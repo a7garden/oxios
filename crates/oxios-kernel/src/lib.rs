@@ -38,7 +38,7 @@ pub use orchestrator::{OrchestrationResult, Orchestrator};
 pub use scheduler::{AgentScheduler, Priority, ScheduledTask, SchedulerStats, TaskStatus};
 pub use host_tools::{common as host_tools_common, HostToolStatus, HostToolValidator};
 pub use mcp::{McpBridge, McpCapabilities, McpServer, McpTool};
-pub use program::{Program, ProgramManager, ProgramMeta, ToolDef, HostRequirementsCheck, ArgumentDef};
+pub use program::{InstallSource, Program, ProgramManager, ProgramMeta, ToolDef, HostRequirementsCheck, ArgumentDef};
 pub use skill::{Skill, SkillMeta, SkillStore};
 pub use state_store::StateStore;
 pub use supervisor::{BasicSupervisor, Supervisor};

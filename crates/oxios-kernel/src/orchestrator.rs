@@ -9,7 +9,7 @@
 //! 5. Evolve and re-execute if evaluation fails
 //!
 //! The orchestrator does NOT know about channels or HTTP — it only
-//! coordinates Ouroboros + Supervisor + EventBus + StateStore.
+//! coordinates Ouroboros + Supervisor + EventBus + StateStore + Scheduler + AccessManager.
 
 use std::sync::Arc;
 
@@ -17,11 +17,13 @@ use anyhow::{Context, Result};
 use oxios_ouroboros::{
     EvaluationResult, InterviewResult, OuroborosProtocol, Phase, Seed,
 };
-use parking_lot::RwLock;
+use parking_lot::{Mutex, RwLock};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use crate::access_manager::AccessManager;
 use crate::event_bus::{EventBus, KernelEvent};
+use crate::scheduler::{AgentScheduler, Priority, ScheduledTask};
 use crate::state_store::StateStore;
 use crate::supervisor::Supervisor;
 use crate::types::AgentId;
@@ -35,6 +37,8 @@ pub struct Orchestrator {
     supervisor: Arc<dyn Supervisor>,
     event_bus: EventBus,
     state_store: Arc<StateStore>,
+    scheduler: Arc<AgentScheduler>,
+    access_manager: Arc<Mutex<AccessManager>>,
     /// Active interview sessions, keyed by session ID.
     sessions: RwLock<std::collections::HashMap<String, InterviewSession>>,
 }
@@ -46,12 +50,16 @@ impl Orchestrator {
         supervisor: Arc<dyn Supervisor>,
         event_bus: EventBus,
         state_store: Arc<StateStore>,
+        scheduler: Arc<AgentScheduler>,
+        access_manager: Arc<Mutex<AccessManager>>,
     ) -> Self {
         Self {
             ouroboros,
             supervisor,
             event_bus,
             state_store,
+            scheduler,
+            access_manager,
             sessions: RwLock::new(std::collections::HashMap::new()),
         }
     }
@@ -176,11 +184,60 @@ impl Orchestrator {
 
         // Phase 3: Fork and execute agent
         let agent_id = self.supervisor.fork(&seed).await?;
-
         tracing::info!(session_id = %session_id, agent_id = %agent_id, seed_id = %seed.id, "Agent forked");
 
-        // Run the agent with the seed.
-        let exec_result = self.supervisor.run_with_seed(agent_id, &seed).await?;
+        // Check access for agent tools before running.
+        let agent_name = format!("agent-{}", agent_id);
+        {
+            let mut access = self.access_manager.lock();
+            // Log the access check for the agent's primary tools.
+            for tool in ["bash", "read", "write", "edit", "grep", "find"] {
+                access.can_use_tool(&agent_name, tool);
+            }
+            // Ensure default permissions exist for the agent.
+            if access.get_permissions(&agent_name).is_none() {
+                tracing::warn!(agent_id = %agent_id, "Agent has no permissions defined, using default");
+                access.get_or_create_permissions(&agent_name);
+            }
+        }
+
+        // Submit the execution task to the scheduler instead of running directly.
+        let task = ScheduledTask::for_agent(
+            agent_id,
+            format!("Execute seed '{}'", seed.goal),
+            Priority::Normal,
+        );
+        let _ = self.scheduler.submit(task)?;
+
+        // Try to get a slot from the scheduler.
+        let exec_result = if let Some(scheduled) = self.scheduler.next_task() {
+            tracing::info!(
+                task_id = %scheduled.id,
+                agent_id = %agent_id,
+                "Scheduler dispatched task"
+            );
+
+            // Run the agent with the seed.
+            let exec_result = self.supervisor.run_with_seed(agent_id, &seed).await?;
+            // Mark task as completed or failed.
+            let task_id = scheduled.id;
+            if exec_result.exit_code == 0 {
+                let _ = self.scheduler.complete_task(task_id);
+            } else {
+                let _ = self.scheduler.fail_task(task_id, &exec_result.stderr);
+            }
+            exec_result
+        } else {
+            // Scheduler queue is full or rate-limited; run directly but track.
+            tracing::warn!(
+                session_id = %session_id,
+                "Scheduler unavailable, running agent directly"
+            );
+            self.supervisor.run_with_seed(agent_id, &seed).await?
+        };
+
+        // Periodically reap zombie tasks.
+        self.reap_zombies().await;
 
         // Phase 4: Evaluate
         self.publish_phase_completed(&session_id, Phase::Execute, "completed").await;
@@ -228,7 +285,42 @@ impl Orchestrator {
 
                 // Re-fork and execute with the evolved seed.
                 let new_agent_id = self.supervisor.fork(&evolved).await?;
-                let new_exec = self.supervisor.run_with_seed(new_agent_id, &evolved).await?;
+                let agent_name = format!("agent-{}", new_agent_id);
+                {
+                    let mut access = self.access_manager.lock();
+                    for tool in ["bash", "read", "write", "edit", "grep", "find"] {
+                        access.can_use_tool(&agent_name, tool);
+                    }
+                    if access.get_permissions(&agent_name).is_none() {
+                        access.get_or_create_permissions(&agent_name);
+                    }
+                }
+
+                let task = ScheduledTask::for_agent(
+                    new_agent_id,
+                    format!("Execute evolved seed '{}'", evolved.goal),
+                    Priority::High,
+                );
+                let _ = self.scheduler.submit(task)?;
+
+                let new_exec = if let Some(scheduled) = self.scheduler.next_task() {
+                    tracing::info!(
+                        task_id = %scheduled.id,
+                        agent_id = %new_agent_id,
+                        "Scheduler dispatched evolved task"
+                    );
+                    let exec_result = self.supervisor.run_with_seed(new_agent_id, &evolved).await?;
+                    let task_id = scheduled.id;
+                    if exec_result.exit_code == 0 {
+                        let _ = self.scheduler.complete_task(task_id);
+                    } else {
+                        let _ = self.scheduler.fail_task(task_id, &exec_result.stderr);
+                    }
+                    exec_result
+                } else {
+                    tracing::warn!("Scheduler unavailable for evolved seed, running directly");
+                    self.supervisor.run_with_seed(new_agent_id, &evolved).await?
+                };
 
                 self.publish_phase_completed(&session_id, Phase::Execute, "completed").await;
                 self.publish_phase_started(&session_id, Phase::Evaluate).await;
@@ -322,6 +414,25 @@ impl Orchestrator {
             phase,
             result_summary: result.to_owned(),
         });
+    }
+
+    /// Reaps zombie tasks and logs the reaped tasks to access audit log.
+    async fn reap_zombies(&self) {
+        let reaped_ids = self.scheduler.reap_zombies();
+
+        if !reaped_ids.is_empty() {
+            tracing::warn!(count = reaped_ids.len(), "Zombie tasks reaped");
+            let mut access = self.access_manager.lock();
+            for task_id in &reaped_ids {
+                access.log_access(
+                    "scheduler",
+                    "zombie_reap",
+                    &task_id.to_string(),
+                    true,
+                    Some(format!("zombie task {} reaped", task_id)),
+                );
+            }
+        }
     }
 }
 

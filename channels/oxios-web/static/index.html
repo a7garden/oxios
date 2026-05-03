@@ -55,6 +55,50 @@ html, body {
   display: flex;
   flex-direction: column;
   overflow-y: auto;
+  transition: width 0.2s ease, min-width 0.2s ease;
+  position: relative;
+}
+
+.sidebar.collapsed {
+  width: 60px;
+  min-width: 60px;
+}
+
+.sidebar.collapsed .sidebar-header .subtitle,
+.sidebar.collapsed .nav-item span:not(.icon),
+.sidebar.collapsed .sidebar-footer span:not(.status-dot) {
+  display: none;
+}
+
+.sidebar.collapsed .nav-item { justify-content: center; padding: 10px; }
+
+.sidebar-toggle {
+  position: absolute;
+  top: 50%;
+  right: -14px;
+  transform: translateY(-50%);
+  width: 24px;
+  height: 24px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  z-index: 10;
+  transition: transform 0.2s ease;
+}
+
+.sidebar-toggle:hover {
+  color: var(--accent);
+  background: var(--bg-tertiary);
+}
+
+.sidebar.collapsed .sidebar-toggle {
+  transform: translateY(-50%) rotate(180deg);
 }
 
 .sidebar-header {
@@ -609,6 +653,205 @@ html, body {
   color: var(--text-secondary);
 }
 
+/* ── Toast Notifications ── */
+.toast-container {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.toast {
+  padding: 12px 16px;
+  border-radius: var(--radius);
+  font-size: 13px;
+  font-family: var(--font-mono);
+  min-width: 250px;
+  max-width: 400px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  animation: toast-in 0.3s ease;
+}
+
+
+.toast.success {
+  background: rgba(63,185,80,0.95);
+  color: #000;
+}
+
+.toast.error {
+  background: rgba(248,81,73,0.95);
+  color: #fff;
+}
+
+.toast.info {
+  background: rgba(88,166,255,0.95);
+  color: #000;
+}
+
+@keyframes toast-in {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes toast-out {
+  from { transform: translateX(0); opacity: 1; }
+  to { transform: translateX(100%); opacity: 0; }
+}
+
+/* ── Host Tools ── */
+.host-tools-section {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.host-tools-section h3 {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--accent);
+  margin-bottom: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+
+.host-tool-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  font-size: 13px;
+}
+
+.host-tool-item .tool-icon {
+  font-size: 14px;
+}
+
+.host-tool-item .tool-available {
+  color: var(--green);
+}
+
+.host-tool-item .tool-missing {
+  color: var(--red);
+}
+
+.host-tool-item .tool-name {
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+}
+
+.host-tools-summary {
+  display: flex;
+  gap: 16px;
+  padding: 12px;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius);
+  margin-bottom: 16px;
+  font-size: 13px;
+}
+
+.host-tools-summary .stat {
+  font-family: var(--font-mono);
+}
+
+.host-tools-summary .stat.green { color: var(--green); }
+.host-tools-summary .stat.red { color: var(--red); }
+
+/* ── Programs ── */
+.program-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  margin-bottom: 10px;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+.program-card:hover {
+  border-color: var(--accent);
+}
+
+.program-card .program-name {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.program-card .program-version {
+  font-size: 11px;
+  color: var(--accent);
+  font-family: var(--font-mono);
+}
+
+.program-card .program-desc {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+.program-card .program-enabled {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  margin-left: 8px;
+}
+
+.program-enabled.yes {
+  background: rgba(63,185,80,0.15);
+  color: var(--green);
+}
+
+.program-enabled.no {
+  background: rgba(139,148,158,0.15);
+  color: var(--text-secondary);
+}
+
+.program-install-form {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.program-install-form h3 {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--accent);
+  margin-bottom: 12px;
+}
+
+.program-install-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.program-install-row input {
+  flex: 1;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 8px 12px;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  outline: none;
+}
+
+.program-install-row input:focus {
+  border-color: var(--accent);
+}
+
 /* ── Modal ── */
 .modal-overlay {
   position: fixed;
@@ -770,6 +1013,12 @@ html, body {
       <div class="nav-item" data-panel="skills">
         <span class="icon">📖</span><span>Skills</span>
       </div>
+      <div class="nav-item" data-panel="programs">
+        <span class="icon">📦</span><span>Programs</span>
+      </div>
+      <div class="nav-item" data-panel="host-tools">
+        <span class="icon">🔧</span><span>Host Tools</span>
+      </div>
       <div class="nav-item" data-panel="gardens">
         <span class="icon">🌿</span><span>Gardens</span>
       </div>
@@ -789,6 +1038,7 @@ html, body {
     <div class="sidebar-footer">
       <span class="status-dot"></span><span id="conn-status">connected</span>
     </div>
+    <button class="sidebar-toggle" id="sidebar-toggle" title="Toggle Sidebar (Ctrl+B)">◀</button>
   </aside>
 
   <!-- Main Content -->
@@ -891,6 +1141,42 @@ html, body {
       </div>
     </div>
 
+    <!-- Programs Panel -->
+    <div class="panel" id="panel-programs">
+      <div class="panel-header">
+        <h2>📦 Programs</h2>
+        <button class="btn btn-sm" id="programs-refresh">Refresh</button>
+      </div>
+      <div class="panel-body" id="programs-body">
+        <div class="program-install-form" id="program-install-form">
+          <h3>Install Program</h3>
+          <div class="program-install-row">
+            <input type="text" id="program-install-name" placeholder="Program name (e.g. my-program)" />
+            <input type="text" id="program-install-path" placeholder="Path to program directory" />
+            <button class="btn btn-sm" id="program-install-btn">Install</button>
+          </div>
+        </div>
+        <div class="empty-state" id="programs-empty">
+          <div class="icon">📦</div>
+          <p>No programs installed. Install a program to extend agent capabilities.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Host Tools Panel -->
+    <div class="panel" id="panel-host-tools">
+      <div class="panel-header">
+        <h2>🔧 Host Tools</h2>
+        <button class="btn btn-sm" id="host-tools-refresh">Refresh</button>
+      </div>
+      <div class="panel-body" id="host-tools-body">
+        <div class="empty-state">
+          <div class="icon">🔧</div>
+          <p>Loading host tools...</p>
+        </div>
+      </div>
+    </div>
+
     <!-- Gardens Panel -->
     <div class="panel" id="panel-gardens">
       <div class="panel-header">
@@ -963,6 +1249,9 @@ html, body {
   </main>
 </div>
 
+<!-- Toast Notifications Container -->
+<div class="toast-container" id="toast-container"></div>
+
 <script>
 // ── API Base ──
 const API = '';
@@ -997,6 +1286,8 @@ function switchPanel(panel) {
     case 'seeds': loadSeeds(); break;
     case 'memory': loadMemory(); break;
     case 'skills': loadSkills(); break;
+    case 'programs': loadPrograms(); break;
+    case 'host-tools': loadHostTools(); break;
     case 'gardens': loadGardens(); break;
     case 'scheduler': loadScheduler(); break;
     case 'security': loadSecurity(); break;
@@ -1675,6 +1966,266 @@ async function deleteSkill(name) {
 }
 
 document.getElementById('skills-refresh').addEventListener('click', loadSkills);
+
+// ── Toast Notifications ──
+function showToast(message, type = 'info') {
+  const container = document.getElementById('toast-container');
+  const toast = document.createElement('div');
+  toast.className = `toast ${type}`;
+  toast.textContent = message;
+  container.appendChild(toast);
+  
+  // Auto-remove after 3 seconds
+  setTimeout(() => {
+    toast.style.animation = 'toast-out 0.3s ease forwards';
+    setTimeout(() => toast.remove(), 300);
+  }, 3000);
+}
+
+// ── Sidebar Toggle ──
+const sidebarToggle = document.getElementById('sidebar-toggle');
+const sidebar = document.querySelector('.sidebar');
+
+sidebarToggle.addEventListener('click', () => {
+  sidebar.classList.toggle('collapsed');
+  sidebarToggle.textContent = sidebar.classList.contains('collapsed') ? '▶' : '◀';
+});
+
+// ── Global Keyboard Shortcuts ──
+document.addEventListener('keydown', (e) => {
+  // Ctrl+Enter in chat input to send
+  if (e.ctrlKey && e.key === 'Enter') {
+    const chatInput = document.getElementById('chat-input');
+    if (chatInput && document.activeElement === chatInput) {
+      e.preventDefault();
+      sendChatMessage();
+    }
+  }
+  
+  // Escape to close any open modal
+  if (e.key === 'Escape') {
+    const modals = document.querySelectorAll('.modal-overlay');
+    modals.forEach(modal => modal.remove());
+  }
+  
+  // Ctrl+B to toggle sidebar
+  if (e.ctrlKey && e.key === 'b') {
+    e.preventDefault();
+    sidebarToggle.click();
+  }
+});
+
+// ── Programs ──
+let selectedProgram = null;
+
+async function loadPrograms() {
+  const body = document.getElementById('programs-body');
+  try {
+    const res = await fetch(`${API}/api/programs`);
+    const programs = await res.json();
+
+    // Keep the install form, update the rest
+    const installForm = document.getElementById('program-install-form');
+    
+    if (!programs.length) {
+      // Remove existing cards if any
+      const existingCards = body.querySelectorAll('.program-card');
+      existingCards.forEach(c => c.remove());
+      
+      if (!document.getElementById('programs-empty')) {
+        const empty = document.createElement('div');
+        empty.id = 'programs-empty';
+        empty.className = 'empty-state';
+        empty.innerHTML = '<div class="icon">📦</div><p>No programs installed. Install a program to extend agent capabilities.</p>';
+        body.appendChild(empty);
+      }
+      return;
+    }
+
+    // Remove empty state if present
+    const emptyState = document.getElementById('programs-empty');
+    if (emptyState) emptyState.remove();
+
+    let html = '<div class="item-list" id="programs-list">';
+    for (const p of programs) {
+      const enabledCls = p.enabled ? 'yes' : 'no';
+      const enabledText = p.enabled ? 'ENABLED' : 'DISABLED';
+      html += `
+        <div class="program-card" onclick="loadProgramDetail('${escAttr(p.name)}')">
+          <div class="program-name">
+            📦 ${esc(p.name)}
+            <span class="program-enabled ${enabledCls}">${enabledText}</span>
+          </div>
+          <div class="program-version">v${esc(p.version || '0.0.0')}</div>
+          <div class="program-desc">${esc(p.description || 'No description')}</div>
+          <div style="margin-top:8px">
+            <button class="btn btn-danger btn-sm" onclick="event.stopPropagation(); deleteProgram('${escAttr(p.name)}')">Delete</button>
+          </div>
+        </div>
+      `;
+    }
+    html += '</div>';
+
+    if (selectedProgram) {
+      html += `<div class="detail-view" id="program-detail"></div>`;
+    }
+
+    // Insert after install form
+    const existingList = document.getElementById('programs-list');
+    if (existingList) {
+      existingList.remove();
+    }
+    body.insertAdjacentHTML('beforeend', html);
+
+    if (selectedProgram) {
+      loadProgramDetail(selectedProgram);
+    }
+  } catch (err) {
+    showToast(`Error loading programs: ${err.message}`, 'error');
+  }
+}
+
+async function loadProgramDetail(name) {
+  selectedProgram = name;
+  let detail = document.getElementById('program-detail');
+  if (!detail) {
+    await loadPrograms();
+    detail = document.getElementById('program-detail');
+  }
+  if (!detail) return;
+
+  try {
+    const res = await fetch(`${API}/api/programs/${encodeURIComponent(name)}`);
+    const data = await res.json();
+    detail.innerHTML = `
+      <h3>${esc(data.name || name)}</h3>
+      <p style="color:var(--text-secondary);margin-bottom:12px">${esc(data.description || 'No description')}</p>
+      <div class="config-row"><span class="key">Version</span><span class="val">${esc(data.version || 'unknown')}</span></div>
+      <div class="config-row"><span class="key">Enabled</span><span class="val">${data.enabled ? 'Yes' : 'No'}</span></div>
+      ${data.tools ? `<div class="config-row"><span class="key">Tools</span><span class="val">${esc(JSON.stringify(data.tools))}</span></div>` : ''}
+      <pre style="white-space:pre-wrap;margin-top:12px">${esc(data.content || '')}</pre>
+    `;
+  } catch (err) {
+    detail.innerHTML = `<p style="color:var(--red)">Error: ${esc(err.message)}</p>`;
+  }
+}
+
+async function deleteProgram(name) {
+  if (!confirm(`Delete program "${name}"? This cannot be undone.`)) return;
+  try {
+    await fetch(`${API}/api/programs/${encodeURIComponent(name)}`, { method: 'DELETE' });
+    selectedProgram = null;
+    showToast(`Program "${name}" deleted`, 'success');
+    loadPrograms();
+  } catch (err) {
+    showToast(`Failed to delete program: ${err.message}`, 'error');
+  }
+}
+
+// Program install
+document.getElementById('program-install-btn').addEventListener('click', async () => {
+  const name = document.getElementById('program-install-name').value.trim();
+  const path = document.getElementById('program-install-path').value.trim();
+  if (!name || !path) {
+    showToast('Please provide both name and path', 'error');
+    return;
+  }
+  try {
+    const res = await fetch(`${API}/api/programs`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, path }),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      showToast(`Error: ${err.error || 'Failed to install program'}`, 'error');
+      return;
+    }
+    document.getElementById('program-install-name').value = '';
+    document.getElementById('program-install-path').value = '';
+    showToast(`Program "${name}" installed`, 'success');
+    loadPrograms();
+  } catch (err) {
+    showToast(`Failed to install program: ${err.message}`, 'error');
+  }
+});
+
+document.getElementById('programs-refresh').addEventListener('click', loadPrograms);
+
+// ── Host Tools ──
+async function loadHostTools() {
+  const body = document.getElementById('host-tools-body');
+  try {
+    const res = await fetch(`${API}/api/host-tools`);
+    const data = await res.json();
+
+    const allRequired = data.required || [];
+    const allOptional = data.optional || [];
+    const requiredAvailable = data.required_available || [];
+    const optionalAvailable = data.optional_available || [];
+    const missingRequired = data.missing_required || [];
+
+    let html = `
+      <div class="host-tools-summary">
+        <div>All Required Present: <span class="stat ${missingRequired.length === 0 ? 'green' : 'red'}">${missingRequired.length === 0 ? '✓' : '✗'}</span></div>
+        <div>Required: <span class="stat green">${requiredAvailable.length}/${allRequired.length}</span></div>
+        <div>Optional: <span class="stat">${optionalAvailable.length}/${allOptional.length}</span></div>
+      </div>
+    `;
+
+    // Required tools section
+    html += `
+      <div class="host-tools-section">
+        <h3>Required Tools</h3>
+    `;
+    if (allRequired.length === 0) {
+      html += '<p style="color:var(--text-muted)">No required tools specified.</p>';
+    } else {
+      for (const tool of allRequired) {
+        const available = requiredAvailable.includes(tool);
+        const icon = available ? '<span class="tool-icon">✅</span>' : '<span class="tool-icon">❌</span>';
+        const cls = available ? 'tool-available' : 'tool-missing';
+        html += `
+          <div class="host-tool-item">
+            ${icon}
+            <span class="tool-name ${cls}">${esc(tool)}</span>
+            <span style="color:var(--text-muted);font-size:11px">${available ? 'available' : 'MISSING'}</span>
+          </div>
+        `;
+      }
+    }
+    html += '</div>';
+
+    // Optional tools section
+    html += `
+      <div class="host-tools-section">
+        <h3>Optional Tools</h3>
+    `;
+    if (allOptional.length === 0) {
+      html += '<p style="color:var(--text-muted)">No optional tools specified.</p>';
+    } else {
+      for (const tool of allOptional) {
+        const available = optionalAvailable.includes(tool);
+        const icon = available ? '<span class="tool-icon">✅</span>' : '<span class="tool-icon">⚪</span>';
+        const cls = available ? 'tool-available' : 'tool-missing';
+        html += `
+          <div class="host-tool-item">
+            ${icon}
+            <span class="tool-name ${cls}">${esc(tool)}</span>
+            <span style="color:var(--text-muted);font-size:11px">${available ? 'available' : 'not installed'}</span>
+          </div>
+        `;
+      }
+    }
+    html += '</div>';
+
+    body.innerHTML = html;
+  } catch (err) {
+    body.innerHTML = `<div class="empty-state"><p>Error: ${esc(err.message)}</p></div>`;
+  }
+}
+
+document.getElementById('host-tools-refresh').addEventListener('click', loadHostTools);
 
 // ── Config ──
 // ── Config ──

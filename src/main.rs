@@ -12,7 +12,7 @@ use oxios_gateway::Gateway;
 use oxios_kernel::{
     AccessManager, AgentRuntime, BasicSupervisor, EventBus, GardenManager, HostExecBridge,
     HostToolValidator, Orchestrator, OxiosConfig, ProgramManager, SkillStore, StateStore,
-    Supervisor, AgentScheduler,
+    Supervisor, AgentScheduler, InstallSource,
 };
 use oxios_ouroboros::OuroborosEngine;
 use oxios_web::WebServer;
@@ -57,6 +57,12 @@ enum Command {
     Config {
         #[command(subcommand)]
         action: ConfigAction,
+    },
+
+    /// Manage installable programs.
+    Pkg {
+        #[command(subcommand)]
+        action: PkgAction,
     },
 }
 
@@ -231,11 +237,20 @@ async fn init_kernel(
     ));
 
     // Create the orchestrator to wire Ouroboros + Supervisor together.
+    // Initialize the access manager and scheduler first.
+    let access_manager = Arc::new(Mutex::new(AccessManager::new()));
+    let scheduler = Arc::new(AgentScheduler::new(
+        config.scheduler.max_concurrent,
+        config.scheduler.rate_limit_per_minute,
+        config.scheduler.zombie_timeout_secs,
+    ));
     let orchestrator = Arc::new(Orchestrator::new(
         ouroboros,
         supervisor.clone(),
         event_bus.clone(),
         state_store.clone(),
+        scheduler.clone(),
+        access_manager.clone(),
     ));
 
     // Initialize gateway with the orchestrator.
@@ -268,16 +283,6 @@ async fn init_kernel(
         config.container.required_host_tools.clone(),
         config.container.optional_host_tools.clone(),
     );
-
-    // Initialize the agent scheduler (AIOS-inspired).
-    let scheduler = Arc::new(AgentScheduler::new(
-        config.scheduler.max_concurrent,
-        config.scheduler.rate_limit_per_minute,
-        config.scheduler.zombie_timeout_secs,
-    ));
-
-    // Initialize the access manager (OWASP-inspired).
-    let access_manager = Arc::new(parking_lot::Mutex::new(AccessManager::new()));
 
     Ok((orchestrator, gateway, event_bus.clone(), state_store, garden_manager, config, skill_store, supervisor, scheduler, access_manager, program_manager, host_tool_validator))
 }
@@ -400,6 +405,93 @@ async fn cmd_garden(action: GardenAction, config_path: &Path) -> Result<()> {
             }
             if result.exit_code != 0 {
                 std::process::exit(result.exit_code);
+            }
+        }
+    }
+
+    Ok(())
+}
+
+// ─── Pkg subcommands ─────────────────────────────────────────────────────────────
+
+
+#[derive(Debug, Subcommand)]
+enum PkgAction {
+    /// Install a program from a URL or local path.
+    Install {
+        /// Source: a git URL, tarball URL, or local directory path.
+        #[arg(value_name = "SOURCE")]
+        source: String,
+        /// Install from a specific git branch.
+        #[arg(short, long)]
+        branch: Option<String>,
+    },
+    /// Uninstall a program by name.
+    Uninstall {
+        /// Name of the program to uninstall.
+        #[arg(value_name = "NAME")]
+        name: String,
+    },
+    /// List all installed programs.
+    List,
+    /// Search programs (stub — lists installed programs).
+    Search,
+}
+
+/// Handle pkg subcommands.
+async fn cmd_pkg(action: PkgAction, config_path: &Path) -> Result<()> {
+    let model_id = "anthropic/claude-sonnet-4-20250514"; // Dummy for pkg cmds
+    let (_, _, _, _, _, _, _, _, _, _, mut program_manager, _) =
+        init_kernel(config_path, model_id).await?;
+
+    match action {
+        PkgAction::Install { source, branch } => {
+            let install_source = if source.ends_with(".git") || source.starts_with("git@") {
+                InstallSource::Git { url: source, branch }
+            } else if source.starts_with("http://") || source.starts_with("https://") {
+                InstallSource::Tarball { url: source }
+            } else {
+                InstallSource::Local(PathBuf::from(&source))
+            };
+
+            let program = program_manager.install_from(install_source).await?;
+            println!("Installed '{}' v{}", program.meta.name, program.meta.version);
+        }
+        PkgAction::Uninstall { name } => {
+            program_manager.uninstall(&name).await?;
+            println!("Uninstalled '{}'", name);
+        }
+        PkgAction::List => {
+            let programs = program_manager.list_programs().await;
+            if programs.is_empty() {
+                println!("No programs installed.");
+            } else {
+                println!("{:30} {:10} {:40}", "NAME", "VERSION", "DESCRIPTION");
+                println!("{}", "-".repeat(82));
+                for p in &programs {
+                    println!(
+                        "{:30} {:10} {:40}",
+                        p.meta.name,
+                        p.meta.version,
+                        p.meta.description
+                    );
+                }
+            }
+        }
+        PkgAction::Search => {
+            let programs = program_manager.list_programs().await;
+            if programs.is_empty() {
+                println!("No programs installed.");
+            } else {
+                for p in &programs {
+                    println!("{} ({})", p.meta.name, p.meta.version);
+                    println!("  {}", p.meta.description);
+                    if !p.meta.tools.is_empty() {
+                        let tools: Vec<_> = p.meta.tools.iter().map(|t| t.name.clone()).collect();
+                        println!("  Tools: {}", tools.join(", "));
+                    }
+                    println!();
+                }
             }
         }
     }
@@ -585,6 +677,12 @@ async fn main() -> Result<()> {
         // ── Config commands ───────────────────────────────
         Some(Command::Config { action }) => {
             cmd_config(action, &config_path).await?;
+            return Ok(());
+        }
+
+        // ── Pkg commands ──────────────────────────────────
+        Some(Command::Pkg { action }) => {
+            cmd_pkg(action, &config_path).await?;
             return Ok(());
         }
 

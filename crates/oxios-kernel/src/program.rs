@@ -23,6 +23,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
+use tokio::process::Command;
 use tokio::sync::RwLock;
 
 use crate::host_tools::HostToolValidator;
@@ -176,6 +177,146 @@ impl ProgramMeta {
             dependencies: Vec::new(),
             host_requirements,
         })
+    }
+}
+
+/// Installation source for a program.
+pub enum InstallSource {
+    /// Install from a local directory path.
+    Local(PathBuf),
+    /// Install from a git repository.
+    Git { url: String, branch: Option<String> },
+    /// Install from a tarball URL.
+    Tarball { url: String },
+}
+
+impl ProgramManager {
+    /// Install a program from an [InstallSource].
+    pub async fn install_from(&self, source: InstallSource) -> Result<Program> {
+        match source {
+            InstallSource::Local(path) => self.install_from_local(&path),
+            InstallSource::Git { url, branch } => self.install_from_git(&url, branch.as_deref()).await,
+            InstallSource::Tarball { url } => self.install_from_tarball(&url).await,
+        }
+    }
+
+    /// Install a program from a local directory path.
+    fn install_from_local(&self, source_path: &Path) -> Result<Program> {
+        self.install(source_path)
+    }
+
+    /// Install a program by cloning a git repository, then installing the result.
+    async fn install_from_git(&self, url: &str, branch: Option<&str>) -> Result<Program> {
+        // Create a temporary directory for the clone.
+        let temp_dir = tempfile::tempdir()?;
+        let clone_path = temp_dir.path();
+
+
+        // Clone the repository.
+        tracing::info!(url, branch = ?branch, "Cloning git repository");
+        let mut cmd = Command::new("git");
+        cmd.arg("clone");
+        if let Some(branch) = branch {
+            cmd.arg("--branch").arg(branch);
+        }
+        cmd.arg("--depth").arg("1");
+        cmd.arg(url);
+        cmd.arg(clone_path);
+
+        let output = cmd.output().await
+            .with_context(|| format!("Failed to run git clone for '{}'", url))?;
+
+        if !output.status.success() {
+            anyhow::bail!(
+                "git clone failed (exit {}): {}",
+                output.status,
+                String::from_utf8_lossy(&output.stderr)
+            );
+        }
+
+        // Find the cloned program directory (single top-level directory expected).
+        let entries: Vec<_> = std::fs::read_dir(clone_path)?
+            .filter_map(|e| e.ok())
+            .filter(|e| e.path().is_dir())
+            .collect();
+
+
+        let program_dir = if entries.len() == 1 {
+            entries.into_iter().next().unwrap().path()
+        } else {
+            clone_path.to_path_buf()
+        };
+
+        let program = self.install(&program_dir).await?;
+
+
+        tracing::info!(name = %program.meta.name, "Program installed from git");
+        Ok(program)
+    }
+
+    /// Install a program by downloading and extracting a tarball.
+    async fn install_from_tarball(&self, url: &str) -> Result<Program> {
+        // Create a temporary directory for download and extraction.
+        let temp_dir = tempfile::tempdir()?;
+        let download_path = temp_dir.path().join("program.tar.gz");
+        let extract_base = temp_dir.path().join("extracted");
+
+        // Download the tarball with curl.
+        tracing::info!(url, "Downloading tarball");
+        let curl = Command::new("curl")
+            .arg("-fsSL")
+            .arg("-o")
+            .arg(&download_path)
+            .arg(url)
+            .output()
+            .await
+            .with_context(|| format!("Failed to run curl for '{}'", url))?;
+
+
+        if !curl.status.success() {
+            anyhow::bail!(
+                "curl failed (exit {}): {}",
+                curl.status,
+                String::from_utf8_lossy(&curl.stderr)
+            );
+        }
+
+        // Extract the tarball.
+        tracing::info!("Extracting tarball");
+        let tar = Command::new("tar")
+            .arg("-xzf")
+            .arg(&download_path)
+            .arg("-C")
+            .arg(&extract_base)
+            .output()
+            .await
+            .with_context(|| "Failed to run tar to extract tarball")?;
+
+        if !tar.status.success() {
+            anyhow::bail!(
+                "tar extraction failed (exit {}): {}",
+                tar.status,
+                String::from_utf8_lossy(&tar.stderr)
+            );
+        }
+
+        // Find the extracted program directory.
+        let entries: Vec<_> = std::fs::read_dir(&extract_base)?
+            .filter_map(|e| e.ok())
+            .filter(|e| e.path().is_dir())
+            .collect();
+
+        let program_dir = if entries.len() == 1 {
+            entries.into_iter().next().unwrap().path()
+        } else {
+            extract_base.to_path_buf()
+        };
+
+        let program = self.install(&program_dir).await?;
+
+
+        tracing::info!(name = %program.meta.name, "Program installed from tarball");
+        Ok(program)
     }
 }
 
