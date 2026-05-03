@@ -17,6 +17,7 @@ use crate::routes::build_routes;
 use oxios_kernel::event_bus::EventBus;
 use oxios_kernel::garden::GardenManager;
 use oxios_kernel::host_tools::HostToolValidator;
+use oxios_kernel::mcp::McpBridge;
 use oxios_kernel::persona_manager::PersonaManager;
 use oxios_kernel::program::ProgramManager;
 use oxios_kernel::scheduler::AgentScheduler;
@@ -58,6 +59,8 @@ pub struct AppState {
     pub config: Arc<oxios_kernel::OxiosConfig>,
     /// Path to the config file (for persistence on PUT /api/config).
     pub config_path: Option<PathBuf>,
+    /// MCP bridge for tool calling.
+    pub mcp_bridge: Arc<McpBridge>,
 }
 
 impl std::fmt::Debug for AppState {
@@ -106,6 +109,7 @@ impl WebServer {
         persona_manager: PersonaManager,
         config: oxios_kernel::OxiosConfig,
         config_path: Option<PathBuf>,
+        mcp_bridge: Arc<McpBridge>,
     ) -> Self {
         let addr: SocketAddr = format!("{host}:{port}")
             .parse()
@@ -125,6 +129,7 @@ impl WebServer {
             persona_manager: Arc::new(persona_manager),
             config: Arc::new(config),
             config_path,
+            mcp_bridge,
         });
         Self { addr, state }
     }

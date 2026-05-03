@@ -28,6 +28,9 @@ pub struct OxiosConfig {
     /// Persona system settings.
     #[serde(default)]
     pub persona: PersonaConfig,
+    /// MCP server configurations.
+    #[serde(default)]
+    pub mcp: McpConfig,
 }
 
 /// Kernel configuration.
@@ -333,6 +336,40 @@ impl Default for PersonaConfig {
             max_concurrent_personas: default_max_concurrent_personas(),
         }
     }
+}
+
+/// MCP server configuration loaded from config.toml.
+///
+/// Each key is a server name; the value is a table with:
+/// - `command`: executable to run (e.g. "npx", "python")
+/// - `args`: arguments array
+/// - `env`: optional map of environment variables
+/// - `enabled`: whether to start this server on boot (default: true)
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+pub struct McpConfig {
+    /// Map of server-name → server definition.
+    #[serde(default)]
+    pub servers: std::collections::HashMap<String, McpServerDef>,
+}
+
+/// A single MCP server definition in config.toml.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct McpServerDef {
+    /// Command to execute.
+    pub command: String,
+    /// Arguments passed to the command.
+    #[serde(default)]
+    pub args: Vec<String>,
+    /// Environment variables.
+    #[serde(default)]
+    pub env: std::collections::HashMap<String, String>,
+    /// Whether this server is enabled (default: true).
+    #[serde(default = "default_mcp_enabled")]
+    pub enabled: bool,
+}
+
+fn default_mcp_enabled() -> bool {
+    true
 }
 
 /// Loads configuration from a TOML file.

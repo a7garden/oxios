@@ -276,6 +276,11 @@ impl RbacManager {
         self.pending_approvals.iter().filter(|(_, s)| matches!(s, ApprovalStatus::Pending)).map(|(p, _)| p).collect()
     }
 
+    /// Returns all approval requests (pending + history) with their status.
+    pub fn all_approvals(&self) -> &[(PendingApproval, ApprovalStatus)] {
+        &self.pending_approvals
+    }
+
     pub fn audit_log(&self) -> &[RbacAuditEntry] {
         &self.audit_log
     }
@@ -483,6 +488,8 @@ pub struct AccessManager {
     audit_log: Vec<AuditEntry>,
     /// Maximum audit log entries to retain.
     max_audit_entries: usize,
+    /// RBAC manager for HitL approvals.
+    pub(crate) rbac: RbacManager,
 }
 
 impl AccessManager {
@@ -492,6 +499,7 @@ impl AccessManager {
             permissions: HashMap::new(),
             audit_log: Vec::new(),
             max_audit_entries: 10_000,
+            rbac: RbacManager::new(),
         }
     }
 
@@ -504,6 +512,7 @@ impl AccessManager {
             permissions: HashMap::new(),
             audit_log: Vec::new(),
             max_audit_entries,
+            rbac: RbacManager::new(),
         }
     }
 
@@ -682,6 +691,16 @@ impl AccessManager {
     /// Searches audit log for denied actions.
     pub fn denied_actions(&self) -> Vec<&AuditEntry> {
         self.audit_log.iter().filter(|e| !e.allowed).collect()
+    }
+
+    /// Returns a reference to the RBAC manager (for HitL approvals).
+    pub fn rbac_manager(&self) -> &RbacManager {
+        &self.rbac
+    }
+
+    /// Returns a mutable reference to the RBAC manager (for HitL approvals).
+    pub fn rbac_manager_mut(&mut self) -> &mut RbacManager {
+        &mut self.rbac
     }
 
     /// Clears the audit log.

@@ -22,6 +22,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::access_manager::AccessManager;
+use crate::a2a::{A2AProtocol, AgentCard, TaskPriority};
 use crate::event_bus::{EventBus, KernelEvent};
 use crate::persona_manager::PersonaManager;
 use crate::scheduler::{AgentScheduler, Priority, ScheduledTask};
@@ -44,6 +45,8 @@ pub struct Orchestrator {
     sessions: RwLock<std::collections::HashMap<String, InterviewSession>>,
     /// Persona manager for voice/personality customization.
     persona_manager: Arc<PersonaManager>,
+    /// A2A protocol for inter-agent communication and delegation.
+    a2a_protocol: Arc<A2AProtocol>,
 }
 
 impl Orchestrator {
@@ -56,6 +59,7 @@ impl Orchestrator {
         scheduler: Arc<AgentScheduler>,
         access_manager: Arc<Mutex<AccessManager>>,
         persona_manager: Arc<PersonaManager>,
+        a2a_protocol: Arc<A2AProtocol>,
     ) -> Self {
         Self {
             ouroboros,
@@ -66,6 +70,7 @@ impl Orchestrator {
             access_manager,
             sessions: RwLock::new(std::collections::HashMap::new()),
             persona_manager,
+            a2a_protocol,
         }
     }
 
@@ -191,6 +196,38 @@ impl Orchestrator {
         let agent_id = self.supervisor.fork(&seed).await?;
         tracing::info!(session_id = %session_id, agent_id = %agent_id, seed_id = %seed.id, "Agent forked");
 
+        // Register agent in A2A registry for inter-agent delegation.
+        let agent_name = format!("agent-{}", agent_id);
+        let mut card = AgentCard::new(
+            agent_id,
+            &agent_name,
+            &format!("Agent executing seed: {}", seed.goal),
+        )
+        .with_capability("execute-seed")
+        .with_status(crate::types::AgentStatus::Starting);
+
+        // Infer capabilities from seed goal and constraints.
+        let goal_lower = seed.goal.to_lowercase();
+        if goal_lower.contains("review") || goal_lower.contains("code") {
+            card = card.with_capability("code-review");
+        }
+        if goal_lower.contains("test") {
+            card = card.with_capability("testing");
+        }
+        if goal_lower.contains("refactor") || goal_lower.contains("improve") {
+            card = card.with_capability("refactoring");
+        }
+        if goal_lower.contains("write") || goal_lower.contains("create") || goal_lower.contains("implement") {
+            card = card.with_capability("code-generation");
+        }
+        if goal_lower.contains("debug") || goal_lower.contains("fix") {
+            card = card.with_capability("debugging");
+        }
+
+        if let Err(e) = self.a2a_protocol.registry().register_agent(card).await {
+            tracing::warn!(agent_id = %agent_id, error = %e, "Failed to register agent card in A2A registry");
+        }
+
         // Check access for agent tools before running.
         let agent_name = format!("agent-{}", agent_id);
         {
@@ -217,6 +254,12 @@ impl Orchestrator {
         self.scheduler.start_task(task_id)?;
 
         let exec_result = self.supervisor.run_with_seed(agent_id, &seed).await?;
+
+        // Unregister agent from A2A registry on completion.
+        if let Err(e) = self.a2a_protocol.registry().unregister_agent(agent_id).await {
+            tracing::warn!(agent_id = %agent_id, error = %e, "Failed to unregister agent card from A2A registry");
+        }
+
         if exec_result.success {
             let _ = self.scheduler.complete_task(task_id);
         } else {
@@ -283,6 +326,20 @@ impl Orchestrator {
                     }
                 }
 
+                // Register evolved agent in A2A registry.
+                let mut card = AgentCard::new(
+                    new_agent_id,
+                    &agent_name,
+                    &format!("Evolved agent executing seed: {}", evolved.goal),
+                )
+                .with_capability("execute-seed")
+                .with_capability("evolved")
+                .with_status(crate::types::AgentStatus::Starting);
+
+                if let Err(e) = self.a2a_protocol.registry().register_agent(card).await {
+                    tracing::warn!(agent_id = %new_agent_id, error = %e, "Failed to register evolved agent card");
+                }
+
                 let task = ScheduledTask::for_agent(
                     new_agent_id,
                     format!("Execute evolved seed '{}'", evolved.goal),
@@ -292,6 +349,12 @@ impl Orchestrator {
                 self.scheduler.start_task(task_id)?;
 
                 let new_exec = self.supervisor.run_with_seed(new_agent_id, &evolved).await?;
+
+                // Unregister evolved agent on completion.
+                if let Err(e) = self.a2a_protocol.registry().unregister_agent(new_agent_id).await {
+                    tracing::warn!(agent_id = %new_agent_id, error = %e, "Failed to unregister evolved agent card");
+                }
+
                 if new_exec.success {
                     let _ = self.scheduler.complete_task(task_id);
                 } else {

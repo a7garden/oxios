@@ -115,6 +115,10 @@ pub fn build_routes() -> Router<Arc<AppState>> {
         .route("/api/sessions", get(handle_sessions_list))
         .route("/api/sessions/{id}", get(handle_session_get))
         .route("/api/sessions/{id}", delete(handle_session_delete))
+        // Approvals (HitL)
+        .route("/api/approvals", get(handle_approvals_list))
+        .route("/api/approvals/{id}/approve", post(handle_approval_approve))
+        .route("/api/approvals/{id}/reject", post(handle_approval_reject))
         // Events
         .route("/api/events", get(handle_events))
 }
@@ -1545,4 +1549,109 @@ async fn handle_events(
             .interval(std::time::Duration::from_secs(30))
             .text("ping"),
     )
+}
+
+// ---------------------------------------------------------------------------
+// Approvals (HitL)
+// ---------------------------------------------------------------------------
+
+/// Approval request for the API response.
+#[derive(Debug, Serialize)]
+struct ApprovalResponse {
+    id: String,
+    subject: String,
+    action: String,
+    resource: String,
+    reason: String,
+    created_at: String,
+    status: String,
+}
+
+/// GET /api/approvals — List all approval requests (pending + history).
+async fn handle_approvals_list(
+    state: State<Arc<AppState>>,
+) -> Json<Vec<ApprovalResponse>> {
+    let access = state.access_manager.lock();
+    let approvals: Vec<ApprovalResponse> = access
+        .rbac_manager()
+        .all_approvals()
+        .iter()
+        .map(|(p, s)| {
+            let subject_str = match &p.subject {
+                oxios_kernel::access_manager::Subject::User(n) => format!("user:{}", n),
+                oxios_kernel::access_manager::Subject::Agent(id) => format!("agent:{}", id),
+                oxios_kernel::access_manager::Subject::System => "system".into(),
+            };
+            let action_str = match &p.action {
+                oxios_kernel::access_manager::Action::UseTool(t) => format!("use_tool:{}", t),
+                oxios_kernel::access_manager::Action::AccessPath(p) => format!("access_path:{}", p),
+                oxios_kernel::access_manager::Action::ManageAgents => "manage_agents".into(),
+                oxios_kernel::access_manager::Action::ManagePrograms => "manage_programs".into(),
+                oxios_kernel::access_manager::Action::ManageGardens => "manage_gardens".into(),
+                oxios_kernel::access_manager::Action::ManageRBAC => "manage_rbac".into(),
+                oxios_kernel::access_manager::Action::ViewAuditLog => "view_audit_log".into(),
+                oxios_kernel::access_manager::Action::SystemConfig => "system_config".into(),
+            };
+            let status_str = match s {
+                oxios_kernel::access_manager::ApprovalStatus::Pending => "pending",
+                oxios_kernel::access_manager::ApprovalStatus::Approved => "approved",
+                oxios_kernel::access_manager::ApprovalStatus::Rejected => "rejected",
+                oxios_kernel::access_manager::ApprovalStatus::Expired => "expired",
+            };
+            ApprovalResponse {
+                id: p.id.to_string(),
+                subject: subject_str,
+                action: action_str,
+                resource: p.resource.clone(),
+                reason: p.reason.clone(),
+                created_at: p.created_at.to_rfc3339(),
+                status: status_str.to_string(),
+            }
+        })
+        .collect();
+    Json(approvals)
+}
+
+/// POST /api/approvals/:id/approve — Approve a pending request.
+async fn handle_approval_approve(
+    state: State<Arc<AppState>>,
+    Path(id): Path<String>,
+) -> Result<Json<serde_json::Value>, StatusCode> {
+    let uuid = match uuid::Uuid::parse_str(&id) {
+        Ok(u) => u,
+        Err(_) => return Err(StatusCode::BAD_REQUEST),
+    };
+    let mut access = state.access_manager.lock();
+    match access.rbac_manager_mut().approve(uuid) {
+        true => {
+            tracing::info!(approval_id = %uuid, "Approval granted");
+            Ok(Json(serde_json::json!({
+                "status": "approved",
+                "id": id,
+            })))
+        }
+        false => Err(StatusCode::NOT_FOUND),
+    }
+}
+
+/// POST /api/approvals/:id/reject — Reject a pending request.
+async fn handle_approval_reject(
+    state: State<Arc<AppState>>,
+    Path(id): Path<String>,
+) -> Result<Json<serde_json::Value>, StatusCode> {
+    let uuid = match uuid::Uuid::parse_str(&id) {
+        Ok(u) => u,
+        Err(_) => return Err(StatusCode::BAD_REQUEST),
+    };
+    let mut access = state.access_manager.lock();
+    match access.rbac_manager_mut().reject(uuid) {
+        true => {
+            tracing::info!(approval_id = %uuid, "Approval rejected");
+            Ok(Json(serde_json::json!({
+                "status": "rejected",
+                "id": id,
+            })))
+        }
+        false => Err(StatusCode::NOT_FOUND),
+    }
 }
