@@ -2092,44 +2092,6 @@ async function loadSecurity() {
 document.getElementById('security-refresh').addEventListener('click', loadSecurity);
 document.getElementById('approvals-refresh').addEventListener('click', loadApprovals);
 
-// ── Agents ──
-async function loadAgents() {
-  const body = document.getElementById('agents-body');
-  try {
-    const res = await fetch(`${API}/api/agents`);
-    const agents = await res.json();
-
-    if (!agents.length) {
-      body.innerHTML = `<div class="empty-state"><div class="icon">⚡</div><p>No agents running.</p></div>`;
-      return;
-    }
-
-    body.innerHTML = agents.map(a => `
-      <div class="agent-card">
-        <div class="agent-info">
-          <div class="agent-name">${esc(a.name || a.id)}</div>
-          <div class="agent-id">${a.id}</div>
-        </div>
-        <span class="agent-status status-${a.status}">${a.status}</span>
-        <button class="btn btn-danger btn-sm" onclick="killAgent('${a.id}')" style="margin-left:12px">Kill</button>
-      </div>
-    `).join('');
-  } catch (err) {
-    body.innerHTML = `<div class="empty-state"><p>Error loading agents: ${esc(err.message)}</p></div>`;
-  }
-}
-
-async function killAgent(id) {
-  try {
-    await fetch(`${API}/api/agents/${id}/kill`, { method: 'POST' });
-    loadAgents();
-  } catch (err) {
-    alert(`Failed to kill agent: ${err.message}`);
-  }
-}
-
-document.getElementById('agents-refresh').addEventListener('click', loadAgents);
-
 // ── Workspace ──
 let workspaceDir = '';
 
@@ -3015,6 +2977,396 @@ document.getElementById('gardens-create-btn').addEventListener('click', () => {
     }
   });
 });
+
+// ── Dashboard ──
+async function loadDashboard() {
+  const body = document.getElementById('dashboard-body');
+  try {
+    const [agentRes, protocolRes, gardenRes, phaseRes] = await Promise.all([
+      fetch(`${API}/api/agents`),
+      fetch(`${API}/api/protocol/status`),
+      fetch(`${API}/api/gardens`),
+      fetch(`${API}/api/ouroboros/phase`).catch(() => null),
+    ]);
+
+    const agents = agentRes.ok ? await agentRes.json() : [];
+    const protocol = protocolRes.ok ? await protocolRes.json() : {};
+    const gardens = gardenRes.ok ? await gardenRes.json() : [];
+    const phaseData = phaseRes ? await phaseRes.json() : null;
+
+    // Active agent status summary
+    const runningAgents = agents.filter(a => a.status === 'running');
+    const forkedAgents = agents.filter(a => a.status === 'forked');
+    const completedAgents = agents.filter(a => a.status === 'completed');
+    const failedAgents = agents.filter(a => a.status === 'failed');
+
+    body.innerHTML = `
+      <div class="config-grid">
+        <!-- Agent Status Summary -->
+        <div class="config-section">
+          <h3>Agent Status</h3>
+          <div class="config-row"><span class="key">Total</span><span class="val">${agents.length}</span></div>
+          <div class="config-row"><span class="key">Running</span><span class="val" style="color:var(--green)">${runningAgents.length}</span></div>
+          <div class="config-row"><span class="key">Forked</span><span class="val" style="color:var(--yellow)">${forkedAgents.length}</span></div>
+          <div class="config-row"><span class="key">Completed</span><span class="val">${completedAgents.length}</span></div>
+          <div class="config-row"><span class="key">Failed</span><span class="val" style="color:var(--red)">${failedAgents.length}</span></div>
+        </div>
+
+        <!-- Protocol Status Summary -->
+        <div class="config-section">
+          <h3>Protocol</h3>
+          <div class="config-row"><span class="key">MCP Servers</span><span class="val">${protocol.mcp_servers ? protocol.mcp_servers.length : 0}</span></div>
+          <div class="config-row"><span class="key">A2A Agents</span><span class="val">${protocol.a2a_agents || protocol.a2a_registry || 0}</span></div>
+          <div class="config-row"><span class="key">RBAC Role</span><span class="val">${protocol.rbac_role || 'unknown'}</span></div>
+        </div>
+
+        <!-- Garden Status Summary -->
+        <div class="config-section">
+          <h3>Gardens</h3>
+          <div class="config-row"><span class="key">Total</span><span class="val">${gardens.length}</span></div>
+          <div class="config-row"><span class="key">Running</span><span class="val" style="color:var(--green)">${gardens.filter(g => g.running).length}</span></div>
+          <div class="config-row"><span class="key">Stopped</span><span class="val">${gardens.filter(g => !g.running).length}</span></div>
+        </div>
+
+        <!-- Ouroboros Phase Summary -->
+        <div class="config-section">
+          <h3>Ouroboros</h3>
+          <div class="config-row"><span class="key">Phase</span><span class="val" style="color:var(--accent)">${phaseData ? phaseData.phase : 'idle'}</span></div>
+          <div class="config-row"><span class="key">Iteration</span><span class="val">${phaseData ? phaseData.iteration : 0}</span></div>
+          <div class="config-row"><span class="key">Progress</span><span class="val">${phaseData ? Math.round(phaseData.progress * 100) + '%' : '0%'}</span></div>
+        </div>
+      </div>
+
+      <!-- Agent Cards -->
+      ${agents.length > 0 ? `
+        <h3 style="font-family:var(--font-mono);margin-top:24px;color:var(--accent)">Active Agents</h3>
+        <div class="agent-monitor-grid">
+          ${agents.map(a => `
+            <div class="agent-monitor-card" onclick="viewAgentDetail('${escAttr(a.id)}')">
+              <div class="agent-monitor-header">
+                <span class="agent-monitor-title">${esc(a.name || 'Agent')}</span>
+                <span class="agent-status status-${a.status}">${a.status}</span>
+              </div>
+              <div class="agent-registry-id">${a.id.slice(0, 16)}</div>
+              ${a.capabilities ? `
+                <div class="agent-registry-capabilities">
+                  ${a.capabilities.map(c => `<span class="agent-cap-tag">${esc(c)}</span>`).join('')}
+                </div>
+              ` : ''}
+            </div>
+          `).join('')}
+        </div>
+      ` : ''}
+
+      <!-- Garden Status Cards -->
+      ${gardens.length > 0 ? `
+        <h3 style="font-family:var(--font-mono);margin-top:24px;color:var(--green)">Garden Status</h3>
+        <div class="garden-status-grid">
+          ${gardens.map(g => `
+            <div class="garden-status-card">
+              <div class="garden-status-header">
+                <span class="garden-status-title">🌿 ${esc(g.name)}</span>
+                <span class="garden-status-badge ${g.running ? 'garden-status-running' : 'garden-status-stopped'}">
+                  ${g.running ? 'RUNNING' : 'STOPPED'}
+                </span>
+              </div>
+              <div class="garden-status-meta">
+                Image: ${esc(g.image_tag)}<br/>
+                Created: ${g.created_at || 'unknown'}
+              </div>
+              ${g.workspace_path ? `
+                <div class="garden-status-meta">
+                  Workspace: <span class="workspace-path">${esc(g.workspace_path)}</span>
+                </div>
+              ` : ''}
+            </div>
+          `).join('')}
+        </div>
+      ` : ''}
+    `;
+  } catch (err) {
+    body.innerHTML = `<div class="empty-state"><p>Error: ${esc(err.message)}</p></div>`;
+  }
+}
+
+// ── Protocol Status ──
+async function loadProtocol() {
+  const body = document.getElementById('protocol-body');
+  try {
+    const [mcpRes, a2aRes, rbacRes] = await Promise.all([
+      fetch(`${API}/api/mcp/servers`).catch(() => null),
+      fetch(`${API}/api/a2a/agents`).catch(() => null),
+      fetch(`${API}/api/rbac/status`).catch(() => null),
+    ]);
+
+    const mcpServers = mcpRes?.ok ? await mcpRes.json() : [];
+    const a2aAgents = a2aRes?.ok ? await a2aRes.json() : [];
+    const rbac = rbacRes?.ok ? await rbacRes.json() : {};
+
+    body.innerHTML = `
+      <div class="protocol-grid">
+        <!-- MCP Servers -->
+        <div class="protocol-card">
+          <div class="protocol-card-header">
+            <span class="protocol-card-title">MCP Servers</span>
+            <span class="protocol-status-badge ${mcpServers.length > 0 ? 'protocol-connected' : 'protocol-disconnected'}">
+              ${mcpServers.length > 0 ? 'Connected' : 'No Servers'}
+            </span>
+          </div>
+          ${mcpServers.length > 0 ? `
+            ${mcpServers.map(s => `
+              <div class="mcp-server-item">
+                <span class="mcp-server-name">${esc(s.name || s.id)}</span>
+                <span class="mcp-server-status" style="color:${getMcpStatusColor(s.status)}">${s.status || 'unknown'}</span>
+              </div>
+            `).join('')}
+          ` : '<p style="color:var(--text-muted);font-size:12px">No MCP servers configured.</p>'}
+        </div>
+
+        <!-- A2A Registry -->
+        <div class="protocol-card">
+          <div class="protocol-card-header">
+            <span class="protocol-card-title">A2A Registry</span>
+            <span class="protocol-status-badge ${a2aAgents.length > 0 ? 'protocol-connected' : 'protocol-disconnected'}">
+              ${a2aAgents.length} registered
+            </span>
+          </div>
+          ${a2aAgents.length > 0 ? `
+            <div class="agent-registry-list">
+              ${a2aAgents.map(a => `
+                <div class="agent-registry-item" onclick="viewAgentDetail('${escAttr(a.id)}')">
+                  <div class="agent-registry-name">${esc(a.name || a.id)}</div>
+                  <div class="agent-registry-id">${a.id.slice(0, 16)}</div>
+                  ${a.capabilities ? `
+                    <div class="agent-registry-capabilities">
+                      ${a.capabilities.slice(0, 5).map(c => `<span class="agent-cap-tag">${esc(c)}</span>`).join('')}
+                      ${a.capabilities.length > 5 ? `<span class="agent-cap-tag">+${a.capabilities.length - 5}</span>` : ''}
+                    </div>
+                  ` : ''}
+                </div>
+              `).join('')}
+            </div>
+          ` : '<p style="color:var(--text-muted);font-size:12px">No agents registered in A2A registry.</p>'}
+        </div>
+
+        <!-- RBAC Status -->
+        <div class="protocol-card" style="grid-column: span 2;">
+          <div class="protocol-card-header">
+            <span class="protocol-card-title">RBAC</span>
+            <span class="protocol-status-badge ${rbac.current_role ? 'protocol-connected' : 'protocol-disconnected'}">
+              Role: ${rbac.current_role || 'unknown'}
+            </span>
+          </div>
+          <div class="protocol-stat">
+            <span class="key">Current Role</span>
+            <span class="val">${rbac.current_role || 'unknown'}</span>
+          </div>
+          <div class="protocol-stat">
+            <span class="key">Permissions</span>
+            <span class="val">${rbac.permissions?.length || 0}</span>
+          </div>
+          ${rbac.permissions && rbac.permissions.length > 0 ? `
+            <div class="protocol-permissions">
+              ${rbac.permissions.map(p => `<span class="protocol-permission-tag">${esc(p)}</span>`).join('')}
+            </div>
+          ` : ''}
+        </div>
+      </div>
+    `;
+  } catch (err) {
+    body.innerHTML = `<div class="empty-state"><p>Error: ${esc(err.message)}</p></div>`;
+  }
+}
+
+function getMcpStatusColor(status) {
+  switch (status) {
+    case 'connected': return 'var(--green)';
+    case 'disconnected': return 'var(--text-secondary)';
+    case 'error': return 'var(--red)';
+    default: return 'var(--text-muted)';
+  }
+}
+
+// ── Ouroboros Phase ──
+async function loadPhase() {
+  const body = document.getElementById('phase-body');
+  try {
+    const res = await fetch(`${API}/api/ouroboros/phase`);
+    const data = await res.json();
+
+    const phases = ['interview', 'seed', 'execute', 'evaluate', 'evolve'];
+    const phaseIcons = { interview: '🤔', seed: '📝', execute: '⚙️', evaluate: '✅', evolve: '🔄' };
+    const currentPhase = data.phase || 'idle';
+    const currentIndex = phases.indexOf(currentPhase);
+    const progress = data.progress || 0;
+    const iteration = data.iteration || 0;
+
+    body.innerHTML = `
+      <div class="phase-indicator">
+        <div class="phase-current">
+          ${phaseIcons[currentPhase] || '🌀'} ${capitalize(currentPhase)} Phase
+          ${currentPhase !== 'idle' ? `<span style="font-size:14px;color:var(--text-muted)">· Iteration ${iteration}</span>` : ''}
+        </div>
+        <div class="phase-progress-bar">
+          <div class="phase-progress-fill" style="width: ${Math.round(progress * 100)}%"></div>
+        </div>
+        <div class="phase-meta">
+          <span>${Math.round(progress * 100)}% complete</span>
+          <span>Iteration ${iteration}</span>
+        </div>
+        <div class="phase-steps">
+          ${phases.map((phase, idx) => {
+            let stepState = 'default';
+            if (idx < currentIndex) stepState = 'completed';
+            else if (phase === currentPhase) stepState = 'active';
+            return `
+              <div class="phase-step ${stepState}">
+                <div class="phase-step-icon">${phaseIcons[phase]}</div>
+                <span class="phase-step-label">${phase}</span>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+
+      ${data.session_id ? `
+        <div class="config-section" style="margin-top:16px">
+          <h3>Session</h3>
+          <div class="config-row"><span class="key">Session ID</span><span class="val">${data.session_id.slice(0, 16)}</span></div>
+          <div class="config-row"><span class="key">Seed ID</span><span class="val">${data.seed_id ? data.seed_id.slice(0, 16) : 'none'}</span></div>
+          <div class="config-row"><span class="key">Started</span><span class="val">${data.started_at || 'unknown'}</span></div>
+        </div>
+      ` : ''}
+    `;
+  } catch (err) {
+    // Phase API might not exist yet, show placeholder
+    body.innerHTML = `
+      <div class="phase-indicator">
+        <div class="phase-current">🌀 Idle</div>
+        <div class="phase-progress-bar">
+          <div class="phase-progress-fill" style="width: 0%"></div>
+        </div>
+        <div class="phase-meta">
+          <span>No active session</span>
+          <span>Iteration 0</span>
+        </div>
+        <div class="phase-steps">
+          ${['interview', 'seed', 'execute', 'evaluate', 'evolve'].map(phase => `
+            <div class="phase-step">
+              <div class="phase-step-icon">${phase === 'interview' ? '🤔' : phase === 'seed' ? '📝' : phase === 'execute' ? '⚙️' : phase === 'evaluate' ? '✅' : '🔄'}</div>
+              <span class="phase-step-label">${phase}</span>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+      <p style="color:var(--text-muted);font-size:12px;margin-top:16px">
+        Ouroboros phase information unavailable. Start a conversation to initiate the interview phase.
+      </p>
+    `;
+  }
+}
+
+function viewAgentDetail(agentId) {
+  // Navigate to agents panel and highlight the agent
+  switchPanel('agents');
+  loadAgents();
+}
+
+document.getElementById('dashboard-refresh').addEventListener('click', loadDashboard);
+document.getElementById('protocol-refresh').addEventListener('click', loadProtocol);
+document.getElementById('phase-refresh').addEventListener('click', loadPhase);
+
+// ── Agents (Agent Monitor) ──
+async function loadAgents() {
+  const body = document.getElementById('agents-body');
+  try {
+    const res = await fetch(`${API}/api/agents`);
+    const agents = await res.json();
+
+    if (!agents.length) {
+      body.innerHTML = `<div class="empty-state"><div class="icon">⚡</div><p>No agents running.</p></div>`;
+      return;
+    }
+
+    body.innerHTML = `
+      <div class="agent-monitor-grid">
+        <div class="agent-monitor-card">
+          <div class="agent-monitor-header">
+            <span class="agent-monitor-title">Active Agents</span>
+            <span class="agent-monitor-count">${agents.length}</span>
+          </div>
+          <div class="agent-registry-list">
+            ${agents.map(a => `
+              <div class="agent-registry-item selected" onclick="showAgentDetail('${escAttr(a.id)}')">
+                <div style="display:flex;justify-content:space-between;align-items:center">
+                  <div class="agent-registry-name">${esc(a.name || 'Agent')}</div>
+                  <span class="agent-status status-${a.status}">${a.status}</span>
+                </div>
+                <div class="agent-registry-id">${a.id.slice(0, 16)}</div>
+                ${a.capabilities ? `
+                  <div class="agent-registry-capabilities">
+                    ${a.capabilities.map(c => `<span class="agent-cap-tag">${esc(c)}</span>`).join('')}
+                  </div>
+                ` : ''}
+              </div>
+            `).join('')}
+          </div>
+        </div>
+        <div class="agent-monitor-card">
+          <div class="agent-monitor-header">
+            <span class="agent-monitor-title">Agent Capabilities</span>
+          </div>
+          <p style="color:var(--text-muted);font-size:12px">Select an agent to view its capabilities from the A2A registry.</p>
+        </div>
+      </div>
+    `;
+  } catch (err) {
+    body.innerHTML = `<div class="empty-state"><p>Error loading agents: ${esc(err.message)}</p></div>`;
+  }
+}
+
+async function showAgentDetail(agentId) {
+  try {
+    const res = await fetch(`${API}/api/agents/${agentId}`);
+    if (!res.ok) return;
+    const agent = await res.json();
+
+    const detail = document.createElement('div');
+    detail.className = 'agent-detail-panel';
+    detail.id = 'agent-detail-' + agentId.slice(0, 8);
+    detail.innerHTML = `
+      <h4>Agent: ${esc(agent.name || agentId.slice(0, 8))}</h4>
+      <div class="config-row"><span class="key">ID</span><span class="val">${agent.id}</span></div>
+      <div class="config-row"><span class="key">Status</span><span class="val">${agent.status}</span></div>
+      ${agent.capabilities ? `
+        <div class="config-row"><span class="key">Capabilities</span></div>
+        <div class="protocol-permissions" style="margin-top:8px">
+          ${agent.capabilities.map(c => `<span class="protocol-permission-tag">${esc(c)}</span>`).join('')}
+        </div>
+      ` : ''}
+      ${agent.created_at ? `<div class="config-row"><span class="key">Created</span><span class="val">${agent.created_at}</span></div>` : ''}
+    `;
+
+    // Remove existing detail panel
+    const existing = document.getElementById('agent-detail-' + agentId.slice(0, 8));
+    if (existing) existing.remove();
+
+    document.getElementById('agents-body').appendChild(detail);
+  } catch (err) {
+    // Ignore detail fetch errors
+  }
+}
+
+async function killAgent(id) {
+  try {
+    await fetch(`${API}/api/agents/${id}/kill`, { method: 'POST' });
+    loadAgents();
+  } catch (err) {
+    alert(`Failed to kill agent: ${err.message}`);
+  }
+}
+
+document.getElementById('agents-refresh').addEventListener('click', loadAgents);
 
 // ── Utilities ──
 function esc(s) {
