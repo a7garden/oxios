@@ -12,6 +12,7 @@ use tokio::fs;
 ///
 /// Files are organized as `<base_path>/<category>/<name>.md` or
 /// `<base_path>/<category>/<name>.json`.
+#[derive(Clone)]
 pub struct StateStore {
     /// Root directory for all state files.
     pub base_path: PathBuf,

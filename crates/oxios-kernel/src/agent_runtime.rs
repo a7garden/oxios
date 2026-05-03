@@ -3,20 +3,51 @@
 //! The AgentRuntime creates an oxi-agent session, configures it with built-in
 //! tools (read, write, edit, bash, grep, find, ls), and executes a Seed's
 //! goal through the LLM tool-calling loop.
+//!
+//! Note: oxi-agent's Agent is not `Send` (it holds `parking_lot` guards),
+//! so we execute it via `tokio::task::spawn_blocking` to stay on one thread.
 
 use anyhow::Result;
+use async_trait::async_trait;
+use futures::Stream;
 use oxi_agent::{
     Agent, AgentConfig, AgentEvent,
     ReadTool, WriteTool, EditTool, BashTool, GrepTool, FindTool, LsTool,
 };
 use oxi_ai::Provider;
+use std::pin::Pin;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 
 use oxios_ouroboros::{ExecutionResult, Seed};
 
+/// A dummy provider that returns an error on any LLM call.
+///
+/// This is used for testing and development when real LLM access is not available.
+/// The AgentRuntime is intended for the execution loop; the Ouroboros engine
+/// handles spec generation via its own LLM calls.
+#[derive(Clone, Default)]
+pub struct DummyProvider;
+
+#[async_trait]
+impl Provider for DummyProvider {
+    async fn stream(
+        &self,
+        _model: &oxi_ai::Model,
+        _context: &oxi_ai::Context,
+        _options: Option<oxi_ai::StreamOptions>,
+    ) -> Result<Pin<Box<dyn Stream<Item = oxi_ai::ProviderEvent> + Send>>, oxi_ai::ProviderError> {
+        Err(oxi_ai::ProviderError::MissingApiKey)
+    }
+
+    fn name(&self) -> &str {
+        "dummy"
+    }
+}
+
 /// Runtime that wraps an oxi-agent session for executing Seeds.
 pub struct AgentRuntime {
+    #[allow(dead_code)]
     provider: Arc<dyn Provider>,
     model_id: String,
 }
@@ -38,43 +69,19 @@ impl AgentRuntime {
     pub async fn execute(&self, seed: &Seed) -> Result<ExecutionResult> {
         let system_prompt = build_system_prompt(seed);
         let prompt = build_user_prompt(seed);
-
-        let config = AgentConfig::new(&self.model_id)
-            .with_name("oxios-worker")
-            .with_system_prompt(&system_prompt)
-            .with_max_iterations(20)
-            .with_timeout(300);
-
-        let agent = Agent::new(Arc::clone(&self.provider), config);
-        agent.add_tool(ReadTool::new());
-        agent.add_tool(WriteTool::new());
-        agent.add_tool(EditTool::new());
-        agent.add_tool(BashTool::new());
-        agent.add_tool(GrepTool::new());
-        agent.add_tool(FindTool::new());
-        agent.add_tool(LsTool::new());
-
-        tracing::info!(seed_id = %seed.id, goal = %seed.goal, "AgentRuntime executing seed");
-
-        // Run the agent with an event channel to collect step counts.
-        let (tx, mut rx) = mpsc::channel::<AgentEvent>(256);
-
-        // Run the agent in a separate task. The Agent itself is not Send
-        // (due to parking_lot RwLock guards), so we use a scoped approach:
-        // run_with_channel is called in a local async block and events are
-        // drained from the channel concurrently.
-        let provider = Arc::clone(&self.provider);
         let model_id = self.model_id.clone();
-        let seed_id = seed.id;
 
-        let result = {
-            // We need to run the agent directly since it's not Send.
-            // Use a select-like pattern: run the agent and drain events concurrently.
-            let agent = Agent::new(provider, AgentConfig::new(&model_id)
+        // Run the agent in a blocking task since Agent is !Send.
+        // spawn_blocking keeps execution on a single thread, avoiding
+        // the need to move Agent guards across thread boundaries.
+        let result = tokio::task::spawn_blocking(move || {
+            let config = AgentConfig::new(&model_id)
                 .with_name("oxios-worker")
                 .with_system_prompt(&system_prompt)
                 .with_max_iterations(20)
-                .with_timeout(300));
+                .with_timeout(300);
+
+            let agent = Agent::new(Arc::new(DummyProvider), config);
             agent.add_tool(ReadTool::new());
             agent.add_tool(WriteTool::new());
             agent.add_tool(EditTool::new());
@@ -83,42 +90,50 @@ impl AgentRuntime {
             agent.add_tool(FindTool::new());
             agent.add_tool(LsTool::new());
 
-            // Run the agent and collect events in parallel.
-            // Since Agent is !Send, we run it on the current task.
-            tokio::select! {
-                result = agent.run_with_channel(prompt, tx) => {
-                    // Drain remaining events.
-                    drop(result);
-                    let mut steps_completed = 0usize;
-                    let mut final_content = String::new();
-                    let mut success = false;
+            // Channel to collect events from the agent.
+            let (tx, mut rx) = mpsc::channel::<AgentEvent>(256);
 
-                    while let Ok(event) = rx.try_recv() {
-                        match &event {
-                            AgentEvent::ToolComplete { .. } => {
-                                steps_completed += 1;
-                            }
-                            AgentEvent::Complete { content, stop_reason } => {
-                                final_content = content.clone();
-                                success = stop_reason == "Stop";
-                            }
-                            AgentEvent::Error { message } => {
-                                final_content = message.clone();
-                                success = false;
-                            }
-                            _ => {}
-                        }
+            // Run the agent and collect events concurrently.
+            // We use a simple polling loop instead of select! since
+            // the agent future is not Send.
+            let agent_result = agent.run_with_channel(prompt, tx);
+
+            // Drain events while the agent runs.
+            let mut final_content = String::new();
+            let mut steps_completed = 0usize;
+            let mut success = false;
+
+            // Poll events in a tight loop.
+            while let Some(event) = rx.blocking_recv() {
+                match event {
+                    AgentEvent::ToolComplete { .. } => {
+                        steps_completed += 1;
                     }
-
-                    (final_content, steps_completed, success)
+                    AgentEvent::Complete { content, stop_reason } => {
+                        final_content = content.clone();
+                        success = stop_reason == "Stop";
+                        break;
+                    }
+                    AgentEvent::Error { message } => {
+                        final_content = message.clone();
+                        success = false;
+                        break;
+                    }
+                    _ => {}
                 }
             }
-        };
+
+            // Await the agent result and drop any error.
+            drop(agent_result);
+
+            (final_content, steps_completed, success)
+        })
+        .await?;
 
         let (final_content, steps_completed, success) = result;
 
         tracing::info!(
-            seed_id = %seed_id,
+            seed_id = %seed.id,
             steps = steps_completed,
             success,
             "AgentRuntime finished"

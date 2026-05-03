@@ -11,7 +11,9 @@ use anyhow::Result;
 use async_trait::async_trait;
 use oxios_gateway::channel::Channel;
 use oxios_gateway::message::{IncomingMessage, OutgoingMessage};
-use tokio::sync::{mpsc, Mutex};
+use std::collections::HashMap;
+use std::sync::Arc;
+use tokio::sync::{broadcast, mpsc, oneshot, RwLock, Mutex};
 
 /// The web channel adapter.
 ///
@@ -23,18 +25,21 @@ pub struct WebChannel {
     /// Sender to pass to the HTTP layer for injecting messages.
     incoming_tx: mpsc::Sender<IncomingMessage>,
     /// Broadcaster for outgoing messages to WebSocket/SSE clients.
-    outgoing_tx: tokio::sync::broadcast::Sender<OutgoingMessage>,
+    outgoing_tx: broadcast::Sender<OutgoingMessage>,
+    /// Correlation map for HTTP request-response matching.
+    responses: Arc<RwLock<HashMap<uuid::Uuid, oneshot::Sender<OutgoingMessage>>>>,
 }
 
 impl WebChannel {
     /// Creates a new web channel with a bounded message buffer.
     pub fn new(buffer: usize) -> Self {
         let (incoming_tx, incoming_rx) = mpsc::channel(buffer);
-        let (outgoing_tx, _) = tokio::sync::broadcast::channel(buffer);
+        let (outgoing_tx, _) = broadcast::channel(buffer);
         Self {
             incoming_rx: Mutex::new(incoming_rx),
             incoming_tx,
             outgoing_tx,
+            responses: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
@@ -44,13 +49,33 @@ impl WebChannel {
     }
 
     /// Returns a receiver for outgoing messages (used by WebSocket/SSE handlers).
-    pub fn subscribe_outgoing(&self) -> tokio::sync::broadcast::Receiver<OutgoingMessage> {
+    pub fn subscribe_outgoing(&self) -> broadcast::Receiver<OutgoingMessage> {
         self.outgoing_tx.subscribe()
     }
 
     /// Send a message directly (for use in tests or direct API responses).
     pub fn broadcast_outgoing(&self, msg: OutgoingMessage) -> Result<()> {
         let _ = self.outgoing_tx.send(msg);
+        Ok(())
+    }
+
+    /// Deliver a response to the registered handler, if any.
+    /// Also broadcasts for WebSocket/SSE clients.
+    pub fn deliver_response(&self, msg: OutgoingMessage) -> Result<()> {
+        let msg_id = msg.id;
+
+        // Try to deliver to a registered HTTP handler first.
+        {
+            let mut responses = self.responses.blocking_write();
+            if let Some(sender) = responses.remove(&msg_id) {
+                let _ = sender.send(msg.clone());
+            }
+        }
+
+        // Always broadcast for WebSocket/SSE clients.
+        let _ = self.outgoing_tx.send(msg);
+
+        tracing::debug!(msg_id = %msg_id, "Delivering response");
         Ok(())
     }
 }
@@ -63,16 +88,12 @@ impl Channel for WebChannel {
 
     async fn receive(&self) -> Result<Option<IncomingMessage>> {
         let mut rx = self.incoming_rx.lock().await;
-        match rx.recv().await {
-            Some(msg) => Ok(Some(msg)),
-            None => Ok(None),
-        }
+        Ok(rx.recv().await)
     }
 
     async fn send(&self, msg: OutgoingMessage) -> Result<()> {
-        tracing::info!(user = %msg.user_id, content_len = msg.content.len(), "Web channel sending message");
-        let _ = self.outgoing_tx.send(msg);
-        Ok(())
+        // Use deliver_response for proper correlation.
+        self.deliver_response(msg)
     }
 }
 
@@ -88,7 +109,9 @@ pub struct WebChannelHandle {
     /// Sender for injecting incoming messages into the gateway pipeline.
     pub incoming_tx: mpsc::Sender<IncomingMessage>,
     /// Broadcast sender for pushing outgoing messages to WebSocket/SSE.
-    pub outgoing_tx: tokio::sync::broadcast::Sender<OutgoingMessage>,
+    pub outgoing_tx: broadcast::Sender<OutgoingMessage>,
+    /// Correlation map for HTTP request-response matching.
+    responses: Arc<RwLock<HashMap<uuid::Uuid, oneshot::Sender<OutgoingMessage>>>>,
 }
 
 impl WebChannelHandle {
@@ -97,16 +120,38 @@ impl WebChannelHandle {
         Self {
             incoming_tx: channel.sender(),
             outgoing_tx: channel.outgoing_tx.clone(),
+            responses: channel.responses.clone(),
         }
     }
 
     /// Subscribe to outgoing messages.
-    pub fn subscribe(&self) -> tokio::sync::broadcast::Receiver<OutgoingMessage> {
+    pub fn subscribe(&self) -> broadcast::Receiver<OutgoingMessage> {
         self.outgoing_tx.subscribe()
     }
 
     /// Send an incoming message to the gateway pipeline.
     pub async fn send_incoming(&self, msg: IncomingMessage) -> Result<()> {
         self.incoming_tx.send(msg).await.map_err(|e| anyhow::anyhow!("{e}"))
+    }
+
+    /// Send a message and wait for a response.
+    ///
+    /// This registers a oneshot receiver for the response and waits for it.
+    /// Used by the HTTP chat endpoint to get the orchestrator's response.
+    pub async fn send_and_wait(&self, msg: IncomingMessage) -> Result<OutgoingMessage> {
+        let (tx, rx) = oneshot::channel::<OutgoingMessage>();
+        let msg_id = msg.id;
+
+        // Register the response handler before sending.
+        {
+            let mut responses = self.responses.write().await;
+            responses.insert(msg_id, tx);
+        }
+
+        // Send the message.
+        self.incoming_tx.send(msg).await.map_err(|e| anyhow::anyhow!("{e}"))?;
+
+        // Wait for the response.
+        rx.await.map_err(|e| anyhow::anyhow!("Response channel dropped: {e}"))
     }
 }

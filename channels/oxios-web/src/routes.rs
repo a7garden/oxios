@@ -31,6 +31,8 @@ use std::sync::Arc;
 use tokio_stream::wrappers::BroadcastStream;
 use tokio_stream::StreamExt as TokioStreamExt;
 
+use oxios_gateway::message::IncomingMessage;
+
 use crate::server::AppState;
 
 // ---------------------------------------------------------------------------
@@ -83,6 +85,9 @@ struct ChatRequest {
     /// Optional user identifier (defaults to "default").
     #[serde(default = "default_user")]
     user_id: String,
+    /// Optional session ID for multi-turn conversations.
+    #[serde(default)]
+    session_id: String,
 }
 
 fn default_user() -> String {
@@ -96,38 +101,55 @@ struct ChatResponse {
     id: String,
     /// Echo of the user's message.
     echo: String,
-    /// Placeholder response.
+    /// The response from the orchestrator.
     reply: String,
+    /// Session ID for multi-turn conversations.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    session_id: Option<String>,
+    /// Phase reached during orchestration.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    phase: Option<String>,
 }
 
-/// POST /api/chat — Send a message to the kernel via gateway.
+/// POST /api/chat — Send a message to the kernel via gateway and get response.
 async fn handle_chat(
     state: State<Arc<AppState>>,
     Json(body): Json<ChatRequest>,
 ) -> Result<Json<ChatResponse>, StatusCode> {
     tracing::info!(content = %body.content, user = %body.user_id, "Chat message received");
 
-    // Create an incoming message and push it into the channel
-    let msg = oxios_gateway::message::IncomingMessage::new(
+    // Build the incoming message.
+    let mut msg = IncomingMessage::new(
         "web",
         &body.user_id,
         &body.content,
     );
+
+    // Include session_id from request if provided (for multi-turn conversations).
+    if !body.session_id.is_empty() {
+        msg.metadata.insert("session_id".to_owned(), body.session_id.clone());
+    }
+
     let msg_id = msg.id.to_string();
     let content_echo = body.content.clone();
 
-    if let Err(e) = state.channel.send_incoming(msg).await {
-        tracing::error!(error = %e, "Failed to send message to gateway");
-        return Err(StatusCode::INTERNAL_SERVER_ERROR);
+    // Send and wait for response from the gateway pipeline.
+    match state.channel.send_and_wait(msg).await {
+        Ok(response) => {
+            tracing::info!(reply_len = response.content.len(), "Chat response received");
+            Ok(Json(ChatResponse {
+                id: msg_id,
+                echo: content_echo,
+                reply: response.content,
+                session_id: response.metadata.get("session_id").cloned(),
+                phase: response.metadata.get("phase").cloned(),
+            }))
+        }
+        Err(e) => {
+            tracing::error!(error = %e, "Failed to get response from gateway");
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
+        }
     }
-
-    // TODO: In the full implementation, we would wait for a response from the
-    // kernel via the outgoing channel. For now, return a placeholder.
-    Ok(Json(ChatResponse {
-        id: msg_id,
-        echo: content_echo,
-        reply: "Message received. Agent execution pipeline not yet connected.".into(),
-    }))
 }
 
 /// GET /api/chat/stream — WebSocket endpoint for real-time chat streaming.

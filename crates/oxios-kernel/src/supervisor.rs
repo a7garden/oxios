@@ -27,6 +27,9 @@ pub trait Supervisor: Send + Sync {
     /// Start executing an agent.
     async fn exec(&self, id: AgentId) -> Result<()>;
 
+    /// Fork and execute an agent with its seed, running to completion.
+    async fn run_with_seed(&self, id: AgentId, seed: &Seed) -> Result<()>;
+
     /// Wait for an agent to complete and return its final status.
     async fn wait(&self, id: AgentId) -> Result<AgentStatus>;
 
@@ -158,6 +161,64 @@ impl Supervisor for BasicSupervisor {
             .event_bus
             .publish(crate::event_bus::KernelEvent::AgentStarted { id });
         tracing::info!(agent_id = %id, "Agent execution started");
+
+        Ok(())
+    }
+
+    async fn run_with_seed(&self, id: AgentId, seed: &Seed) -> Result<()> {
+        // Mark as running.
+        {
+            let mut agents = self.agents.write();
+            match agents.get_mut(&id) {
+                Some(agent) => agent.status = AgentStatus::Running,
+                None => anyhow::bail!("Agent {id} not found"),
+            }
+        }
+
+        let _ = self
+            .event_bus
+            .publish(crate::event_bus::KernelEvent::AgentStarted { id });
+
+        tracing::info!(agent_id = %id, seed_id = %seed.id, "Running agent task");
+
+        match self.runtime.execute(seed).await {
+            Ok(result) => {
+                tracing::info!(
+                    agent_id = %id,
+                    success = result.success,
+                    steps = result.steps_completed,
+                    "Agent task completed"
+                );
+
+                {
+                    let mut agents = self.agents.write();
+                    if let Some(agent) = agents.get_mut(&id) {
+                        agent.status = if result.success {
+                            AgentStatus::Idle
+                        } else {
+                            AgentStatus::Failed
+                        };
+                    }
+                }
+
+                let _ = self.event_bus.publish(crate::event_bus::KernelEvent::AgentStopped { id });
+            }
+            Err(e) => {
+                tracing::error!(agent_id = %id, error = %e, "Agent task failed");
+
+                {
+                    let mut agents = self.agents.write();
+                    if let Some(agent) = agents.get_mut(&id) {
+                        agent.status = AgentStatus::Failed;
+                    }
+                }
+
+                let _ = self.event_bus.publish(crate::event_bus::KernelEvent::AgentFailed {
+                    id,
+                    error: e.to_string(),
+                });
+            }
+        }
 
         Ok(())
     }

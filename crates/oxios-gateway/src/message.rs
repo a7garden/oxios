@@ -5,6 +5,7 @@
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// A message arriving from a channel.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -19,10 +20,13 @@ pub struct IncomingMessage {
     pub content: String,
     /// Timestamp of message creation.
     pub timestamp: DateTime<Utc>,
+    /// Optional metadata (e.g., session_id for multi-turn conversations).
+    #[serde(default)]
+    pub metadata: HashMap<String, String>,
 }
 
 impl IncomingMessage {
-    /// Creates a new incoming message with the current timestamp.
+    /// Creates a new incoming message with the current timestamp and empty metadata.
     pub fn new(channel: impl Into<String>, user_id: impl Into<String>, content: impl Into<String>) -> Self {
         Self {
             id: uuid::Uuid::new_v4(),
@@ -30,6 +34,7 @@ impl IncomingMessage {
             user_id: user_id.into(),
             content: content.into(),
             timestamp: Utc::now(),
+            metadata: HashMap::new(),
         }
     }
 }
@@ -47,6 +52,9 @@ pub struct OutgoingMessage {
     pub content: String,
     /// Timestamp of message creation.
     pub timestamp: DateTime<Utc>,
+    /// Optional metadata (e.g., session_id, phase, evaluation_passed).
+    #[serde(default)]
+    pub metadata: HashMap<String, String>,
 }
 
 impl OutgoingMessage {
@@ -58,6 +66,24 @@ impl OutgoingMessage {
             user_id: user_id.into(),
             content: content.into(),
             timestamp: Utc::now(),
+            metadata: HashMap::new(),
+        }
+    }
+
+    /// Creates a new outgoing message with metadata.
+    pub fn with_metadata(
+        channel: impl Into<String>,
+        user_id: impl Into<String>,
+        content: impl Into<String>,
+        metadata: HashMap<String, String>,
+    ) -> Self {
+        Self {
+            id: uuid::Uuid::new_v4(),
+            channel: channel.into(),
+            user_id: user_id.into(),
+            content: content.into(),
+            timestamp: Utc::now(),
+            metadata,
         }
     }
 }

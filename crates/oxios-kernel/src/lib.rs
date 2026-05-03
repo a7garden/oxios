@@ -12,6 +12,7 @@ pub mod container;
 pub mod event_bus;
 pub mod garden;
 pub mod host_exec;
+pub mod orchestrator;
 pub mod state_store;
 pub mod supervisor;
 pub mod types;
@@ -24,5 +25,7 @@ pub use container::{
 pub use event_bus::{EventBus, KernelEvent};
 pub use garden::{GardenInfo, GardenManager};
 pub use host_exec::HostExecBridge;
+pub use orchestrator::{OrchestrationResult, Orchestrator};
 pub use state_store::StateStore;
+pub use supervisor::{BasicSupervisor, Supervisor};
 pub use types::{AgentId, AgentInfo, AgentStatus};

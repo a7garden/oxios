@@ -920,6 +920,7 @@ let ws = null;
 let eventSource = null;
 let selectedFilePath = null;
 let fileContent = '';
+let currentSessionId = null;
 
 // ── Navigation ──
 document.querySelectorAll('.nav-item').forEach(item => {
@@ -973,15 +974,43 @@ async function sendChatMessage() {
   chatInput.value = '';
   addChatMessage(text, 'user', 'you · just now');
 
+  // Show processing indicator
+  const processingDiv = document.createElement('div');
+  processingDiv.className = 'chat-msg system';
+  processingDiv.id = 'processing-indicator';
+  processingDiv.textContent = 'Processing…';
+  chatMessages.appendChild(processingDiv);
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+
   try {
+    const body = { content: text };
+    if (currentSessionId) {
+      body.session_id = currentSessionId;
+    }
     const res = await fetch(`${API}/api/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content: text }),
+      body: JSON.stringify(body),
     });
     const data = await res.json();
-    addChatMessage(data.reply, 'system', `oxios · ${data.id.slice(0, 8)}`);
+
+    // Remove processing indicator
+    const indicator = document.getElementById('processing-indicator');
+    if (indicator) indicator.remove();
+
+    // Update session_id for follow-up messages
+    if (data.session_id) {
+      currentSessionId = data.session_id;
+    }
+
+    // Show phase info in meta
+    const meta = data.session_id
+      ? `oxios · ${data.id?.slice(0, 8) || ''} · ${data.phase || ''}`
+      : `oxios · ${data.id?.slice(0, 8) || ''}`;
+    addChatMessage(data.reply, 'system', meta);
   } catch (err) {
+    const indicator = document.getElementById('processing-indicator');
+    if (indicator) indicator.remove();
     addChatMessage(`Error: ${err.message}`, 'system', 'error');
   }
 }
@@ -1050,10 +1079,28 @@ function addEvent(data) {
   const line = document.createElement('div');
   line.className = 'event-line';
 
+  // Format Ouroboros phase events for better display
+  let displayText = JSON.stringify(data);
+  if (data.PhaseStarted) {
+    const { session_id, phase } = data.PhaseStarted;
+    const phaseIcon = getPhaseIcon(phase);
+    displayText = `${phaseIcon} Phase started: ${phase}`;
+  } else if (data.PhaseCompleted) {
+    const { session_id, phase, result_summary } = data.PhaseCompleted;
+    const phaseIcon = getPhaseIcon(phase);
+    displayText = `${phaseIcon} Phase completed: ${phase} — ${result_summary}`;
+  } else if (data.AgentStarted) {
+    displayText = `⚙️ Agent started: ${data.AgentStarted.id}`;
+  } else if (data.AgentStopped) {
+    displayText = `✅ Agent stopped: ${data.AgentStopped.id}`;
+  } else if (data.SeedCreated) {
+    displayText = `🌱 Seed created: ${data.SeedCreated.seed_id}`;
+  }
+
   const type = Object.keys(data)[0] || 'unknown';
   const time = new Date().toLocaleTimeString();
 
-  line.innerHTML = `<span class="event-time">${time}</span><span class="event-type">${type}</span> ${JSON.stringify(data[type] || data)}`;
+  line.innerHTML = `<span class="event-time">${time}</span><span class="event-type">${type}</span> ${esc(displayText)}`;
   log.appendChild(line);
 
   // Keep last 200 events
@@ -1065,6 +1112,37 @@ function addEvent(data) {
   if (currentPanel === 'events') {
     log.parentElement.scrollTop = log.parentElement.scrollHeight;
   }
+
+  // Also update chat processing indicator based on phase events
+  updateProcessingIndicator(data);
+}
+
+function getPhaseIcon(phase) {
+  switch (phase) {
+    case 'interview': return '🤔';
+    case 'seed': return '📝';
+    case 'execute': return '⚙️';
+    case 'evaluate': return '✅';
+    case 'evolve': return '🔄';
+    default: return '🔹';
+  }
+}
+
+function updateProcessingIndicator(data) {
+  const indicator = document.getElementById('processing-indicator');
+  if (!indicator) return;
+
+  if (data.PhaseStarted) {
+    const icon = getPhaseIcon(data.PhaseStarted.phase);
+    indicator.textContent = `${icon} ${capitalize(data.PhaseStarted.phase)}…`;
+  } else if (data.PhaseCompleted) {
+    const icon = getPhaseIcon(data.PhaseCompleted.phase);
+    indicator.textContent = `${icon} ${capitalize(data.PhaseCompleted.phase)} done`;
+  }
+}
+
+function capitalize(s) {
+  return s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
 }
 
 document.getElementById('events-clear').addEventListener('click', () => {

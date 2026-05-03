@@ -55,6 +55,31 @@ pub enum KernelEvent {
         /// Whether the evaluation passed.
         passed: bool,
     },
+    /// An Ouroboros phase has started.
+    PhaseStarted {
+        /// The session this phase belongs to.
+        session_id: String,
+        /// The phase that started.
+        phase: oxios_ouroboros::Phase,
+    },
+    /// An Ouroboros phase has completed.
+    PhaseCompleted {
+        /// The session this phase belongs to.
+        session_id: String,
+        /// The phase that completed.
+        phase: oxios_ouroboros::Phase,
+        /// A brief summary of the result.
+        result_summary: String,
+    },
+    /// An agent has produced output.
+    AgentOutput {
+        /// The session this output belongs to.
+        session_id: String,
+        /// The agent's ID.
+        agent_id: AgentId,
+        /// The output content.
+        output: String,
+    },
 }
 
 /// A broadcast-based event bus for kernel events.

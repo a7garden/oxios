@@ -9,7 +9,10 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use oxios_gateway::Gateway;
-use oxios_kernel::{AgentRuntime, EventBus, GardenManager, HostExecBridge, OxiosConfig, StateStore};
+use oxios_kernel::{
+    AgentRuntime, BasicSupervisor, EventBus, GardenManager, HostExecBridge, Orchestrator,
+    OxiosConfig, StateStore, Supervisor,
+};
 use oxios_ouroboros::OuroborosEngine;
 use oxios_web::WebServer;
 
@@ -128,23 +131,34 @@ async fn main() -> Result<()> {
 
     // Initialize kernel components.
     let event_bus = EventBus::new(config.kernel.event_bus_capacity);
-    let state_store = StateStore::new(PathBuf::from(&config.kernel.workspace))?;
+    let state_store = Arc::new(StateStore::new(PathBuf::from(&config.kernel.workspace))?);
 
     // Create the LLM provider from the model ID.
     let (provider, model) = resolve_provider_and_model(&cli.model)?;
 
     // Create the Ouroboros engine for spec-first orchestration.
-    let ouroboros = OuroborosEngine::new(Arc::clone(&provider), model);
+    let ouroboros: Arc<dyn oxios_ouroboros::OuroborosProtocol> =
+        Arc::new(OuroborosEngine::new(Arc::clone(&provider), model));
 
     // Create the agent runtime for executing seeds.
     let agent_runtime = AgentRuntime::new(provider, &cli.model);
 
     // Initialize the supervisor with the agent runtime.
-    let _supervisor =
-        oxios_kernel::supervisor::BasicSupervisor::new(event_bus.clone(), agent_runtime);
+    let supervisor: Arc<dyn Supervisor> = Arc::new(BasicSupervisor::new(
+        event_bus.clone(),
+        agent_runtime,
+    ));
 
-    // Initialize gateway.
-    let gateway = Gateway::new();
+    // Create the orchestrator to wire Ouroboros + Supervisor together.
+    let orchestrator = Arc::new(Orchestrator::new(
+        ouroboros,
+        supervisor.clone(),
+        event_bus.clone(),
+        state_store.clone(),
+    ));
+
+    // Initialize gateway with the orchestrator.
+    let gateway = Gateway::new(orchestrator.clone());
 
     // Create the web channel and extract a handle for the HTTP server.
     let web_channel = oxios_web::WebChannel::new(256);
@@ -171,8 +185,8 @@ async fn main() -> Result<()> {
         &config.gateway.host,
         config.gateway.port,
         channel_handle,
-        event_bus,
-        state_store,
+        event_bus.clone(),
+        (*state_store).clone(),
         garden_manager,
     );
 
@@ -182,13 +196,16 @@ async fn main() -> Result<()> {
         config.gateway.port
     );
 
-    // If a prompt was given, run it through the Ouroboros protocol.
+    // If a prompt was given, run it through the Ouroboros orchestrator.
     if let Some(prompt) = &cli.prompt {
         tracing::info!(prompt = %prompt, "Processing direct prompt");
 
-        match process_prompt(&ouroboros, prompt).await {
+        match orchestrator
+            .handle_message("cli", prompt, None)
+            .await
+        {
             Ok(result) => {
-                tracing::info!(output = %result.output, "Prompt processed");
+                tracing::info!(response = %result.response, "Prompt processed");
             }
             Err(e) => {
                 tracing::error!(error = %e, "Failed to process prompt");
@@ -196,18 +213,16 @@ async fn main() -> Result<()> {
         }
     }
 
-    // Run the web server concurrently with the gateway.
-    tokio::select! {
-        result = web_server.serve() => {
-            if let Err(e) = result {
-                tracing::error!(error = %e, "Web server error");
-            }
+    // Run the web server and gateway concurrently.
+    // The gateway's run() loop handles channel message polling.
+    tokio::spawn(async move {
+        if let Err(e) = gateway.run().await {
+            tracing::error!(error = %e, "Gateway error");
         }
-        result = gateway.run() => {
-            if let Err(e) = result {
-                tracing::error!(error = %e, "Gateway error");
-            }
-        }
+    });
+
+    if let Err(e) = web_server.serve().await {
+        tracing::error!(error = %e, "Web server error");
     }
 
     Ok(())
@@ -232,57 +247,4 @@ fn resolve_provider_and_model(
         .ok_or_else(|| anyhow::anyhow!("Provider '{}' not available", model.provider))?;
 
     Ok((Arc::from(provider), model.clone()))
-}
-
-/// Process a direct prompt through the Ouroboros interview → seed pipeline.
-///
-/// For interactive prompts, we run the interview phase. If the ambiguity is
-/// low enough, we also generate a seed. Execution is deferred to the agent
-/// runtime (would need the full supervisor integration).
-async fn process_prompt(
-    ouroboros: &OuroborosEngine,
-    prompt: &str,
-) -> Result<oxios_ouroboros::ExecutionResult> {
-    use oxios_ouroboros::OuroborosProtocol;
-
-    // Phase 1: Interview.
-    let interview_result = ouroboros.interview(prompt).await?;
-
-    if !interview_result.ready_for_seed {
-        tracing::info!(
-            ambiguity = ?interview_result.ambiguity,
-            "Ambiguity too high for automatic execution. Questions:"
-        );
-        for (i, q) in interview_result.questions.iter().enumerate() {
-            tracing::info!(question = %i, "{}", q);
-        }
-        return Ok(oxios_ouroboros::ExecutionResult {
-            output: format!(
-                "Ambiguity too high ({:.2}). Please clarify:\n{}",
-                interview_result.ambiguity.ambiguity(),
-                interview_result
-                    .questions
-                    .iter()
-                    .enumerate()
-                    .map(|(i, q)| format!("{}. {}", i + 1, q))
-                    .collect::<Vec<_>>()
-                    .join("\n")
-            ),
-            steps_completed: 0,
-            success: false,
-        });
-    }
-
-    // Phase 2: Generate seed.
-    let seed = ouroboros.generate_seed(&interview_result).await?;
-    tracing::info!(seed_id = %seed.id, goal = %seed.goal, "Seed generated from prompt");
-
-    // Phases 3-5 (execute, evaluate, evolve) would be run by the supervisor
-    // via run_with_seed(). For the direct prompt path, we return a result
-    // indicating the seed was created.
-    Ok(oxios_ouroboros::ExecutionResult {
-        output: format!("Seed created: {}", seed.goal),
-        steps_completed: 0,
-        success: true,
-    })
 }

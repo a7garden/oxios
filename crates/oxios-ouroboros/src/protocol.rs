@@ -11,7 +11,7 @@ use crate::seed::Seed;
 use crate::{EvaluationResult, InterviewResult};
 
 /// The phases of the Ouroboros lifecycle.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Phase {
     /// Clarify intent through questions and answers.
     Interview,
