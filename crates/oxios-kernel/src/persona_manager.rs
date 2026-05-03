@@ -114,3 +114,15 @@ impl Default for PersonaManager {
         Self::new()
     }
 }
+
+impl Clone for PersonaManager {
+    fn clone(&self) -> Self {
+        let personas: Vec<Persona> = self.store.list_all();
+        let mut store = PersonaStore::new();
+        store.load_from_slice(&personas);
+        Self {
+            store,
+            active_persona_id: RwLock::new(self.active_persona_id.read().clone()),
+        }
+    }
+}

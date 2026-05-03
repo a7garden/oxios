@@ -73,6 +73,8 @@ pub struct OuroborosEngine {
     provider: Arc<dyn Provider>,
     model: Model,
     phase: parking_lot::Mutex<Phase>,
+    /// Optional persona system prompt, prepended to every LLM call.
+    persona_prompt: parking_lot::Mutex<Option<String>>,
 }
 
 impl OuroborosEngine {
@@ -82,6 +84,7 @@ impl OuroborosEngine {
             provider,
             model,
             phase: parking_lot::Mutex::new(Phase::Interview),
+            persona_prompt: parking_lot::Mutex::new(None),
         }
     }
 
@@ -95,10 +98,22 @@ impl OuroborosEngine {
         *self.phase.lock() = phase;
     }
 
+    /// Set or clear the persona system prompt.
+    fn set_persona_prompt(&self, prompt: Option<String>) {
+        *self.persona_prompt.lock() = prompt;
+    }
+
     /// Run a non-tool LLM completion and return the text content.
     async fn llm_complete(&self, system_prompt: &str, user_message: &str) -> Result<String> {
+        // Prepend persona prompt if set.
+        let effective_system = if let Some(ref persona) = *self.persona_prompt.lock() {
+            format!("{}\n\n{}", persona, system_prompt)
+        } else {
+            system_prompt.to_string()
+        };
+
         let mut ctx = Context::new();
-        ctx.set_system_prompt(system_prompt.to_owned());
+        ctx.set_system_prompt(effective_system);
         ctx.add_message(Message::User(UserMessage::new(user_message)));
 
         let stream = self

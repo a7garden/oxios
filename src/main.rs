@@ -247,6 +247,15 @@ async fn init_kernel(
         config.scheduler.rate_limit_per_minute,
         config.scheduler.zombie_timeout_secs,
     ));
+    // Initialize persona manager (needed for orchestrator + wiring + return).
+    let persona_manager = PersonaManager::new();
+
+    // Wire persona into OuroborosProtocol before orchestrator creation.
+    if let Some(p) = persona_manager.first_enabled() {
+        ouroboros.set_persona_prompt(Some(p.system_prompt));
+        tracing::info!(persona = %p.name, "Active persona set on OuroborosEngine");
+    }
+
     let orchestrator = Arc::new(Orchestrator::new(
         ouroboros,
         supervisor.clone(),
@@ -254,6 +263,7 @@ async fn init_kernel(
         state_store.clone(),
         scheduler.clone(),
         access_manager.clone(),
+        Arc::new(persona_manager.clone()),
     ));
 
     // Initialize gateway with the orchestrator.

@@ -68,4 +68,8 @@ pub trait OuroborosProtocol: Send + Sync {
 
     /// Evolve the seed based on evaluation, returning a new seed if needed.
     async fn evolve(&self, seed: &Seed, evaluation: &EvaluationResult) -> Result<Option<Seed>>;
+
+    /// Inject a persona system prompt for voice customization.
+    /// When set, this is prepended to every LLM call in all phases.
+    fn set_persona_prompt(&self, _prompt: Option<String>) {}
 }
