@@ -489,6 +489,8 @@ async fn test_orchestrator_events_published() {
 
     let scheduler = Arc::new(AgentScheduler::default());
     let access_manager = Arc::new(parking_lot::Mutex::new(AccessManager::new()));
+    let a2a_protocol = Arc::new(A2AProtocol::new(event_bus.clone()));
+    let persona_manager = Arc::new(PersonaManager::new());
     let orchestrator = Orchestrator::new(
         ouroboros,
         supervisor,
@@ -496,6 +498,8 @@ async fn test_orchestrator_events_published() {
         state_store,
         scheduler.clone(),
         access_manager.clone(),
+        persona_manager,
+        a2a_protocol,
     );
 
     // Run orchestration in background.
