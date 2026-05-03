@@ -394,6 +394,30 @@ impl AgentScheduler {
         reaped
     }
 
+    /// Marks a task as running by task ID.
+    ///
+    /// The task must be in the queue (status Queued). This is used by the
+    /// orchestrator to atomically claim a submitted task before execution.
+    pub fn start_task(&self, task_id: Uuid) -> Result<()> {
+        let task = {
+            let mut queue = self.queue.lock();
+            let pos = queue.iter().position(|t| t.id == task_id);
+            pos.map(|idx| queue.remove(idx))
+        };
+
+        match task {
+            Some(mut task) => {
+                task.status = TaskStatus::Running;
+                let mut start_times = self.task_start_times.lock();
+                start_times.insert(task.id, Utc::now());
+                let mut running = self.running.lock();
+                running.insert(task.id, task);
+                Ok(())
+            }
+            None => Err(anyhow::anyhow!("task {} not found in queue", task_id)),
+        }
+    }
+
     /// Cancels a queued task by ID.
     ///
     /// Only works on tasks still in the queue (not yet running).

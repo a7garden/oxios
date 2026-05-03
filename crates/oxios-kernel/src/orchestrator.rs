@@ -201,40 +201,22 @@ impl Orchestrator {
             }
         }
 
-        // Submit the execution task to the scheduler instead of running directly.
+        // Submit the execution task to the scheduler and dispatch atomically.
         let task = ScheduledTask::for_agent(
             agent_id,
             format!("Execute seed '{}'", seed.goal),
             Priority::Normal,
         );
-        let _ = self.scheduler.submit(task)?;
+        let task_id = self.scheduler.submit(task)?;
+        // Immediately start the task so no other caller can grab it.
+        self.scheduler.start_task(task_id)?;
 
-        // Try to get a slot from the scheduler.
-        let exec_result = if let Some(scheduled) = self.scheduler.next_task() {
-            tracing::info!(
-                task_id = %scheduled.id,
-                agent_id = %agent_id,
-                "Scheduler dispatched task"
-            );
-
-            // Run the agent with the seed.
-            let exec_result = self.supervisor.run_with_seed(agent_id, &seed).await?;
-            // Mark task as completed or failed.
-            let task_id = scheduled.id;
-            if exec_result.success {
-                let _ = self.scheduler.complete_task(task_id);
-            } else {
-                let _ = self.scheduler.fail_task(task_id, &exec_result.output);
-            }
-            exec_result
+        let exec_result = self.supervisor.run_with_seed(agent_id, &seed).await?;
+        if exec_result.success {
+            let _ = self.scheduler.complete_task(task_id);
         } else {
-            // Scheduler queue is full or rate-limited; run directly but track.
-            tracing::warn!(
-                session_id = %session_id,
-                "Scheduler unavailable, running agent directly"
-            );
-            self.supervisor.run_with_seed(agent_id, &seed).await?
-        };
+            let _ = self.scheduler.fail_task(task_id, &exec_result.output);
+        }
 
         // Periodically reap zombie tasks.
         self.reap_zombies().await;
@@ -301,26 +283,15 @@ impl Orchestrator {
                     format!("Execute evolved seed '{}'", evolved.goal),
                     Priority::High,
                 );
-                let _ = self.scheduler.submit(task)?;
+                let task_id = self.scheduler.submit(task)?;
+                self.scheduler.start_task(task_id)?;
 
-                let new_exec = if let Some(scheduled) = self.scheduler.next_task() {
-                    tracing::info!(
-                        task_id = %scheduled.id,
-                        agent_id = %new_agent_id,
-                        "Scheduler dispatched evolved task"
-                    );
-                    let exec_result = self.supervisor.run_with_seed(new_agent_id, &evolved).await?;
-                    let task_id = scheduled.id;
-                    if exec_result.success {
-                        let _ = self.scheduler.complete_task(task_id);
-                    } else {
-                        let _ = self.scheduler.fail_task(task_id, &exec_result.output);
-                    }
-                    exec_result
+                let new_exec = self.supervisor.run_with_seed(new_agent_id, &evolved).await?;
+                if new_exec.success {
+                    let _ = self.scheduler.complete_task(task_id);
                 } else {
-                    tracing::warn!("Scheduler unavailable for evolved seed, running directly");
-                    self.supervisor.run_with_seed(new_agent_id, &evolved).await?
-                };
+                    let _ = self.scheduler.fail_task(task_id, &new_exec.output);
+                }
 
                 self.publish_phase_completed(&session_id, Phase::Execute, "completed").await;
                 self.publish_phase_started(&session_id, Phase::Evaluate).await;
@@ -372,12 +343,10 @@ impl Orchestrator {
 
     /// Save a seed to the state store.
     async fn save_seed(&self, seed: &Seed) -> Result<()> {
-        let filename = format!("{}.json", seed.id);
-        let json = serde_json::to_string_pretty(seed)
-            .context("failed to serialize seed")?;
+        let key = seed.id.to_string();
 
         self.state_store
-            .save_markdown("seeds", &filename, &json)
+            .save_json("seeds", &key, seed)
             .await
             .context("failed to save seed to state store")?;
 
@@ -387,12 +356,10 @@ impl Orchestrator {
 
     /// Save an evaluation result to the state store.
     async fn save_evaluation(&self, seed: &Seed, evaluation: &EvaluationResult) -> Result<()> {
-        let filename = format!("{}-eval.json", seed.id);
-        let json = serde_json::to_string_pretty(evaluation)
-            .context("failed to serialize evaluation")?;
+        let key = format!("{}-eval", seed.id);
 
         self.state_store
-            .save_markdown("evals", &filename, &json)
+            .save_json("evals", &key, evaluation)
             .await
             .context("failed to save evaluation to state store")?;
 
