@@ -20,6 +20,8 @@ use oxios_kernel::orchestrator::Orchestrator;
 use oxios_kernel::state_store::StateStore;
 use oxios_kernel::supervisor::Supervisor;
 use oxios_kernel::types::{AgentId, AgentInfo, AgentStatus};
+use oxios_kernel::access_manager::{AccessManager, AgentPermissions};
+use oxios_kernel::scheduler::AgentScheduler;
 use oxios_ouroboros::evaluation::EvaluationResult;
 use oxios_ouroboros::interview::InterviewResult;
 use oxios_ouroboros::protocol::{ExecutionResult, OuroborosProtocol, Phase};
@@ -617,7 +619,7 @@ async fn test_gateway_unknown_channel() {
 // Scheduler + Orchestrator Integration
 // ===========================================================================
 
-use oxios_kernel::scheduler::{AgentScheduler, Priority, ScheduledTask};
+use oxios_kernel::scheduler::{Priority, ScheduledTask};
 use std::sync::atomic::AtomicU32;
 
 /// Mock Supervisor that integrates with the scheduler.
@@ -717,8 +719,6 @@ async fn test_scheduler_orchestrator_integration() {
 
     let ouroboros = Arc::new(MockOuroboros::new());
     let supervisor = Arc::new(SchedulerAwareSupervisor::new(scheduler.clone(), event_bus.clone()));
-
-    let scheduler = Arc::new(AgentScheduler::default());
     let access_manager = Arc::new(parking_lot::Mutex::new(AccessManager::new()));
     let orchestrator = Orchestrator::new(
         ouroboros,
@@ -775,7 +775,9 @@ async fn test_scheduler_priority_ordering_in_orchestration() {
 
     // Verify the scheduler and orchestrator can coexist.
     let ouroboros = Arc::new(MockOuroboros::new());
-    let supervisor = Arc::new(SchedulerAwareSupervisor::new(scheduler, event_bus.clone()));
+    let supervisor = Arc::new(SchedulerAwareSupervisor::new(scheduler.clone(), event_bus.clone()));
+    let access_manager = Arc::new(parking_lot::Mutex::new(AccessManager::new()));
+
 
     let _orchestrator = Orchestrator::new(
         ouroboros,
@@ -920,8 +922,6 @@ author = "X"
 // ===========================================================================
 // Access Manager Enforcing Permissions
 // ===========================================================================
-
-use oxios_kernel::access_manager::{AccessManager, AgentPermissions};
 
 #[tokio::test]
 async fn test_access_manager_blocks_dangerous_tools() {
