@@ -105,6 +105,15 @@ impl SkillStore {
     /// Creates a new skill store pointing to the given directory.
     ///
     /// The directory will be created if it doesn't exist.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// use oxios_kernel::SkillStore;
+    /// use std::path::PathBuf;
+    ///
+    /// let store = SkillStore::new(PathBuf::from("/tmp/skills")).unwrap();
+    /// ```
     pub fn new(skills_dir: PathBuf) -> Result<Self> {
         Ok(Self { skills_dir })
     }

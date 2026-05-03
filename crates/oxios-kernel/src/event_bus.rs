@@ -93,6 +93,16 @@ pub struct EventBus {
 
 impl EventBus {
     /// Creates a new event bus with the given broadcast capacity.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use oxios_kernel::EventBus;
+    ///
+    /// let bus = EventBus::new(256);
+    /// let subscriber = bus.subscribe();
+    /// // Subscriber receives all events published after this point.
+    /// ```
     pub fn new(capacity: usize) -> Self {
         let (sender, _) = broadcast::channel(capacity);
         Self { sender }

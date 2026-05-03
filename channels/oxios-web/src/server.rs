@@ -7,6 +7,7 @@
 use anyhow::Result;
 use axum::Router;
 use std::net::SocketAddr;
+use std::path::PathBuf;
 use std::sync::Arc;
 use tower_http::cors::CorsLayer;
 use tower_http::services::ServeDir;
@@ -17,25 +18,47 @@ use oxios_kernel::event_bus::EventBus;
 use oxios_kernel::garden::GardenManager;
 use oxios_kernel::skill::SkillStore;
 use oxios_kernel::state_store::StateStore;
-use std::sync::Arc as StdArc;
+use oxios_kernel::Supervisor;
 
 /// Shared application state for the web server.
 ///
 /// This is the central state accessible to all route handlers.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct AppState {
     /// Base URL for API responses.
     pub base_url: String,
     /// Handle to the web channel for message passing.
     pub channel: WebChannelHandle,
     /// Event bus for subscribing to kernel events.
-    pub event_bus: StdArc<EventBus>,
+    pub event_bus: Arc<EventBus>,
     /// State store for workspace/memory/seeds access.
     pub state_store: Arc<StateStore>,
     /// Garden manager for container lifecycle.
     pub garden_manager: Arc<GardenManager>,
     /// Skill store for skill management.
     pub skill_store: Arc<SkillStore>,
+    /// Agent supervisor for lifecycle management.
+    pub supervisor: Arc<dyn Supervisor>,
+    /// Loaded configuration.
+    pub config: Arc<oxios_kernel::OxiosConfig>,
+    /// Path to the config file (for persistence on PUT /api/config).
+    pub config_path: Option<PathBuf>,
+}
+
+impl std::fmt::Debug for AppState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("AppState")
+            .field("base_url", &self.base_url)
+            .field("channel", &"...")
+            .field("event_bus", &"...")
+            .field("state_store", &self.state_store)
+            .field("garden_manager", &self.garden_manager)
+            .field("skill_store", &self.skill_store)
+            .field("supervisor", &"...")
+            .field("config", &self.config)
+            .field("config_path", &self.config_path)
+            .finish()
+    }
 }
 
 /// The web HTTP server.
@@ -48,6 +71,7 @@ pub struct WebServer {
 
 impl WebServer {
     /// Creates a new web server bound to the given address.
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         host: &str,
         port: u16,
@@ -56,6 +80,9 @@ impl WebServer {
         state_store: StateStore,
         garden_manager: GardenManager,
         skill_store: SkillStore,
+        supervisor: Arc<dyn Supervisor>,
+        config: oxios_kernel::OxiosConfig,
+        config_path: Option<PathBuf>,
     ) -> Self {
         let addr: SocketAddr = format!("{host}:{port}")
             .parse()
@@ -63,10 +90,13 @@ impl WebServer {
         let state = Arc::new(AppState {
             base_url: format!("http://{host}:{port}"),
             channel,
-            event_bus: StdArc::new(event_bus),
+            event_bus: Arc::new(event_bus),
             state_store: Arc::new(state_store),
             garden_manager: Arc::new(garden_manager),
             skill_store: Arc::new(skill_store),
+            supervisor,
+            config: Arc::new(config),
+            config_path,
         });
         Self { addr, state }
     }

@@ -34,8 +34,9 @@ use std::sync::Arc;
 use tokio_stream::wrappers::BroadcastStream;
 use tokio_stream::StreamExt as TokioStreamExt;
 use oxios_kernel::state_store::StateStore;
-
 use oxios_gateway::message::IncomingMessage;
+use oxios_kernel::AgentId;
+use uuid::Uuid;
 
 use crate::server::AppState;
 
@@ -270,21 +271,39 @@ struct AgentSummary {
 
 /// GET /api/agents — List agent instances.
 async fn handle_agents_list(
-    _state: State<Arc<AppState>>,
+    state: State<Arc<AppState>>,
 ) -> Json<Vec<AgentSummary>> {
-    // TODO: Query the supervisor for actual agent data
-    // For now, return an empty list
-    Json(Vec::new())
+    match state.supervisor.list().await {
+        Ok(agents) => Json(
+            agents
+                .into_iter()
+                .map(|a| AgentSummary {
+                    id: a.id.to_string(),
+                    name: a.name,
+                    status: format!("{:?}", a.status),
+                    created_at: a.created_at.to_rfc3339(),
+                    seed_id: a.seed_id.map(|s| s.to_string()),
+                })
+                .collect(),
+        ),
+        Err(_) => Json(Vec::new()),
+    }
 }
 
 /// POST /api/agents/:id/kill — Kill an agent.
 async fn handle_agent_kill(
-    _state: State<Arc<AppState>>,
+    state: State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<StatusCode, StatusCode> {
     tracing::info!(agent_id = %id, "Kill agent requested");
-    // TODO: Dispatch to supervisor.kill()
-    Ok(StatusCode::OK)
+    let agent_id = match Uuid::parse_str(&id) {
+        Ok(uuid) => AgentId::from(uuid),
+        Err(_) => return Err(StatusCode::BAD_REQUEST),
+    };
+    match state.supervisor.kill(agent_id).await {
+        Ok(_) => Ok(StatusCode::OK),
+        Err(_) => Err(StatusCode::NOT_FOUND),
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -293,33 +312,47 @@ async fn handle_agent_kill(
 
 /// GET /api/config — Get current configuration.
 async fn handle_config_get(
-    _state: State<Arc<AppState>>,
+    state: State<Arc<AppState>>,
 ) -> Result<Json<serde_json::Value>, StatusCode> {
-    // TODO: Load from actual config source
-    let placeholder = serde_json::json!({
-        "kernel": {
-            "workspace": "~/.oxios/workspace",
-            "event_bus_capacity": 256,
-            "max_agents": 16
-        },
-        "gateway": {
-            "host": "127.0.0.1",
-            "port": 4200
-        },
-        "container": {
-            "garden_path": "~/.oxios/gardens"
-        }
-    });
-    Ok(Json(placeholder))
+    // Serialize the actual config from AppState.
+    let config = &*state.config;
+    match serde_json::to_value(config) {
+        Ok(json) => Ok(Json(json)),
+        Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
+    }
 }
 
 /// PUT /api/config — Update configuration.
+///
+/// Validates the incoming JSON against the config schema and persists
+/// changes to the config file on disk.
 async fn handle_config_put(
-    _state: State<Arc<AppState>>,
+    state: State<Arc<AppState>>,
     Json(body): Json<serde_json::Value>,
-) -> Result<Json<serde_json::Value>, StatusCode> {
+) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
     tracing::info!("Config update requested");
-    // TODO: Validate and persist config changes
+
+
+    // Validate: parse as OxiosConfig to ensure the shape is correct.
+    let updated: oxios_kernel::OxiosConfig = match serde_json::from_value(body.clone()) {
+        Ok(cfg) => cfg,
+        Err(e) => {
+            tracing::warn!(error = %e, "Invalid config shape");
+            return Err((StatusCode::BAD_REQUEST, format!("Invalid config: {e}")));
+        }
+    };
+
+    // Persist to the config file.
+    if let Some(config_path) = &state.config_path {
+        let content = toml::to_string_pretty(&updated)
+            .map_err(|e: toml::ser::Error| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        if let Err(e) = tokio::fs::write(config_path, content).await {
+            tracing::error!(error = %e, "Failed to persist config");
+            return Err((StatusCode::INTERNAL_SERVER_ERROR, e.to_string()));
+        }
+        tracing::info!("Config persisted to {:?}", config_path);
+    }
+
     Ok(Json(body))
 }
 

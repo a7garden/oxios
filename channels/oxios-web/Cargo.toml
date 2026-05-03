@@ -22,3 +22,4 @@ tower = "0.5"
 tower-http = { version = "0.6", features = ["cors", "fs"] }
 futures-util = "0.3"
 tokio-stream = { version = "0.1", features = ["sync"] }
+toml = "0.8"

@@ -44,6 +44,17 @@ impl Seed {
     /// Creates a new seed with the given goal and auto-generated ID.
     ///
     /// Generation is set to 0 and parent_seed_id is None.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use oxios_ouroboros::Seed;
+    ///
+    /// let seed = Seed::new("Build a web server");
+    /// assert!(!seed.goal.is_empty());
+    /// assert_eq!(seed.generation, 0);
+    /// assert!(seed.parent_seed_id.is_none());
+    /// ```
     pub fn new(goal: impl Into<String>) -> Self {
         Self {
             id: uuid::Uuid::new_v4(),
@@ -113,6 +124,16 @@ impl AmbiguityScore {
     /// Computes the overall ambiguity (0.0 = clear, 1.0 = fully ambiguous).
     ///
     /// Weighted: goal 40%, constraints 30%, success criteria 30%.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use oxios_ouroboros::AmbiguityScore;
+    ///
+    /// let score = AmbiguityScore::new(1.0, 0.8, 0.9);
+    /// assert!(score.ambiguity() < 0.2); // low ambiguity = ready
+    /// assert!(score.is_ready());
+    /// ```
     pub fn ambiguity(&self) -> f64 {
         1.0 - (self.goal_clarity * 0.4 + self.constraint_clarity * 0.3 + self.success_criteria * 0.3)
     }

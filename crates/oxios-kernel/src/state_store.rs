@@ -20,6 +20,15 @@ pub struct StateStore {
 
 impl StateStore {
     /// Creates a new state store, initializing the directory if needed.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// use oxios_kernel::StateStore;
+    /// use std::path::PathBuf;
+    ///
+    /// let store = StateStore::new(PathBuf::from("/tmp/oxios-state")).unwrap();
+    /// ```
     pub fn new(base_path: PathBuf) -> Result<Self> {
         Ok(Self { base_path })
     }
