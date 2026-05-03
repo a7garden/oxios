@@ -1,0 +1,23 @@
+# Oxios Agent OS — Default Configuration
+# Copy to ~/.oxios/config.toml and customize as needed.
+
+[kernel]
+# Path to the workspace directory (~ is not expanded; use $HOME or absolute path).
+# workspace = "~/.oxios/workspace"
+event_bus_capacity = 256
+max_agents = 10
+
+[gateway]
+# Host to bind the web server to.
+host = "0.0.0.0"
+# Port for the web dashboard.
+port = 4200
+
+[container]
+# Image tag for new garden containers.
+image_tag = "oxios-garden:latest"
+# Commands that agents can execute on the host.
+allowed_host_commands = ["git", "gh", "open", "shortcuts", "osascript"]
+# Resource limits per garden container.
+memory_limit = "4g"
+cpu_limit = 4

@@ -5,7 +5,7 @@
 
 use anyhow::{bail, Context, Result};
 use async_trait::async_trait;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use tracing::{debug, warn};
 
@@ -94,7 +94,7 @@ pub trait ContainerBackend: Send + Sync {
     fn is_available(&self) -> bool;
 
     /// Build a container image from a directory containing a Containerfile.
-    async fn build_image(&self, context: &PathBuf, tag: &str) -> Result<()>;
+    async fn build_image(&self, context: &Path, tag: &str) -> Result<()>;
 
     /// Create and start a garden container.
     async fn create_garden(&self, config: &GardenStartConfig) -> Result<()>;
@@ -139,8 +139,7 @@ pub struct AppleBackend {
 impl AppleBackend {
     /// Create a new AppleBackend, probing for the `container` CLI.
     pub fn new() -> Self {
-        let (available, version) = Self::detect_runtime();
-        Self { version, available }
+        Self::default()
     }
 
     /// Detect whether the `container` CLI is present and return its version.
@@ -238,7 +237,7 @@ impl AppleBackend {
     }
 
     /// Build a container image from the given directory.
-    fn build_image_sync(&self, name: &str, containerfile_dir: &PathBuf) -> Result<()> {
+    fn build_image_sync(&self, name: &str, containerfile_dir: &Path) -> Result<()> {
         let tag = format!("oxios:{}", name);
 
         let status = std::process::Command::new(CONTAINER_BIN)
@@ -261,6 +260,13 @@ impl AppleBackend {
     }
 }
 
+impl Default for AppleBackend {
+    fn default() -> Self {
+        let (available, version) = Self::detect_runtime();
+        Self { version, available }
+    }
+}
+
 impl std::fmt::Debug for AppleBackend {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("AppleBackend")
@@ -280,7 +286,7 @@ impl ContainerBackend for AppleBackend {
         self.available
     }
 
-    async fn build_image(&self, context: &PathBuf, tag: &str) -> Result<()> {
+    async fn build_image(&self, context: &Path, tag: &str) -> Result<()> {
         if !self.available {
             bail!("Apple Container runtime is not available.");
         }
@@ -323,13 +329,13 @@ impl ContainerBackend for AppleBackend {
         };
 
         // Check if image exists locally; if not, try pull then build.
-        if !self.check_local_image(&image_ref).await {
-            if self.pull_image(&image_ref).await.is_err() {
-                tracing::info!("Pull failed, building image locally...");
-                let project_dir = std::env::current_dir()
-                    .context("cannot determine current directory")?;
-                self.build_image_sync(&config.name, &project_dir)?;
-            }
+        if !self.check_local_image(&image_ref).await
+            && self.pull_image(&image_ref).await.is_err()
+        {
+            tracing::info!("Pull failed, building image locally...");
+            let project_dir = std::env::current_dir()
+                .context("cannot determine current directory")?;
+            self.build_image_sync(&config.name, &project_dir)?;
         }
 
         // Run container.

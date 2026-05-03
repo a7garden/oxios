@@ -312,7 +312,7 @@ impl HostExecBridge {
         validate_args(&args)?;
 
         let start = std::time::Instant::now();
-        let effective_timeout = timeout_ms.max(DEFAULT_TIMEOUT_MS).min(60_000);
+        let effective_timeout = timeout_ms.clamp(DEFAULT_TIMEOUT_MS, 60_000);
 
         let result = tokio::time::timeout(
             std::time::Duration::from_millis(effective_timeout),

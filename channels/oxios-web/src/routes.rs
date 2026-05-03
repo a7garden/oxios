@@ -170,7 +170,7 @@ async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState>) {
                     let incoming = oxios_gateway::message::IncomingMessage::new(
                         "web",
                         "ws_user",
-                        &text.to_string(),
+                        text.to_string(),
                     );
                     if send_tx.send(incoming).await.is_err() {
                         break;
@@ -390,11 +390,10 @@ async fn handle_workspace_file_put(
     let canonical_base = state.state_store.base_path.canonicalize().unwrap_or_else(|_| state.state_store.base_path.clone());
     // For new files, canonicalize the parent dir
     if let Some(parent) = full_path.parent() {
-        if let Err(_) = parent.canonicalize() {
-            // Try to create the parent directory
-            if let Err(_) = tokio::fs::create_dir_all(parent).await {
-                return Err(StatusCode::INTERNAL_SERVER_ERROR);
-            }
+        if parent.canonicalize().is_err()
+            && tokio::fs::create_dir_all(parent).await.is_err()
+        {
+            return Err(StatusCode::INTERNAL_SERVER_ERROR);
         }
         if let Ok(canonical_parent) = parent.canonicalize() {
             if !canonical_parent.starts_with(&canonical_base) {

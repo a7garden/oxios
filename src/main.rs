@@ -29,6 +29,46 @@ struct Cli {
     model: String,
 }
 
+/// Subdirectories to create inside the Oxios home directory.
+const WORKSPACE_SUBDIRS: &[&str] = &[
+    "workspace",
+    "workspace/memory",
+    "workspace/memory/knowledge",
+    "workspace/seeds",
+    "workspace/sessions",
+    "workspace/skills",
+    "gardens",
+];
+
+/// Default configuration content written when no config file exists.
+const DEFAULT_CONFIG: &str = include_str!("../channels/oxios-web/static/default-config.toml");
+
+/// Ensures the Oxios home directory structure and default config exist.
+///
+/// Creates `~/.oxios/` and all required subdirectories on first run.
+/// Writes a default `config.toml` if none is found.
+fn ensure_workspace(oxios_home: &std::path::Path) -> Result<()> {
+    if !oxios_home.exists() {
+        tracing::info!(path = %oxios_home.display(), "Creating Oxios home directory");
+        std::fs::create_dir_all(oxios_home)?;
+    }
+
+    for subdir in WORKSPACE_SUBDIRS {
+        let dir = oxios_home.join(subdir);
+        if !dir.exists() {
+            std::fs::create_dir_all(&dir)?;
+        }
+    }
+
+    let config_path = oxios_home.join("config.toml");
+    if !config_path.exists() {
+        tracing::info!(path = %config_path.display(), "Writing default config");
+        std::fs::write(&config_path, DEFAULT_CONFIG)?;
+    }
+
+    Ok(())
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     // Initialize tracing.
@@ -52,6 +92,18 @@ async fn main() -> Result<()> {
         cli.config.clone()
     };
     let config_path = PathBuf::from(&config_path);
+
+    // Determine the Oxios home directory (parent of config file).
+    let oxios_home = config_path
+        .parent()
+        .map(|p| p.to_path_buf())
+        .unwrap_or_else(|| {
+            let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
+            PathBuf::from(format!("{home}/.oxios"))
+        });
+
+    // Ensure workspace structure exists (first-run initialization).
+    ensure_workspace(&oxios_home)?;
 
     // Load config, falling back to defaults.
     let config = if config_path.exists() {
