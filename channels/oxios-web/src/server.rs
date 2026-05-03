@@ -61,7 +61,7 @@ pub struct AppState {
     /// Path to the config file (for persistence on PUT /api/config).
     pub config_path: Option<PathBuf>,
     /// MCP bridge for tool calling (uses Mutex for interior mutability on register_server).
-    pub mcp_bridge: Arc<parking_lot::Mutex<McpBridge>>,
+    pub mcp_bridge: Arc<Mutex<McpBridge>>,
 }
 
 impl std::fmt::Debug for AppState {
@@ -110,7 +110,7 @@ impl WebServer {
         persona_manager: PersonaManager,
         config: oxios_kernel::OxiosConfig,
         config_path: Option<PathBuf>,
-        mcp_bridge: Arc<parking_lot::Mutex<McpBridge>>,
+        mcp_bridge: Arc<Mutex<McpBridge>>,
     ) -> Self {
         let addr: SocketAddr = format!("{host}:{port}")
             .parse()
