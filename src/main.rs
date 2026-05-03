@@ -205,7 +205,7 @@ async fn init_kernel(
     HostToolValidator,
     PersonaManager,
     Arc<A2AProtocol>,
-    Arc<McpBridge>,
+    Arc<Mutex<McpBridge>>,
 )> {
     let config = if config_path.exists() {
         tracing::info!(path = %config_path.display(), "Loading config");
@@ -401,7 +401,7 @@ fn resolve_provider_and_model(
 
 /// Run a single prompt through the Ouroboros orchestrator.
 async fn cmd_run(prompt: &str, config_path: &Path, model_id: &str) -> Result<()> {
-    let (orchestrator, _, _, _, _, _, _, _, _, _, _, _, persona_manager, _) =
+    let (orchestrator, _, _, _, _, _, _, _, _, _, _, _, persona_manager, _, _) =
         init_kernel(config_path, model_id).await?;
 
     tracing::info!(prompt = %prompt, "Processing prompt");
@@ -519,7 +519,7 @@ enum PkgAction {
 /// Handle pkg subcommands.
 async fn cmd_pkg(action: PkgAction, config_path: &Path) -> Result<()> {
     let model_id = "anthropic/claude-sonnet-4-20250514"; // Dummy for pkg cmds
-    let (_, _, _, _, _, _, _, _, _, _, program_manager, _, _, _) =
+    let (_, _, _, _, _, _, _, _, _, _, program_manager, _, _, _, _) =
         init_kernel(config_path, model_id).await?;
 
     match action {
@@ -590,6 +590,7 @@ async fn cmd_config(action: ConfigAction, config_path: &Path) -> Result<()> {
             context: Default::default(),
             security: Default::default(),
             persona: Default::default(),
+            mcp: Default::default(),
         }
     };
 
@@ -672,14 +673,9 @@ async fn cmd_status(config_path: &Path) -> Result<()> {
     );
 
     // MCP servers status.
-    let mcp_servers = mcp_bridge.lock().servers();
+    let mcp_count = mcp_bridge.lock().servers().len();
     println!();
-    println!("MCP Servers: {} configured", mcp_servers.len());
-    if !mcp_servers.is_empty() {
-        for name in &mcp_servers {
-            println!("  - {}", name);
-        }
-    }
+    println!("MCP Servers: {} configured", mcp_count);
 
     Ok(())
 }
