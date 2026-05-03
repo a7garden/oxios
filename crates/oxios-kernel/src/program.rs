@@ -392,9 +392,12 @@ fn copy_dir_all(src: &Path, dst: &Path) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
+
+    // --- ProgramMeta tests ---
 
     #[test]
-    fn test_program_meta_load() {
+    fn test_program_meta_load_minimal() {
         let temp_dir = tempfile::tempdir().unwrap();
         let program_dir = temp_dir.path();
 
@@ -421,6 +424,51 @@ my_tool = { description = "A test tool" }
         assert_eq!(meta.author, "Test Author");
         assert_eq!(meta.tools.len(), 1);
         assert_eq!(meta.tools[0].name, "my_tool");
+        assert_eq!(meta.tools[0].description, "A test tool");
+        assert!(meta.tools[0].arguments.is_empty());
+    }
+
+    #[test]
+    fn test_program_meta_with_tools_and_args() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let program_dir = temp_dir.path();
+
+        let toml_content = r#"
+[program]
+name = "rich-program"
+version = "2.0.0"
+description = "A program with rich tools"
+author = "Author"
+
+[tools.greet]
+description = "Greets a user"
+arguments = [
+    { name = "name", description = "User name", required = true },
+    { name = "loud", description = "Shout", required = false, default = "false" }
+]
+
+[tools.farewell]
+description = "Says goodbye"
+arguments = []
+"#;
+
+        fs::write(program_dir.join("program.toml"), toml_content).unwrap();
+
+        let meta = ProgramMeta::load_from_dir(program_dir).unwrap();
+
+        assert_eq!(meta.tools.len(), 2);
+
+        // Find greet by name (order may vary).
+        let greet = meta.tools.iter().find(|t| t.name == "greet").expect("greet tool");
+        assert_eq!(greet.arguments.len(), 2);
+
+        // Verify arguments exist and have correct structure.
+        let name_arg = greet.arguments.iter().find(|a| a.name == "name").expect("name arg");
+        assert!(name_arg.required, "name should be required");
+        assert_eq!(name_arg.description, "User name");
+
+        let loud_arg = greet.arguments.iter().find(|a| a.name == "loud").expect("loud arg");
+        assert_eq!(loud_arg.default, Some("false".to_string()));
     }
 
     #[test]
@@ -446,5 +494,336 @@ optional = ["jq", "curl"]
 
         assert_eq!(meta.host_requirements.required, vec!["git", "gh"]);
         assert_eq!(meta.host_requirements.optional, vec!["jq", "curl"]);
+    }
+
+    #[test]
+    fn test_program_meta_missing_file() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let program_dir = temp_dir.path();
+
+        // No program.toml — should error.
+        let result = ProgramMeta::load_from_dir(program_dir);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_program_meta_empty_optional_sections() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let program_dir = temp_dir.path();
+
+        let toml_content = r#"
+[program]
+name = "minimal"
+version = "1.0.0"
+description = "Minimal"
+author = "X"
+"#;
+
+        fs::write(program_dir.join("program.toml"), toml_content).unwrap();
+
+        let meta = ProgramMeta::load_from_dir(program_dir).unwrap();
+
+        assert!(meta.tools.is_empty());
+        assert!(meta.host_requirements.required.is_empty());
+        assert!(meta.host_requirements.optional.is_empty());
+    }
+
+    // --- ProgramManager tests ---
+
+    #[tokio::test]
+    async fn test_program_manager_init_creates_dir() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let programs_dir = temp_dir.path().join("programs");
+
+        let manager = ProgramManager::new(programs_dir.clone());
+        manager.init().await.unwrap();
+
+        assert!(programs_dir.exists());
+    }
+
+    #[tokio::test]
+    async fn test_list_programs_empty() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let programs_dir = temp_dir.path().join("programs");
+
+        let manager = ProgramManager::new(programs_dir.clone());
+        manager.init().await.unwrap();
+
+        let programs = manager.list_programs().await;
+        assert!(programs.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_get_program_nonexistent() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let manager = ProgramManager::new(temp_dir.path().join("programs"));
+        manager.init().await.unwrap();
+
+        assert!(manager.get_program("nonexistent").await.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_install_program() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let programs_dir = temp_dir.path().join("programs");
+        let source_dir = temp_dir.path().join("source-program");
+
+        // Create source program.
+        fs::create_dir_all(&source_dir).unwrap();
+        let toml = r#"
+[program]
+name = "my-program"
+version = "1.0.0"
+description = "My program"
+author = "Test"
+
+[tools.hello]
+description = "Says hello"
+"#;
+        fs::write(source_dir.join("program.toml"), toml).unwrap();
+        fs::write(source_dir.join("SKILL.md"), "# My Program\n\nDoes things.").unwrap();
+
+        let manager = ProgramManager::new(programs_dir.clone());
+        manager.init().await.unwrap();
+
+        let installed = manager.install(&source_dir).await.unwrap();
+
+        assert_eq!(installed.meta.name, "my-program");
+        assert_eq!(installed.meta.version, "1.0.0");
+        assert!(installed.enabled);
+        assert!(!installed.skill_content.is_empty());
+
+        // Verify it's listed.
+        let programs = manager.list_programs().await;
+        assert_eq!(programs.len(), 1);
+        assert_eq!(programs[0].meta.name, "my-program");
+
+        // Verify directory exists.
+        assert!(programs_dir.join("my-program").exists());
+    }
+
+    #[tokio::test]
+    async fn test_install_duplicate_fails() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let programs_dir = temp_dir.path().join("programs");
+        let source1 = temp_dir.path().join("src1");
+        let source2 = temp_dir.path().join("src2");
+
+        for src in [&source1, &source2] {
+            fs::create_dir_all(src).unwrap();
+            let toml = r#"
+[program]
+name = "dup"
+version = "1.0.0"
+description = "X"
+author = "X"
+"#;
+            fs::write(src.join("program.toml"), toml).unwrap();
+        }
+
+        let manager = ProgramManager::new(programs_dir.clone());
+        manager.init().await.unwrap();
+
+        manager.install(&source1).await.unwrap();
+        let result = manager.install(&source2).await;
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("already installed"));
+    }
+
+    #[tokio::test]
+    async fn test_uninstall_program() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let programs_dir = temp_dir.path().join("programs");
+        let source = temp_dir.path().join("to-uninstall");
+
+        fs::create_dir_all(&source).unwrap();
+        fs::write(source.join("program.toml"), r#"
+[program]
+name = "removable"
+version = "1.0.0"
+description = "X"
+author = "X"
+"#).unwrap();
+
+        let manager = ProgramManager::new(programs_dir.clone());
+        manager.init().await.unwrap();
+
+        manager.install(&source).await.unwrap();
+        assert!(manager.get_program("removable").await.is_some());
+
+        manager.uninstall("removable").await.unwrap();
+        assert!(manager.get_program("removable").await.is_none());
+
+        // Directory should be gone.
+        assert!(!programs_dir.join("removable").exists());
+    }
+
+    #[tokio::test]
+    async fn test_uninstall_nonexistent_fails() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let manager = ProgramManager::new(temp_dir.path().join("programs"));
+        manager.init().await.unwrap();
+
+        let result = manager.uninstall("nonexistent").await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_set_enabled() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let programs_dir = temp_dir.path().join("programs");
+        let source = temp_dir.path().join("toggle-me");
+
+        fs::create_dir_all(&source).unwrap();
+        fs::write(source.join("program.toml"), r#"
+[program]
+name = "toggle-me"
+version = "1.0.0"
+description = "X"
+author = "X"
+"#).unwrap();
+
+        let manager = ProgramManager::new(programs_dir.clone());
+        manager.init().await.unwrap();
+
+        manager.install(&source).await.unwrap();
+
+        let prog = manager.get_program("toggle-me").await.unwrap();
+        assert!(prog.enabled);
+
+        manager.set_enabled("toggle-me", false).await.unwrap();
+        let prog = manager.get_program("toggle-me").await.unwrap();
+        assert!(!prog.enabled);
+
+        manager.set_enabled("toggle-me", true).await.unwrap();
+        let prog = manager.get_program("toggle-me").await.unwrap();
+        assert!(prog.enabled);
+    }
+
+    #[tokio::test]
+    async fn test_all_tool_schemas() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let programs_dir = temp_dir.path().join("programs");
+
+        // Install two programs with tools.
+        for (name, tool_name) in [("prog-a", "tool-a"), ("prog-b", "tool-b")] {
+            let src = temp_dir.path().join(name);
+            fs::create_dir_all(&src).unwrap();
+            let toml = format!(r#"
+[program]
+name = "{}"
+version = "1.0.0"
+description = "X"
+author = "X"
+
+[tools.{}]
+description = "A tool"
+"#, name, tool_name);
+            fs::write(src.join("program.toml"), toml).unwrap();
+        }
+
+        let manager = ProgramManager::new(programs_dir.clone());
+        manager.init().await.unwrap();
+
+        // Install prog-a (enabled by default), disable prog-b.
+        let src_a = temp_dir.path().join("prog-a");
+        let src_b = temp_dir.path().join("prog-b");
+        manager.install(&src_a).await.unwrap();
+        manager.install(&src_b).await.unwrap();
+        manager.set_enabled("prog-b", false).await.unwrap();
+
+        let schemas = manager.all_tool_schemas().await;
+        assert_eq!(schemas.len(), 1);
+        assert_eq!(schemas[0].name, "tool-a");
+    }
+
+    #[tokio::test]
+    async fn test_get_skill_content() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let programs_dir = temp_dir.path().join("programs");
+        let source = temp_dir.path().join("skill-test");
+
+        fs::create_dir_all(&source).unwrap();
+        fs::write(source.join("program.toml"), r#"
+[program]
+name = "skill-test"
+version = "1.0.0"
+description = "X"
+author = "X"
+"#).unwrap();
+        fs::write(
+            source.join("SKILL.md"),
+            "# Skill Test\n\nUse this program like so.",
+        )
+        .unwrap();
+
+        let manager = ProgramManager::new(programs_dir.clone());
+        manager.init().await.unwrap();
+
+        manager.install(&source).await.unwrap();
+
+        let content = manager.get_skill_content("skill-test").await;
+        assert!(content.is_some());
+        assert!(content.unwrap().contains("Skill Test"));
+    }
+
+    #[tokio::test]
+    async fn test_check_host_requirements() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let programs_dir = temp_dir.path().join("programs");
+        let source = temp_dir.path().join("req-check");
+
+        fs::create_dir_all(&source).unwrap();
+        fs::write(source.join("program.toml"), r#"
+[program]
+name = "req-check"
+version = "1.0.0"
+description = "X"
+author = "X"
+
+[host_requirements]
+required = ["git"]
+optional = ["echo", "nonexistent-tool-xyz"]
+"#).unwrap();
+
+        let manager = ProgramManager::new(programs_dir.clone());
+        manager.init().await.unwrap();
+
+        manager.install(&source).await.unwrap();
+
+        let check = manager.check_host_requirements("req-check").await.unwrap();
+        assert_eq!(check.program_name, "req-check");
+        // git should be available on most systems.
+        assert!(check.missing_required.is_empty());
+        // Optional tools status.
+        assert!(check.optional_available["echo"]);
+        assert!(!check.optional_available["nonexistent-tool-xyz"]);
+    }
+
+    #[tokio::test]
+    async fn test_check_host_requirements_program_not_found() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let manager = ProgramManager::new(temp_dir.path().join("programs"));
+        manager.init().await.unwrap();
+
+        let result = manager.check_host_requirements("ghost").await;
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_copy_dir_all() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let src = temp_dir.path().join("src");
+        let dst = temp_dir.path().join("dst");
+
+        fs::create_dir_all(src.join("subdir")).unwrap();
+        fs::write(src.join("file.txt"), "content").unwrap();
+        fs::write(src.join("subdir").join("nested.txt"), "nested").unwrap();
+
+        copy_dir_all(&src, &dst).unwrap();
+
+        assert!(dst.join("file.txt").exists());
+        assert!(dst.join("subdir").join("nested.txt").exists());
+        assert_eq!(fs::read_to_string(dst.join("file.txt")).unwrap(), "content");
     }
 }

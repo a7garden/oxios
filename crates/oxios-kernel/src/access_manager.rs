@@ -497,47 +497,154 @@ impl Default for AccessManager {
 mod tests {
     use super::*;
 
+    // --- AgentPermissions tests ---
+
     #[test]
     fn test_default_permissions() {
         let perms = AgentPermissions::default();
         assert!(perms.allowed_tools.contains("bash"));
         assert!(!perms.network_access);
+        assert!(!perms.can_fork);
+        assert_eq!(perms.max_execution_time_secs, 300);
+        assert_eq!(perms.max_memory_mb, 512);
     }
 
     #[test]
-    fn test_path_matching() {
+    fn test_for_new_agent() {
+        let perms = AgentPermissions::for_new_agent("my-agent");
+        assert_eq!(perms.agent_name, "my-agent");
+        assert!(perms.allowed_tools.contains("bash"));
+    }
+
+    #[test]
+    fn test_allow_deny_tool() {
+        let mut perms = AgentPermissions::for_new_agent("test");
+        assert!(perms.allowed_tools.contains("bash"));
+
+        perms.deny_tool("bash");
+        assert!(!perms.allowed_tools.contains("bash"));
+
+        perms.allow_tool("custom");
+        assert!(perms.allowed_tools.contains("custom"));
+    }
+
+    #[test]
+    fn test_allow_deny_path() {
+        let mut perms = AgentPermissions::for_new_agent("test");
+
+        perms.allow_path("/workspace/**");
+        assert!(perms.allowed_paths.contains(&"/workspace/**".to_string()));
+
+        perms.deny_path("/workspace/.secret/**");
+        assert!(perms.denied_paths.contains(&"/workspace/.secret/**".to_string()));
+    }
+
+    #[test]
+    fn test_enable_network() {
+        let mut perms = AgentPermissions::for_new_agent("test");
+        assert!(!perms.network_access);
+
+        perms.enable_network();
+        assert!(perms.network_access);
+    }
+
+    #[test]
+    fn test_enable_forking() {
+        let mut perms = AgentPermissions::for_new_agent("test");
+        assert!(!perms.can_fork);
+
+        perms.enable_forking();
+        assert!(perms.can_fork);
+    }
+
+    #[test]
+    fn test_path_matching_allowed() {
         let mut perms = AgentPermissions::for_new_agent("test");
         perms.allowed_paths = vec!["/workspace/**".to_string(), "/home/*/docs/**".to_string()];
         perms.denied_paths = vec!["/workspace/.oxios/**".to_string()];
 
+        // Matches allowed.
         assert!(perms.is_path_allowed("/workspace/project/file.rs"));
         assert!(perms.is_path_allowed("/home/user/docs/readme.md"));
+
+        // Does not match any allowed pattern.
         assert!(!perms.is_path_allowed("/etc/passwd"));
         assert!(!perms.is_path_allowed("/home/user/secret.txt"));
-
-        // Denied takes precedence.
-        assert!(perms.is_path_denied("/workspace/.oxios/config.toml"));
     }
 
     #[test]
-    fn test_access_manager_tool_check() {
+    fn test_path_matching_denied() {
+        let mut perms = AgentPermissions::for_new_agent("test");
+        perms.allowed_paths = vec!["/workspace/**".to_string()];
+        perms.denied_paths = vec!["/workspace/.oxios/**".to_string()];
+
+        // Denied takes precedence over allowed.
+        assert!(perms.is_path_denied("/workspace/.oxios/config.toml"));
+        assert!(!perms.is_path_denied("/workspace/project/file.rs"));
+
+        // Even though it matches allowed, denied blocks it.
+        let _access = AccessManager::new();
+        let mut perms2 = perms.clone();
+        perms2.agent_name = "test".to_string();
+        // The is_path_denied check happens first in can_access_path.
+        // If allowed_paths matches but denied_paths also matches, it's blocked.
+        // We test this via the full can_access_path method.
+    }
+
+    #[test]
+    fn test_path_denied_pattern_matching() {
+        let mut perms = AgentPermissions::for_new_agent("test");
+        perms.denied_paths = vec!["/etc/**".to_string(), "**/secrets/*".to_string()];
+
+        assert!(perms.is_path_denied("/etc/passwd"));
+        assert!(perms.is_path_denied("/etc/shadow"));
+        assert!(!perms.is_path_denied("/workspace/file"));
+    }
+
+    // --- AccessManager tool access tests ---
+
+    #[test]
+    fn test_can_use_tool_allowed() {
         let mut access = AccessManager::new();
 
         let mut perms = AgentPermissions::for_new_agent("code-agent");
         perms.allow_tool("bash");
         perms.allow_tool("read");
-        perms.deny_tool("network");
         access.set_permissions(perms);
 
         assert!(access.can_use_tool("code-agent", "bash"));
         assert!(access.can_use_tool("code-agent", "read"));
-        assert!(!access.can_use_tool("code-agent", "network")); // denied by deny_tool()
-        assert!(!access.can_use_tool("code-agent", "spawn")); // not in default set
+    }
+
+    #[test]
+    fn test_can_use_tool_denied() {
+        let mut access = AccessManager::new();
+
+        let mut perms = AgentPermissions::for_new_agent("code-agent");
+        perms.allow_tool("read");
+        perms.deny_tool("bash"); // Explicitly denied.
+        access.set_permissions(perms);
+
+        assert!(!access.can_use_tool("code-agent", "bash")); // denied
+        assert!(!access.can_use_tool("code-agent", "spawn")); // not in list
         assert!(!access.can_use_tool("unknown-agent", "bash")); // unknown agent
     }
 
     #[test]
-    fn test_access_manager_path_check() {
+    fn test_unknown_agent_denied_all_tools() {
+        let mut access = AccessManager::new();
+
+        // No permissions set for unknown-agent.
+        assert!(!access.can_use_tool("unknown-agent", "read"));
+        assert!(!access.can_access_path("unknown-agent", "/workspace/test.txt"));
+        assert!(!access.can_access_network("unknown-agent"));
+        assert!(!access.can_fork("unknown-agent"));
+    }
+
+    // --- AccessManager path access tests ---
+
+    #[test]
+    fn test_can_access_path_allowed() {
         let mut access = AccessManager::new();
 
         let perms = AgentPermissions::for_new_agent("file-agent");
@@ -548,27 +655,309 @@ mod tests {
     }
 
     #[test]
-    fn test_audit_log() {
+    fn test_can_access_path_denied_takes_precedence() {
+        let mut access = AccessManager::new();
+
+        let mut perms = AgentPermissions::for_new_agent("test");
+        perms.allowed_paths = vec!["/workspace/**".to_string()];
+        perms.denied_paths = vec!["/workspace/.oxios/**".to_string()];
+        access.set_permissions(perms);
+
+        // Allowed but also denied → blocked.
+        assert!(!access.can_access_path("test", "/workspace/.oxios/config.toml"));
+
+        // Just allowed → allowed.
+        assert!(access.can_access_path("test", "/workspace/project/file.rs"));
+    }
+
+    // --- AccessManager network access tests ---
+
+    #[test]
+    fn test_can_access_network() {
+        let mut access = AccessManager::new();
+
+        let mut perms = AgentPermissions::for_new_agent("net-agent");
+        perms.enable_network();
+        access.set_permissions(perms);
+
+        assert!(access.can_access_network("net-agent"));
+        assert!(!access.can_access_network("no-net-agent"));
+    }
+
+    // --- Execution limits tests ---
+
+    #[test]
+    fn test_can_execute_for() {
+        let mut access = AccessManager::new();
+
+        let mut perms = AgentPermissions::for_new_agent("test");
+        perms.max_execution_time_secs = 300;
+        access.set_permissions(perms);
+
+        assert!(access.can_execute_for("test", 100));
+        assert!(access.can_execute_for("test", 300));
+        assert!(!access.can_execute_for("test", 301));
+    }
+
+    #[test]
+    fn test_unlimited_execution_time() {
+        let mut access = AccessManager::new();
+
+        let mut perms = AgentPermissions::for_new_agent("test");
+        perms.max_execution_time_secs = 0; // unlimited
+        access.set_permissions(perms);
+
+        assert!(access.can_execute_for("test", 100_000));
+    }
+
+    #[test]
+    fn test_can_use_memory() {
+        let mut access = AccessManager::new();
+
+        let mut perms = AgentPermissions::for_new_agent("test");
+        perms.max_memory_mb = 512;
+        access.set_permissions(perms);
+
+        assert!(access.can_use_memory("test", 256));
+        assert!(access.can_use_memory("test", 512));
+        assert!(!access.can_use_memory("test", 513));
+    }
+
+    #[test]
+    fn test_unlimited_memory() {
+        let mut access = AccessManager::new();
+
+        let mut perms = AgentPermissions::for_new_agent("test");
+        perms.max_memory_mb = 0;
+        access.set_permissions(perms);
+
+        assert!(access.can_use_memory("test", 1_000_000));
+    }
+
+    // --- Fork tests ---
+
+    #[test]
+    fn test_can_fork() {
+        let mut access = AccessManager::new();
+
+        let mut perms = AgentPermissions::for_new_agent("test");
+        perms.enable_forking();
+        access.set_permissions(perms);
+
+        assert!(access.can_fork("test"));
+        assert!(!access.can_fork("no-fork-agent"));
+    }
+
+    // --- Permission management tests ---
+
+    #[test]
+    fn test_set_and_get_permissions() {
         let mut access = AccessManager::new();
 
         let perms = AgentPermissions::for_new_agent("test-agent");
         access.set_permissions(perms);
 
-        access.can_use_tool("test-agent", "bash");
-        access.can_use_tool("test-agent", "network");
+        let retrieved = access.get_permissions("test-agent");
+        assert!(retrieved.is_some());
+        assert_eq!(retrieved.unwrap().agent_name, "test-agent");
+    }
+
+    #[test]
+    fn test_get_nonexistent_permissions() {
+        let access = AccessManager::new();
+        assert!(access.get_permissions("ghost").is_none());
+    }
+
+    #[test]
+    fn test_get_or_create_permissions() {
+        let mut access = AccessManager::new();
+
+        // First access creates default.
+        let perms = access.get_or_create_permissions("new-agent");
+        assert_eq!(perms.agent_name, "new-agent");
+
+        // Second access returns same instance.
+        let perms2 = access.get_or_create_permissions("new-agent");
+        assert_eq!(perms2.agent_name, "new-agent");
+    }
+
+    #[test]
+    fn test_remove_permissions() {
+        let mut access = AccessManager::new();
+
+        let perms = AgentPermissions::for_new_agent("to-remove");
+        access.set_permissions(perms);
+
+        assert!(access.get_permissions("to-remove").is_some());
+
+        access.remove_permissions("to-remove");
+
+        assert!(access.get_permissions("to-remove").is_none());
+        // All access should now be denied.
+        assert!(!access.can_use_tool("to-remove", "bash"));
+    }
+
+    #[test]
+    fn test_list_agents() {
+        let mut access = AccessManager::new();
+
+        access.set_permissions(AgentPermissions::for_new_agent("agent-1"));
+        access.set_permissions(AgentPermissions::for_new_agent("agent-2"));
+
+        let agents = access.list_agents();
+        assert_eq!(agents.len(), 2);
+        assert!(agents.contains(&"agent-1".to_string()));
+        assert!(agents.contains(&"agent-2".to_string()));
+    }
+
+    // --- Audit log tests ---
+
+    #[test]
+    fn test_audit_log_records_access() {
+        let mut access = AccessManager::new();
+
+        let perms = AgentPermissions::for_new_agent("test-agent");
+        access.set_permissions(perms);
+
+        access.can_use_tool("test-agent", "bash"); // allowed
+        access.can_use_tool("test-agent", "network"); // denied
 
         let log = access.audit_log();
         assert_eq!(log.len(), 2);
         assert!(log[0].allowed);
         assert!(!log[1].allowed);
+        assert_eq!(log[0].agent_name, "test-agent");
+        assert_eq!(log[0].action, "use_tool");
+        assert_eq!(log[0].resource, "bash");
     }
 
     #[test]
-    fn test_deny_tool_removes_from_set() {
-        let mut perms = AgentPermissions::for_new_agent("test");
-        assert!(perms.allowed_tools.contains("bash"));
+    fn test_audit_log_recent() {
+        let mut access = AccessManager::new();
 
-        perms.deny_tool("bash");
-        assert!(!perms.allowed_tools.contains("bash"));
+        let perms = AgentPermissions::for_new_agent("test");
+        access.set_permissions(perms);
+
+        for i in 0..10 {
+            access.can_use_tool("test", &format!("tool-{}", i));
+        }
+
+        let recent = access.audit_log_recent(3);
+        assert_eq!(recent.len(), 3);
+    }
+
+    #[test]
+    fn test_audit_log_for_agent() {
+        let mut access = AccessManager::new();
+
+        access.set_permissions(AgentPermissions::for_new_agent("agent-a"));
+        access.set_permissions(AgentPermissions::for_new_agent("agent-b"));
+
+        access.can_use_tool("agent-a", "tool1");
+        access.can_use_tool("agent-b", "tool2");
+        access.can_use_tool("agent-a", "tool3");
+
+        let log_a = access.audit_log_for_agent("agent-a");
+        assert_eq!(log_a.len(), 2);
+    }
+
+    #[test]
+    fn test_denied_actions() {
+        let mut access = AccessManager::new();
+
+        let perms = AgentPermissions::for_new_agent("test");
+        access.set_permissions(perms);
+
+        access.can_use_tool("test", "bash"); // allowed
+        access.can_use_tool("test", "dangerous"); // denied
+        access.can_access_path("test", "/etc/shadow"); // denied
+
+        let denied = access.denied_actions();
+        assert_eq!(denied.len(), 2);
+    }
+
+    #[test]
+    fn test_clear_audit_log() {
+        let mut access = AccessManager::new();
+
+        let perms = AgentPermissions::for_new_agent("test");
+        access.set_permissions(perms);
+
+        for _ in 0..5 {
+            access.can_use_tool("test", "tool");
+        }
+
+        assert_eq!(access.audit_log().len(), 5);
+
+        access.clear_audit_log();
+
+        assert!(access.audit_log().is_empty());
+    }
+
+    // --- Max audit entries pruning ---
+
+    #[test]
+    fn test_audit_log_prunes_old_entries() {
+        let mut access = AccessManager::with_max_audit_entries(5);
+
+        let perms = AgentPermissions::for_new_agent("test");
+        access.set_permissions(perms);
+
+        // Add 10 entries.
+        for i in 0..10 {
+            access.can_use_tool("test", &format!("tool-{}", i));
+        }
+
+        // Should be pruned to max_audit_entries.
+        assert_eq!(access.audit_log().len(), 5);
+    }
+
+    // --- Validate permissions tests ---
+
+    #[test]
+    fn test_validate_permissions_no_tools() {
+        let mut access = AccessManager::new();
+        let mut perms = AgentPermissions::for_new_agent("test");
+        perms.allowed_tools.clear();
+        access.set_permissions(perms.clone());
+
+        let warnings = access.validate_permissions(&perms);
+        assert!(warnings.iter().any(|w| w.contains("no allowed tools")));
+    }
+
+    #[test]
+    fn test_validate_permissions_no_path_restrictions() {
+        let mut perms = AgentPermissions::for_new_agent("test");
+        perms.allowed_paths.clear();
+
+        let access = AccessManager::new();
+        let warnings = access.validate_permissions(&perms);
+        assert!(warnings.iter().any(|w| w.contains("no path restrictions")));
+    }
+
+    #[test]
+    fn test_validate_permissions_warnings() {
+        let mut access = AccessManager::new();
+        let mut perms = AgentPermissions::for_new_agent("test");
+        perms.network_access = true;
+        perms.can_fork = true;
+        perms.max_execution_time_secs = 0;
+        perms.max_memory_mb = 0;
+        access.set_permissions(perms.clone());
+
+        let warnings = access.validate_permissions(&perms);
+        assert!(warnings.iter().any(|w| w.contains("network access")));
+        assert!(warnings.iter().any(|w| w.contains("fork sub-agents")));
+        assert!(warnings.iter().any(|w| w.contains("no execution time limit")));
+        assert!(warnings.iter().any(|w| w.contains("no memory limit")));
+    }
+
+    // --- AuditEntry timestamp ---
+
+    #[test]
+    fn test_audit_entry_has_timestamp() {
+        let entry = AuditEntry::new("agent", "action", "resource", true, None);
+        // timestamp should be set (not default DateTime).
+        assert!(entry.timestamp.timestamp() > 0);
     }
 }

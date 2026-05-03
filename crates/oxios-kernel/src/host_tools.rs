@@ -145,13 +145,12 @@ pub mod common {
 mod tests {
     use super::*;
 
+    // --- HostToolValidator tests ---
+
     #[test]
     fn test_validate_required_all_present() {
-        // Use tools that should exist on most systems
-        let validator = HostToolValidator::new(
-            vec!["echo".to_string()],
-            Vec::new(),
-        );
+        // Use tools that should exist on most systems.
+        let validator = HostToolValidator::new(vec!["echo".to_string()], Vec::new());
 
         let missing = validator.validate_required();
         assert!(missing.is_empty());
@@ -170,6 +169,20 @@ mod tests {
     }
 
     #[test]
+    fn test_validate_required_multiple_missing() {
+        let validator = HostToolValidator::new(
+            vec![
+                "not-real-1".to_string(),
+                "not-real-2".to_string(),
+            ],
+            Vec::new(),
+        );
+
+        let missing = validator.validate_required();
+        assert_eq!(missing.len(), 2);
+    }
+
+    #[test]
     fn test_check_optional() {
         let validator = HostToolValidator::new(
             Vec::new(),
@@ -184,10 +197,17 @@ mod tests {
 
     #[test]
     fn test_is_tool_available() {
-        // These should exist on most Unix-like systems
+        // These should exist on most Unix-like systems.
         assert!(HostToolValidator::is_tool_available("echo"));
         assert!(HostToolValidator::is_tool_available("ls"));
         assert!(HostToolValidator::is_tool_available("cat"));
+    }
+
+    #[test]
+    fn test_is_tool_available_not_found() {
+        assert!(!HostToolValidator::is_tool_available(
+            "this-tool-definitely-does-not-exist-abc123"
+        ));
     }
 
     #[test]
@@ -204,10 +224,69 @@ mod tests {
     }
 
     #[test]
+    fn test_full_check_missing_required() {
+        let validator = HostToolValidator::new(
+            vec![
+                "echo".to_string(),
+                "not-real-xyz".to_string(),
+            ],
+            Vec::new(),
+        );
+
+        let status = validator.full_check();
+        assert!(!status.all_required_present);
+        assert_eq!(status.missing_required.len(), 1);
+    }
+
+    #[test]
+    fn test_required_tools_accessors() {
+        let validator = HostToolValidator::new(
+            vec!["git".to_string(), "gh".to_string()],
+            vec!["jq".to_string()],
+        );
+
+        assert_eq!(validator.required_tools(), &["git", "gh"]);
+        assert_eq!(validator.optional_tools(), &["jq"]);
+    }
+
+    // --- common module constants ---
+
+    #[test]
     fn test_common_tools_constants() {
         assert!(!common::REQUIRED.is_empty());
         assert!(common::REQUIRED.contains(&"git"));
+
         assert!(!common::OPTIONAL.is_empty());
+        assert!(common::OPTIONAL.contains(&"gh"));
+        assert!(common::OPTIONAL.contains(&"jq"));
+        assert!(common::OPTIONAL.contains(&"curl"));
+
         assert!(!common::CONTAINER_MINIMAL.is_empty());
+        assert!(common::CONTAINER_MINIMAL.contains(&"bash"));
+        assert!(common::CONTAINER_MINIMAL.contains(&"git"));
+    }
+
+    // --- HostToolStatus ---
+
+    #[test]
+    fn test_host_tool_status_serialization() {
+        let status = HostToolStatus {
+            all_required_present: true,
+            missing_required: vec!["git".to_string()],
+            optional_available: HashMap::from([
+                ("jq".to_string(), true),
+                ("curl".to_string(), false),
+            ]),
+        };
+
+        let json = serde_json::to_string(&status).unwrap();
+        assert!(json.contains("all_required_present"));
+        assert!(json.contains("missing_required"));
+        assert!(json.contains("optional_available"));
+
+        // Deserialize back.
+        let loaded: HostToolStatus = serde_json::from_str(&json).unwrap();
+        assert!(loaded.all_required_present);
+        assert_eq!(loaded.missing_required.len(), 1);
     }
 }

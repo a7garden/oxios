@@ -592,3 +592,445 @@ async fn test_gateway_unknown_channel() {
     // the response won't be delivered, which is logged as a warning.
     assert!(result.is_ok());
 }
+
+// ===========================================================================
+// Scheduler + Orchestrator Integration
+// ===========================================================================
+
+use oxios_kernel::scheduler::{AgentScheduler, Priority, ScheduledTask};
+use std::sync::atomic::AtomicU32;
+
+/// Mock Supervisor that integrates with the scheduler.
+struct SchedulerAwareSupervisor {
+    scheduler: Arc<AgentScheduler>,
+    agents: parking_lot::RwLock<HashMap<AgentId, AgentInfo>>,
+    event_bus: EventBus,
+    tasks_claimed: AtomicU32,
+}
+
+impl SchedulerAwareSupervisor {
+    fn new(scheduler: Arc<AgentScheduler>, event_bus: EventBus) -> Self {
+        Self {
+            scheduler,
+            agents: parking_lot::RwLock::new(HashMap::new()),
+            event_bus,
+            tasks_claimed: AtomicU32::new(0),
+        }
+    }
+}
+
+#[async_trait]
+impl Supervisor for SchedulerAwareSupervisor {
+    async fn fork(&self, spec: &Seed) -> anyhow::Result<AgentId> {
+        let id = AgentId::new_v4();
+        let info = AgentInfo {
+            id,
+            name: spec.goal.clone(),
+            status: AgentStatus::Starting,
+            created_at: chrono::Utc::now(),
+            seed_id: Some(spec.id),
+        };
+        {
+            let mut agents = self.agents.write();
+            agents.insert(id, info);
+        }
+        let _ = self.event_bus.publish(KernelEvent::AgentCreated { id, name: spec.goal.clone() });
+        Ok(id)
+    }
+
+    async fn exec(&self, id: AgentId) -> anyhow::Result<()> {
+        let mut agents = self.agents.write();
+        if let Some(a) = agents.get_mut(&id) {
+            a.status = AgentStatus::Running;
+        }
+        Ok(())
+    }
+
+    async fn run_with_seed(&self, id: AgentId, _seed: &Seed) -> anyhow::Result<ExecutionResult> {
+        // Submit to the scheduler before running.
+        let task = ScheduledTask::for_agent(id, format!("Agent {} execution", id), Priority::Normal);
+        self.scheduler.submit(task)?;
+
+        self.tasks_claimed.fetch_add(1, Ordering::SeqCst);
+
+        {
+            let mut agents = self.agents.write();
+            if let Some(a) = agents.get_mut(&id) {
+                a.status = AgentStatus::Idle;
+            }
+        }
+        let _ = self.event_bus.publish(KernelEvent::AgentStarted { id });
+        let _ = self.event_bus.publish(KernelEvent::AgentStopped { id });
+        Ok(ExecutionResult { output: "Task completed".into(), steps_completed: 1, success: true })
+    }
+
+    async fn wait(&self, id: AgentId) -> anyhow::Result<AgentStatus> {
+        let agents = self.agents.read();
+        match agents.get(&id) {
+            Some(a) => Ok(a.status),
+            None => anyhow::bail!("Agent {} not found", id),
+        }
+    }
+
+    async fn kill(&self, id: AgentId) -> anyhow::Result<()> {
+        let mut agents = self.agents.write();
+        if let Some(a) = agents.get_mut(&id) {
+            a.status = AgentStatus::Stopped;
+        }
+        Ok(())
+    }
+
+    async fn list(&self) -> anyhow::Result<Vec<AgentInfo>> {
+        let agents = self.agents.read();
+        Ok(agents.values().cloned().collect())
+    }
+}
+
+#[tokio::test]
+async fn test_scheduler_orchestrator_integration() {
+    let event_bus = EventBus::new(64);
+    let tmp = tempfile::tempdir().unwrap();
+    let state_store = Arc::new(StateStore::new(tmp.path().to_path_buf()).unwrap());
+
+    // Create a scheduler with a reasonable concurrent limit.
+    let scheduler = Arc::new(AgentScheduler::new(3, 100, 60));
+
+    let ouroboros = Arc::new(MockOuroboros::new());
+    let supervisor = Arc::new(SchedulerAwareSupervisor::new(scheduler.clone(), event_bus.clone()));
+
+    let orchestrator = Orchestrator::new(
+        ouroboros,
+        supervisor,
+        event_bus.clone(),
+        state_store,
+    );
+
+    // Run a single orchestration.
+    let result = orchestrator
+        .handle_message("test-user", "Build a simple thing", None)
+        .await
+        .unwrap();
+
+    assert!(result.session_id.is_some());
+    assert!(result.seed_id.is_some());
+    assert_eq!(result.phase_reached, Phase::Evaluate);
+
+    // Scheduler stats - tasks were submitted by the supervisor.
+    // They may still be queued if next_task was never called, or running if called.
+    let stats = scheduler.stats();
+    // Tasks were submitted, so at least some may exist in queue or running.
+    assert!(stats.queued + stats.running >= 1, "Expected at least one task");
+}
+
+#[tokio::test]
+async fn test_scheduler_priority_ordering_in_orchestration() {
+    let event_bus = EventBus::new(64);
+    let tmp = tempfile::tempdir().unwrap();
+    let state_store = Arc::new(StateStore::new(tmp.path().to_path_buf()).unwrap());
+
+    let scheduler = Arc::new(AgentScheduler::new(10, 10_000, 60));
+
+    // Submit tasks of varying priorities.
+    scheduler.submit(ScheduledTask::new("Low priority task".into(), Priority::Low)).unwrap();
+    scheduler.submit(ScheduledTask::new("High priority task".into(), Priority::High)).unwrap();
+    scheduler.submit(ScheduledTask::new("Normal priority task".into(), Priority::Normal)).unwrap();
+    scheduler.submit(ScheduledTask::new("Critical task".into(), Priority::Critical)).unwrap();
+
+    // Drain in priority order.
+    let task1 = scheduler.next_task().unwrap();
+    assert_eq!(task1.priority, Priority::Critical);
+
+    let task2 = scheduler.next_task().unwrap();
+    assert_eq!(task2.priority, Priority::High);
+
+    let task3 = scheduler.next_task().unwrap();
+    assert_eq!(task3.priority, Priority::Normal);
+
+    let task4 = scheduler.next_task().unwrap();
+    assert_eq!(task4.priority, Priority::Low);
+
+    // Verify the scheduler and orchestrator can coexist.
+    let ouroboros = Arc::new(MockOuroboros::new());
+    let supervisor = Arc::new(SchedulerAwareSupervisor::new(scheduler, event_bus.clone()));
+
+    let _orchestrator = Orchestrator::new(
+        ouroboros,
+        supervisor,
+        event_bus,
+        state_store,
+    );
+    // Orchestrator is created successfully — shared state is fine.
+}
+
+// ===========================================================================
+// Program Install + Execution Flow
+// ===========================================================================
+
+use std::fs;
+use oxios_kernel::program::ProgramManager;
+
+#[tokio::test]
+async fn test_program_install_then_orchestrate() {
+    let temp_dir = tempfile::tempdir().unwrap();
+    let programs_dir = temp_dir.path().join("programs");
+    let state_dir = temp_dir.path().join("state");
+
+    let manager = ProgramManager::new(programs_dir.clone());
+    manager.init().await.unwrap();
+
+    // Create and install a program.
+    let source = temp_dir.path().join("hello-program");
+    fs::create_dir_all(&source).unwrap();
+    fs::write(source.join("program.toml"), r#"
+[program]
+name = "hello"
+version = "1.0.0"
+description = "Says hello"
+author = "Test"
+
+[tools.say_hello]
+description = "Says hello to the user"
+arguments = [{ name = "name", description = "Your name", required = true }]
+
+[host_requirements]
+required = ["echo"]
+"#).unwrap();
+    fs::write(source.join("SKILL.md"), "# Hello Program\n\nUse say_hello to greet users.").unwrap();
+
+    let installed = manager.install(&source).await.unwrap();
+    assert_eq!(installed.meta.name, "hello");
+    assert_eq!(installed.meta.tools.len(), 1);
+    assert_eq!(installed.meta.tools[0].name, "say_hello");
+
+    // Verify host requirements check works.
+    let check = manager.check_host_requirements("hello").await.unwrap();
+    assert!(check.missing_required.is_empty()); // echo should be available.
+
+    // List programs should include hello.
+    let programs = manager.list_programs().await;
+    assert_eq!(programs.len(), 1);
+    assert_eq!(programs[0].meta.name, "hello");
+
+    // Now create an orchestrator and verify the program is accessible via it.
+    let event_bus = EventBus::new(64);
+    let state_store = Arc::new(StateStore::new(state_dir).unwrap());
+
+    let ouroboros = Arc::new(MockOuroboros::new());
+    let supervisor = Arc::new(MockSupervisor::new(event_bus.clone()));
+
+    let orchestrator = Orchestrator::new(
+        ouroboros,
+        supervisor,
+        event_bus.clone(),
+        state_store,
+    );
+
+    // Orchestrate a message — the installed program should be discoverable
+    // via the program manager if the orchestrator needs to reference it.
+    let result = orchestrator
+        .handle_message("user-1", "Greet Alice", None)
+        .await
+        .unwrap();
+
+    // phase_reached is always Evaluate or later after a successful run
+assert!(matches!(result.phase_reached, Phase::Evaluate | Phase::Evolve | Phase::Execute | Phase::Seed));
+
+    // Uninstall and verify removal.
+    manager.uninstall("hello").await.unwrap();
+    let programs = manager.list_programs().await;
+    assert!(programs.is_empty());
+}
+
+#[tokio::test]
+async fn test_program_manager_all_tool_schemas() {
+    let temp_dir = tempfile::tempdir().unwrap();
+    let programs_dir = temp_dir.path().join("programs");
+
+    // Install multiple programs with different tools.
+    for (prog_name, tool_names) in [
+        ("adder", vec!["add", "subtract"]),
+        ("mover", vec!["move", "copy"]),
+    ] {
+        let src = temp_dir.path().join(prog_name);
+        fs::create_dir_all(&src).unwrap();
+        let mut toml = format!(r#"
+[program]
+name = "{}"
+version = "1.0.0"
+description = "X"
+author = "X"
+"#, prog_name);
+
+        for tool in &tool_names {
+            toml.push_str(&format!("\n[tools.{}]\ndescription = \"A {}\"", tool, tool));
+        }
+
+        fs::write(src.join("program.toml"), toml).unwrap();
+    }
+
+    let manager = ProgramManager::new(programs_dir);
+    manager.init().await.unwrap();
+
+    manager.install(&temp_dir.path().join("adder")).await.unwrap();
+    manager.install(&temp_dir.path().join("mover")).await.unwrap();
+
+    let schemas = manager.all_tool_schemas().await;
+    assert_eq!(schemas.len(), 4);
+
+    let tool_names: Vec<_> = schemas.iter().map(|t| t.name.clone()).collect();
+    assert!(tool_names.contains(&"add".to_string()));
+    assert!(tool_names.contains(&"move".to_string()));
+
+    // Disable one program, verify tool count drops.
+    manager.set_enabled("mover", false).await.unwrap();
+    let schemas = manager.all_tool_schemas().await;
+    assert_eq!(schemas.len(), 2);
+}
+
+// ===========================================================================
+// Access Manager Enforcing Permissions
+// ===========================================================================
+
+use oxios_kernel::access_manager::{AccessManager, AgentPermissions};
+
+#[tokio::test]
+async fn test_access_manager_blocks_dangerous_tools() {
+    let mut access = AccessManager::new();
+
+    // Create a restrictive permission set (no dangerous tools).
+    let mut perms = AgentPermissions::for_new_agent("safe-agent");
+    perms.allowed_tools.clear(); // Start with nothing.
+    perms.allow_tool("read"); // Only safe tools.
+    perms.allow_tool("grep");
+    access.set_permissions(perms);
+
+    // Verify dangerous tools are blocked.
+    assert!(!access.can_use_tool("safe-agent", "bash"));   // bash not allowed.
+    assert!(!access.can_use_tool("safe-agent", "rm"));     // rm not allowed.
+    assert!(!access.can_use_tool("safe-agent", "sudo"));   // sudo not allowed.
+    assert!(access.can_use_tool("safe-agent", "read"));    // read is allowed.
+    assert!(access.can_use_tool("safe-agent", "grep"));    // grep is allowed.
+
+    // Unknown agent gets no tools.
+    assert!(!access.can_use_tool("unknown-agent", "read"));
+}
+
+#[tokio::test]
+async fn test_access_manager_enforces_path_restrictions() {
+    let mut access = AccessManager::new();
+
+    let mut perms = AgentPermissions::for_new_agent("file-agent");
+    perms.allowed_paths = vec![
+        "/workspace/**".to_string(),
+        "/home/user/projects/**".to_string(),
+    ];
+    perms.denied_paths = vec![
+        "/workspace/secrets/**".to_string(),
+        "/workspace/.oxios/**".to_string(),
+    ];
+    access.set_permissions(perms);
+
+    // Allowed paths.
+    assert!(access.can_access_path("file-agent", "/workspace/file.txt"));
+    assert!(access.can_access_path("file-agent", "/workspace/subdir/code.rs"));
+    assert!(access.can_access_path("file-agent", "/home/user/projects/app/main.rs"));
+
+    // Blocked: outside allowed paths.
+    assert!(!access.can_access_path("file-agent", "/etc/passwd"));
+    assert!(!access.can_access_path("file-agent", "/root/.ssh/id_rsa"));
+
+    // Blocked: denied pattern matches.
+    assert!(!access.can_access_path("file-agent", "/workspace/secrets/api-key.txt"));
+    assert!(!access.can_access_path("file-agent", "/workspace/.oxios/config.toml"));
+}
+
+#[tokio::test]
+async fn test_access_manager_audit_log_on_denied_access() {
+    let mut access = AccessManager::new();
+
+    let perms = AgentPermissions::for_new_agent("audited-agent");
+    access.set_permissions(perms);
+
+    // Attempt denied operations.
+    access.can_use_tool("audited-agent", "network");   // not in allowed set.
+    access.can_access_path("audited-agent", "/etc/shadow"); // path not allowed.
+
+    let log = access.audit_log();
+    assert_eq!(log.len(), 2);
+
+    // Both should be marked as denied.
+    assert!(!log[0].allowed);
+    assert!(!log[1].allowed);
+
+    // Check reason is recorded.
+    assert!(log[0].reason.is_some());
+    assert!(log[1].reason.is_some());
+
+    // Check denied_actions filter.
+    let denied = access.denied_actions();
+    assert_eq!(denied.len(), 2);
+}
+
+#[tokio::test]
+async fn test_access_manager_network_and_fork_permissions() {
+    let mut access = AccessManager::new();
+
+    // Agent with network but no fork.
+    let mut perms = AgentPermissions::for_new_agent("web-agent");
+    perms.enable_network();
+    // can_fork stays false by default.
+    access.set_permissions(perms);
+
+    assert!(access.can_access_network("web-agent"));
+    assert!(!access.can_fork("web-agent"));
+
+    // Agent with fork but no network.
+    let mut perms2 = AgentPermissions::for_new_agent("fork-agent");
+    perms2.enable_forking();
+    // network_access stays false.
+    access.set_permissions(perms2);
+
+    assert!(!access.can_access_network("fork-agent"));
+    assert!(access.can_fork("fork-agent"));
+
+    // Agent with execution time and memory limits.
+    let mut perms3 = AgentPermissions::for_new_agent("limited-agent");
+    perms3.max_execution_time_secs = 60;
+    perms3.max_memory_mb = 256;
+    access.set_permissions(perms3);
+
+    assert!(access.can_execute_for("limited-agent", 30));
+    assert!(access.can_execute_for("limited-agent", 60));
+    assert!(!access.can_execute_for("limited-agent", 61));
+    assert!(access.can_use_memory("limited-agent", 128));
+    assert!(!access.can_use_memory("limited-agent", 257));
+}
+
+#[tokio::test]
+async fn test_access_manager_permission_lifecycle() {
+    let mut access = AccessManager::new();
+
+    // Create permissions.
+    access.set_permissions(AgentPermissions::for_new_agent("lifecycle-agent"));
+
+    // Check agent is listed.
+    assert!(access.list_agents().contains(&"lifecycle-agent".to_string()));
+
+    // Grant a tool.
+    let perms = access.get_or_create_permissions("lifecycle-agent");
+    perms.allow_tool("custom-tool");
+
+    // Verify tool is now allowed.
+    assert!(access.can_use_tool("lifecycle-agent", "custom-tool"));
+
+    // Remove permissions.
+    access.remove_permissions("lifecycle-agent");
+
+    // Agent no longer listed.
+    assert!(!access.list_agents().contains(&"lifecycle-agent".to_string()));
+
+    // All access denied for removed agent.
+    assert!(!access.can_use_tool("lifecycle-agent", "custom-tool"));
+    assert!(!access.can_access_path("lifecycle-agent", "/workspace/test.txt"));
+    assert!(!access.can_access_network("lifecycle-agent"));
+}

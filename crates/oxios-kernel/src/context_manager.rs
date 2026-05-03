@@ -427,6 +427,19 @@ impl Default for ContextManager {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::time::Duration;
+    
+
+    fn _make_context(
+        ctx: &ContextManager,
+        session: &str,
+        content: &str,
+        tokens: usize,
+    ) -> Result<()> {
+        ctx.store_active(session, None, content, tokens)
+    }
+
+    // --- basic store / get tests ---
 
     #[test]
     fn test_store_and_retrieve() {
@@ -436,7 +449,44 @@ mod tests {
         let entry = ctx.get_active("session-1").unwrap();
         assert_eq!(entry.content, "Hello world");
         assert_eq!(entry.tier, ContextTier::Active);
+        assert_eq!(entry.token_count, 2);
     }
+
+    #[test]
+    fn test_get_active_content() {
+        let ctx = ContextManager::new(10_000, 10);
+        ctx.store_active("s1", None, "hello", 1).unwrap();
+        assert_eq!(ctx.get_active_content("s1"), "hello");
+        assert_eq!(ctx.get_active_content("s2"), ""); // missing → empty
+    }
+
+    #[test]
+    fn test_get_nonexistent() {
+        let ctx = ContextManager::new(10_000, 10);
+        assert!(ctx.get_active("none").is_none());
+    }
+
+    #[test]
+    fn test_store_multiple_sessions() {
+        let ctx = ContextManager::new(10_000, 10);
+        ctx.store_active("s1", None, "content1", 100).unwrap();
+        ctx.store_active("s2", None, "content2", 200).unwrap();
+
+        let stats = ctx.stats();
+        assert_eq!(stats.active_count, 2);
+        assert_eq!(stats.active_tokens, 300);
+    }
+
+    #[test]
+    fn test_delete_context() {
+        let ctx = ContextManager::new(10_000, 10);
+        ctx.store_active("s1", None, "hello", 1).unwrap();
+        ctx.delete("s1").unwrap();
+        assert!(ctx.get_active("s1").is_none());
+        assert_eq!(ctx.stats().active_count, 0);
+    }
+
+    // --- demote / compress tests ---
 
     #[test]
     fn test_demote_to_cache() {
@@ -450,33 +500,30 @@ mod tests {
     }
 
     #[test]
-    fn test_has_capacity() {
-        let ctx = ContextManager::new(100, 10);
+    fn test_demote_all_to_cache() {
+        let ctx = ContextManager::new(10_000, 10);
 
-        assert!(ctx.has_capacity(50));
-        assert!(ctx.has_capacity(100));
-        assert!(!ctx.has_capacity(101));
+        ctx.store_active("s1", None, "A", 10).unwrap();
+        ctx.store_active("s2", None, "B", 20).unwrap();
+        ctx.demote_all_to_cache().unwrap();
 
-        ctx.store_active("session-1", None, "x", 60).unwrap();
-        assert!(!ctx.has_capacity(50));
-        assert!(ctx.has_capacity(30));
+        let stats = ctx.stats();
+        assert_eq!(stats.active_count, 0);
+        assert_eq!(stats.cache_count, 2);
     }
 
     #[test]
-    fn test_stats() {
-        let ctx = ContextManager::new(1000, 10);
+    fn test_clear_active_demotes() {
+        let ctx = ContextManager::new(10_000, 10);
+        ctx.store_active("s1", None, "A", 10).unwrap();
+        ctx.clear_active().unwrap();
 
-        ctx.store_active("s1", None, "A", 100).unwrap();
-        ctx.store_active("s2", None, "B", 200).unwrap();
-
-        let stats = ctx.stats();
-        assert_eq!(stats.active_count, 2);
-        assert_eq!(stats.active_tokens, 300);
-        assert_eq!(stats.active_limit, 1000);
+        // Clear calls demote_all_to_cache internally.
+        assert_eq!(ctx.stats().active_count, 0);
     }
 
-    #[tokio::test]
-    async fn test_compress() {
+    #[test]
+    fn test_compress_lru_eviction() {
         let ctx = ContextManager::new(10_000, 2);
 
         // Create 5 contexts in cache.
@@ -493,5 +540,181 @@ mod tests {
         let stats = ctx.stats();
         assert_eq!(stats.cache_count, 2);
         assert_eq!(stats.archive_count, 3);
+    }
+
+    #[test]
+    fn test_compress_no_op_when_within_limit() {
+        let ctx = ContextManager::new(10_000, 10);
+
+        // Create exactly cache_limit entries.
+        for i in 0..5 {
+            let id = format!("session-{}", i);
+            ctx.store_active(&id, None, "content", 10).unwrap();
+            ctx.demote_to_cache(&id).unwrap();
+        }
+
+        let archived = ctx.compress_archive().unwrap();
+        assert_eq!(archived, 0);
+    }
+
+    #[test]
+    fn test_restore_from_archive() {
+        let ctx = ContextManager::new(10_000, 2);
+
+        // Create 5 cache entries → 3 archived.
+        for i in 0..5 {
+            let id = format!("session-{}", i);
+            ctx.store_active(&id, None, "content", 10).unwrap();
+            ctx.demote_to_cache(&id).unwrap();
+        }
+        let archived = ctx.compress_archive().unwrap();
+        assert_eq!(archived, 3);
+
+        // Restore the first archived entry.
+        let restored = ctx.restore_from_archive("session-0").unwrap();
+        assert!(restored.is_some());
+        assert_eq!(restored.unwrap().tier, ContextTier::Cache);
+
+        // Restore a non-archived entry should be None.
+        let restored = ctx.restore_from_archive("session-4").unwrap();
+        assert!(restored.is_none());
+    }
+
+    // --- token limit / capacity tests ---
+
+    #[test]
+    fn test_has_capacity() {
+        let ctx = ContextManager::new(100, 10);
+
+        assert!(ctx.has_capacity(50));
+        assert!(ctx.has_capacity(100));
+        assert!(!ctx.has_capacity(101));
+
+        ctx.store_active("session-1", None, "x", 60).unwrap();
+        assert!(!ctx.has_capacity(50));
+        assert!(ctx.has_capacity(30)); // 60 + 30 = 90 <= 100
+    }
+
+    #[test]
+    fn test_active_capacity_remaining() {
+        let ctx = ContextManager::new(100, 10);
+        assert_eq!(ctx.active_capacity_remaining(), 100);
+
+        ctx.store_active("s1", None, "x", 40).unwrap();
+        assert_eq!(ctx.active_capacity_remaining(), 60);
+    }
+
+    #[test]
+    fn test_enforce_active_limit_auto_demotes() {
+        let ctx = ContextManager::new(100, 10);
+
+        // Store a context that takes 50 tokens.
+        ctx.store_active("s1", None, "A", 50).unwrap();
+
+        // Trying to store 60 tokens should fail without making room.
+        // But enforce_active_limit should demote s1 to make room.
+        ctx.store_active("s2", None, "B", 60).unwrap();
+
+        let stats = ctx.stats();
+        // s1 was demoted, so active only has s2's 60 tokens.
+        assert_eq!(stats.active_tokens, 60);
+        assert_eq!(stats.cache_count, 1);
+    }
+
+    #[test]
+    fn test_enforce_limit_multiple_demotions() {
+        let ctx = ContextManager::new(100, 10);
+
+        // Add three 40-token contexts.
+        ctx.store_active("s1", None, "A", 40).unwrap();
+        ctx.store_active("s2", None, "B", 40).unwrap();
+        ctx.store_active("s3", None, "C", 40).unwrap();
+
+        // Active is now full (80+40=120 > 100). s1 is demoted to make room.
+        let stats = ctx.stats();
+        assert!(stats.active_tokens <= 100); // s2 + s3 fit in active (80 tokens)
+        assert!(stats.cache_count >= 1); // s1 was demoted
+    }
+
+    #[test]
+    fn test_active_token_usage() {
+        let ctx = ContextManager::new(10_000, 10);
+
+        assert_eq!(ctx.active_token_usage(), 0);
+
+        ctx.store_active("s1", None, "A", 100).unwrap();
+        ctx.store_active("s2", None, "B", 200).unwrap();
+
+        assert_eq!(ctx.active_token_usage(), 300);
+
+        // Demote one, should drop to 100.
+        ctx.demote_to_cache("s1").unwrap();
+        assert_eq!(ctx.active_token_usage(), 200);
+    }
+
+    // --- stats ---
+
+    #[test]
+    fn test_stats() {
+        let ctx = ContextManager::new(1000, 10);
+
+        ctx.store_active("s1", None, "A", 100).unwrap();
+        ctx.store_active("s2", None, "B", 200).unwrap();
+
+        let stats = ctx.stats();
+        assert_eq!(stats.active_count, 2);
+        assert_eq!(stats.active_tokens, 300);
+        assert_eq!(stats.active_limit, 1000);
+        assert_eq!(stats.cache_limit, 10);
+    }
+
+    #[test]
+    fn test_active_sessions() {
+        let ctx = ContextManager::new(1000, 10);
+        ctx.store_active("s1", None, "A", 10).unwrap();
+        ctx.store_active("s2", None, "B", 10).unwrap();
+
+        let sessions = ctx.active_sessions();
+        assert_eq!(sessions.len(), 2);
+        assert!(sessions.contains(&"s1".to_string()));
+        assert!(sessions.contains(&"s2".to_string()));
+    }
+
+    #[test]
+    fn test_contexts_for_agent() {
+        let ctx = ContextManager::new(1000, 10);
+        let agent = AgentId::new_v4();
+
+        ctx.store_active("s1", Some(agent), "A", 10).unwrap();
+        ctx.store_active("s2", None, "B", 10).unwrap(); // No agent.
+        ctx.store_active("s3", Some(agent), "C", 10).unwrap();
+
+        let contexts = ctx.contexts_for_agent(&agent);
+        assert_eq!(contexts.len(), 2);
+    }
+
+    #[test]
+    fn test_last_accessed_updated_on_get() {
+        let ctx = ContextManager::new(1000, 10);
+        ctx.store_active("s1", None, "A", 10).unwrap();
+
+        // Get the entry.
+        let entry1 = ctx.get_active("s1").unwrap();
+        let t1 = entry1.last_accessed;
+
+        // Sleep a bit.
+        std::thread::sleep(Duration::from_millis(10));
+
+        // Get again.
+        let entry2 = ctx.get_active("s1").unwrap();
+        assert!(entry2.last_accessed >= t1);
+    }
+
+    #[test]
+    fn test_default_context_manager() {
+        let ctx = ContextManager::default();
+        let stats = ctx.stats();
+        assert_eq!(stats.active_limit, 100_000);
+        assert_eq!(stats.cache_limit, 50);
     }
 }
