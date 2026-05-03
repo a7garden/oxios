@@ -1,12 +1,14 @@
 //! API routes for the web channel.
 //!
-//! Provides five route groups:
+//! Provides route groups:
 //! - **Chat**: POST /api/chat, GET /api/chat/stream (WebSocket)
 //! - **Control**: GET /api/status, GET /api/agents, POST /api/agents/:id/kill
 //! - **Config**: GET /api/config, PUT /api/config
 //! - **Browse**: GET /api/workspace/tree, GET/PUT /api/workspace/file/*
 //! - **Seeds**: GET /api/seeds, GET /api/seeds/:id
 //! - **Memory**: GET /api/memory, GET /api/memory/:name
+//! - **Gardens**: GET /api/gardens, POST /api/gardens, POST /api/gardens/:name/start,
+//!   POST /api/gardens/:name/stop, DELETE /api/gardens/:name, POST /api/gardens/:name/exec
 //! - **Events**: GET /api/events (SSE stream)
 
 use axum::{
@@ -19,7 +21,7 @@ use axum::{
         sse::{Event as SseEvent, Sse},
         IntoResponse,
     },
-    routing::{get, post, put},
+    routing::{delete, get, post, put},
     Json, Router,
 };
 use futures_util::{SinkExt, StreamExt as FuturesStreamExt};
@@ -58,6 +60,13 @@ pub fn build_routes() -> Router<Arc<AppState>> {
         // Memory
         .route("/api/memory", get(handle_memory_list))
         .route("/api/memory/{name}", get(handle_memory_get))
+        // Gardens
+        .route("/api/gardens", get(handle_gardens_list))
+        .route("/api/gardens", post(handle_garden_create))
+        .route("/api/gardens/{name}/start", post(handle_garden_start))
+        .route("/api/gardens/{name}/stop", post(handle_garden_stop))
+        .route("/api/gardens/{name}", delete(handle_garden_remove))
+        .route("/api/gardens/{name}/exec", post(handle_garden_exec))
         // Events
         .route("/api/events", get(handle_events))
 }
@@ -561,6 +570,179 @@ async fn handle_memory_get(
     }
 
     Err(StatusCode::NOT_FOUND)
+}
+
+// ---------------------------------------------------------------------------
+// Gardens
+// ---------------------------------------------------------------------------
+
+/// Garden summary for listing.
+#[derive(Debug, Serialize)]
+struct GardenSummary {
+    /// Garden name.
+    name: String,
+    /// Image tag used.
+    image_tag: String,
+    /// Whether the garden is currently running.
+    running: bool,
+    /// Creation timestamp.
+    created_at: String,
+}
+
+/// Request body for creating a garden.
+#[derive(Debug, Deserialize)]
+struct GardenCreateRequest {
+    /// Name for the new garden.
+    name: String,
+}
+
+/// Request body for executing a command in a garden.
+#[derive(Debug, Deserialize)]
+struct GardenExecRequest {
+    /// Command to execute.
+    command: Vec<String>,
+    /// Working directory (optional, defaults to /workspace).
+    #[serde(default)]
+    workdir: Option<String>,
+}
+
+/// Response body for a garden exec command.
+#[derive(Debug, Serialize)]
+struct GardenExecResponse {
+    /// Standard output.
+    stdout: String,
+    /// Standard error.
+    stderr: String,
+    /// Exit code.
+    exit_code: i32,
+    /// Duration in milliseconds.
+    duration_ms: u64,
+}
+
+/// GET /api/gardens — List gardens.
+async fn handle_gardens_list(
+    state: State<Arc<AppState>>,
+) -> Result<Json<Vec<GardenSummary>>, StatusCode> {
+    let manager = state.garden_manager.clone();
+    match manager.list_gardens().await {
+        Ok(gardens) => {
+            let summaries = gardens
+                .into_iter()
+                .map(|g| GardenSummary {
+                    name: g.name,
+                    image_tag: g.image_tag,
+                    running: g.running,
+                    created_at: g.created_at,
+                })
+                .collect();
+            Ok(Json(summaries))
+        }
+        Err(e) => {
+            tracing::error!(error = %e, "Failed to list gardens");
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
+        }
+    }
+}
+
+/// POST /api/gardens — Create a new garden.
+async fn handle_garden_create(
+    state: State<Arc<AppState>>,
+    Json(body): Json<GardenCreateRequest>,
+) -> Result<Json<GardenSummary>, (StatusCode, String)> {
+    let manager = state.garden_manager.clone();
+    match manager.new_garden(&body.name).await {
+        Ok(()) => {
+            tracing::info!(garden = %body.name, "Garden created via API");
+            Ok(Json(GardenSummary {
+                name: body.name,
+                image_tag: "oxios:latest".into(),
+                running: false,
+                created_at: chrono::Utc::now().to_rfc3339(),
+            }))
+        }
+        Err(e) => {
+            tracing::error!(error = %e, garden = %body.name, "Failed to create garden");
+            Err((StatusCode::BAD_REQUEST, e.to_string()))
+        }
+    }
+}
+
+/// POST /api/gardens/:name/start — Start a garden container.
+async fn handle_garden_start(
+    state: State<Arc<AppState>>,
+    Path(name): Path<String>,
+) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    let manager = state.garden_manager.clone();
+    match manager.start_garden(&name).await {
+        Ok(()) => {
+            tracing::info!(garden = %name, "Garden started via API");
+            Ok(Json(serde_json::json!({"status": "started", "name": name})))
+        }
+        Err(e) => {
+            tracing::error!(error = %e, garden = %name, "Failed to start garden");
+            Err((StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
+        }
+    }
+}
+
+/// POST /api/gardens/:name/stop — Stop a garden container.
+async fn handle_garden_stop(
+    state: State<Arc<AppState>>,
+    Path(name): Path<String>,
+) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    let manager = state.garden_manager.clone();
+    match manager.stop_garden(&name).await {
+        Ok(()) => {
+            tracing::info!(garden = %name, "Garden stopped via API");
+            Ok(Json(serde_json::json!({"status": "stopped", "name": name})))
+        }
+        Err(e) => {
+            tracing::error!(error = %e, garden = %name, "Failed to stop garden");
+            Err((StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
+        }
+    }
+}
+
+/// DELETE /api/gardens/:name — Remove a garden.
+async fn handle_garden_remove(
+    state: State<Arc<AppState>>,
+    Path(name): Path<String>,
+) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    let manager = state.garden_manager.clone();
+    match manager.remove_garden(&name).await {
+        Ok(()) => {
+            tracing::info!(garden = %name, "Garden removed via API");
+            Ok(Json(serde_json::json!({"status": "removed", "name": name})))
+        }
+        Err(e) => {
+            tracing::error!(error = %e, garden = %name, "Failed to remove garden");
+            Err((StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
+        }
+    }
+}
+
+/// POST /api/gardens/:name/exec — Execute a command in a garden.
+async fn handle_garden_exec(
+    state: State<Arc<AppState>>,
+    Path(name): Path<String>,
+    Json(body): Json<GardenExecRequest>,
+) -> Result<Json<GardenExecResponse>, (StatusCode, String)> {
+    let manager = state.garden_manager.clone();
+    match manager
+        .exec_in_garden(&name, &body.command, body.workdir.as_deref())
+        .await
+    {
+        Ok(result) => Ok(Json(GardenExecResponse {
+            stdout: result.stdout,
+            stderr: result.stderr,
+            exit_code: result.exit_code,
+            duration_ms: result.duration_ms,
+        })),
+        Err(e) => {
+            tracing::error!(error = %e, garden = %name, "Failed to exec in garden");
+            Err((StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------

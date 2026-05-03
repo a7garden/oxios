@@ -92,6 +92,19 @@ pub struct ContainerConfig {
     /// Base directory for container gardens.
     #[serde(default = "default_garden_path")]
     pub garden_path: String,
+    /// Default image tag for new gardens.
+    #[serde(default = "default_image_tag")]
+    pub image_tag: String,
+    /// Allowed host commands (for the Host Exec Bridge).
+    /// If empty, all bare-name commands are allowed (development mode).
+    #[serde(default)]
+    pub allowed_host_commands: Vec<String>,
+    /// Default memory limit for garden containers.
+    #[serde(default = "default_memory_limit")]
+    pub memory_limit: String,
+    /// Default CPU limit for garden containers.
+    #[serde(default = "default_cpu_limit")]
+    pub cpu_limit: u64,
 }
 
 fn default_garden_path() -> String {
@@ -100,10 +113,26 @@ fn default_garden_path() -> String {
         .unwrap_or_else(|_| "./gardens".into())
 }
 
+fn default_image_tag() -> String {
+    "oxios:latest".into()
+}
+
+fn default_memory_limit() -> String {
+    "4g".into()
+}
+
+fn default_cpu_limit() -> u64 {
+    4
+}
+
 impl Default for ContainerConfig {
     fn default() -> Self {
         Self {
             garden_path: default_garden_path(),
+            image_tag: default_image_tag(),
+            allowed_host_commands: Vec::new(),
+            memory_limit: default_memory_limit(),
+            cpu_limit: default_cpu_limit(),
         }
     }
 }

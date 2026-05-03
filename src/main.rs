@@ -9,7 +9,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use oxios_gateway::Gateway;
-use oxios_kernel::{AgentRuntime, EventBus, OxiosConfig, StateStore};
+use oxios_kernel::{AgentRuntime, EventBus, GardenManager, HostExecBridge, OxiosConfig, StateStore};
 use oxios_ouroboros::OuroborosEngine;
 use oxios_web::WebServer;
 
@@ -101,13 +101,27 @@ async fn main() -> Result<()> {
     // Register the web channel with the gateway.
     gateway.register(Box::new(web_channel)).await;
 
-    // Create the web server with the channel handle, event bus, and state store.
+    // Initialize the garden manager.
+    let gardens_base = PathBuf::from(&config.container.garden_path);
+    let host_exec = Arc::new(HostExecBridge::new(
+        gardens_base.clone(),
+        config.container.allowed_host_commands.clone(),
+    ));
+    let state_store_for_gardens = StateStore::new(PathBuf::from(&config.kernel.workspace))?;
+    let garden_manager = GardenManager::with_apple_backend(
+        host_exec,
+        Arc::new(state_store_for_gardens),
+        gardens_base,
+    );
+
+    // Create the web server with the channel handle, event bus, state store, and garden manager.
     let web_server = WebServer::new(
         &config.gateway.host,
         config.gateway.port,
         channel_handle,
         event_bus,
         state_store,
+        garden_manager,
     );
 
     tracing::info!(

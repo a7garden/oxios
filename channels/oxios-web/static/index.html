@@ -512,6 +512,161 @@ html, body {
   color: var(--text-primary);
 }
 
+/* ── Gardens Panel ── */
+.garden-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.garden-card .garden-info {
+  flex: 1;
+}
+
+.garden-card .garden-name {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.garden-card .garden-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+.garden-actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.garden-status-badge {
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.garden-status-running { background: rgba(63,185,80,0.15); color: var(--green); }
+.garden-status-stopped { background: rgba(139,148,158,0.15); color: var(--text-secondary); }
+
+.garden-exec-panel {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-top: 16px;
+}
+
+.garden-exec-panel h3 {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--accent);
+  margin-bottom: 12px;
+}
+
+.garden-exec-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.garden-exec-row input {
+  flex: 1;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 8px 12px;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  outline: none;
+}
+
+.garden-exec-row input:focus {
+  border-color: var(--accent);
+}
+
+.garden-exec-output {
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 200px;
+  overflow-y: auto;
+  color: var(--text-secondary);
+}
+
+/* ── Modal ── */
+.modal-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.modal {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 24px;
+  min-width: 360px;
+  max-width: 480px;
+}
+
+.modal h3 {
+  font-family: var(--font-mono);
+  font-size: 15px;
+  margin-bottom: 16px;
+  color: var(--accent);
+}
+
+.modal label {
+  display: block;
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+  font-family: var(--font-mono);
+}
+
+.modal input {
+  width: 100%;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  outline: none;
+  margin-bottom: 16px;
+}
+
+.modal input:focus {
+  border-color: var(--accent);
+}
+
+.modal-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
 /* ── Empty State ── */
 .empty-state {
   text-align: center;
@@ -612,6 +767,9 @@ html, body {
       <div class="nav-item" data-panel="memory">
         <span class="icon">🧠</span><span>Memory</span>
       </div>
+      <div class="nav-item" data-panel="gardens">
+        <span class="icon">🌿</span><span>Gardens</span>
+      </div>
       <div class="nav-item" data-panel="events">
         <span class="icon">📡</span><span>Events</span>
       </div>
@@ -710,6 +868,23 @@ html, body {
       </div>
     </div>
 
+    <!-- Gardens Panel -->
+    <div class="panel" id="panel-gardens">
+      <div class="panel-header">
+        <h2>🌿 Gardens</h2>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-sm" id="gardens-refresh">Refresh</button>
+          <button class="btn btn-sm" id="gardens-create-btn" style="background:var(--green);color:#000">+ New</button>
+        </div>
+      </div>
+      <div class="panel-body" id="gardens-body">
+        <div class="empty-state">
+          <div class="icon">🌿</div>
+          <p>No gardens yet. Create a garden to set up an isolated execution environment.</p>
+        </div>
+      </div>
+    </div>
+
     <!-- Events Panel -->
     <div class="panel" id="panel-events">
       <div class="panel-header">
@@ -767,6 +942,7 @@ function switchPanel(panel) {
     case 'workspace': loadWorkspaceTree(); break;
     case 'seeds': loadSeeds(); break;
     case 'memory': loadMemory(); break;
+    case 'gardens': loadGardens(); break;
     case 'config': loadConfig(); break;
   }
 }
@@ -1161,6 +1337,171 @@ async function loadConfig() {
 }
 
 document.getElementById('config-refresh').addEventListener('click', loadConfig);
+
+// ── Gardens ──
+let selectedGarden = null;
+
+async function loadGardens() {
+  const body = document.getElementById('gardens-body');
+  try {
+    const res = await fetch(`${API}/api/gardens`);
+    const gardens = await res.json();
+
+    if (!gardens.length) {
+      body.innerHTML = `<div class="empty-state"><div class="icon">🌿</div><p>No gardens yet. Create a garden to set up an isolated execution environment.</p></div>`;
+      return;
+    }
+
+    let html = '';
+    for (const g of gardens) {
+      const statusCls = g.running ? 'garden-status-running' : 'garden-status-stopped';
+      const statusText = g.running ? 'RUNNING' : 'STOPPED';
+      const startStopBtn = g.running
+        ? `<button class="btn btn-danger btn-sm" onclick="stopGarden('${escAttr(g.name)}')">Stop</button>`
+        : `<button class="btn btn-sm" style="background:var(--green);color:#000" onclick="startGarden('${escAttr(g.name)}')">Start</button>`;
+
+      html += `
+        <div class="garden-card">
+          <div class="garden-info">
+            <div class="garden-name">🌿 ${esc(g.name)}</div>
+            <div class="garden-meta">${esc(g.image_tag)} · ${g.created_at || 'unknown'}</div>
+          </div>
+          <div class="garden-actions">
+            <span class="garden-status-badge ${statusCls}">${statusText}</span>
+            ${startStopBtn}
+            <button class="btn btn-sm" onclick="showGardenExec('${escAttr(g.name)}')">Exec</button>
+            <button class="btn btn-danger btn-sm" onclick="removeGarden('${escAttr(g.name)}')">Delete</button>
+          </div>
+        </div>
+      `;
+    }
+
+    if (selectedGarden) {
+      html += `
+        <div class="garden-exec-panel" id="garden-exec-panel">
+          <h3>Exec in: ${esc(selectedGarden)}</h3>
+          <div class="garden-exec-row">
+            <input type="text" id="garden-exec-cmd" placeholder="Command (e.g. bash -c 'ls -la')" />
+            <button class="btn btn-sm" onclick="execInGarden('${escAttr(selectedGarden)}')">Run</button>
+          </div>
+          <div class="garden-exec-output" id="garden-exec-output">$ ready</div>
+        </div>
+      `;
+    }
+
+    body.innerHTML = html;
+  } catch (err) {
+    body.innerHTML = `<div class="empty-state"><p>Error: ${esc(err.message)}</p></div>`;
+  }
+}
+
+async function startGarden(name) {
+  try {
+    await fetch(`${API}/api/gardens/${encodeURIComponent(name)}/start`, { method: 'POST' });
+    loadGardens();
+  } catch (err) {
+    alert(`Failed to start garden: ${err.message}`);
+  }
+}
+
+async function stopGarden(name) {
+  try {
+    await fetch(`${API}/api/gardens/${encodeURIComponent(name)}/stop`, { method: 'POST' });
+    loadGardens();
+  } catch (err) {
+    alert(`Failed to stop garden: ${err.message}`);
+  }
+}
+
+async function removeGarden(name) {
+  if (!confirm(`Remove garden "${name}"? This will delete all files.`)) return;
+  try {
+    await fetch(`${API}/api/gardens/${encodeURIComponent(name)}`, { method: 'DELETE' });
+    if (selectedGarden === name) selectedGarden = null;
+    loadGardens();
+  } catch (err) {
+    alert(`Failed to remove garden: ${err.message}`);
+  }
+}
+
+function showGardenExec(name) {
+  selectedGarden = name;
+  loadGardens();
+}
+
+async function execInGarden(name) {
+  const cmdInput = document.getElementById('garden-exec-cmd');
+  const output = document.getElementById('garden-exec-output');
+  if (!cmdInput || !output) return;
+
+  const cmdStr = cmdInput.value.trim();
+  if (!cmdStr) return;
+
+  output.textContent = `$ ${cmdStr}\nRunning...`;
+  cmdInput.value = '';
+
+  try {
+    // Parse command string into array
+    const command = cmdStr.split(/\s+/);
+    const res = await fetch(`${API}/api/gardens/${encodeURIComponent(name)}/exec`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ command }),
+    });
+    const data = await res.json();
+
+    let result = '';
+    if (data.stdout) result += data.stdout;
+    if (data.stderr) result += (result ? '\n' : '') + data.stderr;
+    result += `\n[exit ${data.exit_code}, ${data.duration_ms}ms]`;
+    output.textContent = `$ ${cmdStr}\n${result}`;
+  } catch (err) {
+    output.textContent = `$ ${cmdStr}\nError: ${err.message}`;
+  }
+}
+
+document.getElementById('gardens-refresh').addEventListener('click', loadGardens);
+
+document.getElementById('gardens-create-btn').addEventListener('click', () => {
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.innerHTML = `
+    <div class="modal">
+      <h3>Create Garden</h3>
+      <label>Garden Name</label>
+      <input type="text" id="garden-create-name" placeholder="my-project" />
+      <div class="modal-actions">
+        <button class="btn btn-sm" id="garden-create-cancel">Cancel</button>
+        <button class="btn btn-sm" style="background:var(--green);color:#000" id="garden-create-submit">Create</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+
+  document.getElementById('garden-create-cancel').addEventListener('click', () => overlay.remove());
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+
+  document.getElementById('garden-create-submit').addEventListener('click', async () => {
+    const name = document.getElementById('garden-create-name').value.trim();
+    if (!name) return;
+    try {
+      const res = await fetch(`${API}/api/gardens`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        alert(`Error: ${err.error || 'Failed to create garden'}`);
+        return;
+      }
+      overlay.remove();
+      loadGardens();
+    } catch (err) {
+      alert(`Failed to create garden: ${err.message}`);
+    }
+  });
+});
 
 // ── Utilities ──
 function esc(s) {
