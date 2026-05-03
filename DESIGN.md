@@ -31,54 +31,67 @@ Both philosophies reject uncertainty. Unix fails fast on bad input. Ouroboros cl
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                      Gateway                            │
-│            (channel-agnostic message hub)              │
-│                                                         │
-│   ┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐        │
-│   │ Web  │ │ CLI  │ │Tele- │ │Disc- │ │ API  │  ...    │
-│   │      │ │      │ │gram  │ │ord   │ │      │        │
-│   └──┬───┘ └──┬───┘ └──┬───┘ └──┬───┘ └──┬───┘        │
-│      └────────┴────────┴────────┴────────┘              │
-│                     │                                    │
-│           message in → route → dispatch                  │
-└─────────────────────┼───────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│                      Gateway                                 │
+│            (channel-agnostic message hub)                  │
+│                                                             │
+│   ┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐                      │
+│   │ Web  │ │ CLI  │ │Telegram│ │Discord│ ...                 │
+│   │      │ │      │ │       │ │       │                      │
+│   └──┬───┘ └──┬───┘ └──┬───┘ └──┬───┘                      │
+│      └────────┴────────┴────────┴─────────┘                │
+│                     │                                       │
+│           message in → route → dispatch                     │
+└─────────────────────┼───────────────────────────────────────┘
                       │
                       ▼
-┌─────────────────────────────────────────────────────────┐
-│                  Kernel (oxios-kernel)                   │
-│                                                          │
-│  ┌─────────────┐  ┌──────────────┐  ┌───────────────┐   │
-│  │ Supervisor  │  │ Event Bus    │  │ State Store   │   │
-│  │ (lifecycle) │  │ (broadcast)  │  │ (markdown)    │   │
-│  └─────────────┘  └──────────────┘  └───────────────┘   │
-│                                                          │
-│  ┌─────────────────────────────────────────────────┐   │
-│  │          Ouroboros Protocol                      │   │
-│  │  interview → seed → execute → evaluate → evolve │   │
-│  └─────────────────────────────────────────────────┘   │
-│                                                          │
-│  ┌─────────────────────────────────────────────────┐   │
-│  │          Agent Runtime (oxi-agent)               │   │
-│  │  tools: read, write, edit, bash, grep, find, ls  │   │
-│  │  LLM: oxi-ai (multi-provider)                    │   │
-│  └─────────────────────────────────────────────────┘   │
-│                                                          │
-│  ┌─────────────────────────────────────────────────┐   │
-│  │         AIOS-Inspired Kernel Extensions          │   │
-│  │  ┌──────────────┐ ┌───────────────┐ ┌──────────┐│   │
-│  │  │   Scheduler  │ │ContextManager │ │  Access  ││   │
-│  │  │ (priority/   │ │  (3-tier:     │ │  Manager ││   │
-│  │  │  rate-limit) │ │  active/cache/│ │ (OWASP)  ││   │
-│  │  └──────────────┘ └───────────────┘ └──────────┘│   │
-│  └─────────────────────────────────────────────────┘   │
-└──────────────────────────────────────────────────────────┘
+┌───────────────────────────────────────────────────────────────┐
+│                  Kernel (oxios-kernel)                         │
+│                                                                │
+│  ┌─────────────┐  ┌──────────────┐  ┌───────────────┐         │
+│  │ Supervisor  │  │ Event Bus    │  │ State Store   │         │
+│  │ (lifecycle) │  │ (broadcast) │  │ (markdown)    │         │
+│  └─────────────┘  └──────────────┘  └───────────────┘         │
+│                                                                │
+│  ┌────────────────────────────────────────────────────────┐   │
+│  │          Ouroboros Protocol                              │   │
+│  │  interview → seed → execute → evaluate → evolve         │   │
+│  └────────────────────────────────────────────────────────┘   │
+│                                                                │
+│  ┌────────────────────────────────────────────────────────┐   │
+│  │          Agent Runtime (oxi-agent)                      │   │
+│  │  tools: read, write, edit, bash, grep, find, ls         │   │
+│  │  LLM: oxi-ai (multi-provider)                           │   │
+│  └────────────────────────────────────────────────────────┘   │
+│                                                                │
+│  ┌────────────────────────────────────────────────────────┐   │
+│  │          AIOS-Inspired Kernel Extensions                │   │
+│  │  ┌──────────────┐ ┌───────────────┐ ┌───────────────┐  │   │
+│  │  │   Scheduler  │ │ContextManager │ │   Access      │  │   │
+│  │  │ (priority/   │ │  (3-tier:    │ │   Manager     │  │   │
+│  │  │  rate-limit) │ │  active/cache/│ │   (OWASP)     │  │   │
+│  │  │              │ │  archive)    │ │               │  │   │
+│  │  └──────────────┘ └───────────────┘ └───────────────┘  │   │
+│  └────────────────────────────────────────────────────────┘   │
+│                                                                │
+│  ┌────────────────────────────────────────────────────────┐   │
+│  │          Programs & MCP                                  │   │
+│  │  ┌──────────────────┐ ┌───────────────────────────────┐ │   │
+│  │  │   ProgramManager │ │        McpBridge              │ │   │
+│  │  │  (OS-level apps) │ │  (MCP protocol awareness)    │ │   │
+│  │  └──────────────────┘ └───────────────────────────────┘ │   │
+│  │  ┌──────────────────────────────────────────────────┐  │   │
+│  │  │           HostToolValidator                       │  │   │
+│  │  │  (minimal container + host dependency check)     │  │   │
+│  │  └──────────────────────────────────────────────────┘  │   │
+│  └────────────────────────────────────────────────────────┘   │
+└────────────────────────────────────────────────────────────────┘
                       │
                       ▼
-┌──────────────────────────────────────────────────────────┐
-│              Container Garden (Apple Container)           │
-│              macOS Silicon only                           │
-└──────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────┐
+│              Container Garden (Apple Container)                │
+│              macOS Silicon only                                 │
+└────────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -97,6 +110,8 @@ Both philosophies reject uncertainty. Unix fails fast on bad input. Ouroboros cl
 | /bin, /usr/bin | Tool registry | Built-in tools |
 | Filesystem | Workspace | Persistent storage |
 | Container | Garden | Isolated execution environment |
+| Device driver | MCP server | Protocol-aware tool extension |
+| Package dependency | host_tools | Host command availability |
 
 ---
 
@@ -123,8 +138,12 @@ oxios/
 │   │       ├── garden.rs       GardenManager (container lifecycle)
 │   │       ├── host_exec.rs   HostExecBridge (secure relay)
 │   │       ├── program.rs     ProgramManager (OS-level programs)
+│   │       ├── skill.rs       SkillStore (markdown instruction templates)
 │   │       ├── mcp.rs         McpBridge (MCP protocol awareness)
 │   │       ├── host_tools.rs  HostToolValidator (host dependency check)
+│   │       ├── scheduler.rs   AgentScheduler (AIOS-inspired priority queue)
+│   │       ├── context_manager.rs ContextManager (3-tier RAM-like)
+│   │       ├── access_manager.rs AccessManager (OWASP-inspired security)
 │   │       └── types.rs       AgentId, AgentInfo, AgentStatus
 │   │
 │   ├── oxios-ouroboros/    Spec-first protocol implementation
@@ -151,13 +170,12 @@ oxios/
 │   │   ├── src/
 │   │   │   ├── lib.rs      Public exports
 │   │   │   ├── server.rs  Axum HTTP server with graceful shutdown
-│   │   │   ├── routes.rs  API route handlers (chat, status, gardens, etc.)
+│   │   │   ├── routes.rs  API route handlers
 │   │   │   └── channel.rs WebChannel implements Channel trait
 │   │   └── static/
 │   │       ├── index.html      Dashboard UI (SPA)
 │   │       ├── default-config.toml
 │   │       └── Containerfile
-│   └── oxios-web/          (placeholder for future channels)
 │
 └── docs/
 ```
@@ -186,6 +204,9 @@ The OS kernel. Everything passes through here.
 - **Agent Runtime** — Wraps oxi-agent for tool-calling loop execution
 - **Orchestrator** — Coordinates full Ouroboros lifecycle per message
 - **Garden Manager** — Container lifecycle management
+- **Program Manager** — OS-level installable applications
+- **MCP Bridge** — Model Context Protocol awareness
+- **Host Tool Validator** — Minimal container + host dependency validation
 
 **Agent Lifecycle:**
 
@@ -229,46 +250,42 @@ enum KernelEvent {
 }
 ```
 
-### 1b. Agent Scheduler (AIOS-inspired)
+### 1a. Agent Scheduler (AIOS-inspired)
 
 Inspired by the AIOS paper (Rutgers) and AgentRM systems, the Scheduler manages
 agent task execution with OS-like scheduling discipline:
 
 **Key features:**
 - **Priority queue** — Tasks ranked by priority (Critical > High > Normal > Low),
-  with FIFO ordering within the same priority level. Highest priority tasks
-  are always executed first.
-- **Rate-limit-aware admission** — Before starting a task, checks whether the
-  LLM API rate limit would be exceeded. Prevents hammering API quotas.
-- **Max concurrent enforcement** — Configurable limit on how many tasks can
-  run simultaneously. Prevents resource exhaustion.
-- **Zombie detection & reaping** — Tasks running longer than a configurable
-  timeout (default 300s) are automatically reaped. Stale tasks don't block
-  the queue forever.
+  with FIFO ordering within the same priority level
+- **Rate-limit-aware admission** — Checks LLM API rate limits before starting tasks
+- **Max concurrent enforcement** — Configurable limit on simultaneous tasks
+- **Zombie detection & reaping** — Tasks exceeding timeout are automatically reaped
 
 ```rust
-pub struct AgentScheduler {
-    queue: Arc<Mutex<Vec<ScheduledTask>>>,
-    max_concurrent: usize,
-    rate_limiter: Arc<Mutex<RateLimiter>>,
-    zombie_timeout_secs: u64,
+pub enum Priority { Critical, High, Normal, Low }
+
+pub struct ScheduledTask {
+    pub id: Uuid,
+    pub description: String,
+    pub priority: Priority,
+    pub status: TaskStatus,
+    pub created_at: DateTime<Utc>,
+    pub error: Option<String>,
 }
 
 impl AgentScheduler {
     pub fn submit(&self, task: ScheduledTask) -> Result<Uuid>;
     pub fn next_task(&self) -> Option<ScheduledTask>;
     pub fn complete_task(&self, task_id: Uuid) -> Result<()>;
-    pub fn fail_task(&self, task_id: Uuid, error: &str) -> Result<()>;
-    pub fn reap_zombies(&self) -> Vec<Uuid>;
+    pub fn rate_limit_remaining(&self) -> u32;
     pub fn stats(&self) -> SchedulerStats;
 }
 ```
 
-### 1c. Context Manager (AIOS-inspired)
+### 1b. Context Manager (AIOS-inspired)
 
-Like an OS managing RAM pages, the Context Manager manages LLM context windows.
-The LLM context window is finite and expensive — this manager treats it like
-physical memory with a 3-tier storage hierarchy:
+Like an OS managing RAM pages, the Context Manager manages LLM context windows:
 
 | Tier | Storage | Capacity | Use case |
 |------|---------|----------|----------|
@@ -276,237 +293,192 @@ physical memory with a 3-tier storage hierarchy:
 | **Cache** | In-memory, not in-context | Configurable (default 50 entries) | Recent sessions |
 | **Archive** | Compressed on disk | Unlimited | Long-term storage |
 
-When the active tier fills up, oldest entries are automatically demoted to
-cache (context switching). When cache overflows, LRU entries are compressed
-to archive tier.
-
 ```rust
 pub enum ContextTier { Active, Cache, Archive }
 
+pub struct ContextEntry {
+    pub session_id: String,
+    pub tier: ContextTier,
+    pub content: String,
+    pub token_count: usize,
+    pub created_at: DateTime<Utc>,
+}
+
 impl ContextManager {
-    pub fn store_active(&self, session_id: &str, content: &str, token_count: usize) -> Result<()>;
+    pub fn store_active(&self, session_id: &str, content: &str) -> Result<()>;
     pub fn get_active(&self, session_id: &str) -> Option<ContextEntry>;
     pub fn demote_to_cache(&self, session_id: &str) -> Result<()>;
-    pub fn compress_archive(&self) -> Result<usize>;
-    pub fn has_capacity(&self, tokens: usize) -> bool;
+    pub fn stats(&self) -> ContextStats;
 }
 ```
 
-### 1d. Access Manager (OWASP-inspired)
+### 1c. Access Manager (OWASP-inspired)
 
-Inspired by OWASP Agentic AI Top 10 guidelines, the Access Manager enforces
-least-privilege security for all agents:
-
-- **Tool access control** — Each agent has an explicit allow-list of tools.
-  Agents can only use tools they are explicitly permitted to use.
-- **Path sandboxing** — Glob patterns define allowed/denied file paths.
-  Denied paths (e.g., `/etc/**`, `/root/**`) take precedence.
-- **Network restrictions** — Network access is disabled by default.
-  Agents must be explicitly granted network privileges.
-- **Execution limits** — Time and memory limits per agent prevent runaway processes.
-- **Audit logging** — Every access decision is logged with timestamp, agent,
-  action, resource, and the allow/deny decision with reason.
+Enforces least-privilege security for all agents:
 
 ```rust
 pub struct AgentPermissions {
+    pub agent_name: String,
     pub allowed_tools: HashSet<String>,
     pub allowed_paths: Vec<String>,
     pub denied_paths: Vec<String>,
     pub network_access: bool,
     pub max_execution_time_secs: u64,
     pub max_memory_mb: u64,
+    pub can_fork: bool,
 }
 
 impl AccessManager {
     pub fn can_use_tool(&self, agent_name: &str, tool: &str) -> bool;
     pub fn can_access_path(&self, agent_name: &str, path: &str) -> bool;
-    pub fn can_access_network(&self, agent_name: &str) -> bool;
+    pub fn get_or_create_permissions(&self, agent_name: &str) -> Arc<Mutex<AgentPermissions>>;
     pub fn audit_log(&self) -> &[AuditEntry];
 }
 ```
 
-### 2. oxios-ouroboros
+### 1d. Program Manager (OS-level applications)
 
-Rust implementation of the Ouroboros methodology. The protocol that governs every agent's lifecycle.
-
-**The protocol never skips steps:**
-
-```
-interview  → Ask until ambiguity ≤ 0.2
-seed       → Generate immutable spec (JSON, stored in seeds/)
-execute    → Run tool-calling loop per spec (delegated to AgentRuntime)
-evaluate   → 3-stage verification (mechanical → semantic → consensus)
-evolve     → Feed evaluation back as input for next loop
-```
-
-**Ambiguity Score:**
+Programs are the OS-level installable applications. Like Unix has `/bin` programs,
+Oxios has programs that agents can "execute" to gain capabilities:
 
 ```rust
-struct AmbiguityScore {
-    goal_clarity: f64,        // weight 40%
-    constraint_clarity: f64,  // weight 30%
-    success_criteria: f64,   // weight 30%
+pub struct Program {
+    pub meta: ProgramMeta,
+    pub skill_content: String,
+    pub enabled: bool,
+    pub path: PathBuf,
 }
 
-impl AmbiguityScore {
-    fn ambiguity(&self) -> f64 {
-        1.0 - (self.goal_clarity * 0.4
-             + self.constraint_clarity * 0.3
-             + self.success_criteria * 0.3)
-    }
+pub struct ProgramMeta {
+    pub name: String,
+    pub version: String,
+    pub description: String,
+    pub author: String,
+    pub tools: HashMap<String, ToolDef>,
+    pub host_requirements: HostRequirements,
+    pub container: ContainerSpec,
+}
 
-    fn is_ready(&self) -> bool {
-        self.ambiguity() <= 0.2
-    }
+impl ProgramManager {
+    pub async fn install(&self, path: &Path) -> Result<Program>;
+    pub async fn uninstall(&self, name: &str) -> Result<()>;
+    pub async fn list_programs(&self) -> Vec<Program>;
+    pub async fn get_program(&self, name: &str) -> Option<Program>;
+    pub async fn set_enabled(&self, name: &str, enabled: bool) -> Result<()>;
+    pub async fn check_host_requirements(&self, name: &str) -> Result<HostRequirementsCheck>;
 }
 ```
 
-**Seed (immutable spec):**
+**Program structure:**
+```
+program/
+├── program.toml     # Metadata
+├── SKILL.md        # Instruction file
+├── bin/            # Optional executables
+└── config/         # Optional configs
+```
+
+### 1e. MCP Bridge (Model Context Protocol)
+
+MCP awareness for connecting to external tool providers:
 
 ```rust
-struct Seed {
-    id: Uuid,
-    goal: String,
-    constraints: Vec<String>,
-    acceptance_criteria: Vec<String>,
-    ontology: Vec<Entity>,
-    created_at: DateTime<Utc>,
-    // Immutable after creation. To change, create a new Seed via evolve().
+pub struct McpServer {
+    pub name: String,
+    pub command: String,
+    pub args: Vec<String>,
+    pub enabled: bool,
+}
+
+pub struct McpTool {
+    pub name: String,
+    pub description: String,
+    pub input_schema: serde_json::Value,
+}
+
+impl McpBridge {
+    pub fn list_servers(&self) -> Vec<McpServer>;
+    pub fn register_server(&mut self, server: McpServer) -> Result<()>;
+    pub fn get_capabilities(&self) -> McpCapabilities;
 }
 ```
 
-**Nine Minds (thinking modes, loaded on demand):**
+### 1f. Host Tool Validator (Minimal Container)
 
-Implemented via LLM system prompts in OuroborosEngine (not loaded as separate types):
-
-| Mode | System Prompt | When active |
-|------|--------------|-------------|
-| Interviewer | Socratic questioning | interview phase |
-| Seed Architect | Crystallize to spec | seed generation |
-| Evaluator | 3-stage verification | evaluate phase |
-| Contrarian | Opposite hypothesis | stagnation detected |
-| Hacker | Constraint reality check | stuck |
-| Simplifier | Simplest path | complexity rising |
-| Researcher | Evidence gathering | insufficient info |
-| Architect | Structure analysis | structural issues |
-| Evolver | Improvement loop | evolve phase |
-
-### 3. oxios-gateway
-
-Channel-agnostic message router. The Gateway doesn't care what channel a message comes from.
-
-**Core traits:**
+Validates host dependencies for container minimalism philosophy:
 
 ```rust
-trait Channel: Send + Sync {
-    fn name(&self) -> &str;
-    async fn receive(&self) -> Result<Option<IncomingMessage>>;
-    async fn send(&self, msg: OutgoingMessage) -> Result<()>;
+pub struct HostRequirements {
+    pub required: Vec<String>,
+    pub optional: Vec<String>,
 }
 
-struct Gateway {
-    channels: RwLock<HashMap<String, Box<dyn Channel>>>,
-    orchestrator: Arc<Orchestrator>,
+pub struct HostToolStatus {
+    pub tool: String,
+    pub present: bool,
+    pub path: Option<String>,
 }
 
-impl Gateway {
-    pub async fn register(&self, channel: Box<dyn Channel>);
-    pub async fn route(&self, msg: IncomingMessage) -> Result<()>;
-    pub async fn run(&self) -> Result<()>; // polls channels in loop
+pub struct FullCheckResult {
+    pub all_required_present: bool,
+    pub missing_required: Vec<String>,
+    pub optional_available: HashMap<String, bool>,
+}
+
+impl HostToolValidator {
+    pub fn validate(&self, required: &[String]) -> HostToolStatus;
+    pub fn full_check(&self) -> FullCheckResult;
+    pub fn check_tool(&self, tool: &str) -> HostToolStatus;
 }
 ```
 
-**Message flow:**
-
-```
-User → Channel(Web) → Gateway → Orchestrator → Kernel → Ouroboros → Agent → Result
-                                                                │
-User ← Channel(Web) ← Gateway ← Result ◄────────────────────────────────┘
-```
-
-Channels are plugins. Web is first, Telegram, Discord, CLI plug in later.
-
-### 4. oxios-web
-
-First channel. Web dashboard with Axum HTTP server.
-
-**Capabilities:**
-- Chat (converse with agents via POST /api/chat)
-- Control (agent status, system resources)
-- Browse (memory, documents, seeds)
-- Gardens (container lifecycle management)
-- Events (SSE stream of KernelEvent)
-
-**Tech:** Axum + tower-http + static HTML/CSS/JS frontend
-
----
-
-## State Store
-
-All state is markdown or JSON files.
-
-```
-~/.oxios/
-├── config.toml              System configuration
-├── workspace/
-│   ├── memory/              Agent memory
-│   │   ├── 2026-05-03.md    Daily conversation summaries
-│   │   └── knowledge/       Knowledge base
-│   │       └── project-a.md
-│   ├── seeds/               Ouroboros Seed specs (JSON)
-│   │   └── <uuid>.json
-│   ├── sessions/            Conversation sessions
-│   │   └── abc123.jsonl
-│   ├── skills/              Skill definitions (legacy)
-│   │   └── code-review/
-│   │       └── SKILL.md
-│   └── programs/            OS-level programs (installable capabilities)
-│       └── code-review/
-│           ├── program.toml
-│           └── SKILL.md
-└── gardens/                 Container isolation environments
-    └── project-a/
-        ├── workspace/       Mounted to container
-        ├── Containerfile
-        └── .env
-```
+**Philosophy:** Container ships essential tools only. Rich functionality comes from host.
 
 ---
 
 ## Programs (OS-level installable applications)
 
-Programs are the OS-level concept of installable applications. Like Unix has `/bin` programs, Oxios has programs that agents can "execute" to gain capabilities through their `SKILL.md` instruction files.
+Programs provide structured capabilities that agents can leverage. They embody the
+Unix philosophy: small, composable, installable units of functionality.
 
 ### Structure
 
-A program is a directory with:
-- `program.toml` — metadata (name, version, description, tools, dependencies, host requirements)
-- `SKILL.md` — instruction file (like a man page)
-- optional `bin/` — executables
-- optional `config/` — configuration files
+```
+my-program/
+├── program.toml     # Metadata (name, version, tools, dependencies)
+├── SKILL.md        # Instruction file (agent-facing documentation)
+├── bin/            # Optional: executable scripts
+└── config/         # Optional: configuration files
+```
 
-### program.toml format:
+### program.toml Format
 
 ```toml
 [program]
 name = "code-review"
 version = "1.0.0"
-description = "Guidelines for comprehensive code review"
+description = "Comprehensive code review guidelines for agents"
 author = "oxios"
 
 # Tools this program exposes
 [tools]
-check_security = { description = "Run security checks" }
+check_security = { description = "Run security checks on code" }
 
 # Host tool requirements
 [host_requirements]
 required = ["git"]
 optional = ["gh"]
+
+# Container minimalism
+[container]
+minimal_tools = ["bash", "jq", "ripgrep"]
 ```
 
 ### Philosophy
 
-Programs are **READ-ONLY** instruction sets. They don't execute themselves; they provide guidelines and tool definitions that agents consume. Think of them as man pages that come with metadata for discovery.
+Programs are **READ-ONLY** instruction sets. They don't execute themselves;
+they provide guidelines and tool definitions that agents consume.
+Think of them as man pages that come with metadata for discovery.
 
 ### Minimal Container + Host Dependency
 
@@ -546,11 +518,14 @@ oxios garden list              ← List all gardens
 oxios                          Interactive mode (default — starts web server on port 4200)
 oxios run "do something"       Run single prompt through Ouroboros
 oxios garden new <name>        Create garden
-oxios garden up <name>         Start
-oxios garden down <name>       Stop
+oxios garden up <name>        Start
+oxios garden down <name>      Stop
 oxios garden remove <name>    Remove
 oxios garden list              List
 oxios garden exec <name> -- cmd args...  Execute in garden
+oxios program install <path>   Install a program
+oxios program list             List installed programs
+oxios program uninstall <name> Uninstall a program
 oxios status                   System status
 oxios config show              Show config
 oxios config get <key>         Get config value
@@ -583,13 +558,19 @@ Phase 4: Container ✓
   ├── Garden lifecycle ✓
   └── Host Exec Bridge ✓
 
-Phase 6: Programs + MCP Awareness ✓
+Phase 5: AIOS Extensions ✓
+  ├── AgentScheduler (priority/rate-limit) ✓
+  ├── ContextManager (3-tier hierarchy) ✓
+  └── AccessManager (OWASP security) ✓
+
+Phase 6: Programs + MCP + Host Tools ✓
   ├── ProgramManager (OS-level programs) ✓
-  ├── HostToolValidator (minimal container philosophy) ✓
+  ├── SkillStore (markdown instruction templates) ✓
+  ├── HostToolValidator (minimal container) ✓
   ├── McpBridge (MCP protocol awareness) ✓
   └── Default programs installation ✓
 
-Phase 5: Channel expansion
+Phase 7: Channel expansion
   ├── oxios-telegram (later)
   ├── oxios-cli (later)
   └── ...
