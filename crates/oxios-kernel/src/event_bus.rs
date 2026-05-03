@@ -80,6 +80,24 @@ pub enum KernelEvent {
         /// The output content.
         output: String,
     },
+    /// A HitL approval request has been submitted.
+    ApprovalRequested {
+        /// The approval request ID.
+        id: uuid::Uuid,
+        /// The action requiring approval.
+        action: String,
+        /// The resource involved.
+        resource: String,
+        /// Reason for the request.
+        reason: String,
+    },
+    /// A HitL approval has been resolved (approved or rejected).
+    ApprovalResolved {
+        /// The approval request ID.
+        id: uuid::Uuid,
+        /// Whether it was approved (true) or rejected (false).
+        approved: bool,
+    },
 }
 
 /// A broadcast-based event bus for kernel events.

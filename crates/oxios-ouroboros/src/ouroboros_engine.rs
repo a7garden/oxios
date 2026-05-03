@@ -73,7 +73,7 @@ pub struct OuroborosEngine {
     provider: Arc<dyn Provider>,
     model: Model,
     phase: parking_lot::Mutex<Phase>,
-    /// Optional persona system prompt, prepended to each phase's system prompt.
+    /// Optional persona system prompt, prepended to every LLM call.
     persona_prompt: parking_lot::Mutex<Option<String>>,
 }
 
@@ -88,17 +88,6 @@ impl OuroborosEngine {
         }
     }
 
-    /// Set the active persona's system prompt.
-    /// When set, this is prepended to every LLM call.
-    pub fn set_persona_prompt(&self, prompt: Option<String>) {
-        *self.persona_prompt.lock() = prompt;
-    }
-
-    /// Get the current persona prompt if set.
-    fn get_persona_prompt(&self) -> Option<String> {
-        self.persona_prompt.lock().clone()
-    }
-
     /// Returns the current phase.
     pub fn phase(&self) -> Phase {
         *self.phase.lock()
@@ -109,10 +98,16 @@ impl OuroborosEngine {
         *self.phase.lock() = phase;
     }
 
+    /// Set or clear the persona system prompt.
+    #[allow(dead_code)]
+    fn set_persona_prompt(&self, prompt: Option<String>) {
+        *self.persona_prompt.lock() = prompt;
+    }
+
     /// Run a non-tool LLM completion and return the text content.
     async fn llm_complete(&self, system_prompt: &str, user_message: &str) -> Result<String> {
         // Prepend persona prompt if set.
-        let effective_system = if let Some(ref persona) = self.get_persona_prompt() {
+        let effective_system = if let Some(ref persona) = *self.persona_prompt.lock() {
             format!("{}\n\n{}", persona, system_prompt)
         } else {
             system_prompt.to_string()
@@ -169,6 +164,10 @@ impl OuroborosEngine {
 
 #[async_trait]
 impl OuroborosProtocol for OuroborosEngine {
+    fn set_persona_prompt(&self, prompt: Option<String>) {
+        *self.persona_prompt.lock() = prompt;
+    }
+
     async fn interview(&self, user_input: &str) -> Result<InterviewResult> {
         self.set_phase(Phase::Interview);
 

@@ -6,8 +6,10 @@
 
 #![warn(missing_docs)]
 
+pub mod a2a;
 pub mod access_manager;
 pub mod agent_runtime;
+pub mod argo;
 pub mod config;
 pub mod container;
 pub mod context_manager;
@@ -27,11 +29,24 @@ pub mod state_store;
 pub mod supervisor;
 pub mod types;
 
-pub use access_manager::{AccessManager, AgentPermissions, AuditEntry};
+// A2A protocol exports
+pub use a2a::{
+    A2AMessage, A2AProtocol, A2ARequest, A2AResponse,
+    AgentCard, AgentCardRegistry, TaskPriority, TaskSpec,
+};
+
+// Access Manager exports (includes RBAC)
+pub use access_manager::{
+    AccessManager, AgentPermissions, AuditEntry,
+    RbacManager, RbacPolicy, RbacAuditEntry,
+    Role, Subject, Action,
+    PendingApproval, ApprovalStatus,
+};
+
 pub use agent_runtime::AgentRuntime;
-pub use config::{OxiosConfig, PersonaConfig};
+pub use config::{OxiosConfig, PersonaConfig, McpConfig, McpServerDef};
 pub use container::{
-    AppleBackend, ContainerBackend, ContainerStats, ContainerStatus, ExecResult, GardenStartConfig,
+    AppleBackend, ContainerBackend, ContainerStats, ContainerStatus, ExecResult, GardenStartConfig, GardenWorkspaceInfo,
 };
 pub use context_manager::{ContextManager, ContextStats, ContextTier, ContextEntry};
 pub use event_bus::{EventBus, KernelEvent};
@@ -49,3 +64,6 @@ pub use persona_manager::PersonaManager;
 pub use persona_store::PersonaStore;
 pub use supervisor::{BasicSupervisor, Supervisor};
 pub use types::{AgentId, AgentInfo, AgentStatus};
+
+// Argo Workflows exports
+pub use argo::{ArgoConfig, ArgoWorkflow, WorkflowPhase, WorkflowStatus, WorkflowSummary};

@@ -12,6 +12,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 
+use oxios_kernel::a2a::A2AProtocol;
 use oxios_gateway::channel::Channel;
 use oxios_gateway::gateway::Gateway;
 use oxios_gateway::message::{IncomingMessage, OutgoingMessage};
@@ -412,6 +413,7 @@ async fn test_orchestrator_happy_path() {
     let ouroboros = Arc::new(MockOuroboros::new());
     let supervisor = Arc::new(MockSupervisor::new(event_bus.clone()));
 
+    let a2a = Arc::new(A2AProtocol::new(event_bus.clone()));
     let scheduler = Arc::new(AgentScheduler::default());
     let access_manager = Arc::new(parking_lot::Mutex::new(AccessManager::new()));
     let orchestrator = Orchestrator::new(
@@ -421,6 +423,8 @@ async fn test_orchestrator_happy_path() {
         state_store,
         scheduler.clone(),
         access_manager.clone(),
+        Arc::new(oxios_kernel::PersonaManager::new()),
+        a2a.clone(),
     );
 
     let result = orchestrator
@@ -454,6 +458,7 @@ async fn test_orchestrator_evolution_loop() {
     let ouroboros = Arc::new(MockOuroboros::with_failing_evaluation());
     let supervisor = Arc::new(MockSupervisor::new(event_bus.clone()));
 
+    let a2a = Arc::new(A2AProtocol::new(event_bus.clone()));
     let scheduler = Arc::new(AgentScheduler::default());
     let access_manager = Arc::new(parking_lot::Mutex::new(AccessManager::new()));
     let orchestrator = Orchestrator::new(
@@ -463,6 +468,8 @@ async fn test_orchestrator_evolution_loop() {
         state_store,
         scheduler.clone(),
         access_manager.clone(),
+        Arc::new(oxios_kernel::PersonaManager::new()),
+        a2a.clone(),
     );
 
     let result = orchestrator
@@ -487,6 +494,7 @@ async fn test_orchestrator_events_published() {
     let ouroboros = Arc::new(MockOuroboros::new());
     let supervisor = Arc::new(MockSupervisor::new(event_bus.clone()));
 
+    let a2a = Arc::new(A2AProtocol::new(event_bus.clone()));
     let scheduler = Arc::new(AgentScheduler::default());
     let access_manager = Arc::new(parking_lot::Mutex::new(AccessManager::new()));
     let orchestrator = Orchestrator::new(
@@ -496,6 +504,8 @@ async fn test_orchestrator_events_published() {
         state_store,
         scheduler.clone(),
         access_manager.clone(),
+        Arc::new(oxios_kernel::PersonaManager::new()),
+        a2a.clone(),
     );
 
     // Run orchestration in background.
@@ -556,6 +566,7 @@ async fn test_gateway_routes_message_through_orchestrator() {
     let ouroboros = Arc::new(MockOuroboros::new());
     let supervisor = Arc::new(MockSupervisor::new(event_bus.clone()));
 
+    let a2a = Arc::new(A2AProtocol::new(event_bus.clone()));
     let scheduler = Arc::new(AgentScheduler::default());
     let access_manager = Arc::new(parking_lot::Mutex::new(AccessManager::new()));
     let orchestrator = Arc::new(Orchestrator::new(
@@ -565,6 +576,8 @@ async fn test_gateway_routes_message_through_orchestrator() {
         state_store,
         scheduler.clone(),
         access_manager.clone(),
+        Arc::new(oxios_kernel::PersonaManager::new()),
+        a2a.clone(),
     ));
 
     let gateway = Gateway::new(orchestrator);
@@ -593,6 +606,7 @@ async fn test_gateway_unknown_channel() {
     let ouroboros = Arc::new(MockOuroboros::new());
     let supervisor = Arc::new(MockSupervisor::new(event_bus.clone()));
 
+    let a2a = Arc::new(A2AProtocol::new(event_bus.clone()));
     let scheduler = Arc::new(AgentScheduler::default());
     let access_manager = Arc::new(parking_lot::Mutex::new(AccessManager::new()));
     let orchestrator = Arc::new(Orchestrator::new(
@@ -602,6 +616,8 @@ async fn test_gateway_unknown_channel() {
         state_store,
         scheduler.clone(),
         access_manager.clone(),
+        Arc::new(oxios_kernel::PersonaManager::new()),
+        a2a.clone(),
     ));
 
     let gateway = Gateway::new(orchestrator);
@@ -715,8 +731,8 @@ async fn test_scheduler_orchestrator_integration() {
     let state_store = Arc::new(StateStore::new(tmp.path().to_path_buf()).unwrap());
 
     // Create a scheduler with a reasonable concurrent limit.
+    let a2a = Arc::new(A2AProtocol::new(event_bus.clone()));
     let scheduler = Arc::new(AgentScheduler::new(3, 100, 60));
-
     let ouroboros = Arc::new(MockOuroboros::new());
     let supervisor = Arc::new(SchedulerAwareSupervisor::new(scheduler.clone(), event_bus.clone()));
     let access_manager = Arc::new(parking_lot::Mutex::new(AccessManager::new()));
@@ -727,6 +743,8 @@ async fn test_scheduler_orchestrator_integration() {
         state_store,
         scheduler.clone(),
         access_manager.clone(),
+        Arc::new(oxios_kernel::PersonaManager::new()),
+        a2a.clone(),
     );
 
     // Run a single orchestration.
@@ -752,6 +770,7 @@ async fn test_scheduler_priority_ordering_in_orchestration() {
     let tmp = tempfile::tempdir().unwrap();
     let state_store = Arc::new(StateStore::new(tmp.path().to_path_buf()).unwrap());
 
+    let a2a = Arc::new(A2AProtocol::new(event_bus.clone()));
     let scheduler = Arc::new(AgentScheduler::new(10, 10_000, 60));
 
     // Submit tasks of varying priorities.
@@ -786,6 +805,8 @@ async fn test_scheduler_priority_ordering_in_orchestration() {
         state_store,
         scheduler.clone(),
         access_manager.clone(),
+        Arc::new(oxios_kernel::PersonaManager::new()),
+        a2a.clone(),
     );
     // Orchestrator is created successfully — shared state is fine.
 }
@@ -846,6 +867,7 @@ required = ["echo"]
     let ouroboros = Arc::new(MockOuroboros::new());
     let supervisor = Arc::new(MockSupervisor::new(event_bus.clone()));
 
+    let a2a = Arc::new(A2AProtocol::new(event_bus.clone()));
     let scheduler = Arc::new(AgentScheduler::default());
     let access_manager = Arc::new(parking_lot::Mutex::new(AccessManager::new()));
     let orchestrator = Orchestrator::new(
@@ -855,6 +877,8 @@ required = ["echo"]
         state_store,
         scheduler.clone(),
         access_manager.clone(),
+        Arc::new(oxios_kernel::PersonaManager::new()),
+        a2a.clone(),
     );
 
     // Orchestrate a message — the installed program should be discoverable

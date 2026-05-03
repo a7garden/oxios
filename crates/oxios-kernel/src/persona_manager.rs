@@ -93,6 +93,11 @@ impl PersonaManager {
         tracing::info!("Default personas initialized");
     }
 
+    /// Returns the first enabled persona, for wiring into OuroborosEngine.
+    pub fn first_enabled(&self) -> Option<Persona> {
+        self.store.list_enabled().into_iter().next()
+    }
+
     /// Returns the persona store for direct access.
     pub fn store(&self) -> &PersonaStore {
         &self.store
@@ -107,5 +112,17 @@ impl PersonaManager {
 impl Default for PersonaManager {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl Clone for PersonaManager {
+    fn clone(&self) -> Self {
+        let personas: Vec<Persona> = self.store.list_all();
+        let mut store = PersonaStore::new();
+        store.load_from_slice(&personas);
+        Self {
+            store,
+            active_persona_id: RwLock::new(self.active_persona_id.read().clone()),
+        }
     }
 }

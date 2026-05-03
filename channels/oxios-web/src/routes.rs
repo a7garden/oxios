@@ -35,7 +35,7 @@ use tokio_stream::wrappers::BroadcastStream;
 use tokio_stream::StreamExt as TokioStreamExt;
 use oxios_kernel::state_store::StateStore;
 use oxios_gateway::message::IncomingMessage;
-use oxios_kernel::{AgentId, access_manager::AuditEntry};
+use oxios_kernel::{AgentId, access_manager::AuditEntry, ArgumentDef};
 use uuid::Uuid;
 
 use crate::server::AppState;
@@ -98,9 +98,11 @@ pub fn build_routes() -> Router<Arc<AppState>> {
         .route("/api/programs/{name}/host-requirements", get(handle_program_host_requirements))
         // Host tools
         .route("/api/host-tools", get(handle_host_tools_check))
-        // MCP
-        .route("/api/mcp/servers", get(handle_mcp_servers_list))
-        .route("/api/mcp/servers", post(handle_mcp_server_register))
+        // MCP (stub - disabled until MCP integration is fixed)
+        // .route("/api/mcp/servers", get(handle_mcp_servers_list))
+        // .route("/api/mcp/servers", post(handle_mcp_server_register))
+        // .route("/api/mcp/tools", get(handle_mcp_tools_list))
+        // .route("/api/mcp/tools", post(handle_mcp_tool_call))
         // Events
         .route("/api/events", get(handle_events))
         // Personas (delegated to persona_routes)
@@ -115,6 +117,10 @@ pub fn build_routes() -> Router<Arc<AppState>> {
         .route("/api/sessions", get(handle_sessions_list))
         .route("/api/sessions/{id}", get(handle_session_get))
         .route("/api/sessions/{id}", delete(handle_session_delete))
+        // Approvals (HitL)
+        .route("/api/approvals", get(handle_approvals_list))
+        .route("/api/approvals/{id}/approve", post(handle_approval_approve))
+        .route("/api/approvals/{id}/reject", post(handle_approval_reject))
         // Events
         .route("/api/events", get(handle_events))
 }
@@ -1409,14 +1415,35 @@ struct McpServerResponse {
     command: String,
     args: Vec<String>,
     enabled: bool,
+    initialized: bool,
 }
 
-/// GET /api/mcp/servers — List registered MCP servers (stub).
+/// GET /api/mcp/servers — List registered MCP servers.
 async fn handle_mcp_servers_list(
-    _state: State<Arc<AppState>>,
+    state: State<Arc<AppState>>,
 ) -> Json<Vec<McpServerResponse>> {
-    // Stub: Return empty list until MCP server storage is implemented
-    Json(Vec::new())
+    let bridge = state.mcp_bridge.lock();
+    let servers = bridge.servers();
+    let mut results = Vec::new();
+    for name in servers {
+        let (command, args, enabled) = bridge
+            .get_server(name)
+            .map(|s| (s.command.clone(), s.args.clone(), s.enabled))
+            .unwrap_or_else(|| ("unknown".to_string(), Vec::new(), false));
+        let initialized = if let Some(ref c) = bridge.client(name).await {
+            c.is_initialized().await
+        } else {
+            false
+        };
+        results.push(McpServerResponse {
+            name: name.to_string(),
+            command,
+            args,
+            enabled,
+            initialized,
+        });
+    }
+    Json(results)
 }
 
 /// MCP server registration request.
@@ -1424,21 +1451,118 @@ async fn handle_mcp_servers_list(
 struct McpServerRegisterRequest {
     name: String,
     command: String,
-    #[allow(dead_code)]
-    args: Option<Vec<String>>,
+    #[serde(default)]
+    args: Vec<String>,
 }
 
-/// POST /api/mcp/servers — Register an MCP server (stub).
+/// POST /api/mcp/servers — Register a new MCP server and start it.
 async fn handle_mcp_server_register(
-    _state: State<Arc<AppState>>,
+    state: State<Arc<AppState>>,
     Json(body): Json<McpServerRegisterRequest>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
-    // Stub: MCP server storage not yet implemented
-    tracing::info!(server = %body.name, command = %body.command, "MCP server registration requested (stub)");
+    let name = body.name.clone();
+    let command = body.command.clone();
+    {
+        let mut bridge = state.mcp_bridge.lock();
+        let mut server = oxios_kernel::McpServer::new(&name, &command);
+        server.args = body.args;
+        server.enabled = true;
+        bridge.register_server(server);
+    }
+    if let Err(e) = state.mcp_bridge.lock().initialize_server(&name).await {
+        tracing::error!(server = %name, error = %e, "Failed to start MCP server");
+        return Err((StatusCode::INTERNAL_SERVER_ERROR, e.to_string()));
+    }
+    tracing::info!(server = %name, command = %command, "MCP server registered and started");
     Ok(Json(serde_json::json!({
         "status": "registered",
-        "name": body.name,
-        "note": "MCP integration is stubbed; full implementation requires stdio communication"
+        "name": name,
+        "command": command,
+    })))
+}
+
+/// MCP tool summary exposed to agents.
+#[derive(Debug, Serialize)]
+struct McpToolResponse {
+    name: String,
+    description: String,
+    server: String,
+    arguments: Vec<ArgumentDef>,
+}
+
+/// GET /api/mcp/tools — List all available MCP tools.
+async fn handle_mcp_tools_list(
+    state: State<Arc<AppState>>,
+) -> Json<Vec<McpToolResponse>> {
+    let bridge = state.mcp_bridge.lock();
+    let tools = match bridge.list_tools().await {
+        Ok(t) => t,
+        Err(e) => {
+            tracing::warn!(error = %e, "Failed to list MCP tools");
+            Vec::new()
+        }
+    };
+
+    // Reconstruct server attribution from cached tools.
+    let mut results = Vec::new();
+    for name in bridge.servers() {
+        if let Some(cached) = bridge.cached_tools(name).await {
+            for tool in cached {
+                results.push(McpToolResponse {
+                    name: tool.name,
+                    description: tool.description,
+                    server: name.to_string(),
+                    arguments: tool.arguments,
+                });
+            }
+        }
+    }
+    // Fallback: if no cached tools, list from list_tools() with unknown server.
+    if results.is_empty() {
+        for tool in &tools {
+            results.push(McpToolResponse {
+                name: tool.name.clone(),
+                description: tool.description.clone(),
+                server: "<unknown>".to_string(),
+                arguments: tool.arguments.clone(),
+            });
+        }
+    }
+    Json(results)
+}
+
+/// Request body for calling an MCP tool.
+#[derive(Debug, Deserialize)]
+struct McpToolCallRequest {
+    server: String,
+    tool: String,
+    #[serde(default)]
+    arguments: serde_json::Value,
+}
+
+/// POST /api/mcp/tools — Call an MCP tool.
+async fn handle_mcp_tool_call(
+    state: State<Arc<AppState>>,
+    Json(body): Json<McpToolCallRequest>,
+) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    let result = state.mcp_bridge.lock()
+        .call_tool(&body.server, &body.tool, body.arguments)
+        .await
+        .map_err(|e| {
+            tracing::error!(server = %body.server, tool = %body.tool, error = %e, "MCP tool call failed");
+            (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+        })?;
+
+    // Serialize the content blocks.
+    let content: Vec<serde_json::Value> = result.content
+        .iter()
+        .map(|block| serde_json::to_value(block).unwrap_or_default())
+        .collect();
+
+
+    Ok(Json(serde_json::json!({
+        "content": content,
+        "is_error": result.is_error,
     })))
 }
 
@@ -1545,4 +1669,119 @@ async fn handle_events(
             .interval(std::time::Duration::from_secs(30))
             .text("ping"),
     )
+}
+
+// ---------------------------------------------------------------------------
+// Approvals (HitL)
+// ---------------------------------------------------------------------------
+
+/// Approval request for the API response.
+#[derive(Debug, Serialize)]
+struct ApprovalResponse {
+    id: String,
+    subject: String,
+    action: String,
+    resource: String,
+    reason: String,
+    created_at: String,
+    status: String,
+}
+
+/// GET /api/approvals — List all approval requests (pending + history).
+async fn handle_approvals_list(
+    state: State<Arc<AppState>>,
+) -> Json<Vec<ApprovalResponse>> {
+    let access = state.access_manager.lock();
+    let approvals: Vec<ApprovalResponse> = access
+        .rbac_manager()
+        .all_approvals()
+        .iter()
+        .map(|(p, s)| {
+            let subject_str = match &p.subject {
+                oxios_kernel::access_manager::Subject::User(n) => format!("user:{}", n),
+                oxios_kernel::access_manager::Subject::Agent(id) => format!("agent:{}", id),
+                oxios_kernel::access_manager::Subject::System => "system".into(),
+            };
+            let action_str = match &p.action {
+                oxios_kernel::access_manager::Action::UseTool(t) => format!("use_tool:{}", t),
+                oxios_kernel::access_manager::Action::AccessPath(p) => format!("access_path:{}", p),
+                oxios_kernel::access_manager::Action::ManageAgents => "manage_agents".into(),
+                oxios_kernel::access_manager::Action::ManagePrograms => "manage_programs".into(),
+                oxios_kernel::access_manager::Action::ManageGardens => "manage_gardens".into(),
+                oxios_kernel::access_manager::Action::ManageRBAC => "manage_rbac".into(),
+                oxios_kernel::access_manager::Action::ViewAuditLog => "view_audit_log".into(),
+                oxios_kernel::access_manager::Action::SystemConfig => "system_config".into(),
+            };
+            let status_str = match s {
+                oxios_kernel::access_manager::ApprovalStatus::Pending => "pending",
+                oxios_kernel::access_manager::ApprovalStatus::Approved => "approved",
+                oxios_kernel::access_manager::ApprovalStatus::Rejected => "rejected",
+                oxios_kernel::access_manager::ApprovalStatus::Expired => "expired",
+            };
+            ApprovalResponse {
+                id: p.id.to_string(),
+                subject: subject_str,
+                action: action_str,
+                resource: p.resource.clone(),
+                reason: p.reason.clone(),
+                created_at: p.created_at.to_rfc3339(),
+                status: status_str.to_string(),
+            }
+        })
+        .collect();
+    Json(approvals)
+}
+
+/// POST /api/approvals/:id/approve — Approve a pending request.
+async fn handle_approval_approve(
+    state: State<Arc<AppState>>,
+    Path(id): Path<String>,
+) -> Result<Json<serde_json::Value>, StatusCode> {
+    let uuid = match uuid::Uuid::parse_str(&id) {
+        Ok(u) => u,
+        Err(_) => return Err(StatusCode::BAD_REQUEST),
+    };
+    let mut access = state.access_manager.lock();
+    match access.rbac_manager_mut().approve(uuid) {
+        true => {
+            tracing::info!(approval_id = %uuid, "Approval granted");
+            // Publish event so SSE clients update automatically
+            let _ = state.event_bus.publish(oxios_kernel::event_bus::KernelEvent::ApprovalResolved {
+                id: uuid,
+                approved: true,
+            });
+            Ok(Json(serde_json::json!({
+                "status": "approved",
+                "id": id,
+            })))
+        }
+        false => Err(StatusCode::NOT_FOUND),
+    }
+}
+
+/// POST /api/approvals/:id/reject — Reject a pending request.
+async fn handle_approval_reject(
+    state: State<Arc<AppState>>,
+    Path(id): Path<String>,
+) -> Result<Json<serde_json::Value>, StatusCode> {
+    let uuid = match uuid::Uuid::parse_str(&id) {
+        Ok(u) => u,
+        Err(_) => return Err(StatusCode::BAD_REQUEST),
+    };
+    let mut access = state.access_manager.lock();
+    match access.rbac_manager_mut().reject(uuid) {
+        true => {
+            tracing::info!(approval_id = %uuid, "Approval rejected");
+            // Publish event so SSE clients update automatically
+            let _ = state.event_bus.publish(oxios_kernel::event_bus::KernelEvent::ApprovalResolved {
+                id: uuid,
+                approved: false,
+            });
+            Ok(Json(serde_json::json!({
+                "status": "rejected",
+                "id": id,
+            })))
+        }
+        false => Err(StatusCode::NOT_FOUND),
+    }
 }

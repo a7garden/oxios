@@ -5,6 +5,7 @@
 
 use anyhow::{bail, Context, Result};
 use async_trait::async_trait;
+use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use tracing::{debug, warn};
@@ -82,6 +83,17 @@ pub struct ExecResult {
     pub duration_ms: u64,
 }
 
+/// Information about a garden's workspace and allowed paths.
+#[derive(Debug, Clone)]
+pub struct GardenWorkspaceInfo {
+    /// Name of the garden.
+    pub garden_name: String,
+    /// Absolute path to the garden's workspace directory.
+    pub workspace_path: PathBuf,
+    /// Whether the workspace directory exists.
+    pub exists: bool,
+}
+
 /// Container backend trait.
 ///
 /// Abstracts container operations so different runtimes can be swapped in.
@@ -124,6 +136,18 @@ pub trait ContainerBackend: Send + Sync {
 
     /// Get resource usage statistics for a garden container.
     async fn garden_stats(&self, name: &str) -> Result<Option<ContainerStats>>;
+
+    /// Get the workspace path for a garden.
+    ///
+    /// Returns the workspace path that was used when creating the garden.
+    /// This is used by AccessManager to enforce sandbox boundaries.
+    async fn garden_workspace(&self, name: &str) -> Result<Option<GardenWorkspaceInfo>>;
+
+    /// List all gardens with their workspace information.
+    ///
+    /// This is used by AccessManager to register all garden workspaces
+    /// for sandbox enforcement.
+    async fn list_garden_workspaces(&self) -> Result<Vec<GardenWorkspaceInfo>>;
 }
 
 // ─── AppleBackend ──────────────────────────────────────────────────────────
@@ -598,6 +622,53 @@ impl ContainerBackend for AppleBackend {
         let stdout = String::from_utf8_lossy(&output.stdout);
         Ok(parse_stats_output(&stdout))
     }
+
+    async fn garden_workspace(&self, name: &str) -> Result<Option<GardenWorkspaceInfo>> {
+        if !self.available {
+            return Ok(None);
+        }
+
+        // Get container inspect data to find the volume mount
+        let cname = Self::container_name(name);
+        let output = std::process::Command::new(CONTAINER_BIN)
+            .args(["inspect", &cname])
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .output()
+            .context(format!("failed to inspect container '{}'", name))?;
+
+        if !output.status.success() {
+            return Ok(None);
+        }
+
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let workspace_path = parse_workspace_from_inspect(&stdout)?;
+
+        let exists = fs::metadata(&workspace_path).is_ok();
+
+        Ok(Some(GardenWorkspaceInfo {
+            garden_name: name.to_string(),
+            workspace_path,
+            exists,
+        }))
+    }
+
+    async fn list_garden_workspaces(&self) -> Result<Vec<GardenWorkspaceInfo>> {
+        if !self.available {
+            return Ok(Vec::new());
+        }
+
+        let gardens = self.list_gardens().await?;
+        let mut workspaces = Vec::new();
+
+        for garden_name in gardens {
+            if let Some(info) = self.garden_workspace(&garden_name).await? {
+                workspaces.push(info);
+            }
+        }
+
+        Ok(workspaces)
+    }
 }
 
 // ─── Parsing helpers ───────────────────────────────────────────────────────
@@ -670,6 +741,60 @@ fn parse_mem_usage(s: &str) -> (f64, f64) {
         return (0.0, 0.0);
     }
     (parse_size_mb(parts[0]), parse_size_mb(parts[1]))
+}
+
+/// Parse container inspect JSON to extract the workspace mount path.
+fn parse_workspace_from_inspect(raw: &str) -> Result<PathBuf> {
+    let parsed: serde_json::Value = serde_json::from_str(raw.trim())
+        .context("failed to parse container inspect JSON")?;
+
+    let arr = parsed.as_array().context("expected JSON array in inspect output")?;
+    let obj = arr.first().context("empty container inspect output")?;
+
+    // Look for mounts array and find the workspace volume
+    let mounts = obj.get("mounts")
+        .and_then(|m| m.as_array());
+
+    if let Some(mounts) = mounts {
+        for mount in mounts {
+            let destination = mount.get("destination")
+                .and_then(|d| d.as_str())
+                .unwrap_or("");
+
+            // The workspace is mounted at /workspace in the container
+            if destination == "/workspace" {
+                let source = mount.get("source")
+                    .and_then(|s| s.as_str())
+                    .context("workspace mount has no source")?;
+                return Ok(PathBuf::from(source));
+            }
+        }
+    }
+
+    // Fallback: try to find the volume from mounts section as JSON string
+    let mounts_str = obj.get("mounts")
+        .and_then(|m| m.as_str())
+        .unwrap_or("");
+
+    if !mounts_str.is_empty() {
+        if let Ok(mounts) = serde_json::from_str::<serde_json::Value>(mounts_str) {
+            if let Some(arr) = mounts.as_array() {
+                for mount in arr {
+                    let destination = mount.get("destination")
+                        .and_then(|d| d.as_str())
+                        .unwrap_or("");
+                    if destination == "/workspace" {
+                        let source = mount.get("source")
+                            .and_then(|s| s.as_str())
+                            .context("workspace mount has no source")?;
+                        return Ok(PathBuf::from(source));
+                    }
+                }
+            }
+        }
+    }
+
+    anyhow::bail!("Could not find workspace mount in container inspect output")
 }
 
 /// Parse a size string like "50MiB", "1GiB" into megabytes.
