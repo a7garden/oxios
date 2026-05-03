@@ -1,0 +1,1189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Oxios — Agent OS</title>
+<style>
+/* ── CSS Variables (terminal-inspired dark theme) ── */
+:root {
+  --bg-primary: #0d1117;
+  --bg-secondary: #161b22;
+  --bg-tertiary: #1c2128;
+  --bg-hover: #21262d;
+  --border: #30363d;
+  --text-primary: #e6edf3;
+  --text-secondary: #8b949e;
+  --text-muted: #6e7681;
+  --accent: #58a6ff;
+  --accent-dim: #1f6feb;
+  --green: #3fb950;
+  --red: #f85149;
+  --yellow: #d29922;
+  --purple: #bc8cff;
+  --font-mono: 'SF Mono', 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+  --radius: 6px;
+  --sidebar-width: 220px;
+}
+
+/* ── Reset & Base ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+  overflow: hidden;
+}
+
+/* ── Layout ── */
+.app {
+  display: flex;
+  height: 100vh;
+}
+
+/* ── Sidebar ── */
+.sidebar {
+  width: var(--sidebar-width);
+  min-width: var(--sidebar-width);
+  background: var(--bg-secondary);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.sidebar-header {
+  padding: 16px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sidebar-header .logo {
+  font-family: var(--font-mono);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.sidebar-header .subtitle {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.sidebar-nav {
+  padding: 8px 0;
+  flex: 1;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  border-left: 3px solid transparent;
+  transition: all 0.15s ease;
+  font-size: 13px;
+  user-select: none;
+}
+
+.nav-item:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.nav-item.active {
+  background: var(--bg-tertiary);
+  color: var(--accent);
+  border-left-color: var(--accent);
+}
+
+.nav-item .icon {
+  width: 18px;
+  text-align: center;
+  font-size: 15px;
+}
+
+.sidebar-footer {
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+.status-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--green);
+  margin-right: 6px;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+/* ── Main Content ── */
+.main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 0;
+}
+
+.panel {
+  display: none;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+}
+
+.panel.active {
+  display: flex;
+}
+
+.panel-header {
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.panel-header h2 {
+  font-size: 15px;
+  font-weight: 600;
+  font-family: var(--font-mono);
+}
+
+.panel-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+}
+
+/* ── Chat Panel ── */
+.chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.chat-msg {
+  max-width: 80%;
+  padding: 10px 14px;
+  border-radius: var(--radius);
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.chat-msg.user {
+  align-self: flex-end;
+  background: var(--accent-dim);
+  color: var(--text-primary);
+  border-bottom-right-radius: 2px;
+}
+
+.chat-msg.system {
+  align-self: flex-start;
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-bottom-left-radius: 2px;
+}
+
+.chat-msg .meta {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 4px;
+  font-family: var(--font-mono);
+}
+
+.chat-input-bar {
+  padding: 12px 20px;
+  border-top: 1px solid var(--border);
+  background: var(--bg-secondary);
+  display: flex;
+  gap: 8px;
+}
+
+.chat-input-bar input {
+  flex: 1;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 14px;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.chat-input-bar input:focus {
+  border-color: var(--accent);
+}
+
+.chat-input-bar input::placeholder {
+  color: var(--text-muted);
+}
+
+.btn {
+  background: var(--accent-dim);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 8px 16px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: var(--font-sans);
+}
+
+.btn:hover {
+  background: var(--accent);
+  color: #fff;
+}
+
+.btn-danger {
+  background: transparent;
+  color: var(--red);
+  border-color: var(--red);
+}
+
+.btn-danger:hover {
+  background: var(--red);
+  color: #fff;
+}
+
+.btn-sm {
+  padding: 4px 10px;
+  font-size: 12px;
+}
+
+/* ── Agents Panel ── */
+.agent-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.agent-card .agent-info {
+  flex: 1;
+}
+
+.agent-card .agent-name {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.agent-card .agent-id {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+.agent-card .agent-status {
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.status-running { background: rgba(63,185,80,0.15); color: var(--green); }
+.status-idle { background: rgba(210,153,34,0.15); color: var(--yellow); }
+.status-stopped { background: rgba(139,148,158,0.15); color: var(--text-secondary); }
+.status-failed { background: rgba(248,81,73,0.15); color: var(--red); }
+.status-starting { background: rgba(88,166,255,0.15); color: var(--accent); }
+
+/* ── Workspace Panel ── */
+.workspace-split {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+.workspace-tree {
+  width: 260px;
+  min-width: 200px;
+  border-right: 1px solid var(--border);
+  overflow-y: auto;
+  padding: 12px;
+  background: var(--bg-secondary);
+}
+
+.tree-item {
+  padding: 5px 8px;
+  cursor: pointer;
+  border-radius: 4px;
+  font-size: 13px;
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  user-select: none;
+}
+
+.tree-item:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.tree-item.dir .icon { color: var(--accent); }
+.tree-item.file .icon { color: var(--text-muted); }
+
+.workspace-viewer {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+}
+
+.workspace-viewer pre {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--text-primary);
+}
+
+.workspace-viewer textarea {
+  width: 100%;
+  height: 100%;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.6;
+  resize: none;
+  outline: none;
+}
+
+.workspace-viewer textarea:focus {
+  border-color: var(--accent);
+}
+
+.workspace-toolbar {
+  padding: 8px 16px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.workspace-toolbar .breadcrumb {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-muted);
+  flex: 1;
+}
+
+/* ── Seeds / Memory Panels ── */
+.item-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.item-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+.item-card:hover {
+  border-color: var(--accent);
+}
+
+.item-card .item-title {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.item-card .item-subtitle {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.detail-view {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  margin-top: 16px;
+}
+
+.detail-view h3 {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  margin-bottom: 12px;
+  color: var(--accent);
+}
+
+.detail-view pre {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--text-primary);
+}
+
+/* ── Config Panel ── */
+.config-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.config-section {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+}
+
+.config-section h3 {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--accent);
+  margin-bottom: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.config-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+
+.config-row:last-child { border-bottom: none; }
+
+.config-row .key {
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+}
+
+.config-row .val {
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+}
+
+/* ── Empty State ── */
+.empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--text-muted);
+}
+
+.empty-state .icon {
+  font-size: 40px;
+  margin-bottom: 12px;
+}
+
+.empty-state p {
+  font-size: 13px;
+  max-width: 300px;
+  margin: 0 auto;
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+/* ── Loading spinner ── */
+.loading {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Event Log ── */
+.event-log {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.8;
+  color: var(--text-secondary);
+}
+
+.event-log .event-line {
+  padding: 2px 0;
+  border-bottom: 1px solid var(--bg-tertiary);
+}
+
+.event-log .event-time {
+  color: var(--text-muted);
+  margin-right: 8px;
+}
+
+.event-log .event-type {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* ── Responsive ── */
+@media (max-width: 768px) {
+  .sidebar { width: 60px; min-width: 60px; }
+  .sidebar-header .subtitle,
+  .nav-item span:not(.icon),
+  .sidebar-footer span { display: none; }
+  .nav-item { justify-content: center; padding: 10px; }
+  .config-grid { grid-template-columns: 1fr; }
+  .workspace-tree { width: 180px; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <div>
+        <div class="logo">λ oxios</div>
+        <div class="subtitle">Agent OS</div>
+      </div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-item active" data-panel="chat">
+        <span class="icon">💬</span><span>Chat</span>
+      </div>
+      <div class="nav-item" data-panel="agents">
+        <span class="icon">⚡</span><span>Agents</span>
+      </div>
+      <div class="nav-item" data-panel="workspace">
+        <span class="icon">📁</span><span>Workspace</span>
+      </div>
+      <div class="nav-item" data-panel="seeds">
+        <span class="icon">🌱</span><span>Seeds</span>
+      </div>
+      <div class="nav-item" data-panel="memory">
+        <span class="icon">🧠</span><span>Memory</span>
+      </div>
+      <div class="nav-item" data-panel="events">
+        <span class="icon">📡</span><span>Events</span>
+      </div>
+      <div class="nav-item" data-panel="config">
+        <span class="icon">⚙️</span><span>Config</span>
+      </div>
+    </nav>
+    <div class="sidebar-footer">
+      <span class="status-dot"></span><span id="conn-status">connected</span>
+    </div>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="main">
+
+    <!-- Chat Panel -->
+    <div class="panel active" id="panel-chat">
+      <div class="panel-header">
+        <h2>💬 Chat</h2>
+        <span style="font-size:12px;color:var(--text-muted)" id="ws-status">WebSocket: connecting…</span>
+      </div>
+      <div class="chat-messages" id="chat-messages">
+        <div class="chat-msg system">
+          Welcome to Oxios. Type a message to start interacting with your agents.
+          <div class="meta">system · just now</div>
+        </div>
+      </div>
+      <div class="chat-input-bar">
+        <input type="text" id="chat-input" placeholder="Send a message… (Enter to send)" autocomplete="off" />
+        <button class="btn" id="chat-send">Send</button>
+      </div>
+    </div>
+
+    <!-- Agents Panel -->
+    <div class="panel" id="panel-agents">
+      <div class="panel-header">
+        <h2>⚡ Agents</h2>
+        <button class="btn btn-sm" id="agents-refresh">Refresh</button>
+      </div>
+      <div class="panel-body" id="agents-body">
+        <div class="empty-state">
+          <div class="icon">⚡</div>
+          <p>No agents running. Start a conversation to spawn agents.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Workspace Panel -->
+    <div class="panel" id="panel-workspace">
+      <div class="panel-header">
+        <h2>📁 Workspace</h2>
+        <button class="btn btn-sm" id="workspace-refresh">Refresh</button>
+      </div>
+      <div class="workspace-split">
+        <div class="workspace-tree" id="workspace-tree"></div>
+        <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;">
+          <div class="workspace-toolbar">
+            <span class="breadcrumb" id="workspace-breadcrumb">~</span>
+            <button class="btn btn-sm" id="workspace-save" style="display:none">Save</button>
+          </div>
+          <div class="workspace-viewer" id="workspace-viewer">
+            <div class="empty-state">
+              <div class="icon">📄</div>
+              <p>Select a file from the tree to view its contents.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Seeds Panel -->
+    <div class="panel" id="panel-seeds">
+      <div class="panel-header">
+        <h2>🌱 Seeds</h2>
+        <button class="btn btn-sm" id="seeds-refresh">Refresh</button>
+      </div>
+      <div class="panel-body" id="seeds-body">
+        <div class="empty-state">
+          <div class="icon">🌱</div>
+          <p>No seeds yet. Seeds are created through the Ouroboros interview process.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Memory Panel -->
+    <div class="panel" id="panel-memory">
+      <div class="panel-header">
+        <h2>🧠 Memory</h2>
+        <button class="btn btn-sm" id="memory-refresh">Refresh</button>
+      </div>
+      <div class="panel-body" id="memory-body">
+        <div class="empty-state">
+          <div class="icon">🧠</div>
+          <p>No memory entries yet. Agent conversations generate daily memory summaries.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Events Panel -->
+    <div class="panel" id="panel-events">
+      <div class="panel-header">
+        <h2>📡 Events</h2>
+        <button class="btn btn-sm" id="events-clear">Clear</button>
+      </div>
+      <div class="panel-body">
+        <div class="event-log" id="event-log"></div>
+      </div>
+    </div>
+
+    <!-- Config Panel -->
+    <div class="panel" id="panel-config">
+      <div class="panel-header">
+        <h2>⚙️ Config</h2>
+        <button class="btn btn-sm" id="config-refresh">Refresh</button>
+      </div>
+      <div class="panel-body" id="config-body">
+        <div class="config-grid" id="config-grid"></div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+// ── API Base ──
+const API = '';
+
+// ── State ──
+let currentPanel = 'chat';
+let ws = null;
+let eventSource = null;
+let selectedFilePath = null;
+let fileContent = '';
+
+// ── Navigation ──
+document.querySelectorAll('.nav-item').forEach(item => {
+  item.addEventListener('click', () => {
+    const panel = item.dataset.panel;
+    switchPanel(panel);
+  });
+});
+
+function switchPanel(panel) {
+  currentPanel = panel;
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.querySelector(`.nav-item[data-panel="${panel}"]`).classList.add('active');
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.getElementById(`panel-${panel}`).classList.add('active');
+
+  // Load data for the panel
+  switch (panel) {
+    case 'agents': loadAgents(); break;
+    case 'workspace': loadWorkspaceTree(); break;
+    case 'seeds': loadSeeds(); break;
+    case 'memory': loadMemory(); break;
+    case 'config': loadConfig(); break;
+  }
+}
+
+// ── Chat ──
+const chatInput = document.getElementById('chat-input');
+const chatSend = document.getElementById('chat-send');
+const chatMessages = document.getElementById('chat-messages');
+
+function addChatMessage(text, type, meta) {
+  const div = document.createElement('div');
+  div.className = `chat-msg ${type}`;
+  div.textContent = text;
+  if (meta) {
+    const metaDiv = document.createElement('div');
+    metaDiv.className = 'meta';
+    metaDiv.textContent = meta;
+    div.appendChild(metaDiv);
+  }
+  chatMessages.appendChild(div);
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+async function sendChatMessage() {
+  const text = chatInput.value.trim();
+  if (!text) return;
+
+  chatInput.value = '';
+  addChatMessage(text, 'user', 'you · just now');
+
+  try {
+    const res = await fetch(`${API}/api/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content: text }),
+    });
+    const data = await res.json();
+    addChatMessage(data.reply, 'system', `oxios · ${data.id.slice(0, 8)}`);
+  } catch (err) {
+    addChatMessage(`Error: ${err.message}`, 'system', 'error');
+  }
+}
+
+chatSend.addEventListener('click', sendChatMessage);
+chatInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendChatMessage();
+  }
+});
+
+// ── WebSocket ──
+function connectWebSocket() {
+  const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const wsUrl = `${protocol}//${location.host}/api/chat/stream`;
+  ws = new WebSocket(wsUrl);
+
+  ws.onopen = () => {
+    document.getElementById('ws-status').textContent = 'WebSocket: connected';
+  };
+
+  ws.onmessage = (event) => {
+    try {
+      const msg = JSON.parse(event.data);
+      addChatMessage(msg.content, 'system', `${msg.channel} · ${msg.user_id}`);
+    } catch {
+      addChatMessage(event.data, 'system', 'stream');
+    }
+  };
+
+  ws.onclose = () => {
+    document.getElementById('ws-status').textContent = 'WebSocket: disconnected';
+    setTimeout(connectWebSocket, 3000);
+  };
+
+  ws.onerror = () => {
+    document.getElementById('ws-status').textContent = 'WebSocket: error';
+  };
+}
+
+connectWebSocket();
+
+// ── SSE Events ──
+function connectSSE() {
+  eventSource = new EventSource(`${API}/api/events`);
+
+  eventSource.onmessage = (event) => {
+    try {
+      const data = JSON.parse(event.data);
+      addEvent(data);
+    } catch {
+      // ignore malformed events
+    }
+  };
+
+  eventSource.onerror = () => {
+    // Auto-reconnect is handled by EventSource
+  };
+}
+
+connectSSE();
+
+function addEvent(data) {
+  const log = document.getElementById('event-log');
+  const line = document.createElement('div');
+  line.className = 'event-line';
+
+  const type = Object.keys(data)[0] || 'unknown';
+  const time = new Date().toLocaleTimeString();
+
+  line.innerHTML = `<span class="event-time">${time}</span><span class="event-type">${type}</span> ${JSON.stringify(data[type] || data)}`;
+  log.appendChild(line);
+
+  // Keep last 200 events
+  while (log.children.length > 200) {
+    log.removeChild(log.firstChild);
+  }
+
+  // Auto-scroll if on events panel
+  if (currentPanel === 'events') {
+    log.parentElement.scrollTop = log.parentElement.scrollHeight;
+  }
+}
+
+document.getElementById('events-clear').addEventListener('click', () => {
+  document.getElementById('event-log').innerHTML = '';
+});
+
+// ── Agents ──
+async function loadAgents() {
+  const body = document.getElementById('agents-body');
+  try {
+    const res = await fetch(`${API}/api/agents`);
+    const agents = await res.json();
+
+    if (!agents.length) {
+      body.innerHTML = `<div class="empty-state"><div class="icon">⚡</div><p>No agents running.</p></div>`;
+      return;
+    }
+
+    body.innerHTML = agents.map(a => `
+      <div class="agent-card">
+        <div class="agent-info">
+          <div class="agent-name">${esc(a.name || a.id)}</div>
+          <div class="agent-id">${a.id}</div>
+        </div>
+        <span class="agent-status status-${a.status}">${a.status}</span>
+        <button class="btn btn-danger btn-sm" onclick="killAgent('${a.id}')" style="margin-left:12px">Kill</button>
+      </div>
+    `).join('');
+  } catch (err) {
+    body.innerHTML = `<div class="empty-state"><p>Error loading agents: ${esc(err.message)}</p></div>`;
+  }
+}
+
+async function killAgent(id) {
+  try {
+    await fetch(`${API}/api/agents/${id}/kill`, { method: 'POST' });
+    loadAgents();
+  } catch (err) {
+    alert(`Failed to kill agent: ${err.message}`);
+  }
+}
+
+document.getElementById('agents-refresh').addEventListener('click', loadAgents);
+
+// ── Workspace ──
+let workspaceDir = '';
+
+async function loadWorkspaceTree(dir) {
+  const tree = document.getElementById('workspace-tree');
+  workspaceDir = dir || '';
+  try {
+    const params = dir ? `?dir=${encodeURIComponent(dir)}` : '';
+    const res = await fetch(`${API}/api/workspace/tree${params}`);
+    const entries = await res.json();
+
+    if (!entries.length) {
+      tree.innerHTML = `<div class="tree-item" style="color:var(--text-muted)">Empty directory</div>`;
+      return;
+    }
+
+    let html = '';
+    // Parent dir link
+    if (dir) {
+      const parent = dir.includes('/') ? dir.split('/').slice(0, -1).join('/') : '';
+      html += `<div class="tree-item dir" onclick="loadWorkspaceTree('${escAttr(parent)}')"><span class="icon">📂</span> ..</div>`;
+    }
+    for (const e of entries) {
+      const icon = e.is_dir ? '📂' : '📄';
+      const cls = e.is_dir ? 'dir' : 'file';
+      const fullPath = dir ? `${dir}/${e.name}` : e.name;
+      if (e.is_dir) {
+        html += `<div class="tree-item ${cls}" onclick="loadWorkspaceTree('${escAttr(fullPath)}')"><span class="icon">${icon}</span> ${esc(e.name)}</div>`;
+      } else {
+        html += `<div class="tree-item ${cls}" onclick="loadFile('${escAttr(fullPath)}')"><span class="icon">${icon}</span> ${esc(e.name)}</div>`;
+      }
+    }
+    tree.innerHTML = html;
+  } catch (err) {
+    tree.innerHTML = `<div class="tree-item" style="color:var(--red)">Error: ${esc(err.message)}</div>`;
+  }
+}
+
+async function loadFile(path) {
+  selectedFilePath = path;
+  const viewer = document.getElementById('workspace-viewer');
+  const breadcrumb = document.getElementById('workspace-breadcrumb');
+  const saveBtn = document.getElementById('workspace-save');
+
+  breadcrumb.textContent = `~/${path}`;
+
+  try {
+    const res = await fetch(`${API}/api/workspace/file/${path}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    fileContent = await res.text();
+
+    // Check if it's a markdown or text file → show editor
+    const ext = path.split('.').pop().toLowerCase();
+    if (['md', 'txt', 'toml', 'yaml', 'yml', 'json', 'rs', 'js', 'html', 'css', 'sh'].includes(ext)) {
+      viewer.innerHTML = `<textarea id="file-editor">${esc(fileContent)}</textarea>`;
+      saveBtn.style.display = 'inline-flex';
+    } else {
+      viewer.innerHTML = `<pre>${esc(fileContent)}</pre>`;
+      saveBtn.style.display = 'none';
+    }
+  } catch (err) {
+    viewer.innerHTML = `<div class="empty-state"><p>Error: ${esc(err.message)}</p></div>`;
+    saveBtn.style.display = 'none';
+  }
+}
+
+document.getElementById('workspace-save').addEventListener('click', async () => {
+  if (!selectedFilePath) return;
+  const editor = document.getElementById('file-editor');
+  if (!editor) return;
+
+  try {
+    const res = await fetch(`${API}/api/workspace/file/${selectedFilePath}`, {
+      method: 'PUT',
+      body: editor.value,
+    });
+    if (res.ok) {
+      document.getElementById('workspace-save').textContent = 'Saved!';
+      setTimeout(() => { document.getElementById('workspace-save').textContent = 'Save'; }, 1500);
+    }
+  } catch (err) {
+    alert(`Save failed: ${err.message}`);
+  }
+});
+
+document.getElementById('workspace-refresh').addEventListener('click', () => loadWorkspaceTree(workspaceDir));
+
+// ── Seeds ──
+let selectedSeed = null;
+
+async function loadSeeds() {
+  const body = document.getElementById('seeds-body');
+  try {
+    const res = await fetch(`${API}/api/seeds`);
+    const seeds = await res.json();
+
+    if (!seeds.length) {
+      body.innerHTML = `<div class="empty-state"><div class="icon">🌱</div><p>No seeds yet.</p></div>`;
+      return;
+    }
+
+    let html = '<div class="item-list">';
+    for (const s of seeds) {
+      html += `
+        <div class="item-card" onclick="loadSeedDetail('${escAttr(s.id)}')">
+          <div class="item-title">${esc(s.goal || s.id)}</div>
+          <div class="item-subtitle">${s.id.slice(0, 8)} · ${s.constraints_count} constraints · ${s.created_at || 'unknown date'}</div>
+        </div>
+      `;
+    }
+    html += '</div>';
+    if (selectedSeed) {
+      html += `<div class="detail-view" id="seed-detail"></div>`;
+    }
+    body.innerHTML = html;
+
+    if (selectedSeed) {
+      loadSeedDetail(selectedSeed);
+    }
+  } catch (err) {
+    body.innerHTML = `<div class="empty-state"><p>Error: ${esc(err.message)}</p></div>`;
+  }
+}
+
+async function loadSeedDetail(id) {
+  selectedSeed = id;
+  let detail = document.getElementById('seed-detail');
+  if (!detail) {
+    await loadSeeds();
+    detail = document.getElementById('seed-detail');
+  }
+  if (!detail) return;
+
+  try {
+    const res = await fetch(`${API}/api/seeds/${id}`);
+    const data = await res.json();
+    detail.innerHTML = `<h3>Seed: ${id.slice(0, 8)}</h3><pre>${esc(JSON.stringify(data, null, 2))}</pre>`;
+  } catch (err) {
+    detail.innerHTML = `<p style="color:var(--red)">Error: ${esc(err.message)}</p>`;
+  }
+}
+
+document.getElementById('seeds-refresh').addEventListener('click', loadSeeds);
+
+// ── Memory ──
+let selectedMemory = null;
+
+async function loadMemory() {
+  const body = document.getElementById('memory-body');
+  try {
+    const res = await fetch(`${API}/api/memory`);
+    const entries = await res.json();
+
+    if (!entries.length) {
+      body.innerHTML = `<div class="empty-state"><div class="icon">🧠</div><p>No memory entries yet.</p></div>`;
+      return;
+    }
+
+    let html = '<div class="item-list">';
+    for (const m of entries) {
+      html += `
+        <div class="item-card" onclick="loadMemoryDetail('${escAttr(m.name)}')">
+          <div class="item-title">${esc(m.name)}</div>
+          <div class="item-subtitle">${m.category}</div>
+        </div>
+      `;
+    }
+    html += '</div>';
+    if (selectedMemory) {
+      html += `<div class="detail-view" id="memory-detail"></div>`;
+    }
+    body.innerHTML = html;
+
+    if (selectedMemory) {
+      loadMemoryDetail(selectedMemory);
+    }
+  } catch (err) {
+    body.innerHTML = `<div class="empty-state"><p>Error: ${esc(err.message)}</p></div>`;
+  }
+}
+
+async function loadMemoryDetail(name) {
+  selectedMemory = name;
+  let detail = document.getElementById('memory-detail');
+  if (!detail) {
+    await loadMemory();
+    detail = document.getElementById('memory-detail');
+  }
+  if (!detail) return;
+
+  try {
+    const res = await fetch(`${API}/api/memory/${name}`);
+    const data = await res.json();
+    detail.innerHTML = `<h3>${esc(name)}</h3><pre>${esc(data.content || JSON.stringify(data, null, 2))}</pre>`;
+  } catch (err) {
+    detail.innerHTML = `<p style="color:var(--red)">Error: ${esc(err.message)}</p>`;
+  }
+}
+
+document.getElementById('memory-refresh').addEventListener('click', loadMemory);
+
+// ── Config ──
+async function loadConfig() {
+  const body = document.getElementById('config-body');
+  try {
+    const res = await fetch(`${API}/api/config`);
+    const config = await res.json();
+
+    let html = '<div class="config-grid">';
+    for (const [section, values] of Object.entries(config)) {
+      html += `<div class="config-section"><h3>${esc(section)}</h3>`;
+      if (typeof values === 'object' && values !== null) {
+        for (const [key, val] of Object.entries(values)) {
+          html += `<div class="config-row"><span class="key">${esc(key)}</span><span class="val">${esc(String(val))}</span></div>`;
+        }
+      } else {
+        html += `<div class="config-row"><span class="val">${esc(String(values))}</span></div>`;
+      }
+      html += '</div>';
+    }
+    html += '</div>';
+    body.innerHTML = html;
+  } catch (err) {
+    body.innerHTML = `<div class="empty-state"><p>Error: ${esc(err.message)}</p></div>`;
+  }
+}
+
+document.getElementById('config-refresh').addEventListener('click', loadConfig);
+
+// ── Utilities ──
+function esc(s) {
+  const div = document.createElement('div');
+  div.textContent = s;
+  return div.innerHTML;
+}
+
+function escAttr(s) {
+  return s.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+}
+
+// ── Init: Load status ──
+(async () => {
+  try {
+    const res = await fetch(`${API}/api/status`);
+    const data = await res.json();
+    document.querySelector('.sidebar-footer span:last-child').textContent =
+      `${data.status} · v${data.version}`;
+  } catch {
+    document.getElementById('conn-status').textContent = 'disconnected';
+  }
+})();
+</script>
+</body>
+</html>

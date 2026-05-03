@@ -10,5 +10,5 @@ pub mod channel;
 pub mod routes;
 pub mod server;
 
-pub use channel::WebChannel;
-pub use server::WebServer;
+pub use channel::{WebChannel, WebChannelHandle};
+pub use server::{AppState, WebServer};

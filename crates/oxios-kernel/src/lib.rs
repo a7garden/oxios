@@ -6,12 +6,14 @@
 
 #![warn(missing_docs)]
 
+pub mod agent_runtime;
 pub mod config;
 pub mod event_bus;
 pub mod state_store;
 pub mod supervisor;
 pub mod types;
 
+pub use agent_runtime::AgentRuntime;
 pub use config::OxiosConfig;
 pub use event_bus::{EventBus, KernelEvent};
 pub use state_store::StateStore;

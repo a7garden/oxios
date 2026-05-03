@@ -2,6 +2,9 @@
 //!
 //! The supervisor handles forking, executing, monitoring, and
 //! terminating agent instances. It is the "init" of Oxios.
+//!
+//! When an agent is forked and executed, the supervisor delegates
+//! the actual tool-calling loop to the [`AgentRuntime`].
 
 use anyhow::Result;
 use async_trait::async_trait;
@@ -9,7 +12,9 @@ use chrono::Utc;
 use oxios_ouroboros::Seed;
 use parking_lot::RwLock;
 use std::collections::HashMap;
+use std::sync::Arc;
 
+use crate::agent_runtime::AgentRuntime;
 use crate::event_bus::EventBus;
 use crate::types::{AgentId, AgentInfo, AgentStatus};
 
@@ -32,19 +37,83 @@ pub trait Supervisor: Send + Sync {
     async fn list(&self) -> Result<Vec<AgentInfo>>;
 }
 
-/// Basic in-memory supervisor implementation.
+/// Basic in-memory supervisor implementation with AgentRuntime integration.
 pub struct BasicSupervisor {
     agents: RwLock<HashMap<AgentId, AgentInfo>>,
     event_bus: EventBus,
+    runtime: Arc<AgentRuntime>,
 }
 
 impl BasicSupervisor {
-    /// Creates a new supervisor with the given event bus.
-    pub fn new(event_bus: EventBus) -> Self {
+    /// Creates a new supervisor with the given event bus and agent runtime.
+    pub fn new(event_bus: EventBus, runtime: AgentRuntime) -> Self {
         Self {
             agents: RwLock::new(HashMap::new()),
             event_bus,
+            runtime: Arc::new(runtime),
         }
+    }
+
+    /// Execute an agent with its full seed, running the tool-calling loop.
+    ///
+    /// This is the primary entry point for running an agent. It runs
+    /// the tool-calling loop via the AgentRuntime and publishes events.
+    pub async fn run_with_seed(&self, id: AgentId, seed: &Seed) -> Result<()> {
+        // Mark as running.
+        {
+            let mut agents = self.agents.write();
+            match agents.get_mut(&id) {
+                Some(agent) => agent.status = AgentStatus::Running,
+                None => anyhow::bail!("Agent {id} not found"),
+            }
+        }
+
+        let _ = self
+            .event_bus
+            .publish(crate::event_bus::KernelEvent::AgentStarted { id });
+
+        tracing::info!(agent_id = %id, seed_id = %seed.id, "Running agent task");
+
+        match self.runtime.execute(seed).await {
+            Ok(result) => {
+                tracing::info!(
+                    agent_id = %id,
+                    success = result.success,
+                    steps = result.steps_completed,
+                    "Agent task completed"
+                );
+
+                {
+                    let mut agents = self.agents.write();
+                    if let Some(agent) = agents.get_mut(&id) {
+                        agent.status = if result.success {
+                            AgentStatus::Idle
+                        } else {
+                            AgentStatus::Failed
+                        };
+                    }
+                }
+
+                let _ = self.event_bus.publish(crate::event_bus::KernelEvent::AgentStopped { id });
+            }
+            Err(e) => {
+                tracing::error!(agent_id = %id, error = %e, "Agent task failed");
+
+                {
+                    let mut agents = self.agents.write();
+                    if let Some(agent) = agents.get_mut(&id) {
+                        agent.status = AgentStatus::Failed;
+                    }
+                }
+
+                let _ = self.event_bus.publish(crate::event_bus::KernelEvent::AgentFailed {
+                    id,
+                    error: e.to_string(),
+                });
+            }
+        }
+
+        Ok(())
     }
 }
 
@@ -77,15 +146,19 @@ impl Supervisor for BasicSupervisor {
     async fn exec(&self, id: AgentId) -> Result<()> {
         {
             let mut agents = self.agents.write();
-            if let Some(agent) = agents.get_mut(&id) {
-                agent.status = AgentStatus::Running;
-            } else {
-                anyhow::bail!("Agent {id} not found");
+            match agents.get_mut(&id) {
+                Some(agent) => {
+                    agent.status = AgentStatus::Running;
+                }
+                None => anyhow::bail!("Agent {id} not found"),
             }
         }
 
-        let _ = self.event_bus.publish(crate::event_bus::KernelEvent::AgentStarted { id });
+        let _ = self
+            .event_bus
+            .publish(crate::event_bus::KernelEvent::AgentStarted { id });
         tracing::info!(agent_id = %id, "Agent execution started");
+
         Ok(())
     }
 
@@ -107,7 +180,9 @@ impl Supervisor for BasicSupervisor {
             }
         }
 
-        let _ = self.event_bus.publish(crate::event_bus::KernelEvent::AgentStopped { id });
+        let _ = self
+            .event_bus
+            .publish(crate::event_bus::KernelEvent::AgentStopped { id });
         tracing::info!(agent_id = %id, "Agent killed");
         Ok(())
     }

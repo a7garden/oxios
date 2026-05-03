@@ -9,10 +9,12 @@
 
 pub mod evaluation;
 pub mod interview;
+pub mod ouroboros_engine;
 pub mod protocol;
 pub mod seed;
 
 pub use evaluation::EvaluationResult;
 pub use interview::InterviewResult;
+pub use ouroboros_engine::OuroborosEngine;
 pub use protocol::{ExecutionResult, OuroborosProtocol, Phase};
 pub use seed::{AmbiguityScore, Entity, Seed};

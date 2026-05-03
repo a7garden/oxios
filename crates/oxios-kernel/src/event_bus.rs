@@ -61,6 +61,7 @@ pub enum KernelEvent {
 ///
 /// Subscribers receive all events published after they subscribe.
 /// Late subscribers do not receive historical events.
+#[derive(Clone)]
 pub struct EventBus {
     sender: broadcast::Sender<KernelEvent>,
 }

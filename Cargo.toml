@@ -48,8 +48,10 @@ oxi-agent = { path = "../pi2oxi/oxi-agent" }
 
 [dependencies]
 oxios-kernel = { path = "crates/oxios-kernel" }
+oxios-ouroboros = { path = "crates/oxios-ouroboros" }
 oxios-gateway = { path = "crates/oxios-gateway" }
 oxios-web = { path = "channels/oxios-web" }
+oxi-ai = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }

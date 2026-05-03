@@ -7,6 +7,8 @@ license = "MIT"
 
 [dependencies]
 oxios-gateway = { path = "../../crates/oxios-gateway" }
+oxios-kernel = { path = "../../crates/oxios-kernel" }
+oxios-ouroboros = { path = "../../crates/oxios-ouroboros" }
 tokio = { workspace = true }
 async-trait = { workspace = true }
 serde = { workspace = true }
@@ -14,6 +16,9 @@ serde_json = { workspace = true }
 tracing = { workspace = true }
 anyhow = { workspace = true }
 chrono = { workspace = true }
-axum = "0.8"
+uuid = { workspace = true }
+axum = { version = "0.8", features = ["ws"] }
 tower = "0.5"
 tower-http = { version = "0.6", features = ["cors", "fs"] }
+futures-util = "0.3"
+tokio-stream = { version = "0.1", features = ["sync"] }
