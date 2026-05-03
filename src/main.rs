@@ -5,6 +5,7 @@
 
 use anyhow::{bail, Context, Result};
 use clap::{Parser, Subcommand};
+use parking_lot::Mutex;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -441,7 +442,7 @@ enum PkgAction {
 /// Handle pkg subcommands.
 async fn cmd_pkg(action: PkgAction, config_path: &Path) -> Result<()> {
     let model_id = "anthropic/claude-sonnet-4-20250514"; // Dummy for pkg cmds
-    let (_, _, _, _, _, _, _, _, _, _, mut program_manager, _) =
+    let (_, _, _, _, _, _, _, _, _, _, program_manager, _) =
         init_kernel(config_path, model_id).await?;
 
     match action {

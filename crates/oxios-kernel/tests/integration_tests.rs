@@ -410,11 +410,15 @@ async fn test_orchestrator_happy_path() {
     let ouroboros = Arc::new(MockOuroboros::new());
     let supervisor = Arc::new(MockSupervisor::new(event_bus.clone()));
 
+    let scheduler = Arc::new(AgentScheduler::default());
+    let access_manager = Arc::new(parking_lot::Mutex::new(AccessManager::new()));
     let orchestrator = Orchestrator::new(
         ouroboros.clone(),
         supervisor.clone(),
         event_bus.clone(),
         state_store,
+        scheduler.clone(),
+        access_manager.clone(),
     );
 
     let result = orchestrator
@@ -448,11 +452,15 @@ async fn test_orchestrator_evolution_loop() {
     let ouroboros = Arc::new(MockOuroboros::with_failing_evaluation());
     let supervisor = Arc::new(MockSupervisor::new(event_bus.clone()));
 
+    let scheduler = Arc::new(AgentScheduler::default());
+    let access_manager = Arc::new(parking_lot::Mutex::new(AccessManager::new()));
     let orchestrator = Orchestrator::new(
         ouroboros.clone(),
         supervisor.clone(),
         event_bus.clone(),
         state_store,
+        scheduler.clone(),
+        access_manager.clone(),
     );
 
     let result = orchestrator
@@ -477,11 +485,15 @@ async fn test_orchestrator_events_published() {
     let ouroboros = Arc::new(MockOuroboros::new());
     let supervisor = Arc::new(MockSupervisor::new(event_bus.clone()));
 
+    let scheduler = Arc::new(AgentScheduler::default());
+    let access_manager = Arc::new(parking_lot::Mutex::new(AccessManager::new()));
     let orchestrator = Orchestrator::new(
         ouroboros,
         supervisor,
         event_bus.clone(),
         state_store,
+        scheduler.clone(),
+        access_manager.clone(),
     );
 
     // Run orchestration in background.
@@ -542,11 +554,15 @@ async fn test_gateway_routes_message_through_orchestrator() {
     let ouroboros = Arc::new(MockOuroboros::new());
     let supervisor = Arc::new(MockSupervisor::new(event_bus.clone()));
 
+    let scheduler = Arc::new(AgentScheduler::default());
+    let access_manager = Arc::new(parking_lot::Mutex::new(AccessManager::new()));
     let orchestrator = Arc::new(Orchestrator::new(
         ouroboros,
         supervisor,
         event_bus.clone(),
         state_store,
+        scheduler.clone(),
+        access_manager.clone(),
     ));
 
     let gateway = Gateway::new(orchestrator);
@@ -575,11 +591,15 @@ async fn test_gateway_unknown_channel() {
     let ouroboros = Arc::new(MockOuroboros::new());
     let supervisor = Arc::new(MockSupervisor::new(event_bus.clone()));
 
+    let scheduler = Arc::new(AgentScheduler::default());
+    let access_manager = Arc::new(parking_lot::Mutex::new(AccessManager::new()));
     let orchestrator = Arc::new(Orchestrator::new(
         ouroboros,
         supervisor,
         event_bus.clone(),
         state_store,
+        scheduler.clone(),
+        access_manager.clone(),
     ));
 
     let gateway = Gateway::new(orchestrator);
@@ -698,11 +718,15 @@ async fn test_scheduler_orchestrator_integration() {
     let ouroboros = Arc::new(MockOuroboros::new());
     let supervisor = Arc::new(SchedulerAwareSupervisor::new(scheduler.clone(), event_bus.clone()));
 
+    let scheduler = Arc::new(AgentScheduler::default());
+    let access_manager = Arc::new(parking_lot::Mutex::new(AccessManager::new()));
     let orchestrator = Orchestrator::new(
         ouroboros,
         supervisor,
         event_bus.clone(),
         state_store,
+        scheduler.clone(),
+        access_manager.clone(),
     );
 
     // Run a single orchestration.
@@ -758,6 +782,8 @@ async fn test_scheduler_priority_ordering_in_orchestration() {
         supervisor,
         event_bus,
         state_store,
+        scheduler.clone(),
+        access_manager.clone(),
     );
     // Orchestrator is created successfully — shared state is fine.
 }
@@ -818,11 +844,15 @@ required = ["echo"]
     let ouroboros = Arc::new(MockOuroboros::new());
     let supervisor = Arc::new(MockSupervisor::new(event_bus.clone()));
 
+    let scheduler = Arc::new(AgentScheduler::default());
+    let access_manager = Arc::new(parking_lot::Mutex::new(AccessManager::new()));
     let orchestrator = Orchestrator::new(
         ouroboros,
         supervisor,
         event_bus.clone(),
         state_store,
+        scheduler.clone(),
+        access_manager.clone(),
     );
 
     // Orchestrate a message — the installed program should be discoverable

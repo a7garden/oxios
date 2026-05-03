@@ -423,7 +423,7 @@ impl AccessManager {
     /// Logs an access decision to the audit log.
     ///
     /// Automatically prunes old entries if max_audit_entries is exceeded.
-    fn log_access(
+    pub(crate) fn log_access(
         &mut self,
         agent_name: &str,
         action: &str,

@@ -185,30 +185,38 @@ pub enum InstallSource {
     /// Install from a local directory path.
     Local(PathBuf),
     /// Install from a git repository.
-    Git { url: String, branch: Option<String> },
+    Git {
+        /// Git repository URL.
+        url: String,
+        /// Optional branch to checkout.
+        branch: Option<String>,
+    },
     /// Install from a tarball URL.
-    Tarball { url: String },
+    Tarball {
+        /// Tarball URL (http/https).
+        url: String,
+    },
 }
 
 impl ProgramManager {
     /// Install a program from an [InstallSource].
     pub async fn install_from(&self, source: InstallSource) -> Result<Program> {
         match source {
-            InstallSource::Local(path) => self.install_from_local(&path),
+            InstallSource::Local(path) => self.install_from_local(&path).await,
             InstallSource::Git { url, branch } => self.install_from_git(&url, branch.as_deref()).await,
             InstallSource::Tarball { url } => self.install_from_tarball(&url).await,
         }
     }
 
     /// Install a program from a local directory path.
-    fn install_from_local(&self, source_path: &Path) -> Result<Program> {
-        self.install(source_path)
+    async fn install_from_local(&self, source_path: &Path) -> Result<Program> {
+        self.install(source_path).await
     }
 
     /// Install a program by cloning a git repository, then installing the result.
     async fn install_from_git(&self, url: &str, branch: Option<&str>) -> Result<Program> {
         // Create a temporary directory for the clone.
-        let temp_dir = tempfile::tempdir()?;
+        let temp_dir = tempfile::tempdir().map_err(|e| anyhow::anyhow!("tempfile: {}", e))?;
         let clone_path = temp_dir.path();
 
 
@@ -257,7 +265,7 @@ impl ProgramManager {
     /// Install a program by downloading and extracting a tarball.
     async fn install_from_tarball(&self, url: &str) -> Result<Program> {
         // Create a temporary directory for download and extraction.
-        let temp_dir = tempfile::tempdir()?;
+        let temp_dir = tempfile::tempdir().map_err(|e| anyhow::anyhow!("tempfile: {}", e))?;
         let download_path = temp_dir.path().join("program.tar.gz");
         let extract_base = temp_dir.path().join("extracted");
 

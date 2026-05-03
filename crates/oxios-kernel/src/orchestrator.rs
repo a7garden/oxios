@@ -221,10 +221,10 @@ impl Orchestrator {
             let exec_result = self.supervisor.run_with_seed(agent_id, &seed).await?;
             // Mark task as completed or failed.
             let task_id = scheduled.id;
-            if exec_result.exit_code == 0 {
+            if exec_result.success {
                 let _ = self.scheduler.complete_task(task_id);
             } else {
-                let _ = self.scheduler.fail_task(task_id, &exec_result.stderr);
+                let _ = self.scheduler.fail_task(task_id, &exec_result.output);
             }
             exec_result
         } else {
@@ -311,10 +311,10 @@ impl Orchestrator {
                     );
                     let exec_result = self.supervisor.run_with_seed(new_agent_id, &evolved).await?;
                     let task_id = scheduled.id;
-                    if exec_result.exit_code == 0 {
+                    if exec_result.success {
                         let _ = self.scheduler.complete_task(task_id);
                     } else {
-                        let _ = self.scheduler.fail_task(task_id, &exec_result.stderr);
+                        let _ = self.scheduler.fail_task(task_id, &exec_result.output);
                     }
                     exec_result
                 } else {
