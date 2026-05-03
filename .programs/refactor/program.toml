@@ -1,0 +1,36 @@
+[program]
+name = "refactor"
+version = "1.0.0"
+description = "Safe refactoring with behavior preservation"
+category = "development"
+enabled = true
+
+[program.metadata]
+icon = "🔄"
+tags = ["refactor", "improvement", "cleanup"]
+
+[program.execution]
+timeout_secs = 1200
+requires_garden = true
+
+[program.host_tools]
+required = []
+optional = ["git"]
+
+[program.tools]
+- read
+- bash
+- grep
+- edit
+- find
+
+[program.args]
+- { name = "target", description = "File or directory to refactor", required = true }
+- { name = "goal", description = "Refactoring goal (readability|performance|maintainability)", required = true }
+
+[program.dependencies]
+- skill:oxios-refactor
+
+[program.host_requirements]
+tools = ["git"]
+paths = ["/Volumes/MERCURY/projects"]

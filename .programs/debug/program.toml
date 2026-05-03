@@ -1,0 +1,35 @@
+[program]
+name = "debug"
+version = "1.0.0"
+description = "Systematic debugging with hypothesis-driven approach"
+category = "development"
+enabled = true
+
+[program.metadata]
+icon = "🐛"
+tags = ["debug", "investigation", "diagnosis"]
+
+[program.execution]
+timeout_secs = 900
+requires_garden = true
+
+[program.host_tools]
+required = []
+optional = ["git", "lldb"]
+
+[program.tools]
+- read
+- bash
+- grep
+- find
+
+[program.args]
+- { name = "problem", description = "Description of the bug or issue", required = true }
+- { name = "context", description = "Additional context (error message, stack trace, etc.)", required = false }
+
+[program.dependencies]
+- skill:oxios-debug
+
+[program.host_requirements]
+tools = ["git"]
+paths = ["/Volumes/MERCURY/projects"]

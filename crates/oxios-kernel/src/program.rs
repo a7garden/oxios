@@ -355,19 +355,29 @@ impl ProgramManager {
         self.load_all().await
     }
 
-    /// Load all programs from the programs directory
+    /// Load all programs from the programs directory.
+    /// If the directory is empty, bootstrap from the `.programs/` directory in the oxios repo root.
     async fn load_all(&self) -> Result<()> {
-        let mut installed = self.installed.write().await;
-
         if !self.programs_dir.exists() {
             fs::create_dir_all(&self.programs_dir)?;
-            return Ok(());
         }
 
+        // Count installed programs
+        let count = fs::read_dir(&self.programs_dir)?
+            .filter_map(|e| e.ok())
+            .filter(|e| e.path().is_dir())
+            .count();
+
+        // Bootstrap from `.programs/` (oxios repo root) if directory is empty.
+        // This allows `.programs/` in the repo to serve as the default program source.
+        if count == 0 {
+            Self::bootstrap_defaults(&self.programs_dir).await?;
+        }
+
+        let mut installed = self.installed.write().await;
         for entry in fs::read_dir(&self.programs_dir)? {
             let entry = entry?;
             let path = entry.path();
-
             if path.is_dir() {
                 if let Ok(program) = self.load_program(&path) {
                     installed.insert(program.meta.name.clone(), program);
@@ -377,6 +387,37 @@ impl ProgramManager {
 
         Ok(())
     }
+
+    /// Bootstrap default programs from the `.programs/` directory in the oxios repo root.
+    /// This copies (not symlinks) so the programs directory is self-contained.
+    async fn bootstrap_defaults(target_dir: &Path) -> Result<()> {
+        let source_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(".programs");
+        if !source_dir.exists() {
+            tracing::info!("No .programs/ directory found, skipping bootstrap");
+            return Ok(());
+        }
+
+        tracing::info!(source = %source_dir.display(), "Bootstrapping default programs");
+
+        for entry in fs::read_dir(&source_dir)? {
+            let entry = entry?;
+            let src = entry.path();
+            if src.is_dir() {
+                let name = src.file_name().unwrap().to_string_lossy();
+                let dest = target_dir.join(&*name);
+
+                // Only copy if not already present
+                if !dest.exists() {
+                    copy_dir_all(&src, &dest)?;
+                    tracing::info!(program = %name, "Bootstrapped default program");
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Recursively copy a directory (like `cp -r`).
 
     /// Load a single program from a directory
     fn load_program(&self, path: &Path) -> Result<Program> {

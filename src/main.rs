@@ -254,7 +254,16 @@ async fn init_kernel(
         state_store.clone(),
         scheduler.clone(),
         access_manager.clone(),
+        persona_manager.clone(),
     ));
+
+    // Wire persona into OuroborosEngine for voice customization.
+    if let Some(engine) = ouroboros.downcast_ref::<OuroborosEngine>() {
+        if let Some(persona) = persona_manager.get_enabled().first() {
+            engine.set_persona_prompt(Some(persona.system_prompt.clone()));
+            tracing::info!(persona = %persona.name, "Active persona set on OuroborosEngine");
+        }
+    }
 
     // Initialize gateway with the orchestrator.
     let gateway = Gateway::new(orchestrator.clone());

@@ -23,6 +23,8 @@ use uuid::Uuid;
 
 use crate::access_manager::AccessManager;
 use crate::event_bus::{EventBus, KernelEvent};
+use crate::ouroboros_engine::OuroborosEngine;
+use crate::persona::PersonaManager;
 use crate::scheduler::{AgentScheduler, Priority, ScheduledTask};
 use crate::state_store::StateStore;
 use crate::supervisor::Supervisor;
@@ -41,6 +43,8 @@ pub struct Orchestrator {
     access_manager: Arc<Mutex<AccessManager>>,
     /// Active interview sessions, keyed by session ID.
     sessions: RwLock<std::collections::HashMap<String, InterviewSession>>,
+    /// Persona manager for voice/personality customization.
+    persona_manager: Arc<PersonaManager>,
 }
 
 impl Orchestrator {
@@ -52,6 +56,7 @@ impl Orchestrator {
         state_store: Arc<StateStore>,
         scheduler: Arc<AgentScheduler>,
         access_manager: Arc<Mutex<AccessManager>>,
+        persona_manager: Arc<PersonaManager>,
     ) -> Self {
         Self {
             ouroboros,
@@ -61,6 +66,7 @@ impl Orchestrator {
             scheduler,
             access_manager,
             sessions: RwLock::new(std::collections::HashMap::new()),
+            persona_manager,
         }
     }
 
