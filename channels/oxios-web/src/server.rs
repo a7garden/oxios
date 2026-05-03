@@ -16,6 +16,8 @@ use crate::channel::WebChannelHandle;
 use crate::routes::build_routes;
 use oxios_kernel::event_bus::EventBus;
 use oxios_kernel::garden::GardenManager;
+use oxios_kernel::host_tools::HostToolValidator;
+use oxios_kernel::program::ProgramManager;
 use oxios_kernel::scheduler::AgentScheduler;
 use oxios_kernel::access_manager::AccessManager;
 use oxios_kernel::skill::SkillStore;
@@ -37,8 +39,12 @@ pub struct AppState {
     pub state_store: Arc<StateStore>,
     /// Garden manager for container lifecycle.
     pub garden_manager: Arc<GardenManager>,
-    /// Skill store for skill management.
+    /// Skill store for skill management (deprecated, use program_manager).
     pub skill_store: Arc<SkillStore>,
+    /// Program manager for OS-level programs.
+    pub program_manager: Arc<ProgramManager>,
+    /// Host tool validator.
+    pub host_tool_validator: Arc<HostToolValidator>,
     /// Agent supervisor for lifecycle management.
     pub supervisor: Arc<dyn Supervisor>,
     /// Agent scheduler for task queue management.
@@ -88,6 +94,8 @@ impl WebServer {
         state_store: StateStore,
         garden_manager: GardenManager,
         skill_store: SkillStore,
+        program_manager: ProgramManager,
+        host_tool_validator: HostToolValidator,
         supervisor: Arc<dyn Supervisor>,
         scheduler: Arc<AgentScheduler>,
         access_manager: Arc<parking_lot::Mutex<AccessManager>>,
@@ -104,6 +112,8 @@ impl WebServer {
             state_store: Arc::new(state_store),
             garden_manager: Arc::new(garden_manager),
             skill_store: Arc::new(skill_store),
+            program_manager: Arc::new(program_manager),
+            host_tool_validator: Arc::new(host_tool_validator),
             supervisor,
             scheduler,
             access_manager,

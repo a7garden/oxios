@@ -11,7 +11,8 @@ use std::sync::Arc;
 use oxios_gateway::Gateway;
 use oxios_kernel::{
     AccessManager, AgentRuntime, BasicSupervisor, EventBus, GardenManager, HostExecBridge,
-    Orchestrator, OxiosConfig, SkillStore, StateStore, Supervisor, AgentScheduler,
+    HostToolValidator, Orchestrator, OxiosConfig, ProgramManager, SkillStore, StateStore,
+    Supervisor, AgentScheduler,
 };
 use oxios_ouroboros::OuroborosEngine;
 use oxios_web::WebServer;
@@ -121,6 +122,7 @@ const WORKSPACE_SUBDIRS: &[&str] = &[
     "workspace/seeds",
     "workspace/sessions",
     "workspace/skills",
+    "workspace/programs",
     "gardens",
 ];
 
@@ -191,6 +193,8 @@ async fn init_kernel(
     Arc<dyn Supervisor>,
     Arc<AgentScheduler>,
     Arc<parking_lot::Mutex<AccessManager>>,
+    ProgramManager,
+    HostToolValidator,
 )> {
     let config = if config_path.exists() {
         tracing::info!(path = %config_path.display(), "Loading config");
@@ -254,6 +258,17 @@ async fn init_kernel(
     let skills_dir = PathBuf::from(&config.kernel.workspace).join("skills");
     let skill_store = SkillStore::new(skills_dir)?;
 
+    // Initialize the program manager.
+    let programs_dir = PathBuf::from(&config.kernel.workspace).join("programs");
+    let program_manager = ProgramManager::new(programs_dir);
+    program_manager.init().await?;
+
+    // Initialize the host tool validator.
+    let host_tool_validator = HostToolValidator::new(
+        config.container.required_host_tools.clone(),
+        config.container.optional_host_tools.clone(),
+    );
+
     // Initialize the agent scheduler (AIOS-inspired).
     let scheduler = Arc::new(AgentScheduler::new(
         config.scheduler.max_concurrent,
@@ -264,7 +279,7 @@ async fn init_kernel(
     // Initialize the access manager (OWASP-inspired).
     let access_manager = Arc::new(parking_lot::Mutex::new(AccessManager::new()));
 
-    Ok((orchestrator, gateway, event_bus.clone(), state_store, garden_manager, config, skill_store, supervisor, scheduler, access_manager))
+    Ok((orchestrator, gateway, event_bus.clone(), state_store, garden_manager, config, skill_store, supervisor, scheduler, access_manager, program_manager, host_tool_validator))
 }
 
 // ─── Resolve provider and model ────────────────────────────────────────────
@@ -305,7 +320,7 @@ fn resolve_provider_and_model(
 
 /// Run a single prompt through the Ouroboros orchestrator.
 async fn cmd_run(prompt: &str, config_path: &Path, model_id: &str) -> Result<()> {
-    let (orchestrator, _, _, _, _, _, _, _, _, _) =
+    let (orchestrator, _, _, _, _, _, _, _, _, _, _, _) =
         init_kernel(config_path, model_id).await?;
 
     tracing::info!(prompt = %prompt, "Processing prompt");
@@ -331,7 +346,7 @@ async fn cmd_run(prompt: &str, config_path: &Path, model_id: &str) -> Result<()>
 /// Handle garden subcommands.
 async fn cmd_garden(action: GardenAction, config_path: &Path) -> Result<()> {
     let model_id = "anthropic/claude-sonnet-4-20250514"; // Dummy for garden cmds
-    let (_, _, _, _, garden_manager, _, _, _, _, _) = init_kernel(config_path, model_id).await?;
+    let (_, _, _, _, garden_manager, _, _, _, _, _, _, _) = init_kernel(config_path, model_id).await?;
 
     match action {
         GardenAction::New { name } => {
@@ -446,7 +461,7 @@ fn get_config_value(config: &OxiosConfig, key: &str) -> Option<String> {
 /// Show system status.
 async fn cmd_status(config_path: &Path) -> Result<()> {
     let model_id = "anthropic/claude-sonnet-4-20250514";
-    let (_, _, _, _, garden_manager, config, _, _, _, _) =
+    let (_, _, _, _, garden_manager, config, _, _, _, _, _, _) =
         init_kernel(config_path, model_id).await?;
 
     println!("Oxios Agent OS");
@@ -600,7 +615,7 @@ async fn main() -> Result<()> {
             }
 
             // Initialize kernel components.
-            let (_orchestrator, gateway, event_bus, state_store, garden_manager, config, skill_store, supervisor, scheduler, access_manager) =
+            let (_orchestrator, gateway, event_bus, state_store, garden_manager, config, skill_store, supervisor, scheduler, access_manager, program_manager, host_tool_validator) =
                 init_kernel(&config_path, default_model).await?;
 
             // Initialize default skills on first run.
@@ -608,6 +623,22 @@ async fn main() -> Result<()> {
                 .join("channels/oxios-web/static/default-skills");
             if let Err(e) = skill_store.init_defaults(&defaults_dir).await {
                 tracing::warn!(error = %e, "Failed to initialize default skills");
+            }
+
+            // Initialize default programs on first run.
+            let programs_defaults_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("channels/oxios-web/static/default-programs");
+            if programs_defaults_dir.exists() {
+                for entry in std::fs::read_dir(&programs_defaults_dir)? {
+                    let entry = entry?;
+                    if entry.path().is_dir()
+                        && program_manager.get_program(entry.file_name().to_str().unwrap_or("")).await.is_none()
+                    {
+                        if let Err(e) = program_manager.install(&entry.path()).await {
+                            tracing::warn!(error = %e, program = ?entry.file_name(), "Failed to install default program");
+                        }
+                    }
+                }
             }
 
             // Create the web channel.
@@ -627,6 +658,8 @@ async fn main() -> Result<()> {
                 (*state_store).clone(),
                 garden_manager,
                 skill_store.clone(),
+                program_manager,
+                host_tool_validator,
                 supervisor.clone(),
                 scheduler.clone(),
                 access_manager.clone(),

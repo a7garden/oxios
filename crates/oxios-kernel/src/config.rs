@@ -114,6 +114,15 @@ pub struct ContainerConfig {
     /// Default CPU limit for garden containers.
     #[serde(default = "default_cpu_limit")]
     pub cpu_limit: u64,
+    /// Minimal container tools (pre-installed in the minimal container image).
+    #[serde(default = "default_minimal_tools")]
+    pub minimal_tools: Vec<String>,
+    /// Host tools that MUST be on host (checked on startup).
+    #[serde(default = "default_required_host_tools")]
+    pub required_host_tools: Vec<String>,
+    /// Optional host tools: checked when program needs them.
+    #[serde(default = "default_optional_host_tools")]
+    pub optional_host_tools: Vec<String>,
 }
 
 fn default_garden_path() -> String {
@@ -134,6 +143,32 @@ fn default_cpu_limit() -> u64 {
     4
 }
 
+fn default_minimal_tools() -> Vec<String> {
+    vec![
+        "curl".to_string(),
+        "git".to_string(),
+        "ripgrep".to_string(),
+        "jq".to_string(),
+        "sqlite3".to_string(),
+        "bash".to_string(),
+        "python3".to_string(),
+    ]
+}
+
+fn default_required_host_tools() -> Vec<String> {
+    vec!["git".to_string()]
+}
+
+fn default_optional_host_tools() -> Vec<String> {
+    vec![
+        "gh".to_string(),
+        "remindctl".to_string(),
+        "shortcuts".to_string(),
+        "osascript".to_string(),
+        "open".to_string(),
+    ]
+}
+
 impl Default for ContainerConfig {
     fn default() -> Self {
         Self {
@@ -142,6 +177,9 @@ impl Default for ContainerConfig {
             allowed_host_commands: Vec::new(),
             memory_limit: default_memory_limit(),
             cpu_limit: default_cpu_limit(),
+            minimal_tools: default_minimal_tools(),
+            required_host_tools: default_required_host_tools(),
+            optional_host_tools: default_optional_host_tools(),
         }
     }
 }

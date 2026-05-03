@@ -35,8 +35,7 @@ use tokio_stream::wrappers::BroadcastStream;
 use tokio_stream::StreamExt as TokioStreamExt;
 use oxios_kernel::state_store::StateStore;
 use oxios_gateway::message::IncomingMessage;
-use oxios_kernel::AgentId;
-use oxios_kernel::access_manager::AuditEntry;
+use oxios_kernel::{AgentId, access_manager::AuditEntry};
 use uuid::Uuid;
 
 use crate::server::AppState;
@@ -88,6 +87,19 @@ pub fn build_routes() -> Router<Arc<AppState>> {
         .route("/api/audit", get(handle_audit_log))
         .route("/api/permissions/{agent}", get(handle_permissions_get))
         .route("/api/permissions/{agent}", put(handle_permissions_put))
+        // Programs
+        .route("/api/programs", get(handle_programs_list))
+        .route("/api/programs", post(handle_program_install))
+        .route("/api/programs/{name}", get(handle_program_get))
+        .route("/api/programs/{name}", delete(handle_program_uninstall))
+        .route("/api/programs/{name}/enable", post(handle_program_enable))
+        .route("/api/programs/{name}/disable", post(handle_program_disable))
+        .route("/api/programs/{name}/host-requirements", get(handle_program_host_requirements))
+        // Host tools
+        .route("/api/host-tools", get(handle_host_tools_check))
+        // MCP
+        .route("/api/mcp/servers", get(handle_mcp_servers_list))
+        .route("/api/mcp/servers", post(handle_mcp_server_register))
         // Events
         .route("/api/events", get(handle_events))
 }
@@ -1210,6 +1222,208 @@ async fn handle_permissions_put(
     Ok(Json(serde_json::json!({
         "status": "updated",
         "agent": agent,
+    })))
+}
+
+// ---------------------------------------------------------------------------
+// Programs (OS-level installable applications)
+// ---------------------------------------------------------------------------
+
+/// Program summary for listing.
+#[derive(Debug, Serialize)]
+struct ProgramSummary {
+    name: String,
+    version: String,
+    description: String,
+    author: String,
+    enabled: bool,
+    tools_count: usize,
+    has_skill_content: bool,
+}
+
+/// GET /api/programs — List all installed programs.
+async fn handle_programs_list(
+    state: State<Arc<AppState>>,
+) -> Json<Vec<ProgramSummary>> {
+    let programs = state.program_manager.list_programs().await;
+    Json(programs
+        .into_iter()
+        .map(|p| ProgramSummary {
+            name: p.meta.name,
+            version: p.meta.version,
+            description: p.meta.description,
+            author: p.meta.author,
+            enabled: p.enabled,
+            tools_count: p.meta.tools.len(),
+            has_skill_content: !p.skill_content.is_empty(),
+        })
+        .collect())
+}
+
+/// GET /api/programs/:name — Get program details.
+async fn handle_program_get(
+    state: State<Arc<AppState>>,
+    Path(name): Path<String>,
+) -> Result<Json<serde_json::Value>, StatusCode> {
+    match state.program_manager.get_program(&name).await {
+        Some(program) => Ok(Json(serde_json::json!({
+            "name": program.meta.name,
+            "version": program.meta.version,
+            "description": program.meta.description,
+            "author": program.meta.author,
+            "enabled": program.enabled,
+            "tools": program.meta.tools,
+            "skill_content": program.skill_content,
+            "path": program.path.to_string_lossy(),
+        }))),
+        None => Err(StatusCode::NOT_FOUND),
+    }
+}
+
+/// Request body for program installation.
+#[derive(Debug, Deserialize)]
+struct ProgramInstallRequest {
+    /// Path to the program directory to install.
+    path: String,
+}
+
+/// POST /api/programs — Install a program from a directory.
+async fn handle_program_install(
+    state: State<Arc<AppState>>,
+    Json(body): Json<ProgramInstallRequest>,
+) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    let path = std::path::PathBuf::from(&body.path);
+    match state.program_manager.install(&path).await {
+        Ok(program) => {
+            tracing::info!(program = %program.meta.name, "Program installed via API");
+            Ok(Json(serde_json::json!({
+                "status": "installed",
+                "name": program.meta.name,
+                "version": program.meta.version,
+            })))
+        }
+        Err(e) => {
+            tracing::error!(error = %e, path = %body.path, "Failed to install program");
+            Err((StatusCode::BAD_REQUEST, e.to_string()))
+        }
+    }
+}
+
+/// DELETE /api/programs/:name — Uninstall a program.
+async fn handle_program_uninstall(
+    state: State<Arc<AppState>>,
+    Path(name): Path<String>,
+) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    match state.program_manager.uninstall(&name).await {
+        Ok(()) => {
+            tracing::info!(program = %name, "Program uninstalled via API");
+            Ok(Json(serde_json::json!({"status": "uninstalled", "name": name})))
+        }
+        Err(e) => {
+            tracing::error!(error = %e, program = %name, "Failed to uninstall program");
+            Err((StatusCode::BAD_REQUEST, e.to_string()))
+        }
+    }
+}
+
+/// POST /api/programs/:name/enable — Enable a program.
+async fn handle_program_enable(
+    state: State<Arc<AppState>>,
+    Path(name): Path<String>,
+) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    match state.program_manager.set_enabled(&name, true).await {
+        Ok(()) => Ok(Json(serde_json::json!({"status": "enabled", "name": name}))),
+        Err(e) => Err((StatusCode::BAD_REQUEST, e.to_string())),
+    }
+}
+
+/// POST /api/programs/:name/disable — Disable a program.
+async fn handle_program_disable(
+    state: State<Arc<AppState>>,
+    Path(name): Path<String>,
+) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    match state.program_manager.set_enabled(&name, false).await {
+        Ok(()) => Ok(Json(serde_json::json!({"status": "disabled", "name": name}))),
+        Err(e) => Err((StatusCode::BAD_REQUEST, e.to_string())),
+    }
+}
+
+/// GET /api/programs/:name/host-requirements — Check host requirements for a program.
+async fn handle_program_host_requirements(
+    state: State<Arc<AppState>>,
+    Path(name): Path<String>,
+) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    match state.program_manager.check_host_requirements(&name).await {
+        Ok(check) => Ok(Json(serde_json::to_value(&check).unwrap())),
+        Err(e) => Err((StatusCode::BAD_REQUEST, e.to_string())),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Host Tools
+// ---------------------------------------------------------------------------
+
+/// Host tools status response.
+#[derive(Debug, Serialize)]
+struct HostToolsStatusResponse {
+    all_required_present: bool,
+    missing_required: Vec<String>,
+    optional_available: std::collections::HashMap<String, bool>,
+}
+
+/// GET /api/host-tools — Check host tool availability.
+async fn handle_host_tools_check(
+    state: State<Arc<AppState>>,
+) -> Json<HostToolsStatusResponse> {
+    let status = state.host_tool_validator.full_check();
+    Json(HostToolsStatusResponse {
+        all_required_present: status.all_required_present,
+        missing_required: status.missing_required,
+        optional_available: status.optional_available,
+    })
+}
+
+// ---------------------------------------------------------------------------
+// MCP (Model Context Protocol)
+// ---------------------------------------------------------------------------
+
+/// MCP server configuration response.
+#[derive(Debug, Serialize)]
+struct McpServerResponse {
+    name: String,
+    command: String,
+    args: Vec<String>,
+    enabled: bool,
+}
+
+/// GET /api/mcp/servers — List registered MCP servers (stub).
+async fn handle_mcp_servers_list(
+    _state: State<Arc<AppState>>,
+) -> Json<Vec<McpServerResponse>> {
+    // Stub: Return empty list until MCP server storage is implemented
+    Json(Vec::new())
+}
+
+/// MCP server registration request.
+#[derive(Debug, Deserialize)]
+struct McpServerRegisterRequest {
+    name: String,
+    command: String,
+    #[allow(dead_code)]
+    args: Option<Vec<String>>,
+}
+
+/// POST /api/mcp/servers — Register an MCP server (stub).
+async fn handle_mcp_server_register(
+    _state: State<Arc<AppState>>,
+    Json(body): Json<McpServerRegisterRequest>,
+) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    // Stub: MCP server storage not yet implemented
+    tracing::info!(server = %body.name, command = %body.command, "MCP server registration requested (stub)");
+    Ok(Json(serde_json::json!({
+        "status": "registered",
+        "name": body.name,
+        "note": "MCP integration is stubbed; full implementation requires stdio communication"
     })))
 }
 

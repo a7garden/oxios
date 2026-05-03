@@ -92,7 +92,7 @@ Both philosophies reject uncertainty. Unix fails fast on bad input. Ouroboros cl
 | Shell | Gateway | Human↔OS interface |
 | Pipe (|) | Event Bus | Inter-process communication |
 | init (PID 1) | Supervisor | Agent lifecycle management |
-| Shell script | Skill | Composition of tools into larger capability |
+| Shell script | Program | OS-level installable capability |
 | Daemon | Background agent | Background service |
 | /bin, /usr/bin | Tool registry | Built-in tools |
 | Filesystem | Workspace | Persistent storage |
@@ -122,6 +122,9 @@ oxios/
 │   │       ├── container.rs    AppleBackend implements ContainerBackend
 │   │       ├── garden.rs       GardenManager (container lifecycle)
 │   │       ├── host_exec.rs   HostExecBridge (secure relay)
+│   │       ├── program.rs     ProgramManager (OS-level programs)
+│   │       ├── mcp.rs         McpBridge (MCP protocol awareness)
+│   │       ├── host_tools.rs  HostToolValidator (host dependency check)
 │   │       └── types.rs       AgentId, AgentInfo, AgentStatus
 │   │
 │   ├── oxios-ouroboros/    Spec-first protocol implementation
@@ -454,8 +457,12 @@ All state is markdown or JSON files.
 │   │   └── <uuid>.json
 │   ├── sessions/            Conversation sessions
 │   │   └── abc123.jsonl
-│   └── skills/              Skill definitions
+│   ├── skills/              Skill definitions (legacy)
+│   │   └── code-review/
+│   │       └── SKILL.md
+│   └── programs/            OS-level programs (installable capabilities)
 │       └── code-review/
+│           ├── program.toml
 │           └── SKILL.md
 └── gardens/                 Container isolation environments
     └── project-a/
@@ -463,6 +470,56 @@ All state is markdown or JSON files.
         ├── Containerfile
         └── .env
 ```
+
+---
+
+## Programs (OS-level installable applications)
+
+Programs are the OS-level concept of installable applications. Like Unix has `/bin` programs, Oxios has programs that agents can "execute" to gain capabilities through their `SKILL.md` instruction files.
+
+### Structure
+
+A program is a directory with:
+- `program.toml` — metadata (name, version, description, tools, dependencies, host requirements)
+- `SKILL.md` — instruction file (like a man page)
+- optional `bin/` — executables
+- optional `config/` — configuration files
+
+### program.toml format:
+
+```toml
+[program]
+name = "code-review"
+version = "1.0.0"
+description = "Guidelines for comprehensive code review"
+author = "oxios"
+
+# Tools this program exposes
+[tools]
+check_security = { description = "Run security checks" }
+
+# Host tool requirements
+[host_requirements]
+required = ["git"]
+optional = ["gh"]
+```
+
+### Philosophy
+
+Programs are **READ-ONLY** instruction sets. They don't execute themselves; they provide guidelines and tool definitions that agents consume. Think of them as man pages that come with metadata for discovery.
+
+### Minimal Container + Host Dependency
+
+The container ships only essential tools. Rich functionality comes from the host:
+
+```toml
+[container]
+minimal_tools = ["curl", "git", "ripgrep", "jq", "sqlite3", "bash", "python3"]
+required_host_tools = ["git"]
+optional_host_tools = ["gh", "remindctl", "shortcuts", "osascript", "open"]
+```
+
+This embodies Unix philosophy: minimal inside, rich on host.
 
 ---
 
@@ -525,6 +582,12 @@ Phase 4: Container ✓
   ├── Apple Container integration ✓
   ├── Garden lifecycle ✓
   └── Host Exec Bridge ✓
+
+Phase 6: Programs + MCP Awareness ✓
+  ├── ProgramManager (OS-level programs) ✓
+  ├── HostToolValidator (minimal container philosophy) ✓
+  ├── McpBridge (MCP protocol awareness) ✓
+  └── Default programs installation ✓
 
 Phase 5: Channel expansion
   ├── oxios-telegram (later)
