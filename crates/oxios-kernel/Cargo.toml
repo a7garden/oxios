@@ -1,0 +1,21 @@
+[package]
+name = "oxios-kernel"
+version = "0.1.0-alpha"
+edition = "2021"
+description = "Oxios kernel: supervisor, event bus, state store"
+license = "MIT"
+
+[dependencies]
+oxios-ouroboros = { path = "../oxios-ouroboros" }
+tokio = { workspace = true }
+futures = { workspace = true }
+async-trait = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+uuid = { workspace = true }
+tracing = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+chrono = { workspace = true }
+parking_lot = { workspace = true }
+toml = { workspace = true }

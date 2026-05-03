@@ -1,0 +1,17 @@
+[package]
+name = "oxios-ouroboros"
+version = "0.1.0-alpha"
+edition = "2021"
+description = "Ouroboros spec-first protocol for Oxios"
+license = "MIT"
+
+[dependencies]
+tokio = { workspace = true }
+async-trait = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+uuid = { workspace = true }
+tracing = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+chrono = { workspace = true }

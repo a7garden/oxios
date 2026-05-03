@@ -1,0 +1,19 @@
+[package]
+name = "oxios-web"
+version = "0.1.0-alpha"
+edition = "2021"
+description = "Web dashboard channel for Oxios"
+license = "MIT"
+
+[dependencies]
+oxios-gateway = { path = "../../crates/oxios-gateway" }
+tokio = { workspace = true }
+async-trait = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tracing = { workspace = true }
+anyhow = { workspace = true }
+chrono = { workspace = true }
+axum = "0.8"
+tower = "0.5"
+tower-http = { version = "0.6", features = ["cors", "fs"] }

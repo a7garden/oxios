@@ -1,3 +1,10 @@
+[package]
+name = "oxios"
+version = "0.1.0-alpha"
+edition = "2021"
+description = "Oxios Agent OS"
+license = "MIT"
+
 [workspace]
 resolver = "2"
 members = [
@@ -5,7 +12,6 @@ members = [
     "crates/oxios-ouroboros",
     "crates/oxios-gateway",
     "channels/oxios-web",
-    ".",
 ]
 
 [workspace.dependencies]
@@ -20,7 +26,7 @@ serde_json = "1"
 toml = "0.8"
 
 # IDs
-uuid = { version = "1", features = ["v4"] }
+uuid = { version = "1", features = ["v4", "serde"] }
 
 # Logging
 tracing = "0.1"
@@ -33,6 +39,20 @@ thiserror = "1"
 # Time
 chrono = { version = "0.4", features = ["serde"] }
 
+# Concurrency
+parking_lot = "0.12"
+
 # oxi engine crates (path dependencies to pi2oxi)
 oxi-ai = { path = "../pi2oxi/oxi-ai" }
 oxi-agent = { path = "../pi2oxi/oxi-agent" }
+
+[dependencies]
+oxios-kernel = { path = "crates/oxios-kernel" }
+oxios-gateway = { path = "crates/oxios-gateway" }
+oxios-web = { path = "channels/oxios-web" }
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+anyhow = { workspace = true }
+serde = { workspace = true }
+clap = { version = "4", features = ["derive"] }
