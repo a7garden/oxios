@@ -16,6 +16,15 @@ pub struct OxiosConfig {
     /// Container settings.
     #[serde(default)]
     pub container: ContainerConfig,
+    /// Scheduler settings (AIOS-inspired task scheduling).
+    #[serde(default)]
+    pub scheduler: SchedulerConfig,
+    /// Context manager settings (LLM context window management).
+    #[serde(default)]
+    pub context: ContextConfig,
+    /// Security/access control settings.
+    #[serde(default)]
+    pub security: SecurityConfig,
 }
 
 /// Kernel configuration.
@@ -133,6 +142,129 @@ impl Default for ContainerConfig {
             allowed_host_commands: Vec::new(),
             memory_limit: default_memory_limit(),
             cpu_limit: default_cpu_limit(),
+        }
+    }
+}
+
+/// Scheduler configuration (inspired by AIOS / AgentRM).
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct SchedulerConfig {
+    /// Maximum number of concurrent agent tasks.
+    #[serde(default = "default_max_concurrent")]
+    pub max_concurrent: usize,
+    /// Maximum LLM API calls per minute (rate limiting).
+    #[serde(default = "default_rate_limit")]
+    pub rate_limit_per_minute: u32,
+    /// Timeout in seconds before a running task is considered a zombie.
+    #[serde(default = "default_zombie_timeout")]
+    pub zombie_timeout_secs: u64,
+}
+
+fn default_max_concurrent() -> usize {
+    5
+}
+
+fn default_rate_limit() -> u32 {
+    60
+}
+
+fn default_zombie_timeout() -> u64 {
+    300
+}
+
+impl Default for SchedulerConfig {
+    fn default() -> Self {
+        Self {
+            max_concurrent: default_max_concurrent(),
+            rate_limit_per_minute: default_rate_limit(),
+            zombie_timeout_secs: default_zombie_timeout(),
+        }
+    }
+}
+
+/// Context manager configuration (inspired by AIOS).
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ContextConfig {
+    /// Maximum tokens in the active (in-context) tier.
+    #[serde(default = "default_active_limit")]
+    pub active_limit_tokens: usize,
+    /// Maximum entries in the cache tier.
+    #[serde(default = "default_cache_limit")]
+    pub cache_limit_entries: usize,
+}
+
+fn default_active_limit() -> usize {
+    100_000
+}
+
+fn default_cache_limit() -> usize {
+    50
+}
+
+impl Default for ContextConfig {
+    fn default() -> Self {
+        Self {
+            active_limit_tokens: default_active_limit(),
+            cache_limit_entries: default_cache_limit(),
+        }
+    }
+}
+
+/// Security/access control configuration (inspired by OWASP Agentic AI).
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct SecurityConfig {
+    /// Default allowed tools for agents (least privilege).
+    #[serde(default = "default_allowed_tools")]
+    pub allowed_tools: Vec<String>,
+    /// Whether agents can make network requests by default.
+    #[serde(default)]
+    pub network_access: bool,
+    /// Maximum execution time in seconds for agent tasks.
+    #[serde(default = "default_max_exec_time")]
+    pub max_execution_time_secs: u64,
+    /// Maximum memory in MB for agent tasks.
+    #[serde(default = "default_max_memory")]
+    pub max_memory_mb: u64,
+    /// Whether agents can fork sub-agents by default.
+    #[serde(default)]
+    pub can_fork: bool,
+    /// Maximum audit log entries to retain.
+    #[serde(default = "default_max_audit")]
+    pub max_audit_entries: usize,
+}
+
+fn default_allowed_tools() -> Vec<String> {
+    vec![
+        "read".to_string(),
+        "write".to_string(),
+        "edit".to_string(),
+        "bash".to_string(),
+        "grep".to_string(),
+        "find".to_string(),
+    ]
+}
+
+fn default_max_exec_time() -> u64 {
+    300
+}
+
+fn default_max_memory() -> u64 {
+    512
+}
+
+fn default_max_audit() -> usize {
+    10_000
+}
+
+impl Default for SecurityConfig {
+    fn default() -> Self {
+        Self {
+            allowed_tools: default_allowed_tools(),
+            network_access: false,
+            max_execution_time_secs: default_max_exec_time(),
+            max_memory_mb: default_max_memory(),
+            can_fork: false,
+            max_audit_entries: default_max_audit(),
         }
     }
 }

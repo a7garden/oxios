@@ -776,6 +776,12 @@ html, body {
       <div class="nav-item" data-panel="events">
         <span class="icon">📡</span><span>Events</span>
       </div>
+      <div class="nav-item" data-panel="scheduler">
+        <span class="icon">📋</span><span>Scheduler</span>
+      </div>
+      <div class="nav-item" data-panel="security">
+        <span class="icon">🔒</span><span>Security</span>
+      </div>
       <div class="nav-item" data-panel="config">
         <span class="icon">⚙️</span><span>Config</span>
       </div>
@@ -913,6 +919,36 @@ html, body {
       </div>
     </div>
 
+    <!-- Scheduler Panel (AIOS-inspired) -->
+    <div class="panel" id="panel-scheduler">
+      <div class="panel-header">
+        <h2>📋 Scheduler</h2>
+        <button class="btn btn-sm" id="scheduler-refresh">Refresh</button>
+      </div>
+      <div class="panel-body" id="scheduler-body">
+        <div class="empty-state">
+          <div class="icon">📋</div>
+          <p>Loading scheduler stats...</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Security Panel (OWASP-inspired) -->
+    <div class="panel" id="panel-security">
+      <div class="panel-header">
+        <h2>🔒 Security</h2>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-sm" id="security-refresh">Refresh</button>
+        </div>
+      </div>
+      <div class="panel-body" id="security-body">
+        <div class="empty-state">
+          <div class="icon">🔒</div>
+          <p>Loading security info...</p>
+        </div>
+      </div>
+    </div>
+
     <!-- Config Panel -->
     <div class="panel" id="panel-config">
       <div class="panel-header">
@@ -962,6 +998,8 @@ function switchPanel(panel) {
     case 'memory': loadMemory(); break;
     case 'skills': loadSkills(); break;
     case 'gardens': loadGardens(); break;
+    case 'scheduler': loadScheduler(); break;
+    case 'security': loadSecurity(); break;
     case 'config': loadConfig(); break;
   }
 }
@@ -1166,6 +1204,104 @@ function capitalize(s) {
 document.getElementById('events-clear').addEventListener('click', () => {
   document.getElementById('event-log').innerHTML = '';
 });
+
+// ── Scheduler (AIOS-inspired) ──
+async function loadScheduler() {
+  const body = document.getElementById('scheduler-body');
+  try {
+    const res = await fetch(`${API}/api/scheduler/stats`);
+    const stats = await res.json();
+    const tasksRes = await fetch(`${API}/api/scheduler/tasks`);
+    const tasks = await tasksRes.json();
+
+    body.innerHTML = `
+      <div class="config-grid">
+        <div class="config-section">
+          <h3>Queue Status</h3>
+          <div class="config-row"><span class="key">Queued</span><span class="val">${stats.queued}</span></div>
+          <div class="config-row"><span class="key">Running</span><span class="val">${stats.running}</span></div>
+          <div class="config-row"><span class="key">Max Concurrent</span><span class="val">${stats.max_concurrent}</span></div>
+          <div class="config-row"><span class="key">Rate Limit/min</span><span class="val">${stats.rate_limit_per_minute}</span></div>
+          <div class="config-row"><span class="key">Rate Remaining</span><span class="val">${stats.rate_remaining}</span></div>
+        </div>
+      </div>
+
+      <h3 style="font-family:var(--font-mono);margin-top:24px;color:var(--accent)">Queued Tasks</h3>
+      <div class="item-list" id="scheduler-queued-list">
+        ${tasks.queued.length === 0 ? '<div class="empty-state"><p>No queued tasks.</p></div>' :
+          tasks.queued.map(t => `
+            <div class="item-card">
+              <div class="item-title">${esc(t.description)} <span style="color:var(--yellow);font-size:11px">${t.priority}</span></div>
+              <div class="item-subtitle">ID: ${t.id.slice(0, 8)} · Status: ${t.status} · Created: ${new Date(t.created_at).toLocaleTimeString()}</div>
+            </div>
+          `).join('')
+        }
+      </div>
+
+      <h3 style="font-family:var(--font-mono);margin-top:24px;color:var(--green)">Running Tasks</h3>
+      <div class="item-list" id="scheduler-running-list">
+        ${tasks.running.length === 0 ? '<div class="empty-state"><p>No running tasks.</p></div>' :
+          tasks.running.map(t => `
+            <div class="item-card" style="border-color:var(--green)">
+              <div class="item-title">${esc(t.description)} <span style="color:var(--green);font-size:11px">${t.priority}</span></div>
+              <div class="item-subtitle">ID: ${t.id.slice(0, 8)} · Status: ${t.status} · Created: ${new Date(t.created_at).toLocaleTimeString()}</div>
+            </div>
+          `).join('')
+        }
+      </div>
+    `;
+  } catch (err) {
+    body.innerHTML = `<div class="empty-state"><p>Error: ${esc(err.message)}</p></div>`;
+  }
+}
+
+document.getElementById('scheduler-refresh').addEventListener('click', loadScheduler);
+
+// ── Security (OWASP-inspired) ──
+async function loadSecurity() {
+  const body = document.getElementById('security-body');
+  try {
+    const auditRes = await fetch(`${API}/api/audit`);
+    const auditLog = await auditRes.json();
+
+    // Recent denied actions
+    const denied = auditLog.filter(e => !e.allowed);
+    const recent = auditLog.slice(-20);
+
+    body.innerHTML = `
+      <div class="config-grid">
+        <div class="config-section">
+          <h3>Audit Log (${auditLog.length} entries)</h3>
+          ${recent.length === 0 ? '<p style="color:var(--text-muted)">No access events recorded yet.</p>' :
+            recent.map(e => `
+              <div class="config-row" style="font-size:12px">
+                <span class="key">${new Date(e.timestamp).toLocaleTimeString()}</span>
+                <span style="color:${e.allowed ? 'var(--green)' : 'var(--red)'}">${e.allowed ? '✅' : '🚫'}</span>
+                <span class="val" style="flex:1">${esc(e.agent_name)} · ${esc(e.action)} · ${esc(e.resource)}</span>
+              </div>
+            `).join('')
+          }
+        </div>
+      </div>
+
+      ${denied.length > 0 ? `
+        <h3 style="font-family:var(--font-mono);margin-top:24px;color:var(--red)">Recent Denied Actions (${denied.length})</h3>
+        <div class="item-list">
+          ${denied.slice(-10).map(e => `
+            <div class="item-card" style="border-color:var(--red)">
+              <div class="item-title" style="color:var(--red)">🚫 ${esc(e.agent_name)} · ${esc(e.action)}</div>
+              <div class="item-subtitle">Resource: ${esc(e.resource)} · ${esc(e.reason || 'no reason')}</div>
+            </div>
+          `).join('')}
+        </div>
+      ` : '<p style="color:var(--text-muted);margin-top:24px">No denied actions recorded.</p>'}
+    `;
+  } catch (err) {
+    body.innerHTML = `<div class="empty-state"><p>Error: ${esc(err.message)}</p></div>`;
+  }
+}
+
+document.getElementById('security-refresh').addEventListener('click', loadSecurity);
 
 // ── Agents ──
 async function loadAgents() {

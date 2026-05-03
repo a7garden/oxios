@@ -6,27 +6,33 @@
 
 #![warn(missing_docs)]
 
+pub mod access_manager;
 pub mod agent_runtime;
 pub mod config;
 pub mod container;
+pub mod context_manager;
 pub mod event_bus;
 pub mod garden;
 pub mod host_exec;
 pub mod orchestrator;
+pub mod scheduler;
 pub mod skill;
 pub mod state_store;
 pub mod supervisor;
 pub mod types;
 
+pub use access_manager::{AccessManager, AgentPermissions, AuditEntry};
 pub use agent_runtime::AgentRuntime;
 pub use config::OxiosConfig;
 pub use container::{
     AppleBackend, ContainerBackend, ContainerStats, ContainerStatus, ExecResult, GardenStartConfig,
 };
+pub use context_manager::{ContextManager, ContextStats, ContextTier, ContextEntry};
 pub use event_bus::{EventBus, KernelEvent};
 pub use garden::{GardenInfo, GardenManager};
 pub use host_exec::HostExecBridge;
 pub use orchestrator::{OrchestrationResult, Orchestrator};
+pub use scheduler::{AgentScheduler, Priority, ScheduledTask, SchedulerStats, TaskStatus};
 pub use skill::{Skill, SkillMeta, SkillStore};
 pub use state_store::StateStore;
 pub use supervisor::{BasicSupervisor, Supervisor};

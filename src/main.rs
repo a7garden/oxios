@@ -10,8 +10,8 @@ use std::sync::Arc;
 
 use oxios_gateway::Gateway;
 use oxios_kernel::{
-    AgentRuntime, BasicSupervisor, EventBus, GardenManager, HostExecBridge, Orchestrator,
-    OxiosConfig, SkillStore, StateStore, Supervisor,
+    AccessManager, AgentRuntime, BasicSupervisor, EventBus, GardenManager, HostExecBridge,
+    Orchestrator, OxiosConfig, SkillStore, StateStore, Supervisor, AgentScheduler,
 };
 use oxios_ouroboros::OuroborosEngine;
 use oxios_web::WebServer;
@@ -189,6 +189,8 @@ async fn init_kernel(
     OxiosConfig,
     SkillStore,
     Arc<dyn Supervisor>,
+    Arc<AgentScheduler>,
+    Arc<parking_lot::Mutex<AccessManager>>,
 )> {
     let config = if config_path.exists() {
         tracing::info!(path = %config_path.display(), "Loading config");
@@ -199,6 +201,9 @@ async fn init_kernel(
             kernel: Default::default(),
             gateway: Default::default(),
             container: Default::default(),
+            scheduler: Default::default(),
+            context: Default::default(),
+            security: Default::default(),
         }
     };
 
@@ -249,7 +254,17 @@ async fn init_kernel(
     let skills_dir = PathBuf::from(&config.kernel.workspace).join("skills");
     let skill_store = SkillStore::new(skills_dir)?;
 
-    Ok((orchestrator, gateway, event_bus.clone(), state_store, garden_manager, config, skill_store, supervisor))
+    // Initialize the agent scheduler (AIOS-inspired).
+    let scheduler = Arc::new(AgentScheduler::new(
+        config.scheduler.max_concurrent,
+        config.scheduler.rate_limit_per_minute,
+        config.scheduler.zombie_timeout_secs,
+    ));
+
+    // Initialize the access manager (OWASP-inspired).
+    let access_manager = Arc::new(parking_lot::Mutex::new(AccessManager::new()));
+
+    Ok((orchestrator, gateway, event_bus.clone(), state_store, garden_manager, config, skill_store, supervisor, scheduler, access_manager))
 }
 
 // ─── Resolve provider and model ────────────────────────────────────────────
@@ -290,7 +305,7 @@ fn resolve_provider_and_model(
 
 /// Run a single prompt through the Ouroboros orchestrator.
 async fn cmd_run(prompt: &str, config_path: &Path, model_id: &str) -> Result<()> {
-    let (orchestrator, _, _, _, _, _, _, _) =
+    let (orchestrator, _, _, _, _, _, _, _, _, _) =
         init_kernel(config_path, model_id).await?;
 
     tracing::info!(prompt = %prompt, "Processing prompt");
@@ -316,7 +331,7 @@ async fn cmd_run(prompt: &str, config_path: &Path, model_id: &str) -> Result<()>
 /// Handle garden subcommands.
 async fn cmd_garden(action: GardenAction, config_path: &Path) -> Result<()> {
     let model_id = "anthropic/claude-sonnet-4-20250514"; // Dummy for garden cmds
-    let (_, _, _, _, garden_manager, _, _, _) = init_kernel(config_path, model_id).await?;
+    let (_, _, _, _, garden_manager, _, _, _, _, _) = init_kernel(config_path, model_id).await?;
 
     match action {
         GardenAction::New { name } => {
@@ -345,7 +360,7 @@ async fn cmd_garden(action: GardenAction, config_path: &Path) -> Result<()> {
             println!("Garden '{}' removed.", name);
         }
         GardenAction::List => {
-            let gardens = garden_manager.list_gardens().await?;
+            let gardens: Vec<_> = garden_manager.list_gardens().await?;
             if gardens.is_empty() {
                 println!("No gardens found.");
             } else {
@@ -386,6 +401,9 @@ async fn cmd_config(action: ConfigAction, config_path: &Path) -> Result<()> {
             kernel: Default::default(),
             gateway: Default::default(),
             container: Default::default(),
+            scheduler: Default::default(),
+            context: Default::default(),
+            security: Default::default(),
         }
     };
 
@@ -428,7 +446,7 @@ fn get_config_value(config: &OxiosConfig, key: &str) -> Option<String> {
 /// Show system status.
 async fn cmd_status(config_path: &Path) -> Result<()> {
     let model_id = "anthropic/claude-sonnet-4-20250514";
-    let (_, _, _, _, garden_manager, config, _, _) =
+    let (_, _, _, _, garden_manager, config, _, _, _, _) =
         init_kernel(config_path, model_id).await?;
 
     println!("Oxios Agent OS");
@@ -450,7 +468,7 @@ async fn cmd_status(config_path: &Path) -> Result<()> {
     println!();
 
     // Gardens status.
-    let gardens = garden_manager.list_gardens().await?;
+    let gardens: Vec<_> = garden_manager.list_gardens().await?;
     println!("Gardens: {} known", gardens.len());
     if !gardens.is_empty() {
         let running = gardens.iter().filter(|g| g.running).count();
@@ -582,7 +600,7 @@ async fn main() -> Result<()> {
             }
 
             // Initialize kernel components.
-            let (_orchestrator, gateway, event_bus, state_store, garden_manager, config, skill_store, supervisor) =
+            let (_orchestrator, gateway, event_bus, state_store, garden_manager, config, skill_store, supervisor, scheduler, access_manager) =
                 init_kernel(&config_path, default_model).await?;
 
             // Initialize default skills on first run.
@@ -610,6 +628,8 @@ async fn main() -> Result<()> {
                 garden_manager,
                 skill_store.clone(),
                 supervisor.clone(),
+                scheduler.clone(),
+                access_manager.clone(),
                 config.clone(),
                 Some(config_path.clone()),
             );

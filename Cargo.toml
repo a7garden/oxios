@@ -62,3 +62,4 @@ toml = { workspace = true }
 axum = { version = "0.8", features = ["ws"] }
 tower-http = { version = "0.6", features = ["cors", "fs"] }
 tokio-stream = { version = "0.1", features = ["sync"] }
+parking_lot = { workspace = true }

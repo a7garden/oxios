@@ -36,6 +36,7 @@ use tokio_stream::StreamExt as TokioStreamExt;
 use oxios_kernel::state_store::StateStore;
 use oxios_gateway::message::IncomingMessage;
 use oxios_kernel::AgentId;
+use oxios_kernel::access_manager::AuditEntry;
 use uuid::Uuid;
 
 use crate::server::AppState;
@@ -80,6 +81,13 @@ pub fn build_routes() -> Router<Arc<AppState>> {
         .route("/api/gardens/{name}/stop", post(handle_garden_stop))
         .route("/api/gardens/{name}", delete(handle_garden_remove))
         .route("/api/gardens/{name}/exec", post(handle_garden_exec))
+        // Scheduler stats & tasks
+        .route("/api/scheduler/stats", get(handle_scheduler_stats))
+        .route("/api/scheduler/tasks", get(handle_scheduler_tasks))
+        // Audit log & permissions
+        .route("/api/audit", get(handle_audit_log))
+        .route("/api/permissions/{agent}", get(handle_permissions_get))
+        .route("/api/permissions/{agent}", put(handle_permissions_put))
         // Events
         .route("/api/events", get(handle_events))
 }
@@ -1001,6 +1009,208 @@ async fn handle_garden_exec(
             Err((StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
         }
     }
+}
+
+// ---------------------------------------------------------------------------
+// Scheduler (AIOS-inspired task scheduling)
+// ---------------------------------------------------------------------------
+
+/// Scheduler statistics response.
+#[derive(Debug, Serialize)]
+struct SchedulerStatsResponse {
+    queued: usize,
+    running: usize,
+    max_concurrent: usize,
+    rate_limit_per_minute: u32,
+    rate_remaining: u32,
+}
+
+/// GET /api/scheduler/stats — Get scheduler statistics.
+async fn handle_scheduler_stats(
+    state: State<Arc<AppState>>,
+) -> Json<SchedulerStatsResponse> {
+    let stats = state.scheduler.stats();
+    let rate_remaining = state.scheduler.rate_limit_remaining();
+    Json(SchedulerStatsResponse {
+        queued: stats.queued,
+        running: stats.running,
+        max_concurrent: stats.max_concurrent,
+        rate_limit_per_minute: stats.rate_limit_per_minute,
+        rate_remaining,
+    })
+}
+
+/// Task summary for listing.
+#[derive(Debug, Serialize)]
+struct TaskSummary {
+    id: String,
+    description: String,
+    priority: String,
+    status: String,
+    created_at: String,
+    error: Option<String>,
+}
+
+/// GET /api/scheduler/tasks — List queued and running tasks.
+async fn handle_scheduler_tasks(
+    state: State<Arc<AppState>>,
+) -> Json<serde_json::Value> {
+    let queued: Vec<TaskSummary> = state
+        .scheduler
+        .queued_tasks()
+        .into_iter()
+        .map(|t| TaskSummary {
+            id: t.id.to_string(),
+            description: t.description,
+            priority: format!("{:?}", t.priority),
+            status: format!("{:?}", t.status),
+            created_at: t.created_at.to_rfc3339(),
+            error: t.error,
+        })
+        .collect();
+
+    let running: Vec<TaskSummary> = state
+        .scheduler
+        .running_tasks()
+        .into_iter()
+        .map(|t| TaskSummary {
+            id: t.id.to_string(),
+            description: t.description,
+            priority: format!("{:?}", t.priority),
+            status: format!("{:?}", t.status),
+            created_at: t.created_at.to_rfc3339(),
+            error: t.error,
+        })
+        .collect();
+
+    Json(serde_json::json!({
+        "queued": queued,
+        "running": running,
+    }))
+}
+
+// ---------------------------------------------------------------------------
+// Audit & Permissions
+// ---------------------------------------------------------------------------
+
+/// Audit log entry response.
+#[derive(Debug, Serialize)]
+struct AuditEntryResponse {
+    timestamp: String,
+    agent_name: String,
+    action: String,
+    resource: String,
+    allowed: bool,
+    reason: Option<String>,
+}
+
+impl From<&AuditEntry> for AuditEntryResponse {
+    fn from(entry: &AuditEntry) -> Self {
+        Self {
+            timestamp: entry.timestamp.to_rfc3339(),
+            agent_name: entry.agent_name.clone(),
+            action: entry.action.clone(),
+            resource: entry.resource.clone(),
+            allowed: entry.allowed,
+            reason: entry.reason.clone(),
+        }
+    }
+}
+
+/// GET /api/audit — Get security audit log.
+async fn handle_audit_log(
+    state: State<Arc<AppState>>,
+) -> Json<Vec<AuditEntryResponse>> {
+    let access = state.access_manager.lock();
+    let entries: Vec<AuditEntryResponse> = access
+        .audit_log()
+        .iter()
+        .map(AuditEntryResponse::from)
+        .collect();
+    Json(entries)
+}
+
+/// Permissions response.
+#[derive(Debug, Serialize)]
+struct PermissionsResponse {
+    agent_name: String,
+    allowed_tools: Vec<String>,
+    allowed_paths: Vec<String>,
+    denied_paths: Vec<String>,
+    network_access: bool,
+    max_execution_time_secs: u64,
+    max_memory_mb: u64,
+    can_fork: bool,
+}
+
+/// GET /api/permissions/:agent — Get permissions for an agent.
+async fn handle_permissions_get(
+    state: State<Arc<AppState>>,
+    Path(agent): Path<String>,
+) -> Result<Json<PermissionsResponse>, StatusCode> {
+    let access = state.access_manager.lock();
+    match access.get_permissions(&agent) {
+        Some(perms) => Ok(Json(PermissionsResponse {
+            agent_name: perms.agent_name.clone(),
+            allowed_tools: perms.allowed_tools.iter().cloned().collect(),
+            allowed_paths: perms.allowed_paths.clone(),
+            denied_paths: perms.denied_paths.clone(),
+            network_access: perms.network_access,
+            max_execution_time_secs: perms.max_execution_time_secs,
+            max_memory_mb: perms.max_memory_mb,
+            can_fork: perms.can_fork,
+        })),
+        None => Err(StatusCode::NOT_FOUND),
+    }
+}
+
+/// PUT /api/permissions/:agent — Set permissions for an agent.
+#[derive(Debug, Deserialize)]
+struct PermissionsUpdate {
+    allowed_tools: Option<Vec<String>>,
+    allowed_paths: Option<Vec<String>>,
+    denied_paths: Option<Vec<String>>,
+    network_access: Option<bool>,
+    max_execution_time_secs: Option<u64>,
+    max_memory_mb: Option<u64>,
+    can_fork: Option<bool>,
+}
+
+async fn handle_permissions_put(
+    state: State<Arc<AppState>>,
+    Path(agent): Path<String>,
+    Json(body): Json<PermissionsUpdate>,
+) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    let mut access = state.access_manager.lock();
+    let perms = access.get_or_create_permissions(&agent);
+
+    if let Some(tools) = body.allowed_tools {
+        perms.allowed_tools = tools.into_iter().collect();
+    }
+    if let Some(paths) = body.allowed_paths {
+        perms.allowed_paths = paths;
+    }
+    if let Some(paths) = body.denied_paths {
+        perms.denied_paths = paths;
+    }
+    if let Some(v) = body.network_access {
+        perms.network_access = v;
+    }
+    if let Some(v) = body.max_execution_time_secs {
+        perms.max_execution_time_secs = v;
+    }
+    if let Some(v) = body.max_memory_mb {
+        perms.max_memory_mb = v;
+    }
+    if let Some(v) = body.can_fork {
+        perms.can_fork = v;
+    }
+
+    tracing::info!(agent = %agent, "Permissions updated");
+    Ok(Json(serde_json::json!({
+        "status": "updated",
+        "agent": agent,
+    })))
 }
 
 // ---------------------------------------------------------------------------

@@ -21,3 +21,29 @@ allowed_host_commands = ["git", "gh", "open", "shortcuts", "osascript"]
 # Resource limits per garden container.
 memory_limit = "4g"
 cpu_limit = 4
+
+[scheduler]
+# Maximum concurrent agent tasks.
+max_concurrent = 5
+# Maximum LLM API calls per minute (rate limiting).
+rate_limit_per_minute = 60
+# Timeout in seconds before a running task is considered a zombie.
+zombie_timeout_secs = 300
+
+[context]
+# Maximum tokens in the active (in-context) tier.
+active_limit_tokens = 100000
+# Maximum entries in the cache tier.
+cache_limit_entries = 50
+
+[security]
+# Default allowed tools for agents (least privilege).
+allowed_tools = ["read", "write", "edit", "bash", "grep", "find"]
+# Whether agents can make network requests by default.
+network_access = false
+# Maximum execution time in seconds.
+max_execution_time_secs = 300
+# Maximum memory in MB per agent.
+max_memory_mb = 512
+# Whether agents can fork sub-agents.
+can_fork = false

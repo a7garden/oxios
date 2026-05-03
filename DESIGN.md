@@ -63,6 +63,15 @@ Both philosophies reject uncertainty. Unix fails fast on bad input. Ouroboros cl
 │  │  tools: read, write, edit, bash, grep, find, ls  │   │
 │  │  LLM: oxi-ai (multi-provider)                    │   │
 │  └─────────────────────────────────────────────────┘   │
+│                                                          │
+│  ┌─────────────────────────────────────────────────┐   │
+│  │         AIOS-Inspired Kernel Extensions          │   │
+│  │  ┌──────────────┐ ┌───────────────┐ ┌──────────┐│   │
+│  │  │   Scheduler  │ │ContextManager │ │  Access  ││   │
+│  │  │ (priority/   │ │  (3-tier:     │ │  Manager ││   │
+│  │  │  rate-limit) │ │  active/cache/│ │ (OWASP)  ││   │
+│  │  └──────────────┘ └───────────────┘ └──────────┘│   │
+│  └─────────────────────────────────────────────────┘   │
 └──────────────────────────────────────────────────────────┘
                       │
                       ▼
@@ -214,6 +223,102 @@ enum KernelEvent {
     PhaseStarted { session_id: String, phase: Phase },
     PhaseCompleted { session_id: String, phase: Phase, result_summary: String },
     // ...
+}
+```
+
+### 1b. Agent Scheduler (AIOS-inspired)
+
+Inspired by the AIOS paper (Rutgers) and AgentRM systems, the Scheduler manages
+agent task execution with OS-like scheduling discipline:
+
+**Key features:**
+- **Priority queue** — Tasks ranked by priority (Critical > High > Normal > Low),
+  with FIFO ordering within the same priority level. Highest priority tasks
+  are always executed first.
+- **Rate-limit-aware admission** — Before starting a task, checks whether the
+  LLM API rate limit would be exceeded. Prevents hammering API quotas.
+- **Max concurrent enforcement** — Configurable limit on how many tasks can
+  run simultaneously. Prevents resource exhaustion.
+- **Zombie detection & reaping** — Tasks running longer than a configurable
+  timeout (default 300s) are automatically reaped. Stale tasks don't block
+  the queue forever.
+
+```rust
+pub struct AgentScheduler {
+    queue: Arc<Mutex<Vec<ScheduledTask>>>,
+    max_concurrent: usize,
+    rate_limiter: Arc<Mutex<RateLimiter>>,
+    zombie_timeout_secs: u64,
+}
+
+impl AgentScheduler {
+    pub fn submit(&self, task: ScheduledTask) -> Result<Uuid>;
+    pub fn next_task(&self) -> Option<ScheduledTask>;
+    pub fn complete_task(&self, task_id: Uuid) -> Result<()>;
+    pub fn fail_task(&self, task_id: Uuid, error: &str) -> Result<()>;
+    pub fn reap_zombies(&self) -> Vec<Uuid>;
+    pub fn stats(&self) -> SchedulerStats;
+}
+```
+
+### 1c. Context Manager (AIOS-inspired)
+
+Like an OS managing RAM pages, the Context Manager manages LLM context windows.
+The LLM context window is finite and expensive — this manager treats it like
+physical memory with a 3-tier storage hierarchy:
+
+| Tier | Storage | Capacity | Use case |
+|------|---------|----------|----------|
+| **Active** | In-memory, in-context | Configurable (default 100k tokens) | Current conversation |
+| **Cache** | In-memory, not in-context | Configurable (default 50 entries) | Recent sessions |
+| **Archive** | Compressed on disk | Unlimited | Long-term storage |
+
+When the active tier fills up, oldest entries are automatically demoted to
+cache (context switching). When cache overflows, LRU entries are compressed
+to archive tier.
+
+```rust
+pub enum ContextTier { Active, Cache, Archive }
+
+impl ContextManager {
+    pub fn store_active(&self, session_id: &str, content: &str, token_count: usize) -> Result<()>;
+    pub fn get_active(&self, session_id: &str) -> Option<ContextEntry>;
+    pub fn demote_to_cache(&self, session_id: &str) -> Result<()>;
+    pub fn compress_archive(&self) -> Result<usize>;
+    pub fn has_capacity(&self, tokens: usize) -> bool;
+}
+```
+
+### 1d. Access Manager (OWASP-inspired)
+
+Inspired by OWASP Agentic AI Top 10 guidelines, the Access Manager enforces
+least-privilege security for all agents:
+
+- **Tool access control** — Each agent has an explicit allow-list of tools.
+  Agents can only use tools they are explicitly permitted to use.
+- **Path sandboxing** — Glob patterns define allowed/denied file paths.
+  Denied paths (e.g., `/etc/**`, `/root/**`) take precedence.
+- **Network restrictions** — Network access is disabled by default.
+  Agents must be explicitly granted network privileges.
+- **Execution limits** — Time and memory limits per agent prevent runaway processes.
+- **Audit logging** — Every access decision is logged with timestamp, agent,
+  action, resource, and the allow/deny decision with reason.
+
+```rust
+pub struct AgentPermissions {
+    pub allowed_tools: HashSet<String>,
+    pub allowed_paths: Vec<String>,
+    pub denied_paths: Vec<String>,
+    pub network_access: bool,
+    pub max_execution_time_secs: u64,
+    pub max_memory_mb: u64,
+}
+
+impl AccessManager {
+    pub fn can_use_tool(&self, agent_name: &str, tool: &str) -> bool;
+    pub fn can_access_path(&self, agent_name: &str, path: &str) -> bool;
+    pub fn can_access_network(&self, agent_name: &str) -> bool;
+    pub fn audit_log(&self) -> &[AuditEntry];
 }
 ```
 
