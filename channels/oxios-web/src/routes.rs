@@ -5,7 +5,8 @@
 //! - **Control**: GET /api/status, GET /api/agents, POST /api/agents/:id/kill
 //! - **Config**: GET /api/config, PUT /api/config
 //! - **Browse**: GET /api/workspace/tree, GET/PUT /api/workspace/file/*
-//! - **Seeds**: GET /api/seeds, GET /api/seeds/:id
+//! - **Seeds**: GET /api/seeds, GET /api/seeds/:id, GET /api/seeds/:id/evolution
+//! - **Skills**: GET /api/skills, GET /api/skills/:name, POST /api/skills, DELETE /api/skills/:name
 //! - **Memory**: GET /api/memory, GET /api/memory/:name
 //! - **Gardens**: GET /api/gardens, POST /api/gardens, POST /api/gardens/:name/start,
 //!   POST /api/gardens/:name/stop, DELETE /api/gardens/:name, POST /api/gardens/:name/exec
@@ -27,9 +28,12 @@ use axum::{
 use futures_util::{SinkExt, StreamExt as FuturesStreamExt};
 use serde::{Deserialize, Serialize};
 use std::convert::Infallible;
+use std::future::Future;
+use std::pin::Pin;
 use std::sync::Arc;
 use tokio_stream::wrappers::BroadcastStream;
 use tokio_stream::StreamExt as TokioStreamExt;
+use oxios_kernel::state_store::StateStore;
 
 use oxios_gateway::message::IncomingMessage;
 
@@ -59,6 +63,12 @@ pub fn build_routes() -> Router<Arc<AppState>> {
         // Seeds
         .route("/api/seeds", get(handle_seeds_list))
         .route("/api/seeds/{id}", get(handle_seed_get))
+        .route("/api/seeds/{id}/evolution", get(handle_seed_evolution))
+        // Skills
+        .route("/api/skills", get(handle_skills_list))
+        .route("/api/skills/{name}", get(handle_skill_get))
+        .route("/api/skills", post(handle_skill_create))
+        .route("/api/skills/{name}", delete(handle_skill_delete))
         // Memory
         .route("/api/memory", get(handle_memory_list))
         .route("/api/memory/{name}", get(handle_memory_get))
@@ -518,6 +528,200 @@ async fn handle_seed_get(
     }
 
     Err(StatusCode::NOT_FOUND)
+}
+
+/// Evolution lineage entry for a seed.
+#[derive(Debug, Serialize)]
+struct EvolutionEntry {
+    /// Seed ID.
+    id: String,
+    /// Generation number.
+    generation: u32,
+    /// Goal at this generation.
+    goal: String,
+    /// Parent seed ID (if any).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    parent_id: Option<String>,
+    /// Evaluation score (if evaluated).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    score: Option<f64>,
+    /// Whether evaluation passed.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    passed: Option<bool>,
+}
+
+/// GET /api/seeds/:id/evolution — Get evolution lineage for a seed.
+async fn handle_seed_evolution(
+    state: State<Arc<AppState>>,
+    Path(id): Path<String>,
+) -> Result<Json<Vec<EvolutionEntry>>, StatusCode> {
+    use oxios_ouroboros::Seed;
+    // Helper to build lineage by following parent IDs.
+    // Build lineage iteratively using a work stack.
+    fn build_lineage_iterative(
+        state_store: Arc<StateStore>,
+        seed_id: String,
+    ) -> Pin<Box<dyn Future<Output = anyhow::Result<Vec<EvolutionEntry>>> + Send>> {
+        Box::pin(async move {
+            let mut lineage = Vec::new();
+            let mut stack = vec![seed_id];
+
+            while let Some(current_id) = stack.pop() {
+                let content = match state_store.load_markdown("seeds", &current_id).await {
+                    Ok(Some(c)) => c,
+                    _ => continue,
+                };
+                let seed: Seed = match serde_json::from_str(&content) {
+                    Ok(s) => s,
+                    Err(_) => continue,
+                };
+
+                // Push parent first so it's processed before children (reversed order).
+                if let Some(ref parent_id) = seed.parent_seed_id {
+                    stack.push(parent_id.to_string());
+                }
+
+                let (score, passed) = {
+                    let eval_name = format!("{}-eval", current_id);
+                    if let Ok(Some(eval_content)) =
+                        state_store.load_markdown("evals", &eval_name).await
+                    {
+                        if let Ok(eval) =
+                            serde_json::from_str::<oxios_ouroboros::EvaluationResult>(&eval_content)
+                        {
+                            (Some(eval.score), Some(eval.all_passed()))
+                        } else {
+                            (None, None)
+                        }
+                    } else {
+                        (None, None)
+                    }
+                };
+
+                lineage.push(EvolutionEntry {
+                    id: seed.id.to_string(),
+                    generation: seed.generation,
+                    goal: seed.goal,
+                    parent_id: seed.parent_seed_id.map(|p| p.to_string()),
+                    score,
+                    passed,
+                });
+            }
+
+            lineage.reverse(); // Reverse so parent comes first.
+            Ok(lineage)
+        })
+    }
+
+    match build_lineage_iterative(state.state_store.clone(), id).await {
+        Ok(lineage) if !lineage.is_empty() => Ok(Json(lineage)),
+        _ => Err(StatusCode::NOT_FOUND),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Skills
+// ---------------------------------------------------------------------------
+
+
+/// Skill summary for listing.
+#[derive(Debug, Serialize)]
+struct SkillSummary {
+    /// Skill name.
+    name: String,
+    /// Skill description.
+    description: String,
+}
+
+/// GET /api/skills — List all skills.
+async fn handle_skills_list(
+    state: State<Arc<AppState>>,
+) -> Json<Vec<SkillSummary>> {
+    match state.skill_store.list_skills().await {
+        Ok(skills) => Json(
+            skills
+                .into_iter()
+                .map(|s| SkillSummary {
+                    name: s.name,
+                    description: s.description,
+                })
+                .collect(),
+        ),
+        Err(_) => Json(Vec::new()),
+    }
+}
+
+/// GET /api/skills/:name — Get skill content.
+async fn handle_skill_get(
+    state: State<Arc<AppState>>,
+    Path(name): Path<String>,
+) -> Result<Json<serde_json::Value>, StatusCode> {
+    match state.skill_store.load_skill(&name).await {
+        Ok(Some(skill)) => Ok(Json(serde_json::json!({
+            "name": skill.meta.name,
+            "description": skill.meta.description,
+            "content": skill.content,
+            "path": skill.path.to_string_lossy(),
+        }))),
+        Ok(None) => Err(StatusCode::NOT_FOUND),
+        Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
+    }
+}
+
+/// Request body for creating a skill.
+#[derive(Debug, Deserialize)]
+struct SkillCreateRequest {
+    /// Skill name.
+    name: String,
+    /// Skill description.
+    description: String,
+    /// Skill markdown content.
+    #[serde(default)]
+    content: String,
+}
+
+/// POST /api/skills — Create a new skill.
+async fn handle_skill_create(
+    state: State<Arc<AppState>>,
+    Json(body): Json<SkillCreateRequest>,
+) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    match state
+        .skill_store
+        .create_skill(&body.name, &body.description, &body.content)
+        .await
+    {
+        Ok(_) => {
+            tracing::info!(skill = %body.name, "Skill created via API");
+            Ok(Json(serde_json::json!({
+                "status": "created",
+                "name": body.name,
+            })))
+        }
+        Err(e) => {
+            tracing::error!(error = %e, skill = %body.name, "Failed to create skill");
+            Err((StatusCode::BAD_REQUEST, e.to_string()))
+        }
+    }
+}
+
+/// DELETE /api/skills/:name — Delete a skill.
+async fn handle_skill_delete(
+    state: State<Arc<AppState>>,
+    Path(name): Path<String>,
+) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    match state.skill_store.delete_skill(&name).await {
+        Ok(_) => {
+            tracing::info!(skill = %name, "Skill deleted via API");
+            Ok(Json(serde_json::json!({
+                "status": "deleted",
+                "name": name,
+            })))
+        }
+        Err(e) => {
+            tracing::error!(error = %e, skill = %name, "Failed to delete skill");
+            Err((StatusCode::BAD_REQUEST, e.to_string()))
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------

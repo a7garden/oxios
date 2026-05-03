@@ -14,6 +14,10 @@ pub type SeedId = uuid::Uuid;
 /// The Seed captures the goal, constraints, acceptance criteria, and
 /// relevant ontology entities. It is the contract between the user's
 /// intent and the agent's execution.
+///
+/// Seeds are versioned via the `generation` field. Gen 0 is the initial
+/// seed from `generate_seed()`. Each successful evolution increments
+/// generation. Lineage is tracked via `parent_seed_id`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Seed {
     /// Unique identifier for this seed.
@@ -28,10 +32,18 @@ pub struct Seed {
     pub ontology: Vec<Entity>,
     /// Timestamp of seed creation.
     pub created_at: DateTime<Utc>,
+    /// Evolution generation counter (0 = initial seed).
+    #[serde(default)]
+    pub generation: u32,
+    /// Parent seed ID if this seed was evolved from another.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub parent_seed_id: Option<SeedId>,
 }
 
 impl Seed {
     /// Creates a new seed with the given goal and auto-generated ID.
+    ///
+    /// Generation is set to 0 and parent_seed_id is None.
     pub fn new(goal: impl Into<String>) -> Self {
         Self {
             id: uuid::Uuid::new_v4(),
@@ -40,6 +52,25 @@ impl Seed {
             acceptance_criteria: Vec::new(),
             ontology: Vec::new(),
             created_at: Utc::now(),
+            generation: 0,
+            parent_seed_id: None,
+        }
+    }
+
+    /// Creates a new evolved seed from a parent seed.
+    ///
+    /// The new seed has generation = parent.generation + 1 and
+    /// parent_seed_id = parent.id.
+    pub fn evolved_from(parent: &Seed) -> Seed {
+        Self {
+            id: uuid::Uuid::new_v4(),
+            goal: parent.goal.clone(),
+            constraints: parent.constraints.clone(),
+            acceptance_criteria: parent.acceptance_criteria.clone(),
+            ontology: parent.ontology.clone(),
+            created_at: Utc::now(),
+            generation: parent.generation + 1,
+            parent_seed_id: Some(parent.id),
         }
     }
 }

@@ -86,6 +86,8 @@ impl OuroborosProtocol for MockOuroboros {
             acceptance_criteria: vec!["Output contains 'done'".into()],
             ontology: vec![],
             created_at: chrono::Utc::now(),
+            generation: 0,
+            parent_seed_id: None,
         })
     }
 
@@ -128,6 +130,8 @@ impl OuroborosProtocol for MockOuroboros {
             acceptance_criteria: seed.acceptance_criteria.clone(),
             ontology: vec![],
             created_at: chrono::Utc::now(),
+            generation: seed.generation + 1,
+            parent_seed_id: Some(seed.id),
         }))
     }
 }

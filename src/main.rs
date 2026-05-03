@@ -11,7 +11,7 @@ use std::sync::Arc;
 use oxios_gateway::Gateway;
 use oxios_kernel::{
     AgentRuntime, BasicSupervisor, EventBus, GardenManager, HostExecBridge, Orchestrator,
-    OxiosConfig, StateStore, Supervisor,
+    OxiosConfig, SkillStore, StateStore, Supervisor,
 };
 use oxios_ouroboros::OuroborosEngine;
 use oxios_web::WebServer;
@@ -187,6 +187,7 @@ async fn init_kernel(
     Arc<StateStore>,
     GardenManager,
     OxiosConfig,
+    SkillStore,
 )> {
     let config = if config_path.exists() {
         tracing::info!(path = %config_path.display(), "Loading config");
@@ -243,7 +244,11 @@ async fn init_kernel(
         gardens_base,
     );
 
-    Ok((orchestrator, gateway, event_bus, state_store, garden_manager, config))
+    // Initialize the skill store.
+    let skills_dir = PathBuf::from(&config.kernel.workspace).join("skills");
+    let skill_store = SkillStore::new(skills_dir)?;
+
+    Ok((orchestrator, gateway, event_bus, state_store, garden_manager, config, skill_store))
 }
 
 // ─── Resolve provider and model ────────────────────────────────────────────
@@ -284,7 +289,7 @@ fn resolve_provider_and_model(
 
 /// Run a single prompt through the Ouroboros orchestrator.
 async fn cmd_run(prompt: &str, config_path: &Path, model_id: &str) -> Result<()> {
-    let (orchestrator, _, _, _, _, _) =
+    let (orchestrator, _, _, _, _, _, _) =
         init_kernel(config_path, model_id).await?;
 
     tracing::info!(prompt = %prompt, "Processing prompt");
@@ -310,7 +315,7 @@ async fn cmd_run(prompt: &str, config_path: &Path, model_id: &str) -> Result<()>
 /// Handle garden subcommands.
 async fn cmd_garden(action: GardenAction, config_path: &Path) -> Result<()> {
     let model_id = "anthropic/claude-sonnet-4-20250514"; // Dummy for garden cmds
-    let (_, _, _, _, garden_manager, _) = init_kernel(config_path, model_id).await?;
+    let (_, _, _, _, garden_manager, _, _) = init_kernel(config_path, model_id).await?;
 
     match action {
         GardenAction::New { name } => {
@@ -422,7 +427,7 @@ fn get_config_value(config: &OxiosConfig, key: &str) -> Option<String> {
 /// Show system status.
 async fn cmd_status(config_path: &Path) -> Result<()> {
     let model_id = "anthropic/claude-sonnet-4-20250514";
-    let (_, _, _, _, garden_manager, config) =
+    let (_, _, _, _, garden_manager, config, _) =
         init_kernel(config_path, model_id).await?;
 
     println!("Oxios Agent OS");
@@ -576,8 +581,15 @@ async fn main() -> Result<()> {
             }
 
             // Initialize kernel components.
-            let (_orchestrator, gateway, event_bus, state_store, garden_manager, config) =
+            let (_orchestrator, gateway, event_bus, state_store, garden_manager, config, skill_store) =
                 init_kernel(&config_path, default_model).await?;
+
+            // Initialize default skills on first run.
+            let defaults_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("channels/oxios-web/static/default-skills");
+            if let Err(e) = skill_store.init_defaults(&defaults_dir).await {
+                tracing::warn!(error = %e, "Failed to initialize default skills");
+            }
 
             // Create the web channel.
             let web_channel = oxios_web::WebChannel::new(256);
@@ -595,6 +607,7 @@ async fn main() -> Result<()> {
                 event_bus.clone(),
                 (*state_store).clone(),
                 garden_manager,
+                skill_store.clone(),
             );
 
             // Set up graceful shutdown.
@@ -624,6 +637,7 @@ async fn main() -> Result<()> {
                         )?),
                         PathBuf::from(&config.container.garden_path),
                     )),
+                    skill_store: Arc::new(skill_store.clone()),
                 });
                 let routes = oxios_web::routes::build_routes();
                 axum::Router::new()

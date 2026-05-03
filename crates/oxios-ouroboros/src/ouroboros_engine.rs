@@ -242,6 +242,8 @@ impl OuroborosProtocol for OuroborosEngine {
             acceptance_criteria: parsed.acceptance_criteria,
             ontology: parsed.ontology,
             created_at: Utc::now(),
+            generation: 0,
+            parent_seed_id: None,
         };
 
         tracing::info!(seed_id = %seed.id, goal = %seed.goal, "Seed generated");
@@ -386,13 +388,18 @@ impl OuroborosProtocol for OuroborosEngine {
             }
         });
 
+        let evolved = Seed::evolved_from(seed);
+
+        // Override fields with LLM-suggested improvements.
         let evolved = Seed {
-            id: uuid::Uuid::new_v4(),
+            id: evolved.id,
             goal: parsed.goal,
             constraints: parsed.constraints,
             acceptance_criteria: parsed.acceptance_criteria,
             ontology: parsed.ontology,
             created_at: Utc::now(),
+            generation: evolved.generation,
+            parent_seed_id: evolved.parent_seed_id,
         };
 
         tracing::info!(

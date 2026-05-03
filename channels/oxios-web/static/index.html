@@ -767,6 +767,9 @@ html, body {
       <div class="nav-item" data-panel="memory">
         <span class="icon">🧠</span><span>Memory</span>
       </div>
+      <div class="nav-item" data-panel="skills">
+        <span class="icon">📖</span><span>Skills</span>
+      </div>
       <div class="nav-item" data-panel="gardens">
         <span class="icon">🌿</span><span>Gardens</span>
       </div>
@@ -868,6 +871,20 @@ html, body {
       </div>
     </div>
 
+    <!-- Skills Panel -->
+    <div class="panel" id="panel-skills">
+      <div class="panel-header">
+        <h2>📖 Skills</h2>
+        <button class="btn btn-sm" id="skills-refresh">Refresh</button>
+      </div>
+      <div class="panel-body" id="skills-body">
+        <div class="empty-state">
+          <div class="icon">📖</div>
+          <p>Loading skills...</p>
+        </div>
+      </div>
+    </div>
+
     <!-- Gardens Panel -->
     <div class="panel" id="panel-gardens">
       <div class="panel-header">
@@ -943,6 +960,7 @@ function switchPanel(panel) {
     case 'workspace': loadWorkspaceTree(); break;
     case 'seeds': loadSeeds(); break;
     case 'memory': loadMemory(); break;
+    case 'skills': loadSkills(); break;
     case 'gardens': loadGardens(); break;
     case 'config': loadConfig(); break;
   }
@@ -1388,6 +1406,141 @@ async function loadMemoryDetail(name) {
 
 document.getElementById('memory-refresh').addEventListener('click', loadMemory);
 
+// ── Skills ──
+let selectedSkill = null;
+
+async function loadSkills() {
+  const body = document.getElementById('skills-body');
+  try {
+    const res = await fetch(`${API}/api/skills`);
+    const skills = await res.json();
+
+    if (!skills.length) {
+      body.innerHTML = `<div class="empty-state"><div class="icon">📖</div><p>No skills yet. Skills are instruction templates for agents.</p></div>`;
+      return;
+    }
+
+    let html = '<div class="item-list">';
+    for (const s of skills) {
+      html += `
+        <div class="item-card" onclick="loadSkillDetail('${escAttr(s.name)}')">
+          <div class="item-title">${esc(s.name)}</div>
+          <div class="item-subtitle">${esc(s.description || 'No description')}</div>
+        </div>
+      `;
+    }
+    html += '</div>';
+
+    // Create button for new skill
+    html += `
+      <button class="btn btn-sm" id="skills-create-btn" style="margin-top:16px;background:var(--green);color:#000">+ New Skill</button>
+    `;
+
+    if (selectedSkill) {
+      html += `<div class="detail-view" id="skill-detail"></div>`;
+    }
+    body.innerHTML = html;
+
+    // Add create button listener
+    const createBtn = document.getElementById('skills-create-btn');
+    if (createBtn) {
+      createBtn.addEventListener('click', showSkillCreate);
+    }
+
+    if (selectedSkill) {
+      loadSkillDetail(selectedSkill);
+    }
+  } catch (err) {
+    body.innerHTML = `<div class="empty-state"><p>Error: ${esc(err.message)}</p></div>`;
+  }
+}
+
+async function loadSkillDetail(name) {
+  selectedSkill = name;
+  let detail = document.getElementById('skill-detail');
+  if (!detail) {
+    await loadSkills();
+    detail = document.getElementById('skill-detail');
+  }
+  if (!detail) return;
+
+  try {
+    const res = await fetch(`${API}/api/skills/${encodeURIComponent(name)}`);
+    const data = await res.json();
+    detail.innerHTML = `
+      <h3>${esc(data.name || name)}</h3>
+      <p style="color:var(--text-secondary);margin-bottom:12px">${esc(data.description || '')}</p>
+      <pre style="white-space:pre-wrap">${esc(data.content || '')}</pre>
+      <div style="margin-top:12px;display:flex;gap:8px">
+        <button class="btn btn-danger btn-sm" onclick="deleteSkill('${escAttr(name)}')">Delete</button>
+      </div>
+    `;
+  } catch (err) {
+    detail.innerHTML = `<p style="color:var(--red)">Error: ${esc(err.message)}</p>`;
+  }
+}
+
+function showSkillCreate() {
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.innerHTML = `
+    <div class="modal">
+      <h3>Create Skill</h3>
+      <label>Skill Name</label>
+      <input type="text" id="skill-create-name" placeholder="e.g. code-review" />
+      <label>Description</label>
+      <input type="text" id="skill-create-desc" placeholder="Brief description of this skill" />
+      <label>Content (Markdown)</label>
+      <textarea id="skill-create-content" rows="10" style="width:100%;background:var(--bg-primary);color:var(--text-primary);border:1px solid var(--border);border-radius:var(--radius);padding:10px;font-family:var(--font-mono);font-size:13px" placeholder="# Skill Title&#10;&#10;Skill instructions..."></textarea>
+      <div class="modal-actions">
+        <button class="btn btn-sm" id="skill-create-cancel">Cancel</button>
+        <button class="btn btn-sm" style="background:var(--green);color:#000" id="skill-create-submit">Create</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+
+  document.getElementById('skill-create-cancel').addEventListener('click', () => overlay.remove());
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+
+  document.getElementById('skill-create-submit').addEventListener('click', async () => {
+    const name = document.getElementById('skill-create-name').value.trim();
+    const desc = document.getElementById('skill-create-desc').value.trim();
+    const content = document.getElementById('skill-create-content').value.trim();
+    if (!name) return;
+    try {
+      const res = await fetch(`${API}/api/skills`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, description: desc, content }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        alert(`Error: ${err.error || 'Failed to create skill'}`);
+        return;
+      }
+      overlay.remove();
+      loadSkills();
+    } catch (err) {
+      alert(`Failed to create skill: ${err.message}`);
+    }
+  });
+}
+
+async function deleteSkill(name) {
+  if (!confirm(`Delete skill "${name}"? This cannot be undone.`)) return;
+  try {
+    await fetch(`${API}/api/skills/${encodeURIComponent(name)}`, { method: 'DELETE' });
+    selectedSkill = null;
+    loadSkills();
+  } catch (err) {
+    alert(`Failed to delete skill: ${err.message}`);
+  }
+}
+
+document.getElementById('skills-refresh').addEventListener('click', loadSkills);
+
+// ── Config ──
 // ── Config ──
 async function loadConfig() {
   const body = document.getElementById('config-body');

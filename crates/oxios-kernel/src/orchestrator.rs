@@ -199,6 +199,11 @@ impl Orchestrator {
             passed: evaluation.all_passed(),
         })?;
 
+
+        // Save evaluation to state store for lineage tracking.
+        self.save_evaluation(&seed, &evaluation).await?;
+
+
         // Phase 5: Evolve if needed
         let mut current_seed = Some(seed);
         let mut current_evaluation = evaluation;
@@ -236,6 +241,8 @@ impl Orchestrator {
                     Phase::Evaluate,
                     &format!("score={:.2}", current_evaluation.score),
                 ).await;
+                // Save evolved seed evaluation for lineage tracking.
+                self.save_evaluation(&evolved, &current_evaluation).await?;
             } else {
                 // No evolution possible.
                 self.publish_phase_completed(&session_id, Phase::Evolve, "no evolution").await;
@@ -281,6 +288,21 @@ impl Orchestrator {
             .save_markdown("seeds", &filename, &json)
             .await
             .context("failed to save seed to state store")?;
+
+        Ok(())
+    }
+
+
+    /// Save an evaluation result to the state store.
+    async fn save_evaluation(&self, seed: &Seed, evaluation: &EvaluationResult) -> Result<()> {
+        let filename = format!("{}-eval.json", seed.id);
+        let json = serde_json::to_string_pretty(evaluation)
+            .context("failed to serialize evaluation")?;
+
+        self.state_store
+            .save_markdown("evals", &filename, &json)
+            .await
+            .context("failed to save evaluation to state store")?;
 
         Ok(())
     }

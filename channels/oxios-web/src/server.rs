@@ -15,6 +15,7 @@ use crate::channel::WebChannelHandle;
 use crate::routes::build_routes;
 use oxios_kernel::event_bus::EventBus;
 use oxios_kernel::garden::GardenManager;
+use oxios_kernel::skill::SkillStore;
 use oxios_kernel::state_store::StateStore;
 use std::sync::Arc as StdArc;
 
@@ -33,6 +34,8 @@ pub struct AppState {
     pub state_store: Arc<StateStore>,
     /// Garden manager for container lifecycle.
     pub garden_manager: Arc<GardenManager>,
+    /// Skill store for skill management.
+    pub skill_store: Arc<SkillStore>,
 }
 
 /// The web HTTP server.
@@ -52,6 +55,7 @@ impl WebServer {
         event_bus: EventBus,
         state_store: StateStore,
         garden_manager: GardenManager,
+        skill_store: SkillStore,
     ) -> Self {
         let addr: SocketAddr = format!("{host}:{port}")
             .parse()
@@ -62,6 +66,7 @@ impl WebServer {
             event_bus: StdArc::new(event_bus),
             state_store: Arc::new(state_store),
             garden_manager: Arc::new(garden_manager),
+            skill_store: Arc::new(skill_store),
         });
         Self { addr, state }
     }
