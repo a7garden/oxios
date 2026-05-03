@@ -8,46 +8,18 @@
 //! so we execute it via `tokio::task::spawn_blocking` to stay on one thread.
 
 use anyhow::Result;
-use async_trait::async_trait;
-use futures::Stream;
 use oxi_agent::{
     Agent, AgentConfig, AgentEvent,
     ReadTool, WriteTool, EditTool, BashTool, GrepTool, FindTool, LsTool,
 };
 use oxi_ai::Provider;
-use std::pin::Pin;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 
 use oxios_ouroboros::{ExecutionResult, Seed};
 
-/// A dummy provider that returns an error on any LLM call.
-///
-/// This is used for testing and development when real LLM access is not available.
-/// The AgentRuntime is intended for the execution loop; the Ouroboros engine
-/// handles spec generation via its own LLM calls.
-#[derive(Clone, Default)]
-pub struct DummyProvider;
-
-#[async_trait]
-impl Provider for DummyProvider {
-    async fn stream(
-        &self,
-        _model: &oxi_ai::Model,
-        _context: &oxi_ai::Context,
-        _options: Option<oxi_ai::StreamOptions>,
-    ) -> Result<Pin<Box<dyn Stream<Item = oxi_ai::ProviderEvent> + Send>>, oxi_ai::ProviderError> {
-        Err(oxi_ai::ProviderError::MissingApiKey)
-    }
-
-    fn name(&self) -> &str {
-        "dummy"
-    }
-}
-
 /// Runtime that wraps an oxi-agent session for executing Seeds.
 pub struct AgentRuntime {
-    #[allow(dead_code)]
     provider: Arc<dyn Provider>,
     model_id: String,
 }
@@ -70,6 +42,7 @@ impl AgentRuntime {
         let system_prompt = build_system_prompt(seed);
         let prompt = build_user_prompt(seed);
         let model_id = self.model_id.clone();
+        let provider = Arc::clone(&self.provider);
 
         // Run the agent in a blocking task since Agent is !Send.
         // spawn_blocking keeps execution on a single thread, avoiding
@@ -81,7 +54,7 @@ impl AgentRuntime {
                 .with_max_iterations(20)
                 .with_timeout(300);
 
-            let agent = Agent::new(Arc::new(DummyProvider), config);
+            let agent = Agent::new(provider, config);
             agent.add_tool(ReadTool::new());
             agent.add_tool(WriteTool::new());
             agent.add_tool(EditTool::new());
@@ -98,7 +71,7 @@ impl AgentRuntime {
             // the agent future is not Send.
             let agent_result = agent.run_with_channel(prompt, tx);
 
-            // Drain events while the agent runs.
+            // Drain events in a tight loop.
             let mut final_content = String::new();
             let mut steps_completed = 0usize;
             let mut success = false;

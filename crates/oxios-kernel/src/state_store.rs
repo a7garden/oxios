@@ -3,7 +3,7 @@
 //! All state is persisted as markdown or JSON files organized
 //! by category. This is the "filesystem" of Oxios.
 
-use anyhow::Result;
+use anyhow::{bail, Result};
 use serde::{de::DeserializeOwned, Serialize};
 use std::path::PathBuf;
 use tokio::fs;
@@ -24,8 +24,26 @@ impl StateStore {
         Ok(Self { base_path })
     }
 
+    /// Validate that a category name does not contain path traversal.
+    fn validate_category(category: &str) -> Result<()> {
+        if category.contains("..") || category.contains('/') || category.contains('\\') {
+            bail!("invalid category name: '{}'", category);
+        }
+        Ok(())
+    }
+
+    /// Validate that a file name does not contain path traversal.
+    fn validate_name(name: &str) -> Result<()> {
+        if name.contains("..") || name.contains('/') || name.contains('\\') {
+            bail!("invalid file name: '{}'", name);
+        }
+        Ok(())
+    }
+
     /// Save a markdown file under the given category.
     pub async fn save_markdown(&self, category: &str, name: &str, content: &str) -> Result<()> {
+        Self::validate_category(category)?;
+        Self::validate_name(name)?;
         let dir = self.base_path.join(category);
         fs::create_dir_all(&dir).await?;
         let path = dir.join(format!("{name}.md"));
@@ -35,6 +53,8 @@ impl StateStore {
 
     /// Load a markdown file from the given category.
     pub async fn load_markdown(&self, category: &str, name: &str) -> Result<Option<String>> {
+        Self::validate_category(category)?;
+        Self::validate_name(name)?;
         let path = self.base_path.join(category).join(format!("{name}.md"));
         match fs::read_to_string(&path).await {
             Ok(content) => Ok(Some(content)),
@@ -45,6 +65,7 @@ impl StateStore {
 
     /// List all markdown files in a category (names without extension).
     pub async fn list_category(&self, category: &str) -> Result<Vec<String>> {
+        Self::validate_category(category)?;
         let dir = self.base_path.join(category);
         if !dir.exists() {
             return Ok(Vec::new());
@@ -67,6 +88,8 @@ impl StateStore {
 
     /// Save a serializable value as JSON under the given category.
     pub async fn save_json<T: Serialize>(&self, category: &str, name: &str, data: &T) -> Result<()> {
+        Self::validate_category(category)?;
+        Self::validate_name(name)?;
         let dir = self.base_path.join(category);
         fs::create_dir_all(&dir).await?;
         let path = dir.join(format!("{name}.json"));
@@ -77,6 +100,8 @@ impl StateStore {
 
     /// Load a deserializable value from JSON in the given category.
     pub async fn load_json<T: DeserializeOwned>(&self, category: &str, name: &str) -> Result<Option<T>> {
+        Self::validate_category(category)?;
+        Self::validate_name(name)?;
         let path = self.base_path.join(category).join(format!("{name}.json"));
         match fs::read_to_string(&path).await {
             Ok(content) => Ok(Some(serde_json::from_str(&content)?)),

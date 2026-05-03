@@ -61,12 +61,12 @@ impl WebChannel {
 
     /// Deliver a response to the registered handler, if any.
     /// Also broadcasts for WebSocket/SSE clients.
-    pub fn deliver_response(&self, msg: OutgoingMessage) -> Result<()> {
+    pub async fn deliver_response(&self, msg: OutgoingMessage) -> Result<()> {
         let msg_id = msg.id;
 
         // Try to deliver to a registered HTTP handler first.
         {
-            let mut responses = self.responses.blocking_write();
+            let mut responses = self.responses.write().await;
             if let Some(sender) = responses.remove(&msg_id) {
                 let _ = sender.send(msg.clone());
             }
@@ -93,7 +93,7 @@ impl Channel for WebChannel {
 
     async fn send(&self, msg: OutgoingMessage) -> Result<()> {
         // Use deliver_response for proper correlation.
-        self.deliver_response(msg)
+        self.deliver_response(msg).await
     }
 }
 

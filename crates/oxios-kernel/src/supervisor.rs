@@ -17,6 +17,7 @@ use std::sync::Arc;
 use crate::agent_runtime::AgentRuntime;
 use crate::event_bus::EventBus;
 use crate::types::{AgentId, AgentInfo, AgentStatus};
+use oxios_ouroboros::ExecutionResult;
 
 /// Supervisor trait for managing agent lifecycles.
 #[async_trait]
@@ -28,7 +29,8 @@ pub trait Supervisor: Send + Sync {
     async fn exec(&self, id: AgentId) -> Result<()>;
 
     /// Fork and execute an agent with its seed, running to completion.
-    async fn run_with_seed(&self, id: AgentId, seed: &Seed) -> Result<()>;
+    /// Returns the execution result from the agent runtime.
+    async fn run_with_seed(&self, id: AgentId, seed: &Seed) -> Result<ExecutionResult>;
 
     /// Wait for an agent to complete and return its final status.
     async fn wait(&self, id: AgentId) -> Result<AgentStatus>;
@@ -55,68 +57,6 @@ impl BasicSupervisor {
             event_bus,
             runtime: Arc::new(runtime),
         }
-    }
-
-    /// Execute an agent with its full seed, running the tool-calling loop.
-    ///
-    /// This is the primary entry point for running an agent. It runs
-    /// the tool-calling loop via the AgentRuntime and publishes events.
-    pub async fn run_with_seed(&self, id: AgentId, seed: &Seed) -> Result<()> {
-        // Mark as running.
-        {
-            let mut agents = self.agents.write();
-            match agents.get_mut(&id) {
-                Some(agent) => agent.status = AgentStatus::Running,
-                None => anyhow::bail!("Agent {id} not found"),
-            }
-        }
-
-        let _ = self
-            .event_bus
-            .publish(crate::event_bus::KernelEvent::AgentStarted { id });
-
-        tracing::info!(agent_id = %id, seed_id = %seed.id, "Running agent task");
-
-        match self.runtime.execute(seed).await {
-            Ok(result) => {
-                tracing::info!(
-                    agent_id = %id,
-                    success = result.success,
-                    steps = result.steps_completed,
-                    "Agent task completed"
-                );
-
-                {
-                    let mut agents = self.agents.write();
-                    if let Some(agent) = agents.get_mut(&id) {
-                        agent.status = if result.success {
-                            AgentStatus::Idle
-                        } else {
-                            AgentStatus::Failed
-                        };
-                    }
-                }
-
-                let _ = self.event_bus.publish(crate::event_bus::KernelEvent::AgentStopped { id });
-            }
-            Err(e) => {
-                tracing::error!(agent_id = %id, error = %e, "Agent task failed");
-
-                {
-                    let mut agents = self.agents.write();
-                    if let Some(agent) = agents.get_mut(&id) {
-                        agent.status = AgentStatus::Failed;
-                    }
-                }
-
-                let _ = self.event_bus.publish(crate::event_bus::KernelEvent::AgentFailed {
-                    id,
-                    error: e.to_string(),
-                });
-            }
-        }
-
-        Ok(())
     }
 }
 
@@ -165,7 +105,7 @@ impl Supervisor for BasicSupervisor {
         Ok(())
     }
 
-    async fn run_with_seed(&self, id: AgentId, seed: &Seed) -> Result<()> {
+    async fn run_with_seed(&self, id: AgentId, seed: &Seed) -> Result<ExecutionResult> {
         // Mark as running.
         {
             let mut agents = self.agents.write();
@@ -202,6 +142,7 @@ impl Supervisor for BasicSupervisor {
                 }
 
                 let _ = self.event_bus.publish(crate::event_bus::KernelEvent::AgentStopped { id });
+                Ok(result)
             }
             Err(e) => {
                 tracing::error!(agent_id = %id, error = %e, "Agent task failed");
@@ -217,10 +158,14 @@ impl Supervisor for BasicSupervisor {
                     id,
                     error: e.to_string(),
                 });
+
+                Ok(ExecutionResult {
+                    output: format!("Agent failed: {e}"),
+                    steps_completed: 0,
+                    success: false,
+                })
             }
         }
-
-        Ok(())
     }
 
     async fn wait(&self, id: AgentId) -> Result<AgentStatus> {

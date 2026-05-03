@@ -15,7 +15,7 @@ use std::sync::Arc;
 
 use anyhow::{Context, Result};
 use oxios_ouroboros::{
-    EvaluationResult, ExecutionResult, InterviewResult, OuroborosProtocol, Phase, Seed,
+    EvaluationResult, InterviewResult, OuroborosProtocol, Phase, Seed,
 };
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
@@ -180,17 +180,11 @@ impl Orchestrator {
         tracing::info!(session_id = %session_id, agent_id = %agent_id, seed_id = %seed.id, "Agent forked");
 
         // Run the agent with the seed.
-        self.supervisor.run_with_seed(agent_id, &seed).await?;
+        let exec_result = self.supervisor.run_with_seed(agent_id, &seed).await?;
 
         // Phase 4: Evaluate
         self.publish_phase_completed(&session_id, Phase::Execute, "completed").await;
         self.publish_phase_started(&session_id, Phase::Evaluate).await;
-
-        let exec_result = ExecutionResult {
-            output: String::new(), // Result is in the agent's final state
-            steps_completed: 0,
-            success: true,
-        };
 
         let evaluation = self.ouroboros.evaluate(&seed, &exec_result).await?;
 
@@ -229,12 +223,12 @@ impl Orchestrator {
 
                 // Re-fork and execute with the evolved seed.
                 let new_agent_id = self.supervisor.fork(&evolved).await?;
-                self.supervisor.run_with_seed(new_agent_id, &evolved).await?;
+                let new_exec = self.supervisor.run_with_seed(new_agent_id, &evolved).await?;
 
                 self.publish_phase_completed(&session_id, Phase::Execute, "completed").await;
                 self.publish_phase_started(&session_id, Phase::Evaluate).await;
 
-                let new_eval = self.ouroboros.evaluate(&evolved, &exec_result).await?;
+                let new_eval = self.ouroboros.evaluate(&evolved, &new_exec).await?;
                 current_evaluation = new_eval;
 
                 self.publish_phase_completed(

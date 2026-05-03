@@ -1422,6 +1422,7 @@ dependencies = [
  "futures",
  "oxi-agent",
  "oxi-ai",
+ "oxios-gateway",
  "oxios-ouroboros",
  "parking_lot",
  "serde",

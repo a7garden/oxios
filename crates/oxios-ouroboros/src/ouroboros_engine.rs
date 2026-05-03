@@ -11,7 +11,8 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use chrono::Utc;
-use oxi_ai::{complete, get_model, Context, Message, Model, UserMessage};
+use futures::StreamExt;
+use oxi_ai::{Context, Message, Model, Provider, UserMessage};
 use serde::Deserialize;
 use std::sync::Arc;
 
@@ -66,39 +67,22 @@ struct EvaluationResponse {
 
 /// LLM-powered implementation of the Ouroboros protocol.
 ///
-/// The engine uses `oxi_ai::complete` internally, which resolves the
-/// provider automatically from the model's provider field.
+/// The engine uses the injected `oxi_ai::Provider` to make LLM calls
+/// for interview, seed generation, evaluation, and evolution.
 pub struct OuroborosEngine {
+    provider: Arc<dyn Provider>,
     model: Model,
     phase: parking_lot::Mutex<Phase>,
 }
 
 impl OuroborosEngine {
-    /// Create a new engine with the given LLM model.
-    ///
-    /// The provider is resolved automatically by `oxi_ai::complete`
-    /// based on the model's provider field.
-    pub fn new(_provider: Arc<dyn oxi_ai::Provider>, model: Model) -> Self {
+    /// Create a new engine with the given provider and LLM model.
+    pub fn new(provider: Arc<dyn Provider>, model: Model) -> Self {
         Self {
+            provider,
             model,
             phase: parking_lot::Mutex::new(Phase::Interview),
         }
-    }
-
-    /// Create an engine using a model ID string (e.g. "anthropic/claude-sonnet-4-20250514").
-    ///
-    /// Looks up the model in the oxi-ai model registry.
-    /// Returns `None` if the model is not found.
-    pub fn from_model_id(model_id: &str) -> Option<Self> {
-        let parts: Vec<&str> = model_id.split('/').collect();
-        if parts.len() < 2 {
-            return None;
-        }
-        let model = get_model(parts[0], &parts[1..].join("/")).cloned()?;
-        Some(Self {
-            model,
-            phase: parking_lot::Mutex::new(Phase::Interview),
-        })
     }
 
     /// Returns the current phase.
@@ -117,8 +101,35 @@ impl OuroborosEngine {
         ctx.set_system_prompt(system_prompt.to_owned());
         ctx.add_message(Message::User(UserMessage::new(user_message)));
 
-        let msg = complete(&self.model, &ctx, None).await?;
-        Ok(msg.text_content())
+        let stream = self
+            .provider
+            .stream(&self.model, &ctx, None)
+            .await?;
+
+        // Collect the stream into a single text string.
+        let mut text = String::new();
+        tokio::pin!(stream);
+        while let Some(event) = stream.next().await {
+            match event {
+                oxi_ai::ProviderEvent::TextDelta { delta, .. } => {
+                    text.push_str(&delta);
+                }
+                oxi_ai::ProviderEvent::Done { .. } => break,
+                oxi_ai::ProviderEvent::Error { error, .. } => {
+                    // Try to extract text from the error message.
+                    let msg_text = error.text_content();
+                    if !msg_text.is_empty() {
+                        text = msg_text;
+                    } else {
+                        anyhow::bail!("LLM stream error");
+                    }
+                    break;
+                }
+                _ => {}
+            }
+        }
+
+        Ok(text)
     }
 
     /// Parse a JSON object from the LLM response, tolerating markdown fences.
@@ -239,14 +250,16 @@ impl OuroborosProtocol for OuroborosEngine {
 
     async fn execute(&self, seed: &Seed) -> Result<ExecutionResult> {
         self.set_phase(Phase::Execute);
-        // Execution is delegated to the kernel's AgentRuntime.
+        // Execution is delegated to the kernel's AgentRuntime via the Supervisor.
         // The OuroborosEngine itself does not run tools — it orchestrates.
-        // The kernel calls AgentRuntime::execute(seed) and feeds the result here.
-        tracing::info!(seed_id = %seed.id, "Execute phase (delegated to AgentRuntime)");
+        // The Orchestrator calls Supervisor::run_with_seed() directly.
+        // This method exists for protocol completeness but the Orchestrator
+        // does not invoke it; it uses the Supervisor instead.
+        tracing::info!(seed_id = %seed.id, "Execute phase (delegated to AgentRuntime via Supervisor)");
         Ok(ExecutionResult {
-            output: String::new(),
+            output: format!("Execution of seed {} delegated to agent runtime", seed.id),
             steps_completed: 0,
-            success: false,
+            success: false, // Caller should replace with actual result
         })
     }
 
