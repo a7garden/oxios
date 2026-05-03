@@ -173,6 +173,21 @@ pub struct McpError {
     pub data: Option<serde_json::Value>,
 }
 
+impl std::fmt::Display for McpError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let error_type = match self.code {
+            -32700 => "parse error",
+            -32600 => "invalid request",
+            -32601 => "method not found",
+            -32602 => "invalid params",
+            -32603 => "internal error",
+            -32099..=-32000 => "server error",
+            _ => "unknown error",
+        };
+        write!(f, "{} (code {}): {}", error_type, self.code, self.message)
+    }
+}
+
 impl McpError {
     /// Create a new MCP error
     pub fn new(code: i32, message: &str) -> Self {
@@ -223,7 +238,7 @@ impl McpResponse {
     /// Extract the result value, erroring if there is one
     pub fn into_result(self) -> Result<serde_json::Value> {
         if let Some(err) = self.error {
-            return Err(anyhow!("MCP error {}: {}", err.code, err.message));
+            return Err(anyhow!("{}", err));
         }
         Ok(self.result.unwrap_or(serde_json::Value::Null))
     }
@@ -1129,6 +1144,7 @@ mod tests {
     // --- JSON-RPC echo round-trip test (using bash script) ---
 
     #[tokio::test]
+    #[ignore = "Requires bash shell environment with executable script support"]
     async fn test_jsonrpc_echo_server() {
         // Create a bash echo script that echoes back stdin lines
         let temp_script = tempfile::tempdir().unwrap().path().join("mcp_echo.sh");
