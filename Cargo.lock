@@ -1385,6 +1385,7 @@ name = "oxios"
 version = "0.1.0-alpha"
 dependencies = [
  "anyhow",
+ "axum",
  "clap",
  "oxi-ai",
  "oxios-gateway",
@@ -1393,6 +1394,9 @@ dependencies = [
  "oxios-web",
  "serde",
  "tokio",
+ "tokio-stream",
+ "toml",
+ "tower-http",
  "tracing",
  "tracing-subscriber",
 ]

@@ -92,8 +92,20 @@ impl Channel for WebChannel {
     }
 
     async fn send(&self, msg: OutgoingMessage) -> Result<()> {
-        // Use deliver_response for proper correlation.
-        self.deliver_response(msg).await
+        // Route the response back to the waiting HTTP handler via correlation map.
+        // The OutgoingMessage.id matches the original IncomingMessage.id,
+        // which is the key registered by send_and_wait().
+        {
+            let mut responses = self.responses.write().await;
+            if let Some(sender) = responses.remove(&msg.id) {
+                let _ = sender.send(msg.clone());
+                tracing::debug!(msg_id = %msg.id, "Correlated response to HTTP handler");
+            }
+        }
+
+        // Always broadcast for WebSocket/SSE clients.
+        let _ = self.outgoing_tx.send(msg);
+        Ok(())
     }
 }
 

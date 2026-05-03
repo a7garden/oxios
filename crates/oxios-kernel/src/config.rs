@@ -3,10 +3,10 @@
 //! Configuration is stored at `~/.oxios/config.toml` and controls
 //! kernel, gateway, and container settings.
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 /// Top-level Oxios configuration.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct OxiosConfig {
     /// Kernel settings.
     pub kernel: KernelConfig,
@@ -19,7 +19,7 @@ pub struct OxiosConfig {
 }
 
 /// Kernel configuration.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct KernelConfig {
     /// Path to the workspace directory.
     #[serde(default = "default_workspace")]
@@ -59,7 +59,7 @@ impl Default for KernelConfig {
 }
 
 /// Gateway configuration.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct GatewayConfig {
     /// Host to bind the gateway to.
     #[serde(default = "default_gateway_host")]
@@ -87,7 +87,7 @@ impl Default for GatewayConfig {
 }
 
 /// Container (garden) configuration.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ContainerConfig {
     /// Base directory for container gardens.
     #[serde(default = "default_garden_path")]
