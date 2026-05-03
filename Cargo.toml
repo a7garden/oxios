@@ -1,0 +1,38 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/oxios-kernel",
+    "crates/oxios-ouroboros",
+    "crates/oxios-gateway",
+    "channels/oxios-web",
+    ".",
+]
+
+[workspace.dependencies]
+# Async
+tokio = { version = "1", features = ["full"] }
+futures = "0.3"
+async-trait = "0.1"
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.8"
+
+# IDs
+uuid = { version = "1", features = ["v4"] }
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Error handling
+anyhow = "1"
+thiserror = "1"
+
+# Time
+chrono = { version = "0.4", features = ["serde"] }
+
+# oxi engine crates (path dependencies to pi2oxi)
+oxi-ai = { path = "../pi2oxi/oxi-ai" }
+oxi-agent = { path = "../pi2oxi/oxi-agent" }
