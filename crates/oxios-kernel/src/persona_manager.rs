@@ -93,6 +93,11 @@ impl PersonaManager {
         tracing::info!("Default personas initialized");
     }
 
+    /// Returns the first enabled persona, for wiring into OuroborosEngine.
+    pub fn first_enabled(&self) -> Option<Persona> {
+        self.store.list_enabled().into_iter().next()
+    }
+
     /// Returns the persona store for direct access.
     pub fn store(&self) -> &PersonaStore {
         &self.store
