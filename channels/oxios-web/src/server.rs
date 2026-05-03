@@ -17,6 +17,7 @@ use crate::routes::build_routes;
 use oxios_kernel::event_bus::EventBus;
 use oxios_kernel::garden::GardenManager;
 use oxios_kernel::host_tools::HostToolValidator;
+use oxios_kernel::persona_manager::PersonaManager;
 use oxios_kernel::program::ProgramManager;
 use oxios_kernel::scheduler::AgentScheduler;
 use oxios_kernel::access_manager::AccessManager;
@@ -51,6 +52,8 @@ pub struct AppState {
     pub scheduler: Arc<AgentScheduler>,
     /// Access manager for agent permissions and security.
     pub access_manager: Arc<parking_lot::Mutex<AccessManager>>,
+    /// Persona manager for multi-persona support.
+    pub persona_manager: Arc<PersonaManager>,
     /// Loaded configuration.
     pub config: Arc<oxios_kernel::OxiosConfig>,
     /// Path to the config file (for persistence on PUT /api/config).
@@ -69,6 +72,7 @@ impl std::fmt::Debug for AppState {
             .field("supervisor", &"...")
             .field("scheduler", &"...")
             .field("access_manager", &"...")
+            .field("persona_manager", &"...")
             .field("config", &self.config)
             .field("config_path", &self.config_path)
             .finish()
@@ -99,6 +103,7 @@ impl WebServer {
         supervisor: Arc<dyn Supervisor>,
         scheduler: Arc<AgentScheduler>,
         access_manager: Arc<parking_lot::Mutex<AccessManager>>,
+        persona_manager: PersonaManager,
         config: oxios_kernel::OxiosConfig,
         config_path: Option<PathBuf>,
     ) -> Self {
@@ -117,6 +122,7 @@ impl WebServer {
             supervisor,
             scheduler,
             access_manager,
+            persona_manager: Arc::new(persona_manager),
             config: Arc::new(config),
             config_path,
         });

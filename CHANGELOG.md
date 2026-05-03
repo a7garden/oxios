@@ -35,7 +35,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 #### Programs System
 
 - **ProgramManager** (`program.rs`) — OS-level installable applications:
-  - Install/uninstall programs from directories
+  - Install/uninstall programs from directories, git, or tarball URLs
   - Enable/disable programs
   - Host requirements validation
   - Program metadata parsing (program.toml)
@@ -64,20 +64,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Full host environment audit
   - API endpoint: `GET /api/host-tools`
 
-#### Seeds API Enhancements
+#### Seeds & Evaluation API
 
 - `GET /api/seeds/:id/evolution` — Track seed evolution lineage with parent links and evaluation scores
+- **ExecutionMetadata** (`oxios-ouroboros`) — Per-seed execution tracking:
+  - Execution count and rolling average score
+  - Success rate calculation
+  - User-defined tags for categorization
 
 #### Configuration Enhancements
 
 - `[scheduler]` section — Max concurrent, rate limit, zombie timeout
 - `[context]` section — Active/cache/archive tier configuration
-- `[access]` section — Audit log size, default tool allowlists
+- `[security]` section — Audit log size, default tool allowlists
+- `[persona]` section — Default persona and concurrent persona limits
+
+#### Persona System
+
+- **PersonaManager** + **PersonaStore** (`persona_manager.rs`, `persona_store.rs`) — Multiple AI characters:
+  - Three default personas: Dev, Review, Research
+  - Per-persona system prompts and personality traits
+  - Active persona switching for orchestrator
+
+#### State & Sessions
+
+- **StateStore** (`state_store.rs`) — Extended with Session management:
+  - `SessionId`, `UserMessage`, `AgentResponse`, `Session` types
+  - Full conversation history persistence
+  - Path traversal protection
 
 ### Changed
 
 - Kernel module structure expanded from core modules to include AIOS extensions
 - API routes reorganized to group related endpoints logically
+- Version bumped to `0.2.0-alpha` across all crates
+- `Seed::new()` now includes `execution_metadata` field
+
+### Fixed
+
+- `parking_lots` typo corrected to `parking_lot` in persona modules
+- `Deserialize` import added to `state_store.rs`
+- `OxiosConfig` default initialization includes all config sections
+- Tuple element count mismatch in `init_kernel` callers
+- `mut` warning in `PersonaManager::with_defaults`
 
 ## [0.1.0-alpha] - 2026-05-03
 

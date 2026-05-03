@@ -39,6 +39,7 @@ use oxios_kernel::{AgentId, access_manager::AuditEntry};
 use uuid::Uuid;
 
 use crate::server::AppState;
+use crate::persona_routes;
 
 // ---------------------------------------------------------------------------
 // Route builder
@@ -100,6 +101,20 @@ pub fn build_routes() -> Router<Arc<AppState>> {
         // MCP
         .route("/api/mcp/servers", get(handle_mcp_servers_list))
         .route("/api/mcp/servers", post(handle_mcp_server_register))
+        // Events
+        .route("/api/events", get(handle_events))
+        // Personas (delegated to persona_routes)
+        .route("/api/personas", get(persona_routes::handle_personas_list))
+        .route("/api/personas", post(persona_routes::handle_persona_create))
+        .route("/api/personas/{id}", get(persona_routes::handle_persona_get))
+        .route("/api/personas/{id}", put(persona_routes::handle_persona_update))
+        .route("/api/personas/{id}", delete(persona_routes::handle_persona_delete))
+        .route("/api/personas/active", get(persona_routes::handle_persona_active_get))
+        .route("/api/personas/active", put(persona_routes::handle_persona_active_set))
+        // Sessions
+        .route("/api/sessions", get(handle_sessions_list))
+        .route("/api/sessions/{id}", get(handle_session_get))
+        .route("/api/sessions/{id}", delete(handle_session_delete))
         // Events
         .route("/api/events", get(handle_events))
 }
@@ -1425,6 +1440,84 @@ async fn handle_mcp_server_register(
         "name": body.name,
         "note": "MCP integration is stubbed; full implementation requires stdio communication"
     })))
+}
+
+// ---------------------------------------------------------------------------
+// Sessions
+// ---------------------------------------------------------------------------
+
+/// Session summary for listing (lightweight version without full history).
+#[derive(Debug, Serialize)]
+struct SessionListItem {
+    id: String,
+    user_id: String,
+    message_count: usize,
+    active_seed_id: Option<String>,
+    created_at: String,
+    updated_at: String,
+}
+
+/// GET /api/sessions — List recent sessions.
+async fn handle_sessions_list(
+    state: State<Arc<AppState>>,
+) -> Json<Vec<SessionListItem>> {
+    match state.state_store.list_sessions().await {
+        Ok(sessions) => Json(
+            sessions
+                .into_iter()
+                .map(|s| SessionListItem {
+                    id: s.id,
+                    user_id: s.user_id,
+                    message_count: s.message_count,
+                    active_seed_id: s.active_seed_id,
+                    created_at: s.created_at.to_rfc3339(),
+                    updated_at: s.updated_at.to_rfc3339(),
+                })
+                .collect(),
+        ),
+        Err(_) => Json(Vec::new()),
+    }
+}
+
+/// GET /api/sessions/:id — Get session with full message history.
+async fn handle_session_get(
+    state: State<Arc<AppState>>,
+    Path(id): Path<String>,
+) -> Result<Json<serde_json::Value>, StatusCode> {
+    use oxios_kernel::state_store::SessionId;
+    let session_id = SessionId(id);
+    match state.state_store.load_session(&session_id).await {
+        Ok(Some(session)) => Ok(Json(serde_json::json!({
+            "id": session.id.0,
+            "user_id": session.user_id,
+            "user_messages": session.user_messages,
+            "agent_responses": session.agent_responses,
+            "active_seed_id": session.active_seed_id,
+            "active_persona_id": session.active_persona_id,
+            "created_at": session.created_at.to_rfc3339(),
+            "updated_at": session.updated_at.to_rfc3339(),
+            "metadata": session.metadata,
+        }))),
+        Ok(None) => Err(StatusCode::NOT_FOUND),
+        Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
+    }
+}
+
+/// DELETE /api/sessions/:id — Delete a session.
+async fn handle_session_delete(
+    state: State<Arc<AppState>>,
+    Path(id): Path<String>,
+) -> Result<Json<serde_json::Value>, StatusCode> {
+    use oxios_kernel::state_store::SessionId;
+    let session_id = SessionId(id);
+    match state.state_store.delete_session(&session_id).await {
+        Ok(true) => Ok(Json(serde_json::json!({
+            "status": "deleted",
+            "id": session_id.0,
+        }))),
+        Ok(false) => Err(StatusCode::NOT_FOUND),
+        Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
+    }
 }
 
 // ---------------------------------------------------------------------------

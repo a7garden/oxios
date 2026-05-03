@@ -17,6 +17,9 @@ pub mod host_exec;
 pub mod host_tools;
 pub mod mcp;
 pub mod orchestrator;
+pub mod persona;
+pub mod persona_manager;
+pub mod persona_store;
 pub mod program;
 pub mod scheduler;
 pub mod skill;
@@ -26,7 +29,7 @@ pub mod types;
 
 pub use access_manager::{AccessManager, AgentPermissions, AuditEntry};
 pub use agent_runtime::AgentRuntime;
-pub use config::OxiosConfig;
+pub use config::{OxiosConfig, PersonaConfig};
 pub use container::{
     AppleBackend, ContainerBackend, ContainerStats, ContainerStatus, ExecResult, GardenStartConfig,
 };
@@ -40,6 +43,9 @@ pub use host_tools::{common as host_tools_common, HostToolStatus, HostToolValida
 pub use mcp::{McpBridge, McpCapabilities, McpServer, McpTool};
 pub use program::{InstallSource, Program, ProgramManager, ProgramMeta, ToolDef, HostRequirementsCheck, ArgumentDef};
 pub use skill::{Skill, SkillMeta, SkillStore};
-pub use state_store::StateStore;
+pub use state_store::{AgentResponse, Session, SessionId, SessionSummary, StateStore};
+pub use persona::{default_personas, Persona};
+pub use persona_manager::PersonaManager;
+pub use persona_store::PersonaStore;
 pub use supervisor::{BasicSupervisor, Supervisor};
 pub use types::{AgentId, AgentInfo, AgentStatus};

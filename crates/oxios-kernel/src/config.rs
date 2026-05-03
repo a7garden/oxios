@@ -25,6 +25,9 @@ pub struct OxiosConfig {
     /// Security/access control settings.
     #[serde(default)]
     pub security: SecurityConfig,
+    /// Persona system settings.
+    #[serde(default)]
+    pub persona: PersonaConfig,
 }
 
 /// Kernel configuration.
@@ -303,6 +306,31 @@ impl Default for SecurityConfig {
             max_memory_mb: default_max_memory(),
             can_fork: false,
             max_audit_entries: default_max_audit(),
+        }
+    }
+}
+
+/// Persona system configuration.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct PersonaConfig {
+    /// Default persona ID to activate on startup.
+    #[serde(default)]
+    pub default_persona_id: Option<String>,
+    /// Maximum concurrent personas.
+    #[serde(default = "default_max_concurrent_personas")]
+    pub max_concurrent_personas: usize,
+}
+
+
+fn default_max_concurrent_personas() -> usize {
+    5
+}
+
+impl Default for PersonaConfig {
+    fn default() -> Self {
+        Self {
+            default_persona_id: Some("dev".to_string()),
+            max_concurrent_personas: default_max_concurrent_personas(),
         }
     }
 }

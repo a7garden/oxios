@@ -12,8 +12,8 @@ use std::sync::Arc;
 use oxios_gateway::Gateway;
 use oxios_kernel::{
     AccessManager, AgentRuntime, BasicSupervisor, EventBus, GardenManager, HostExecBridge,
-    HostToolValidator, Orchestrator, OxiosConfig, ProgramManager, SkillStore, StateStore,
-    Supervisor, AgentScheduler, InstallSource,
+    HostToolValidator, Orchestrator, OxiosConfig, PersonaManager, ProgramManager, SkillStore,
+    StateStore, Supervisor, AgentScheduler, InstallSource,
 };
 use oxios_ouroboros::OuroborosEngine;
 use oxios_web::WebServer;
@@ -202,6 +202,7 @@ async fn init_kernel(
     Arc<parking_lot::Mutex<AccessManager>>,
     ProgramManager,
     HostToolValidator,
+    PersonaManager,
 )> {
     let config = if config_path.exists() {
         tracing::info!(path = %config_path.display(), "Loading config");
@@ -215,6 +216,7 @@ async fn init_kernel(
             scheduler: Default::default(),
             context: Default::default(),
             security: Default::default(),
+            persona: Default::default(),
         }
     };
 
@@ -285,7 +287,9 @@ async fn init_kernel(
         config.container.optional_host_tools.clone(),
     );
 
-    Ok((orchestrator, gateway, event_bus.clone(), state_store, garden_manager, config, skill_store, supervisor, scheduler, access_manager, program_manager, host_tool_validator))
+    // Initialize the persona manager with default personas.
+    let persona_manager = PersonaManager::new();
+    Ok((orchestrator, gateway, event_bus.clone(), state_store, garden_manager, config, skill_store, supervisor, scheduler, access_manager, program_manager, host_tool_validator, persona_manager))
 }
 
 // ─── Resolve provider and model ────────────────────────────────────────────
@@ -326,10 +330,12 @@ fn resolve_provider_and_model(
 
 /// Run a single prompt through the Ouroboros orchestrator.
 async fn cmd_run(prompt: &str, config_path: &Path, model_id: &str) -> Result<()> {
-    let (orchestrator, _, _, _, _, _, _, _, _, _, _, _) =
+    let (orchestrator, _, _, _, _, _, _, _, _, _, _, _, persona_manager) =
         init_kernel(config_path, model_id).await?;
 
     tracing::info!(prompt = %prompt, "Processing prompt");
+    // Keep persona_manager alive for the duration of this function.
+    let _persona = persona_manager;
 
     let result = orchestrator.handle_message("cli", prompt, None).await?;
 
@@ -352,7 +358,7 @@ async fn cmd_run(prompt: &str, config_path: &Path, model_id: &str) -> Result<()>
 /// Handle garden subcommands.
 async fn cmd_garden(action: GardenAction, config_path: &Path) -> Result<()> {
     let model_id = "anthropic/claude-sonnet-4-20250514"; // Dummy for garden cmds
-    let (_, _, _, _, garden_manager, _, _, _, _, _, _, _) = init_kernel(config_path, model_id).await?;
+    let (_, _, _, _, garden_manager, _, _, _, _, _, _, _, _) = init_kernel(config_path, model_id).await?;
 
     match action {
         GardenAction::New { name } => {
@@ -442,7 +448,7 @@ enum PkgAction {
 /// Handle pkg subcommands.
 async fn cmd_pkg(action: PkgAction, config_path: &Path) -> Result<()> {
     let model_id = "anthropic/claude-sonnet-4-20250514"; // Dummy for pkg cmds
-    let (_, _, _, _, _, _, _, _, _, _, program_manager, _) =
+    let (_, _, _, _, _, _, _, _, _, _, program_manager, _, _) =
         init_kernel(config_path, model_id).await?;
 
     match action {
@@ -512,6 +518,7 @@ async fn cmd_config(action: ConfigAction, config_path: &Path) -> Result<()> {
             scheduler: Default::default(),
             context: Default::default(),
             security: Default::default(),
+            persona: Default::default(),
         }
     };
 
@@ -554,7 +561,7 @@ fn get_config_value(config: &OxiosConfig, key: &str) -> Option<String> {
 /// Show system status.
 async fn cmd_status(config_path: &Path) -> Result<()> {
     let model_id = "anthropic/claude-sonnet-4-20250514";
-    let (_, _, _, _, garden_manager, config, _, _, _, _, _, _) =
+    let (_, _, _, _, garden_manager, config, _, _, _, _, _, _, _) =
         init_kernel(config_path, model_id).await?;
 
     println!("Oxios Agent OS");
@@ -714,7 +721,7 @@ async fn main() -> Result<()> {
             }
 
             // Initialize kernel components.
-            let (_orchestrator, gateway, event_bus, state_store, garden_manager, config, skill_store, supervisor, scheduler, access_manager, program_manager, host_tool_validator) =
+            let (_orchestrator, gateway, event_bus, state_store, garden_manager, config, skill_store, supervisor, scheduler, access_manager, program_manager, host_tool_validator, persona_manager) =
                 init_kernel(&config_path, default_model).await?;
 
             // Initialize default skills on first run.
@@ -740,6 +747,8 @@ async fn main() -> Result<()> {
                 }
             }
 
+            // Initialize default persona (set during init_kernel).
+
             // Create the web channel.
             let web_channel = oxios_web::WebChannel::new(256);
             let channel_handle = oxios_web::channel::WebChannelHandle::from_channel(&web_channel);
@@ -762,6 +771,7 @@ async fn main() -> Result<()> {
                 supervisor.clone(),
                 scheduler.clone(),
                 access_manager.clone(),
+                persona_manager,
                 config.clone(),
                 Some(config_path.clone()),
             );
