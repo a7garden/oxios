@@ -22,7 +22,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::access_manager::AccessManager;
-use crate::a2a::{A2AProtocol, AgentCard, TaskPriority};
+use crate::a2a::{A2AProtocol, AgentCard};
 use crate::event_bus::{EventBus, KernelEvent};
 use crate::persona_manager::PersonaManager;
 use crate::scheduler::{AgentScheduler, Priority, ScheduledTask};
