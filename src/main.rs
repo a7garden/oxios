@@ -14,6 +14,7 @@ use oxios_kernel::{
     AccessManager, AgentRuntime, BasicSupervisor, EventBus, GardenManager, HostExecBridge,
     HostToolValidator, Orchestrator, OxiosConfig, PersonaManager, ProgramManager, SkillStore,
     StateStore, Supervisor, AgentScheduler, InstallSource, McpBridge, McpServer,
+    A2AProtocol,
 };
 use oxios_ouroboros::OuroborosEngine;
 use oxios_web::WebServer;
@@ -203,6 +204,7 @@ async fn init_kernel(
     ProgramManager,
     HostToolValidator,
     PersonaManager,
+    Arc<A2AProtocol>,
     Arc<McpBridge>,
 )> {
     let config = if config_path.exists() {
@@ -258,6 +260,9 @@ async fn init_kernel(
         tracing::info!(persona = %p.name, "Active persona set on OuroborosEngine");
     }
 
+    // Create A2A protocol for inter-agent communication.
+    let a2a_protocol = Arc::new(A2AProtocol::new(event_bus.clone()));
+
     let orchestrator = Arc::new(Orchestrator::new(
         ouroboros,
         supervisor.clone(),
@@ -266,6 +271,7 @@ async fn init_kernel(
         scheduler.clone(),
         access_manager.clone(),
         Arc::new(persona_manager.clone()),
+        a2a_protocol.clone(),
     ));
 
     // Initialize gateway with the orchestrator.
@@ -303,9 +309,9 @@ async fn init_kernel(
     let persona_manager = PersonaManager::new();
 
     // Initialize the MCP bridge.
-    let mcp_bridge = Arc::new(init_mcp_bridge(&config).await?);
+    let mcp_bridge = Arc::new(Mutex::new(init_mcp_bridge(&config).await?));
 
-    Ok((orchestrator, gateway, event_bus.clone(), state_store, garden_manager, config, skill_store, supervisor, scheduler, access_manager, program_manager, host_tool_validator, persona_manager, mcp_bridge))
+    Ok((orchestrator, gateway, event_bus.clone(), state_store, garden_manager, config, skill_store, supervisor, scheduler, access_manager, program_manager, host_tool_validator, persona_manager, a2a_protocol, mcp_bridge))
 }
 
 /// Initialize the MCP bridge and register all configured servers.
@@ -423,7 +429,7 @@ async fn cmd_run(prompt: &str, config_path: &Path, model_id: &str) -> Result<()>
 /// Handle garden subcommands.
 async fn cmd_garden(action: GardenAction, config_path: &Path) -> Result<()> {
     let model_id = "anthropic/claude-sonnet-4-20250514"; // Dummy for garden cmds
-    let (_, _, _, _, garden_manager, _, _, _, _, _, _, _, _, _) = init_kernel(config_path, model_id).await?;
+    let (_, _, _, _, garden_manager, _, _, _, _, _, _, _, _, _, _) = init_kernel(config_path, model_id).await?;
 
     match action {
         GardenAction::New { name } => {
@@ -626,7 +632,7 @@ fn get_config_value(config: &OxiosConfig, key: &str) -> Option<String> {
 /// Show system status.
 async fn cmd_status(config_path: &Path) -> Result<()> {
     let model_id = "anthropic/claude-sonnet-4-20250514";
-    let (_, _, _, _, garden_manager, config, _, _, _, _, _, _, _, mcp_bridge) =
+    let (_, _, _, _, garden_manager, config, _, _, _, _, _, _, _, _, mcp_bridge) =
         init_kernel(config_path, model_id).await?;
 
     println!("Oxios Agent OS");
@@ -666,7 +672,7 @@ async fn cmd_status(config_path: &Path) -> Result<()> {
     );
 
     // MCP servers status.
-    let mcp_servers = mcp_bridge.servers();
+    let mcp_servers = mcp_bridge.lock().servers();
     println!();
     println!("MCP Servers: {} configured", mcp_servers.len());
     if !mcp_servers.is_empty() {
@@ -796,12 +802,12 @@ async fn main() -> Result<()> {
             }
 
             // Initialize kernel components.
-            let (_orchestrator, gateway, event_bus, state_store, garden_manager, config, skill_store, supervisor, scheduler, access_manager, program_manager, host_tool_validator, persona_manager, mcp_bridge) =
+            let (_orchestrator, gateway, event_bus, state_store, garden_manager, config, skill_store, supervisor, scheduler, access_manager, program_manager, host_tool_validator, persona_manager, _a2a, mcp_bridge) =
                 init_kernel(&config_path, default_model).await?;
 
             // Initialize MCP servers from config (init_kernel already created the bridge).
             if !config.mcp.servers.is_empty() {
-                if let Err(e) = mcp_bridge.initialize_all().await {
+                if let Err(e) = mcp_bridge.lock().initialize_all().await {
                     tracing::warn!(error = %e, "Some MCP servers failed to initialize");
                 } else {
                     tracing::info!(count = config.mcp.servers.len(), "MCP servers initialized");
@@ -908,7 +914,7 @@ async fn main() -> Result<()> {
                 .await?;
 
             // Shutdown MCP servers gracefully.
-            if let Err(e) = mcp_bridge.shutdown_all().await {
+            if let Err(e) = mcp_bridge.lock().shutdown_all().await {
                 tracing::warn!(error = %e, "Error during MCP shutdown");
             }
 

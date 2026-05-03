@@ -35,7 +35,7 @@ use tokio_stream::wrappers::BroadcastStream;
 use tokio_stream::StreamExt as TokioStreamExt;
 use oxios_kernel::state_store::StateStore;
 use oxios_gateway::message::IncomingMessage;
-use oxios_kernel::{AgentId, access_manager::AuditEntry};
+use oxios_kernel::{AgentId, access_manager::AuditEntry, ArgumentDef};
 use uuid::Uuid;
 
 use crate::server::AppState;
@@ -1487,7 +1487,7 @@ struct McpToolResponse {
     name: String,
     description: String,
     server: String,
-    arguments: Vec<oxios_kernel::ArgumentDef>,
+    arguments: Vec<ArgumentDef>,
 }
 
 /// GET /api/mcp/tools — List all available MCP tools.

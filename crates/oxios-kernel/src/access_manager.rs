@@ -1609,30 +1609,30 @@ mod tests {
 
         // Use /tmp for testing - it should exist on most systems
         let workspace = PathBuf::from("/tmp/oxios-test-workspace");
-        access.register_garden_workspace("my-garden", workspace.clone());
 
-        // Create temp directories for testing
+        // Create temp directories BEFORE registering (so canonicalize works)
         std::fs::create_dir_all(&workspace).ok();
         std::fs::create_dir_all(workspace.join("subdir")).ok();
 
-        // Canonicalize the workspace for the test assertions
-        let workspace_canonical = workspace.canonicalize().unwrap_or(workspace.clone());
+        // Now register the garden workspace
+        access.register_garden_workspace("my-garden", workspace.clone());
 
         // Path inside workspace
         let inside_path = workspace.join("file.txt");
+        std::fs::write(&inside_path, "test").ok(); // Create the file too
+
         assert!(
             access.is_path_in_garden_workspace("my-garden", inside_path.to_str().unwrap()),
-            "Path {:?} should be inside workspace {:?}",
-            inside_path,
-            workspace_canonical
+            "Path {:?} should be inside workspace",
+            inside_path
         );
 
         let nested_path = workspace.join("subdir/nested.txt");
+        std::fs::write(&nested_path, "test").ok();
         assert!(
             access.is_path_in_garden_workspace("my-garden", nested_path.to_str().unwrap()),
-            "Path {:?} should be inside workspace {:?}",
-            nested_path,
-            workspace_canonical
+            "Path {:?} should be inside workspace",
+            nested_path
         );
 
         // Path outside workspace (use /tmp directly without our subdirectory)

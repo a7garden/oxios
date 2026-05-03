@@ -43,9 +43,9 @@ pub use access_manager::{
 };
 
 pub use agent_runtime::AgentRuntime;
-pub use config::{OxiosConfig, PersonaConfig};
+pub use config::{OxiosConfig, PersonaConfig, McpConfig, McpServerDef};
 pub use container::{
-    AppleBackend, ContainerBackend, ContainerStats, ContainerStatus, ExecResult, GardenStartConfig,
+    AppleBackend, ContainerBackend, ContainerStats, ContainerStatus, ExecResult, GardenStartConfig, GardenWorkspaceInfo,
 };
 pub use context_manager::{ContextManager, ContextStats, ContextTier, ContextEntry};
 pub use event_bus::{EventBus, KernelEvent};
