@@ -207,6 +207,7 @@ The OS kernel. Everything passes through here.
 - **Program Manager** — OS-level installable applications
 - **MCP Bridge** — Model Context Protocol awareness
 - **Host Tool Validator** — Minimal container + host dependency validation
+- **Persona Manager** — Multi-persona support for future agent customization
 
 **Agent Lifecycle:**
 
@@ -433,6 +434,89 @@ impl HostToolValidator {
 ```
 
 **Philosophy:** Container ships essential tools only. Rich functionality comes from host.
+
+### 1g. Session Management
+
+Sessions track user conversations for persistence and history:
+
+```rust
+pub struct Session {
+    pub id: SessionId,
+    pub user_id: String,
+    pub user_messages: Vec<UserMessage>,
+    pub agent_responses: Vec<AgentResponse>,
+    pub active_seed_id: Option<String>,
+    pub active_persona_id: Option<String>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+    pub metadata: SessionMetadata,
+}
+
+pub struct ExecutionMetadata {
+    pub execution_count: u32,
+    pub last_executed: Option<DateTime<Utc>>,
+    pub success_count: u32,
+    pub average_score: f64,
+    pub tags: Vec<String>,
+}
+```
+
+**Seed execution metadata:** Each seed tracks its execution history:
+- `execution_count` — total number of times executed
+- `last_executed` — timestamp of most recent execution
+- `success_count` — how many evaluations passed
+- `average_score` — rolling average of evaluation scores
+- `tags` — user-defined categorization labels
+
+Sessions are created per user conversation and persisted for later retrieval.
+The Orchestrator creates/updates Sessions automatically during message handling.
+
+**Session API:**
+- `GET /api/sessions` — List recent sessions
+- `GET /api/sessions/:id` — Get session with full message history
+- `DELETE /api/sessions/:id` — Delete a session
+
+### 1h. Persona Manager (Multi-Agent Characters)
+
+Personas are AI characters with distinct voices, roles, and system prompts.
+Multiple personas can be active simultaneously, laying the foundation for future
+multi-agent chat scenarios (e.g., group chat with Dev, Review, and Research together).
+
+```rust
+pub struct Persona {
+    pub id: String,
+    pub name: String,
+    pub role: String,          // developer, qa, architect, researcher...
+    pub description: String,
+    pub system_prompt: String,  // The persona's character definition
+    pub enabled: bool,
+    pub model: Option<String>,  // Optional model override
+    pub personality_traits: Vec<String>, // curious, skeptical, creative...
+}
+
+/// Default personas created on first run:
+/// - **Dev** — Pragmatic developer focused on implementation
+/// - **Review** — Skeptical QA/architect focused on quality
+/// - **Research** — Curious researcher focused on understanding and evidence
+```
+
+```rust
+impl PersonaManager {
+    pub fn get_active_persona(&self) -> Option<Persona>;
+    pub fn set_active_persona(&self, id: &str) -> Result<()>;
+    pub fn active_system_prompt(&self) -> String;
+    pub fn create_default_personas(&self);  // Dev, Review, Research
+}
+```
+
+**API routes:**
+- `GET /api/personas` — List all personas
+- `GET /api/personas/:id` — Get persona details
+- `POST /api/personas` — Create persona
+- `PUT /api/personas/:id` — Update persona
+- `DELETE /api/personas/:id` — Delete persona
+- `GET /api/personas/active` — Get active persona
+- `PUT /api/personas/active` — Set active persona
 
 ---
 
