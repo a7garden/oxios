@@ -972,6 +972,401 @@ html, body {
   font-weight: 600;
 }
 
+/* ── Ouroboros Phase ── */
+.ouroboros-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.phase-indicator {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+}
+
+.phase-current {
+  font-family: var(--font-mono);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--accent);
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.phase-progress-bar {
+  height: 8px;
+  background: var(--bg-tertiary);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.phase-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent-dim), var(--accent));
+  transition: width 0.4s ease;
+  border-radius: 4px;
+}
+
+.phase-meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+.phase-steps {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 16px;
+}
+
+.phase-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  cursor: pointer;
+  opacity: 0.5;
+  transition: opacity 0.2s;
+}
+
+.phase-step.active, .phase-step.completed {
+  opacity: 1;
+}
+
+.phase-step-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--bg-tertiary);
+  border: 2px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  transition: all 0.2s;
+}
+
+.phase-step.active .phase-step-icon {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+  color: var(--text-primary);
+}
+
+.phase-step.completed .phase-step-icon {
+  border-color: var(--green);
+  background: rgba(63,185,80,0.2);
+  color: var(--green);
+}
+
+.phase-step-label {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.phase-step.active .phase-step-label {
+  color: var(--accent);
+}
+
+.phase-step.completed .phase-step-label {
+  color: var(--green);
+}
+
+/* ── Protocol Status ── */
+.protocol-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.protocol-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+}
+
+.protocol-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.protocol-card-title {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.protocol-status-badge {
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.protocol-connected { background: rgba(63,185,80,0.15); color: var(--green); }
+.protocol-disconnected { background: rgba(139,148,158,0.15); color: var(--text-secondary); }
+.protocol-error { background: rgba(248,81,73,0.15); color: var(--red); }
+
+.protocol-stat {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 0;
+  font-size: 13px;
+  border-bottom: 1px solid var(--bg-tertiary);
+}
+
+.protocol-stat:last-child { border-bottom: none; }
+.protocol-stat .key { color: var(--text-secondary); font-family: var(--font-mono); }
+.protocol-stat .val { color: var(--text-primary); font-family: var(--font-mono); }
+
+.protocol-permissions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.protocol-permission-tag {
+  padding: 2px 8px;
+  background: var(--bg-tertiary);
+  border-radius: 10px;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+}
+
+.mcp-server-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--bg-tertiary);
+}
+
+.mcp-server-item:last-child { border-bottom: none; }
+
+.mcp-server-name {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-primary);
+}
+
+.mcp-server-status {
+  font-size: 11px;
+  font-family: var(--font-mono);
+}
+
+/* ── Agent Monitor ── */
+.agent-monitor-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.agent-monitor-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+}
+
+.agent-monitor-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.agent-monitor-title {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.agent-monitor-count {
+  padding: 4px 10px;
+  background: rgba(88,166,255,0.15);
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.agent-registry-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.agent-registry-item {
+  padding: 10px 12px;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: border-color 0.15s;
+  border: 1px solid transparent;
+}
+
+.agent-registry-item:hover {
+  border-color: var(--accent);
+}
+
+.agent-registry-item.selected {
+  border-color: var(--accent);
+  background: var(--bg-hover);
+}
+
+.agent-registry-name {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.agent-registry-capabilities {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.agent-cap-tag {
+  padding: 2px 6px;
+  background: var(--bg-primary);
+  border-radius: 6px;
+  font-size: 10px;
+  font-family: var(--font-mono);
+  color: var(--accent);
+}
+
+.agent-registry-id {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  margin-top: 4px;
+}
+
+.agent-detail-panel {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-top: 16px;
+}
+
+.agent-detail-panel h4 {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  color: var(--accent);
+  margin-bottom: 12px;
+}
+
+/* ── Garden Status ── */
+.garden-status-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.garden-status-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+}
+
+.garden-status-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.garden-status-title {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.garden-status-item {
+  padding: 10px 12px;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius);
+  margin-bottom: 8px;
+}
+
+.garden-status-item:last-child { margin-bottom: 0; }
+
+.garden-status-name {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.garden-status-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  margin-top: 4px;
+}
+
+.garden-status-meta .workspace-path {
+  color: var(--green);
+}
+
+.garden-agents-list {
+  margin-top: 8px;
+  padding: 8px;
+  background: var(--bg-primary);
+  border-radius: var(--radius);
+}
+
+.garden-agents-label {
+  font-size: 10px;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
+}
+
+.garden-agent-tag {
+  display: inline-block;
+  padding: 2px 8px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+  margin: 2px;
+}
+
 /* ── Responsive ── */
 @media (max-width: 768px) {
   .sidebar { width: 60px; min-width: 60px; }
@@ -998,8 +1393,14 @@ html, body {
       <div class="nav-item active" data-panel="chat">
         <span class="icon">💬</span><span>Chat</span>
       </div>
+      <div class="nav-item" data-panel="dashboard">
+        <span class="icon">📊</span><span>Dashboard</span>
+      </div>
       <div class="nav-item" data-panel="agents">
         <span class="icon">⚡</span><span>Agents</span>
+      </div>
+      <div class="nav-item" data-panel="protocol">
+        <span class="icon">🔌</span><span>Protocol</span>
       </div>
       <div class="nav-item" data-panel="workspace">
         <span class="icon">📁</span><span>Workspace</span>
@@ -1068,16 +1469,60 @@ html, body {
       </div>
     </div>
 
+    <!-- Dashboard Panel -->
+    <div class="panel" id="panel-dashboard">
+      <div class="panel-header">
+        <h2>📊 Dashboard</h2>
+        <button class="btn btn-sm" id="dashboard-refresh">Refresh</button>
+      </div>
+      <div class="panel-body" id="dashboard-body">
+        <div class="empty-state">
+          <div class="icon">📊</div>
+          <p>Loading Agent OS status...</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Protocol Status Panel -->
+    <div class="panel" id="panel-protocol">
+      <div class="panel-header">
+        <h2>🔌 Protocol Status</h2>
+        <button class="btn btn-sm" id="protocol-refresh">Refresh</button>
+      </div>
+      <div class="panel-body" id="protocol-body">
+        <div class="empty-state">
+          <div class="icon">🔌</div>
+          <p>Loading protocol status...</p>
+        </div>
+      </div>
+    </div>
+
     <!-- Agents Panel -->
     <div class="panel" id="panel-agents">
       <div class="panel-header">
-        <h2>⚡ Agents</h2>
+        <h2>⚡ Agent Monitor</h2>
         <button class="btn btn-sm" id="agents-refresh">Refresh</button>
       </div>
       <div class="panel-body" id="agents-body">
         <div class="empty-state">
           <div class="icon">⚡</div>
           <p>No agents running. Start a conversation to spawn agents.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Ouroboros Phase Panel -->
+    <div class="panel" id="panel-phase">
+      <div class="panel-header">
+        <h2>🌀 Ouroboros Phase</h2>
+        <button class="btn btn-sm" id="phase-refresh">Refresh</button>
+      </div>
+      <div class="panel-body">
+        <div class="ouroboros-panel" id="phase-body">
+          <div class="empty-state">
+            <div class="icon">🌀</div>
+            <p>Loading Ouroboros status...</p>
+          </div>
         </div>
       </div>
     </div>
@@ -1316,6 +1761,9 @@ function switchPanel(panel) {
 
   // Load data for the panel
   switch (panel) {
+    case 'dashboard': loadDashboard(); break;
+    case 'protocol': loadProtocol(); break;
+    case 'phase': loadPhase(); break;
     case 'agents': loadAgents(); break;
     case 'workspace': loadWorkspaceTree(); break;
     case 'seeds': loadSeeds(); break;

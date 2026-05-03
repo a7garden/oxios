@@ -9,6 +9,7 @@
 pub mod a2a;
 pub mod access_manager;
 pub mod agent_runtime;
+pub mod argo;
 pub mod config;
 pub mod container;
 pub mod context_manager;
@@ -63,3 +64,6 @@ pub use persona_manager::PersonaManager;
 pub use persona_store::PersonaStore;
 pub use supervisor::{BasicSupervisor, Supervisor};
 pub use types::{AgentId, AgentInfo, AgentStatus};
+
+// Argo Workflows exports
+pub use argo::{ArgoConfig, ArgoWorkflow, WorkflowPhase, WorkflowStatus, WorkflowSummary};

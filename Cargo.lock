@@ -1480,6 +1480,7 @@ dependencies = [
  "oxios-gateway",
  "oxios-ouroboros",
  "parking_lot",
+ "reqwest",
  "serde",
  "serde_json",
  "tempfile",
