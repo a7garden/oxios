@@ -1016,6 +1016,9 @@ html, body {
       <div class="nav-item" data-panel="programs">
         <span class="icon">📦</span><span>Programs</span>
       </div>
+      <div class="nav-item" data-panel="personas">
+        <span class="icon">🎭</span><span>Personas</span>
+      </div>
       <div class="nav-item" data-panel="host-tools">
         <span class="icon">🔧</span><span>Host Tools</span>
       </div>
@@ -1160,6 +1163,19 @@ html, body {
           <div class="icon">📦</div>
           <p>No programs installed. Install a program to extend agent capabilities.</p>
         </div>
+      </div>
+    </div>
+
+    <!-- Personas Panel (stub) -->
+    <div class="panel" id="panel-personas">
+      <div class="panel-header">
+        <h2>🎭 Personas</h2>
+        <button class="btn btn-sm" id="personas-refresh">Refresh</button>
+      </div>
+      <div class="panel-body" id="personas-body">
+        <p style="color: var(--text-muted); font-size: 12px;">
+          Personas API available via REST. Access at <code>/api/personas</code>.
+        </p>
       </div>
     </div>
 
