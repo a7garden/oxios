@@ -25,6 +25,7 @@ use oxios_kernel::access_manager::AccessManager;
 use oxios_kernel::skill::SkillStore;
 use oxios_kernel::state_store::StateStore;
 use oxios_kernel::Supervisor;
+use parking_lot::Mutex;
 
 /// Shared application state for the web server.
 ///
@@ -59,8 +60,8 @@ pub struct AppState {
     pub config: Arc<oxios_kernel::OxiosConfig>,
     /// Path to the config file (for persistence on PUT /api/config).
     pub config_path: Option<PathBuf>,
-    /// MCP bridge for tool calling.
-    pub mcp_bridge: Arc<McpBridge>,
+    /// MCP bridge for tool calling (uses Mutex for interior mutability on register_server).
+    pub mcp_bridge: Arc<parking_lot::Mutex<McpBridge>>,
 }
 
 impl std::fmt::Debug for AppState {
@@ -109,7 +110,7 @@ impl WebServer {
         persona_manager: PersonaManager,
         config: oxios_kernel::OxiosConfig,
         config_path: Option<PathBuf>,
-        mcp_bridge: Arc<McpBridge>,
+        mcp_bridge: Arc<parking_lot::Mutex<McpBridge>>,
     ) -> Self {
         let addr: SocketAddr = format!("{host}:{port}")
             .parse()

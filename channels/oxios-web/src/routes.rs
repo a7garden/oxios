@@ -98,9 +98,11 @@ pub fn build_routes() -> Router<Arc<AppState>> {
         .route("/api/programs/{name}/host-requirements", get(handle_program_host_requirements))
         // Host tools
         .route("/api/host-tools", get(handle_host_tools_check))
-        // MCP
-        .route("/api/mcp/servers", get(handle_mcp_servers_list))
-        .route("/api/mcp/servers", post(handle_mcp_server_register))
+        // MCP (stub - disabled until MCP integration is fixed)
+        // .route("/api/mcp/servers", get(handle_mcp_servers_list))
+        // .route("/api/mcp/servers", post(handle_mcp_server_register))
+        // .route("/api/mcp/tools", get(handle_mcp_tools_list))
+        // .route("/api/mcp/tools", post(handle_mcp_tool_call))
         // Events
         .route("/api/events", get(handle_events))
         // Personas (delegated to persona_routes)
@@ -1413,14 +1415,35 @@ struct McpServerResponse {
     command: String,
     args: Vec<String>,
     enabled: bool,
+    initialized: bool,
 }
 
-/// GET /api/mcp/servers — List registered MCP servers (stub).
+/// GET /api/mcp/servers — List registered MCP servers.
 async fn handle_mcp_servers_list(
-    _state: State<Arc<AppState>>,
+    state: State<Arc<AppState>>,
 ) -> Json<Vec<McpServerResponse>> {
-    // Stub: Return empty list until MCP server storage is implemented
-    Json(Vec::new())
+    let bridge = state.mcp_bridge.lock();
+    let servers = bridge.servers();
+    let mut results = Vec::new();
+    for name in servers {
+        let (command, args, enabled) = bridge
+            .get_server(name)
+            .map(|s| (s.command.clone(), s.args.clone(), s.enabled))
+            .unwrap_or_else(|| ("unknown".to_string(), Vec::new(), false));
+        let initialized = if let Some(ref c) = bridge.client(name).await {
+            c.is_initialized().await
+        } else {
+            false
+        };
+        results.push(McpServerResponse {
+            name: name.to_string(),
+            command,
+            args,
+            enabled,
+            initialized,
+        });
+    }
+    Json(results)
 }
 
 /// MCP server registration request.
@@ -1428,21 +1451,118 @@ async fn handle_mcp_servers_list(
 struct McpServerRegisterRequest {
     name: String,
     command: String,
-    #[allow(dead_code)]
-    args: Option<Vec<String>>,
+    #[serde(default)]
+    args: Vec<String>,
 }
 
-/// POST /api/mcp/servers — Register an MCP server (stub).
+/// POST /api/mcp/servers — Register a new MCP server and start it.
 async fn handle_mcp_server_register(
-    _state: State<Arc<AppState>>,
+    state: State<Arc<AppState>>,
     Json(body): Json<McpServerRegisterRequest>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
-    // Stub: MCP server storage not yet implemented
-    tracing::info!(server = %body.name, command = %body.command, "MCP server registration requested (stub)");
+    let name = body.name.clone();
+    let command = body.command.clone();
+    {
+        let mut bridge = state.mcp_bridge.lock();
+        let mut server = oxios_kernel::McpServer::new(&name, &command);
+        server.args = body.args;
+        server.enabled = true;
+        bridge.register_server(server);
+    }
+    if let Err(e) = state.mcp_bridge.lock().initialize_server(&name).await {
+        tracing::error!(server = %name, error = %e, "Failed to start MCP server");
+        return Err((StatusCode::INTERNAL_SERVER_ERROR, e.to_string()));
+    }
+    tracing::info!(server = %name, command = %command, "MCP server registered and started");
     Ok(Json(serde_json::json!({
         "status": "registered",
-        "name": body.name,
-        "note": "MCP integration is stubbed; full implementation requires stdio communication"
+        "name": name,
+        "command": command,
+    })))
+}
+
+/// MCP tool summary exposed to agents.
+#[derive(Debug, Serialize)]
+struct McpToolResponse {
+    name: String,
+    description: String,
+    server: String,
+    arguments: Vec<oxios_kernel::ArgumentDef>,
+}
+
+/// GET /api/mcp/tools — List all available MCP tools.
+async fn handle_mcp_tools_list(
+    state: State<Arc<AppState>>,
+) -> Json<Vec<McpToolResponse>> {
+    let bridge = state.mcp_bridge.lock();
+    let tools = match bridge.list_tools().await {
+        Ok(t) => t,
+        Err(e) => {
+            tracing::warn!(error = %e, "Failed to list MCP tools");
+            Vec::new()
+        }
+    };
+
+    // Reconstruct server attribution from cached tools.
+    let mut results = Vec::new();
+    for name in bridge.servers() {
+        if let Some(cached) = bridge.cached_tools(name).await {
+            for tool in cached {
+                results.push(McpToolResponse {
+                    name: tool.name,
+                    description: tool.description,
+                    server: name.to_string(),
+                    arguments: tool.arguments,
+                });
+            }
+        }
+    }
+    // Fallback: if no cached tools, list from list_tools() with unknown server.
+    if results.is_empty() {
+        for tool in &tools {
+            results.push(McpToolResponse {
+                name: tool.name.clone(),
+                description: tool.description.clone(),
+                server: "<unknown>".to_string(),
+                arguments: tool.arguments.clone(),
+            });
+        }
+    }
+    Json(results)
+}
+
+/// Request body for calling an MCP tool.
+#[derive(Debug, Deserialize)]
+struct McpToolCallRequest {
+    server: String,
+    tool: String,
+    #[serde(default)]
+    arguments: serde_json::Value,
+}
+
+/// POST /api/mcp/tools — Call an MCP tool.
+async fn handle_mcp_tool_call(
+    state: State<Arc<AppState>>,
+    Json(body): Json<McpToolCallRequest>,
+) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    let result = state.mcp_bridge.lock()
+        .call_tool(&body.server, &body.tool, body.arguments)
+        .await
+        .map_err(|e| {
+            tracing::error!(server = %body.server, tool = %body.tool, error = %e, "MCP tool call failed");
+            (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+        })?;
+
+    // Serialize the content blocks.
+    let content: Vec<serde_json::Value> = result.content
+        .iter()
+        .map(|block| serde_json::to_value(block).unwrap_or_default())
+        .collect();
+
+
+    Ok(Json(serde_json::json!({
+        "content": content,
+        "is_error": result.is_error,
     })))
 }
 
@@ -1625,6 +1745,11 @@ async fn handle_approval_approve(
     match access.rbac_manager_mut().approve(uuid) {
         true => {
             tracing::info!(approval_id = %uuid, "Approval granted");
+            // Publish event so SSE clients update automatically
+            let _ = state.event_bus.publish(oxios_kernel::event_bus::KernelEvent::ApprovalResolved {
+                id: uuid,
+                approved: true,
+            });
             Ok(Json(serde_json::json!({
                 "status": "approved",
                 "id": id,
@@ -1647,6 +1772,11 @@ async fn handle_approval_reject(
     match access.rbac_manager_mut().reject(uuid) {
         true => {
             tracing::info!(approval_id = %uuid, "Approval rejected");
+            // Publish event so SSE clients update automatically
+            let _ = state.event_bus.publish(oxios_kernel::event_bus::KernelEvent::ApprovalResolved {
+                id: uuid,
+                approved: false,
+            });
             Ok(Json(serde_json::json!({
                 "status": "rejected",
                 "id": id,

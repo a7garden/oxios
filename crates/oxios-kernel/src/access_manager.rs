@@ -13,6 +13,8 @@ use chrono::{DateTime, Utc};
 use glob::Pattern;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
+use std::fs;
+use std::path::{Path, PathBuf};
 
 use crate::types::AgentId;
 
@@ -466,19 +468,17 @@ impl AuditEntry {
 /// // Create permissions for a new agent
 /// access.set_permissions(AgentPermissions::for_new_agent("code-agent"));
 ///
-/// // Check permissions
-/// if access.can_use_tool("code-agent", "bash") {
-///     // allow bash execution
+/// // Assign agent to a garden workspace
+/// access.assign_garden("code-agent", "project-alpha");
+///
+/// // Check permissions with sandbox enforcement
+/// if access.can_access_path_in_garden("code-agent", "/workspace/file.rs", "project-alpha") {
+///     // allow file access within garden
 /// }
 ///
-/// // Check path access
-/// if access.can_access_path("code-agent", "/workspace/project/file.rs") {
-///     // allow file access
-/// }
-///
-/// // View audit log
-/// for entry in access.audit_log() {
-///     println!("{:?} {} {} -> {}", entry.timestamp, entry.agent_name, entry.action, entry.allowed);
+/// // Check if agent can access a specific garden
+/// if access.can_access_garden("code-agent", "project-alpha") {
+///     // allow garden access
 /// }
 /// ```
 pub struct AccessManager {
@@ -490,6 +490,12 @@ pub struct AccessManager {
     max_audit_entries: usize,
     /// RBAC manager for HitL approvals.
     pub(crate) rbac: RbacManager,
+    /// Garden workspace paths: garden_name -> workspace_path.
+    garden_workspaces: HashMap<String, PathBuf>,
+    /// Agent-to-garden assignments: agent_name -> garden_name.
+    agent_gardens: HashMap<String, String>,
+    /// Garden-to-agents mapping: garden_name -> set of agent_names.
+    garden_agents: HashMap<String, HashSet<String>>,
 }
 
 impl AccessManager {
@@ -500,6 +506,9 @@ impl AccessManager {
             audit_log: Vec::new(),
             max_audit_entries: 10_000,
             rbac: RbacManager::new(),
+            garden_workspaces: HashMap::new(),
+            agent_gardens: HashMap::new(),
+            garden_agents: HashMap::new(),
         }
     }
 
@@ -513,6 +522,9 @@ impl AccessManager {
             audit_log: Vec::new(),
             max_audit_entries,
             rbac: RbacManager::new(),
+            garden_workspaces: HashMap::new(),
+            agent_gardens: HashMap::new(),
+            garden_agents: HashMap::new(),
         }
     }
 
@@ -701,6 +713,250 @@ impl AccessManager {
     /// Returns a mutable reference to the RBAC manager (for HitL approvals).
     pub fn rbac_manager_mut(&mut self) -> &mut RbacManager {
         &mut self.rbac
+    }
+
+    // ─── Garden Sandbox Integration ───────────────────────────────────────
+
+    /// Registers a garden workspace path.
+    ///
+    /// This is used by ContainerBackend to report which paths belong to each garden.
+    ///
+    /// # Arguments
+    /// * `garden_name` - Name of the garden
+    /// * `workspace_path` - Absolute path to the garden's workspace directory
+    pub fn register_garden_workspace(&mut self, garden_name: &str, workspace_path: PathBuf) {
+        self.garden_workspaces.insert(garden_name.to_string(), workspace_path);
+        tracing::debug!(garden = %garden_name, "Garden workspace registered");
+    }
+
+    /// Assigns an agent to a specific garden.
+    ///
+    /// After assignment, the agent is sandboxed to that garden's workspace.
+    ///
+    /// # Arguments
+    /// * `agent_name` - Name of the agent to assign
+    /// * `garden_name` - Name of the garden to assign the agent to
+    ///
+    /// # Returns
+    /// `true` if assignment succeeded, `false` if the garden doesn't exist
+    pub fn assign_garden(&mut self, agent_name: &str, garden_name: &str) -> bool {
+        if !self.garden_workspaces.contains_key(garden_name) {
+            tracing::warn!(agent = %agent_name, garden = %garden_name, "Cannot assign agent to non-existent garden");
+            return false;
+        }
+
+        // Remove from previous garden if any
+        if let Some(prev_garden) = self.agent_gardens.get(agent_name) {
+            if let Some(agents) = self.garden_agents.get_mut(prev_garden) {
+                agents.remove(agent_name);
+            }
+        }
+
+        // Assign to new garden
+        self.agent_gardens.insert(agent_name.to_string(), garden_name.to_string());
+        self.garden_agents
+            .entry(garden_name.to_string())
+            .or_insert_with(HashSet::new)
+            .insert(agent_name.to_string());
+
+        tracing::info!(agent = %agent_name, garden = %garden_name, "Agent assigned to garden");
+        true
+    }
+
+    /// Gets the garden name that an agent is assigned to.
+    ///
+    /// # Returns
+    /// `Some(garden_name)` if assigned, `None` if the agent is not assigned to any garden
+    pub fn get_garden_for_agent(&self, agent_name: &str) -> Option<String> {
+        self.agent_gardens.get(agent_name).cloned()
+    }
+
+    /// Gets the workspace path for a specific garden.
+    ///
+    /// # Returns
+    /// `Some(path)` if the garden exists, `None` otherwise
+    pub fn get_garden_workspace(&self, garden_name: &str) -> Option<&PathBuf> {
+        self.garden_workspaces.get(garden_name)
+    }
+
+    /// Lists all registered gardens.
+    pub fn list_gardens(&self) -> Vec<String> {
+        self.garden_workspaces.keys().cloned().collect()
+    }
+
+    /// Lists all agents assigned to a specific garden.
+    pub fn list_agents_in_garden(&self, garden_name: &str) -> Vec<String> {
+        self.garden_agents
+            .get(garden_name)
+            .map(|agents| agents.iter().cloned().collect())
+            .unwrap_or_default()
+    }
+
+    /// Checks if an agent can access a specific garden.
+    ///
+    /// An agent can access a garden if it is assigned to it.
+    ///
+    /// # Arguments
+    /// * `agent_name` - Name of the agent
+    /// * `garden_name` - Name of the garden to check
+    ///
+    /// # Returns
+    /// `true` if the agent is assigned to the garden, `false` otherwise
+    pub fn can_access_garden(&self, agent_name: &str, garden_name: &str) -> bool {
+        self.agent_gardens
+            .get(agent_name)
+            .map(|g| g == garden_name)
+            .unwrap_or(false)
+    }
+
+    /// Checks if a path is within a garden's workspace.
+    ///
+    /// This performs a canonical path comparison to ensure the path is
+    /// a descendant of the garden's workspace directory.
+    ///
+    /// # Arguments
+    /// * `garden_name` - Name of the garden
+    /// * `path` - Path to check (absolute or relative)
+    ///
+    /// # Returns
+    /// `true` if the path is within the garden's workspace, `false` otherwise
+    pub fn is_path_in_garden_workspace(&self, garden_name: &str, path: &str) -> bool {
+        let workspace = match self.garden_workspaces.get(garden_name) {
+            Some(w) => w,
+            None => return false,
+        };
+
+        // Resolve the path to an absolute canonical path
+        let requested_path = match Path::new(path).canonicalize() {
+            Ok(p) => p,
+            Err(_) => {
+                // If we can't canonicalize, try as relative to workspace
+                let candidate = workspace.join(path);
+                match candidate.canonicalize() {
+                    Ok(p) => p,
+                    Err(_) => return false,
+                }
+            }
+        };
+
+        // Check if the canonical path starts with the workspace
+        let workspace_canonical = match workspace.canonicalize() {
+            Ok(w) => w,
+            Err(_) => return false,
+        };
+
+        requested_path.starts_with(&workspace_canonical)
+    }
+
+    /// Full sandbox check: RBAC → path allowed? → within garden workspace?
+    ///
+    /// This is the main method for enforcing sandbox boundaries. It checks:
+    /// 1. RBAC - does the agent's role allow the action?
+    /// 2. Path permissions - is the path in the agent's allowed_paths?
+    /// 3. Garden boundary - is the path within the assigned garden's workspace?
+    ///
+    /// If any check fails, the access is denied and logged as "sandbox violation"
+    /// if the path would be valid but outside the garden boundary.
+    ///
+    /// # Arguments
+    /// * `agent_name` - Name of the agent
+    /// * `path` - Path to access
+    /// * `garden` - Garden context (if agent is assigned to one)
+    ///
+    /// # Returns
+    /// `true` if all checks pass, `false` otherwise
+    pub fn can_access_path_in_garden(
+        &mut self,
+        agent_name: &str,
+        path: &str,
+        garden: Option<&str>,
+    ) -> bool {
+        // First check RBAC via the agent's role
+        let subject = Subject::Agent(AgentId::new_v4());
+        let action = Action::AccessPath(path.to_string());
+        let rbac_allowed = self.rbac.check_permission(&subject, &action, path);
+
+        // Check path permissions (allowed_paths vs denied_paths)
+        let path_allowed = self.can_access_path(agent_name, path);
+
+        // Check garden workspace boundary
+        let garden_allowed = if let Some(garden_name) = garden {
+            let is_in_workspace = self.is_path_in_garden_workspace(garden_name, path);
+
+            if !is_in_workspace {
+                // Log as sandbox violation
+                self.log_access(
+                    agent_name,
+                    "sandbox_violation",
+                    path,
+                    false,
+                    Some(format!(
+                        "Path '{}' is outside garden '{}' workspace boundary",
+                        path, garden_name
+                    )),
+                );
+            }
+
+            is_in_workspace
+        } else {
+            // No garden context - check if agent has any garden assignment
+            if let Some(assigned_garden) = self.agent_gardens.get(agent_name) {
+                let is_in_workspace = self.is_path_in_garden_workspace(assigned_garden, path);
+
+                if !is_in_workspace {
+                    self.log_access(
+                        agent_name,
+                        "sandbox_violation",
+                        path,
+                        false,
+                        Some(format!(
+                            "Path '{}' is outside assigned garden '{}' workspace boundary",
+                            path, assigned_garden
+                        )),
+                    );
+                }
+
+                is_in_workspace
+            } else {
+                // Agent has no garden assignment - default to allowing path check only
+                true
+            }
+        };
+
+        // All three checks must pass
+        rbac_allowed && path_allowed && garden_allowed
+    }
+
+    /// Unassigns an agent from its garden (if any).
+    ///
+    /// The agent will no longer be sandboxed to any garden workspace.
+    pub fn unassign_garden(&mut self, agent_name: &str) -> Option<String> {
+        if let Some(garden_name) = self.agent_gardens.remove(agent_name) {
+            if let Some(agents) = self.garden_agents.get_mut(&garden_name) {
+                agents.remove(agent_name);
+            }
+            tracing::info!(agent = %agent_name, garden = %garden_name, "Agent unassigned from garden");
+            Some(garden_name)
+        } else {
+            None
+        }
+    }
+
+    /// Removes a garden and unassigns all agents from it.
+    ///
+    /// All agents assigned to this garden will have their garden assignments cleared.
+    pub fn remove_garden(&mut self, garden_name: &str) {
+        // Unassign all agents from this garden
+        if let Some(agents) = self.garden_agents.remove(garden_name) {
+            for agent_name in agents {
+                self.agent_gardens.remove(&agent_name);
+            }
+        }
+
+        // Remove the workspace path
+        self.garden_workspaces.remove(garden_name);
+
+        tracing::info!(garden = %garden_name, "Garden removed from access manager");
     }
 
     /// Clears the audit log.
@@ -1249,5 +1505,143 @@ mod tests {
         let entry = AuditEntry::new("agent", "action", "resource", true, None);
         // timestamp should be set (not default DateTime).
         assert!(entry.timestamp.timestamp() > 0);
+    }
+
+    // --- Garden Sandbox tests ---
+
+    #[test]
+    fn test_register_garden_workspace() {
+        let mut access = AccessManager::new();
+        access.register_garden_workspace("my-garden", PathBuf::from("/workspace/my-garden"));
+
+        assert_eq!(access.list_gardens(), vec!["my-garden"]);
+        assert_eq!(access.get_garden_workspace("my-garden"), Some(&PathBuf::from("/workspace/my-garden")));
+    }
+
+    #[test]
+    fn test_assign_agent_to_garden() {
+        let mut access = AccessManager::new();
+        access.register_garden_workspace("project-alpha", PathBuf::from("/workspace/alpha"));
+
+        // Assign agent to garden
+        assert!(access.assign_garden("agent-1", "project-alpha"));
+
+        // Check agent is assigned
+        assert_eq!(access.get_garden_for_agent("agent-1"), Some("project-alpha".to_string()));
+        assert!(access.can_access_garden("agent-1", "project-alpha"));
+        assert!(!access.can_access_garden("agent-1", "other-garden"));
+    }
+
+    #[test]
+    fn test_assign_agent_to_nonexistent_garden_fails() {
+        let mut access = AccessManager::new();
+
+        // Cannot assign to non-existent garden
+        assert!(!access.assign_garden("agent-1", "nonexistent"));
+        assert_eq!(access.get_garden_for_agent("agent-1"), None);
+    }
+
+    #[test]
+    fn test_reassign_agent_to_different_garden() {
+        let mut access = AccessManager::new();
+        access.register_garden_workspace("garden-a", PathBuf::from("/workspace/a"));
+        access.register_garden_workspace("garden-b", PathBuf::from("/workspace/b"));
+
+        // Assign to first garden
+        access.assign_garden("agent-1", "garden-a");
+        assert_eq!(access.get_garden_for_agent("agent-1"), Some("garden-a".to_string()));
+
+        // Reassign to second garden
+        access.assign_garden("agent-1", "garden-b");
+        assert_eq!(access.get_garden_for_agent("agent-1"), Some("garden-b".to_string()));
+
+        // Agent should not be in first garden anymore
+        assert!(!access.can_access_garden("agent-1", "garden-a"));
+    }
+
+    #[test]
+    fn test_unassign_agent_from_garden() {
+        let mut access = AccessManager::new();
+        access.register_garden_workspace("my-garden", PathBuf::from("/workspace/my"));
+
+        access.assign_garden("agent-1", "my-garden");
+        assert!(access.get_garden_for_agent("agent-1").is_some());
+
+        let removed = access.unassign_garden("agent-1");
+        assert_eq!(removed, Some("my-garden".to_string()));
+        assert!(access.get_garden_for_agent("agent-1").is_none());
+    }
+
+    #[test]
+    fn test_list_agents_in_garden() {
+        let mut access = AccessManager::new();
+        access.register_garden_workspace("my-garden", PathBuf::from("/workspace/my"));
+
+        access.assign_garden("agent-1", "my-garden");
+        access.assign_garden("agent-2", "my-garden");
+        access.assign_garden("agent-3", "other-garden");
+
+        let agents = access.list_agents_in_garden("my-garden");
+        assert_eq!(agents.len(), 2);
+        assert!(agents.contains(&"agent-1".to_string()));
+        assert!(agents.contains(&"agent-2".to_string()));
+        assert!(!agents.contains(&"agent-3".to_string()));
+    }
+
+    #[test]
+    fn test_remove_garden_unassigns_all_agents() {
+        let mut access = AccessManager::new();
+        access.register_garden_workspace("my-garden", PathBuf::from("/workspace/my"));
+
+        access.assign_garden("agent-1", "my-garden");
+        access.assign_garden("agent-2", "my-garden");
+
+        access.remove_garden("my-garden");
+
+        assert!(access.list_gardens().is_empty());
+        assert!(access.get_garden_for_agent("agent-1").is_none());
+        assert!(access.get_garden_for_agent("agent-2").is_none());
+    }
+
+    #[test]
+    fn test_is_path_in_garden_workspace() {
+        let mut access = AccessManager::new();
+
+        // Use /tmp for testing - it should exist on most systems
+        let workspace = PathBuf::from("/tmp/oxios-test-workspace");
+        access.register_garden_workspace("my-garden", workspace.clone());
+
+        // Create temp directories for testing
+        std::fs::create_dir_all(&workspace).ok();
+        std::fs::create_dir_all(workspace.join("subdir")).ok();
+
+        // Canonicalize the workspace for the test assertions
+        let workspace_canonical = workspace.canonicalize().unwrap_or(workspace.clone());
+
+        // Path inside workspace
+        let inside_path = workspace.join("file.txt");
+        assert!(
+            access.is_path_in_garden_workspace("my-garden", inside_path.to_str().unwrap()),
+            "Path {:?} should be inside workspace {:?}",
+            inside_path,
+            workspace_canonical
+        );
+
+        let nested_path = workspace.join("subdir/nested.txt");
+        assert!(
+            access.is_path_in_garden_workspace("my-garden", nested_path.to_str().unwrap()),
+            "Path {:?} should be inside workspace {:?}",
+            nested_path,
+            workspace_canonical
+        );
+
+        // Path outside workspace (use /tmp directly without our subdirectory)
+        assert!(!access.is_path_in_garden_workspace("my-garden", "/tmp/other-workspace/file.txt"));
+
+        // Non-existent garden
+        assert!(!access.is_path_in_garden_workspace("nonexistent", "/tmp/test"));
+
+        // Cleanup
+        std::fs::remove_dir_all(workspace).ok();
     }
 }

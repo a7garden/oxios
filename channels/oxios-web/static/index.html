@@ -1034,6 +1034,9 @@ html, body {
       <div class="nav-item" data-panel="security">
         <span class="icon">🔒</span><span>Security</span>
       </div>
+      <div class="nav-item" data-panel="approvals">
+        <span class="icon">🛡️</span><span>Approvals</span>
+      </div>
       <div class="nav-item" data-panel="config">
         <span class="icon">⚙️</span><span>Config</span>
       </div>
@@ -1323,6 +1326,7 @@ function switchPanel(panel) {
     case 'gardens': loadGardens(); break;
     case 'scheduler': loadScheduler(); break;
     case 'security': loadSecurity(); break;
+    case 'approvals': loadApprovals(); break;
     case 'config': loadConfig(); break;
   }
 }
@@ -1474,6 +1478,19 @@ function addEvent(data) {
     displayText = `✅ Agent stopped: ${data.AgentStopped.id}`;
   } else if (data.SeedCreated) {
     displayText = `🌱 Seed created: ${data.SeedCreated.seed_id}`;
+  } else if (data.ApprovalRequested) {
+    displayText = `🛡️ Approval requested: ${data.ApprovalRequested.action} → ${data.ApprovalRequested.resource}`;
+    if (currentPanel === 'approvals') {
+      loadApprovals();
+    } else {
+      showToast(`Approval: ${data.ApprovalRequested.action}`, 'info');
+    }
+  } else if (data.ApprovalResolved) {
+    const icon = data.ApprovalResolved.approved ? '✅' : '❌';
+    displayText = `${icon} Approval ${data.ApprovalResolved.approved ? 'approved' : 'rejected'}`;
+    if (currentPanel === 'approvals') {
+      loadApprovals();
+    }
   }
 
   const type = Object.keys(data)[0] || 'unknown';
@@ -1625,6 +1642,7 @@ async function loadSecurity() {
 }
 
 document.getElementById('security-refresh').addEventListener('click', loadSecurity);
+document.getElementById('approvals-refresh').addEventListener('click', loadApprovals);
 
 // ── Agents ──
 async function loadAgents() {
@@ -2287,6 +2305,103 @@ async function loadConfig() {
 }
 
 document.getElementById('config-refresh').addEventListener('click', loadConfig);
+
+// ── Approvals (HitL) ──
+async function loadApprovals() {
+  const body = document.getElementById('approvals-body');
+  try {
+    const res = await fetch(`${API}/api/approvals`);
+    const approvals = await res.json();
+
+    if (!approvals.length) {
+      body.innerHTML = `
+        <div class="empty-state">
+          <div class="icon">🛡️</div>
+          <p>No approval requests. HitL is active when agents request high-risk actions.</p>
+        </div>
+      `;
+      return;
+    }
+
+    const pending = approvals.filter(a => a.status === 'pending');
+    const resolved = approvals.filter(a => a.status !== 'pending');
+
+    let html = '';
+
+    if (pending.length) {
+      html += `<h3 style="font-family:var(--font-mono);color:var(--yellow);margin-bottom:12px">⏳ Pending (${pending.length})</h3>`;
+      html += '<div class="item-list">';
+      for (const a of pending) {
+        const actionColor = a.action.includes('SystemConfig') || a.action.includes('ManageRBAC')
+          ? 'var(--red)' : 'var(--yellow)';
+        html += `
+          <div class="item-card" style="border-color:var(--yellow)">
+            <div class="item-title" style="color:${actionColor}">🛡️ ${esc(a.action)}</div>
+            <div class="item-subtitle">${esc(a.subject)} → ${esc(a.resource)}</div>
+            <div class="item-subtitle" style="color:var(--text-muted)">${esc(a.reason)}</div>
+            <div style="margin-top:10px;display:flex;gap:8px">
+              <button class="btn btn-sm" style="background:var(--green);color:#000" onclick="approveRequest('${escAttr(a.id)}')">✓ Approve</button>
+              <button class="btn btn-sm btn-danger" onclick="rejectRequest('${escAttr(a.id)}')">✗ Reject</button>
+            </div>
+          </div>
+        `;
+      }
+      html += '</div>';
+    }
+
+    if (resolved.length) {
+      html += `<h3 style="font-family:var(--font-mono);color:var(--text-muted);margin-top:24px;margin-bottom:12px">📜 History (${resolved.length})</h3>`;
+      html += '<div class="item-list">';
+      for (const a of resolved.slice().reverse()) {
+        const statusColor = a.status === 'approved' ? 'var(--green)' : 'var(--red)';
+        const statusIcon = a.status === 'approved' ? '✓' : '✗';
+        html += `
+          <div class="item-card">
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="color:${statusColor};font-weight:bold">${statusIcon}</span>
+              <span style="color:${statusColor}">${esc(a.action)}</span>
+            </div>
+            <div class="item-subtitle">${esc(a.subject)} → ${esc(a.resource)}</div>
+            <div class="item-subtitle" style="font-size:11px">${new Date(a.created_at).toLocaleString()}</div>
+          </div>
+        `;
+      }
+      html += '</div>';
+    }
+
+    body.innerHTML = html;
+  } catch (err) {
+    body.innerHTML = `<div class="empty-state"><p>Error: ${esc(err.message)}</p></div>`;
+  }
+}
+
+async function approveRequest(id) {
+  try {
+    const res = await fetch(`${API}/api/approvals/${id}/approve`, { method: 'POST' });
+    if (res.ok) {
+      showToast(`Request approved`, 'success');
+      loadApprovals();
+    } else {
+      showToast('Failed to approve request', 'error');
+    }
+  } catch (err) {
+    showToast(`Error: ${err.message}`, 'error');
+  }
+}
+
+async function rejectRequest(id) {
+  try {
+    const res = await fetch(`${API}/api/approvals/${id}/reject`, { method: 'POST' });
+    if (res.ok) {
+      showToast(`Request rejected`, 'error');
+      loadApprovals();
+    } else {
+      showToast('Failed to reject request', 'error');
+    }
+  } catch (err) {
+    showToast(`Error: ${err.message}`, 'error');
+  }
+}
 
 // ── Gardens ──
 let selectedGarden = null;
