@@ -99,6 +99,7 @@ impl OuroborosEngine {
     }
 
     /// Set or clear the persona system prompt.
+    #[allow(dead_code)]
     fn set_persona_prompt(&self, prompt: Option<String>) {
         *self.persona_prompt.lock() = prompt;
     }
@@ -163,6 +164,10 @@ impl OuroborosEngine {
 
 #[async_trait]
 impl OuroborosProtocol for OuroborosEngine {
+    fn set_persona_prompt(&self, prompt: Option<String>) {
+        *self.persona_prompt.lock() = prompt;
+    }
+
     async fn interview(&self, user_input: &str) -> Result<InterviewResult> {
         self.set_phase(Phase::Interview);
 

@@ -71,5 +71,6 @@ pub trait OuroborosProtocol: Send + Sync {
 
     /// Inject a persona system prompt for voice customization.
     /// When set, this is prepended to every LLM call in all phases.
+    #[inline]
     fn set_persona_prompt(&self, _prompt: Option<String>) {}
 }

@@ -421,6 +421,8 @@ async fn test_orchestrator_happy_path() {
         state_store,
         scheduler.clone(),
         access_manager.clone(),
+        Arc::new(oxios_kernel::PersonaManager::new()),
+    Arc::new(oxios_kernel::PersonaManager::new()),
     );
 
     let result = orchestrator
@@ -463,6 +465,7 @@ async fn test_orchestrator_evolution_loop() {
         state_store,
         scheduler.clone(),
         access_manager.clone(),
+    Arc::new(oxios_kernel::PersonaManager::new()),
     );
 
     let result = orchestrator
@@ -489,8 +492,6 @@ async fn test_orchestrator_events_published() {
 
     let scheduler = Arc::new(AgentScheduler::default());
     let access_manager = Arc::new(parking_lot::Mutex::new(AccessManager::new()));
-    let a2a_protocol = Arc::new(A2AProtocol::new(event_bus.clone()));
-    let persona_manager = Arc::new(PersonaManager::new());
     let orchestrator = Orchestrator::new(
         ouroboros,
         supervisor,
@@ -498,8 +499,8 @@ async fn test_orchestrator_events_published() {
         state_store,
         scheduler.clone(),
         access_manager.clone(),
-        persona_manager,
-        a2a_protocol,
+        Arc::new(oxios_kernel::PersonaManager::new()),
+    Arc::new(oxios_kernel::PersonaManager::new()),
     );
 
     // Run orchestration in background.
@@ -569,6 +570,7 @@ async fn test_gateway_routes_message_through_orchestrator() {
         state_store,
         scheduler.clone(),
         access_manager.clone(),
+        Arc::new(oxios_kernel::PersonaManager::new()),
     ));
 
     let gateway = Gateway::new(orchestrator);
@@ -606,6 +608,7 @@ async fn test_gateway_unknown_channel() {
         state_store,
         scheduler.clone(),
         access_manager.clone(),
+        Arc::new(oxios_kernel::PersonaManager::new()),
     ));
 
     let gateway = Gateway::new(orchestrator);
@@ -724,8 +727,6 @@ async fn test_scheduler_orchestrator_integration() {
     let ouroboros = Arc::new(MockOuroboros::new());
     let supervisor = Arc::new(SchedulerAwareSupervisor::new(scheduler.clone(), event_bus.clone()));
     let access_manager = Arc::new(parking_lot::Mutex::new(AccessManager::new()));
-    let a2a_protocol = Arc::new(A2AProtocol::new(event_bus.clone()));
-    let persona_manager = Arc::new(PersonaManager::new());
     let orchestrator = Orchestrator::new(
         ouroboros,
         supervisor,
@@ -733,8 +734,8 @@ async fn test_scheduler_orchestrator_integration() {
         state_store,
         scheduler.clone(),
         access_manager.clone(),
-        persona_manager,
-        a2a_protocol,
+        Arc::new(oxios_kernel::PersonaManager::new()),
+    Arc::new(oxios_kernel::PersonaManager::new()),
     );
 
     // Run a single orchestration.
@@ -794,6 +795,8 @@ async fn test_scheduler_priority_ordering_in_orchestration() {
         state_store,
         scheduler.clone(),
         access_manager.clone(),
+        Arc::new(oxios_kernel::PersonaManager::new()),
+    Arc::new(oxios_kernel::PersonaManager::new()),
     );
     // Orchestrator is created successfully — shared state is fine.
 }
@@ -856,8 +859,6 @@ required = ["echo"]
 
     let scheduler = Arc::new(AgentScheduler::default());
     let access_manager = Arc::new(parking_lot::Mutex::new(AccessManager::new()));
-    let a2a_protocol = Arc::new(A2AProtocol::new(event_bus.clone()));
-    let persona_manager = Arc::new(PersonaManager::new());
     let orchestrator = Orchestrator::new(
         ouroboros,
         supervisor,
@@ -865,8 +866,7 @@ required = ["echo"]
         state_store,
         scheduler.clone(),
         access_manager.clone(),
-        persona_manager,
-        a2a_protocol,
+        Arc::new(oxios_kernel::PersonaManager::new()),
     );
 
     // Orchestrate a message — the installed program should be discoverable
