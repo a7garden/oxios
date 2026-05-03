@@ -724,6 +724,8 @@ async fn test_scheduler_orchestrator_integration() {
     let ouroboros = Arc::new(MockOuroboros::new());
     let supervisor = Arc::new(SchedulerAwareSupervisor::new(scheduler.clone(), event_bus.clone()));
     let access_manager = Arc::new(parking_lot::Mutex::new(AccessManager::new()));
+    let a2a_protocol = Arc::new(A2AProtocol::new(event_bus.clone()));
+    let persona_manager = Arc::new(PersonaManager::new());
     let orchestrator = Orchestrator::new(
         ouroboros,
         supervisor,
@@ -731,6 +733,8 @@ async fn test_scheduler_orchestrator_integration() {
         state_store,
         scheduler.clone(),
         access_manager.clone(),
+        persona_manager,
+        a2a_protocol,
     );
 
     // Run a single orchestration.
@@ -852,6 +856,8 @@ required = ["echo"]
 
     let scheduler = Arc::new(AgentScheduler::default());
     let access_manager = Arc::new(parking_lot::Mutex::new(AccessManager::new()));
+    let a2a_protocol = Arc::new(A2AProtocol::new(event_bus.clone()));
+    let persona_manager = Arc::new(PersonaManager::new());
     let orchestrator = Orchestrator::new(
         ouroboros,
         supervisor,
@@ -859,6 +865,8 @@ required = ["echo"]
         state_store,
         scheduler.clone(),
         access_manager.clone(),
+        persona_manager,
+        a2a_protocol,
     );
 
     // Orchestrate a message — the installed program should be discoverable

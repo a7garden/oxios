@@ -6,6 +6,7 @@
 
 #![warn(missing_docs)]
 
+pub mod a2a;
 pub mod access_manager;
 pub mod agent_runtime;
 pub mod config;
@@ -27,7 +28,20 @@ pub mod state_store;
 pub mod supervisor;
 pub mod types;
 
-pub use access_manager::{AccessManager, AgentPermissions, AuditEntry};
+// A2A protocol exports
+pub use a2a::{
+    A2AMessage, A2AProtocol, A2ARequest, A2AResponse,
+    AgentCard, AgentCardRegistry, TaskPriority, TaskSpec,
+};
+
+// Access Manager exports (includes RBAC)
+pub use access_manager::{
+    AccessManager, AgentPermissions, AuditEntry,
+    RbacManager, RbacPolicy, RbacAuditEntry,
+    Role, Subject, Action,
+    PendingApproval, ApprovalStatus,
+};
+
 pub use agent_runtime::AgentRuntime;
 pub use config::{OxiosConfig, PersonaConfig};
 pub use container::{
