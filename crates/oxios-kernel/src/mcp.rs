@@ -1141,9 +1141,11 @@ mod tests {
 
     // --- JSON-RPC echo round-trip test (using bash script) ---
 
+    #[cfg(unix)]
     #[tokio::test]
     #[ignore = "Requires bash shell environment with executable script support"]
     async fn test_jsonrpc_echo_server() {
+        use std::os::unix::fs::PermissionsExt;
         // Create a bash echo script that echoes back stdin lines
         let temp_script = tempfile::tempdir().unwrap().path().join("mcp_echo.sh");
         std::fs::write(
