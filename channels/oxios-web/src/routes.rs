@@ -21,6 +21,7 @@ use axum::{
     response::{
         sse::{Event as SseEvent, Sse},
         IntoResponse,
+        Redirect,
     },
     routing::{delete, get, post, put},
     Json, Router,
@@ -48,6 +49,8 @@ use crate::persona_routes;
 /// Builds the axum router with all API routes.
 pub fn build_routes() -> Router<Arc<AppState>> {
     Router::new()
+        // Dioxus WASM frontend redirect
+        .route("/dioxus", get(|| async { Redirect::permanent("/dioxus/") }))
         // Chat
         .route("/api/chat", post(handle_chat))
         .route("/api/chat/stream", get(handle_chat_stream))
