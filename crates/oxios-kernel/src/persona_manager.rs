@@ -118,7 +118,7 @@ impl Default for PersonaManager {
 impl Clone for PersonaManager {
     fn clone(&self) -> Self {
         let personas: Vec<Persona> = self.store.list_all();
-        let mut store = PersonaStore::new();
+        let store = PersonaStore::new();
         store.load_from_slice(&personas);
         Self {
             store,

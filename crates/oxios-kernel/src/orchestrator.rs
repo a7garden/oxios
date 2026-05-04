@@ -43,7 +43,7 @@ pub struct Orchestrator {
     access_manager: Arc<Mutex<AccessManager>>,
     /// Active interview sessions, keyed by session ID.
     sessions: RwLock<std::collections::HashMap<String, InterviewSession>>,
-    /// Persona manager for voice/personality customization.
+    #[allow(dead_code)] // Reserved for future persona-driven agent customization
     persona_manager: Arc<PersonaManager>,
     /// A2A protocol for inter-agent communication and delegation.
     a2a_protocol: Arc<A2AProtocol>,
@@ -327,7 +327,7 @@ impl Orchestrator {
                 }
 
                 // Register evolved agent in A2A registry.
-                let mut card = AgentCard::new(
+                let card = AgentCard::new(
                     new_agent_id,
                     &agent_name,
                     &format!("Evolved agent executing seed: {}", evolved.goal),

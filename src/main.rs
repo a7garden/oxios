@@ -11,8 +11,8 @@ use std::sync::Arc;
 
 use oxios_gateway::Gateway;
 use oxios_kernel::{
-    AccessManager, AgentRuntime, BasicSupervisor, EventBus, GardenManager, HostExecBridge,
-    HostToolValidator, Orchestrator, OxiosConfig, PersonaManager, ProgramManager, SkillStore,
+    AccessManager, AgentRuntime, BasicSupervisor, EngineProvider, EventBus, GardenManager, HostExecBridge,
+    HostToolValidator, OxiEngineProvider, Orchestrator, OxiosConfig, PersonaManager, ProgramManager, SkillStore,
     StateStore, Supervisor, AgentScheduler, InstallSource, McpBridge, McpServer,
     A2AProtocol,
 };
@@ -227,8 +227,14 @@ async fn init_kernel(
     let event_bus = EventBus::new(config.kernel.event_bus_capacity);
     let state_store = Arc::new(StateStore::new(PathBuf::from(&config.kernel.workspace))?);
 
-    // Create the LLM provider from the model ID.
-    let (provider, model) = resolve_provider_and_model(model_id)?;
+    // Create the engine provider for resolving models and providers.
+    let engine_provider = OxiEngineProvider::new(model_id);
+
+    // Create the LLM provider and model via EngineProvider abstraction.
+    let model = engine_provider.resolve_model(model_id)
+        .context("Failed to resolve model")?;
+    let provider = engine_provider.create_provider(&model.provider)
+        .context("Failed to create provider")?;
 
     // Create the Ouroboros engine for spec-first orchestration.
     let ouroboros: Arc<dyn oxios_ouroboros::OuroborosProtocol> =
@@ -366,6 +372,10 @@ async fn init_mcp_bridge(config: &OxiosConfig) -> Result<McpBridge> {
 // ─── Resolve provider and model ────────────────────────────────────────────
 
 /// Resolve a model ID string into a Provider and Model.
+/// Resolve a provider/model ID string into a concrete provider and model.
+///
+/// Kept for backward compatibility. Prefer using [`OxiEngineProvider`] instead.
+#[allow(dead_code)]
 fn resolve_provider_and_model(
     model_id: &str,
 ) -> Result<(Arc<dyn oxi_ai::Provider>, oxi_ai::Model)> {

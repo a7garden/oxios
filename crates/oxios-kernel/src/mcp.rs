@@ -260,15 +260,20 @@ pub struct McpCapabilities {
 /// Initialize request params
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct InitializeParams {
+    /// Protocol version string.
     pub protocol_version: String,
+    /// Client capabilities.
     pub capabilities: McpCapabilities,
+    /// Information about the connecting client.
     pub client_info: ClientInfo,
 }
 
 /// Client info sent during initialize
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ClientInfo {
+    /// Client name.
     pub name: String,
+    /// Client version.
     pub version: String,
 }
 
@@ -288,15 +293,20 @@ impl Default for InitializeParams {
 /// Initialize response from the server
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct InitializeResult {
+    /// Protocol version agreed upon.
     pub protocol_version: String,
+    /// Server capabilities.
     pub capabilities: McpCapabilities,
+    /// Information about the server.
     pub server_info: ServerInfo,
 }
 
 /// Server info from initialize response
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ServerInfo {
+    /// Server name.
     pub name: String,
+    /// Server version.
     pub version: String,
 }
 
@@ -351,13 +361,16 @@ impl McpTool {
 /// MCP tools/list result
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct McpToolsResult {
+    /// Available tools from the server.
     pub tools: Vec<McpTool>,
 }
 
 /// MCP tools/call result
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct McpToolCallResult {
+    /// Content blocks returned by the tool.
     pub content: Vec<McpContentBlock>,
+    /// Whether the result is an error.
     pub is_error: Option<bool>,
 }
 
@@ -365,18 +378,34 @@ pub struct McpToolCallResult {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum McpContentBlock {
+    /// Plain text content.
     #[serde(rename = "text")]
-    Text { text: String },
+    Text {
+        /// The text content.
+        text: String,
+    },
+    /// Base64-encoded image data.
     #[serde(rename = "image")]
-    Image { data: String, mime_type: Option<String> },
+    Image {
+        /// Base64-encoded image data.
+        data: String,
+        /// MIME type of the image.
+        mime_type: Option<String>,
+    },
+    /// Embedded resource reference.
     #[serde(rename = "resource")]
-    Resource { resource: MappedResource },
+    Resource {
+        /// The referenced resource.
+        resource: MappedResource,
+    },
 }
 
 /// Resource reference
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MappedResource {
+    /// URI of the resource.
     pub uri: String,
+    /// MIME type of the resource.
     pub mime_type: Option<String>,
 }
 

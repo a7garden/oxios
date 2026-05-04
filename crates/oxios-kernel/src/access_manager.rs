@@ -137,13 +137,18 @@ impl Action {
 /// RBAC policy defining what a role can do.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RbacPolicy {
+    /// The role this policy applies to.
     pub role: Role,
+    /// Set of actions this role is allowed to perform.
     pub allowed_actions: HashSet<Action>,
+    /// Glob patterns for accessible resources.
     pub resource_patterns: Vec<String>,
+    /// Maximum number of concurrent agents for this role.
     pub max_concurrent_agents: usize,
 }
 
 impl RbacPolicy {
+    /// Checks whether this policy allows the given action.
     pub fn allows(&self, action: &Action) -> bool {
         self.allowed_actions.contains(action)
     }
@@ -152,11 +157,17 @@ impl RbacPolicy {
 /// RBAC audit entry — records authorization decisions.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RbacAuditEntry {
+    /// When the authorization decision was made.
     pub timestamp: DateTime<Utc>,
+    /// Who performed the action.
     pub subject: Subject,
+    /// What action was attempted.
     pub action: Action,
+    /// Which resource was involved.
     pub resource: String,
+    /// Whether the action was allowed.
     pub allowed: bool,
+    /// Optional reason for the decision.
     pub reason: Option<String>,
 }
 
@@ -169,20 +180,30 @@ impl RbacAuditEntry {
 /// Human-in-the-loop approval request.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PendingApproval {
+    /// Unique identifier for this approval request.
     pub id: uuid::Uuid,
+    /// Who is requesting the action.
     pub subject: Subject,
+    /// What action is being requested.
     pub action: Action,
+    /// Which resource is involved.
     pub resource: String,
+    /// Why the action needs approval.
     pub reason: String,
+    /// When the request was created.
     pub created_at: DateTime<Utc>,
 }
 
 /// Status of a HitL approval request.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ApprovalStatus {
+    /// Awaiting user decision.
     Pending,
+    /// User approved the request.
     Approved,
+    /// User rejected the request.
     Rejected,
+    /// Request timed out.
     Expired,
 }
 
@@ -196,6 +217,7 @@ pub struct RbacManager {
 }
 
 impl RbacManager {
+    /// Creates a new RBAC manager with default policies for all roles.
     pub fn new() -> Self {
         let mut this = Self {
             policies: HashMap::new(),
@@ -210,18 +232,22 @@ impl RbacManager {
         this
     }
 
+    /// Assigns a role to a subject.
     pub fn assign_role(&mut self, subject: Subject, role: Role) {
         self.subject_roles.insert(subject.clone(), role);
     }
 
+    /// Revokes the role from a subject.
     pub fn revoke_role(&mut self, subject: &Subject) {
         self.subject_roles.remove(subject);
     }
 
+    /// Returns the role assigned to a subject, if any.
     pub fn get_role(&self, subject: &Subject) -> Option<Role> {
         self.subject_roles.get(subject).copied()
     }
 
+    /// Checks whether a subject has permission for the given action on a resource.
     pub fn check_permission(&mut self, subject: &Subject, action: &Action, resource: &str) -> bool {
         if matches!(subject, Subject::System) {
             return true;
@@ -248,6 +274,7 @@ impl RbacManager {
         allowed
     }
 
+    /// Creates a new approval request for a high-risk action.
     pub fn request_approval(&mut self, subject: Subject, action: Action, resource: String, reason: String) -> uuid::Uuid {
         let id = uuid::Uuid::new_v4();
         self.pending_approvals.push((
@@ -257,6 +284,7 @@ impl RbacManager {
         id
     }
 
+    /// Approves a pending approval request.
     pub fn approve(&mut self, id: uuid::Uuid) -> bool {
         if let Some((_, s)) = self.pending_approvals.iter_mut().find(|(p, _)| p.id == id) {
             *s = ApprovalStatus::Approved;
@@ -265,6 +293,7 @@ impl RbacManager {
         false
     }
 
+    /// Rejects a pending approval request.
     pub fn reject(&mut self, id: uuid::Uuid) -> bool {
         if let Some((_, s)) = self.pending_approvals.iter_mut().find(|(p, _)| p.id == id) {
             *s = ApprovalStatus::Rejected;
@@ -273,6 +302,7 @@ impl RbacManager {
         false
     }
 
+    /// Returns all currently pending approval requests.
     pub fn pending_approvals(&self) -> Vec<&PendingApproval> {
         self.pending_approvals.iter().filter(|(_, s)| matches!(s, ApprovalStatus::Pending)).map(|(p, _)| p).collect()
     }
@@ -282,6 +312,7 @@ impl RbacManager {
         &self.pending_approvals
     }
 
+    /// Returns the RBAC audit log.
     pub fn audit_log(&self) -> &[RbacAuditEntry] {
         &self.audit_log
     }

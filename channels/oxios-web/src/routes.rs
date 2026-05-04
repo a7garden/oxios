@@ -1412,6 +1412,7 @@ async fn handle_host_tools_check(
 // ---------------------------------------------------------------------------
 
 /// MCP server configuration response.
+#[allow(dead_code)] // Reserved for future MCP management API
 #[derive(Debug, Serialize)]
 struct McpServerResponse {
     name: String,
@@ -1422,6 +1423,7 @@ struct McpServerResponse {
 }
 
 /// GET /api/mcp/servers — List registered MCP servers.
+#[allow(dead_code)] // Reserved for future MCP management API
 async fn handle_mcp_servers_list(
     state: State<Arc<AppState>>,
 ) -> Json<Vec<McpServerResponse>> {
@@ -1450,6 +1452,7 @@ async fn handle_mcp_servers_list(
 }
 
 /// MCP server registration request.
+#[allow(dead_code)] // Reserved for future MCP management API
 #[derive(Debug, Deserialize)]
 struct McpServerRegisterRequest {
     name: String,
@@ -1459,6 +1462,7 @@ struct McpServerRegisterRequest {
 }
 
 /// POST /api/mcp/servers — Register a new MCP server and start it.
+#[allow(dead_code)] // Reserved for future MCP management API
 async fn handle_mcp_server_register(
     state: State<Arc<AppState>>,
     Json(body): Json<McpServerRegisterRequest>,
@@ -1485,6 +1489,7 @@ async fn handle_mcp_server_register(
 }
 
 /// MCP tool summary exposed to agents.
+#[allow(dead_code)] // Reserved for future MCP management API
 #[derive(Debug, Serialize)]
 struct McpToolResponse {
     name: String,
@@ -1494,6 +1499,7 @@ struct McpToolResponse {
 }
 
 /// GET /api/mcp/tools — List all available MCP tools.
+#[allow(dead_code)] // Reserved for future MCP management API
 async fn handle_mcp_tools_list(
     state: State<Arc<AppState>>,
 ) -> Json<Vec<McpToolResponse>> {
@@ -1535,6 +1541,7 @@ async fn handle_mcp_tools_list(
 }
 
 /// Request body for calling an MCP tool.
+#[allow(dead_code)] // Reserved for future MCP management API
 #[derive(Debug, Deserialize)]
 struct McpToolCallRequest {
     server: String,
@@ -1544,6 +1551,7 @@ struct McpToolCallRequest {
 }
 
 /// POST /api/mcp/tools — Call an MCP tool.
+#[allow(dead_code)] // Reserved for future MCP management API
 async fn handle_mcp_tool_call(
     state: State<Arc<AppState>>,
     Json(body): Json<McpToolCallRequest>,

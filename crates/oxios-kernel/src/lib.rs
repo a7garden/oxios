@@ -13,6 +13,7 @@ pub mod argo;
 pub mod config;
 pub mod container;
 pub mod context_manager;
+pub mod engine;
 pub mod event_bus;
 pub mod garden;
 pub mod host_exec;
@@ -44,6 +45,7 @@ pub use access_manager::{
 };
 
 pub use agent_runtime::AgentRuntime;
+pub use engine::{EngineProvider, OxiEngineProvider};
 pub use config::{OxiosConfig, PersonaConfig, McpConfig, McpServerDef};
 pub use container::{
     AppleBackend, ContainerBackend, ContainerStats, ContainerStatus, ExecResult, GardenStartConfig, GardenWorkspaceInfo,

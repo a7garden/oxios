@@ -1,112 +1,116 @@
-//! Agent runtime: wraps oxi-agent's tool-calling loop for use by the kernel.
+//! Agent runtime: wraps oxi-agent's AgentLoop for use by the kernel.
 //!
-//! The AgentRuntime creates an oxi-agent session, configures it with built-in
-//! tools (read, write, edit, bash, grep, find, ls), and executes a Seed's
-//! goal through the LLM tool-calling loop.
+//! The AgentRuntime creates an oxi-agent `AgentLoop` session, configures it
+//! with built-in tools via `ToolRegistry::with_builtins()`, and executes a
+//! Seed's goal through the multi-turn LLM tool-calling loop.
 //!
-//! Note: oxi-agent's Agent is not `Send` (it holds `parking_lot` guards),
-//! so we execute it via `tokio::task::spawn_blocking` to stay on one thread.
+//! ## Migration from Agent V1 → AgentLoop V2
+//!
+//! - `Agent` + individual `add_tool()` → `AgentLoop` + `ToolRegistry::with_builtins()`
+//! - `spawn_blocking` + channel → `spawn_blocking` + `AgentLoop::run()` with event callback
+//! - `AgentConfig` → `AgentLoopConfig` with richer options (parallel/sequential
+//!   tool execution, auto-retry, compaction)
+//!
+//! Note: `AgentLoop::run()` produces a `!Send` future (the internal tool
+//! execution uses `Box<dyn Future>` without `Send`). We keep `spawn_blocking`
+//! to stay compatible with the `Supervisor` trait's `Send` bounds.
 
 use anyhow::Result;
 use oxi_agent::{
-    Agent, AgentConfig, AgentEvent,
-    ReadTool, WriteTool, EditTool, BashTool, GrepTool, FindTool, LsTool,
+    AgentEvent, AgentLoop, AgentLoopConfig, SharedState, ToolExecutionMode, ToolRegistry,
 };
-use oxi_ai::Provider;
+use oxi_ai::{CompactionStrategy, Provider};
+use parking_lot::Mutex;
 use std::sync::Arc;
-use tokio::sync::mpsc;
 
 use oxios_ouroboros::{ExecutionResult, Seed};
 
-/// Runtime that wraps an oxi-agent session for executing Seeds.
+/// Configuration for creating AgentRuntime instances.
+#[derive(Debug, Clone)]
+pub struct AgentRuntimeConfig {
+    /// Model ID in `provider/model` format (e.g. `anthropic/claude-sonnet-4-20250514`).
+    pub model_id: String,
+    /// Maximum number of agent turns before forcing a stop.
+    pub max_iterations: usize,
+    /// How to execute tool calls within a single turn.
+    pub tool_execution: ToolExecutionMode,
+    /// Whether auto-retry is enabled for retryable LLM errors.
+    pub auto_retry_enabled: bool,
+}
+
+impl Default for AgentRuntimeConfig {
+    fn default() -> Self {
+        Self {
+            model_id: "anthropic/claude-sonnet-4-20250514".into(),
+            max_iterations: 20,
+            tool_execution: ToolExecutionMode::Parallel,
+            auto_retry_enabled: true,
+        }
+    }
+}
+
+/// Mutable state shared between the event callback and the main execute flow.
+/// Wrapped in `Arc<Mutex<>>` because `AgentLoop::run()` takes `Fn` (not `FnMut`).
+#[derive(Default)]
+struct ExecuteState {
+    final_content: String,
+    steps_completed: usize,
+    success: bool,
+}
+
+/// Runtime that wraps an oxi-agent `AgentLoop` for executing Seeds.
+///
+/// Each call to [`AgentRuntime::execute`] creates a fresh `AgentLoop`,
+/// runs it to completion, and returns the result.
 pub struct AgentRuntime {
     provider: Arc<dyn Provider>,
-    model_id: String,
+    config: AgentRuntimeConfig,
 }
 
 impl AgentRuntime {
-    /// Creates a new agent runtime with the given LLM provider and model.
+    /// Creates a new agent runtime with the given LLM provider and default config.
     pub fn new(provider: Arc<dyn Provider>, model_id: impl Into<String>) -> Self {
         Self {
             provider,
-            model_id: model_id.into(),
+            config: AgentRuntimeConfig {
+                model_id: model_id.into(),
+                ..Default::default()
+            },
         }
+    }
+
+    /// Creates a new agent runtime with the given LLM provider and full config.
+    #[allow(dead_code)]
+    pub fn with_config(provider: Arc<dyn Provider>, config: AgentRuntimeConfig) -> Self {
+        Self { provider, config }
     }
 
     /// Execute a Seed by running the tool-calling loop to completion.
     ///
-    /// Creates a fresh `oxi_agent::Agent`, registers built-in tools,
-    /// sets the system prompt from the Seed's goal and constraints,
-    /// and runs the agent loop.
+    /// Creates a fresh `AgentLoop`, registers built-in tools via
+    /// `ToolRegistry::with_builtins()`, sets the system prompt from the
+    /// Seed's goal and constraints, and runs the loop with an event
+    /// callback that tracks progress.
+    ///
+    /// Runs inside `spawn_blocking` because `AgentLoop::run()` produces
+    /// a `!Send` future (internal `Box<dyn Future>` without `Send` bound).
     pub async fn execute(&self, seed: &Seed) -> Result<ExecutionResult> {
         let system_prompt = build_system_prompt(seed);
         let prompt = build_user_prompt(seed);
-        let model_id = self.model_id.clone();
+
+        // Clone config and provider to move into spawn_blocking.
+        let config = self.config.clone();
         let provider = Arc::clone(&self.provider);
+        let seed_id = seed.id;
 
-        // Run the agent in a blocking task since Agent is !Send.
-        // spawn_blocking keeps execution on a single thread, avoiding
-        // the need to move Agent guards across thread boundaries.
-        let result = tokio::task::spawn_blocking(move || {
-            let config = AgentConfig::new(&model_id)
-                .with_name("oxios-worker")
-                .with_system_prompt(&system_prompt)
-                .with_max_iterations(20)
-                .with_timeout(300);
-
-            let agent = Agent::new(provider, config);
-            agent.add_tool(ReadTool::new());
-            agent.add_tool(WriteTool::new());
-            agent.add_tool(EditTool::new());
-            agent.add_tool(BashTool::new());
-            agent.add_tool(GrepTool::new());
-            agent.add_tool(FindTool::new());
-            agent.add_tool(LsTool::new());
-
-            // Channel to collect events from the agent.
-            let (tx, mut rx) = mpsc::channel::<AgentEvent>(256);
-
-            // Run the agent and collect events concurrently.
-            // We use a simple polling loop instead of select! since
-            // the agent future is not Send.
-            let agent_result = agent.run_with_channel(prompt, tx);
-
-            // Drain events in a tight loop.
-            let mut final_content = String::new();
-            let mut steps_completed = 0usize;
-            let mut success = false;
-
-            // Poll events in a tight loop.
-            while let Some(event) = rx.blocking_recv() {
-                match event {
-                    AgentEvent::ToolComplete { .. } => {
-                        steps_completed += 1;
-                    }
-                    AgentEvent::Complete { content, stop_reason } => {
-                        final_content = content.clone();
-                        success = stop_reason == "Stop";
-                        break;
-                    }
-                    AgentEvent::Error { message } => {
-                        final_content = message.clone();
-                        success = false;
-                        break;
-                    }
-                    _ => {}
-                }
-            }
-
-            // Await the agent result and drop any error.
-            drop(agent_result);
-
-            (final_content, steps_completed, success)
-        })
-        .await?;
-
-        let (final_content, steps_completed, success) = result;
+        let (final_content, steps_completed, success) =
+            tokio::task::spawn_blocking(move || {
+                run_agent_loop(provider, config, system_prompt, prompt, seed_id)
+            })
+            .await??;
 
         tracing::info!(
-            seed_id = %seed.id,
+            seed_id = %seed_id,
             steps = steps_completed,
             success,
             "AgentRuntime finished"
@@ -122,6 +126,92 @@ impl AgentRuntime {
             success,
         })
     }
+}
+
+/// Run the AgentLoop inside a blocking thread.
+///
+/// This function is called from `spawn_blocking` because `AgentLoop::run()`
+/// produces a `!Send` future. We use `tokio::runtime::Handle::block_on` to
+/// drive the async work from the blocking thread.
+fn run_agent_loop(
+    provider: Arc<dyn Provider>,
+    config: AgentRuntimeConfig,
+    system_prompt: String,
+    prompt: String,
+    seed_id: uuid::Uuid,
+) -> Result<(String, usize, bool)> {
+    // Build tool registry with all built-in tools in one call.
+    let tools = Arc::new(ToolRegistry::with_builtins());
+
+    // Build the AgentLoop config from our runtime config.
+    let loop_config = AgentLoopConfig {
+        model_id: config.model_id,
+        system_prompt: Some(system_prompt),
+        temperature: 0.7,
+        max_tokens: 8192,
+        max_iterations: config.max_iterations,
+        tool_execution: config.tool_execution,
+        compaction_strategy: CompactionStrategy::Threshold(0.8),
+        context_window: 128_000,
+        compaction_instruction: None,
+        session_id: Some(seed_id.to_string()),
+        transport: None,
+        compact_on_start: false,
+        max_retry_delay_ms: None,
+        auto_retry_enabled: config.auto_retry_enabled,
+        auto_retry_max_attempts: 3,
+        auto_retry_base_delay_ms: 2000,
+    };
+
+    let state = SharedState::new();
+    let agent_loop = AgentLoop::new(provider, loop_config, tools, state);
+
+    // Shared mutable state for the event callback.
+    let exec_state = Arc::new(Mutex::new(ExecuteState::default()));
+    let exec_state_clone = Arc::clone(&exec_state);
+
+    // Run the async AgentLoop inside the blocking thread.
+    let rt = tokio::runtime::Handle::current();
+    rt.block_on(async {
+        let result = agent_loop
+            .run(prompt, move |event| {
+                let mut s = exec_state_clone.lock();
+                match event {
+                    AgentEvent::ToolExecutionEnd { is_error: false, .. } => {
+                        s.steps_completed += 1;
+                    }
+                    AgentEvent::AgentEnd { messages, stop_reason } => {
+                        if let Some(msg) = messages.last() {
+                            if let oxi_ai::Message::Assistant(a) = msg {
+                                s.final_content = a.text_content();
+                            }
+                        }
+                        s.success = stop_reason.as_deref() == Some("Stop");
+                    }
+                    AgentEvent::Error { message } => {
+                        s.final_content = message.clone();
+                        s.success = false;
+                    }
+                    _ => {}
+                }
+            })
+            .await;
+
+        if let Err(e) = result {
+            tracing::error!(seed_id = %seed_id, error = %e, "AgentLoop failed");
+            let s = exec_state.lock();
+            return Ok((format!("Agent failed: {e}"), s.steps_completed, false));
+        }
+
+        let s = exec_state.lock();
+        tracing::info!(
+            seed_id = %seed_id,
+            steps = s.steps_completed,
+            success = s.success,
+            "AgentLoop completed inside blocking thread"
+        );
+        Ok((s.final_content.clone(), s.steps_completed, s.success))
+    })
 }
 
 /// Build a system prompt from the Seed's goal and constraints.
@@ -182,7 +272,7 @@ fn build_user_prompt(seed: &Seed) -> String {
 impl std::fmt::Debug for AgentRuntime {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("AgentRuntime")
-            .field("model_id", &self.model_id)
+            .field("model_id", &self.config.model_id)
             .finish()
     }
 }

@@ -453,7 +453,7 @@ mod tests {
         let temp_dir = tempfile::tempdir().unwrap();
         let store = StateStore::new(temp_dir.path().to_path_buf()).unwrap();
 
-        let mut session = Session::new("user-123");
+        let session = Session::new("user-123");
         store.save_session(&session).await.unwrap();
 
         // Delete and verify
