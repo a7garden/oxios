@@ -42,9 +42,9 @@ chrono = { version = "0.4", features = ["serde"] }
 # Concurrency
 parking_lot = "0.12"
 
-# oxi engine crates (path dependencies to pi2oxi)
-oxi-ai = { path = "../pi2oxi/oxi-ai" }
-oxi-agent = { path = "../pi2oxi/oxi-agent" }
+# oxi engine crates (from crates.io)
+oxi-ai = "0.3.1"
+oxi-agent = "0.3.1"
 
 [dependencies]
 oxios-kernel = { path = "crates/oxios-kernel" }
