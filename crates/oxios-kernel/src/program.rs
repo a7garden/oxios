@@ -46,6 +46,9 @@ pub struct ProgramMeta {
     pub dependencies: Vec<String>,
     /// Host tools this program requires to function
     pub host_requirements: ProgramHostRequirements,
+    /// MCP servers this program connects to (parsed from [mcp] table)
+    #[serde(default)]
+    pub mcp_servers: Vec<McpServerConfig>,
 }
 
 /// Host tool requirements for a program
@@ -57,7 +60,22 @@ pub struct ProgramHostRequirements {
     pub optional: Vec<String>,
 }
 
-/// Tool definition exposed by a program
+/// MCP server configuration parsed from [mcp] in program.toml
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct McpServerConfig {
+    pub name: String,
+    pub command: String,
+    #[serde(default)]
+    pub args: Vec<String>,
+    #[serde(default)]
+    pub env: std::collections::HashMap<String, String>,
+    #[serde(default = "default_enabled")]
+    pub enabled: bool,
+}
+
+fn default_enabled() -> bool {
+    true
+}
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ToolDef {
     /// Tool name (unique within the program)
@@ -106,6 +124,8 @@ struct TomlProgram {
     host_requirements: Option<TomlHostRequirements>,
     #[serde(rename = "requires_tools")]
     requires_tools: Option<TomlRequiresTools>,
+    #[serde(rename = "mcp", default)]
+    mcp: Option<Vec<McpServerConfig>>,
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -187,6 +207,8 @@ impl ProgramMeta {
             .map(|rt| rt.names)
             .unwrap_or_default();
 
+        let mcp_servers = toml.mcp.unwrap_or_default();
+
         Ok(ProgramMeta {
             name: toml.program.name,
             version: toml.program.version,
@@ -195,6 +217,7 @@ impl ProgramMeta {
             tools,
             dependencies,
             host_requirements,
+            mcp_servers,
         })
     }
 }

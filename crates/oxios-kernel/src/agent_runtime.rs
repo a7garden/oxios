@@ -21,10 +21,11 @@ use std::sync::Arc;
 use crate::config::OxiosConfig;
 use crate::container_manager::ContainerManager;
 use crate::host_exec::HostExecBridge;
+use crate::mcp::{McpBridge, McpServer};
 use crate::persona_manager::PersonaManager;
 use crate::program::ProgramManager;
 use crate::state_store::StateStore;
-use crate::tools::{ContainerExecTool, HostExecTool, ProgramTool};
+use crate::tools::{ContainerExecTool, HostExecTool, McpToolWrapper, ProgramTool};
 use oxios_ouroboros::{ExecutionResult, Seed};
 
 /// Configuration for creating AgentRuntime instances.
@@ -273,9 +274,8 @@ fn run_agent_loop(
         let host_exec = Arc::new(HostExecTool::new(bridge));
         registry.register_arc(host_exec.clone());
 
-        // ── Tier 3: Program tools (dynamic) ──
+        // ── Tier 3: Program tools (dynamic) + Tier 4: MCP servers ──
         if let Some(pm) = program_manager {
-            // Get enabled programs synchronously (we're in spawn_blocking)
             let rt = tokio::runtime::Handle::current();
             let programs = rt.block_on(async { pm.list_enabled().await });
             let container_config = oxios_config
@@ -284,6 +284,65 @@ fn run_agent_loop(
                 .cloned()
                 .unwrap_or_default();
 
+            // Collect MCP servers from all programs.
+            let mcp_bridge: Arc<McpBridge> = Arc::new(McpBridge::new());
+            let mut mcp_server_names: Vec<String> = Vec::new();
+
+            for program in &programs {
+                // Collect MCP servers first (before mutating mcp_bridge).
+                for server_config in &program.meta.mcp_servers {
+                    if server_config.enabled {
+                        mcp_server_names.push(server_config.name.clone());
+                    }
+                }
+            }
+
+            // Register MCP servers (requires &mut self on McpBridge).
+            for program in &programs {
+                for server_config in &program.meta.mcp_servers {
+                    if server_config.enabled {
+                        let server = McpServer {
+                            name: server_config.name.clone(),
+                            command: server_config.command.clone(),
+                            args: server_config.args.clone(),
+                            env: server_config.env.clone(),
+                            enabled: server_config.enabled,
+                        };
+                        // register_server needs &mut; we use Arc::get_mut.
+                        if let Some(bridge_mut) = Arc::get_mut(&mut mcp_bridge.clone()) {
+                            bridge_mut.register_server(server);
+                        }
+                    }
+                }
+            }
+
+            // Now initialize MCP servers and get tools.
+            if !mcp_server_names.is_empty() {
+                if let Err(e) = rt.block_on(mcp_bridge.initialize_all()) {
+                    tracing::warn!(error = %e, "MCP bridge init failed — skipping MCP tools");
+                } else {
+                    let _ = rt.block_on(mcp_bridge.list_tools()); // populate cache
+                    let mut mcp_tool_count = 0usize;
+                    for server_name in &mcp_server_names {
+                        if let Some(tool_defs) = rt.block_on(mcp_bridge.cached_tools(server_name)) {
+                            for tool_def in tool_defs {
+                                let wrapper = McpToolWrapper::new(
+                                    Arc::clone(&mcp_bridge),
+                                    server_name,
+                                    &tool_def.name,
+                                    tool_def.description.clone(),
+                                    serde_json::json!({"type": "object", "properties": {}}),
+                                );
+                                registry.register(wrapper);
+                                mcp_tool_count += 1;
+                            }
+                        }
+                    }
+                    tracing::info!(count = mcp_tool_count, "MCP tools registered");
+                }
+            }
+
+            // Tier 3: Program tools.
             for program in &programs {
                 // ── P1-3: requires_tools validation ──
                 let missing_tools: Vec<&str> = program
