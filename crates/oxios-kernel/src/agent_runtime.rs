@@ -180,7 +180,7 @@ fn run_agent_loop(
                     AgentEvent::ToolExecutionEnd { is_error: false, .. } => {
                         s.steps_completed += 1;
                     }
-                    AgentEvent::AgentEnd { messages, stop_reason } => {
+                    AgentEvent::AgentEnd { messages, stop_reason, .. } => {
                         if let Some(msg) = messages.last() {
                             if let oxi_ai::Message::Assistant(a) = msg {
                                 s.final_content = a.text_content();
@@ -188,7 +188,7 @@ fn run_agent_loop(
                         }
                         s.success = stop_reason.as_deref() == Some("Stop");
                     }
-                    AgentEvent::Error { message } => {
+                    AgentEvent::Error { message, .. } => {
                         s.final_content = message.clone();
                         s.success = false;
                     }

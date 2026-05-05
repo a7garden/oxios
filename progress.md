@@ -1,30 +1,26 @@
-# Phase 0-B: Documentation ClawGarden Cleanup — COMPLETE
+# Phase 0-A: ClawGarden Naming Cleanup — COMPLETE ✅
+
+## Summary
+Renamed all ClawGarden-era naming to Oxios-native naming across the Rust codebase.
 
 ## Changes Made
 
-### DESIGN.md (10 replacements)
-- `Container Garden (Apple Container)` → `Container (Apple Container)`
-- Unix↔Oxios table: `Garden` → `Container`
-- Crate structure: `garden.rs` → `container_manager.rs`, `GardenManager` → `ContainerManager`
-- Responsibilities: `Garden Manager` → `Container Manager`
-- Dependencies: `pi2oxi/oxi-ai` → `oxi/oxi-ai`, `pi2oxi/oxi-agent` → `oxi/oxi-agent`
-- Container Isolation section: `Each Garden` → `Each Container`, CLI `garden` → `container`
-- Command Interface: all `oxios garden` → `oxios container`
-- Build Order: `Garden lifecycle` → `Container lifecycle`, `Gardens` → `Containers`
-- Project Info: `pi2oxi path dependency` → `oxi path dependency`
+### Files Renamed
+- `garden.rs` → `container_manager.rs`
 
-### AGENTS.md (7 replacements)
-- Architecture: `Container Garden` → `Container`
-- Architecture: `garden per project` → `container per project`
-- Engine: `../pi2oxi/` → `../oxi/`
-- Kernel Modules table: `garden | Garden lifecycle manager` → `container_manager | Container lifecycle manager`
-- Key Principles #3: `pi2oxi` → `oxi`
-- Dependency Map: `../pi2oxi/oxi-agent` → `../oxi/oxi-agent`, `../pi2oxi/oxi-ai` → `../oxi/oxi-ai`
-- Best Practices: `Test in garden` → `Test in container`
+### Files Modified
+- `container.rs` — `GardenStartConfig` → `ContainerConfig`, `GardenWorkspaceInfo` → `ContainerWorkspaceInfo`, all trait methods renamed (create_garden→create, stop_garden→stop, exec_in_garden→exec_in_container, etc.)
+- `container_manager.rs` (was garden.rs) — `GardenManager` → `ContainerManager`, `GardenInfo` → `ContainerInfo`, all methods renamed (new_garden→new_container, start_garden→start_container, etc.), added `active_container_name()` method
+- `config.rs` — `garden_path` → `container_path`, default path changed from `~/.oxios/gardens` to `~/.oxios/containers`
+- `lib.rs` — `pub mod garden` → `pub mod container_manager`, all re-exports updated
+- `access_manager.rs` — all garden references → container (garden_workspaces → container_workspaces, register_garden_workspace → register_container_workspace, etc.)
+- `host_exec.rs` — comment references updated
+- `agent_runtime.rs` — fixed pre-existing AgentEvent pattern match issues (added `..` for new session_id fields)
 
-## Preserved (intentional)
-- All `ClawGarden`/`clawgarden` references in AGENTS.md §"Reusable Code from ClawGarden" — these reference the external project source, not our naming
+### Verification
+- `cargo check -p oxios-kernel`: ✅ PASS
+- `cargo test -p oxios-kernel`: ✅ 22/22 tests pass
 
-## Verification
-- `grep -in "garden" DESIGN.md AGENTS.md` returns only `clawgarden` references
-- `grep -in "pi2oxi" DESIGN.md AGENTS.md` returns zero results
+### Notes
+- Pre-existing `oxi-agent` compilation error (`ParallelTask: Clone`) is unrelated to this change
+- The `active_container_name()` method was added to ContainerManager per the tool architecture design spec

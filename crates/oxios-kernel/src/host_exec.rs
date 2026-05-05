@@ -1,6 +1,6 @@
 //! Host Exec Bridge: secure relay for executing host commands on behalf of containerized agents.
 //!
-//! Adapted from clawgarden-relay. Listens on a Unix Domain Socket and executes
+//! Adapted from clawgarden-relay architecture. Listens on a Unix Domain Socket and executes
 //! whitelisted host commands. Security model:
 //! - Command whitelist (only approved commands can run)
 //! - Argument validation (blocks shell metacharacters, path traversal)
@@ -299,7 +299,7 @@ impl HostExecBridge {
 
     /// Execute a command on the host via direct execution (not through the relay).
     ///
-    /// This is used by the GardenManager for commands that don't need to go
+    /// This is used by the ContainerManager for commands that don't need to go
     /// through the UDS relay (i.e., when called from the host itself).
     pub async fn exec(
         &self,

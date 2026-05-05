@@ -1,4 +1,4 @@
-//! Oxios kernel: supervisor, event bus, state store, container, garden.
+//! Oxios kernel: supervisor, event bus, state store, container.
 //!
 //! The kernel is the core of the Oxios Agent OS. Everything passes
 //! through here: agent lifecycle, inter-agent communication, container
@@ -15,7 +15,7 @@ pub mod container;
 pub mod context_manager;
 pub mod engine;
 pub mod event_bus;
-pub mod garden;
+pub mod container_manager;
 pub mod host_exec;
 pub mod host_tools;
 pub mod mcp;
@@ -48,11 +48,11 @@ pub use agent_runtime::AgentRuntime;
 pub use engine::{EngineProvider, OxiEngineProvider};
 pub use config::{OxiosConfig, PersonaConfig, McpConfig, McpServerDef};
 pub use container::{
-    AppleBackend, ContainerBackend, ContainerStats, ContainerStatus, ExecResult, GardenStartConfig, GardenWorkspaceInfo,
+    AppleBackend, ContainerBackend, ContainerConfig, ContainerStats, ContainerStatus, ContainerWorkspaceInfo, ExecResult,
 };
 pub use context_manager::{ContextManager, ContextStats, ContextTier, ContextEntry};
 pub use event_bus::{EventBus, KernelEvent};
-pub use garden::{GardenInfo, GardenManager};
+pub use container_manager::{ContainerInfo, ContainerManager};
 pub use host_exec::HostExecBridge;
 pub use orchestrator::{OrchestrationResult, Orchestrator};
 pub use scheduler::{AgentScheduler, Priority, ScheduledTask, SchedulerStats, TaskStatus};

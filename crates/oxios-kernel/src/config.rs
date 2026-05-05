@@ -101,23 +101,23 @@ impl Default for GatewayConfig {
     }
 }
 
-/// Container (garden) configuration.
+/// Container configuration.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ContainerConfig {
-    /// Base directory for container gardens.
-    #[serde(default = "default_garden_path")]
-    pub garden_path: String,
-    /// Default image tag for new gardens.
+    /// Base directory for containers.
+    #[serde(default = "default_container_path")]
+    pub container_path: String,
+    /// Default image tag for new containers.
     #[serde(default = "default_image_tag")]
     pub image_tag: String,
     /// Allowed host commands (for the Host Exec Bridge).
     /// If empty, all bare-name commands are allowed (development mode).
     #[serde(default)]
     pub allowed_host_commands: Vec<String>,
-    /// Default memory limit for garden containers.
+    /// Default memory limit for containers.
     #[serde(default = "default_memory_limit")]
     pub memory_limit: String,
-    /// Default CPU limit for garden containers.
+    /// Default CPU limit for containers.
     #[serde(default = "default_cpu_limit")]
     pub cpu_limit: u64,
     /// Minimal container tools (pre-installed in the minimal container image).
@@ -131,10 +131,10 @@ pub struct ContainerConfig {
     pub optional_host_tools: Vec<String>,
 }
 
-fn default_garden_path() -> String {
+fn default_container_path() -> String {
     std::env::var("HOME")
-        .map(|h| format!("{h}/.oxios/gardens"))
-        .unwrap_or_else(|_| "./gardens".into())
+        .map(|h| format!("{h}/.oxios/containers"))
+        .unwrap_or_else(|_| "./containers".into())
 }
 
 fn default_image_tag() -> String {
@@ -178,7 +178,7 @@ fn default_optional_host_tools() -> Vec<String> {
 impl Default for ContainerConfig {
     fn default() -> Self {
         Self {
-            garden_path: default_garden_path(),
+            container_path: default_container_path(),
             image_tag: default_image_tag(),
             allowed_host_commands: Vec::new(),
             memory_limit: default_memory_limit(),

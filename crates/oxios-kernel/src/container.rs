@@ -1,7 +1,7 @@
 //! Apple Container backend for Oxios.
 //!
 //! Uses the `container` CLI (Apple's native macOS container runtime)
-//! for garden lifecycle management. Requires macOS 15+ and Apple Silicon.
+//! for container lifecycle management. Requires macOS 15+ and Apple Silicon.
 
 use anyhow::{bail, Context, Result};
 use async_trait::async_trait;
@@ -13,7 +13,7 @@ use tracing::{debug, warn};
 /// Path to the Apple Container CLI.
 const CONTAINER_BIN: &str = "container";
 
-/// Container name prefix for Oxios gardens.
+/// Container name prefix for Oxios containers.
 const CONTAINER_PREFIX: &str = "oxios-";
 
 /// Container status.
@@ -51,10 +51,10 @@ pub struct ContainerStats {
     pub memory_limit_mb: f64,
 }
 
-/// Configuration for starting a garden container.
+/// Configuration for starting a container.
 #[derive(Debug, Clone)]
-pub struct GardenStartConfig {
-    /// Garden name.
+pub struct ContainerConfig {
+    /// Container name.
     pub name: String,
     /// Image tag or registry reference.
     pub image: String,
@@ -83,12 +83,12 @@ pub struct ExecResult {
     pub duration_ms: u64,
 }
 
-/// Information about a garden's workspace and allowed paths.
+/// Information about a container's workspace and allowed paths.
 #[derive(Debug, Clone)]
-pub struct GardenWorkspaceInfo {
-    /// Name of the garden.
-    pub garden_name: String,
-    /// Absolute path to the garden's workspace directory.
+pub struct ContainerWorkspaceInfo {
+    /// Name of the container.
+    pub container_name: String,
+    /// Absolute path to the container's workspace directory.
     pub workspace_path: PathBuf,
     /// Whether the workspace directory exists.
     pub exists: bool,
@@ -108,46 +108,46 @@ pub trait ContainerBackend: Send + Sync {
     /// Build a container image from a directory containing a Containerfile.
     async fn build_image(&self, context: &Path, tag: &str) -> Result<()>;
 
-    /// Create and start a garden container.
-    async fn create_garden(&self, config: &GardenStartConfig) -> Result<()>;
+    /// Create and start a container.
+    async fn create(&self, config: &ContainerConfig) -> Result<()>;
 
-    /// Start an existing garden container.
-    async fn start_garden(&self, name: &str) -> Result<()>;
+    /// Start an existing container.
+    async fn start(&self, name: &str) -> Result<()>;
 
-    /// Stop a running garden container.
-    async fn stop_garden(&self, name: &str) -> Result<()>;
+    /// Stop a running container.
+    async fn stop(&self, name: &str) -> Result<()>;
 
-    /// Remove a garden container (optionally deleting files).
-    async fn remove_garden(&self, name: &str, delete_files: bool) -> Result<()>;
+    /// Remove a container (optionally deleting files).
+    async fn remove(&self, name: &str, delete_files: bool) -> Result<()>;
 
-    /// List all garden containers managed by this backend.
-    async fn list_gardens(&self) -> Result<Vec<String>>;
+    /// List all containers managed by this backend.
+    async fn list(&self) -> Result<Vec<String>>;
 
-    /// Execute a command inside a garden container.
-    async fn exec_in_garden(
+    /// Execute a command inside a container.
+    async fn exec_in_container(
         &self,
         name: &str,
         cmd: &[String],
         workdir: Option<&str>,
     ) -> Result<ExecResult>;
 
-    /// Get the status of a garden container.
-    async fn garden_status(&self, name: &str) -> Result<ContainerStatus>;
+    /// Get the status of a container.
+    async fn status(&self, name: &str) -> Result<ContainerStatus>;
 
-    /// Get resource usage statistics for a garden container.
-    async fn garden_stats(&self, name: &str) -> Result<Option<ContainerStats>>;
+    /// Get resource usage statistics for a container.
+    async fn stats(&self, name: &str) -> Result<Option<ContainerStats>>;
 
-    /// Get the workspace path for a garden.
+    /// Get the workspace path for a container.
     ///
-    /// Returns the workspace path that was used when creating the garden.
+    /// Returns the workspace path that was used when creating the container.
     /// This is used by AccessManager to enforce sandbox boundaries.
-    async fn garden_workspace(&self, name: &str) -> Result<Option<GardenWorkspaceInfo>>;
+    async fn workspace(&self, name: &str) -> Result<Option<ContainerWorkspaceInfo>>;
 
-    /// List all gardens with their workspace information.
+    /// List all containers with their workspace information.
     ///
-    /// This is used by AccessManager to register all garden workspaces
+    /// This is used by AccessManager to register all container workspaces
     /// for sandbox enforcement.
-    async fn list_garden_workspaces(&self) -> Result<Vec<GardenWorkspaceInfo>>;
+    async fn list_workspaces(&self) -> Result<Vec<ContainerWorkspaceInfo>>;
 }
 
 // ─── AppleBackend ──────────────────────────────────────────────────────────
@@ -330,7 +330,7 @@ impl ContainerBackend for AppleBackend {
         Ok(())
     }
 
-    async fn create_garden(&self, config: &GardenStartConfig) -> Result<()> {
+    async fn create(&self, config: &ContainerConfig) -> Result<()> {
         if !self.available {
             bail!(
                 "Apple Container runtime is not available. \
@@ -343,7 +343,7 @@ impl ContainerBackend for AppleBackend {
         let cname = Self::container_name(&config.name);
 
         // Stop existing container if running (silent, ignore errors).
-        let _ = self.stop_garden(&config.name).await;
+        let _ = self.stop(&config.name).await;
 
         // Resolve image reference.
         let image_ref = if config.image.contains('/') {
@@ -363,7 +363,7 @@ impl ContainerBackend for AppleBackend {
         }
 
         // Run container.
-        tracing::info!(garden = %config.name, "Starting garden container");
+        tracing::info!(container = %config.name, "Starting container");
 
         let workspace = config
             .workspace_path
@@ -426,15 +426,15 @@ impl ContainerBackend for AppleBackend {
         }
 
         tracing::info!(
-            garden = %config.name,
-            container = %cname,
-            "Garden container started"
+            container = %config.name,
+            container_id = %cname,
+            "Container started"
         );
 
         Ok(())
     }
 
-    async fn start_garden(&self, name: &str) -> Result<()> {
+    async fn start(&self, name: &str) -> Result<()> {
         if !self.available {
             bail!("Apple Container runtime is not available.");
         }
@@ -452,11 +452,11 @@ impl ContainerBackend for AppleBackend {
             bail!("container start failed for '{}' (exit {:?})", name, status.code());
         }
 
-        tracing::info!(garden = %name, "Garden started");
+        tracing::info!(container = %name, "Container started");
         Ok(())
     }
 
-    async fn stop_garden(&self, name: &str) -> Result<()> {
+    async fn stop(&self, name: &str) -> Result<()> {
         if !self.available {
             bail!("Apple Container runtime is not available.");
         }
@@ -477,28 +477,28 @@ impl ContainerBackend for AppleBackend {
 
         match delete_result {
             Ok(s) if s.success() => {
-                tracing::info!(garden = %name, "Garden stopped and removed");
+                tracing::info!(container = %name, "Container stopped and removed");
                 Ok(())
             }
             _ => {
-                tracing::debug!(garden = %name, "No running container to stop");
+                tracing::debug!(container = %name, "No running container to stop");
                 Ok(())
             }
         }
     }
 
-    async fn remove_garden(&self, name: &str, delete_files: bool) -> Result<()> {
+    async fn remove(&self, name: &str, delete_files: bool) -> Result<()> {
         // Stop the container first.
-        let _ = self.stop_garden(name).await;
+        let _ = self.stop(name).await;
 
         if delete_files {
-            tracing::info!(garden = %name, "Garden files deletion requested (handled by GardenManager)");
+            tracing::info!(container = %name, "Container files deletion requested (handled by ContainerManager)");
         }
 
         Ok(())
     }
 
-    async fn list_gardens(&self) -> Result<Vec<String>> {
+    async fn list(&self) -> Result<Vec<String>> {
         if !self.available {
             return Ok(Vec::new());
         }
@@ -515,15 +515,15 @@ impl ContainerBackend for AppleBackend {
         }
 
         let stdout = String::from_utf8_lossy(&output.stdout);
-        let mut gardens = Vec::new();
+        let mut containers = Vec::new();
 
         // Parse JSON array of container objects.
         if let Ok(value) = serde_json::from_str::<serde_json::Value>(&stdout) {
             if let Some(arr) = value.as_array() {
                 for obj in arr {
                     if let Some(names) = obj.get("name").and_then(|n| n.as_str()) {
-                        if let Some(garden_name) = names.strip_prefix(CONTAINER_PREFIX) {
-                            gardens.push(garden_name.to_string());
+                        if let Some(container_name) = names.strip_prefix(CONTAINER_PREFIX) {
+                            containers.push(container_name.to_string());
                         }
                     }
                 }
@@ -531,21 +531,21 @@ impl ContainerBackend for AppleBackend {
         }
 
         // Fallback: parse tabular output if JSON fails.
-        if gardens.is_empty() && !stdout.trim().is_empty() {
+        if containers.is_empty() && !stdout.trim().is_empty() {
             for line in stdout.lines().skip(1) {
                 let fields: Vec<&str> = line.split_whitespace().collect();
                 if let Some(name) = fields.first() {
-                    if let Some(garden_name) = name.strip_prefix(CONTAINER_PREFIX) {
-                        gardens.push(garden_name.to_string());
+                    if let Some(container_name) = name.strip_prefix(CONTAINER_PREFIX) {
+                        containers.push(container_name.to_string());
                     }
                 }
             }
         }
 
-        Ok(gardens)
+        Ok(containers)
     }
 
-    async fn exec_in_garden(
+    async fn exec_in_container(
         &self,
         name: &str,
         cmd: &[String],
@@ -577,7 +577,7 @@ impl ContainerBackend for AppleBackend {
         })
     }
 
-    async fn garden_status(&self, name: &str) -> Result<ContainerStatus> {
+    async fn status(&self, name: &str) -> Result<ContainerStatus> {
         if !self.available {
             return Ok(ContainerStatus::NotFound);
         }
@@ -601,7 +601,7 @@ impl ContainerBackend for AppleBackend {
         Ok(status)
     }
 
-    async fn garden_stats(&self, name: &str) -> Result<Option<ContainerStats>> {
+    async fn stats(&self, name: &str) -> Result<Option<ContainerStats>> {
         if !self.available {
             return Ok(None);
         }
@@ -623,7 +623,7 @@ impl ContainerBackend for AppleBackend {
         Ok(parse_stats_output(&stdout))
     }
 
-    async fn garden_workspace(&self, name: &str) -> Result<Option<GardenWorkspaceInfo>> {
+    async fn workspace(&self, name: &str) -> Result<Option<ContainerWorkspaceInfo>> {
         if !self.available {
             return Ok(None);
         }
@@ -646,23 +646,23 @@ impl ContainerBackend for AppleBackend {
 
         let exists = fs::metadata(&workspace_path).is_ok();
 
-        Ok(Some(GardenWorkspaceInfo {
-            garden_name: name.to_string(),
+        Ok(Some(ContainerWorkspaceInfo {
+            container_name: name.to_string(),
             workspace_path,
             exists,
         }))
     }
 
-    async fn list_garden_workspaces(&self) -> Result<Vec<GardenWorkspaceInfo>> {
+    async fn list_workspaces(&self) -> Result<Vec<ContainerWorkspaceInfo>> {
         if !self.available {
             return Ok(Vec::new());
         }
 
-        let gardens = self.list_gardens().await?;
+        let containers = self.list().await?;
         let mut workspaces = Vec::new();
 
-        for garden_name in gardens {
-            if let Some(info) = self.garden_workspace(&garden_name).await? {
+        for container_name in containers {
+            if let Some(info) = self.workspace(&container_name).await? {
                 workspaces.push(info);
             }
         }
@@ -843,7 +843,7 @@ mod tests {
 
     #[test]
     fn test_container_name() {
-        assert_eq!(AppleBackend::container_name("mygarden"), "oxios-mygarden");
+        assert_eq!(AppleBackend::container_name("mycontainer"), "oxios-mycontainer");
     }
 
     #[test]
