@@ -6,20 +6,20 @@
 
 Oxios is an Agent Operating System built in Rust. It combines Unix philosophy (minimal composable tools) with Ouroboros methodology (specification-first workflows) to create an OS where AI agents execute real work on behalf of users.
 
-**Engine:** oxi-ai + oxi-agent (from `../pi2oxi/`) are consumed as path dependencies. Never reimplement what oxi already provides.
+**Engine:** oxi-ai + oxi-agent (from `../oxi/`) are consumed as path dependencies. Never reimplement what oxi already provides.
 
 **Runtime:** Apple Container on macOS Silicon. Linux support is deferred.
 
 ## Architecture
 
 ```
-Gateway (channel-agnostic) → Kernel (supervisor + ouroboros + oxi-agent) → Container Garden
+Gateway (channel-agnostic) → Kernel (supervisor + ouroboros + oxi-agent) → Container
 ```
 
 - Gateway: message hub, channels plug in as plugins (Web first, Telegram/CLI later)
 - Kernel: agent lifecycle (fork/exec/wait/kill), event bus, state store, tool registry
 - Ouroboros: spec-first protocol (interview → seed → execute → evaluate → evolve)
-- Container: Apple Container isolation (garden per project)
+- Container: Apple Container isolation (container per project)
 
 ## Kernel Modules
 
@@ -34,7 +34,7 @@ The `oxios-kernel` crate exposes these public modules:
 | `orchestrator` | Ouroboros lifecycle coordinator |
 | `agent_runtime` | oxi-agent wrapper (tool-calling loop) |
 | `container` | Apple Container backend |
-| `garden` | Garden lifecycle manager |
+| `container_manager` | Container lifecycle manager |
 | `host_exec` | Secure host command execution bridge |
 | `program` | OS-level programs (installable capabilities) |
 | `skill` | Markdown-based agent instruction templates |
@@ -100,7 +100,7 @@ Scopes: kernel, ouroboros, gateway, web, cli, docs
 
 1. **Unix philosophy:** Every component does one thing well. Compose small pieces.
 2. **Ouroboros first:** Never execute without a spec. Interview → seed → execute → evaluate → evolve.
-3. **No reimplementation:** Reuse oxi-ai and oxi-agent from pi2oxi. Reuse clawgarden code where applicable.
+3. **No reimplementation:** Reuse oxi-ai and oxi-agent from oxi. Reuse clawgarden code where applicable.
 4. **Channel agnostic:** Gateway doesn't care if the message comes from Web, CLI, or Telegram.
 5. **User invisible:** Users don't know how many agents are running. They talk, the OS handles the rest.
 6. **Container minimalism:** Ship essential tools only; rich functionality comes from host dependencies.
@@ -110,8 +110,8 @@ Scopes: kernel, ouroboros, gateway, web, cli, docs
 ```
 oxios (binary)
 ├── oxios-kernel
-│   ├── oxi-agent (from ../pi2oxi/oxi-agent)
-│   │   └── oxi-ai (from ../pi2oxi/oxi-ai)
+│   ├── oxi-agent (from ../oxi/oxi-agent)
+│   │   └── oxi-ai (from ../oxi/oxi-ai)
 │   └── oxios-ouroboros
 ├── oxios-gateway
 └── oxios-web (channel plugin)
@@ -221,7 +221,7 @@ POST /api/programs
 2. **Document host dependencies** — Always specify required vs optional host tools
 3. **Make SKILL.md comprehensive** — Agents use this to understand capability
 4. **Version semantically** — Follow SemVer for program versions
-5. **Test in garden** — Always test programs inside a garden container
+5. **Test in container** — Always test programs inside a container
 
 ---
 

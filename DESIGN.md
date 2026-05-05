@@ -89,7 +89,7 @@ Both philosophies reject uncertainty. Unix fails fast on bad input. Ouroboros cl
                       │
                       ▼
 ┌────────────────────────────────────────────────────────────────┐
-│              Container Garden (Apple Container)                │
+│              Container (Apple Container)                      │
 │              macOS Silicon only                                 │
 └────────────────────────────────────────────────────────────────┘
 ```
@@ -109,7 +109,7 @@ Both philosophies reject uncertainty. Unix fails fast on bad input. Ouroboros cl
 | Daemon | Background agent | Background service |
 | /bin, /usr/bin | Tool registry | Built-in tools |
 | Filesystem | Workspace | Persistent storage |
-| Container | Garden | Isolated execution environment |
+| Container | Container | Isolated execution environment |
 | Device driver | MCP server | Protocol-aware tool extension |
 | Package dependency | host_tools | Host command availability |
 
@@ -135,7 +135,7 @@ oxios/
 │   │       ├── agent_runtime.rs oxi-agent wrapper (AgentRuntime)
 │   │       ├── orchestrator.rs  Ouroboros lifecycle coordinator
 │   │       ├── container.rs    AppleBackend implements ContainerBackend
-│   │       ├── garden.rs       GardenManager (container lifecycle)
+│   │       ├── container_manager.rs ContainerManager (container lifecycle)
 │   │       ├── host_exec.rs   HostExecBridge (secure relay)
 │   │       ├── program.rs     ProgramManager (OS-level programs)
 │   │       ├── skill.rs       SkillStore (markdown instruction templates)
@@ -183,8 +183,8 @@ oxios/
 ### Dependencies (no reimplementation)
 
 ```
-pi2oxi/oxi-ai        → LLM provider layer for oxios-kernel and ouroboros
-pi2oxi/oxi-agent     → Tool runtime for oxios-kernel (AgentRuntime)
+oxi/oxi-ai        → LLM provider layer for oxios-kernel and ouroboros
+oxi/oxi-agent     → Tool runtime for oxios-kernel (AgentRuntime)
 ```
 
 Oxios is a layer on top of oxi. oxi is consumed as a path dependency, never reimplemented.
@@ -203,7 +203,7 @@ The OS kernel. Everything passes through here.
 - **State Store** — Markdown-based persistent state (sessions, memory, workspace)
 - **Agent Runtime** — Wraps oxi-agent for tool-calling loop execution
 - **Orchestrator** — Coordinates full Ouroboros lifecycle per message
-- **Garden Manager** — Container lifecycle management
+- **Container Manager** — Container lifecycle management
 - **Program Manager** — OS-level installable applications
 - **MCP Bridge** — Model Context Protocol awareness
 - **Host Tool Validator** — Minimal container + host dependency validation
@@ -581,17 +581,17 @@ This embodies Unix philosophy: minimal inside, rich on host.
 
 ## Container Isolation
 
-Apple Container based. Each Garden is an isolated execution environment.
+Apple Container based. Each Container is an isolated execution environment.
 
 **CLI:**
 
 ```bash
-oxios garden new project-a     ← Create garden
-oxios garden up project-a      ← Start container
-oxios garden exec project-a -- ls /workspace
-oxios garden down project-a    ← Stop container
-oxios garden remove project-a  ← Delete everything
-oxios garden list              ← List all gardens
+oxios container new project-a     ← Create container
+oxios container up project-a      ← Start container
+oxios container exec project-a -- ls /workspace
+oxios container down project-a    ← Stop container
+oxios container remove project-a  ← Delete everything
+oxios container list              ← List all containers
 ```
 
 ---
@@ -601,12 +601,12 @@ oxios garden list              ← List all gardens
 ```bash
 oxios                          Interactive mode (default — starts web server on port 4200)
 oxios run "do something"       Run single prompt through Ouroboros
-oxios garden new <name>        Create garden
-oxios garden up <name>        Start
-oxios garden down <name>      Stop
-oxios garden remove <name>    Remove
-oxios garden list              List
-oxios garden exec <name> -- cmd args...  Execute in garden
+oxios container new <name>        Create container
+oxios container up <name>        Start
+oxios container down <name>      Stop
+oxios container remove <name>    Remove
+oxios container list              List
+oxios container exec <name> -- cmd args...  Execute in container
 oxios program install <path>   Install a program
 oxios program list             List installed programs
 oxios program uninstall <name> Uninstall a program
@@ -635,11 +635,11 @@ Phase 2: Ouroboros Protocol ✓
 Phase 3: Gateway + Web ✓
   ├── oxios-gateway (channel trait, routing) ✓
   ├── oxios-web (HTTP server, dashboard) ✓
-  └── Chat + Control + Browse + Gardens ✓
+  └── Chat + Control + Browse + Containers ✓
 
 Phase 4: Container ✓
   ├── Apple Container integration ✓
-  ├── Garden lifecycle ✓
+  ├── Container lifecycle ✓
   └── Host Exec Bridge ✓
 
 Phase 5: AIOS Extensions ✓
@@ -668,6 +668,6 @@ Phase 7: Channel expansion
 |------|-------|
 | Language | Rust (edition 2021) |
 | Target | macOS Silicon (Apple Container) |
-| Engine | oxi-ai + oxi-agent (pi2oxi path dependency) |
+| Engine | oxi-ai + oxi-agent (oxi path dependency) |
 | License | MIT |
 | Default port | 4200 |
