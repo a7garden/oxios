@@ -110,6 +110,18 @@ impl ContainerExecTool {
             .and_then(|v| v.as_str())
             .ok_or_else(|| "Missing required parameter: command".to_string())?;
 
+        let cwd = params.get("cwd").and_then(|v| v.as_str());
+
+        // Log env vars if provided (full forwarding deferred — requires
+        // backend support for environment passthrough).
+        if let Some(env) = params.get("env") {
+            tracing::debug!(
+                target: "oxios::container_exec",
+                env = %env,
+                "Environment variables provided but not forwarded to container"
+            );
+        }
+
         let cmd_parts: Vec<String> = vec![
             "sh".to_string(),
             "-c".to_string(),
@@ -119,7 +131,7 @@ impl ContainerExecTool {
         let start = std::time::Instant::now();
 
         let result = cm
-            .exec_in_container(container_name, &cmd_parts, None)
+            .exec_in_container(container_name, &cmd_parts, cwd)
             .await
             .map_err(|e| format!("Container exec failed: {}", e))?;
 
