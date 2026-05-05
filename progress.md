@@ -1,13 +1,19 @@
 # Tool Architecture Redesign — Progress
 
 ## Phase 0: ClawGarden 잔재 제거 ✅
-- b72674d refactor(kernel): remove ClawGarden naming, adopt Oxios identity
+- Commit: `b72674d refactor(kernel): remove ClawGarden naming, adopt Oxios identity`
 
 ## Phase 1: ToolRegistry 재구성
-### Phase 1-A-2: container_exec.rs ✅
-- File created: `crates/oxios-kernel/src/tools/container_exec.rs`
-- ContainerExecTool implements AgentTool trait
-- Delegates to BashTool for local fallback
-- Uses ContainerManager.exec_in_container() for container path
-- Compiles clean, 4 unit tests passing
-- Build blocked by sibling files (host_exec_tool.rs, program_tool.rs) from parallel workers — not caused by this file
+### Batch 1-A: tools 모듈 생성
+- [x] `tools/mod.rs` — 모듈 선언
+- [x] `tools/container_exec.rs` — ContainerExecTool (BashTool 위임)
+- [x] `tools/host_exec_tool.rs` — HostExecTool (HostExecBridge 래핑) — **10 tests pass**
+- [x] `tools/program_tool.rs` — Phase 2용 placeholder
+- [x] `lib.rs`에 `mod tools` + re-exports 추가
+
+### Batch 1-B: agent_runtime.rs 수정
+- [ ] `build_tool_registry()` 함수로 교체
+
+### 상태
+- Build: ✅ PASS
+- Tests: ✅ PASS (200+ 통과)

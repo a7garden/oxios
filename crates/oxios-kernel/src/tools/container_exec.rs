@@ -6,7 +6,7 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use oxi_agent::{AgentTool, AgentToolResult, BashTool, ToolError};
+use oxi_agent::{AgentTool, AgentToolResult, BashTool};
 use serde_json::{json, Value};
 use tokio::sync::oneshot;
 
@@ -86,7 +86,7 @@ impl AgentTool for ContainerExecTool {
         tool_call_id: &str,
         params: Value,
         signal: Option<oneshot::Receiver<()>>,
-    ) -> Result<AgentToolResult, ToolError> {
+    ) -> Result<AgentToolResult, String> {
         // Check if we have an active container
         if let Some(cm) = &self.container {
             if let Some(name) = cm.active_container_name().await {
@@ -106,7 +106,7 @@ impl ContainerExecTool {
         container_name: &str,
         cm: &ContainerManager,
         params: &Value,
-    ) -> Result<AgentToolResult, ToolError> {
+    ) -> Result<AgentToolResult, String> {
         let command = params
             .get("command")
             .and_then(|v| v.as_str())

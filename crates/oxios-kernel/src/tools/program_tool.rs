@@ -6,7 +6,7 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use oxi_agent::{AgentTool, AgentToolResult, ToolError};
+use oxi_agent::{AgentTool, AgentToolResult};
 use serde_json::Value;
 use tokio::sync::oneshot;
 
@@ -47,7 +47,7 @@ impl AgentTool for ProgramTool {
         _tool_call_id: &str,
         _params: Value,
         _signal: Option<oneshot::Receiver<()>>,
-    ) -> Result<AgentToolResult, ToolError> {
+    ) -> Result<AgentToolResult, String> {
         Ok(AgentToolResult::error(
             "ProgramTool not yet implemented (Phase 2)",
         ))
