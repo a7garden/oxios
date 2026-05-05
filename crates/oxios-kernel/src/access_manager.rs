@@ -810,7 +810,7 @@ impl AccessManager {
     }
 
     /// Lists all registered containers.
-    pub fn list_gardens(&self) -> Vec<String> {
+    pub fn list_containers(&self) -> Vec<String> {
         self.container_workspaces.keys().cloned().collect()
     }
 
@@ -1544,7 +1544,7 @@ mod tests {
         let mut access = AccessManager::new();
         access.register_container_workspace("my-container", PathBuf::from("/workspace/my-container"));
 
-        assert_eq!(access.list_gardens(), vec!["my-container"]);
+        assert_eq!(access.list_containers(), vec!["my-container"]);
         assert_eq!(access.get_container_workspace("my-container"), Some(&PathBuf::from("/workspace/my-container")));
     }
 
@@ -1628,7 +1628,7 @@ mod tests {
 
         access.remove_container("my-container");
 
-        assert!(access.list_gardens().is_empty());
+        assert!(access.list_containers().is_empty());
         assert!(access.get_garden_for_agent("agent-1").is_none());
         assert!(access.get_garden_for_agent("agent-2").is_none());
     }
