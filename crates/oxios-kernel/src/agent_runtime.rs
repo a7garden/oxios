@@ -1,15 +1,9 @@
 //! Agent runtime: wraps oxi-agent's AgentLoop for use by the kernel.
 //!
 //! The AgentRuntime creates an oxi-agent `AgentLoop` session, configures it
-//! with built-in tools via `ToolRegistry::with_builtins()`, and executes a
-//! Seed's goal through the multi-turn LLM tool-calling loop.
-//!
-//! ## Migration from Agent V1 → AgentLoop V2
-//!
-//! - `Agent` + individual `add_tool()` → `AgentLoop` + `ToolRegistry::with_builtins()`
-//! - `spawn_blocking` + channel → `spawn_blocking` + `AgentLoop::run()` with event callback
-//! - `AgentConfig` → `AgentLoopConfig` with richer options (parallel/sequential
-//!   tool execution, auto-retry, compaction)
+//! with a custom ToolRegistry (Tier 1: oxi native, Tier 2: container/host exec,
+//! Tier 3: Program tools), and executes a Seed's goal through the multi-turn
+//! LLM tool-calling loop.
 //!
 //! Note: `AgentLoop::run()` produces a `!Send` future (the internal tool
 //! execution uses `Box<dyn Future>` without `Send`). We keep `spawn_blocking`
@@ -17,12 +11,13 @@
 
 use anyhow::Result;
 use oxi_agent::{
-    AgentEvent, AgentLoop, AgentLoopConfig, SharedState, ToolExecutionMode, ToolRegistry,
+    AgentEvent, AgentLoop, AgentLoopConfig, GrepTool, LsTool, ReadTool, SharedState, ToolExecutionMode, ToolRegistry, WriteTool, EditTool, FindTool,
 };
 use oxi_ai::{CompactionStrategy, Provider};
 use parking_lot::Mutex;
 use std::sync::Arc;
 
+use crate::tools::{ContainerExecTool, HostExecTool};
 use oxios_ouroboros::{ExecutionResult, Seed};
 
 /// Configuration for creating AgentRuntime instances.
@@ -140,8 +135,20 @@ fn run_agent_loop(
     prompt: String,
     seed_id: uuid::Uuid,
 ) -> Result<(String, usize, bool)> {
-    // Build tool registry with all built-in tools in one call.
-    let tools = Arc::new(ToolRegistry::with_builtins());
+    // Build tool registry with Oxios tool composition.
+    // Tier 1: oxi native tools (file operations) — no BashTool
+    // Tier 2: Oxios execution tools (container_exec, host_exec)
+    // Note: Tier 3 (Program tools) will be added in Phase 2
+    let registry = ToolRegistry::new();
+    registry.register(ReadTool::new());
+    registry.register(WriteTool::new());
+    registry.register(EditTool::new());
+    registry.register(GrepTool::new());
+    registry.register(FindTool::new());
+    registry.register(LsTool::new());
+    registry.register(ContainerExecTool::new(None));
+    // TODO: Phase 2 — add HostExecTool and ProgramTool when wiring is complete
+    let tools = Arc::new(registry);
 
     // Build the AgentLoop config from our runtime config.
     let loop_config = AgentLoopConfig {
