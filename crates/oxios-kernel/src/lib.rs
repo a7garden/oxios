@@ -9,7 +9,7 @@
 pub mod a2a;
 pub mod access_manager;
 pub mod agent_runtime;
-pub mod argo;
+
 pub mod config;
 pub mod container;
 pub mod context_manager;
@@ -69,5 +69,3 @@ pub use supervisor::{BasicSupervisor, Supervisor};
 pub use tools::{ContainerExecTool, HostExecTool, ProgramTool};
 pub use types::{AgentId, AgentInfo, AgentStatus};
 
-// Argo Workflows exports
-pub use argo::{ArgoConfig, ArgoWorkflow, WorkflowPhase, WorkflowStatus, WorkflowSummary};

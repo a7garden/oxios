@@ -15,14 +15,16 @@ use tokio::sync::oneshot;
 use super::container_exec::ContainerExecTool;
 use super::host_exec_tool::HostExecTool;
 use crate::config::ContainerConfig;
+use crate::container_manager::ContainerManager;
+use crate::host_exec::HostExecBridge;
 use crate::program::{ProgramHostRequirements, ToolDef};
+use crate::state_store::StateStore;
 
 /// A tool defined by a Program, with automatic execution routing.
 ///
 /// Routes to `host_exec` if the command binary is listed in the program's
 /// `host_requirements` or the global `ContainerConfig` host tools.
-/// Otherwise routes to `container_exec` (which falls back to local `sh -c`
-/// when no container is active).
+/// Otherwise routes to `container_exec` (container-only, no local fallback).
 pub struct ProgramTool {
     /// Full namespaced name: `"program:{program_name}:{tool_name}"`
     full_name: String,
@@ -176,11 +178,24 @@ impl AgentTool for ProgramTool {
 mod tests {
     use super::*;
 
+    /// Helper: create a minimal test container manager.
+    fn make_test_container_manager(allowlist: Vec<String>) -> Arc<ContainerManager> {
+        let host_exec_bridge = Arc::new(
+            HostExecBridge::new(std::env::temp_dir(), allowlist)
+                .expect("non-empty allowlist required in tests"),
+        );
+        let state = StateStore::new(std::env::temp_dir().as_path().join("state")).unwrap();
+        Arc::new(ContainerManager::with_apple_backend(
+            host_exec_bridge,
+            Arc::new(state),
+            std::env::temp_dir().as_path().join("containers"),
+        ))
+    }
+
     /// Verify that ProgramTool correctly determines host routing based on
     /// program-level host_requirements.
     #[test]
     fn test_host_routing_from_program_requirements() {
-        // Simulate a tool where "gh" is in host_requirements.required
         let tool_def = ToolDef {
             name: "create_pr".to_string(),
             description: "Create a PR".to_string(),
@@ -193,12 +208,13 @@ mod tests {
         };
         let config = ContainerConfig::default();
 
-        // We need real Tier 2 tools for Arc — use minimal stubs
-        let container_exec = Arc::new(ContainerExecTool::new(None));
-        let host_bridge = Arc::new(
-            crate::host_exec::HostExecBridge::new(std::env::temp_dir(), vec!["gh".to_string()]),
+        let cm = make_test_container_manager(vec!["gh".to_string()]);
+        let container_exec = Arc::new(ContainerExecTool::new(Arc::clone(&cm)));
+        let host_exec_bridge = Arc::new(
+            HostExecBridge::new(std::env::temp_dir(), vec!["gh".to_string()])
+                .expect("non-empty allowlist required"),
         );
-        let host_exec = Arc::new(HostExecTool::new(host_bridge));
+        let host_exec = Arc::new(HostExecTool::new(host_exec_bridge));
 
         let tool = ProgramTool::from_definition(
             "github",
@@ -230,11 +246,13 @@ mod tests {
         };
         let config = ContainerConfig::default();
 
-        let container_exec = Arc::new(ContainerExecTool::new(None));
-        let host_bridge = Arc::new(
-            crate::host_exec::HostExecBridge::new(std::env::temp_dir(), vec![]),
+        let cm = make_test_container_manager(vec!["echo".to_string()]);
+        let container_exec = Arc::new(ContainerExecTool::new(Arc::clone(&cm)));
+        let host_exec_bridge = Arc::new(
+            HostExecBridge::new(std::env::temp_dir(), vec!["echo".to_string()])
+                .expect("non-empty allowlist required"),
         );
-        let host_exec = Arc::new(HostExecTool::new(host_bridge));
+        let host_exec = Arc::new(HostExecTool::new(host_exec_bridge));
 
         let tool = ProgramTool::from_definition(
             "jq",
@@ -269,11 +287,13 @@ mod tests {
         let mut config = ContainerConfig::default();
         config.required_host_tools = vec!["git".to_string()];
 
-        let container_exec = Arc::new(ContainerExecTool::new(None));
-        let host_bridge = Arc::new(
-            crate::host_exec::HostExecBridge::new(std::env::temp_dir(), vec!["git".to_string()]),
+        let cm = make_test_container_manager(vec!["git".to_string()]);
+        let container_exec = Arc::new(ContainerExecTool::new(Arc::clone(&cm)));
+        let host_exec_bridge = Arc::new(
+            HostExecBridge::new(std::env::temp_dir(), vec!["git".to_string()])
+                .expect("non-empty allowlist required"),
         );
-        let host_exec = Arc::new(HostExecTool::new(host_bridge));
+        let host_exec = Arc::new(HostExecTool::new(host_exec_bridge));
 
         let tool = ProgramTool::from_definition(
             "git-tools",

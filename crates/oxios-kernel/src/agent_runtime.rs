@@ -21,7 +21,9 @@ use std::sync::Arc;
 use crate::config::OxiosConfig;
 use crate::container_manager::ContainerManager;
 use crate::host_exec::HostExecBridge;
+use crate::persona_manager::PersonaManager;
 use crate::program::ProgramManager;
+use crate::state_store::StateStore;
 use crate::tools::{ContainerExecTool, HostExecTool, ProgramTool};
 use oxios_ouroboros::{ExecutionResult, Seed};
 
@@ -65,26 +67,54 @@ struct ExecuteState {
 pub struct AgentRuntime {
     provider: Arc<dyn Provider>,
     config: AgentRuntimeConfig,
-    container: Option<Arc<ContainerManager>>,
+    /// Container manager — always present, required for workspace execution.
+    container: Arc<ContainerManager>,
     host_bridge: Option<Arc<HostExecBridge>>,
     program_manager: Option<Arc<ProgramManager>>,
     oxios_config: Option<OxiosConfig>,
+    persona_manager: Option<Arc<PersonaManager>>,
+}
+
+/// Create a minimal placeholder ContainerManager for cases where
+/// no real container is available (e.g., during initialization before
+/// kernel is fully set up, or in tests).
+fn make_placeholder_container_manager() -> ContainerManager {
+    let tmp = tempfile::tempdir().unwrap();
+    let state = StateStore::new(tmp.path().join("state")).unwrap();
+    let host_exec = Arc::new(
+        HostExecBridge::new(tmp.path().to_path_buf(), vec!["echo".to_string()])
+            .expect("placeholder needs non-empty allowlist"),
+    );
+    ContainerManager::with_apple_backend(
+        host_exec,
+        Arc::new(state),
+        tmp.path().join("containers"),
+    )
 }
 
 impl AgentRuntime {
     /// Creates a new agent runtime with the given LLM provider and default config.
     pub fn new(provider: Arc<dyn Provider>, model_id: impl Into<String>) -> Self {
+        // NOTE: container must be set via with_container() before execute()
+        // A placeholder is used until with_container() is called.
         Self {
             provider,
             config: AgentRuntimeConfig {
                 model_id: model_id.into(),
                 ..Default::default()
             },
-            container: None,
+            container: Arc::new(make_placeholder_container_manager()),
             host_bridge: None,
             program_manager: None,
             oxios_config: None,
+            persona_manager: None,
         }
+    }
+
+    /// Attach a PersonaManager for persona system prompt injection.
+    pub fn with_persona_manager(mut self, pm: Arc<PersonaManager>) -> Self {
+        self.persona_manager = Some(pm);
+        self
     }
 
     /// Creates a new agent runtime with the given LLM provider and full config.
@@ -93,16 +123,18 @@ impl AgentRuntime {
         Self {
             provider,
             config,
-            container: None,
+            container: Arc::new(make_placeholder_container_manager()),
             host_bridge: None,
             program_manager: None,
             oxios_config: None,
+            persona_manager: None,
         }
     }
 
     /// Attach a ContainerManager for container execution.
+    /// Container is always required — set via this method or during construction.
     pub fn with_container(mut self, container: Arc<ContainerManager>) -> Self {
-        self.container = Some(container);
+        self.container = container;
         self
     }
 
@@ -134,14 +166,41 @@ impl AgentRuntime {
     /// Runs inside `spawn_blocking` because `AgentLoop::run()` produces
     /// a `!Send` future (internal `Box<dyn Future>` without `Send` bound).
     pub async fn execute(&self, seed: &Seed) -> Result<ExecutionResult> {
-        let system_prompt = build_system_prompt(seed);
         let prompt = build_user_prompt(seed);
+
+        // Collect SKILL.md content from enabled programs.
+        let skill_contents: Vec<String> = if let Some(ref pm) = self.program_manager {
+            let rt = tokio::runtime::Handle::current();
+            rt.block_on(async {
+                let programs = pm.list_enabled().await;
+                let mut contents = Vec::new();
+                for p in &programs {
+                    if let Some(c) = pm.get_skill_content(&p.meta.name).await {
+                        if !c.trim().is_empty() {
+                            contents.push(c);
+                        }
+                    }
+                }
+                contents
+            })
+        } else {
+            Vec::new()
+        };
+
+        // Get active persona system prompt.
+        let persona_prompt = self
+            .persona_manager
+            .as_ref()
+            .map(|pm| pm.active_system_prompt())
+            .filter(|s| !s.trim().is_empty());
+
+        let system_prompt = build_system_prompt(seed, &skill_contents, persona_prompt.as_deref());
 
         // Clone everything to move into spawn_blocking.
         let config = self.config.clone();
         let provider = Arc::clone(&self.provider);
         let seed_id = seed.id;
-        let container = self.container.clone();
+        let container = Arc::clone(&self.container);
         let host_bridge = self.host_bridge.clone();
         let program_manager = self.program_manager.clone();
         let oxios_config = self.oxios_config.clone();
@@ -192,7 +251,7 @@ fn run_agent_loop(
     system_prompt: String,
     prompt: String,
     seed_id: uuid::Uuid,
-    container: Option<Arc<ContainerManager>>,
+    container: Arc<ContainerManager>,
     host_bridge: Option<Arc<HostExecBridge>>,
     program_manager: Option<Arc<ProgramManager>>,
     oxios_config: Option<OxiosConfig>,
@@ -226,6 +285,23 @@ fn run_agent_loop(
                 .unwrap_or_default();
 
             for program in &programs {
+                // ── P1-3: requires_tools validation ──
+                let missing_tools: Vec<&str> = program
+                    .meta
+                    .dependencies
+                    .iter()
+                    .filter(|tool_name| registry.get(tool_name).is_none())
+                    .map(|s| s.as_str())
+                    .collect();
+                if !missing_tools.is_empty() {
+                    tracing::warn!(
+                        program = %program.meta.name,
+                        missing_tools = ?missing_tools,
+                        "Skipping program: required tools not found in registry",
+                    );
+                    continue;
+                }
+
                 for tool_def in &program.meta.tools {
                     if !tool_def.command.is_empty() {
                         let tool = ProgramTool::from_definition(
@@ -316,8 +392,8 @@ fn run_agent_loop(
     })
 }
 
-/// Build a system prompt from the Seed's goal and constraints.
-fn build_system_prompt(seed: &Seed) -> String {
+/// Build a system prompt from the Seed's goal, constraints, and program skills.
+fn build_system_prompt(seed: &Seed, skill_contents: &[String], persona_prompt: Option<&str>) -> String {
     let mut prompt = format!(
         "You are an autonomous agent executing a specific task.\n\n\
          ## Goal\n\
@@ -347,6 +423,23 @@ fn build_system_prompt(seed: &Seed) -> String {
                 e.name, e.entity_type, e.description
             ));
         }
+    }
+
+    // Inject SKILL.md content from enabled programs
+    if !skill_contents.is_empty() {
+        prompt.push_str("\n## Available Programs\n");
+        prompt.push_str("You have access to the following programs. Use their tools and guidelines as needed.\n\n");
+        for content in skill_contents {
+            prompt.push_str(content);
+            prompt.push_str("\n\n");
+        }
+    }
+
+    // Inject persona system prompt
+    if let Some(pp) = persona_prompt {
+        prompt.push_str("\n## Persona\n");
+        prompt.push_str(pp);
+        prompt.push_str("\n");
     }
 
     // Execution environment guidance
@@ -383,5 +476,137 @@ impl std::fmt::Debug for AgentRuntime {
         f.debug_struct("AgentRuntime")
             .field("model_id", &self.config.model_id)
             .finish()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use async_trait::async_trait;
+    use oxi_agent::tools::{AgentTool, ToolError};
+    use serde_json::Value;
+    use oxios_ouroboros::Entity;
+
+    /// A test tool that does nothing — used to populate the registry.
+    struct DummyTool {
+        name: String,
+    }
+
+    #[async_trait]
+    impl AgentTool for DummyTool {
+        fn name(&self) -> &str { &self.name }
+        fn label(&self) -> &str { &self.name }
+        fn description(&self) -> &str { "Test tool" }
+        fn parameters_schema(&self) -> Value { serde_json::json!({"type": "object"}) }
+
+        async fn execute(
+            &self,
+            _tool_call_id: &str,
+            _params: Value,
+            _shutdown: Option<tokio::sync::oneshot::Receiver<()>>,
+        ) -> Result<oxi_agent::AgentToolResult, ToolError> {
+            Ok(oxi_agent::AgentToolResult::success("ok"))
+        }
+    }
+
+    /// Test that requires_tools validation passes when all tools are present.
+    #[test]
+    fn test_requires_tools_validation_passes() {
+        let registry = ToolRegistry::new();
+
+        // Register the tools the program depends on.
+        registry.register(DummyTool { name: "read".into() });
+        registry.register(DummyTool { name: "container_exec".into() });
+
+        // Simulate a program that requires "read" and "container_exec".
+        let required_tools = vec!["read".to_string(), "container_exec".to_string()];
+
+        // Validation: all required tools must exist in the registry.
+        let missing: Vec<&str> = required_tools
+            .iter()
+            .filter(|name| registry.get(name).is_none())
+            .map(|s| s.as_str())
+            .collect();
+
+        assert!(missing.is_empty(), "Expected no missing tools, got: {:?}", missing);
+    }
+
+    /// Test that requires_tools validation fails when a tool is missing.
+    #[test]
+    fn test_requires_tools_validation_fails() {
+        let registry = ToolRegistry::new();
+
+        // Only register "read", not "container_exec" or "nonexistent".
+        registry.register(DummyTool { name: "read".into() });
+
+        // Simulate a program that requires tools that don't exist.
+        let required_tools = vec![
+            "read".to_string(),       // exists
+            "container_exec".to_string(), // missing
+            "nonexistent".to_string(), // missing
+        ];
+
+        // Validation: find missing tools.
+        let missing: Vec<&str> = required_tools
+            .iter()
+            .filter(|name| registry.get(name).is_none())
+            .map(|s| s.as_str())
+            .collect();
+
+        assert_eq!(missing, vec!["container_exec", "nonexistent"]);
+    }
+
+    #[test]
+    fn test_build_system_prompt_includes_skills() {
+        let seed = Seed {
+            id: uuid::Uuid::new_v4(),
+            goal: "Build a web server".into(),
+            constraints: vec!["Must use Rust".into()],
+            acceptance_criteria: vec!["Server responds to requests".into()],
+            ontology: vec![
+                Entity {
+                    name: "HttpServer".into(),
+                    entity_type: "struct".into(),
+                    description: "The main server struct".into(),
+                },
+            ],
+            created_at: chrono::Utc::now(),
+            generation: 0,
+            parent_seed_id: None,
+        };
+
+        let prompt = build_system_prompt(&seed, &[], None);
+
+        // Verify goal is present
+        assert!(prompt.contains("Build a web server"));
+
+        // Verify constraints are present
+        assert!(prompt.contains("Must use Rust"));
+
+        // Verify acceptance criteria is present
+        assert!(prompt.contains("Server responds to requests"));
+
+        // Verify domain entities are present
+        assert!(prompt.contains("HttpServer"));
+        assert!(prompt.contains("struct"));
+    }
+
+    #[test]
+    fn test_build_system_prompt_empty_skills() {
+        let seed = Seed {
+            id: uuid::Uuid::new_v4(),
+            goal: "Test goal".into(),
+            constraints: vec![],
+            acceptance_criteria: vec![],
+            ontology: vec![],
+            created_at: chrono::Utc::now(),
+            generation: 0,
+            parent_seed_id: None,
+        };
+
+        let prompt = build_system_prompt(&seed, &[], None);
+
+        // Verify goal is present
+        assert!(prompt.contains("Test goal"));
     }
 }

@@ -381,10 +381,10 @@ mod tests {
         let base = tmp.path().join("containers");
         let state = StateStore::new(tmp.path().join("state")).unwrap();
 
-        let host_exec = Arc::new(HostExecBridge::new(
-            tmp.path().to_path_buf(),
-            vec![],
-        ));
+        let host_exec = Arc::new(
+            HostExecBridge::new(tmp.path().to_path_buf(), vec!["echo".to_string()])
+                .expect("non-empty allowlist required"),
+        );
 
         let manager = ContainerManager::with_apple_backend(host_exec, Arc::new(state), base.clone());
 
@@ -402,10 +402,10 @@ mod tests {
         let base = tmp.path().join("containers");
         let state = StateStore::new(tmp.path().join("state")).unwrap();
 
-        let host_exec = Arc::new(HostExecBridge::new(
-            tmp.path().to_path_buf(),
-            vec![],
-        ));
+        let host_exec = Arc::new(
+            HostExecBridge::new(tmp.path().to_path_buf(), vec!["echo".to_string()])
+                .expect("non-empty allowlist required"),
+        );
 
         let manager = ContainerManager::with_apple_backend(host_exec, Arc::new(state), base.clone());
 
@@ -420,10 +420,10 @@ mod tests {
         let base = tmp.path().join("containers");
         let state = StateStore::new(tmp.path().join("state")).unwrap();
 
-        let host_exec = Arc::new(HostExecBridge::new(
-            tmp.path().to_path_buf(),
-            vec![],
-        ));
+        let host_exec = Arc::new(
+            HostExecBridge::new(tmp.path().to_path_buf(), vec!["echo".to_string()])
+                .expect("non-empty allowlist required"),
+        );
 
         let manager = ContainerManager::with_apple_backend(host_exec, Arc::new(state), base);
 
@@ -441,10 +441,10 @@ mod tests {
         let base = tmp.path().join("containers");
         let state = StateStore::new(tmp.path().join("state")).unwrap();
 
-        let host_exec = Arc::new(HostExecBridge::new(
-            tmp.path().to_path_buf(),
-            vec![],
-        ));
+        let host_exec = Arc::new(
+            HostExecBridge::new(tmp.path().to_path_buf(), vec!["echo".to_string()])
+                .expect("non-empty allowlist required"),
+        );
 
         let manager = ContainerManager::with_apple_backend(host_exec, Arc::new(state), base.clone());
 

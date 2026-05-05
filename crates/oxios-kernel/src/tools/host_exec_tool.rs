@@ -162,10 +162,13 @@ mod tests {
 
     fn make_bridge(allowed: Vec<&str>) -> Arc<HostExecBridge> {
         let tmp = tempfile::tempdir().unwrap();
-        Arc::new(HostExecBridge::new(
-            tmp.path().to_path_buf(),
-            allowed.into_iter().map(String::from).collect(),
-        ))
+        Arc::new(
+            HostExecBridge::new(
+                tmp.path().to_path_buf(),
+                allowed.into_iter().map(String::from).collect(),
+            )
+            .expect("non-empty allowlist required"),
+        )
     }
 
     #[tokio::test]
@@ -198,7 +201,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_missing_binary_param() {
-        let bridge = make_bridge(vec![]);
+        let bridge = make_bridge(vec!["echo"]);
         let tool = HostExecTool::new(bridge);
 
         let result = tool.execute("test-3", json!({}), None).await;
@@ -276,21 +279,21 @@ mod tests {
 
     #[test]
     fn test_name() {
-        let bridge = make_bridge(vec![]);
+        let bridge = make_bridge(vec!["echo"]);
         let tool = HostExecTool::new(bridge);
         assert_eq!(tool.name(), "host_exec");
     }
 
     #[test]
     fn test_label() {
-        let bridge = make_bridge(vec![]);
+        let bridge = make_bridge(vec!["echo"]);
         let tool = HostExecTool::new(bridge);
         assert_eq!(tool.label(), "Host Exec");
     }
 
     #[test]
     fn test_parameters_schema_structure() {
-        let bridge = make_bridge(vec![]);
+        let bridge = make_bridge(vec!["echo"]);
         let tool = HostExecTool::new(bridge);
         let schema = tool.parameters_schema();
 

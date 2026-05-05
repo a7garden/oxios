@@ -270,10 +270,13 @@ async fn init_kernel(
 
     // Initialize the container manager.
     let containers_base = PathBuf::from(&config.container.container_path);
-    let host_exec = Arc::new(HostExecBridge::new(
-        containers_base.clone(),
-        config.container.allowed_host_commands.clone(),
-    ));
+    let host_exec = Arc::new(
+        HostExecBridge::new(
+            containers_base.clone(),
+            config.container.allowed_host_commands.clone(),
+        )
+        .context("HostExecBridge requires non-empty allowlist")?,
+    );
     let state_store_for_containers = StateStore::new(PathBuf::from(&config.kernel.workspace))?;
     let container_manager = Arc::new(ContainerManager::with_apple_backend(
         host_exec.clone(),
@@ -295,7 +298,8 @@ async fn init_kernel(
         .with_container(Arc::clone(&container_manager))
         .with_host_bridge(host_exec)
         .with_program_manager(Arc::clone(&program_manager))
-        .with_oxios_config(config.clone());
+        .with_oxios_config(config.clone())
+        .with_persona_manager(Arc::new(persona_manager.clone()));
 
     // Initialize the supervisor with the agent runtime.
     let supervisor: Arc<dyn Supervisor> = Arc::new(BasicSupervisor::new(

@@ -212,15 +212,23 @@ impl HostExecBridge {
     /// Create a new HostExecBridge.
     ///
     /// The socket will be placed at `base_path/oxios-relay.sock`.
-    /// If `allowed_commands` is empty, all bare-name commands are allowed
-    /// (useful for development; lock down in production).
-    pub fn new(base_path: PathBuf, allowed_commands: Vec<String>) -> Self {
+    /// The `allowed_commands` must be non-empty — security requires an explicit allowlist.
+    ///
+    /// Returns an error if `allowed_commands` is empty.
+    pub fn new(base_path: PathBuf, allowed_commands: Vec<String>) -> Result<Self> {
+        if allowed_commands.is_empty() {
+            anyhow::bail!(
+                "HostExecBridge allowlist cannot be empty; \
+                pass at least one allowed command for security"
+            );
+        }
+
         let allowed: HashSet<String> = allowed_commands.into_iter().collect();
-        Self {
+        Ok(Self {
             allowed_commands: Arc::new(allowed),
             relay_sock_path: base_path.join(RELAY_SOCK_NAME),
             running: Arc::new(std::sync::atomic::AtomicBool::new(false)),
-        }
+        })
     }
 
     /// Start the relay daemon (spawns a background task).
@@ -484,7 +492,7 @@ mod tests {
         let bridge = HostExecBridge::new(
             tmp.path().to_path_buf(),
             vec!["echo".to_string()],
-        );
+        ).expect("non-empty allowlist required");
 
         // Use exec directly (not through relay).
         let result = bridge.exec("echo", vec!["hello world".into()], 5000).await;
@@ -500,9 +508,17 @@ mod tests {
         let bridge = HostExecBridge::new(
             tmp.path().to_path_buf(),
             vec!["echo".to_string()],
-        );
+        ).expect("non-empty allowlist required");
 
         let result = bridge.exec("rm", vec!["-rf".into(), "/".into()], 5000).await;
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_host_exec_bridge_rejects_empty_allowlist() {
+        let tmp = tempfile::tempdir().unwrap();
+        let result = HostExecBridge::new(tmp.path().to_path_buf(), vec![]);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("allowlist cannot be empty"));
     }
 }

@@ -104,6 +104,8 @@ struct TomlProgram {
     tools: Option<HashMap<String, TomlTool>>,
     #[serde(rename = "host_requirements")]
     host_requirements: Option<TomlHostRequirements>,
+    #[serde(rename = "requires_tools")]
+    requires_tools: Option<TomlRequiresTools>,
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -135,6 +137,12 @@ struct TomlArgument {
 struct TomlHostRequirements {
     required: Option<Vec<String>>,
     optional: Option<Vec<String>>,
+}
+
+/// Required tools for a program to function.
+#[derive(Debug, Clone, serde::Deserialize)]
+struct TomlRequiresTools {
+    names: Vec<String>,
 }
 
 impl ProgramMeta {
@@ -175,13 +183,17 @@ impl ProgramMeta {
             })
             .unwrap_or_default();
 
+        let dependencies = toml.requires_tools
+            .map(|rt| rt.names)
+            .unwrap_or_default();
+
         Ok(ProgramMeta {
             name: toml.program.name,
             version: toml.program.version,
             description: toml.program.description,
             author: toml.program.author,
             tools,
-            dependencies: Vec::new(),
+            dependencies,
             host_requirements,
         })
     }
@@ -729,6 +741,76 @@ author = "X"
         assert!(meta.tools.is_empty());
         assert!(meta.host_requirements.required.is_empty());
         assert!(meta.host_requirements.optional.is_empty());
+        assert!(meta.dependencies.is_empty());
+    }
+
+    #[test]
+    fn test_requires_tools_parsed() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let program_dir = temp_dir.path();
+
+        let toml_content = r#"
+[program]
+name = "needs-tools"
+version = "1.0.0"
+description = "A program that requires tools"
+author = "Test"
+
+[requires_tools]
+names = ["read", "container_exec"]
+"#;
+
+        fs::write(program_dir.join("program.toml"), toml_content).unwrap();
+
+        let meta = ProgramMeta::load_from_dir(program_dir).unwrap();
+
+        assert_eq!(meta.dependencies, vec!["read", "container_exec"]);
+    }
+
+    #[test]
+    fn test_requires_tools_empty() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let program_dir = temp_dir.path();
+
+        let toml_content = r#"
+[program]
+name = "no-reqs"
+version = "1.0.0"
+description = "No requirements"
+author = "Test"
+
+[requires_tools]
+names = []
+"#;
+
+        fs::write(program_dir.join("program.toml"), toml_content).unwrap();
+
+        let meta = ProgramMeta::load_from_dir(program_dir).unwrap();
+
+        assert!(meta.dependencies.is_empty());
+    }
+
+    #[test]
+    fn test_requires_tools_single() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let program_dir = temp_dir.path();
+
+        let toml_content = r#"
+[program]
+name = "single-req"
+version = "1.0.0"
+description = "Single requirement"
+author = "Test"
+
+[requires_tools]
+names = ["grep"]
+"#;
+
+        fs::write(program_dir.join("program.toml"), toml_content).unwrap();
+
+        let meta = ProgramMeta::load_from_dir(program_dir).unwrap();
+
+        assert_eq!(meta.dependencies, vec!["grep"]);
     }
 
     // --- ProgramManager tests ---
