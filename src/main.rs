@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use oxios_gateway::Gateway;
 use oxios_kernel::{
-    AccessManager, AgentRuntime, BasicSupervisor, EngineProvider, EventBus, GardenManager, HostExecBridge,
+    AccessManager, AgentRuntime, BasicSupervisor, EngineProvider, EventBus, ContainerManager, HostExecBridge,
     HostToolValidator, OxiEngineProvider, Orchestrator, OxiosConfig, PersonaManager, ProgramManager, SkillStore,
     StateStore, Supervisor, AgentScheduler, InstallSource, McpBridge, McpServer,
     A2AProtocol,
@@ -195,7 +195,7 @@ async fn init_kernel(
     Gateway,
     EventBus,
     Arc<StateStore>,
-    GardenManager,
+    ContainerManager,
     OxiosConfig,
     SkillStore,
     Arc<dyn Supervisor>,
@@ -284,16 +284,16 @@ async fn init_kernel(
     let gateway = Gateway::new(orchestrator.clone());
 
     // Initialize the garden manager.
-    let gardens_base = PathBuf::from(&config.container.garden_path);
+    let containers_base = PathBuf::from(&config.container.container_path);
     let host_exec = Arc::new(HostExecBridge::new(
-        gardens_base.clone(),
+        containers_base.clone(),
         config.container.allowed_host_commands.clone(),
     ));
     let state_store_for_gardens = StateStore::new(PathBuf::from(&config.kernel.workspace))?;
-    let garden_manager = GardenManager::with_apple_backend(
+    let container_manager = ContainerManager::with_apple_backend(
         host_exec,
         Arc::new(state_store_for_gardens),
-        gardens_base,
+        containers_base,
     );
 
     // Initialize the skill store.
@@ -317,7 +317,7 @@ async fn init_kernel(
     // Initialize the MCP bridge.
     let mcp_bridge = Arc::new(Mutex::new(init_mcp_bridge(&config).await?));
 
-    Ok((orchestrator, gateway, event_bus.clone(), state_store, garden_manager, config, skill_store, supervisor, scheduler, access_manager, program_manager, host_tool_validator, persona_manager, a2a_protocol, mcp_bridge))
+    Ok((orchestrator, gateway, event_bus.clone(), state_store, container_manager, config, skill_store, supervisor, scheduler, access_manager, program_manager, host_tool_validator, persona_manager, a2a_protocol, mcp_bridge))
 }
 
 /// Initialize the MCP bridge and register all configured servers.
@@ -439,36 +439,36 @@ async fn cmd_run(prompt: &str, config_path: &Path, model_id: &str) -> Result<()>
 /// Handle garden subcommands.
 async fn cmd_garden(action: GardenAction, config_path: &Path) -> Result<()> {
     let model_id = "anthropic/claude-sonnet-4-20250514"; // Dummy for garden cmds
-    let (_, _, _, _, garden_manager, _, _, _, _, _, _, _, _, _, _) = init_kernel(config_path, model_id).await?;
+    let (_, _, _, _, container_manager, _, _, _, _, _, _, _, _, _, _) = init_kernel(config_path, model_id).await?;
 
     match action {
         GardenAction::New { name } => {
-            garden_manager.new_garden(&name).await?;
+            container_manager.new_container(&name).await?;
             println!("Garden '{}' created.", name);
         }
         GardenAction::Up { name } => {
-            if !garden_manager.is_backend_available() {
+            if !container_manager.is_backend_available() {
                 println!("⚠️  Container runtime not available. Garden metadata recorded.");
                 println!("   To start the container, install 'container' CLI from Xcode.");
             } else {
-                garden_manager.start_garden(&name).await?;
+                container_manager.start_container(&name).await?;
                 println!("Garden '{}' started.", name);
             }
         }
         GardenAction::Down { name } => {
-            if !garden_manager.is_backend_available() {
+            if !container_manager.is_backend_available() {
                 println!("⚠️  Container runtime not available.");
             } else {
-                garden_manager.stop_garden(&name).await?;
+                container_manager.stop_container(&name).await?;
                 println!("Garden '{}' stopped.", name);
             }
         }
         GardenAction::Remove { name } => {
-            garden_manager.remove_garden(&name).await?;
+            container_manager.remove_container(&name).await?;
             println!("Garden '{}' removed.", name);
         }
         GardenAction::List => {
-            let gardens: Vec<_> = garden_manager.list_gardens().await?;
+            let gardens: Vec<_> = container_manager.list_containers().await?;
             if gardens.is_empty() {
                 println!("No gardens found.");
             } else {
@@ -481,10 +481,10 @@ async fn cmd_garden(action: GardenAction, config_path: &Path) -> Result<()> {
             }
         }
         GardenAction::Exec { name, command } => {
-            if !garden_manager.is_backend_available() {
+            if !container_manager.is_backend_available() {
                 bail!("Container runtime not available. Cannot exec in garden.");
             }
-            let result = garden_manager.exec_in_garden(&name, &command, None).await?;
+            let result = container_manager.exec_in_container(&name, &command, None).await?;
             if !result.stdout.is_empty() {
                 print!("{}", result.stdout);
             }
@@ -632,7 +632,7 @@ fn get_config_value(config: &OxiosConfig, key: &str) -> Option<String> {
         ["kernel", "max_agents"] => Some(config.kernel.max_agents.to_string()),
         ["gateway", "host"] => Some(config.gateway.host.clone()),
         ["gateway", "port"] => Some(config.gateway.port.to_string()),
-        ["container", "garden_path"] => Some(config.container.garden_path.clone()),
+        ["container", "container_path"] => Some(config.container.container_path.clone()),
         ["container", "image_tag"] => Some(config.container.image_tag.clone()),
         ["container", "memory_limit"] => Some(config.container.memory_limit.clone()),
         ["container", "cpu_limit"] => Some(config.container.cpu_limit.to_string()),
@@ -643,7 +643,7 @@ fn get_config_value(config: &OxiosConfig, key: &str) -> Option<String> {
 /// Show system status.
 async fn cmd_status(config_path: &Path) -> Result<()> {
     let model_id = "anthropic/claude-sonnet-4-20250514";
-    let (_, _, _, _, garden_manager, config, _, _, _, _, _, _, _, _, mcp_bridge) =
+    let (_, _, _, _, container_manager, config, _, _, _, _, _, _, _, _, mcp_bridge) =
         init_kernel(config_path, model_id).await?;
 
     println!("Oxios Agent OS");
@@ -651,13 +651,13 @@ async fn cmd_status(config_path: &Path) -> Result<()> {
     println!("  Version: {}", env!("CARGO_PKG_VERSION"));
     println!("  Config: {}", config_path.display());
     println!("  Workspace: {}", config.kernel.workspace);
-    println!("  Garden path: {}", config.container.garden_path);
+    println!("  Garden path: {}", config.container.container_path);
     println!();
 
     // Container backend status.
-    let backend_available = garden_manager.is_backend_available();
+    let backend_available = container_manager.is_backend_available();
     println!("Container Runtime:");
-    println!("  Backend: {}", garden_manager.backend_name());
+    println!("  Backend: {}", container_manager.backend_name());
     println!("  Available: {} ({})",
         if backend_available { "yes" } else { "no" },
         if backend_available { "ready" } else { "install container CLI from Xcode" }
@@ -665,7 +665,7 @@ async fn cmd_status(config_path: &Path) -> Result<()> {
     println!();
 
     // Gardens status.
-    let gardens: Vec<_> = garden_manager.list_gardens().await?;
+    let gardens: Vec<_> = container_manager.list_containers().await?;
     println!("Gardens: {} known", gardens.len());
     if !gardens.is_empty() {
         let running = gardens.iter().filter(|g| g.running).count();
@@ -808,7 +808,7 @@ async fn main() -> Result<()> {
             }
 
             // Initialize kernel components.
-            let (_orchestrator, gateway, event_bus, state_store, garden_manager, config, skill_store, supervisor, scheduler, access_manager, program_manager, host_tool_validator, persona_manager, _a2a, mcp_bridge) =
+            let (_orchestrator, gateway, event_bus, state_store, container_manager, config, skill_store, supervisor, scheduler, access_manager, program_manager, host_tool_validator, persona_manager, _a2a, mcp_bridge) =
                 init_kernel(&config_path, default_model).await?;
 
             // Initialize MCP servers from config (init_kernel already created the bridge).
@@ -851,7 +851,7 @@ async fn main() -> Result<()> {
             gateway.register(Box::new(web_channel)).await;
 
             // Start the host exec bridge if available.
-            // (The bridge is created in GardenManager but start() is optional)
+            // (The bridge is created in ContainerManager but start() is optional)
 
             // Create the web server.
             let _web_server = WebServer::new(
@@ -860,7 +860,7 @@ async fn main() -> Result<()> {
                 channel_handle,
                 event_bus.clone(),
                 (*state_store).clone(),
-                garden_manager,
+                container_manager,
                 skill_store.clone(),
                 program_manager,
                 host_tool_validator,

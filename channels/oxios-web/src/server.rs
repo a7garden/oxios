@@ -15,7 +15,7 @@ use tower_http::services::ServeDir;
 use crate::channel::WebChannelHandle;
 use crate::routes::build_routes;
 use oxios_kernel::event_bus::EventBus;
-use oxios_kernel::garden::GardenManager;
+use oxios_kernel::container_manager::ContainerManager;
 use oxios_kernel::host_tools::HostToolValidator;
 use oxios_kernel::mcp::McpBridge;
 use oxios_kernel::persona_manager::PersonaManager;
@@ -40,8 +40,8 @@ pub struct AppState {
     pub event_bus: Arc<EventBus>,
     /// State store for workspace/memory/seeds access.
     pub state_store: Arc<StateStore>,
-    /// Garden manager for container lifecycle.
-    pub garden_manager: Arc<GardenManager>,
+    /// Container manager for container lifecycle.
+    pub container_manager: Arc<ContainerManager>,
     /// Skill store for skill management (deprecated, use program_manager).
     pub skill_store: Arc<SkillStore>,
     /// Program manager for OS-level programs.
@@ -71,7 +71,7 @@ impl std::fmt::Debug for AppState {
             .field("channel", &"...")
             .field("event_bus", &"...")
             .field("state_store", &self.state_store)
-            .field("garden_manager", &self.garden_manager)
+            .field("container_manager", &self.container_manager)
             .field("skill_store", &self.skill_store)
             .field("supervisor", &"...")
             .field("scheduler", &"...")
@@ -100,7 +100,7 @@ impl WebServer {
         channel: WebChannelHandle,
         event_bus: EventBus,
         state_store: StateStore,
-        garden_manager: GardenManager,
+        container_manager: ContainerManager,
         skill_store: SkillStore,
         program_manager: ProgramManager,
         host_tool_validator: HostToolValidator,
@@ -120,7 +120,7 @@ impl WebServer {
             channel,
             event_bus: Arc::new(event_bus),
             state_store: Arc::new(state_store),
-            garden_manager: Arc::new(garden_manager),
+            container_manager: Arc::new(container_manager),
             skill_store: Arc::new(skill_store),
             program_manager: Arc::new(program_manager),
             host_tool_validator: Arc::new(host_tool_validator),

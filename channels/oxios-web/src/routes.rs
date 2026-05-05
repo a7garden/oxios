@@ -925,8 +925,8 @@ struct GardenExecResponse {
 async fn handle_gardens_list(
     state: State<Arc<AppState>>,
 ) -> Result<Json<Vec<GardenSummary>>, StatusCode> {
-    let manager = state.garden_manager.clone();
-    match manager.list_gardens().await {
+    let manager = state.container_manager.clone();
+    match manager.list_containers().await {
         Ok(gardens) => {
             let summaries = gardens
                 .into_iter()
@@ -951,8 +951,8 @@ async fn handle_garden_create(
     state: State<Arc<AppState>>,
     Json(body): Json<GardenCreateRequest>,
 ) -> Result<Json<GardenSummary>, (StatusCode, String)> {
-    let manager = state.garden_manager.clone();
-    match manager.new_garden(&body.name).await {
+    let manager = state.container_manager.clone();
+    match manager.new_container(&body.name).await {
         Ok(()) => {
             tracing::info!(garden = %body.name, "Garden created via API");
             Ok(Json(GardenSummary {
@@ -974,8 +974,8 @@ async fn handle_garden_start(
     state: State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
-    let manager = state.garden_manager.clone();
-    match manager.start_garden(&name).await {
+    let manager = state.container_manager.clone();
+    match manager.start_container(&name).await {
         Ok(()) => {
             tracing::info!(garden = %name, "Garden started via API");
             Ok(Json(serde_json::json!({"status": "started", "name": name})))
@@ -992,8 +992,8 @@ async fn handle_garden_stop(
     state: State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
-    let manager = state.garden_manager.clone();
-    match manager.stop_garden(&name).await {
+    let manager = state.container_manager.clone();
+    match manager.stop_container(&name).await {
         Ok(()) => {
             tracing::info!(garden = %name, "Garden stopped via API");
             Ok(Json(serde_json::json!({"status": "stopped", "name": name})))
@@ -1010,8 +1010,8 @@ async fn handle_garden_remove(
     state: State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
-    let manager = state.garden_manager.clone();
-    match manager.remove_garden(&name).await {
+    let manager = state.container_manager.clone();
+    match manager.remove_container(&name).await {
         Ok(()) => {
             tracing::info!(garden = %name, "Garden removed via API");
             Ok(Json(serde_json::json!({"status": "removed", "name": name})))
@@ -1029,9 +1029,9 @@ async fn handle_garden_exec(
     Path(name): Path<String>,
     Json(body): Json<GardenExecRequest>,
 ) -> Result<Json<GardenExecResponse>, (StatusCode, String)> {
-    let manager = state.garden_manager.clone();
+    let manager = state.container_manager.clone();
     match manager
-        .exec_in_garden(&name, &body.command, body.workdir.as_deref())
+        .exec_in_container(&name, &body.command, body.workdir.as_deref())
         .await
     {
         Ok(result) => Ok(Json(GardenExecResponse {
