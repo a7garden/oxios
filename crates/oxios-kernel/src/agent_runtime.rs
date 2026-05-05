@@ -11,13 +11,18 @@
 
 use anyhow::Result;
 use oxi_agent::{
-    AgentEvent, AgentLoop, AgentLoopConfig, GrepTool, LsTool, ReadTool, SharedState, ToolExecutionMode, ToolRegistry, WriteTool, EditTool, FindTool,
+    AgentEvent, AgentLoop, AgentLoopConfig, GrepTool, LsTool, ReadTool, SharedState,
+    ToolExecutionMode, ToolRegistry, WriteTool, EditTool, FindTool,
 };
 use oxi_ai::{CompactionStrategy, Provider};
 use parking_lot::Mutex;
 use std::sync::Arc;
 
-use crate::tools::{ContainerExecTool, HostExecTool};
+use crate::config::OxiosConfig;
+use crate::container_manager::ContainerManager;
+use crate::host_exec::HostExecBridge;
+use crate::program::ProgramManager;
+use crate::tools::{ContainerExecTool, HostExecTool, ProgramTool};
 use oxios_ouroboros::{ExecutionResult, Seed};
 
 /// Configuration for creating AgentRuntime instances.
@@ -56,10 +61,14 @@ struct ExecuteState {
 /// Runtime that wraps an oxi-agent `AgentLoop` for executing Seeds.
 ///
 /// Each call to [`AgentRuntime::execute`] creates a fresh `AgentLoop`,
-/// runs it to completion, and returns the result.
+/// builds a ToolRegistry with Tier 1-3 tools, and runs it to completion.
 pub struct AgentRuntime {
     provider: Arc<dyn Provider>,
     config: AgentRuntimeConfig,
+    container: Option<Arc<ContainerManager>>,
+    host_bridge: Option<Arc<HostExecBridge>>,
+    program_manager: Option<Arc<ProgramManager>>,
+    oxios_config: Option<OxiosConfig>,
 }
 
 impl AgentRuntime {
@@ -71,13 +80,48 @@ impl AgentRuntime {
                 model_id: model_id.into(),
                 ..Default::default()
             },
+            container: None,
+            host_bridge: None,
+            program_manager: None,
+            oxios_config: None,
         }
     }
 
     /// Creates a new agent runtime with the given LLM provider and full config.
     #[allow(dead_code)]
     pub fn with_config(provider: Arc<dyn Provider>, config: AgentRuntimeConfig) -> Self {
-        Self { provider, config }
+        Self {
+            provider,
+            config,
+            container: None,
+            host_bridge: None,
+            program_manager: None,
+            oxios_config: None,
+        }
+    }
+
+    /// Attach a ContainerManager for container execution.
+    pub fn with_container(mut self, container: Arc<ContainerManager>) -> Self {
+        self.container = Some(container);
+        self
+    }
+
+    /// Attach a HostExecBridge for host command execution.
+    pub fn with_host_bridge(mut self, bridge: Arc<HostExecBridge>) -> Self {
+        self.host_bridge = Some(bridge);
+        self
+    }
+
+    /// Attach a ProgramManager for Tier 3 tool registration.
+    pub fn with_program_manager(mut self, pm: Arc<ProgramManager>) -> Self {
+        self.program_manager = Some(pm);
+        self
+    }
+
+    /// Attach the full OxiosConfig.
+    pub fn with_oxios_config(mut self, config: OxiosConfig) -> Self {
+        self.oxios_config = Some(config);
+        self
     }
 
     /// Execute a Seed by running the tool-calling loop to completion.
@@ -93,14 +137,28 @@ impl AgentRuntime {
         let system_prompt = build_system_prompt(seed);
         let prompt = build_user_prompt(seed);
 
-        // Clone config and provider to move into spawn_blocking.
+        // Clone everything to move into spawn_blocking.
         let config = self.config.clone();
         let provider = Arc::clone(&self.provider);
         let seed_id = seed.id;
+        let container = self.container.clone();
+        let host_bridge = self.host_bridge.clone();
+        let program_manager = self.program_manager.clone();
+        let oxios_config = self.oxios_config.clone();
 
         let (final_content, steps_completed, success) =
             tokio::task::spawn_blocking(move || {
-                run_agent_loop(provider, config, system_prompt, prompt, seed_id)
+                run_agent_loop(
+                    provider,
+                    config,
+                    system_prompt,
+                    prompt,
+                    seed_id,
+                    container,
+                    host_bridge,
+                    program_manager,
+                    oxios_config,
+                )
             })
             .await??;
 
@@ -134,11 +192,12 @@ fn run_agent_loop(
     system_prompt: String,
     prompt: String,
     seed_id: uuid::Uuid,
+    container: Option<Arc<ContainerManager>>,
+    host_bridge: Option<Arc<HostExecBridge>>,
+    program_manager: Option<Arc<ProgramManager>>,
+    oxios_config: Option<OxiosConfig>,
 ) -> Result<(String, usize, bool)> {
-    // Build tool registry with Oxios tool composition.
-    // Tier 1: oxi native tools (file operations) — no BashTool
-    // Tier 2: Oxios execution tools (container_exec, host_exec)
-    // Note: Tier 3 (Program tools) will be added in Phase 2
+    // ── Tier 1: oxi native tools (file operations) ──
     let registry = ToolRegistry::new();
     registry.register(ReadTool::new());
     registry.register(WriteTool::new());
@@ -146,8 +205,44 @@ fn run_agent_loop(
     registry.register(GrepTool::new());
     registry.register(FindTool::new());
     registry.register(LsTool::new());
-    registry.register(ContainerExecTool::new(None));
-    // TODO: Phase 2 — add HostExecTool and ProgramTool when wiring is complete
+
+    // ── Tier 2: Oxios execution tools ──
+    let container_exec = Arc::new(ContainerExecTool::new(container));
+    registry.register_arc(container_exec.clone());
+
+    if let Some(bridge) = host_bridge {
+        let host_exec = Arc::new(HostExecTool::new(bridge));
+        registry.register_arc(host_exec.clone());
+
+        // ── Tier 3: Program tools (dynamic) ──
+        if let Some(pm) = program_manager {
+            // Get enabled programs synchronously (we're in spawn_blocking)
+            let rt = tokio::runtime::Handle::current();
+            let programs = rt.block_on(async { pm.list_enabled().await });
+            let container_config = oxios_config
+                .as_ref()
+                .map(|c| &c.container)
+                .cloned()
+                .unwrap_or_default();
+
+            for program in &programs {
+                for tool_def in &program.meta.tools {
+                    if !tool_def.command.is_empty() {
+                        let tool = ProgramTool::from_definition(
+                            &program.meta.name,
+                            tool_def,
+                            &program.meta.host_requirements,
+                            &container_config,
+                            container_exec.clone(),
+                            host_exec.clone(),
+                        );
+                        registry.register(tool);
+                    }
+                }
+            }
+        }
+    }
+
     let tools = Arc::new(registry);
 
     // Build the AgentLoop config from our runtime config.

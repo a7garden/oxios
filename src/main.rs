@@ -195,13 +195,13 @@ async fn init_kernel(
     Gateway,
     EventBus,
     Arc<StateStore>,
-    ContainerManager,
+    Arc<ContainerManager>,
     OxiosConfig,
     SkillStore,
     Arc<dyn Supervisor>,
     Arc<AgentScheduler>,
     Arc<parking_lot::Mutex<AccessManager>>,
-    ProgramManager,
+    Arc<ProgramManager>,
     HostToolValidator,
     PersonaManager,
     Arc<A2AProtocol>,
@@ -240,14 +240,8 @@ async fn init_kernel(
     let ouroboros: Arc<dyn oxios_ouroboros::OuroborosProtocol> =
         Arc::new(OuroborosEngine::new(Arc::clone(&provider), model));
 
-    // Create the agent runtime for executing seeds.
-    let agent_runtime = AgentRuntime::new(provider, model_id);
-
-    // Initialize the supervisor with the agent runtime.
-    let supervisor: Arc<dyn Supervisor> = Arc::new(BasicSupervisor::new(
-        event_bus.clone(),
-        agent_runtime,
-    ));
+    // Agent runtime will be created after container_manager is initialized (see below).
+    // We need container_manager, host_bridge, program_manager, and config first.
 
     // Create the orchestrator to wire Ouroboros + Supervisor together.
     // Initialize the access manager and scheduler first.
@@ -269,6 +263,47 @@ async fn init_kernel(
     // Create A2A protocol for inter-agent communication.
     let a2a_protocol = Arc::new(A2AProtocol::new(event_bus.clone()));
 
+    // Create A2A protocol for inter-agent communication.
+    let a2a_protocol = Arc::new(A2AProtocol::new(event_bus.clone()));
+
+    // ── Initialize infrastructure before agent runtime ──
+
+    // Initialize the container manager.
+    let containers_base = PathBuf::from(&config.container.container_path);
+    let host_exec = Arc::new(HostExecBridge::new(
+        containers_base.clone(),
+        config.container.allowed_host_commands.clone(),
+    ));
+    let state_store_for_containers = StateStore::new(PathBuf::from(&config.kernel.workspace))?;
+    let container_manager = Arc::new(ContainerManager::with_apple_backend(
+        host_exec.clone(),
+        Arc::new(state_store_for_containers),
+        containers_base,
+    ));
+
+    // Initialize the skill store.
+    let skills_dir = PathBuf::from(&config.kernel.workspace).join("skills");
+    let skill_store = SkillStore::new(skills_dir)?;
+
+    // Initialize the program manager.
+    let programs_dir = PathBuf::from(&config.kernel.workspace).join("programs");
+    let program_manager = Arc::new(ProgramManager::new(programs_dir));
+    program_manager.init().await?;
+
+    // ── Create agent runtime with all dependencies wired ──
+    let agent_runtime = AgentRuntime::new(provider, model_id)
+        .with_container(Arc::clone(&container_manager))
+        .with_host_bridge(host_exec)
+        .with_program_manager(Arc::clone(&program_manager))
+        .with_oxios_config(config.clone());
+
+    // Initialize the supervisor with the agent runtime.
+    let supervisor: Arc<dyn Supervisor> = Arc::new(BasicSupervisor::new(
+        event_bus.clone(),
+        agent_runtime,
+    ));
+
+    // Now create the orchestrator (needs supervisor).
     let orchestrator = Arc::new(Orchestrator::new(
         ouroboros,
         supervisor.clone(),
@@ -282,28 +317,6 @@ async fn init_kernel(
 
     // Initialize gateway with the orchestrator.
     let gateway = Gateway::new(orchestrator.clone());
-
-    // Initialize the garden manager.
-    let containers_base = PathBuf::from(&config.container.container_path);
-    let host_exec = Arc::new(HostExecBridge::new(
-        containers_base.clone(),
-        config.container.allowed_host_commands.clone(),
-    ));
-    let state_store_for_gardens = StateStore::new(PathBuf::from(&config.kernel.workspace))?;
-    let container_manager = ContainerManager::with_apple_backend(
-        host_exec,
-        Arc::new(state_store_for_gardens),
-        containers_base,
-    );
-
-    // Initialize the skill store.
-    let skills_dir = PathBuf::from(&config.kernel.workspace).join("skills");
-    let skill_store = SkillStore::new(skills_dir)?;
-
-    // Initialize the program manager.
-    let programs_dir = PathBuf::from(&config.kernel.workspace).join("programs");
-    let program_manager = ProgramManager::new(programs_dir);
-    program_manager.init().await?;
 
     // Initialize the host tool validator.
     let host_tool_validator = HostToolValidator::new(
