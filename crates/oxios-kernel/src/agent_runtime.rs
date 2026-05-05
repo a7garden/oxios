@@ -254,6 +254,13 @@ fn build_system_prompt(seed: &Seed) -> String {
         }
     }
 
+    // Execution environment guidance
+    prompt.push_str(
+        "\n## Execution Environment\n\
+         Use `container_exec` for workspace commands (compilation, tests, etc.).\n\
+         Use `host_exec` for host commands (git, gh, osascript, etc.).\n",
+    );
+
     prompt.push_str(
         "\nUse the available tools to accomplish the goal. \
          Work methodically and verify your work against the acceptance criteria.",
