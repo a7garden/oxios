@@ -28,6 +28,7 @@ pub mod scheduler;
 pub mod skill;
 pub mod state_store;
 pub mod supervisor;
+pub mod tools;
 pub mod types;
 
 // A2A protocol exports
@@ -65,6 +66,7 @@ pub use persona::{default_personas, Persona};
 pub use persona_manager::PersonaManager;
 pub use persona_store::PersonaStore;
 pub use supervisor::{BasicSupervisor, Supervisor};
+pub use tools::{ContainerExecTool, HostExecTool, ProgramTool};
 pub use types::{AgentId, AgentInfo, AgentStatus};
 
 // Argo Workflows exports
