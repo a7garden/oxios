@@ -354,6 +354,7 @@ impl McpTool {
             name: self.name.clone(),
             description: self.description.clone(),
             arguments,
+            command: String::new(), // MCP tools don't use command-based execution
         }
     }
 }

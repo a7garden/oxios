@@ -2,33 +2,14 @@
 name = "deploy"
 version = "1.0.0"
 description = "Safe deployment with pre-flight checks and rollback"
-category = "operations"
-enabled = true
+author = "oxios"
 
-[program.metadata]
-icon = "🚀"
-tags = ["deploy", "release", "operations"]
+[requires_tools]
+names = ["read", "container_exec", "grep"]
 
-[program.execution]
-timeout_secs = 600
-requires_garden = true
-
-[program.host_tools]
+[host_requirements]
 required = []
 optional = ["gh", "kubectl"]
 
-[program.tools]
-- read
-- bash
-- grep
-
-[program.args]
-- { name = "environment", description = "Target environment (staging|production)", required = true }
-- { name = "version", description = "Version or tag to deploy", required = false }
-
-[program.dependencies]
-- skill:oxios-deploy
-
-[program.host_requirements]
-tools = ["gh"]
-paths = ["/Volumes/MERCURY/projects"]
+[container]
+minimal_tools = []

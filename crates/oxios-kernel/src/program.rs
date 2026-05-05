@@ -66,6 +66,9 @@ pub struct ToolDef {
     pub description: String,
     /// Expected arguments
     pub arguments: Vec<ArgumentDef>,
+    /// Command to execute (first word = binary, rest = default args)
+    #[serde(default)]
+    pub command: String,
 }
 
 /// Argument definition for a tool
@@ -114,6 +117,9 @@ struct TomlProgramInfo {
 #[derive(Debug, Clone, serde::Deserialize)]
 struct TomlTool {
     description: String,
+    /// Command to execute (first word = binary, rest = default args)
+    #[serde(default)]
+    command: String,
     arguments: Option<Vec<TomlArgument>>,
 }
 
@@ -156,6 +162,7 @@ impl ProgramMeta {
                         name,
                         description: tool.description,
                         arguments,
+                        command: tool.command,
                     }
                 })
                 .collect()
@@ -442,6 +449,12 @@ impl ProgramManager {
     pub async fn list_programs(&self) -> Vec<Program> {
         let installed = self.installed.read().await;
         installed.values().cloned().collect()
+    }
+
+    /// List all enabled programs
+    pub async fn list_enabled(&self) -> Vec<Program> {
+        let installed = self.installed.read().await;
+        installed.values().filter(|p| p.enabled).cloned().collect()
     }
 
     /// Get a specific program by name

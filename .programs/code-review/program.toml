@@ -2,34 +2,14 @@
 name = "code-review"
 version = "1.0.0"
 description = "Deep code review with quality domain analysis"
-category = "development"
-enabled = true
+author = "oxios"
 
-[program.metadata]
-icon = "🔍"
-tags = ["review", "quality", "security"]
+[requires_tools]
+names = ["read", "container_exec", "grep", "find"]
 
-[program.execution]
-timeout_secs = 600
-requires_garden = true
-
-[program.host_tools]
+[host_requirements]
 required = []
 optional = ["git"]
 
-[program.tools]
-- read
-- bash
-- grep
-- edit
-
-[program.args]
-- { name = "target", description = "File or directory to review", required = true }
-- { name = "focus", description = "Focus area (quality|security|performance|all)", default = "all" }
-
-[program.dependencies]
-- skill:oxios-code-review
-
-[program.host_requirements]
-tools = ["git"]
-paths = ["/Volumes/MERCURY/projects"]
+[container]
+minimal_tools = []

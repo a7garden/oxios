@@ -1,19 +1,17 @@
-# Tool Architecture Redesign — Progress
+# Phase 2-B Progress: .programs/*/program.toml 재작성
 
-## Phase 0: ClawGarden 잔재 제거 ✅
-- Commit: `b72674d refactor(kernel): remove ClawGarden naming, adopt Oxios identity`
+## Status: ✅ COMPLETE
 
-## Phase 1: ToolRegistry 재구성
-### Batch 1-A: tools 모듈 생성
-- [x] `tools/mod.rs` — 모듈 선언
-- [x] `tools/container_exec.rs` — ContainerExecTool (BashTool 위임)
-- [x] `tools/host_exec_tool.rs` — HostExecTool (HostExecBridge 래핑) — **10 tests pass**
-- [x] `tools/program_tool.rs` — Phase 2용 placeholder
-- [x] `lib.rs`에 `mod tools` + re-exports 추가
+### Files Changed
+- `.programs/code-review/program.toml` — 새 스키마로 재작성 (지시형, requires_tools: read/container_exec/grep/find)
+- `.programs/debug/program.toml` — 새 스키마로 재작성 (지시형, requires_tools: read/container_exec/grep/find)
+- `.programs/deploy/program.toml` — 새 스키마로 재작성 (지시형, requires_tools: read/container_exec/grep)
+- `.programs/refactor/program.toml` — 새 스키마로 재작성 (지시형, requires_tools: read/container_exec/grep/find/edit)
+- `crates/oxios-kernel/src/mcp.rs` — ToolDef에 command 필드 누락 수정 (MCP tools → 빈 문자열)
 
-### Batch 1-B: agent_runtime.rs 수정
-- [ ] `build_tool_registry()` 함수로 교체
+### SKILL.md files
+- 모두 변경 없음 (그대로 유지)
 
-### 상태
-- Build: ✅ PASS
-- Tests: ✅ PASS (200+ 통과)
+### Verification
+- `cargo test -p oxios-kernel`: 222 passed, 0 failed
+- `cargo test -p oxios-kernel -- program`: 2 passed (program install + tool schemas)
