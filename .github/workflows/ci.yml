@@ -1,0 +1,37 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  check:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: oxios
+      - uses: actions/checkout@v4
+        with:
+          repository: a7garden/oxi
+          path: oxi
+          ref: v0.5.0
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            oxios -> target
+            oxi -> target
+      - name: Check formatting
+        working-directory: oxios
+        run: cargo fmt --all -- --check
+      - name: Clippy
+        working-directory: oxios
+        run: cargo clippy --workspace -- -W clippy::all
+      - name: Test
+        working-directory: oxios
+        run: cargo test --workspace
