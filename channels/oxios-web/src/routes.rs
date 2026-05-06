@@ -1441,21 +1441,34 @@ struct McpServerResponse {
 async fn handle_mcp_servers_list(
     state: State<Arc<AppState>>,
 ) -> Json<Vec<McpServerResponse>> {
-    let bridge = state.mcp_bridge.lock();
-    let servers = bridge.servers();
+    // Collect server metadata synchronously, then drop the guard before awaits.
+    let server_meta: Vec<(String, String, Vec<String>, bool)> = {
+        let bridge = state.mcp_bridge.lock();
+        bridge
+            .servers()
+            .into_iter()
+            .map(|name| {
+                let (command, args, enabled) = bridge
+                    .get_server(name)
+                    .map(|s| (s.command.clone(), s.args.clone(), s.enabled))
+                    .unwrap_or_else(|| ("unknown".to_string(), Vec::new(), false));
+                (name.to_string(), command, args, enabled)
+            })
+            .collect()
+    }; // guard dropped
+
     let mut results = Vec::new();
-    for name in servers {
-        let (command, args, enabled) = bridge
-            .get_server(name)
-            .map(|s| (s.command.clone(), s.args.clone(), s.enabled))
-            .unwrap_or_else(|| ("unknown".to_string(), Vec::new(), false));
-        let initialized = if let Some(ref c) = bridge.client(name).await {
-            c.is_initialized().await
-        } else {
-            false
+    for (name, command, args, enabled) in server_meta {
+        let initialized = {
+            let bridge = state.mcp_bridge.lock();
+            if let Some(ref c) = bridge.client(&name).await {
+                c.is_initialized().await
+            } else {
+                false
+            }
         };
         results.push(McpServerResponse {
-            name: name.to_string(),
+            name,
             command,
             args,
             enabled,

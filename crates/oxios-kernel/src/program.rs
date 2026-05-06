@@ -60,15 +60,20 @@ pub struct ProgramHostRequirements {
     pub optional: Vec<String>,
 }
 
-/// MCP server configuration parsed from [mcp] in program.toml
+/// MCP server configuration parsed from `[mcp]` in program.toml.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct McpServerConfig {
+    /// Server name identifier.
     pub name: String,
+    /// Command to launch the MCP server.
     pub command: String,
+    /// Command-line arguments.
     #[serde(default)]
     pub args: Vec<String>,
+    /// Environment variables for the server process.
     #[serde(default)]
     pub env: std::collections::HashMap<String, String>,
+    /// Whether the server is enabled by default.
     #[serde(default = "default_enabled")]
     pub enabled: bool,
 }
@@ -76,6 +81,7 @@ pub struct McpServerConfig {
 fn default_enabled() -> bool {
     true
 }
+/// Definition of a tool exposed by a program.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ToolDef {
     /// Tool name (unique within the program)
@@ -469,8 +475,6 @@ impl ProgramManager {
 
         Ok(())
     }
-
-    /// Recursively copy a directory (like `cp -r`).
 
     /// Load a single program from a directory
     fn load_program(&self, path: &Path) -> Result<Program> {

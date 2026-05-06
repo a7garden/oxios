@@ -51,6 +51,7 @@ pub struct Orchestrator {
 
 impl Orchestrator {
     /// Creates a new orchestrator.
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         ouroboros: Arc<dyn OuroborosProtocol>,
         supervisor: Arc<dyn Supervisor>,

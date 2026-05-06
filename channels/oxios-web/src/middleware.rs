@@ -53,8 +53,11 @@ pub async fn require_auth(
         .ok_or(StatusCode::UNAUTHORIZED)?;
 
     // Validate against AuthManager
-    let mut auth = state.auth_manager.lock();
-    if !auth.validate(token) {
+    let is_valid = {
+        let mut auth = state.auth_manager.lock();
+        auth.validate(token)
+    }; // guard dropped here
+    if !is_valid {
         tracing::warn!(path = %request.uri().path(), "Authentication failed");
         return Err(StatusCode::UNAUTHORIZED);
     }

@@ -67,8 +67,7 @@ fn format_content_block(block: &McpContentBlock) -> String {
         }
         McpContentBlock::Resource { resource } => {
             format!("[Resource: {}]", resource.uri)
-        }
-        _ => format!("{:?}", block),
+        },
     }
 }
 

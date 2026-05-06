@@ -246,6 +246,7 @@ impl AgentRuntime {
 /// This function is called from `spawn_blocking` because `AgentLoop::run()`
 /// produces a `!Send` future. We use `tokio::runtime::Handle::block_on` to
 /// drive the async work from the blocking thread.
+#[allow(clippy::too_many_arguments)]
 fn run_agent_loop(
     provider: Arc<dyn Provider>,
     config: AgentRuntimeConfig,
@@ -418,10 +419,8 @@ fn run_agent_loop(
                         s.steps_completed += 1;
                     }
                     AgentEvent::AgentEnd { messages, stop_reason, .. } => {
-                        if let Some(msg) = messages.last() {
-                            if let oxi_ai::Message::Assistant(a) = msg {
-                                s.final_content = a.text_content();
-                            }
+                        if let Some(oxi_ai::Message::Assistant(a)) = messages.last() {
+                            s.final_content = a.text_content();
                         }
                         s.success = stop_reason.as_deref() == Some("Stop");
                     }
