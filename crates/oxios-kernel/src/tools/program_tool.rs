@@ -15,10 +15,7 @@ use tokio::sync::oneshot;
 use super::container_exec::ContainerExecTool;
 use super::host_exec_tool::HostExecTool;
 use crate::config::ContainerConfig;
-use crate::container_manager::ContainerManager;
-use crate::host_exec::HostExecBridge;
 use crate::program::{ProgramHostRequirements, ToolDef};
-use crate::state_store::StateStore;
 
 /// A tool defined by a Program, with automatic execution routing.
 ///
@@ -177,6 +174,9 @@ impl AgentTool for ProgramTool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::container_manager::ContainerManager;
+    use crate::host_exec::HostExecBridge;
+    use crate::state_store::StateStore;
 
     /// Helper: create a minimal test container manager.
     fn make_test_container_manager(allowlist: Vec<String>) -> Arc<ContainerManager> {

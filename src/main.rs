@@ -899,7 +899,7 @@ async fn main() -> Result<()> {
 
             // Build the Axum app using the web server's state.
             let app = _web_server.state();
-            let routes = oxios_web::routes::build_routes();
+            let routes = oxios_web::routes::build_routes(app.clone());
             let static_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
                 .join("channels/oxios-web/static");
             let app = axum::Router::new()
@@ -908,15 +908,6 @@ async fn main() -> Result<()> {
                     tower_http::services::ServeDir::new(&static_dir)
                         .append_index_html_on_directories(true),
                 )
-                .layer({
-                    let cors = tower_http::cors::CorsLayer::new()
-                        .allow_origin(
-                            ["http://localhost:4200".parse::<axum::http::HeaderValue>().unwrap()]
-                        )
-                        .allow_methods(tower_http::cors::Any)
-                        .allow_headers(tower_http::cors::Any);
-                    cors
-                })
                 .with_state(app);
 
             // Spawn the gateway loop.

@@ -113,7 +113,7 @@ impl AuthManager {
     /// Returns the full key string (only shown once).
     pub fn generate_key(&mut self, name: &str) -> Result<String> {
         let key_bytes = Self::random_key();
-        let full_key = format!("{}{}", KEY_PREFIX, hex::encode(&key_bytes));
+        let full_key = format!("{}{}", KEY_PREFIX, hex::encode(key_bytes));
         let hash = Self::hash_key(&full_key);
         let meta = KeyMeta {
             name: name.to_string(),

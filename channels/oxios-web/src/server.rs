@@ -159,7 +159,7 @@ impl WebServer {
             .allow_headers(tower_http::cors::Any);
 
         let app = Router::new()
-            .merge(build_routes())
+            .merge(build_routes(self.state.clone()))
             .fallback_service(
                 ServeDir::new(&static_dir).append_index_html_on_directories(true),
             )

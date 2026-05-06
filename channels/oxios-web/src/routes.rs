@@ -47,7 +47,10 @@ use crate::persona_routes;
 // ---------------------------------------------------------------------------
 
 /// Builds the axum router with all API routes.
-pub fn build_routes() -> Router<Arc<AppState>> {
+///
+/// Auth middleware is applied to all `/api/*` routes.
+/// `/health` and static assets are excluded from auth.
+pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
     Router::new()
         // Health check (no auth required)
         .route("/health", get(handle_health))
@@ -103,11 +106,6 @@ pub fn build_routes() -> Router<Arc<AppState>> {
         .route("/api/programs/{name}/host-requirements", get(handle_program_host_requirements))
         // Host tools
         .route("/api/host-tools", get(handle_host_tools_check))
-        // MCP (stub - disabled until MCP integration is fixed)
-        // .route("/api/mcp/servers", get(handle_mcp_servers_list))
-        // .route("/api/mcp/servers", post(handle_mcp_server_register))
-        // .route("/api/mcp/tools", get(handle_mcp_tools_list))
-        // .route("/api/mcp/tools", post(handle_mcp_tool_call))
         // Events
         .route("/api/events", get(handle_events))
         // Personas (delegated to persona_routes)
@@ -126,9 +124,8 @@ pub fn build_routes() -> Router<Arc<AppState>> {
         .route("/api/approvals", get(handle_approvals_list))
         .route("/api/approvals/{id}/approve", post(handle_approval_approve))
         .route("/api/approvals/{id}/reject", post(handle_approval_reject))
+        .with_state(state)
 }
-
-// ---------------------------------------------------------------------------
 // Health
 // ---------------------------------------------------------------------------
 

@@ -77,7 +77,7 @@ impl AgentTool for ContainerExecTool {
 
     async fn execute(
         &self,
-        tool_call_id: &str,
+        _tool_call_id: &str,
         params: Value,
         _signal: Option<tokio::sync::oneshot::Receiver<()>>,
     ) -> Result<AgentToolResult, String> {

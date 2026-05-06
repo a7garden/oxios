@@ -201,7 +201,7 @@ impl Orchestrator {
         let mut card = AgentCard::new(
             agent_id,
             &agent_name,
-            &format!("Agent executing seed: {}", seed.goal),
+            format!("Agent executing seed: {}", seed.goal),
         )
         .with_capability("execute-seed")
         .with_status(crate::types::AgentStatus::Starting);
@@ -330,7 +330,7 @@ impl Orchestrator {
                 let card = AgentCard::new(
                     new_agent_id,
                     &agent_name,
-                    &format!("Evolved agent executing seed: {}", evolved.goal),
+                    format!("Evolved agent executing seed: {}", evolved.goal),
                 )
                 .with_capability("execute-seed")
                 .with_capability("evolved")

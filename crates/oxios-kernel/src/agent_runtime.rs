@@ -498,7 +498,7 @@ fn build_system_prompt(seed: &Seed, skill_contents: &[String], persona_prompt: O
     if let Some(pp) = persona_prompt {
         prompt.push_str("\n## Persona\n");
         prompt.push_str(pp);
-        prompt.push_str("\n");
+        prompt.push('\n');
     }
 
     // Execution environment guidance

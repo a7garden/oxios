@@ -37,6 +37,12 @@ active_limit_tokens = 100000
 cache_limit_entries = 50
 
 [security]
+# Enable API key authentication (set to true for production).
+auth_enabled = false
+# Path to API keys file (JSON format).
+api_keys_path = "~/.oxios/api-keys.json"
+# Allowed CORS origins.
+cors_origins = ["http://localhost:4200"]
 # Default allowed tools for agents (least privilege).
 allowed_tools = ["read", "write", "edit", "bash", "grep", "find"]
 # Whether agents can make network requests by default.

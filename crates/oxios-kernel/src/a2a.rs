@@ -82,10 +82,12 @@ impl A2AMessage {
 
 /// Priority level for delegated tasks.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Default)]
 pub enum TaskPriority {
     /// Low priority, best-effort.
     Low,
     /// Normal priority.
+    #[default]
     Normal,
     /// High priority, should be handled soon.
     High,
@@ -93,11 +95,6 @@ pub enum TaskPriority {
     Critical,
 }
 
-impl Default for TaskPriority {
-    fn default() -> Self {
-        TaskPriority::Normal
-    }
-}
 
 /// Specification for a delegated task.
 #[derive(Debug, Clone, Serialize, Deserialize)]

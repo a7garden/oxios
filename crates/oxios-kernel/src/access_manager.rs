@@ -786,7 +786,7 @@ impl AccessManager {
         self.agent_containers.insert(agent_name.to_string(), container_name.to_string());
         self.garden_agents
             .entry(container_name.to_string())
-            .or_insert_with(HashSet::new)
+            .or_default()
             .insert(agent_name.to_string());
 
         tracing::info!(agent = %agent_name, garden = %container_name, "Agent assigned to garden");
