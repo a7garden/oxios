@@ -3,6 +3,7 @@
 //! Provides authentication, input validation, and other cross-cutting concerns.
 
 use axum::{
+    body::Body,
     extract::State,
     http::{Request, StatusCode},
     middleware::Next,
@@ -16,10 +17,10 @@ use crate::server::AppState;
 ///
 /// Skips authentication if `auth_enabled` is false in config.
 /// Excludes `/health` from authentication requirements.
-pub async fn require_auth<B>(
+pub async fn require_auth(
     State(state): State<Arc<AppState>>,
-    request: Request<B>,
-    next: Next<B>,
+    request: Request<Body>,
+    next: Next,
 ) -> Result<Response, StatusCode> {
     // Skip auth if disabled
     if !state.config.security.auth_enabled {
@@ -35,7 +36,7 @@ pub async fn require_auth<B>(
     let auth_header = request
         .headers()
         .get("Authorization")
-        .and_then(|v| v.to_str().ok())
+        .and_then(|v: &axum::http::HeaderValue| v.to_str().ok())
         .ok_or(StatusCode::UNAUTHORIZED)?;
 
     let token = auth_header

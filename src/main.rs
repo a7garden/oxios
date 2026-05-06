@@ -431,7 +431,7 @@ fn resolve_provider_and_model(
 
 /// Run a single prompt through the Ouroboros orchestrator.
 async fn cmd_run(prompt: &str, config_path: &Path, model_id: &str) -> Result<()> {
-    let (orchestrator, _, _, _, _, _, _, _, _, _, _, _, persona_manager, _, _) =
+    let (orchestrator, _, _, _, _, _, _, _, _, _, _, _, persona_manager, _, _, _) =
         init_kernel(config_path, model_id).await?;
 
     tracing::info!(prompt = %prompt, "Processing prompt");
@@ -459,7 +459,7 @@ async fn cmd_run(prompt: &str, config_path: &Path, model_id: &str) -> Result<()>
 /// Handle garden subcommands.
 async fn cmd_garden(action: GardenAction, config_path: &Path) -> Result<()> {
     let model_id = "anthropic/claude-sonnet-4-20250514"; // Dummy for garden cmds
-    let (_, _, _, _, container_manager, _, _, _, _, _, _, _, _, _, _) = init_kernel(config_path, model_id).await?;
+    let (_, _, _, _, container_manager, _, _, _, _, _, _, _, _, _, _, _) = init_kernel(config_path, model_id).await?;
 
     match action {
         GardenAction::New { name } => {
@@ -549,7 +549,7 @@ enum PkgAction {
 /// Handle pkg subcommands.
 async fn cmd_pkg(action: PkgAction, config_path: &Path) -> Result<()> {
     let model_id = "anthropic/claude-sonnet-4-20250514"; // Dummy for pkg cmds
-    let (_, _, _, _, _, _, _, _, _, _, program_manager, _, _, _, _) =
+    let (_, _, _, _, _, _, _, _, _, _, program_manager, _, _, _, _, _) =
         init_kernel(config_path, model_id).await?;
 
     match action {
@@ -663,7 +663,7 @@ fn get_config_value(config: &OxiosConfig, key: &str) -> Option<String> {
 /// Show system status.
 async fn cmd_status(config_path: &Path) -> Result<()> {
     let model_id = "anthropic/claude-sonnet-4-20250514";
-    let (_, _, _, _, container_manager, config, _, _, _, _, _, _, _, _, mcp_bridge) =
+    let (_, _, _, _, container_manager, config, _, _, _, _, _, _, _, _, mcp_bridge, _) =
         init_kernel(config_path, model_id).await?;
 
     println!("Oxios Agent OS");
@@ -828,7 +828,7 @@ async fn main() -> Result<()> {
             }
 
             // Initialize kernel components.
-            let (_orchestrator, gateway, event_bus, state_store, container_manager, config, skill_store, supervisor, scheduler, access_manager, program_manager, host_tool_validator, persona_manager, _a2a, mcp_bridge) =
+            let (_orchestrator, gateway, event_bus, state_store, container_manager, config, skill_store, supervisor, scheduler, access_manager, program_manager, host_tool_validator, persona_manager, _a2a, mcp_bridge, auth_manager) =
                 init_kernel(&config_path, default_model).await?;
 
             // Initialize MCP servers from config (init_kernel already created the bridge).
@@ -891,6 +891,7 @@ async fn main() -> Result<()> {
                 config.clone(),
                 Some(config_path.clone()),
                 mcp_bridge.clone(),
+                auth_manager,
             );
 
             // Set up graceful shutdown.
@@ -907,7 +908,15 @@ async fn main() -> Result<()> {
                     tower_http::services::ServeDir::new(&static_dir)
                         .append_index_html_on_directories(true),
                 )
-                .layer(tower_http::cors::CorsLayer::permissive())
+                .layer({
+                    let cors = tower_http::cors::CorsLayer::new()
+                        .allow_origin(
+                            ["http://localhost:4200".parse::<axum::http::HeaderValue>().unwrap()]
+                        )
+                        .allow_methods(tower_http::cors::Any)
+                        .allow_headers(tower_http::cors::Any);
+                    cors
+                })
                 .with_state(app);
 
             // Spawn the gateway loop.

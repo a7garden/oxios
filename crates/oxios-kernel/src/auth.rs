@@ -73,7 +73,7 @@ impl AuthManager {
     }
 
     /// Load keys from a JSON file.
-    fn load_from_file(&mut self, path: &Path) -> Result<()> {
+    pub fn load_from_file(&mut self, path: &Path) -> Result<()> {
         let content = std::fs::read_to_string(path)
             .with_context(|| format!("Failed to read API keys from {}", path.display()))?;
         let key_file: KeyFile =
