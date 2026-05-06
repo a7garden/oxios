@@ -9,7 +9,6 @@ use axum::Router;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
-use tower_http::cors::CorsLayer;
 use tower_http::services::ServeDir;
 
 use crate::channel::WebChannelHandle;
@@ -62,6 +61,8 @@ pub struct AppState {
     pub config_path: Option<PathBuf>,
     /// MCP bridge for tool calling (uses Mutex for interior mutability on register_server).
     pub mcp_bridge: Arc<Mutex<McpBridge>>,
+    /// Authentication manager for bearer token validation.
+    pub auth_manager: Arc<parking_lot::Mutex<oxios_kernel::auth::AuthManager>>,
 }
 
 impl std::fmt::Debug for AppState {
@@ -111,6 +112,7 @@ impl WebServer {
         config: oxios_kernel::OxiosConfig,
         config_path: Option<PathBuf>,
         mcp_bridge: Arc<Mutex<McpBridge>>,
+        auth_manager: Arc<parking_lot::Mutex<oxios_kernel::auth::AuthManager>>,
     ) -> Self {
         let addr: SocketAddr = format!("{host}:{port}")
             .parse()
@@ -131,6 +133,7 @@ impl WebServer {
             config: Arc::new(config),
             config_path,
             mcp_bridge,
+            auth_manager,
         });
         Self { addr, state }
     }
@@ -148,12 +151,19 @@ impl WebServer {
         let static_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("static");
 
+        let cors = tower_http::cors::CorsLayer::new()
+            .allow_origin(
+                ["http://localhost:4200".parse::<axum::http::HeaderValue>().unwrap()]
+            )
+            .allow_methods(tower_http::cors::Any)
+            .allow_headers(tower_http::cors::Any);
+
         let app = Router::new()
             .merge(build_routes())
             .fallback_service(
                 ServeDir::new(&static_dir).append_index_html_on_directories(true),
             )
-            .layer(CorsLayer::permissive())
+            .layer(cors)
             .with_state(self.state.clone());
 
         let listener = tokio::net::TcpListener::bind(self.addr).await?;

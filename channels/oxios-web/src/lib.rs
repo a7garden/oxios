@@ -7,6 +7,7 @@
 #![warn(missing_docs)]
 
 pub mod channel;
+pub mod middleware;
 pub mod persona_routes;
 pub mod routes;
 pub mod server;

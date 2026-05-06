@@ -49,6 +49,8 @@ use crate::persona_routes;
 /// Builds the axum router with all API routes.
 pub fn build_routes() -> Router<Arc<AppState>> {
     Router::new()
+        // Health check (no auth required)
+        .route("/health", get(handle_health))
         // Dioxus WASM frontend redirect
         .route("/dioxus", get(|| async { Redirect::permanent("/dioxus/") }))
         // Chat
@@ -124,6 +126,21 @@ pub fn build_routes() -> Router<Arc<AppState>> {
         .route("/api/approvals", get(handle_approvals_list))
         .route("/api/approvals/{id}/approve", post(handle_approval_approve))
         .route("/api/approvals/{id}/reject", post(handle_approval_reject))
+}
+
+// ---------------------------------------------------------------------------
+// Health
+// ---------------------------------------------------------------------------
+
+/// GET /health — Health check endpoint (no auth required).
+pub async fn handle_health(State(state): State<Arc<AppState>>) -> Json<serde_json::Value> {
+    Json(serde_json::json!({
+        "status": "ok",
+        "version": env!("CARGO_PKG_VERSION"),
+        "backend": {
+            "container": state.container_manager.is_backend_available(),
+        }
+    }))
 }
 
 // ---------------------------------------------------------------------------

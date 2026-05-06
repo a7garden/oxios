@@ -10,6 +10,7 @@ pub mod a2a;
 pub mod access_manager;
 pub mod agent_runtime;
 
+pub mod auth;
 pub mod config;
 pub mod container;
 pub mod context_manager;
@@ -50,6 +51,9 @@ pub use agent_runtime::AgentRuntime;
 pub use error::{HttpStatus, KernelError, KernelResult};
 pub use engine::{EngineProvider, OxiEngineProvider};
 pub use config::{OxiosConfig, PersonaConfig, McpConfig, McpServerDef};
+
+// Auth manager exports
+pub use auth::{AuthManager, KeyMeta};
 pub use container::{
     AppleBackend, ContainerBackend, ContainerConfig, ContainerStats, ContainerStatus, ContainerWorkspaceInfo, ExecResult,
 };

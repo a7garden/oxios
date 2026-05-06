@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use oxios_gateway::Gateway;
 use oxios_kernel::{
-    AccessManager, AgentRuntime, BasicSupervisor, EngineProvider, EventBus, ContainerManager, HostExecBridge,
+    AccessManager, AgentRuntime, AuthManager, BasicSupervisor, EngineProvider, EventBus, ContainerManager, HostExecBridge,
     HostToolValidator, OxiEngineProvider, Orchestrator, OxiosConfig, PersonaManager, ProgramManager, SkillStore,
     StateStore, Supervisor, AgentScheduler, InstallSource, McpBridge, McpServer,
     A2AProtocol,
@@ -206,6 +206,7 @@ async fn init_kernel(
     PersonaManager,
     Arc<A2AProtocol>,
     Arc<Mutex<McpBridge>>,
+    Arc<parking_lot::Mutex<AuthManager>>,
 )> {
     let config = if config_path.exists() {
         tracing::info!(path = %config_path.display(), "Loading config");
@@ -328,7 +329,15 @@ async fn init_kernel(
     // Initialize the MCP bridge.
     let mcp_bridge = Arc::new(Mutex::new(init_mcp_bridge(&config).await?));
 
-    Ok((orchestrator, gateway, event_bus.clone(), state_store, container_manager, config, skill_store, supervisor, scheduler, access_manager, program_manager, host_tool_validator, persona_manager, a2a_protocol, mcp_bridge))
+    // Initialize the auth manager and load API keys if configured.
+    let mut auth_manager = AuthManager::new();
+    let api_keys_path = PathBuf::from(&config.security.api_keys_path);
+    if let Err(e) = auth_manager.load_from_file(&api_keys_path) {
+        tracing::warn!(error = %e, "Failed to load API keys");
+    }
+    let auth_manager = Arc::new(parking_lot::Mutex::new(auth_manager));
+
+    Ok((orchestrator, gateway, event_bus.clone(), state_store, container_manager, config, skill_store, supervisor, scheduler, access_manager, program_manager, host_tool_validator, persona_manager, a2a_protocol, mcp_bridge, auth_manager))
 }
 
 /// Initialize the MCP bridge and register all configured servers.
