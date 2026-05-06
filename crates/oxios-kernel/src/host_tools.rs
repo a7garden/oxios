@@ -32,6 +32,15 @@ pub struct HostToolValidator {
     optional: Vec<String>,
 }
 
+impl Clone for HostToolValidator {
+    fn clone(&self) -> Self {
+        Self {
+            required: self.required.clone(),
+            optional: self.optional.clone(),
+        }
+    }
+}
+
 impl HostToolValidator {
     /// Create a new validator with the specified tool requirements
     pub fn new(required: Vec<String>, optional: Vec<String>) -> Self {

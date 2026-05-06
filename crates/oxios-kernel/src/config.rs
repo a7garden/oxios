@@ -6,7 +6,7 @@
 use serde::{Deserialize, Serialize};
 
 /// Top-level Oxios configuration.
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
 pub struct OxiosConfig {
     /// Kernel settings.
     pub kernel: KernelConfig,
