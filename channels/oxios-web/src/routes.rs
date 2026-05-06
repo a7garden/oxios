@@ -1441,34 +1441,21 @@ struct McpServerResponse {
 async fn handle_mcp_servers_list(
     state: State<Arc<AppState>>,
 ) -> Json<Vec<McpServerResponse>> {
-    // Collect server metadata synchronously, then drop the guard before awaits.
-    let server_meta: Vec<(String, String, Vec<String>, bool)> = {
-        let bridge = state.mcp_bridge.lock();
-        bridge
-            .servers()
-            .into_iter()
-            .map(|name| {
-                let (command, args, enabled) = bridge
-                    .get_server(name)
-                    .map(|s| (s.command.clone(), s.args.clone(), s.enabled))
-                    .unwrap_or_else(|| ("unknown".to_string(), Vec::new(), false));
-                (name.to_string(), command, args, enabled)
-            })
-            .collect()
-    }; // guard dropped
-
+    let bridge = state.mcp_bridge.lock().await;
+    let servers = bridge.servers();
     let mut results = Vec::new();
-    for (name, command, args, enabled) in server_meta {
-        let initialized = {
-            let bridge = state.mcp_bridge.lock();
-            if let Some(ref c) = bridge.client(&name).await {
-                c.is_initialized().await
-            } else {
-                false
-            }
+    for name in servers {
+        let (command, args, enabled) = bridge
+            .get_server(name)
+            .map(|s| (s.command.clone(), s.args.clone(), s.enabled))
+            .unwrap_or_else(|| ("unknown".to_string(), Vec::new(), false));
+        let initialized = if let Some(ref c) = bridge.client(name).await {
+            c.is_initialized().await
+        } else {
+            false
         };
         results.push(McpServerResponse {
-            name,
+            name: name.to_string(),
             command,
             args,
             enabled,
@@ -1497,13 +1484,13 @@ async fn handle_mcp_server_register(
     let name = body.name.clone();
     let command = body.command.clone();
     {
-        let mut bridge = state.mcp_bridge.lock();
+        let mut bridge = state.mcp_bridge.lock().await;
         let mut server = oxios_kernel::McpServer::new(&name, &command);
         server.args = body.args;
         server.enabled = true;
         bridge.register_server(server);
     }
-    if let Err(e) = state.mcp_bridge.lock().initialize_server(&name).await {
+    if let Err(e) = state.mcp_bridge.lock().await.initialize_server(&name).await {
         tracing::error!(server = %name, error = %e, "Failed to start MCP server");
         return Err((StatusCode::INTERNAL_SERVER_ERROR, e.to_string()));
     }
@@ -1530,7 +1517,7 @@ struct McpToolResponse {
 async fn handle_mcp_tools_list(
     state: State<Arc<AppState>>,
 ) -> Json<Vec<McpToolResponse>> {
-    let bridge = state.mcp_bridge.lock();
+    let bridge = state.mcp_bridge.lock().await;
     let tools = match bridge.list_tools().await {
         Ok(t) => t,
         Err(e) => {
@@ -1583,7 +1570,7 @@ async fn handle_mcp_tool_call(
     state: State<Arc<AppState>>,
     Json(body): Json<McpToolCallRequest>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
-    let result = state.mcp_bridge.lock()
+    let result = state.mcp_bridge.lock().await
         .call_tool(&body.server, &body.tool, body.arguments)
         .await
         .map_err(|e| {

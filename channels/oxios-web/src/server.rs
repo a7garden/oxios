@@ -24,7 +24,7 @@ use oxios_kernel::access_manager::AccessManager;
 use oxios_kernel::skill::SkillStore;
 use oxios_kernel::state_store::StateStore;
 use oxios_kernel::Supervisor;
-use parking_lot::Mutex;
+use tokio::sync::Mutex;
 
 /// Shared application state for the web server.
 ///
@@ -59,7 +59,7 @@ pub struct AppState {
     pub config: Arc<oxios_kernel::OxiosConfig>,
     /// Path to the config file (for persistence on PUT /api/config).
     pub config_path: Option<PathBuf>,
-    /// MCP bridge for tool calling (uses Mutex for interior mutability on register_server).
+    /// MCP bridge for tool calling (uses tokio::sync::Mutex for async-safe interior mutability).
     pub mcp_bridge: Arc<Mutex<McpBridge>>,
     /// Authentication manager for bearer token validation.
     pub auth_manager: Arc<parking_lot::Mutex<oxios_kernel::auth::AuthManager>>,

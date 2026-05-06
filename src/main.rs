@@ -5,7 +5,8 @@
 
 use anyhow::{bail, Context, Result};
 use clap::{Parser, Subcommand};
-use parking_lot::Mutex;
+use parking_lot::Mutex as PLMutex;
+use tokio::sync::Mutex;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -246,7 +247,7 @@ async fn init_kernel(
 
     // Create the orchestrator to wire Ouroboros + Supervisor together.
     // Initialize the access manager and scheduler first.
-    let access_manager = Arc::new(Mutex::new(AccessManager::new()));
+    let access_manager = Arc::new(PLMutex::new(AccessManager::new()));
     let scheduler = Arc::new(AgentScheduler::new(
         config.scheduler.max_concurrent,
         config.scheduler.rate_limit_per_minute,
@@ -327,7 +328,7 @@ async fn init_kernel(
     );
 
     // Initialize the MCP bridge.
-    let mcp_bridge = Arc::new(Mutex::new(init_mcp_bridge(&config).await?));
+    let mcp_bridge = Arc::new(Mutex::new(init_mcp_bridge(&config).await?)); // tokio::sync::Mutex
 
     // Initialize the auth manager and load API keys if configured.
     let mut auth_manager = AuthManager::new();
@@ -703,7 +704,7 @@ async fn cmd_status(config_path: &Path) -> Result<()> {
     );
 
     // MCP servers status.
-    let mcp_count = mcp_bridge.lock().servers().len();
+    let mcp_count = mcp_bridge.lock().await.servers().len();
     println!();
     println!("MCP Servers: {} configured", mcp_count);
 
@@ -833,7 +834,7 @@ async fn main() -> Result<()> {
 
             // Initialize MCP servers from config (init_kernel already created the bridge).
             if !config.mcp.servers.is_empty() {
-                if let Err(e) = mcp_bridge.lock().initialize_all().await {
+                if let Err(e) = mcp_bridge.lock().await.initialize_all().await {
                     tracing::warn!(error = %e, "Some MCP servers failed to initialize");
                 } else {
                     tracing::info!(count = config.mcp.servers.len(), "MCP servers initialized");
@@ -940,7 +941,7 @@ async fn main() -> Result<()> {
                 .await?;
 
             // Shutdown MCP servers gracefully.
-            if let Err(e) = mcp_bridge.lock().shutdown_all().await {
+            if let Err(e) = mcp_bridge.lock().await.shutdown_all().await {
                 tracing::warn!(error = %e, "Error during MCP shutdown");
             }
 
