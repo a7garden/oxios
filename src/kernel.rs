@@ -4,17 +4,17 @@
 //! it's responsible for *assembling* kernel components, not providing them.
 //! The kernel library provides parts; the binary puts them together.
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result};
 use oxios_gateway::Gateway;
 use oxios_kernel::{
     access_manager::AccessManager, auth::AuthManager, config::load_config,
-    A2AProtocol, AgentRuntime, BasicSupervisor, ContainerManager, EngineProvider,
-    EventBus, HostExecBridge, HostToolValidator, McpBridge, McpServer,
-    Orchestrator, OxiosConfig, PersonaManager, ProgramManager, SkillStore,
-    AgentScheduler, Supervisor,
+    A2AProtocol, AgentRuntime, BasicSupervisor, ContainerManager,
+    EngineProvider, EventBus, HostExecBridge, HostToolValidator,
+    McpBridge, McpServer, Orchestrator, OxiosConfig, PersonaManager,
+    ProgramManager, SkillStore, AgentScheduler, Supervisor,
 };
 use oxios_ouroboros::{OuroborosEngine, OuroborosProtocol};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::Arc;
 
 /// Fully assembled Oxios kernel with all components wired together.
@@ -48,14 +48,10 @@ pub struct Kernel {
     pub host_tool_validator: HostToolValidator,
     /// Persona manager (multi-persona support).
     pub persona_manager: PersonaManager,
-    /// Inter-agent communication protocol.
-    pub a2a_protocol: Arc<A2AProtocol>,
     /// MCP tool bridge.
     pub mcp_bridge: Arc<tokio::sync::Mutex<McpBridge>>,
     /// API key authentication manager.
     pub auth_manager: Arc<parking_lot::Mutex<AuthManager>>,
-    /// Path to the config file (for config persistence).
-    pub config_path: PathBuf,
 }
 
 /// Builder for assembling the Oxios kernel.
@@ -214,10 +210,8 @@ impl KernelBuilder {
             program_manager,
             host_tool_validator,
             persona_manager,
-            a2a_protocol,
             mcp_bridge,
             auth_manager,
-            config_path,
         })
     }
 }
@@ -263,10 +257,10 @@ async fn init_mcp_bridge(config: &OxiosConfig) -> Result<McpBridge> {
                 continue;
             }
             let mut server = McpServer::new(name, &value);
-            if let Ok(args_str) = std::env::var(&format!("OXIOS_MCP_{}_ARGS", name)) {
+            if let Ok(args_str) = std::env::var(format!("OXIOS_MCP_{}_ARGS", name)) {
                 server.args = args_str.split_whitespace().map(String::from).collect();
             }
-            if let Ok(env_str) = std::env::var(&format!("OXIOS_MCP_{}_ENV", name)) {
+            if let Ok(env_str) = std::env::var(format!("OXIOS_MCP_{}_ENV", name)) {
                 for pair in env_str.split(',') {
                     if let Some((k, v)) = pair.split_once('=') {
                         server.env.insert(k.trim().to_string(), v.trim().to_string());

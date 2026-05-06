@@ -8,10 +8,9 @@ mod kernel;
 use anyhow::{bail, Context, Result};
 use clap::{Parser, Subcommand};
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
 
 use kernel::Kernel;
-use oxios_kernel::{OxiosConfig, InstallSource, Supervisor};
+use oxios_kernel::{OxiosConfig, InstallSource};
 use oxios_web::WebServer;
 
 // ─── CLI ───────────────────────────────────────────────────────────────────
@@ -156,7 +155,7 @@ fn expand_path(path: &str) -> PathBuf {
 fn oxios_home_from_config(config_path: &Path) -> PathBuf {
     config_path
         .parent()
-        .map(|p| p.to_path_buf())
+        .map(|p: &Path| p.to_path_buf())
         .unwrap_or_else(|| {
             let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
             PathBuf::from(format!("{home}/.oxios"))
