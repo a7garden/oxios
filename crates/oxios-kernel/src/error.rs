@@ -128,3 +128,44 @@ impl KernelError {
 
 /// Convenience alias for results using [`KernelError`].
 pub type KernelResult<T> = Result<T, KernelError>;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_error_display() {
+        let id = crate::types::AgentId::new_v4();
+        let err = KernelError::AgentNotFound { id };
+        let msg = err.to_string();
+        assert!(msg.contains("not found"));
+    }
+
+    #[test]
+    fn test_all_http_status_mappings() {
+        let id = crate::types::AgentId::new_v4();
+        assert_eq!(u16::from(KernelError::AgentNotFound { id }.http_status()), 404);
+        assert_eq!(u16::from(KernelError::PermissionDenied { reason: "test".into() }.http_status()), 403);
+        assert_eq!(u16::from(KernelError::ContainerUnavailable { name: "x".into(), detail: "down".into() }.http_status()), 503);
+        assert_eq!(u16::from(KernelError::BackendUnavailable.http_status()), 503);
+        assert_eq!(u16::from(KernelError::ProgramNotFound { name: "p".into() }.http_status()), 404);
+        assert_eq!(u16::from(KernelError::ProgramAlreadyExists { name: "p".into() }.http_status()), 409);
+        assert_eq!(u16::from(KernelError::InvalidConfig { detail: "bad".into() }.http_status()), 400);
+        assert_eq!(u16::from(KernelError::SeedNotFound { id: "s".into() }.http_status()), 404);
+        assert_eq!(u16::from(KernelError::SessionNotFound { id: "s".into() }.http_status()), 404);
+    }
+
+    #[test]
+    fn test_internal_error_wrapping() {
+        let err = KernelError::Internal(anyhow::anyhow!("something broke"));
+        assert!(err.to_string().contains("something broke"));
+        assert_eq!(u16::from(err.http_status()), 500);
+    }
+
+    #[test]
+    fn test_io_error_conversion() {
+        let err = KernelError::StateStore(std::io::Error::new(std::io::ErrorKind::NotFound, "gone"));
+        assert!(err.to_string().contains("gone"));
+        assert_eq!(u16::from(err.http_status()), 500);
+    }
+}
