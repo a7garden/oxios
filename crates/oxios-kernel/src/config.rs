@@ -275,6 +275,15 @@ pub struct SecurityConfig {
     /// Maximum audit log entries to retain.
     #[serde(default = "default_max_audit")]
     pub max_audit_entries: usize,
+    /// Enable API key authentication.
+    #[serde(default)]
+    pub auth_enabled: bool,
+    /// Path to API keys file.
+    #[serde(default = "default_api_keys_path")]
+    pub api_keys_path: String,
+    /// Allowed CORS origins.
+    #[serde(default = "default_cors_origins")]
+    pub cors_origins: Vec<String>,
 }
 
 fn default_allowed_tools() -> Vec<String> {
@@ -300,6 +309,16 @@ fn default_max_audit() -> usize {
     10_000
 }
 
+fn default_api_keys_path() -> String {
+    std::env::var("HOME")
+        .map(|h| format!("{h}/.oxios/api-keys.json"))
+        .unwrap_or_else(|_| "./api-keys.json".into())
+}
+
+fn default_cors_origins() -> Vec<String> {
+    vec!["http://localhost:4200".to_string()]
+}
+
 impl Default for SecurityConfig {
     fn default() -> Self {
         Self {
@@ -309,6 +328,9 @@ impl Default for SecurityConfig {
             max_memory_mb: default_max_memory(),
             can_fork: false,
             max_audit_entries: default_max_audit(),
+            auth_enabled: false,
+            api_keys_path: default_api_keys_path(),
+            cors_origins: default_cors_origins(),
         }
     }
 }

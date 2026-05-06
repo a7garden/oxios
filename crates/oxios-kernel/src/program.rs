@@ -292,7 +292,11 @@ impl ProgramManager {
 
 
         let program_dir = if entries.len() == 1 {
-            entries.into_iter().next().unwrap().path()
+            entries
+                .into_iter()
+                .next()
+                .map(|e| e.path())
+                .unwrap_or_else(|| clone_path.to_path_buf())
         } else {
             clone_path.to_path_buf()
         };
@@ -357,7 +361,11 @@ impl ProgramManager {
             .collect();
 
         let program_dir = if entries.len() == 1 {
-            entries.into_iter().next().unwrap().path()
+            entries
+                .into_iter()
+                .next()
+                .map(|e| e.path())
+                .unwrap_or_else(|| extract_base.to_path_buf())
         } else {
             extract_base.to_path_buf()
         };
@@ -445,7 +453,10 @@ impl ProgramManager {
             let entry = entry?;
             let src = entry.path();
             if src.is_dir() {
-                let name = src.file_name().unwrap().to_string_lossy();
+                let name = match src.file_name().map(|n| n.to_string_lossy().into_owned()) {
+                    Some(n) if !n.is_empty() => n,
+                    _ => continue,
+                };
                 let dest = target_dir.join(&*name);
 
                 // Only copy if not already present

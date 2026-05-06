@@ -124,8 +124,6 @@ pub fn build_routes() -> Router<Arc<AppState>> {
         .route("/api/approvals", get(handle_approvals_list))
         .route("/api/approvals/{id}/approve", post(handle_approval_approve))
         .route("/api/approvals/{id}/reject", post(handle_approval_reject))
-        // Events
-        .route("/api/events", get(handle_events))
 }
 
 // ---------------------------------------------------------------------------
@@ -1378,7 +1376,9 @@ async fn handle_program_host_requirements(
     Path(name): Path<String>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
     match state.program_manager.check_host_requirements(&name).await {
-        Ok(check) => Ok(Json(serde_json::to_value(&check).unwrap())),
+        Ok(check) => serde_json::to_value(&check)
+            .map(Json)
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())),
         Err(e) => Err((StatusCode::BAD_REQUEST, e.to_string())),
     }
 }

@@ -39,6 +39,11 @@ thiserror = "1"
 # Time
 chrono = { version = "0.4", features = ["serde"] }
 
+# Cryptography / hashing
+sha2 = "0.10"
+hex = "0.4"
+getrandom = "0.2"
+
 # Concurrency
 parking_lot = "0.12"
 
@@ -51,6 +56,7 @@ oxios-kernel = { path = "crates/oxios-kernel" }
 oxios-ouroboros = { path = "crates/oxios-ouroboros" }
 oxios-gateway = { path = "crates/oxios-gateway" }
 oxios-web = { path = "channels/oxios-web" }
+hex = { workspace = true }
 oxi-ai = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }

@@ -263,9 +263,6 @@ async fn init_kernel(
     // Create A2A protocol for inter-agent communication.
     let a2a_protocol = Arc::new(A2AProtocol::new(event_bus.clone()));
 
-    // Create A2A protocol for inter-agent communication.
-    let a2a_protocol = Arc::new(A2AProtocol::new(event_bus.clone()));
-
     // ── Initialize infrastructure before agent runtime ──
 
     // Initialize the container manager.
@@ -327,9 +324,6 @@ async fn init_kernel(
         config.container.required_host_tools.clone(),
         config.container.optional_host_tools.clone(),
     );
-
-    // Initialize the persona manager with default personas.
-    let persona_manager = PersonaManager::new();
 
     // Initialize the MCP bridge.
     let mcp_bridge = Arc::new(Mutex::new(init_mcp_bridge(&config).await?));

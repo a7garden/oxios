@@ -14,6 +14,7 @@ pub mod config;
 pub mod container;
 pub mod context_manager;
 pub mod engine;
+pub mod error;
 pub mod event_bus;
 pub mod container_manager;
 pub mod host_exec;
@@ -46,6 +47,7 @@ pub use access_manager::{
 };
 
 pub use agent_runtime::AgentRuntime;
+pub use error::{HttpStatus, KernelError, KernelResult};
 pub use engine::{EngineProvider, OxiEngineProvider};
 pub use config::{OxiosConfig, PersonaConfig, McpConfig, McpServerDef};
 pub use container::{
