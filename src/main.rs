@@ -442,6 +442,10 @@ fn setup_shutdown_handler() -> tokio::sync::mpsc::Sender<()> {
 async fn main() -> Result<()> {
     let cli = Cli::parse();
 
+    let config_path = expand_path(&cli.config);
+    let oxios_home = oxios_home_from_config(&config_path);
+    ensure_workspace(&oxios_home)?;
+
     // ── Tracing setup with file appender ──
     let log_dir = oxios_home.join("logs");
     std::fs::create_dir_all(&log_dir)?;
@@ -472,10 +476,6 @@ async fn main() -> Result<()> {
         .with_writer(non_blocking)
         .init();
 
-    let config_path = expand_path(&cli.config);
-    let oxios_home = oxios_home_from_config(&config_path);
-    ensure_workspace(&oxios_home)?;
-
     let default_model = "anthropic/claude-sonnet-4-20250514";
     const DEFAULT_PORT: u16 = 4200;
 
@@ -488,7 +488,8 @@ async fn main() -> Result<()> {
                 .config_path(config_path.to_path_buf())
                 .build()
                 .await?;
-            let (cli_channel, handle) = oxios_cli::CliChannel::new(256);
+            let cli_channel = oxios_cli::CliChannel::new(256);
+            let handle = cli_channel.handle();
             kernel.gateway.register(Box::new(cli_channel)).await;
             let mut loop_ = oxios_cli::InteractiveLoop::new(handle);
             loop_.run().await?;
@@ -503,8 +504,17 @@ async fn main() -> Result<()> {
                 .config_path(config_path.to_path_buf())
                 .build()
                 .await?;
-            let output_path = output.as_ref().map(|p| std::path::PathBuf::from(p));
-            oxios_kernel::backup::create_backup(&kernel.state_store, output_path.as_deref()).await?;
+            let output_path = match output {
+                Some(p) => std::path::PathBuf::from(p),
+                None => {
+                    let ts = std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .as_secs();
+                    kernel.state_store.base_path.join("backups").join(ts.to_string())
+                }
+            };
+            oxios_kernel::backup::create_backup(&kernel.state_store, &output_path).await?;
             Ok(())
         }
         Some(Command::Restore { input }) => {
