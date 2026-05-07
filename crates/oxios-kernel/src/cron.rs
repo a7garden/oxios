@@ -21,18 +21,14 @@ use uuid::Uuid;
 
 /// Source of a cron job.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Default)]
 #[serde(rename_all = "lowercase")]
 pub enum JobSource {
     /// Defined in config.toml.
     Config,
     /// Created via API.
+    #[default]
     Api,
-}
-
-impl Default for JobSource {
-    fn default() -> Self {
-        Self::Api
-    }
 }
 
 /// A cron job definition.
@@ -386,7 +382,7 @@ impl CronScheduler {
             jobs.iter()
                 .filter(|(_, job)| {
                     job.enabled
-                        && job.next_run.map_or(false, |nr| nr <= now)
+                        && job.next_run.is_some_and(|nr| nr <= now)
                         && !self.running_jobs.lock().contains(&job.id)
                 })
                 .map(|(_, job)| (job.id, job.goal.clone()))
