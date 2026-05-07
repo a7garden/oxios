@@ -43,13 +43,6 @@ enum Command {
     /// Start an interactive CLI chat session.
     Chat,
 
-    /// Start the terminal UI.
-    Tui {
-        /// Also start the web server.
-        #[arg(long)]
-        with_web: bool,
-    },
-
     /// Backup Oxios state.
     Backup {
         /// Output directory for the backup (default: <workspace>/backups/<timestamp>).
@@ -493,10 +486,6 @@ async fn main() -> Result<()> {
             kernel.gateway.register(Box::new(cli_channel)).await;
             let mut loop_ = oxios_cli::InteractiveLoop::new(handle);
             loop_.run().await?;
-            Ok(())
-        }
-        Some(Command::Tui { with_web: _ }) => {
-            println!("TUI not yet implemented");
             Ok(())
         }
         Some(Command::Backup { output }) => {

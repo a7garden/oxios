@@ -650,13 +650,13 @@ impl MemoryManager {
 
         // Check semantic similarity via vector index first (fast)
         let query_vector = TextVector::from_text(content);
-        let index = self.vector_index.read();
-        for (_id, vector) in index.iter() {
-            if query_vector.cosine_similarity(vector) > 0.95 {
-                return true;
-            }
+        let similar = {
+            let index = self.vector_index.read();
+            index.iter().any(|(_, vector)| query_vector.cosine_similarity(vector) > 0.95)
+        };
+        if similar {
+            return true;
         }
-        drop(index);
 
         // Then check exact content hash across all types
         for mt in &[
