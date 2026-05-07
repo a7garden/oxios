@@ -2,14 +2,88 @@
 //!
 //! Provides persistent memory for agents across sessions.
 //! Memory entries are stored as JSON files via StateStore.
+//! Supports embedding-based vector search using TF-IDF + cosine similarity.
 
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use anyhow::Result;
 use chrono::{DateTime, Utc};
+use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 
 use crate::state_store::StateStore;
+
+// ---------------------------------------------------------------------------
+// TextVector (TF-IDF vector for semantic similarity)
+// ---------------------------------------------------------------------------
+
+/// Simple TF-IDF vector for text similarity.
+///
+/// Tokenizes text into terms, computes normalized term frequency,
+/// and supports cosine similarity comparison. No external embedding
+/// model needed — works for any language including Korean.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TextVector {
+    /// Term frequencies (normalized).
+    tf: HashMap<String, f64>,
+}
+
+impl TextVector {
+    /// Create a text vector from input text.
+    pub fn from_text(text: &str) -> Self {
+        let mut tf: HashMap<String, f64> = HashMap::new();
+        let terms = Self::tokenize(text);
+        let total = terms.len() as f64;
+
+        for term in terms {
+            *tf.entry(term).or_insert(0.0) += 1.0;
+        }
+
+        // Normalize by total term count
+        if total > 0.0 {
+            for v in tf.values_mut() {
+                *v /= total;
+            }
+        }
+
+        Self { tf }
+    }
+
+    /// Tokenize text into terms (language-agnostic).
+    /// Splits on whitespace and punctuation, lowercases.
+    /// Preserves Korean Hangul syllables (U+AC00–U+D7A3) within tokens.
+    pub fn tokenize(text: &str) -> Vec<String> {
+        text.to_lowercase()
+            .split(|c: char| !c.is_alphanumeric() && !('\u{AC00}'..='\u{D7A3}').contains(&c))
+            .filter(|s| !s.is_empty() && s.len() > 1)
+            .map(|s| s.to_string())
+            .collect()
+    }
+
+    /// Compute cosine similarity between two vectors.
+    pub fn cosine_similarity(&self, other: &TextVector) -> f64 {
+        let mut dot = 0.0;
+        let mut norm_a = 0.0;
+        let mut norm_b = 0.0;
+
+        for (term, &a) in &self.tf {
+            norm_a += a * a;
+            if let Some(&b) = other.tf.get(term) {
+                dot += a * b;
+            }
+        }
+        for &b in other.tf.values() {
+            norm_b += b * b;
+        }
+
+        if norm_a == 0.0 || norm_b == 0.0 {
+            return 0.0;
+        }
+
+        dot / (norm_a.sqrt() * norm_b.sqrt())
+    }
+}
 
 // ---------------------------------------------------------------------------
 // Types
@@ -95,10 +169,22 @@ fn default_importance() -> f32 {
 /// Agent memory manager.
 ///
 /// Stores and retrieves memory entries using the file-based StateStore.
-#[derive(Debug, Clone)]
+/// Supports embedding-based vector search via an in-memory TF-IDF index
+/// that is rebuilt on startup.
 pub struct MemoryManager {
     state_store: Arc<StateStore>,
     max_recall: usize,
+    /// Vector index for semantic search (id → TextVector).
+    vector_index: RwLock<HashMap<String, TextVector>>,
+}
+
+impl std::fmt::Debug for MemoryManager {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("MemoryManager")
+            .field("max_recall", &self.max_recall)
+            .field("index_size", &self.vector_index.read().len())
+            .finish()
+    }
 }
 
 impl MemoryManager {
@@ -107,6 +193,7 @@ impl MemoryManager {
         Self {
             state_store,
             max_recall: 10,
+            vector_index: RwLock::new(HashMap::new()),
         }
     }
 
@@ -116,13 +203,72 @@ impl MemoryManager {
         self
     }
 
+    /// Apply MemoryConfig settings.
+    pub fn with_config(mut self, config: &crate::config::MemoryConfig) -> Self {
+        self.max_recall = config.max_recall;
+        self
+    }
+
+    /// Rebuild the vector index from all stored memories.
+    ///
+    /// Call once at startup to populate the in-memory index from
+    /// persisted memory entries.
+    pub async fn rebuild_index(&self) -> Result<()> {
+        // Collect all entries outside the lock
+        let mut entries_to_index: Vec<(String, TextVector)> = Vec::new();
+
+        for mt in &[
+            MemoryType::Conversation,
+            MemoryType::Session,
+            MemoryType::Fact,
+            MemoryType::Episode,
+            MemoryType::Knowledge,
+        ] {
+            if let Ok(names) = self.state_store.list_category(mt.category()).await {
+                for name in names {
+                    if let Ok(Some(entry)) = self
+                        .state_store
+                        .load_json::<MemoryEntry>(mt.category(), &name)
+                        .await
+                    {
+                        let vector = TextVector::from_text(&entry.content);
+                        entries_to_index.push((entry.id.clone(), vector));
+                    }
+                }
+            }
+        }
+
+        // Now acquire the lock only for the write
+        {
+            let mut index = self.vector_index.write();
+            index.clear();
+            for (id, vector) in entries_to_index {
+                index.insert(id, vector);
+            }
+        }
+
+        tracing::info!(entries = self.vector_index.read().len(), "Memory vector index rebuilt");
+        Ok(())
+    }
+
     /// Store a memory entry. Returns the entry ID.
+    ///
+    /// Also computes and stores the entry's text vector in the in-memory
+    /// index for future semantic search.
     pub async fn remember(&self, entry: MemoryEntry) -> Result<String> {
         let id = entry.id.clone();
+        let vector = TextVector::from_text(&entry.content);
         let category = entry.memory_type.category();
         self.state_store
             .save_json(category, &id, &entry)
             .await?;
+
+        // Update vector index
+        {
+            let mut index = self.vector_index.write();
+            index.insert(id.clone(), vector);
+        }
+
         tracing::debug!(id = %id, ty = entry.memory_type.label(), "Memory stored");
         Ok(id)
     }
@@ -155,8 +301,80 @@ impl MemoryManager {
         Ok(entries)
     }
 
-    /// Search memories by keyword.
+    /// Search memories by semantic similarity (vector search).
+    ///
+    /// Falls back to keyword search when the vector index is empty or
+    /// yields no results above the similarity threshold.
     pub async fn search(
+        &self,
+        query: &str,
+        memory_type: Option<MemoryType>,
+        limit: usize,
+    ) -> Result<Vec<MemoryEntry>> {
+        let query_vector = TextVector::from_text(query);
+
+        // Scope the read lock: compute scores, then drop before any await.
+        let scored: Vec<(String, f64)> = {
+            let index = self.vector_index.read();
+            let mut scored: Vec<(String, f64)> = index
+                .iter()
+                .map(|(id, vector)| {
+                    let score = query_vector.cosine_similarity(vector);
+                    (id.clone(), score)
+                })
+                .filter(|(_, score)| *score > 0.1)
+                .collect();
+            scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+            scored.truncate(limit);
+            scored
+        }; // lock dropped here, before any .await
+
+        // If index was empty, scored will be empty — fall back immediately
+        if scored.is_empty() {
+            return self.keyword_search(query, memory_type, limit).await;
+        }
+
+        // Determine which memory types to search
+        let all_types: &[MemoryType] = &[
+            MemoryType::Conversation,
+            MemoryType::Session,
+            MemoryType::Fact,
+            MemoryType::Episode,
+            MemoryType::Knowledge,
+        ];
+        let types: &[MemoryType] = match memory_type {
+            Some(ref t) => std::slice::from_ref(t),
+            None => all_types,
+        };
+
+        // Load entries from state store (no lock held)
+        let mut results = Vec::new();
+        for (id, score) in scored {
+            for mt in types {
+                if let Ok(Some(mut entry)) = self
+                    .state_store
+                    .load_json::<MemoryEntry>(mt.category(), &id)
+                    .await
+                {
+                    entry.access_count += 1;
+                    entry.accessed_at = chrono::Utc::now();
+                    tracing::debug!(id = %id, score, "Vector search hit");
+                    results.push(entry);
+                    break;
+                }
+            }
+        }
+
+        // Fall back to keyword search if no results
+        if results.is_empty() {
+            return self.keyword_search(query, memory_type, limit).await;
+        }
+
+        Ok(results)
+    }
+
+    /// Keyword-based search (original algorithm, used as fallback).
+    async fn keyword_search(
         &self,
         query: &str,
         memory_type: Option<MemoryType>,
@@ -388,6 +606,142 @@ mod tests {
         let result = mgr.blend_into_prompt(&memories, "You are an agent.");
         assert!(result.contains("## Relevant Memory"));
         assert!(result.contains("[fact]"));
+    }
+
+    // ---- Vector search tests ----
+
+    #[test]
+    fn test_text_vector_cosine_similarity() {
+        let v1 = TextVector::from_text("fix the null pointer error in main.rs");
+        let v2 = TextVector::from_text("null pointer error found in rust code");
+        let v3 = TextVector::from_text("update the documentation for deployment");
+
+        // Similar texts should have high similarity
+        assert!(
+            v1.cosine_similarity(&v2) > 0.3,
+            "Similar texts should have > 0.3 similarity"
+        );
+
+        // Different texts should have low similarity
+        assert!(
+            v1.cosine_similarity(&v3) < 0.2,
+            "Different texts should have < 0.2 similarity"
+        );
+    }
+
+    #[test]
+    fn test_text_vector_korean() {
+        let v1 = TextVector::from_text("main.rs 파일의 null pointer 에러 수정");
+        let v2 = TextVector::from_text("null pointer 오류를 수정했습니다");
+        let v3 = TextVector::from_text("문서 업데이트 배포 가이드");
+
+        assert!(
+            v1.cosine_similarity(&v2) > 0.1,
+            "Korean+code similarity"
+        );
+        assert!(
+            v1.cosine_similarity(&v3) < 0.1,
+            "Korean different topics"
+        );
+    }
+
+    #[test]
+    fn test_text_vector_empty() {
+        let v1 = TextVector::from_text("");
+        let v2 = TextVector::from_text("hello");
+        assert_eq!(v1.cosine_similarity(&v2), 0.0);
+    }
+
+    #[test]
+    fn test_text_vector_identical() {
+        let v1 = TextVector::from_text("rust programming language");
+        let v2 = TextVector::from_text("rust programming language");
+        let sim = v1.cosine_similarity(&v2);
+        assert!(
+            (sim - 1.0).abs() < 1e-9,
+            "Identical texts should have similarity ~1.0, got {}",
+            sim
+        );
+    }
+
+    #[test]
+    fn test_tokenize_korean() {
+        let terms = TextVector::tokenize("main.rs 파일의 버그를 수정");
+        // Should contain at least some meaningful tokens
+        assert!(!terms.is_empty(), "Korean text should produce tokens");
+    }
+
+    #[tokio::test]
+    async fn test_vector_search_over_keyword_fallback() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let store = Arc::new(StateStore::new(temp_dir.path().to_path_buf()).unwrap());
+        let mgr = MemoryManager::new(store.clone());
+
+        // Store some memories
+        let entry1 = MemoryEntry {
+            id: "vec-test-1".to_string(),
+            memory_type: MemoryType::Fact,
+            content: "Rust is a systems programming language focused on safety".to_string(),
+            source: "test".to_string(),
+            session_id: None,
+            tags: vec![],
+            importance: 0.5,
+            created_at: Utc::now(),
+            accessed_at: Utc::now(),
+            access_count: 0,
+        };
+        let entry2 = MemoryEntry {
+            id: "vec-test-2".to_string(),
+            memory_type: MemoryType::Fact,
+            content: "Python is great for machine learning and data science".to_string(),
+            source: "test".to_string(),
+            session_id: None,
+            tags: vec![],
+            importance: 0.5,
+            created_at: Utc::now(),
+            accessed_at: Utc::now(),
+            access_count: 0,
+        };
+
+        mgr.remember(entry1).await.unwrap();
+        mgr.remember(entry2).await.unwrap();
+
+        // Vector search should find the Rust entry for a Rust-related query
+        let results = mgr.search("systems programming with rust", None, 5).await.unwrap();
+        assert!(!results.is_empty(), "Vector search should find results");
+        assert_eq!(results[0].id, "vec-test-1", "Should find the Rust entry first");
+    }
+
+    #[tokio::test]
+    async fn test_rebuild_index() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let store = Arc::new(StateStore::new(temp_dir.path().to_path_buf()).unwrap());
+        let mgr = MemoryManager::new(store.clone());
+
+        // Store a memory directly via state_store (bypassing remember to test rebuild)
+        let entry = MemoryEntry {
+            id: "rebuild-test-1".to_string(),
+            memory_type: MemoryType::Fact,
+            content: "memory for rebuild test".to_string(),
+            source: "test".to_string(),
+            session_id: None,
+            tags: vec![],
+            importance: 0.5,
+            created_at: Utc::now(),
+            accessed_at: Utc::now(),
+            access_count: 0,
+        };
+        store.save_json("memory/facts", "rebuild-test-1", &entry).await.unwrap();
+
+        // Index should be empty before rebuild
+        assert_eq!(mgr.vector_index.read().len(), 0);
+
+        // Rebuild
+        mgr.rebuild_index().await.unwrap();
+
+        // Index should now contain the entry
+        assert_eq!(mgr.vector_index.read().len(), 1);
+        assert!(mgr.vector_index.read().contains_key("rebuild-test-1"));
     }
 
     fn make_entry(id: &str, ty: MemoryType) -> MemoryEntry {

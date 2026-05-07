@@ -194,6 +194,17 @@ pub(crate) fn sanitize_event(event: &oxios_kernel::event_bus::KernelEvent) -> se
             "query": query,
             "count": count,
         }),
+        KernelEvent::AgentGroupCreated { group_id, agent_count } => serde_json::json!({
+            "type": "agent_group_created",
+            "group_id": group_id.to_string(),
+            "agent_count": agent_count,
+        }),
+        KernelEvent::AgentGroupMemberCompleted { group_id, agent_id, success } => serde_json::json!({
+            "type": "agent_group_member_completed",
+            "group_id": group_id.to_string(),
+            "agent_id": agent_id.to_string(),
+            "success": success,
+        }),
     }
 }
 

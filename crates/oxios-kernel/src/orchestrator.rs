@@ -28,6 +28,40 @@ use crate::scheduler::Priority;
 use crate::state_store::StateStore;
 use crate::types::AgentId;
 
+/// A subtask within a multi-agent plan.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SubTask {
+    /// Unique subtask ID.
+    pub id: Uuid,
+    /// Human-readable description.
+    pub description: String,
+    /// Capability required (e.g., "code-review", "testing").
+    pub required_capability: Option<String>,
+    /// Result of the subtask (filled after execution).
+    pub result: Option<String>,
+    /// Whether this subtask succeeded.
+    pub success: bool,
+}
+
+impl SubTask {
+    /// Create a new subtask with the given description.
+    pub fn new(description: impl Into<String>) -> Self {
+        Self {
+            id: Uuid::new_v4(),
+            description: description.into(),
+            required_capability: None,
+            result: None,
+            success: false,
+        }
+    }
+
+    /// Set the required capability for this subtask.
+    pub fn with_capability(mut self, cap: impl Into<String>) -> Self {
+        self.required_capability = Some(cap.into());
+        self
+    }
+}
+
 /// Maximum number of Ouroboros loops before giving up.
 const MAX_EVOLUTION_ITERATIONS: usize = 3;
 
@@ -179,6 +213,54 @@ impl Orchestrator {
 
         self.publish_phase_completed(&session_id, Phase::Seed, "generated").await;
         self.publish_phase_started(&session_id, Phase::Execute).await;
+
+        // Check if the seed should be split into multi-agent execution.
+        // When the seed has 3+ acceptance criteria, we treat each criterion
+        // as a distinct subtask and delegate to separate agents.
+        if should_split_seed(&seed) {
+            let subtasks = split_into_subtasks(&seed);
+            if subtasks.len() > 1 {
+                tracing::info!(
+                    seed_id = %seed.id,
+                    subtasks = subtasks.len(),
+                    "Splitting into multi-agent execution"
+                );
+                let results = self.delegate_subtasks(subtasks, &seed).await?;
+
+                // Combine successful results
+                let combined: String = results
+                    .iter()
+                    .filter(|r| r.success)
+                    .filter_map(|r| r.result.as_deref())
+                    .collect::<Vec<_>>()
+                    .join("\n\n");
+
+                let all_passed = results.iter().all(|r| r.success);
+
+                // Clean up the session.
+                {
+                    let mut sessions = self.sessions.write();
+                    sessions.remove(&session_id);
+                }
+
+                tracing::info!(
+                    session_id = %session_id,
+                    subtasks = results.len(),
+                    passed = all_passed,
+                    "Multi-agent orchestration complete"
+                );
+
+                return Ok(OrchestrationResult {
+                    session_id: Some(session_id),
+                    response: format_result_combined(&combined),
+                    seed_id: Some(seed.id),
+                    agent_id: None,
+                    phase_reached: Phase::Execute,
+                    evaluation_passed: all_passed,
+                    output: Some(combined),
+                });
+            }
+        }
 
         // Phase 3: Fork and execute agent via lifecycle manager
         let exec_result = self.lifecycle.spawn_and_run(&seed, Priority::Normal).await?;
@@ -332,6 +414,103 @@ impl Orchestrator {
         });
     }
 
+    /// Execute multiple subtasks using separate agents.
+    ///
+    /// Each subtask becomes a lightweight Seed that is executed by
+    /// a separate agent via the lifecycle manager.
+    /// Results are collected and combined.
+    pub async fn delegate_subtasks(
+        &self,
+        subtasks: Vec<SubTask>,
+        parent_seed: &Seed,
+    ) -> Result<Vec<SubTask>> {
+        use crate::agent_group::AgentGroup;
+
+        // Create an AgentGroup to track execution
+        let descriptions: Vec<String> = subtasks.iter().map(|st| st.description.clone()).collect();
+        let group = AgentGroup::new(parent_seed, descriptions);
+        let group_id = group.id;
+
+        self.event_bus.publish(KernelEvent::AgentGroupCreated {
+            group_id,
+            agent_count: group.agents.len(),
+        })?;
+
+        tracing::info!(
+            group_id = %group_id,
+            agent_count = group.agents.len(),
+            "Starting multi-agent execution"
+        );
+
+        // Execute subtasks sequentially through the full lifecycle.
+        // Each subtask runs through spawn_and_run which handles fork,
+        // A2A registration, permissions, scheduling, execution, and cleanup.
+        let mut completed = Vec::new();
+        for (idx, agent_entry) in group.agents.iter().enumerate() {
+            let subtask = &subtasks[idx];
+            let subtask_id = subtask.id;
+            let child_seed = &agent_entry.seed;
+
+            tracing::info!(
+                group_id = %group_id,
+                subtask_index = idx,
+                subtask_id = %subtask_id,
+                goal = %child_seed.goal,
+                "Executing subtask"
+            );
+
+            match self.lifecycle.spawn_and_run(child_seed, Priority::Normal).await {
+                Ok(exec_result) => {
+                    let _ = self.event_bus.publish(KernelEvent::AgentGroupMemberCompleted {
+                        group_id,
+                        agent_id: agent_entry.id,
+                        success: exec_result.success,
+                    });
+                    completed.push(SubTask {
+                        id: subtask_id,
+                        description: subtask.description.clone(),
+                        required_capability: subtask.required_capability.clone(),
+                        result: Some(exec_result.output.clone()),
+                        success: exec_result.success,
+                    });
+                }
+                Err(e) => {
+                    tracing::warn!(
+                        subtask_id = %subtask_id,
+                        error = %e,
+                        "Subtask failed"
+                    );
+                    let _ = self.event_bus.publish(KernelEvent::AgentGroupMemberCompleted {
+                        group_id,
+                        agent_id: agent_entry.id,
+                        success: false,
+                    });
+                    completed.push(SubTask {
+                        id: subtask_id,
+                        description: subtask.description.clone(),
+                        required_capability: subtask.required_capability.clone(),
+                        result: Some(format!("Failed: {e}")),
+                        success: false,
+                    });
+                }
+            }
+        }
+
+        let succeeded = completed.iter().filter(|r| r.success).count();
+        let total = completed.len();
+        tracing::info!(
+            group_id = %group_id,
+            succeeded,
+            total,
+            "Multi-agent execution complete"
+        );
+
+        // Periodically reap zombie tasks after multi-agent runs.
+        self.lifecycle.reap_zombies();
+
+        Ok(completed)
+    }
+
 }
 
 /// Active session state for multi-turn interviews.
@@ -412,4 +591,32 @@ fn format_result(seed: &Seed, evaluation: &EvaluationResult) -> String {
     }
 
     lines.join("\n")
+}
+
+/// Check if a seed should be split into subtasks.
+///
+/// Simple heuristic: if the seed has 3 or more acceptance criteria,
+/// it likely contains distinct concerns that can be parallelized.
+fn should_split_seed(seed: &Seed) -> bool {
+    seed.acceptance_criteria.len() >= 3
+}
+
+/// Split a seed into subtasks based on acceptance criteria.
+///
+/// Each acceptance criterion becomes a separate subtask with the
+/// parent seed's goal as context.
+fn split_into_subtasks(seed: &Seed) -> Vec<SubTask> {
+    seed.acceptance_criteria
+        .iter()
+        .map(|criterion| SubTask::new(format!("{}: {}", seed.goal, criterion)))
+        .collect()
+}
+
+/// Format combined results from multi-agent execution.
+fn format_result_combined(combined: &str) -> String {
+    if combined.is_empty() {
+        "No subtasks completed successfully.".to_string()
+    } else {
+        format!("Multi-agent execution completed:\n\n{}", combined)
+    }
 }

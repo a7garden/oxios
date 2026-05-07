@@ -114,6 +114,22 @@ pub enum KernelEvent {
         /// Number of memories returned.
         count: usize,
     },
+    /// Multi-agent group created.
+    AgentGroupCreated {
+        /// The group's ID.
+        group_id: uuid::Uuid,
+        /// Number of agents in the group.
+        agent_count: usize,
+    },
+    /// An agent in a group completed.
+    AgentGroupMemberCompleted {
+        /// The group's ID.
+        group_id: uuid::Uuid,
+        /// The agent's ID.
+        agent_id: uuid::Uuid,
+        /// Whether the agent succeeded.
+        success: bool,
+    },
 }
 
 /// A broadcast-based event bus for kernel events.

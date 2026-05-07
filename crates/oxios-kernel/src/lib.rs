@@ -10,6 +10,7 @@ pub mod circuit_breaker;
 pub mod metrics;
 pub mod a2a;
 pub mod access_manager;
+pub mod agent_group;
 pub mod agent_lifecycle;
 pub mod agent_runtime;
 
@@ -52,6 +53,7 @@ pub use access_manager::{
     PendingApproval, ApprovalStatus,
 };
 
+pub use agent_group::{AgentGroup, AgentGroupStatus, GroupAgent};
 pub use agent_lifecycle::AgentLifecycleManager;
 pub use agent_runtime::AgentRuntime;
 pub use error::{HttpStatus, KernelError, KernelResult};
@@ -70,7 +72,7 @@ pub use orchestrator::{OrchestrationResult, Orchestrator};
 pub use scheduler::{AgentScheduler, Priority, ScheduledTask, SchedulerStats, TaskStatus};
 pub use host_tools::{common as host_tools_common, HostToolStatus, HostToolValidator};
 pub use mcp::{McpBridge, McpCapabilities, McpServer, McpTool};
-pub use memory::{MemoryEntry, MemoryManager, MemoryType};
+pub use memory::{MemoryEntry, MemoryManager, MemoryType, TextVector};
 pub use program::{InstallSource, Program, ProgramManager, ProgramMeta, ToolDef, HostRequirementsCheck, ArgumentDef};
 pub use skill::{Skill, SkillMeta, SkillStore};
 pub use state_store::{AgentResponse, Session, SessionId, SessionSummary, StateStore};
