@@ -1,33 +1,26 @@
 # Progress
 
 ## Status
-Completed
+In Progress
 
 ## Tasks
-- [x] Add Chat, Tui, Backup, Restore command variants to `Command` enum in main.rs
-- [x] Add command handlers for Chat (interactive CLI via CliChannel), Tui (placeholder), Backup, Restore
-- [x] Add `oxios-cli` dependency to root Cargo.toml and workspace members
-- [x] Add `tracing-appender` to workspace and root dependencies
-- [x] Add log rotation with tracing-appender (daily rotation, non-blocking writer)
-- [x] Fix pre-existing compilation errors (memory.rs borrow issues, api_docs.rs SecurityScheme import, utoipa-swagger-ui version mismatch with axum 0.8)
-- [x] Fix recursive async in backup.rs (Box::pin)
-- [x] Verify compilation passes (`cargo check -p oxios` — clean)
+- [x] Loop 9 Cross-Reference Check (all 12 items verified)
+  - 10/12 PASS (all core integrations verified correct)
+  - 2 warnings: dead stubs in oxios-cli/src/channel.rs (unreachable!/unimplemented!)
+- [x] Loop 9 Deep Code Review (19 files)
+  - 2 CRITICAL: A2A send_and_wait UUID mismatch + message consumption bug
+  - 5 MEDIUM: handle_container_tools 501 despite working impl, is_duplicate scan limit, InteractiveLoop blocking, CliChannel panic methods, 
+  - 5 LOW: eval_cache unused, dead code on OuroborosEngine, AgentGroup helpers unused, execute() hardcoded false, MechanicalEvalResult unused
+  - 11 items verified clean
 
 ## Files Changed
-- `Cargo.toml` — Added `oxios-cli` dep, `tracing-appender` workspace + root dep, added `channels/oxios-cli` to workspace members
-- `src/main.rs` — Added Chat/Tui/Backup/Restore commands, handlers, tracing-appender log rotation
-- `src/kernel.rs` — No changes needed (fields already public)
-- `channels/oxios-cli/` — Created new crate with CliChannel, CliChannelHandle, InteractiveLoop (reedline-based)
-- `crates/oxios-kernel/src/backup.rs` — Created backup/restore functions with recursive directory copy
-- `crates/oxios-kernel/src/lib.rs` — Added `pub mod backup` (already done by other worker)
-- `crates/oxios-kernel/src/memory.rs` — Fixed pre-existing borrow-after-move errors
-- `channels/oxios-web/src/api_docs.rs` — Fixed SecurityScheme import
-- `channels/oxios-web/Cargo.toml` — Upgraded utoipa-swagger-ui 8 → 9 for axum 0.8 compat
-- `channels/oxios-web/src/server.rs` — Fixed Router state type mismatch with SwaggerUi
-- `channels/oxios-cli/src/interactive.rs` — Fixed reedline API (PromptSegments → DefaultPromptSegment)
+- `/tmp/oxios-loop9-scout.md` — Full cross-reference report
+- `/tmp/oxios-loop9-review-1.md` — Deep code review report
 
 ## Notes
-- The `oxios-cli` crate was created from scratch since it didn't exist. It provides `CliChannel` (implements `Channel` trait), `CliChannelHandle`, and `InteractiveLoop` (reedline-based REPL with meta-commands).
-- Log rotation uses `tracing_appender::rolling::daily` with a non-blocking writer. The guard is leaked via `Box::leak` for program lifetime.
-- The backup module uses a `Box::pin` recursive async pattern to satisfy Rust's recursion requirements.
-- Several pre-existing compilation errors were fixed as blockers: memory.rs borrow issues, utoipa-swagger-ui version incompatibility with axum 0.8, and reedline API mismatches.
+- All core type integrations are properly wired and consistent
+- Two critical logic bugs in A2A `send_and_wait`: UUID comparison mismatch and destructive message consumption
+- handle_container_tools route returns 501 but the underlying method is fully implemented — easy fix
+- Memory is_duplicate only scans 100 entries per type, missing duplicates beyond that
+- InteractiveLoop::run() blocks async runtime in Chat subcommand
+- eval_cache, MechanicalEvalResult, AgentGroup helper methods are dead code
