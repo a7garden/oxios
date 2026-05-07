@@ -26,7 +26,7 @@ http://127.0.0.1:4200
 ### Health Check
 
 ```sh
-curl http://127.0.0.1:4200/api/health
+curl http://127.0.0.1:4200/health
 ```
 
 Response:
@@ -42,10 +42,9 @@ Response:
 Send a message to the Oxios gateway for processing:
 
 ```sh
-curl -X POST http://127.0.0.1:4200/api/message \
+curl -X POST http://127.0.0.1:4200/api/chat \
   -H "Content-Type: application/json" \
   -d '{
-    "channel": "rest",
     "message": "Build a TODO app with React and SQLite",
     "session_id": null
   }'
@@ -391,7 +390,7 @@ async fn handle_telegram_webhook(
     // Forward to Oxios
     let client = reqwest::Client::new();
     let oxios_resp = client
-        .post(format!("{}/api/message", state.oxios_url))
+        .post(format!("{}/api/chat", state.oxios_url))
         .json(&OxiosMessage {
             channel: "telegram".into(),
             message: text.clone(),

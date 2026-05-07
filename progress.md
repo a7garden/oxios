@@ -1,31 +1,19 @@
-# Progress
+# Oxios Progress Tracker
 
-## Status
-In Progress
+## 2026-05-07: Agent OS Research
 
-## Tasks
-- [x] Loop 10 Deep Code Verification Review (9 files inspected)
+### ✅ Completed: Deep Investigation into "Agent Operating System"
 
-## Files Changed
-- Reviewed: `crates/oxios-kernel/src/container_manager.rs`
-- Reviewed: `crates/oxios-kernel/src/embedding.rs`
-- Reviewed: `crates/oxios-kernel/src/memory.rs`
-- Reviewed: `crates/oxios-kernel/src/a2a.rs`
-- Reviewed: `crates/oxios-kernel/src/orchestrator.rs`
-- Reviewed: `channels/oxios-web/src/routes/system.rs`
-- Reviewed: `channels/oxios-web/src/routes/mod.rs`
-- Reviewed: `crates/oxios-kernel/src/telemetry_stub.rs`
-- Reviewed: `crates/oxios-kernel/src/telemetry_otel.rs`
-- Reviewed: `tests/e2e_real_pipeline.rs`
-- Reviewed: `crates/oxios-kernel/tests/e2e_test.rs`
-- Reviewed: `docs/channel-plugin-guide.md`
-- Output: `/tmp/oxios-l10-review.md`
+**Output:** `/tmp/oxios-agent-os-research.md`
 
-## Notes
-### Loop 10 Review Findings
-- **CRITICAL**: Channel guide has wrong health check path (`/api/health` → should be `/health`)
-- **MEDIUM**: Channel guide references non-existent `/api/message` endpoint (should be `/api/chat`)
-- **LOW**: API reference link in channel guide points to `routes.rs` not `mod.rs`
-- **LOW**: OTel feature is currently a no-op placeholder
-- **LOW**: Notify single-permit pattern is correct but could use a clarifying comment
-- All 7 focus areas verified. No code bugs found in Rust implementation files.
+**Key Findings:**
+- Agent OS ≠ Agent Framework ≠ Agent SDK — the OS provides process management, scheduling, IPC, security (like Linux for processes)
+- **AIOS** (COLM 2025) is the foundational academic paper — defines kernel modules: scheduler, context manager, memory manager, storage manager, tool manager, access manager
+- **AgenticOS 2026** — first ASPLOS workshop on OS design for AI agents, signals formal recognition by systems research community
+- **OpenFang** — most relevant existing project: Rust-based Agent OS, 180ms cold start, production-oriented
+- **AARM** — emerging security spec (CSA, donated by Vanta) — the "SELinux for Agent OS"
+- **MCP + A2A** — complementary protocols forming the communication stack (agent→tool + agent→agent)
+- **OpenClaw / miniclaw-os** — NOT found in public sources; may be internal/private projects
+- Multi-agent orchestration patterns converging on 4 models: Supervisor, Pipeline, Swarm, Hierarchical
+
+**Status:** Research complete, ready for review.
