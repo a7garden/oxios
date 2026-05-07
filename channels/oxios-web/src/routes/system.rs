@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use axum::extract::{Path, Query, State};
 use axum::Json;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use oxios_kernel::{AgentId};
 use uuid::Uuid;
@@ -267,6 +267,55 @@ pub(crate) async fn handle_agent_kill(
             Err(AppError::NotFound("agent not found".into()))
         }
     }
+}
+
+// ---------------------------------------------------------------------------
+// Container Create / Toolchains
+// ---------------------------------------------------------------------------
+
+/// Request body for creating a container.
+#[derive(Debug, Deserialize)]
+pub(crate) struct CreateContainerRequest {
+    /// Container name.
+    pub name: String,
+    /// Optional toolchain (e.g. "rust", "node", "python").
+    pub toolchain: Option<String>,
+}
+
+/// Info about a single toolchain template.
+#[derive(Debug, Serialize)]
+pub(crate) struct ToolchainInfo {
+    /// Toolchain identifier.
+    pub id: String,
+    /// Supported language names.
+    pub languages: Vec<String>,
+}
+
+/// POST /api/containers — Create a new container.
+pub(crate) async fn handle_container_create(
+    state: State<Arc<AppState>>,
+    Json(body): Json<CreateContainerRequest>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    let result = if let Some(toolchain) = &body.toolchain {
+        state.container_manager
+            .new_container_with_toolchain(&body.name, toolchain)
+            .await
+    } else {
+        state.container_manager.new_container(&body.name).await
+    };
+    result
+        .map(|_| Json(serde_json::json!({"created": body.name})))
+        .map_err(|e| AppError::Internal(e.to_string()))
+}
+
+/// GET /api/toolchains — List available toolchain templates.
+pub(crate) async fn handle_toolchains_list() -> Json<Vec<ToolchainInfo>> {
+    Json(vec![
+        ToolchainInfo { id: "default".into(), languages: vec!["bash".into(), "python3".into()] },
+        ToolchainInfo { id: "rust".into(), languages: vec!["rust".into()] },
+        ToolchainInfo { id: "node".into(), languages: vec!["typescript".into(), "javascript".into()] },
+        ToolchainInfo { id: "python".into(), languages: vec!["python3".into()] },
+    ])
 }
 
 // ---------------------------------------------------------------------------

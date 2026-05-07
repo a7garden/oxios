@@ -27,6 +27,53 @@ WORKDIR /workspace
 CMD ["/bin/bash"]
 "#;
 
+/// Rust toolchain containerfile.
+const RUST_TOOLCHAIN_CONTAINERFILE: &str = r#"# Oxios Rust Dev Container
+FROM debian:bookworm-slim
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl git ripgrep jq bash ca-certificates \
+    build-essential pkg-config libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+ENV PATH="/root/.cargo/bin:${PATH}"
+WORKDIR /workspace
+CMD ["/bin/bash"]
+"#;
+
+/// Node.js / TypeScript toolchain containerfile.
+const NODE_TOOLCHAIN_CONTAINERFILE: &str = r#"# Oxios Node Dev Container
+FROM debian:bookworm-slim
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl git ripgrep jq bash ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
+    && apt-get install -y nodejs \
+    && npm install -g typescript ts-node \
+    && rm -rf /var/lib/apt/lists/*
+WORKDIR /workspace
+CMD ["/bin/bash"]
+"#;
+
+/// Python toolchain containerfile.
+const PYTHON_TOOLCHAIN_CONTAINERFILE: &str = r#"# Oxios Python Dev Container
+FROM debian:bookworm-slim
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl git ripgrep jq bash ca-certificates python3 python3-pip python3-venv \
+    && rm -rf /var/lib/apt/lists/*
+WORKDIR /workspace
+CMD ["/bin/bash"]
+"#;
+
+/// Select a containerfile template based on language/toolchain.
+pub fn containerfile_for_toolchain(toolchain: &str) -> &'static str {
+    match toolchain {
+        "rust" => RUST_TOOLCHAIN_CONTAINERFILE,
+        "node" | "typescript" | "ts" => NODE_TOOLCHAIN_CONTAINERFILE,
+        "python" | "python3" => PYTHON_TOOLCHAIN_CONTAINERFILE,
+        _ => DEFAULT_CONTAINERFILE,
+    }
+}
+
 /// Status of a single tool in a container.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ToolStatus {
@@ -126,13 +173,12 @@ impl ContainerManager {
         containers.into_iter().find(|c| c.running).map(|c| c.name)
     }
 
-    /// Create a new container workspace.
-    ///
-    /// Creates the directory structure:
-    /// - `$containers_base/<name>/workspace/` (mounted to container)
-    /// - `$containers_base/<name>/Containerfile`
-    /// - `$containers_base/<name>/.env` (empty)
-    pub async fn new_container(&self, name: &str) -> Result<()> {
+    /// Create a new container with a specific toolchain template.
+    pub async fn new_container_with_toolchain(
+        &self,
+        name: &str,
+        toolchain: &str,
+    ) -> Result<()> {
         let container_dir = self.containers_base.join(name);
         if container_dir.exists() {
             bail!("Container '{}' already exists", name);
@@ -154,8 +200,9 @@ impl ContainerManager {
             .await
             .with_context(|| format!("failed to create container directory for '{}'", name))?;
 
-        // Write default Containerfile.
-        tokio::fs::write(container_dir.join("Containerfile"), DEFAULT_CONTAINERFILE)
+        // Write Containerfile for the selected toolchain.
+        let containerfile = containerfile_for_toolchain(toolchain);
+        tokio::fs::write(container_dir.join("Containerfile"), containerfile)
             .await
             .context("failed to write Containerfile")?;
 
@@ -170,7 +217,11 @@ impl ContainerManager {
             image_tag: DEFAULT_IMAGE_TAG.to_string(),
             created_at: chrono::Utc::now().to_rfc3339(),
             running: false,
-            toolchain: None,
+            toolchain: if toolchain == "default" {
+                None
+            } else {
+                Some(toolchain.to_string())
+            },
             tools_verified: false,
         };
         self.state_store
@@ -178,8 +229,18 @@ impl ContainerManager {
             .await
             .context("failed to save container metadata")?;
 
-        tracing::info!(container = %name, "Container workspace created");
+        tracing::info!(name = %name, toolchain = %toolchain, "Container created with toolchain");
         Ok(())
+    }
+
+    /// Create a new container workspace.
+    ///
+    /// Creates the directory structure:
+    /// - `$containers_base/<name>/workspace/` (mounted to container)
+    /// - `$containers_base/<name>/Containerfile`
+    /// - `$containers_base/<name>/.env` (empty)
+    pub async fn new_container(&self, name: &str) -> Result<()> {
+        self.new_container_with_toolchain(name, "default").await
     }
 
     /// Start a container.
@@ -453,6 +514,43 @@ mod tests {
         // Ensure the default Containerfile is sensible.
         assert!(DEFAULT_CONTAINERFILE.contains("FROM"));
         assert!(DEFAULT_CONTAINERFILE.contains("WORKDIR /workspace"));
+    }
+
+    #[test]
+    fn test_containerfile_for_toolchain_rust() {
+        let cf = containerfile_for_toolchain("rust");
+        assert!(cf.contains("rustup"));
+        assert!(cf.contains("WORKDIR /workspace"));
+        assert_eq!(cf, RUST_TOOLCHAIN_CONTAINERFILE);
+    }
+
+    #[test]
+    fn test_containerfile_for_toolchain_node() {
+        for alias in &["node", "typescript", "ts"] {
+            let cf = containerfile_for_toolchain(alias);
+            assert!(cf.contains("nodesource"));
+            assert!(cf.contains("WORKDIR /workspace"));
+            assert_eq!(cf, NODE_TOOLCHAIN_CONTAINERFILE);
+        }
+    }
+
+    #[test]
+    fn test_containerfile_for_toolchain_python() {
+        for alias in &["python", "python3"] {
+            let cf = containerfile_for_toolchain(alias);
+            assert!(cf.contains("python3"));
+            assert!(cf.contains("WORKDIR /workspace"));
+            assert_eq!(cf, PYTHON_TOOLCHAIN_CONTAINERFILE);
+        }
+    }
+
+    #[test]
+    fn test_containerfile_for_toolchain_unknown_returns_default() {
+        let cf = containerfile_for_toolchain("unknown-lang");
+        assert_eq!(cf, DEFAULT_CONTAINERFILE);
+
+        let cf2 = containerfile_for_toolchain("");
+        assert_eq!(cf2, DEFAULT_CONTAINERFILE);
     }
 
     #[tokio::test]
