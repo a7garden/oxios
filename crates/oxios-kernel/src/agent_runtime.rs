@@ -11,7 +11,7 @@
 
 use anyhow::Result;
 use oxi_agent::{
-    AgentEvent, AgentLoop, AgentLoopConfig, GrepTool, LsTool, ReadTool, SharedState,
+    AgentEvent, AgentLoop, AgentLoopConfig, CompactionEvent, GrepTool, LsTool, ReadTool, SharedState,
     ToolExecutionMode, ToolRegistry, WriteTool, EditTool, FindTool,
 };
 use oxi_ai::{CompactionStrategy, Provider};
@@ -25,7 +25,7 @@ use crate::mcp::McpBridge;
 use crate::persona_manager::PersonaManager;
 use crate::program::ProgramManager;
 use crate::state_store::StateStore;
-use crate::memory::MemoryManager;
+use crate::memory::{MemoryEntry, MemoryManager, MemoryType};
 use crate::tools::{ContainerExecTool, HostExecTool, McpToolWrapper, ProgramTool};
 use crate::tools::memory_tools::{MemoryWriteTool, MemoryReadTool, MemorySearchTool};
 use oxios_ouroboros::{ExecutionResult, Seed};
@@ -201,7 +201,19 @@ impl AgentRuntime {
             .map(|pm| pm.active_system_prompt())
             .filter(|s| !s.trim().is_empty());
 
-        let system_prompt = build_system_prompt(seed, &skill_contents, persona_prompt.as_deref());
+        let mut system_prompt = build_system_prompt(seed, &skill_contents, persona_prompt.as_deref());
+
+        // Blend relevant memories into system prompt if memory manager is available.
+        if let Some(ref mm) = self.memory_manager {
+            match mm.recall(&seed.goal).await {
+                Ok(memories) if !memories.is_empty() => {
+                    tracing::info!(count = memories.len(), "Recalled memories for seed");
+                    system_prompt = mm.blend_into_prompt(&memories, &system_prompt);
+                }
+                Ok(_) => tracing::debug!("No memories recalled"),
+                Err(e) => tracing::warn!(error = %e, "Failed to recall memories"),
+            }
+        }
 
         // Clone everything to move into spawn_blocking.
         let config = self.config.clone();
@@ -414,9 +426,12 @@ fn run_agent_loop(
     // Shared mutable state for the event callback.
     let exec_state = Arc::new(Mutex::new(ExecuteState::default()));
     let exec_state_clone = Arc::clone(&exec_state);
+    let memory_for_callback = memory_manager.clone();
+    let session_id_for_callback = seed_id.to_string();
 
     // Run the async AgentLoop inside the blocking thread.
     let rt = tokio::runtime::Handle::current();
+    let rt_for_callback = rt.clone();
     rt.block_on(async {
         let result = agent_loop
             .run(prompt, move |event| {
@@ -434,6 +449,27 @@ fn run_agent_loop(
                     AgentEvent::Error { message, .. } => {
                         s.final_content = message.clone();
                         s.success = false;
+                    }
+                    AgentEvent::Compaction { event } => {
+                        if let Some(ref mm) = memory_for_callback {
+                            if let CompactionEvent::Completed { result, .. } = event {
+                                let entry = MemoryEntry {
+                                    id: uuid::Uuid::new_v4().to_string(),
+                                    memory_type: MemoryType::Conversation,
+                                    content: result.summary.clone(),
+                                    source: "compaction".to_string(),
+                                    session_id: Some(session_id_for_callback.clone()),
+                                    tags: vec![],
+                                    importance: 0.5,
+                                    created_at: chrono::Utc::now(),
+                                    accessed_at: chrono::Utc::now(),
+                                    access_count: 0,
+                                };
+                                if let Err(e) = rt_for_callback.block_on(mm.remember(entry)) {
+                                    tracing::warn!(error = %e, "Failed to save compaction summary");
+                                }
+                            }
+                        }
                     }
                     _ => {}
                 }

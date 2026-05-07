@@ -17,6 +17,7 @@ use oxios_kernel::event_bus::EventBus;
 use oxios_kernel::container_manager::ContainerManager;
 use oxios_kernel::host_tools::HostToolValidator;
 use oxios_kernel::mcp::McpBridge;
+use oxios_kernel::memory::MemoryManager;
 use oxios_kernel::persona_manager::PersonaManager;
 use oxios_kernel::program::ProgramManager;
 use oxios_kernel::scheduler::AgentScheduler;
@@ -62,6 +63,8 @@ pub struct AppState {
     pub mcp_bridge: Arc<McpBridge>,
     /// Authentication manager for bearer token validation.
     pub auth_manager: Arc<parking_lot::Mutex<oxios_kernel::auth::AuthManager>>,
+    /// Memory manager for cross-session agent memory.
+    pub memory_manager: Arc<MemoryManager>,
 }
 
 impl std::fmt::Debug for AppState {
@@ -112,6 +115,7 @@ impl WebServer {
         config_path: Option<PathBuf>,
         mcp_bridge: Arc<McpBridge>,
         auth_manager: Arc<parking_lot::Mutex<oxios_kernel::auth::AuthManager>>,
+        memory_manager: Arc<MemoryManager>,
     ) -> Result<Self, anyhow::Error> {
         let addr: SocketAddr = format!("{host}:{port}")
             .parse()
@@ -133,6 +137,7 @@ impl WebServer {
             config_path,
             mcp_bridge,
             auth_manager,
+            memory_manager,
         });
         Ok(Self { addr, state })
     }

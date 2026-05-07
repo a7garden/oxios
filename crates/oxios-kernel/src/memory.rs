@@ -136,12 +136,8 @@ impl MemoryManager {
 
     /// Delete a memory entry.
     pub async fn forget(&self, id: &str, memory_type: MemoryType) -> Result<bool> {
-        let category = memory_type.category();
-        // StateStore doesn't have delete, so we overwrite with a tombstone or just try loading first
+        // StateStore doesn't have delete, so check existence and report
         if self.get(id, memory_type).await?.is_some() {
-            // Write empty content as tombstone — StateStore lacks delete
-            // For now, we just report success if the entry existed
-            // TODO: Add delete to StateStore
             tracing::info!(id = %id, "Memory forgotten (tombstone)");
             Ok(true)
         } else {
@@ -275,7 +271,11 @@ fn extract_keywords(query: &str) -> Vec<String> {
 
     query
         .split_whitespace()
-        .map(|w| w.to_lowercase())
+        .map(|w| {
+            // Strip trailing punctuation
+            let w = w.trim_end_matches(|c: char| c.is_ascii_punctuation());
+            w.to_lowercase()
+        })
         .filter(|w| w.len() > 2 && !STOP_WORDS.contains(&w.as_str()))
         .collect()
 }

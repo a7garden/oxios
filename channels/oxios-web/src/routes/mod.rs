@@ -29,7 +29,7 @@ pub(crate) use events::{handle_events, handle_sessions_list, handle_session_get,
 pub(crate) use infra::{handle_scheduler_stats, handle_scheduler_tasks, handle_audit_log, handle_permissions_get, handle_permissions_put};
 pub(crate) use resources::{handle_gardens_list, handle_garden_create, handle_garden_start, handle_garden_stop, handle_garden_remove, handle_garden_exec, handle_programs_list, handle_program_get, handle_program_install, handle_program_uninstall, handle_program_enable, handle_program_disable, handle_program_host_requirements, handle_host_tools_check};
 pub(crate) use system::{handle_health, handle_status, handle_agents_list, handle_agent_kill, handle_config_get, handle_config_put};
-pub(crate) use workspace::{handle_workspace_tree, handle_workspace_file_get, handle_workspace_file_put, handle_seeds_list, handle_seed_get, handle_seed_evolution, handle_skills_list, handle_skill_get, handle_skill_create, handle_skill_delete, handle_memory_list, handle_memory_get};
+pub(crate) use workspace::{handle_workspace_tree, handle_workspace_file_get, handle_workspace_file_put, handle_seeds_list, handle_seed_get, handle_seed_evolution, handle_skills_list, handle_skill_get, handle_skill_create, handle_skill_delete, handle_memory_list, handle_memory_get, handle_memory_create, handle_memory_search};
 
 /// Builds the axum router with all API routes.
 ///
@@ -68,6 +68,8 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         .route("/api/skills/{name}", delete(handle_skill_delete))
         // Memory
         .route("/api/memory", get(handle_memory_list))
+        .route("/api/memory", post(handle_memory_create))
+        .route("/api/memory/search", post(handle_memory_search))
         .route("/api/memory/{name}", get(handle_memory_get))
         // Gardens
         .route("/api/gardens", get(handle_gardens_list))

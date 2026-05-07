@@ -8,6 +8,7 @@ use axum::response::IntoResponse;
 use axum::Json;
 use serde::{Deserialize, Serialize};
 
+use oxios_kernel::memory::{MemoryEntry, MemoryType};
 use oxios_kernel::state_store::StateStore;
 
 use crate::error::AppError;
@@ -501,4 +502,109 @@ pub(crate) async fn handle_memory_get(
     }
 
     Err(AppError::NotFound("memory entry not found".into()))
+}
+
+// ---------------------------------------------------------------------------
+// Memory CRUD
+// ---------------------------------------------------------------------------
+
+/// Request body for creating a memory entry.
+#[derive(Debug, Deserialize)]
+pub(crate) struct MemoryCreateRequest {
+    /// Memory content.
+    content: String,
+    /// Memory type: fact, episode, or knowledge.
+    #[serde(default = "default_memory_type")]
+    memory_type: String,
+    /// Tags for search.
+    #[serde(default)]
+    tags: Vec<String>,
+    /// Importance (0.0-1.0).
+    #[serde(default = "default_importance")]
+    importance: f32,
+}
+
+fn default_memory_type() -> String {
+    "fact".to_string()
+}
+
+fn default_importance() -> f32 {
+    0.5
+}
+
+/// POST /api/memory — Create a memory entry.
+pub(crate) async fn handle_memory_create(
+    state: State<Arc<AppState>>,
+    Json(body): Json<MemoryCreateRequest>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    let memory_type = match body.memory_type.as_str() {
+        "fact" => MemoryType::Fact,
+        "episode" => MemoryType::Episode,
+        "knowledge" => MemoryType::Knowledge,
+        _ => {
+            return Err(AppError::BadRequest(
+                "memory_type must be fact, episode, or knowledge".into(),
+            ))
+        }
+    };
+    let entry = MemoryEntry {
+        id: uuid::Uuid::new_v4().to_string(),
+        memory_type,
+        content: body.content,
+        source: "api".to_string(),
+        session_id: None,
+        tags: body.tags,
+        importance: body.importance,
+        created_at: chrono::Utc::now(),
+        accessed_at: chrono::Utc::now(),
+        access_count: 0,
+    };
+    let id = state
+        .memory_manager
+        .remember(entry)
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))?;
+    Ok(Json(serde_json::json!({ "id": id, "status": "created" })))
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct MemorySearchRequest {
+    query: String,
+    memory_type: Option<String>,
+    limit: Option<usize>,
+}
+
+/// POST /api/memory/search — Search memory entries.
+pub(crate) async fn handle_memory_search(
+    state: State<Arc<AppState>>,
+    Json(body): Json<MemorySearchRequest>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    let type_filter = body.memory_type.as_deref().and_then(|s| match s {
+        "conversation" => Some(MemoryType::Conversation),
+        "session" => Some(MemoryType::Session),
+        "fact" => Some(MemoryType::Fact),
+        "episode" => Some(MemoryType::Episode),
+        "knowledge" => Some(MemoryType::Knowledge),
+        _ => None,
+    });
+    let limit = body.limit.unwrap_or(10);
+    let entries = state
+        .memory_manager
+        .search(&body.query, type_filter, limit)
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))?;
+    let results: Vec<serde_json::Value> = entries
+        .iter()
+        .map(|e| {
+            serde_json::json!({
+                "id": e.id,
+                "type": e.memory_type.label(),
+                "content": e.content,
+                "tags": e.tags,
+                "importance": e.importance,
+                "created_at": e.created_at.to_rfc3339(),
+            })
+        })
+        .collect();
+    Ok(Json(serde_json::json!({ "count": results.len(), "entries": results })))
 }

@@ -95,7 +95,7 @@ impl AgentTool for MemoryWriteTool {
             "episode" => MemoryType::Episode,
             "knowledge" => MemoryType::Knowledge,
             _ => return Ok(AgentToolResult::error(
-                &format!("Invalid memory_type '{}'. Must be one of: fact, episode, knowledge", memory_type_str),
+                format!("Invalid memory_type '{}'. Must be one of: fact, episode, knowledge", memory_type_str),
             )),
         };
 
@@ -128,11 +128,11 @@ impl AgentTool for MemoryWriteTool {
         let entry_id = entry.id.clone();
 
         match self.memory_manager.remember(entry).await {
-            Ok(_) => Ok(AgentToolResult::success(&format!(
+            Ok(_) => Ok(AgentToolResult::success(format!(
                 "Memory entry saved (id: {}, type: {})",
                 entry_id, memory_type_str,
             ))),
-            Err(e) => Ok(AgentToolResult::error(&format!("Failed to write memory: {e}"))),
+            Err(e) => Ok(AgentToolResult::error(format!("Failed to write memory: {e}"))),
         }
     }
 }
@@ -217,8 +217,8 @@ impl AgentTool for MemoryReadTool {
                     );
                     Ok(AgentToolResult::success(&output))
                 }
-                Ok(None) => Ok(AgentToolResult::error(&format!("Memory entry '{}' not found", id))),
-                Err(e) => Ok(AgentToolResult::error(&format!("Failed to read memory: {e}"))),
+                Ok(None) => Ok(AgentToolResult::error(format!("Memory entry '{}' not found", id))),
+                Err(e) => Ok(AgentToolResult::error(format!("Failed to read memory: {e}"))),
             }
         } else {
             // List entries by type
@@ -228,7 +228,7 @@ impl AgentTool for MemoryReadTool {
             match self.memory_manager.list(memory_type, limit).await {
                 Ok(entries) => {
                     if entries.is_empty() {
-                        return Ok(AgentToolResult::success(&format!(
+                        return Ok(AgentToolResult::success(format!(
                             "No {} memory entries found.",
                             memory_type_str,
                         )));
@@ -254,7 +254,7 @@ impl AgentTool for MemoryReadTool {
                     }
                     Ok(AgentToolResult::success(&output))
                 }
-                Err(e) => Ok(AgentToolResult::error(&format!("Failed to list memory: {e}"))),
+                Err(e) => Ok(AgentToolResult::error(format!("Failed to list memory: {e}"))),
             }
         }
     }
@@ -354,7 +354,7 @@ impl AgentTool for MemorySearchTool {
                 }
                 Ok(AgentToolResult::success(&output))
             }
-            Err(e) => Ok(AgentToolResult::error(&format!("Failed to search memory: {e}"))),
+            Err(e) => Ok(AgentToolResult::error(format!("Failed to search memory: {e}"))),
         }
     }
 }

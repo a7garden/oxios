@@ -51,6 +51,7 @@ pub struct Kernel {
     /// MCP tool bridge.
     pub mcp_bridge: Arc<McpBridge>,
     /// Memory manager for cross-session agent memory.
+    #[allow(dead_code)] // Used via AgentRuntime
     pub memory_manager: Arc<MemoryManager>,
     /// API key authentication manager.
     pub auth_manager: Arc<parking_lot::Mutex<AuthManager>>,
