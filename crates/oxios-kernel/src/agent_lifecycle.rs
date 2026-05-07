@@ -62,10 +62,18 @@ impl AgentLifecycleManager {
         let task_id = self.scheduler.submit(task)?;
         self.scheduler.start_task(task_id)?;
 
-        // 5. Run
-        let result = self.supervisor.run_with_seed(agent_id, seed).await?;
+        // 5. Run — always cleanup even on failure
+        let result = match self.supervisor.run_with_seed(agent_id, seed).await {
+            Ok(r) => r,
+            Err(e) => {
+                // Agent execution failed — clean up before propagating error
+                tracing::warn!(agent_id = %agent_id, error = %e, "Agent execution failed, cleaning up");
+                self.cleanup_on_failure(agent_id, task_id).await;
+                return Err(e);
+            }
+        };
 
-        // 6. Cleanup
+        // 6. Cleanup on success
         self.cleanup(agent_id, task_id, &result).await;
 
         Ok(result)
@@ -137,5 +145,13 @@ impl AgentLifecycleManager {
         } else {
             let _ = self.scheduler.fail_task(task_id, &result.output);
         }
+    }
+
+    /// Cleanup when agent execution fails (no ExecutionResult available).
+    async fn cleanup_on_failure(&self, agent_id: AgentId, task_id: uuid::Uuid) {
+        if let Err(e) = self.a2a.registry().unregister_agent(agent_id).await {
+            tracing::warn!(agent_id = %agent_id, error = %e, "Failed to unregister A2A card");
+        }
+        let _ = self.scheduler.fail_task(task_id, "execution failed");
     }
 }
