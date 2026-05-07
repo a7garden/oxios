@@ -19,6 +19,7 @@ use oxios_ouroboros::{
 };
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
+use tracing::instrument;
 use uuid::Uuid;
 
 use crate::agent_lifecycle::AgentLifecycleManager;
@@ -101,6 +102,7 @@ impl Orchestrator {
     /// the result will contain the questions and the phase will be
     /// `Phase::Interview`. The caller should send these questions to
     /// the user and include the `session_id` in follow-up messages.
+    #[instrument(name = "orchestrator.handle_message", skip(self, user_message), fields(session_id = %session_id.unwrap_or("new")))]
     pub async fn handle_message(
         &self,
         user_id: &str,
@@ -126,31 +128,34 @@ impl Orchestrator {
         };
 
         // Conduct the interview.
-        let interview = if needs_interview {
-            self.ouroboros.interview(user_message).await?
-        } else {
-            // This is a follow-up message in an existing interview.
-            // Record the user's answer in the session and extract the Q&A context.
-            let qa_context = {
-                let mut sessions = self.sessions.write();
-                if let Some(session) = sessions.get_mut(&session_id) {
-                    session.interview.add_exchange("", user_message);
-                }
-                // Extract Q&A context while holding the write lock, then drop.
-                let sessions = self.sessions.read();
-                let session = sessions.get(&session_id).expect("session exists");
-                session
-                    .interview
-                    .questions
-                    .iter()
-                    .zip(session.interview.answers.iter())
-                    .map(|(q, a)| format!("Q: {}\nA: {}", q, a))
-                    .collect::<Vec<_>>()
-                    .join("\n\n")
-            };
+        let interview = {
+            let _span = tracing::info_span!("ouroboros.interview").entered();
+            if needs_interview {
+                self.ouroboros.interview(user_message).await?
+            } else {
+                // This is a follow-up message in an existing interview.
+                // Record the user's answer in the session and extract the Q&A context.
+                let qa_context = {
+                    let mut sessions = self.sessions.write();
+                    if let Some(session) = sessions.get_mut(&session_id) {
+                        session.interview.add_exchange("", user_message);
+                    }
+                    // Extract Q&A context while holding the write lock, then drop.
+                    let sessions = self.sessions.read();
+                    let session = sessions.get(&session_id).expect("session exists");
+                    session
+                        .interview
+                        .questions
+                        .iter()
+                        .zip(session.interview.answers.iter())
+                        .map(|(q, a)| format!("Q: {}\nA: {}", q, a))
+                        .collect::<Vec<_>>()
+                        .join("\n\n")
+                };
 
-            // Run another interview pass with accumulated context.
-            self.ouroboros.interview(&qa_context).await?
+                // Run another interview pass with accumulated context.
+                self.ouroboros.interview(&qa_context).await?
+            }
         };
 
         // If ambiguity is too high, return questions for the user to answer.
@@ -202,7 +207,10 @@ impl Orchestrator {
         self.publish_phase_started(&session_id, Phase::Seed).await;
 
         // Phase 2: Generate seed
-        let seed = self.ouroboros.generate_seed(&interview).await?;
+        let seed = {
+            let _span = tracing::info_span!("ouroboros.seed").entered();
+            self.ouroboros.generate_seed(&interview).await?
+        };
 
         // Save seed to state store.
         self.save_seed(&seed).await?;
@@ -225,7 +233,10 @@ impl Orchestrator {
                     subtasks = subtasks.len(),
                     "Splitting into multi-agent execution"
                 );
-                let results = self.delegate_subtasks(subtasks, &seed).await?;
+                let results = {
+                    let _span = tracing::info_span!("ouroboros.delegate_subtasks").entered();
+                    self.delegate_subtasks(subtasks, &seed).await?
+                };
 
                 // Combine successful results
                 let combined: String = results
@@ -263,7 +274,10 @@ impl Orchestrator {
         }
 
         // Phase 3: Fork and execute agent via lifecycle manager
-        let exec_result = self.lifecycle.spawn_and_run(&seed, Priority::Normal).await?;
+        let exec_result = {
+            let _span = tracing::info_span!("ouroboros.execute").entered();
+            self.lifecycle.spawn_and_run(&seed, Priority::Normal).await?
+        };
 
         // Periodically reap zombie tasks.
         self.lifecycle.reap_zombies();
@@ -272,7 +286,10 @@ impl Orchestrator {
         self.publish_phase_completed(&session_id, Phase::Execute, "completed").await;
         self.publish_phase_started(&session_id, Phase::Evaluate).await;
 
-        let evaluation = self.ouroboros.evaluate(&seed, &exec_result).await?;
+        let evaluation = {
+            let _span = tracing::info_span!("ouroboros.evaluate").entered();
+            self.ouroboros.evaluate(&seed, &exec_result).await?
+        };
 
         self.publish_phase_completed(
             &session_id,
@@ -299,10 +316,15 @@ impl Orchestrator {
             iterations += 1;
             self.publish_phase_started(&session_id, Phase::Evolve).await;
 
-            if let Some(evolved) = self.ouroboros.evolve(
-                current_seed.as_ref().expect("seed exists"),
-                &current_evaluation,
-            ).await? {
+            let evolve_result = {
+                let _span = tracing::info_span!("ouroboros.evolve").entered();
+                self.ouroboros.evolve(
+                    current_seed.as_ref().expect("seed exists"),
+                    &current_evaluation,
+                ).await?
+            };
+
+            if let Some(evolved) = evolve_result {
                 current_seed = Some(evolved.clone());
 
                 // Save evolved seed.
@@ -313,12 +335,18 @@ impl Orchestrator {
                 self.publish_phase_started(&session_id, Phase::Execute).await;
 
                 // Re-execute with the evolved seed via lifecycle manager.
-                let new_exec = self.lifecycle.spawn_and_run(&evolved, Priority::High).await?;
+                let new_exec = {
+                    let _span = tracing::info_span!("ouroboros.execute").entered();
+                    self.lifecycle.spawn_and_run(&evolved, Priority::High).await?
+                };
 
                 self.publish_phase_completed(&session_id, Phase::Execute, "completed").await;
                 self.publish_phase_started(&session_id, Phase::Evaluate).await;
 
-                let new_eval = self.ouroboros.evaluate(&evolved, &new_exec).await?;
+                let new_eval = {
+                    let _span = tracing::info_span!("ouroboros.evaluate").entered();
+                    self.ouroboros.evaluate(&evolved, &new_exec).await?
+                };
                 current_evaluation = new_eval;
 
                 self.publish_phase_completed(
@@ -414,6 +442,7 @@ impl Orchestrator {
         });
     }
 
+    #[instrument(name = "orchestrator.delegate_subtasks", skip(self, subtasks, parent_seed))]
     /// Execute multiple subtasks using separate agents in parallel.
     ///
     /// Each subtask becomes a lightweight Seed that is executed by

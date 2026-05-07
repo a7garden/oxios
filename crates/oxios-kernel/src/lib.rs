@@ -17,6 +17,7 @@ pub mod agent_runtime;
 
 pub mod auth;
 pub mod config;
+pub mod embedding;
 pub mod container;
 pub mod engine;
 pub mod error;
@@ -37,6 +38,16 @@ pub mod state_store;
 pub mod supervisor;
 pub mod tools;
 pub mod types;
+
+#[cfg(feature = "otel")]
+mod telemetry_otel;
+#[cfg(feature = "otel")]
+pub use telemetry_otel as telemetry;
+
+#[cfg(not(feature = "otel"))]
+mod telemetry_stub;
+#[cfg(not(feature = "otel"))]
+pub use telemetry_stub as telemetry;
 
 pub use circuit_breaker::CircuitBreaker;
 pub use metrics::{registry, register_builtin_metrics, get_metrics};
@@ -73,6 +84,7 @@ pub use orchestrator::{OrchestrationResult, Orchestrator};
 pub use scheduler::{AgentScheduler, Priority, ScheduledTask, SchedulerStats, TaskStatus};
 pub use host_tools::{common as host_tools_common, HostToolStatus, HostToolValidator};
 pub use mcp::{McpBridge, McpCapabilities, McpServer, McpTool};
+pub use embedding::{EmbeddingProvider, EmbeddingVector, TfIdfEmbeddingProvider};
 pub use memory::{MemoryEntry, MemoryManager, MemoryType, TextVector, MemoryBudget, CurationReport, CurationCandidate, content_hash};
 pub use program::{InstallSource, Program, ProgramManager, ProgramMeta, ToolDef, HostRequirementsCheck, ArgumentDef};
 pub use skill::{Skill, SkillMeta, SkillStore};

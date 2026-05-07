@@ -12,6 +12,7 @@ use chrono::{DateTime, Utc};
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 
+use crate::embedding::{EmbeddingProvider, EmbeddingVector, TfIdfEmbeddingProvider};
 use crate::state_store::StateStore;
 
 // ---------------------------------------------------------------------------
@@ -73,6 +74,11 @@ impl TextVector {
             .filter(|s| !s.is_empty() && s.len() > 1)
             .map(|s| s.to_string())
             .collect()
+    }
+
+    /// Returns a reference to the term-frequency map.
+    pub fn tf_map(&self) -> &HashMap<String, f64> {
+        &self.tf
     }
 
     /// Compute cosine similarity between two vectors.
@@ -224,8 +230,8 @@ struct VectorIndexSnapshot {
     created_at: DateTime<Utc>,
     /// Number of entries in the snapshot.
     entry_count: usize,
-    /// Map of entry ID to text vector.
-    entries: HashMap<String, TextVector>,
+    /// Map of entry ID to embedding vector.
+    entries: HashMap<String, EmbeddingVector>,
 }
 
 // ---------------------------------------------------------------------------
@@ -240,8 +246,10 @@ struct VectorIndexSnapshot {
 pub struct MemoryManager {
     state_store: Arc<StateStore>,
     max_recall: usize,
-    /// Vector index for semantic search (id → TextVector).
-    vector_index: RwLock<HashMap<String, TextVector>>,
+    /// Vector index for semantic search (id → EmbeddingVector).
+    vector_index: RwLock<HashMap<String, EmbeddingVector>>,
+    /// Embedding provider for generating vectors.
+    embedding: Arc<dyn EmbeddingProvider>,
 }
 
 impl std::fmt::Debug for MemoryManager {
@@ -260,6 +268,7 @@ impl MemoryManager {
             state_store,
             max_recall: 10,
             vector_index: RwLock::new(HashMap::new()),
+            embedding: Arc::new(TfIdfEmbeddingProvider),
         }
     }
 
@@ -303,7 +312,7 @@ impl MemoryManager {
     /// persisted memory entries.
     pub async fn rebuild_index(&self) -> Result<()> {
         // Collect all entries outside the lock
-        let mut entries_to_index: Vec<(String, TextVector)> = Vec::new();
+        let mut entries_to_index: Vec<(String, EmbeddingVector)> = Vec::new();
 
         for mt in &[
             MemoryType::Conversation,
@@ -319,7 +328,7 @@ impl MemoryManager {
                         .load_json::<MemoryEntry>(mt.category(), &name)
                         .await
                     {
-                        let vector = TextVector::from_text(&entry.content);
+                        let vector = self.embedding.embed(&entry.content).await?;
                         entries_to_index.push((entry.id.clone(), vector));
                     }
                 }
@@ -386,7 +395,7 @@ impl MemoryManager {
     /// index for future semantic search.
     pub async fn remember(&self, entry: MemoryEntry) -> Result<String> {
         let id = entry.id.clone();
-        let vector = TextVector::from_text(&entry.content);
+        let vector = self.embedding.embed(&entry.content).await?;
         let category = entry.memory_type.category();
         self.state_store
             .save_json(category, &id, &entry)
@@ -440,7 +449,7 @@ impl MemoryManager {
         memory_type: Option<MemoryType>,
         limit: usize,
     ) -> Result<Vec<MemoryEntry>> {
-        let query_vector = TextVector::from_text(query);
+        let query_vector = self.embedding.embed(query).await?;
 
         // Scope the read lock: compute scores, then drop before any await.
         let scored: Vec<(String, f64)> = {
@@ -649,7 +658,10 @@ impl MemoryManager {
         let hash = content_hash(content);
 
         // Check semantic similarity via vector index first (fast)
-        let query_vector = TextVector::from_text(content);
+        let query_vector = match self.embedding.embed(content).await {
+            Ok(v) => v,
+            Err(_) => return false,
+        };
         let similar = {
             let index = self.vector_index.read();
             index.iter().any(|(_, vector)| query_vector.cosine_similarity(vector) > 0.95)

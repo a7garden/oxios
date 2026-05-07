@@ -73,3 +73,10 @@ tower-http = { version = "0.6", features = ["cors", "fs"] }
 tokio-stream = { version = "0.1", features = ["sync"] }
 parking_lot = { workspace = true }
 tracing-appender = { workspace = true }
+
+[dev-dependencies]
+oxios-ouroboros = { path = "crates/oxios-ouroboros" }
+oxi-ai = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+tokio = { workspace = true }

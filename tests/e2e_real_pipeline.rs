@@ -10,6 +10,7 @@
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;
+    use oxios_ouroboros::OuroborosProtocol;
 
     fn should_run() -> bool {
         std::env::var("OXIOS_E2E").is_ok()

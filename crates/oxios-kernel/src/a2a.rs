@@ -409,13 +409,33 @@ impl std::fmt::Debug for AgentCardRegistry {
     }
 }
 
+/// Per-agent message queue with notification.
+///
+/// Each agent gets its own queue backed by `tokio::sync::Notify`
+/// so consumers can `.await` new messages without polling.
+struct AgentQueue {
+    /// Buffered pending messages (behind a sync mutex for cheap push/drain).
+    messages: parking_lot::Mutex<Vec<PendingMessage>>,
+    /// Notifier signalled when a new message is pushed.
+    notify: tokio::sync::Notify,
+}
+
+impl AgentQueue {
+    fn new() -> Self {
+        Self {
+            messages: parking_lot::Mutex::new(Vec::new()),
+            notify: tokio::sync::Notify::new(),
+        }
+    }
+}
+
 /// A2A Protocol handler for inter-agent communication.
 #[derive(Clone)]
 pub struct A2AProtocol {
     /// The registry for agent capability discovery.
     registry: AgentCardRegistry,
-    /// Pending messages for each agent.
-    message_queue: Arc<RwLock<HashMap<AgentId, Vec<PendingMessage>>>>,
+    /// Per-agent queues with notification support.
+    queues: Arc<RwLock<HashMap<AgentId, Arc<AgentQueue>>>>,
     /// Event bus for kernel events.
     event_bus: EventBus,
 }
@@ -426,9 +446,18 @@ impl A2AProtocol {
         let registry = AgentCardRegistry::new(event_bus.clone());
         Self {
             registry,
-            message_queue: Arc::new(RwLock::new(HashMap::new())),
+            queues: Arc::new(RwLock::new(HashMap::new())),
             event_bus,
         }
+    }
+
+    /// Get or create a queue for the given agent.
+    async fn get_or_create_queue(&self, agent_id: AgentId) -> Arc<AgentQueue> {
+        let mut queues = self.queues.write().await;
+        queues
+            .entry(agent_id)
+            .or_insert_with(|| Arc::new(AgentQueue::new()))
+            .clone()
     }
 
     /// Returns the agent card registry.
@@ -447,12 +476,10 @@ impl A2AProtocol {
         let request = A2ARequest::new(from, to, message);
         let request_id = request.request_id;
 
-        let mut queue = self.message_queue.write().await;
-        queue
-            .entry(to)
-            .or_insert_with(Vec::new)
-            .push(PendingMessage::new(request.clone()));
-        drop(queue);
+        // Push to the target agent's queue and notify.
+        let queue = self.get_or_create_queue(to).await;
+        queue.messages.lock().push(PendingMessage::new(request.clone()));
+        queue.notify.notify_one();
 
         self.event_bus.publish(KernelEvent::MessageReceived {
             from,
@@ -547,20 +574,29 @@ impl A2AProtocol {
         self.send_message(from, to, message).await
     }
 
-    /// Receives all pending messages for an agent.
+    /// Receives all pending messages for an agent, draining the queue.
     pub async fn receive_messages(&self, agent_id: AgentId) -> Vec<A2ARequest> {
-        let mut queue = self.message_queue.write().await;
-        let messages: Vec<A2ARequest> = queue
-            .remove(&agent_id)
-            .map(|msgs| msgs.into_iter().map(|m| m.request).collect())
-            .unwrap_or_default();
-        messages
+        let queues = self.queues.read().await;
+        if let Some(queue) = queues.get(&agent_id) {
+            let drained: Vec<PendingMessage> = queue.messages.lock().drain(..).collect();
+            drained.into_iter().map(|m| m.request).collect()
+        } else {
+            Vec::new()
+        }
     }
 
     /// Returns the number of pending messages for an agent.
     pub async fn pending_count(&self, agent_id: AgentId) -> usize {
-        let queue = self.message_queue.read().await;
-        queue.get(&agent_id).map(|v| v.len()).unwrap_or(0)
+        let queues = self.queues.read().await;
+        queues
+            .get(&agent_id)
+            .map(|q| q.messages.lock().len())
+            .unwrap_or(0)
+    }
+
+    /// Returns true if the agent has any pending messages.
+    pub async fn has_messages(&self, agent_id: AgentId) -> bool {
+        self.pending_count(agent_id).await > 0
     }
 
     /// Deliver all pending messages to an agent, publishing events for each.
@@ -580,9 +616,8 @@ impl A2AProtocol {
 
     /// Send a message and wait for a response within a timeout.
     ///
-    /// Note: Uses `request_id` (envelope UUID) for matching. The remote agent
-    /// should echo this ID in its response for correlation. If the response
-    /// doesn't include the request_id, this will time out.
+    /// Uses `tokio::select!` with `Notify` instead of polling.
+    /// Matches by `request_id` echoed in `ResultSharing` payload.
     pub async fn send_and_wait(
         &self,
         from: AgentId,
@@ -591,35 +626,42 @@ impl A2AProtocol {
         timeout: std::time::Duration,
     ) -> Result<A2AResponse> {
         let request_id = self.send_message(from, to, message).await?;
-        let start = std::time::Instant::now();
+        let queue = self.get_or_create_queue(from).await;
+        let deadline = tokio::time::Instant::now() + timeout;
+
         loop {
-            // Peek at messages without consuming — re-queue non-matching
-            let messages = {
-                let queue = self.message_queue.read().await;
-                queue.get(&from).cloned().unwrap_or_default()
-            };
-            for msg in &messages {
-                // Match by request_id echoed in ResultSharing payload
-                if let A2AMessage::ResultSharing { task_id, result, summary: _ } = &msg.request.message {
-                    if *task_id == request_id {
-                        // Remove the matched message from queue
-                        let mut queue = self.message_queue.write().await;
-                        if let Some(pending) = queue.get_mut(&from) {
-                            pending.retain(|p| p.request.request_id != request_id);
-                        }
-                        return Ok(A2AResponse::success(
-                            request_id,
-                            to,
-                            from,
-                            result.clone(),
-                        ));
+            // First, check if a matching response is already in the queue.
+            {
+                let mut msgs = queue.messages.lock();
+                let match_idx = msgs.iter().position(|p| {
+                    if let A2AMessage::ResultSharing { task_id, .. } = &p.request.message {
+                        *task_id == request_id
+                    } else {
+                        false
+                    }
+                });
+                if let Some(idx) = match_idx {
+                    let matched = msgs.remove(idx);
+                    if let A2AMessage::ResultSharing { result, .. } = matched.request.message {
+                        return Ok(A2AResponse::success(request_id, to, from, result));
                     }
                 }
             }
-            if start.elapsed() > timeout {
+
+            // No match yet — wait for notification or timeout.
+            let remaining = deadline.saturating_duration_since(tokio::time::Instant::now());
+            if remaining.is_zero() {
                 anyhow::bail!("A2A response timeout after {:?}", timeout);
             }
-            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+
+            tokio::select! {
+                _ = queue.notify.notified() => {
+                    // A new message arrived — loop to check for a match.
+                }
+                _ = tokio::time::sleep(remaining) => {
+                    anyhow::bail!("A2A response timeout after {:?}", timeout);
+                }
+            }
         }
     }
 }
