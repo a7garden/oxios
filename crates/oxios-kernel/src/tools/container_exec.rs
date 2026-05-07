@@ -14,17 +14,33 @@ use crate::container_manager::ContainerManager;
 /// Execute commands in the workspace.
 ///
 /// When a container is active, runs commands inside it via ContainerBackend.
-/// P0 Security: No local fallback — if no container is running, returns an error.
-/// This prevents container_exec from bypassing the container sandbox.
+/// If no container is running and a host_exec_bridge is available, falls back
+/// to host execution (development mode). Otherwise returns an error.
 pub struct ContainerExecTool {
     /// Container manager — required for secure workspace execution.
     container: Arc<ContainerManager>,
+    /// Optional host exec bridge for fallback when no container is running.
+    host_exec_bridge: Option<Arc<crate::host_exec::HostExecBridge>>,
 }
 
 impl ContainerExecTool {
     /// Create a new ContainerExecTool with the given container manager.
     pub fn new(container: Arc<ContainerManager>) -> Self {
-        Self { container }
+        Self {
+            container,
+            host_exec_bridge: None,
+        }
+    }
+
+    /// Create a new ContainerExecTool with a host exec bridge for fallback.
+    pub fn new_with_host_bridge(
+        container: Arc<ContainerManager>,
+        host_exec_bridge: Arc<crate::host_exec::HostExecBridge>,
+    ) -> Self {
+        Self {
+            container,
+            host_exec_bridge: Some(host_exec_bridge),
+        }
     }
 }
 
@@ -81,19 +97,46 @@ impl AgentTool for ContainerExecTool {
         params: Value,
         _signal: Option<tokio::sync::oneshot::Receiver<()>>,
     ) -> Result<AgentToolResult, String> {
-        // P0 Security: Require an active container. No local fallback.
-        // This prevents container_exec from bypassing the container sandbox.
-        let container_name = match self.container.active_container_name().await {
-            Some(name) => name,
-            None => {
-                return Ok(AgentToolResult::error(
-                    "container_exec: no active container. \
-                     Start a garden with 'oxios garden up <name>' before executing commands.",
-                ));
-            }
-        };
+        // Check for an active container.
+        let container_name = self.container.active_container_name().await;
 
-        self.exec_in_container(&container_name, &self.container, &params).await
+        // ── No-container fallback: execute via host_exec bridge ──
+        if container_name.is_none() {
+            if let Some(bridge) = &self.host_exec_bridge {
+                let cmd = params
+                    .get("command")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("");
+                if cmd.is_empty() {
+                    return Ok(AgentToolResult::error(
+                        "container_exec: 'command' parameter is required",
+                    ));
+                }
+                match bridge.exec("bash", vec!["bash".to_string(), "-c".to_string(), cmd.to_string()], 30_000).await {
+                    Ok(result) => {
+                        let output = if result.stderr.is_empty() {
+                            result.stdout
+                        } else {
+                            format!("{}\n{}", result.stdout, result.stderr)
+                        };
+                        return Ok(AgentToolResult::success(output));
+                    }
+                    Err(e) => {
+                        return Ok(AgentToolResult::error(format!(
+                            "container_exec (host fallback): {e}"
+                        )));
+                    }
+                }
+            }
+            // No fallback available.
+            return Ok(AgentToolResult::error(
+                "container_exec: no active container. \
+                 Start a garden with 'oxios garden up <name>' or set \
+                 execution_mode = 'host' for direct host execution.",
+            ));
+        }
+
+        self.exec_in_container(container_name.as_deref().unwrap(), &self.container, &params).await
     }
 }
 

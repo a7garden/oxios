@@ -8,3 +8,11 @@ channels/oxios-web/static/dioxus/assets/
 .DS_Store
 .env
 .secrets.toml
+
+# Local overrides for dependencies (development)
+# Place a Cargo.toml.local at the workspace root to override workspace.dependencies.
+# Example Cargo.toml.local:
+#   [workspace.dependencies]
+#   oxi-ai = { path = "../oxi/oxi-ai" }
+#   oxi-agent = { path = "../oxi/oxi-agent" }
+Cargo.toml.local

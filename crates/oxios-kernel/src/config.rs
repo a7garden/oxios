@@ -25,6 +25,17 @@ pub struct MemoryConfig {
     pub retention_days: u32,
 }
 
+/// Execution mode for agent command execution.
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum ExecutionMode {
+    /// Execute inside a container (production).
+    Container,
+    /// Execute directly on host (development).
+    #[default]
+    Auto,
+}
+
 fn default_true() -> bool { true }
 
 fn default_max_recall() -> usize { 10 }
@@ -168,6 +179,9 @@ pub struct ContainerConfig {
     /// Optional host tools: checked when program needs them.
     #[serde(default = "default_optional_host_tools")]
     pub optional_host_tools: Vec<String>,
+    /// Execution mode for command execution.
+    #[serde(default)]
+    pub execution_mode: ExecutionMode,
 }
 
 fn default_container_path() -> String {
@@ -225,6 +239,7 @@ impl Default for ContainerConfig {
             minimal_tools: default_minimal_tools(),
             required_host_tools: default_required_host_tools(),
             optional_host_tools: default_optional_host_tools(),
+            execution_mode: ExecutionMode::Auto,
         }
     }
 }
@@ -323,6 +338,12 @@ pub struct SecurityConfig {
     /// Allowed CORS origins.
     #[serde(default = "default_cors_origins")]
     pub cors_origins: Vec<String>,
+    /// Path for audit log file (optional, enables file-based persistence).
+    #[serde(default)]
+    pub audit_log_path: Option<String>,
+    /// Rate limit for API endpoints (requests per minute).
+    #[serde(default = "default_rate_limit_per_minute")]
+    pub rate_limit_per_minute: u32,
 }
 
 fn default_allowed_tools() -> Vec<String> {
@@ -358,6 +379,10 @@ fn default_cors_origins() -> Vec<String> {
     vec!["http://localhost:4200".to_string()]
 }
 
+fn default_rate_limit_per_minute() -> u32 {
+    120
+}
+
 impl Default for SecurityConfig {
     fn default() -> Self {
         Self {
@@ -370,6 +395,8 @@ impl Default for SecurityConfig {
             auth_enabled: false,
             api_keys_path: default_api_keys_path(),
             cors_origins: default_cors_origins(),
+            audit_log_path: None,
+            rate_limit_per_minute: default_rate_limit_per_minute(),
         }
     }
 }

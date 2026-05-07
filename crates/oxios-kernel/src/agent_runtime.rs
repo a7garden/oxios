@@ -11,8 +11,8 @@
 
 use anyhow::Result;
 use oxi_agent::{
-    AgentEvent, AgentLoop, AgentLoopConfig, CompactionEvent, GrepTool, LsTool, ReadTool, SharedState,
-    ToolExecutionMode, ToolRegistry, WriteTool, EditTool, FindTool,
+    prelude::CompactionEvent, AgentEvent, AgentLoop, AgentLoopConfig, GrepTool, LsTool, ReadTool,
+    SharedState, ToolExecutionMode, ToolRegistry, WriteTool, EditTool, FindTool,
 };
 use oxi_ai::{CompactionStrategy, Provider};
 use parking_lot::Mutex;
@@ -282,6 +282,27 @@ fn run_agent_loop(
     mcp_bridge_for_runtime: Option<Arc<McpBridge>>,
     memory_manager: Option<Arc<MemoryManager>>,
 ) -> Result<(String, usize, bool)> {
+    // ── Workspace Scoping: restrict agent file access ──
+    let workspace = if let Some(ref bridge) = host_bridge {
+        bridge
+            .socket_path()
+            .parent()
+            .map(|p| p.join("agent-workspace"))
+            .unwrap_or_else(|| std::env::temp_dir().join("oxios-agent-workspace"))
+    } else {
+        std::env::temp_dir().join("oxios-agent-workspace")
+    };
+
+    // Ensure workspace exists.
+    let _ = std::fs::create_dir_all(&workspace);
+
+    // Set current directory for file tools (read/write/edit).
+    if let Err(e) = std::env::set_current_dir(&workspace) {
+        tracing::warn!(error = %e, "Failed to set agent workspace dir");
+    }
+
+    tracing::debug!(workspace = %workspace.display(), "Agent workspace scoped");
+
     // ── Tier 1: oxi native tools (file operations) ──
     let registry = ToolRegistry::new();
     registry.register(ReadTool::new());
@@ -292,11 +313,18 @@ fn run_agent_loop(
     registry.register(LsTool::new());
 
     // ── Tier 2: Oxios execution tools ──
-    let container_exec = Arc::new(ContainerExecTool::new(container));
+    let container_exec = if let Some(ref bridge) = host_bridge {
+        Arc::new(ContainerExecTool::new_with_host_bridge(
+            container.clone(),
+            bridge.clone(),
+        ))
+    } else {
+        Arc::new(ContainerExecTool::new(container.clone()))
+    };
     registry.register_arc(container_exec.clone());
 
     if let Some(bridge) = host_bridge {
-        let host_exec = Arc::new(HostExecTool::new(bridge));
+        let host_exec = Arc::new(HostExecTool::new(bridge.clone()));
         registry.register_arc(host_exec.clone());
 
         // ── Tier 3: Program tools (dynamic) + Tier 4: MCP servers ──

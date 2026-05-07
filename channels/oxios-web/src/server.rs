@@ -12,6 +12,7 @@ use std::sync::Arc;
 use tower_http::services::ServeDir;
 
 use crate::channel::WebChannelHandle;
+use crate::middleware::RateLimiter;
 use crate::routes::build_routes;
 use oxios_kernel::event_bus::EventBus;
 use oxios_kernel::container_manager::ContainerManager;
@@ -65,6 +66,9 @@ pub struct AppState {
     pub auth_manager: Arc<parking_lot::Mutex<oxios_kernel::auth::AuthManager>>,
     /// Memory manager for cross-session agent memory.
     pub memory_manager: Arc<MemoryManager>,
+    /// Rate limiter for API endpoints.
+    #[allow(dead_code)]
+    pub rate_limiter: RateLimiter,
 }
 
 impl std::fmt::Debug for AppState {
@@ -120,6 +124,7 @@ impl WebServer {
         let addr: SocketAddr = format!("{host}:{port}")
             .parse()
             .map_err(|e| anyhow::anyhow!("Invalid bind address '{host}:{port}': {e}"))?;
+        let rate_limit = config.security.rate_limit_per_minute;
         let state = Arc::new(AppState {
             base_url: format!("http://{host}:{port}"),
             channel,
@@ -138,6 +143,7 @@ impl WebServer {
             mcp_bridge,
             auth_manager,
             memory_manager,
+            rate_limiter: RateLimiter::new(rate_limit),
         });
         Ok(Self { addr, state })
     }

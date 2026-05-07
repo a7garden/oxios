@@ -110,7 +110,13 @@ impl KernelBuilder {
             Arc::new(OuroborosEngine::new(Arc::clone(&provider), model));
 
         // ── Access control & scheduling ──
-        let access_manager = Arc::new(parking_lot::Mutex::new(AccessManager::new()));
+        let mut access_manager = AccessManager::new();
+        if let Some(ref audit_path) = config.security.audit_log_path {
+            let expanded = expand_path(audit_path);
+            access_manager = access_manager.with_audit_log_path(expanded.clone());
+            tracing::info!(path = %expanded.display(), "Audit log file persistence enabled");
+        }
+        let access_manager = Arc::new(parking_lot::Mutex::new(access_manager));
         let scheduler = Arc::new(AgentScheduler::new(
             config.scheduler.max_concurrent,
             config.scheduler.rate_limit_per_minute,

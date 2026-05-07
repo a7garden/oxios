@@ -516,6 +516,9 @@ pub struct AccessManager {
     permissions: HashMap<String, AgentPermissions>,
     /// Audit log of all access decisions.
     audit_log: Vec<AuditEntry>,
+    /// Optional path for audit log file persistence.
+    #[allow(dead_code)]
+    audit_log_path: Option<std::path::PathBuf>,
     /// Maximum audit log entries to retain.
     max_audit_entries: usize,
     /// RBAC manager for HitL approvals.
@@ -534,6 +537,7 @@ impl AccessManager {
         Self {
             permissions: HashMap::new(),
             audit_log: Vec::new(),
+            audit_log_path: None,
             max_audit_entries: 10_000,
             rbac: RbacManager::new(),
             container_workspaces: HashMap::new(),
@@ -550,12 +554,19 @@ impl AccessManager {
         Self {
             permissions: HashMap::new(),
             audit_log: Vec::new(),
+            audit_log_path: None,
             max_audit_entries,
             rbac: RbacManager::new(),
             container_workspaces: HashMap::new(),
             agent_containers: HashMap::new(),
             garden_agents: HashMap::new(),
         }
+    }
+
+    /// Configure an audit log file path for persistence.
+    pub fn with_audit_log_path(mut self, path: std::path::PathBuf) -> Self {
+        self.audit_log_path = Some(path);
+        self
     }
 
     /// Checks if an agent is allowed to use a specific tool.
@@ -999,6 +1010,7 @@ impl AccessManager {
     /// Logs an access decision to the audit log.
     ///
     /// Automatically prunes old entries if max_audit_entries is exceeded.
+    /// Persists to file if audit_log_path is configured.
     pub(crate) fn log_access(
         &mut self,
         agent_name: &str,
@@ -1009,13 +1021,16 @@ impl AccessManager {
     ) {
         let entry = AuditEntry::new(agent_name, action, resource, allowed, reason.clone());
 
-        self.audit_log.push(entry);
+        self.audit_log.push(entry.clone());
 
         // Prune if needed.
         if self.audit_log.len() > self.max_audit_entries {
             let prune_count = self.audit_log.len() - self.max_audit_entries;
             self.audit_log.drain(0..prune_count);
         }
+
+        // Persist to file (fire-and-forget).
+        self.persist_audit_entry(&entry);
 
         // Trace denied actions at warn level.
         if !allowed {
@@ -1027,6 +1042,30 @@ impl AccessManager {
                 "Access denied"
             );
         }
+    }
+
+    /// Persists an audit entry to the configured log file.
+    /// Runs in a background thread to avoid blocking the main path.
+    fn persist_audit_entry(&self, entry: &AuditEntry) {
+        let path = match &self.audit_log_path {
+            Some(p) => p.clone(),
+            None => return,
+        };
+        let line = match serde_json::to_string(entry) {
+            Ok(s) => s,
+            Err(_) => return,
+        };
+        let path_for_thread = path;
+        std::thread::spawn(move || {
+            use std::io::Write;
+            if let Ok(mut f) = std::fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(&path_for_thread)
+            {
+                let _ = writeln!(f, "{}", line);
+            }
+        });
     }
 
     /// Validates a permission set for correctness.

@@ -19,7 +19,7 @@ use std::sync::Arc;
 
 use axum::{routing::{delete, get, post, put}, Router};
 
-use crate::middleware::require_auth;
+use crate::middleware::{require_auth, rate_limit_layer};
 use crate::server::AppState;
 use crate::persona_routes;
 
@@ -114,6 +114,7 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         .route("/api/approvals/{id}/approve", post(handle_approval_approve))
         .route("/api/approvals/{id}/reject", post(handle_approval_reject))
         .layer(axum::middleware::from_fn_with_state(state.clone(), require_auth))
+        .layer(axum::middleware::from_fn_with_state(state.clone().rate_limiter.clone(), rate_limit_layer))
         .layer(axum::extract::DefaultBodyLimit::max(API_BODY_LIMIT))
         .with_state(state.clone());
 

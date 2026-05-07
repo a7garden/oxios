@@ -86,6 +86,11 @@ impl ContainerManager {
         &self.containers_base
     }
 
+    /// Get the workspace path for a named container.
+    pub fn workspace_path(&self, name: &str) -> std::path::PathBuf {
+        self.containers_base.join(name).join("workspace")
+    }
+
     /// Get the active container name, if any container is running.
     pub async fn active_container_name(&self) -> Option<String> {
         let containers = self.list_containers().await.ok()?;
