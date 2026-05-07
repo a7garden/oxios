@@ -76,7 +76,6 @@ pub struct OuroborosEngine {
     /// Optional persona system prompt, prepended to every LLM call.
     persona_prompt: parking_lot::Mutex<Option<String>>,
     /// Evaluation cache for avoiding redundant LLM calls.
-    #[allow(dead_code)] // Will be used by evaluate phase in future protocol steps
     eval_cache: crate::eval_cache::EvalCache,
 }
 
@@ -178,7 +177,6 @@ impl OuroborosEngine {
     }
 
     /// Run LLM completion, parse as JSON, retry once on failure.
-    #[allow(dead_code)] // Will be used by future protocol steps
     async fn llm_json<T: serde::de::DeserializeOwned>(
         &self,
         system_prompt: &str,
@@ -336,21 +334,45 @@ impl OuroborosProtocol for OuroborosEngine {
     ) -> Result<EvaluationResult> {
         self.set_phase(Phase::Evaluate);
 
-        // Stage 1: Mechanical — check if acceptance criteria are literally met.
-        let mechanical_pass = seed
-            .acceptance_criteria
-            .iter()
-            .all(|criterion| execution.output.contains(criterion));
+        // Check cache first
+        if let Some(cached) = self.eval_cache.get(seed, execution) {
+            tracing::info!(seed_id = %seed.id, "Evaluation cache hit");
+            return Ok(cached);
+        }
 
-        // Stage 2: Semantic — use LLM to judge if output matches intent.
+        // Stage 1: Enhanced mechanical evaluation (language-agnostic)
+        let mechanical = crate::evaluation::MechanicalEvalResult::evaluate(
+            &seed.acceptance_criteria,
+            &execution.output,
+        );
+
+        // If mechanical passes perfectly, skip LLM eval
+        if mechanical.all_passed {
+            let result = EvaluationResult {
+                mechanical_pass: true,
+                semantic_pass: None,
+                consensus_pass: None,
+                score: 1.0,
+                notes: mechanical.criterion_results.iter()
+                    .map(|r| format!("✓ {}", r.criterion))
+                    .collect(),
+            };
+            self.eval_cache.put(seed, execution, result.clone());
+            tracing::info!(seed_id = %seed.id, score = 1.0, "Mechanical evaluation passed, skipping LLM");
+            return Ok(result);
+        }
+
+        // Stage 2: Semantic evaluation via LLM (with retry)
+        let mechanical_notes: String = mechanical.criterion_results.iter()
+            .map(|r| format!("- {}: {} ({})", r.criterion, r.passed, r.reason))
+            .collect::<Vec<_>>()
+            .join("\n");
+
         let system_prompt = EVALUATE_SYSTEM_PROMPT;
         let user_message = format!(
-            "## Goal\n\
-             {}\n\n\
-             ## Acceptance Criteria\n\
-             {}\n\n\
-             ## Execution Output\n\
-             {}\n\n\
+            "## Goal\n{}\n\n## Acceptance Criteria\n{}\n\n\
+             ## Mechanical Check Results\n{}\n\n\
+             ## Execution Output (first 3000 chars)\n{}\n\n\
              Evaluate whether the execution output satisfies the goal and acceptance criteria.\n\
              Produce a JSON object:\n\
              - \"mechanical_pass\": {}\n\
@@ -358,28 +380,28 @@ impl OuroborosProtocol for OuroborosEngine {
              - \"score\": 0.0 to 1.0\n\
              - \"notes\": list of evaluation notes",
             seed.goal,
-            seed.acceptance_criteria
-                .iter()
-                .enumerate()
+            seed.acceptance_criteria.iter().enumerate()
                 .map(|(i, c)| format!("{}. {}", i + 1, c))
                 .collect::<Vec<_>>()
                 .join("\n"),
-            execution.output,
-            mechanical_pass,
+            mechanical_notes,
+            &execution.output[..execution.output.len().min(3000)],
+            mechanical.all_passed,
         );
 
-        let raw = self.llm_complete(system_prompt, &user_message).await?;
-        let parsed: EvaluationResponse = Self::parse_json(&raw).unwrap_or_else(|e| {
-            tracing::warn!(error = %e, "Failed to parse evaluation LLM response, using defaults");
-            EvaluationResponse {
-                mechanical_pass,
-                semantic_pass: mechanical_pass,
-                score: if mechanical_pass { 0.7 } else { 0.3 },
-                notes: vec!["Evaluation parsing failed, using mechanical check only".into()],
+        let parsed = match self.llm_json::<EvaluationResponse>(system_prompt, &user_message).await {
+            Ok(p) => p,
+            Err(e) => {
+                tracing::warn!(error = %e, "Evaluation JSON parse failed after retry, using mechanical-only");
+                EvaluationResponse {
+                    mechanical_pass: mechanical.all_passed,
+                    semantic_pass: mechanical.all_passed,
+                    score: if mechanical.all_passed { 0.7 } else { 0.3 },
+                    notes: vec![format!("Evaluation parsing failed: {}", e)],
+                }
             }
-        });
+        };
 
-        // Stage 3: Consensus would require a second model; skip for now.
         let result = EvaluationResult {
             mechanical_pass: parsed.mechanical_pass,
             semantic_pass: Some(parsed.semantic_pass),
@@ -387,6 +409,8 @@ impl OuroborosProtocol for OuroborosEngine {
             score: parsed.score,
             notes: parsed.notes,
         };
+
+        self.eval_cache.put(seed, execution, result.clone());
 
         tracing::info!(
             seed_id = %seed.id,

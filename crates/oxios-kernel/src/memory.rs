@@ -647,11 +647,18 @@ impl MemoryManager {
     /// Uses a fast hash comparison against the in-memory vector index.
     pub async fn is_duplicate(&self, content: &str) -> bool {
         let hash = content_hash(content);
+
+        // Check semantic similarity via vector index first (fast)
+        let query_vector = TextVector::from_text(content);
         let index = self.vector_index.read();
-        // We can't directly check hashes from index, so scan all entries of same type
+        for (_id, vector) in index.iter() {
+            if query_vector.cosine_similarity(vector) > 0.95 {
+                return true;
+            }
+        }
         drop(index);
 
-        // Load all entries and compare content hash
+        // Then check exact content hash across all types
         for mt in &[
             MemoryType::Conversation,
             MemoryType::Session,
@@ -659,7 +666,7 @@ impl MemoryManager {
             MemoryType::Episode,
             MemoryType::Knowledge,
         ] {
-            if let Ok(entries) = self.list(*mt, 100).await {
+            if let Ok(entries) = self.list(*mt, 1000).await {
                 for entry in entries {
                     if content_hash(&entry.content) == hash {
                         return true;
