@@ -30,19 +30,15 @@ use crate::state_store::StateStore;
 use crate::types::AgentId;
 
 /// Role of an agent within a group.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub enum AgentRole {
     /// Executes a specific subtask.
+    #[default]
     Worker,
     /// Coordinates subtasks, synthesizes results.
     Manager,
 }
 
-impl Default for AgentRole {
-    fn default() -> Self {
-        AgentRole::Worker
-    }
-}
 
 /// A subtask within a multi-agent plan.
 #[derive(Debug, Clone, Serialize, Deserialize)]
