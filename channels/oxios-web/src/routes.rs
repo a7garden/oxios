@@ -128,10 +128,14 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         .route("/api/approvals/{id}/approve", post(handle_approval_approve))
         .route("/api/approvals/{id}/reject", post(handle_approval_reject))
         .layer(axum::middleware::from_fn_with_state(state.clone(), require_auth))
+        .layer(axum::extract::DefaultBodyLimit::max(API_BODY_LIMIT))
         .with_state(state.clone());
 
     public.merge(api).with_state(state)
 }
+
+/// Body size limit for API requests (10 MB).
+const API_BODY_LIMIT: usize = 10 * 1024 * 1024;
 // Health
 // ---------------------------------------------------------------------------
 
@@ -225,11 +229,27 @@ async fn handle_chat(
     }
 }
 
+/// Query parameters for WebSocket connections.
+#[derive(Debug, serde::Deserialize)]
+struct WsParams {
+    /// Bearer token for authentication.
+    token: Option<String>,
+}
+
 /// GET /api/chat/stream — WebSocket endpoint for real-time chat streaming.
 async fn handle_chat_stream(
     ws: WebSocketUpgrade,
     state: State<Arc<AppState>>,
+    Query(params): Query<WsParams>,
 ) -> impl IntoResponse {
+    // Authenticate if auth is enabled
+    if state.config.security.auth_enabled {
+        let token = params.token.as_deref().unwrap_or("");
+        let valid = { state.auth_manager.lock().validate(token) };
+        if !valid {
+            return StatusCode::UNAUTHORIZED.into_response();
+        }
+    }
     ws.on_upgrade(move |socket| handle_chat_websocket(socket, state.0))
 }
 
@@ -264,7 +284,7 @@ async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState>) {
                 Message::Text(text) => {
                     let incoming = oxios_gateway::message::IncomingMessage::new(
                         "web",
-                        "ws_user",
+                        "session",  // TODO: derive from token when user system exists
                         text.to_string(),
                     );
                     if send_tx.send(incoming).await.is_err() {
@@ -1708,7 +1728,10 @@ async fn handle_events(
     let stream = TokioStreamExt::filter_map(stream, |result| {
         match result {
             Ok(event) => {
-                let data = serde_json::to_string(&event).unwrap_or_default();
+                // Sanitize events: include type and basic metadata only.
+                // Detailed data (full seed content, LLM responses) is excluded.
+                let sanitized = sanitize_event(&event);
+                let data = serde_json::to_string(&sanitized).unwrap_or_default();
                 Some(Ok(SseEvent::default().data(data)))
             }
             Err(_) => None, // Skip lagged messages
@@ -1720,6 +1743,71 @@ async fn handle_events(
             .interval(std::time::Duration::from_secs(30))
             .text("ping"),
     )
+}
+
+/// Sanitize a kernel event for SSE broadcast.
+/// Returns only the event type and non-sensitive metadata.
+fn sanitize_event(event: &oxios_kernel::event_bus::KernelEvent) -> serde_json::Value {
+    use oxios_kernel::event_bus::KernelEvent;
+    match event {
+        KernelEvent::AgentCreated { id, name } => serde_json::json!({
+            "type": "agent_created",
+            "agent_id": id.to_string(),
+            "name": name,
+        }),
+        KernelEvent::AgentStarted { id } => serde_json::json!({
+            "type": "agent_started",
+            "agent_id": id.to_string(),
+        }),
+        KernelEvent::AgentStopped { id } => serde_json::json!({
+            "type": "agent_stopped",
+            "agent_id": id.to_string(),
+        }),
+        KernelEvent::AgentFailed { id, error } => serde_json::json!({
+            "type": "agent_failed",
+            "agent_id": id.to_string(),
+            "error": error,
+        }),
+        KernelEvent::MessageReceived { from, .. } => serde_json::json!({
+            "type": "message_received",
+            "from": from.to_string(),
+            // content excluded — may contain sensitive data
+        }),
+        KernelEvent::SeedCreated { seed_id } => serde_json::json!({
+            "type": "seed_created",
+            "seed_id": seed_id.to_string(),
+        }),
+        KernelEvent::EvaluationComplete { seed_id, passed } => serde_json::json!({
+            "type": "evaluation_complete",
+            "seed_id": seed_id.to_string(),
+            "passed": passed,
+        }),
+        KernelEvent::PhaseStarted { phase, .. } => serde_json::json!({
+            "type": "phase_started",
+            "phase": format!("{phase:?}"),
+        }),
+        KernelEvent::PhaseCompleted { phase, .. } => serde_json::json!({
+            "type": "phase_completed",
+            "phase": format!("{phase:?}"),
+        }),
+        KernelEvent::AgentOutput { session_id, agent_id, .. } => serde_json::json!({
+            "type": "agent_output",
+            "session_id": session_id,
+            "agent_id": agent_id.to_string(),
+            // content excluded
+        }),
+        KernelEvent::ApprovalRequested { id, action, resource, .. } => serde_json::json!({
+            "type": "approval_requested",
+            "id": id.to_string(),
+            "action": action,
+            "resource": resource,
+        }),
+        KernelEvent::ApprovalResolved { id, approved } => serde_json::json!({
+            "type": "approval_resolved",
+            "id": id.to_string(),
+            "approved": approved,
+        }),
+    }
 }
 
 // ---------------------------------------------------------------------------

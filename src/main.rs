@@ -540,7 +540,7 @@ async fn main() -> Result<()> {
                 Some(config_path),
                 kernel.mcp_bridge.clone(),
                 kernel.auth_manager.clone(),
-            );
+            )?;
 
             let shutdown_tx = setup_shutdown_handler();
 

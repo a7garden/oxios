@@ -113,10 +113,10 @@ impl WebServer {
         config_path: Option<PathBuf>,
         mcp_bridge: Arc<Mutex<McpBridge>>,
         auth_manager: Arc<parking_lot::Mutex<oxios_kernel::auth::AuthManager>>,
-    ) -> Self {
+    ) -> Result<Self, anyhow::Error> {
         let addr: SocketAddr = format!("{host}:{port}")
             .parse()
-            .expect("Invalid bind address");
+            .map_err(|e| anyhow::anyhow!("Invalid bind address '{host}:{port}': {e}"))?;
         let state = Arc::new(AppState {
             base_url: format!("http://{host}:{port}"),
             channel,
@@ -135,7 +135,7 @@ impl WebServer {
             mcp_bridge,
             auth_manager,
         });
-        Self { addr, state }
+        Ok(Self { addr, state })
     }
 
     /// Returns the shared application state.
@@ -153,7 +153,8 @@ impl WebServer {
 
         let cors = tower_http::cors::CorsLayer::new()
             .allow_origin(
-                ["http://localhost:4200".parse::<axum::http::HeaderValue>().unwrap()]
+                ["http://localhost:4200".parse::<axum::http::HeaderValue>()
+                    .expect("hardcoded valid origin")]
             )
             .allow_methods(tower_http::cors::Any)
             .allow_headers(tower_http::cors::Any);
@@ -183,13 +184,18 @@ async fn shutdown_signal() {
     let ctrl_c = async {
         tokio::signal::ctrl_c()
             .await
-            .expect("Failed to install Ctrl+C handler");
+            .unwrap_or_else(|e| tracing::error!(error = %e, "Ctrl+C handler failed"));
     };
 
     #[cfg(unix)]
     let terminate = async {
         tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
-            .expect("Failed to install SIGTERM handler")
+            .unwrap_or_else(|e| {
+                tracing::error!(error = %e, "SIGTERM handler failed");
+                // Return a signal stream that never fires
+                tokio::signal::unix::signal(tokio::signal::unix::SignalKind::user_defined1())
+                    .expect("fallback signal")
+            })
             .recv()
             .await;
     };
