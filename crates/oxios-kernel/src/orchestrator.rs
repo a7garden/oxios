@@ -17,18 +17,14 @@ use anyhow::{Context, Result};
 use oxios_ouroboros::{
     EvaluationResult, InterviewResult, OuroborosProtocol, Phase, Seed,
 };
-use parking_lot::{Mutex, RwLock};
+use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::access_manager::AccessManager;
-use crate::a2a::A2AProtocol;
 use crate::agent_lifecycle::AgentLifecycleManager;
 use crate::event_bus::{EventBus, KernelEvent};
-use crate::persona_manager::PersonaManager;
-use crate::scheduler::{AgentScheduler, Priority};
+use crate::scheduler::Priority;
 use crate::state_store::StateStore;
-use crate::supervisor::Supervisor;
 use crate::types::AgentId;
 
 /// Maximum number of Ouroboros loops before giving up.
@@ -37,54 +33,27 @@ const MAX_EVOLUTION_ITERATIONS: usize = 3;
 /// The orchestrator coordinates the full Ouroboros lifecycle.
 pub struct Orchestrator {
     ouroboros: Arc<dyn OuroborosProtocol>,
-    #[allow(dead_code)] // Used for supervisor.list() in status endpoints
-    supervisor: Arc<dyn Supervisor>,
     event_bus: EventBus,
     state_store: Arc<StateStore>,
-    #[allow(dead_code)] // Used for scheduler.stats() in API
-    scheduler: Arc<AgentScheduler>,
-    #[allow(dead_code)] // Used for access_manager.lock() in audit API
-    access_manager: Arc<Mutex<AccessManager>>,
     /// Active interview sessions, keyed by session ID.
     sessions: RwLock<std::collections::HashMap<String, InterviewSession>>,
-    #[allow(dead_code)] // Reserved for future persona-driven agent customization
-    persona_manager: Arc<PersonaManager>,
-    #[allow(dead_code)] // Used for A2A protocol access in API
-    a2a_protocol: Arc<A2AProtocol>,
     /// Agent lifecycle manager (fork, register, run, cleanup).
     lifecycle: AgentLifecycleManager,
 }
 
 impl Orchestrator {
     /// Creates a new orchestrator.
-    #[allow(clippy::too_many_arguments)]
     pub fn new(
         ouroboros: Arc<dyn OuroborosProtocol>,
-        supervisor: Arc<dyn Supervisor>,
         event_bus: EventBus,
         state_store: Arc<StateStore>,
-        scheduler: Arc<AgentScheduler>,
-        access_manager: Arc<Mutex<AccessManager>>,
-        persona_manager: Arc<PersonaManager>,
-        a2a_protocol: Arc<A2AProtocol>,
+        lifecycle: AgentLifecycleManager,
     ) -> Self {
-        let lifecycle = AgentLifecycleManager::new(
-            supervisor.clone(),
-            scheduler.clone(),
-            access_manager.clone(),
-            a2a_protocol.clone(),
-            event_bus.clone(),
-        );
         Self {
             ouroboros,
-            supervisor,
             event_bus,
             state_store,
-            scheduler,
-            access_manager,
             sessions: RwLock::new(std::collections::HashMap::new()),
-            persona_manager,
-            a2a_protocol,
             lifecycle,
         }
     }
@@ -211,7 +180,7 @@ impl Orchestrator {
         let exec_result = self.lifecycle.spawn_and_run(&seed, Priority::Normal).await?;
 
         // Periodically reap zombie tasks.
-        self.reap_zombies().await;
+        self.lifecycle.reap_zombies();
 
         // Phase 4: Evaluate
         self.publish_phase_completed(&session_id, Phase::Execute, "completed").await;
@@ -350,24 +319,6 @@ impl Orchestrator {
         });
     }
 
-    /// Reaps zombie tasks and logs the reaped tasks to access audit log.
-    async fn reap_zombies(&self) {
-        let reaped_ids = self.scheduler.reap_zombies();
-
-        if !reaped_ids.is_empty() {
-            tracing::warn!(count = reaped_ids.len(), "Zombie tasks reaped");
-            let mut access = self.access_manager.lock();
-            for task_id in &reaped_ids {
-                access.log_access(
-                    "scheduler",
-                    "zombie_reap",
-                    &task_id.to_string(),
-                    true,
-                    Some(format!("zombie task {} reaped", task_id)),
-                );
-            }
-        }
-    }
 }
 
 /// Active session state for multi-turn interviews.

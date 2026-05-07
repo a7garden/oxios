@@ -147,6 +147,19 @@ impl AgentLifecycleManager {
         }
     }
 
+    /// Reap finished zombie tasks and log the cleanup.
+    pub fn reap_zombies(&self) -> Vec<uuid::Uuid> {
+        let reaped = self.scheduler.reap_zombies();
+        if !reaped.is_empty() {
+            tracing::warn!(count = reaped.len(), "Zombie tasks reaped");
+            let mut access = self.access_manager.lock();
+            for task_id in &reaped {
+                access.log_access("scheduler", "zombie_reap", &task_id.to_string(), true, None);
+            }
+        }
+        reaped
+    }
+
     /// Cleanup when agent execution fails (no ExecutionResult available).
     async fn cleanup_on_failure(&self, agent_id: AgentId, task_id: uuid::Uuid) {
         if let Err(e) = self.a2a.registry().unregister_agent(agent_id).await {

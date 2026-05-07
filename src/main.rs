@@ -8,7 +8,6 @@ mod kernel;
 use anyhow::{bail, Context, Result};
 use clap::{Parser, Subcommand};
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
 
 use kernel::Kernel;
 use oxios_kernel::{OxiosConfig, InstallSource};

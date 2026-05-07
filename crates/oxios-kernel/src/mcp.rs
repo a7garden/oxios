@@ -808,7 +808,8 @@ impl McpBridge {
     pub async fn initialize_all(&self) -> Result<()> {
         let mut errors = Vec::new();
 
-        for server in self.servers.read().iter() {
+        let server_list: Vec<McpServer> = self.servers.read().iter().cloned().collect();
+        for server in server_list {
             if !server.enabled {
                 tracing::debug!(server = %server.name, "Skipping disabled MCP server");
                 continue;

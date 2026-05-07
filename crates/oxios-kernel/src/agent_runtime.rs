@@ -121,21 +121,6 @@ impl AgentRuntime {
         self
     }
 
-    /// Creates a new agent runtime with the given LLM provider and full config.
-    #[allow(dead_code)]
-    pub fn with_config(provider: Arc<dyn Provider>, config: AgentRuntimeConfig) -> Self {
-        Self {
-            provider,
-            config,
-            container: Arc::new(make_placeholder_container_manager()),
-            host_bridge: None,
-            program_manager: None,
-            oxios_config: None,
-            persona_manager: None,
-            mcp_bridge: None,
-        }
-    }
-
     /// Attach a ContainerManager for container execution.
     /// Container is always required — set via this method or during construction.
     pub fn with_container(mut self, container: Arc<ContainerManager>) -> Self {
@@ -215,7 +200,7 @@ impl AgentRuntime {
         let host_bridge = self.host_bridge.clone();
         let program_manager = self.program_manager.clone();
         let oxios_config = self.oxios_config.clone();
-        let mcp_bridge_for_runtime = self.mcp_bridge.as_ref().map(|b| Arc::clone(b));
+        let mcp_bridge_for_runtime = self.mcp_bridge.as_ref().map(Arc::clone);
 
         let (final_content, steps_completed, success) =
             tokio::task::spawn_blocking(move || {

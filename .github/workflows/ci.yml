@@ -31,7 +31,12 @@ jobs:
         run: cargo fmt --all -- --check
       - name: Clippy
         working-directory: oxios
-        run: cargo clippy --workspace -- -W clippy::all
+        run: cargo clippy -p oxios -p oxios-kernel -p oxios-ouroboros -p oxios-gateway -p oxios-web -- -D warnings
       - name: Test
         working-directory: oxios
         run: cargo test --workspace
+      - name: Security audit
+        working-directory: oxios
+        run: |
+          cargo install cargo-audit
+          cargo audit

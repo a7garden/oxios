@@ -17,7 +17,7 @@ test:
 
 # Run Clippy with warnings
 lint:
-    cargo clippy --workspace -- -W clippy::all
+    cargo clippy -p oxios -p oxios-kernel -p oxios-ouroboros -p oxios-gateway -p oxios-web -- -D warnings
 
 # Format code
 fmt:

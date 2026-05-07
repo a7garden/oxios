@@ -149,7 +149,7 @@ impl KernelBuilder {
         program_manager.init().await?;
 
         // ── MCP bridge (register program MCP servers before Arc wrapping) ──
-        let mut mcp_bridge = init_mcp_bridge(&config).await?;
+        let mcp_bridge = init_mcp_bridge(&config).await?;
         for program in program_manager.list_enabled().await {
             for server_config in &program.meta.mcp_servers {
                 if server_config.enabled {
@@ -180,16 +180,21 @@ impl KernelBuilder {
             agent_runtime,
         ));
 
+        // ── Agent lifecycle manager ──
+        let lifecycle = oxios_kernel::AgentLifecycleManager::new(
+            supervisor.clone(),
+            scheduler.clone(),
+            access_manager.clone(),
+            a2a_protocol.clone(),
+            event_bus.clone(),
+        );
+
         // ── Orchestrator ──
         let orchestrator = Arc::new(Orchestrator::new(
             ouroboros,
-            supervisor.clone(),
             event_bus.clone(),
             state_store.clone(),
-            scheduler.clone(),
-            access_manager.clone(),
-            Arc::new(persona_manager.clone()),
-            a2a_protocol.clone(),
+            lifecycle,
         ));
 
         // ── Gateway ──
@@ -251,7 +256,7 @@ fn expand_path(path: &str) -> PathBuf {
 
 /// Initialize the MCP bridge from config and environment variables.
 async fn init_mcp_bridge(config: &OxiosConfig) -> Result<McpBridge> {
-    let mut bridge = McpBridge::new();
+    let bridge = McpBridge::new();
 
     for (name, def) in &config.mcp.servers {
         let mut server = McpServer::new(name, &def.command);

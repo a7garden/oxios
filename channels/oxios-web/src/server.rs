@@ -24,7 +24,6 @@ use oxios_kernel::access_manager::AccessManager;
 use oxios_kernel::skill::SkillStore;
 use oxios_kernel::state_store::StateStore;
 use oxios_kernel::Supervisor;
-use tokio::sync::Mutex;
 
 /// Shared application state for the web server.
 ///
