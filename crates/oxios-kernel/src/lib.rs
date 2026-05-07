@@ -8,12 +8,12 @@
 
 pub mod a2a;
 pub mod access_manager;
+pub mod agent_lifecycle;
 pub mod agent_runtime;
 
 pub mod auth;
 pub mod config;
 pub mod container;
-pub mod context_manager;
 pub mod engine;
 pub mod error;
 pub mod event_bus;
@@ -47,6 +47,7 @@ pub use access_manager::{
     PendingApproval, ApprovalStatus,
 };
 
+pub use agent_lifecycle::AgentLifecycleManager;
 pub use agent_runtime::AgentRuntime;
 pub use error::{HttpStatus, KernelError, KernelResult};
 pub use engine::{EngineProvider, OxiEngineProvider};
@@ -57,7 +58,6 @@ pub use auth::{AuthManager, KeyMeta};
 pub use container::{
     AppleBackend, ContainerBackend, ContainerConfig, ContainerStats, ContainerStatus, ContainerWorkspaceInfo, ExecResult,
 };
-pub use context_manager::{ContextManager, ContextStats, ContextTier, ContextEntry};
 pub use event_bus::{EventBus, KernelEvent};
 pub use container_manager::{ContainerInfo, ContainerManager};
 pub use host_exec::HostExecBridge;

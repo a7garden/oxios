@@ -581,11 +581,29 @@ async fn main() -> Result<()> {
                 })
                 .await?;
 
-            if let Err(e) = kernel.mcp_bridge.lock().await.shutdown_all().await {
-                tracing::warn!(error = %e, "Error during MCP shutdown");
+            // Structured shutdown sequence
+            tracing::info!("Starting graceful shutdown...");
+
+            // 1. Stop running agents
+            if let Ok(agents) = kernel.supervisor.list().await {
+                for agent in &agents {
+                    if let Err(e) = kernel.supervisor.kill(agent.id).await {
+                        tracing::warn!(agent = %agent.id, error = %e, "Failed to kill agent");
+                    }
+                }
+                if !agents.is_empty() {
+                    tracing::info!(count = agents.len(), "Agents terminated");
+                }
             }
 
+            // 2. Stop MCP servers
+            if let Err(e) = kernel.mcp_bridge.lock().await.shutdown_all().await {
+                tracing::warn!(error = %e, "MCP shutdown error");
+            }
+
+            // 3. Stop gateway
             gateway_handle.abort();
+
             tracing::info!("Oxios shut down gracefully");
             Ok(())
         }

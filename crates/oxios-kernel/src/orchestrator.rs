@@ -22,10 +22,11 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::access_manager::AccessManager;
-use crate::a2a::{A2AProtocol, AgentCard};
+use crate::a2a::A2AProtocol;
+use crate::agent_lifecycle::AgentLifecycleManager;
 use crate::event_bus::{EventBus, KernelEvent};
 use crate::persona_manager::PersonaManager;
-use crate::scheduler::{AgentScheduler, Priority, ScheduledTask};
+use crate::scheduler::{AgentScheduler, Priority};
 use crate::state_store::StateStore;
 use crate::supervisor::Supervisor;
 use crate::types::AgentId;
@@ -36,17 +37,22 @@ const MAX_EVOLUTION_ITERATIONS: usize = 3;
 /// The orchestrator coordinates the full Ouroboros lifecycle.
 pub struct Orchestrator {
     ouroboros: Arc<dyn OuroborosProtocol>,
+    #[allow(dead_code)] // Used for supervisor.list() in status endpoints
     supervisor: Arc<dyn Supervisor>,
     event_bus: EventBus,
     state_store: Arc<StateStore>,
+    #[allow(dead_code)] // Used for scheduler.stats() in API
     scheduler: Arc<AgentScheduler>,
+    #[allow(dead_code)] // Used for access_manager.lock() in audit API
     access_manager: Arc<Mutex<AccessManager>>,
     /// Active interview sessions, keyed by session ID.
     sessions: RwLock<std::collections::HashMap<String, InterviewSession>>,
     #[allow(dead_code)] // Reserved for future persona-driven agent customization
     persona_manager: Arc<PersonaManager>,
-    /// A2A protocol for inter-agent communication and delegation.
+    #[allow(dead_code)] // Used for A2A protocol access in API
     a2a_protocol: Arc<A2AProtocol>,
+    /// Agent lifecycle manager (fork, register, run, cleanup).
+    lifecycle: AgentLifecycleManager,
 }
 
 impl Orchestrator {
@@ -62,6 +68,13 @@ impl Orchestrator {
         persona_manager: Arc<PersonaManager>,
         a2a_protocol: Arc<A2AProtocol>,
     ) -> Self {
+        let lifecycle = AgentLifecycleManager::new(
+            supervisor.clone(),
+            scheduler.clone(),
+            access_manager.clone(),
+            a2a_protocol.clone(),
+            event_bus.clone(),
+        );
         Self {
             ouroboros,
             supervisor,
@@ -72,6 +85,7 @@ impl Orchestrator {
             sessions: RwLock::new(std::collections::HashMap::new()),
             persona_manager,
             a2a_protocol,
+            lifecycle,
         }
     }
 
@@ -193,79 +207,8 @@ impl Orchestrator {
         self.publish_phase_completed(&session_id, Phase::Seed, "generated").await;
         self.publish_phase_started(&session_id, Phase::Execute).await;
 
-        // Phase 3: Fork and execute agent
-        let agent_id = self.supervisor.fork(&seed).await?;
-        tracing::info!(session_id = %session_id, agent_id = %agent_id, seed_id = %seed.id, "Agent forked");
-
-        // Register agent in A2A registry for inter-agent delegation.
-        let agent_name = format!("agent-{}", agent_id);
-        let mut card = AgentCard::new(
-            agent_id,
-            &agent_name,
-            format!("Agent executing seed: {}", seed.goal),
-        )
-        .with_capability("execute-seed")
-        .with_status(crate::types::AgentStatus::Starting);
-
-        // Infer capabilities from seed goal and constraints.
-        let goal_lower = seed.goal.to_lowercase();
-        if goal_lower.contains("review") || goal_lower.contains("code") {
-            card = card.with_capability("code-review");
-        }
-        if goal_lower.contains("test") {
-            card = card.with_capability("testing");
-        }
-        if goal_lower.contains("refactor") || goal_lower.contains("improve") {
-            card = card.with_capability("refactoring");
-        }
-        if goal_lower.contains("write") || goal_lower.contains("create") || goal_lower.contains("implement") {
-            card = card.with_capability("code-generation");
-        }
-        if goal_lower.contains("debug") || goal_lower.contains("fix") {
-            card = card.with_capability("debugging");
-        }
-
-        if let Err(e) = self.a2a_protocol.registry().register_agent(card).await {
-            tracing::warn!(agent_id = %agent_id, error = %e, "Failed to register agent card in A2A registry");
-        }
-
-        // Check access for agent tools before running.
-        let agent_name = format!("agent-{}", agent_id);
-        {
-            let mut access = self.access_manager.lock();
-            // Log the access check for the agent's primary tools.
-            for tool in ["bash", "read", "write", "edit", "grep", "find"] {
-                access.can_use_tool(&agent_name, tool);
-            }
-            // Ensure default permissions exist for the agent.
-            if access.get_permissions(&agent_name).is_none() {
-                tracing::warn!(agent_id = %agent_id, "Agent has no permissions defined, using default");
-                access.get_or_create_permissions(&agent_name);
-            }
-        }
-
-        // Submit the execution task to the scheduler and dispatch atomically.
-        let task = ScheduledTask::for_agent(
-            agent_id,
-            format!("Execute seed '{}'", seed.goal),
-            Priority::Normal,
-        );
-        let task_id = self.scheduler.submit(task)?;
-        // Immediately start the task so no other caller can grab it.
-        self.scheduler.start_task(task_id)?;
-
-        let exec_result = self.supervisor.run_with_seed(agent_id, &seed).await?;
-
-        // Unregister agent from A2A registry on completion.
-        if let Err(e) = self.a2a_protocol.registry().unregister_agent(agent_id).await {
-            tracing::warn!(agent_id = %agent_id, error = %e, "Failed to unregister agent card from A2A registry");
-        }
-
-        if exec_result.success {
-            let _ = self.scheduler.complete_task(task_id);
-        } else {
-            let _ = self.scheduler.fail_task(task_id, &exec_result.output);
-        }
+        // Phase 3: Fork and execute agent via lifecycle manager
+        let exec_result = self.lifecycle.spawn_and_run(&seed, Priority::Normal).await?;
 
         // Periodically reap zombie tasks.
         self.reap_zombies().await;
@@ -314,53 +257,8 @@ impl Orchestrator {
                 self.publish_phase_completed(&session_id, Phase::Evolve, "evolved").await;
                 self.publish_phase_started(&session_id, Phase::Execute).await;
 
-                // Re-fork and execute with the evolved seed.
-                let new_agent_id = self.supervisor.fork(&evolved).await?;
-                let agent_name = format!("agent-{}", new_agent_id);
-                {
-                    let mut access = self.access_manager.lock();
-                    for tool in ["bash", "read", "write", "edit", "grep", "find"] {
-                        access.can_use_tool(&agent_name, tool);
-                    }
-                    if access.get_permissions(&agent_name).is_none() {
-                        access.get_or_create_permissions(&agent_name);
-                    }
-                }
-
-                // Register evolved agent in A2A registry.
-                let card = AgentCard::new(
-                    new_agent_id,
-                    &agent_name,
-                    format!("Evolved agent executing seed: {}", evolved.goal),
-                )
-                .with_capability("execute-seed")
-                .with_capability("evolved")
-                .with_status(crate::types::AgentStatus::Starting);
-
-                if let Err(e) = self.a2a_protocol.registry().register_agent(card).await {
-                    tracing::warn!(agent_id = %new_agent_id, error = %e, "Failed to register evolved agent card");
-                }
-
-                let task = ScheduledTask::for_agent(
-                    new_agent_id,
-                    format!("Execute evolved seed '{}'", evolved.goal),
-                    Priority::High,
-                );
-                let task_id = self.scheduler.submit(task)?;
-                self.scheduler.start_task(task_id)?;
-
-                let new_exec = self.supervisor.run_with_seed(new_agent_id, &evolved).await?;
-
-                // Unregister evolved agent on completion.
-                if let Err(e) = self.a2a_protocol.registry().unregister_agent(new_agent_id).await {
-                    tracing::warn!(agent_id = %new_agent_id, error = %e, "Failed to unregister evolved agent card");
-                }
-
-                if new_exec.success {
-                    let _ = self.scheduler.complete_task(task_id);
-                } else {
-                    let _ = self.scheduler.fail_task(task_id, &new_exec.output);
-                }
+                // Re-execute with the evolved seed via lifecycle manager.
+                let new_exec = self.lifecycle.spawn_and_run(&evolved, Priority::High).await?;
 
                 self.publish_phase_completed(&session_id, Phase::Execute, "completed").await;
                 self.publish_phase_started(&session_id, Phase::Evaluate).await;

@@ -21,7 +21,7 @@ use std::sync::Arc;
 use crate::config::OxiosConfig;
 use crate::container_manager::ContainerManager;
 use crate::host_exec::HostExecBridge;
-use crate::mcp::{McpBridge, McpServer};
+use crate::mcp::McpBridge;
 use crate::persona_manager::PersonaManager;
 use crate::program::ProgramManager;
 use crate::state_store::StateStore;
