@@ -1,25 +1,19 @@
 # Progress
 
 ## Status
-Completed
+In Progress — Loop 10 cross-reference review complete
 
 ## Tasks
-- [x] Add OTel feature to oxios-kernel Cargo.toml
-- [x] Create telemetry module (feature-gated, compiles with and without otel)
-- [x] Add trace spans to orchestrator.rs phases
-- [x] Verify: cargo check (without otel) ✅
-- [x] Verify: cargo check --features otel ✅
-- [x] Verify: cargo test -p oxios-kernel ✅ (246/246 tests pass)
-- [x] Verify: full project cargo check ✅
+
+### Loop 10 Cross-reference Check (2026-05-07)
+- [x] Verified all 16 integration points
+- All checks pass (see /tmp/oxios-l10-crossref.md)
+- `cargo check --tests` clean
+- `cargo test --workspace` — 288 passed, 0 failed
 
 ## Files Changed
-- `crates/oxios-kernel/Cargo.toml` — added `[features]` section with `otel` flag + optional OTel deps + tracing-subscriber workspace dep
-- `crates/oxios-kernel/src/lib.rs` — registered telemetry module (both cfg variants)
-- `crates/oxios-kernel/src/telemetry_otel.rs` — OTel-enabled telemetry module (real layer init stub)
-- `crates/oxios-kernel/src/telemetry_stub.rs` — No-op telemetry module (when otel feature is off)
-- `crates/oxios-kernel/src/orchestrator.rs` — added structured trace logging to all phases
+- `/tmp/oxios-l10-crossref.md` — Full review findings
 
 ## Notes
-- Used `tracing::info!` with structured fields instead of `#[instrument]` / `info_span!().entered()` because `EnteredSpan` is `!Send`, which breaks `tokio::spawn` in test code (the orchestrator's `handle_message` is spawned in integration/e2e tests)
-- The `TelemetryConfig` and `init_telemetry_layers()` are available as `oxios_kernel::telemetry::*` regardless of whether the `otel` feature is enabled
-- The OTel dependencies successfully resolve and compile: tracing-opentelemetry 0.28, opentelemetry 0.27, opentelemetry_sdk 0.27, opentelemetry-otlp 0.27, opentelemetry-stdout 0.27
+- No blockers found. Loop 10 implementation is consistent and complete.
+- Commit: `87e98ad feat(loop10): Tool templates, EmbeddingProvider, Notify-based A2A, E2E test, OTel, channel guide`
