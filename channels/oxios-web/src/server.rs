@@ -191,17 +191,19 @@ impl WebServer {
 
         // Build OpenAPI spec and Swagger UI
         let openapi = api_docs::build_openapi();
-        let swagger = utoipa_swagger_ui::SwaggerUi::new("/swagger-ui")
-            .url("/api-docs/openapi.json", openapi);
+        let swagger: Router<()> = utoipa_swagger_ui::SwaggerUi::new("/swagger-ui")
+            .url("/api-docs/openapi.json", openapi)
+            .into();
 
         let app = Router::new()
-            .merge(Router::<Arc<AppState>>::from(swagger))
             .merge(build_routes(self.state.clone()))
             .fallback_service(
                 ServeDir::new(&static_dir).append_index_html_on_directories(true),
             )
             .layer(cors)
             .with_state(self.state.clone());
+
+        let app = Router::new().merge(swagger).merge(app);
 
         let listener = tokio::net::TcpListener::bind(self.addr).await?;
         tracing::info!(addr = %self.addr, "Web server listening");

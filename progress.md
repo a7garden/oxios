@@ -55,3 +55,15 @@ In Progress
   - [x] New `backup.rs` module with `create_backup` / `restore_backup`
   - [x] Register `backup` module, export all new types in `lib.rs`
   - [x] `cargo check -p oxios-kernel` passes, all 242 tests green
+
+- [x] Web Channel: Observability + OpenAPI + Agent Group API + SSE
+  - [x] Enhanced `/api/status` with `ComponentHealth`, `ComponentStatus`, `MemoryHealth`, `AgentHealth` structs
+  - [x] SSE endpoint already existed in `events.rs` — verified, no changes needed
+  - [x] Agent Group API routes (`GET /api/agent-groups`, `GET /api/agent-groups/:id`)
+  - [x] Tool Health endpoint (`GET /api/containers/:name/tools`) — 501 placeholder
+  - [x] Added `utoipa` + `utoipa-swagger-ui` dependencies
+  - [x] Created `api_docs.rs` with OpenAPI spec builder
+  - [x] Swagger UI registered at `/swagger-ui`
+  - [x] Added `vector_index_size()` and `total_entries()` to `MemoryManager`
+  - [x] Fixed pre-existing kernel bugs: duplicate `pub mod backup`, missing `.await`, memory curation borrow errors
+  - [x] `cargo check -p oxios-web` passes cleanly, 0 errors, 0 warnings

@@ -4,7 +4,6 @@
 //! incrementally as routes are documented with utoipa annotations.
 
 use utoipa::openapi::security::{HttpAuthScheme, HttpBuilder, SecurityScheme};
-use utoipa::OpenApi;
 
 /// Build the OpenAPI specification for the Oxios web API.
 pub fn build_openapi() -> utoipa::openapi::OpenApi {
