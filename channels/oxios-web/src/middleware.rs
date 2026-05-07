@@ -32,12 +32,11 @@ pub async fn require_auth(
         return Ok(next.run(request).await);
     }
 
-    // Allow static assets without auth
-    if path.starts_with("/dioxus")
-        || path.ends_with(".js")
-        || path.ends_with(".css")
-        || path.ends_with(".html")
-    {
+    // Allow only actual static asset paths (prefix-based, not suffix)
+    let static_prefixes = ["/assets/", "/dioxus/", "/favicon"];
+    let is_static = static_prefixes.iter().any(|p| path.starts_with(p))
+        || path == "/" || path == "/index.html";
+    if is_static {
         return Ok(next.run(request).await);
     }
 

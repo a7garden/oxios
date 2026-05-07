@@ -191,10 +191,24 @@ impl KernelBuilder {
         }
         let auth_manager = Arc::new(parking_lot::Mutex::new(auth_manager));
 
-        // ── MCP bridge ──
-        let mcp_bridge = Arc::new(tokio::sync::Mutex::new(
-            init_mcp_bridge(&config).await?,
-        ));
+        // ── MCP bridge (register program MCP servers before Arc wrapping) ──
+        let mut mcp_bridge = init_mcp_bridge(&config).await?;
+
+        // Register MCP servers from installed programs
+        for program in program_manager.list_enabled().await {
+            for server_config in &program.meta.mcp_servers {
+                if server_config.enabled {
+                    mcp_bridge.register_server(McpServer {
+                        name: server_config.name.clone(),
+                        command: server_config.command.clone(),
+                        args: server_config.args.clone(),
+                        env: server_config.env.clone(),
+                        enabled: server_config.enabled,
+                    });
+                }
+            }
+        }
+        let mcp_bridge = Arc::new(tokio::sync::Mutex::new(mcp_bridge));
 
         Ok(Kernel {
             orchestrator,

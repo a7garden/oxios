@@ -41,6 +41,7 @@ use uuid::Uuid;
 
 use crate::server::AppState;
 use crate::persona_routes;
+use crate::middleware::require_auth;
 
 // ---------------------------------------------------------------------------
 // Route builder
@@ -51,11 +52,13 @@ use crate::persona_routes;
 /// Auth middleware is applied to all `/api/*` routes.
 /// `/health` and static assets are excluded from auth.
 pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
-    Router::new()
-        // Health check (no auth required)
+    // Public routes (no auth)
+    let public = Router::new()
         .route("/health", get(handle_health))
-        // Dioxus WASM frontend redirect
-        .route("/dioxus", get(|| async { Redirect::permanent("/dioxus/") }))
+        .route("/dioxus", get(|| async { Redirect::permanent("/dioxus/") }));
+
+    // Protected API routes (auth middleware applied)
+    let api = Router::new()
         // Chat
         .route("/api/chat", post(handle_chat))
         .route("/api/chat/stream", get(handle_chat_stream))
@@ -124,7 +127,10 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         .route("/api/approvals", get(handle_approvals_list))
         .route("/api/approvals/{id}/approve", post(handle_approval_approve))
         .route("/api/approvals/{id}/reject", post(handle_approval_reject))
-        .with_state(state)
+        .layer(axum::middleware::from_fn_with_state(state.clone(), require_auth))
+        .with_state(state.clone());
+
+    public.merge(api).with_state(state)
 }
 // Health
 // ---------------------------------------------------------------------------
@@ -441,9 +447,21 @@ async fn handle_workspace_tree(
     Query(query): Query<TreeQuery>,
 ) -> Result<Json<Vec<TreeEntry>>, StatusCode> {
     let base = &state.state_store.base_path;
+    let canonical_base = state.state_store.base_path.canonicalize()
+        .unwrap_or_else(|_| state.state_store.base_path.clone());
     let dir = match &query.dir {
-        Some(d) => base.join(d),
-        None => base.clone(),
+        Some(d) => {
+            let candidate = base.join(d);
+            let canonical = match candidate.canonicalize() {
+                Ok(c) => c,
+                Err(_) => return Err(StatusCode::NOT_FOUND),
+            };
+            if !canonical.starts_with(&canonical_base) {
+                return Err(StatusCode::FORBIDDEN);
+            }
+            canonical
+        }
+        None => canonical_base,
     };
 
     let mut entries = Vec::new();
@@ -509,17 +527,15 @@ async fn handle_workspace_file_put(
 
     // Security: ensure the path doesn't escape the workspace
     let canonical_base = state.state_store.base_path.canonicalize().unwrap_or_else(|_| state.state_store.base_path.clone());
-    // For new files, canonicalize the parent dir
     if let Some(parent) = full_path.parent() {
-        if parent.canonicalize().is_err()
-            && tokio::fs::create_dir_all(parent).await.is_err()
-        {
-            return Err(StatusCode::INTERNAL_SERVER_ERROR);
+        if !parent.exists() {
+            tokio::fs::create_dir_all(parent).await
+                .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
         }
-        if let Ok(canonical_parent) = parent.canonicalize() {
-            if !canonical_parent.starts_with(&canonical_base) {
-                return Err(StatusCode::FORBIDDEN);
-            }
+        let canonical_parent = parent.canonicalize()
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        if !canonical_parent.starts_with(&canonical_base) {
+            return Err(StatusCode::FORBIDDEN);
         }
     }
 
@@ -1319,17 +1335,27 @@ async fn handle_program_get(
 /// Request body for program installation.
 #[derive(Debug, Deserialize)]
 struct ProgramInstallRequest {
-    /// Path to the program directory to install.
+    /// URL (git or tarball) to install from.
     path: String,
 }
 
-/// POST /api/programs — Install a program from a directory.
+/// POST /api/programs — Install a program from a URL.
 async fn handle_program_install(
     state: State<Arc<AppState>>,
     Json(body): Json<ProgramInstallRequest>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
-    let path = std::path::PathBuf::from(&body.path);
-    match state.program_manager.install(&path).await {
+    use oxios_kernel::InstallSource;
+
+    // Only allow remote sources via API (no local path traversal)
+    let source = if body.path.ends_with(".git") || body.path.starts_with("git@") {
+        InstallSource::Git { url: body.path.clone(), branch: None }
+    } else if body.path.starts_with("http://") || body.path.starts_with("https://") {
+        InstallSource::Tarball { url: body.path.clone() }
+    } else {
+        return Err((StatusCode::BAD_REQUEST, "Local path installation not allowed via API. Use git URL or tarball URL.".into()));
+    };
+
+    match state.program_manager.install_from(source).await {
         Ok(program) => {
             tracing::info!(program = %program.meta.name, "Program installed via API");
             Ok(Json(serde_json::json!({

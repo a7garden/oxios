@@ -298,24 +298,8 @@ fn run_agent_loop(
                 }
             }
 
-            // Register MCP servers (requires &mut self on McpBridge).
-            for program in &programs {
-                for server_config in &program.meta.mcp_servers {
-                    if server_config.enabled {
-                        let server = McpServer {
-                            name: server_config.name.clone(),
-                            command: server_config.command.clone(),
-                            args: server_config.args.clone(),
-                            env: server_config.env.clone(),
-                            enabled: server_config.enabled,
-                        };
-                        // register_server needs &mut; we use Arc::get_mut.
-                        if let Some(bridge_mut) = Arc::get_mut(&mut mcp_bridge.clone()) {
-                            bridge_mut.register_server(server);
-                        }
-                    }
-                }
-            }
+            // MCP servers are pre-registered by kernel.rs (before Arc wrapping).
+            // Collect names for later tool registration.
 
             // Now initialize MCP servers and get tools.
             if !mcp_server_names.is_empty() {
