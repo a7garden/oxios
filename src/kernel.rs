@@ -10,7 +10,7 @@ use oxios_kernel::{
     access_manager::AccessManager, auth::AuthManager, config::load_config,
     A2AProtocol, AgentRuntime, BasicSupervisor, ContainerManager,
     EngineProvider, EventBus, HostExecBridge, HostToolValidator,
-    McpBridge, McpServer, Orchestrator, OxiosConfig, PersonaManager,
+    McpBridge, McpServer, MemoryManager, Orchestrator, OxiosConfig, PersonaManager,
     ProgramManager, SkillStore, AgentScheduler, Supervisor,
 };
 use oxios_ouroboros::{OuroborosEngine, OuroborosProtocol};
@@ -50,6 +50,8 @@ pub struct Kernel {
     pub persona_manager: PersonaManager,
     /// MCP tool bridge.
     pub mcp_bridge: Arc<McpBridge>,
+    /// Memory manager for cross-session agent memory.
+    pub memory_manager: Arc<MemoryManager>,
     /// API key authentication manager.
     pub auth_manager: Arc<parking_lot::Mutex<AuthManager>>,
 }
@@ -174,6 +176,13 @@ impl KernelBuilder {
             .with_persona_manager(Arc::new(persona_manager.clone()))
             .with_mcp_bridge(mcp_bridge.clone());
 
+        // ── Memory manager ──
+        let memory_manager = Arc::new(MemoryManager::new(state_store.clone()));
+
+        // ── Agent runtime with memory ──
+        let agent_runtime = agent_runtime
+            .with_memory_manager(memory_manager.clone());
+
         // ── Supervisor ──
         let supervisor: Arc<dyn Supervisor> = Arc::new(BasicSupervisor::new(
             event_bus.clone(),
@@ -229,6 +238,7 @@ impl KernelBuilder {
             host_tool_validator,
             persona_manager,
             mcp_bridge,
+            memory_manager,
             auth_manager,
         })
     }

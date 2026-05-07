@@ -394,12 +394,28 @@ async fn test_state_store_path_traversal_blocked() {
     let result = store.save_markdown("memory", "../shadow", "hacked").await;
     assert!(result.is_err());
 
-    // Slash in category should be blocked.
+    // Slash in category is allowed (sub-directory categories like memory/knowledge).
     let result = store.save_markdown("foo/bar", "test", "content").await;
-    assert!(result.is_err());
+    assert!(result.is_ok());
 
     // Backslash should be blocked.
     let result = store.save_markdown("foo\\bar", "test", "content").await;
+    assert!(result.is_err());
+
+    // Empty category should be blocked.
+    let result = store.save_markdown("", "test", "content").await;
+    assert!(result.is_err());
+
+    // Leading slash should be blocked.
+    let result = store.save_markdown("/foo", "test", "content").await;
+    assert!(result.is_err());
+
+    // Trailing slash should be blocked.
+    let result = store.save_markdown("foo/", "test", "content").await;
+    assert!(result.is_err());
+
+    // Double slash should be blocked.
+    let result = store.save_markdown("foo//bar", "test", "content").await;
     assert!(result.is_err());
 }
 

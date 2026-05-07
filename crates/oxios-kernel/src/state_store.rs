@@ -220,7 +220,10 @@ impl StateStore {
 
     /// Validate that a category name does not contain path traversal.
     fn validate_category(category: &str) -> Result<()> {
-        if category.contains("..") || category.contains('/') || category.contains('\\') {
+        if category.contains("..") || category.contains('\\') {
+            bail!("invalid category name: '{}'", category);
+        }
+        if category.is_empty() || category.starts_with('/') || category.ends_with('/') || category.contains("//") {
             bail!("invalid category name: '{}'", category);
         }
         Ok(())

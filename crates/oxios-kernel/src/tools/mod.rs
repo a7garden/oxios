@@ -8,9 +8,11 @@
 pub mod container_exec;
 pub mod host_exec_tool;
 pub mod mcp_tool;
+pub mod memory_tools;
 pub mod program_tool;
 
 pub use container_exec::ContainerExecTool;
 pub use host_exec_tool::HostExecTool;
 pub use mcp_tool::McpToolWrapper;
+pub use memory_tools::{MemoryReadTool, MemorySearchTool, MemoryWriteTool};
 pub use program_tool::ProgramTool;

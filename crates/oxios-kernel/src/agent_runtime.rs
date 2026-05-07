@@ -25,7 +25,9 @@ use crate::mcp::McpBridge;
 use crate::persona_manager::PersonaManager;
 use crate::program::ProgramManager;
 use crate::state_store::StateStore;
+use crate::memory::MemoryManager;
 use crate::tools::{ContainerExecTool, HostExecTool, McpToolWrapper, ProgramTool};
+use crate::tools::memory_tools::{MemoryWriteTool, MemoryReadTool, MemorySearchTool};
 use oxios_ouroboros::{ExecutionResult, Seed};
 
 /// Configuration for creating AgentRuntime instances.
@@ -76,6 +78,8 @@ pub struct AgentRuntime {
     persona_manager: Option<Arc<PersonaManager>>,
     /// MCP bridge with pre-registered servers (from kernel.rs).
     mcp_bridge: Option<Arc<McpBridge>>,
+    /// Memory manager for cross-session memory.
+    memory_manager: Option<Arc<MemoryManager>>,
 }
 
 /// Create a minimal placeholder ContainerManager for cases where
@@ -112,6 +116,7 @@ impl AgentRuntime {
             oxios_config: None,
             persona_manager: None,
             mcp_bridge: None,
+            memory_manager: None,
         }
     }
 
@@ -149,6 +154,12 @@ impl AgentRuntime {
     /// Attach the MCP bridge with pre-registered servers.
     pub fn with_mcp_bridge(mut self, bridge: Arc<McpBridge>) -> Self {
         self.mcp_bridge = Some(bridge);
+        self
+    }
+
+    /// Attach a MemoryManager for cross-session memory tools.
+    pub fn with_memory_manager(mut self, mm: Arc<MemoryManager>) -> Self {
+        self.memory_manager = Some(mm);
         self
     }
 
@@ -201,6 +212,7 @@ impl AgentRuntime {
         let program_manager = self.program_manager.clone();
         let oxios_config = self.oxios_config.clone();
         let mcp_bridge_for_runtime = self.mcp_bridge.as_ref().map(Arc::clone);
+        let memory_manager = self.memory_manager.clone();
 
         let (final_content, steps_completed, success) =
             tokio::task::spawn_blocking(move || {
@@ -215,6 +227,7 @@ impl AgentRuntime {
                     program_manager,
                     oxios_config,
                     mcp_bridge_for_runtime,
+                    memory_manager,
                 )
             })
             .await??;
@@ -255,6 +268,7 @@ fn run_agent_loop(
     program_manager: Option<Arc<ProgramManager>>,
     oxios_config: Option<OxiosConfig>,
     mcp_bridge_for_runtime: Option<Arc<McpBridge>>,
+    memory_manager: Option<Arc<MemoryManager>>,
 ) -> Result<(String, usize, bool)> {
     // ── Tier 1: oxi native tools (file operations) ──
     let registry = ToolRegistry::new();
@@ -359,6 +373,17 @@ fn run_agent_loop(
                 }
             }
         }
+    }
+
+    // ── Tier 5: Memory tools ──
+    if let Some(ref mm) = memory_manager {
+        let write_tool = Arc::new(MemoryWriteTool::new(mm.clone()));
+        let read_tool = Arc::new(MemoryReadTool::new(mm.clone()));
+        let search_tool = Arc::new(MemorySearchTool::new(mm.clone()));
+        registry.register_arc(write_tool);
+        registry.register_arc(read_tool);
+        registry.register_arc(search_tool);
+        tracing::debug!("Memory tools registered");
     }
 
     let tools = Arc::new(registry);
