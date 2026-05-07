@@ -455,6 +455,7 @@ fn run_agent_loop(
         auto_retry_enabled: config.auto_retry_enabled,
         auto_retry_max_attempts: 3,
         auto_retry_base_delay_ms: 2000,
+        api_key: None,
     };
 
     let state = SharedState::new();

@@ -49,12 +49,9 @@ getrandom = "0.2"
 # Concurrency
 parking_lot = "0.12"
 
-# oxi engine crates — git tag for reproducible builds
-# (override with Cargo.toml.local for local co-development)
-# e.g. oxi-ai = { path = "../oxi/oxi-ai" }
-# e.g. oxi-agent = { path = "../oxi/oxi-agent" }
-oxi-ai = { git = "https://github.com/a7garden/oxi", tag = "v0.4.4" }
-oxi-agent = { git = "https://github.com/a7garden/oxi", tag = "v0.4.4" }
+# oxi engine crates — local path for co-development
+oxi-ai = { path = "../oxi/oxi-ai" }
+oxi-agent = { path = "../oxi/oxi-agent" }
 
 [dependencies]
 oxios-kernel = { path = "crates/oxios-kernel" }
