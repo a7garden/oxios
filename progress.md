@@ -4,19 +4,22 @@
 Completed
 
 ## Tasks
-- [x] Read a2a.rs, orchestrator.rs, agent_lifecycle.rs
-- [x] Add Notify-based AgentQueue to a2a.rs
-- [x] Add AgentRole enum + role field to SubTask in orchestrator.rs
-- [x] Add single-task optimization in delegate_subtasks
-- [x] Export AgentRole + SubTask from lib.rs
-- [x] cargo check -p oxios-kernel passes
-- [x] cargo test -p oxios-kernel --lib passes (218/218)
+- [x] Add OTel feature to oxios-kernel Cargo.toml
+- [x] Create telemetry module (feature-gated, compiles with and without otel)
+- [x] Add trace spans to orchestrator.rs phases
+- [x] Verify: cargo check (without otel) ✅
+- [x] Verify: cargo check --features otel ✅
+- [x] Verify: cargo test -p oxios-kernel ✅ (246/246 tests pass)
+- [x] Verify: full project cargo check ✅
 
 ## Files Changed
-- `crates/oxios-kernel/src/a2a.rs` — Replaced flat message_queue with per-agent AgentQueue (parking_lot::Mutex<Vec> + tokio::sync::Notify); updated send_message, receive_messages, pending_count, send_and_wait; added has_messages
-- `crates/oxios-kernel/src/orchestrator.rs` — Added AgentRole enum (Worker/Manager), added role field to SubTask, added single-task fast path in delegate_subtasks
-- `crates/oxios-kernel/src/lib.rs` — Exported SubTask and AgentRole from orchestrator module
+- `crates/oxios-kernel/Cargo.toml` — added `[features]` section with `otel` flag + optional OTel deps + tracing-subscriber workspace dep
+- `crates/oxios-kernel/src/lib.rs` — registered telemetry module (both cfg variants)
+- `crates/oxios-kernel/src/telemetry_otel.rs` — OTel-enabled telemetry module (real layer init stub)
+- `crates/oxios-kernel/src/telemetry_stub.rs` — No-op telemetry module (when otel feature is off)
+- `crates/oxios-kernel/src/orchestrator.rs` — added structured trace logging to all phases
 
 ## Notes
-- Pre-existing integration test failures (e2e_test.rs, integration_tests.rs) from `#[instrument]` + `tokio::spawn` Send bound — not caused by these changes
-- agent_lifecycle.rs required no changes — it calls A2AProtocol methods whose signatures are unchanged
+- Used `tracing::info!` with structured fields instead of `#[instrument]` / `info_span!().entered()` because `EnteredSpan` is `!Send`, which breaks `tokio::spawn` in test code (the orchestrator's `handle_message` is spawned in integration/e2e tests)
+- The `TelemetryConfig` and `init_telemetry_layers()` are available as `oxios_kernel::telemetry::*` regardless of whether the `otel` feature is enabled
+- The OTel dependencies successfully resolve and compile: tracing-opentelemetry 0.28, opentelemetry 0.27, opentelemetry_sdk 0.27, opentelemetry-otlp 0.27, opentelemetry-stdout 0.27

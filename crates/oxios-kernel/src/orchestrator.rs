@@ -20,7 +20,6 @@ use oxios_ouroboros::{
 };
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
-use tracing::instrument;
 use uuid::Uuid;
 
 use crate::agent_lifecycle::AgentLifecycleManager;
@@ -149,7 +148,7 @@ impl Orchestrator {
 
         // Conduct the interview.
         let interview = {
-            let _span = tracing::info_span!("ouroboros.interview").entered();
+            tracing::info!(phase = "interview", "Starting interview phase");
             if needs_interview {
                 self.ouroboros.interview(user_message).await?
             } else {
@@ -227,10 +226,8 @@ impl Orchestrator {
         self.publish_phase_started(&session_id, Phase::Seed).await;
 
         // Phase 2: Generate seed
-        let seed = {
-            let _span = tracing::info_span!("ouroboros.seed").entered();
-            self.ouroboros.generate_seed(&interview).await?
-        };
+        tracing::info!(phase = "seed", "Starting seed generation");
+        let seed = self.ouroboros.generate_seed(&interview).await?;
 
         // Save seed to state store.
         self.save_seed(&seed).await?;
@@ -248,15 +245,8 @@ impl Orchestrator {
         if should_split_seed(&seed) {
             let subtasks = split_into_subtasks(&seed);
             if subtasks.len() > 1 {
-                tracing::info!(
-                    seed_id = %seed.id,
-                    subtasks = subtasks.len(),
-                    "Splitting into multi-agent execution"
-                );
-                let results = {
-                    let _span = tracing::info_span!("ouroboros.delegate_subtasks").entered();
-                    self.delegate_subtasks(subtasks, &seed).await?
-                };
+                tracing::info!(phase = "delegate", subtasks = subtasks.len(), "Delegating to multi-agent");
+                let results = self.delegate_subtasks(subtasks, &seed).await?;
 
                 // Combine successful results
                 let combined: String = results
@@ -294,10 +284,8 @@ impl Orchestrator {
         }
 
         // Phase 3: Fork and execute agent via lifecycle manager
-        let exec_result = {
-            let _span = tracing::info_span!("ouroboros.execute").entered();
-            self.lifecycle.spawn_and_run(&seed, Priority::Normal).await?
-        };
+        tracing::info!(phase = "execute", "Starting execution phase");
+        let exec_result = self.lifecycle.spawn_and_run(&seed, Priority::Normal).await?;
 
         // Periodically reap zombie tasks.
         self.lifecycle.reap_zombies();
@@ -306,10 +294,8 @@ impl Orchestrator {
         self.publish_phase_completed(&session_id, Phase::Execute, "completed").await;
         self.publish_phase_started(&session_id, Phase::Evaluate).await;
 
-        let evaluation = {
-            let _span = tracing::info_span!("ouroboros.evaluate").entered();
-            self.ouroboros.evaluate(&seed, &exec_result).await?
-        };
+        tracing::info!(phase = "evaluate", "Starting evaluation phase");
+        let evaluation = self.ouroboros.evaluate(&seed, &exec_result).await?;
 
         self.publish_phase_completed(
             &session_id,
@@ -336,13 +322,11 @@ impl Orchestrator {
             iterations += 1;
             self.publish_phase_started(&session_id, Phase::Evolve).await;
 
-            let evolve_result = {
-                let _span = tracing::info_span!("ouroboros.evolve").entered();
-                self.ouroboros.evolve(
-                    current_seed.as_ref().expect("seed exists"),
-                    &current_evaluation,
-                ).await?
-            };
+            tracing::info!(phase = "evolve", iteration = iterations, "Starting evolve phase");
+            let evolve_result = self.ouroboros.evolve(
+                current_seed.as_ref().expect("seed exists"),
+                &current_evaluation,
+            ).await?;
 
             if let Some(evolved) = evolve_result {
                 current_seed = Some(evolved.clone());
@@ -354,19 +338,14 @@ impl Orchestrator {
                 self.publish_phase_completed(&session_id, Phase::Evolve, "evolved").await;
                 self.publish_phase_started(&session_id, Phase::Execute).await;
 
-                // Re-execute with the evolved seed via lifecycle manager.
-                let new_exec = {
-                    let _span = tracing::info_span!("ouroboros.execute").entered();
-                    self.lifecycle.spawn_and_run(&evolved, Priority::High).await?
-                };
+                tracing::info!(phase = "re-execute", iteration = iterations, "Re-executing with evolved seed");
+                let new_exec = self.lifecycle.spawn_and_run(&evolved, Priority::High).await?;
 
                 self.publish_phase_completed(&session_id, Phase::Execute, "completed").await;
                 self.publish_phase_started(&session_id, Phase::Evaluate).await;
 
-                let new_eval = {
-                    let _span = tracing::info_span!("ouroboros.evaluate").entered();
-                    self.ouroboros.evaluate(&evolved, &new_exec).await?
-                };
+                tracing::info!(phase = "re-evaluate", iteration = iterations, "Re-evaluating evolved result");
+                let new_eval = self.ouroboros.evaluate(&evolved, &new_exec).await?;
                 current_evaluation = new_eval;
 
                 self.publish_phase_completed(
@@ -462,7 +441,6 @@ impl Orchestrator {
         });
     }
 
-    #[instrument(name = "orchestrator.delegate_subtasks", skip(self, subtasks, parent_seed))]
     /// Execute multiple subtasks using separate agents in parallel.
     ///
     /// Each subtask becomes a lightweight Seed that is executed by
