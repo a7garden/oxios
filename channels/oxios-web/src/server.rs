@@ -6,12 +6,15 @@
 
 use anyhow::Result;
 use axum::Router;
+use parking_lot::RwLock;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::time::Instant;
 use tower_http::services::ServeDir;
 
 use crate::channel::WebChannelHandle;
+use crate::error::AppError;
 use crate::middleware::RateLimiter;
 use crate::routes::build_routes;
 use oxios_kernel::event_bus::EventBus;
@@ -56,10 +59,12 @@ pub struct AppState {
     pub access_manager: Arc<parking_lot::Mutex<AccessManager>>,
     /// Persona manager for multi-persona support.
     pub persona_manager: Arc<PersonaManager>,
-    /// Loaded configuration.
-    pub config: Arc<oxios_kernel::OxiosConfig>,
+    /// Loaded configuration (hot-reloadable via RwLock).
+    pub config: Arc<RwLock<oxios_kernel::OxiosConfig>>,
     /// Path to the config file (for persistence on PUT /api/config).
-    pub config_path: Option<PathBuf>,
+    pub config_path: PathBuf,
+    /// Server start time (for uptime calculation).
+    pub start_time: Instant,
     /// MCP bridge for tool calling (uses tokio::sync::Mutex for async-safe interior mutability).
     pub mcp_bridge: Arc<McpBridge>,
     /// Authentication manager for bearer token validation.
@@ -84,9 +89,22 @@ impl std::fmt::Debug for AppState {
             .field("scheduler", &"...")
             .field("access_manager", &"...")
             .field("persona_manager", &"...")
-            .field("config", &self.config)
+            .field("config", &"...")
             .field("config_path", &self.config_path)
             .finish()
+    }
+}
+
+impl AppState {
+    /// Reload config from disk and update in-memory state.
+    pub async fn reload_config(&self) -> Result<(), AppError> {
+        let config = oxios_kernel::config::load_config(&self.config_path)
+            .map_err(|e| AppError::Internal(e.to_string()))?;
+
+        *self.config.write() = config;
+
+        tracing::info!("Config hot-reloaded from {}", self.config_path.display());
+        Ok(())
     }
 }
 
@@ -138,8 +156,9 @@ impl WebServer {
             scheduler,
             access_manager,
             persona_manager: Arc::new(persona_manager),
-            config: Arc::new(config),
-            config_path,
+            config: Arc::new(RwLock::new(config)),
+            config_path: config_path.clone().unwrap_or_default(),
+            start_time: Instant::now(),
             mcp_bridge,
             auth_manager,
             memory_manager,

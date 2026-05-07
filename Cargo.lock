@@ -1489,6 +1489,7 @@ dependencies = [
  "getrandom 0.2.17",
  "glob",
  "hex",
+ "once_cell",
  "oxi-agent",
  "oxi-ai",
  "oxios-gateway",

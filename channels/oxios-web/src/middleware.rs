@@ -97,7 +97,7 @@ pub async fn require_auth(
     next: Next,
 ) -> Result<Response, StatusCode> {
     // Skip auth if disabled
-    if !state.config.security.auth_enabled {
+    if !state.config.read().security.auth_enabled {
         return Ok(next.run(request).await);
     }
 

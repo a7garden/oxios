@@ -1,6 +1,6 @@
 use std::convert::Infallible;
 use std::sync::Arc;
-use axum::extract::{Path, State};
+use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::response::sse::{Event as SseEvent, Sse};
 use axum::Json;
@@ -8,6 +8,7 @@ use serde::Serialize;
 use tokio_stream::wrappers::BroadcastStream;
 use tokio_stream::StreamExt as TokioStreamExt;
 
+use crate::routes::{PageParams, paginate};
 use crate::server::AppState;
 
 // ---------------------------------------------------------------------------
@@ -15,7 +16,7 @@ use crate::server::AppState;
 // ---------------------------------------------------------------------------
 
 /// Session summary for listing (lightweight version without full history).
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub(crate) struct SessionListItem {
     id: String,
     user_id: String,
@@ -25,13 +26,14 @@ pub(crate) struct SessionListItem {
     updated_at: String,
 }
 
-/// GET /api/sessions — List recent sessions.
+/// GET /api/sessions — List recent sessions (paginated).
 pub(crate) async fn handle_sessions_list(
     state: State<Arc<AppState>>,
-) -> Json<Vec<SessionListItem>> {
+    Query(params): Query<PageParams>,
+) -> Json<serde_json::Value> {
     match state.state_store.list_sessions().await {
-        Ok(sessions) => Json(
-            sessions
+        Ok(sessions) => {
+            let items: Vec<SessionListItem> = sessions
                 .into_iter()
                 .map(|s| SessionListItem {
                     id: s.id,
@@ -41,9 +43,10 @@ pub(crate) async fn handle_sessions_list(
                     created_at: s.created_at.to_rfc3339(),
                     updated_at: s.updated_at.to_rfc3339(),
                 })
-                .collect(),
-        ),
-        Err(_) => Json(Vec::new()),
+                .collect();
+            Json(paginate(&items, &params))
+        }
+        Err(_) => Json(paginate(&Vec::<SessionListItem>::new(), &params)),
     }
 }
 

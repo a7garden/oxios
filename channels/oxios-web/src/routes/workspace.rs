@@ -12,6 +12,7 @@ use oxios_kernel::memory::{MemoryEntry, MemoryType};
 use oxios_kernel::state_store::StateStore;
 
 use crate::error::AppError;
+use crate::routes::{PageParams, paginate};
 use crate::server::AppState;
 
 // ---------------------------------------------------------------------------
@@ -27,7 +28,7 @@ pub(crate) struct TreeQuery {
 }
 
 /// File tree entry.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub(crate) struct TreeEntry {
     /// File or directory name.
     name: String,
@@ -119,6 +120,15 @@ pub(crate) async fn handle_workspace_file_put(
     Path(path): Path<String>,
     body: String,
 ) -> Result<(), AppError> {
+    // Validate file size (max 1MB)
+    const MAX_FILE_SIZE: usize = 1024 * 1024;
+    if body.len() > MAX_FILE_SIZE {
+        return Err(AppError::PayloadTooLarge {
+            size: body.len(),
+            limit: MAX_FILE_SIZE,
+        });
+    }
+
     let full_path = state.state_store.base_path.join(&path);
 
     // Security: ensure the path doesn't escape the workspace
@@ -167,7 +177,7 @@ fn guess_mime(path: &str) -> String {
 // ---------------------------------------------------------------------------
 
 /// Seed summary for listing.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub(crate) struct SeedSummary {
     /// Seed unique ID.
     id: String,
@@ -182,7 +192,8 @@ pub(crate) struct SeedSummary {
 /// GET /api/seeds — List Ouroboros seeds.
 pub(crate) async fn handle_seeds_list(
     state: State<Arc<AppState>>,
-) -> Json<Vec<SeedSummary>> {
+    Query(params): Query<PageParams>,
+) -> Json<serde_json::Value> {
     let mut summaries = Vec::new();
 
     if let Ok(names) = state.state_store.list_category("seeds").await {
@@ -209,7 +220,7 @@ pub(crate) async fn handle_seeds_list(
         }
     }
 
-    Json(summaries)
+    Json(paginate(&summaries, &params))
 }
 
 /// GET /api/seeds/:id — Get a specific seed.
@@ -232,7 +243,7 @@ pub(crate) async fn handle_seed_get(
 }
 
 /// Evolution lineage entry for a seed.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub(crate) struct EvolutionEntry {
     /// Seed ID.
     id: String,
@@ -326,7 +337,7 @@ pub(crate) async fn handle_seed_evolution(
 
 
 /// Skill summary for listing.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub(crate) struct SkillSummary {
     /// Skill name.
     name: String,
@@ -337,20 +348,22 @@ pub(crate) struct SkillSummary {
 /// GET /api/skills — List all skills.
 pub(crate) async fn handle_skills_list(
     state: State<Arc<AppState>>,
-) -> Json<Vec<SkillSummary>> {
+    Query(params): Query<PageParams>,
+) -> Json<serde_json::Value> {
     match state.skill_store.list_skills().await {
-        Ok(skills) => Json(
-            skills
+        Ok(skills) => {
+            let summaries: Vec<SkillSummary> = skills
                 .into_iter()
                 .map(|s| SkillSummary {
                     name: s.name,
                     description: s.description,
                 })
-                .collect(),
-        ),
+                .collect();
+            Json(paginate(&summaries, &params))
+        }
         Err(e) => {
             tracing::error!(error = %e, "Failed to list skills");
-            Json(Vec::new())
+            Json(paginate(&Vec::<SkillSummary>::new(), &params))
         }
     }
 }
@@ -392,6 +405,15 @@ pub(crate) async fn handle_skill_create(
     state: State<Arc<AppState>>,
     Json(body): Json<SkillCreateRequest>,
 ) -> Result<Json<serde_json::Value>, AppError> {
+    // Validate skill content size (max 64KB)
+    const MAX_SKILL_CONTENT: usize = 64 * 1024;
+    if body.content.len() > MAX_SKILL_CONTENT {
+        return Err(AppError::PayloadTooLarge {
+            size: body.content.len(),
+            limit: MAX_SKILL_CONTENT,
+        });
+    }
+
     match state
         .skill_store
         .create_skill(&body.name, &body.description, &body.content)
@@ -436,7 +458,7 @@ pub(crate) async fn handle_skill_delete(
 // ---------------------------------------------------------------------------
 
 /// Memory entry summary.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub(crate) struct MemorySummary {
     /// Entry name.
     name: String,
@@ -447,7 +469,8 @@ pub(crate) struct MemorySummary {
 /// GET /api/memory — List memory entries.
 pub(crate) async fn handle_memory_list(
     state: State<Arc<AppState>>,
-) -> Json<Vec<MemorySummary>> {
+    Query(params): Query<PageParams>,
+) -> Json<serde_json::Value> {
     let mut entries = Vec::new();
 
     // List daily memory files
@@ -470,7 +493,7 @@ pub(crate) async fn handle_memory_list(
         }
     }
 
-    Json(entries)
+    Json(paginate(&entries, &params))
 }
 
 /// GET /api/memory/:name — Get a specific memory entry.
@@ -537,6 +560,15 @@ pub(crate) async fn handle_memory_create(
     state: State<Arc<AppState>>,
     Json(body): Json<MemoryCreateRequest>,
 ) -> Result<Json<serde_json::Value>, AppError> {
+    // Validate memory entry size (max 32KB)
+    const MAX_MEMORY_ENTRY: usize = 32 * 1024;
+    if body.content.len() > MAX_MEMORY_ENTRY {
+        return Err(AppError::PayloadTooLarge {
+            size: body.content.len(),
+            limit: MAX_MEMORY_ENTRY,
+        });
+    }
+
     let memory_type = match body.memory_type.as_str() {
         "fact" => MemoryType::Fact,
         "episode" => MemoryType::Episode,

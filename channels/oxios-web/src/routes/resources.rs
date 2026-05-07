@@ -1,11 +1,12 @@
 use std::sync::Arc;
 
-use axum::extract::{Path, State};
+use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::Json;
 use serde::{Deserialize, Serialize};
 
 use crate::error::AppError;
+use crate::routes::{PageParams, paginate};
 use crate::server::AppState;
 
 // ---------------------------------------------------------------------------
@@ -13,7 +14,7 @@ use crate::server::AppState;
 // ---------------------------------------------------------------------------
 
 /// Garden summary for listing.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub(crate) struct GardenSummary {
     /// Garden name.
     name: String,
@@ -43,7 +44,7 @@ pub(crate) struct GardenExecRequest {
 }
 
 /// Response body for a garden exec command.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub(crate) struct GardenExecResponse {
     /// Standard output.
     stdout: String,
@@ -58,11 +59,12 @@ pub(crate) struct GardenExecResponse {
 /// GET /api/gardens — List gardens.
 pub(crate) async fn handle_gardens_list(
     state: State<Arc<AppState>>,
-) -> Result<Json<Vec<GardenSummary>>, AppError> {
+    Query(params): Query<PageParams>,
+) -> Result<Json<serde_json::Value>, AppError> {
     let manager = state.container_manager.clone();
     match manager.list_containers().await {
         Ok(gardens) => {
-            let summaries = gardens
+            let summaries: Vec<GardenSummary> = gardens
                 .into_iter()
                 .map(|g| GardenSummary {
                     name: g.name,
@@ -71,7 +73,7 @@ pub(crate) async fn handle_gardens_list(
                     created_at: g.created_at,
                 })
                 .collect();
-            Ok(Json(summaries))
+            Ok(Json(paginate(&summaries, &params)))
         }
         Err(e) => {
             tracing::error!(error = %e, "Failed to list gardens");
@@ -186,7 +188,7 @@ pub(crate) async fn handle_garden_exec(
 // ---------------------------------------------------------------------------
 
 /// Program summary for listing.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub(crate) struct ProgramSummary {
     name: String,
     version: String,
@@ -200,9 +202,10 @@ pub(crate) struct ProgramSummary {
 /// GET /api/programs — List all installed programs.
 pub(crate) async fn handle_programs_list(
     state: State<Arc<AppState>>,
-) -> Json<Vec<ProgramSummary>> {
+    Query(params): Query<PageParams>,
+) -> Json<serde_json::Value> {
     let programs = state.program_manager.list_programs().await;
-    Json(programs
+    let summaries: Vec<ProgramSummary> = programs
         .into_iter()
         .map(|p| ProgramSummary {
             name: p.meta.name,
@@ -213,7 +216,8 @@ pub(crate) async fn handle_programs_list(
             tools_count: p.meta.tools.len(),
             has_skill_content: !p.skill_content.is_empty(),
         })
-        .collect())
+        .collect();
+    Json(paginate(&summaries, &params))
 }
 
 /// GET /api/programs/:name — Get program details.
@@ -248,6 +252,16 @@ pub(crate) async fn handle_program_install(
     state: State<Arc<AppState>>,
     Json(body): Json<ProgramInstallRequest>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    // Validate install source URL length (proxy for sanity check)
+    const MAX_SOURCE_LENGTH: usize = 8192;
+    if body.path.len() > MAX_SOURCE_LENGTH {
+        return Err((StatusCode::PAYLOAD_TOO_LARGE, format!(
+            "Source URL too long: {} bytes exceeds limit of {} bytes",
+            body.path.len(),
+            MAX_SOURCE_LENGTH,
+        )));
+    }
+
     use oxios_kernel::InstallSource;
 
     // Only allow remote sources via API (no local path traversal)
@@ -332,7 +346,7 @@ pub(crate) async fn handle_program_host_requirements(
 // ---------------------------------------------------------------------------
 
 /// Host tools status response.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub(crate) struct HostToolsStatusResponse {
     all_required_present: bool,
     missing_required: Vec<String>,

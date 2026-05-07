@@ -1,14 +1,25 @@
 use std::sync::Arc;
 
-use axum::extract::{Path, State};
+use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::Json;
 use serde::{Deserialize, Serialize};
 
 use oxios_kernel::access_manager::AuditEntry;
 use oxios_kernel::ArgumentDef;
+use oxios_kernel::metrics::registry;
 
+use crate::routes::{PageParams, paginate};
 use crate::server::AppState;
+
+// ---------------------------------------------------------------------------
+// Prometheus Metrics
+// ---------------------------------------------------------------------------
+
+/// GET /api/metrics — Prometheus-compatible metrics endpoint.
+pub(crate) async fn handle_metrics() -> Result<String, StatusCode> {
+    Ok(registry().export())
+}
 
 // ---------------------------------------------------------------------------
 // Scheduler (AIOS-inspired task scheduling)
@@ -40,7 +51,7 @@ pub(crate) async fn handle_scheduler_stats(
 }
 
 /// Task summary for listing.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub(crate) struct TaskSummary {
     id: String,
     description: String,
@@ -50,9 +61,10 @@ pub(crate) struct TaskSummary {
     error: Option<String>,
 }
 
-/// GET /api/scheduler/tasks — List queued and running tasks.
+/// GET /api/scheduler/tasks — List queued and running tasks (paginated).
 pub(crate) async fn handle_scheduler_tasks(
     state: State<Arc<AppState>>,
+    Query(params): Query<PageParams>,
 ) -> Json<serde_json::Value> {
     let queued: Vec<TaskSummary> = state
         .scheduler
@@ -82,10 +94,11 @@ pub(crate) async fn handle_scheduler_tasks(
         })
         .collect();
 
-    Json(serde_json::json!({
-        "queued": queued,
-        "running": running,
-    }))
+    // Combine and paginate
+    let mut all_tasks = Vec::new();
+    all_tasks.extend(queued);
+    all_tasks.extend(running);
+    Json(paginate(&all_tasks, &params))
 }
 
 // ---------------------------------------------------------------------------
@@ -93,7 +106,7 @@ pub(crate) async fn handle_scheduler_tasks(
 // ---------------------------------------------------------------------------
 
 /// Audit log entry response.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub(crate) struct AuditEntryResponse {
     timestamp: String,
     agent_name: String,
@@ -116,17 +129,35 @@ impl From<&AuditEntry> for AuditEntryResponse {
     }
 }
 
-/// GET /api/audit — Get security audit log.
+/// Audit log with pagination.
+#[derive(Debug, Deserialize)]
+pub struct AuditLogParams {
+    #[serde(default = "default_page")]
+    pub page: usize,
+    #[serde(default = "default_limit")]
+    pub limit: usize,
+}
+
+fn default_page() -> usize { 1 }
+fn default_limit() -> usize { 50 }
+
+/// GET /api/audit — Get security audit log (paginated).
 pub(crate) async fn handle_audit_log(
     state: State<Arc<AppState>>,
-) -> Json<Vec<AuditEntryResponse>> {
+    Query(params): Query<AuditLogParams>,
+) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
     let access = state.access_manager.lock();
-    let entries: Vec<AuditEntryResponse> = access
-        .audit_log()
-        .iter()
-        .map(AuditEntryResponse::from)
-        .collect();
-    Json(entries)
+    let entries = access.audit_log();
+    let total = entries.len();
+    let limit = params.limit.min(500);
+    let offset = (params.page.saturating_sub(1)) * limit;
+    let page_entries: Vec<_> = entries.iter().rev().skip(offset).take(limit).map(AuditEntryResponse::from).collect();
+    Ok(Json(serde_json::json!({
+        "items": page_entries,
+        "total": total,
+        "page": params.page,
+        "limit": limit,
+    })))
 }
 
 /// Permissions response.

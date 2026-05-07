@@ -10,6 +10,7 @@ use std::sync::Arc;
 use crate::access_manager::AccessManager;
 use crate::a2a::{A2AProtocol, AgentCard};
 use crate::event_bus::{EventBus, KernelEvent};
+use crate::metrics::get_metrics;
 use crate::scheduler::{AgentScheduler, Priority, ScheduledTask};
 use crate::supervisor::Supervisor;
 use crate::types::{AgentId, AgentStatus};
@@ -54,6 +55,7 @@ impl AgentLifecycleManager {
         self.ensure_permissions(&agent_name);
 
         // 4. Submit and start task
+        get_metrics().agents_forked.inc();
         let task = ScheduledTask::for_agent(
             agent_id,
             format!("Execute seed '{}'", seed.goal),

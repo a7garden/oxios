@@ -55,6 +55,15 @@ pub(crate) async fn handle_chat(
     state: State<Arc<AppState>>,
     Json(body): Json<ChatRequest>,
 ) -> Result<Json<ChatResponse>, AppError> {
+    // Validate chat content size (max 64KB for user message)
+    const MAX_CHAT_LENGTH: usize = 64 * 1024;
+    if body.content.len() > MAX_CHAT_LENGTH {
+        return Err(AppError::PayloadTooLarge {
+            size: body.content.len(),
+            limit: MAX_CHAT_LENGTH,
+        });
+    }
+
     tracing::info!(content = %body.content, user = %body.user_id, "Chat message received");
 
     // Build the incoming message.
@@ -132,7 +141,7 @@ pub(crate) async fn handle_chat_stream(
     Query(params): Query<WsParams>,
 ) -> impl axum::response::IntoResponse {
     // Authenticate if auth is enabled
-    if state.config.security.auth_enabled {
+    if state.config.read().security.auth_enabled {
         let token = params.token.as_deref().unwrap_or("");
         let valid = { state.auth_manager.lock().validate(token) };
         if !valid {

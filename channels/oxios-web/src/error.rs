@@ -17,6 +17,13 @@ pub enum AppError {
     Unauthorized(String),
     /// Permission denied.
     Forbidden(String),
+    /// Payload too large (超过限制).
+    PayloadTooLarge {
+        /// Actual size in bytes.
+        size: usize,
+        /// Maximum allowed size.
+        limit: usize,
+    },
 }
 
 impl std::fmt::Display for AppError {
@@ -27,6 +34,7 @@ impl std::fmt::Display for AppError {
             AppError::Internal(m) => write!(f, "Internal Error: {m}"),
             AppError::Unauthorized(m) => write!(f, "Unauthorized: {m}"),
             AppError::Forbidden(m) => write!(f, "Forbidden: {m}"),
+            AppError::PayloadTooLarge { size, limit } => write!(f, "Payload too large: {size} bytes exceeds limit of {limit} bytes"),
         }
     }
 }
@@ -41,6 +49,9 @@ impl IntoResponse for AppError {
             AppError::Internal(m) => (StatusCode::INTERNAL_SERVER_ERROR, m.clone()),
             AppError::Unauthorized(m) => (StatusCode::UNAUTHORIZED, m.clone()),
             AppError::Forbidden(m) => (StatusCode::FORBIDDEN, m.clone()),
+            AppError::PayloadTooLarge { size, limit } => {
+                (StatusCode::PAYLOAD_TOO_LARGE, format!("{size} bytes exceeds limit of {limit} bytes"))
+            }
         };
         let body = json!({ "error": message });
         (status, axum::Json(body)).into_response()

@@ -6,6 +6,8 @@
 
 #![warn(missing_docs)]
 
+pub mod circuit_breaker;
+pub mod metrics;
 pub mod a2a;
 pub mod access_manager;
 pub mod agent_lifecycle;
@@ -34,7 +36,9 @@ pub mod supervisor;
 pub mod tools;
 pub mod types;
 
-// A2A protocol exports
+pub use circuit_breaker::CircuitBreaker;
+pub use metrics::{registry, register_builtin_metrics, get_metrics};
+
 pub use a2a::{
     A2AMessage, A2AProtocol, A2ARequest, A2AResponse,
     AgentCard, AgentCardRegistry, TaskPriority, TaskSpec,

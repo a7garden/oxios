@@ -18,6 +18,7 @@ use oxi_ai::{CompactionStrategy, Provider};
 use parking_lot::Mutex;
 use std::sync::Arc;
 
+use crate::circuit_breaker::CircuitBreaker;
 use crate::config::OxiosConfig;
 use crate::container_manager::ContainerManager;
 use crate::host_exec::HostExecBridge;
@@ -29,6 +30,14 @@ use crate::memory::{MemoryEntry, MemoryManager, MemoryType};
 use crate::tools::{ContainerExecTool, HostExecTool, McpToolWrapper, ProgramTool};
 use crate::tools::memory_tools::{MemoryWriteTool, MemoryReadTool, MemorySearchTool};
 use oxios_ouroboros::{ExecutionResult, Seed};
+
+/// Global LLM circuit breaker instance.
+static LLM_CIRCUIT_BREAKER: std::sync::OnceLock<CircuitBreaker> = std::sync::OnceLock::new();
+
+/// Get the global LLM circuit breaker.
+fn get_llm_circuit_breaker() -> &'static CircuitBreaker {
+    LLM_CIRCUIT_BREAKER.get_or_init(CircuitBreaker::default)
+}
 
 /// Configuration for creating AgentRuntime instances.
 #[derive(Debug, Clone)]
@@ -503,6 +512,14 @@ fn run_agent_loop(
                 }
             })
             .await;
+
+        // Record circuit breaker result after agent execution
+        let circuit = get_llm_circuit_breaker();
+        if result.is_err() {
+            circuit.record_failure();
+        } else {
+            circuit.record_success();
+        }
 
         if let Err(e) = result {
             tracing::error!(seed_id = %seed_id, error = %e, "AgentLoop failed");

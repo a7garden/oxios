@@ -23,6 +23,7 @@ use uuid::Uuid;
 
 use crate::agent_lifecycle::AgentLifecycleManager;
 use crate::event_bus::{EventBus, KernelEvent};
+use crate::metrics::get_metrics;
 use crate::scheduler::Priority;
 use crate::state_store::StateStore;
 use crate::types::AgentId;
@@ -72,6 +73,9 @@ impl Orchestrator {
         user_message: &str,
         session_id: Option<&str>,
     ) -> Result<OrchestrationResult> {
+        get_metrics().messages.inc();
+        let orch_start = std::time::Instant::now();
+
         let session_id = session_id
             .map(String::from)
             .unwrap_or_else(|| Uuid::new_v4().to_string());
@@ -265,6 +269,15 @@ impl Orchestrator {
             passed,
             "Orchestration complete"
         );
+
+        // Measure orchestration duration.
+        let metrics = get_metrics();
+        metrics.orch_duration.observe(orch_start.elapsed().as_secs_f64());
+        if passed {
+            metrics.agents_completed.inc();
+        } else {
+            metrics.agents_failed.inc();
+        }
 
         Ok(OrchestrationResult {
             session_id: Some(session_id),
