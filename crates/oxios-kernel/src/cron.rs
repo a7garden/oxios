@@ -212,46 +212,53 @@ impl CronScheduler {
 
     /// Update a job's fields (enabled, schedule, goal, etc).
     pub async fn update_job(&self, id: Uuid, update: CronJobUpdate) -> Result<()> {
-        let mut jobs = self.jobs.write();
-        let job = jobs
-            .get_mut(&id)
-            .ok_or_else(|| anyhow::anyhow!("Job {} not found", id))?;
+        // Separate the sync mutation from the async persist to avoid
+        // holding a !Send RwLockWriteGuard across an await point.
+        let should_persist = {
+            let mut jobs = self.jobs.write();
+            let job = jobs
+                .get_mut(&id)
+                .ok_or_else(|| anyhow::anyhow!("Job {} not found", id))?;
 
-        if let Some(name) = update.name {
-            job.name = name;
-        }
-        if let Some(schedule) = &update.schedule {
-            let parsed = self.parse_schedule(schedule)?;
-            self.schedules.lock().insert(id, parsed);
-            job.schedule = schedule.clone();
-            // Recompute next_run
-            let sched = self.schedules.lock().get(&id).cloned();
-            if let Some(s) = sched {
-                job.next_run = self.next_fire_time(&s, &Utc::now());
+            if let Some(name) = update.name {
+                job.name = name;
             }
-        }
-        if let Some(goal) = update.goal {
-            job.goal = goal;
-        }
-        if let Some(constraints) = update.constraints {
-            job.constraints = constraints;
-        }
-        if let Some(criteria) = update.acceptance_criteria {
-            job.acceptance_criteria = criteria;
-        }
-        if let Some(toolchain) = update.toolchain {
-            job.toolchain = toolchain;
-        }
-        if let Some(priority) = update.priority {
-            job.priority = priority;
-        }
-        if let Some(enabled) = update.enabled {
-            job.enabled = enabled;
-        }
+            if let Some(schedule) = &update.schedule {
+                let parsed = self.parse_schedule(schedule)?;
+                self.schedules.lock().insert(id, parsed);
+                job.schedule = schedule.clone();
+                // Recompute next_run
+                let sched = self.schedules.lock().get(&id).cloned();
+                if let Some(s) = sched {
+                    job.next_run = self.next_fire_time(&s, &Utc::now());
+                }
+            }
+            if let Some(goal) = update.goal {
+                job.goal = goal;
+            }
+            if let Some(constraints) = update.constraints {
+                job.constraints = constraints;
+            }
+            if let Some(criteria) = update.acceptance_criteria {
+                job.acceptance_criteria = criteria;
+            }
+            if let Some(toolchain) = update.toolchain {
+                job.toolchain = toolchain;
+            }
+            if let Some(priority) = update.priority {
+                job.priority = priority;
+            }
+            if let Some(enabled) = update.enabled {
+                job.enabled = enabled;
+            }
 
-        self.dirty.store(true, Ordering::Relaxed);
-        drop(jobs);
-        self.persist_jobs().await;
+            self.dirty.store(true, Ordering::Relaxed);
+            true
+        }; // RwLockWriteGuard dropped here, before any .await
+
+        if should_persist {
+            self.persist_jobs().await;
+        }
         Ok(())
     }
 

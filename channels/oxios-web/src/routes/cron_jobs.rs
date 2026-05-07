@@ -11,7 +11,7 @@ use serde::Deserialize;
 use uuid::Uuid;
 
 use oxios_gateway::message::IncomingMessage;
-use oxios_kernel::{CronJob, CronJobUpdate, Priority};
+use oxios_kernel::{CronJob, Priority};
 
 use crate::error::AppError;
 use crate::server::AppState;
@@ -106,17 +106,18 @@ pub(crate) async fn handle_cron_job_delete(
 }
 
 /// PATCH /api/cron-jobs/:id — Update a cron job.
-pub(crate) async fn handle_cron_job_update(
+pub(crate) async fn update_cron_job(
     state: State<Arc<AppState>>,
     Path(id): Path<Uuid>,
-    Json(body): Json<CronJobUpdate>,
+    Json(body): Json<serde_json::Value>,
 ) -> Result<Json<serde_json::Value>, AppError> {
+    let update: oxios_kernel::CronJobUpdate = serde_json::from_value(body)
+        .map_err(|e| AppError::BadRequest(e.to_string()))?;
     state
         .cron_scheduler
-        .update_job(id, body)
+        .update_job(id, update)
         .await
         .map_err(|e| AppError::Internal(e.to_string()))?;
-
     Ok(Json(serde_json::json!({ "updated": id })))
 }
 

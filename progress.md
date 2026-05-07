@@ -37,3 +37,54 @@ Key fixes applied:
 - `crates/oxios-kernel/src/lib.rs`
 - `crates/oxios-kernel/src/config.rs`
 - `crates/oxios-kernel/src/cron.rs` (new)
+
+## L11-CRON-API: Cron Scheduler API Routes (2026-05-08)
+
+### Status: ✅ Complete
+
+### What was done
+Created API routes for cron job management and wired them into the web server:
+
+1. **Created `channels/oxios-web/src/routes/cron_jobs.rs`** — 6 API handlers:
+   - `GET /api/cron-jobs` — List all cron jobs
+   - `POST /api/cron-jobs` — Create a new cron job
+   - `GET /api/cron-jobs/{id}` — Get a specific cron job
+   - `DELETE /api/cron-jobs/{id}` — Delete a cron job
+   - `POST /api/cron-jobs/{id}/edit` — Update a cron job
+   - `POST /api/cron-jobs/{id}/trigger` — Manually trigger a cron job
+
+2. **Registered routes in `channels/oxios-web/src/routes/mod.rs`**:
+   - Added `mod cron_jobs;` module
+   - Re-exported all handlers
+   - Added routes to `build_routes`
+
+3. **Added `cron_scheduler` to `AppState` and `Kernel`**:
+   - `server.rs`: Added `cron_scheduler: Arc<CronScheduler>` field to `AppState`
+   - `server.rs`: Updated `WebServer::new()` to accept `cron_scheduler` parameter
+   - `src/kernel.rs`: Added `cron_scheduler: Arc<CronScheduler>` field to `Kernel`
+   - `src/main.rs`: Pass `kernel.cron_scheduler.clone()` to `WebServer::new()`
+
+4. **Fixed `cron.rs` Send issues**:
+   - `update_job()`: Scoped `RwLockWriteGuard` in block to drop before `.await`
+   - `mark_job_completed()`: Scoped `RwLockWriteGuard` in block to drop before `.await`
+   - `persist_jobs()`: Clone data out of read lock before `.await`
+   - `start()`: Added `'static` bounds to `Fut` parameter
+   - `tick_inner()`: Added `'static` bounds to `Fut` parameter
+
+5. **Fixed `agent_runtime.rs` import**: Changed `ToolExecutionMode` import to use `oxi_agent::agent_loop::config::ToolExecutionMode`
+
+6. **Config**: Added `cron: CronConfig` field to `OxiosConfig` in `config.rs`
+
+### Verification
+- `cargo check -p oxios-web` ✅
+- `cargo check` (full workspace) ✅
+
+### Files Changed
+- `channels/oxios-web/src/routes/cron_jobs.rs` (new)
+- `channels/oxios-web/src/routes/mod.rs`
+- `channels/oxios-web/src/server.rs`
+- `src/kernel.rs`
+- `src/main.rs`
+- `crates/oxios-kernel/src/cron.rs` (Send fixes)
+- `crates/oxios-kernel/src/agent_runtime.rs` (import fix)
+- `crates/oxios-kernel/src/config.rs` (CronConfig in OxiosConfig)
