@@ -13,6 +13,7 @@ use std::sync::Arc;
 use std::time::Instant;
 use tower_http::services::ServeDir;
 
+use crate::api_docs;
 use crate::channel::WebChannelHandle;
 use crate::error::AppError;
 use crate::middleware::RateLimiter;
@@ -188,7 +189,13 @@ impl WebServer {
             .allow_methods(tower_http::cors::Any)
             .allow_headers(tower_http::cors::Any);
 
+        // Build OpenAPI spec and Swagger UI
+        let openapi = api_docs::build_openapi();
+        let swagger = utoipa_swagger_ui::SwaggerUi::new("/swagger-ui")
+            .url("/api-docs/openapi.json", openapi);
+
         let app = Router::new()
+            .merge(swagger)
             .merge(build_routes(self.state.clone()))
             .fallback_service(
                 ServeDir::new(&static_dir).append_index_html_on_directories(true),

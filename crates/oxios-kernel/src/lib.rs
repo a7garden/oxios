@@ -14,6 +14,7 @@ pub mod access_manager;
 pub mod agent_group;
 pub mod agent_lifecycle;
 pub mod agent_runtime;
+pub mod backup;
 
 pub mod auth;
 pub mod config;
@@ -67,7 +68,7 @@ pub use container::{
     AppleBackend, ContainerBackend, ContainerConfig, ContainerStats, ContainerStatus, ContainerWorkspaceInfo, ExecResult,
 };
 pub use event_bus::{EventBus, KernelEvent};
-pub use container_manager::{ContainerInfo, ContainerManager};
+pub use container_manager::{ContainerInfo, ContainerManager, ToolHealthReport, ToolStatus};
 pub use host_exec::HostExecBridge;
 pub use orchestrator::{OrchestrationResult, Orchestrator};
 pub use scheduler::{AgentScheduler, Priority, ScheduledTask, SchedulerStats, TaskStatus};
