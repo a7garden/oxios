@@ -579,6 +579,10 @@ impl A2AProtocol {
     }
 
     /// Send a message and wait for a response within a timeout.
+    ///
+    /// Note: Uses `request_id` (envelope UUID) for matching. The remote agent
+    /// should echo this ID in its response for correlation. If the response
+    /// doesn't include the request_id, this will time out.
     pub async fn send_and_wait(
         &self,
         from: AgentId,
@@ -589,10 +593,20 @@ impl A2AProtocol {
         let request_id = self.send_message(from, to, message).await?;
         let start = std::time::Instant::now();
         loop {
-            let messages = self.receive_messages(from).await;
-            for msg in messages {
-                if let A2AMessage::ResultSharing { task_id, result, summary: _ } = &msg.message {
+            // Peek at messages without consuming — re-queue non-matching
+            let messages = {
+                let queue = self.message_queue.read().await;
+                queue.get(&from).cloned().unwrap_or_default()
+            };
+            for msg in &messages {
+                // Match by request_id echoed in ResultSharing payload
+                if let A2AMessage::ResultSharing { task_id, result, summary: _ } = &msg.request.message {
                     if *task_id == request_id {
+                        // Remove the matched message from queue
+                        let mut queue = self.message_queue.write().await;
+                        if let Some(pending) = queue.get_mut(&from) {
+                            pending.retain(|p| p.request.request_id != request_id);
+                        }
                         return Ok(A2AResponse::success(
                             request_id,
                             to,

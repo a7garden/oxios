@@ -201,21 +201,9 @@ pub(crate) async fn handle_container_tools(
     state: State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> Result<Json<serde_json::Value>, AppError> {
-    // Check if the container exists
-    match state.container_manager.container_status(&name).await {
-        Ok(_status) => {
-            // check_tool_health() is not yet implemented on ContainerManager
-            // Return 501 Not Implemented with a descriptive message
-            Err(AppError::Internal(
-                "Tool health check is not yet implemented. \
-                 Container found but tool inspection is pending kernel support.".into()
-            ))
-        }
-        Err(e) => {
-            tracing::warn!(container = %name, error = %e, "Container not found for tool check");
-            Err(AppError::NotFound(format!("container '{name}' not found")))
-        }
-    }
+    let report = state.container_manager.check_tool_health(&name).await
+        .map_err(|e| AppError::Internal(e.to_string()))?;
+    Ok(Json(serde_json::to_value(report).unwrap_or_default()))
 }
 
 /// Agent summary for listing.

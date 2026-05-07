@@ -48,24 +48,6 @@ impl CliChannel {
         self.incoming_tx.clone()
     }
 
-    /// Returns a receiver for outgoing messages (used by the display loop).
-    pub fn outgoing_receiver(&self) -> mpsc::Receiver<OutgoingMessage> {
-        // We can't clone the receiver, so this is a one-shot operation.
-        // Use `subscribe_outgoing` pattern instead — store receiver separately.
-        unreachable!("Use take_outgoing_rx after construction")
-    }
-
-    /// Takes the outgoing receiver. Call once during setup.
-    pub fn take_outgoing_rx(&self) -> mpsc::Receiver<OutgoingMessage> {
-        // The outgoing_tx is connected to nothing useful initially.
-        // We need to re-create this pattern. For simplicity, we return
-        // a new channel and the sender is what we use in `send()`.
-        //
-        // Actually, let's just use a simpler approach: the send() method
-        // prints to stdout directly.
-        unimplemented!("Use the direct stdout approach via send()")
-    }
-
     /// Returns a handle for injecting messages from outside the channel.
     pub fn handle(&self) -> CliChannelHandle {
         CliChannelHandle {
