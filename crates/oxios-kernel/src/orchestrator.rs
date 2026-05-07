@@ -14,6 +14,7 @@
 use std::sync::Arc;
 
 use anyhow::{Context, Result};
+use chrono;
 use oxios_ouroboros::{
     EvaluationResult, InterviewResult, OuroborosProtocol, Phase, Seed,
 };
@@ -29,6 +30,21 @@ use crate::scheduler::Priority;
 use crate::state_store::StateStore;
 use crate::types::AgentId;
 
+/// Role of an agent within a group.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub enum AgentRole {
+    /// Executes a specific subtask.
+    Worker,
+    /// Coordinates subtasks, synthesizes results.
+    Manager,
+}
+
+impl Default for AgentRole {
+    fn default() -> Self {
+        AgentRole::Worker
+    }
+}
+
 /// A subtask within a multi-agent plan.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SubTask {
@@ -42,6 +58,9 @@ pub struct SubTask {
     pub result: Option<String>,
     /// Whether this subtask succeeded.
     pub success: bool,
+    /// Role of the agent assigned to this subtask.
+    #[serde(default)]
+    pub role: AgentRole,
 }
 
 impl SubTask {
@@ -53,6 +72,7 @@ impl SubTask {
             required_capability: None,
             result: None,
             success: false,
+            role: AgentRole::default(),
         }
     }
 
@@ -102,13 +122,13 @@ impl Orchestrator {
     /// the result will contain the questions and the phase will be
     /// `Phase::Interview`. The caller should send these questions to
     /// the user and include the `session_id` in follow-up messages.
-    #[instrument(name = "orchestrator.handle_message", skip(self, user_message), fields(session_id = %session_id.unwrap_or("new")))]
     pub async fn handle_message(
         &self,
         user_id: &str,
         user_message: &str,
         session_id: Option<&str>,
     ) -> Result<OrchestrationResult> {
+        tracing::info!(name = "orchestrator.handle_message", session_id = %session_id.unwrap_or("new"), "starting");
         get_metrics().messages.inc();
         let orch_start = std::time::Instant::now();
 
@@ -453,6 +473,32 @@ impl Orchestrator {
         subtasks: Vec<SubTask>,
         parent_seed: &Seed,
     ) -> Result<Vec<SubTask>> {
+        // Single task — execute directly without group overhead.
+        if subtasks.len() == 1 {
+            let mut task = subtasks.into_iter().next().unwrap();
+            let child_seed = Seed {
+                id: Uuid::new_v4(),
+                goal: task.description.clone(),
+                constraints: parent_seed.constraints.clone(),
+                acceptance_criteria: vec!["Task completes successfully".into()],
+                ontology: parent_seed.ontology.clone(),
+                created_at: chrono::Utc::now(),
+                generation: parent_seed.generation + 1,
+                parent_seed_id: Some(parent_seed.id),
+            };
+            match self.lifecycle.spawn_and_run(&child_seed, Priority::Normal).await {
+                Ok(result) => {
+                    task.result = Some(result.output.clone());
+                    task.success = result.success;
+                }
+                Err(e) => {
+                    task.result = Some(format!("Failed: {e}"));
+                    task.success = false;
+                }
+            }
+            return Ok(vec![task]);
+        }
+
         use crate::agent_group::AgentGroup;
         use tokio::task::JoinSet;
 
@@ -499,6 +545,7 @@ impl Orchestrator {
                         required_capability: subtasks[idx].required_capability.clone(),
                         result: Some(exec_result.output.clone()),
                         success: exec_result.success,
+                        role: subtasks[idx].role.clone(),
                     });
                 }
                 Ok((idx, agent_id, Err(e))) => {
@@ -514,6 +561,7 @@ impl Orchestrator {
                         required_capability: subtasks[idx].required_capability.clone(),
                         result: Some(format!("Failed: {e}")),
                         success: false,
+                        role: subtasks[idx].role.clone(),
                     });
                 }
                 Err(e) => {

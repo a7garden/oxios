@@ -1,19 +1,22 @@
 # Progress
 
 ## Status
-In Progress
+Completed
 
 ## Tasks
-- [x] Production 10: E2E test + load test + channel plugin guide
+- [x] Read a2a.rs, orchestrator.rs, agent_lifecycle.rs
+- [x] Add Notify-based AgentQueue to a2a.rs
+- [x] Add AgentRole enum + role field to SubTask in orchestrator.rs
+- [x] Add single-task optimization in delegate_subtasks
+- [x] Export AgentRole + SubTask from lib.rs
+- [x] cargo check -p oxios-kernel passes
+- [x] cargo test -p oxios-kernel --lib passes (218/218)
 
 ## Files Changed
-- `Cargo.toml` — Added `[dev-dependencies]` for e2e test (oxios-ouroboros, oxi-ai, uuid, chrono, tokio)
-- `tests/e2e_real_pipeline.rs` — E2E test with real LLM pipeline (interview→seed, evaluate with cache)
-- `scripts/load-test.sh` — Load test script for concurrent gateway testing
-- `docs/channel-plugin-guide.md` — Channel plugin guide (REST, Gateway trait, SSE, Telegram)
+- `crates/oxios-kernel/src/a2a.rs` — Replaced flat message_queue with per-agent AgentQueue (parking_lot::Mutex<Vec> + tokio::sync::Notify); updated send_message, receive_messages, pending_count, send_and_wait; added has_messages
+- `crates/oxios-kernel/src/orchestrator.rs` — Added AgentRole enum (Worker/Manager), added role field to SubTask, added single-task fast path in delegate_subtasks
+- `crates/oxios-kernel/src/lib.rs` — Exported SubTask and AgentRole from orchestrator module
 
 ## Notes
-- Pre-existing compilation errors in `oxios-kernel` (a2a.rs) prevent full `cargo check --test e2e_real_pipeline` from completing, but these are unrelated to the E2E test code. The test's direct dependencies (`oxios-ouroboros`, `oxi-ai`, `uuid`, `chrono`, `tokio`) all compile cleanly.
-- Used `oxi_ai::lookup_model(provider, model_id)` (not `Model::find` which doesn't exist) to resolve models from the "provider/model-id" format.
-- Used `oxi_ai::get_provider(provider_name)` which returns `Option<Box<dyn Provider>>`.
-- Added `use oxios_ouroboros::OuroborosProtocol` trait import required for calling `.interview()`, `.generate_seed()`, `.evaluate()` on `OuroborosEngine`.
+- Pre-existing integration test failures (e2e_test.rs, integration_tests.rs) from `#[instrument]` + `tokio::spawn` Send bound — not caused by these changes
+- agent_lifecycle.rs required no changes — it calls A2AProtocol methods whose signatures are unchanged

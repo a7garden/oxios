@@ -40,12 +40,12 @@ pub mod tools;
 pub mod types;
 
 #[cfg(feature = "otel")]
-mod telemetry_otel;
+pub mod telemetry_otel;
 #[cfg(feature = "otel")]
 pub use telemetry_otel as telemetry;
 
 #[cfg(not(feature = "otel"))]
-mod telemetry_stub;
+pub mod telemetry_stub;
 #[cfg(not(feature = "otel"))]
 pub use telemetry_stub as telemetry;
 
@@ -80,7 +80,7 @@ pub use container::{
 pub use event_bus::{EventBus, KernelEvent};
 pub use container_manager::{ContainerInfo, ContainerManager, ToolHealthReport, ToolStatus};
 pub use host_exec::HostExecBridge;
-pub use orchestrator::{OrchestrationResult, Orchestrator};
+pub use orchestrator::{OrchestrationResult, Orchestrator, SubTask, AgentRole};
 pub use scheduler::{AgentScheduler, Priority, ScheduledTask, SchedulerStats, TaskStatus};
 pub use host_tools::{common as host_tools_common, HostToolStatus, HostToolValidator};
 pub use mcp::{McpBridge, McpCapabilities, McpServer, McpTool};
