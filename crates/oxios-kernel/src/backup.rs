@@ -76,6 +76,7 @@ pub async fn restore_backup(
     backup_path: &Path,
 ) -> Result<BackupManifest> {
     let manifest_data = tokio::fs::read_to_string(backup_path.join("manifest.json"))
+        .await
         .context("Backup missing manifest.json")?;
     let manifest: BackupManifest = serde_json::from_str(&manifest_data)?;
 
@@ -86,17 +87,19 @@ pub async fn restore_backup(
     Ok(manifest)
 }
 
-async fn copy_dir_recursive(src: &Path, dest: &Path) -> Result<()> {
-    tokio::fs::create_dir_all(dest).await?;
-    let mut entries = tokio::fs::read_dir(src).await?;
-    while let Some(entry) = entries.next_entry().await? {
-        let src_path = entry.path();
-        let dest_path = dest.join(entry.file_name());
-        if src_path.is_dir() {
-            copy_dir_recursive(&src_path, &dest_path).await?;
-        } else {
-            tokio::fs::copy(&src_path, &dest_path).await?;
+fn copy_dir_recursive<'a>(src: &'a Path, dest: &'a Path) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<()>> + Send + 'a>> {
+    Box::pin(async move {
+        tokio::fs::create_dir_all(dest).await?;
+        let mut entries = tokio::fs::read_dir(src).await?;
+        while let Some(entry) = entries.next_entry().await? {
+            let src_path = entry.path();
+            let dest_path = dest.join(entry.file_name());
+            if src_path.is_dir() {
+                copy_dir_recursive(&src_path, &dest_path).await?;
+            } else {
+                tokio::fs::copy(&src_path, &dest_path).await?;
+            }
         }
-    }
-    Ok(())
+        Ok(())
+    })
 }

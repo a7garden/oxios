@@ -284,11 +284,11 @@ impl MemoryManager {
     pub async fn total_entries(&self) -> usize {
         let mut total = 0;
         for mt in [
-            MemoryType::ShortTerm,
-            MemoryType::LongTerm,
-            MemoryType::Episodic,
-            MemoryType::Semantic,
-            MemoryType::Procedural,
+            MemoryType::Conversation,
+            MemoryType::Session,
+            MemoryType::Fact,
+            MemoryType::Episode,
+            MemoryType::Knowledge,
         ] {
             if let Ok(entries) = self.list(mt, usize::MAX).await {
                 total += entries.len();
@@ -709,21 +709,22 @@ impl MemoryManager {
             }
 
             // Sort by effective importance ascending (least important first)
+            let total_count = entries.len();
             let mut scored: Vec<_> = entries
                 .into_iter()
-                .map(|e| (e, Self::effective_importance(&e)))
+                .map(|e| (e.id.clone(), e.memory_type, Self::effective_importance(&e)))
                 .collect();
-            scored.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
+            scored.sort_by(|a, b| a.2.partial_cmp(&b.2).unwrap_or(std::cmp::Ordering::Equal));
 
             let to_remove = scored.len() - budget.max_per_type;
-            for (entry, score) in scored.into_iter().take(to_remove) {
+            for (id, memory_type, score) in scored.into_iter().take(to_remove) {
                 report.candidates_for_removal.push(CurationCandidate {
-                    id: entry.id.clone(),
-                    memory_type: entry.memory_type,
+                    id,
+                    memory_type,
                     effective_importance: score,
                 });
             }
-            report.total_before += scored.len() + to_remove; // already removed from iterator
+            report.total_before += total_count;
         }
 
         // Actually remove candidates

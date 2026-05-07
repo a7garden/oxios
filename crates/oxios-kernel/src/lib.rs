@@ -14,7 +14,6 @@ pub mod access_manager;
 pub mod agent_group;
 pub mod agent_lifecycle;
 pub mod agent_runtime;
-pub mod backup;
 
 pub mod auth;
 pub mod config;
@@ -74,7 +73,7 @@ pub use orchestrator::{OrchestrationResult, Orchestrator};
 pub use scheduler::{AgentScheduler, Priority, ScheduledTask, SchedulerStats, TaskStatus};
 pub use host_tools::{common as host_tools_common, HostToolStatus, HostToolValidator};
 pub use mcp::{McpBridge, McpCapabilities, McpServer, McpTool};
-pub use memory::{MemoryEntry, MemoryManager, MemoryType, TextVector};
+pub use memory::{MemoryEntry, MemoryManager, MemoryType, TextVector, MemoryBudget, CurationReport, CurationCandidate, content_hash};
 pub use program::{InstallSource, Program, ProgramManager, ProgramMeta, ToolDef, HostRequirementsCheck, ArgumentDef};
 pub use skill::{Skill, SkillMeta, SkillStore};
 pub use state_store::{AgentResponse, Session, SessionId, SessionSummary, StateStore};
@@ -84,4 +83,6 @@ pub use persona_store::PersonaStore;
 pub use supervisor::{BasicSupervisor, Supervisor};
 pub use tools::{ContainerExecTool, HostExecTool, ProgramTool};
 pub use types::{AgentId, AgentInfo, AgentStatus};
+
+pub use backup::{BackupManifest, BackupSection};
 

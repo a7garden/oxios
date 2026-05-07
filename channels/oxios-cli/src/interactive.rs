@@ -4,8 +4,7 @@
 //! forward messages to the channel, and display responses.
 
 use anyhow::Result;
-use reedline::{DefaultPrompt, Reedline, Signal};
-use std::sync::Arc;
+use reedline::{DefaultPrompt, DefaultPromptSegment, Reedline, Signal};
 
 use crate::channel::CliChannelHandle;
 use crate::commands::MetaCommand;
@@ -37,10 +36,8 @@ impl InteractiveLoop {
     pub fn with_prompt_label(handle: CliChannelHandle, left: &str) -> Self {
         let editor = Reedline::create();
         let prompt = DefaultPrompt::new(
-            reedline::PromptSegments::new(
-                reedline::PromptString::from(left.to_string()),
-                reedline::PromptString::default(),
-            ),
+            DefaultPromptSegment::Basic(left.to_string()),
+            DefaultPromptSegment::Empty,
         );
 
         Self {

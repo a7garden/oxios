@@ -3,7 +3,7 @@
 //! Provides a minimal OpenAPI 3.0 spec that can be populated
 //! incrementally as routes are documented with utoipa annotations.
 
-use utoipa::openapi::security::{HttpAuthScheme, HttpBuilder, SecurityAddon};
+use utoipa::openapi::security::{HttpAuthScheme, HttpBuilder, SecurityScheme};
 use utoipa::OpenApi;
 
 /// Build the OpenAPI specification for the Oxios web API.
@@ -21,7 +21,7 @@ pub fn build_openapi() -> utoipa::openapi::OpenApi {
             utoipa::openapi::ComponentsBuilder::new()
                 .security_scheme(
                     "bearer_auth",
-                    utoipa::openapi::SecurityScheme::Http(
+                    SecurityScheme::Http(
                         HttpBuilder::new()
                             .scheme(HttpAuthScheme::Bearer)
                             .bearer_format("JWT")
@@ -29,6 +29,6 @@ pub fn build_openapi() -> utoipa::openapi::OpenApi {
                     ),
                 )
                 .build(),
-        )
+        ))
         .build()
 }

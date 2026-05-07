@@ -195,7 +195,7 @@ impl WebServer {
             .url("/api-docs/openapi.json", openapi);
 
         let app = Router::new()
-            .merge(swagger)
+            .merge(Router::<Arc<AppState>>::from(swagger))
             .merge(build_routes(self.state.clone()))
             .fallback_service(
                 ServeDir::new(&static_dir).append_index_html_on_directories(true),

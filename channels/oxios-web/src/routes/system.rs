@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
 use axum::extract::{Path, Query, State};
-use axum::http::StatusCode;
 use axum::Json;
 use serde::Serialize;
 
@@ -121,7 +120,7 @@ pub(crate) async fn handle_status(
     };
 
     // State store health — check that the base path exists
-    let state_store_healthy = state.state_store.base_path().exists();
+    let state_store_healthy = state.state_store.base_path.exists();
 
     // Event bus — always healthy if we got this far
     let event_bus_healthy = true;

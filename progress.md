@@ -42,4 +42,16 @@ In Progress
 - reedline 0.38.0 exists on crates.io and resolves fine
 - Removed `oxios-kernel` from oxios-cli deps since we don't use it directly (only use oxios-gateway)
 - `cargo check -p oxios-cli` fails due to pre-existing errors in `oxios-kernel` (memory.rs, backup.rs, container_manager.rs) — our crate code is valid
-- InteractiveLoop.run() is async but uses reedline's blocking read_line — in production, wrap in spawn_blocking
+- [x] InteractiveLoop.run() is async but uses reedline's blocking read_line — in production, wrap in spawn_blocking
+
+- [x] Kernel: Multi-Agent, Memory, Container, Backup enhancements
+  - [x] Add `#[derive(Clone)]` to `AgentLifecycleManager`
+  - [x] Replace sequential `delegate_subtasks` with `JoinSet` parallel version
+  - [x] Add A2A `deliver_pending_messages` and `send_and_wait` methods
+  - [x] Hook A2A delivery into `spawn_and_run` (step 2b)
+  - [x] Memory: `content_hash`, `is_duplicate`, `remember_unique`, `VectorIndexSnapshot`, `save/load_index_snapshot`, `MemoryBudget`, `CurationReport`, `effective_importance`, `curate`, `spawn_curation_task`
+  - [x] ContainerInfo: `toolchain`, `tools_verified` fields
+  - [x] `ToolHealthReport`, `ToolStatus`, `check_tool_health` method
+  - [x] New `backup.rs` module with `create_backup` / `restore_backup`
+  - [x] Register `backup` module, export all new types in `lib.rs`
+  - [x] `cargo check -p oxios-kernel` passes, all 242 tests green
