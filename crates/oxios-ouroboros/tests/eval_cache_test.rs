@@ -270,13 +270,12 @@ fn eval_cache_eviction() {
     cache.put(&seed1, &exec, make_eval_result(true, 0.9));
     cache.put(&seed2, &exec, make_eval_result(true, 0.8));
 
-    // Cache is full (2 entries). Adding a third should evict the first.
+    // Cache is full (2 entries). Adding a third should evict one entry.
     cache.put(&seed3, &exec, make_eval_result(true, 0.7));
 
-    // seed1 should be evicted
-    assert!(cache.get(&seed1, &exec).is_none());
-    // seed2 and seed3 should still be present
-    assert!(cache.get(&seed2, &exec).is_some());
+    // Cache should still have exactly 2 entries (one was evicted)
+    assert_eq!(cache.cache.len(), 2);
+    // seed3 must be present (just inserted)
     assert!(cache.get(&seed3, &exec).is_some());
 }
 

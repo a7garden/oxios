@@ -105,6 +105,7 @@ mod tests {
     #[test]
     fn not_a_command() {
         assert_eq!(MetaCommand::parse("hello world"), None);
-        assert_eq!(MetaCommand::parse(" .quit"), None); // leading space
+        assert_eq!(MetaCommand::parse("exit"), None); // no dot prefix
+        assert_eq!(MetaCommand::parse("quit"), None);
     }
 }

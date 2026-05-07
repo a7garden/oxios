@@ -341,13 +341,14 @@ impl MemoryManager {
 
     /// Save the current vector index to disk as a snapshot.
     pub async fn save_index_snapshot(&self) -> Result<()> {
-        let index = self.vector_index.read();
-        let snapshot = VectorIndexSnapshot {
-            created_at: chrono::Utc::now(),
-            entry_count: index.len(),
-            entries: index.clone(),
+        let snapshot = {
+            let index = self.vector_index.read();
+            VectorIndexSnapshot {
+                created_at: chrono::Utc::now(),
+                entry_count: index.len(),
+                entries: index.clone(),
+            }
         };
-        drop(index);
 
         self.state_store
             .save_json("memory", "vector_index_snapshot", &snapshot)

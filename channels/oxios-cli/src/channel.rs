@@ -26,8 +26,6 @@ pub struct CliChannel {
     incoming_rx: Mutex<mpsc::Receiver<IncomingMessage>>,
     /// Sender for injecting incoming messages.
     incoming_tx: mpsc::Sender<IncomingMessage>,
-    /// Sender for outgoing messages (responses to display).
-    outgoing_tx: mpsc::Sender<OutgoingMessage>,
     /// Current session metadata.
     session: Arc<std::sync::Mutex<Session>>,
 }
@@ -36,13 +34,11 @@ impl CliChannel {
     /// Creates a new CLI channel with the given buffer size.
     pub fn new(buffer: usize) -> Self {
         let (incoming_tx, incoming_rx) = mpsc::channel(buffer);
-        let (outgoing_tx, _outgoing_rx) = mpsc::channel(buffer);
         let session = Arc::new(std::sync::Mutex::new(Session::new(None)));
 
         Self {
             incoming_rx: Mutex::new(incoming_rx),
             incoming_tx,
-            outgoing_tx,
             session,
         }
     }
