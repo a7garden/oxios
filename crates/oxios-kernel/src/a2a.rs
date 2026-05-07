@@ -562,6 +562,52 @@ impl A2AProtocol {
         let queue = self.message_queue.read().await;
         queue.get(&agent_id).map(|v| v.len()).unwrap_or(0)
     }
+
+    /// Deliver all pending messages to an agent, publishing events for each.
+    pub async fn deliver_pending_messages(
+        &self,
+        agent_id: AgentId,
+    ) -> Result<Vec<A2ARequest>> {
+        let messages = self.receive_messages(agent_id).await;
+        for msg in &messages {
+            self.event_bus.publish(KernelEvent::MessageReceived {
+                from: msg.from,
+                content: format!("[A2A] {:?}", msg.request_id),
+            })?;
+        }
+        Ok(messages)
+    }
+
+    /// Send a message and wait for a response within a timeout.
+    pub async fn send_and_wait(
+        &self,
+        from: AgentId,
+        to: AgentId,
+        message: A2AMessage,
+        timeout: std::time::Duration,
+    ) -> Result<A2AResponse> {
+        let request_id = self.send_message(from, to, message).await?;
+        let start = std::time::Instant::now();
+        loop {
+            let messages = self.receive_messages(from).await;
+            for msg in messages {
+                if let A2AMessage::ResultSharing { task_id, result, summary: _ } = &msg.message {
+                    if *task_id == request_id {
+                        return Ok(A2AResponse::success(
+                            request_id,
+                            to,
+                            from,
+                            result.clone(),
+                        ));
+                    }
+                }
+            }
+            if start.elapsed() > timeout {
+                anyhow::bail!("A2A response timeout after {:?}", timeout);
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        }
+    }
 }
 
 impl std::fmt::Debug for A2AProtocol {

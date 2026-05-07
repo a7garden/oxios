@@ -12,6 +12,7 @@ members = [
     "crates/oxios-ouroboros",
     "crates/oxios-gateway",
     "channels/oxios-web",
+    "channels/oxios-cli",
 ]
 
 [workspace.dependencies]
@@ -31,6 +32,7 @@ uuid = { version = "1", features = ["v4", "serde"] }
 # Logging
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing-appender = "0.2"
 
 # Error handling
 anyhow = "1"
@@ -59,6 +61,7 @@ oxios-kernel = { path = "crates/oxios-kernel" }
 oxios-ouroboros = { path = "crates/oxios-ouroboros" }
 oxios-gateway = { path = "crates/oxios-gateway" }
 oxios-web = { path = "channels/oxios-web" }
+oxios-cli = { path = "channels/oxios-cli" }
 hex = { workspace = true }
 oxi-ai = { workspace = true }
 tokio = { workspace = true }
@@ -72,3 +75,4 @@ axum = { version = "0.8", features = ["ws"] }
 tower-http = { version = "0.6", features = ["cors", "fs"] }
 tokio-stream = { version = "0.1", features = ["sync"] }
 parking_lot = { workspace = true }
+tracing-appender = { workspace = true }

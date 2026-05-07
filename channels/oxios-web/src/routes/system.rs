@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use axum::extract::{Path, Query, State};
+use axum::http::StatusCode;
 use axum::Json;
 use serde::Serialize;
 
@@ -30,6 +31,58 @@ pub(crate) async fn handle_health(State(state): State<Arc<AppState>>) -> Json<se
 // Control
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Component Health Types
+// ---------------------------------------------------------------------------
+
+/// Health status of an individual component.
+#[derive(Debug, Serialize, Clone)]
+pub(crate) struct ComponentStatus {
+    /// Whether the component is healthy.
+    pub healthy: bool,
+    /// Optional detail message.
+    pub detail: Option<String>,
+}
+
+/// Memory subsystem health.
+#[derive(Debug, Serialize, Clone)]
+pub(crate) struct MemoryHealth {
+    /// Whether memory is enabled.
+    pub enabled: bool,
+    /// Number of entries in the vector index.
+    pub index_size: usize,
+    /// Total entries across all memory types.
+    pub total_entries: usize,
+}
+
+/// Agent subsystem health.
+#[derive(Debug, Serialize, Clone)]
+pub(crate) struct AgentHealth {
+    /// Number of currently active agents.
+    pub active_count: usize,
+    /// Total agents forked (lifetime).
+    pub total_forked: u64,
+    /// Total agents completed (lifetime).
+    pub total_completed: u64,
+    /// Total agents failed (lifetime).
+    pub total_failed: u64,
+}
+
+/// Aggregate health of all system components.
+#[derive(Debug, Serialize, Clone)]
+pub(crate) struct ComponentHealth {
+    /// Container backend health.
+    pub container_backend: ComponentStatus,
+    /// State store health.
+    pub state_store: ComponentStatus,
+    /// Event bus health.
+    pub event_bus: ComponentStatus,
+    /// Memory subsystem health.
+    pub memory: MemoryHealth,
+    /// Agent subsystem health.
+    pub agents: AgentHealth,
+}
+
 /// Response body for the status endpoint.
 #[derive(Debug, Serialize, Clone)]
 pub(crate) struct StatusResponse {
@@ -43,9 +96,11 @@ pub(crate) struct StatusResponse {
     channels: Vec<String>,
     /// Uptime info.
     uptime: String,
+    /// Component-level health details.
+    components: Option<ComponentHealth>,
 }
 
-/// GET /api/status — System status.
+/// GET /api/status — System status with component health.
 pub(crate) async fn handle_status(
     state: State<Arc<AppState>>,
 ) -> Json<StatusResponse> {
@@ -56,13 +111,112 @@ pub(crate) async fn handle_status(
         (uptime.as_secs() % 3600) / 60,
         uptime.as_secs() % 60
     );
+
+    // Container backend health
+    let container_healthy = state.container_manager.is_backend_available();
+    let container_detail = if container_healthy {
+        Some(state.container_manager.backend_name().to_string())
+    } else {
+        Some("no backend available".to_string())
+    };
+
+    // State store health — check that the base path exists
+    let state_store_healthy = state.state_store.base_path().exists();
+
+    // Event bus — always healthy if we got this far
+    let event_bus_healthy = true;
+
+    // Memory health
+    let mem_index_size = state.memory_manager.vector_index_size();
+    let mem_total = state.memory_manager.total_entries().await;
+    let memory_health = MemoryHealth {
+        enabled: true,
+        index_size: mem_index_size,
+        total_entries: mem_total,
+    };
+
+    // Agent health — count active from supervisor, metrics from export
+    let active_count = state.supervisor.list().await
+        .map(|agents| agents.iter().filter(|a| {
+            matches!(a.status, oxios_kernel::AgentStatus::Running | oxios_kernel::AgentStatus::Starting | oxios_kernel::AgentStatus::Idle)
+        }).count())
+        .unwrap_or(0);
+
+    let (total_forked, total_completed, total_failed) = parse_agent_metrics();
+
+    let agent_health = AgentHealth {
+        active_count,
+        total_forked,
+        total_completed,
+        total_failed,
+    };
+
+    let components = Some(ComponentHealth {
+        container_backend: ComponentStatus {
+            healthy: container_healthy,
+            detail: container_detail,
+        },
+        state_store: ComponentStatus {
+            healthy: state_store_healthy,
+            detail: if state_store_healthy { None } else { Some("base path not found".to_string()) },
+        },
+        event_bus: ComponentStatus {
+            healthy: event_bus_healthy,
+            detail: None,
+        },
+        memory: memory_health,
+        agents: agent_health,
+    });
+
     Json(StatusResponse {
         service: "oxios".into(),
         status: "running".into(),
         version: env!("CARGO_PKG_VERSION").into(),
         channels: vec!["web".into()],
         uptime: uptime_str,
+        components,
     })
+}
+
+/// Parse agent metrics from the Prometheus export text.
+/// Returns (forked, completed, failed) counters.
+fn parse_agent_metrics() -> (u64, u64, u64) {
+    let export = oxios_kernel::metrics::registry().export();
+    let mut forked = 0u64;
+    let mut completed = 0u64;
+    let mut failed = 0u64;
+    for line in export.lines() {
+        if line.starts_with("oxios_agents_forked_total ") {
+            forked = line.rsplit(' ').next().and_then(|v| v.parse().ok()).unwrap_or(0);
+        } else if line.starts_with("oxios_agents_completed_total ") {
+            completed = line.rsplit(' ').next().and_then(|v| v.parse().ok()).unwrap_or(0);
+        } else if line.starts_with("oxios_agents_failed_total ") {
+            failed = line.rsplit(' ').next().and_then(|v| v.parse().ok()).unwrap_or(0);
+        }
+    }
+    (forked, completed, failed)
+}
+
+/// GET /api/containers/:name/tools — Tool health check for a container.
+pub(crate) async fn handle_container_tools(
+    state: State<Arc<AppState>>,
+    Path(name): Path<String>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    // Check if the container exists
+    match state.container_manager.container_status(&name).await {
+        Ok(_status) => {
+            // check_tool_health() is not yet implemented on ContainerManager
+            // Return 501 Not Implemented with a descriptive message
+            Err(AppError::Internal(
+                "Tool health check is not yet implemented. \
+                 Container found but tool inspection is pending kernel support.".into()
+            ))
+        }
+        Err(e) => {
+            tracing::warn!(container = %name, error = %e, "Container not found for tool check");
+            Err(AppError::NotFound(format!("container '{name}' not found")))
+        }
+    }
 }
 
 /// Agent summary for listing.

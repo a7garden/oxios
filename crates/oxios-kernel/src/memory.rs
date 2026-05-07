@@ -15,6 +15,20 @@ use serde::{Deserialize, Serialize};
 use crate::state_store::StateStore;
 
 // ---------------------------------------------------------------------------
+// Content hashing
+// ---------------------------------------------------------------------------
+
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
+
+/// Compute a stable hash of content for deduplication.
+pub fn content_hash(content: &str) -> u64 {
+    let mut hasher = DefaultHasher::new();
+    content.hash(&mut hasher);
+    hasher.finish()
+}
+
+// ---------------------------------------------------------------------------
 // TextVector (TF-IDF vector for semantic similarity)
 // ---------------------------------------------------------------------------
 
@@ -162,6 +176,58 @@ fn default_importance() -> f32 {
     0.5
 }
 
+/// Budget for memory curation — limits per type.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MemoryBudget {
+    /// Maximum entries per memory type.
+    pub max_per_type: usize,
+}
+
+impl Default for MemoryBudget {
+    fn default() -> Self {
+        Self { max_per_type: 100 }
+    }
+}
+
+/// A single candidate for removal during curation.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CurationCandidate {
+    /// Memory entry ID.
+    pub id: String,
+    /// Memory type.
+    pub memory_type: MemoryType,
+    /// Effective importance score (lower = more likely removed).
+    pub effective_importance: f32,
+}
+
+/// Report from a curation run.
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+pub struct CurationReport {
+    /// Total entries before curation.
+    pub total_before: usize,
+    /// Total entries after curation.
+    pub total_after: usize,
+    /// Number of entries actually removed.
+    pub removed: usize,
+    /// Candidates identified for removal.
+    pub candidates_for_removal: Vec<CurationCandidate>,
+}
+
+// ---------------------------------------------------------------------------
+// VectorIndexSnapshot
+// ---------------------------------------------------------------------------
+
+/// Snapshot of the vector index for persistence.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct VectorIndexSnapshot {
+    /// Snapshot creation timestamp.
+    created_at: DateTime<Utc>,
+    /// Number of entries in the snapshot.
+    entry_count: usize,
+    /// Map of entry ID to text vector.
+    entries: HashMap<String, TextVector>,
+}
+
 // ---------------------------------------------------------------------------
 // MemoryManager
 // ---------------------------------------------------------------------------
@@ -209,6 +275,28 @@ impl MemoryManager {
         self
     }
 
+    /// Returns the number of entries in the vector index.
+    pub fn vector_index_size(&self) -> usize {
+        self.vector_index.read().len()
+    }
+
+    /// Returns total entries across all memory types (from disk).
+    pub async fn total_entries(&self) -> usize {
+        let mut total = 0;
+        for mt in [
+            MemoryType::ShortTerm,
+            MemoryType::LongTerm,
+            MemoryType::Episodic,
+            MemoryType::Semantic,
+            MemoryType::Procedural,
+        ] {
+            if let Ok(entries) = self.list(mt, usize::MAX).await {
+                total += entries.len();
+            }
+        }
+        total
+    }
+
     /// Rebuild the vector index from all stored memories.
     ///
     /// Call once at startup to populate the in-memory index from
@@ -249,6 +337,46 @@ impl MemoryManager {
 
         tracing::info!(entries = self.vector_index.read().len(), "Memory vector index rebuilt");
         Ok(())
+    }
+
+    /// Save the current vector index to disk as a snapshot.
+    pub async fn save_index_snapshot(&self) -> Result<()> {
+        let index = self.vector_index.read();
+        let snapshot = VectorIndexSnapshot {
+            created_at: chrono::Utc::now(),
+            entry_count: index.len(),
+            entries: index.clone(),
+        };
+        drop(index);
+
+        self.state_store
+            .save_json("memory", "vector_index_snapshot", &snapshot)
+            .await?;
+
+        tracing::debug!(entries = snapshot.entry_count, "Vector index snapshot saved");
+        Ok(())
+    }
+
+    /// Load a previously saved vector index snapshot from disk.
+    pub async fn load_index_snapshot(&self) -> Result<usize> {
+        let snapshot: Option<VectorIndexSnapshot> = self
+            .state_store
+            .load_json("memory", "vector_index_snapshot")
+            .await?;
+
+        match snapshot {
+            Some(snap) => {
+                let count = snap.entry_count;
+                let mut index = self.vector_index.write();
+                *index = snap.entries;
+                tracing::info!(entries = count, "Vector index snapshot loaded");
+                Ok(count)
+            }
+            None => {
+                tracing::debug!("No vector index snapshot found");
+                Ok(0)
+            }
+        }
     }
 
     /// Store a memory entry. Returns the entry ID.
@@ -511,6 +639,125 @@ impl MemoryManager {
 
         let id = self.remember(entry).await?;
         Ok(Some(id))
+    }
+
+    /// Check if a memory entry with identical content already exists.
+    ///
+    /// Uses a fast hash comparison against the in-memory vector index.
+    pub async fn is_duplicate(&self, content: &str) -> bool {
+        let hash = content_hash(content);
+        let index = self.vector_index.read();
+        // We can't directly check hashes from index, so scan all entries of same type
+        drop(index);
+
+        // Load all entries and compare content hash
+        for mt in &[
+            MemoryType::Conversation,
+            MemoryType::Session,
+            MemoryType::Fact,
+            MemoryType::Episode,
+            MemoryType::Knowledge,
+        ] {
+            if let Ok(entries) = self.list(*mt, 100).await {
+                for entry in entries {
+                    if content_hash(&entry.content) == hash {
+                        return true;
+                    }
+                }
+            }
+        }
+        false
+    }
+
+    /// Store a memory entry only if no duplicate content exists.
+    ///
+    /// Returns the entry ID if stored, or `None` if duplicate.
+    pub async fn remember_unique(&self, entry: MemoryEntry) -> Result<Option<String>> {
+        if self.is_duplicate(&entry.content).await {
+            tracing::debug!(id = %entry.id, "Skipping duplicate memory");
+            return Ok(None);
+        }
+        let id = self.remember(entry).await?;
+        Ok(Some(id))
+    }
+
+    /// Compute effective importance of a memory entry.
+    ///
+    /// Effective importance = base_importance * (1 + log(1 + access_count))
+    /// Memories accessed frequently get a boost.
+    pub fn effective_importance(entry: &MemoryEntry) -> f32 {
+        let access_boost = (1.0_f32 + entry.access_count as f32).ln();
+        entry.importance * (1.0 + access_boost)
+    }
+
+    /// Curate memories: identify candidates for removal based on budget.
+    ///
+    /// Returns a report of how many entries would be pruned per type.
+    pub async fn curate(&self, budget: &MemoryBudget) -> Result<CurationReport> {
+        let mut report = CurationReport::default();
+
+        for mt in &[
+            MemoryType::Conversation,
+            MemoryType::Session,
+            MemoryType::Fact,
+            MemoryType::Episode,
+            MemoryType::Knowledge,
+        ] {
+            let entries = self.list(*mt, budget.max_per_type * 2).await?;
+            if entries.len() <= budget.max_per_type {
+                continue;
+            }
+
+            // Sort by effective importance ascending (least important first)
+            let mut scored: Vec<_> = entries
+                .into_iter()
+                .map(|e| (e, Self::effective_importance(&e)))
+                .collect();
+            scored.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
+
+            let to_remove = scored.len() - budget.max_per_type;
+            for (entry, score) in scored.into_iter().take(to_remove) {
+                report.candidates_for_removal.push(CurationCandidate {
+                    id: entry.id.clone(),
+                    memory_type: entry.memory_type,
+                    effective_importance: score,
+                });
+            }
+            report.total_before += scored.len() + to_remove; // already removed from iterator
+        }
+
+        // Actually remove candidates
+        for candidate in &report.candidates_for_removal {
+            if self.forget(&candidate.id, candidate.memory_type).await.is_ok() {
+                report.removed += 1;
+            }
+        }
+
+        report.total_after = report.total_before - report.removed;
+        Ok(report)
+    }
+
+    /// Spawn a background curation task.
+    ///
+    /// Returns immediately; curation runs asynchronously.
+    pub fn spawn_curation_task(self: &Arc<Self>, budget: MemoryBudget) {
+        let mgr = Arc::clone(self);
+        tokio::spawn(async move {
+            match mgr.curate(&budget).await {
+                Ok(report) => {
+                    if report.removed > 0 {
+                        tracing::info!(
+                            removed = report.removed,
+                            candidates = report.candidates_for_removal.len(),
+                            "Memory curation complete"
+                        );
+                    }
+                }
+                Err(e) => {
+                    tracing::warn!(error = %e, "Memory curation failed");
+                }
+            }
+        });
     }
 }
 

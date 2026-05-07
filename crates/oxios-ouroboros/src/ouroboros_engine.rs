@@ -75,6 +75,9 @@ pub struct OuroborosEngine {
     phase: parking_lot::Mutex<Phase>,
     /// Optional persona system prompt, prepended to every LLM call.
     persona_prompt: parking_lot::Mutex<Option<String>>,
+    /// Evaluation cache for avoiding redundant LLM calls.
+    #[allow(dead_code)] // Will be used by evaluate phase in future protocol steps
+    eval_cache: crate::eval_cache::EvalCache,
 }
 
 impl OuroborosEngine {
@@ -85,6 +88,7 @@ impl OuroborosEngine {
             model,
             phase: parking_lot::Mutex::new(Phase::Interview),
             persona_prompt: parking_lot::Mutex::new(None),
+            eval_cache: crate::eval_cache::EvalCache::new(256),
         }
     }
 
@@ -148,17 +152,57 @@ impl OuroborosEngine {
         Ok(text)
     }
 
-    /// Parse a JSON object from the LLM response, tolerating markdown fences.
+    /// Parse JSON from LLM output, handling markdown fences and prose wrapping.
     fn parse_json<T: serde::de::DeserializeOwned>(raw: &str) -> Result<T> {
         let trimmed = raw.trim();
         let json_str = if trimmed.starts_with("```") {
             let after_open = trimmed.find('\n').map(|i| i + 1).unwrap_or(0);
             let before_close = trimmed.rfind("```").unwrap_or(trimmed.len());
             &trimmed[after_open..before_close]
+        } else if let Some(start) = trimmed.find('{') {
+            if let Some(end) = trimmed.rfind('}') {
+                &trimmed[start..=end]
+            } else {
+                trimmed
+            }
+        } else if let Some(start) = trimmed.find('[') {
+            if let Some(end) = trimmed.rfind(']') {
+                &trimmed[start..=end]
+            } else {
+                trimmed
+            }
         } else {
             trimmed
         };
         Ok(serde_json::from_str(json_str.trim())?)
+    }
+
+    /// Run LLM completion, parse as JSON, retry once on failure.
+    #[allow(dead_code)] // Will be used by future protocol steps
+    async fn llm_json<T: serde::de::DeserializeOwned>(
+        &self,
+        system_prompt: &str,
+        user_message: &str,
+    ) -> Result<T> {
+        let raw = self.llm_complete(system_prompt, user_message).await?;
+        match Self::parse_json::<T>(&raw) {
+            Ok(parsed) => Ok(parsed),
+            Err(e) => {
+                tracing::warn!(error = %e, "JSON parse failed, retrying with correction");
+                let retry_msg = format!(
+                    "Your previous response was invalid JSON. The error was: {}\n\n\
+                     Your raw output was:\n```\n{}\n```\n\n\
+                     Please respond with ONLY valid JSON matching the requested schema. \
+                     Do not include any text before or after the JSON object.",
+                    e,
+                    &raw[..raw.len().min(500)]
+                );
+                let retry_raw = self.llm_complete(system_prompt, &retry_msg).await?;
+                Self::parse_json::<T>(&retry_raw).map_err(|e2| {
+                    anyhow::anyhow!("JSON parse failed after retry: {}", e2)
+                })
+            }
+        }
     }
 }
 

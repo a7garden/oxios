@@ -40,6 +40,29 @@ enum Command {
         prompt: String,
     },
 
+    /// Start an interactive CLI chat session.
+    Chat,
+
+    /// Start the terminal UI.
+    Tui {
+        /// Also start the web server.
+        #[arg(long)]
+        with_web: bool,
+    },
+
+    /// Backup Oxios state.
+    Backup {
+        /// Output directory for the backup (default: <workspace>/backups/<timestamp>).
+        #[arg(short, long)]
+        output: Option<String>,
+    },
+
+    /// Restore Oxios state from a backup.
+    Restore {
+        /// Input backup directory path.
+        input: String,
+    },
+
     /// Manage container gardens.
     Garden {
         #[command(subcommand)]
@@ -419,22 +442,34 @@ fn setup_shutdown_handler() -> tokio::sync::mpsc::Sender<()> {
 async fn main() -> Result<()> {
     let cli = Cli::parse();
 
+    // ── Tracing setup with file appender ──
+    let log_dir = oxios_home.join("logs");
+    std::fs::create_dir_all(&log_dir)?;
+
+    let file_appender = tracing_appender::rolling::daily(&log_dir, "oxios.log");
+    let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
+
+    // Leak the guard so it lives for the program duration.
+    // Without this, the guard would be dropped and log flushing would stop.
+    Box::leak(Box::new(_guard));
+
+    let env_filter = tracing_subscriber::EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| {
+            if cli.verbose {
+                tracing_subscriber::EnvFilter::new("debug")
+            } else {
+                tracing_subscriber::EnvFilter::new("info")
+            }
+        });
+
     tracing_subscriber::fmt()
-        .with_env_filter(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| {
-                    if cli.verbose {
-                        tracing_subscriber::EnvFilter::new("debug")
-                    } else {
-                        tracing_subscriber::EnvFilter::new("info")
-                    }
-                }),
-        )
+        .with_env_filter(env_filter)
         .with_target(true)
         .with_thread_ids(false)
         .with_file(false)
         .with_line_number(false)
         .compact()
+        .with_writer(non_blocking)
         .init();
 
     let config_path = expand_path(&cli.config);
@@ -447,6 +482,39 @@ async fn main() -> Result<()> {
     match cli.command {
         Some(Command::Run { prompt }) => {
             cmd_run(&prompt, &config_path, default_model).await
+        }
+        Some(Command::Chat) => {
+            let kernel = Kernel::builder()
+                .config_path(config_path.to_path_buf())
+                .build()
+                .await?;
+            let (cli_channel, handle) = oxios_cli::CliChannel::new(256);
+            kernel.gateway.register(Box::new(cli_channel)).await;
+            let mut loop_ = oxios_cli::InteractiveLoop::new(handle);
+            loop_.run().await?;
+            Ok(())
+        }
+        Some(Command::Tui { with_web: _ }) => {
+            println!("TUI not yet implemented");
+            Ok(())
+        }
+        Some(Command::Backup { output }) => {
+            let kernel = Kernel::builder()
+                .config_path(config_path.to_path_buf())
+                .build()
+                .await?;
+            let output_path = output.as_ref().map(|p| std::path::PathBuf::from(p));
+            oxios_kernel::backup::create_backup(&kernel.state_store, output_path.as_deref()).await?;
+            Ok(())
+        }
+        Some(Command::Restore { input }) => {
+            let kernel = Kernel::builder()
+                .config_path(config_path.to_path_buf())
+                .build()
+                .await?;
+            let input_path = std::path::PathBuf::from(&input);
+            oxios_kernel::backup::restore_backup(&kernel.state_store, &input_path).await?;
+            Ok(())
         }
         Some(Command::Garden { action }) => {
             cmd_garden(action, &config_path).await

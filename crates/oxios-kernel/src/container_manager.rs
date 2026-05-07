@@ -27,6 +27,29 @@ WORKDIR /workspace
 CMD ["/bin/bash"]
 "#;
 
+/// Status of a single tool in a container.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct ToolStatus {
+    /// Tool name.
+    pub name: String,
+    /// Whether the tool is available and functional.
+    pub available: bool,
+    /// Version string if detected.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub version: Option<String>,
+}
+
+/// Report on the health of tools in a container.
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+pub struct ToolHealthReport {
+    /// Per-tool status.
+    pub tools: Vec<ToolStatus>,
+    /// Number of healthy tools.
+    pub healthy_count: usize,
+    /// Total tools checked.
+    pub total_checked: usize,
+}
+
 /// Container metadata stored in the state store.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ContainerInfo {
@@ -38,6 +61,12 @@ pub struct ContainerInfo {
     pub created_at: String,
     /// Whether the container is currently running.
     pub running: bool,
+    /// Toolchain installed in the container (e.g., "rust", "python").
+    #[serde(default)]
+    pub toolchain: Option<String>,
+    /// Whether container tools have been verified.
+    #[serde(default)]
+    pub tools_verified: bool,
 }
 
 /// Container lifecycle manager.
@@ -141,6 +170,8 @@ impl ContainerManager {
             image_tag: DEFAULT_IMAGE_TAG.to_string(),
             created_at: chrono::Utc::now().to_rfc3339(),
             running: false,
+            toolchain: None,
+            tools_verified: false,
         };
         self.state_store
             .save_json("containers", name, &info)
@@ -284,6 +315,8 @@ impl ContainerManager {
                             image_tag: DEFAULT_IMAGE_TAG.to_string(),
                             created_at: String::new(),
                             running: false,
+                            toolchain: None,
+                            tools_verified: false,
                         });
                     }
                 }
@@ -354,6 +387,48 @@ impl ContainerManager {
     /// Get the backend name.
     pub fn backend_name(&self) -> &str {
         self.backend.name()
+    }
+
+    /// Check the health of tools in a container by running version commands.
+    ///
+    /// Attempts to exec common tool version commands in the container
+    /// and reports which tools are available.
+    pub async fn check_tool_health(&self, name: &str) -> Result<ToolHealthReport> {
+        let mut report = ToolHealthReport::default();
+
+        let checks = [
+            ("bash", vec!["bash".to_string(), "--version".to_string()]),
+            ("git", vec!["git".to_string(), "--version".to_string()]),
+            ("python3", vec!["python3".to_string(), "--version".to_string()]),
+            ("curl", vec!["curl".to_string(), "--version".to_string()]),
+            ("ripgrep", vec!["rg".to_string(), "--version".to_string()]),
+            ("jq", vec!["jq".to_string(), "--version".to_string()]),
+            ("sqlite3", vec!["sqlite3".to_string(), "--version".to_string()]),
+        ];
+
+        for (tool, cmd) in &checks {
+            match self.exec_in_container(name, cmd, None).await {
+                Ok(result) if result.exit_code == 0 => {
+                    report.tools.push(ToolStatus {
+                        name: tool.to_string(),
+                        available: true,
+                        version: result.stdout.lines().next().map(|s| s.to_string()),
+                    });
+                }
+                _ => {
+                    report.tools.push(ToolStatus {
+                        name: tool.to_string(),
+                        available: false,
+                        version: None,
+                    });
+                }
+            }
+        }
+
+        report.healthy_count = report.tools.iter().filter(|t| t.available).count();
+        report.total_checked = report.tools.len();
+
+        Ok(report)
     }
 }
 

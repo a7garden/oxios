@@ -8,6 +8,7 @@
 //! - **infra**: Scheduler, audit, permissions, MCP
 //! - **events**: Sessions, SSE events, approvals
 
+mod agent_groups;
 mod chat;
 mod events;
 mod infra;
@@ -29,7 +30,8 @@ pub(crate) use chat::{handle_chat, handle_chat_stream};
 pub(crate) use events::{handle_events, handle_sessions_list, handle_session_get, handle_session_delete, handle_approvals_list, handle_approval_approve, handle_approval_reject};
 pub(crate) use infra::{handle_audit_log, handle_metrics, handle_permissions_get, handle_permissions_put, handle_scheduler_stats, handle_scheduler_tasks};
 pub(crate) use resources::{handle_gardens_list, handle_garden_create, handle_garden_start, handle_garden_stop, handle_garden_remove, handle_garden_exec, handle_programs_list, handle_program_get, handle_program_install, handle_program_uninstall, handle_program_enable, handle_program_disable, handle_program_host_requirements, handle_host_tools_check};
-pub(crate) use system::{handle_health, handle_status, handle_agents_list, handle_agent_kill, handle_config_get, handle_config_put};
+pub(crate) use system::{handle_health, handle_status, handle_agents_list, handle_agent_kill, handle_config_get, handle_config_put, handle_container_tools};
+pub(crate) use agent_groups::{handle_agent_groups_list, handle_agent_group_get};
 pub(crate) use workspace::{handle_workspace_tree, handle_workspace_file_get, handle_workspace_file_put, handle_seeds_list, handle_seed_get, handle_seed_evolution, handle_skills_list, handle_skill_get, handle_skill_create, handle_skill_delete, handle_memory_list, handle_memory_get, handle_memory_create, handle_memory_search};
 
 // ---------------------------------------------------------------------------
@@ -130,6 +132,11 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         .route("/api/programs/{name}/host-requirements", get(handle_program_host_requirements))
         // Host tools
         .route("/api/host-tools", get(handle_host_tools_check))
+        // Agent Groups
+        .route("/api/agent-groups", get(handle_agent_groups_list))
+        .route("/api/agent-groups/{id}", get(handle_agent_group_get))
+        // Container Tools
+        .route("/api/containers/{name}/tools", get(handle_container_tools))
         // Events
         .route("/api/events", get(handle_events))
         // Personas (delegated to persona_routes)

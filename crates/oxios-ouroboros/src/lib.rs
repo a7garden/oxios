@@ -7,6 +7,7 @@
 
 #![warn(missing_docs)]
 
+pub mod eval_cache;
 pub mod evaluation;
 pub mod interview;
 pub mod ouroboros_engine;

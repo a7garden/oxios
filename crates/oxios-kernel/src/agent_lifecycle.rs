@@ -17,6 +17,7 @@ use crate::types::{AgentId, AgentStatus};
 use oxios_ouroboros::{ExecutionResult, Seed};
 
 /// Manages the full lifecycle of a single agent from fork to cleanup.
+#[derive(Clone)]
 pub struct AgentLifecycleManager {
     supervisor: Arc<dyn Supervisor>,
     scheduler: Arc<AgentScheduler>,
@@ -49,6 +50,11 @@ impl AgentLifecycleManager {
         let card = self.build_agent_card(agent_id, &agent_name, seed);
         if let Err(e) = self.a2a.registry().register_agent(card).await {
             tracing::warn!(agent_id = %agent_id, error = %e, "Failed to register A2A card");
+        }
+
+        // 2b. Deliver any pending A2A messages to this agent
+        if let Err(e) = self.a2a.deliver_pending_messages(agent_id).await {
+            tracing::debug!(agent_id = %agent_id, error = %e, "No pending A2A messages");
         }
 
         // 3. Ensure access permissions

@@ -414,19 +414,19 @@ impl Orchestrator {
         });
     }
 
-    /// Execute multiple subtasks using separate agents.
+    /// Execute multiple subtasks using separate agents in parallel.
     ///
     /// Each subtask becomes a lightweight Seed that is executed by
     /// a separate agent via the lifecycle manager.
-    /// Results are collected and combined.
+    /// Results are collected as they complete using `JoinSet`.
     pub async fn delegate_subtasks(
         &self,
         subtasks: Vec<SubTask>,
         parent_seed: &Seed,
     ) -> Result<Vec<SubTask>> {
         use crate::agent_group::AgentGroup;
+        use tokio::task::JoinSet;
 
-        // Create an AgentGroup to track execution
         let descriptions: Vec<String> = subtasks.iter().map(|st| st.description.clone()).collect();
         let group = AgentGroup::new(parent_seed, descriptions);
         let group_id = group.id;
@@ -439,74 +439,73 @@ impl Orchestrator {
         tracing::info!(
             group_id = %group_id,
             agent_count = group.agents.len(),
-            "Starting multi-agent execution"
+            "Starting parallel multi-agent execution"
         );
 
-        // Execute subtasks sequentially through the full lifecycle.
-        // Each subtask runs through spawn_and_run which handles fork,
-        // A2A registration, permissions, scheduling, execution, and cleanup.
-        let mut completed = Vec::new();
+        let mut join_set: JoinSet<(usize, crate::types::AgentId, Result<oxios_ouroboros::ExecutionResult>)> = JoinSet::new();
+
         for (idx, agent_entry) in group.agents.iter().enumerate() {
-            let subtask = &subtasks[idx];
-            let subtask_id = subtask.id;
-            let child_seed = &agent_entry.seed;
+            let child_seed = agent_entry.seed.clone();
+            let agent_id = agent_entry.id;
+            let lifecycle = self.lifecycle.clone();
 
-            tracing::info!(
-                group_id = %group_id,
-                subtask_index = idx,
-                subtask_id = %subtask_id,
-                goal = %child_seed.goal,
-                "Executing subtask"
-            );
+            join_set.spawn(async move {
+                let result = lifecycle.spawn_and_run(&child_seed, Priority::Normal).await;
+                (idx, agent_id, result)
+            });
+        }
 
-            match self.lifecycle.spawn_and_run(child_seed, Priority::Normal).await {
-                Ok(exec_result) => {
+        let mut completed = vec![None; subtasks.len()];
+        while let Some(join_result) = join_set.join_next().await {
+            match join_result {
+                Ok((idx, agent_id, Ok(exec_result))) => {
                     let _ = self.event_bus.publish(KernelEvent::AgentGroupMemberCompleted {
                         group_id,
-                        agent_id: agent_entry.id,
+                        agent_id,
                         success: exec_result.success,
                     });
-                    completed.push(SubTask {
-                        id: subtask_id,
-                        description: subtask.description.clone(),
-                        required_capability: subtask.required_capability.clone(),
+                    completed[idx] = Some(SubTask {
+                        id: subtasks[idx].id,
+                        description: subtasks[idx].description.clone(),
+                        required_capability: subtasks[idx].required_capability.clone(),
                         result: Some(exec_result.output.clone()),
                         success: exec_result.success,
                     });
                 }
-                Err(e) => {
-                    tracing::warn!(
-                        subtask_id = %subtask_id,
-                        error = %e,
-                        "Subtask failed"
-                    );
+                Ok((idx, agent_id, Err(e))) => {
+                    tracing::warn!(subtask_index = idx, error = %e, "Subtask failed");
                     let _ = self.event_bus.publish(KernelEvent::AgentGroupMemberCompleted {
                         group_id,
-                        agent_id: agent_entry.id,
+                        agent_id,
                         success: false,
                     });
-                    completed.push(SubTask {
-                        id: subtask_id,
-                        description: subtask.description.clone(),
-                        required_capability: subtask.required_capability.clone(),
+                    completed[idx] = Some(SubTask {
+                        id: subtasks[idx].id,
+                        description: subtasks[idx].description.clone(),
+                        required_capability: subtasks[idx].required_capability.clone(),
                         result: Some(format!("Failed: {e}")),
                         success: false,
                     });
                 }
+                Err(e) => {
+                    tracing::error!(error = %e, "JoinSet task panicked");
+                }
             }
         }
 
+        let completed: Vec<SubTask> = completed.into_iter().flatten().collect();
         let succeeded = completed.iter().filter(|r| r.success).count();
         let total = completed.len();
+
         tracing::info!(
             group_id = %group_id,
             succeeded,
             total,
-            "Multi-agent execution complete"
+            "Parallel multi-agent execution complete"
         );
 
-        // Periodically reap zombie tasks after multi-agent runs.
-        self.lifecycle.reap_zombies();
+        // Persist group state
+        let _ = self.state_store.save_json("agent_groups", &group_id.to_string(), &group).await;
 
         Ok(completed)
     }

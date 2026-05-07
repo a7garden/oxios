@@ -1,0 +1,18 @@
+[package]
+name = "oxios-cli"
+version = "0.2.0-alpha"
+edition = "2021"
+description = "Interactive CLI channel for Oxios"
+license = "MIT"
+
+[dependencies]
+oxios-gateway = { path = "../../crates/oxios-gateway" }
+reedline = "0.38"
+tokio = { workspace = true }
+async-trait = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }

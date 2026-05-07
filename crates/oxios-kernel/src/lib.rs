@@ -6,6 +6,7 @@
 
 #![warn(missing_docs)]
 
+pub mod backup;
 pub mod circuit_breaker;
 pub mod metrics;
 pub mod a2a;

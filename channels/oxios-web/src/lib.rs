@@ -6,6 +6,7 @@
 
 #![warn(missing_docs)]
 
+pub mod api_docs;
 pub mod channel;
 pub mod error;
 pub mod middleware;

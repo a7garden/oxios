@@ -41,3 +41,62 @@ impl EvaluationResult {
             && self.consensus_pass.unwrap_or(true)
     }
 }
+
+/// Result of mechanical (non-LLM) evaluation.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MechanicalEvalResult {
+    /// Each criterion and whether it passed mechanically.
+    pub criterion_results: Vec<CriterionResult>,
+    /// Overall mechanical pass (all criteria passed).
+    pub all_passed: bool,
+}
+
+/// Result of evaluating a single acceptance criterion.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CriterionResult {
+    /// The acceptance criterion being checked.
+    pub criterion: String,
+    /// Whether it passed.
+    pub passed: bool,
+    /// Why it passed or failed.
+    pub reason: String,
+}
+
+impl MechanicalEvalResult {
+    /// Run mechanical checks against acceptance criteria.
+    ///
+    /// Checks structural patterns only (language-agnostic):
+    /// - Substring containment (works for any language)
+    /// - Exit code 0 presence
+    /// - Absence of common error markers
+    pub fn evaluate(criteria: &[String], output: &str) -> Self {
+        let output_lower = output.to_lowercase();
+        let mut results = Vec::new();
+
+        for criterion in criteria {
+            let c_lower = criterion.to_lowercase();
+            let (passed, reason) = if c_lower.contains("exit code")
+                || c_lower.contains("exit status")
+            {
+                let has_zero = output_lower.contains("exit code 0")
+                    || output_lower.contains("exit status 0");
+                (has_zero, format!("exit_code_0={}", has_zero))
+            } else {
+                // Default: substring containment (language-agnostic)
+                let contains = output.contains(criterion);
+                (contains, format!("substring_match={}", contains))
+            };
+            results.push(CriterionResult {
+                criterion: criterion.clone(),
+                passed,
+                reason,
+            });
+        }
+
+        let all_passed = results.iter().all(|r| r.passed);
+        Self {
+            criterion_results: results,
+            all_passed,
+        }
+    }
+}
