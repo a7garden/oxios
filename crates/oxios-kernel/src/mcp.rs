@@ -769,7 +769,7 @@ impl std::fmt::Debug for McpClient {
 /// ```
 pub struct McpBridge {
     /// Registered MCP server configurations
-    servers: Vec<McpServer>,
+    servers: parking_lot::RwLock<Vec<McpServer>>,
     /// Active MCP clients (keyed by server name)
     clients: RwLock<HashMap<String, Arc<McpClient>>>,
     /// Tool cache: server_name → cached tool defs
@@ -780,25 +780,25 @@ impl McpBridge {
     /// Create a new empty MCP bridge
     pub fn new() -> Self {
         Self {
-            servers: Vec::new(),
+            servers: parking_lot::RwLock::new(Vec::new()),
             clients: RwLock::new(HashMap::new()),
             tool_cache: RwLock::new(HashMap::new()),
         }
     }
 
     /// Register an MCP server configuration (does not start the process).
-    pub fn register_server(&mut self, server: McpServer) {
-        self.servers.push(server);
+    pub fn register_server(&self, server: McpServer) {
+        self.servers.write().push(server);
     }
 
     /// Get all registered server configurations (names only).
-    pub fn servers(&self) -> Vec<&str> {
-        self.servers.iter().map(|s| s.name.as_str()).collect()
+    pub fn servers(&self) -> Vec<String> {
+        self.servers.read().iter().map(|s| s.name.clone()).collect()
     }
 
     /// Get a server configuration by name.
-    pub fn get_server(&self, name: &str) -> Option<&McpServer> {
-        self.servers.iter().find(|s| s.name == name)
+    pub fn get_server(&self, name: &str) -> Option<McpServer> {
+        self.servers.read().iter().find(|s| s.name == name).cloned()
     }
 
     /// Initialize all enabled MCP servers.
@@ -808,7 +808,7 @@ impl McpBridge {
     pub async fn initialize_all(&self) -> Result<()> {
         let mut errors = Vec::new();
 
-        for server in &self.servers {
+        for server in self.servers.read().iter() {
             if !server.enabled {
                 tracing::debug!(server = %server.name, "Skipping disabled MCP server");
                 continue;
@@ -836,11 +836,12 @@ impl McpBridge {
 
     /// Initialize a specific server by name.
     pub async fn initialize_server(&self, name: &str) -> Result<()> {
-        let server = self.servers.iter()
+        let server = self.servers.read().iter()
             .find(|s| s.name == name)
+            .cloned()
             .ok_or_else(|| anyhow!("MCP server '{}' not found", name))?;
 
-        let client = Arc::new(McpClient::new(server.clone()));
+        let client = Arc::new(McpClient::new(server));
         client.initialize().await?;
 
         self.clients.write().await.insert(name.to_string(), client);

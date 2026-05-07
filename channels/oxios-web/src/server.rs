@@ -60,7 +60,7 @@ pub struct AppState {
     /// Path to the config file (for persistence on PUT /api/config).
     pub config_path: Option<PathBuf>,
     /// MCP bridge for tool calling (uses tokio::sync::Mutex for async-safe interior mutability).
-    pub mcp_bridge: Arc<Mutex<McpBridge>>,
+    pub mcp_bridge: Arc<McpBridge>,
     /// Authentication manager for bearer token validation.
     pub auth_manager: Arc<parking_lot::Mutex<oxios_kernel::auth::AuthManager>>,
 }
@@ -111,7 +111,7 @@ impl WebServer {
         persona_manager: PersonaManager,
         config: oxios_kernel::OxiosConfig,
         config_path: Option<PathBuf>,
-        mcp_bridge: Arc<Mutex<McpBridge>>,
+        mcp_bridge: Arc<McpBridge>,
         auth_manager: Arc<parking_lot::Mutex<oxios_kernel::auth::AuthManager>>,
     ) -> Result<Self, anyhow::Error> {
         let addr: SocketAddr = format!("{host}:{port}")

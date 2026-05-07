@@ -49,7 +49,7 @@ pub struct Kernel {
     /// Persona manager (multi-persona support).
     pub persona_manager: PersonaManager,
     /// MCP tool bridge.
-    pub mcp_bridge: Arc<tokio::sync::Mutex<McpBridge>>,
+    pub mcp_bridge: Arc<McpBridge>,
     /// API key authentication manager.
     pub auth_manager: Arc<parking_lot::Mutex<AuthManager>>,
 }
@@ -148,13 +148,31 @@ impl KernelBuilder {
         let program_manager = Arc::new(ProgramManager::new(programs_dir));
         program_manager.init().await?;
 
+        // ── MCP bridge (register program MCP servers before Arc wrapping) ──
+        let mut mcp_bridge = init_mcp_bridge(&config).await?;
+        for program in program_manager.list_enabled().await {
+            for server_config in &program.meta.mcp_servers {
+                if server_config.enabled {
+                    mcp_bridge.register_server(McpServer {
+                        name: server_config.name.clone(),
+                        command: server_config.command.clone(),
+                        args: server_config.args.clone(),
+                        env: server_config.env.clone(),
+                        enabled: server_config.enabled,
+                    });
+                }
+            }
+        }
+        let mcp_bridge = Arc::new(mcp_bridge);
+
         // ── Agent runtime ──
         let agent_runtime = AgentRuntime::new(provider, model_id)
             .with_container(Arc::clone(&container_manager))
             .with_host_bridge(host_exec)
             .with_program_manager(Arc::clone(&program_manager))
             .with_oxios_config(config.clone())
-            .with_persona_manager(Arc::new(persona_manager.clone()));
+            .with_persona_manager(Arc::new(persona_manager.clone()))
+            .with_mcp_bridge(mcp_bridge.clone());
 
         // ── Supervisor ──
         let supervisor: Arc<dyn Supervisor> = Arc::new(BasicSupervisor::new(
@@ -190,25 +208,6 @@ impl KernelBuilder {
             tracing::debug!(error = %e, "No API keys file loaded (this is normal on first run)");
         }
         let auth_manager = Arc::new(parking_lot::Mutex::new(auth_manager));
-
-        // ── MCP bridge (register program MCP servers before Arc wrapping) ──
-        let mut mcp_bridge = init_mcp_bridge(&config).await?;
-
-        // Register MCP servers from installed programs
-        for program in program_manager.list_enabled().await {
-            for server_config in &program.meta.mcp_servers {
-                if server_config.enabled {
-                    mcp_bridge.register_server(McpServer {
-                        name: server_config.name.clone(),
-                        command: server_config.command.clone(),
-                        args: server_config.args.clone(),
-                        env: server_config.env.clone(),
-                        enabled: server_config.enabled,
-                    });
-                }
-            }
-        }
-        let mcp_bridge = Arc::new(tokio::sync::Mutex::new(mcp_bridge));
 
         Ok(Kernel {
             orchestrator,

@@ -74,6 +74,8 @@ pub struct AgentRuntime {
     program_manager: Option<Arc<ProgramManager>>,
     oxios_config: Option<OxiosConfig>,
     persona_manager: Option<Arc<PersonaManager>>,
+    /// MCP bridge with pre-registered servers (from kernel.rs).
+    mcp_bridge: Option<Arc<McpBridge>>,
 }
 
 /// Create a minimal placeholder ContainerManager for cases where
@@ -109,6 +111,7 @@ impl AgentRuntime {
             program_manager: None,
             oxios_config: None,
             persona_manager: None,
+            mcp_bridge: None,
         }
     }
 
@@ -129,6 +132,7 @@ impl AgentRuntime {
             program_manager: None,
             oxios_config: None,
             persona_manager: None,
+            mcp_bridge: None,
         }
     }
 
@@ -154,6 +158,12 @@ impl AgentRuntime {
     /// Attach the full OxiosConfig.
     pub fn with_oxios_config(mut self, config: OxiosConfig) -> Self {
         self.oxios_config = Some(config);
+        self
+    }
+
+    /// Attach the MCP bridge with pre-registered servers.
+    pub fn with_mcp_bridge(mut self, bridge: Arc<McpBridge>) -> Self {
+        self.mcp_bridge = Some(bridge);
         self
     }
 
@@ -205,6 +215,7 @@ impl AgentRuntime {
         let host_bridge = self.host_bridge.clone();
         let program_manager = self.program_manager.clone();
         let oxios_config = self.oxios_config.clone();
+        let mcp_bridge_for_runtime = self.mcp_bridge.as_ref().map(|b| Arc::clone(b));
 
         let (final_content, steps_completed, success) =
             tokio::task::spawn_blocking(move || {
@@ -218,6 +229,7 @@ impl AgentRuntime {
                     host_bridge,
                     program_manager,
                     oxios_config,
+                    mcp_bridge_for_runtime,
                 )
             })
             .await??;
@@ -257,6 +269,7 @@ fn run_agent_loop(
     host_bridge: Option<Arc<HostExecBridge>>,
     program_manager: Option<Arc<ProgramManager>>,
     oxios_config: Option<OxiosConfig>,
+    mcp_bridge_for_runtime: Option<Arc<McpBridge>>,
 ) -> Result<(String, usize, bool)> {
     // ── Tier 1: oxi native tools (file operations) ──
     let registry = ToolRegistry::new();
@@ -285,12 +298,11 @@ fn run_agent_loop(
                 .cloned()
                 .unwrap_or_default();
 
-            // Collect MCP servers from all programs.
-            let mcp_bridge: Arc<McpBridge> = Arc::new(McpBridge::new());
+            // Use the pre-registered MCP bridge from kernel.rs (if available).
+            // Collect server names from programs for tool registration.
             let mut mcp_server_names: Vec<String> = Vec::new();
 
             for program in &programs {
-                // Collect MCP servers first (before mutating mcp_bridge).
                 for server_config in &program.meta.mcp_servers {
                     if server_config.enabled {
                         mcp_server_names.push(server_config.name.clone());
@@ -298,32 +310,33 @@ fn run_agent_loop(
                 }
             }
 
-            // MCP servers are pre-registered by kernel.rs (before Arc wrapping).
-            // Collect names for later tool registration.
-
-            // Now initialize MCP servers and get tools.
+            // Register MCP tools from the pre-configured bridge.
             if !mcp_server_names.is_empty() {
-                if let Err(e) = rt.block_on(mcp_bridge.initialize_all()) {
-                    tracing::warn!(error = %e, "MCP bridge init failed — skipping MCP tools");
-                } else {
-                    let _ = rt.block_on(mcp_bridge.list_tools()); // populate cache
-                    let mut mcp_tool_count = 0usize;
-                    for server_name in &mcp_server_names {
-                        if let Some(tool_defs) = rt.block_on(mcp_bridge.cached_tools(server_name)) {
-                            for tool_def in tool_defs {
-                                let wrapper = McpToolWrapper::new(
-                                    Arc::clone(&mcp_bridge),
-                                    server_name,
-                                    &tool_def.name,
-                                    tool_def.description.clone(),
-                                    serde_json::json!({"type": "object", "properties": {}}),
-                                );
-                                registry.register(wrapper);
-                                mcp_tool_count += 1;
+                if let Some(ref bridge) = mcp_bridge_for_runtime {
+                    if let Err(e) = rt.block_on(bridge.initialize_all()) {
+                        tracing::warn!(error = %e, "MCP bridge init failed — skipping MCP tools");
+                    } else {
+                        let _ = rt.block_on(bridge.list_tools()); // populate cache
+                        let mut mcp_tool_count = 0usize;
+                        for server_name in &mcp_server_names {
+                            if let Some(tool_defs) = rt.block_on(bridge.cached_tools(server_name)) {
+                                for tool_def in tool_defs {
+                                    let wrapper = McpToolWrapper::new(
+                                        Arc::clone(bridge),
+                                        server_name,
+                                        &tool_def.name,
+                                        tool_def.description.clone(),
+                                        serde_json::json!({"type": "object", "properties": {}}),
+                                    );
+                                    registry.register(wrapper);
+                                    mcp_tool_count += 1;
+                                }
                             }
                         }
+                        tracing::info!(count = mcp_tool_count, "MCP tools registered");
                     }
-                    tracing::info!(count = mcp_tool_count, "MCP tools registered");
+                } else {
+                    tracing::warn!(count = mcp_server_names.len(), "MCP servers declared but no bridge available");
                 }
             }
 

@@ -8,6 +8,7 @@ mod kernel;
 use anyhow::{bail, Context, Result};
 use clap::{Parser, Subcommand};
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use kernel::Kernel;
 use oxios_kernel::{OxiosConfig, InstallSource};
@@ -385,7 +386,7 @@ async fn cmd_status(config_path: &Path) -> Result<()> {
         if has_key { "yes" } else { "no" },
         if has_key { "found" } else { "set ANTHROPIC_API_KEY or API_KEY" });
 
-    let mcp_count = kernel.mcp_bridge.lock().await.servers().len();
+    let mcp_count = kernel.mcp_bridge.servers().len();
     println!();
     println!("MCP Servers: {} configured", mcp_count);
 
@@ -486,7 +487,7 @@ async fn main() -> Result<()> {
 
             // Initialize MCP servers
             if !kernel.config.mcp.servers.is_empty() {
-                if let Err(e) = kernel.mcp_bridge.lock().await.initialize_all().await {
+                if let Err(e) = kernel.mcp_bridge.initialize_all().await {
                     tracing::warn!(error = %e, "Some MCP servers failed to initialize");
                 } else {
                     tracing::info!(count = kernel.config.mcp.servers.len(), "MCP servers initialized");
@@ -597,7 +598,7 @@ async fn main() -> Result<()> {
             }
 
             // 2. Stop MCP servers
-            if let Err(e) = kernel.mcp_bridge.lock().await.shutdown_all().await {
+            if let Err(e) = kernel.mcp_bridge.shutdown_all().await {
                 tracing::warn!(error = %e, "MCP shutdown error");
             }
 
