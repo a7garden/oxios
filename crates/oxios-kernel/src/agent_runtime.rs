@@ -12,9 +12,10 @@
 use anyhow::Result;
 use oxi_agent::{
     prelude::CompactionEvent, AgentEvent, AgentLoop, AgentLoopConfig, GrepTool, LsTool, ReadTool,
-    SharedState, ToolExecutionMode, ToolRegistry, WriteTool, EditTool, FindTool,
+    SharedState, ToolRegistry, WriteTool, EditTool, FindTool,
 };
 use oxi_ai::{CompactionStrategy, Provider};
+use oxi_agent::agent_loop::config::ToolExecutionMode;
 use parking_lot::Mutex;
 use std::sync::Arc;
 

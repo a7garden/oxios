@@ -3,7 +3,61 @@
 //! Configuration is stored at `~/.oxios/config.toml` and controls
 //! kernel, gateway, and container settings.
 
+use crate::scheduler::Priority;
 use serde::{Deserialize, Serialize};
+
+/// Cron scheduler configuration.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct CronConfig {
+    /// Enable the cron scheduler.
+    #[serde(default)]
+    pub enabled: bool,
+    /// Tick interval in seconds.
+    #[serde(default = "default_tick_interval")]
+    pub tick_interval_secs: u64,
+    /// Inline job definitions from config.toml.
+    #[serde(default)]
+    pub jobs: std::collections::HashMap<String, InlineCronJob>,
+}
+
+impl Default for CronConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            tick_interval_secs: default_tick_interval(),
+            jobs: std::collections::HashMap::new(),
+        }
+    }
+}
+
+fn default_tick_interval() -> u64 {
+    60
+}
+
+/// Inline cron job definition in config.toml.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct InlineCronJob {
+    pub schedule: String,
+    pub goal: String,
+    #[serde(default)]
+    pub constraints: Vec<String>,
+    #[serde(default)]
+    pub acceptance_criteria: Vec<String>,
+    #[serde(default = "default_toolchain_inline")]
+    pub toolchain: String,
+    #[serde(default)]
+    pub priority: Priority,
+    #[serde(default = "default_true_inline")]
+    pub enabled: bool,
+}
+
+fn default_toolchain_inline() -> String {
+    "default".into()
+}
+
+fn default_true_inline() -> bool {
+    true
+}
 
 /// Memory system configuration.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -78,6 +132,9 @@ pub struct OxiosConfig {
     /// Memory system settings.
     #[serde(default)]
     pub memory: MemoryConfig,
+    /// Cron scheduler settings.
+    #[serde(default)]
+    pub cron: CronConfig,
     /// MCP server configurations.
     #[serde(default)]
     pub mcp: McpConfig,

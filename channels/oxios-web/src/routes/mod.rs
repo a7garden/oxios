@@ -10,6 +10,7 @@
 
 mod agent_groups;
 mod chat;
+mod cron_jobs;
 mod events;
 mod infra;
 mod resources;
@@ -18,7 +19,7 @@ mod workspace;
 
 use std::sync::Arc;
 
-use axum::{routing::{delete, get, post, put}, Router};
+use axum::{routing::{delete, get, post, put, patch}, Router};
 use serde::Deserialize;
 
 use crate::middleware::{require_auth, rate_limit_layer};
@@ -27,6 +28,7 @@ use crate::persona_routes;
 
 // Re-export all handlers for use in build_routes
 pub(crate) use chat::{handle_chat, handle_chat_stream};
+pub(crate) use cron_jobs::{handle_cron_jobs_list, handle_cron_job_create, handle_cron_job_get, handle_cron_job_delete, handle_cron_job_update, handle_cron_job_trigger};
 pub(crate) use events::{handle_events, handle_sessions_list, handle_session_get, handle_session_delete, handle_approvals_list, handle_approval_approve, handle_approval_reject};
 pub(crate) use infra::{handle_audit_log, handle_metrics, handle_permissions_get, handle_permissions_put, handle_scheduler_stats, handle_scheduler_tasks};
 pub(crate) use resources::{handle_gardens_list, handle_garden_create, handle_garden_start, handle_garden_stop, handle_garden_remove, handle_garden_exec, handle_programs_list, handle_program_get, handle_program_install, handle_program_uninstall, handle_program_enable, handle_program_disable, handle_program_host_requirements, handle_host_tools_check};
@@ -155,6 +157,13 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         .route("/api/sessions", get(handle_sessions_list))
         .route("/api/sessions/{id}", get(handle_session_get))
         .route("/api/sessions/{id}", delete(handle_session_delete))
+        // Cron Jobs
+        .route("/api/cron-jobs", get(handle_cron_jobs_list))
+        .route("/api/cron-jobs", post(handle_cron_job_create))
+        .route("/api/cron-jobs/{id}", get(handle_cron_job_get))
+        .route("/api/cron-jobs/{id}", delete(handle_cron_job_delete))
+        .route("/api/cron-jobs/{id}", patch(handle_cron_job_update))
+        .route("/api/cron-jobs/{id}/trigger", post(handle_cron_job_trigger))
         // Approvals (HitL)
         .route("/api/approvals", get(handle_approvals_list))
         .route("/api/approvals/{id}/approve", post(handle_approval_approve))

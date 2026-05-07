@@ -1,19 +1,39 @@
-# Oxios Progress Tracker
+# Progress
 
-## 2026-05-07: Agent OS Research
+## Status
+In Progress
 
-### ✅ Completed: Deep Investigation into "Agent Operating System"
+## Tasks
 
-**Output:** `/tmp/oxios-agent-os-research.md`
+## Files Changed
 
-**Key Findings:**
-- Agent OS ≠ Agent Framework ≠ Agent SDK — the OS provides process management, scheduling, IPC, security (like Linux for processes)
-- **AIOS** (COLM 2025) is the foundational academic paper — defines kernel modules: scheduler, context manager, memory manager, storage manager, tool manager, access manager
-- **AgenticOS 2026** — first ASPLOS workshop on OS design for AI agents, signals formal recognition by systems research community
-- **OpenFang** — most relevant existing project: Rust-based Agent OS, 180ms cold start, production-oriented
-- **AARM** — emerging security spec (CSA, donated by Vanta) — the "SELinux for Agent OS"
-- **MCP + A2A** — complementary protocols forming the communication stack (agent→tool + agent→agent)
-- **OpenClaw / miniclaw-os** — NOT found in public sources; may be internal/private projects
-- Multi-agent orchestration patterns converging on 4 models: Supervisor, Pipeline, Swarm, Hierarchical
+## Notes
 
-**Status:** Research complete, ready for review.
+## L11: Cron Scheduler Core Implementation (2026-05-08)
+
+### Status: ✅ Complete
+
+### What was done
+Implemented the full `CronScheduler` module for `oxios-kernel`:
+- Created `crates/oxios-kernel/src/cron.rs` with `CronScheduler`, `CronJob`, `CronJobResult`, `CronJobUpdate`, `JobSource`
+- Added `cron = "0.16"` to `Cargo.toml` dependencies
+- Added `CronConfig` and `InlineCronJob` to `config.rs` with `use crate::scheduler::Priority`
+- Registered `pub mod cron` in `lib.rs` and exported public types
+- Removed old `cron_scheduler` module that caused duplicate type errors
+
+Key fixes applied:
+- **C1**: `normalize_expr()` auto-prepends `"0 "` for 5-field Linux cron expressions
+- **C2**: `running_jobs: Arc<Mutex<HashSet<Uuid>>>` guard prevents duplicate execution
+- **L2**: `dirty: Arc<AtomicBool>` flag avoids unnecessary persistence writes
+- **Send fix**: Scoped `{ }` block drops `RwLockWriteGuard` before `.await`
+- **Arc<Self>**: `start()` takes `Arc<Self>` so spawned tasks get `'static` lifetime
+
+### Verification
+- `cargo check -p oxios-kernel` ✅ (pre-existing warnings only)
+- `cargo test -p oxios-kernel --lib -- cron` ✅ **16/16 tests pass**
+
+### Files Changed
+- `crates/oxios-kernel/Cargo.toml`
+- `crates/oxios-kernel/src/lib.rs`
+- `crates/oxios-kernel/src/config.rs`
+- `crates/oxios-kernel/src/cron.rs` (new)

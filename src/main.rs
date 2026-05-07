@@ -608,6 +608,7 @@ async fn main() -> Result<()> {
                 kernel.mcp_bridge.clone(),
                 kernel.auth_manager.clone(),
                 kernel.memory_manager.clone(),
+                kernel.cron_scheduler.clone(),
             )?;
 
             let shutdown_tx = setup_shutdown_handler();

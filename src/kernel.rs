@@ -9,7 +9,7 @@ use oxios_gateway::Gateway;
 use oxios_kernel::{
     access_manager::AccessManager, auth::AuthManager, config::load_config,
     A2AProtocol, AgentRuntime, BasicSupervisor, ContainerManager,
-    EngineProvider, EventBus, HostExecBridge, HostToolValidator,
+    CronScheduler, EngineProvider, EventBus, HostExecBridge, HostToolValidator,
     McpBridge, McpServer, MemoryManager, Orchestrator, OxiosConfig, PersonaManager,
     ProgramManager, SkillStore, AgentScheduler, Supervisor,
 };
@@ -55,6 +55,8 @@ pub struct Kernel {
     pub memory_manager: Arc<MemoryManager>,
     /// API key authentication manager.
     pub auth_manager: Arc<parking_lot::Mutex<AuthManager>>,
+    /// Cron job scheduler for time-based task execution.
+    pub cron_scheduler: Arc<CronScheduler>,
 }
 
 /// Builder for assembling the Oxios kernel.
@@ -230,6 +232,12 @@ impl KernelBuilder {
         }
         let auth_manager = Arc::new(parking_lot::Mutex::new(auth_manager));
 
+        // ── Cron scheduler ──
+        let cron_scheduler = Arc::new(CronScheduler::new(
+            state_store.clone(),
+            config.cron.tick_interval_secs,
+        ));
+
         Ok(Kernel {
             orchestrator,
             gateway,
@@ -247,6 +255,7 @@ impl KernelBuilder {
             mcp_bridge,
             memory_manager,
             auth_manager,
+            cron_scheduler,
         })
     }
 }

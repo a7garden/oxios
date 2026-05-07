@@ -23,6 +23,7 @@ pub mod engine;
 pub mod error;
 pub mod event_bus;
 pub mod container_manager;
+pub mod cron;
 pub mod host_exec;
 pub mod host_tools;
 pub mod memory;
@@ -70,7 +71,7 @@ pub use agent_lifecycle::AgentLifecycleManager;
 pub use agent_runtime::AgentRuntime;
 pub use error::{HttpStatus, KernelError, KernelResult};
 pub use engine::{EngineProvider, OxiEngineProvider};
-pub use config::{OxiosConfig, MemoryConfig, PersonaConfig, McpConfig, McpServerDef};
+pub use config::{OxiosConfig, MemoryConfig, PersonaConfig, McpConfig, McpServerDef, CronConfig, InlineCronJob};
 
 // Auth manager exports
 pub use auth::{AuthManager, KeyMeta};
@@ -82,6 +83,7 @@ pub use container_manager::{ContainerInfo, ContainerManager, ToolHealthReport, T
 pub use host_exec::HostExecBridge;
 pub use orchestrator::{OrchestrationResult, Orchestrator, SubTask, AgentRole};
 pub use scheduler::{AgentScheduler, Priority, ScheduledTask, SchedulerStats, TaskStatus};
+pub use cron::{CronScheduler, CronJob, CronJobResult, CronJobUpdate, JobSource};
 pub use host_tools::{common as host_tools_common, HostToolStatus, HostToolValidator};
 pub use mcp::{McpBridge, McpCapabilities, McpServer, McpTool};
 pub use embedding::{EmbeddingProvider, EmbeddingVector, TfIdfEmbeddingProvider};

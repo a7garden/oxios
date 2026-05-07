@@ -23,6 +23,7 @@ tracing = { workspace = true }
 anyhow = { workspace = true }
 thiserror = { workspace = true }
 chrono = { workspace = true }
+cron = "0.16"
 
 parking_lot = { workspace = true }
 toml = { workspace = true }
