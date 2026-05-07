@@ -136,13 +136,7 @@ impl MemoryManager {
 
     /// Delete a memory entry.
     pub async fn forget(&self, id: &str, memory_type: MemoryType) -> Result<bool> {
-        // StateStore doesn't have delete, so check existence and report
-        if self.get(id, memory_type).await?.is_some() {
-            tracing::info!(id = %id, "Memory forgotten (tombstone)");
-            Ok(true)
-        } else {
-            Ok(false)
-        }
+        self.state_store.delete_file(memory_type.category(), id).await
     }
 
     /// List memories of a given type, most recent first.
@@ -243,6 +237,62 @@ impl MemoryManager {
         format!(
             "{system_prompt}\n\n## Relevant Memory\n\n{memory_block}"
         )
+    }
+
+    /// Create a session summary memory entry from a completed session.
+    ///
+    /// This does NOT use LLM — it records key metadata from the session
+    /// as a structured memory entry for future reference.
+    pub async fn summarize_session(
+        &self,
+        session: &crate::state_store::Session,
+    ) -> Result<Option<String>> {
+        if session.user_messages.is_empty() {
+            return Ok(None);
+        }
+
+        // Build a summary from the session metadata
+        let mut summary_parts = Vec::new();
+
+        // Include the first user message as context
+        if let Some(first_msg) = session.user_messages.first() {
+            summary_parts.push(format!("User: {}", first_msg.content));
+        }
+
+        // Include the last agent response
+        if let Some(last_response) = session.agent_responses.last() {
+            let truncated = if last_response.content.len() > 500 {
+                format!("{}...", &last_response.content[..500])
+            } else {
+                last_response.content.clone()
+            };
+            summary_parts.push(format!("Agent: {}", truncated));
+        }
+
+        // Include metadata
+        if let Some(ref seed_id) = session.active_seed_id {
+            summary_parts.push(format!("Seed: {}", seed_id));
+        }
+        if let Some(ref persona_id) = session.active_persona_id {
+            summary_parts.push(format!("Persona: {}", persona_id));
+        }
+
+        let content = summary_parts.join("\n");
+        let entry = MemoryEntry {
+            id: format!("session-{}-{}", session.id.0, chrono::Utc::now().timestamp()),
+            memory_type: MemoryType::Session,
+            content,
+            source: "session_summary".to_string(),
+            session_id: Some(session.id.0.clone()),
+            tags: vec![],
+            importance: 0.6,
+            created_at: chrono::Utc::now(),
+            accessed_at: chrono::Utc::now(),
+            access_count: 0,
+        };
+
+        let id = self.remember(entry).await?;
+        Ok(Some(id))
     }
 }
 

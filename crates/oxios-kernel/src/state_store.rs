@@ -306,6 +306,25 @@ impl StateStore {
             Err(e) => Err(e.into()),
         }
     }
+
+    /// Delete a file from the given category.
+    pub async fn delete_file(&self, category: &str, name: &str) -> Result<bool> {
+        Self::validate_category(category)?;
+        Self::validate_name(name)?;
+        let path = self.base_path.join(category).join(format!("{name}.json"));
+        if path.exists() {
+            tokio::fs::remove_file(path).await?;
+            Ok(true)
+        } else {
+            let path = self.base_path.join(category).join(format!("{name}.md"));
+            if path.exists() {
+                tokio::fs::remove_file(path).await?;
+                Ok(true)
+            } else {
+                Ok(false)
+            }
+        }
+    }
 }
 
 impl std::fmt::Debug for StateStore {

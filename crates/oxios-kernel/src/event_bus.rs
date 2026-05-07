@@ -98,6 +98,22 @@ pub enum KernelEvent {
         /// Whether it was approved (true) or rejected (false).
         approved: bool,
     },
+    /// A memory entry was stored.
+    MemoryStored {
+        /// Memory entry ID.
+        id: String,
+        /// Memory type label.
+        memory_type: String,
+        /// Source of the memory.
+        source: String,
+    },
+    /// Memories were recalled for a new session.
+    MemoryRecalled {
+        /// The recall query.
+        query: String,
+        /// Number of memories returned.
+        count: usize,
+    },
 }
 
 /// A broadcast-based event bus for kernel events.

@@ -52,7 +52,7 @@ pub use agent_lifecycle::AgentLifecycleManager;
 pub use agent_runtime::AgentRuntime;
 pub use error::{HttpStatus, KernelError, KernelResult};
 pub use engine::{EngineProvider, OxiEngineProvider};
-pub use config::{OxiosConfig, PersonaConfig, McpConfig, McpServerDef};
+pub use config::{OxiosConfig, MemoryConfig, PersonaConfig, McpConfig, McpServerDef};
 
 // Auth manager exports
 pub use auth::{AuthManager, KeyMeta};

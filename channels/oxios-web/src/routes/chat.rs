@@ -76,6 +76,33 @@ pub(crate) async fn handle_chat(
     match state.channel.send_and_wait(msg).await {
         Ok(response) => {
             tracing::info!(reply_len = response.content.len(), "Chat response received");
+
+
+            // Persist session
+            {
+                let session_id_for_save = response.metadata.get("session_id").cloned()
+                    .unwrap_or_else(|| msg_id.clone());
+                let store = &state.state_store;
+                let session_id = oxios_kernel::state_store::SessionId(session_id_for_save);
+                match store.get_or_create_session(&body.user_id, Some(&session_id)).await {
+                    Ok(mut session) => {
+                        session.add_user_message(&content_echo);
+                        session.add_agent_response(oxios_kernel::state_store::AgentResponse {
+                            content: response.content.clone(),
+                            session_id: Some(session_id.0),
+                            seed_id: response.metadata.get("seed_id").cloned(),
+                            phase_reached: response.metadata.get("phase").cloned(),
+                            evaluation_passed: response.metadata.get("evaluation_passed").and_then(|v| v.parse().ok()),
+                            timestamp: chrono::Utc::now(),
+                        });
+                        if let Err(e) = store.update_session(&session).await {
+                            tracing::warn!(error = %e, "Failed to persist session");
+                        }
+                    }
+                    Err(e) => tracing::warn!(error = %e, "Failed to get/create session"),
+                }
+            }
+
             Ok(Json(ChatResponse {
                 id: msg_id,
                 echo: content_echo,

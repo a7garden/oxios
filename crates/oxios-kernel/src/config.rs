@@ -5,6 +5,42 @@
 
 use serde::{Deserialize, Serialize};
 
+/// Memory system configuration.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MemoryConfig {
+    /// Enable the memory system.
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+    /// Maximum memories returned by recall.
+    #[serde(default = "default_max_recall")]
+    pub max_recall: usize,
+    /// Auto-summarize sessions on completion.
+    #[serde(default = "default_true")]
+    pub auto_summarize: bool,
+    /// Capture compaction summaries as conversation memory.
+    #[serde(default = "default_true")]
+    pub capture_compaction: bool,
+    /// Memory retention in days (0 = unlimited).
+    #[serde(default)]
+    pub retention_days: u32,
+}
+
+fn default_true() -> bool { true }
+
+fn default_max_recall() -> usize { 10 }
+
+impl Default for MemoryConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            max_recall: 10,
+            auto_summarize: true,
+            capture_compaction: true,
+            retention_days: 0,
+        }
+    }
+}
+
 /// Top-level Oxios configuration.
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
 pub struct OxiosConfig {
@@ -28,6 +64,9 @@ pub struct OxiosConfig {
     /// Persona system settings.
     #[serde(default)]
     pub persona: PersonaConfig,
+    /// Memory system settings.
+    #[serde(default)]
+    pub memory: MemoryConfig,
     /// MCP server configurations.
     #[serde(default)]
     pub mcp: McpConfig,
