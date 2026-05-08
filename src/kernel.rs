@@ -205,6 +205,7 @@ impl KernelBuilder {
             access_manager.clone(),
             a2a_protocol.clone(),
             event_bus.clone(),
+            config.security.max_execution_time_secs,
         );
 
         // ── Orchestrator ──

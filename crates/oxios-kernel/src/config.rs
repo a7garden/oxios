@@ -5,6 +5,7 @@
 
 use cron::Schedule;
 use serde::{Deserialize, Serialize};
+use std::str::FromStr;
 
 use crate::scheduler::Priority;
 
@@ -105,16 +106,6 @@ impl Default for MemoryConfig {
             capture_compaction: true,
             retention_days: 0,
         }
-    }
-}
-
-/// Returns the effective API key — prefers OXIOS_API_KEY env var,
-    /// falls back to the security.default_api_key config field.
-    pub fn api_key(&self) -> Option<String> {
-        std::env::var("OXIOS_API_KEY")
-            .ok()
-            .filter(|k| !k.is_empty())
-            .or_else(|| self.security.default_api_key.clone())
     }
 }
 
@@ -467,6 +458,7 @@ impl Default for SecurityConfig {
             max_audit_entries: default_max_audit(),
             auth_enabled: false,
             api_keys_path: default_api_keys_path(),
+            default_api_key: None,
             cors_origins: default_cors_origins(),
             audit_log_path: None,
             rate_limit_per_minute: default_rate_limit_per_minute(),
@@ -549,6 +541,15 @@ pub fn load_config(path: &std::path::Path) -> anyhow::Result<OxiosConfig> {
 }
 
 impl OxiosConfig {
+    /// Returns the effective API key — prefers OXIOS_API_KEY env var,
+    /// falls back to the security.default_api_key config field.
+    pub fn api_key(&self) -> Option<String> {
+        std::env::var("OXIOS_API_KEY")
+            .ok()
+            .filter(|k| !k.is_empty())
+            .or_else(|| self.security.default_api_key.clone())
+    }
+
     /// Validate configuration values and return a list of warnings.
     /// Returns (errors, warnings). Empty errors = valid config.
     pub fn validate(&self) -> (Vec<String>, Vec<String>) {

@@ -244,7 +244,12 @@ impl StateStore {
         let dir = self.base_path.join(category);
         fs::create_dir_all(&dir).await?;
         let path = dir.join(format!("{name}.md"));
-        fs::write(path, content).await?;
+
+        // Write to temp file first, then atomic rename
+        let temp_path = dir.join(format!("{name}.{}.tmp", std::process::id()));
+        fs::write(&temp_path, content).await?;
+        tokio::fs::rename(&temp_path, &path).await?;
+
         Ok(())
     }
 
@@ -290,8 +295,14 @@ impl StateStore {
         let dir = self.base_path.join(category);
         fs::create_dir_all(&dir).await?;
         let path = dir.join(format!("{name}.json"));
+
         let content = serde_json::to_string_pretty(data)?;
-        fs::write(path, content).await?;
+
+        // Write to temp file first, then atomic rename
+        let temp_path = dir.join(format!("{name}.{}.tmp", std::process::id()));
+        fs::write(&temp_path, &content).await?;
+        tokio::fs::rename(&temp_path, &path).await?;
+
         Ok(())
     }
 

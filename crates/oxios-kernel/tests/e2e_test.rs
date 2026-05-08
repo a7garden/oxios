@@ -205,6 +205,7 @@ async fn build_test_orchestrator() -> Result<Orchestrator> {
         access_manager,
         a2a,
         event_bus.clone(),
+        300, // max_execution_time_secs
     );
 
     let orchestrator = Orchestrator::new(
@@ -276,6 +277,7 @@ async fn test_orchestrator_evolution_loop() -> Result<()> {
         access_manager,
         a2a,
         event_bus.clone(),
+        300, // max_execution_time_secs
     );
 
     let orchestrator = Orchestrator::new(
@@ -399,6 +401,7 @@ async fn test_phase_events_published() -> Result<()> {
         access_manager,
         a2a,
         event_bus.clone(),
+        300, // max_execution_time_secs
     );
 
     let orchestrator = Orchestrator::new(

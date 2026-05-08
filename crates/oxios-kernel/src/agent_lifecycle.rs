@@ -4,8 +4,10 @@
 //! Handles: fork agent → register A2A → check permissions →
 //! submit to scheduler → run → unregister → complete/fail.
 
-use anyhow::Result;
+use anyhow::{bail, Result};
 use std::sync::Arc;
+
+use tokio::time::{timeout, Duration};
 
 use crate::access_manager::AccessManager;
 use crate::a2a::{A2AProtocol, AgentCard};
@@ -24,6 +26,8 @@ pub struct AgentLifecycleManager {
     access_manager: Arc<parking_lot::Mutex<AccessManager>>,
     a2a: Arc<A2AProtocol>,
     event_bus: EventBus,
+    /// Maximum execution time in seconds for agent tasks (0 = no limit).
+    max_execution_time_secs: u64,
 }
 
 impl AgentLifecycleManager {
@@ -34,8 +38,16 @@ impl AgentLifecycleManager {
         access_manager: Arc<parking_lot::Mutex<AccessManager>>,
         a2a: Arc<A2AProtocol>,
         event_bus: EventBus,
+        max_execution_time_secs: u64,
     ) -> Self {
-        Self { supervisor, scheduler, access_manager, a2a, event_bus }
+        Self {
+            supervisor,
+            scheduler,
+            access_manager,
+            a2a,
+            event_bus,
+            max_execution_time_secs,
+        }
     }
 
     /// Fork an agent, register it in A2A and access control, submit to
@@ -71,13 +83,30 @@ impl AgentLifecycleManager {
         self.scheduler.start_task(task_id)?;
 
         // 5. Run — always cleanup even on failure
-        let result = match self.supervisor.run_with_seed(agent_id, seed).await {
-            Ok(r) => r,
-            Err(e) => {
-                // Agent execution failed — clean up before propagating error
-                tracing::warn!(agent_id = %agent_id, error = %e, "Agent execution failed, cleaning up");
-                self.cleanup_on_failure(agent_id, task_id).await;
-                return Err(e);
+        let result = if self.max_execution_time_secs > 0 {
+            let exec_timeout = Duration::from_secs(self.max_execution_time_secs);
+            match timeout(exec_timeout, self.supervisor.run_with_seed(agent_id, seed)).await {
+                Ok(Ok(r)) => r,
+                Ok(Err(e)) => {
+                    tracing::warn!(agent_id = %agent_id, error = %e, "Agent execution failed, cleaning up");
+                    self.cleanup_on_failure(agent_id, task_id).await;
+                    return Err(e);
+                }
+                Err(_) => {
+                    let secs = exec_timeout.as_secs();
+                    tracing::warn!(agent_id = %agent_id, secs, "Agent execution timed out after {}s", secs);
+                    self.cleanup_on_failure(agent_id, task_id).await;
+                    bail!("Agent execution timed out after {} seconds", secs);
+                }
+            }
+        } else {
+            match self.supervisor.run_with_seed(agent_id, seed).await {
+                Ok(r) => r,
+                Err(e) => {
+                    tracing::warn!(agent_id = %agent_id, error = %e, "Agent execution failed, cleaning up");
+                    self.cleanup_on_failure(agent_id, task_id).await;
+                    return Err(e);
+                }
             }
         };
 
