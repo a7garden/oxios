@@ -18,6 +18,8 @@ use crate::channel::WebChannelHandle;
 use crate::error::AppError;
 use crate::middleware::RateLimiter;
 use crate::routes::build_routes;
+use oxios_kernel::audit_trail::AuditTrail;
+use oxios_kernel::budget::BudgetManager;
 use oxios_kernel::event_bus::EventBus;
 use oxios_kernel::container_manager::ContainerManager;
 use oxios_kernel::cron::CronScheduler;
@@ -31,6 +33,7 @@ use oxios_kernel::scheduler::AgentScheduler;
 use oxios_kernel::access_manager::AccessManager;
 use oxios_kernel::skill::SkillStore;
 use oxios_kernel::state_store::StateStore;
+use oxios_kernel::resource_monitor::ResourceMonitor;
 use oxios_kernel::Supervisor;
 
 /// Shared application state for the web server.
@@ -48,6 +51,12 @@ pub struct AppState {
     pub state_store: Arc<StateStore>,
     /// Container manager for container lifecycle.
     pub container_manager: Arc<ContainerManager>,
+    /// Resource monitor for system metrics.
+    pub resource_monitor: Arc<ResourceMonitor>,
+    /// Audit trail for tamper-evident logging.
+    pub audit_trail: Arc<AuditTrail>,
+    /// Budget manager for agent-level token/call budgets.
+    pub budget_manager: Arc<BudgetManager>,
     /// Skill store for skill management (deprecated, use program_manager).
     pub skill_store: Arc<SkillStore>,
     /// Program manager for OS-level programs.
@@ -133,6 +142,9 @@ impl WebServer {
         event_bus: EventBus,
         state_store: StateStore,
         container_manager: Arc<ContainerManager>,
+        resource_monitor: Arc<ResourceMonitor>,
+        audit_trail: Arc<AuditTrail>,
+        budget_manager: Arc<BudgetManager>,
         skill_store: SkillStore,
         program_manager: Arc<ProgramManager>,
         host_tool_validator: HostToolValidator,
@@ -158,6 +170,9 @@ impl WebServer {
             event_bus: Arc::new(event_bus),
             state_store: Arc::new(state_store),
             container_manager,
+            resource_monitor,
+            audit_trail,
+            budget_manager,
             skill_store: Arc::new(skill_store),
             program_manager,
             host_tool_validator: Arc::new(host_tool_validator),

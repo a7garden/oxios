@@ -144,6 +144,15 @@ pub struct OxiosConfig {
     /// Git version control settings.
     #[serde(default)]
     pub git: GitConfig,
+    /// Audit trail configuration.
+    #[serde(default)]
+    pub audit: AuditConfig,
+    /// Budget enforcement configuration.
+    #[serde(default)]
+    pub budget: BudgetConfig,
+    /// Resource monitor configuration.
+    #[serde(default)]
+    pub resource_monitor: ResourceMonitorConfig,
 }
 
 /// Kernel configuration.
@@ -542,6 +551,114 @@ impl Default for GitConfig {
     }
 }
 
+/// Audit trail configuration.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct AuditConfig {
+    /// Maximum audit entries before pruning.
+    #[serde(default = "default_audit_max_entries")]
+    pub max_entries: usize,
+    /// Enable audit trail.
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+}
+
+fn default_audit_max_entries() -> usize {
+    100_000
+}
+
+impl Default for AuditConfig {
+    fn default() -> Self {
+        Self {
+            max_entries: default_audit_max_entries(),
+            enabled: true,
+        }
+    }
+}
+
+/// Budget enforcement configuration.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct BudgetConfig {
+    /// Default token budget per agent (0 = unlimited).
+    #[serde(default)]
+    pub default_token_budget: u64,
+    /// Default call budget per agent (0 = unlimited).
+    #[serde(default)]
+    pub default_calls_budget: u64,
+    /// Default budget window in seconds.
+    #[serde(default = "default_budget_window")]
+    pub default_window_secs: u64,
+    /// Enable budget enforcement.
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+}
+
+fn default_budget_window() -> u64 {
+    3600
+}
+
+impl Default for BudgetConfig {
+    fn default() -> Self {
+        Self {
+            default_token_budget: 0,
+            default_calls_budget: 0,
+            default_window_secs: default_budget_window(),
+            enabled: true,
+        }
+    }
+}
+
+/// Resource monitor configuration.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ResourceMonitorConfig {
+    /// Snapshot interval in seconds.
+    #[serde(default = "default_rm_interval")]
+    pub interval_secs: u64,
+    /// Maximum history entries.
+    #[serde(default = "default_rm_history_max")]
+    pub history_max: usize,
+    /// CPU threshold for overload.
+    #[serde(default = "default_rm_cpu_threshold")]
+    pub cpu_threshold: f32,
+    /// Memory threshold for overload (percentage).
+    #[serde(default = "default_rm_mem_threshold")]
+    pub memory_threshold: f32,
+    /// Load average threshold for overload.
+    #[serde(default = "default_rm_load_threshold")]
+    pub load_threshold: f32,
+}
+
+fn default_rm_interval() -> u64 {
+    60
+}
+
+fn default_rm_history_max() -> usize {
+    60
+}
+
+fn default_rm_cpu_threshold() -> f32 {
+    90.0
+}
+
+fn default_rm_mem_threshold() -> f32 {
+    90.0
+}
+
+fn default_rm_load_threshold() -> f32 {
+    8.0
+}
+
+impl Default for ResourceMonitorConfig {
+    fn default() -> Self {
+        Self {
+            interval_secs: default_rm_interval(),
+            history_max: default_rm_history_max(),
+            cpu_threshold: default_rm_cpu_threshold(),
+            memory_threshold: default_rm_mem_threshold(),
+            load_threshold: default_rm_load_threshold(),
+        }
+    }
+}
+
 /// Loads configuration from a TOML file.
 pub fn load_config(path: &std::path::Path) -> anyhow::Result<OxiosConfig> {
     let content = std::fs::read_to_string(path)?;
@@ -660,6 +777,24 @@ impl OxiosConfig {
             warnings.push(
                 "OXIOS_API_KEY is set in environment — consider using it instead of config file".into(),
             );
+        }
+
+        // Audit validation
+        if self.audit.max_entries == 0 {
+            warnings.push("audit.max_entries is 0 — audit will never prune".into());
+        }
+
+        // Budget validation
+        if self.budget.default_window_secs == 0 {
+            warnings.push("budget.default_window_secs is 0 — no time window".into());
+        }
+
+        // Resource monitor validation
+        if self.resource_monitor.cpu_threshold > 100.0 {
+            errors.push("resource_monitor.cpu_threshold must be <= 100".into());
+        }
+        if self.resource_monitor.memory_threshold > 100.0 {
+            errors.push("resource_monitor.memory_threshold must be <= 100".into());
         }
 
         (errors, warnings)

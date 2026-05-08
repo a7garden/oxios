@@ -7,6 +7,7 @@
 //! - Maximum concurrent task enforcement
 
 use crate::types::AgentId;
+use crate::budget::BudgetManager;
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use parking_lot::Mutex;
@@ -184,6 +185,8 @@ pub struct AgentScheduler {
     zombie_timeout_secs: u64,
     /// Track when each running task started (for zombie detection).
     task_start_times: Arc<Mutex<HashMap<Uuid, DateTime<Utc>>>>,
+    /// Optional budget manager for scheduling checks.
+    budget_manager: Option<Arc<BudgetManager>>,
 }
 
 impl AgentScheduler {
@@ -201,7 +204,19 @@ impl AgentScheduler {
             rate_limiter: Arc::new(Mutex::new(RateLimiter::new(60, rate_limit_per_minute))),
             zombie_timeout_secs,
             task_start_times: Arc::new(Mutex::new(HashMap::new())),
+            budget_manager: None,
         }
+    }
+
+    /// Attaches a budget manager for scheduling checks.
+    ///
+    /// When a budget manager is set, the scheduler will:
+    /// - Check `can_schedule()` before starting a task (soft gate)
+    /// - Track calls via `track_call()` when a task begins
+    ///
+    /// If no budget manager is set, tasks proceed normally.
+    pub fn set_budget_manager(&mut self, bm: Arc<BudgetManager>) {
+        self.budget_manager = Some(bm);
     }
 
     /// Submits a task to the scheduler queue.
@@ -267,38 +282,63 @@ impl AgentScheduler {
             }
         }
 
-        // Pop the highest priority task.
-        let task = {
-            let mut queue = self.queue.lock();
-            queue.pop()
+        // Pop the highest priority task with budget check.
+        let mut task = loop {
+            let task_opt = {
+                let mut queue = self.queue.lock();
+                queue.pop()
+            };
+
+            match task_opt {
+                Some(t) => break t,
+                None => return None,
+            }
         };
 
-        if let Some(mut task) = task {
-            task.status = TaskStatus::Running;
-
-            // Track start time for zombie detection.
-            {
-                let mut start_times = self.task_start_times.lock();
-                start_times.insert(task.id, Utc::now());
+        // Check budget before scheduling (soft gate).
+        if let (Some(ref bm), Some(ref agent_id)) = (&self.budget_manager, &task.agent_id) {
+            if !bm.can_schedule(agent_id) {
+                tracing::warn!(
+                    agent_id = %agent_id,
+                    "Agent budget exhausted, skipping task"
+                );
+                return self.next_task(); // Try next task recursively.
             }
-
-            // Add to running map.
-            {
-                let mut running = self.running.lock();
-                running.insert(task.id, task.clone());
-            }
-
-            tracing::info!(
-                task_id = %task.id,
-                priority = ?task.priority,
-                running = self.running.lock().len(),
-                "Task started by scheduler"
-            );
-
-            Some(task)
-        } else {
-            None
         }
+
+        task.status = TaskStatus::Running;
+
+        // Track start time for zombie detection.
+        {
+            let mut start_times = self.task_start_times.lock();
+            start_times.insert(task.id, Utc::now());
+        }
+
+        // Add to running map.
+        {
+            let mut running = self.running.lock();
+            running.insert(task.id, task.clone());
+        }
+
+        tracing::info!(
+            task_id = %task.id,
+            priority = ?task.priority,
+            running = self.running.lock().len(),
+            "Task started by scheduler"
+        );
+
+        // Track call for budget management.
+        if let (Some(ref bm), Some(ref agent_id)) = (&self.budget_manager, &task.agent_id) {
+            if let Err(e) = bm.track_call(agent_id) {
+                tracing::warn!(
+                    agent_id = %agent_id,
+                    error = %e,
+                    "Budget exceeded during task track_call"
+                );
+            }
+        }
+
+        Some(task)
     }
 
     /// Marks a task as completed.
@@ -839,5 +879,117 @@ mod tests {
         let stats = scheduler.stats();
         assert_eq!(stats.max_concurrent, 5);
         assert_eq!(stats.rate_limit_per_minute, 60);
+    }
+
+    #[test]
+    fn test_budget_manager_integration_skips_exhausted_agent() {
+        use crate::budget::{BudgetLimit, BudgetManager};
+
+        let scheduler = Arc::new(Mutex::new(AgentScheduler::new(2, 10_000, 60)));
+        let budget_manager = Arc::new(BudgetManager::new());
+
+        // Set a very low budget (1 call).
+        let agent_id = AgentId::new_v4();
+        budget_manager.set_budget(BudgetLimit {
+            agent_id,
+            token_budget: 1000,
+            calls_budget: 1,
+            window_secs: 60,
+        });
+
+        // Attach budget manager to scheduler.
+        scheduler.lock().set_budget_manager(Arc::clone(&budget_manager));
+
+        // Submit two tasks for the same agent.
+        scheduler
+            .lock()
+            .submit(ScheduledTask::for_agent(agent_id, "Task 1".into(), Priority::Normal))
+            .unwrap();
+        scheduler
+            .lock()
+            .submit(ScheduledTask::for_agent(agent_id, "Task 2".into(), Priority::Normal))
+            .unwrap();
+
+        // First task should run (track_call succeeds).
+        let task1 = scheduler.lock().next_task();
+        assert!(task1.is_some());
+        scheduler.lock().complete_task(task1.unwrap().id).unwrap();
+
+        // Second task should be skipped (budget exhausted).
+        let task2 = scheduler.lock().next_task();
+        assert!(task2.is_none());
+    }
+
+    #[test]
+    fn test_budget_manager_allows_different_agents() {
+        use crate::budget::{BudgetLimit, BudgetManager};
+
+        let scheduler = Arc::new(Mutex::new(AgentScheduler::new(2, 10_000, 60)));
+        let budget_manager = Arc::new(BudgetManager::new());
+
+        let agent1 = AgentId::new_v4();
+        let agent2 = AgentId::new_v4();
+
+        // Set budget for both agents (3 calls each).
+        for agent_id in [&agent1, &agent2] {
+            budget_manager.set_budget(BudgetLimit {
+                agent_id: *agent_id,
+                token_budget: 1000,
+                calls_budget: 3,
+                window_secs: 60,
+            });
+        }
+
+        scheduler.lock().set_budget_manager(Arc::clone(&budget_manager));
+
+        // Submit tasks for both agents.
+        scheduler
+            .lock()
+            .submit(ScheduledTask::for_agent(agent1, "A1".into(), Priority::Normal))
+            .unwrap();
+        scheduler
+            .lock()
+            .submit(ScheduledTask::for_agent(agent2, "B1".into(), Priority::Normal))
+            .unwrap();
+
+        // Both should run.
+        let t1 = scheduler.lock().next_task().unwrap();
+        let t2 = scheduler.lock().next_task().unwrap();
+        assert_ne!(t1.description, t2.description);
+    }
+
+    #[test]
+    fn test_budget_manager_task_without_agent_id() {
+        use crate::budget::{BudgetLimit, BudgetManager};
+
+        let scheduler = Arc::new(Mutex::new(AgentScheduler::new(2, 10_000, 60)));
+        let budget_manager = Arc::new(BudgetManager::new());
+
+        scheduler.lock().set_budget_manager(Arc::clone(&budget_manager));
+
+        // Submit a task without an agent ID.
+        scheduler
+            .lock()
+            .submit(ScheduledTask::new("No agent".into(), Priority::Normal))
+            .unwrap();
+
+        // Should still run (no budget check for tasks without agent).
+        let task = scheduler.lock().next_task();
+        assert!(task.is_some());
+    }
+
+    #[test]
+    fn test_budget_manager_not_set_skips_check() {
+        let scheduler = Arc::new(Mutex::new(AgentScheduler::new(2, 10_000, 60)));
+        // No budget manager attached.
+
+        scheduler
+            .lock()
+            .submit(ScheduledTask::new("Any task".into(), Priority::Normal))
+            .unwrap();
+
+        // Should run normally without budget manager.
+        let task = scheduler.lock().next_task();
+        assert!(task.is_some());
     }
 }

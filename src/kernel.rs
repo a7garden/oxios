@@ -12,6 +12,7 @@ use oxios_kernel::{
     CronScheduler, EngineProvider, EventBus, GitLayer, HostExecBridge, HostToolValidator,
     McpBridge, McpServer, MemoryManager, Orchestrator, OxiosConfig, PersonaManager,
     ProgramManager, SkillStore, AgentScheduler, Supervisor,
+    AuditTrail, BudgetManager, ResourceMonitor,
 };
 use oxios_ouroboros::{OuroborosEngine, OuroborosProtocol};
 use std::path::PathBuf;
@@ -59,6 +60,12 @@ pub struct Kernel {
     pub cron_scheduler: Arc<CronScheduler>,
     /// Git-based version control layer for state persistence.
     pub git_layer: Arc<GitLayer>,
+    /// Audit trail for tamper-evident event logging.
+    pub audit_trail: Arc<AuditTrail>,
+    /// Budget manager for agent-level token/call budgets.
+    pub budget_manager: Arc<BudgetManager>,
+    /// Resource monitor for system metrics.
+    pub resource_monitor: Arc<ResourceMonitor>,
 }
 
 /// Builder for assembling the Oxios kernel.
@@ -247,6 +254,21 @@ impl KernelBuilder {
             config.git.auto_commit,
         )?);
 
+        // ── Audit trail ──
+        let audit_trail = Arc::new(AuditTrail::new(config.audit.max_entries));
+
+        // ── Budget manager ──
+        let budget_manager = Arc::new(BudgetManager::new());
+
+        // ── Resource monitor ──
+        let resource_monitor = Arc::new(ResourceMonitor::new(
+            config.resource_monitor.interval_secs,
+            config.resource_monitor.history_max,
+        ));
+
+        // Wire audit trail to event bus
+        event_bus.attach_audit_trail(audit_trail.clone());
+
         Ok(Kernel {
             orchestrator,
             gateway,
@@ -266,6 +288,9 @@ impl KernelBuilder {
             auth_manager,
             cron_scheduler,
             git_layer,
+            audit_trail,
+            budget_manager,
+            resource_monitor,
         })
     }
 }

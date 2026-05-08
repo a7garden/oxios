@@ -1,0 +1,91 @@
+//! Budget management API routes.
+
+use std::sync::Arc;
+use axum::extract::{Path, State};
+use axum::Json;
+use serde::Deserialize;
+use crate::error::AppError;
+use crate::server::AppState;
+use oxios_kernel::types::AgentId;
+use serde_json;
+
+#[derive(Debug, Deserialize)]
+pub struct SetBudgetRequest {
+    pub token_budget: u64,
+    pub calls_budget: u64,
+    pub window_secs: u64,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ReserveRequest {
+    pub tokens: u64,
+}
+
+fn parse_agent_id(id: &str) -> Result<AgentId, AppError> {
+    AgentId::parse_str(id).map_err(|e| AppError::Internal(format!("Invalid agent ID: {e}")))
+}
+
+/// GET /api/budget/{agent_id}
+pub(crate) async fn handle_budget_get(
+    State(state): State<Arc<AppState>>,
+    Path(agent_id): Path<String>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    let aid = parse_agent_id(&agent_id)?;
+    let info = state.budget_manager.remaining(&aid);
+    Ok(Json(serde_json::json!({
+        "agent_id": agent_id,
+        "tokens_remaining": info.tokens_remaining,
+        "calls_remaining": info.calls_remaining,
+        "window_remaining_secs": info.window_remaining_secs,
+        "is_exhausted": info.is_exhausted,
+    })))
+}
+
+/// POST /api/budget/{agent_id}
+pub(crate) async fn handle_budget_set(
+    State(state): State<Arc<AppState>>,
+    Path(agent_id): Path<String>,
+    Json(body): Json<SetBudgetRequest>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    let aid = parse_agent_id(&agent_id)?;
+    use oxios_kernel::budget::BudgetLimit;
+    state.budget_manager.set_budget(BudgetLimit {
+        agent_id: aid,
+        token_budget: body.token_budget,
+        calls_budget: body.calls_budget,
+        window_secs: body.window_secs,
+    });
+    Ok(Json(serde_json::json!({ "set": true, "agent_id": agent_id })))
+}
+
+/// DELETE /api/budget/{agent_id}
+pub(crate) async fn handle_budget_remove(
+    State(state): State<Arc<AppState>>,
+    Path(agent_id): Path<String>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    let aid = parse_agent_id(&agent_id)?;
+    state.budget_manager.remove_budget(&aid);
+    Ok(Json(serde_json::json!({ "removed": true, "agent_id": agent_id })))
+}
+
+/// POST /api/budget/{agent_id}/reserve
+pub(crate) async fn handle_budget_reserve(
+    State(state): State<Arc<AppState>>,
+    Path(agent_id): Path<String>,
+    Json(body): Json<ReserveRequest>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    let aid = parse_agent_id(&agent_id)?;
+    state.budget_manager.reserve(&aid, body.tokens)
+        .map_err(|e| AppError::Internal(format!("Budget exceeded: {e}")))?;
+    Ok(Json(serde_json::json!({ "reserved": true })))
+}
+
+/// POST /api/budget/{agent_id}/reset
+pub(crate) async fn handle_budget_reset(
+    State(state): State<Arc<AppState>>,
+    Path(agent_id): Path<String>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    let aid = parse_agent_id(&agent_id)?;
+    state.budget_manager.reset_window(&aid);
+    Ok(Json(serde_json::json!({ "reset": true, "agent_id": agent_id })))
+}

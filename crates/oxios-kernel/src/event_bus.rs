@@ -5,8 +5,10 @@
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 use tokio::sync::broadcast;
 
+use crate::audit_trail::{AuditAction, AuditTrail};
 use crate::types::AgentId;
 
 /// Events that flow through the kernel event bus.
@@ -132,6 +134,74 @@ pub enum KernelEvent {
     },
 }
 
+/// Convert a KernelEvent to an AuditAction for the audit trail.
+pub fn kernel_event_to_audit_action(event: &KernelEvent) -> AuditAction {
+    match event {
+        KernelEvent::AgentCreated { name, .. } => AuditAction::AgentSpawn {
+            task_type: name.clone(),
+        },
+        KernelEvent::AgentStarted { .. } => AuditAction::AgentSpawn {
+            task_type: "started".to_string(),
+        },
+        KernelEvent::AgentStopped { .. } => AuditAction::AgentExit {
+            reason: "stopped".to_string(),
+        },
+        KernelEvent::AgentFailed { error, .. } => AuditAction::AgentExit {
+            reason: error.clone(),
+        },
+        KernelEvent::MessageReceived { content, .. } => AuditAction::Other {
+            detail: format!("message: {}", content),
+        },
+        KernelEvent::SeedCreated { seed_id, .. } => AuditAction::Other {
+            detail: format!("seed_created:{}", seed_id),
+        },
+        KernelEvent::EvaluationComplete { seed_id, passed } => AuditAction::Other {
+            detail: format!("evaluation:{}:{}", seed_id, passed),
+        },
+        KernelEvent::PhaseStarted { session_id, phase } => AuditAction::Other {
+            detail: format!("phase_started:{}:{}", session_id, phase),
+        },
+        KernelEvent::PhaseCompleted { session_id, phase, result_summary } => AuditAction::Other {
+            detail: format!("phase_completed:{}:{}:{}", session_id, phase, result_summary),
+        },
+        KernelEvent::AgentOutput { output, .. } => AuditAction::Other {
+            detail: format!("agent_output:{}", output),
+        },
+        KernelEvent::ApprovalRequested { id, action, resource, reason } => AuditAction::Other {
+            detail: format!("approval_requested:{}:{}:{}", id, action, resource),
+        },
+        KernelEvent::ApprovalResolved { id, approved } => AuditAction::Other {
+            detail: format!("approval_resolved:{}:{}", id, approved),
+        },
+        KernelEvent::MemoryStored { id, memory_type, .. } => AuditAction::MemoryWrite {
+            entry_id: format!("{}:{}", id, memory_type),
+        },
+        KernelEvent::MemoryRecalled { query, count } => AuditAction::MemoryRead {
+            entry_id: format!("query:{}:{}results", query, count),
+        },
+        KernelEvent::AgentGroupCreated { group_id, agent_count } => AuditAction::Other {
+            detail: format!("group_created:{}:{}agents", group_id, agent_count),
+        },
+        KernelEvent::AgentGroupMemberCompleted { group_id, agent_id, success } => AuditAction::Other {
+            detail: format!("group_member_completed:{}:{}:{}", group_id, agent_id, success),
+        },
+    }
+}
+
+/// Extract agent ID from a KernelEvent variant.
+fn extract_agent_id(event: &KernelEvent) -> String {
+    match event {
+        KernelEvent::AgentCreated { id, .. } => id.to_string(),
+        KernelEvent::AgentStarted { id, .. } => id.to_string(),
+        KernelEvent::AgentStopped { id, .. } => id.to_string(),
+        KernelEvent::AgentFailed { id, .. } => id.to_string(),
+        KernelEvent::MessageReceived { from, .. } => from.to_string(),
+        KernelEvent::AgentOutput { agent_id, .. } => agent_id.to_string(),
+        KernelEvent::AgentGroupMemberCompleted { agent_id, .. } => agent_id.to_string(),
+        _ => "system".to_string(),
+    }
+}
+
 /// A broadcast-based event bus for kernel events.
 ///
 /// Subscribers receive all events published after they subscribe.
@@ -168,6 +238,20 @@ impl EventBus {
         // It's okay if there are no subscribers.
         let _ = self.sender.send(event);
         Ok(())
+    }
+
+    /// Subscribe the audit trail to all kernel events.
+    /// This forwards all events to the audit trail as background tasks.
+    pub fn attach_audit_trail(&self, audit: Arc<AuditTrail>) {
+        let mut rx = self.subscribe();
+        tokio::spawn(async move {
+            while let Ok(event) = rx.recv().await {
+                let actor = extract_agent_id(&event);
+                let action = kernel_event_to_audit_action(&event);
+                let resource = format!("{:?}", event);
+                audit.append(actor, action, resource);
+            }
+        });
     }
 }
 

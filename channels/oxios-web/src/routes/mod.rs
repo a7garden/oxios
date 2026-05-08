@@ -9,12 +9,15 @@
 //! - **events**: Sessions, SSE events, approvals
 
 mod agent_groups;
+mod audit_routes;
+mod budget_routes;
 mod chat;
 mod cron_jobs;
 mod events;
 mod git_routes;
 mod infra;
 mod resources;
+mod resource_routes;
 mod system;
 mod workspace;
 
@@ -33,8 +36,17 @@ pub(crate) use cron_jobs::{handle_cron_jobs_list, handle_cron_job_create, handle
 pub(crate) use events::{handle_events, handle_sessions_list, handle_session_get, handle_session_delete, handle_approvals_list, handle_approval_approve, handle_approval_reject};
 pub(crate) use infra::{handle_audit_log, handle_metrics, handle_permissions_get, handle_permissions_put, handle_scheduler_stats, handle_scheduler_tasks};
 pub(crate) use resources::{handle_gardens_list, handle_garden_create, handle_garden_start, handle_garden_stop, handle_garden_remove, handle_garden_exec, handle_programs_list, handle_program_get, handle_program_install, handle_program_uninstall, handle_program_enable, handle_program_disable, handle_program_host_requirements, handle_host_tools_check};
+pub(crate) use resource_routes::{handle_resource_snapshot, handle_resource_history, handle_resource_overload};
 pub(crate) use system::{handle_health, handle_status, handle_agents_list, handle_agent_kill, handle_config_get, handle_config_put, handle_container_tools, handle_container_create, handle_toolchains_list};
 pub(crate) use agent_groups::{handle_agent_groups_list, handle_agent_group_get};
+pub(crate) use audit_routes::{
+    handle_audit_entries,
+    handle_audit_verify,
+    handle_audit_by_agent,
+    handle_audit_export,
+    handle_audit_flush,
+};
+pub(crate) use budget_routes::{handle_budget_get, handle_budget_set, handle_budget_remove, handle_budget_reserve, handle_budget_reset};
 pub(crate) use git_routes::{handle_git_log, handle_git_tags, handle_git_verify, handle_git_restore};
 pub(crate) use workspace::{handle_workspace_tree, handle_workspace_file_get, handle_workspace_file_put, handle_seeds_list, handle_seed_get, handle_seed_evolution, handle_skills_list, handle_skill_get, handle_skill_create, handle_skill_delete, handle_memory_list, handle_memory_get, handle_memory_create, handle_memory_search};
 
@@ -120,7 +132,13 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         // Scheduler stats & tasks
         .route("/api/scheduler/stats", get(handle_scheduler_stats))
         .route("/api/scheduler/tasks", get(handle_scheduler_tasks))
-        // Audit log & permissions
+        // Audit log
+        .route("/api/audit/entries", get(handle_audit_entries))
+        .route("/api/audit/verify", get(handle_audit_verify))
+        .route("/api/audit/agent/{agent_id}", get(handle_audit_by_agent))
+        .route("/api/audit/export", post(handle_audit_export))
+        .route("/api/audit/flush", post(handle_audit_flush))
+        // Permissions
         .route("/api/audit", get(handle_audit_log))
         .route("/api/permissions/{agent}", get(handle_permissions_get))
         .route("/api/permissions/{agent}", put(handle_permissions_put))
@@ -136,6 +154,10 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         .route("/api/programs/{name}/host-requirements", get(handle_program_host_requirements))
         // Host tools
         .route("/api/host-tools", get(handle_host_tools_check))
+        // Resources
+        .route("/api/resources", get(handle_resource_snapshot))
+        .route("/api/resources/history", get(handle_resource_history))
+        .route("/api/resources/overload", get(handle_resource_overload))
         // Agent Groups
         .route("/api/agent-groups", get(handle_agent_groups_list))
         .route("/api/agent-groups/{id}", get(handle_agent_group_get))
@@ -175,6 +197,12 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         .route("/api/git/tags", get(handle_git_tags))
         .route("/api/git/verify", post(handle_git_verify))
         .route("/api/git/restore", post(handle_git_restore))
+        // Budget
+        .route("/api/budget/{agent_id}", get(handle_budget_get))
+        .route("/api/budget/{agent_id}", post(handle_budget_set))
+        .route("/api/budget/{agent_id}", delete(handle_budget_remove))
+        .route("/api/budget/{agent_id}/reserve", post(handle_budget_reserve))
+        .route("/api/budget/{agent_id}/reset", post(handle_budget_reset))
         .layer(axum::middleware::from_fn_with_state(state.clone(), require_auth))
         .layer(axum::middleware::from_fn_with_state(state.clone().rate_limiter.clone(), rate_limit_layer))
         .layer(axum::extract::DefaultBodyLimit::max(API_BODY_LIMIT))

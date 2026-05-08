@@ -16,6 +16,7 @@ use std::sync::Arc;
 
 use crate::agent_runtime::AgentRuntime;
 use crate::event_bus::EventBus;
+use crate::resource_monitor::ResourceMonitor;
 use crate::types::{AgentId, AgentInfo, AgentStatus};
 use oxios_ouroboros::ExecutionResult;
 
@@ -47,6 +48,7 @@ pub struct BasicSupervisor {
     agents: RwLock<HashMap<AgentId, AgentInfo>>,
     event_bus: EventBus,
     runtime: Arc<AgentRuntime>,
+    resource_monitor: Option<Arc<ResourceMonitor>>,
 }
 
 impl BasicSupervisor {
@@ -56,6 +58,20 @@ impl BasicSupervisor {
             agents: RwLock::new(HashMap::new()),
             event_bus,
             runtime: Arc::new(runtime),
+            resource_monitor: None,
+        }
+    }
+
+    /// Attach a resource monitor for agent count tracking.
+    pub fn set_resource_monitor(&mut self, rm: Arc<ResourceMonitor>) {
+        self.resource_monitor = Some(rm);
+    }
+
+    /// Update the resource monitor with current active agent count.
+    fn update_agent_count(&self) {
+        if let Some(ref rm) = self.resource_monitor {
+            let count = self.agents.read().len();
+            rm.set_active_agents(count);
         }
     }
 }
@@ -77,6 +93,8 @@ impl Supervisor for BasicSupervisor {
             agents.insert(id, info);
         }
 
+        self.update_agent_count();
+
         let _ = self.event_bus.publish(crate::event_bus::KernelEvent::AgentCreated {
             id,
             name: spec.goal.clone(),
@@ -96,6 +114,8 @@ impl Supervisor for BasicSupervisor {
                 None => anyhow::bail!("Agent {id} not found"),
             }
         }
+
+        self.update_agent_count();
 
         let _ = self
             .event_bus
@@ -142,6 +162,7 @@ impl Supervisor for BasicSupervisor {
                 }
 
                 let _ = self.event_bus.publish(crate::event_bus::KernelEvent::AgentStopped { id });
+                self.update_agent_count();
                 Ok(result)
             }
             Err(e) => {
@@ -158,6 +179,7 @@ impl Supervisor for BasicSupervisor {
                     id,
                     error: e.to_string(),
                 });
+                self.update_agent_count();
 
                 Ok(ExecutionResult {
                     output: format!("Agent failed: {e}"),
@@ -189,6 +211,7 @@ impl Supervisor for BasicSupervisor {
         let _ = self
             .event_bus
             .publish(crate::event_bus::KernelEvent::AgentStopped { id });
+        self.update_agent_count();
         tracing::info!(agent_id = %id, "Agent killed");
         Ok(())
     }
