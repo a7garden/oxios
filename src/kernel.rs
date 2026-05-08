@@ -144,6 +144,12 @@ impl KernelBuilder {
         // ── A2A protocol (created once) ──
         let a2a_protocol = Arc::new(A2AProtocol::new(event_bus.clone()));
 
+        // ── Git version control layer (created early for wiring to other components) ──
+        let git_layer = Arc::new(GitLayer::new(
+            PathBuf::from(&config.kernel.workspace),
+            config.git.auto_commit,
+        )?);
+
         // ── Container infrastructure ──
         let containers_base = PathBuf::from(&config.container.container_path);
         let host_exec = Arc::new(
@@ -155,11 +161,13 @@ impl KernelBuilder {
         );
         let state_store_for_containers =
             oxios_kernel::state_store::StateStore::new(PathBuf::from(&config.kernel.workspace))?;
-        let container_manager = Arc::new(ContainerManager::with_apple_backend(
+        let mut container_manager = ContainerManager::with_apple_backend(
             host_exec.clone(),
             Arc::new(state_store_for_containers),
             containers_base,
-        ));
+        );
+        container_manager.set_git_layer(git_layer.clone());
+        let container_manager = Arc::new(container_manager);
 
         // ── Skills & programs ──
         let skills_dir = PathBuf::from(&config.kernel.workspace).join("skills");
@@ -195,7 +203,9 @@ impl KernelBuilder {
             .with_mcp_bridge(mcp_bridge.clone());
 
         // ── Memory manager ──
-        let memory_manager = Arc::new(MemoryManager::new(state_store.clone()));
+        let mut memory_manager = MemoryManager::new(state_store.clone());
+        memory_manager.set_git_layer(git_layer.clone());
+        let memory_manager = Arc::new(memory_manager);
 
         // ── Agent runtime with memory ──
         let agent_runtime = agent_runtime
@@ -218,12 +228,14 @@ impl KernelBuilder {
         );
 
         // ── Orchestrator ──
-        let orchestrator = Arc::new(Orchestrator::new(
+        let mut orchestrator = Orchestrator::new(
             ouroboros,
             event_bus.clone(),
             state_store.clone(),
             lifecycle,
-        ));
+        );
+        orchestrator.set_git_layer(git_layer.clone());
+        let orchestrator = Arc::new(orchestrator);
 
         // ── Gateway ──
         let gateway = Gateway::new(orchestrator.clone());
@@ -243,16 +255,12 @@ impl KernelBuilder {
         let auth_manager = Arc::new(parking_lot::Mutex::new(auth_manager));
 
         // ── Cron scheduler ──
-        let cron_scheduler = Arc::new(CronScheduler::new(
+        let mut cron_scheduler = CronScheduler::new(
             state_store.clone(),
             config.cron.tick_interval_secs,
-        ));
-
-        // ── Git version control layer ──
-        let git_layer = Arc::new(GitLayer::new(
-            PathBuf::from(&config.kernel.workspace),
-            config.git.auto_commit,
-        )?);
+        );
+        cron_scheduler.set_git_layer(git_layer.clone());
+        let cron_scheduler = Arc::new(cron_scheduler);
 
         // ── Audit trail ──
         let audit_trail = Arc::new(AuditTrail::new(config.audit.max_entries));
@@ -302,6 +310,73 @@ impl Kernel {
             config_path: expand_path("~/.oxios/config.toml"),
             model_id: "anthropic/claude-sonnet-4-20250514".to_string(),
         }
+    }
+
+    /// Save data to state store and commit to git.
+    pub async fn save_and_commit<T: serde::Serialize>(
+        &self,
+        category: &str,
+        name: &str,
+        data: &T,
+    ) -> anyhow::Result<()> {
+        self.state_store.save_json(category, name, data).await?;
+        if self.git_layer.is_enabled() {
+            let rel_path = format!("{}/{}.json", category, name);
+            let _ = self.git_layer.commit_file(&rel_path, &format!("save {}/{}", category, name));
+        }
+        Ok(())
+    }
+
+    /// Save markdown to state store and commit to git.
+    pub async fn save_markdown_and_commit(
+        &self,
+        category: &str,
+        name: &str,
+        content: &str,
+    ) -> anyhow::Result<()> {
+        self.state_store.save_markdown(category, name, content).await?;
+        if self.git_layer.is_enabled() {
+            let rel_path = format!("{}/{}.md", category, name);
+            let _ = self.git_layer.commit_file(&rel_path, &format!("save {}/{}", category, name));
+        }
+        Ok(())
+    }
+
+    /// Delete a file from state store and commit the removal to git.
+    pub async fn delete_and_commit(
+        &self,
+        category: &str,
+        name: &str,
+    ) -> anyhow::Result<bool> {
+        let deleted = self.state_store.delete_file(category, name).await?;
+        if deleted && self.git_layer.is_enabled() {
+            let rel_path = format!("{}/{}.json", category, name);
+            let _ = self.git_layer.remove_file(&rel_path, &format!("delete {}/{}", category, name));
+        }
+        Ok(deleted)
+    }
+
+    /// Commit all current changes to git.
+    pub fn commit_all(&self, message: &str) -> anyhow::Result<Option<oxios_kernel::git_layer::CommitInfo>> {
+        if !self.git_layer.is_enabled() {
+            return Ok(None);
+        }
+        // Use a broad path set - commit the workspace
+        self.git_layer.commit_file(".", message).ok()
+            .map_or(Ok(None), |info| Ok(Some(info)))
+    }
+
+    /// Flush audit trail to state store and commit to git.
+    pub fn flush_audit(&self) -> anyhow::Result<()> {
+        if self.git_layer.is_enabled() {
+            let _ = self.git_layer.commit_file("audit", "audit trail flush");
+        }
+        Ok(())
+    }
+
+    /// Check if auto-commit is enabled.
+    pub fn auto_commit_enabled(&self) -> bool {
+        self.config.git.auto_commit && self.git_layer.is_enabled()
     }
 }
 

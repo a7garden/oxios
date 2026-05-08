@@ -4,6 +4,7 @@
 //! Supports 5-field (Linux cron) and 6-7 field expressions via the `cron` crate.
 
 use crate::config::CronConfig;
+use crate::git_layer::GitLayer;
 use crate::scheduler::Priority;
 use crate::state_store::StateStore;
 use anyhow::{bail, Result};
@@ -131,6 +132,8 @@ pub struct CronScheduler {
     cancel: Arc<AtomicBool>,
     dirty: Arc<AtomicBool>,
     tick_interval_secs: u64,
+    /// Optional git layer for version-controlled saves.
+    git_layer: Option<Arc<GitLayer>>,
 }
 
 impl CronScheduler {
@@ -148,7 +151,13 @@ impl CronScheduler {
             cancel: Arc::new(AtomicBool::new(false)),
             dirty: Arc::new(AtomicBool::new(false)),
             tick_interval_secs,
+            git_layer: None,
         }
+    }
+
+    /// Set the git layer for version-controlled saves.
+    pub fn set_git_layer(&mut self, gl: Arc<GitLayer>) {
+        self.git_layer = Some(gl);
     }
 
     /// Normalize a cron expression: prepend seconds field if 5-field (Linux style).
@@ -411,6 +420,12 @@ impl CronScheduler {
         if let Err(e) = self.state_store.save_json("cron", "jobs", &job_list).await {
             tracing::error!("Failed to persist cron jobs: {}", e);
         }
+        // Fire-and-forget git commit if git layer is configured
+        if let Some(ref gl) = self.git_layer {
+            if gl.is_enabled() {
+                let _ = gl.commit_file("cron/jobs.json", "cron: update jobs");
+            }
+        }
     }
 
     /// Restore jobs from disk on startup.
@@ -499,6 +514,7 @@ impl Clone for CronScheduler {
             cancel: self.cancel.clone(),
             dirty: self.dirty.clone(),
             tick_interval_secs: self.tick_interval_secs,
+            git_layer: self.git_layer.clone(),
         }
     }
 }

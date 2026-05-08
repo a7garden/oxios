@@ -13,6 +13,7 @@ use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 
 use crate::embedding::{EmbeddingProvider, EmbeddingVector, TfIdfEmbeddingProvider};
+use crate::git_layer::GitLayer;
 use crate::state_store::StateStore;
 
 // ---------------------------------------------------------------------------
@@ -250,6 +251,8 @@ pub struct MemoryManager {
     vector_index: RwLock<HashMap<String, EmbeddingVector>>,
     /// Embedding provider for generating vectors.
     embedding: Arc<dyn EmbeddingProvider>,
+    /// Optional git layer for version-controlled memory.
+    git_layer: Option<Arc<GitLayer>>,
 }
 
 impl std::fmt::Debug for MemoryManager {
@@ -269,6 +272,22 @@ impl MemoryManager {
             max_recall: 10,
             vector_index: RwLock::new(HashMap::new()),
             embedding: Arc::new(TfIdfEmbeddingProvider),
+            git_layer: None,
+        }
+    }
+
+
+    /// Attach a git layer for version-controlled saves.
+    pub fn set_git_layer(&mut self, gl: Arc<GitLayer>) {
+        self.git_layer = Some(gl);
+    }
+
+    /// Commit a file to git if git_layer is available.
+    fn git_commit(&self, rel_path: &str, message: &str) {
+        if let Some(ref gl) = self.git_layer {
+            if gl.is_enabled() {
+                let _ = gl.commit_file(rel_path, message);
+            }
         }
     }
 
@@ -363,6 +382,8 @@ impl MemoryManager {
             .save_json("memory", "vector_index_snapshot", &snapshot)
             .await?;
 
+        self.git_commit("memory/vector_index_snapshot.json", "memory: snapshot save");
+
         tracing::debug!(entries = snapshot.entry_count, "Vector index snapshot saved");
         Ok(())
     }
@@ -400,6 +421,11 @@ impl MemoryManager {
         self.state_store
             .save_json(category, &id, &entry)
             .await?;
+
+        self.git_commit(
+            &format!("{}/{}.json", category, id),
+            &format!("memory: store {}", id),
+        );
 
         // Update vector index
         {

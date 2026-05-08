@@ -24,6 +24,7 @@ use uuid::Uuid;
 
 use crate::agent_lifecycle::AgentLifecycleManager;
 use crate::event_bus::{EventBus, KernelEvent};
+use crate::git_layer::GitLayer;
 use crate::metrics::get_metrics;
 use crate::scheduler::Priority;
 use crate::state_store::StateStore;
@@ -86,6 +87,8 @@ pub struct Orchestrator {
     ouroboros: Arc<dyn OuroborosProtocol>,
     event_bus: EventBus,
     state_store: Arc<StateStore>,
+    /// Git version control layer for auto-commits.
+    git_layer: Option<Arc<GitLayer>>,
     /// Active interview sessions, keyed by session ID.
     sessions: RwLock<std::collections::HashMap<String, InterviewSession>>,
     /// Agent lifecycle manager (fork, register, run, cleanup).
@@ -104,8 +107,23 @@ impl Orchestrator {
             ouroboros,
             event_bus,
             state_store,
+            git_layer: None,
             sessions: RwLock::new(std::collections::HashMap::new()),
             lifecycle,
+        }
+    }
+
+    /// Set the GitLayer for auto-commits after state saves.
+    pub fn set_git_layer(&mut self, git_layer: Arc<GitLayer>) {
+        self.git_layer = Some(git_layer);
+    }
+
+    /// Commit a file to git if GitLayer is configured and enabled.
+    fn git_commit(&self, rel_path: &str, message: &str) {
+        if let Some(ref gl) = self.git_layer {
+            if gl.is_enabled() {
+                let _ = gl.commit_file(rel_path, message);
+            }
         }
     }
 
@@ -404,6 +422,8 @@ impl Orchestrator {
             .await
             .context("failed to save seed to state store")?;
 
+        self.git_commit(&format!("seeds/{}.json", key), "ourobors: save seed");
+
         Ok(())
     }
 
@@ -416,6 +436,8 @@ impl Orchestrator {
             .save_json("evals", &key, evaluation)
             .await
             .context("failed to save evaluation to state store")?;
+
+        self.git_commit(&format!("evals/{}.json", key), "ourobors: save eval");
 
         Ok(())
     }
@@ -557,6 +579,7 @@ impl Orchestrator {
 
         // Persist group state
         let _ = self.state_store.save_json("agent_groups", &group_id.to_string(), &group).await;
+        self.git_commit(&format!("agent_groups/{}.json", group_id), "orchestrator: save group");
 
         Ok(completed)
     }

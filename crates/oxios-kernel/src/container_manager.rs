@@ -11,6 +11,7 @@ use anyhow::{bail, Context, Result};
 use crate::container::{
     AppleBackend, ContainerBackend, ContainerConfig, ContainerStats, ContainerStatus, ExecResult,
 };
+use crate::git_layer::GitLayer;
 use crate::host_exec::HostExecBridge;
 use crate::state_store::StateStore;
 
@@ -127,6 +128,8 @@ pub struct ContainerManager {
     host_exec: Arc<HostExecBridge>,
     /// State store for persisting container metadata.
     state_store: Arc<StateStore>,
+    /// Git version control layer for auto-commits.
+    git_layer: Option<Arc<GitLayer>>,
     /// Base directory for container workspaces.
     containers_base: PathBuf,
 }
@@ -143,7 +146,22 @@ impl ContainerManager {
             backend,
             host_exec,
             state_store,
+            git_layer: None,
             containers_base,
+        }
+    }
+
+    /// Set the GitLayer for auto-commits after state saves.
+    pub fn set_git_layer(&mut self, git_layer: Arc<GitLayer>) {
+        self.git_layer = Some(git_layer);
+    }
+
+    /// Commit a file to git if GitLayer is configured and enabled.
+    fn git_commit(&self, rel_path: &str, message: &str) {
+        if let Some(ref gl) = self.git_layer {
+            if gl.is_enabled() {
+                let _ = gl.commit_file(rel_path, message);
+            }
         }
     }
 
@@ -229,6 +247,9 @@ impl ContainerManager {
             .await
             .context("failed to save container metadata")?;
 
+        self.git_commit(&format!("containers/{}.json", name), "container: created");
+
+
         tracing::info!(name = %name, toolchain = %toolchain, "Container created with toolchain");
         Ok(())
     }
@@ -291,6 +312,7 @@ impl ContainerManager {
             self.state_store
                 .save_json("containers", name, &info)
                 .await?;
+            self.git_commit(&format!("containers/{}.json", name), "container: started");
         }
 
         Ok(())
@@ -310,6 +332,7 @@ impl ContainerManager {
             self.state_store
                 .save_json("containers", name, &info)
                 .await?;
+            self.git_commit(&format!("containers/{}.json", name), "container: stopped");
         }
 
         tracing::info!(container = %name, "Container stopped");
