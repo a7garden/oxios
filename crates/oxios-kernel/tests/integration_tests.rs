@@ -444,7 +444,6 @@ async fn test_orchestrator_happy_path() {
     let orchestrator = Orchestrator::new(
         ouroboros.clone(),
         event_bus.clone(),
-        300,
         state_store,
         lifecycle,
     );
@@ -494,7 +493,6 @@ async fn test_orchestrator_evolution_loop() {
     let orchestrator = Orchestrator::new(
         ouroboros.clone(),
         event_bus.clone(),
-        300,
         state_store,
         lifecycle,
     );
@@ -535,7 +533,6 @@ async fn test_orchestrator_events_published() {
     let orchestrator = Orchestrator::new(
         ouroboros,
         event_bus.clone(),
-        300,
         state_store,
         lifecycle,
     );
@@ -613,7 +610,6 @@ async fn test_gateway_routes_message_through_orchestrator() {
         Orchestrator::new(
             ouroboros,
             event_bus.clone(),
-        300,
             state_store,
             lifecycle,
         )
@@ -660,7 +656,6 @@ async fn test_gateway_unknown_channel() {
         Orchestrator::new(
             ouroboros,
             event_bus.clone(),
-        300,
             state_store,
             lifecycle,
         )
@@ -789,12 +784,10 @@ async fn test_scheduler_orchestrator_integration() {
         a2a.clone(),
         event_bus.clone(),
         300,
-        300, // max_execution_time_secs
     );
     let orchestrator = Orchestrator::new(
         ouroboros,
         event_bus.clone(),
-        300,
         state_store,
         lifecycle,
     );
@@ -856,7 +849,6 @@ async fn test_scheduler_priority_ordering_in_orchestration() {
         a2a.clone(),
         event_bus.clone(),
         300,
-        300, // max_execution_time_secs
     );
     let _orchestrator = Orchestrator::new(
         ouroboros,
@@ -933,12 +925,10 @@ required = ["echo"]
         a2a.clone(),
         event_bus.clone(),
         300,
-        300, // max_execution_time_secs
     );
     let orchestrator = Orchestrator::new(
         ouroboros,
         event_bus.clone(),
-        300,
         state_store,
         lifecycle,
     );
