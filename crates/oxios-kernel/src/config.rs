@@ -3,8 +3,10 @@
 //! Configuration is stored at `~/.oxios/config.toml` and controls
 //! kernel, gateway, and container settings.
 
-use crate::scheduler::Priority;
+use cron::Schedule;
 use serde::{Deserialize, Serialize};
+
+use crate::scheduler::Priority;
 
 /// Cron scheduler configuration.
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -103,6 +105,16 @@ impl Default for MemoryConfig {
             capture_compaction: true,
             retention_days: 0,
         }
+    }
+}
+
+/// Returns the effective API key — prefers OXIOS_API_KEY env var,
+    /// falls back to the security.default_api_key config field.
+    pub fn api_key(&self) -> Option<String> {
+        std::env::var("OXIOS_API_KEY")
+            .ok()
+            .filter(|k| !k.is_empty())
+            .or_else(|| self.security.default_api_key.clone())
     }
 }
 
@@ -389,9 +401,13 @@ pub struct SecurityConfig {
     /// Enable API key authentication.
     #[serde(default)]
     pub auth_enabled: bool,
-    /// Path to API keys file.
+    /// Path to API keys file (JSON with SHA-256 hashed keys).
     #[serde(default = "default_api_keys_path")]
     pub api_keys_path: String,
+    /// Static API key for simple deployments.
+    /// Set this OR use the file at `api_keys_path`, not both.
+    #[serde(default)]
+    pub default_api_key: Option<String>,
     /// Allowed CORS origins.
     #[serde(default = "default_cors_origins")]
     pub cors_origins: Vec<String>,
@@ -520,6 +536,114 @@ fn default_mcp_enabled() -> bool {
 /// Loads configuration from a TOML file.
 pub fn load_config(path: &std::path::Path) -> anyhow::Result<OxiosConfig> {
     let content = std::fs::read_to_string(path)?;
-    let config: OxiosConfig = toml::from_str(&content)?;
+    let mut config: OxiosConfig = toml::from_str(&content)?;
+    let (errors, warnings) = config.validate();
+    for w in warnings {
+        tracing::warn!("config: {}", w);
+    }
+    if !errors.is_empty() {
+        let msg = errors.join("; ");
+        anyhow::bail!("Configuration validation failed: {}", msg);
+    }
     Ok(config)
+}
+
+impl OxiosConfig {
+    /// Validate configuration values and return a list of warnings.
+    /// Returns (errors, warnings). Empty errors = valid config.
+    pub fn validate(&self) -> (Vec<String>, Vec<String>) {
+        let mut errors = Vec::new();
+        let mut warnings = Vec::new();
+
+        // Kernel validation
+        if self.kernel.max_agents == 0 {
+            errors.push("kernel.max_agents must be > 0".into());
+        }
+        if self.kernel.workspace.is_empty() {
+            errors.push("kernel.workspace must not be empty".into());
+        }
+
+        // Gateway validation
+        if self.gateway.port == 0 {
+            errors.push("gateway.port must be > 0".into());
+        }
+        if self.gateway.port < 1024 && self.gateway.host == "0.0.0.0" {
+            warnings.push("Running on port <1024 as 0.0.0.0 may require root".into());
+        }
+
+        // Container validation
+        if self.container.container_path.is_empty() {
+            errors.push("container.container_path must not be empty".into());
+        }
+        if self.container.memory_limit.is_empty() {
+            errors.push("container.memory_limit must not be empty".into());
+        }
+        // Validate memory format (e.g. "4g", "512m")
+        let valid = self.container.memory_limit.ends_with('k')
+            || self.container.memory_limit.ends_with('m')
+            || self.container.memory_limit.ends_with('g')
+            || self.container.memory_limit.ends_with('t');
+        if !valid {
+            warnings.push(format!(
+                "container.memory_limit '{}' may not be valid",
+                self.container.memory_limit
+            ));
+        }
+
+        // Scheduler validation
+        if self.scheduler.max_concurrent == 0 {
+            warnings.push("scheduler.max_concurrent is 0 — no tasks will run".into());
+        }
+        if self.scheduler.zombie_timeout_secs == 0 {
+            errors.push("scheduler.zombie_timeout_secs must be > 0".into());
+        }
+
+        // Cron validation
+        for (name, job) in &self.cron.jobs {
+            if job.schedule.is_empty() {
+                errors.push(format!("cron.jobs.{}: schedule is empty", name));
+            } else {
+                // Normalize 5-field to 6-field (prepend "0 " for seconds)
+                let normalized = {
+                    let fields: Vec<&str> = job.schedule.split_whitespace().collect();
+                    match fields.len() {
+                        5 => format!("0 {}", job.schedule),
+                        _ => job.schedule.clone(),
+                    }
+                };
+                if Schedule::from_str(&normalized).is_err() {
+                    errors.push(format!(
+                        "cron.jobs.{}: invalid cron expression '{}'",
+                        name, job.schedule
+                    ));
+                }
+            }
+            if job.goal.is_empty() {
+                errors.push(format!("cron.jobs.{}: goal is empty", name));
+            }
+        }
+
+        // Security validation
+        if self.security.auth_enabled {
+            let keys_path = std::path::Path::new(&self.security.api_keys_path);
+            if !keys_path.exists() {
+                warnings.push(format!(
+                    "security.api_keys_path '{}' does not exist — auth will fail",
+                    self.security.api_keys_path
+                ));
+            }
+        }
+        if self.security.max_execution_time_secs == 0 {
+            warnings.push("security.max_execution_time_secs is 0 — no timeout".into());
+        }
+
+        // Check for API key in environment variable
+        if std::env::var("OXIOS_API_KEY").is_ok() {
+            warnings.push(
+                "OXIOS_API_KEY is set in environment — consider using it instead of config file".into(),
+            );
+        }
+
+        (errors, warnings)
+    }
 }

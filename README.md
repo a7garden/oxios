@@ -10,6 +10,91 @@ Oxios is an Agent Operating System built in Rust. It combines Unix philosophy (m
 
 ---
 
+## Quick Start
+
+### 1. Install
+
+```bash
+cargo install oxios
+# Or build from source:
+git clone https://github.com/your-repo/oxios
+cd oxios && cargo build --release
+```
+
+### 2. Configure
+
+Create `~/.oxios/config.toml`:
+
+```toml
+[gateway]
+host = "127.0.0.1"
+port = 4200
+
+[security]
+auth_enabled = true
+default_api_key = "sk-your-key-here"  # or set OXIOS_API_KEY env var
+```
+
+Or use environment variables:
+```bash
+export OXIOS_API_KEY=sk-your-key-here
+export ANTHROPIC_API_KEY=sk-ant-...
+```
+
+### 3. Run
+
+```bash
+oxios
+# Or with a custom config:
+oxios --config /path/to/config.toml
+```
+
+### 4. Use
+
+```bash
+# Via CLI (interactive)
+oxios chat
+
+# Via REST API
+curl -X POST http://127.0.0.1:4200/api/chat \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $OXIOS_API_KEY" \
+  -d '{"content": "Build a TODO app", "user_id": "user1"}'
+
+# Via Web Dashboard
+open http://127.0.0.1:4200
+```
+
+### 5. Cron Jobs (autonomous agents)
+
+Schedule agents to run on a schedule:
+
+```toml
+[cron]
+enabled = true
+tick_interval_secs = 60
+
+[cron.jobs.morning_report]
+schedule = "0 9 * * *"
+goal = "Summarize latest tech news"
+priority = "low"
+```
+
+Manage via API:
+```bash
+# List jobs
+curl http://127.0.0.1:4200/api/cron-jobs \
+  -H "Authorization: Bearer $OXIOS_API_KEY"
+
+# Create a job
+curl -X POST http://127.0.0.1:4200/api/cron-jobs \
+  -H "Authorization: Bearer $OXIOS_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"news","schedule":"0 * * * *","goal":"Fetch top HN stories"}'
+```
+
+---
+
 ## Architecture
 
 ```
@@ -216,8 +301,9 @@ Oxios uses TOML configuration at `~/.oxios/config.toml`.
 
 | Variable | Description |
 |----------|-------------|
-| `ANTHROPIC_API_KEY` | Anthropic API key |
-| `OPENAI_API_KEY` | OpenAI API key |
+| `OXIOS_API_KEY` | Primary API key (takes precedence over config file) |
+| `ANTHROPIC_API_KEY` | Anthropic API key (LLM backend) |
+| `OPENAI_API_KEY` | OpenAI API key (LLM backend) |
 | `API_KEY` | Fallback API key |
 | `RUST_LOG` | Tracing filter (e.g., `info`, `debug`) |
 
