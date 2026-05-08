@@ -609,6 +609,7 @@ async fn main() -> Result<()> {
                 kernel.auth_manager.clone(),
                 kernel.memory_manager.clone(),
                 kernel.cron_scheduler.clone(),
+                kernel.git_layer.clone(),
             )?;
 
             let shutdown_tx = setup_shutdown_handler();

@@ -9,7 +9,7 @@ use oxios_gateway::Gateway;
 use oxios_kernel::{
     access_manager::AccessManager, auth::AuthManager, config::load_config,
     A2AProtocol, AgentRuntime, BasicSupervisor, ContainerManager,
-    CronScheduler, EngineProvider, EventBus, HostExecBridge, HostToolValidator,
+    CronScheduler, EngineProvider, EventBus, GitLayer, HostExecBridge, HostToolValidator,
     McpBridge, McpServer, MemoryManager, Orchestrator, OxiosConfig, PersonaManager,
     ProgramManager, SkillStore, AgentScheduler, Supervisor,
 };
@@ -57,6 +57,8 @@ pub struct Kernel {
     pub auth_manager: Arc<parking_lot::Mutex<AuthManager>>,
     /// Cron job scheduler for time-based task execution.
     pub cron_scheduler: Arc<CronScheduler>,
+    /// Git-based version control layer for state persistence.
+    pub git_layer: Arc<GitLayer>,
 }
 
 /// Builder for assembling the Oxios kernel.
@@ -239,6 +241,12 @@ impl KernelBuilder {
             config.cron.tick_interval_secs,
         ));
 
+        // ── Git version control layer ──
+        let git_layer = Arc::new(GitLayer::new(
+            PathBuf::from(&config.kernel.workspace),
+            config.git.auto_commit,
+        )?);
+
         Ok(Kernel {
             orchestrator,
             gateway,
@@ -257,6 +265,7 @@ impl KernelBuilder {
             memory_manager,
             auth_manager,
             cron_scheduler,
+            git_layer,
         })
     }
 }

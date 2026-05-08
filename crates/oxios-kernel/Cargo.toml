@@ -8,6 +8,7 @@ license = "MIT"
 [features]
 default = []
 otel = ["tracing-opentelemetry", "opentelemetry", "opentelemetry_sdk", "opentelemetry-otlp", "opentelemetry-stdout"]
+wasm-sandbox = ["dep:wasmtime", "dep:wasmtime-wasi"]
 
 [dependencies]
 oxios-ouroboros = { path = "../oxios-ouroboros" }
@@ -26,6 +27,7 @@ chrono = { workspace = true }
 cron = "0.16"
 
 parking_lot = { workspace = true }
+gix = { version = "0.70", features = ["tree-editor"] }
 toml = { workspace = true }
 glob = "0.3"
 tempfile = "3"
@@ -34,7 +36,13 @@ sha2 = { workspace = true }
 hex = { workspace = true }
 getrandom = { workspace = true }
 once_cell = "1.19"
+blake3 = { workspace = true }
 tracing-subscriber = { workspace = true }
+
+# WASM sandbox (optional)
+wasmtime = { version = "22", features = ["cranelift"], optional = true }
+wasmtime-wasi = { version = "22", optional = true }
+sysinfo = "0.35"
 
 # OpenTelemetry (optional)
 tracing-opentelemetry = { version = "0.28", optional = true }

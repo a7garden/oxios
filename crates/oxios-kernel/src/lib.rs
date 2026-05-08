@@ -7,6 +7,7 @@
 #![warn(missing_docs)]
 
 pub mod backup;
+pub mod budget;
 pub mod circuit_breaker;
 pub mod metrics;
 pub mod a2a;
@@ -14,6 +15,7 @@ pub mod access_manager;
 pub mod agent_group;
 pub mod agent_lifecycle;
 pub mod agent_runtime;
+pub mod audit_trail;
 
 pub mod auth;
 pub mod config;
@@ -24,7 +26,10 @@ pub mod error;
 pub mod event_bus;
 pub mod container_manager;
 pub mod cron;
+pub mod git_layer;
 pub mod host_exec;
+#[cfg(feature = "wasm-sandbox")]
+pub mod wasm_sandbox;
 pub mod host_tools;
 pub mod memory;
 pub mod mcp;
@@ -33,6 +38,7 @@ pub mod persona;
 pub mod persona_manager;
 pub mod persona_store;
 pub mod program;
+pub mod resource_monitor;
 pub mod scheduler;
 pub mod skill;
 pub mod state_store;
@@ -60,7 +66,7 @@ pub use a2a::{
 
 // Access Manager exports (includes RBAC)
 pub use access_manager::{
-    AccessManager, AgentPermissions, AuditEntry,
+    AccessManager, AgentPermissions,
     RbacManager, RbacPolicy, RbacAuditEntry,
     Role, Subject, Action,
     PendingApproval, ApprovalStatus,
@@ -71,7 +77,7 @@ pub use agent_lifecycle::AgentLifecycleManager;
 pub use agent_runtime::AgentRuntime;
 pub use error::{HttpStatus, KernelError, KernelResult};
 pub use engine::{EngineProvider, OxiEngineProvider};
-pub use config::{OxiosConfig, MemoryConfig, PersonaConfig, McpConfig, McpServerDef, CronConfig, InlineCronJob};
+pub use config::{OxiosConfig, MemoryConfig, PersonaConfig, McpConfig, McpServerDef, CronConfig, InlineCronJob, GitConfig};
 
 // Auth manager exports
 pub use auth::{AuthManager, KeyMeta};
@@ -91,6 +97,10 @@ pub use memory::{MemoryEntry, MemoryManager, MemoryType, TextVector, MemoryBudge
 pub use program::{InstallSource, Program, ProgramManager, ProgramMeta, ToolDef, HostRequirementsCheck, ArgumentDef};
 pub use skill::{Skill, SkillMeta, SkillStore};
 pub use state_store::{AgentResponse, Session, SessionId, SessionSummary, StateStore};
+
+#[cfg(feature = "wasm-sandbox")]
+pub use wasm_sandbox::{WasmSandbox, WasmConfig, WasmError, ResourceKind};
+
 pub use persona::{default_personas, Persona};
 pub use persona_manager::PersonaManager;
 pub use persona_store::PersonaStore;
@@ -99,4 +109,14 @@ pub use tools::{ContainerExecTool, HostExecTool, ProgramTool};
 pub use types::{AgentId, AgentInfo, AgentStatus};
 
 pub use backup::{BackupManifest, BackupSection};
+pub use audit_trail::{
+    AuditTrail, AuditEntry, AuditAction, AuditError, HashDigest,
+    AgentId as AuditAgentId,
+};
+
+pub use git_layer::{GitLayer, CommitInfo, LogEntry};
+
+// Budget manager exports
+pub use budget::{BudgetExceeded, BudgetInfo, BudgetKind, BudgetLimit, BudgetManager};
+pub use resource_monitor::{OverloadThreshold, ResourceMonitor, ResourceSnapshot};
 

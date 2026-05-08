@@ -141,6 +141,9 @@ pub struct OxiosConfig {
     /// MCP server configurations.
     #[serde(default)]
     pub mcp: McpConfig,
+    /// Git version control settings.
+    #[serde(default)]
+    pub git: GitConfig,
 }
 
 /// Kernel configuration.
@@ -523,6 +526,20 @@ pub struct McpServerDef {
 
 fn default_mcp_enabled() -> bool {
     true
+}
+
+/// Git version control configuration.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct GitConfig {
+    /// Enable automatic commits for state changes.
+    #[serde(default = "default_true")]
+    pub auto_commit: bool,
+}
+
+impl Default for GitConfig {
+    fn default() -> Self {
+        Self { auto_commit: true }
+    }
 }
 
 /// Loads configuration from a TOML file.

@@ -43,6 +43,7 @@ chrono = { version = "0.4", features = ["serde"] }
 
 # Cryptography / hashing
 sha2 = "0.10"
+blake3 = "1.8"
 hex = "0.4"
 getrandom = "0.2"
 

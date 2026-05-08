@@ -21,6 +21,7 @@ use crate::routes::build_routes;
 use oxios_kernel::event_bus::EventBus;
 use oxios_kernel::container_manager::ContainerManager;
 use oxios_kernel::cron::CronScheduler;
+use oxios_kernel::git_layer::GitLayer;
 use oxios_kernel::host_tools::HostToolValidator;
 use oxios_kernel::mcp::McpBridge;
 use oxios_kernel::memory::MemoryManager;
@@ -78,6 +79,8 @@ pub struct AppState {
     pub rate_limiter: RateLimiter,
     /// Cron scheduler for time-based job execution.
     pub cron_scheduler: Arc<CronScheduler>,
+    /// Git version control layer.
+    pub git_layer: Arc<GitLayer>,
 }
 
 impl std::fmt::Debug for AppState {
@@ -143,6 +146,7 @@ impl WebServer {
         auth_manager: Arc<parking_lot::Mutex<oxios_kernel::auth::AuthManager>>,
         memory_manager: Arc<MemoryManager>,
         cron_scheduler: Arc<CronScheduler>,
+        git_layer: Arc<GitLayer>,
     ) -> Result<Self, anyhow::Error> {
         let addr: SocketAddr = format!("{host}:{port}")
             .parse()
@@ -169,6 +173,7 @@ impl WebServer {
             memory_manager,
             rate_limiter: RateLimiter::new(rate_limit),
             cron_scheduler,
+            git_layer,
         });
         Ok(Self { addr, state })
     }
