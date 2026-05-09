@@ -28,7 +28,7 @@ pub struct PersonaSummary {
 pub async fn handle_personas_list(
     state: State<Arc<AppState>>,
 ) -> Json<Vec<PersonaSummary>> {
-    let personas = state.persona_manager.store().list_all();
+    let personas = state.kernel.list_personas();
     Json(personas
         .into_iter()
         .map(|p| PersonaSummary {
@@ -47,7 +47,7 @@ pub async fn handle_persona_get(
     state: State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<Json<serde_json::Value>, StatusCode> {
-    match state.persona_manager.store().get(&id) {
+    match state.kernel.get_persona(&id) {
         Some(p) => Ok(Json(serde_json::json!({
             "id": p.id,
             "name": p.name,
@@ -98,7 +98,7 @@ pub async fn handle_persona_create(
         model: body.model,
         personality_traits: body.personality_traits,
     };
-    state.persona_manager.store().register(persona.clone());
+    state.kernel.create_persona(persona.clone());
     tracing::info!(persona = %persona.name, "Persona created via API");
     Ok(Json(serde_json::json!({
         "status": "created",
@@ -126,7 +126,7 @@ pub async fn handle_persona_update(
     Json(body): Json<PersonaUpdateRequest>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
     use oxios_kernel::Persona;
-    let existing = state.persona_manager.store().get(&id)
+    let existing = state.kernel.get_persona(&id)
         .ok_or_else(|| (StatusCode::NOT_FOUND, format!("Persona '{}' not found", id)))?;
 
     let updated = Persona {
@@ -140,8 +140,7 @@ pub async fn handle_persona_update(
         personality_traits: body.personality_traits.unwrap_or(existing.personality_traits),
     };
 
-    state.persona_manager.store()
-        .update(&id, updated.clone())
+    state.kernel.update_persona(&id, updated.clone())
         .map_err(|e: anyhow::Error| (StatusCode::BAD_REQUEST, e.to_string()))?;
     tracing::info!(persona_id = %id, "Persona updated via API");
     Ok(Json(serde_json::json!({
@@ -156,19 +155,20 @@ pub async fn handle_persona_delete(
     Path(id): Path<String>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
     // Prevent deleting the last persona.
-    if state.persona_manager.store().len() <= 1 {
+    if state.kernel.persona_count() <= 1 {
         return Err((StatusCode::BAD_REQUEST, "Cannot delete the last persona".to_string()));
     }
 
-    state.persona_manager.store()
-        .delete(&id)
+    state.kernel.delete_persona(&id)
         .map_err(|e: anyhow::Error| (StatusCode::NOT_FOUND, e.to_string()))?;
 
     // If deleted persona was active, clear the active reference.
-    if state.persona_manager.active_persona_id().as_ref() == Some(&id) {
-        // Try to set another persona as active.
-        if let Some(next) = state.persona_manager.store().list_enabled().into_iter().next() {
-            let _ = state.persona_manager.set_active_persona(&next.id);
+    if let Some(active) = state.kernel.get_active_persona() {
+        if active.id == id {
+            // Try to set another persona as active.
+            if let Some(next) = state.kernel.list_enabled_personas().into_iter().next() {
+                let _ = state.kernel.set_active_persona(&next.id);
+            }
         }
     }
 
@@ -183,7 +183,7 @@ pub async fn handle_persona_delete(
 pub async fn handle_persona_active_get(
     state: State<Arc<AppState>>,
 ) -> Json<serde_json::Value> {
-    match state.persona_manager.get_active_persona() {
+    match state.kernel.get_active_persona() {
         Some(p) => Json(serde_json::json!({
             "id": p.id,
             "name": p.name,
@@ -210,11 +210,10 @@ pub async fn handle_persona_active_set(
     state: State<Arc<AppState>>,
     Json(body): Json<PersonaActiveRequest>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
-    state.persona_manager
-        .set_active_persona(&body.id)
+    state.kernel.set_active_persona(&body.id)
         .map_err(|e: anyhow::Error| (StatusCode::BAD_REQUEST, e.to_string()))?;
 
-    let persona = state.persona_manager.get_active_persona();
+    let persona = state.kernel.get_active_persona();
     Ok(Json(serde_json::json!({
         "status": "active",
         "id": body.id,

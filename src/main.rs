@@ -589,30 +589,15 @@ async fn main() -> Result<()> {
             kernel.gateway.register(Box::new(web_channel)).await;
 
             // Create web server
+            let kernel_handle = kernel.handle();
+            let config_arc = std::sync::Arc::new(parking_lot::RwLock::new(kernel.config.clone()));
             let _web_server = WebServer::new(
                 &kernel.config.gateway.host,
                 kernel.config.gateway.port,
                 channel_handle,
-                kernel.event_bus.clone(),
-                (*kernel.state_store).clone(),
-                kernel.container_manager.clone(),
-                kernel.resource_monitor.clone(),
-                kernel.audit_trail.clone(),
-                kernel.budget_manager.clone(),
-                kernel.skill_store.clone(),
-                kernel.program_manager.clone(),
-                kernel.host_tool_validator.clone(),
-                kernel.supervisor.clone(),
-                kernel.scheduler.clone(),
-                kernel.access_manager.clone(),
-                kernel.persona_manager.clone(),
-                kernel.config.clone(),
+                kernel_handle,
+                config_arc,
                 Some(config_path),
-                kernel.mcp_bridge.clone(),
-                kernel.auth_manager.clone(),
-                kernel.memory_manager.clone(),
-                kernel.cron_scheduler.clone(),
-                kernel.git_layer.clone(),
             )?;
 
             let shutdown_tx = setup_shutdown_handler();

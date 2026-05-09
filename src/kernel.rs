@@ -66,6 +66,8 @@ pub struct Kernel {
     pub budget_manager: Arc<BudgetManager>,
     /// Resource monitor for system metrics.
     pub resource_monitor: Arc<ResourceMonitor>,
+    /// Kernel start time for uptime tracking.
+    pub start_time: std::time::Instant,
 }
 
 /// Builder for assembling the Oxios kernel.
@@ -299,6 +301,7 @@ impl KernelBuilder {
             audit_trail,
             budget_manager,
             resource_monitor,
+            start_time: std::time::Instant::now(),
         })
     }
 }
@@ -377,6 +380,258 @@ impl Kernel {
     /// Check if auto-commit is enabled.
     pub fn auto_commit_enabled(&self) -> bool {
         self.config.git.auto_commit && self.git_layer.is_enabled()
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // SYSTEM CALL METHODS
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    // ── State ──
+
+    /// Load data from state store.
+    pub async fn load<T: serde::de::DeserializeOwned>(&self, category: &str, name: &str) -> anyhow::Result<Option<T>> {
+        self.state_store.load_json(category, name).await
+    }
+
+    /// List files in a category.
+    pub async fn list_category(&self, category: &str) -> anyhow::Result<Vec<String>> {
+        self.state_store.list_category(category).await
+    }
+
+    /// Save session.
+    pub async fn save_session(&self, session: &oxios_kernel::state_store::Session) -> anyhow::Result<()> {
+        self.state_store.save_session(session).await
+    }
+
+    /// Load session.
+    pub async fn load_session(&self, id: &oxios_kernel::state_store::SessionId) -> anyhow::Result<Option<oxios_kernel::state_store::Session>> {
+        self.state_store.load_session(id).await
+    }
+
+    /// List sessions.
+    pub async fn list_sessions(&self) -> anyhow::Result<Vec<oxios_kernel::state_store::SessionSummary>> {
+        self.state_store.list_sessions().await
+    }
+
+    /// Delete session.
+    pub async fn delete_session(&self, id: &oxios_kernel::state_store::SessionId) -> anyhow::Result<bool> {
+        self.state_store.delete_session(id).await
+    }
+
+    // ── Agent ──
+
+    /// List running agents.
+    pub async fn list_agents(&self) -> anyhow::Result<Vec<oxios_kernel::types::AgentInfo>> {
+        self.supervisor.list().await.map_err(|e| anyhow::anyhow!("supervisor: {e}"))
+    }
+
+    /// Kill a running agent.
+    pub async fn kill_agent(&self, agent_id: &str) -> anyhow::Result<()> {
+        let id = uuid::Uuid::parse_str(agent_id)
+            .map_err(|e| anyhow::anyhow!("invalid agent id: {e}"))?;
+        self.supervisor.kill(id).await.map_err(|e| anyhow::anyhow!("supervisor: {e}"))
+    }
+
+    // ── Memory ──
+
+    /// Get memory stats (sync version).
+    pub fn memory_stats(&self) -> (usize, usize) {
+        (self.memory_manager.vector_index_size(), 0)
+    }
+
+    /// Get memory stats (async version with total entries).
+    pub async fn memory_stats_async(&self) -> (usize, usize) {
+        (self.memory_manager.vector_index_size(), self.memory_manager.total_entries().await)
+    }
+
+    // ── Git ──
+
+    /// Get commit log.
+    pub fn git_log(&self, max: usize) -> anyhow::Result<Vec<oxios_kernel::git_layer::LogEntry>> {
+        self.git_layer.log(max)
+    }
+
+    /// Tag current state.
+    pub fn git_tag(&self, name: &str, message: &str) -> anyhow::Result<()> {
+        self.git_layer.tag(name, message)
+    }
+
+    /// Restore file from commit.
+    pub fn git_restore(&self, path: &str, hash: &str) -> anyhow::Result<()> {
+        self.git_layer.restore_file(path, hash)
+    }
+
+    /// Verify git repository.
+    pub fn git_verify(&self) -> anyhow::Result<bool> {
+        self.git_layer.verify()
+    }
+
+    /// List git tags.
+    pub fn git_tags(&self) -> anyhow::Result<Vec<String>> {
+        self.git_layer.list_tags()
+    }
+
+    // ── Scheduling ──
+
+    /// Schedule a cron job.
+    pub async fn schedule(&self, cron_expr: &str, task: &str, persona: Option<&str>) -> anyhow::Result<String> {
+        let _persona = persona.unwrap_or("default");
+        let job = oxios_kernel::cron::CronJob::new(
+            format!("job_{}", uuid::Uuid::new_v4()),
+            cron_expr.to_string(),
+            task.to_string(),
+        );
+        let job_id = self.cron_scheduler.add_job(job).await?;
+        Ok(job_id.to_string())
+    }
+
+    /// Unschedule a cron job.
+    pub async fn unschedule(&self, job_id: &str) -> anyhow::Result<bool> {
+        let uuid = uuid::Uuid::parse_str(job_id)
+            .map_err(|e| anyhow::anyhow!("invalid job id: {e}"))?;
+        match self.cron_scheduler.remove_job(uuid).await {
+            Ok(()) => Ok(true),
+            Err(_) => Ok(false),
+        }
+    }
+
+    /// List cron jobs.
+    pub fn list_schedules(&self) -> Vec<oxios_kernel::cron::CronJob> {
+        self.cron_scheduler.list_jobs()
+    }
+
+    // ── Audit ──
+
+    /// Audit an action.
+    pub fn audit(&self, actor: &str, action: oxios_kernel::audit_trail::AuditAction, resource: &str) -> String {
+        self.audit_trail.append(actor.to_string(), action, resource.to_string())
+    }
+
+    /// Verify audit chain.
+    pub fn verify_audit(&self) -> anyhow::Result<bool> {
+        self.audit_trail.verify()
+            .map_err(|e| anyhow::anyhow!("audit verify failed: {:?}", e))
+    }
+
+    /// Query audit entries by sequence range.
+    pub fn query_audit(&self, from_seq: u64, to_seq: u64) -> Vec<oxios_kernel::audit_trail::AuditEntry> {
+        self.audit_trail.entries(from_seq, to_seq)
+    }
+
+    /// Query audit by agent.
+    pub fn query_audit_by_agent(&self, agent_id: &str) -> Vec<oxios_kernel::audit_trail::AuditEntry> {
+        self.audit_trail.by_agent(agent_id)
+    }
+
+    /// Get audit entry count.
+    pub fn audit_count(&self) -> usize {
+        self.audit_trail.len()
+    }
+
+    // ── Resources ──
+
+    /// Get resource snapshot.
+    pub fn resource_snapshot(&self) -> oxios_kernel::resource_monitor::ResourceSnapshot {
+        self.resource_monitor.snapshot()
+    }
+
+    /// Check budget for an agent.
+    pub fn check_budget(&self, agent_id: &oxios_kernel::types::AgentId) -> oxios_kernel::budget::BudgetInfo {
+        self.budget_manager.remaining(agent_id)
+    }
+
+    /// Get overload status.
+    pub fn is_overloaded(&self) -> bool {
+        self.resource_monitor.is_overloaded()
+    }
+
+    // ── Container ──
+
+    /// Check if container backend is available.
+    pub fn container_available(&self) -> bool {
+        self.container_manager.is_backend_available()
+    }
+
+    /// Get container backend name.
+    pub fn container_backend(&self) -> Option<String> {
+        if self.container_manager.is_backend_available() {
+            Some(self.container_manager.backend_name().to_string())
+        } else {
+            None
+        }
+    }
+
+    /// Create new container.
+    pub async fn create_container(&self, name: &str) -> anyhow::Result<()> {
+        self.container_manager.new_container(name).await
+    }
+
+    /// List containers.
+    pub fn list_containers(&self) -> Vec<oxios_kernel::container_manager::ContainerInfo> {
+        // Note: list_containers is async - use block_on with fallback for sync context
+        match tokio::runtime::Handle::current().block_on(self.container_manager.list_containers()) {
+            Ok(containers) => containers,
+            Err(_) => vec![],
+        }
+    }
+
+    /// Check tool health in container.
+    pub async fn check_tool_health(&self, container_name: &str) -> anyhow::Result<oxios_kernel::container_manager::ToolHealthReport> {
+        self.container_manager.check_tool_health(container_name).await
+    }
+
+    // ── Events ──
+
+    /// Subscribe to kernel events.
+    pub fn subscribe(&self) -> tokio::sync::broadcast::Receiver<oxios_kernel::event_bus::KernelEvent> {
+        self.event_bus.subscribe()
+    }
+
+    // ── System ──
+
+    /// Get config reference.
+    pub fn get_config(&self) -> &oxios_kernel::OxiosConfig {
+        &self.config
+    }
+
+    /// Get system uptime.
+    pub fn uptime(&self) -> std::time::Duration {
+        self.start_time.elapsed()
+    }
+
+    /// List installed programs.
+    pub async fn list_programs(&self) -> Vec<oxios_kernel::program::ProgramMeta> {
+        self.program_manager.list_programs()
+            .await
+            .into_iter()
+            .map(|p| p.meta)
+            .collect()
+    }
+
+    /// Create a KernelHandle facade for use by other crates.
+    pub fn handle(&self) -> Arc<oxios_kernel::KernelHandle> {
+        Arc::new(oxios_kernel::KernelHandle::new(
+            self.state_store.clone(),
+            self.event_bus.clone(),
+            self.container_manager.clone(),
+            self.supervisor.clone(),
+            self.scheduler.clone(),
+            self.memory_manager.clone(),
+            self.git_layer.clone(),
+            self.audit_trail.clone(),
+            self.budget_manager.clone(),
+            self.resource_monitor.clone(),
+            self.cron_scheduler.clone(),
+            self.program_manager.clone(),
+            Arc::new(self.skill_store.clone()),
+            Arc::new(self.persona_manager.clone()),
+            self.mcp_bridge.clone(),
+            self.auth_manager.clone(),
+            self.access_manager.clone(),
+            Arc::new(self.host_tool_validator.clone()),
+            self.config.clone(),
+            self.start_time,
+        ))
     }
 }
 

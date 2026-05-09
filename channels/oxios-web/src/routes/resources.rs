@@ -61,25 +61,17 @@ pub(crate) async fn handle_gardens_list(
     state: State<Arc<AppState>>,
     Query(params): Query<PageParams>,
 ) -> Result<Json<serde_json::Value>, AppError> {
-    let manager = state.container_manager.clone();
-    match manager.list_containers().await {
-        Ok(gardens) => {
-            let summaries: Vec<GardenSummary> = gardens
-                .into_iter()
-                .map(|g| GardenSummary {
-                    name: g.name,
-                    image_tag: g.image_tag,
-                    running: g.running,
-                    created_at: g.created_at,
-                })
-                .collect();
-            Ok(Json(paginate(&summaries, &params)))
-        }
-        Err(e) => {
-            tracing::error!(error = %e, "Failed to list gardens");
-            Err(AppError::Internal("failed to list gardens".into()))
-        }
-    }
+    let containers = state.kernel.list_containers();
+    let summaries: Vec<GardenSummary> = containers
+        .into_iter()
+        .map(|g| GardenSummary {
+            name: g.name,
+            image_tag: g.image_tag,
+            running: g.running,
+            created_at: g.created_at,
+        })
+        .collect();
+    Ok(Json(paginate(&summaries, &params)))
 }
 
 /// POST /api/gardens — Create a new garden.
@@ -87,22 +79,19 @@ pub(crate) async fn handle_garden_create(
     state: State<Arc<AppState>>,
     Json(body): Json<GardenCreateRequest>,
 ) -> Result<Json<GardenSummary>, AppError> {
-    let manager = state.container_manager.clone();
-    match manager.new_container(&body.name).await {
-        Ok(()) => {
-            tracing::info!(garden = %body.name, "Garden created via API");
-            Ok(Json(GardenSummary {
-                name: body.name,
-                image_tag: "oxios:latest".into(),
-                running: false,
-                created_at: chrono::Utc::now().to_rfc3339(),
-            }))
-        }
-        Err(e) => {
+    state.kernel.create_container(&body.name).await
+        .map_err(|e| {
             tracing::error!(error = %e, garden = %body.name, "Failed to create garden");
-            Err(AppError::BadRequest(e.to_string()))
-        }
-    }
+            AppError::BadRequest(e.to_string())
+        })?;
+
+    tracing::info!(garden = %body.name, "Garden created via API");
+    Ok(Json(GardenSummary {
+        name: body.name,
+        image_tag: "oxios:latest".into(),
+        running: false,
+        created_at: chrono::Utc::now().to_rfc3339(),
+    }))
 }
 
 /// POST /api/gardens/:name/start — Start a garden container.
@@ -110,17 +99,9 @@ pub(crate) async fn handle_garden_start(
     state: State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
-    let manager = state.container_manager.clone();
-    match manager.start_container(&name).await {
-        Ok(()) => {
-            tracing::info!(garden = %name, "Garden started via API");
-            Ok(Json(serde_json::json!({"status": "started", "name": name})))
-        }
-        Err(e) => {
-            tracing::error!(error = %e, garden = %name, "Failed to start garden");
-            Err((StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
-        }
-    }
+    state.kernel.inner_container_manager().start_container(&name).await
+        .map(|_| Json(serde_json::json!({"status": "started", "name": name})))
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
 }
 
 /// POST /api/gardens/:name/stop — Stop a garden container.
@@ -128,17 +109,9 @@ pub(crate) async fn handle_garden_stop(
     state: State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
-    let manager = state.container_manager.clone();
-    match manager.stop_container(&name).await {
-        Ok(()) => {
-            tracing::info!(garden = %name, "Garden stopped via API");
-            Ok(Json(serde_json::json!({"status": "stopped", "name": name})))
-        }
-        Err(e) => {
-            tracing::error!(error = %e, garden = %name, "Failed to stop garden");
-            Err((StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
-        }
-    }
+    state.kernel.inner_container_manager().stop_container(&name).await
+        .map(|_| Json(serde_json::json!({"status": "stopped", "name": name})))
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
 }
 
 /// DELETE /api/gardens/:name — Remove a garden.
@@ -146,17 +119,9 @@ pub(crate) async fn handle_garden_remove(
     state: State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
-    let manager = state.container_manager.clone();
-    match manager.remove_container(&name).await {
-        Ok(()) => {
-            tracing::info!(garden = %name, "Garden removed via API");
-            Ok(Json(serde_json::json!({"status": "removed", "name": name})))
-        }
-        Err(e) => {
-            tracing::error!(error = %e, garden = %name, "Failed to remove garden");
-            Err((StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
-        }
-    }
+    state.kernel.inner_container_manager().remove_container(&name).await
+        .map(|_| Json(serde_json::json!({"status": "removed", "name": name})))
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
 }
 
 /// POST /api/gardens/:name/exec — Execute a command in a garden.
@@ -165,22 +130,16 @@ pub(crate) async fn handle_garden_exec(
     Path(name): Path<String>,
     Json(body): Json<GardenExecRequest>,
 ) -> Result<Json<GardenExecResponse>, (StatusCode, String)> {
-    let manager = state.container_manager.clone();
-    match manager
+    state.kernel.inner_container_manager()
         .exec_in_container(&name, &body.command, body.workdir.as_deref())
         .await
-    {
-        Ok(result) => Ok(Json(GardenExecResponse {
+        .map(|result| Json(GardenExecResponse {
             stdout: result.stdout,
             stderr: result.stderr,
             exit_code: result.exit_code,
             duration_ms: result.duration_ms,
-        })),
-        Err(e) => {
-            tracing::error!(error = %e, garden = %name, "Failed to exec in garden");
-            Err((StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
-        }
-    }
+        }))
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
 }
 
 // ---------------------------------------------------------------------------
@@ -204,7 +163,7 @@ pub(crate) async fn handle_programs_list(
     state: State<Arc<AppState>>,
     Query(params): Query<PageParams>,
 ) -> Json<serde_json::Value> {
-    let programs = state.program_manager.list_programs().await;
+    let programs = state.kernel.inner_program_manager().list_programs().await;
     let summaries: Vec<ProgramSummary> = programs
         .into_iter()
         .map(|p| ProgramSummary {
@@ -225,7 +184,7 @@ pub(crate) async fn handle_program_get(
     state: State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> Result<Json<serde_json::Value>, StatusCode> {
-    match state.program_manager.get_program(&name).await {
+    match state.kernel.inner_program_manager().get_program(&name).await {
         Some(program) => Ok(Json(serde_json::json!({
             "name": program.meta.name,
             "version": program.meta.version,
@@ -273,20 +232,16 @@ pub(crate) async fn handle_program_install(
         return Err((StatusCode::BAD_REQUEST, "Local path installation not allowed via API. Use git URL or tarball URL.".into()));
     };
 
-    match state.program_manager.install_from(source).await {
-        Ok(program) => {
+    state.kernel.inner_program_manager().install_from(source).await
+        .map(|program| {
             tracing::info!(program = %program.meta.name, "Program installed via API");
-            Ok(Json(serde_json::json!({
+            Json(serde_json::json!({
                 "status": "installed",
                 "name": program.meta.name,
                 "version": program.meta.version,
-            })))
-        }
-        Err(e) => {
-            tracing::error!(error = %e, path = %body.path, "Failed to install program");
-            Err((StatusCode::BAD_REQUEST, e.to_string()))
-        }
-    }
+            }))
+        })
+        .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))
 }
 
 /// DELETE /api/programs/:name — Uninstall a program.
@@ -294,16 +249,12 @@ pub(crate) async fn handle_program_uninstall(
     state: State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
-    match state.program_manager.uninstall(&name).await {
-        Ok(()) => {
+    state.kernel.inner_program_manager().uninstall(&name).await
+        .map(|_| {
             tracing::info!(program = %name, "Program uninstalled via API");
-            Ok(Json(serde_json::json!({"status": "uninstalled", "name": name})))
-        }
-        Err(e) => {
-            tracing::error!(error = %e, program = %name, "Failed to uninstall program");
-            Err((StatusCode::BAD_REQUEST, e.to_string()))
-        }
-    }
+            Json(serde_json::json!({"status": "uninstalled", "name": name}))
+        })
+        .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))
 }
 
 /// POST /api/programs/:name/enable — Enable a program.
@@ -311,10 +262,9 @@ pub(crate) async fn handle_program_enable(
     state: State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
-    match state.program_manager.set_enabled(&name, true).await {
-        Ok(()) => Ok(Json(serde_json::json!({"status": "enabled", "name": name}))),
-        Err(e) => Err((StatusCode::BAD_REQUEST, e.to_string())),
-    }
+    state.kernel.inner_program_manager().set_enabled(&name, true).await
+        .map(|_| Json(serde_json::json!({"status": "enabled", "name": name})))
+        .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))
 }
 
 /// POST /api/programs/:name/disable — Disable a program.
@@ -322,10 +272,9 @@ pub(crate) async fn handle_program_disable(
     state: State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
-    match state.program_manager.set_enabled(&name, false).await {
-        Ok(()) => Ok(Json(serde_json::json!({"status": "disabled", "name": name}))),
-        Err(e) => Err((StatusCode::BAD_REQUEST, e.to_string())),
-    }
+    state.kernel.inner_program_manager().set_enabled(&name, false).await
+        .map(|_| Json(serde_json::json!({"status": "disabled", "name": name})))
+        .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))
 }
 
 /// GET /api/programs/:name/host-requirements — Check host requirements for a program.
@@ -333,12 +282,10 @@ pub(crate) async fn handle_program_host_requirements(
     state: State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
-    match state.program_manager.check_host_requirements(&name).await {
-        Ok(check) => serde_json::to_value(&check)
-            .map(Json)
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())),
-        Err(e) => Err((StatusCode::BAD_REQUEST, e.to_string())),
-    }
+    state.kernel.inner_program_manager().check_host_requirements(&name).await
+        .map(|check| serde_json::to_value(&check).map(Json))
+        .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
 }
 
 // ---------------------------------------------------------------------------
@@ -357,7 +304,7 @@ pub(crate) struct HostToolsStatusResponse {
 pub(crate) async fn handle_host_tools_check(
     state: State<Arc<AppState>>,
 ) -> Json<HostToolsStatusResponse> {
-    let status = state.host_tool_validator.full_check();
+    let status = state.kernel.check_host_tools();
     Json(HostToolsStatusResponse {
         all_required_present: status.all_required_present,
         missing_required: status.missing_required,

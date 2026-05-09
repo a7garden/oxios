@@ -18,84 +18,72 @@ use crate::channel::WebChannelHandle;
 use crate::error::AppError;
 use crate::middleware::RateLimiter;
 use crate::routes::build_routes;
-use oxios_kernel::audit_trail::AuditTrail;
-use oxios_kernel::budget::BudgetManager;
-use oxios_kernel::event_bus::EventBus;
-use oxios_kernel::container_manager::ContainerManager;
-use oxios_kernel::cron::CronScheduler;
-use oxios_kernel::git_layer::GitLayer;
-use oxios_kernel::host_tools::HostToolValidator;
-use oxios_kernel::mcp::McpBridge;
-use oxios_kernel::memory::MemoryManager;
-use oxios_kernel::persona_manager::PersonaManager;
-use oxios_kernel::program::ProgramManager;
-use oxios_kernel::scheduler::AgentScheduler;
-use oxios_kernel::access_manager::AccessManager;
-use oxios_kernel::skill::SkillStore;
-use oxios_kernel::state_store::StateStore;
-use oxios_kernel::resource_monitor::ResourceMonitor;
-use oxios_kernel::Supervisor;
+use oxios_kernel::KernelHandle;
 
 /// Shared application state for the web server.
 ///
 /// This is the central state accessible to all route handlers.
+/// Built from KernelHandle for clean dependency injection.
 #[derive(Clone)]
 pub struct AppState {
     /// Base URL for API responses.
     pub base_url: String,
+    /// Handle to the kernel subsystem (provides access to all kernel components).
+    pub kernel: Arc<KernelHandle>,
     /// Handle to the web channel for message passing.
     pub channel: WebChannelHandle,
     /// Event bus for subscribing to kernel events.
-    pub event_bus: Arc<EventBus>,
+    pub event_bus: Arc<oxios_kernel::EventBus>,
     /// State store for workspace/memory/seeds access.
-    pub state_store: Arc<StateStore>,
+    pub state_store: Arc<oxios_kernel::StateStore>,
     /// Container manager for container lifecycle.
-    pub container_manager: Arc<ContainerManager>,
+    pub container_manager: Arc<oxios_kernel::ContainerManager>,
     /// Resource monitor for system metrics.
-    pub resource_monitor: Arc<ResourceMonitor>,
+    pub resource_monitor: Arc<oxios_kernel::ResourceMonitor>,
     /// Audit trail for tamper-evident logging.
-    pub audit_trail: Arc<AuditTrail>,
+    pub audit_trail: Arc<oxios_kernel::AuditTrail>,
     /// Budget manager for agent-level token/call budgets.
-    pub budget_manager: Arc<BudgetManager>,
-    /// Skill store for skill management (deprecated, use program_manager).
-    pub skill_store: Arc<SkillStore>,
+    pub budget_manager: Arc<oxios_kernel::BudgetManager>,
+    /// Skill store for skill management.
+    pub skill_store: Arc<oxios_kernel::SkillStore>,
     /// Program manager for OS-level programs.
-    pub program_manager: Arc<ProgramManager>,
+    pub program_manager: Arc<oxios_kernel::ProgramManager>,
     /// Host tool validator.
-    pub host_tool_validator: Arc<HostToolValidator>,
+    pub host_tool_validator: Arc<oxios_kernel::HostToolValidator>,
     /// Agent supervisor for lifecycle management.
-    pub supervisor: Arc<dyn Supervisor>,
+    pub supervisor: Arc<dyn oxios_kernel::Supervisor>,
     /// Agent scheduler for task queue management.
-    pub scheduler: Arc<AgentScheduler>,
+    pub scheduler: Arc<oxios_kernel::AgentScheduler>,
     /// Access manager for agent permissions and security.
-    pub access_manager: Arc<parking_lot::Mutex<AccessManager>>,
+    pub access_manager: Arc<parking_lot::Mutex<oxios_kernel::AccessManager>>,
     /// Persona manager for multi-persona support.
-    pub persona_manager: Arc<PersonaManager>,
+    pub persona_manager: Arc<oxios_kernel::PersonaManager>,
     /// Loaded configuration (hot-reloadable via RwLock).
     pub config: Arc<RwLock<oxios_kernel::OxiosConfig>>,
     /// Path to the config file (for persistence on PUT /api/config).
     pub config_path: PathBuf,
     /// Server start time (for uptime calculation).
     pub start_time: Instant,
-    /// MCP bridge for tool calling (uses tokio::sync::Mutex for async-safe interior mutability).
-    pub mcp_bridge: Arc<McpBridge>,
+    /// MCP bridge for tool calling.
+    pub mcp_bridge: Arc<oxios_kernel::McpBridge>,
     /// Authentication manager for bearer token validation.
     pub auth_manager: Arc<parking_lot::Mutex<oxios_kernel::auth::AuthManager>>,
     /// Memory manager for cross-session agent memory.
-    pub memory_manager: Arc<MemoryManager>,
+    pub memory_manager: Arc<oxios_kernel::MemoryManager>,
     /// Rate limiter for API endpoints.
     #[allow(dead_code)]
     pub rate_limiter: RateLimiter,
     /// Cron scheduler for time-based job execution.
-    pub cron_scheduler: Arc<CronScheduler>,
+    pub cron_scheduler: Arc<oxios_kernel::CronScheduler>,
     /// Git version control layer.
-    pub git_layer: Arc<GitLayer>,
+    pub git_layer: Arc<oxios_kernel::GitLayer>,
 }
 
 impl std::fmt::Debug for AppState {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("AppState")
             .field("base_url", &self.base_url)
+            .field("kernel", &"...")
             .field("channel", &"...")
             .field("event_bus", &"...")
             .field("state_store", &self.state_store)
@@ -134,62 +122,56 @@ pub struct WebServer {
 
 impl WebServer {
     /// Creates a new web server bound to the given address.
-    #[allow(clippy::too_many_arguments)]
+    ///
+    /// # Arguments
+    /// * `host` - Host address to bind to
+    /// * `port` - Port to listen on
+    /// * `channel` - Web channel handle for message passing
+    /// * `kernel` - Arc<KernelHandle> containing all kernel subsystems
+    /// * `config` - Arc<RwLock<OxiosConfig>> for hot-reloadable config
+    /// * `config_path` - Optional path to config file for persistence
     pub fn new(
         host: &str,
         port: u16,
         channel: WebChannelHandle,
-        event_bus: EventBus,
-        state_store: StateStore,
-        container_manager: Arc<ContainerManager>,
-        resource_monitor: Arc<ResourceMonitor>,
-        audit_trail: Arc<AuditTrail>,
-        budget_manager: Arc<BudgetManager>,
-        skill_store: SkillStore,
-        program_manager: Arc<ProgramManager>,
-        host_tool_validator: HostToolValidator,
-        supervisor: Arc<dyn Supervisor>,
-        scheduler: Arc<AgentScheduler>,
-        access_manager: Arc<parking_lot::Mutex<AccessManager>>,
-        persona_manager: PersonaManager,
-        config: oxios_kernel::OxiosConfig,
+        kernel: Arc<KernelHandle>,
+        config: Arc<RwLock<oxios_kernel::OxiosConfig>>,
         config_path: Option<PathBuf>,
-        mcp_bridge: Arc<McpBridge>,
-        auth_manager: Arc<parking_lot::Mutex<oxios_kernel::auth::AuthManager>>,
-        memory_manager: Arc<MemoryManager>,
-        cron_scheduler: Arc<CronScheduler>,
-        git_layer: Arc<GitLayer>,
     ) -> Result<Self, anyhow::Error> {
         let addr: SocketAddr = format!("{host}:{port}")
             .parse()
             .map_err(|e| anyhow::anyhow!("Invalid bind address '{host}:{port}': {e}"))?;
-        let rate_limit = config.security.rate_limit_per_minute;
+
+        let rate_limit = kernel.get_config().security.rate_limit_per_minute;
+
         let state = Arc::new(AppState {
             base_url: format!("http://{host}:{port}"),
+            kernel: kernel.clone(),
             channel,
-            event_bus: Arc::new(event_bus),
-            state_store: Arc::new(state_store),
-            container_manager,
-            resource_monitor,
-            audit_trail,
-            budget_manager,
-            skill_store: Arc::new(skill_store),
-            program_manager,
-            host_tool_validator: Arc::new(host_tool_validator),
-            supervisor,
-            scheduler,
-            access_manager,
-            persona_manager: Arc::new(persona_manager),
-            config: Arc::new(RwLock::new(config)),
+            event_bus: Arc::new(kernel.event_bus().clone()),
+            state_store: kernel.state_store().clone(),
+            container_manager: kernel.container_manager().clone(),
+            resource_monitor: kernel.resource_monitor().clone(),
+            audit_trail: kernel.audit_trail().clone(),
+            budget_manager: kernel.budget_manager().clone(),
+            skill_store: kernel.skill_store().clone(),
+            program_manager: kernel.program_manager().clone(),
+            host_tool_validator: kernel.host_tool_validator().clone(),
+            supervisor: kernel.supervisor().clone(),
+            scheduler: kernel.scheduler().clone(),
+            access_manager: kernel.access_manager().clone(),
+            persona_manager: kernel.persona_manager().clone(),
+            config,
             config_path: config_path.clone().unwrap_or_default(),
-            start_time: Instant::now(),
-            mcp_bridge,
-            auth_manager,
-            memory_manager,
+            start_time: kernel.start_time(),
+            mcp_bridge: kernel.mcp_bridge().clone(),
+            auth_manager: kernel.auth_manager().clone(),
+            memory_manager: kernel.memory_manager().clone(),
             rate_limiter: RateLimiter::new(rate_limit),
-            cron_scheduler,
-            git_layer,
+            cron_scheduler: kernel.cron_scheduler().clone(),
+            git_layer: kernel.git_layer().clone(),
         });
+
         Ok(Self { addr, state })
     }
 

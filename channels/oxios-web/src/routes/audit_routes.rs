@@ -79,7 +79,7 @@ pub(crate) async fn handle_audit_entries(
     let from_seq = params.from_seq.unwrap_or(0);
     let to_seq = params.to_seq.unwrap_or(100);
 
-    let entries = state.audit_trail.entries(from_seq, to_seq);
+    let entries = state.kernel.query_audit(from_seq, to_seq);
     let count = entries.len();
 
     let entries_json: Vec<serde_json::Value> = entries
@@ -99,35 +99,47 @@ pub(crate) async fn handle_audit_entries(
 pub(crate) async fn handle_audit_verify(
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<serde_json::Value>, AppError> {
-    let entry_count = state.audit_trail.len();
+    let entry_count = state.kernel.audit_count();
 
-    match state.audit_trail.verify() {
+    match state.kernel.verify_audit() {
         Ok(valid) => Ok(Json(json!({
             "valid": valid,
             "entry_count": entry_count,
         }))),
-        Err(oxios_kernel::audit_trail::AuditError::ChainBroken {
-            seq,
-            expected,
-            found,
-        }) => Ok(Json(json!({
-            "valid": false,
-            "entry_count": entry_count,
-            "broken_at_seq": seq,
-            "expected": expected,
-            "found": found,
-        }))),
-        Err(oxios_kernel::audit_trail::AuditError::InvalidTimestamp { seq }) => {
-            Ok(Json(json!({
-                "valid": false,
-                "entry_count": entry_count,
-                "broken_at_seq": seq,
-                "expected": "valid timestamp",
-                "found": "timestamp in the future",
-            })))
-        }
-        Err(oxios_kernel::audit_trail::AuditError::ExportFailed(msg)) => {
-            Err(AppError::Internal(format!("export failed: {}", msg)))
+        Err(e) => {
+            // Parse the error message to extract details
+            let msg = e.to_string();
+            if let Some(seq) = msg.strip_prefix("chain broken at seq ") {
+                let parts: Vec<&str> = seq.split(" expected ").collect();
+                if parts.len() >= 2 {
+                    let seq_num: u64 = parts[0].parse().unwrap_or(0);
+                    let exp_found: Vec<&str> = parts[1].split(" found ").collect();
+                    if exp_found.len() >= 2 {
+                        return Ok(Json(json!({
+                            "valid": false,
+                            "entry_count": entry_count,
+                            "broken_at_seq": seq_num,
+                            "expected": exp_found[0],
+                            "found": exp_found[1],
+                        })));
+                    }
+                }
+            }
+            if msg.contains("timestamp in the future") {
+                let seq = msg.lines()
+                    .find(|l| l.contains("seq"))
+                    .and_then(|l| l.split(":").nth(1))
+                    .map(|s| s.trim().parse::<u64>().unwrap_or(0))
+                    .unwrap_or(0);
+                return Ok(Json(json!({
+                    "valid": false,
+                    "entry_count": entry_count,
+                    "broken_at_seq": seq,
+                    "expected": "valid timestamp",
+                    "found": "timestamp in the future",
+                })));
+            }
+            Err(AppError::Internal(format!("audit verify failed: {}", msg)))
         }
     }
 }
@@ -139,7 +151,7 @@ pub(crate) async fn handle_audit_by_agent(
     State(state): State<Arc<AppState>>,
     Path(agent_id): Path<String>,
 ) -> Result<Json<serde_json::Value>, AppError> {
-    let entries = state.audit_trail.by_agent(&agent_id);
+    let entries = state.kernel.query_audit_by_agent(&agent_id);
     let count = entries.len();
 
     let entries_json: Vec<serde_json::Value> = entries
@@ -162,7 +174,7 @@ pub(crate) async fn handle_audit_export(
 ) -> Result<Json<serde_json::Value>, AppError> {
     let from_seq = body.from_seq.unwrap_or(0);
 
-    let entries = state.audit_trail.entries(from_seq, u64::MAX);
+    let entries = state.kernel.query_audit(from_seq, u64::MAX);
     let entry_count = entries.len();
 
     let json = serde_json::to_string_pretty(&entries)
@@ -180,12 +192,9 @@ pub(crate) async fn handle_audit_export(
 pub(crate) async fn handle_audit_flush(
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<serde_json::Value>, AppError> {
-    let flushed = state.audit_trail.len();
+    let flushed = state.kernel.audit_count();
 
-    state
-        .audit_trail
-        .flush(&state.state_store)
-        .map_err(|e| AppError::Internal(format!("failed to flush audit trail: {}", e)))?;
+    state.kernel.flush_audit();
 
     Ok(Json(json!({
         "flushed": flushed,

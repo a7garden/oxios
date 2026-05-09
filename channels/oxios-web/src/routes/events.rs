@@ -31,7 +31,7 @@ pub(crate) async fn handle_sessions_list(
     state: State<Arc<AppState>>,
     Query(params): Query<PageParams>,
 ) -> Json<serde_json::Value> {
-    match state.state_store.list_sessions().await {
+    match state.kernel.list_sessions().await {
         Ok(sessions) => {
             let items: Vec<SessionListItem> = sessions
                 .into_iter()
@@ -57,7 +57,7 @@ pub(crate) async fn handle_session_get(
 ) -> Result<Json<serde_json::Value>, StatusCode> {
     use oxios_kernel::state_store::SessionId;
     let session_id = SessionId(id);
-    match state.state_store.load_session(&session_id).await {
+    match state.kernel.load_session(&session_id).await {
         Ok(Some(session)) => Ok(Json(serde_json::json!({
             "id": session.id.0,
             "user_id": session.user_id,
@@ -81,7 +81,7 @@ pub(crate) async fn handle_session_delete(
 ) -> Result<Json<serde_json::Value>, StatusCode> {
     use oxios_kernel::state_store::SessionId;
     let session_id = SessionId(id);
-    match state.state_store.delete_session(&session_id).await {
+    match state.kernel.delete_session(&session_id).await {
         Ok(true) => Ok(Json(serde_json::json!({
             "status": "deleted",
             "id": session_id.0,
@@ -99,7 +99,7 @@ pub(crate) async fn handle_session_delete(
 pub(crate) async fn handle_events(
     state: State<Arc<AppState>>,
 ) -> Sse<impl tokio_stream::Stream<Item = Result<SseEvent, Infallible>>> {
-    let receiver = state.event_bus.subscribe();
+    let receiver = state.kernel.subscribe();
     let stream = BroadcastStream::new(receiver);
     let stream = TokioStreamExt::filter_map(stream, |result| {
         match result {
@@ -228,7 +228,7 @@ pub(crate) struct ApprovalResponse {
 pub(crate) async fn handle_approvals_list(
     state: State<Arc<AppState>>,
 ) -> Json<Vec<ApprovalResponse>> {
-    let access = state.access_manager.lock();
+    let access = state.kernel.access_manager().lock();
     let approvals: Vec<ApprovalResponse> = access
         .rbac_manager()
         .all_approvals()
@@ -278,21 +278,20 @@ pub(crate) async fn handle_approval_approve(
         Ok(u) => u,
         Err(_) => return Err(StatusCode::BAD_REQUEST),
     };
-    let mut access = state.access_manager.lock();
-    match access.rbac_manager_mut().approve(uuid) {
-        true => {
-            tracing::info!(approval_id = %uuid, "Approval granted");
-            // Publish event so SSE clients update automatically
-            let _ = state.event_bus.publish(oxios_kernel::event_bus::KernelEvent::ApprovalResolved {
-                id: uuid,
-                approved: true,
-            });
-            Ok(Json(serde_json::json!({
-                "status": "approved",
-                "id": id,
-            })))
-        }
-        false => Err(StatusCode::NOT_FOUND),
+    
+    if state.kernel.approve_request(uuid) {
+        tracing::info!(approval_id = %uuid, "Approval granted");
+        // Publish event so SSE clients update automatically
+        let _ = state.kernel.publish(oxios_kernel::event_bus::KernelEvent::ApprovalResolved {
+            id: uuid,
+            approved: true,
+        });
+        Ok(Json(serde_json::json!({
+            "status": "approved",
+            "id": id,
+        })))
+    } else {
+        Err(StatusCode::NOT_FOUND)
     }
 }
 
@@ -305,20 +304,19 @@ pub(crate) async fn handle_approval_reject(
         Ok(u) => u,
         Err(_) => return Err(StatusCode::BAD_REQUEST),
     };
-    let mut access = state.access_manager.lock();
-    match access.rbac_manager_mut().reject(uuid) {
-        true => {
-            tracing::info!(approval_id = %uuid, "Approval rejected");
-            // Publish event so SSE clients update automatically
-            let _ = state.event_bus.publish(oxios_kernel::event_bus::KernelEvent::ApprovalResolved {
-                id: uuid,
-                approved: false,
-            });
-            Ok(Json(serde_json::json!({
-                "status": "rejected",
-                "id": id,
-            })))
-        }
-        false => Err(StatusCode::NOT_FOUND),
+    
+    if state.kernel.reject_request(uuid) {
+        tracing::info!(approval_id = %uuid, "Approval rejected");
+        // Publish event so SSE clients update automatically
+        let _ = state.kernel.publish(oxios_kernel::event_bus::KernelEvent::ApprovalResolved {
+            id: uuid,
+            approved: false,
+        });
+        Ok(Json(serde_json::json!({
+            "status": "rejected",
+            "id": id,
+        })))
+    } else {
+        Err(StatusCode::NOT_FOUND)
     }
 }

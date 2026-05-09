@@ -39,8 +39,8 @@ pub(crate) struct SchedulerStatsResponse {
 pub(crate) async fn handle_scheduler_stats(
     state: State<Arc<AppState>>,
 ) -> Json<SchedulerStatsResponse> {
-    let stats = state.scheduler.stats();
-    let rate_remaining = state.scheduler.rate_limit_remaining();
+    let stats = state.kernel.scheduler_stats();
+    let rate_remaining = state.kernel.scheduler_rate_remaining();
     Json(SchedulerStatsResponse {
         queued: stats.queued,
         running: stats.running,
@@ -67,8 +67,8 @@ pub(crate) async fn handle_scheduler_tasks(
     Query(params): Query<PageParams>,
 ) -> Json<serde_json::Value> {
     let queued: Vec<TaskSummary> = state
-        .scheduler
-        .queued_tasks()
+        .kernel
+        .scheduler_queued_tasks()
         .into_iter()
         .map(|t| TaskSummary {
             id: t.id.to_string(),
@@ -81,8 +81,8 @@ pub(crate) async fn handle_scheduler_tasks(
         .collect();
 
     let running: Vec<TaskSummary> = state
-        .scheduler
-        .running_tasks()
+        .kernel
+        .scheduler_running_tasks()
         .into_iter()
         .map(|t| TaskSummary {
             id: t.id.to_string(),
@@ -146,8 +146,7 @@ pub(crate) async fn handle_audit_log(
     state: State<Arc<AppState>>,
     Query(params): Query<AuditLogParams>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
-    let access = state.access_manager.lock();
-    let entries = access.audit_log();
+    let entries = state.kernel.get_audit_log();
     let total = entries.len();
     let limit = params.limit.min(500);
     let offset = (params.page.saturating_sub(1)) * limit;
@@ -178,8 +177,10 @@ pub(crate) async fn handle_permissions_get(
     state: State<Arc<AppState>>,
     Path(agent): Path<String>,
 ) -> Result<Json<PermissionsResponse>, StatusCode> {
-    let access = state.access_manager.lock();
-    match access.get_permissions(&agent) {
+    let access = state.kernel.access_manager().lock();
+    let perms = access.get_permissions(&agent);
+    
+    match perms {
         Some(perms) => Ok(Json(PermissionsResponse {
             agent_name: perms.agent_name.clone(),
             allowed_tools: perms.allowed_tools.iter().cloned().collect(),
@@ -211,7 +212,7 @@ pub(crate) async fn handle_permissions_put(
     Path(agent): Path<String>,
     Json(body): Json<PermissionsUpdate>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
-    let mut access = state.access_manager.lock();
+    let mut access = state.kernel.access_manager().lock();
     let perms = access.get_or_create_permissions(&agent);
 
     if let Some(tools) = body.allowed_tools {
@@ -263,7 +264,7 @@ pub(crate) struct McpServerResponse {
 pub(crate) async fn handle_mcp_servers_list(
     state: State<Arc<AppState>>,
 ) -> Json<Vec<McpServerResponse>> {
-    let bridge = &*state.mcp_bridge;
+    let bridge = state.kernel.mcp_bridge();
     let servers = bridge.servers();
     let mut results = Vec::new();
     for name in servers {
@@ -306,13 +307,13 @@ pub(crate) async fn handle_mcp_server_register(
     let name = body.name.clone();
     let command = body.command.clone();
     {
-        let bridge = &*state.mcp_bridge;
+        let bridge = state.kernel.mcp_bridge();
         let mut server = oxios_kernel::McpServer::new(&name, &command);
         server.args = body.args;
         server.enabled = true;
         bridge.register_server(server);
     }
-    if let Err(e) = state.mcp_bridge.initialize_server(&name).await {
+    if let Err(e) = state.kernel.mcp_bridge().initialize_server(&name).await {
         tracing::error!(server = %name, error = %e, "Failed to start MCP server");
         return Err((StatusCode::INTERNAL_SERVER_ERROR, e.to_string()));
     }
@@ -339,7 +340,7 @@ pub(crate) struct McpToolResponse {
 pub(crate) async fn handle_mcp_tools_list(
     state: State<Arc<AppState>>,
 ) -> Json<Vec<McpToolResponse>> {
-    let bridge = &*state.mcp_bridge;
+    let bridge = state.kernel.mcp_bridge();
     let tools = match bridge.list_tools().await {
         Ok(t) => t,
         Err(e) => {
@@ -392,7 +393,7 @@ pub(crate) async fn handle_mcp_tool_call(
     state: State<Arc<AppState>>,
     Json(body): Json<McpToolCallRequest>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
-    let result = state.mcp_bridge
+    let result = state.kernel.mcp_bridge()
         .call_tool(&body.server, &body.tool, body.arguments)
         .await
         .map_err(|e| {
@@ -405,7 +406,6 @@ pub(crate) async fn handle_mcp_tool_call(
         .iter()
         .map(|block| serde_json::to_value(block).unwrap_or_default())
         .collect();
-
 
     Ok(Json(serde_json::json!({
         "content": content,

@@ -9,7 +9,6 @@ use axum::Json;
 use serde::{Deserialize, Serialize};
 
 use oxios_kernel::memory::{MemoryEntry, MemoryType};
-use oxios_kernel::state_store::StateStore;
 
 use crate::error::AppError;
 use crate::routes::{PageParams, paginate};
@@ -43,9 +42,9 @@ pub(crate) async fn handle_workspace_tree(
     state: State<Arc<AppState>>,
     Query(query): Query<TreeQuery>,
 ) -> Result<Json<Vec<TreeEntry>>, AppError> {
-    let base = &state.state_store.base_path;
-    let canonical_base = state.state_store.base_path.canonicalize()
-        .unwrap_or_else(|_| state.state_store.base_path.clone());
+    let base = state.kernel.state_store_base_path();
+    let canonical_base = base.canonicalize()
+        .unwrap_or_else(|_| base.to_path_buf());
     let dir = match &query.dir {
         Some(d) => {
             let candidate = base.join(d);
@@ -88,10 +87,11 @@ pub(crate) async fn handle_workspace_file_get(
     state: State<Arc<AppState>>,
     Path(path): Path<String>,
 ) -> Result<impl IntoResponse, AppError> {
-    let full_path = state.state_store.base_path.join(&path);
+    let base = state.kernel.state_store_base_path();
+    let full_path = base.join(&path);
 
     // Security: ensure the path doesn't escape the workspace
-    let canonical_base = state.state_store.base_path.canonicalize().unwrap_or_else(|_| state.state_store.base_path.clone());
+    let canonical_base = base.canonicalize().unwrap_or_else(|_| base.to_path_buf());
     let canonical_file = match full_path.canonicalize() {
         Ok(p) => p,
         Err(_) => return Err(AppError::NotFound("file not found".into())),
@@ -129,10 +129,11 @@ pub(crate) async fn handle_workspace_file_put(
         });
     }
 
-    let full_path = state.state_store.base_path.join(&path);
+    let base = state.kernel.state_store_base_path();
+    let full_path = base.join(&path);
 
     // Security: ensure the path doesn't escape the workspace
-    let canonical_base = state.state_store.base_path.canonicalize().unwrap_or_else(|_| state.state_store.base_path.clone());
+    let canonical_base = base.canonicalize().unwrap_or_else(|_| base.to_path_buf());
     if let Some(parent) = full_path.parent() {
         if !parent.exists() {
             tokio::fs::create_dir_all(parent).await
@@ -165,8 +166,8 @@ fn guess_mime(path: &str) -> String {
         Some("toml") => "application/toml".into(),
         Some("yaml" | "yml") => "application/yaml".into(),
         Some("txt") => "text/plain; charset=utf-8".into(),
-        Some("html") => "text/html; charset=utf-8".into(),
-        Some("css") => "text/css; charset=utf-8".into(),
+        Some("html") => "text/html".into(),
+        Some("css") => "text/css".into(),
         Some("js") => "application/javascript".into(),
         _ => "text/plain; charset=utf-8".into(),
     }
@@ -196,9 +197,9 @@ pub(crate) async fn handle_seeds_list(
 ) -> Json<serde_json::Value> {
     let mut summaries = Vec::new();
 
-    if let Ok(names) = state.state_store.list_category("seeds").await {
+    if let Ok(names) = state.kernel.list_category("seeds").await {
         for name in names {
-            if let Ok(Some(content)) = state.state_store.load_markdown("seeds", &name).await {
+            if let Ok(Some(content)) = state.kernel.load_markdown("seeds", &name).await {
                 // Try to parse as JSON (seeds stored as JSON)
                 if let Ok(seed) = serde_json::from_str::<oxios_ouroboros::Seed>(&content) {
                     summaries.push(SeedSummary {
@@ -229,7 +230,7 @@ pub(crate) async fn handle_seed_get(
     Path(id): Path<String>,
 ) -> Result<Json<serde_json::Value>, AppError> {
     // Try JSON first, then markdown
-    if let Ok(Some(content)) = state.state_store.load_markdown("seeds", &id).await {
+    if let Ok(Some(content)) = state.kernel.load_markdown("seeds", &id).await {
         if let Ok(seed) = serde_json::from_str::<oxios_ouroboros::Seed>(&content) {
             return Ok(Json(serde_json::to_value(&seed).unwrap_or_default()));
         }
@@ -271,7 +272,7 @@ pub(crate) async fn handle_seed_evolution(
     // Helper to build lineage by following parent IDs.
     // Build lineage iteratively using a work stack.
     fn build_lineage_iterative(
-        state_store: Arc<StateStore>,
+        kernel: Arc<oxios_kernel::KernelHandle>,
         seed_id: String,
     ) -> Pin<Box<dyn Future<Output = anyhow::Result<Vec<EvolutionEntry>>> + Send>> {
         Box::pin(async move {
@@ -279,7 +280,7 @@ pub(crate) async fn handle_seed_evolution(
             let mut stack = vec![seed_id];
 
             while let Some(current_id) = stack.pop() {
-                let content = match state_store.load_markdown("seeds", &current_id).await {
+                let content = match kernel.load_markdown("seeds", &current_id).await {
                     Ok(Some(c)) => c,
                     _ => continue,
                 };
@@ -296,7 +297,7 @@ pub(crate) async fn handle_seed_evolution(
                 let (score, passed) = {
                     let eval_name = format!("{}-eval", current_id);
                     if let Ok(Some(eval_content)) =
-                        state_store.load_markdown("evals", &eval_name).await
+                        kernel.load_markdown("evals", &eval_name).await
                     {
                         if let Ok(eval) =
                             serde_json::from_str::<oxios_ouroboros::EvaluationResult>(&eval_content)
@@ -325,7 +326,7 @@ pub(crate) async fn handle_seed_evolution(
         })
     }
 
-    match build_lineage_iterative(state.state_store.clone(), id).await {
+    match build_lineage_iterative(state.kernel.clone(), id).await {
         Ok(lineage) if !lineage.is_empty() => Ok(Json(lineage)),
         _ => Err(AppError::NotFound("seed evolution not found".into())),
     }
@@ -350,7 +351,7 @@ pub(crate) async fn handle_skills_list(
     state: State<Arc<AppState>>,
     Query(params): Query<PageParams>,
 ) -> Json<serde_json::Value> {
-    match state.skill_store.list_skills().await {
+    match state.kernel.list_skills().await {
         Ok(skills) => {
             let summaries: Vec<SkillSummary> = skills
                 .into_iter()
@@ -373,7 +374,7 @@ pub(crate) async fn handle_skill_get(
     state: State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> Result<Json<serde_json::Value>, AppError> {
-    match state.skill_store.load_skill(&name).await {
+    match state.kernel.load_skill(&name).await {
         Ok(Some(skill)) => Ok(Json(serde_json::json!({
             "name": skill.meta.name,
             "description": skill.meta.description,
@@ -414,23 +415,17 @@ pub(crate) async fn handle_skill_create(
         });
     }
 
-    match state
-        .skill_store
-        .create_skill(&body.name, &body.description, &body.content)
-        .await
-    {
-        Ok(_) => {
-            tracing::info!(skill = %body.name, "Skill created via API");
-            Ok(Json(serde_json::json!({
-                "status": "created",
-                "name": body.name,
-            })))
-        }
-        Err(e) => {
+    state.kernel.create_skill(&body.name, &body.description, &body.content).await
+        .map_err(|e| {
             tracing::error!(error = %e, skill = %body.name, "Failed to create skill");
-            Err(AppError::BadRequest(e.to_string()))
-        }
-    }
+            AppError::BadRequest(e.to_string())
+        })?;
+
+    tracing::info!(skill = %body.name, "Skill created via API");
+    Ok(Json(serde_json::json!({
+        "status": "created",
+        "name": body.name,
+    })))
 }
 
 /// DELETE /api/skills/:name — Delete a skill.
@@ -438,19 +433,17 @@ pub(crate) async fn handle_skill_delete(
     state: State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> Result<Json<serde_json::Value>, AppError> {
-    match state.skill_store.delete_skill(&name).await {
-        Ok(_) => {
-            tracing::info!(skill = %name, "Skill deleted via API");
-            Ok(Json(serde_json::json!({
-                "status": "deleted",
-                "name": name,
-            })))
-        }
-        Err(e) => {
+    state.kernel.delete_skill(&name).await
+        .map_err(|e| {
             tracing::error!(error = %e, skill = %name, "Failed to delete skill");
-            Err(AppError::BadRequest(e.to_string()))
-        }
-    }
+            AppError::BadRequest(e.to_string())
+        })?;
+
+    tracing::info!(skill = %name, "Skill deleted via API");
+    Ok(Json(serde_json::json!({
+        "status": "deleted",
+        "name": name,
+    })))
 }
 
 // ---------------------------------------------------------------------------
@@ -474,7 +467,7 @@ pub(crate) async fn handle_memory_list(
     let mut entries = Vec::new();
 
     // List daily memory files
-    if let Ok(names) = state.state_store.list_category("memory").await {
+    if let Ok(names) = state.kernel.list_category("memory").await {
         for name in names {
             entries.push(MemorySummary {
                 name,
@@ -484,7 +477,7 @@ pub(crate) async fn handle_memory_list(
     }
 
     // List knowledge base entries
-    if let Ok(names) = state.state_store.list_category("memory/knowledge").await {
+    if let Ok(names) = state.kernel.list_category("memory/knowledge").await {
         for name in names {
             entries.push(MemorySummary {
                 name,
@@ -502,7 +495,7 @@ pub(crate) async fn handle_memory_get(
     Path(name): Path<String>,
 ) -> Result<impl IntoResponse, AppError> {
     // Try memory/ first, then memory/knowledge/
-    if let Ok(Some(content)) = state.state_store.load_markdown("memory", &name).await {
+    if let Ok(Some(content)) = state.kernel.load_markdown("memory", &name).await {
         return Ok(Json(serde_json::json!({
             "name": name,
             "category": "daily",
@@ -511,11 +504,7 @@ pub(crate) async fn handle_memory_get(
         .into_response());
     }
 
-    if let Ok(Some(content)) = state
-        .state_store
-        .load_markdown("memory/knowledge", &name)
-        .await
-    {
+    if let Ok(Some(content)) = state.kernel.load_markdown("memory/knowledge", &name).await {
         return Ok(Json(serde_json::json!({
             "name": name,
             "category": "knowledge",
@@ -591,10 +580,9 @@ pub(crate) async fn handle_memory_create(
         accessed_at: chrono::Utc::now(),
         access_count: 0,
     };
-    let id = state
-        .memory_manager
-        .remember(entry)
-        .await
+    
+    // Use memory manager from kernel
+    let id = state.kernel.inner_memory_manager().remember(entry).await
         .map_err(|e| AppError::Internal(e.to_string()))?;
     Ok(Json(serde_json::json!({ "id": id, "status": "created" })))
 }
@@ -620,10 +608,9 @@ pub(crate) async fn handle_memory_search(
         _ => None,
     });
     let limit = body.limit.unwrap_or(10);
-    let entries = state
-        .memory_manager
-        .search(&body.query, type_filter, limit)
-        .await
+    
+    // Use memory manager from kernel
+    let entries = state.kernel.inner_memory_manager().search(&body.query, type_filter, limit).await
         .map_err(|e| AppError::Internal(e.to_string()))?;
     let results: Vec<serde_json::Value> = entries
         .iter()

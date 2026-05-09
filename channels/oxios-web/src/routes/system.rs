@@ -21,7 +21,7 @@ pub(crate) async fn handle_health(State(state): State<Arc<AppState>>) -> Json<se
         "status": "ok",
         "version": env!("CARGO_PKG_VERSION"),
         "backend": {
-            "container": state.container_manager.is_backend_available(),
+            "container": state.kernel.container_available(),
         }
     }))
 }
@@ -112,22 +112,17 @@ pub(crate) async fn handle_status(
     );
 
     // Container backend health
-    let container_healthy = state.container_manager.is_backend_available();
-    let container_detail = if container_healthy {
-        Some(state.container_manager.backend_name().to_string())
-    } else {
-        Some("no backend available".to_string())
-    };
+    let container_healthy = state.kernel.container_available();
+    let container_detail = state.kernel.container_backend();
 
     // State store health — check that the base path exists
-    let state_store_healthy = state.state_store.base_path.exists();
+    let state_store_healthy = state.kernel.state_store_base_path().exists();
 
     // Event bus — always healthy if we got this far
     let event_bus_healthy = true;
 
     // Memory health
-    let mem_index_size = state.memory_manager.vector_index_size();
-    let mem_total = state.memory_manager.total_entries().await;
+    let (mem_index_size, mem_total) = state.kernel.memory_stats_async().await;
     let memory_health = MemoryHealth {
         enabled: true,
         index_size: mem_index_size,
@@ -135,7 +130,7 @@ pub(crate) async fn handle_status(
     };
 
     // Agent health — count active from supervisor, metrics from export
-    let active_count = state.supervisor.list().await
+    let active_count = state.kernel.list_agents().await
         .map(|agents| agents.iter().filter(|a| {
             matches!(a.status, oxios_kernel::AgentStatus::Running | oxios_kernel::AgentStatus::Starting | oxios_kernel::AgentStatus::Idle)
         }).count())
@@ -201,7 +196,7 @@ pub(crate) async fn handle_container_tools(
     state: State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> Result<Json<serde_json::Value>, AppError> {
-    let report = state.container_manager.check_tool_health(&name).await
+    let report = state.kernel.check_tool_health(&name).await
         .map_err(|e| AppError::Internal(e.to_string()))?;
     Ok(Json(serde_json::to_value(report).unwrap_or_default()))
 }
@@ -226,7 +221,7 @@ pub(crate) async fn handle_agents_list(
     state: State<Arc<AppState>>,
     Query(params): Query<PageParams>,
 ) -> Json<serde_json::Value> {
-    match state.supervisor.list().await {
+    match state.kernel.list_agents().await {
         Ok(agents) => {
             let items: Vec<AgentSummary> = agents
                 .into_iter()
@@ -253,20 +248,11 @@ pub(crate) async fn handle_agent_kill(
     Path(id): Path<String>,
 ) -> Result<(), AppError> {
     tracing::info!(agent_id = %id, "Kill agent requested");
-    let agent_id = match Uuid::parse_str(&id) {
-        Ok(uuid) => AgentId::from(uuid),
-        Err(e) => {
-            tracing::warn!(error = %e, "Invalid agent ID");
-            return Err(AppError::BadRequest("invalid agent ID".into()));
-        }
-    };
-    match state.supervisor.kill(agent_id).await {
-        Ok(_) => Ok(()),
-        Err(e) => {
+    state.kernel.kill_agent(&id).await
+        .map_err(|e| {
             tracing::warn!(error = %e, "Agent not found");
-            Err(AppError::NotFound("agent not found".into()))
-        }
-    }
+            AppError::NotFound("agent not found".into())
+        })
 }
 
 // ---------------------------------------------------------------------------
@@ -296,14 +282,7 @@ pub(crate) async fn handle_container_create(
     state: State<Arc<AppState>>,
     Json(body): Json<CreateContainerRequest>,
 ) -> Result<Json<serde_json::Value>, AppError> {
-    let result = if let Some(toolchain) = &body.toolchain {
-        state.container_manager
-            .new_container_with_toolchain(&body.name, toolchain)
-            .await
-    } else {
-        state.container_manager.new_container(&body.name).await
-    };
-    result
+    state.kernel.create_container(&body.name).await
         .map(|_| Json(serde_json::json!({"created": body.name})))
         .map_err(|e| AppError::Internal(e.to_string()))
 }

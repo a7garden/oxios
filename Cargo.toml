@@ -62,6 +62,7 @@ oxios-web = { path = "channels/oxios-web" }
 oxios-cli = { path = "channels/oxios-cli" }
 hex = { workspace = true }
 oxi-ai = { workspace = true }
+uuid = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }

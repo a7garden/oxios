@@ -55,7 +55,7 @@ fn default_toolchain() -> String {
 pub(crate) async fn handle_cron_jobs_list(
     state: State<Arc<AppState>>,
 ) -> Result<Json<serde_json::Value>, AppError> {
-    let jobs = state.cron_scheduler.list_jobs();
+    let jobs = state.kernel.list_schedules();
     Ok(Json(serde_json::json!({ "jobs": jobs })))
 }
 
@@ -70,10 +70,7 @@ pub(crate) async fn handle_cron_job_create(
     job.toolchain = body.toolchain;
     job.priority = body.priority;
 
-    let id = state
-        .cron_scheduler
-        .add_job(job)
-        .await
+    let id = state.kernel.add_cron_job(job).await
         .map_err(|e| AppError::Internal(e.to_string()))?;
 
     Ok(Json(serde_json::json!({ "id": id })))
@@ -84,9 +81,7 @@ pub(crate) async fn handle_cron_job_get(
     state: State<Arc<AppState>>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<CronJob>, AppError> {
-    state
-        .cron_scheduler
-        .get_job(id)
+    state.kernel.get_cron_job(id)
         .map(Json)
         .ok_or_else(|| AppError::NotFound(format!("Cron job {} not found", id)))
 }
@@ -96,10 +91,7 @@ pub(crate) async fn handle_cron_job_delete(
     state: State<Arc<AppState>>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>, AppError> {
-    state
-        .cron_scheduler
-        .remove_job(id)
-        .await
+    state.kernel.unschedule(&id.to_string()).await
         .map_err(|e| AppError::Internal(e.to_string()))?;
 
     Ok(Json(serde_json::json!({ "deleted": id })))
@@ -113,10 +105,7 @@ pub(crate) async fn update_cron_job(
 ) -> Result<Json<serde_json::Value>, AppError> {
     let update: oxios_kernel::CronJobUpdate = serde_json::from_value(body)
         .map_err(|e| AppError::BadRequest(e.to_string()))?;
-    state
-        .cron_scheduler
-        .update_job(id, update)
-        .await
+    state.kernel.update_cron_job(id, update).await
         .map_err(|e| AppError::Internal(e.to_string()))?;
     Ok(Json(serde_json::json!({ "updated": id })))
 }
@@ -126,9 +115,7 @@ pub(crate) async fn handle_cron_job_trigger(
     state: State<Arc<AppState>>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>, AppError> {
-    let job = state
-        .cron_scheduler
-        .trigger_job(id)
+    let job = state.kernel.trigger_cron_job(id)
         .map_err(|e| AppError::Internal(e.to_string()))?;
 
     tracing::info!(job_id = %id, job_name = %job.name, "Triggering cron job");
@@ -157,10 +144,7 @@ pub(crate) async fn handle_cron_job_trigger(
         .unwrap_or_else(|| response.content.clone());
 
     // Record the result on the job.
-    state
-        .cron_scheduler
-        .mark_job_completed(id, success, summary.clone())
-        .await;
+    state.kernel.mark_cron_job_completed(id, success, summary.clone()).await;
 
     Ok(Json(serde_json::json!({
         "job_id": id,

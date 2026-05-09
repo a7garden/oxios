@@ -86,15 +86,13 @@ pub(crate) async fn handle_chat(
         Ok(response) => {
             tracing::info!(reply_len = response.content.len(), "Chat response received");
 
-
             // Persist session
             {
                 let session_id_for_save = response.metadata.get("session_id").cloned()
                     .unwrap_or_else(|| msg_id.clone());
-                let store = &state.state_store;
-                let session_id = oxios_kernel::state_store::SessionId(session_id_for_save);
-                match store.get_or_create_session(&body.user_id, Some(&session_id)).await {
-                    Ok(mut session) => {
+                let session_id = oxios_kernel::state_store::SessionId(session_id_for_save.clone());
+                match state.kernel.load_session(&session_id).await {
+                    Ok(Some(mut session)) => {
                         session.add_user_message(&content_echo);
                         session.add_agent_response(oxios_kernel::state_store::AgentResponse {
                             content: response.content.clone(),
@@ -104,11 +102,28 @@ pub(crate) async fn handle_chat(
                             evaluation_passed: response.metadata.get("evaluation_passed").and_then(|v| v.parse().ok()),
                             timestamp: chrono::Utc::now(),
                         });
-                        if let Err(e) = store.update_session(&session).await {
+                        if let Err(e) = state.kernel.save_session(&session).await {
                             tracing::warn!(error = %e, "Failed to persist session");
                         }
                     }
-                    Err(e) => tracing::warn!(error = %e, "Failed to get/create session"),
+                    Ok(None) => {
+                        // Create new session
+                        let mut session = oxios_kernel::state_store::Session::new(body.user_id.clone());
+                        session.id = oxios_kernel::state_store::SessionId(session_id_for_save.clone());
+                        session.add_user_message(&content_echo);
+                        session.add_agent_response(oxios_kernel::state_store::AgentResponse {
+                            content: response.content.clone(),
+                            session_id: Some(session_id.0),
+                            seed_id: response.metadata.get("seed_id").cloned(),
+                            phase_reached: response.metadata.get("phase").cloned(),
+                            evaluation_passed: response.metadata.get("evaluation_passed").and_then(|v| v.parse().ok()),
+                            timestamp: chrono::Utc::now(),
+                        });
+                        if let Err(e) = state.kernel.save_session(&session).await {
+                            tracing::warn!(error = %e, "Failed to create session");
+                        }
+                    }
+                    Err(e) => tracing::warn!(error = %e, "Failed to load/create session"),
                 }
             }
 
@@ -143,8 +158,7 @@ pub(crate) async fn handle_chat_stream(
     // Authenticate if auth is enabled
     if state.config.read().security.auth_enabled {
         let token = params.token.as_deref().unwrap_or("");
-        let valid = { state.auth_manager.lock().validate(token) };
-        if !valid {
+        if !state.kernel.validate_token(token) {
             return axum::http::StatusCode::UNAUTHORIZED.into_response();
         }
     }
@@ -156,7 +170,7 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
     let (mut ws_tx, mut ws_rx) = socket.split();
 
     // Subscribe to outgoing messages
-    let mut outgoing_rx = state.channel.subscribe();
+    let mut outgoing_rx = state.kernel.subscribe();
 
     // Forward outgoing messages to the WebSocket
     let recv_task = tokio::spawn(async move {

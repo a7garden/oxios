@@ -56,6 +56,9 @@ pub mod telemetry_stub;
 #[cfg(not(feature = "otel"))]
 pub use telemetry_stub as telemetry;
 
+pub mod kernel_handle;
+pub use kernel_handle::KernelHandle;
+
 pub use circuit_breaker::CircuitBreaker;
 pub use metrics::{registry, register_builtin_metrics, get_metrics};
 
