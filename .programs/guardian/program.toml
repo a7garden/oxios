@@ -1,0 +1,15 @@
+[program]
+name = "guardian"
+version = "1.0.0"
+description = "Background daemon for audit verification, resource monitoring, and budget enforcement"
+author = "oxios"
+
+[requires_tools]
+names = []
+
+[host_requirements]
+required = []
+optional = []
+
+[daemon]
+interval_secs = 300

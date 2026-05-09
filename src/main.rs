@@ -614,6 +614,9 @@ async fn main() -> Result<()> {
                 )
                 .with_state(app);
 
+            // Start guardian daemon for background integrity checks
+            kernel.start_guardian();
+
             // Spawn gateway loop
             let gateway_handle = tokio::spawn({
                 let g = kernel.gateway;

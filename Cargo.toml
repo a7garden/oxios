@@ -83,3 +83,6 @@ oxi-ai = { workspace = true }
 uuid = { workspace = true }
 chrono = { workspace = true }
 tokio = { workspace = true }
+serde_json = { workspace = true }
+tempfile = "3"
+mockall = "0.12"

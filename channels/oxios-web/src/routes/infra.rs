@@ -159,43 +159,8 @@ pub(crate) async fn handle_audit_log(
     })))
 }
 
-/// Permissions response.
-#[derive(Debug, Serialize)]
-pub(crate) struct PermissionsResponse {
-    agent_name: String,
-    allowed_tools: Vec<String>,
-    allowed_paths: Vec<String>,
-    denied_paths: Vec<String>,
-    network_access: bool,
-    max_execution_time_secs: u64,
-    max_memory_mb: u64,
-    can_fork: bool,
-}
-
-/// GET /api/permissions/:agent — Get permissions for an agent.
-pub(crate) async fn handle_permissions_get(
-    state: State<Arc<AppState>>,
-    Path(agent): Path<String>,
-) -> Result<Json<PermissionsResponse>, StatusCode> {
-    let perms = state.kernel.get_permissions(&agent);
-    
-    match perms {
-        Some(perms) => Ok(Json(PermissionsResponse {
-            agent_name: perms.agent_name.clone(),
-            allowed_tools: perms.allowed_tools.iter().cloned().collect(),
-            allowed_paths: perms.allowed_paths.clone(),
-            denied_paths: perms.denied_paths.clone(),
-            network_access: perms.network_access,
-            max_execution_time_secs: perms.max_execution_time_secs,
-            max_memory_mb: perms.max_memory_mb,
-            can_fork: perms.can_fork,
-        })),
-        None => Err(StatusCode::NOT_FOUND),
-    }
-}
-
-/// PUT /api/permissions/:agent — Set permissions for an agent.
-#[derive(Debug, Deserialize)]
+/// Permission update request from JSON API.
+/// We avoid derive(Deserialize) to prevent conflicts with kernel's PermissionUpdate.
 pub(crate) struct PermissionsUpdate {
     allowed_tools: Option<Vec<String>>,
     allowed_paths: Option<Vec<String>>,
@@ -206,36 +171,68 @@ pub(crate) struct PermissionsUpdate {
     can_fork: Option<bool>,
 }
 
+impl PermissionsUpdate {
+    /// Parse from JSON value.
+    pub fn from_json(value: serde_json::Value) -> Self {
+        use std::collections::HashSet;
+        Self {
+            allowed_tools: value.get("allowed_tools").and_then(|v| v.as_array())
+                .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect()),
+            allowed_paths: value.get("allowed_paths").and_then(|v| v.as_array())
+                .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect()),
+            denied_paths: value.get("denied_paths").and_then(|v| v.as_array())
+                .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect()),
+            network_access: value.get("network_access").and_then(|v| v.as_bool()),
+            max_execution_time_secs: value.get("max_execution_time_secs").and_then(|v| v.as_u64()).map(|v| v as u64),
+            max_memory_mb: value.get("max_memory_mb").and_then(|v| v.as_u64()).map(|v| v as u64),
+            can_fork: value.get("can_fork").and_then(|v| v.as_bool()),
+        }
+    }
+
+    /// Convert to kernel PermissionUpdate.
+    pub fn into_kernel(self) -> oxios_kernel::access_manager::PermissionUpdate {
+        use std::collections::HashSet;
+        oxios_kernel::access_manager::PermissionUpdate {
+            allowed_tools: self.allowed_tools.map(|t| t.into_iter().collect()),
+            allowed_paths: self.allowed_paths,
+            denied_paths: self.denied_paths,
+            network_access: self.network_access,
+            max_execution_time_secs: self.max_execution_time_secs,
+            max_memory_mb: self.max_memory_mb,
+            can_fork: self.can_fork,
+        }
+    }
+}
+
+/// GET /api/permissions/:agent — Get permissions for an agent.
+pub(crate) async fn handle_permissions_get(
+    state: State<Arc<AppState>>,
+    Path(agent): Path<String>,
+) -> Result<Json<serde_json::Value>, StatusCode> {
+    match state.kernel.get_permissions(&agent) {
+        Some(perms) => Ok(Json(serde_json::json!({
+            "agent_name": perms.agent_name,
+            "allowed_tools": perms.allowed_tools.iter().cloned().collect::<Vec<_>>(),
+            "allowed_paths": perms.allowed_paths,
+            "denied_paths": perms.denied_paths,
+            "network_access": perms.network_access,
+            "max_execution_time_secs": perms.max_execution_time_secs,
+            "max_memory_mb": perms.max_memory_mb,
+            "can_fork": perms.can_fork,
+        }))),
+        None => Err(StatusCode::NOT_FOUND),
+    }
+}
+
+/// PUT /api/permissions/:agent — Set permissions for an agent.
 pub(crate) async fn handle_permissions_put(
     state: State<Arc<AppState>>,
     Path(agent): Path<String>,
-    Json(body): Json<PermissionsUpdate>,
+    Json(body): Json<serde_json::Value>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
-    // Get a mutable reference to access manager
-    let mut access = state.kernel.access_manager().lock();
-    let perms = access.get_or_create_permissions(&agent);
-
-    if let Some(tools) = body.allowed_tools {
-        perms.allowed_tools = tools.into_iter().collect();
-    }
-    if let Some(paths) = body.allowed_paths {
-        perms.allowed_paths = paths;
-    }
-    if let Some(paths) = body.denied_paths {
-        perms.denied_paths = paths;
-    }
-    if let Some(v) = body.network_access {
-        perms.network_access = v;
-    }
-    if let Some(v) = body.max_execution_time_secs {
-        perms.max_execution_time_secs = v;
-    }
-    if let Some(v) = body.max_memory_mb {
-        perms.max_memory_mb = v;
-    }
-    if let Some(v) = body.can_fork {
-        perms.can_fork = v;
-    }
+    let update = PermissionsUpdate::from_json(body).into_kernel();
+    state.kernel.update_permissions(&agent, update)
+        .map_err(|e: anyhow::Error| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     tracing::info!(agent = %agent, "Permissions updated");
     Ok(Json(serde_json::json!({

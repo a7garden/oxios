@@ -380,6 +380,59 @@ impl Default for AgentPermissions {
     }
 }
 
+/// Update struct for permission changes (partial updates).
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct PermissionUpdate {
+    /// Set of allowed tool names.
+    #[serde(default)]
+    pub allowed_tools: Option<HashSet<String>>,
+    /// Allowed path patterns (glob).
+    #[serde(default)]
+    pub allowed_paths: Option<Vec<String>>,
+    /// Denied path patterns (glob).
+    #[serde(default)]
+    pub denied_paths: Option<Vec<String>>,
+    /// Whether this agent can make network requests.
+    #[serde(default)]
+    pub network_access: Option<bool>,
+    /// Maximum execution time in seconds (0 = unlimited).
+    #[serde(default)]
+    pub max_execution_time_secs: Option<u64>,
+    /// Maximum memory in MB (0 = unlimited).
+    #[serde(default)]
+    pub max_memory_mb: Option<u64>,
+    /// Whether this agent can spawn sub-agents.
+    #[serde(default)]
+    pub can_fork: Option<bool>,
+}
+
+impl PermissionUpdate {
+    /// Apply this update to a permission set.
+    pub fn apply(&self, perms: &mut AgentPermissions) {
+        if let Some(tools) = &self.allowed_tools {
+            perms.allowed_tools = tools.clone();
+        }
+        if let Some(paths) = &self.allowed_paths {
+            perms.allowed_paths = paths.clone();
+        }
+        if let Some(paths) = &self.denied_paths {
+            perms.denied_paths = paths.clone();
+        }
+        if let Some(v) = self.network_access {
+            perms.network_access = v;
+        }
+        if let Some(v) = self.max_execution_time_secs {
+            perms.max_execution_time_secs = v;
+        }
+        if let Some(v) = self.max_memory_mb {
+            perms.max_memory_mb = v;
+        }
+        if let Some(v) = self.can_fork {
+            perms.can_fork = v;
+        }
+    }
+}
+
 impl AgentPermissions {
     /// Creates permissions for a new agent with the default restrictive set.
     pub fn for_new_agent(agent_name: &str) -> Self {
@@ -701,6 +754,18 @@ impl AccessManager {
     pub fn set_permissions(&mut self, permissions: AgentPermissions) {
         let agent_name = permissions.agent_name.clone();
         self.permissions.insert(agent_name, permissions);
+    }
+
+    /// Updates permissions for an agent using a partial update.
+    ///
+    /// Creates default permissions if the agent doesn't exist.
+    /// Only updates fields that are Some() in the update.
+    pub fn update_permissions(&mut self, agent_name: &str, update: PermissionUpdate) -> anyhow::Result<()> {
+        let perms = self.permissions
+            .entry(agent_name.to_string())
+            .or_insert_with(|| AgentPermissions::for_new_agent(agent_name));
+        update.apply(perms);
+        Ok(())
     }
 
     /// Removes permissions for an agent.

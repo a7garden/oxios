@@ -315,6 +315,41 @@ impl Kernel {
         }
     }
 
+    /// Start the guardian background daemon.
+    /// Periodically verifies audit chain, git integrity, and resource health.
+    pub fn start_guardian(&self) {
+        use oxios_kernel::audit_trail::AuditAction;
+        let handle = self.handle();
+        tokio::spawn(async move {
+            loop {
+                tokio::time::sleep(std::time::Duration::from_secs(300)).await;
+
+                // Audit chain integrity
+                if let Ok(valid) = handle.verify_audit() {
+                    if !valid {
+                        handle.audit("guardian", AuditAction::Other { detail: "AUDIT CHAIN BROKEN".into() }, "guardian");
+                    }
+                }
+
+                // Resource check
+                if handle.is_overloaded() {
+                    let snap = handle.resource_snapshot();
+                    handle.audit("guardian", AuditAction::Other { detail: format!("OVERLOADED: cpu={:.1}%", snap.cpu_percent) }, "guardian");
+                }
+
+                // Git integrity
+                if let Ok(valid) = handle.git_verify() {
+                    if !valid {
+                        handle.audit("guardian", AuditAction::Other { detail: "GIT REPOSITORY CORRUPTED".into() }, "guardian");
+                    }
+                }
+
+                // Periodic checkpoint
+                let _ = handle.commit_all("guardian: periodic checkpoint");
+            }
+        });
+    }
+
     /// Save data to state store and commit to git.
     pub async fn save_and_commit<T: serde::Serialize>(
         &self,

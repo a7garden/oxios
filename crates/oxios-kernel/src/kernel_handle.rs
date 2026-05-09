@@ -456,99 +456,8 @@ impl KernelHandle {
             .collect()
     }
 
-    // ── Subsystem Accessors ──
-
-    /// Get scheduler reference.
-    pub fn scheduler(&self) -> &Arc<AgentScheduler> {
-        &self.scheduler
-    }
-
-    /// Get event bus reference.
-    pub fn event_bus(&self) -> &EventBus {
-        &self.event_bus
-    }
-
-    /// Get state store reference.
-    pub fn state_store(&self) -> &Arc<StateStore> {
-        &self.state_store
-    }
-
-    /// Get container manager reference.
-    pub fn container_manager(&self) -> &Arc<ContainerManager> {
-        &self.container_manager
-    }
-
-    /// Get resource monitor reference.
-    pub fn resource_monitor(&self) -> &Arc<ResourceMonitor> {
-        &self.resource_monitor
-    }
-
-    /// Get audit trail reference.
-    pub fn audit_trail(&self) -> &Arc<AuditTrail> {
-        &self.audit_trail
-    }
-
-    /// Get budget manager reference.
-    pub fn budget_manager(&self) -> &Arc<BudgetManager> {
-        &self.budget_manager
-    }
-
-    /// Get skill store reference.
-    pub fn skill_store(&self) -> &Arc<SkillStore> {
-        &self.skill_store
-    }
-
-    /// Get program manager reference.
-    pub fn program_manager(&self) -> &Arc<ProgramManager> {
-        &self.program_manager
-    }
-
-    /// Get host tool validator reference.
-    pub fn host_tool_validator(&self) -> &Arc<HostToolValidator> {
-        &self.host_tool_validator
-    }
-
-    /// Get supervisor reference.
-    pub fn supervisor(&self) -> &Arc<dyn Supervisor> {
-        &self.supervisor
-    }
-
-    /// Get access manager reference.
-    pub fn access_manager(&self) -> &Arc<parking_lot::Mutex<AccessManager>> {
-        &self.access_manager
-    }
-
-    /// Get persona manager reference.
-    pub fn persona_manager(&self) -> &Arc<PersonaManager> {
-        &self.persona_manager
-    }
-
-    /// Get MCP bridge reference.
-    pub fn mcp_bridge(&self) -> &Arc<McpBridge> {
-        &self.mcp_bridge
-    }
-
-    /// Get memory manager reference.
-    pub fn memory_manager(&self) -> &Arc<MemoryManager> {
-        &self.memory_manager
-    }
-
-    /// Get auth manager reference.
-    pub fn auth_manager(&self) -> &Arc<parking_lot::Mutex<AuthManager>> {
-        &self.auth_manager
-    }
-
-    /// Get cron scheduler reference.
-    pub fn cron_scheduler(&self) -> &Arc<CronScheduler> {
-        &self.cron_scheduler
-    }
-
-    /// Get git layer reference.
-    pub fn git_layer(&self) -> &Arc<GitLayer> {
-        &self.git_layer
-    }
-
     // ── Skills ──
+
     pub async fn list_skills(&self) -> anyhow::Result<Vec<crate::skill::SkillMeta>> {
         self.skill_store.list_skills().await
     }
@@ -914,38 +823,9 @@ impl KernelHandle {
         am.log_access(agent_name, action, resource, true, None);
     }
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    // DIRECT SUBSYSTEM ACCESS (for advanced operations only)
-    // ═══════════════════════════════════════════════════════════════════════════
-
-    /// Get inner container manager Arc for advanced operations.
-    pub fn inner_container_manager(&self) -> &Arc<ContainerManager> {
-        &self.container_manager
-    }
-
-    /// Get inner program manager Arc for advanced operations.
-    pub fn inner_program_manager(&self) -> &Arc<ProgramManager> {
-        &self.program_manager
-    }
-
-    /// Get inner memory manager Arc for advanced operations.
-    pub fn inner_memory_manager(&self) -> &Arc<MemoryManager> {
-        &self.memory_manager
-    }
-
-    /// Get inner resource monitor Arc for advanced operations.
-    pub fn inner_resource_monitor(&self) -> &Arc<ResourceMonitor> {
-        &self.resource_monitor
-    }
-
-    /// Get inner scheduler Arc for advanced operations.
-    pub fn inner_scheduler(&self) -> &Arc<AgentScheduler> {
-        &self.scheduler
-    }
-
-    /// Get inner skill store Arc for advanced operations.
-    pub fn inner_skill_store(&self) -> &Arc<SkillStore> {
-        &self.skill_store
+    /// Update permissions for an agent using a partial update.
+    pub fn update_permissions(&self, agent: &str, update: crate::access_manager::PermissionUpdate) -> anyhow::Result<()> {
+        self.access_manager.lock().update_permissions(agent, update)
     }
 }
 
