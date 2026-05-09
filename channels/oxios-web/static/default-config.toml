@@ -53,3 +53,11 @@ max_execution_time_secs = 300
 max_memory_mb = 512
 # Whether agents can fork sub-agents.
 can_fork = false
+
+# OpenTelemetry tracing configuration.
+# Set enabled = true to export spans via OTLP to a collector.
+[otel]
+enabled = false
+endpoint = "http://localhost:4317"
+service_name = "oxios"
+sampling_ratio = 1.0

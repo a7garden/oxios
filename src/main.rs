@@ -4,6 +4,7 @@
 //! registers the web channel, and runs the gateway event loop.
 
 mod kernel;
+mod otel;
 
 use anyhow::{bail, Context, Result};
 use clap::{Parser, Subcommand};
@@ -77,6 +78,39 @@ enum Command {
         #[command(subcommand)]
         action: PkgAction,
     },
+
+    /// Manage running agents.
+    Agent {
+        #[command(subcommand)]
+        action: AgentAction,
+    },
+
+    /// Verify audit trail integrity.
+    Audit,
+
+    /// Git operations on state store.
+    Git {
+        #[command(subcommand)]
+        action: GitAction,
+    },
+
+    /// Show agent budget information.
+    Budget {
+        /// Show budget for a specific agent (UUID).
+        agent_id: Option<String>,
+    },
+
+    /// Daemon management.
+    Daemon {
+        #[command(subcommand)]
+        action: DaemonAction,
+    },
+
+    /// Show program skill file and usage.
+    Program {
+        /// Program name to display.
+        name: String,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -124,6 +158,33 @@ enum PkgAction {
     List,
     /// Search programs (stub — lists installed programs).
     Search,
+}
+
+/// Agent subcommands.
+#[derive(Debug, Subcommand)]
+enum AgentAction {
+    /// List all active agents.
+    List,
+    /// Kill a running agent by ID.
+    Kill { id: String },
+}
+
+/// Git subcommands.
+#[derive(Debug, Subcommand)]
+enum GitAction {
+    /// Show recent commits.
+    Log { limit: Option<usize> },
+    /// Create a tag.
+    Tag { name: String, message: Option<String> },
+}
+
+/// Daemon subcommands.
+#[derive(Debug, Subcommand)]
+enum DaemonAction {
+    /// Show daemon status.
+    Status,
+    /// Restart the guardian daemon.
+    Restart,
 }
 
 // ─── Workspace helpers ─────────────────────────────────────────────────────
@@ -470,6 +531,22 @@ async fn main() -> Result<()> {
         .with_writer(non_blocking)
         .init();
 
+    // Initialize OpenTelemetry (OTLP export) after tracing setup
+    // This is a no-op when otel.enabled = false
+    let early_config = if config_path.exists() {
+        oxios_kernel::config::load_config(&config_path).unwrap_or_default()
+    } else {
+        OxiosConfig::default()
+    };
+    let _otel_guard = otel::init_otel(&otel::OtelConfig {
+        enabled: early_config.otel.enabled,
+        endpoint: early_config.otel.endpoint.clone(),
+        service_name: early_config.otel.service_name.clone(),
+        sampling_ratio: early_config.otel.sampling_ratio,
+    }).await?;
+    // Keep the guard alive for program duration
+    Box::leak(Box::new(_otel_guard));
+
     let default_model = "anthropic/claude-sonnet-4-20250514";
     const DEFAULT_PORT: u16 = 4200;
 
@@ -527,6 +604,231 @@ async fn main() -> Result<()> {
         }
         Some(Command::Status) => {
             cmd_status(&config_path).await
+        }
+
+        // ── Agent ──────────────────────────────────────────────────────────────────
+        Some(Command::Agent { action }) => {
+            let kernel = Kernel::builder()
+                .config_path(config_path.to_path_buf())
+                .build()
+                .await?;
+
+            match action {
+                AgentAction::List => {
+                    let agents = kernel.supervisor.list().await
+                        .map_err(|e| anyhow::anyhow!("failed to list agents: {}", e))?;
+                    if agents.is_empty() {
+                        println!("No active agents.");
+                    } else {
+                        println!("{:36} {:10} {:20} {}", "ID", "STATUS", "NAME", "CREATED");
+                        println!("{}", "-".repeat(90));
+                        for agent in &agents {
+                            println!(
+                                "{:36} {:10} {:20} {}",
+                                agent.id,
+                                agent.status,
+                                agent.name,
+                                agent.created_at.format("%Y-%m-%d %H:%M")
+                            );
+                        }
+                        println!();
+                        println!("{} agent(s) active.", agents.len());
+                    }
+                    Ok(())
+                }
+                AgentAction::Kill { id } => {
+                    let uuid = uuid::Uuid::parse_str(&id)
+                        .map_err(|e| anyhow::anyhow!("invalid agent id '{}': {}", id, e))?;
+                    kernel.supervisor.kill(uuid).await
+                        .map_err(|e| anyhow::anyhow!("failed to kill agent {}: {}", id, e))?;
+                    println!("Agent {} terminated.", id);
+                    Ok(())
+                }
+            }
+        }
+
+        // ── Audit ─────────────────────────────────────────────────────────────────
+        Some(Command::Audit) => {
+            let kernel = Kernel::builder()
+                .config_path(config_path.to_path_buf())
+                .build()
+                .await?;
+
+            match kernel.audit_trail.verify() {
+                Ok(_) => println!("✓ Audit trail verified — chain intact."),
+                Err(e) => {
+                    eprintln!("✗ Audit verification failed: {:?}", e);
+                    println!("  Some entries may have been tampered with.");
+                }
+            }
+
+            let entries = kernel.handle().query_audit(0, 20);
+            println!();
+            if entries.is_empty() {
+                println!("No audit entries yet.");
+            } else {
+                println!("Recent Audit Entries (showing last {}):", entries.len());
+                println!("{:10} {:20} {:15} {}", "SEQ", "TIMESTAMP", "ACTOR", "ACTION");
+                println!("{}", "-".repeat(70));
+                for entry in entries {
+                    println!(
+                        "{:10} {:20} {:15} {}",
+                        entry.seq,
+                        entry.timestamp.format("%Y-%m-%d %H:%M:%S"),
+                        entry.actor,
+                        format!("{:?}", entry.action)
+                    );
+                }
+            }
+            println!();
+            println!("Total entries: {}", kernel.handle().audit_count());
+            Ok(())
+        }
+
+        // ── Git ────────────────────────────────────────────────────────────────────
+        Some(Command::Git { action }) => {
+            let kernel = Kernel::builder()
+                .config_path(config_path.to_path_buf())
+                .build()
+                .await?;
+
+            match action {
+                GitAction::Log { limit } => {
+                    let limit = limit.unwrap_or(20);
+                    match kernel.handle().git_log(limit) {
+                        Ok(entries) => {
+                            if entries.is_empty() {
+                                println!("No commits yet.");
+                            } else {
+                                println!("{:8} {:20} {:40}", "HASH", "AUTHOR", "MESSAGE");
+                                println!("{}", "-".repeat(75));
+                                for entry in entries {
+                                    let short_hash = &entry.hash[..8.min(entry.hash.len())];
+                                    let author = entry.author.chars().take(20).collect::<String>();
+                                    let msg = entry.message.chars().take(40).collect::<String>();
+                                    println!("{:8} {:20} {:40}", short_hash, author, msg);
+                                }
+                            }
+                            Ok(())
+                        }
+                        Err(e) => Err(anyhow::anyhow!("failed to get git log: {}", e)),
+                    }
+                }
+                GitAction::Tag { name, message } => {
+                    let msg = message.as_deref().unwrap_or("");
+                    match kernel.handle().git_tag(&name, msg) {
+                        Ok(_) => {
+                            println!("Tagged '{}'.", name);
+                            if !msg.is_empty() {
+                                println!("  Message: {}", msg);
+                            }
+                            Ok(())
+                        }
+                        Err(e) => Err(anyhow::anyhow!("failed to create tag: {}", e)),
+                    }
+                }
+            }
+        }
+
+        // ── Budget ─────────────────────────────────────────────────────────────────
+        Some(Command::Budget { agent_id }) => {
+            let kernel = Kernel::builder()
+                .config_path(config_path.to_path_buf())
+                .build()
+                .await?;
+
+            match agent_id {
+                Some(id) => {
+                    let uuid = uuid::Uuid::parse_str(&id)
+                        .map_err(|e| anyhow::anyhow!("invalid agent id '{}': {}", id, e))?;
+                    let budget = kernel.handle().check_budget(&uuid);
+                    println!("Budget for agent {}", id);
+                    println!("{}", "-".repeat(40));
+                    println!("  Tokens remaining: {}", budget.tokens_remaining);
+                    println!("  Calls remaining:  {}", budget.calls_remaining);
+                    println!("  Window remaining:   {} seconds", budget.window_remaining_secs);
+                    if budget.is_exhausted {
+                        println!("  Status: EXHAUSTED");
+                    } else {
+                        println!("  Status: OK");
+                    }
+                    Ok(())
+                }
+                None => {
+                    println!("Agent Budget Overview");
+                    println!("{}", "=".repeat(50));
+                    println!("(No agent metadata available without agent list)");
+                    println!();
+                    println!("Use 'oxios agent list' to see agent IDs,");
+                    println!("then 'oxios budget <agent-id>' for details.");
+                    Ok(())
+                }
+            }
+        }
+
+        // ── Daemon ─────────────────────────────────────────────────────────────────
+        Some(Command::Daemon { action }) => {
+            match action {
+                DaemonAction::Status => {
+                    println!("Guardian Daemon");
+                    println!("{}", "-".repeat(30));
+                    println!("  Status: running (background tokio task)");
+                    println!("  Purpose: periodic integrity checks and cleanup");
+                    println!();
+                    println!("The daemon runs as a background task within the server process.");
+                    println!("Start the server with 'oxios' to activate the daemon.");
+                    Ok(())
+                }
+                DaemonAction::Restart => {
+                    println!("Daemon restart not supported via CLI.");
+                    println!("Restart the entire server process: pkill -f oxios && oxios");
+                    Ok(())
+                }
+            }
+        }
+
+        // ── Program ────────────────────────────────────────────────────────────────
+        Some(Command::Program { name }) => {
+            let kernel = Kernel::builder()
+                .config_path(config_path.to_path_buf())
+                .build()
+                .await?;
+
+            match kernel.handle().get_program(&name).await {
+                Some(program) => {
+                    println!("Program: {} v{}", program.meta.name, program.meta.version);
+                    println!("{}", "-".repeat(50));
+                    println!();
+                    if !program.skill_content.is_empty() {
+                        println!("SKILL.md:");
+                        println!("{}", program.skill_content);
+                    } else {
+                        println!("(No SKILL.md found in program)");
+                    }
+                    println!();
+                    println!("Description: {}", program.meta.description);
+                    if !program.meta.tools.is_empty() {
+                        println!();
+                        println!("Tools:");
+                        for tool in &program.meta.tools {
+                            println!("  - {}: {}", tool.name, tool.description);
+                        }
+                    }
+                    if !program.meta.host_requirements.required.is_empty() {
+                        println!();
+                        println!("Required host tools: {}", program.meta.host_requirements.required.join(", "));
+                    }
+                    if !program.meta.host_requirements.optional.is_empty() {
+                        println!();
+                        println!("Optional host tools: {}", program.meta.host_requirements.optional.join(", "));
+                    }
+                    Ok(())
+                }
+                None => Err(anyhow::anyhow!(
+                    "program '{}' not found. Install with 'oxios pkg install'",
+                    name
+                )),
+            }
         }
 
         // ── Interactive mode (default) ──

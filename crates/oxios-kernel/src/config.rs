@@ -153,6 +153,9 @@ pub struct OxiosConfig {
     /// Resource monitor configuration.
     #[serde(default)]
     pub resource_monitor: ResourceMonitorConfig,
+    /// OpenTelemetry tracing configuration.
+    #[serde(default)]
+    pub otel: OtelConfig,
 }
 
 /// Kernel configuration.
@@ -655,6 +658,46 @@ impl Default for ResourceMonitorConfig {
             cpu_threshold: default_rm_cpu_threshold(),
             memory_threshold: default_rm_mem_threshold(),
             load_threshold: default_rm_load_threshold(),
+        }
+    }
+}
+
+/// OpenTelemetry tracing configuration.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct OtelConfig {
+    /// Enable OTLP export (default: false).
+    #[serde(default)]
+    pub enabled: bool,
+    /// OTLP gRPC endpoint.
+    #[serde(default = "default_otel_endpoint")]
+    pub endpoint: String,
+    /// Service name for traces.
+    #[serde(default = "default_otel_service_name")]
+    pub service_name: String,
+    /// Sampling ratio (0.0 to 1.0).
+    #[serde(default = "default_otel_sampling_ratio")]
+    pub sampling_ratio: f64,
+}
+
+fn default_otel_endpoint() -> String {
+    "http://localhost:4317".into()
+}
+
+fn default_otel_service_name() -> String {
+    "oxios".into()
+}
+
+fn default_otel_sampling_ratio() -> f64 {
+    1.0
+}
+
+impl Default for OtelConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            endpoint: default_otel_endpoint(),
+            service_name: default_otel_service_name(),
+            sampling_ratio: default_otel_sampling_ratio(),
         }
     }
 }
