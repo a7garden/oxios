@@ -94,7 +94,7 @@ pub use orchestrator::{OrchestrationResult, Orchestrator, SubTask, AgentRole};
 pub use scheduler::{AgentScheduler, Priority, ScheduledTask, SchedulerStats, TaskStatus};
 pub use cron::{CronScheduler, CronJob, CronJobResult, CronJobUpdate, JobSource};
 pub use host_tools::{common as host_tools_common, HostToolStatus, HostToolValidator};
-pub use mcp::{McpBridge, McpCapabilities, McpServer, McpTool};
+pub use mcp::{McpBridge, McpCapabilities, McpServer, McpTool, McpToolCallResult as CallToolResult};
 pub use embedding::{EmbeddingProvider, EmbeddingVector, TfIdfEmbeddingProvider};
 pub use memory::{MemoryEntry, MemoryManager, MemoryType, TextVector, MemoryBudget, CurationReport, CurationCandidate, content_hash};
 pub use program::{InstallSource, Program, ProgramManager, ProgramMeta, ToolDef, HostRequirementsCheck, ArgumentDef};

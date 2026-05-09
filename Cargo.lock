@@ -3838,6 +3838,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "oxios-telegram"
+version = "0.2.0-alpha"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "chrono",
+ "oxios-gateway",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
 name = "oxios-web"
 version = "0.2.0-alpha"
 dependencies = [

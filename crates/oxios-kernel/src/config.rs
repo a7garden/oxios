@@ -662,7 +662,7 @@ impl Default for ResourceMonitorConfig {
 /// Loads configuration from a TOML file.
 pub fn load_config(path: &std::path::Path) -> anyhow::Result<OxiosConfig> {
     let content = std::fs::read_to_string(path)?;
-    let mut config: OxiosConfig = toml::from_str(&content)?;
+    let config: OxiosConfig = toml::from_str(&content)?;
     let (errors, warnings) = config.validate();
     for w in warnings {
         tracing::warn!("config: {}", w);

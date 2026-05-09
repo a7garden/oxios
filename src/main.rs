@@ -8,6 +8,7 @@ mod kernel;
 use anyhow::{bail, Context, Result};
 use clap::{Parser, Subcommand};
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use kernel::Kernel;
 use oxios_kernel::{OxiosConfig, InstallSource};
@@ -589,15 +590,13 @@ async fn main() -> Result<()> {
             kernel.gateway.register(Box::new(web_channel)).await;
 
             // Create web server
-            let kernel_handle = kernel.handle();
-            let config_arc = std::sync::Arc::new(parking_lot::RwLock::new(kernel.config.clone()));
             let _web_server = WebServer::new(
                 &kernel.config.gateway.host,
                 kernel.config.gateway.port,
                 channel_handle,
-                kernel_handle,
-                config_arc,
-                Some(config_path),
+                kernel.handle(),
+                Arc::new(parking_lot::RwLock::new(kernel.config.clone())),
+                Some(config_path.clone()),
             )?;
 
             let shutdown_tx = setup_shutdown_handler();

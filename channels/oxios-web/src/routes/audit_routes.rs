@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 use axum::extract::{Path, Query, State};
 use axum::Json;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize};
 use serde_json::json;
 
 use crate::error::AppError;
@@ -33,38 +33,8 @@ pub struct ExportRequest {
 
 // ─── Response Types ───────────────────────────────────────────────────────────
 
-/// Response for audit entry queries.
-#[derive(Debug, Serialize)]
-pub struct AuditEntriesResponse {
-    pub entries: Vec<serde_json::Value>,
-    pub count: usize,
-}
-
-/// Response for audit verification.
-#[derive(Debug, Serialize)]
-pub struct AuditVerifyResponse {
-    pub valid: bool,
-    pub entry_count: usize,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub broken_at_seq: Option<u64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub expected: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub found: Option<String>,
-}
-
-/// Response for audit export.
-#[derive(Debug, Serialize)]
-pub struct AuditExportResponse {
-    pub json: String,
-    pub entry_count: usize,
-}
-
-/// Response for audit flush operation.
-#[derive(Debug, Serialize)]
-pub struct AuditFlushResponse {
-    pub flushed: usize,
-}
+// Note: Response types are inlined in handlers for now.
+// Future: Extract to avoid duplication if needed.
 
 // ─── Handlers ─────────────────────────────────────────────────────────────────
 
@@ -194,7 +164,7 @@ pub(crate) async fn handle_audit_flush(
 ) -> Result<Json<serde_json::Value>, AppError> {
     let flushed = state.kernel.audit_count();
 
-    state.kernel.flush_audit();
+    let _ = state.kernel.flush_audit();
 
     Ok(Json(json!({
         "flushed": flushed,

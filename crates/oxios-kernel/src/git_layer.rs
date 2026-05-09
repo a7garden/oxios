@@ -1,7 +1,7 @@
 //! Git-based version control layer using gix.
 //! Provides in-process commits, logs, tags, and restore.
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use anyhow::{bail, Result};
 use gix::hash::ObjectId;
 use gix::objs::tree::EntryKind;
@@ -56,6 +56,7 @@ pub struct GitLayer {
     repo: Arc<Mutex<gix::Repository>>,
     root: PathBuf,
     committer_name: String,
+    #[allow(dead_code)]
     committer_email: String,
     enabled: bool,
 }
@@ -107,7 +108,7 @@ impl GitLayer {
         let mut editor = repo_lock.edit_tree(empty_tree)?;
         editor.upsert(".gitignore", EntryKind::Blob, blob_id)?;
         let tree_id = editor.write()?;
-        let sig = self_signature_ref();
+        let _sig = self_signature_ref();
         repo_lock.commit_as(
             self_signature_ref(),
             self_signature_ref(),
@@ -138,7 +139,7 @@ impl GitLayer {
         let tree_id = editor.write()?;
 
         let parent = Self::head_id_detached(&self.repo);
-        let sig = self_signature_ref();
+        let _sig = self_signature_ref();
         let commit_id = repo.commit_as(
             self_signature_ref(),
             self_signature_ref(),
@@ -171,7 +172,7 @@ impl GitLayer {
         let tree_id = editor.write()?;
 
         let parent = Self::head_id_detached(&self.repo);
-        let sig = self_signature_ref();
+        let _sig = self_signature_ref();
         let commit_id = repo.commit_as(
             self_signature_ref(),
             self_signature_ref(),
@@ -196,7 +197,7 @@ impl GitLayer {
         let tree_id = editor.write()?;
 
         let parent = Self::head_id_detached(&self.repo);
-        let sig = self_signature_ref();
+        let _sig = self_signature_ref();
         let commit_id = repo.commit_as(
             self_signature_ref(),
             self_signature_ref(),
@@ -250,12 +251,12 @@ impl GitLayer {
         let repo = self.repo.lock();
         let head_id = Self::head_id_detached(&self.repo)
             .ok_or_else(|| anyhow::anyhow!("No HEAD commit to tag"))?;
-        let sig = self_signature_ref();
+        let _sig = self_signature_ref();
         repo.tag(
             name,
             head_id,
             gix::objs::Kind::Commit,
-            Some(sig),
+            Some(_sig),
             message,
             PreviousValue::MustNotExist,
         )?;

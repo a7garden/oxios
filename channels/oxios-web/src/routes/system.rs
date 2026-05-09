@@ -4,9 +4,6 @@ use axum::extract::{Path, Query, State};
 use axum::Json;
 use serde::{Deserialize, Serialize};
 
-use oxios_kernel::{AgentId};
-use uuid::Uuid;
-
 use crate::error::AppError;
 use crate::routes::{PageParams, paginate};
 use crate::server::AppState;
@@ -116,7 +113,7 @@ pub(crate) async fn handle_status(
     let container_detail = state.kernel.container_backend();
 
     // State store health — check that the base path exists
-    let state_store_healthy = state.kernel.state_store_base_path().exists();
+    let state_store_healthy = state.kernel.workspace_path().exists();
 
     // Event bus — always healthy if we got this far
     let event_bus_healthy = true;
@@ -265,6 +262,7 @@ pub(crate) struct CreateContainerRequest {
     /// Container name.
     pub name: String,
     /// Optional toolchain (e.g. "rust", "node", "python").
+    #[allow(dead_code)]
     pub toolchain: Option<String>,
 }
 

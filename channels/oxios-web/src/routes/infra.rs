@@ -177,8 +177,7 @@ pub(crate) async fn handle_permissions_get(
     state: State<Arc<AppState>>,
     Path(agent): Path<String>,
 ) -> Result<Json<PermissionsResponse>, StatusCode> {
-    let access = state.kernel.access_manager().lock();
-    let perms = access.get_permissions(&agent);
+    let perms = state.kernel.get_permissions(&agent);
     
     match perms {
         Some(perms) => Ok(Json(PermissionsResponse {
@@ -212,6 +211,7 @@ pub(crate) async fn handle_permissions_put(
     Path(agent): Path<String>,
     Json(body): Json<PermissionsUpdate>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    // Get a mutable reference to access manager
     let mut access = state.kernel.access_manager().lock();
     let perms = access.get_or_create_permissions(&agent);
 
@@ -264,19 +264,13 @@ pub(crate) struct McpServerResponse {
 pub(crate) async fn handle_mcp_servers_list(
     state: State<Arc<AppState>>,
 ) -> Json<Vec<McpServerResponse>> {
-    let bridge = state.kernel.mcp_bridge();
-    let servers = bridge.servers();
+    let servers = state.kernel.mcp_list_servers();
     let mut results = Vec::new();
     for name in servers {
-        let (command, args, enabled) = bridge
-            .get_server(&name)
+        let (command, args, enabled) = state.kernel.get_mcp_server(&name)
             .map(|s| (s.command.clone(), s.args.clone(), s.enabled))
             .unwrap_or_else(|| ("unknown".to_string(), Vec::new(), false));
-        let initialized = if let Some(ref c) = bridge.client(&name).await {
-            c.is_initialized().await
-        } else {
-            false
-        };
+        let initialized = state.kernel.mcp_client_status(&name).await.unwrap_or(false);
         results.push(McpServerResponse {
             name: name.to_string(),
             command,
@@ -306,17 +300,15 @@ pub(crate) async fn handle_mcp_server_register(
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
     let name = body.name.clone();
     let command = body.command.clone();
-    {
-        let bridge = state.kernel.mcp_bridge();
-        let mut server = oxios_kernel::McpServer::new(&name, &command);
-        server.args = body.args;
-        server.enabled = true;
-        bridge.register_server(server);
-    }
-    if let Err(e) = state.kernel.mcp_bridge().initialize_server(&name).await {
-        tracing::error!(server = %name, error = %e, "Failed to start MCP server");
-        return Err((StatusCode::INTERNAL_SERVER_ERROR, e.to_string()));
-    }
+    let mut server = oxios_kernel::McpServer::new(&name, &command);
+    server.args = body.args;
+    server.enabled = true;
+    state.kernel.register_mcp_server(server);
+    state.kernel.mcp_initialize_server(&name).await
+        .map_err(|e| {
+            tracing::error!(server = %name, error = %e, "Failed to start MCP server");
+            (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+        })?;
     tracing::info!(server = %name, command = %command, "MCP server registered and started");
     Ok(Json(serde_json::json!({
         "status": "registered",
@@ -340,8 +332,7 @@ pub(crate) struct McpToolResponse {
 pub(crate) async fn handle_mcp_tools_list(
     state: State<Arc<AppState>>,
 ) -> Json<Vec<McpToolResponse>> {
-    let bridge = state.kernel.mcp_bridge();
-    let tools = match bridge.list_tools().await {
+    let tools = match state.kernel.mcp_list_tools().await {
         Ok(t) => t,
         Err(e) => {
             tracing::warn!(error = %e, "Failed to list MCP tools");
@@ -351,8 +342,8 @@ pub(crate) async fn handle_mcp_tools_list(
 
     // Reconstruct server attribution from cached tools.
     let mut results = Vec::new();
-    for name in bridge.servers() {
-        if let Some(cached) = bridge.cached_tools(&name).await {
+    for name in state.kernel.mcp_list_servers() {
+        if let Some(cached) = state.kernel.mcp_cached_tools(&name).await {
             for tool in cached {
                 results.push(McpToolResponse {
                     name: tool.name,
@@ -393,8 +384,7 @@ pub(crate) async fn handle_mcp_tool_call(
     state: State<Arc<AppState>>,
     Json(body): Json<McpToolCallRequest>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
-    let result = state.kernel.mcp_bridge()
-        .call_tool(&body.server, &body.tool, body.arguments)
+    let result = state.kernel.mcp_call_tool(&body.server, &body.tool, body.arguments)
         .await
         .map_err(|e| {
             tracing::error!(server = %body.server, tool = %body.tool, error = %e, "MCP tool call failed");

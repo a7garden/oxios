@@ -1,0 +1,16 @@
+[package]
+name = "oxios-telegram"
+version = "0.2.0-alpha"
+edition = "2021"
+
+[dependencies]
+oxios-gateway = { path = "../../crates/oxios-gateway" }
+anyhow = { workspace = true }
+async-trait = { workspace = true }
+reqwest = { version = "0.12", features = ["json"] }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+tokio = { workspace = true, features = ["full"] }
+tracing = { workspace = true }
+chrono = { workspace = true }
+uuid = { workspace = true }

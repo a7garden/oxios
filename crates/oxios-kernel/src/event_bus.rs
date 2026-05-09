@@ -167,7 +167,7 @@ pub fn kernel_event_to_audit_action(event: &KernelEvent) -> AuditAction {
         KernelEvent::AgentOutput { output, .. } => AuditAction::Other {
             detail: format!("agent_output:{}", output),
         },
-        KernelEvent::ApprovalRequested { id, action, resource, reason } => AuditAction::Other {
+        KernelEvent::ApprovalRequested { id, action, resource, reason: _ } => AuditAction::Other {
             detail: format!("approval_requested:{}:{}:{}", id, action, resource),
         },
         KernelEvent::ApprovalResolved { id, approved } => AuditAction::Other {

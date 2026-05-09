@@ -57,7 +57,11 @@ impl Default for OverloadThreshold {
 
 /// Resource monitor collecting system and agent metrics.
 pub struct ResourceMonitor {
+    /// Sampling interval in seconds.
+    #[allow(dead_code)]
     interval_secs: u64,
+    /// Maximum number of history entries to retain.
+    #[allow(dead_code)]
     history_max: usize,
     history: RwLock<VecDeque<ResourceSnapshot>>,
     total_token_usage: AtomicU64,

@@ -10,6 +10,7 @@ use crate::{
     state_store::{StateStore, Session, SessionId, SessionSummary},
     event_bus::{EventBus, KernelEvent},
     container_manager::{ContainerManager, ContainerInfo, ToolHealthReport},
+    container::ExecResult,
     supervisor::Supervisor,
     scheduler::AgentScheduler,
     memory::MemoryManager,
@@ -21,7 +22,7 @@ use crate::{
     program::{ProgramManager, ProgramMeta},
     skill::SkillStore,
     persona_manager::PersonaManager,
-    mcp::McpBridge,
+    mcp::{McpBridge, McpToolCallResult},
     auth::AuthManager,
     access_manager::AccessManager,
     host_tools::HostToolValidator,
@@ -126,6 +127,7 @@ impl KernelHandle {
     }
 
     /// Verify the KernelHandle is properly constructed (for testing).
+    #[allow(unused_comparisons)]
     pub fn verify(&self) -> bool {
         // Basic sanity checks
         self.git_layer.is_enabled() == self.config.git.auto_commit
@@ -669,6 +671,11 @@ impl KernelHandle {
         self.mcp_bridge.get_server(name)
     }
 
+    /// Register an MCP server.
+    pub fn register_mcp_server(&self, server: crate::McpServer) {
+        self.mcp_bridge.register_server(server);
+    }
+
     // ── Host Tools ──
 
     /// Full host tool check.
@@ -748,7 +755,167 @@ impl KernelHandle {
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // DIRECT SUBSYSTEM ACCESS (for advanced operations)
+    // WORKSPACE
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /// Get workspace base path.
+    pub fn workspace_path(&self) -> &std::path::Path {
+        &self.state_store.base_path
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // CONTAINER (System Call wrappers)
+    // ═══════════════════════════════════════════════════════════════════════════
+
+
+    /// Start a container.
+    pub async fn start_container(&self, name: &str) -> anyhow::Result<()> {
+        self.container_manager.start_container(name).await
+    }
+
+    /// Stop a container.
+    pub async fn stop_container(&self, name: &str) -> anyhow::Result<()> {
+        self.container_manager.stop_container(name).await
+    }
+
+    /// Remove a container.
+    pub async fn remove_container(&self, name: &str) -> anyhow::Result<()> {
+        self.container_manager.remove_container(name).await
+    }
+
+    /// Execute command in container.
+    pub async fn exec_in_container(
+        &self,
+        name: &str,
+        command: &[String],
+        workdir: Option<&str>,
+    ) -> anyhow::Result<ExecResult> {
+        self.container_manager.exec_in_container(name, command, workdir).await
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // PROGRAM (System Call wrappers)
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /// Get program details.
+    pub async fn get_program(&self, name: &str) -> Option<crate::program::Program> {
+        self.program_manager.get_program(name).await
+    }
+
+    /// Install a program from source.
+    pub async fn install_program(&self, source: crate::program::InstallSource) -> anyhow::Result<crate::program::Program> {
+        self.program_manager.install_from(source).await
+    }
+
+    /// Uninstall a program.
+    pub async fn uninstall_program(&self, name: &str) -> anyhow::Result<()> {
+        self.program_manager.uninstall(name).await
+    }
+
+    /// Enable a program.
+    pub async fn enable_program(&self, name: &str) -> anyhow::Result<()> {
+        self.program_manager.set_enabled(name, true).await
+    }
+
+    /// Disable a program.
+    pub async fn disable_program(&self, name: &str) -> anyhow::Result<()> {
+        self.program_manager.set_enabled(name, false).await
+    }
+
+    /// Check host requirements for a program.
+    pub async fn check_program_host_requirements(&self, name: &str) -> anyhow::Result<crate::program::HostRequirementsCheck> {
+        self.program_manager.check_host_requirements(name).await
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // MEMORY (System Call wrappers)
+    // ═══════════════════════════════════════════════════════════════════════════
+
+
+    /// Store a memory entry.
+    pub async fn memory_remember(&self, entry: crate::memory::MemoryEntry) -> anyhow::Result<String> {
+        self.memory_manager.remember(entry).await
+    }
+
+    /// Search memory entries.
+    pub async fn memory_search(
+        &self,
+        query: &str,
+        memory_type: Option<crate::memory::MemoryType>,
+        limit: usize,
+    ) -> anyhow::Result<Vec<crate::memory::MemoryEntry>> {
+        self.memory_manager.search(query, memory_type, limit).await
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // RESOURCE MONITOR (System Call wrappers)
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /// Get resource history snapshots.
+    pub fn resource_history(&self, last_n: usize) -> Vec<crate::resource_monitor::ResourceSnapshot> {
+        self.resource_monitor.history(last_n)
+    }
+
+    /// Get overload threshold.
+    pub fn resource_overload_threshold(&self) -> crate::resource_monitor::OverloadThreshold {
+        self.resource_monitor.overload_threshold()
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // MCP BRIDGE (System Call wrappers)
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /// List registered MCP servers.
+    pub fn mcp_list_servers(&self) -> Vec<String> {
+        self.mcp_bridge.servers()
+    }
+
+    /// Initialize a specific MCP server.
+    pub async fn mcp_initialize_server(&self, name: &str) -> anyhow::Result<()> {
+        self.mcp_bridge.initialize_server(name).await
+    }
+
+    /// Get MCP client status.
+    pub async fn mcp_client_status(&self, name: &str) -> Option<bool> {
+        if let Some(client) = self.mcp_bridge.client(name).await {
+            Some(client.is_initialized().await)
+        } else {
+            None
+        }
+    }
+
+    /// List all MCP tools.
+    pub async fn mcp_list_tools(&self) -> anyhow::Result<Vec<crate::program::ToolDef>> {
+        self.mcp_bridge.list_tools().await
+    }
+
+    /// Get cached tools for a server.
+    pub async fn mcp_cached_tools(&self, server_name: &str) -> Option<Vec<crate::program::ToolDef>> {
+        self.mcp_bridge.cached_tools(server_name).await
+    }
+
+    /// Call an MCP tool.
+    pub async fn mcp_call_tool(
+        &self,
+        server: &str,
+        tool: &str,
+        arguments: serde_json::Value,
+    ) -> anyhow::Result<McpToolCallResult> {
+        self.mcp_bridge.call_tool(server, tool, arguments).await
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // ACCESS MANAGER (System Call wrappers)
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /// Log an audit action.
+    pub fn audit_log_action(&self, agent_name: &str, action: &str, resource: &str) {
+        let mut am = self.access_manager.lock();
+        am.log_access(agent_name, action, resource, true, None);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // DIRECT SUBSYSTEM ACCESS (for advanced operations only)
     // ═══════════════════════════════════════════════════════════════════════════
 
     /// Get inner container manager Arc for advanced operations.

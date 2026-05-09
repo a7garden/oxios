@@ -160,6 +160,7 @@ pub struct AuditTrail {
     /// Sequence number counter for next entry.
     seq_counter: AtomicU64,
     /// Chain hasher for computing hashes (mutex for interior mutability).
+    #[allow(dead_code)]
     chain_hasher: parking_lot::Mutex<blake3::Hasher>,
     /// Maximum number of entries before auto-pruning.
     max_entries: usize,

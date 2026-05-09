@@ -13,6 +13,7 @@ members = [
     "crates/oxios-gateway",
     "channels/oxios-web",
     "channels/oxios-cli",
+    "channels/oxios-telegram",
 ]
 
 [workspace.dependencies]

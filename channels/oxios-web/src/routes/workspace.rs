@@ -42,7 +42,7 @@ pub(crate) async fn handle_workspace_tree(
     state: State<Arc<AppState>>,
     Query(query): Query<TreeQuery>,
 ) -> Result<Json<Vec<TreeEntry>>, AppError> {
-    let base = state.kernel.state_store_base_path();
+    let base = state.kernel.workspace_path();
     let canonical_base = base.canonicalize()
         .unwrap_or_else(|_| base.to_path_buf());
     let dir = match &query.dir {
@@ -87,7 +87,7 @@ pub(crate) async fn handle_workspace_file_get(
     state: State<Arc<AppState>>,
     Path(path): Path<String>,
 ) -> Result<impl IntoResponse, AppError> {
-    let base = state.kernel.state_store_base_path();
+    let base = state.kernel.workspace_path();
     let full_path = base.join(&path);
 
     // Security: ensure the path doesn't escape the workspace
@@ -129,7 +129,7 @@ pub(crate) async fn handle_workspace_file_put(
         });
     }
 
-    let base = state.kernel.state_store_base_path();
+    let base = state.kernel.workspace_path();
     let full_path = base.join(&path);
 
     // Security: ensure the path doesn't escape the workspace
@@ -582,7 +582,7 @@ pub(crate) async fn handle_memory_create(
     };
     
     // Use memory manager from kernel
-    let id = state.kernel.inner_memory_manager().remember(entry).await
+    let id = state.kernel.memory_remember(entry).await
         .map_err(|e| AppError::Internal(e.to_string()))?;
     Ok(Json(serde_json::json!({ "id": id, "status": "created" })))
 }
@@ -610,7 +610,7 @@ pub(crate) async fn handle_memory_search(
     let limit = body.limit.unwrap_or(10);
     
     // Use memory manager from kernel
-    let entries = state.kernel.inner_memory_manager().search(&body.query, type_filter, limit).await
+    let entries = state.kernel.memory_search(&body.query, type_filter, limit).await
         .map_err(|e| AppError::Internal(e.to_string()))?;
     let results: Vec<serde_json::Value> = entries
         .iter()

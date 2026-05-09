@@ -228,10 +228,7 @@ pub(crate) struct ApprovalResponse {
 pub(crate) async fn handle_approvals_list(
     state: State<Arc<AppState>>,
 ) -> Json<Vec<ApprovalResponse>> {
-    let access = state.kernel.access_manager().lock();
-    let approvals: Vec<ApprovalResponse> = access
-        .rbac_manager()
-        .all_approvals()
+    let approvals: Vec<ApprovalResponse> = state.kernel.list_approvals()
         .iter()
         .map(|(p, s)| {
             let subject_str = match &p.subject {
