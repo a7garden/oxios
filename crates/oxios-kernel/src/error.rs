@@ -22,19 +22,6 @@ pub enum KernelError {
         reason: String,
     },
 
-    /// Container is unavailable or not running.
-    #[error("Container '{name}' is unavailable: {detail}")]
-    ContainerUnavailable {
-        /// Container name.
-        name: String,
-        /// Additional detail.
-        detail: String,
-    },
-
-    /// Container backend is not available on this platform.
-    #[error("Container backend not available on this platform")]
-    BackendUnavailable,
-
     /// Requested program was not found.
     #[error("Program '{name}' not found")]
     ProgramNotFound {
@@ -113,8 +100,7 @@ impl KernelError {
         match self {
             Self::AgentNotFound { .. } => HttpStatus::NotFound,
             Self::PermissionDenied { .. } => HttpStatus::Forbidden,
-            Self::ContainerUnavailable { .. } => HttpStatus::ServiceUnavailable,
-            Self::BackendUnavailable => HttpStatus::ServiceUnavailable,
+
             Self::ProgramNotFound { .. } => HttpStatus::NotFound,
             Self::ProgramAlreadyExists { .. } => HttpStatus::Conflict,
             Self::InvalidConfig { .. } => HttpStatus::BadRequest,
@@ -146,8 +132,6 @@ mod tests {
         let id = crate::types::AgentId::new_v4();
         assert_eq!(u16::from(KernelError::AgentNotFound { id }.http_status()), 404);
         assert_eq!(u16::from(KernelError::PermissionDenied { reason: "test".into() }.http_status()), 403);
-        assert_eq!(u16::from(KernelError::ContainerUnavailable { name: "x".into(), detail: "down".into() }.http_status()), 503);
-        assert_eq!(u16::from(KernelError::BackendUnavailable.http_status()), 503);
         assert_eq!(u16::from(KernelError::ProgramNotFound { name: "p".into() }.http_status()), 404);
         assert_eq!(u16::from(KernelError::ProgramAlreadyExists { name: "p".into() }.http_status()), 409);
         assert_eq!(u16::from(KernelError::InvalidConfig { detail: "bad".into() }.http_status()), 400);

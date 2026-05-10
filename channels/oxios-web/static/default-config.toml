@@ -13,14 +13,13 @@ host = "0.0.0.0"
 # Port for the web dashboard.
 port = 4200
 
-[container]
-# Image tag for new garden containers.
-image_tag = "oxios-garden:latest"
-# Commands that agents can execute on the host.
-allowed_host_commands = ["git", "gh", "open", "shortcuts", "osascript"]
-# Resource limits per garden container.
-memory_limit = "4g"
-cpu_limit = 4
+[exec]
+# Commands allowed for structured execution.
+allowed_commands = ["git", "gh", "open", "shortcuts", "osascript"]
+# Default command timeout in seconds.
+default_timeout_secs = 120
+# Maximum command timeout in seconds.
+max_timeout_secs = 600
 
 [scheduler]
 # Maximum concurrent agent tasks.

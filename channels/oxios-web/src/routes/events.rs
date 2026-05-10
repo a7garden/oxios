@@ -241,7 +241,7 @@ pub(crate) async fn handle_approvals_list(
                 oxios_kernel::access_manager::Action::AccessPath(p) => format!("access_path:{}", p),
                 oxios_kernel::access_manager::Action::ManageAgents => "manage_agents".into(),
                 oxios_kernel::access_manager::Action::ManagePrograms => "manage_programs".into(),
-                oxios_kernel::access_manager::Action::ManageGardens => "manage_gardens".into(),
+                oxios_kernel::access_manager::Action::ManageWorkspaces => "manage_workspaces".into(),
                 oxios_kernel::access_manager::Action::ManageRBAC => "manage_rbac".into(),
                 oxios_kernel::access_manager::Action::ViewAuditLog => "view_audit_log".into(),
                 oxios_kernel::access_manager::Action::SystemConfig => "system_config".into(),
