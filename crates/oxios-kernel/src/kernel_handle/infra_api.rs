@@ -21,6 +21,26 @@ pub struct InfraApi {
 }
 
 impl InfraApi {
+    /// Create a new InfraApi.
+    pub fn new(
+        git_layer: Arc<GitLayer>,
+        scheduler: Arc<AgentScheduler>,
+        cron_scheduler: Arc<CronScheduler>,
+        resource_monitor: Arc<ResourceMonitor>,
+        event_bus: EventBus,
+        config: OxiosConfig,
+        start_time: Instant,
+    ) -> Self {
+        Self {
+            git_layer,
+            scheduler,
+            cron_scheduler,
+            resource_monitor,
+            event_bus,
+            config,
+            start_time,
+        }
+    }
     /// Get a reference to the GitLayer.
     pub fn git(&self) -> &GitLayer {
         &self.git_layer

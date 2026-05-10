@@ -10,6 +10,10 @@ pub struct PersonaApi {
 }
 
 impl PersonaApi {
+    /// Create a new PersonaApi.
+    pub fn new(persona_manager: Arc<PersonaManager>) -> Self {
+        Self { persona_manager }
+    }
     /// List all personas.
     pub fn list(&self) -> Vec<Persona> {
         self.persona_manager.store().list_all()

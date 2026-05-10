@@ -10,6 +10,10 @@ pub struct McpApi {
 }
 
 impl McpApi {
+    /// Create a new McpApi.
+    pub fn new(mcp_bridge: Arc<McpBridge>) -> Self {
+        Self { mcp_bridge }
+    }
     /// List registered MCP servers.
     pub fn list_servers(&self) -> Vec<String> {
         self.mcp_bridge.servers()

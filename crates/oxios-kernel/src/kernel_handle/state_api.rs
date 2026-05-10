@@ -12,6 +12,10 @@ pub struct StateApi {
 }
 
 impl StateApi {
+    /// Create a new StateApi.
+    pub fn new(state_store: Arc<StateStore>) -> Self {
+        Self { state_store }
+    }
     /// Save JSON data.
     pub async fn save<T: Serialize>(&self, category: &str, name: &str, data: &T) -> anyhow::Result<()> {
         self.state_store.save_json(category, name, data).await

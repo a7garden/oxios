@@ -55,7 +55,7 @@ fn default_toolchain() -> String {
 pub(crate) async fn handle_cron_jobs_list(
     state: State<Arc<AppState>>,
 ) -> Result<Json<serde_json::Value>, AppError> {
-    let jobs = state.kernel.list_schedules();
+    let jobs = state.kernel.infra.list_crons();
     Ok(Json(serde_json::json!({ "jobs": jobs })))
 }
 

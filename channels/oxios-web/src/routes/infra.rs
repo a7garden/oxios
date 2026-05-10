@@ -67,7 +67,8 @@ pub(crate) async fn handle_scheduler_tasks(
 ) -> Json<serde_json::Value> {
     let queued: Vec<TaskSummary> = state
         .kernel
-        .infra.scheduler_queued_tasks()
+        .infra
+        .queued_tasks()
         .into_iter()
         .map(|t| TaskSummary {
             id: t.id.to_string(),
@@ -81,7 +82,8 @@ pub(crate) async fn handle_scheduler_tasks(
 
     let running: Vec<TaskSummary> = state
         .kernel
-        .infra.scheduler_running_tasks()
+        .infra
+        .running_tasks()
         .into_iter()
         .map(|t| TaskSummary {
             id: t.id.to_string(),

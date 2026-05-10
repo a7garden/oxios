@@ -14,6 +14,14 @@ pub struct ExtensionApi {
 }
 
 impl ExtensionApi {
+    /// Create a new ExtensionApi.
+    pub fn new(
+        program_manager: Arc<ProgramManager>,
+        skill_store: Arc<SkillStore>,
+        host_tool_validator: Arc<HostToolValidator>,
+    ) -> Self {
+        Self { program_manager, skill_store, host_tool_validator }
+    }
     /// List installed programs.
     pub async fn list_programs(&self) -> Vec<ProgramMeta> {
         self.program_manager.list_programs()

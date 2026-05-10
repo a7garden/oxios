@@ -13,6 +13,14 @@ pub struct SecurityApi {
 }
 
 impl SecurityApi {
+    /// Create a new SecurityApi.
+    pub fn new(
+        auth_manager: Arc<parking_lot::Mutex<AuthManager>>,
+        audit_trail: Arc<AuditTrail>,
+        access_manager: Arc<parking_lot::Mutex<AccessManager>>,
+    ) -> Self {
+        Self { auth_manager, audit_trail, access_manager }
+    }
     /// Audit an action.
     pub fn audit(&self, actor: &str, action: AuditAction, resource: &str) -> String {
         self.audit_trail.append(actor.to_string(), action, resource.to_string())

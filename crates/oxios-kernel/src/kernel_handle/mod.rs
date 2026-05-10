@@ -17,7 +17,27 @@ pub use mcp_api::McpApi;
 pub use infra_api::InfraApi;
 
 use serde::Serialize;
+use std::sync::Arc;
+use std::time::Instant;
 use crate::git_layer::CommitInfo;
+use crate::state_store::StateStore;
+use crate::supervisor::Supervisor;
+use crate::scheduler::AgentScheduler;
+use crate::memory::MemoryManager;
+use crate::git_layer::GitLayer;
+use crate::audit_trail::AuditTrail;
+use crate::budget::BudgetManager;
+use crate::resource_monitor::ResourceMonitor;
+use crate::cron::CronScheduler;
+use crate::program::ProgramManager;
+use crate::skill::SkillStore;
+use crate::persona_manager::PersonaManager;
+use crate::mcp::McpBridge;
+use crate::auth::AuthManager;
+use crate::access_manager::AccessManager;
+use crate::host_tools::HostToolValidator;
+use crate::config::OxiosConfig;
+use crate::event_bus::EventBus;
 
 /// Oxios kernel System Call API — composed of 7 domain Facades.
 ///
@@ -68,6 +88,41 @@ impl KernelHandle {
             extensions,
             mcp,
             infra,
+        }
+    }
+
+    /// Build a KernelHandle from raw subsystem parameters.
+    /// This is a convenience for kernel.rs which has all subsystems available.
+    #[allow(clippy::too_many_arguments)]
+    pub fn from_subsystems(
+        state_store: Arc<StateStore>,
+        event_bus: EventBus,
+        supervisor: Arc<dyn Supervisor>,
+        scheduler: Arc<AgentScheduler>,
+        memory_manager: Arc<MemoryManager>,
+        git_layer: Arc<GitLayer>,
+        audit_trail: Arc<AuditTrail>,
+        budget_manager: Arc<BudgetManager>,
+        resource_monitor: Arc<ResourceMonitor>,
+        cron_scheduler: Arc<CronScheduler>,
+        program_manager: Arc<ProgramManager>,
+        skill_store: Arc<SkillStore>,
+        persona_manager: Arc<PersonaManager>,
+        mcp_bridge: Arc<McpBridge>,
+        auth_manager: Arc<parking_lot::Mutex<AuthManager>>,
+        access_manager: Arc<parking_lot::Mutex<AccessManager>>,
+        host_tool_validator: Arc<HostToolValidator>,
+        config: OxiosConfig,
+        start_time: Instant,
+    ) -> Self {
+        Self {
+            state: StateApi::new(state_store),
+            agents: AgentApi::new(supervisor, budget_manager, memory_manager),
+            security: SecurityApi::new(auth_manager, audit_trail, access_manager),
+            persona: PersonaApi::new(persona_manager),
+            extensions: ExtensionApi::new(program_manager, skill_store, host_tool_validator),
+            mcp: McpApi::new(mcp_bridge),
+            infra: InfraApi::new(git_layer, scheduler, cron_scheduler, resource_monitor, event_bus, config, start_time),
         }
     }
 
@@ -169,5 +224,10 @@ impl KernelHandle {
     /// Load JSON from state store.
     pub async fn load_json<T: serde::de::DeserializeOwned>(&self, category: &str, name: &str) -> anyhow::Result<Option<T>> {
         self.state.load(category, name).await
+    }
+
+    /// Get kernel start time.
+    pub fn start_time(&self) -> std::time::Instant {
+        self.infra.start_time
     }
 }

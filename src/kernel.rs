@@ -337,42 +337,26 @@ impl Kernel {
 
     /// Create a KernelHandle facade for use by other crates.
     pub fn handle(&self) -> Arc<oxios_kernel::KernelHandle> {
-        use oxios_kernel::kernel_handle::{StateApi, AgentApi, SecurityApi, PersonaApi, ExtensionApi, McpApi, InfraApi};
-
-        Arc::new(oxios_kernel::KernelHandle::new(
-            StateApi {
-                state_store: self.state_store.clone(),
-            },
-            AgentApi {
-                supervisor: self.supervisor.clone(),
-                budget_manager: self.budget_manager.clone(),
-                memory_manager: self.memory_manager.clone(),
-            },
-            SecurityApi {
-                auth_manager: self.auth_manager.clone(),
-                audit_trail: self.audit_trail.clone(),
-                access_manager: self.access_manager.clone(),
-            },
-            PersonaApi {
-                persona_manager: Arc::new(self.persona_manager.clone()),
-            },
-            ExtensionApi {
-                program_manager: self.program_manager.clone(),
-                skill_store: Arc::new(self.skill_store.clone()),
-                host_tool_validator: Arc::new(self.host_tool_validator.clone()),
-            },
-            McpApi {
-                mcp_bridge: self.mcp_bridge.clone(),
-            },
-            InfraApi {
-                git_layer: self.git_layer.clone(),
-                scheduler: self.scheduler.clone(),
-                cron_scheduler: self.cron_scheduler.clone(),
-                resource_monitor: self.resource_monitor.clone(),
-                event_bus: self.event_bus.clone(),
-                config: self.config.clone(),
-                start_time: self.start_time,
-            },
+        Arc::new(oxios_kernel::KernelHandle::from_subsystems(
+            self.state_store.clone(),
+            self.event_bus.clone(),
+            self.supervisor.clone(),
+            self.scheduler.clone(),
+            self.memory_manager.clone(),
+            self.git_layer.clone(),
+            self.audit_trail.clone(),
+            self.budget_manager.clone(),
+            self.resource_monitor.clone(),
+            self.cron_scheduler.clone(),
+            self.program_manager.clone(),
+            Arc::new(self.skill_store.clone()),
+            Arc::new(self.persona_manager.clone()),
+            self.mcp_bridge.clone(),
+            self.auth_manager.clone(),
+            self.access_manager.clone(),
+            Arc::new(self.host_tool_validator.clone()),
+            self.config.clone(),
+            self.start_time,
         ))
     }
 }

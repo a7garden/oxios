@@ -14,6 +14,14 @@ pub struct AgentApi {
 }
 
 impl AgentApi {
+    /// Create a new AgentApi.
+    pub fn new(
+        supervisor: Arc<dyn Supervisor>,
+        budget_manager: Arc<BudgetManager>,
+        memory_manager: Arc<MemoryManager>,
+    ) -> Self {
+        Self { supervisor, budget_manager, memory_manager }
+    }
     /// List running agents.
     pub async fn list(&self) -> anyhow::Result<Vec<crate::types::AgentInfo>> {
         self.supervisor.list().await.map_err(|e| anyhow::anyhow!("supervisor: {e}"))
