@@ -82,17 +82,6 @@ pub struct MemoryConfig {
     pub retention_days: u32,
 }
 
-/// Execution mode for agent command execution.
-#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "lowercase")]
-pub enum ExecutionMode {
-    /// Execute inside a container (production).
-    Container,
-    /// Execute directly on host (development).
-    #[default]
-    Auto,
-}
-
 fn default_true() -> bool { true }
 
 fn default_max_recall() -> usize { 10 }
@@ -117,9 +106,6 @@ pub struct OxiosConfig {
     /// Gateway settings.
     #[serde(default)]
     pub gateway: GatewayConfig,
-    /// Container settings.
-    #[serde(default)]
-    pub container: ContainerConfig,
     /// Scheduler settings (AIOS-inspired task scheduling).
     #[serde(default)]
     pub scheduler: SchedulerConfig,
@@ -229,98 +215,7 @@ impl Default for GatewayConfig {
     }
 }
 
-/// Container configuration.
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct ContainerConfig {
-    /// Base directory for containers.
-    #[serde(default = "default_container_path")]
-    pub container_path: String,
-    /// Default image tag for new containers.
-    #[serde(default = "default_image_tag")]
-    pub image_tag: String,
-    /// Allowed host commands (for the Host Exec Bridge).
-    /// If empty, all bare-name commands are allowed (development mode).
-    #[serde(default)]
-    pub allowed_host_commands: Vec<String>,
-    /// Default memory limit for containers.
-    #[serde(default = "default_memory_limit")]
-    pub memory_limit: String,
-    /// Default CPU limit for containers.
-    #[serde(default = "default_cpu_limit")]
-    pub cpu_limit: u64,
-    /// Minimal container tools (pre-installed in the minimal container image).
-    #[serde(default = "default_minimal_tools")]
-    pub minimal_tools: Vec<String>,
-    /// Host tools that MUST be on host (checked on startup).
-    #[serde(default = "default_required_host_tools")]
-    pub required_host_tools: Vec<String>,
-    /// Optional host tools: checked when program needs them.
-    #[serde(default = "default_optional_host_tools")]
-    pub optional_host_tools: Vec<String>,
-    /// Execution mode for command execution.
-    #[serde(default)]
-    pub execution_mode: ExecutionMode,
-}
 
-fn default_container_path() -> String {
-    dirs::home_dir()
-        .map(|h| format!("{}/.oxios/containers", h.display()))
-        .unwrap_or_else(|| "./containers".into())
-}
-
-fn default_image_tag() -> String {
-    "oxios:latest".into()
-}
-
-fn default_memory_limit() -> String {
-    "4g".into()
-}
-
-fn default_cpu_limit() -> u64 {
-    4
-}
-
-fn default_minimal_tools() -> Vec<String> {
-    vec![
-        "curl".to_string(),
-        "git".to_string(),
-        "ripgrep".to_string(),
-        "jq".to_string(),
-        "sqlite3".to_string(),
-        "bash".to_string(),
-        "python3".to_string(),
-    ]
-}
-
-fn default_required_host_tools() -> Vec<String> {
-    vec!["git".to_string()]
-}
-
-fn default_optional_host_tools() -> Vec<String> {
-    vec![
-        "gh".to_string(),
-        "remindctl".to_string(),
-        "shortcuts".to_string(),
-        "osascript".to_string(),
-        "open".to_string(),
-    ]
-}
-
-impl Default for ContainerConfig {
-    fn default() -> Self {
-        Self {
-            container_path: default_container_path(),
-            image_tag: default_image_tag(),
-            allowed_host_commands: Vec::new(),
-            memory_limit: default_memory_limit(),
-            cpu_limit: default_cpu_limit(),
-            minimal_tools: default_minimal_tools(),
-            required_host_tools: default_required_host_tools(),
-            optional_host_tools: default_optional_host_tools(),
-            execution_mode: ExecutionMode::Auto,
-        }
-    }
-}
 
 /// Exec configuration (host command execution bridge).
 ///
@@ -800,25 +695,6 @@ impl OxiosConfig {
         }
         if self.gateway.port < 1024 && self.gateway.host == "0.0.0.0" {
             warnings.push("Running on port <1024 as 0.0.0.0 may require root".into());
-        }
-
-        // Container validation
-        if self.container.container_path.is_empty() {
-            errors.push("container.container_path must not be empty".into());
-        }
-        if self.container.memory_limit.is_empty() {
-            errors.push("container.memory_limit must not be empty".into());
-        }
-        // Validate memory format (e.g. "4g", "512m")
-        let valid = self.container.memory_limit.ends_with('k')
-            || self.container.memory_limit.ends_with('m')
-            || self.container.memory_limit.ends_with('g')
-            || self.container.memory_limit.ends_with('t');
-        if !valid {
-            warnings.push(format!(
-                "container.memory_limit '{}' may not be valid",
-                self.container.memory_limit
-            ));
         }
 
         // Scheduler validation

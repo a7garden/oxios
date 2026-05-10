@@ -208,6 +208,7 @@ pub enum ApprovalStatus {
 }
 
 /// RBAC Manager — manages roles, permissions, and HitL approvals.
+#[derive(Debug, Clone)]
 pub struct RbacManager {
     policies: HashMap<Role, RbacPolicy>,
     subject_roles: HashMap<Subject, Role>,
@@ -564,6 +565,10 @@ impl AuditEntry {
 ///     // allow garden access
 /// }
 /// ```
+/// Access Manager — least-privilege security for agents.
+// NOTE: Clone is derived for ExecTool compatibility (Phase 1).
+// Clone is cheap — only HashMaps of primitives, no external resources.
+#[derive(Debug, Clone)]
 pub struct AccessManager {
     /// Permissions for each agent.
     permissions: HashMap<String, AgentPermissions>,

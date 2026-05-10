@@ -1,8 +1,8 @@
-//! Oxios kernel: supervisor, event bus, state store, container.
+//! Oxios kernel: supervisor, event bus, state store.
 //!
 //! The kernel is the core of the Oxios Agent OS. Everything passes
-//! through here: agent lifecycle, inter-agent communication, container
-//! management, and persistent state management.
+//! through here: agent lifecycle, inter-agent communication, and
+//! persistent state management.
 
 #![warn(missing_docs)]
 
@@ -20,14 +20,11 @@ pub mod audit_trail;
 pub mod auth;
 pub mod config;
 pub mod embedding;
-pub mod container;
 pub mod engine;
 pub mod error;
 pub mod event_bus;
-pub mod container_manager;
 pub mod cron;
 pub mod git_layer;
-pub mod host_exec;
 #[cfg(feature = "wasm-sandbox")]
 pub mod wasm_sandbox;
 pub mod host_tools;
@@ -84,12 +81,7 @@ pub use config::{ExecConfig, OxiosConfig, MemoryConfig, PersonaConfig, McpConfig
 
 // Auth manager exports
 pub use auth::{AuthManager, KeyMeta};
-pub use container::{
-    AppleBackend, ContainerBackend, ContainerConfig, ContainerStats, ContainerStatus, ContainerWorkspaceInfo, ExecResult,
-};
 pub use event_bus::{EventBus, KernelEvent};
-pub use container_manager::{ContainerInfo, ContainerManager, ToolHealthReport, ToolStatus};
-pub use host_exec::HostExecBridge;
 pub use orchestrator::{OrchestrationResult, Orchestrator, SubTask, AgentRole};
 pub use scheduler::{AgentScheduler, Priority, ScheduledTask, SchedulerStats, TaskStatus};
 pub use cron::{CronScheduler, CronJob, CronJobResult, CronJobUpdate, JobSource};
@@ -108,7 +100,7 @@ pub use persona::{default_personas, Persona};
 pub use persona_manager::PersonaManager;
 pub use persona_store::PersonaStore;
 pub use supervisor::{BasicSupervisor, Supervisor};
-pub use tools::{ContainerExecTool, ExecTool, HostExecTool, ProgramTool};
+pub use tools::{ExecTool, ProgramTool};
 pub use types::{AgentId, AgentInfo, AgentStatus};
 
 pub use backup::{BackupManifest, BackupSection};

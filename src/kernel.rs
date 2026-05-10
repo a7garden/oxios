@@ -9,12 +9,11 @@ use oxios_gateway::Gateway;
 use oxios_kernel::{
     access_manager::AccessManager, auth::AuthManager, config::load_config,
     A2AProtocol, AgentRuntime, BasicSupervisor,
-    CronScheduler, EngineProvider, EventBus, GitLayer, HostExecBridge, HostToolValidator,
+    CronScheduler, EngineProvider, EventBus, GitLayer, HostToolValidator,
     McpBridge, McpServer, MemoryManager, Orchestrator, OxiosConfig, PersonaManager,
     ProgramManager, SkillStore, AgentScheduler, Supervisor,
     AuditTrail, BudgetManager, ResourceMonitor,
 };
-use oxios_kernel::tools::ExecTool;
 use oxios_ouroboros::{OuroborosEngine, OuroborosProtocol};
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -65,8 +64,6 @@ pub struct Kernel {
     pub budget_manager: Arc<BudgetManager>,
     /// Resource monitor for system metrics.
     pub resource_monitor: Arc<ResourceMonitor>,
-    /// Unified command execution tool (successor to HostExecBridge).
-    pub exec_tool: Arc<ExecTool>,
     /// Kernel start time for uptime tracking.
     pub start_time: std::time::Instant,
 }
@@ -153,28 +150,6 @@ impl KernelBuilder {
             config.git.auto_commit,
         )?);
 
-        // ── Host exec bridge ──
-        let containers_base = PathBuf::from(&config.container.container_path);
-        let host_exec = Arc::new(
-            HostExecBridge::new(
-                containers_base.clone(),
-                config.container.allowed_host_commands.clone(),
-            )
-            .context("HostExecBridge requires non-empty allowlist")?,
-        );
-
-        // ── ExecTool (unified command execution, alongside HostExecBridge) ──
-        let exec_config = Arc::new(oxios_kernel::ExecConfig {
-            allowed_commands: config.container.allowed_host_commands.clone(),
-            default_timeout_secs: config.exec.default_timeout_secs,
-            max_timeout_secs: config.exec.max_timeout_secs,
-            required_host_tools: config.container.required_host_tools.clone(),
-            optional_host_tools: config.container.optional_host_tools.clone(),
-        });
-        let exec_access: Arc<tokio::sync::Mutex<AccessManager>> =
-            Arc::new(tokio::sync::Mutex::new(access_manager.lock().clone()));
-        let exec_tool = Arc::new(ExecTool::new(exec_config, exec_access));
-
         // ── Skills & programs ──
         let skills_dir = PathBuf::from(&config.kernel.workspace).join("skills");
         let skill_store = SkillStore::new(skills_dir)?;
@@ -201,7 +176,6 @@ impl KernelBuilder {
 
         // ── Agent runtime ──
         let agent_runtime = AgentRuntime::new(provider, model_id)
-            .with_host_bridge(host_exec)
             .with_program_manager(Arc::clone(&program_manager))
             .with_oxios_config(config.clone())
             .with_persona_manager(Arc::new(persona_manager.clone()))
@@ -303,7 +277,6 @@ impl KernelBuilder {
             audit_trail,
             budget_manager,
             resource_monitor,
-            exec_tool,
             start_time: std::time::Instant::now(),
         })
     }

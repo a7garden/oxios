@@ -145,12 +145,9 @@ mod tests {
         };
         let host_reqs = ProgramHostRequirements::default();
 
-        // Create a minimal ExecTool for testing
-        let exec_bridge = Arc::new(
-            crate::host_exec::HostExecBridge::new(std::env::temp_dir(), vec!["gh".to_string()])
-                .expect("non-empty allowlist required"),
-        );
-        let exec = Arc::new(ExecTool::new(exec_bridge));
+        let exec_config = Arc::new(crate::config::ExecConfig::default());
+        let exec_access = Arc::new(tokio::sync::Mutex::new(crate::access_manager::AccessManager::new()));
+        let exec = Arc::new(ExecTool::new(exec_config, exec_access));
 
         let tool = ProgramTool::from_definition(
             "github",
@@ -175,11 +172,9 @@ mod tests {
         };
         let host_reqs = ProgramHostRequirements::default();
 
-        let exec_bridge = Arc::new(
-            crate::host_exec::HostExecBridge::new(std::env::temp_dir(), vec!["git".to_string()])
-                .expect("non-empty allowlist required"),
-        );
-        let exec = Arc::new(ExecTool::new(exec_bridge));
+        let exec_config = Arc::new(crate::config::ExecConfig::default());
+        let exec_access = Arc::new(tokio::sync::Mutex::new(crate::access_manager::AccessManager::new()));
+        let exec = Arc::new(ExecTool::new(exec_config, exec_access));
 
         let tool = ProgramTool::from_definition(
             "git-tools",
@@ -204,11 +199,9 @@ mod tests {
         };
         let host_reqs = ProgramHostRequirements::default();
 
-        let exec_bridge = Arc::new(
-            crate::host_exec::HostExecBridge::new(std::env::temp_dir(), vec!["git".to_string()])
-                .expect("non-empty allowlist required"),
-        );
-        let exec = Arc::new(ExecTool::new(exec_bridge));
+        let exec_config = Arc::new(crate::config::ExecConfig::default());
+        let exec_access = Arc::new(tokio::sync::Mutex::new(crate::access_manager::AccessManager::new()));
+        let exec = Arc::new(ExecTool::new(exec_config, exec_access));
 
         let tool = ProgramTool::from_definition(
             "git-tools",
