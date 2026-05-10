@@ -13,7 +13,6 @@ pub fn AppLayout() -> Element {
         Panel::Agents    => rsx! { crate::views::agents::AgentsView {} },
         Panel::Seeds     => rsx! { crate::views::seeds::SeedsView {} },
         Panel::Workspace => rsx! { crate::views::workspace::WorkspaceView {} },
-        Panel::Gardens   => rsx! { crate::views::gardens::GardensView {} },
         Panel::Skills    => rsx! { crate::views::skills::SkillsView {} },
         Panel::Programs  => rsx! { crate::views::programs::ProgramsView {} },
         Panel::Memory    => rsx! { crate::views::memory::MemoryView {} },

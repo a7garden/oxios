@@ -345,8 +345,6 @@ impl AuditTrail {
                     AuditAction::MemoryWrite { .. } => "MemoryWrite",
                     AuditAction::MemoryRead { .. } => "MemoryRead",
                     AuditAction::ConfigChange { .. } => "ConfigChange",
-                    AuditAction::ContainerStart { .. } => unreachable!("removed"),
-                    AuditAction::ContainerStop { .. } => unreachable!("removed"),
                     AuditAction::ProgramInstall { .. } => "ProgramInstall",
                     AuditAction::CronTrigger { .. } => "CronTrigger",
                     AuditAction::GitCommit { .. } => "GitCommit",

@@ -8,7 +8,6 @@ pub mod protocol;
 pub mod agents;
 pub mod seeds;
 pub mod workspace;
-pub mod gardens;
 pub mod skills;
 pub mod programs;
 pub mod memory;

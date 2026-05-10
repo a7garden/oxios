@@ -49,7 +49,7 @@ pub fn DashboardView() -> Element {
                     Some(Ok(s)) => rsx! {
                         StatCard { icon: "⏱".to_string(), label: "Uptime".to_string(), value: format!("{}s", s.uptime_secs), color: Some("blue".to_string()) }
                         StatCard { icon: "🤖".to_string(), label: "Active Agents".to_string(), value: s.active_agents.to_string(), color: Some("green".to_string()) }
-                        StatCard { icon: "🌿".to_string(), label: "Gardens".to_string(), value: s.total_gardens.to_string(), color: Some("purple".to_string()) }
+                        StatCard { icon: "📁".to_string(), label: "Workspaces".to_string(), value: s.total_seeds.to_string(), color: Some("purple".to_string()) }
                         StatCard { icon: "🌱".to_string(), label: "Seeds".to_string(), value: s.total_seeds.to_string(), color: Some("orange".to_string()) }
                         StatCard { icon: "📡".to_string(), label: "Version".to_string(), value: s.version.clone(), color: None }
                     },
@@ -72,7 +72,6 @@ pub fn DashboardView() -> Element {
                             th { "ID" }
                             th { "Name" }
                             th { "Status" }
-                            th { "Garden" }
                         }}
                         tbody {
                             for a in list {

@@ -158,7 +158,7 @@ pub struct StatusResponse {
     pub version: String,
     pub uptime_secs: u64,
     pub active_agents: usize,
-    pub total_gardens: usize,
+
     pub total_seeds: usize,
     #[serde(default)]
     pub kernel_status: Option<String>,
@@ -173,8 +173,6 @@ pub struct AgentInfo {
     pub status: String,
     #[serde(default)]
     pub pid: Option<u32>,
-    #[serde(default)]
-    pub garden: Option<String>,
     #[serde(default)]
     pub started_at: Option<String>,
 }
