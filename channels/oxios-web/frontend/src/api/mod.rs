@@ -281,34 +281,6 @@ pub struct MemoryDetail {
 }
 
 // ---------------------------------------------------------------------------
-// Gardens (backend /api/gardens)
-// ---------------------------------------------------------------------------
-
-/// Garden information — kept for backward compat.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[allow(dead_code)]
-pub struct GardenInfo {
-    pub id: String,
-    pub name: String,
-    pub status: String,
-    #[serde(default)]
-    pub container_id: Option<String>,
-    #[serde(default)]
-    pub agents: Vec<String>,
-    #[serde(default)]
-    pub created_at: Option<String>,
-}
-
-/// Garden summary from backend listing.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GardenSummary {
-    pub name: String,
-    pub image_tag: String,
-    pub running: bool,
-    pub created_at: String,
-}
-
-// ---------------------------------------------------------------------------
 // Scheduler (backend /api/scheduler)
 // ---------------------------------------------------------------------------
 
