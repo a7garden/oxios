@@ -24,7 +24,7 @@ use crate::types::AgentId;
 pub enum Role {
     /// Basic user — can use agents, limited permissions.
     User,
-    /// Superuser — can manage programs, skills, containers.
+    /// Superuser — can manage programs, skills, workspaces.
     Superuser,
     /// Admin — full system access, can modify RBAC.
     Admin,
@@ -1646,81 +1646,81 @@ mod tests {
         assert!(entry.timestamp.timestamp() > 0);
     }
 
-    // --- Garden Sandbox tests ---
+    // --- Workspace Sandbox tests ---
 
     #[test]
-    fn test_register_container_workspace() {
+    fn test_register_workspace_path() {
         let mut access = AccessManager::new();
-        access.register_container_workspace("my-container", PathBuf::from("/workspace/my-container"));
+        access.register_workspace_path("my-container", PathBuf::from("/workspace/my-container"));
 
-        assert_eq!(access.list_containers(), vec!["my-container"]);
-        assert_eq!(access.get_container_workspace("my-container"), Some(&PathBuf::from("/workspace/my-container")));
+        assert_eq!(access.list_workspaces(), vec!["my-container"]);
+        assert_eq!(access.get_workspace_path("my-container"), Some(&PathBuf::from("/workspace/my-container")));
     }
 
     #[test]
-    fn test_assign_agent_to_garden() {
+    fn test_assign_agent_to_workspace() {
         let mut access = AccessManager::new();
-        access.register_container_workspace("project-alpha", PathBuf::from("/workspace/alpha"));
+        access.register_workspace_path("project-alpha", PathBuf::from("/workspace/alpha"));
 
-        // Assign agent to garden
-        assert!(access.assign_garden("agent-1", "project-alpha"));
+        // Assign agent to workspace
+        assert!(access.assign_workspace("agent-1", "project-alpha"));
 
         // Check agent is assigned
-        assert_eq!(access.get_garden_for_agent("agent-1"), Some("project-alpha".to_string()));
-        assert!(access.can_access_garden("agent-1", "project-alpha"));
-        assert!(!access.can_access_garden("agent-1", "other-garden"));
+        assert_eq!(access.get_workspace_for_agent("agent-1"), Some("project-alpha".to_string()));
+        assert!(access.can_access_workspace("agent-1", "project-alpha"));
+        assert!(!access.can_access_workspace("agent-1", "other-workspace"));
     }
 
     #[test]
-    fn test_assign_agent_to_nonexistent_garden_fails() {
+    fn test_assign_agent_to_nonexistent_workspace_fails() {
         let mut access = AccessManager::new();
 
-        // Cannot assign to non-existent garden
-        assert!(!access.assign_garden("agent-1", "nonexistent"));
-        assert_eq!(access.get_garden_for_agent("agent-1"), None);
+        // Cannot assign to non-existent workspace
+        assert!(!access.assign_workspace("agent-1", "nonexistent"));
+        assert_eq!(access.get_workspace_for_agent("agent-1"), None);
     }
 
     #[test]
-    fn test_reassign_agent_to_different_garden() {
+    fn test_reassign_agent_to_different_workspace() {
         let mut access = AccessManager::new();
-        access.register_container_workspace("container-a", PathBuf::from("/workspace/a"));
-        access.register_container_workspace("container-b", PathBuf::from("/workspace/b"));
+        access.register_workspace_path("workspace-a", PathBuf::from("/workspace/a"));
+        access.register_workspace_path("workspace-b", PathBuf::from("/workspace/b"));
 
-        // Assign to first garden
-        access.assign_garden("agent-1", "container-a");
-        assert_eq!(access.get_garden_for_agent("agent-1"), Some("container-a".to_string()));
+        // Assign to first workspace
+        access.assign_workspace("agent-1", "workspace-a");
+        assert_eq!(access.get_workspace_for_agent("agent-1"), Some("workspace-a".to_string()));
 
-        // Reassign to second garden
-        access.assign_garden("agent-1", "container-b");
-        assert_eq!(access.get_garden_for_agent("agent-1"), Some("container-b".to_string()));
+        // Reassign to second workspace
+        access.assign_workspace("agent-1", "workspace-b");
+        assert_eq!(access.get_workspace_for_agent("agent-1"), Some("workspace-b".to_string()));
 
-        // Agent should not be in first garden anymore
-        assert!(!access.can_access_garden("agent-1", "container-a"));
+        // Agent should not be in first workspace anymore
+        assert!(!access.can_access_workspace("agent-1", "workspace-a"));
     }
 
     #[test]
-    fn test_unassign_agent_from_garden() {
+    fn test_unassign_agent_from_workspace() {
         let mut access = AccessManager::new();
-        access.register_container_workspace("my-container", PathBuf::from("/workspace/my"));
+        access.register_workspace_path("my-container", PathBuf::from("/workspace/my"));
 
-        access.assign_garden("agent-1", "my-container");
-        assert!(access.get_garden_for_agent("agent-1").is_some());
+        access.assign_workspace("agent-1", "my-container");
+        assert!(access.get_workspace_for_agent("agent-1").is_some());
 
-        let removed = access.unassign_garden("agent-1");
+        let removed = access.unassign_workspace("agent-1");
         assert_eq!(removed, Some("my-container".to_string()));
-        assert!(access.get_garden_for_agent("agent-1").is_none());
+        assert!(access.get_workspace_for_agent("agent-1").is_none());
     }
 
     #[test]
-    fn test_list_agents_in_garden() {
+    fn test_list_agents_in_workspace() {
         let mut access = AccessManager::new();
-        access.register_container_workspace("my-container", PathBuf::from("/workspace/my"));
+        access.register_workspace_path("my-container", PathBuf::from("/workspace/my"));
 
-        access.assign_garden("agent-1", "my-container");
-        access.assign_garden("agent-2", "my-container");
-        access.assign_garden("agent-3", "other-garden");
+        access.assign_workspace("agent-1", "my-container");
+        access.assign_workspace("agent-2", "my-container");
+        access.assign_workspace("agent-3", "other-workspace");
 
-        let agents = access.list_agents_in_garden("my-container");
+        let agents = access.list_agents_in_workspace("my-container");
         assert_eq!(agents.len(), 2);
         assert!(agents.contains(&"agent-1".to_string()));
         assert!(agents.contains(&"agent-2".to_string()));
@@ -1728,22 +1728,22 @@ mod tests {
     }
 
     #[test]
-    fn test_remove_container_unassigns_all_agents() {
+    fn test_remove_workspace_unassigns_all_agents() {
         let mut access = AccessManager::new();
-        access.register_container_workspace("my-container", PathBuf::from("/workspace/my"));
+        access.register_workspace_path("my-container", PathBuf::from("/workspace/my"));
 
-        access.assign_garden("agent-1", "my-container");
-        access.assign_garden("agent-2", "my-container");
+        access.assign_workspace("agent-1", "my-container");
+        access.assign_workspace("agent-2", "my-container");
 
-        access.remove_container("my-container");
+        access.remove_workspace("my-container");
 
-        assert!(access.list_containers().is_empty());
-        assert!(access.get_garden_for_agent("agent-1").is_none());
-        assert!(access.get_garden_for_agent("agent-2").is_none());
+        assert!(access.list_workspaces().is_empty());
+        assert!(access.get_workspace_for_agent("agent-1").is_none());
+        assert!(access.get_workspace_for_agent("agent-2").is_none());
     }
 
     #[test]
-    fn test_is_path_in_container_workspace() {
+    fn test_is_path_in_workspace() {
         let mut access = AccessManager::new();
 
         // Use /tmp for testing - it should exist on most systems
@@ -1753,15 +1753,15 @@ mod tests {
         std::fs::create_dir_all(&workspace).ok();
         std::fs::create_dir_all(workspace.join("subdir")).ok();
 
-        // Now register the garden workspace
-        access.register_container_workspace("my-container", workspace.clone());
+        // Now register the workspace
+        access.register_workspace_path("my-container", workspace.clone());
 
         // Path inside workspace
         let inside_path = workspace.join("file.txt");
         std::fs::write(&inside_path, "test").ok(); // Create the file too
 
         assert!(
-            access.is_path_in_container_workspace("my-container", inside_path.to_str().unwrap()),
+            access.is_path_in_workspace("my-container", inside_path.to_str().unwrap()),
             "Path {:?} should be inside workspace",
             inside_path
         );
@@ -1769,16 +1769,16 @@ mod tests {
         let nested_path = workspace.join("subdir/nested.txt");
         std::fs::write(&nested_path, "test").ok();
         assert!(
-            access.is_path_in_container_workspace("my-container", nested_path.to_str().unwrap()),
+            access.is_path_in_workspace("my-container", nested_path.to_str().unwrap()),
             "Path {:?} should be inside workspace",
             nested_path
         );
 
         // Path outside workspace (use /tmp directly without our subdirectory)
-        assert!(!access.is_path_in_container_workspace("my-container", "/tmp/other-workspace/file.txt"));
+        assert!(!access.is_path_in_workspace("my-container", "/tmp/other-workspace/file.txt"));
 
-        // Non-existent garden
-        assert!(!access.is_path_in_container_workspace("nonexistent", "/tmp/test"));
+        // Non-existent workspace
+        assert!(!access.is_path_in_workspace("nonexistent", "/tmp/test"));
 
         // Cleanup
         std::fs::remove_dir_all(workspace).ok();
