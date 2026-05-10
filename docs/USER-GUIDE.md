@@ -1,68 +1,67 @@
-# Oxios — 사용자 가이드
+# Oxios — User Guide
 
-> AI 에이전트 운영 체제. Unix 철학 + Ouroboros 방법론.
-
----
-
-## 소개
-
-Oxios는 **24/7 데몬**으로 동작하는 AI 에이전트 운영 체제입니다.
-
-```
-사용자 (Web/CLI) → Gateway → Kernel → 에이전트 실행 → 응답
-                    ↑
-              Cron 스케줄 (시간 기반 자동 실행)
-```
-
-**핵심 개념:**
-- **Ouroboros 프로토콜**: interview → seed → execute → evaluate → evolve
-- **ExecTool**: 워크스페이스 명령 직접 실행 (허용 목록 + 메타문자 차단)
-- **Workspace 샌드박스**: 디렉토리 기반 격리, RBAC + 감사 로깅
+> AI Agent Operating System. Unix philosophy + Ouroboros methodology.
 
 ---
 
-## 설치 및 실행
+## Overview
 
-### 1. 빌드
+Oxios is an AI Agent Operating System that runs as a **24/7 daemon**.
+
+```
+User (Web/CLI) → Gateway → Kernel → Agent → Response
+                     ↑
+              Cron scheduling (time-based triggers)
+```
+
+**Key Concepts:**
+- **Ouroboros Protocol**: interview → seed → execute → evaluate → evolve
+- **ExecTool**: direct host command execution (allowlist + metachar blocking)
+- **Workspace Sandbox**: directory-based isolation, RBAC + audit logging
+
+---
+
+## Installation
+
+### 1. Build
 
 ```bash
-# 방법 1: cargo install (crate가 publish되면)
-cargo install oxios
-
-# 방법 2: source에서 빌드
+# From source
 git clone https://github.com/your-repo/oxios
 cd oxios
 cargo build --release
+
+# Binary will be at: target/release/oxios
 ```
 
-### 2. 환경 변수 설정
+### 2. Environment Variables
 
 ```bash
 export ANTHROPIC_API_KEY=sk-ant-...
-# 또는
+# or
 export OPENAI_API_KEY=sk-...
 ```
 
-### 3. 데몬 실행
+### 3. Run
 
 ```bash
 oxios
-# → http://127.0.0.1:4200 에서 Web UI 열림
-# → 백그라운드에서 24/7 동작
+# → Web UI opens at http://127.0.0.1:4200
+# → Runs 24/7 in background
 ```
 
-### 4. 데몬 관리
+### 4. Daemon Management
 
 ```bash
-oxios daemon status    # 상태 확인
-oxios daemon restart    # 재시작
+oxios daemon status    # Check status
+oxios daemon restart   # Restart
 ```
 
 ---
 
-## Web UI 사용
+## Web UI
 
-브라우저에서 `http://127.0.0.1:4200` 열기.
+Open `http://127.0.0.1:4200` in your browser.
 
 ```
 ┌─────────────────────────────────────────────────────────┐
@@ -70,41 +69,41 @@ oxios daemon restart    # 재시작
 ├──────────┬──────────────────────────────────────────────┤
 │ 💬 Chat  │                                              │
 │ 👥 Agents│  ┌──────────────────────────────────────┐   │
-│ 📅 Cron  │  │ Welcome to Oxios. 무엇을 도와드릴까요?│   │
+│ 📅 Cron  │  │ Welcome to Oxios. How can I help you? │   │
 │ 📁 Programs│ │                                      │   │
 │ 🎯 Memory │  └──────────────────────────────────────┘   │
 │ ⚙️ Config │                                              │
 └──────────┴──────────────────────────────────────────────┘
 ```
 
-**사용법:**
-1. Chat 패널에서 메시지 입력
-2. 에이전트가 Ouroboros 프로토콜로 작업
-3. 결과를 확인
+**Usage:**
+1. Type a message in Chat panel
+2. Agent works using Ouroboros protocol
+3. View results
 
 ---
 
-## API 사용
+## API
 
 ### Chat
 
 ```bash
 curl -X POST http://127.0.0.1:4200/api/chat \
   -H "Content-Type: application/json" \
-  -d '{"content": "帮我写一个Rust HTTP服务器", "user_id": "user1"}'
+  -d '{"content": "Build a TODO app in Rust", "user_id": "user1"}'
 ```
 
-### 에이전트 관리
+### Agent Management
 
 ```bash
-# 실행 중인 에이전트 목록
+# List running agents
 curl http://127.0.0.1:4200/api/agents
 
-# 에이전트 종료
+# Kill agent
 curl -X POST http://127.0.0.1:4200/api/agents/<id>/kill
 ```
 
-### 상태 확인
+### Status
 
 ```bash
 curl http://127.0.0.1:4200/api/status
@@ -112,21 +111,21 @@ curl http://127.0.0.1:4200/api/status
 
 ---
 
-## CLI 사용
+## CLI
 
-### 대화형 모드
+### Interactive Mode
 
 ```bash
 oxios chat
 ```
 
-### 단일 프롬프트 실행
+### Single Prompt
 
 ```bash
-oxios run "帮我写一个TODO应用"
+oxios run "Build a TODO app in Rust"
 ```
 
-### 설정 확인
+### Config
 
 ```bash
 oxios config show
@@ -135,11 +134,11 @@ oxios config get exec.allowed_commands
 
 ---
 
-## Cron Jobs (자동 실행)
+## Cron Jobs
 
-매일 아침 뉴스를 요약하거나, 주기적으로 백업을 수행하는 등의 작업을 등록할 수 있습니다.
+Schedule agents to run on a schedule.
 
-### 설정 파일로 등록
+### Via Config
 
 `~/.oxios/config.toml`:
 
@@ -150,11 +149,11 @@ tick_interval_secs = 60
 
 [cron.jobs.morning_news]
 schedule = "0 9 * * *"
-goal = "오늘的新闻摘要"
+goal = "Summarize top tech news"
 priority = "low"
 ```
 
-### API로 등록
+### Via API
 
 ```bash
 curl -X POST http://127.0.0.1:4200/api/cron-jobs \
@@ -162,52 +161,52 @@ curl -X POST http://127.0.0.1:4200/api/cron-jobs \
   -d '{
     "name": "news-summary",
     "schedule": "0 9 * * *",
-    "goal": "오늘的新闻摘要"
+    "goal": "Summarize top tech news"
   }'
 ```
 
 ---
 
-## Program (에이전트 앱)
+## Programs
 
-Program은 에이전트가 사용할 수 있는 설치 가능한 앱입니다.
+Programs are installable apps for agents.
 
-### Program 설치
+### Install
 
 ```bash
 oxios program install ./my-program
 ```
 
-### Program 목록
+### List
 
 ```bash
 oxios program list
 ```
 
-### Program 활성화/비활성화
+### Enable/Disable
 
 ```bash
 oxios program enable my-program
 oxios program disable my-program
 ```
 
-### Program 구조
+### Structure
 
 ```
 my-program/
-├── program.toml     # 메타데이터
-├── SKILL.md        # 에이전트 지침
-├── bin/            # 실행 파일 (선택)
-└── config/         # 설정 (선택)
+├── program.toml     # Metadata
+├── SKILL.md        # Agent instructions
+├── bin/            # Executables (optional)
+└── config/         # Config (optional)
 ```
 
 ---
 
-## 설정
+## Configuration
 
-설정 파일: `~/.oxios/config.toml`
+Config file: `~/.oxios/config.toml`
 
-### 전체 설정 예시
+### Full Example
 
 ```toml
 [kernel]
@@ -219,15 +218,15 @@ host = "127.0.0.1"
 port = 4200
 
 [exec]
-# 허용된 호스트 명령 (빈 배열 = 모두 허용, 개발 모드)
+# Allowed host commands (empty = allow all, dev mode)
 allowed_commands = ["git", "gh", "open", "osascript"]
-# 명령 기본 타임아웃 (초)
+# Default timeout (seconds)
 default_timeout_secs = 120
-# 명령 최대 타임아웃 (초)
+# Max timeout (seconds)
 max_timeout_secs = 600
-# 필수 호스트 도구
+# Required host tools (checked at startup)
 required_host_tools = ["git"]
-# 선택적 호스트 도구
+# Optional host tools (checked when needed)
 optional_host_tools = ["gh", "osascript", "shortcuts", "remindctl"]
 
 [scheduler]
@@ -242,48 +241,47 @@ max_execution_time_secs = 300
 
 ---
 
-## 도구 (Tools)
+## Tools
 
-에이전트가 사용할 수 있는 도구들:
+Tools available to agents:
 
-| 도구 | 설명 |
-|------|------|
-| `exec` (shell) | 워크스페이스에서 bash 명령 실행 |
-| `exec` (structured) | 허용 목록 기반 호스트 명령 실행 |
-| `read` | 파일 읽기 |
-| `write` | 파일 쓰기 |
-| `edit` | 파일 편집 |
-| `grep` | 텍스트 검색 |
-| `find` | 파일 검색 |
-| `ls` | 디렉토리 목록 |
+| Tool | Description |
+|------|-------------|
+| `exec` (shell) | Run bash commands in workspace |
+| `exec` (structured) | Run allowlisted host commands |
+| `read` | Read files |
+| `write` | Write files |
+| `edit` | Edit files |
+| `grep` | Search text |
+| `find` | Find files |
+| `ls` | List directories |
 
 ---
 
-## 메모리
+## Memory
 
-에이전트는 세션 간 기억할 수 있습니다:
+Agents can remember across sessions:
 
 ```bash
-# 메모리 저장
+# Store
 curl -X PUT http://127.0.0.1:4200/api/memory/my-note \
-  -d '{"category": "notes", "content": "중요한 내용"}'
+  -d '{"category": "notes", "content": "Important info"}'
 
-# 메모리 검색
+# Search
 curl http://127.0.0.1:4200/api/memory
 ```
 
 ---
 
-## 감사 로그
+## Audit Log
 
-모든 도구 사용이 감사됩니다:
+All tool usage is audited:
 
 ```bash
-# 감사 로그 확인
 curl http://127.0.0.1:4200/api/audit
 ```
 
-응답 형식:
+Response:
 ```json
 [
   {
@@ -299,86 +297,72 @@ curl http://127.0.0.1:4200/api/audit
 
 ---
 
-## 문제 해결
+## Troubleshooting
 
-### 데몬이 시작되지 않음
+### Daemon won't start
 
 ```bash
-# 로그 확인
+# Check logs
 RUST_LOG=debug oxios 2>&1
 
-# 포트 충돌 확인
+# Check port
 lsof -i :4200
 ```
 
-### 에이전트가 멈춤
+### Agent stuck
 
 ```bash
-# 실행 중인 에이전트 확인
+# List agents
 oxios agent list
 
-# 강제 종료
+# Kill agent
 oxios agent kill <id>
 ```
 
-### 설정 오류
+### Config errors
 
 ```bash
-# 설정 검증
+# Validate config
 oxios config show
 
-# 기본 설정으로 복원
+# Reset to defaults
 rm ~/.oxios/config.toml
-oxios  # 자동 재생성
+oxios  # Auto-regenerates
 ```
 
 ---
 
-## 환경 변수
+## Environment Variables
 
-| 변수 | 설명 |
-|------|------|
-| `ANTHROPIC_API_KEY` | Anthropic (Claude) API 키 |
-| `OPENAI_API_KEY` | OpenAI API 키 |
-| `OXIOS_API_KEY` | Oxios API 키 (선택) |
-| `RUST_LOG` | 로깅 레벨 (`info`, `debug`) |
+| Variable | Description |
+|----------|-------------|
+| `ANTHROPIC_API_KEY` | Anthropic (Claude) API key |
+| `OPENAI_API_KEY` | OpenAI API key |
+| `OXIOS_API_KEY` | Oxios API key (optional) |
+| `RUST_LOG` | Log level (`info`, `debug`) |
 
 ---
 
-## 파일 구조
+## File Structure
 
 ```
 ~/.oxios/
-├── config.toml              # 설정
-├── workspace/               # 작업 디렉토리
-│   ├── memory/             # 에이전트 메모리
-│   │   ├── knowledge/     # 지식 베이스
-│   │   └── conversations/ # 세션 기록
-│   ├── sessions/          # 세션
-│   ├── seeds/             # Ouroboros 시드
-│   ├── skills/            # 스킬 템플릿
-│   └── programs/         # 설치된 프로그램
-└── api-keys.json         # API 키 (production)
+├── config.toml              # Config
+├── workspace/               # Workspace
+│   ├── memory/             # Agent memory
+│   │   ├── knowledge/     # Knowledge base
+│   │   └── conversations/ # Session logs
+│   ├── sessions/          # Sessions
+│   ├── seeds/             # Ouroboros seeds
+│   ├── skills/            # Skill templates
+│   └── programs/         # Installed programs
+└── api-keys.json         # API keys (production)
 ```
 
 ---
 
-## 참고
+## See Also
 
-- **추가 문서:**
-  - `README.md` — 설치 및 개발 가이드
-  - `DESIGN.md` — 아키텍처 및 설계 결정
-  - `AGENTS.md` — AI 에이전트 개발 규칙
-
-- **프로토콜:** Ouroboros (spec-first)
-  - interview: 요구사항 분석
-  - seed: 실행 계획 생성
-  - execute: 에이전트 작업 실행
-  - evaluate: 결과 평가
-  - evolve: 개선
-
-- **보안 모델:**
-  - RBAC (역할 기반 접근 제어)
-  - Workspace 샌드박스 (디렉토리 제한)
-  - 감사 로깅 (모든 작업 기록)
-  - 허용 목록 (허용된 명령만 실행)
+- `README.md` — Installation and development guide
+- `DESIGN.md` — Architecture and design decisions
+- `AGENTS.md` — AI agent development conventions
