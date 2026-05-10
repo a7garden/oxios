@@ -39,14 +39,13 @@ pub(crate) struct SchedulerStatsResponse {
 pub(crate) async fn handle_scheduler_stats(
     state: State<Arc<AppState>>,
 ) -> Json<SchedulerStatsResponse> {
-    let stats = state.kernel.scheduler_stats();
-    let rate_remaining = state.kernel.scheduler_rate_remaining();
+    let stats = state.kernel.infra.scheduler_stats();
     Json(SchedulerStatsResponse {
         queued: stats.queued,
         running: stats.running,
         max_concurrent: stats.max_concurrent,
         rate_limit_per_minute: stats.rate_limit_per_minute,
-        rate_remaining,
+        rate_remaining: stats.rate_remaining,
     })
 }
 
@@ -68,7 +67,7 @@ pub(crate) async fn handle_scheduler_tasks(
 ) -> Json<serde_json::Value> {
     let queued: Vec<TaskSummary> = state
         .kernel
-        .scheduler_queued_tasks()
+        .infra.scheduler_queued_tasks()
         .into_iter()
         .map(|t| TaskSummary {
             id: t.id.to_string(),
@@ -82,7 +81,7 @@ pub(crate) async fn handle_scheduler_tasks(
 
     let running: Vec<TaskSummary> = state
         .kernel
-        .scheduler_running_tasks()
+        .infra.scheduler_running_tasks()
         .into_iter()
         .map(|t| TaskSummary {
             id: t.id.to_string(),
@@ -146,7 +145,7 @@ pub(crate) async fn handle_audit_log(
     state: State<Arc<AppState>>,
     Query(params): Query<AuditLogParams>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
-    let entries = state.kernel.get_audit_log();
+    let entries = state.kernel.security.get_audit_log();
     let total = entries.len();
     let limit = params.limit.min(500);
     let offset = (params.page.saturating_sub(1)) * limit;
@@ -207,7 +206,7 @@ pub(crate) async fn handle_permissions_get(
     state: State<Arc<AppState>>,
     Path(agent): Path<String>,
 ) -> Result<Json<serde_json::Value>, StatusCode> {
-    match state.kernel.get_permissions(&agent) {
+    match state.kernel.security.get_permissions(&agent) {
         Some(perms) => Ok(Json(serde_json::json!({
             "agent_name": perms.agent_name,
             "allowed_tools": perms.allowed_tools.iter().cloned().collect::<Vec<_>>(),
@@ -229,7 +228,7 @@ pub(crate) async fn handle_permissions_put(
     Json(body): Json<serde_json::Value>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
     let update = PermissionsUpdate::from_json(body).into_kernel();
-    state.kernel.update_permissions(&agent, update)
+    state.kernel.security.update_permissions(&agent, update)
         .map_err(|e: anyhow::Error| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     tracing::info!(agent = %agent, "Permissions updated");
@@ -259,13 +258,13 @@ pub(crate) struct McpServerResponse {
 pub(crate) async fn handle_mcp_servers_list(
     state: State<Arc<AppState>>,
 ) -> Json<Vec<McpServerResponse>> {
-    let servers = state.kernel.mcp_list_servers();
+    let servers = state.kernel.mcp.list_servers();
     let mut results = Vec::new();
     for name in servers {
-        let (command, args, enabled) = state.kernel.get_mcp_server(&name)
+        let (command, args, enabled) = state.kernel.mcp.get_server(&name)
             .map(|s| (s.command.clone(), s.args.clone(), s.enabled))
             .unwrap_or_else(|| ("unknown".to_string(), Vec::new(), false));
-        let initialized = state.kernel.mcp_client_status(&name).await.unwrap_or(false);
+        let initialized = state.kernel.mcp.client_status(&name).await.unwrap_or(false);
         results.push(McpServerResponse {
             name: name.to_string(),
             command,
@@ -298,8 +297,8 @@ pub(crate) async fn handle_mcp_server_register(
     let mut server = oxios_kernel::McpServer::new(&name, &command);
     server.args = body.args;
     server.enabled = true;
-    state.kernel.register_mcp_server(server);
-    state.kernel.mcp_initialize_server(&name).await
+    state.kernel.mcp.register_server(server);
+    state.kernel.mcp.init_server(&name).await
         .map_err(|e| {
             tracing::error!(server = %name, error = %e, "Failed to start MCP server");
             (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
@@ -327,7 +326,7 @@ pub(crate) struct McpToolResponse {
 pub(crate) async fn handle_mcp_tools_list(
     state: State<Arc<AppState>>,
 ) -> Json<Vec<McpToolResponse>> {
-    let tools = match state.kernel.mcp_list_tools().await {
+    let tools = match state.kernel.mcp.list_tools().await {
         Ok(t) => t,
         Err(e) => {
             tracing::warn!(error = %e, "Failed to list MCP tools");
@@ -337,8 +336,8 @@ pub(crate) async fn handle_mcp_tools_list(
 
     // Reconstruct server attribution from cached tools.
     let mut results = Vec::new();
-    for name in state.kernel.mcp_list_servers() {
-        if let Some(cached) = state.kernel.mcp_cached_tools(&name).await {
+    for name in state.kernel.mcp.list_servers() {
+        if let Some(cached) = state.kernel.mcp.cached_tools(&name).await {
             for tool in cached {
                 results.push(McpToolResponse {
                     name: tool.name,
@@ -379,7 +378,7 @@ pub(crate) async fn handle_mcp_tool_call(
     state: State<Arc<AppState>>,
     Json(body): Json<McpToolCallRequest>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
-    let result = state.kernel.mcp_call_tool(&body.server, &body.tool, body.arguments)
+    let result = state.kernel.mcp.call_tool(&body.server, &body.tool, body.arguments)
         .await
         .map_err(|e| {
             tracing::error!(server = %body.server, tool = %body.tool, error = %e, "MCP tool call failed");

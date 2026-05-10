@@ -31,7 +31,7 @@ pub(crate) async fn handle_sessions_list(
     state: State<Arc<AppState>>,
     Query(params): Query<PageParams>,
 ) -> Json<serde_json::Value> {
-    match state.kernel.list_sessions().await {
+    match state.kernel.state.list_sessions().await {
         Ok(sessions) => {
             let items: Vec<SessionListItem> = sessions
                 .into_iter()
@@ -57,7 +57,7 @@ pub(crate) async fn handle_session_get(
 ) -> Result<Json<serde_json::Value>, StatusCode> {
     use oxios_kernel::state_store::SessionId;
     let session_id = SessionId(id);
-    match state.kernel.load_session(&session_id).await {
+    match state.kernel.state.load_session(&session_id).await {
         Ok(Some(session)) => Ok(Json(serde_json::json!({
             "id": session.id.0,
             "user_id": session.user_id,
@@ -81,7 +81,7 @@ pub(crate) async fn handle_session_delete(
 ) -> Result<Json<serde_json::Value>, StatusCode> {
     use oxios_kernel::state_store::SessionId;
     let session_id = SessionId(id);
-    match state.kernel.delete_session(&session_id).await {
+    match state.kernel.state.delete_session(&session_id).await {
         Ok(true) => Ok(Json(serde_json::json!({
             "status": "deleted",
             "id": session_id.0,
@@ -99,7 +99,7 @@ pub(crate) async fn handle_session_delete(
 pub(crate) async fn handle_events(
     state: State<Arc<AppState>>,
 ) -> Sse<impl tokio_stream::Stream<Item = Result<SseEvent, Infallible>>> {
-    let receiver = state.kernel.subscribe();
+    let receiver = state.kernel.infra.subscribe();
     let stream = BroadcastStream::new(receiver);
     let stream = TokioStreamExt::filter_map(stream, |result| {
         match result {
@@ -228,7 +228,7 @@ pub(crate) struct ApprovalResponse {
 pub(crate) async fn handle_approvals_list(
     state: State<Arc<AppState>>,
 ) -> Json<Vec<ApprovalResponse>> {
-    let approvals: Vec<ApprovalResponse> = state.kernel.list_approvals()
+    let approvals: Vec<ApprovalResponse> = state.kernel.security.list_approvals()
         .iter()
         .map(|(p, s)| {
             let subject_str = match &p.subject {
@@ -276,10 +276,10 @@ pub(crate) async fn handle_approval_approve(
         Err(_) => return Err(StatusCode::BAD_REQUEST),
     };
     
-    if state.kernel.approve_request(uuid) {
+    if state.kernel.security.approve(uuid) {
         tracing::info!(approval_id = %uuid, "Approval granted");
         // Publish event so SSE clients update automatically
-        let _ = state.kernel.publish(oxios_kernel::event_bus::KernelEvent::ApprovalResolved {
+        let _ = state.kernel.infra.publish(oxios_kernel::event_bus::KernelEvent::ApprovalResolved {
             id: uuid,
             approved: true,
         });
@@ -302,10 +302,10 @@ pub(crate) async fn handle_approval_reject(
         Err(_) => return Err(StatusCode::BAD_REQUEST),
     };
     
-    if state.kernel.reject_request(uuid) {
+    if state.kernel.security.reject(uuid) {
         tracing::info!(approval_id = %uuid, "Approval rejected");
         // Publish event so SSE clients update automatically
-        let _ = state.kernel.publish(oxios_kernel::event_bus::KernelEvent::ApprovalResolved {
+        let _ = state.kernel.infra.publish(oxios_kernel::event_bus::KernelEvent::ApprovalResolved {
             id: uuid,
             approved: false,
         });

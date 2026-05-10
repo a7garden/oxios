@@ -36,7 +36,7 @@ fn default_last_n() -> usize {
 pub(crate) async fn handle_resource_snapshot(
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<serde_json::Value>, AppError> {
-    let snapshot = state.kernel.resource_snapshot();
+    let snapshot = state.kernel.infra.resource_snapshot();
     serde_json::to_value(&snapshot)
         .map(Json)
         .map_err(|e| AppError::Internal(format!("failed to serialize snapshot: {}", e)))
@@ -47,7 +47,7 @@ pub(crate) async fn handle_resource_history(
     State(state): State<Arc<AppState>>,
     Query(params): Query<HistoryQuery>,
 ) -> Result<Json<serde_json::Value>, AppError> {
-    let snapshots = state.kernel.resource_history(params.last_n);
+    let snapshots = state.kernel.infra.resource_history(params.last_n);
     let count = snapshots.len();
     serde_json::to_value(&serde_json::json!({
         "snapshots": snapshots,
@@ -61,8 +61,8 @@ pub(crate) async fn handle_resource_history(
 pub(crate) async fn handle_resource_overload(
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<serde_json::Value>, AppError> {
-    let overloaded = state.kernel.is_overloaded();
-    let threshold = state.kernel.resource_overload_threshold();
+    let snapshot = state.kernel.infra.resource_snapshot();
+    let overloaded = state.kernel.infra.is_overloaded();
 
     serde_json::to_value(&serde_json::json!({
         "overloaded": overloaded,

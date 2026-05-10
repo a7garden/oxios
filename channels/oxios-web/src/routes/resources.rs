@@ -29,7 +29,7 @@ pub(crate) async fn handle_programs_list(
     state: State<Arc<AppState>>,
     Query(params): Query<PageParams>,
 ) -> Json<serde_json::Value> {
-    let programs = state.kernel.list_programs().await;
+    let programs = state.kernel.extensions.list_programs().await;
     let summaries: Vec<ProgramSummary> = programs
         .into_iter()
         .map(|p| ProgramSummary {
@@ -50,7 +50,7 @@ pub(crate) async fn handle_program_get(
     state: State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> Result<Json<serde_json::Value>, StatusCode> {
-    match state.kernel.get_program(&name).await {
+    match state.kernel.extensions.get_program(&name).await {
         Some(program) => Ok(Json(serde_json::json!({
             "name": program.meta.name,
             "version": program.meta.version,
@@ -98,7 +98,7 @@ pub(crate) async fn handle_program_install(
         return Err((StatusCode::BAD_REQUEST, "Local path installation not allowed via API. Use git URL or tarball URL.".into()));
     };
 
-    state.kernel.install_program(source).await
+    state.kernel.extensions.install_program(source).await
         .map(|program| {
             tracing::info!(program = %program.meta.name, "Program installed via API");
             Json(serde_json::json!({
@@ -115,7 +115,7 @@ pub(crate) async fn handle_program_uninstall(
     state: State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
-    state.kernel.uninstall_program(&name).await
+    state.kernel.extensions.uninstall_program(&name).await
         .map(|_| {
             tracing::info!(program = %name, "Program uninstalled via API");
             Json(serde_json::json!({"status": "uninstalled", "name": name}))
@@ -128,7 +128,7 @@ pub(crate) async fn handle_program_enable(
     state: State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
-    state.kernel.enable_program(&name).await
+    state.kernel.extensions.enable_program(&name).await
         .map(|_| Json(serde_json::json!({"status": "enabled", "name": name})))
         .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))
 }
@@ -138,7 +138,7 @@ pub(crate) async fn handle_program_disable(
     state: State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
-    state.kernel.disable_program(&name).await
+    state.kernel.extensions.disable_program(&name).await
         .map(|_| Json(serde_json::json!({"status": "disabled", "name": name})))
         .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))
 }
@@ -148,7 +148,7 @@ pub(crate) async fn handle_program_host_requirements(
     state: State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
-    state.kernel.check_program_host_requirements(&name).await
+    state.kernel.extensions.check_host_requirements(&name).await
         .map(|check| serde_json::to_value(&check).map(Json))
         .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
@@ -170,7 +170,7 @@ pub(crate) struct HostToolsStatusResponse {
 pub(crate) async fn handle_host_tools_check(
     state: State<Arc<AppState>>,
 ) -> Json<HostToolsStatusResponse> {
-    let status = state.kernel.check_host_tools();
+    let status = state.kernel.extensions.check_host_tools();
     Json(HostToolsStatusResponse {
         all_required_present: status.all_required_present,
         missing_required: status.missing_required,

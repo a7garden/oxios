@@ -132,7 +132,7 @@ pub async fn require_auth(
 
     let is_valid = {
         // Validate against auth_manager (kernel subsystem), OXIOS_API_KEY env, or config key
-        let key_valid = state.kernel.validate_token(token);
+        let key_valid = state.kernel.security.validate_token(token);
         // Also accept OXIOS_API_KEY env or static config key
         let env_valid = env_key.as_deref().map(|k| k == token).unwrap_or(false);
         let config_valid = config_key.as_deref().map(|k| k == token).unwrap_or(false);

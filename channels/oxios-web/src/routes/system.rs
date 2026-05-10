@@ -104,13 +104,13 @@ pub(crate) async fn handle_status(
     );
 
     // State store health — check that the base path exists
-    let state_store_healthy = state.kernel.workspace_path().exists();
+    let state_store_healthy = state.kernel.state.workspace_path().exists();
 
     // Event bus — always healthy if we got this far
     let event_bus_healthy = true;
 
     // Memory health
-    let (mem_index_size, mem_total) = state.kernel.memory_stats_async().await;
+    let (mem_index_size, mem_total) = state.kernel.agents.memory_stats().await;
     let memory_health = MemoryHealth {
         enabled: true,
         index_size: mem_index_size,
@@ -118,7 +118,7 @@ pub(crate) async fn handle_status(
     };
 
     // Agent health — count active from supervisor, metrics from export
-    let active_count = state.kernel.list_agents().await
+    let active_count = state.kernel.agents.list().await
         .map(|agents| agents.iter().filter(|a| {
             matches!(a.status, oxios_kernel::AgentStatus::Running | oxios_kernel::AgentStatus::Starting | oxios_kernel::AgentStatus::Idle)
         }).count())
@@ -195,7 +195,7 @@ pub(crate) async fn handle_agents_list(
     state: State<Arc<AppState>>,
     Query(params): Query<PageParams>,
 ) -> Json<serde_json::Value> {
-    match state.kernel.list_agents().await {
+    match state.kernel.agents.list().await {
         Ok(agents) => {
             let items: Vec<AgentSummary> = agents
                 .into_iter()
@@ -222,7 +222,7 @@ pub(crate) async fn handle_agent_kill(
     Path(id): Path<String>,
 ) -> Result<(), AppError> {
     tracing::info!(agent_id = %id, "Kill agent requested");
-    state.kernel.kill_agent(&id).await
+    state.kernel.agents.kill(&id).await
         .map_err(|e| {
             tracing::warn!(error = %e, "Agent not found");
             AppError::NotFound("agent not found".into())

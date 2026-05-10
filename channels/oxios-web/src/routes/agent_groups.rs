@@ -12,7 +12,7 @@ use crate::server::AppState;
 pub(crate) async fn handle_agent_groups_list(
     state: State<Arc<AppState>>,
 ) -> Result<Json<Vec<serde_json::Value>>, AppError> {
-    let names = state.kernel.list_category("agent_groups").await
+    let names = state.kernel.state.list_category("agent_groups").await
         .map_err(|e| AppError::Internal(e.to_string()))?;
 
     let mut groups = Vec::new();

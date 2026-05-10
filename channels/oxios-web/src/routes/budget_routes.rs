@@ -32,7 +32,7 @@ pub(crate) async fn handle_budget_get(
     Path(agent_id): Path<String>,
 ) -> Result<Json<serde_json::Value>, AppError> {
     let aid = parse_agent_id(&agent_id)?;
-    let info = state.kernel.check_budget(&aid);
+    let info = state.kernel.agents.check_budget(&aid);
     Ok(Json(serde_json::json!({
         "agent_id": agent_id,
         "tokens_remaining": info.tokens_remaining,
@@ -49,7 +49,7 @@ pub(crate) async fn handle_budget_set(
     Json(body): Json<SetBudgetRequest>,
 ) -> Result<Json<serde_json::Value>, AppError> {
     let aid = parse_agent_id(&agent_id)?;
-    state.kernel.set_budget(BudgetLimit {
+    state.kernel.agents.set_budget(BudgetLimit {
         agent_id: aid,
         token_budget: body.token_budget,
         calls_budget: body.calls_budget,
@@ -64,7 +64,7 @@ pub(crate) async fn handle_budget_remove(
     Path(agent_id): Path<String>,
 ) -> Result<Json<serde_json::Value>, AppError> {
     let aid = parse_agent_id(&agent_id)?;
-    state.kernel.remove_budget(&aid);
+    state.kernel.agents.remove_budget(&aid);
     Ok(Json(serde_json::json!({ "removed": true, "agent_id": agent_id })))
 }
 
@@ -75,7 +75,7 @@ pub(crate) async fn handle_budget_reserve(
     Json(body): Json<ReserveRequest>,
 ) -> Result<Json<serde_json::Value>, AppError> {
     let aid = parse_agent_id(&agent_id)?;
-    state.kernel.reserve_budget(&aid, body.tokens)
+    state.kernel.agents.reserve_budget(&aid, body.tokens)
         .map_err(|e| AppError::Internal(format!("Budget exceeded: {e}")))?;
     Ok(Json(serde_json::json!({ "reserved": true })))
 }
@@ -86,6 +86,6 @@ pub(crate) async fn handle_budget_reset(
     Path(agent_id): Path<String>,
 ) -> Result<Json<serde_json::Value>, AppError> {
     let aid = parse_agent_id(&agent_id)?;
-    state.kernel.reset_budget(&aid);
+    state.kernel.agents.reset_budget(&aid);
     Ok(Json(serde_json::json!({ "reset": true, "agent_id": agent_id })))
 }

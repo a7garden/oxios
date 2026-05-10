@@ -91,7 +91,7 @@ pub(crate) async fn handle_chat(
                 let session_id_for_save = response.metadata.get("session_id").cloned()
                     .unwrap_or_else(|| msg_id.clone());
                 let session_id = oxios_kernel::state_store::SessionId(session_id_for_save.clone());
-                match state.kernel.load_session(&session_id).await {
+                match state.kernel.state.load_session(&session_id).await {
                     Ok(Some(mut session)) => {
                         session.add_user_message(&content_echo);
                         session.add_agent_response(oxios_kernel::state_store::AgentResponse {
@@ -102,7 +102,7 @@ pub(crate) async fn handle_chat(
                             evaluation_passed: response.metadata.get("evaluation_passed").and_then(|v| v.parse().ok()),
                             timestamp: chrono::Utc::now(),
                         });
-                        if let Err(e) = state.kernel.save_session(&session).await {
+                        if let Err(e) = state.kernel.state.save_session(&session).await {
                             tracing::warn!(error = %e, "Failed to persist session");
                         }
                     }
@@ -119,7 +119,7 @@ pub(crate) async fn handle_chat(
                             evaluation_passed: response.metadata.get("evaluation_passed").and_then(|v| v.parse().ok()),
                             timestamp: chrono::Utc::now(),
                         });
-                        if let Err(e) = state.kernel.save_session(&session).await {
+                        if let Err(e) = state.kernel.state.save_session(&session).await {
                             tracing::warn!(error = %e, "Failed to create session");
                         }
                     }
@@ -158,7 +158,7 @@ pub(crate) async fn handle_chat_stream(
     // Authenticate if auth is enabled
     if state.config.read().security.auth_enabled {
         let token = params.token.as_deref().unwrap_or("");
-        if !state.kernel.validate_token(token) {
+        if !state.kernel.security.validate_token(token) {
             return axum::http::StatusCode::UNAUTHORIZED.into_response();
         }
     }
@@ -170,7 +170,7 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
     let (mut ws_tx, mut ws_rx) = socket.split();
 
     // Subscribe to outgoing messages
-    let mut outgoing_rx = state.kernel.subscribe();
+    let mut outgoing_rx = state.kernel.infra.subscribe();
 
     // Forward outgoing messages to the WebSocket
     let recv_task = tokio::spawn(async move {

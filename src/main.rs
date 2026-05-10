@@ -552,7 +552,7 @@ async fn main() -> Result<()> {
                 }
             }
 
-            let entries = kernel.handle().query_audit(0, 20);
+            let entries = kernel.handle().security.query_audit(0, 20);
             println!();
             if entries.is_empty() {
                 println!("No audit entries yet.");
@@ -571,7 +571,7 @@ async fn main() -> Result<()> {
                 }
             }
             println!();
-            println!("Total entries: {}", kernel.handle().audit_count());
+            println!("Total entries: {}", kernel.handle().security.audit_count());
             Ok(())
         }
 
@@ -585,7 +585,7 @@ async fn main() -> Result<()> {
             match action {
                 GitAction::Log { limit } => {
                     let limit = limit.unwrap_or(20);
-                    match kernel.handle().git_log(limit) {
+                    match kernel.handle().infra.git_log(limit) {
                         Ok(entries) => {
                             if entries.is_empty() {
                                 println!("No commits yet.");
@@ -606,7 +606,7 @@ async fn main() -> Result<()> {
                 }
                 GitAction::Tag { name, message } => {
                     let msg = message.as_deref().unwrap_or("");
-                    match kernel.handle().git_tag(&name, msg) {
+                    match kernel.handle().infra.git_tag(&name, msg) {
                         Ok(_) => {
                             println!("Tagged '{}'.", name);
                             if !msg.is_empty() {
@@ -631,7 +631,7 @@ async fn main() -> Result<()> {
                 Some(id) => {
                     let uuid = uuid::Uuid::parse_str(&id)
                         .map_err(|e| anyhow::anyhow!("invalid agent id '{}': {}", id, e))?;
-                    let budget = kernel.handle().check_budget(&uuid);
+                    let budget = kernel.handle().agents.check_budget(&uuid);
                     println!("Budget for agent {}", id);
                     println!("{}", "-".repeat(40));
                     println!("  Tokens remaining: {}", budget.tokens_remaining);
@@ -684,7 +684,7 @@ async fn main() -> Result<()> {
                 .build()
                 .await?;
 
-            match kernel.handle().get_program(&name).await {
+            match kernel.handle().extensions.get_program(&name).await {
                 Some(program) => {
                     println!("Program: {} v{}", program.meta.name, program.meta.version);
                     println!("{}", "-".repeat(50));
