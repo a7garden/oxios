@@ -610,10 +610,10 @@ mod tests {
 
         // Register the tools the program depends on.
         registry.register(DummyTool { name: "read".into() });
-        registry.register(DummyTool { name: "host_exec".into() });
+        registry.register(DummyTool { name: "exec".into() });
 
-        // Simulate a program that requires "read" and "host_exec".
-        let required_tools = vec!["read".to_string(), "host_exec".to_string()];
+        // Simulate a program that requires "read" and "exec".
+        let required_tools = vec!["read".to_string(), "exec".to_string()];
 
         // Validation: all required tools must exist in the registry.
         let missing: Vec<&str> = required_tools
@@ -630,13 +630,13 @@ mod tests {
     fn test_requires_tools_validation_fails() {
         let registry = ToolRegistry::new();
 
-        // Only register "read", not "host_exec" or "nonexistent".
+        // Only register "read", not "exec" or "nonexistent".
         registry.register(DummyTool { name: "read".into() });
 
         // Simulate a program that requires tools that don't exist.
         let required_tools = vec![
             "read".to_string(),       // exists
-            "host_exec".to_string(), // missing
+            "exec".to_string(), // missing
             "nonexistent".to_string(), // missing
         ];
 
@@ -647,7 +647,7 @@ mod tests {
             .map(|s| s.as_str())
             .collect();
 
-        assert_eq!(missing, vec!["host_exec", "nonexistent"]);
+        assert_eq!(missing, vec!["exec", "nonexistent"]);
     }
 
     #[test]

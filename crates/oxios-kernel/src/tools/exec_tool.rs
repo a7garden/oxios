@@ -30,7 +30,7 @@ use tokio::sync::{Mutex, oneshot};
 use crate::access_manager::AccessManager;
 use crate::config::ExecConfig;
 
-// ─── Shell metacharacter blocklist (shared with host_exec bridge) ──────────
+// ─── Shell metacharacter blocklist ──────────
 
 /// Characters that are rejected in structured-mode arguments.
 const SHELL_METACHARS: &[char] = &[
@@ -123,7 +123,7 @@ impl ExecTool {
 
     /// Execute a binary with explicit args, enforcing allowlist + metachar blocking.
     ///
-    /// This is the successor to `HostExecTool`'s structured execution path.
+    /// Primary structured execution path.
     /// Security checks:
     /// 1. Binary must be a bare name (no `/` or `..`).
     /// 2. Binary must be in the allowlist (or allowlist is empty = dev mode).
@@ -212,7 +212,7 @@ fn has_metacharacters(args: &[String]) -> bool {
 }
 
 /// Format an `ExecResult` into a human-readable output string (matching the
-/// format used by the old ContainerExecTool / HostExecTool).
+/// format consistent with agent expectations).
 fn format_exec_output(result: &ExecResult) -> String {
     let mut output = String::new();
 

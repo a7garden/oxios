@@ -60,10 +60,8 @@ Response:
 }
 ```
 
-### List Gardens
 
 ```sh
-curl http://127.0.0.1:4200/api/gardens
 ```
 
 Response:
@@ -77,20 +75,16 @@ Response:
 ]
 ```
 
-### Create a Garden
 
 ```sh
-curl -X POST http://127.0.0.1:4200/api/gardens \
   -H "Content-Type: application/json" \
   -d '{
     "name": "my-project"
   }'
 ```
 
-### Execute in a Garden
 
 ```sh
-curl -X POST http://127.0.0.1:4200/api/gardens/my-project/exec \
   -H "Content-Type: application/json" \
   -d '{
     "command": ["cargo", "test"]
