@@ -8,18 +8,16 @@ Oxios is an Agent Operating System built in Rust. It combines Unix philosophy (m
 
 **Engine:** oxi-ai + oxi-agent (from `../oxi/`) are consumed as path dependencies. Never reimplement what oxi already provides.
 
-**Runtime:** Apple Container on macOS Silicon. Linux support is deferred.
-
 ## Architecture
 
 ```
-Gateway (channel-agnostic) → Kernel (supervisor + ouroboros + oxi-agent) → Container
+Gateway (channel-agnostic) → Kernel (supervisor + ouroboros + oxi-agent)
 ```
 
 - Gateway: message hub, channels plug in as plugins (Web first, Telegram/CLI later)
 - Kernel: agent lifecycle (fork/exec/wait/kill), event bus, state store, tool registry
 - Ouroboros: spec-first protocol (interview → seed → execute → evaluate → evolve)
-- Container: Apple Container isolation (container per project)
+
 
 ## Kernel Modules
 
@@ -28,21 +26,39 @@ The `oxios-kernel` crate exposes these public modules:
 | Module | Purpose |
 |--------|---------|
 | `supervisor` | Agent lifecycle management (fork/exec/wait/kill) |
+| `agent_lifecycle` | High-level agent lifecycle manager |
+| `agent_group` | Agent grouping and coordination |
+| `agent_runtime` | oxi-agent wrapper (tool-calling loop) |
+| `engine` | LLM engine abstraction (OxiEngineProvider) |
 | `event_bus` | KernelEvent broadcast channel |
 | `state_store` | Markdown-based persistent state |
 | `config` | TOML configuration (OxiosConfig) |
 | `orchestrator` | Ouroboros lifecycle coordinator |
-| `agent_runtime` | oxi-agent wrapper (tool-calling loop) |
-| `container` | Apple Container backend |
-| `container_manager` | Container lifecycle manager |
-| `host_exec` | Secure host command execution bridge |
 | `program` | OS-level programs (installable capabilities) |
 | `skill` | Markdown-based agent instruction templates |
-| `mcp` | MCP (Model Context Protocol) awareness |
+| `mcp` | MCP (Model Context Protocol) bridge |
 | `host_tools` | Host dependency validator |
 | `scheduler` | AIOS-inspired task scheduler |
-| `context_manager` | AIOS-inspired 3-tier context management |
-| `access_manager` | OWASP-inspired security enforcement |
+| `cron` | Cron-based scheduled jobs |
+| `access_manager` | OWASP-inspired security & RBAC enforcement |
+| `auth` | API key management |
+| `a2a` | Agent-to-agent communication protocol |
+| `memory` | Vector-based memory with budget-aware curation |
+| `embedding` | Embedding provider (TF-IDF default) |
+| `persona` | Agent persona definitions |
+| `persona_manager` | Persona lifecycle management |
+| `persona_store` | Persona persistence |
+| `budget` | Token and cost budget enforcement |
+| `resource_monitor` | System resource monitoring & overload detection |
+| `circuit_breaker` | Fault tolerance for external calls |
+| `metrics` | Prometheus-compatible metrics registry |
+| `audit_trail` | Immutable audit logging |
+| `backup` | State backup and restore |
+| `git_layer` | Git-based state versioning |
+| `tools` | Built-in tool implementations (exec, program, mcp, memory) |
+| `types` | Shared kernel types (AgentId, AgentInfo, AgentStatus) |
+| `wasm_sandbox` | WASM sandboxed execution (`wasm-sandbox` feature) |
+| `telemetry_otel` | OpenTelemetry tracing (`otel` feature) |
 
 ## Directory Structure
 
@@ -103,7 +119,6 @@ Scopes: kernel, ouroboros, gateway, web, cli, docs
 3. **No reimplementation:** Reuse oxi-ai and oxi-agent from oxi. Reuse clawgarden code where applicable.
 4. **Channel agnostic:** Gateway doesn't care if the message comes from Web, CLI, or Telegram.
 5. **User invisible:** Users don't know how many agents are running. They talk, the OS handles the rest.
-6. **Container minimalism:** Ship essential tools only; rich functionality comes from host dependencies.
 
 ## Dependency Map
 
@@ -127,8 +142,6 @@ When implementing, check `../clawgarden/crates/` for reusable code:
 | `clawgarden-proto/config.rs` | `oxios-kernel` config | Adapt layered config |
 | `clawgarden-bus/supervisor.rs` | `oxios-kernel` supervisor | Direct adaptation |
 | `clawgarden-bus/uds_server.rs` | `oxios-kernel` event bus | Adapt UDS protocol |
-| `clawgarden-relay` | `oxios-kernel` host exec | Direct reuse |
-| `clawgarden-cli/backend/apple.rs` | `oxios-kernel` container | Direct reuse |
 | `clawgarden-memory` | `oxios-kernel` state store | Adapt knowledge/memory |
 
 ## Build & Run
@@ -172,14 +185,9 @@ author = "oxios"
 [tools]
 my_tool = { description = "What the tool does" }
 
-# Host tool requirements (critical for container minimalism)
 [host_requirements]
 required = ["git", "curl"]
 optional = ["gh", "osascript"]
-
-# Container minimalism: tools that must be in the container
-[container]
-minimal_tools = ["bash", "jq", "sqlite3"]
 ```
 
 ### SKILL.md Format
@@ -221,73 +229,6 @@ POST /api/programs
 2. **Document host dependencies** — Always specify required vs optional host tools
 3. **Make SKILL.md comprehensive** — Agents use this to understand capability
 4. **Version semantically** — Follow SemVer for program versions
-5. **Test in container** — Always test programs inside a container
-
----
-
-## Container Minimalism Philosophy
-
-Oxios containers ship **only essential tools**. Rich functionality comes from host macOS integration.
-
-### Minimal Container Toolset
-
-```toml
-[container]
-minimal_tools = [
-    "bash",      # Shell scripting
-    "curl",      # HTTP requests
-    "git",       # Version control (via host mount)
-    "ripgrep",   # Search
-    "jq",        # JSON processing
-    "sqlite3",   # Database
-    "python3",   # Scripting (optional)
-]
-```
-
-### Why Minimalism?
-
-1. **Security** — Smaller attack surface
-2. **Performance** — Faster container startup
-3. **Reliability** — Predictable environment
-4. **Unix philosophy** — Small pieces, composed
-
-### Host Integration Layer
-
-Rich capabilities come from the host via `host_exec`:
-
-| Host Capability | Access Method |
-|-----------------|----------------|
-| Git operations | Via `git` (host-mounted) |
-| GitHub CLI | Via `gh` command |
-| Notifications | Via `osascript` or `remindctl` |
-| Browser | Via `open` command |
-| macOS automation | Via `shortcuts` or `osascript` |
-
-### Host Tool Validation
-
-The `HostToolValidator` ensures host dependencies are available:
-
-```rust
-pub struct HostToolValidator {
-    required: Vec<String>,
-    optional: Vec<String>,
-}
-
-impl HostToolValidator {
-    /// Check all required tools are present on the host
-    pub fn validate(&self) -> HostToolStatus;
-    
-    /// Get all available tools (required + optional)
-    pub fn full_check(&self) -> FullCheckResult;
-}
-```
-
-Access via API:
-
-```
-GET /api/host-tools
-→ { all_required_present, missing_required, optional_available }
-```
 
 ---
 

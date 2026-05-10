@@ -41,7 +41,7 @@ impl Role {
                     Action::AccessPath("*".into()),
                     Action::ManageAgents,
                     Action::ManagePrograms,
-                    Action::ManageGardens,
+                    Action::ManageWorkspaces,
                     Action::ManageRBAC,
                     Action::ViewAuditLog,
                     Action::SystemConfig,
@@ -56,7 +56,7 @@ impl Role {
                     Action::AccessPath("/workspace/**".into()),
                     Action::ManageAgents,
                     Action::ManagePrograms,
-                    Action::ManageGardens,
+                    Action::ManageWorkspaces,
                     Action::ViewAuditLog,
                 ].into_iter().collect(),
                 resource_patterns: vec!["/workspace/**".into(), "/tmp/**".into()],
@@ -113,8 +113,8 @@ pub enum Action {
     ManageAgents,
     /// Manage programs (install/uninstall).
     ManagePrograms,
-    /// Manage gardens (create/start/stop/remove).
-    ManageGardens,
+    /// Manage workspaces (create/start/stop/remove).
+    ManageWorkspaces,
     /// Modify RBAC policies and role assignments.
     ManageRBAC,
     /// View the audit log.
@@ -552,17 +552,17 @@ impl AuditEntry {
 /// // Create permissions for a new agent
 /// access.set_permissions(AgentPermissions::for_new_agent("code-agent"));
 ///
-/// // Assign agent to a garden workspace
-/// access.assign_garden("code-agent", "project-alpha");
+/// // Assign agent to a workspace
+/// access.assign_workspace("code-agent", "project-alpha");
 ///
 /// // Check permissions with sandbox enforcement
-/// if access.can_access_path_in_garden("code-agent", "/workspace/file.rs", "project-alpha") {
-///     // allow file access within garden
+/// if access.can_access_path_in_workspace("code-agent", "/workspace/file.rs", Some("project-alpha")) {
+///     // allow file access within workspace
 /// }
 ///
-/// // Check if agent can access a specific garden
-/// if access.can_access_garden("code-agent", "project-alpha") {
-///     // allow garden access
+/// // Check if agent can access a specific workspace
+/// if access.can_access_workspace("code-agent", "project-alpha") {
+///     // allow workspace access
 /// }
 /// ```
 /// Access Manager — least-privilege security for agents.
@@ -581,12 +581,12 @@ pub struct AccessManager {
     max_audit_entries: usize,
     /// RBAC manager for HitL approvals.
     pub(crate) rbac: RbacManager,
-    /// Garden workspace paths: container_name -> workspace_path.
-    container_workspaces: HashMap<String, PathBuf>,
-    /// Agent-to-garden assignments: agent_name -> container_name.
-    agent_containers: HashMap<String, String>,
-    /// Garden-to-agents mapping: container_name -> set of agent_names.
-    garden_agents: HashMap<String, HashSet<String>>,
+    /// Workspace paths: workspace_name -> workspace_path.
+    workspace_paths: HashMap<String, PathBuf>,
+    /// Agent-to-workspace assignments: agent_name -> workspace_name.
+    agent_workspaces: HashMap<String, String>,
+    /// Workspace-to-agents mapping: workspace_name -> set of agent_names.
+    workspace_agents: HashMap<String, HashSet<String>>,
 }
 
 impl AccessManager {
@@ -598,9 +598,9 @@ impl AccessManager {
             audit_log_path: None,
             max_audit_entries: 10_000,
             rbac: RbacManager::new(),
-            container_workspaces: HashMap::new(),
-            agent_containers: HashMap::new(),
-            garden_agents: HashMap::new(),
+            workspace_paths: HashMap::new(),
+            agent_workspaces: HashMap::new(),
+            workspace_agents: HashMap::new(),
         }
     }
 
@@ -615,9 +615,9 @@ impl AccessManager {
             audit_log_path: None,
             max_audit_entries,
             rbac: RbacManager::new(),
-            container_workspaces: HashMap::new(),
-            agent_containers: HashMap::new(),
-            garden_agents: HashMap::new(),
+            workspace_paths: HashMap::new(),
+            agent_workspaces: HashMap::new(),
+            workspace_agents: HashMap::new(),
         }
     }
 
@@ -826,113 +826,113 @@ impl AccessManager {
         &mut self.rbac
     }
 
-    // ─── Garden Sandbox Integration ───────────────────────────────────────
+    // ─── Workspace Sandbox Integration ────────────────────────────────────
 
-    /// Registers a garden workspace path.
+    /// Registers a workspace path.
     ///
-    /// This is used by ContainerBackend to report which paths belong to each garden.
+    /// This is used to report which paths belong to each workspace.
     ///
     /// # Arguments
-    /// * `container_name` - Name of the garden
-    /// * `workspace_path` - Absolute path to the garden's workspace directory
-    pub fn register_container_workspace(&mut self, container_name: &str, workspace_path: PathBuf) {
-        self.container_workspaces.insert(container_name.to_string(), workspace_path);
-        tracing::debug!(garden = %container_name, "Garden workspace registered");
+    /// * `workspace_name` - Name of the workspace
+    /// * `workspace_path` - Absolute path to the workspace directory
+    pub fn register_workspace_path(&mut self, workspace_name: &str, workspace_path: PathBuf) {
+        self.workspace_paths.insert(workspace_name.to_string(), workspace_path);
+        tracing::debug!(workspace = %workspace_name, "Workspace path registered");
     }
 
-    /// Assigns an agent to a specific garden.
+    /// Assigns an agent to a specific workspace.
     ///
-    /// After assignment, the agent is sandboxed to that garden's workspace.
+    /// After assignment, the agent is sandboxed to that workspace.
     ///
     /// # Arguments
     /// * `agent_name` - Name of the agent to assign
-    /// * `container_name` - Name of the garden to assign the agent to
+    /// * `workspace_name` - Name of the workspace to assign the agent to
     ///
     /// # Returns
-    /// `true` if assignment succeeded, `false` if the garden doesn't exist
-    pub fn assign_garden(&mut self, agent_name: &str, container_name: &str) -> bool {
-        if !self.container_workspaces.contains_key(container_name) {
-            tracing::warn!(agent = %agent_name, garden = %container_name, "Cannot assign agent to non-existent garden");
+    /// `true` if assignment succeeded, `false` if the workspace doesn't exist
+    pub fn assign_workspace(&mut self, agent_name: &str, workspace_name: &str) -> bool {
+        if !self.workspace_paths.contains_key(workspace_name) {
+            tracing::warn!(agent = %agent_name, workspace = %workspace_name, "Cannot assign agent to non-existent workspace");
             return false;
         }
 
-        // Remove from previous garden if any
-        if let Some(prev_container) = self.agent_containers.get(agent_name) {
-            if let Some(agents) = self.garden_agents.get_mut(prev_container) {
+        // Remove from previous workspace if any
+        if let Some(prev_workspace) = self.agent_workspaces.get(agent_name) {
+            if let Some(agents) = self.workspace_agents.get_mut(prev_workspace) {
                 agents.remove(agent_name);
             }
         }
 
-        // Assign to new garden
-        self.agent_containers.insert(agent_name.to_string(), container_name.to_string());
-        self.garden_agents
-            .entry(container_name.to_string())
+        // Assign to new workspace
+        self.agent_workspaces.insert(agent_name.to_string(), workspace_name.to_string());
+        self.workspace_agents
+            .entry(workspace_name.to_string())
             .or_default()
             .insert(agent_name.to_string());
 
-        tracing::info!(agent = %agent_name, garden = %container_name, "Agent assigned to garden");
+        tracing::info!(agent = %agent_name, workspace = %workspace_name, "Agent assigned to workspace");
         true
     }
 
-    /// Gets the garden name that an agent is assigned to.
+    /// Gets the workspace name that an agent is assigned to.
     ///
     /// # Returns
-    /// `Some(container_name)` if assigned, `None` if the agent is not assigned to any garden
-    pub fn get_garden_for_agent(&self, agent_name: &str) -> Option<String> {
-        self.agent_containers.get(agent_name).cloned()
+    /// `Some(workspace_name)` if assigned, `None` if the agent is not assigned to any workspace
+    pub fn get_workspace_for_agent(&self, agent_name: &str) -> Option<String> {
+        self.agent_workspaces.get(agent_name).cloned()
     }
 
-    /// Gets the workspace path for a specific garden.
+    /// Gets the path for a specific workspace.
     ///
     /// # Returns
-    /// `Some(path)` if the garden exists, `None` otherwise
-    pub fn get_container_workspace(&self, container_name: &str) -> Option<&PathBuf> {
-        self.container_workspaces.get(container_name)
+    /// `Some(path)` if the workspace exists, `None` otherwise
+    pub fn get_workspace_path(&self, workspace_name: &str) -> Option<&PathBuf> {
+        self.workspace_paths.get(workspace_name)
     }
 
-    /// Lists all registered containers.
-    pub fn list_containers(&self) -> Vec<String> {
-        self.container_workspaces.keys().cloned().collect()
+    /// Lists all registered workspaces.
+    pub fn list_workspaces(&self) -> Vec<String> {
+        self.workspace_paths.keys().cloned().collect()
     }
 
-    /// Lists all agents assigned to a specific garden.
-    pub fn list_agents_in_garden(&self, container_name: &str) -> Vec<String> {
-        self.garden_agents
-            .get(container_name)
+    /// Lists all agents assigned to a specific workspace.
+    pub fn list_agents_in_workspace(&self, workspace_name: &str) -> Vec<String> {
+        self.workspace_agents
+            .get(workspace_name)
             .map(|agents| agents.iter().cloned().collect())
             .unwrap_or_default()
     }
 
-    /// Checks if an agent can access a specific garden.
+    /// Checks if an agent can access a specific workspace.
     ///
-    /// An agent can access a garden if it is assigned to it.
+    /// An agent can access a workspace if it is assigned to it.
     ///
     /// # Arguments
     /// * `agent_name` - Name of the agent
-    /// * `container_name` - Name of the garden to check
+    /// * `workspace_name` - Name of the workspace to check
     ///
     /// # Returns
-    /// `true` if the agent is assigned to the garden, `false` otherwise
-    pub fn can_access_garden(&self, agent_name: &str, container_name: &str) -> bool {
-        self.agent_containers
+    /// `true` if the agent is assigned to the workspace, `false` otherwise
+    pub fn can_access_workspace(&self, agent_name: &str, workspace_name: &str) -> bool {
+        self.agent_workspaces
             .get(agent_name)
-            .map(|g| g == container_name)
+            .map(|w| w == workspace_name)
             .unwrap_or(false)
     }
 
-    /// Checks if a path is within a garden's workspace.
+    /// Checks if a path is within a workspace's directory.
     ///
     /// This performs a canonical path comparison to ensure the path is
-    /// a descendant of the garden's workspace directory.
+    /// a descendant of the workspace directory.
     ///
     /// # Arguments
-    /// * `container_name` - Name of the garden
+    /// * `workspace_name` - Name of the workspace
     /// * `path` - Path to check (absolute or relative)
     ///
     /// # Returns
-    /// `true` if the path is within the garden's workspace, `false` otherwise
-    pub fn is_path_in_container_workspace(&self, container_name: &str, path: &str) -> bool {
-        let workspace = match self.container_workspaces.get(container_name) {
+    /// `true` if the path is within the workspace, `false` otherwise
+    pub fn is_path_in_workspace(&self, workspace_name: &str, path: &str) -> bool {
+        let workspace = match self.workspace_paths.get(workspace_name) {
             Some(w) => w,
             None => return false,
         };
@@ -959,28 +959,28 @@ impl AccessManager {
         requested_path.starts_with(&workspace_canonical)
     }
 
-    /// Full sandbox check: RBAC → path allowed? → within garden workspace?
+    /// Full sandbox check: RBAC → path allowed? → within workspace?
     ///
     /// This is the main method for enforcing sandbox boundaries. It checks:
     /// 1. RBAC - does the agent's role allow the action?
     /// 2. Path permissions - is the path in the agent's allowed_paths?
-    /// 3. Garden boundary - is the path within the assigned garden's workspace?
+    /// 3. Workspace boundary - is the path within the assigned workspace?
     ///
     /// If any check fails, the access is denied and logged as "sandbox violation"
-    /// if the path would be valid but outside the garden boundary.
+    /// if the path would be valid but outside the workspace boundary.
     ///
     /// # Arguments
     /// * `agent_name` - Name of the agent
     /// * `path` - Path to access
-    /// * `garden` - Garden context (if agent is assigned to one)
+    /// * `workspace` - Workspace context (if agent is assigned to one)
     ///
     /// # Returns
     /// `true` if all checks pass, `false` otherwise
-    pub fn can_access_path_in_garden(
+    pub fn can_access_path_in_workspace(
         &mut self,
         agent_name: &str,
         path: &str,
-        garden: Option<&str>,
+        workspace: Option<&str>,
     ) -> bool {
         // First check RBAC via the agent's role
         let subject = Subject::Agent(AgentId::new_v4());
@@ -990,9 +990,9 @@ impl AccessManager {
         // Check path permissions (allowed_paths vs denied_paths)
         let path_allowed = self.can_access_path(agent_name, path);
 
-        // Check garden workspace boundary
-        let garden_allowed = if let Some(container_name) = garden {
-            let is_in_workspace = self.is_path_in_container_workspace(container_name, path);
+        // Check workspace boundary
+        let workspace_allowed = if let Some(workspace_name) = workspace {
+            let is_in_workspace = self.is_path_in_workspace(workspace_name, path);
 
             if !is_in_workspace {
                 // Log as sandbox violation
@@ -1002,17 +1002,17 @@ impl AccessManager {
                     path,
                     false,
                     Some(format!(
-                        "Path '{}' is outside garden '{}' workspace boundary",
-                        path, container_name
+                        "Path '{}' is outside workspace '{}' boundary",
+                        path, workspace_name
                     )),
                 );
             }
 
             is_in_workspace
         } else {
-            // No garden context - check if agent has any garden assignment
-            if let Some(assigned_container) = self.agent_containers.get(agent_name) {
-                let is_in_workspace = self.is_path_in_container_workspace(assigned_container, path);
+            // No workspace context - check if agent has any workspace assignment
+            if let Some(assigned_workspace) = self.agent_workspaces.get(agent_name) {
+                let is_in_workspace = self.is_path_in_workspace(assigned_workspace, path);
 
                 if !is_in_workspace {
                     self.log_access(
@@ -1021,53 +1021,53 @@ impl AccessManager {
                         path,
                         false,
                         Some(format!(
-                            "Path '{}' is outside assigned garden '{}' workspace boundary",
-                            path, assigned_container
+                            "Path '{}' is outside assigned workspace '{}' boundary",
+                            path, assigned_workspace
                         )),
                     );
                 }
 
                 is_in_workspace
             } else {
-                // Agent has no garden assignment - default to allowing path check only
+                // Agent has no workspace assignment - default to allowing path check only
                 true
             }
         };
 
         // All three checks must pass
-        rbac_allowed && path_allowed && garden_allowed
+        rbac_allowed && path_allowed && workspace_allowed
     }
 
-    /// Unassigns an agent from its garden (if any).
+    /// Unassigns an agent from its workspace (if any).
     ///
-    /// The agent will no longer be sandboxed to any garden workspace.
-    pub fn unassign_garden(&mut self, agent_name: &str) -> Option<String> {
-        if let Some(container_name) = self.agent_containers.remove(agent_name) {
-            if let Some(agents) = self.garden_agents.get_mut(&container_name) {
+    /// The agent will no longer be sandboxed to any workspace.
+    pub fn unassign_workspace(&mut self, agent_name: &str) -> Option<String> {
+        if let Some(workspace_name) = self.agent_workspaces.remove(agent_name) {
+            if let Some(agents) = self.workspace_agents.get_mut(&workspace_name) {
                 agents.remove(agent_name);
             }
-            tracing::info!(agent = %agent_name, garden = %container_name, "Agent unassigned from garden");
-            Some(container_name)
+            tracing::info!(agent = %agent_name, workspace = %workspace_name, "Agent unassigned from workspace");
+            Some(workspace_name)
         } else {
             None
         }
     }
 
-    /// Removes a garden and unassigns all agents from it.
+    /// Removes a workspace and unassigns all agents from it.
     ///
-    /// All agents assigned to this garden will have their garden assignments cleared.
-    pub fn remove_container(&mut self, container_name: &str) {
-        // Unassign all agents from this garden
-        if let Some(agents) = self.garden_agents.remove(container_name) {
+    /// All agents assigned to this workspace will have their assignments cleared.
+    pub fn remove_workspace(&mut self, workspace_name: &str) {
+        // Unassign all agents from this workspace
+        if let Some(agents) = self.workspace_agents.remove(workspace_name) {
             for agent_name in agents {
-                self.agent_containers.remove(&agent_name);
+                self.agent_workspaces.remove(&agent_name);
             }
         }
 
         // Remove the workspace path
-        self.container_workspaces.remove(container_name);
+        self.workspace_paths.remove(workspace_name);
 
-        tracing::info!(garden = %container_name, "Garden removed from access manager");
+        tracing::info!(workspace = %workspace_name, "Workspace removed from access manager");
     }
 
     /// Clears the audit log.
