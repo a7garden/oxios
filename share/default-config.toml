@@ -1,0 +1,66 @@
+# Oxios Agent OS — Default Configuration
+# Copy to ~/.oxios/config.toml and customize as needed.
+
+[kernel]
+# Path to the workspace directory (~ is not expanded; use $HOME or absolute path).
+# workspace = "~/.oxios/workspace"
+event_bus_capacity = 256
+max_agents = 10
+
+[gateway]
+# Host to bind the web server to.
+host = "0.0.0.0"
+# Port for the web dashboard.
+port = 4200
+
+[exec]
+# Commands allowed for structured execution.
+allowed_commands = ["git", "gh", "open", "shortcuts", "osascript"]
+# Default command timeout in seconds.
+default_timeout_secs = 120
+# Maximum command timeout in seconds.
+max_timeout_secs = 600
+
+[scheduler]
+# Maximum concurrent agent tasks.
+max_concurrent = 5
+# Maximum LLM API calls per minute (rate limiting).
+rate_limit_per_minute = 60
+# Timeout in seconds before a running task is considered a zombie.
+zombie_timeout_secs = 300
+
+[context]
+# Maximum tokens in the active (in-context) tier.
+active_limit_tokens = 100000
+# Maximum entries in the cache tier.
+cache_limit_entries = 50
+
+[security]
+# Enable API key authentication (set to true for production).
+auth_enabled = false
+# Path to API keys file (JSON format).
+api_keys_path = "~/.oxios/api-keys.json"
+# Allowed CORS origins.
+cors_origins = ["http://localhost:4200"]
+# Default allowed tools for agents (least privilege).
+allowed_tools = ["read", "write", "edit", "bash", "grep", "find"]
+# Whether agents can make network requests by default.
+network_access = false
+# Maximum execution time in seconds.
+max_execution_time_secs = 300
+# Maximum memory in MB per agent.
+max_memory_mb = 512
+# Whether agents can fork sub-agents.
+can_fork = false
+
+# OpenTelemetry tracing configuration.
+# Set enabled = true to export spans via OTLP to a collector.
+[otel]
+enabled = false
+endpoint = "http://localhost:4317"
+service_name = "oxios"
+sampling_ratio = 1.0
+
+# Channel configuration — which channels to activate on startup.
+[channels]
+enabled = ["web"]

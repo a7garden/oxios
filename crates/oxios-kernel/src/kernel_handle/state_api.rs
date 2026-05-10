@@ -79,4 +79,9 @@ impl StateApi {
     pub fn workspace_path(&self) -> &std::path::Path {
         &self.state_store.base_path
     }
+
+    /// Access the underlying StateStore (for backup/restore).
+    pub fn store(&self) -> &Arc<StateStore> {
+        &self.state_store
+    }
 }

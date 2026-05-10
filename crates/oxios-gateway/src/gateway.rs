@@ -8,7 +8,7 @@ use anyhow::Result;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tokio::time::{sleep, Duration};
+use tokio::time::Duration;
 
 use crate::channel::Channel;
 use crate::message::{IncomingMessage, OutgoingMessage};
@@ -110,40 +110,54 @@ impl Gateway {
 
     /// Runs the gateway event loop, polling registered channels for incoming messages.
     ///
-    /// This loop polls each registered channel for incoming messages
-    /// and routes them through the orchestrator. It runs until a shutdown
-    /// signal is received.
+    /// Each channel is drained completely before moving to the next.
+    /// Adaptive sleep: yields immediately when messages are flowing,
+    /// pauses for 50 ms when idle — balancing latency and CPU usage.
     pub async fn run(&self) -> Result<()> {
         tracing::info!("Gateway event loop started");
 
-        let poll_interval = Duration::from_millis(100);
-
         loop {
-            // Get a snapshot of all channels.
+            let mut received_any = false;
+
+            // Snapshot channel names to minimise lock hold time.
             let channel_names = {
                 let channels = self.channels.read().await;
                 channels.keys().cloned().collect::<Vec<_>>()
             };
 
-            // Poll each channel.
             for name in &channel_names {
-                let msg = {
-                    let channels = self.channels.read().await;
-                    if let Some(ch) = channels.get(name) {
-                        ch.receive().await.ok().flatten()
-                    } else {
-                        None
-                    }
-                };
+                // Drain every pending message from this channel.
+                loop {
+                    let msg = {
+                        let channels = self.channels.read().await;
+                        if let Some(ch) = channels.get(name) {
+                            ch.receive().await.ok().flatten()
+                        } else {
+                            break;
+                        }
+                    };
 
-                if let Some(msg) = msg {
-                    if let Err(e) = self.route(msg).await {
-                        tracing::error!(channel = %name, error = %e, "Failed to route message");
+                    if let Some(msg) = msg {
+                        received_any = true;
+                        if let Err(e) = self.route(msg).await {
+                            tracing::error!(
+                                channel = %name,
+                                error = %e,
+                                "Failed to route message"
+                            );
+                        }
+                    } else {
+                        break; // No more messages from this channel.
                     }
                 }
             }
 
-            sleep(poll_interval).await;
+            // Adaptive back-off: busy when messages flow, pause when idle.
+            if received_any {
+                tokio::task::yield_now().await;
+            } else {
+                tokio::time::sleep(Duration::from_millis(50)).await;
+            }
         }
     }
 

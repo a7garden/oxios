@@ -17,4 +17,4 @@ pub mod server;
 
 pub use channel::{WebChannel, WebChannelHandle};
 pub use plugin::WebPlugin;
-pub use server::{AppState, WebServer};
+pub use server::AppState;

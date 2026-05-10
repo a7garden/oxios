@@ -17,55 +17,181 @@ use oxios_kernel::{
 use oxios_ouroboros::{OuroborosEngine, OuroborosProtocol};
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::sync::OnceLock;
 
 /// Fully assembled Oxios kernel with all components wired together.
 ///
-/// Created via [`Kernel::builder()`]. Each field is publicly accessible
-/// for use by the main binary's subcommands and web server setup.
+/// Created via [`Kernel::builder()`]. Fields are private — access
+/// through typed methods or [`Kernel::handle()`] for the KernelHandle facade.
 pub struct Kernel {
-    /// Ouroboros lifecycle orchestrator.
-    pub orchestrator: Arc<Orchestrator>,
-    /// Channel-agnostic message gateway.
-    pub gateway: Gateway,
-    /// Kernel event bus.
-    pub event_bus: EventBus,
-    /// Persistent state store (markdown/JSON).
-    pub state_store: Arc<oxios_kernel::state_store::StateStore>,
-    /// Loaded configuration.
-    pub config: OxiosConfig,
-    /// Skill instruction store.
-    pub skill_store: SkillStore,
-    /// Agent supervisor (lifecycle management).
-    pub supervisor: Arc<dyn Supervisor>,
-    /// Task scheduler.
-    pub scheduler: Arc<AgentScheduler>,
-    /// Access control manager (RBAC, audit).
-    pub access_manager: Arc<parking_lot::Mutex<AccessManager>>,
-    /// OS-level program manager.
-    pub program_manager: Arc<ProgramManager>,
-    /// Host tool validator.
-    pub host_tool_validator: HostToolValidator,
-    /// Persona manager (multi-persona support).
-    pub persona_manager: PersonaManager,
-    /// MCP tool bridge.
-    pub mcp_bridge: Arc<McpBridge>,
-    /// Memory manager for cross-session agent memory.
-    #[allow(dead_code)] // Used via AgentRuntime
-    pub memory_manager: Arc<MemoryManager>,
-    /// API key authentication manager.
-    pub auth_manager: Arc<parking_lot::Mutex<AuthManager>>,
-    /// Cron job scheduler for time-based task execution.
-    pub cron_scheduler: Arc<CronScheduler>,
-    /// Git-based version control layer for state persistence.
-    pub git_layer: Arc<GitLayer>,
-    /// Audit trail for tamper-evident event logging.
-    pub audit_trail: Arc<AuditTrail>,
-    /// Budget manager for agent-level token/call budgets.
-    pub budget_manager: Arc<BudgetManager>,
-    /// Resource monitor for system metrics.
-    pub resource_monitor: Arc<ResourceMonitor>,
-    /// Kernel start time for uptime tracking.
-    pub start_time: std::time::Instant,
+    orchestrator: Arc<Orchestrator>,
+    gateway: Gateway,
+    event_bus: EventBus,
+    state_store: Arc<oxios_kernel::state_store::StateStore>,
+    config: OxiosConfig,
+    skill_store: SkillStore,
+    supervisor: Arc<dyn Supervisor>,
+    scheduler: Arc<AgentScheduler>,
+    access_manager: Arc<parking_lot::Mutex<AccessManager>>,
+    program_manager: Arc<ProgramManager>,
+    host_tool_validator: HostToolValidator,
+    persona_manager: PersonaManager,
+    mcp_bridge: Arc<McpBridge>,
+    #[allow(dead_code)]
+    memory_manager: Arc<MemoryManager>,
+    auth_manager: Arc<parking_lot::Mutex<AuthManager>>,
+    cron_scheduler: Arc<CronScheduler>,
+    git_layer: Arc<GitLayer>,
+    audit_trail: Arc<AuditTrail>,
+    budget_manager: Arc<BudgetManager>,
+    resource_monitor: Arc<ResourceMonitor>,
+    start_time: std::time::Instant,
+    /// Cached KernelHandle — created once, reused forever.
+    handle_cache: OnceLock<Arc<oxios_kernel::KernelHandle>>,
+}
+
+impl Kernel {
+    /// Create a new kernel builder with sensible defaults.
+    pub fn builder() -> KernelBuilder {
+        KernelBuilder {
+            config_path: oxios_kernel::config::expand_home("~/.oxios/config.toml"),
+            model_id: "anthropic/claude-sonnet-4-20250514".to_string(),
+        }
+    }
+
+    // ── Public accessors ────────────────────────────────────────────────
+
+    /// KernelHandle facade — the primary API for subcommands and plugins.
+    ///
+    /// Cached after first call. Use this for all kernel operations.
+    pub fn handle(&self) -> Arc<oxios_kernel::KernelHandle> {
+        self.handle_cache.get_or_init(|| {
+            Arc::new(oxios_kernel::KernelHandle::new(
+                oxios_kernel::StateApi::new(self.state_store.clone()),
+                oxios_kernel::AgentApi::new(
+                    self.supervisor.clone(),
+                    self.budget_manager.clone(),
+                    self.memory_manager.clone(),
+                ),
+                oxios_kernel::SecurityApi::new(
+                    self.auth_manager.clone(),
+                    self.audit_trail.clone(),
+                    self.access_manager.clone(),
+                ),
+                oxios_kernel::PersonaApi::new(Arc::new(self.persona_manager.clone())),
+                oxios_kernel::ExtensionApi::new(
+                    self.program_manager.clone(),
+                    Arc::new(self.skill_store.clone()),
+                    Arc::new(self.host_tool_validator.clone()),
+                ),
+                oxios_kernel::McpApi::new(self.mcp_bridge.clone()),
+                oxios_kernel::InfraApi::new(
+                    self.git_layer.clone(),
+                    self.scheduler.clone(),
+                    self.cron_scheduler.clone(),
+                    self.resource_monitor.clone(),
+                    self.event_bus.clone(),
+                    self.config.clone(),
+                    self.start_time,
+                ),
+            ))
+        }).clone()
+    }
+
+    /// Gateway reference — for channel registration and message routing.
+    pub fn gateway(&self) -> &Gateway {
+        &self.gateway
+    }
+
+    /// Configuration reference.
+    pub fn config(&self) -> &OxiosConfig {
+        &self.config
+    }
+
+    /// Execute a prompt through the Orchestrator directly (bypasses Gateway).
+    ///
+    /// Used by `oxios run` for one-shot execution where the Gateway
+    /// event loop is not running. Audit logging compensates for the bypass.
+    pub async fn execute_prompt(&self, prompt: &str) -> Result<oxios_kernel::OrchestrationResult> {
+        self.orchestrator.handle_message("cli", prompt, None).await
+    }
+
+    /// Register a channel with the gateway.
+    pub async fn register_channel(&self, channel: Box<dyn oxios_gateway::Channel>) {
+        self.gateway.register(channel).await;
+    }
+
+    /// Run the gateway event loop (blocking).
+    pub async fn run_gateway(&self) -> Result<()> {
+        self.gateway.run().await
+    }
+
+    // ── Initialization helpers (used by default mode only) ─────────────
+
+    /// Initialize default skills from the share directory.
+    pub async fn init_default_skills(&self, share_dir: &std::path::Path) -> Result<()> {
+        let defaults_dir = share_dir.join("default-skills");
+        self.skill_store.init_defaults(&defaults_dir).await?;
+        Ok(())
+    }
+
+    /// Initialize default programs from the share directory.
+    pub async fn init_default_programs(&self, share_dir: &std::path::Path) -> Result<()> {
+        let programs_dir = share_dir.join("default-programs");
+        if programs_dir.exists() {
+            for entry in std::fs::read_dir(&programs_dir)? {
+                let entry = entry?;
+                let name = entry.file_name().to_str().unwrap_or("").to_string();
+                if entry.path().is_dir()
+                    && self.program_manager.get_program(&name).await.is_none()
+                {
+                    if let Err(e) = self.program_manager.install(&entry.path()).await {
+                        tracing::warn!(error = %e, program = ?entry.file_name(), "Failed to install default program");
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Initialize MCP servers from config.
+    pub async fn init_mcp_servers(&self) -> Result<()> {
+        if !self.config.mcp.servers.is_empty() {
+            self.mcp_bridge.initialize_all().await?;
+            tracing::info!(count = self.config.mcp.servers.len(), "MCP servers initialized");
+        }
+        Ok(())
+    }
+
+    /// Start the guardian daemon (background integrity checks).
+    pub fn start_guardian(&self) {
+        use oxios_kernel::audit_trail::AuditAction;
+        let handle = self.handle();
+        tokio::spawn(async move {
+            loop {
+                tokio::time::sleep(std::time::Duration::from_secs(300)).await;
+
+                if let Ok(valid) = handle.security.verify_chain() {
+                    if !valid {
+                        handle.security.audit("guardian", AuditAction::Other { detail: "AUDIT CHAIN BROKEN".into() }, "guardian");
+                    }
+                }
+
+                if handle.infra.is_overloaded() {
+                    let snap = handle.infra.resource_snapshot();
+                    handle.security.audit("guardian", AuditAction::Other { detail: format!("OVERLOADED: cpu={:.1}%", snap.cpu_percent) }, "guardian");
+                }
+
+                if let Ok(valid) = handle.infra.git_verify() {
+                    if !valid {
+                        handle.security.audit("guardian", AuditAction::Other { detail: "GIT REPOSITORY CORRUPTED".into() }, "guardian");
+                    }
+                }
+
+                let _ = handle.commit_all("guardian: periodic checkpoint");
+            }
+        });
+    }
 }
 
 /// Builder for assembling the Oxios kernel.
@@ -92,7 +218,6 @@ impl KernelBuilder {
         let config_path = self.config_path;
         let model_id = &self.model_id;
 
-        // ── Load configuration ──
         let config = if config_path.exists() {
             tracing::info!(path = %config_path.display(), "Loading config");
             load_config(&config_path)?
@@ -101,13 +226,11 @@ impl KernelBuilder {
             OxiosConfig::default()
         };
 
-        // ── Core infrastructure ──
         let event_bus = EventBus::new(config.kernel.event_bus_capacity);
         let state_store = Arc::new(oxios_kernel::state_store::StateStore::new(
             PathBuf::from(&config.kernel.workspace),
         )?);
 
-        // ── Engine provider ──
         let engine_provider = oxios_kernel::OxiEngineProvider::new(model_id);
         let model = engine_provider
             .resolve_model(model_id)
@@ -116,14 +239,12 @@ impl KernelBuilder {
             .create_provider(&model.provider)
             .context("Failed to create provider")?;
 
-        // ── Ouroboros engine ──
         let ouroboros: Arc<dyn OuroborosProtocol> =
             Arc::new(OuroborosEngine::new(Arc::clone(&provider), model));
 
-        // ── Access control & scheduling ──
         let mut access_manager = AccessManager::new();
         if let Some(ref audit_path) = config.security.audit_log_path {
-            let expanded = expand_path(audit_path);
+            let expanded = oxios_kernel::config::expand_home(audit_path);
             access_manager = access_manager.with_audit_log_path(expanded.clone());
             tracing::info!(path = %expanded.display(), "Audit log file persistence enabled");
         }
@@ -134,30 +255,25 @@ impl KernelBuilder {
             config.scheduler.zombie_timeout_secs,
         ));
 
-        // ── Persona (created once, used everywhere) ──
         let persona_manager = PersonaManager::new();
         if let Some(p) = persona_manager.first_enabled() {
             ouroboros.set_persona_prompt(Some(p.system_prompt));
             tracing::info!(persona = %p.name, "Active persona set on OuroborosEngine");
         }
 
-        // ── A2A protocol (created once) ──
         let a2a_protocol = Arc::new(A2AProtocol::new(event_bus.clone()));
 
-        // ── Git version control layer (created early for wiring to other components) ──
         let git_layer = Arc::new(GitLayer::new(
             PathBuf::from(&config.kernel.workspace),
             config.git.auto_commit,
         )?);
 
-        // ── Skills & programs ──
         let skills_dir = PathBuf::from(&config.kernel.workspace).join("skills");
         let skill_store = SkillStore::new(skills_dir)?;
         let programs_dir = PathBuf::from(&config.kernel.workspace).join("programs");
         let program_manager = Arc::new(ProgramManager::new(programs_dir));
         program_manager.init().await?;
 
-        // ── MCP bridge (register program MCP servers before Arc wrapping) ──
         let mcp_bridge = init_mcp_bridge(&config).await?;
         for program in program_manager.list_enabled().await {
             for server_config in &program.meta.mcp_servers {
@@ -174,29 +290,24 @@ impl KernelBuilder {
         }
         let mcp_bridge = Arc::new(mcp_bridge);
 
-        // ── Agent runtime ──
         let agent_runtime = AgentRuntime::new(provider, model_id)
             .with_program_manager(Arc::clone(&program_manager))
             .with_oxios_config(config.clone())
             .with_persona_manager(Arc::new(persona_manager.clone()))
             .with_mcp_bridge(mcp_bridge.clone());
 
-        // ── Memory manager ──
         let mut memory_manager = MemoryManager::new(state_store.clone());
         memory_manager.set_git_layer(git_layer.clone());
         let memory_manager = Arc::new(memory_manager);
 
-        // ── Agent runtime with memory ──
         let agent_runtime = agent_runtime
             .with_memory_manager(memory_manager.clone());
 
-        // ── Supervisor ──
         let supervisor: Arc<dyn Supervisor> = Arc::new(BasicSupervisor::new(
             event_bus.clone(),
             agent_runtime,
         ));
 
-        // ── Agent lifecycle manager ──
         let lifecycle = oxios_kernel::AgentLifecycleManager::new(
             supervisor.clone(),
             scheduler.clone(),
@@ -206,7 +317,6 @@ impl KernelBuilder {
             config.security.max_execution_time_secs,
         );
 
-        // ── Orchestrator ──
         let mut orchestrator = Orchestrator::new(
             ouroboros,
             event_bus.clone(),
@@ -216,16 +326,13 @@ impl KernelBuilder {
         orchestrator.set_git_layer(git_layer.clone());
         let orchestrator = Arc::new(orchestrator);
 
-        // ── Gateway ──
         let gateway = Gateway::new(orchestrator.clone());
 
-        // ── Host tool validator ──
         let host_tool_validator = HostToolValidator::new(
             config.exec.required_host_tools.clone(),
             config.exec.optional_host_tools.clone(),
         );
 
-        // ── Auth manager ──
         let mut auth_manager = AuthManager::new();
         let api_keys_path = PathBuf::from(&config.security.api_keys_path);
         if let Err(e) = auth_manager.load_from_file(&api_keys_path) {
@@ -233,7 +340,6 @@ impl KernelBuilder {
         }
         let auth_manager = Arc::new(parking_lot::Mutex::new(auth_manager));
 
-        // ── Cron scheduler ──
         let mut cron_scheduler = CronScheduler::new(
             state_store.clone(),
             config.cron.tick_interval_secs,
@@ -241,19 +347,13 @@ impl KernelBuilder {
         cron_scheduler.set_git_layer(git_layer.clone());
         let cron_scheduler = Arc::new(cron_scheduler);
 
-        // ── Audit trail ──
         let audit_trail = Arc::new(AuditTrail::new(config.audit.max_entries));
-
-        // ── Budget manager ──
         let budget_manager = Arc::new(BudgetManager::new());
-
-        // ── Resource monitor ──
         let resource_monitor = Arc::new(ResourceMonitor::new(
             config.resource_monitor.interval_secs,
             config.resource_monitor.history_max,
         ));
 
-        // Wire audit trail to event bus
         event_bus.attach_audit_trail(audit_trail.clone());
 
         Ok(Kernel {
@@ -278,86 +378,9 @@ impl KernelBuilder {
             budget_manager,
             resource_monitor,
             start_time: std::time::Instant::now(),
+            handle_cache: OnceLock::new(),
         })
     }
-}
-
-impl Kernel {
-    /// Create a new kernel builder with sensible defaults.
-    pub fn builder() -> KernelBuilder {
-        KernelBuilder {
-            config_path: expand_path("~/.oxios/config.toml"),
-            model_id: "anthropic/claude-sonnet-4-20250514".to_string(),
-        }
-    }
-
-    pub fn start_guardian(&self) {
-        use oxios_kernel::audit_trail::AuditAction;
-        let handle = self.handle();
-        tokio::spawn(async move {
-            loop {
-                tokio::time::sleep(std::time::Duration::from_secs(300)).await;
-
-                // Audit chain integrity
-                if let Ok(valid) = handle.security.verify_chain() {
-                    if !valid {
-                        handle.security.audit("guardian", AuditAction::Other { detail: "AUDIT CHAIN BROKEN".into() }, "guardian");
-                    }
-                }
-
-                // Resource check
-                if handle.infra.is_overloaded() {
-                    let snap = handle.infra.resource_snapshot();
-                    handle.security.audit("guardian", AuditAction::Other { detail: format!("OVERLOADED: cpu={:.1}%", snap.cpu_percent) }, "guardian");
-                }
-
-                // Git integrity
-                if let Ok(valid) = handle.infra.git_verify() {
-                    if !valid {
-                        handle.security.audit("guardian", AuditAction::Other { detail: "GIT REPOSITORY CORRUPTED".into() }, "guardian");
-                    }
-                }
-
-                // Periodic checkpoint
-                let _ = handle.commit_all("guardian: periodic checkpoint");
-            }
-        });
-    }
-
-    /// Create a KernelHandle facade for use by other crates.
-    pub fn handle(&self) -> Arc<oxios_kernel::KernelHandle> {
-        Arc::new(oxios_kernel::KernelHandle::from_subsystems(
-            self.state_store.clone(),
-            self.event_bus.clone(),
-            self.supervisor.clone(),
-            self.scheduler.clone(),
-            self.memory_manager.clone(),
-            self.git_layer.clone(),
-            self.audit_trail.clone(),
-            self.budget_manager.clone(),
-            self.resource_monitor.clone(),
-            self.cron_scheduler.clone(),
-            self.program_manager.clone(),
-            Arc::new(self.skill_store.clone()),
-            Arc::new(self.persona_manager.clone()),
-            self.mcp_bridge.clone(),
-            self.auth_manager.clone(),
-            self.access_manager.clone(),
-            Arc::new(self.host_tool_validator.clone()),
-            self.config.clone(),
-            self.start_time,
-        ))
-    }
-}
-
-/// Expand tilde in paths.
-fn expand_path(path: &str) -> PathBuf {
-    if path.starts_with("~/") {
-        if let Ok(home) = std::env::var("HOME") {
-            return PathBuf::from(path.replacen("~/", &format!("{home}/"), 1));
-        }
-    }
-    PathBuf::from(path)
 }
 
 /// Initialize the MCP bridge from config and environment variables.
@@ -373,7 +396,6 @@ async fn init_mcp_bridge(config: &OxiosConfig) -> Result<McpBridge> {
         tracing::debug!(server = %name, command = %def.command, "Registered MCP server from config");
     }
 
-    // Load from environment: OXIOS_MCP_<NAME>_COMMAND=...
     for (key, value) in std::env::vars() {
         if let Some(name) = key.strip_prefix("OXIOS_MCP_") {
             let name = name.trim_end_matches("_COMMAND");

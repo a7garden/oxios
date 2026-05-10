@@ -847,3 +847,15 @@ impl OxiosConfig {
         (errors, warnings)
     }
 }
+
+/// Expand `~/` in paths to the user's home directory.
+///
+/// Shared utility for path expansion across the binary and kernel.
+pub fn expand_home(path: &str) -> std::path::PathBuf {
+    if let Some(rest) = path.strip_prefix("~/") {
+        if let Ok(home) = std::env::var("HOME") {
+            return std::path::PathBuf::from(format!("{home}/{rest}"));
+        }
+    }
+    std::path::PathBuf::from(path)
+}

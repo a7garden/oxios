@@ -62,4 +62,14 @@ impl McpApi {
     ) -> anyhow::Result<McpToolCallResult> {
         self.mcp_bridge.call_tool(server, tool, arguments).await
     }
+
+    /// Number of configured MCP servers.
+    pub fn server_count(&self) -> usize {
+        self.mcp_bridge.servers().len()
+    }
+
+    /// Shutdown all MCP servers.
+    pub async fn shutdown_all(&self) -> anyhow::Result<()> {
+        self.mcp_bridge.shutdown_all().await
+    }
 }

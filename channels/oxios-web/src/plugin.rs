@@ -56,13 +56,12 @@ impl ChannelPlugin for WebPlugin {
         // Build API routes
         let api_routes = routes::build_routes(state.clone());
 
-        // CORS layer
+        // CORS layer — origins from config
+        let cors_origins: Vec<_> = config.security.cors_origins.iter()
+            .filter_map(|o| o.parse::<axum::http::HeaderValue>().ok())
+            .collect();
         let cors = tower_http::cors::CorsLayer::new()
-            .allow_origin(
-                ["http://localhost:4200"
-                    .parse::<axum::http::HeaderValue>()
-                    .expect("hardcoded valid origin")],
-            )
+            .allow_origin(cors_origins)
             .allow_methods(tower_http::cors::Any)
             .allow_headers(tower_http::cors::Any);
 

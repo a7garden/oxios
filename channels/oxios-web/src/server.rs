@@ -1,29 +1,21 @@
-//! Axum HTTP server setup for the web channel.
+//! Web application state for the dashboard channel.
 //!
-//! Starts an HTTP server on a configurable port (default 4200)
-//! with CORS, WebSocket support, SSE streaming, and static file serving.
-//! Supports graceful shutdown via SIGINT.
+//! `AppState` is the shared state accessible to all route handlers.
+//! The server lifecycle is managed by [`WebPlugin`](crate::plugin::WebPlugin).
 
-use anyhow::Result;
-use axum::Router;
 use parking_lot::RwLock;
-use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Instant;
-use tower_http::services::ServeDir;
 
-use crate::api_docs;
 use crate::channel::WebChannelHandle;
 use crate::error::AppError;
 use crate::middleware::RateLimiter;
-use crate::routes::build_routes;
 use oxios_kernel::{config, KernelHandle, OxiosConfig};
 
-/// Shared application state for the web server.
+/// Shared application state for the web dashboard.
 ///
-/// This is the central state accessible to all route handlers.
-/// All subsystems are accessible through state.kernel.xxx().
+/// All subsystems are accessible through `state.kernel.xxx()`.
 #[derive(Clone)]
 pub struct AppState {
     /// Base URL for API responses.
@@ -65,130 +57,5 @@ impl AppState {
 
         tracing::info!("Config hot-reloaded from {}", self.config_path.display());
         Ok(())
-    }
-}
-
-/// The web HTTP server.
-pub struct WebServer {
-    /// Address to bind the server to.
-    addr: SocketAddr,
-    /// Shared application state.
-    state: Arc<AppState>,
-}
-
-impl WebServer {
-    /// Creates a new web server bound to the given address.
-    ///
-    /// # Arguments
-    /// * `host` - Host address to bind to
-    /// * `port` - Port to listen on
-    /// * `channel` - Web channel handle for message passing
-    /// * `kernel` - Arc<KernelHandle> containing all kernel subsystems
-    /// * `config` - Arc<RwLock<OxiosConfig>> for hot-reloadable config
-    /// * `config_path` - Optional path to config file for persistence
-    pub fn new(
-        host: &str,
-        port: u16,
-        channel: WebChannelHandle,
-        kernel: Arc<KernelHandle>,
-        config: Arc<RwLock<OxiosConfig>>,
-        config_path: Option<PathBuf>,
-    ) -> Result<Self, anyhow::Error> {
-        let addr: SocketAddr = format!("{host}:{port}")
-            .parse()
-            .map_err(|e| anyhow::anyhow!("Invalid bind address '{host}:{port}': {e}"))?;
-
-        let rate_limit = config.read().security.rate_limit_per_minute;
-
-
-        let state = Arc::new(AppState {
-            base_url: format!("http://{host}:{port}"),
-            kernel: kernel.clone(),
-            channel,
-            config,
-            config_path: config_path.clone().unwrap_or_default(),
-            start_time: kernel.start_time(),
-            rate_limiter: RateLimiter::new(rate_limit),
-        });
-
-        Ok(Self { addr, state })
-    }
-
-    /// Returns the shared application state.
-    pub fn state(&self) -> Arc<AppState> {
-        self.state.clone()
-    }
-
-    /// Starts the HTTP server with graceful shutdown.
-    ///
-    /// This method blocks until the server is shut down via SIGINT.
-    pub async fn serve(&self) -> Result<()> {
-        // Locate the static directory (relative to the crate root)
-        let static_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("static");
-
-        let cors = tower_http::cors::CorsLayer::new()
-            .allow_origin(
-                ["http://localhost:4200".parse::<axum::http::HeaderValue>()
-                    .expect("hardcoded valid origin")]
-            )
-            .allow_methods(tower_http::cors::Any)
-            .allow_headers(tower_http::cors::Any);
-
-        // Build OpenAPI spec and Swagger UI
-        let openapi = api_docs::build_openapi();
-        let swagger: Router<()> = utoipa_swagger_ui::SwaggerUi::new("/swagger-ui")
-            .url("/api-docs/openapi.json", openapi)
-            .into();
-
-        let app = Router::new()
-            .merge(build_routes(self.state.clone()))
-            .fallback_service(
-                ServeDir::new(&static_dir).append_index_html_on_directories(true),
-            )
-            .layer(cors)
-            .with_state(self.state.clone());
-
-        let app = Router::new().merge(swagger).merge(app);
-
-        let listener = tokio::net::TcpListener::bind(self.addr).await?;
-        tracing::info!(addr = %self.addr, "Web server listening");
-
-        axum::serve(listener, app)
-            .with_graceful_shutdown(shutdown_signal())
-            .await?;
-
-        tracing::info!("Web server shut down");
-        Ok(())
-    }
-}
-
-/// Waits for Ctrl+C or SIGTERM to trigger graceful shutdown.
-async fn shutdown_signal() {
-    let ctrl_c = async {
-        tokio::signal::ctrl_c()
-            .await
-            .unwrap_or_else(|e| tracing::error!(error = %e, "Ctrl+C handler failed"));
-    };
-
-    #[cfg(unix)]
-    let terminate = async {
-        tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
-            .unwrap_or_else(|e| {
-                tracing::error!(error = %e, "SIGTERM handler failed");
-                // Return a signal stream that never fires
-                tokio::signal::unix::signal(tokio::signal::unix::SignalKind::user_defined1())
-                    .expect("fallback signal")
-            })
-            .recv()
-            .await;
-    };
-
-    #[cfg(not(unix))]
-    let terminate = std::future::pending::<()>();
-
-    tokio::select! {
-        _ = ctrl_c => tracing::info!("Received Ctrl+C"),
-        _ = terminate => tracing::info!("Received SIGTERM"),
     }
 }

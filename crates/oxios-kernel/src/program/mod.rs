@@ -18,371 +18,25 @@
 //! they provide guidelines and tools that agents consume. Think of them as
 //! man pages that come with metadata for discovery.
 
+mod installer;
+mod parser;
+mod types;
+
+pub use types::{
+    ArgumentDef, HostRequirementsCheck, InstallSource, McpServerConfig, Program,
+    ProgramHostRequirements, ProgramMeta, ToolDef,
+};
+
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
-use tokio::process::Command;
 use tokio::sync::RwLock;
 
 use crate::host_tools::HostToolValidator;
 
-/// Program metadata — the OS-level "executable header"
-/// Like an ELF header or PE header, but for AI programs
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct ProgramMeta {
-    /// Program name (unique identifier)
-    pub name: String,
-    /// Semantic version
-    pub version: String,
-    /// Human-readable description
-    pub description: String,
-    /// Author name
-    pub author: String,
-    /// Tools this program provides (maps tool name → description)
-    pub tools: Vec<ToolDef>,
-    /// Other programs this program depends on
-    pub dependencies: Vec<String>,
-    /// Host tools this program requires to function
-    pub host_requirements: ProgramHostRequirements,
-    /// MCP servers this program connects to (parsed from [mcp] table)
-    #[serde(default)]
-    pub mcp_servers: Vec<McpServerConfig>,
-}
-
-/// Host tool requirements for a program
-#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
-pub struct ProgramHostRequirements {
-    /// Required on host (checked at startup)
-    pub required: Vec<String>,
-    /// Optional on host (checked when needed)
-    pub optional: Vec<String>,
-}
-
-/// MCP server configuration parsed from `[mcp]` in program.toml.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct McpServerConfig {
-    /// Server name identifier.
-    pub name: String,
-    /// Command to launch the MCP server.
-    pub command: String,
-    /// Command-line arguments.
-    #[serde(default)]
-    pub args: Vec<String>,
-    /// Environment variables for the server process.
-    #[serde(default)]
-    pub env: std::collections::HashMap<String, String>,
-    /// Whether the server is enabled by default.
-    #[serde(default = "default_enabled")]
-    pub enabled: bool,
-}
-
-fn default_enabled() -> bool {
-    true
-}
-/// Definition of a tool exposed by a program.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct ToolDef {
-    /// Tool name (unique within the program)
-    pub name: String,
-    /// Brief description of what the tool does
-    pub description: String,
-    /// Expected arguments
-    pub arguments: Vec<ArgumentDef>,
-    /// Command to execute (first word = binary, rest = default args)
-    #[serde(default)]
-    pub command: String,
-}
-
-/// Argument definition for a tool
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct ArgumentDef {
-    /// Argument name
-    pub name: String,
-    /// Description of the argument
-    pub description: String,
-    /// Whether this argument is required
-    pub required: bool,
-    /// Default value if not provided
-    pub default: Option<String>,
-}
-
-/// Program installed in the OS
-#[derive(Debug, Clone)]
-pub struct Program {
-    /// Program metadata
-    pub meta: ProgramMeta,
-    /// Path to the program directory
-    pub path: PathBuf,
-    /// Content of the SKILL.md instruction file
-    pub skill_content: String,
-    /// Whether the program is enabled
-    pub enabled: bool,
-}
-
-/// Parsed program.toml structure
-#[derive(Debug, Clone, serde::Deserialize)]
-struct TomlProgram {
-    program: TomlProgramInfo,
-    tools: Option<HashMap<String, TomlTool>>,
-    #[serde(rename = "host_requirements")]
-    host_requirements: Option<TomlHostRequirements>,
-    #[serde(rename = "requires_tools")]
-    requires_tools: Option<TomlRequiresTools>,
-    #[serde(rename = "mcp", default)]
-    mcp: Option<Vec<McpServerConfig>>,
-}
-
-#[derive(Debug, Clone, serde::Deserialize)]
-struct TomlProgramInfo {
-    name: String,
-    version: String,
-    description: String,
-    author: String,
-}
-
-#[derive(Debug, Clone, serde::Deserialize)]
-struct TomlTool {
-    description: String,
-    /// Command to execute (first word = binary, rest = default args)
-    #[serde(default)]
-    command: String,
-    arguments: Option<Vec<TomlArgument>>,
-}
-
-#[derive(Debug, Clone, serde::Deserialize)]
-struct TomlArgument {
-    name: String,
-    description: String,
-    required: Option<bool>,
-    default: Option<String>,
-}
-
-#[derive(Debug, Clone, serde::Deserialize)]
-struct TomlHostRequirements {
-    required: Option<Vec<String>>,
-    optional: Option<Vec<String>>,
-}
-
-/// Required tools for a program to function.
-#[derive(Debug, Clone, serde::Deserialize)]
-struct TomlRequiresTools {
-    names: Vec<String>,
-}
-
-impl ProgramMeta {
-    /// Load program metadata from a directory
-    pub fn load_from_dir(path: &Path) -> Result<Self> {
-        let toml_path = path.join("program.toml");
-        let content = fs::read_to_string(&toml_path)
-            .with_context(|| format!("Failed to read {}", toml_path.display()))?;
-
-        let toml: TomlProgram = toml::from_str(&content)
-            .with_context(|| format!("Failed to parse {}", toml_path.display()))?;
-
-        let tools = toml.tools.map(|t| {
-            t.into_iter()
-                .map(|(name, tool)| {
-                    let arguments = tool.arguments.unwrap_or_default().into_iter()
-                        .map(|arg| ArgumentDef {
-                            name: arg.name,
-                            description: arg.description,
-                            required: arg.required.unwrap_or(true),
-                            default: arg.default,
-                        })
-                        .collect();
-                    ToolDef {
-                        name,
-                        description: tool.description,
-                        arguments,
-                        command: tool.command,
-                    }
-                })
-                .collect()
-        }).unwrap_or_default();
-
-        let host_requirements = toml.host_requirements
-            .map(|hr| ProgramHostRequirements {
-                required: hr.required.unwrap_or_default(),
-                optional: hr.optional.unwrap_or_default(),
-            })
-            .unwrap_or_default();
-
-        let dependencies = toml.requires_tools
-            .map(|rt| rt.names)
-            .unwrap_or_default();
-
-        let mcp_servers = toml.mcp.unwrap_or_default();
-
-        Ok(ProgramMeta {
-            name: toml.program.name,
-            version: toml.program.version,
-            description: toml.program.description,
-            author: toml.program.author,
-            tools,
-            dependencies,
-            host_requirements,
-            mcp_servers,
-        })
-    }
-}
-
-/// Installation source for a program.
-pub enum InstallSource {
-    /// Install from a local directory path.
-    Local(PathBuf),
-    /// Install from a git repository.
-    Git {
-        /// Git repository URL.
-        url: String,
-        /// Optional branch to checkout.
-        branch: Option<String>,
-    },
-    /// Install from a tarball URL.
-    Tarball {
-        /// Tarball URL (http/https).
-        url: String,
-    },
-}
-
-impl ProgramManager {
-    /// Install a program from an [InstallSource].
-    pub async fn install_from(&self, source: InstallSource) -> Result<Program> {
-        match source {
-            InstallSource::Local(path) => self.install_from_local(&path).await,
-            InstallSource::Git { url, branch } => self.install_from_git(&url, branch.as_deref()).await,
-            InstallSource::Tarball { url } => self.install_from_tarball(&url).await,
-        }
-    }
-
-    /// Install a program from a local directory path.
-    async fn install_from_local(&self, source_path: &Path) -> Result<Program> {
-        self.install(source_path).await
-    }
-
-    /// Install a program by cloning a git repository, then installing the result.
-    async fn install_from_git(&self, url: &str, branch: Option<&str>) -> Result<Program> {
-        // Create a temporary directory for the clone.
-        let temp_dir = tempfile::tempdir().map_err(|e| anyhow::anyhow!("tempfile: {}", e))?;
-        let clone_path = temp_dir.path();
-
-
-        // Clone the repository.
-        tracing::info!(url, branch = ?branch, "Cloning git repository");
-        let mut cmd = Command::new("git");
-        cmd.arg("clone");
-        if let Some(branch) = branch {
-            cmd.arg("--branch").arg(branch);
-        }
-        cmd.arg("--depth").arg("1");
-        cmd.arg(url);
-        cmd.arg(clone_path);
-
-        let output = cmd.output().await
-            .with_context(|| format!("Failed to run git clone for '{}'", url))?;
-
-        if !output.status.success() {
-            anyhow::bail!(
-                "git clone failed (exit {}): {}",
-                output.status,
-                String::from_utf8_lossy(&output.stderr)
-            );
-        }
-
-        // Find the cloned program directory (single top-level directory expected).
-        let entries: Vec<_> = std::fs::read_dir(clone_path)?
-            .filter_map(|e| e.ok())
-            .filter(|e| e.path().is_dir())
-            .collect();
-
-
-        let program_dir = if entries.len() == 1 {
-            entries
-                .into_iter()
-                .next()
-                .map(|e| e.path())
-                .unwrap_or_else(|| clone_path.to_path_buf())
-        } else {
-            clone_path.to_path_buf()
-        };
-
-        let program = self.install(&program_dir).await?;
-
-
-        tracing::info!(name = %program.meta.name, "Program installed from git");
-        Ok(program)
-    }
-
-    /// Install a program by downloading and extracting a tarball.
-    async fn install_from_tarball(&self, url: &str) -> Result<Program> {
-        // Create a temporary directory for download and extraction.
-        let temp_dir = tempfile::tempdir().map_err(|e| anyhow::anyhow!("tempfile: {}", e))?;
-        let download_path = temp_dir.path().join("program.tar.gz");
-        let extract_base = temp_dir.path().join("extracted");
-
-        // Download the tarball with curl.
-        tracing::info!(url, "Downloading tarball");
-        let curl = Command::new("curl")
-            .arg("-fsSL")
-            .arg("-o")
-            .arg(&download_path)
-            .arg(url)
-            .output()
-            .await
-            .with_context(|| format!("Failed to run curl for '{}'", url))?;
-
-
-        if !curl.status.success() {
-            anyhow::bail!(
-                "curl failed (exit {}): {}",
-                curl.status,
-                String::from_utf8_lossy(&curl.stderr)
-            );
-        }
-
-        // Extract the tarball.
-        tracing::info!("Extracting tarball");
-        let tar = Command::new("tar")
-            .arg("-xzf")
-            .arg(&download_path)
-            .arg("-C")
-            .arg(&extract_base)
-            .output()
-            .await
-            .with_context(|| "Failed to run tar to extract tarball")?;
-
-        if !tar.status.success() {
-            anyhow::bail!(
-                "tar extraction failed (exit {}): {}",
-                tar.status,
-                String::from_utf8_lossy(&tar.stderr)
-            );
-        }
-
-        // Find the extracted program directory.
-        let entries: Vec<_> = std::fs::read_dir(&extract_base)?
-            .filter_map(|e| e.ok())
-            .filter(|e| e.path().is_dir())
-            .collect();
-
-        let program_dir = if entries.len() == 1 {
-            entries
-                .into_iter()
-                .next()
-                .map(|e| e.path())
-                .unwrap_or_else(|| extract_base.to_path_buf())
-        } else {
-            extract_base.to_path_buf()
-        };
-
-        let program = self.install(&program_dir).await?;
-
-
-        tracing::info!(name = %program.meta.name, "Program installed from tarball");
-        Ok(program)
-    }
-}
+use installer::copy_dir_all;
 
 /// Program manager — handles installation, uninstallation, and discovery
 pub struct ProgramManager {
@@ -548,6 +202,137 @@ impl ProgramManager {
         Ok(program)
     }
 
+    /// Install a program from an [InstallSource].
+    pub async fn install_from(&self, source: InstallSource) -> Result<Program> {
+        match source {
+            InstallSource::Local(path) => self.install_from_local(&path).await,
+            InstallSource::Git { url, branch } => self.install_from_git(&url, branch.as_deref()).await,
+            InstallSource::Tarball { url } => self.install_from_tarball(&url).await,
+        }
+    }
+
+    /// Install a program from a local directory path.
+    async fn install_from_local(&self, source_path: &Path) -> Result<Program> {
+        self.install(source_path).await
+    }
+
+    /// Install a program by cloning a git repository, then installing the result.
+    async fn install_from_git(&self, url: &str, branch: Option<&str>) -> Result<Program> {
+        // Create a temporary directory for the clone.
+        let temp_dir = tempfile::tempdir().map_err(|e| anyhow::anyhow!("tempfile: {}", e))?;
+        let clone_path = temp_dir.path();
+
+        // Clone the repository.
+        tracing::info!(url, branch = ?branch, "Cloning git repository");
+        let mut cmd = tokio::process::Command::new("git");
+        cmd.arg("clone");
+        if let Some(branch) = branch {
+            cmd.arg("--branch").arg(branch);
+        }
+        cmd.arg("--depth").arg("1");
+        cmd.arg(url);
+        cmd.arg(clone_path);
+
+        let output = cmd.output().await
+            .with_context(|| format!("Failed to run git clone for '{}'", url))?;
+
+        if !output.status.success() {
+            anyhow::bail!(
+                "git clone failed (exit {}): {}",
+                output.status,
+                String::from_utf8_lossy(&output.stderr)
+            );
+        }
+
+        // Find the cloned program directory (single top-level directory expected).
+        let entries: Vec<_> = std::fs::read_dir(clone_path)?
+            .filter_map(|e| e.ok())
+            .filter(|e| e.path().is_dir())
+            .collect();
+
+        let program_dir = if entries.len() == 1 {
+            entries
+                .into_iter()
+                .next()
+                .map(|e| e.path())
+                .unwrap_or_else(|| clone_path.to_path_buf())
+        } else {
+            clone_path.to_path_buf()
+        };
+
+        let program = self.install(&program_dir).await?;
+
+        tracing::info!(name = %program.meta.name, "Program installed from git");
+        Ok(program)
+    }
+
+    /// Install a program by downloading and extracting a tarball.
+    async fn install_from_tarball(&self, url: &str) -> Result<Program> {
+        // Create a temporary directory for download and extraction.
+        let temp_dir = tempfile::tempdir().map_err(|e| anyhow::anyhow!("tempfile: {}", e))?;
+        let download_path = temp_dir.path().join("program.tar.gz");
+        let extract_base = temp_dir.path().join("extracted");
+
+        // Download the tarball with curl.
+        tracing::info!(url, "Downloading tarball");
+        let curl = tokio::process::Command::new("curl")
+            .arg("-fsSL")
+            .arg("-o")
+            .arg(&download_path)
+            .arg(url)
+            .output()
+            .await
+            .with_context(|| format!("Failed to run curl for '{}'", url))?;
+
+        if !curl.status.success() {
+            anyhow::bail!(
+                "curl failed (exit {}): {}",
+                curl.status,
+                String::from_utf8_lossy(&curl.stderr)
+            );
+        }
+
+        // Extract the tarball.
+        tracing::info!("Extracting tarball");
+        let tar = tokio::process::Command::new("tar")
+            .arg("-xzf")
+            .arg(&download_path)
+            .arg("-C")
+            .arg(&extract_base)
+            .output()
+            .await
+            .with_context(|| "Failed to run tar to extract tarball")?;
+
+        if !tar.status.success() {
+            anyhow::bail!(
+                "tar extraction failed (exit {}): {}",
+                tar.status,
+                String::from_utf8_lossy(&tar.stderr)
+            );
+        }
+
+        // Find the extracted program directory.
+        let entries: Vec<_> = std::fs::read_dir(&extract_base)?
+            .filter_map(|e| e.ok())
+            .filter(|e| e.path().is_dir())
+            .collect();
+
+        let program_dir = if entries.len() == 1 {
+            entries
+                .into_iter()
+                .next()
+                .map(|e| e.path())
+                .unwrap_or_else(|| extract_base.to_path_buf())
+        } else {
+            extract_base.to_path_buf()
+        };
+
+        let program = self.install(&program_dir).await?;
+
+        tracing::info!(name = %program.meta.name, "Program installed from tarball");
+        Ok(program)
+    }
+
     /// Uninstall a program
     pub async fn uninstall(&self, name: &str) -> Result<()> {
         let mut installed = self.installed.write().await;
@@ -610,36 +395,6 @@ impl ProgramManager {
         let installed = self.installed.read().await;
         installed.get(name).map(|p| p.skill_content.clone())
     }
-}
-
-/// Result of checking host requirements
-#[derive(Debug, Clone, serde::Serialize)]
-pub struct HostRequirementsCheck {
-    /// Name of the program checked
-    pub program_name: String,
-    /// Required tools that are missing on the host
-    pub missing_required: Vec<String>,
-    /// Availability status of optional tools
-    pub optional_available: HashMap<String, bool>,
-}
-
-/// Copy directory recursively
-fn copy_dir_all(src: &Path, dst: &Path) -> Result<()> {
-    fs::create_dir_all(dst)?;
-
-    for entry in fs::read_dir(src)? {
-        let entry = entry?;
-        let ty = entry.file_type()?;
-        let dest = dst.join(entry.file_name());
-
-        if ty.is_dir() {
-            copy_dir_all(&entry.path(), &dest)?;
-        } else {
-            fs::copy(entry.path(), &dest)?;
-        }
-    }
-
-    Ok(())
 }
 
 #[cfg(test)]

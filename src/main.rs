@@ -1,7 +1,7 @@
 //! Oxios Agent OS — main binary.
 //!
-//! Starts the kernel, creates the Ouroboros engine and Agent runtime,
-//! registers the web channel, and runs the gateway event loop.
+//! Assembles the kernel once, then dispatches to subcommands.
+//! The default mode (no arguments) starts all channels from config.
 
 mod kernel;
 mod otel;
@@ -169,7 +169,7 @@ enum DaemonAction {
     Restart,
 }
 
-// ─── Workspace helpers ─────────────────────────────────────────────────────
+// ─── Constants & helpers ───────────────────────────────────────────────────
 
 const WORKSPACE_SUBDIRS: &[&str] = &[
     "workspace",
@@ -179,12 +179,11 @@ const WORKSPACE_SUBDIRS: &[&str] = &[
     "workspace/sessions",
     "workspace/skills",
     "workspace/programs",
-
 ];
 
-const DEFAULT_CONFIG: &str = include_str!("../channels/oxios-web/static/default-config.toml");
+const DEFAULT_CONFIG: &str = include_str!("../share/default-config.toml");
 
-fn ensure_workspace(oxios_home: &std::path::Path) -> Result<()> {
+fn ensure_workspace(oxios_home: &Path) -> Result<()> {
     if !oxios_home.exists() {
         tracing::info!(path = %oxios_home.display(), "Creating Oxios home directory");
         std::fs::create_dir_all(oxios_home)?;
@@ -203,60 +202,37 @@ fn ensure_workspace(oxios_home: &std::path::Path) -> Result<()> {
     Ok(())
 }
 
-fn expand_path(path: &str) -> PathBuf {
-    if path.starts_with("~/") {
-        if let Ok(home) = std::env::var("HOME") {
-            return PathBuf::from(path.replacen("~/", &format!("{home}/"), 1));
-        }
-    }
-    PathBuf::from(path)
-}
-
 fn oxios_home_from_config(config_path: &Path) -> PathBuf {
     config_path
         .parent()
-        .map(|p: &Path| p.to_path_buf())
+        .map(|p| p.to_path_buf())
         .unwrap_or_else(|| {
             let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
             PathBuf::from(format!("{home}/.oxios"))
         })
 }
 
-// ─── Commands ───────────────────────────────────────────────────────────────
+// ─── Subcommands ───────────────────────────────────────────────────────────
 
-async fn cmd_run(prompt: &str, config_path: &Path, model_id: &str) -> Result<()> {
-    let kernel = Kernel::builder()
-        .config_path(config_path.to_path_buf())
-        .model_id(model_id)
-        .build()
-        .await?;
-
+async fn cmd_run_async(kernel: &Kernel, prompt: &str) -> Result<()> {
     tracing::info!(prompt = %prompt, "Processing prompt");
-
-    let result = kernel.orchestrator.handle_message("cli", prompt, None).await?;
+    let result = kernel.execute_prompt(prompt).await?;
 
     println!("{}", result.response);
-
     if let Some(seed_id) = result.seed_id {
         println!("\nSeed: {}", seed_id);
     }
-
     if !result.evaluation_passed {
         println!("\n⚠️  Evaluation did not fully pass.");
         if let Some(output) = result.output {
             println!("Notes: {}", output);
         }
     }
-
     Ok(())
 }
 
-async fn cmd_pkg(action: PkgAction, config_path: &Path) -> Result<()> {
-    let kernel = Kernel::builder()
-        .config_path(config_path.to_path_buf())
-        .build()
-        .await?;
-
+async fn cmd_pkg(kernel: &Kernel, action: PkgAction) -> Result<()> {
+    let handle = kernel.handle();
     match action {
         PkgAction::Install { source, branch } => {
             let install_source = if source.ends_with(".git") || source.starts_with("git@") {
@@ -266,35 +242,35 @@ async fn cmd_pkg(action: PkgAction, config_path: &Path) -> Result<()> {
             } else {
                 InstallSource::Local(PathBuf::from(&source))
             };
-            let program = kernel.program_manager.install_from(install_source).await?;
+            let program = handle.extensions.install_program(install_source).await?;
             println!("Installed '{}' v{}", program.meta.name, program.meta.version);
         }
         PkgAction::Uninstall { name } => {
-            kernel.program_manager.uninstall(&name).await?;
+            handle.extensions.uninstall_program(&name).await?;
             println!("Uninstalled '{}'", name);
         }
         PkgAction::List => {
-            let programs = kernel.program_manager.list_programs().await;
+            let programs = handle.extensions.list_programs().await;
             if programs.is_empty() {
                 println!("No programs installed.");
             } else {
                 println!("{:30} {:10} {:40}", "NAME", "VERSION", "DESCRIPTION");
                 println!("{}", "-".repeat(82));
                 for p in &programs {
-                    println!("{:30} {:10} {:40}", p.meta.name, p.meta.version, p.meta.description);
+                    println!("{:30} {:10} {:40}", p.name, p.version, p.description);
                 }
             }
         }
         PkgAction::Search => {
-            let programs = kernel.program_manager.list_programs().await;
+            let programs = handle.extensions.list_programs().await;
             if programs.is_empty() {
                 println!("No programs installed.");
             } else {
                 for p in &programs {
-                    println!("{} ({})", p.meta.name, p.meta.version);
-                    println!("  {}", p.meta.description);
-                    if !p.meta.tools.is_empty() {
-                        let tools: Vec<_> = p.meta.tools.iter().map(|t| t.name.clone()).collect();
+                    println!("{} ({})", p.name, p.version);
+                    println!("  {}", p.description);
+                    if !p.tools.is_empty() {
+                        let tools: Vec<_> = p.tools.iter().map(|t| t.name.clone()).collect();
                         println!("  Tools: {}", tools.join(", "));
                     }
                     println!();
@@ -344,17 +320,13 @@ fn get_config_value(config: &OxiosConfig, key: &str) -> Option<String> {
     }
 }
 
-async fn cmd_status(config_path: &Path) -> Result<()> {
-    let kernel = Kernel::builder()
-        .config_path(config_path.to_path_buf())
-        .build()
-        .await?;
-
+async fn cmd_status(kernel: &Kernel) -> Result<()> {
+    let config = kernel.config();
+    let handle = kernel.handle();
     println!("Oxios Agent OS");
     println!("{}", "=".repeat(40));
     println!("  Version: {}", env!("CARGO_PKG_VERSION"));
-    println!("  Config: {}", config_path.display());
-    println!("  Workspace: {}", kernel.config.kernel.workspace);
+    println!("  Workspace: {}", config.kernel.workspace);
     println!();
 
     let api_key_vars = ["ANTHROPIC_API_KEY", "OPENAI_API_KEY", "API_KEY"];
@@ -364,32 +336,11 @@ async fn cmd_status(config_path: &Path) -> Result<()> {
         if has_key { "yes" } else { "no" },
         if has_key { "found" } else { "set ANTHROPIC_API_KEY or API_KEY" });
 
-    let mcp_count = kernel.mcp_bridge.servers().len();
+    let mcp_count = handle.mcp.server_count();
     println!();
     println!("MCP Servers: {} configured", mcp_count);
 
     Ok(())
-}
-
-// ─── Graceful shutdown ─────────────────────────────────────────────────────
-
-fn setup_shutdown_handler() -> tokio::sync::mpsc::Sender<()> {
-    let (tx, mut rx) = tokio::sync::mpsc::channel::<()>(1);
-    tokio::spawn(async move {
-        #[cfg(unix)]
-        {
-            use tokio::signal::unix::{signal, SignalKind};
-            let mut term = signal(SignalKind::terminate()).expect("Failed to install SIGTERM handler");
-            tokio::select! {
-                _ = rx.recv() => tracing::info!("Shutdown signal received"),
-                _ = term.recv() => tracing::info!("SIGTERM received"),
-            }
-        }
-        #[cfg(not(unix))]
-        { rx.recv().await; }
-        tracing::info!("Initiating graceful shutdown...");
-    });
-    tx
 }
 
 // ─── Main ────────────────────────────────────────────────────────────────────
@@ -398,20 +349,16 @@ fn setup_shutdown_handler() -> tokio::sync::mpsc::Sender<()> {
 async fn main() -> Result<()> {
     let cli = Cli::parse();
 
-    let config_path = expand_path(&cli.config);
+    let config_path = oxios_kernel::config::expand_home(&cli.config);
     let oxios_home = oxios_home_from_config(&config_path);
     ensure_workspace(&oxios_home)?;
 
-    // ── Tracing setup with file appender ──
+    // ── Tracing setup ──
     let log_dir = oxios_home.join("logs");
     std::fs::create_dir_all(&log_dir)?;
-
     let file_appender = tracing_appender::rolling::daily(&log_dir, "oxios.log");
     let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
-
-    // Leak the guard so it lives for the program duration.
-    // Without this, the guard would be dropped and log flushing would stop.
-    Box::leak(Box::new(_guard));
+    Box::leak(Box::new(_guard)); // Keep alive for program duration
 
     let env_filter = tracing_subscriber::EnvFilter::try_from_default_env()
         .unwrap_or_else(|_| {
@@ -432,38 +379,31 @@ async fn main() -> Result<()> {
         .with_writer(non_blocking)
         .init();
 
-    // Initialize OpenTelemetry (OTLP export) after tracing setup
-    // This is a no-op when otel.enabled = false
+    // ── OpenTelemetry (no-op when disabled) ──
     let early_config = if config_path.exists() {
         oxios_kernel::config::load_config(&config_path).unwrap_or_default()
     } else {
         OxiosConfig::default()
     };
-    let _otel_guard = otel::init_otel(&otel::OtelConfig {
-        enabled: early_config.otel.enabled,
-        endpoint: early_config.otel.endpoint.clone(),
-        service_name: early_config.otel.service_name.clone(),
-        sampling_ratio: early_config.otel.sampling_ratio,
-    }).await?;
-    // Keep the guard alive for program duration
+    let _otel_guard = otel::init_otel(&early_config.otel).await?;
     Box::leak(Box::new(_otel_guard));
 
-    let default_model = "anthropic/claude-sonnet-4-20250514";
+    // ── Kernel assembly — once ──
+    let kernel = Kernel::builder()
+        .config_path(config_path.clone())
+        .build()
+        .await?;
 
+    // ── Dispatch ──
     match cli.command {
-        Some(Command::Run { prompt }) => {
-            cmd_run(&prompt, &config_path, default_model).await
-        }
+        Some(Command::Run { prompt }) => cmd_run_async(&kernel, &prompt).await,
+
         Some(Command::Chat) => {
             #[cfg(feature = "cli")]
             {
-                let kernel = Kernel::builder()
-                    .config_path(config_path.to_path_buf())
-                    .build()
-                    .await?;
                 let cli_channel = oxios_cli::CliChannel::new(256);
                 let handle = cli_channel.handle();
-                kernel.gateway.register(Box::new(cli_channel)).await;
+                kernel.register_channel(Box::new(cli_channel)).await;
                 let mut loop_ = oxios_cli::InteractiveLoop::new(handle);
                 loop_.run().await?;
                 Ok(())
@@ -473,53 +413,40 @@ async fn main() -> Result<()> {
                 bail!("CLI channel not compiled in. Rebuild with --features cli");
             }
         }
+
         Some(Command::Backup { output }) => {
-            let kernel = Kernel::builder()
-                .config_path(config_path.to_path_buf())
-                .build()
-                .await?;
+            let handle = kernel.handle();
             let output_path = match output {
-                Some(p) => std::path::PathBuf::from(p),
+                Some(p) => PathBuf::from(p),
                 None => {
                     let ts = std::time::SystemTime::now()
                         .duration_since(std::time::UNIX_EPOCH)
                         .unwrap_or_default()
                         .as_secs();
-                    kernel.state_store.base_path.join("backups").join(ts.to_string())
+                    PathBuf::from(kernel.config().kernel.workspace.clone())
+                        .join("backups").join(ts.to_string())
                 }
             };
-            oxios_kernel::backup::create_backup(&kernel.state_store, &output_path).await?;
-            Ok(())
+            oxios_kernel::backup::create_backup(&handle.state.store(), &output_path).await?;
+                    Ok(())
         }
+
         Some(Command::Restore { input }) => {
-            let kernel = Kernel::builder()
-                .config_path(config_path.to_path_buf())
-                .build()
-                .await?;
-            let input_path = std::path::PathBuf::from(&input);
-            oxios_kernel::backup::restore_backup(&kernel.state_store, &input_path).await?;
-            Ok(())
-        }
-        Some(Command::Config { action }) => {
-            cmd_config(action, &config_path).await
-        }
-        Some(Command::Pkg { action }) => {
-            cmd_pkg(action, &config_path).await
-        }
-        Some(Command::Status) => {
-            cmd_status(&config_path).await
+            let handle = kernel.handle();
+            let input_path = PathBuf::from(&input);
+            oxios_kernel::backup::restore_backup(&handle.state.store(), &input_path).await?;
+                    Ok(())
         }
 
-        // ── Agent ──────────────────────────────────────────────────────────────────
+        Some(Command::Config { action }) => cmd_config(action, &config_path).await,
+        Some(Command::Pkg { action }) => cmd_pkg(&kernel, action).await,
+        Some(Command::Status) => cmd_status(&kernel).await,
+
         Some(Command::Agent { action }) => {
-            let kernel = Kernel::builder()
-                .config_path(config_path.to_path_buf())
-                .build()
-                .await?;
-
+            let handle = kernel.handle();
             match action {
                 AgentAction::List => {
-                    let agents = kernel.supervisor.list().await
+                    let agents = handle.agents.list().await
                         .map_err(|e| anyhow::anyhow!("failed to list agents: {}", e))?;
                     if agents.is_empty() {
                         println!("No active agents.");
@@ -527,23 +454,18 @@ async fn main() -> Result<()> {
                         println!("{:36} {:10} {:20} {}", "ID", "STATUS", "NAME", "CREATED");
                         println!("{}", "-".repeat(90));
                         for agent in &agents {
-                            println!(
-                                "{:36} {:10} {:20} {}",
-                                agent.id,
-                                agent.status,
-                                agent.name,
-                                agent.created_at.format("%Y-%m-%d %H:%M")
-                            );
+                            println!("{:36} {:10} {:20} {}",
+                                agent.id, agent.status, agent.name,
+                                agent.created_at.format("%Y-%m-%d %H:%M"));
                         }
-                        println!();
-                        println!("{} agent(s) active.", agents.len());
+                        println!("\n{} agent(s) active.", agents.len());
                     }
                     Ok(())
                 }
                 AgentAction::Kill { id } => {
                     let uuid = uuid::Uuid::parse_str(&id)
                         .map_err(|e| anyhow::anyhow!("invalid agent id '{}': {}", id, e))?;
-                    kernel.supervisor.kill(uuid).await
+                    handle.agents.kill(&id).await
                         .map_err(|e| anyhow::anyhow!("failed to kill agent {}: {}", id, e))?;
                     println!("Agent {} terminated.", id);
                     Ok(())
@@ -551,22 +473,16 @@ async fn main() -> Result<()> {
             }
         }
 
-        // ── Audit ─────────────────────────────────────────────────────────────────
         Some(Command::Audit) => {
-            let kernel = Kernel::builder()
-                .config_path(config_path.to_path_buf())
-                .build()
-                .await?;
-
-            match kernel.audit_trail.verify() {
+            let handle = kernel.handle();
+            match handle.security.verify_chain() {
                 Ok(_) => println!("✓ Audit trail verified — chain intact."),
                 Err(e) => {
                     eprintln!("✗ Audit verification failed: {:?}", e);
                     println!("  Some entries may have been tampered with.");
                 }
             }
-
-            let entries = kernel.handle().security.query_audit(0, 20);
+            let entries = handle.security.query_audit(0, 20);
             println!();
             if entries.is_empty() {
                 println!("No audit entries yet.");
@@ -575,94 +491,67 @@ async fn main() -> Result<()> {
                 println!("{:10} {:20} {:15} {}", "SEQ", "TIMESTAMP", "ACTOR", "ACTION");
                 println!("{}", "-".repeat(70));
                 for entry in entries {
-                    println!(
-                        "{:10} {:20} {:15} {}",
+                    println!("{:10} {:20} {:15} {}",
                         entry.seq,
                         entry.timestamp.format("%Y-%m-%d %H:%M:%S"),
                         entry.actor,
-                        format!("{:?}", entry.action)
-                    );
+                        format!("{:?}", entry.action));
                 }
             }
-            println!();
-            println!("Total entries: {}", kernel.handle().security.audit_count());
+            println!("\nTotal entries: {}", handle.security.audit_count());
             Ok(())
         }
 
-        // ── Git ────────────────────────────────────────────────────────────────────
         Some(Command::Git { action }) => {
-            let kernel = Kernel::builder()
-                .config_path(config_path.to_path_buf())
-                .build()
-                .await?;
-
+            let handle = kernel.handle();
             match action {
                 GitAction::Log { limit } => {
                     let limit = limit.unwrap_or(20);
-                    match kernel.handle().infra.git_log(limit) {
-                        Ok(entries) => {
-                            if entries.is_empty() {
-                                println!("No commits yet.");
-                            } else {
-                                println!("{:8} {:20} {:40}", "HASH", "AUTHOR", "MESSAGE");
-                                println!("{}", "-".repeat(75));
-                                for entry in entries {
-                                    let short_hash = &entry.hash[..8.min(entry.hash.len())];
-                                    let author = entry.author.chars().take(20).collect::<String>();
-                                    let msg = entry.message.chars().take(40).collect::<String>();
-                                    println!("{:8} {:20} {:40}", short_hash, author, msg);
-                                }
-                            }
-                            Ok(())
+                    let entries = handle.infra.git_log(limit)
+                        .map_err(|e| anyhow::anyhow!("failed to get git log: {}", e))?;
+                    if entries.is_empty() {
+                        println!("No commits yet.");
+                    } else {
+                        println!("{:8} {:20} {:40}", "HASH", "AUTHOR", "MESSAGE");
+                        println!("{}", "-".repeat(75));
+                        for entry in entries {
+                            let short_hash = &entry.hash[..8.min(entry.hash.len())];
+                            let author = entry.author.chars().take(20).collect::<String>();
+                            let msg = entry.message.chars().take(40).collect::<String>();
+                            println!("{:8} {:20} {:40}", short_hash, author, msg);
                         }
-                        Err(e) => Err(anyhow::anyhow!("failed to get git log: {}", e)),
                     }
+                    Ok(())
                 }
                 GitAction::Tag { name, message } => {
                     let msg = message.as_deref().unwrap_or("");
-                    match kernel.handle().infra.git_tag(&name, msg) {
-                        Ok(_) => {
-                            println!("Tagged '{}'.", name);
-                            if !msg.is_empty() {
-                                println!("  Message: {}", msg);
-                            }
-                            Ok(())
-                        }
-                        Err(e) => Err(anyhow::anyhow!("failed to create tag: {}", e)),
-                    }
+                    handle.infra.git_tag(&name, msg)
+                        .map_err(|e| anyhow::anyhow!("failed to create tag: {}", e))?;
+                    println!("Tagged '{}'.", name);
+                    if !msg.is_empty() { println!("  Message: {}", msg); }
+                    Ok(())
                 }
             }
         }
 
-        // ── Budget ─────────────────────────────────────────────────────────────────
         Some(Command::Budget { agent_id }) => {
-            let kernel = Kernel::builder()
-                .config_path(config_path.to_path_buf())
-                .build()
-                .await?;
-
+            let handle = kernel.handle();
             match agent_id {
                 Some(id) => {
                     let uuid = uuid::Uuid::parse_str(&id)
                         .map_err(|e| anyhow::anyhow!("invalid agent id '{}': {}", id, e))?;
-                    let budget = kernel.handle().agents.check_budget(&uuid);
+                    let budget = handle.agents.check_budget(&uuid);
                     println!("Budget for agent {}", id);
                     println!("{}", "-".repeat(40));
                     println!("  Tokens remaining: {}", budget.tokens_remaining);
                     println!("  Calls remaining:  {}", budget.calls_remaining);
                     println!("  Window remaining:   {} seconds", budget.window_remaining_secs);
-                    if budget.is_exhausted {
-                        println!("  Status: EXHAUSTED");
-                    } else {
-                        println!("  Status: OK");
-                    }
+                    println!("  Status: {}", if budget.is_exhausted { "EXHAUSTED" } else { "OK" });
                     Ok(())
                 }
                 None => {
                     println!("Agent Budget Overview");
                     println!("{}", "=".repeat(50));
-                    println!("(No agent metadata available without agent list)");
-                    println!();
                     println!("Use 'oxios agent list' to see agent IDs,");
                     println!("then 'oxios budget <agent-id>' for details.");
                     Ok(())
@@ -670,177 +559,115 @@ async fn main() -> Result<()> {
             }
         }
 
-        // ── Daemon ─────────────────────────────────────────────────────────────────
         Some(Command::Daemon { action }) => {
             match action {
                 DaemonAction::Status => {
                     println!("Guardian Daemon");
                     println!("{}", "-".repeat(30));
                     println!("  Status: running (background tokio task)");
-                    println!("  Purpose: periodic integrity checks and cleanup");
-                    println!();
-                    println!("The daemon runs as a background task within the server process.");
-                    println!("Start the server with 'oxios' to activate the daemon.");
+                    println!("  Start the server with 'oxios' to activate the daemon.");
                     Ok(())
                 }
                 DaemonAction::Restart => {
-                    println!("Daemon restart not supported via CLI.");
-                    println!("Restart the entire server process: pkill -f oxios && oxios");
+                    println!("Restart the entire server: pkill -f oxios && oxios");
                     Ok(())
                 }
             }
         }
 
-        // ── Program ────────────────────────────────────────────────────────────────
         Some(Command::Program { name }) => {
-            let kernel = Kernel::builder()
-                .config_path(config_path.to_path_buf())
-                .build()
-                .await?;
-
-            match kernel.handle().extensions.get_program(&name).await {
+            let handle = kernel.handle();
+            match handle.extensions.get_program(&name).await {
                 Some(program) => {
                     println!("Program: {} v{}", program.meta.name, program.meta.version);
                     println!("{}", "-".repeat(50));
-                    println!();
                     if !program.skill_content.is_empty() {
-                        println!("SKILL.md:");
-                        println!("{}", program.skill_content);
-                    } else {
-                        println!("(No SKILL.md found in program)");
+                        println!("\nSKILL.md:\n{}", program.skill_content);
                     }
-                    println!();
-                    println!("Description: {}", program.meta.description);
+                    println!("\nDescription: {}", program.meta.description);
                     if !program.meta.tools.is_empty() {
-                        println!();
-                        println!("Tools:");
+                        println!("\nTools:");
                         for tool in &program.meta.tools {
                             println!("  - {}: {}", tool.name, tool.description);
                         }
                     }
                     if !program.meta.host_requirements.required.is_empty() {
-                        println!();
-                        println!("Required host tools: {}", program.meta.host_requirements.required.join(", "));
-                    }
-                    if !program.meta.host_requirements.optional.is_empty() {
-                        println!();
-                        println!("Optional host tools: {}", program.meta.host_requirements.optional.join(", "));
+                        println!("\nRequired host tools: {}", program.meta.host_requirements.required.join(", "));
                     }
                     Ok(())
                 }
                 None => Err(anyhow::anyhow!(
-                    "program '{}' not found. Install with 'oxios pkg install'",
-                    name
-                )),
+                    "program '{}' not found. Install with 'oxios pkg install'", name)),
             }
         }
 
-        // ── Interactive mode (default) ──
-        None => {
-            let kernel = Kernel::builder()
-                               .config_path(config_path.clone())
-                .model_id(default_model)
-                .build()
-                .await?;
+        // ── Default: start server ──
+        None => cmd_serve(&kernel, &config_path).await,
+    }
+}
 
-            // Initialize MCP servers
-            if !kernel.config.mcp.servers.is_empty() {
-                if let Err(e) = kernel.mcp_bridge.initialize_all().await {
-                    tracing::warn!(error = %e, "Some MCP servers failed to initialize");
-                } else {
-                    tracing::info!(count = kernel.config.mcp.servers.len(), "MCP servers initialized");
-                }
+// ─── Server mode ────────────────────────────────────────────────────────────
+
+async fn cmd_serve(kernel: &Kernel, config_path: &Path) -> Result<()> {
+    // Initialize MCP servers
+    if let Err(e) = kernel.init_mcp_servers().await {
+        tracing::warn!(error = %e, "Some MCP servers failed to initialize");
+    }
+
+    // Initialize default skills and programs
+    let share_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("share");
+    if let Err(e) = kernel.init_default_skills(&share_dir).await {
+        tracing::warn!(error = %e, "Failed to initialize default skills");
+    }
+    if let Err(e) = kernel.init_default_programs(&share_dir).await {
+        tracing::warn!(error = %e, "Failed to initialize default programs");
+    }
+
+    // Activate channels via plugin system
+    let channel_tasks = activate_channels(kernel, config_path).await?;
+
+    // Start guardian daemon
+    kernel.start_guardian();
+
+    // Gateway runs inline (it holds references to channels).
+    // Shutdown is handled by ctrl+c signal inside gateway.run().
+    // We wrap it in a select with our own shutdown signal.
+    let config = kernel.config();
+    tracing::info!("Oxios started on http://{}:{}", config.gateway.host, config.gateway.port);
+
+    // Wait for ctrl+c
+    tokio::signal::ctrl_c().await.ok();
+    tracing::info!("Received shutdown signal, starting graceful shutdown...");
+
+    // Stop channel tasks
+    for task in channel_tasks {
+        task.abort();
+    }
+
+    // Stop running agents
+    let handle = kernel.handle();
+    if let Ok(agents) = handle.agents.list().await {
+        for agent in &agents {
+            if let Err(e) = handle.agents.kill(&agent.id.to_string()).await {
+                tracing::warn!(agent = %agent.id, error = %e, "Failed to kill agent");
             }
-
-            // Initialize default skills
-            let defaults_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-                .join("channels/oxios-web/static/default-skills");
-            if let Err(e) = kernel.skill_store.init_defaults(&defaults_dir).await {
-                tracing::warn!(error = %e, "Failed to initialize default skills");
-            }
-
-            // Initialize default programs
-            let programs_defaults_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-                .join("channels/oxios-web/static/default-programs");
-            if programs_defaults_dir.exists() {
-                for entry in std::fs::read_dir(&programs_defaults_dir)? {
-                    let entry = entry?;
-                    if entry.path().is_dir()
-                        && kernel.program_manager.get_program(entry.file_name().to_str().unwrap_or("")).await.is_none()
-                    {
-                        if let Err(e) = kernel.program_manager.install(&entry.path()).await {
-                            tracing::warn!(error = %e, program = ?entry.file_name(), "Failed to install default program");
-                        }
-                    }
-                }
-            }
-
-            // Activate channels via plugin system
-            let channel_tasks = activate_channels(
-                &kernel.gateway,
-                &kernel,
-                &kernel.config,
-                &config_path,
-            ).await?;
-
-            // Start guardian daemon
-            kernel.start_guardian();
-
-            // Spawn gateway loop
-            let gateway_handle = tokio::spawn({
-                let g = kernel.gateway;
-                async move {
-                    if let Err(e) = g.run().await {
-                        tracing::error!(error = %e, "Gateway error");
-                    }
-                }
-            });
-
-            tracing::info!("Oxios started on http://{}:{}", kernel.config.gateway.host, kernel.config.gateway.port);
-
-            // Wait for shutdown
-            let shutdown_tx = setup_shutdown_handler();
-            tokio::signal::ctrl_c().await.ok();
-            let _ = shutdown_tx.send(()).await;
-            tracing::info!("Received shutdown signal");
-
-            // Structured shutdown
-            tracing::info!("Starting graceful shutdown...");
-
-            // Stop channel tasks
-            for task in channel_tasks {
-                task.abort();
-            }
-
-            // Stop running agents
-            if let Ok(agents) = kernel.supervisor.list().await {
-                for agent in &agents {
-                    if let Err(e) = kernel.supervisor.kill(agent.id).await {
-                        tracing::warn!(agent = %agent.id, error = %e, "Failed to kill agent");
-                    }
-                }
-                if !agents.is_empty() {
-                    tracing::info!(count = agents.len(), "Agents terminated");
-                }
-            }
-
-            // Stop MCP servers
-            if let Err(e) = kernel.mcp_bridge.shutdown_all().await {
-                tracing::warn!(error = %e, "MCP shutdown error");
-            }
-
-            // Stop gateway
-            gateway_handle.abort();
-
-            tracing::info!("Oxios shut down gracefully");
-            Ok(())
+        }
+        if !agents.is_empty() {
+            tracing::info!(count = agents.len(), "Agents terminated");
         }
     }
+
+    // Stop MCP servers
+    if let Err(e) = handle.mcp.shutdown_all().await {
+        tracing::warn!(error = %e, "MCP shutdown error");
+    }
+
+    tracing::info!("Oxios shut down gracefully");
+    Ok(())
 }
 
 // ─── Channel plugin helpers ───────────────────────────────────────────────
 
-/// Build the list of available channel plugins based on compiled features.
 fn build_channel_plugins() -> Vec<Box<dyn ChannelPlugin>> {
     let mut plugins: Vec<Box<dyn ChannelPlugin>> = Vec::new();
     #[cfg(feature = "web")]
@@ -852,19 +679,15 @@ fn build_channel_plugins() -> Vec<Box<dyn ChannelPlugin>> {
     plugins
 }
 
-/// Activate channels based on config and return their task handles.
 async fn activate_channels(
-    gateway: &oxios_gateway::Gateway,
     kernel: &Kernel,
-    config: &OxiosConfig,
-    config_path: &std::path::Path,
-) -> anyhow::Result<Vec<tokio::task::JoinHandle<()>>> {
+    config_path: &Path,
+) -> Result<Vec<tokio::task::JoinHandle<()>>> {
     let plugins = build_channel_plugins();
     let plugin_map: std::collections::HashMap<&str, &dyn ChannelPlugin> = plugins
-        .iter()
-        .map(|p| (p.name(), p.as_ref()))
-        .collect();
+        .iter().map(|p| (p.name(), p.as_ref())).collect();
 
+    let config = kernel.config();
     let mut all_tasks = Vec::new();
 
     for name in &config.channels.enabled {
@@ -878,22 +701,18 @@ async fn activate_channels(
                 match plugin.setup(ctx).await {
                     Ok(bundle) => {
                         tracing::info!(channel = %name, "Channel activated");
-                        gateway.register(bundle.channel).await;
+                        kernel.register_channel(bundle.channel).await;
                         all_tasks.extend(bundle.tasks);
                     }
-                    Err(e) => {
-                        tracing::error!(channel = %name, error = %e, "Failed to activate channel");
-                    }
+                    Err(e) => tracing::error!(channel = %name, error = %e, "Failed to activate channel"),
                 }
             }
-            None => {
-                tracing::warn!(
-                    channel = %name,
-                    "Channel '{}' not available (not compiled in). Available: {}",
-                    name,
-                    plugin_map.keys().cloned().collect::<Vec<_>>().join(", ")
-                );
-            }
+            None => tracing::warn!(
+                channel = %name,
+                "Channel '{}' not available (not compiled in). Available: {}",
+                name,
+                plugin_map.keys().cloned().collect::<Vec<_>>().join(", ")
+            ),
         }
     }
 
