@@ -45,7 +45,7 @@ pub(crate) async fn handle_scheduler_stats(
         running: stats.running,
         max_concurrent: stats.max_concurrent,
         rate_limit_per_minute: stats.rate_limit_per_minute,
-        rate_remaining: stats.rate_remaining,
+        rate_remaining: stats.rate_limit_per_minute,
     })
 }
 
