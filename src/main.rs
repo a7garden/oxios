@@ -328,10 +328,10 @@ fn get_config_value(config: &OxiosConfig, key: &str) -> Option<String> {
         ["kernel", "max_agents"] => Some(config.kernel.max_agents.to_string()),
         ["gateway", "host"] => Some(config.gateway.host.clone()),
         ["gateway", "port"] => Some(config.gateway.port.to_string()),
-        ["container", "container_path"] => Some(config.container.container_path.clone()),
-        ["container", "image_tag"] => Some(config.container.image_tag.clone()),
-        ["container", "memory_limit"] => Some(config.container.memory_limit.clone()),
-        ["container", "cpu_limit"] => Some(config.container.cpu_limit.to_string()),
+        ["exec", "required_host_tools"] => Some(config.exec.required_host_tools.join(",")),
+        ["exec", "optional_host_tools"] => Some(config.exec.optional_host_tools.join(",")),
+        ["exec", "default_timeout_secs"] => Some(config.exec.default_timeout_secs.to_string()),
+        ["exec", "max_timeout_secs"] => Some(config.exec.max_timeout_secs.to_string()),
         _ => None,
     }
 }

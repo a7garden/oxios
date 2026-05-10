@@ -221,8 +221,8 @@ impl KernelBuilder {
 
         // ── Host tool validator ──
         let host_tool_validator = HostToolValidator::new(
-            config.container.required_host_tools.clone(),
-            config.container.optional_host_tools.clone(),
+            config.exec.required_host_tools.clone(),
+            config.exec.optional_host_tools.clone(),
         );
 
         // ── Auth manager ──

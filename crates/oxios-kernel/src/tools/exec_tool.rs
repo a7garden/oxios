@@ -332,10 +332,10 @@ impl AgentTool for ExecTool {
 
         match mode {
             "shell" => {
-                let command = params
-                    .get("command")
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| "shell mode requires 'command' parameter".to_string())?;
+                let command = match params.get("command").and_then(|v| v.as_str()) {
+                    Some(c) => c,
+                    None => return Ok(AgentToolResult::error("shell mode requires 'command' parameter")),
+                };
 
                 match self.shell_exec(command, timeout_ms).await {
                     Ok(result) => {
@@ -351,10 +351,10 @@ impl AgentTool for ExecTool {
             }
 
             "structured" => {
-                let binary = params
-                    .get("binary")
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| "structured mode requires 'binary' parameter".to_string())?;
+                let binary = match params.get("binary").and_then(|v| v.as_str()) {
+                    Some(b) => b,
+                    None => return Ok(AgentToolResult::error("structured mode requires 'binary' parameter")),
+                };
 
                 let args: Vec<String> = params
                     .get("args")
@@ -614,7 +614,7 @@ mod tests {
         assert!(result.is_ok());
         let r = result.unwrap();
         assert!(!r.success);
-        assert!(r.output.contains("requires 'command'"));
+        assert!(r.output.contains("shell mode requires 'command' parameter"));
     }
 
     #[tokio::test]
@@ -626,7 +626,7 @@ mod tests {
         assert!(result.is_ok());
         let r = result.unwrap();
         assert!(!r.success);
-        assert!(r.output.contains("requires 'binary'"));
+        assert!(r.output.contains("structured mode requires 'binary' parameter"));
     }
 
     #[tokio::test]
