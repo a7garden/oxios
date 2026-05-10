@@ -82,6 +82,9 @@ impl ExecTool {
             return Err("shell_exec: command must not be empty".to_string());
         }
 
+        // Log execution for audit trail
+        tracing::debug!(mode = "shell", command = %command.chars().take(200).collect::<String>(), "ExecTool executing");
+
         let effective_timeout = timeout_ms.clamp(1_000, self.config.max_timeout_secs * 1_000);
 
         let start = std::time::Instant::now();
@@ -135,6 +138,9 @@ impl ExecTool {
         timeout_ms: u64,
     ) -> Result<ExecResult, String> {
         // --- Binary validation ---
+
+        // Log execution for audit trail
+        tracing::debug!(mode = "structured", binary = %binary, args = ?args, "ExecTool executing");
 
         if binary.contains("..") {
             return Err("structured_exec: path traversal in binary name".to_string());
