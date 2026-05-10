@@ -5,11 +5,9 @@ description = "Safe deployment with pre-flight checks and rollback"
 author = "oxios"
 
 [requires_tools]
-names = ["read", "container_exec", "grep"]
+names = ["read", "exec", "grep"]
 
 [host_requirements]
 required = []
 optional = ["gh", "kubectl"]
 
-[container]
-minimal_tools = []

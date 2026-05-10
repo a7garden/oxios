@@ -5,11 +5,9 @@ description = "Safe refactoring with behavior preservation"
 author = "oxios"
 
 [requires_tools]
-names = ["read", "container_exec", "grep", "find", "edit"]
+names = ["read", "exec", "grep", "find", "edit"]
 
 [host_requirements]
 required = []
 optional = ["git"]
 
-[container]
-minimal_tools = []

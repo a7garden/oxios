@@ -5,11 +5,9 @@ description = "Deep code review with quality domain analysis"
 author = "oxios"
 
 [requires_tools]
-names = ["read", "container_exec", "grep", "find"]
+names = ["read", "exec", "grep", "find"]
 
 [host_requirements]
 required = []
 optional = ["git"]
 
-[container]
-minimal_tools = []

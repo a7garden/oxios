@@ -5,11 +5,9 @@ description = "Systematic debugging with hypothesis-driven approach"
 author = "oxios"
 
 [requires_tools]
-names = ["read", "container_exec", "grep", "find"]
+names = ["read", "exec", "grep", "find"]
 
 [host_requirements]
 required = []
 optional = ["git", "lldb"]
 
-[container]
-minimal_tools = []

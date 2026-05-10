@@ -53,12 +53,6 @@ When writing SKILL.md instructions, you can reference these kernel capabilities:
 - `is_overloaded()` — check if system is overloaded
 - `resource_snapshot()` — current CPU/memory/load
 
-### Container
-- `create_container(name)` — create a container
-- `start_container(name)` / `stop_container(name)` / `remove_container(name)`
-- `exec_in_container(name, command)` — run command in container
-- `container_available()` — check if container backend exists
-
 ### Scheduling
 - `schedule(cron_expr, task, persona)` — schedule a recurring task
 - `unschedule(job_id)` — remove a schedule
@@ -90,14 +84,11 @@ author = "user-name"
 [requires_tools]
 names = ["bash", "read", "write"]
 
-# Host tools required (runs on macOS, not in container)
+# Host tools required (runs on macOS)
 [host_requirements]
 required = []
 optional = ["gh", "git"]
 
-# Container tools needed (if using container execution)
-[container]
-minimal_tools = ["bash", "jq"]
 ```
 
 ### SKILL.md
