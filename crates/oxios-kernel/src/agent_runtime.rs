@@ -1,7 +1,7 @@
 //! Agent runtime: wraps oxi-agent's AgentLoop for use by the kernel.
 //!
 //! The AgentRuntime creates an oxi-agent `AgentLoop` session, configures it
-//! with a custom ToolRegistry (Tier 1: oxi native, Tier 2: container/host exec,
+//! with a custom ToolRegistry (Tier 1: oxi native, Tier 2: exec,
 //! Tier 3: Program tools), and executes a Seed's goal through the multi-turn
 //! LLM tool-calling loop.
 //!
@@ -21,12 +21,11 @@ use std::sync::Arc;
 
 use crate::circuit_breaker::CircuitBreaker;
 use crate::config::OxiosConfig;
-use crate::host_exec::HostExecBridge;
 use crate::mcp::McpBridge;
 use crate::persona_manager::PersonaManager;
 use crate::program::ProgramManager;
 use crate::memory::{MemoryEntry, MemoryManager, MemoryType};
-use crate::tools::{ExecTool, HostExecTool, McpToolWrapper, ProgramTool};
+use crate::tools::{ExecTool, McpToolWrapper, ProgramTool};
 use crate::tools::memory_tools::{MemoryWriteTool, MemoryReadTool, MemorySearchTool};
 use oxios_ouroboros::{ExecutionResult, Seed};
 
@@ -78,7 +77,6 @@ struct ExecuteState {
 pub struct AgentRuntime {
     provider: Arc<dyn Provider>,
     config: AgentRuntimeConfig,
-    host_bridge: Option<Arc<HostExecBridge>>,
     program_manager: Option<Arc<ProgramManager>>,
     oxios_config: Option<OxiosConfig>,
     persona_manager: Option<Arc<PersonaManager>>,
@@ -86,18 +84,8 @@ pub struct AgentRuntime {
     mcp_bridge: Option<Arc<McpBridge>>,
     /// Memory manager for cross-session memory.
     memory_manager: Option<Arc<MemoryManager>>,
-    /// ExecTool for unified execution (Phase 1: alongside HostExecTool).
+    /// ExecTool for unified execution.
     exec_tool: Option<Arc<ExecTool>>,
-}
-
-/// Create a minimal HostExecBridge for cases where no bridge is available
-/// (e.g., during initialization or in tests).
-fn make_placeholder_host_exec() -> Arc<HostExecBridge> {
-    let tmp = tempfile::tempdir().unwrap();
-    Arc::new(
-        HostExecBridge::new(tmp.path().to_path_buf(), vec!["echo".to_string()])
-            .expect("placeholder needs non-empty allowlist"),
-    )
 }
 
 impl AgentRuntime {
@@ -109,7 +97,6 @@ impl AgentRuntime {
                 model_id: model_id.into(),
                 ..Default::default()
             },
-            host_bridge: None,
             program_manager: None,
             oxios_config: None,
             persona_manager: None,
@@ -122,12 +109,6 @@ impl AgentRuntime {
     /// Attach a PersonaManager for persona system prompt injection.
     pub fn with_persona_manager(mut self, pm: Arc<PersonaManager>) -> Self {
         self.persona_manager = Some(pm);
-        self
-    }
-
-    /// Attach a HostExecBridge for host command execution.
-    pub fn with_host_bridge(mut self, bridge: Arc<HostExecBridge>) -> Self {
-        self.host_bridge = Some(bridge);
         self
     }
 
@@ -217,7 +198,6 @@ impl AgentRuntime {
         let config = self.config.clone();
         let provider = Arc::clone(&self.provider);
         let seed_id = seed.id;
-        let host_bridge = self.host_bridge.clone();
         let program_manager = self.program_manager.clone();
         let oxios_config = self.oxios_config.clone();
         let mcp_bridge_for_runtime = self.mcp_bridge.as_ref().map(Arc::clone);
@@ -232,7 +212,6 @@ impl AgentRuntime {
                     system_prompt,
                     prompt,
                     seed_id,
-                    host_bridge,
                     program_manager,
                     oxios_config,
                     mcp_bridge_for_runtime,
@@ -273,7 +252,6 @@ fn run_agent_loop(
     system_prompt: String,
     prompt: String,
     seed_id: uuid::Uuid,
-    host_bridge: Option<Arc<HostExecBridge>>,
     program_manager: Option<Arc<ProgramManager>>,
     oxios_config: Option<OxiosConfig>,
     mcp_bridge_for_runtime: Option<Arc<McpBridge>>,
@@ -281,15 +259,7 @@ fn run_agent_loop(
     exec_tool: Option<Arc<ExecTool>>,
 ) -> Result<(String, usize, bool)> {
     // ── Workspace Scoping: restrict agent file access ──
-    let workspace = if let Some(ref bridge) = host_bridge {
-        bridge
-            .socket_path()
-            .parent()
-            .map(|p| p.join("agent-workspace"))
-            .unwrap_or_else(|| std::env::temp_dir().join("oxios-agent-workspace"))
-    } else {
-        std::env::temp_dir().join("oxios-agent-workspace")
-    };
+    let workspace = std::env::temp_dir().join("oxios-agent-workspace");
 
     // Ensure workspace exists.
     let _ = std::fs::create_dir_all(&workspace);
@@ -310,16 +280,7 @@ fn run_agent_loop(
     registry.register(FindTool::new());
     registry.register(LsTool::new());
 
-    // ── Tier 2: Oxios execution tools ──
-    let host_exec = if let Some(ref bridge) = host_bridge {
-        Arc::new(HostExecTool::new(bridge.clone()))
-    } else {
-        // Fallback for tests
-        Arc::new(HostExecTool::new(make_placeholder_host_exec()))
-    };
-    registry.register_arc(host_exec.clone());
-
-    // ── ExecTool: unified execution tool (Phase 1: alongside HostExecTool) ──
+    // ── ExecTool: unified execution tool ──
     if let Some(ref exec) = exec_tool {
         registry.register_arc(exec.clone());
     }
@@ -579,7 +540,7 @@ fn build_system_prompt(seed: &Seed, skill_contents: &[String], persona_prompt: O
     // Execution environment guidance
     prompt.push_str(
         "\n## Execution Environment\n\
-         Use `host_exec` for all command execution (git, gh, osascript, etc.).\n",
+         Use `exec` for all command execution (git, gh, osascript, etc.).\n",
     );
 
     prompt.push_str(
