@@ -26,7 +26,7 @@ use crate::mcp::McpBridge;
 use crate::persona_manager::PersonaManager;
 use crate::program::ProgramManager;
 use crate::memory::{MemoryEntry, MemoryManager, MemoryType};
-use crate::tools::{HostExecTool, McpToolWrapper, ProgramTool};
+use crate::tools::{ExecTool, HostExecTool, McpToolWrapper, ProgramTool};
 use crate::tools::memory_tools::{MemoryWriteTool, MemoryReadTool, MemorySearchTool};
 use oxios_ouroboros::{ExecutionResult, Seed};
 
@@ -86,6 +86,8 @@ pub struct AgentRuntime {
     mcp_bridge: Option<Arc<McpBridge>>,
     /// Memory manager for cross-session memory.
     memory_manager: Option<Arc<MemoryManager>>,
+    /// ExecTool for unified execution (Phase 1: alongside HostExecTool).
+    exec_tool: Option<Arc<ExecTool>>,
 }
 
 /// Create a minimal HostExecBridge for cases where no bridge is available
@@ -113,6 +115,7 @@ impl AgentRuntime {
             persona_manager: None,
             mcp_bridge: None,
             memory_manager: None,
+            exec_tool: None,
         }
     }
 
@@ -149,6 +152,12 @@ impl AgentRuntime {
     /// Attach a MemoryManager for cross-session memory tools.
     pub fn with_memory_manager(mut self, mm: Arc<MemoryManager>) -> Self {
         self.memory_manager = Some(mm);
+        self
+    }
+
+    /// Attach an ExecTool for unified execution.
+    pub fn with_exec_tool(mut self, tool: Arc<ExecTool>) -> Self {
+        self.exec_tool = Some(tool);
         self
     }
 
@@ -213,6 +222,7 @@ impl AgentRuntime {
         let oxios_config = self.oxios_config.clone();
         let mcp_bridge_for_runtime = self.mcp_bridge.as_ref().map(Arc::clone);
         let memory_manager = self.memory_manager.clone();
+        let exec_tool = self.exec_tool.clone();
 
         let (final_content, steps_completed, success) =
             tokio::task::spawn_blocking(move || {
@@ -227,6 +237,7 @@ impl AgentRuntime {
                     oxios_config,
                     mcp_bridge_for_runtime,
                     memory_manager,
+                    exec_tool,
                 )
             })
             .await??;
@@ -267,6 +278,7 @@ fn run_agent_loop(
     oxios_config: Option<OxiosConfig>,
     mcp_bridge_for_runtime: Option<Arc<McpBridge>>,
     memory_manager: Option<Arc<MemoryManager>>,
+    exec_tool: Option<Arc<ExecTool>>,
 ) -> Result<(String, usize, bool)> {
     // ── Workspace Scoping: restrict agent file access ──
     let workspace = if let Some(ref bridge) = host_bridge {
@@ -306,6 +318,11 @@ fn run_agent_loop(
         Arc::new(HostExecTool::new(make_placeholder_host_exec()))
     };
     registry.register_arc(host_exec.clone());
+
+    // ── ExecTool: unified execution tool (Phase 1: alongside HostExecTool) ──
+    if let Some(ref exec) = exec_tool {
+        registry.register_arc(exec.clone());
+    }
 
         // ── Tier 3: Program tools (dynamic) + Tier 4: MCP servers ──
         if let Some(pm) = program_manager {

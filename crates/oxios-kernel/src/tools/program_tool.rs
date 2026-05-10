@@ -1,9 +1,9 @@
 //! Program-defined tool with automatic host/container routing.
 //!
 //! Each `[[tools]]` entry in `program.toml` becomes a `ProgramTool` registered
-//! in the ToolRegistry at Tier 3. When executed, the tool routes to `host_exec`
+//! in the ToolRegistry at Tier 3. When executed, the tool routes to `ExecTool`
 //! for command execution. Since Oxios runs inside a container, all execution
-//! goes through the host_exec bridge which provides the execution environment.
+//! goes through the exec bridge which provides the execution environment.
 
 use std::sync::Arc;
 
@@ -12,8 +12,7 @@ use oxi_agent::{AgentTool, AgentToolResult};
 use serde_json::{json, Value};
 use tokio::sync::oneshot;
 
-use super::host_exec_tool::HostExecTool;
-use crate::config::ContainerConfig;
+use super::exec_tool::ExecTool;
 use crate::program::{ProgramHostRequirements, ToolDef};
 
 /// A tool defined by a Program, with automatic execution routing.
@@ -30,20 +29,19 @@ pub struct ProgramTool {
     /// Default arguments from the command definition
     default_args: Vec<String>,
     /// Execution delegates — actual execution is delegated to Tier 2 tools
-    host_exec: Arc<HostExecTool>,
+    exec_tool: Arc<ExecTool>,
 }
 
 impl ProgramTool {
     /// Create a ProgramTool from a program's tool definition.
     ///
-    /// All program tools now route to `host_exec` since Oxios runs inside
-    /// a container and `host_exec` provides the execution bridge.
+    /// All program tools route through `ExecTool` which provides the
+    /// execution environment.
     pub fn from_definition(
         program_name: &str,
         tool_def: &ToolDef,
         _host_requirements: &ProgramHostRequirements,
-        _container_config: &ContainerConfig,
-        host_exec: Arc<HostExecTool>,
+        exec: Arc<ExecTool>,
     ) -> Self {
         // Parse command: first word is binary, rest are default args
         let parts: Vec<&str> = tool_def.command.split_whitespace().collect();
@@ -55,7 +53,7 @@ impl ProgramTool {
             description: tool_def.description.clone(),
             binary,
             default_args,
-            host_exec,
+            exec_tool: exec,
         }
     }
 }
@@ -121,13 +119,13 @@ impl AgentTool for ProgramTool {
             .cloned()
             .collect();
 
-        // Route to host_exec
-        let host_params = json!({
+        // Route to exec_tool
+        let exec_params = json!({
             "binary": self.binary,
             "args": all_args,
         });
-        self.host_exec
-            .execute(&format!("pg:{}", self.full_name), host_params, signal)
+        self.exec_tool
+            .execute(&format!("pg:{}", self.full_name), exec_params, signal)
             .await
     }
 }
@@ -146,21 +144,19 @@ mod tests {
             command: "gh pr create".to_string(),
         };
         let host_reqs = ProgramHostRequirements::default();
-        let config = ContainerConfig::default();
 
-        // Create a minimal HostExecTool for testing
-        let host_exec_bridge = Arc::new(
+        // Create a minimal ExecTool for testing
+        let exec_bridge = Arc::new(
             crate::host_exec::HostExecBridge::new(std::env::temp_dir(), vec!["gh".to_string()])
                 .expect("non-empty allowlist required"),
         );
-        let host_exec = Arc::new(HostExecTool::new(host_exec_bridge));
+        let exec = Arc::new(ExecTool::new(exec_bridge));
 
         let tool = ProgramTool::from_definition(
             "github",
             &tool_def,
             &host_reqs,
-            &config,
-            host_exec,
+            exec,
         );
 
         assert_eq!(tool.full_name, "program:github:create_pr");
@@ -178,20 +174,18 @@ mod tests {
             command: "git".to_string(),
         };
         let host_reqs = ProgramHostRequirements::default();
-        let config = ContainerConfig::default();
 
-        let host_exec_bridge = Arc::new(
+        let exec_bridge = Arc::new(
             crate::host_exec::HostExecBridge::new(std::env::temp_dir(), vec!["git".to_string()])
                 .expect("non-empty allowlist required"),
         );
-        let host_exec = Arc::new(HostExecTool::new(host_exec_bridge));
+        let exec = Arc::new(ExecTool::new(exec_bridge));
 
         let tool = ProgramTool::from_definition(
             "git-tools",
             &tool_def,
             &host_reqs,
-            &config,
-            host_exec,
+            exec,
         );
 
         assert_eq!(tool.full_name, "program:git-tools:status");
@@ -209,20 +203,18 @@ mod tests {
             command: "git fetch --all --prune".to_string(),
         };
         let host_reqs = ProgramHostRequirements::default();
-        let config = ContainerConfig::default();
 
-        let host_exec_bridge = Arc::new(
+        let exec_bridge = Arc::new(
             crate::host_exec::HostExecBridge::new(std::env::temp_dir(), vec!["git".to_string()])
                 .expect("non-empty allowlist required"),
         );
-        let host_exec = Arc::new(HostExecTool::new(host_exec_bridge));
+        let exec = Arc::new(ExecTool::new(exec_bridge));
 
         let tool = ProgramTool::from_definition(
             "git-tools",
             &tool_def,
             &host_reqs,
-            &config,
-            host_exec,
+            exec,
         );
 
         assert_eq!(tool.binary, "git");

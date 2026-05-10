@@ -150,6 +150,9 @@ pub struct OxiosConfig {
     /// Budget enforcement configuration.
     #[serde(default)]
     pub budget: BudgetConfig,
+    /// Exec configuration (host command execution bridge).
+    #[serde(default)]
+    pub exec: ExecConfig,
     /// Resource monitor configuration.
     #[serde(default)]
     pub resource_monitor: ResourceMonitorConfig,
@@ -315,6 +318,60 @@ impl Default for ContainerConfig {
             required_host_tools: default_required_host_tools(),
             optional_host_tools: default_optional_host_tools(),
             execution_mode: ExecutionMode::Auto,
+        }
+    }
+}
+
+/// Exec configuration (host command execution bridge).
+///
+/// Governs how the kernel dispatches commands to the host when running
+/// outside a container (Phase 1 backward-compatible host exec bridge).
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ExecConfig {
+    /// Commands allowed to run on the host.
+    /// If empty, *all* bare-name commands are permitted (development mode).
+    #[serde(default)]
+    pub allowed_commands: Vec<String>,
+    /// Default timeout for an exec call in seconds.
+    #[serde(default = "default_exec_timeout")]
+    pub default_timeout_secs: u64,
+    /// Maximum allowed timeout for an exec call in seconds.
+    #[serde(default = "default_exec_max_timeout")]
+    pub max_timeout_secs: u64,
+    /// Host tools that MUST be present (checked on startup).
+    #[serde(default)]
+    pub required_host_tools: Vec<String>,
+    /// Host tools that are optional (checked lazily when needed).
+    #[serde(default)]
+    pub optional_host_tools: Vec<String>,
+}
+
+fn default_exec_timeout() -> u64 {
+    120
+}
+
+fn default_exec_max_timeout() -> u64 {
+    600
+}
+
+impl ExecConfig {
+    /// Check whether a binary / command name is allowed to execute.
+    ///
+    /// Returns `true` when `allowed_commands` is empty (permissive dev mode)
+    /// **or** when the name is present in the allow-list.
+    pub fn is_binary_allowed(&self, name: &str) -> bool {
+        self.allowed_commands.is_empty() || self.allowed_commands.iter().any(|c| c == name)
+    }
+}
+
+impl Default for ExecConfig {
+    fn default() -> Self {
+        Self {
+            allowed_commands: Vec::new(),
+            default_timeout_secs: default_exec_timeout(),
+            max_timeout_secs: default_exec_max_timeout(),
+            required_host_tools: Vec::new(),
+            optional_host_tools: Vec::new(),
         }
     }
 }
@@ -819,6 +876,20 @@ impl OxiosConfig {
         // Budget validation
         if self.budget.default_window_secs == 0 {
             warnings.push("budget.default_window_secs is 0 — no time window".into());
+        }
+
+        // Exec validation
+        if self.exec.default_timeout_secs == 0 {
+            errors.push("exec.default_timeout_secs must be > 0".into());
+        }
+        if self.exec.max_timeout_secs == 0 {
+            errors.push("exec.max_timeout_secs must be > 0".into());
+        }
+        if self.exec.default_timeout_secs > self.exec.max_timeout_secs {
+            errors.push(format!(
+                "exec.default_timeout_secs ({}) must not exceed max_timeout_secs ({})",
+                self.exec.default_timeout_secs, self.exec.max_timeout_secs
+            ));
         }
 
         // Resource monitor validation

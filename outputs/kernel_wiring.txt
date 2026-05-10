@@ -1,0 +1,41 @@
+Phase 1: ExecTool Wiring into Kernel — Complete
+================================================
+
+Changes made to: src/kernel.rs
+
+1. IMPORT ADDED (line 19):
+   use oxios_kernel::tools::ExecTool;
+
+2. KERNEL STRUCT FIELD ADDED (after resource_monitor, before start_time):
+   pub exec_tool: Arc<ExecTool>,
+   Doc: "Unified command execution tool (successor to HostExecBridge)."
+
+3. KernelBuilder::build() — NEW BLOCK inserted after HostExecBridge creation,
+   before "Skills & programs" section:
+   - Creates ExecConfig from config.container and config.exec values
+   - Creates a tokio::sync::Mutex<AccessManager> wrapper (needed because
+     ExecTool expects Arc<tokio::sync::Mutex<AccessManager>> while the kernel
+     uses Arc<parking_lot::Mutex<AccessManager>> — we clone the inner
+     AccessManager into a new tokio mutex)
+   - Creates ExecTool wrapped in Arc
+
+4. KERNEL RETURN — exec_tool field added to struct initialization:
+   exec_tool,
+
+NOT CHANGED:
+- Kernel::handle() — not modified (KernelHandle doesn't use ExecTool yet)
+- HostExecBridge — fully preserved, no code removed
+- All other wiring untouched
+
+IMPORTANT NOTES:
+- Type bridge: ExecTool::new() requires Arc<tokio::sync::Mutex<AccessManager>>,
+  but the kernel's access_manager is Arc<parking_lot::Mutex<AccessManager>>.
+  Solution: clone the inner AccessManager into a fresh tokio::sync::Mutex.
+  This means the two mutexes are NOT the same instance — changes to one
+  won't be reflected in the other. For Phase 2, consider either:
+  (a) switching kernel.rs to tokio::sync::Mutex uniformly, or
+  (b) making ExecTool generic over the mutex type.
+
+- Pre-existing compile errors in agent_runtime.rs / program_tool.rs are
+  unrelated to these changes (ProgramTool::from_definition signature mismatch).
+  Zero errors in kernel.rs.

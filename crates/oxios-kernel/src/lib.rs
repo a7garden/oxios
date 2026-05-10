@@ -80,7 +80,7 @@ pub use agent_lifecycle::AgentLifecycleManager;
 pub use agent_runtime::AgentRuntime;
 pub use error::{HttpStatus, KernelError, KernelResult};
 pub use engine::{EngineProvider, OxiEngineProvider};
-pub use config::{OxiosConfig, MemoryConfig, PersonaConfig, McpConfig, McpServerDef, CronConfig, InlineCronJob, GitConfig};
+pub use config::{ExecConfig, OxiosConfig, MemoryConfig, PersonaConfig, McpConfig, McpServerDef, CronConfig, InlineCronJob, GitConfig};
 
 // Auth manager exports
 pub use auth::{AuthManager, KeyMeta};
@@ -108,7 +108,7 @@ pub use persona::{default_personas, Persona};
 pub use persona_manager::PersonaManager;
 pub use persona_store::PersonaStore;
 pub use supervisor::{BasicSupervisor, Supervisor};
-pub use tools::{ContainerExecTool, HostExecTool, ProgramTool};
+pub use tools::{ContainerExecTool, ExecTool, HostExecTool, ProgramTool};
 pub use types::{AgentId, AgentInfo, AgentStatus};
 
 pub use backup::{BackupManifest, BackupSection};
