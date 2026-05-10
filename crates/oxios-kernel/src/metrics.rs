@@ -314,8 +314,8 @@ pub fn register_builtin_metrics() {
     r.counter("oxios_memory_recall_total", "Memory recall operations", &[]);
 
     // Container metrics
-    r.counter("oxios_container_exec_total", "Container exec calls", &[]);
-    r.histogram("oxios_container_exec_duration_seconds", "Container exec duration", vec![0.1, 0.5, 1.0, 5.0, 10.0, 30.0]);
+    r.counter("oxios_garden_exec_total", "Garden exec calls", &[]);
+    r.histogram("oxios_garden_exec_duration_seconds", "Garden exec duration", vec![0.1, 0.5, 1.0, 5.0, 10.0, 30.0]);
 
     // Session metrics
     r.gauge("oxios_active_sessions", "Active sessions", 0.0);

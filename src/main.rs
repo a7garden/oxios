@@ -171,7 +171,7 @@ const WORKSPACE_SUBDIRS: &[&str] = &[
     "workspace/sessions",
     "workspace/skills",
     "workspace/programs",
-    "gardens",
+
 ];
 
 const DEFAULT_CONFIG: &str = include_str!("../channels/oxios-web/static/default-config.toml");

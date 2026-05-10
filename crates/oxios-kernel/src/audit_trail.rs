@@ -79,10 +79,6 @@ pub enum AuditAction {
     MemoryRead { entry_id: String },
     /// Configuration changed.
     ConfigChange { key: String },
-    /// Container started.
-    ContainerStart { container_id: String },
-    /// Container stopped.
-    ContainerStop { container_id: String },
     /// Program installed.
     ProgramInstall { program: String, version: String },
     /// Cron job triggered.
@@ -349,8 +345,8 @@ impl AuditTrail {
                     AuditAction::MemoryWrite { .. } => "MemoryWrite",
                     AuditAction::MemoryRead { .. } => "MemoryRead",
                     AuditAction::ConfigChange { .. } => "ConfigChange",
-                    AuditAction::ContainerStart { .. } => "ContainerStart",
-                    AuditAction::ContainerStop { .. } => "ContainerStop",
+                    AuditAction::ContainerStart { .. } => unreachable!("removed"),
+                    AuditAction::ContainerStop { .. } => unreachable!("removed"),
                     AuditAction::ProgramInstall { .. } => "ProgramInstall",
                     AuditAction::CronTrigger { .. } => "CronTrigger",
                     AuditAction::GitCommit { .. } => "GitCommit",
@@ -853,8 +849,6 @@ mod tests {
             AuditAction::MemoryWrite { entry_id: "mem-001".to_string() },
             AuditAction::MemoryRead { entry_id: "mem-001".to_string() },
             AuditAction::ConfigChange { key: "max_agents".to_string() },
-            AuditAction::ContainerStart { container_id: "ctr-001".to_string() },
-            AuditAction::ContainerStop { container_id: "ctr-001".to_string() },
             AuditAction::ProgramInstall { program: "test-program".to_string(), version: "1.0.0".to_string() },
             AuditAction::CronTrigger { job_id: "job-001".to_string() },
             AuditAction::GitCommit { message: "test commit".to_string() },
@@ -870,7 +864,7 @@ mod tests {
             );
         }
 
-        assert_eq!(trail.len(), 14);
+        assert_eq!(trail.len(), 12);
         assert!(trail.verify().is_ok());
     }
 
