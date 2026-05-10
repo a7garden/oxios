@@ -28,10 +28,10 @@ pub fn ApprovalsView() -> Element {
                 let timestamp = approval.created_at.clone();
 
                 let status_class = match status.as_str() {
-                    "pending" => "garden-status-badge garden-status-running",
-                    "approved" => "garden-status-badge garden-status-running",
-                    "rejected" => "garden-status-badge garden-status-stopped",
-                    _ => "garden-status-badge garden-status-stopped",
+                    "pending" => "status-badge status-badge-active",
+                    "approved" => "status-badge status-badge-active",
+                    "rejected" => "status-badge status-badge-inactive",
+                    _ => "status-badge status-badge-inactive",
                 };
 
                 let approve_id = id.clone();
@@ -83,7 +83,7 @@ pub fn ApprovalsView() -> Element {
                             div { class: "agent-name", "{subject} → {action} on {resource_name}" }
                             div { class: "agent-id", "{reason} · {timestamp}" }
                         }
-                        div { class: "garden-actions",
+                        div { class: "card-actions",
                             span { class: "{status_class}", "{status}" }
                             {buttons}
                         }

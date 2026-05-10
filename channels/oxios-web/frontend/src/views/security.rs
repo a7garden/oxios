@@ -26,9 +26,9 @@ pub fn SecurityView() -> Element {
                 let reason = entry.reason.clone().unwrap_or_default();
 
                 let status_class = if allowed {
-                    "garden-status-badge garden-status-running"
+                    "status-badge status-badge-active"
                 } else {
-                    "garden-status-badge garden-status-stopped"
+                    "status-badge status-badge-inactive"
                 };
                 let status_text = if allowed { "Allow" } else { "Deny" };
 

@@ -33,7 +33,7 @@ pub fn PersonasView() -> Element {
                 let set_active_id = id.clone();
 
                 let active_badge: Element = if is_active {
-                    rsx! { span { class: "garden-status-badge garden-status-running", "Active" } }
+                    rsx! { span { class: "status-badge status-badge-active", "Active" } }
                 } else {
                     rsx! { div {} }
                 };
@@ -71,7 +71,7 @@ pub fn PersonasView() -> Element {
                             div { class: "agent-id", "{persona.role} · {traits}" }
                             div { class: "agent-id", "{persona.description}" }
                         }
-                        div { class: "garden-actions",
+                        div { class: "card-actions",
                             {action_btn}
                         }
                     }

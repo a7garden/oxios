@@ -79,7 +79,6 @@ pub fn DashboardView() -> Element {
                                     td { class: "text-mono", "{a.id}" }
                                     td { "{a.name}" }
                                     td { "{a.status}" }
-                                    td { "{a.garden.as_deref().unwrap_or(\"-\")}" }
                                 }
                             }
                         }

@@ -14,10 +14,11 @@ Oxios is an Agent Operating System built in Rust. It combines Unix philosophy (m
 Gateway (channel-agnostic) → Kernel (supervisor + ouroboros + oxi-agent)
 ```
 
-- Gateway: message hub, channels plug in as plugins (Web first, Telegram/CLI later)
-- Kernel: agent lifecycle (fork/exec/wait/kill), event bus, state store, tool registry
-- Ouroboros: spec-first protocol (interview → seed → execute → evaluate → evolve)
-
+- **Gateway:** message hub, channels plug in as plugins (Web first, Telegram/CLI later)
+- **Kernel:** agent lifecycle (fork/exec/wait/kill), event bus, state store, tool registry, access control
+- **Ouroboros:** spec-first protocol (interview → seed → execute → evaluate → evolve)
+- **Execution:** Direct process execution via `ExecTool`. No container layer. Shell isolation is provided by `AccessManager` (RBAC, path sandboxing) and the host process environment.
+- **Sandbox:** Workspace-based (directory isolation), not container-based.
 
 ## Kernel Modules
 
@@ -60,12 +61,23 @@ The `oxios-kernel` crate exposes these public modules:
 | `wasm_sandbox` | WASM sandboxed execution (`wasm-sandbox` feature) |
 | `telemetry_otel` | OpenTelemetry tracing (`otel` feature) |
 
+## Execution Model (ExecTool)
+
+Agents execute work via `ExecTool` — a unified execution tool with two modes:
+
+| Mode | Description | Security |
+|------|-------------|----------|
+| `shell` | Raw command string via `bash -c <cmd>`. Supports pipelines, redirects, compound commands. | AccessManager enforces RBAC and path sandboxing upstream. |
+| `structured` | Binary with explicit args, allowlist + shell metacharacter blocking. | Binary must be in allowlist. All args validated for metacharacters (`\|`, `;`, `$`, `` ` ``, `<`, `>`, etc.) and path traversal (`..`). |
+
+Timeout is enforced per execution and capped by `ExecConfig.max_timeout_secs`.
+
 ## Directory Structure
 
 ```
 oxios/
 ├── crates/
-│   ├── oxios-kernel/       Core: supervisor, event bus, state store
+│   ├── oxios-kernel/       Core: supervisor, event bus, state store, tools
 │   ├── oxios-ouroboros/    Spec-first protocol
 │   ├── oxios-gateway/      Channel-agnostic message hub
 │   └── oxios/              Main binary
@@ -119,6 +131,7 @@ Scopes: kernel, ouroboros, gateway, web, cli, docs
 3. **No reimplementation:** Reuse oxi-ai and oxi-agent from oxi. Reuse clawgarden code where applicable.
 4. **Channel agnostic:** Gateway doesn't care if the message comes from Web, CLI, or Telegram.
 5. **User invisible:** Users don't know how many agents are running. They talk, the OS handles the rest.
+6. **No containers:** Execution happens directly in the host process environment, sandboxed by workspace path rules and AccessManager.
 
 ## Dependency Map
 
@@ -199,7 +212,7 @@ optional = ["gh", "osascript"]
 Brief description of what this program does.
 
 ## Usage
-How agents should use this program.
+How agents should use the program.
 
 ## Tools
 - `my_tool`: Description of the tool
