@@ -49,7 +49,7 @@ pub(crate) async fn handle_audit_entries(
     let from_seq = params.from_seq.unwrap_or(0);
     let to_seq = params.to_seq.unwrap_or(100);
 
-    let entries = state.kernel.query_audit(from_seq, to_seq);
+    let entries = state.kernel.security.query_audit(from_seq, to_seq);
     let count = entries.len();
 
     let entries_json: Vec<serde_json::Value> = entries
@@ -69,9 +69,9 @@ pub(crate) async fn handle_audit_entries(
 pub(crate) async fn handle_audit_verify(
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<serde_json::Value>, AppError> {
-    let entry_count = state.kernel.audit_count();
+    let entry_count = state.kernel.security.audit_count();
 
-    match state.kernel.verify_audit() {
+    match state.kernel.security.verify_chain() {
         Ok(valid) => Ok(Json(json!({
             "valid": valid,
             "entry_count": entry_count,
@@ -121,7 +121,7 @@ pub(crate) async fn handle_audit_by_agent(
     State(state): State<Arc<AppState>>,
     Path(agent_id): Path<String>,
 ) -> Result<Json<serde_json::Value>, AppError> {
-    let entries = state.kernel.query_audit_by_agent(&agent_id);
+    let entries = state.kernel.security.query_audit_by_agent(&agent_id);
     let count = entries.len();
 
     let entries_json: Vec<serde_json::Value> = entries
@@ -144,7 +144,7 @@ pub(crate) async fn handle_audit_export(
 ) -> Result<Json<serde_json::Value>, AppError> {
     let from_seq = body.from_seq.unwrap_or(0);
 
-    let entries = state.kernel.query_audit(from_seq, u64::MAX);
+    let entries = state.kernel.security.query_audit(from_seq, u64::MAX);
     let entry_count = entries.len();
 
     let json = serde_json::to_string_pretty(&entries)
@@ -162,7 +162,7 @@ pub(crate) async fn handle_audit_export(
 pub(crate) async fn handle_audit_flush(
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<serde_json::Value>, AppError> {
-    let flushed = state.kernel.audit_count();
+    let flushed = state.kernel.security.audit_count();
 
     let _ = state.kernel.flush_audit();
 
