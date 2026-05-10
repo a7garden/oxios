@@ -4,7 +4,7 @@
 //! - **chat**: Chat and WebSocket streaming
 //! - **system**: Health, status, agents, config
 //! - **workspace**: File tree, seeds, skills, memory
-//! - **resources**: Programs, host-tools
+//! - **resources**: Programs, host-tools, system resources
 //! - **infra**: Scheduler, audit, permissions, MCP
 //! - **events**: Sessions, SSE events, approvals
 

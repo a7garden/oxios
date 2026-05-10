@@ -1,21 +1,7 @@
-//! Host tool validation.
+//! Host tool validation for Oxios.
 //!
-//! Implements the "minimal container, host dependency" philosophy.
-//! The container ships only essential tools; additional capabilities
-//! must be provided by the host.
-//!
-//! # Philosophy
-//!
-//! Unix philosophy says: "Do one thing well."
-//! In the context of Oxios, the container does the minimal work
-//! (hosting the LLM, managing agent state), while the HOST provides
-//! the rich environment (git, shell tools, system integrations).
-//!
-//! # Tool Categories
-//!
-//! - **Required tools**: Must be on the host (checked at startup)
-//! - **Optional tools**: Checked when programs need them
-//! - **Container tools**: Pre-installed in the minimal container
+//! Checks that required and optional host tools (git, gh, osascript, etc.) are available.
+//! These are macOS tools that agents can call via ExecTool.
 
 use std::collections::HashMap;
 use std::process::Command;

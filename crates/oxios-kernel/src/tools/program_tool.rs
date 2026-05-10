@@ -1,9 +1,8 @@
-//! Program-defined tool with automatic host/container routing.
+//! Program-defined tool with automatic exec routing.
 //!
 //! Each `[[tools]]` entry in `program.toml` becomes a `ProgramTool` registered
 //! in the ToolRegistry at Tier 3. When executed, the tool routes to `ExecTool`
-//! for command execution. Since Oxios runs inside a container, all execution
-//! goes through the exec bridge which provides the execution environment.
+//! for command execution. All execution goes through ExecTool.
 
 use std::sync::Arc;
 

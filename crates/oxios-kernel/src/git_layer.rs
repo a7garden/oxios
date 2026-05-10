@@ -15,7 +15,6 @@ const GITIGNORE: &str = r#"# Oxios
 *.lock
 .env
 api-keys.json
-container_volumes/
 "#;
 
 /// Commit information returned after a successful commit.

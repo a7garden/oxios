@@ -1,7 +1,7 @@
 //! Configuration loading from TOML files.
 //!
 //! Configuration is stored at `~/.oxios/config.toml` and controls
-//! kernel, gateway, and container settings.
+//! kernel, gateway, and execution settings.
 
 use cron::Schedule;
 use serde::{Deserialize, Serialize};
@@ -217,10 +217,9 @@ impl Default for GatewayConfig {
 
 
 
-/// Exec configuration (host command execution bridge).
+/// Exec configuration.
 ///
-/// Governs how the kernel dispatches commands to the host when running
-/// outside a container (Phase 1 backward-compatible host exec bridge).
+/// Governs how the kernel dispatches commands for execution.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ExecConfig {
     /// Commands allowed to run on the host.

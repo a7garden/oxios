@@ -1651,10 +1651,10 @@ mod tests {
     #[test]
     fn test_register_workspace_path() {
         let mut access = AccessManager::new();
-        access.register_workspace_path("my-container", PathBuf::from("/workspace/my-container"));
+        access.register_workspace_path("my-workspace", PathBuf::from("/workspace/my-workspace"));
 
-        assert_eq!(access.list_workspaces(), vec!["my-container"]);
-        assert_eq!(access.get_workspace_path("my-container"), Some(&PathBuf::from("/workspace/my-container")));
+        assert_eq!(access.list_workspaces(), vec!["my-workspace"]);
+        assert_eq!(access.get_workspace_path("my-workspace"), Some(&PathBuf::from("/workspace/my-workspace")));
     }
 
     #[test]
@@ -1701,26 +1701,26 @@ mod tests {
     #[test]
     fn test_unassign_agent_from_workspace() {
         let mut access = AccessManager::new();
-        access.register_workspace_path("my-container", PathBuf::from("/workspace/my"));
+        access.register_workspace_path("my-workspace", PathBuf::from("/workspace/my"));
 
-        access.assign_workspace("agent-1", "my-container");
+        access.assign_workspace("agent-1", "my-workspace");
         assert!(access.get_workspace_for_agent("agent-1").is_some());
 
         let removed = access.unassign_workspace("agent-1");
-        assert_eq!(removed, Some("my-container".to_string()));
+        assert_eq!(removed, Some("my-workspace".to_string()));
         assert!(access.get_workspace_for_agent("agent-1").is_none());
     }
 
     #[test]
     fn test_list_agents_in_workspace() {
         let mut access = AccessManager::new();
-        access.register_workspace_path("my-container", PathBuf::from("/workspace/my"));
+        access.register_workspace_path("my-workspace", PathBuf::from("/workspace/my"));
 
-        access.assign_workspace("agent-1", "my-container");
-        access.assign_workspace("agent-2", "my-container");
+        access.assign_workspace("agent-1", "my-workspace");
+        access.assign_workspace("agent-2", "my-workspace");
         access.assign_workspace("agent-3", "other-workspace");
 
-        let agents = access.list_agents_in_workspace("my-container");
+        let agents = access.list_agents_in_workspace("my-workspace");
         assert_eq!(agents.len(), 2);
         assert!(agents.contains(&"agent-1".to_string()));
         assert!(agents.contains(&"agent-2".to_string()));
@@ -1730,12 +1730,12 @@ mod tests {
     #[test]
     fn test_remove_workspace_unassigns_all_agents() {
         let mut access = AccessManager::new();
-        access.register_workspace_path("my-container", PathBuf::from("/workspace/my"));
+        access.register_workspace_path("my-workspace", PathBuf::from("/workspace/my"));
 
-        access.assign_workspace("agent-1", "my-container");
-        access.assign_workspace("agent-2", "my-container");
+        access.assign_workspace("agent-1", "my-workspace");
+        access.assign_workspace("agent-2", "my-workspace");
 
-        access.remove_workspace("my-container");
+        access.remove_workspace("my-workspace");
 
         assert!(access.list_workspaces().is_empty());
         assert!(access.get_workspace_for_agent("agent-1").is_none());
@@ -1754,14 +1754,14 @@ mod tests {
         std::fs::create_dir_all(workspace.join("subdir")).ok();
 
         // Now register the workspace
-        access.register_workspace_path("my-container", workspace.clone());
+        access.register_workspace_path("my-workspace", workspace.clone());
 
         // Path inside workspace
         let inside_path = workspace.join("file.txt");
         std::fs::write(&inside_path, "test").ok(); // Create the file too
 
         assert!(
-            access.is_path_in_workspace("my-container", inside_path.to_str().unwrap()),
+            access.is_path_in_workspace("my-workspace", inside_path.to_str().unwrap()),
             "Path {:?} should be inside workspace",
             inside_path
         );
@@ -1769,13 +1769,13 @@ mod tests {
         let nested_path = workspace.join("subdir/nested.txt");
         std::fs::write(&nested_path, "test").ok();
         assert!(
-            access.is_path_in_workspace("my-container", nested_path.to_str().unwrap()),
+            access.is_path_in_workspace("my-workspace", nested_path.to_str().unwrap()),
             "Path {:?} should be inside workspace",
             nested_path
         );
 
         // Path outside workspace (use /tmp directly without our subdirectory)
-        assert!(!access.is_path_in_workspace("my-container", "/tmp/other-workspace/file.txt"));
+        assert!(!access.is_path_in_workspace("my-workspace", "/tmp/other-workspace/file.txt"));
 
         // Non-existent workspace
         assert!(!access.is_path_in_workspace("nonexistent", "/tmp/test"));

@@ -1,4 +1,4 @@
-//! Unified execution tool — Phase 1 of container layer removal (RFC 0001).
+//! Unified execution tool for Oxios agents.
 //!
 //! Replaces both `ContainerExecTool` and `HostExecTool` with a single `ExecTool`
 //! that provides two execution modes:
