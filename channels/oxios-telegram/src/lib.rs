@@ -1,3 +1,7 @@
+pub mod plugin;
+
+pub use plugin::TelegramPlugin;
+
 use anyhow::Result;
 use async_trait::async_trait;
 use oxios_gateway::channel::Channel;

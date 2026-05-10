@@ -55,12 +55,19 @@ parking_lot = "0.12"
 oxi-ai = { path = "../oxi/oxi-ai" }
 oxi-agent = { path = "../oxi/oxi-agent" }
 
+[features]
+default = ["web", "cli"]
+web = ["dep:oxios-web"]
+cli = ["dep:oxios-cli"]
+telegram = ["dep:oxios-telegram"]
+
 [dependencies]
 oxios-kernel = { path = "crates/oxios-kernel" }
 oxios-ouroboros = { path = "crates/oxios-ouroboros" }
 oxios-gateway = { path = "crates/oxios-gateway" }
-oxios-web = { path = "channels/oxios-web" }
-oxios-cli = { path = "channels/oxios-cli" }
+oxios-web = { path = "channels/oxios-web", optional = true }
+oxios-cli = { path = "channels/oxios-cli", optional = true }
+oxios-telegram = { path = "channels/oxios-telegram", optional = true }
 hex = { workspace = true }
 oxi-ai = { workspace = true }
 uuid = { workspace = true }
@@ -71,9 +78,6 @@ anyhow = { workspace = true }
 serde = { workspace = true }
 clap = { version = "4", features = ["derive"] }
 toml = { workspace = true }
-axum = { version = "0.8", features = ["ws"] }
-tower-http = { version = "0.6", features = ["cors", "fs"] }
-tokio-stream = { version = "0.1", features = ["sync"] }
 parking_lot = { workspace = true }
 tracing-appender = { workspace = true }
 

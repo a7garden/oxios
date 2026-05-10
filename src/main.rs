@@ -13,7 +13,15 @@ use std::sync::Arc;
 
 use kernel::Kernel;
 use oxios_kernel::{OxiosConfig, InstallSource};
-use oxios_web::WebServer;
+
+#[cfg(feature = "web")]
+use oxios_web::WebPlugin;
+#[cfg(feature = "cli")]
+use oxios_cli::CliPlugin;
+#[cfg(feature = "telegram")]
+use oxios_telegram::TelegramPlugin;
+
+use oxios_gateway::plugin::{ChannelPlugin, ChannelContext};
 
 // ─── CLI ───────────────────────────────────────────────────────────────────
 
@@ -441,23 +449,29 @@ async fn main() -> Result<()> {
     Box::leak(Box::new(_otel_guard));
 
     let default_model = "anthropic/claude-sonnet-4-20250514";
-    const DEFAULT_PORT: u16 = 4200;
 
     match cli.command {
         Some(Command::Run { prompt }) => {
             cmd_run(&prompt, &config_path, default_model).await
         }
         Some(Command::Chat) => {
-            let kernel = Kernel::builder()
-                .config_path(config_path.to_path_buf())
-                .build()
-                .await?;
-            let cli_channel = oxios_cli::CliChannel::new(256);
-            let handle = cli_channel.handle();
-            kernel.gateway.register(Box::new(cli_channel)).await;
-            let mut loop_ = oxios_cli::InteractiveLoop::new(handle);
-            loop_.run().await?;
-            Ok(())
+            #[cfg(feature = "cli")]
+            {
+                let kernel = Kernel::builder()
+                    .config_path(config_path.to_path_buf())
+                    .build()
+                    .await?;
+                let cli_channel = oxios_cli::CliChannel::new(256);
+                let handle = cli_channel.handle();
+                kernel.gateway.register(Box::new(cli_channel)).await;
+                let mut loop_ = oxios_cli::InteractiveLoop::new(handle);
+                loop_.run().await?;
+                Ok(())
+            }
+            #[cfg(not(feature = "cli"))]
+            {
+                bail!("CLI channel not compiled in. Rebuild with --features cli");
+            }
         }
         Some(Command::Backup { output }) => {
             let kernel = Kernel::builder()
@@ -723,23 +737,8 @@ async fn main() -> Result<()> {
 
         // ── Interactive mode (default) ──
         None => {
-            if !is_port_available("127.0.0.1", DEFAULT_PORT).await {
-                let (occupied, pid) = check_port_occupant("127.0.0.1", DEFAULT_PORT).await;
-                eprintln!("Error: Port {} is already in use.", DEFAULT_PORT);
-                if let Some(info) = occupied {
-                    eprintln!("  Current binding: {}", info);
-                    if let Some(p) = pid {
-                        eprintln!("  Process PID: {}", p);
-                    }
-                }
-                eprintln!("\nTo use a different port, add this to your config (~/.oxios/config.toml):");
-                eprintln!("  [gateway]");
-                eprintln!("  port = 4201");
-                std::process::exit(1);
-            }
-
             let kernel = Kernel::builder()
-                .config_path(config_path.clone())
+                               .config_path(config_path.clone())
                 .model_id(default_model)
                 .build()
                 .await?;
@@ -776,37 +775,15 @@ async fn main() -> Result<()> {
                 }
             }
 
-            // Create web channel
-            let web_channel = oxios_web::WebChannel::new(256);
-            let channel_handle = oxios_web::channel::WebChannelHandle::from_channel(&web_channel);
-            kernel.gateway.register(Box::new(web_channel)).await;
+            // Activate channels via plugin system
+            let channel_tasks = activate_channels(
+                &kernel.gateway,
+                &kernel,
+                &kernel.config,
+                &config_path,
+            ).await?;
 
-            // Create web server
-            let _web_server = WebServer::new(
-                &kernel.config.gateway.host,
-                kernel.config.gateway.port,
-                channel_handle,
-                kernel.handle(),
-                Arc::new(parking_lot::RwLock::new(kernel.config.clone())),
-                Some(config_path.clone()),
-            )?;
-
-            let shutdown_tx = setup_shutdown_handler();
-
-            // Build Axum app
-            let app = _web_server.state();
-            let routes = oxios_web::routes::build_routes(app.clone());
-            let static_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-                .join("channels/oxios-web/static");
-            let app = axum::Router::new()
-                .merge(routes)
-                .fallback_service(
-                    tower_http::services::ServeDir::new(&static_dir)
-                        .append_index_html_on_directories(true),
-                )
-                .with_state(app);
-
-            // Start guardian daemon for background integrity checks
+            // Start guardian daemon
             kernel.start_guardian();
 
             // Spawn gateway loop
@@ -821,22 +798,21 @@ async fn main() -> Result<()> {
 
             tracing::info!("Oxios started on http://{}:{}", kernel.config.gateway.host, kernel.config.gateway.port);
 
-            let addr = format!("{}:{}", kernel.config.gateway.host, kernel.config.gateway.port);
-            let listener = tokio::net::TcpListener::bind(&addr).await?;
-            tracing::info!(addr = %addr, "Web server listening");
+            // Wait for shutdown
+            let shutdown_tx = setup_shutdown_handler();
+            tokio::signal::ctrl_c().await.ok();
+            let _ = shutdown_tx.send(()).await;
+            tracing::info!("Received shutdown signal");
 
-            axum::serve(listener, app)
-                .with_graceful_shutdown(async move {
-                    tokio::signal::ctrl_c().await.ok();
-                    let _ = shutdown_tx.send(()).await;
-                    tracing::info!("Received shutdown signal");
-                })
-                .await?;
-
-            // Structured shutdown sequence
+            // Structured shutdown
             tracing::info!("Starting graceful shutdown...");
 
-            // 1. Stop running agents
+            // Stop channel tasks
+            for task in channel_tasks {
+                task.abort();
+            }
+
+            // Stop running agents
             if let Ok(agents) = kernel.supervisor.list().await {
                 for agent in &agents {
                     if let Err(e) = kernel.supervisor.kill(agent.id).await {
@@ -848,12 +824,12 @@ async fn main() -> Result<()> {
                 }
             }
 
-            // 2. Stop MCP servers
+            // Stop MCP servers
             if let Err(e) = kernel.mcp_bridge.shutdown_all().await {
                 tracing::warn!(error = %e, "MCP shutdown error");
             }
 
-            // 3. Stop gateway
+            // Stop gateway
             gateway_handle.abort();
 
             tracing::info!("Oxios shut down gracefully");
@@ -862,33 +838,64 @@ async fn main() -> Result<()> {
     }
 }
 
-// ─── Port checking utilities ───────────────────────────────────────────────
+// ─── Channel plugin helpers ───────────────────────────────────────────────
 
-async fn is_port_available(host: &str, port: u16) -> bool {
-    tokio::net::TcpStream::connect(format!("{host}:{port}"))
-        .await
-        .is_err()
+/// Build the list of available channel plugins based on compiled features.
+fn build_channel_plugins() -> Vec<Box<dyn ChannelPlugin>> {
+    let mut plugins: Vec<Box<dyn ChannelPlugin>> = Vec::new();
+    #[cfg(feature = "web")]
+    plugins.push(Box::new(WebPlugin::new()));
+    #[cfg(feature = "cli")]
+    plugins.push(Box::new(CliPlugin::new()));
+    #[cfg(feature = "telegram")]
+    plugins.push(Box::new(TelegramPlugin::new()));
+    plugins
 }
 
-#[allow(unused_variables)]
-async fn check_port_occupant(host: &str, port: u16) -> (Option<String>, Option<u32>) {
-    let output = std::process::Command::new("lsof")
-        .args(["-i", &format!(":{port}"), "-P", "-n"])
-        .output();
-    match output {
-        Ok(out) if out.status.success() => {
-            let stdout = String::from_utf8_lossy(&out.stdout);
-            let lines: Vec<&str> = stdout.lines().collect();
-            if lines.len() > 1 {
-                let info = lines[1..].iter().take(2).map(|l| l.trim()).collect::<Vec<_>>().join("\n  ");
-                let pid = lines.get(1).and_then(|l| {
-                    l.split_whitespace().nth(1).and_then(|s| s.parse::<u32>().ok())
-                });
-                (Some(info), pid)
-            } else {
-                (None, None)
+/// Activate channels based on config and return their task handles.
+async fn activate_channels(
+    gateway: &oxios_gateway::Gateway,
+    kernel: &Kernel,
+    config: &OxiosConfig,
+    config_path: &std::path::Path,
+) -> anyhow::Result<Vec<tokio::task::JoinHandle<()>>> {
+    let plugins = build_channel_plugins();
+    let plugin_map: std::collections::HashMap<&str, &dyn ChannelPlugin> = plugins
+        .iter()
+        .map(|p| (p.name(), p.as_ref()))
+        .collect();
+
+    let mut all_tasks = Vec::new();
+
+    for name in &config.channels.enabled {
+        match plugin_map.get(name.as_str()) {
+            Some(plugin) => {
+                let ctx = ChannelContext {
+                    kernel: kernel.handle(),
+                    config: Arc::new(parking_lot::RwLock::new(config.clone())),
+                    config_path: config_path.to_path_buf(),
+                };
+                match plugin.setup(ctx).await {
+                    Ok(bundle) => {
+                        tracing::info!(channel = %name, "Channel activated");
+                        gateway.register(bundle.channel).await;
+                        all_tasks.extend(bundle.tasks);
+                    }
+                    Err(e) => {
+                        tracing::error!(channel = %name, error = %e, "Failed to activate channel");
+                    }
+                }
+            }
+            None => {
+                tracing::warn!(
+                    channel = %name,
+                    "Channel '{}' not available (not compiled in). Available: {}",
+                    name,
+                    plugin_map.keys().cloned().collect::<Vec<_>>().join(", ")
+                );
             }
         }
-        _ => (None, None),
     }
+
+    Ok(all_tasks)
 }

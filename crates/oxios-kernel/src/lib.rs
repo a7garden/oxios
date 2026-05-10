@@ -77,7 +77,7 @@ pub use agent_lifecycle::AgentLifecycleManager;
 pub use agent_runtime::AgentRuntime;
 pub use error::{HttpStatus, KernelError, KernelResult};
 pub use engine::{EngineProvider, OxiEngineProvider};
-pub use config::{ExecConfig, OxiosConfig, MemoryConfig, PersonaConfig, McpConfig, McpServerDef, CronConfig, InlineCronJob, GitConfig};
+pub use config::{ExecConfig, OxiosConfig, MemoryConfig, PersonaConfig, McpConfig, McpServerDef, CronConfig, InlineCronJob, GitConfig, ChannelsConfig, TelegramChannelConfig};
 
 // Auth manager exports
 pub use auth::{AuthManager, KeyMeta};

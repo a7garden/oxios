@@ -98,6 +98,56 @@ impl Default for MemoryConfig {
     }
 }
 
+/// Channel activation configuration.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ChannelsConfig {
+    /// List of channel names to activate on startup.
+    /// Default: ["web"]
+    #[serde(default = "default_channels_enabled")]
+    pub enabled: Vec<String>,
+
+    /// Telegram-specific configuration.
+    #[serde(default)]
+    pub telegram: TelegramChannelConfig,
+}
+
+fn default_channels_enabled() -> Vec<String> {
+    vec!["web".to_string()]
+}
+
+impl Default for ChannelsConfig {
+    fn default() -> Self {
+        Self {
+            enabled: default_channels_enabled(),
+            telegram: TelegramChannelConfig::default(),
+        }
+    }
+}
+
+/// Telegram channel configuration.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct TelegramChannelConfig {
+    /// Environment variable name holding the bot token.
+    #[serde(default = "default_telegram_token_env")]
+    pub bot_token_env: String,
+    /// List of allowed Telegram user IDs (empty = allow all).
+    #[serde(default)]
+    pub allowed_users: Vec<i64>,
+}
+
+fn default_telegram_token_env() -> String {
+    "TELEGRAM_BOT_TOKEN".to_string()
+}
+
+impl Default for TelegramChannelConfig {
+    fn default() -> Self {
+        Self {
+            bot_token_env: default_telegram_token_env(),
+            allowed_users: Vec::new(),
+        }
+    }
+}
+
 /// Top-level Oxios configuration.
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
 pub struct OxiosConfig {
@@ -145,6 +195,9 @@ pub struct OxiosConfig {
     /// OpenTelemetry tracing configuration.
     #[serde(default)]
     pub otel: OtelConfig,
+    /// Channel activation configuration.
+    #[serde(default)]
+    pub channels: ChannelsConfig,
 }
 
 /// Kernel configuration.
@@ -773,6 +826,22 @@ impl OxiosConfig {
         }
         if self.resource_monitor.memory_threshold > 100.0 {
             errors.push("resource_monitor.memory_threshold must be <= 100".into());
+        }
+
+        // Channels validation
+        for name in &self.channels.enabled {
+            let valid = ["web", "cli", "telegram"];
+            if !valid.contains(&name.as_str()) {
+                warnings.push(format!("channels.enabled: unknown channel '{}'", name));
+            }
+        }
+        if self.channels.enabled.iter().any(|c| c == "telegram") {
+            if std::env::var(&self.channels.telegram.bot_token_env).is_err() {
+                warnings.push(format!(
+                    "channels.telegram: {} env var not set — telegram channel will fail",
+                    self.channels.telegram.bot_token_env
+                ));
+            }
         }
 
         (errors, warnings)

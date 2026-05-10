@@ -11,8 +11,10 @@ pub mod channel;
 pub mod error;
 pub mod middleware;
 pub mod persona_routes;
+pub mod plugin;
 pub mod routes;
 pub mod server;
 
 pub use channel::{WebChannel, WebChannelHandle};
+pub use plugin::WebPlugin;
 pub use server::{AppState, WebServer};

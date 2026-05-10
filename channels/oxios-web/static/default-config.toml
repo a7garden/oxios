@@ -60,3 +60,10 @@ enabled = false
 endpoint = "http://localhost:4317"
 service_name = "oxios"
 sampling_ratio = 1.0
+
+# Channel configuration — which channels to activate on startup.
+[channels]
+enabled = ["web"]
+
+[channels]
+enabled = ["web"]
