@@ -11,9 +11,9 @@
 ```
 항목 3 (agent_id 버그) ──✅ 완료
        ↓ (선행 조건)
-항목 2a (ExecTool 프로덕션 연결) ← 아직 kernel.rs에서 with_exec_tool() 미호출
+항목 2a (ExecTool 프로덕션 연결) — ✅ 완료
        ↓
-항목 2b (ExecTool 접근 제어)
+항목 2b (ExecTool 접근 제어) — ✅ 완료
        ↓ (독립)
 항목 1 (Channel Stream) ← 0.3.0
 ```
@@ -138,184 +138,22 @@ pub struct TelegramChannel {
 
 ---
 
-## 항목 2: ExecTool 접근 제어 (0.2.0)
+## 항목 2: ExecTool 접근 제어 — ✅ 완료
 
-### 전제: ExecTool이 현재 프로덕션에 연결되어 있지 않음
+이전에는 ExecTool이 프로덕션에 연결되어 있지 않았음 (`with_exec_tool()` 미호출).
+ProgramTool도 ExecTool에 의존하므로 프로그램 도구도 동작하지 않았음.
 
-```rust
-// src/kernel.rs — ExecTool을 AgentRuntime에 연결하는 코드가 없음
-let agent_runtime = AgentRuntime::new(provider, model_id)
-    .with_program_manager(...)
-    .with_mcp_bridge(...)
-    .with_memory_manager(...);
-    // ← .with_exec_tool() 호출 없음!
-```
+## 항목 2a: ExecTool 프로덕션 연결 — ✅ 완료
 
-`with_exec_tool()`은 정의되어 있지만 아무도 호출하지 않는다.
-ProgramTool도 ExecTool에 의존하므로, 현재 프로그램 도구도 동작하지 않는다.
+kernel.rs에서 ExecConfig + AccessManager를 AgentRuntime에 전달.
+AgentRuntime은 실행 시점에 `ExecTool::for_agent()`로 에이전트별 인스턴스를 생성.
 
-### 단계 2a: ExecTool 프로덕션 연결 (선행)
+## 항목 2b: ExecTool 접근 제어 — ✅ 완료
 
-kernel.rs에서 ExecTool을 생성하고 AgentRuntime에 연결:
-
-```rust
-// src/kernel.rs — Kernel::builder() 내
-let exec_config = Arc::new(ExecConfig::from_security_config(&config.security));
-let exec_access = Arc::new(Mutex::new(access_manager.clone()));
-let exec_tool = Arc::new(ExecTool::new(exec_config, exec_access));
-
-let agent_runtime = AgentRuntime::new(provider, model_id)
-    .with_program_manager(...)
-    .with_mcp_bridge(...)
-    .with_memory_manager(...)
-    .with_exec_tool(exec_tool);  // ← 연결
-```
-
-### 단계 2b: 접근 제어 활성화
-
-#### 설계: agent_name을 생성자에 고정
-
-**핵심 인사이트**: `Arc<ExecTool>`이 여러 에이전트 실행에 공유되므로,
-`RwLock<Option<AgentContext>>`를 쓰면 경쟁 조건이 발생한다.
-대신 **에이전트별로 ExecTool 인스턴스를 따로 만든다**.
-
-```rust
-pub struct ExecTool {
-    config: Arc<ExecConfig>,
-    access: Arc<Mutex<AccessManager>>,
-    /// 이 인스턴스를 소유한 에이전트 이름.
-    /// AgentTool::execute()는 agent context를 전달하지 않으므로
-    /// 생성 시점에 고정.
-    agent_name: Option<String>,
-}
-
-impl ExecTool {
-    /// 접근 제어 없는 기본 생성자 (테스트용).
-    pub fn new(config: Arc<ExecConfig>, access: Arc<Mutex<AccessManager>>) -> Self {
-        Self { config, access, agent_name: None }
-    }
-
-    /// 에이전트 전용 생성자.
-    pub fn for_agent(
-        config: Arc<ExecConfig>,
-        access: Arc<Mutex<AccessManager>>,
-        agent_name: String,
-    ) -> Self {
-        Self { config, access, agent_name: Some(agent_name) }
-    }
-}
-```
-
-#### AgentRuntime 변경
-
-현재: `with_exec_tool(Arc<ExecTool>)` — 하나의 ExecTool을 공유.
-
-변경: AgentRuntime이 에이전트 실행 시점에 **새 ExecTool**을 생성:
-
-```rust
-pub struct AgentRuntime {
-    // ...
-    exec_config: Option<Arc<ExecConfig>>,        // 변경: 설정만 보관
-    exec_access: Option<Arc<Mutex<AccessManager>>>, // 변경: AM만 보관
-}
-
-impl AgentRuntime {
-    /// ExecTool 설정을 저장 (인스턴스가 아닌 설정).
-    pub fn with_exec_config(
-        mut self,
-        config: Arc<ExecConfig>,
-        access: Arc<Mutex<AccessManager>>,
-    ) -> Self {
-        self.exec_config = Some(config);
-        self.exec_access = Some(access);
-        self
-    }
-}
-```
-
-`run_agent_loop()`에서 에이전트별 ExecTool 생성:
-
-```rust
-fn run_agent_loop(
-    // ... 기존 인자
-    agent_name: String,  // ← 추가: seed 또는 config에서 전달
-    exec_config: Option<Arc<ExecConfig>>,
-    exec_access: Option<Arc<Mutex<AccessManager>>>,
-) -> Result<(String, usize, bool)> {
-    // ...
-    let exec_tool: Option<Arc<ExecTool>> = match (exec_config, exec_access) {
-        (Some(cfg), Some(access)) => {
-            let tool = ExecTool::for_agent(cfg, access, agent_name);
-            Some(Arc::new(tool))
-        }
-        _ => None,
-    };
-
-    if let Some(ref exec) = exec_tool {
-        registry.register_arc(exec.clone());
-    }
-    // ...
-}
-```
-
-#### 검증 로직
-
-```rust
-impl ExecTool {
-    pub async fn shell_exec(&self, command: &str, timeout_ms: u64) -> Result<ExecResult, String> {
-        // Audit logging (agent_name이 있으면)
-        if let Some(ref name) = self.agent_name {
-            tracing::info!(
-                agent = %name,
-                mode = "shell",
-                command = %command.chars().take(200).collect::<String>(),
-                "ExecTool: executing shell command",
-            );
-        }
-        // ... 기존 실행 로직 ...
-    }
-
-    pub async fn structured_exec(
-        &self, binary: &str, args: Vec<String>, timeout_ms: u64,
-    ) -> Result<ExecResult, String> {
-        // structured 모드: 사전 권한 검증
-        if let Some(ref name) = self.agent_name {
-            let mut access = self.access.lock();
-            if !access.can_use_tool(name, binary) {
-                return Err(format!(
-                    "structured_exec: agent '{}' cannot execute '{}'",
-                    name, binary
-                ));
-            }
-        }
-        // 기존 경로 순회 검사는 이미 구현되어 있음 (binary.contains(".."), args 검증)
-        // ... 기존 실행 로직 ...
-    }
-}
-```
-
-#### 주의사항
-
-- **shell_exec**: 임의 셸 명령이므로 완벽한 샌드박싱 불가. audit 로깅으로 추적.
-- **structured_exec**: binary가 명확하므로 `can_use_tool()`으로 사전 차단 가능.
-- **AgentTool trait 변경 불필요**: oxi-agent의 `execute()` 시그니처는 그대로.
-  agent_name은 ExecTool 생성 시점에 주입.
-- **기존 경로 순회 검사 중복 없음**: `structured_exec`에 이미 `..` 검사가 있으므로
-  추가하지 않음. `can_use_tool()` 검증만 새로 추가.
-
-### 구현 계획
-
-| 단계 | 내용 | 난이도 |
-|------|------|--------|
-| 2a-1 | kernel.rs에서 ExecTool 생성 후 AgentRuntime에 연결 | 🟢 |
-| 2a-2 | ExecConfig를 security 설정에서 생성하는 헬퍼 추가 | 🟢 |
-| 2a-3 | ProgramTool이 정상 동작하는지 통합 테스트 | 🟡 |
-| 2b-1 | `ExecTool::for_agent()` 생성자 추가 | 🟢 |
-| 2b-2 | `AgentRuntime::with_exec_config()`로 변경 (설정만 보관) | 🟡 |
-| 2b-3 | `run_agent_loop()`에서 에이전트별 ExecTool 생성 | 🟡 |
-| 2b-4 | `structured_exec`에 `can_use_tool()` 검증 추가 | 🟢 |
-| 2b-5 | `shell_exec`에 audit 로깅 추가 | 🟢 |
-| 2b-6 | 테스트 작성 | 🟢 |
+- `ExecTool::for_agent()`: agent_name을 생성 시점에 고정
+- `structured_exec`: `can_use_tool(name, binary)` 사전 권한 검증
+- `shell_exec`: agent_name 기반 audit 로깅
+- Mutex 타입을 `parking_lot::Mutex`로 통일
 
 ---
 
@@ -365,6 +203,6 @@ pub fn can_access_path_in_workspace(
 | 항목 | 상태 | 위험도 | 난이도 | 시기 |
 |------|------|--------|--------|------|
 | **3. agent_id 버그** | ✅ 완료 | 🔴 보안 | 🟢 | 완료 |
-| **2a. ExecTool 연결** | 📋 예정 | 🟡 기능 | 🟢 | 0.2.0 |
-| **2b. 접근 제어** | 📋 예정 | 🟡 보안 | 🟡 | 0.2.0 |
+| **2a. ExecTool 연결** | ✅ 완료 | 🟡 기능 | 🟢 | 완료 |
+| **2b. 접근 제어** | ✅ 완료 | 🟡 보안 | 🟡 | 완료 |
 | **1. Channel Stream** | 📋 예정 | 🟢 성능 | 🔴 | 0.3.0 |
