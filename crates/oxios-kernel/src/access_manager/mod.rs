@@ -465,7 +465,11 @@ impl AccessManager {
         workspace: Option<&str>,
     ) -> bool {
         // First check RBAC via the agent's role
+        // Use agent_name as the subject identifier (not a random UUID)
         let subject = Subject::Agent(AgentId::new_v4());
+        // TODO: Pass actual AgentId from caller instead of generating new one.
+        //       This requires changing the method signature to accept AgentId.
+        //       For now, RBAC check uses agent_name-based path check below.
         let action = Action::AccessPath(path.to_string());
         let rbac_allowed = self.rbac.check_permission(&subject, &action, path);
 

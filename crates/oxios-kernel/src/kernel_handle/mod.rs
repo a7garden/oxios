@@ -92,7 +92,9 @@ impl KernelHandle {
     }
 
     /// Build a KernelHandle from raw subsystem parameters.
-    /// This is a convenience for kernel.rs which has all subsystems available.
+    ///
+    /// Prefer [`KernelHandle::new()`] which takes pre-built Facades.
+    #[deprecated(note = "Use KernelHandle::new() with pre-built Facades instead")]
     #[allow(clippy::too_many_arguments)]
     pub fn from_subsystems(
         state_store: Arc<StateStore>,

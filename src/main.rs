@@ -216,6 +216,16 @@ fn oxios_home_from_config(config_path: &Path) -> PathBuf {
 
 async fn cmd_run_async(kernel: &Kernel, prompt: &str) -> Result<()> {
     tracing::info!(prompt = %prompt, "Processing prompt");
+
+    // Audit: cmd_run bypasses Gateway, so we log directly for traceability
+    kernel.handle().security.audit(
+        "cli",
+        oxios_kernel::audit_trail::AuditAction::Other {
+            detail: format!("run: {}", prompt.chars().take(100).collect::<String>()),
+        },
+        "cli-user",
+    );
+
     let result = kernel.execute_prompt(prompt).await?;
 
     println!("{}", result.response);
