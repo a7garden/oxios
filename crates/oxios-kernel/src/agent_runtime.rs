@@ -25,7 +25,6 @@ use crate::host_exec::HostExecBridge;
 use crate::mcp::McpBridge;
 use crate::persona_manager::PersonaManager;
 use crate::program::ProgramManager;
-use crate::state_store::StateStore;
 use crate::memory::{MemoryEntry, MemoryManager, MemoryType};
 use crate::tools::{HostExecTool, McpToolWrapper, ProgramTool};
 use crate::tools::memory_tools::{MemoryWriteTool, MemoryReadTool, MemorySearchTool};

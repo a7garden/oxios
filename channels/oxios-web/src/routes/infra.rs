@@ -174,7 +174,6 @@ pub(crate) struct PermissionsUpdate {
 impl PermissionsUpdate {
     /// Parse from JSON value.
     pub fn from_json(value: serde_json::Value) -> Self {
-        use std::collections::HashSet;
         Self {
             allowed_tools: value.get("allowed_tools").and_then(|v| v.as_array())
                 .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect()),
@@ -191,9 +190,8 @@ impl PermissionsUpdate {
 
     /// Convert to kernel PermissionUpdate.
     pub fn into_kernel(self) -> oxios_kernel::access_manager::PermissionUpdate {
-        use std::collections::HashSet;
         oxios_kernel::access_manager::PermissionUpdate {
-            allowed_tools: self.allowed_tools.map(|t| t.into_iter().collect()),
+            allowed_tools: self.allowed_tools.map(|t| t.into_iter().collect::<std::collections::HashSet<String>>()),
             allowed_paths: self.allowed_paths,
             denied_paths: self.denied_paths,
             network_access: self.network_access,

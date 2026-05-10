@@ -5,7 +5,6 @@ use axum::http::StatusCode;
 use axum::Json;
 use serde::{Deserialize, Serialize};
 
-use crate::error::AppError;
 use crate::routes::{PageParams, paginate};
 use crate::server::AppState;
 

@@ -24,8 +24,10 @@ pub struct OtelConfig {
     /// OTLP endpoint (e.g., "http://localhost:4317" for gRPC).
     pub endpoint: String,
     /// Service name for traces.
+    #[allow(dead_code)]
     pub service_name: String,
     /// Sampling ratio (0.0 to 1.0).
+    #[allow(dead_code)]
     pub sampling_ratio: f64,
 }
 

@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use axum::extract::{Path, Query, State};
 use axum::Json;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 
 use crate::error::AppError;
 use crate::routes::{PageParams, paginate};
