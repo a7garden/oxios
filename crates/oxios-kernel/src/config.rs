@@ -177,7 +177,7 @@ fn default_workspace() -> String {
 }
 
 fn dirs_home() -> Option<String> {
-    std::env::var("HOME").ok().map(|h| format!("{h}/.oxios/workspace"))
+    dirs::home_dir().map(|h| format!("{}/.oxios/workspace", h.display()))
 }
 
 fn default_event_bus_capacity() -> usize {
@@ -260,9 +260,9 @@ pub struct ContainerConfig {
 }
 
 fn default_container_path() -> String {
-    std::env::var("HOME")
-        .map(|h| format!("{h}/.oxios/containers"))
-        .unwrap_or_else(|_| "./containers".into())
+    dirs::home_dir()
+        .map(|h| format!("{}/.oxios/containers", h.display()))
+        .unwrap_or_else(|| "./containers".into())
 }
 
 fn default_image_tag() -> String {
@@ -449,9 +449,9 @@ fn default_max_audit() -> usize {
 }
 
 fn default_api_keys_path() -> String {
-    std::env::var("HOME")
-        .map(|h| format!("{h}/.oxios/api-keys.json"))
-        .unwrap_or_else(|_| "./api-keys.json".into())
+    dirs::home_dir()
+        .map(|h| format!("{}/.oxios/api-keys.json", h.display()))
+        .unwrap_or_else(|| "./api-keys.json".into())
 }
 
 fn default_cors_origins() -> Vec<String> {
@@ -718,13 +718,9 @@ pub fn load_config(path: &std::path::Path) -> anyhow::Result<OxiosConfig> {
 }
 
 impl OxiosConfig {
-    /// Returns the effective API key — prefers OXIOS_API_KEY env var,
-    /// falls back to the security.default_api_key config field.
+    /// Returns the effective API key from the config file.
     pub fn api_key(&self) -> Option<String> {
-        std::env::var("OXIOS_API_KEY")
-            .ok()
-            .filter(|k| !k.is_empty())
-            .or_else(|| self.security.default_api_key.clone())
+        self.security.default_api_key.clone().filter(|k| !k.is_empty())
     }
 
     /// Validate configuration values and return a list of warnings.
@@ -813,13 +809,6 @@ impl OxiosConfig {
         }
         if self.security.max_execution_time_secs == 0 {
             warnings.push("security.max_execution_time_secs is 0 — no timeout".into());
-        }
-
-        // Check for API key in environment variable
-        if std::env::var("OXIOS_API_KEY").is_ok() {
-            warnings.push(
-                "OXIOS_API_KEY is set in environment — consider using it instead of config file".into(),
-            );
         }
 
         // Audit validation

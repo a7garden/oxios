@@ -43,6 +43,7 @@ tracing-subscriber = { workspace = true }
 wasmtime = { version = "22", features = ["cranelift"], optional = true }
 wasmtime-wasi = { version = "22", optional = true }
 sysinfo = "0.35"
+dirs = "6"
 
 # OpenTelemetry (optional)
 tracing-opentelemetry = { version = "0.28", optional = true }
