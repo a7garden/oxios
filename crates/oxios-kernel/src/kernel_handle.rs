@@ -9,8 +9,6 @@ use anyhow::Result;
 use crate::{
     state_store::{StateStore, Session, SessionId, SessionSummary},
     event_bus::{EventBus, KernelEvent},
-    container_manager::{ContainerManager, ContainerInfo, ToolHealthReport},
-    container::ExecResult,
     supervisor::Supervisor,
     scheduler::AgentScheduler,
     memory::MemoryManager,
@@ -39,8 +37,6 @@ pub struct KernelHandle {
     pub(crate) state_store: Arc<StateStore>,
     /// Kernel event bus.
     pub(crate) event_bus: EventBus,
-    /// Container lifecycle manager.
-    pub(crate) container_manager: Arc<ContainerManager>,
     /// Agent supervisor (lifecycle management).
     pub(crate) supervisor: Arc<dyn Supervisor>,
     /// Task scheduler.
@@ -83,7 +79,6 @@ impl KernelHandle {
     pub fn new(
         state_store: Arc<StateStore>,
         event_bus: EventBus,
-        container_manager: Arc<ContainerManager>,
         supervisor: Arc<dyn Supervisor>,
         scheduler: Arc<AgentScheduler>,
         memory_manager: Arc<MemoryManager>,
@@ -105,7 +100,6 @@ impl KernelHandle {
         Self {
             state_store,
             event_bus,
-            container_manager,
             supervisor,
             scheduler,
             memory_manager,
@@ -384,40 +378,6 @@ impl KernelHandle {
         self.resource_monitor.is_overloaded()
     }
 
-    // ── Container ──
-
-    /// Check if container backend is available.
-    pub fn container_available(&self) -> bool {
-        self.container_manager.is_backend_available()
-    }
-
-    /// Get container backend name.
-    pub fn container_backend(&self) -> Option<String> {
-        if self.container_manager.is_backend_available() {
-            Some(self.container_manager.backend_name().to_string())
-        } else {
-            None
-        }
-    }
-
-    /// Create new container.
-    pub async fn create_container(&self, name: &str) -> anyhow::Result<()> {
-        self.container_manager.new_container(name).await
-    }
-
-    /// List containers.
-    pub fn list_containers(&self) -> Vec<ContainerInfo> {
-        match tokio::runtime::Handle::current().block_on(self.container_manager.list_containers()) {
-            Ok(containers) => containers,
-            Err(_) => vec![],
-        }
-    }
-
-    /// Check tool health in container.
-    pub async fn check_tool_health(&self, container_name: &str) -> anyhow::Result<ToolHealthReport> {
-        self.container_manager.check_tool_health(container_name).await
-    }
-
     // ── Events ──
 
     /// Subscribe to kernel events.
@@ -673,36 +633,6 @@ impl KernelHandle {
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // CONTAINER (System Call wrappers)
-    // ═══════════════════════════════════════════════════════════════════════════
-
-
-    /// Start a container.
-    pub async fn start_container(&self, name: &str) -> anyhow::Result<()> {
-        self.container_manager.start_container(name).await
-    }
-
-    /// Stop a container.
-    pub async fn stop_container(&self, name: &str) -> anyhow::Result<()> {
-        self.container_manager.stop_container(name).await
-    }
-
-    /// Remove a container.
-    pub async fn remove_container(&self, name: &str) -> anyhow::Result<()> {
-        self.container_manager.remove_container(name).await
-    }
-
-    /// Execute command in container.
-    pub async fn exec_in_container(
-        &self,
-        name: &str,
-        command: &[String],
-        workdir: Option<&str>,
-    ) -> anyhow::Result<ExecResult> {
-        self.container_manager.exec_in_container(name, command, workdir).await
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════════
     // PROGRAM (System Call wrappers)
     // ═══════════════════════════════════════════════════════════════════════════
 
@@ -839,7 +769,6 @@ mod tests {
         let fields = [
             "state_store",
             "event_bus",
-            "container_manager",
             "supervisor",
             "scheduler",
             "memory_manager",
@@ -861,6 +790,6 @@ mod tests {
         
         // This test documents the expected fields
         // Each field should be pub(crate)
-        assert_eq!(fields.len(), 20);
+        assert_eq!(fields.len(), 19);
     }
 }

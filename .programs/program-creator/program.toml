@@ -1,0 +1,12 @@
+[program]
+name = "program-creator"
+version = "1.0.0"
+description = "Create, modify, and share Oxios programs through conversation"
+author = "oxios"
+
+[requires_tools]
+names = ["bash", "read", "write"]
+
+[host_requirements]
+required = []
+optional = []

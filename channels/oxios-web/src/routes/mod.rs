@@ -35,9 +35,9 @@ pub(crate) use chat::{handle_chat, handle_chat_stream};
 pub(crate) use cron_jobs::{handle_cron_jobs_list, handle_cron_job_create, handle_cron_job_get, handle_cron_job_delete, update_cron_job, handle_cron_job_trigger};
 pub(crate) use events::{handle_events, handle_sessions_list, handle_session_get, handle_session_delete, handle_approvals_list, handle_approval_approve, handle_approval_reject};
 pub(crate) use infra::{handle_audit_log, handle_metrics, handle_permissions_get, handle_permissions_put, handle_scheduler_stats, handle_scheduler_tasks};
-pub(crate) use resources::{handle_gardens_list, handle_garden_create, handle_garden_start, handle_garden_stop, handle_garden_remove, handle_garden_exec, handle_programs_list, handle_program_get, handle_program_install, handle_program_uninstall, handle_program_enable, handle_program_disable, handle_program_host_requirements, handle_host_tools_check};
+pub(crate) use resources::{handle_programs_list, handle_program_get, handle_program_install, handle_program_uninstall, handle_program_enable, handle_program_disable, handle_program_host_requirements, handle_host_tools_check};
 pub(crate) use resource_routes::{handle_resource_snapshot, handle_resource_history, handle_resource_overload};
-pub(crate) use system::{handle_health, handle_status, handle_agents_list, handle_agent_kill, handle_config_get, handle_config_put, handle_container_tools, handle_container_create, handle_toolchains_list};
+pub(crate) use system::{handle_health, handle_status, handle_agents_list, handle_agent_kill, handle_config_get, handle_config_put};
 pub(crate) use agent_groups::{handle_agent_groups_list, handle_agent_group_get};
 pub(crate) use audit_routes::{
     handle_audit_entries,
@@ -122,13 +122,6 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         .route("/api/memory", post(handle_memory_create))
         .route("/api/memory/search", post(handle_memory_search))
         .route("/api/memory/{name}", get(handle_memory_get))
-        // Gardens
-        .route("/api/gardens", get(handle_gardens_list))
-        .route("/api/gardens", post(handle_garden_create))
-        .route("/api/gardens/{name}/start", post(handle_garden_start))
-        .route("/api/gardens/{name}/stop", post(handle_garden_stop))
-        .route("/api/gardens/{name}", delete(handle_garden_remove))
-        .route("/api/gardens/{name}/exec", post(handle_garden_exec))
         // Scheduler stats & tasks
         .route("/api/scheduler/stats", get(handle_scheduler_stats))
         .route("/api/scheduler/tasks", get(handle_scheduler_tasks))
@@ -161,12 +154,6 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         // Agent Groups
         .route("/api/agent-groups", get(handle_agent_groups_list))
         .route("/api/agent-groups/{id}", get(handle_agent_group_get))
-        // Container Tools
-        .route("/api/containers/{name}/tools", get(handle_container_tools))
-        // Container Create
-        .route("/api/containers", post(handle_container_create))
-        // Toolchains
-        .route("/api/toolchains", get(handle_toolchains_list))
         // Events
         .route("/api/events", get(handle_events))
         // Personas (delegated to persona_routes)

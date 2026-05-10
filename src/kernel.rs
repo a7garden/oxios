@@ -8,7 +8,7 @@ use anyhow::{Context, Result};
 use oxios_gateway::Gateway;
 use oxios_kernel::{
     access_manager::AccessManager, auth::AuthManager, config::load_config,
-    A2AProtocol, AgentRuntime, BasicSupervisor, ContainerManager,
+    A2AProtocol, AgentRuntime, BasicSupervisor,
     CronScheduler, EngineProvider, EventBus, GitLayer, HostExecBridge, HostToolValidator,
     McpBridge, McpServer, MemoryManager, Orchestrator, OxiosConfig, PersonaManager,
     ProgramManager, SkillStore, AgentScheduler, Supervisor,
@@ -31,8 +31,6 @@ pub struct Kernel {
     pub event_bus: EventBus,
     /// Persistent state store (markdown/JSON).
     pub state_store: Arc<oxios_kernel::state_store::StateStore>,
-    /// Container lifecycle manager.
-    pub container_manager: Arc<ContainerManager>,
     /// Loaded configuration.
     pub config: OxiosConfig,
     /// Skill instruction store.
@@ -152,7 +150,7 @@ impl KernelBuilder {
             config.git.auto_commit,
         )?);
 
-        // ── Container infrastructure ──
+        // ── Host exec bridge ──
         let containers_base = PathBuf::from(&config.container.container_path);
         let host_exec = Arc::new(
             HostExecBridge::new(
@@ -161,15 +159,6 @@ impl KernelBuilder {
             )
             .context("HostExecBridge requires non-empty allowlist")?,
         );
-        let state_store_for_containers =
-            oxios_kernel::state_store::StateStore::new(PathBuf::from(&config.kernel.workspace))?;
-        let mut container_manager = ContainerManager::with_apple_backend(
-            host_exec.clone(),
-            Arc::new(state_store_for_containers),
-            containers_base,
-        );
-        container_manager.set_git_layer(git_layer.clone());
-        let container_manager = Arc::new(container_manager);
 
         // ── Skills & programs ──
         let skills_dir = PathBuf::from(&config.kernel.workspace).join("skills");
@@ -197,7 +186,6 @@ impl KernelBuilder {
 
         // ── Agent runtime ──
         let agent_runtime = AgentRuntime::new(provider, model_id)
-            .with_container(Arc::clone(&container_manager))
             .with_host_bridge(host_exec)
             .with_program_manager(Arc::clone(&program_manager))
             .with_oxios_config(config.clone())
@@ -284,7 +272,6 @@ impl KernelBuilder {
             gateway,
             event_bus: event_bus.clone(),
             state_store,
-            container_manager,
             config,
             skill_store,
             supervisor,
@@ -580,41 +567,6 @@ impl Kernel {
         self.resource_monitor.is_overloaded()
     }
 
-    // ── Container ──
-
-    /// Check if container backend is available.
-    pub fn container_available(&self) -> bool {
-        self.container_manager.is_backend_available()
-    }
-
-    /// Get container backend name.
-    pub fn container_backend(&self) -> Option<String> {
-        if self.container_manager.is_backend_available() {
-            Some(self.container_manager.backend_name().to_string())
-        } else {
-            None
-        }
-    }
-
-    /// Create new container.
-    pub async fn create_container(&self, name: &str) -> anyhow::Result<()> {
-        self.container_manager.new_container(name).await
-    }
-
-    /// List containers.
-    pub fn list_containers(&self) -> Vec<oxios_kernel::container_manager::ContainerInfo> {
-        // Note: list_containers is async - use block_on with fallback for sync context
-        match tokio::runtime::Handle::current().block_on(self.container_manager.list_containers()) {
-            Ok(containers) => containers,
-            Err(_) => vec![],
-        }
-    }
-
-    /// Check tool health in container.
-    pub async fn check_tool_health(&self, container_name: &str) -> anyhow::Result<oxios_kernel::container_manager::ToolHealthReport> {
-        self.container_manager.check_tool_health(container_name).await
-    }
-
     // ── Events ──
 
     /// Subscribe to kernel events.
@@ -648,7 +600,6 @@ impl Kernel {
         Arc::new(oxios_kernel::KernelHandle::new(
             self.state_store.clone(),
             self.event_bus.clone(),
-            self.container_manager.clone(),
             self.supervisor.clone(),
             self.scheduler.clone(),
             self.memory_manager.clone(),

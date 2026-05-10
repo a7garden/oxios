@@ -13,13 +13,10 @@ use crate::server::AppState;
 // ---------------------------------------------------------------------------
 
 /// GET /health — Health check endpoint (no auth required).
-pub(crate) async fn handle_health(State(state): State<Arc<AppState>>) -> Json<serde_json::Value> {
+pub(crate) async fn handle_health(State(_state): State<Arc<AppState>>) -> Json<serde_json::Value> {
     Json(serde_json::json!({
         "status": "ok",
         "version": env!("CARGO_PKG_VERSION"),
-        "backend": {
-            "container": state.kernel.container_available(),
-        }
     }))
 }
 
@@ -67,8 +64,6 @@ pub(crate) struct AgentHealth {
 /// Aggregate health of all system components.
 #[derive(Debug, Serialize, Clone)]
 pub(crate) struct ComponentHealth {
-    /// Container backend health.
-    pub container_backend: ComponentStatus,
     /// State store health.
     pub state_store: ComponentStatus,
     /// Event bus health.
@@ -108,10 +103,6 @@ pub(crate) async fn handle_status(
         uptime.as_secs() % 60
     );
 
-    // Container backend health
-    let container_healthy = state.kernel.container_available();
-    let container_detail = state.kernel.container_backend();
-
     // State store health — check that the base path exists
     let state_store_healthy = state.kernel.workspace_path().exists();
 
@@ -143,10 +134,6 @@ pub(crate) async fn handle_status(
     };
 
     let components = Some(ComponentHealth {
-        container_backend: ComponentStatus {
-            healthy: container_healthy,
-            detail: container_detail,
-        },
         state_store: ComponentStatus {
             healthy: state_store_healthy,
             detail: if state_store_healthy { None } else { Some("base path not found".to_string()) },
@@ -186,16 +173,6 @@ fn parse_agent_metrics() -> (u64, u64, u64) {
         }
     }
     (forked, completed, failed)
-}
-
-/// GET /api/containers/:name/tools — Tool health check for a container.
-pub(crate) async fn handle_container_tools(
-    state: State<Arc<AppState>>,
-    Path(name): Path<String>,
-) -> Result<Json<serde_json::Value>, AppError> {
-    let report = state.kernel.check_tool_health(&name).await
-        .map_err(|e| AppError::Internal(e.to_string()))?;
-    Ok(Json(serde_json::to_value(report).unwrap_or_default()))
 }
 
 /// Agent summary for listing.
@@ -250,49 +227,6 @@ pub(crate) async fn handle_agent_kill(
             tracing::warn!(error = %e, "Agent not found");
             AppError::NotFound("agent not found".into())
         })
-}
-
-// ---------------------------------------------------------------------------
-// Container Create / Toolchains
-// ---------------------------------------------------------------------------
-
-/// Request body for creating a container.
-#[derive(Debug, Deserialize)]
-pub(crate) struct CreateContainerRequest {
-    /// Container name.
-    pub name: String,
-    /// Optional toolchain (e.g. "rust", "node", "python").
-    #[allow(dead_code)]
-    pub toolchain: Option<String>,
-}
-
-/// Info about a single toolchain template.
-#[derive(Debug, Serialize)]
-pub(crate) struct ToolchainInfo {
-    /// Toolchain identifier.
-    pub id: String,
-    /// Supported language names.
-    pub languages: Vec<String>,
-}
-
-/// POST /api/containers — Create a new container.
-pub(crate) async fn handle_container_create(
-    state: State<Arc<AppState>>,
-    Json(body): Json<CreateContainerRequest>,
-) -> Result<Json<serde_json::Value>, AppError> {
-    state.kernel.create_container(&body.name).await
-        .map(|_| Json(serde_json::json!({"created": body.name})))
-        .map_err(|e| AppError::Internal(e.to_string()))
-}
-
-/// GET /api/toolchains — List available toolchain templates.
-pub(crate) async fn handle_toolchains_list() -> Json<Vec<ToolchainInfo>> {
-    Json(vec![
-        ToolchainInfo { id: "default".into(), languages: vec!["bash".into(), "python3".into()] },
-        ToolchainInfo { id: "rust".into(), languages: vec!["rust".into()] },
-        ToolchainInfo { id: "node".into(), languages: vec!["typescript".into(), "javascript".into()] },
-        ToolchainInfo { id: "python".into(), languages: vec!["python3".into()] },
-    ])
 }
 
 // ---------------------------------------------------------------------------

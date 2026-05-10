@@ -58,12 +58,6 @@ enum Command {
         input: String,
     },
 
-    /// Manage container gardens.
-    Garden {
-        #[command(subcommand)]
-        action: GardenAction,
-    },
-
     /// Show system status.
     Status,
 
@@ -110,26 +104,6 @@ enum Command {
     Program {
         /// Program name to display.
         name: String,
-    },
-}
-
-#[derive(Debug, Subcommand)]
-enum GardenAction {
-    /// Create a new garden workspace.
-    New { name: String },
-    /// Start a garden container.
-    Up { name: String },
-    /// Stop a garden container.
-    Down { name: String },
-    /// Remove a garden entirely.
-    Remove { name: String },
-    /// List all gardens.
-    List,
-    /// Execute a command inside a garden.
-    Exec {
-        name: String,
-        #[arg(trailing_var_arg = true)]
-        command: Vec<String>,
     },
 }
 
@@ -269,70 +243,6 @@ async fn cmd_run(prompt: &str, config_path: &Path, model_id: &str) -> Result<()>
     Ok(())
 }
 
-async fn cmd_garden(action: GardenAction, config_path: &Path) -> Result<()> {
-    let kernel = Kernel::builder()
-        .config_path(config_path.to_path_buf())
-        .build()
-        .await?;
-
-    match action {
-        GardenAction::New { name } => {
-            kernel.container_manager.new_container(&name).await?;
-            println!("Garden '{}' created.", name);
-        }
-        GardenAction::Up { name } => {
-            if !kernel.container_manager.is_backend_available() {
-                println!("⚠️  Container runtime not available. Garden metadata recorded.");
-                println!("   To start the container, install 'container' CLI from Xcode.");
-            } else {
-                kernel.container_manager.start_container(&name).await?;
-                println!("Garden '{}' started.", name);
-            }
-        }
-        GardenAction::Down { name } => {
-            if !kernel.container_manager.is_backend_available() {
-                println!("⚠️  Container runtime not available.");
-            } else {
-                kernel.container_manager.stop_container(&name).await?;
-                println!("Garden '{}' stopped.", name);
-            }
-        }
-        GardenAction::Remove { name } => {
-            kernel.container_manager.remove_container(&name).await?;
-            println!("Garden '{}' removed.", name);
-        }
-        GardenAction::List => {
-            let gardens: Vec<_> = kernel.container_manager.list_containers().await?;
-            if gardens.is_empty() {
-                println!("No gardens found.");
-            } else {
-                println!("{:30} {:15} IMAGE", "NAME", "STATUS");
-                println!("{}", "-".repeat(70));
-                for g in &gardens {
-                    let status = if g.running { "running" } else { "stopped" };
-                    println!("{:30} {:15} {}", g.name, status, g.image_tag);
-                }
-            }
-        }
-        GardenAction::Exec { name, command } => {
-            if !kernel.container_manager.is_backend_available() {
-                bail!("Container runtime not available. Cannot exec in garden.");
-            }
-            let result = kernel.container_manager.exec_in_container(&name, &command, None).await?;
-            if !result.stdout.is_empty() {
-                print!("{}", result.stdout);
-            }
-            if !result.stderr.is_empty() {
-                eprint!("{}", result.stderr);
-            }
-            if result.exit_code != 0 {
-                std::process::exit(result.exit_code);
-            }
-        }
-    }
-    Ok(())
-}
-
 async fn cmd_pkg(action: PkgAction, config_path: &Path) -> Result<()> {
     let kernel = Kernel::builder()
         .config_path(config_path.to_path_buf())
@@ -437,27 +347,10 @@ async fn cmd_status(config_path: &Path) -> Result<()> {
     println!("  Version: {}", env!("CARGO_PKG_VERSION"));
     println!("  Config: {}", config_path.display());
     println!("  Workspace: {}", kernel.config.kernel.workspace);
-    println!("  Garden path: {}", kernel.config.container.container_path);
     println!();
-
-    let backend_available = kernel.container_manager.is_backend_available();
-    println!("Container Runtime:");
-    println!("  Backend: {}", kernel.container_manager.backend_name());
-    println!("  Available: {} ({})",
-        if backend_available { "yes" } else { "no" },
-        if backend_available { "ready" } else { "install container CLI from Xcode" });
-    println!();
-
-    let gardens: Vec<_> = kernel.container_manager.list_containers().await?;
-    println!("Gardens: {} known", gardens.len());
-    if !gardens.is_empty() {
-        let running = gardens.iter().filter(|g| g.running).count();
-        println!("  {} running, {} stopped", running, gardens.len() - running);
-    }
 
     let api_key_vars = ["ANTHROPIC_API_KEY", "OPENAI_API_KEY", "API_KEY"];
     let has_key = api_key_vars.iter().any(|v| std::env::var(v).is_ok());
-    println!();
     println!("API Keys:");
     println!("  Configured: {} ({})",
         if has_key { "yes" } else { "no" },
@@ -592,9 +485,6 @@ async fn main() -> Result<()> {
             let input_path = std::path::PathBuf::from(&input);
             oxios_kernel::backup::restore_backup(&kernel.state_store, &input_path).await?;
             Ok(())
-        }
-        Some(Command::Garden { action }) => {
-            cmd_garden(action, &config_path).await
         }
         Some(Command::Config { action }) => {
             cmd_config(action, &config_path).await

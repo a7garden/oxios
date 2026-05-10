@@ -21,14 +21,13 @@ use std::sync::Arc;
 
 use crate::circuit_breaker::CircuitBreaker;
 use crate::config::OxiosConfig;
-use crate::container_manager::ContainerManager;
 use crate::host_exec::HostExecBridge;
 use crate::mcp::McpBridge;
 use crate::persona_manager::PersonaManager;
 use crate::program::ProgramManager;
 use crate::state_store::StateStore;
 use crate::memory::{MemoryEntry, MemoryManager, MemoryType};
-use crate::tools::{ContainerExecTool, HostExecTool, McpToolWrapper, ProgramTool};
+use crate::tools::{HostExecTool, McpToolWrapper, ProgramTool};
 use crate::tools::memory_tools::{MemoryWriteTool, MemoryReadTool, MemorySearchTool};
 use oxios_ouroboros::{ExecutionResult, Seed};
 
@@ -80,8 +79,6 @@ struct ExecuteState {
 pub struct AgentRuntime {
     provider: Arc<dyn Provider>,
     config: AgentRuntimeConfig,
-    /// Container manager — always present, required for workspace execution.
-    container: Arc<ContainerManager>,
     host_bridge: Option<Arc<HostExecBridge>>,
     program_manager: Option<Arc<ProgramManager>>,
     oxios_config: Option<OxiosConfig>,
@@ -92,35 +89,25 @@ pub struct AgentRuntime {
     memory_manager: Option<Arc<MemoryManager>>,
 }
 
-/// Create a minimal placeholder ContainerManager for cases where
-/// no real container is available (e.g., during initialization before
-/// kernel is fully set up, or in tests).
-fn make_placeholder_container_manager() -> ContainerManager {
+/// Create a minimal HostExecBridge for cases where no bridge is available
+/// (e.g., during initialization or in tests).
+fn make_placeholder_host_exec() -> Arc<HostExecBridge> {
     let tmp = tempfile::tempdir().unwrap();
-    let state = StateStore::new(tmp.path().join("state")).unwrap();
-    let host_exec = Arc::new(
+    Arc::new(
         HostExecBridge::new(tmp.path().to_path_buf(), vec!["echo".to_string()])
             .expect("placeholder needs non-empty allowlist"),
-    );
-    ContainerManager::with_apple_backend(
-        host_exec,
-        Arc::new(state),
-        tmp.path().join("containers"),
     )
 }
 
 impl AgentRuntime {
     /// Creates a new agent runtime with the given LLM provider and default config.
     pub fn new(provider: Arc<dyn Provider>, model_id: impl Into<String>) -> Self {
-        // NOTE: container must be set via with_container() before execute()
-        // A placeholder is used until with_container() is called.
         Self {
             provider,
             config: AgentRuntimeConfig {
                 model_id: model_id.into(),
                 ..Default::default()
             },
-            container: Arc::new(make_placeholder_container_manager()),
             host_bridge: None,
             program_manager: None,
             oxios_config: None,
@@ -133,13 +120,6 @@ impl AgentRuntime {
     /// Attach a PersonaManager for persona system prompt injection.
     pub fn with_persona_manager(mut self, pm: Arc<PersonaManager>) -> Self {
         self.persona_manager = Some(pm);
-        self
-    }
-
-    /// Attach a ContainerManager for container execution.
-    /// Container is always required — set via this method or during construction.
-    pub fn with_container(mut self, container: Arc<ContainerManager>) -> Self {
-        self.container = container;
         self
     }
 
@@ -229,7 +209,6 @@ impl AgentRuntime {
         let config = self.config.clone();
         let provider = Arc::clone(&self.provider);
         let seed_id = seed.id;
-        let container = Arc::clone(&self.container);
         let host_bridge = self.host_bridge.clone();
         let program_manager = self.program_manager.clone();
         let oxios_config = self.oxios_config.clone();
@@ -244,7 +223,6 @@ impl AgentRuntime {
                     system_prompt,
                     prompt,
                     seed_id,
-                    container,
                     host_bridge,
                     program_manager,
                     oxios_config,
@@ -285,7 +263,6 @@ fn run_agent_loop(
     system_prompt: String,
     prompt: String,
     seed_id: uuid::Uuid,
-    container: Arc<ContainerManager>,
     host_bridge: Option<Arc<HostExecBridge>>,
     program_manager: Option<Arc<ProgramManager>>,
     oxios_config: Option<OxiosConfig>,
@@ -323,19 +300,13 @@ fn run_agent_loop(
     registry.register(LsTool::new());
 
     // ── Tier 2: Oxios execution tools ──
-    let container_exec = if let Some(ref bridge) = host_bridge {
-        Arc::new(ContainerExecTool::new_with_host_bridge(
-            container.clone(),
-            bridge.clone(),
-        ))
+    let host_exec = if let Some(ref bridge) = host_bridge {
+        Arc::new(HostExecTool::new(bridge.clone()))
     } else {
-        Arc::new(ContainerExecTool::new(container.clone()))
+        // Fallback for tests
+        Arc::new(HostExecTool::new(make_placeholder_host_exec()))
     };
-    registry.register_arc(container_exec.clone());
-
-    if let Some(bridge) = host_bridge {
-        let host_exec = Arc::new(HostExecTool::new(bridge.clone()));
-        registry.register_arc(host_exec.clone());
+    registry.register_arc(host_exec.clone());
 
         // ── Tier 3: Program tools (dynamic) + Tier 4: MCP servers ──
         if let Some(pm) = program_manager {
@@ -415,7 +386,6 @@ fn run_agent_loop(
                             tool_def,
                             &program.meta.host_requirements,
                             &container_config,
-                            container_exec.clone(),
                             host_exec.clone(),
                         );
                         registry.register(tool);
@@ -423,7 +393,6 @@ fn run_agent_loop(
                 }
             }
         }
-    }
 
     // ── Tier 5: Memory tools ──
     if let Some(ref mm) = memory_manager {
@@ -593,8 +562,7 @@ fn build_system_prompt(seed: &Seed, skill_contents: &[String], persona_prompt: O
     // Execution environment guidance
     prompt.push_str(
         "\n## Execution Environment\n\
-         Use `container_exec` for workspace commands (compilation, tests, etc.).\n\
-         Use `host_exec` for host commands (git, gh, osascript, etc.).\n",
+         Use `host_exec` for all command execution (git, gh, osascript, etc.).\n",
     );
 
     prompt.push_str(
@@ -664,10 +632,10 @@ mod tests {
 
         // Register the tools the program depends on.
         registry.register(DummyTool { name: "read".into() });
-        registry.register(DummyTool { name: "container_exec".into() });
+        registry.register(DummyTool { name: "host_exec".into() });
 
-        // Simulate a program that requires "read" and "container_exec".
-        let required_tools = vec!["read".to_string(), "container_exec".to_string()];
+        // Simulate a program that requires "read" and "host_exec".
+        let required_tools = vec!["read".to_string(), "host_exec".to_string()];
 
         // Validation: all required tools must exist in the registry.
         let missing: Vec<&str> = required_tools
@@ -684,13 +652,13 @@ mod tests {
     fn test_requires_tools_validation_fails() {
         let registry = ToolRegistry::new();
 
-        // Only register "read", not "container_exec" or "nonexistent".
+        // Only register "read", not "host_exec" or "nonexistent".
         registry.register(DummyTool { name: "read".into() });
 
         // Simulate a program that requires tools that don't exist.
         let required_tools = vec![
             "read".to_string(),       // exists
-            "container_exec".to_string(), // missing
+            "host_exec".to_string(), // missing
             "nonexistent".to_string(), // missing
         ];
 
@@ -701,7 +669,7 @@ mod tests {
             .map(|s| s.as_str())
             .collect();
 
-        assert_eq!(missing, vec!["container_exec", "nonexistent"]);
+        assert_eq!(missing, vec!["host_exec", "nonexistent"]);
     }
 
     #[test]
