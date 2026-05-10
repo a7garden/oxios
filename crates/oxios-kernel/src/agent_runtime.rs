@@ -26,6 +26,8 @@ use crate::persona_manager::PersonaManager;
 use crate::program::ProgramManager;
 use crate::memory::{MemoryEntry, MemoryManager, MemoryType};
 use crate::tools::{ExecTool, McpToolWrapper, ProgramTool};
+use crate::config::ExecConfig;
+use crate::AccessManager;
 use crate::tools::memory_tools::{MemoryWriteTool, MemoryReadTool, MemorySearchTool};
 use oxios_ouroboros::{ExecutionResult, Seed};
 
@@ -84,8 +86,10 @@ pub struct AgentRuntime {
     mcp_bridge: Option<Arc<McpBridge>>,
     /// Memory manager for cross-session memory.
     memory_manager: Option<Arc<MemoryManager>>,
-    /// ExecTool for unified execution.
-    exec_tool: Option<Arc<ExecTool>>,
+    /// ExecTool config + access manager for per-agent ExecTool creation.
+    exec_config: Option<Arc<ExecConfig>>,
+    /// Access manager shared across per-agent ExecTool instances.
+    exec_access: Option<Arc<Mutex<AccessManager>>>,
 }
 
 impl AgentRuntime {
@@ -102,7 +106,8 @@ impl AgentRuntime {
             persona_manager: None,
             mcp_bridge: None,
             memory_manager: None,
-            exec_tool: None,
+            exec_config: None,
+            exec_access: None,
         }
     }
 
@@ -136,9 +141,18 @@ impl AgentRuntime {
         self
     }
 
-    /// Attach an ExecTool for unified execution.
-    pub fn with_exec_tool(mut self, tool: Arc<ExecTool>) -> Self {
-        self.exec_tool = Some(tool);
+    /// Attach ExecTool config for per-agent execution.
+    ///
+    /// Rather than sharing one `Arc<ExecTool>` across all agents (which would
+    /// cause race conditions on agent context), we store the config and
+    /// create a fresh `ExecTool::for_agent()` per execution.
+    pub fn with_exec_config(
+        mut self,
+        config: Arc<ExecConfig>,
+        access: Arc<Mutex<AccessManager>>,
+    ) -> Self {
+        self.exec_config = Some(config);
+        self.exec_access = Some(access);
         self
     }
 
@@ -202,7 +216,8 @@ impl AgentRuntime {
         let oxios_config = self.oxios_config.clone();
         let mcp_bridge_for_runtime = self.mcp_bridge.as_ref().map(Arc::clone);
         let memory_manager = self.memory_manager.clone();
-        let exec_tool = self.exec_tool.clone();
+        let exec_config = self.exec_config.clone();
+        let exec_access = self.exec_access.clone();
 
         let (final_content, steps_completed, success) =
             tokio::task::spawn_blocking(move || {
@@ -216,7 +231,8 @@ impl AgentRuntime {
                     oxios_config,
                     mcp_bridge_for_runtime,
                     memory_manager,
-                    exec_tool,
+                    exec_config,
+                    exec_access,
                 )
             })
             .await??;
@@ -256,7 +272,8 @@ fn run_agent_loop(
     oxios_config: Option<OxiosConfig>,
     mcp_bridge_for_runtime: Option<Arc<McpBridge>>,
     memory_manager: Option<Arc<MemoryManager>>,
-    exec_tool: Option<Arc<ExecTool>>,
+    exec_config: Option<Arc<ExecConfig>>,
+    exec_access: Option<Arc<Mutex<AccessManager>>>,
 ) -> Result<(String, usize, bool)> {
     // ── Workspace Scoping: restrict agent file access ──
     let workspace = std::env::temp_dir().join("oxios-agent-workspace");
@@ -280,7 +297,16 @@ fn run_agent_loop(
     registry.register(FindTool::new());
     registry.register(LsTool::new());
 
-    // ── ExecTool: unified execution tool ──
+    // ── ExecTool: unified execution tool (per-agent instance) ──
+    let agent_name = format!("seed-{}", seed_id);
+    let exec_tool: Option<Arc<ExecTool>> = match (exec_config, exec_access) {
+        (Some(cfg), Some(access)) => {
+            let tool = ExecTool::for_agent(cfg, access, agent_name);
+            tracing::debug!(agent = %seed_id, "ExecTool created for agent");
+            Some(Arc::new(tool))
+        }
+        _ => None,
+    };
     if let Some(ref exec) = exec_tool {
         registry.register_arc(exec.clone());
     }

@@ -145,7 +145,7 @@ mod tests {
         let host_reqs = ProgramHostRequirements::default();
 
         let exec_config = Arc::new(crate::config::ExecConfig::default());
-        let exec_access = Arc::new(tokio::sync::Mutex::new(crate::access_manager::AccessManager::new()));
+        let exec_access = Arc::new(parking_lot::Mutex::new(crate::access_manager::AccessManager::new()));
         let exec = Arc::new(ExecTool::new(exec_config, exec_access));
 
         let tool = ProgramTool::from_definition(
@@ -172,7 +172,7 @@ mod tests {
         let host_reqs = ProgramHostRequirements::default();
 
         let exec_config = Arc::new(crate::config::ExecConfig::default());
-        let exec_access = Arc::new(tokio::sync::Mutex::new(crate::access_manager::AccessManager::new()));
+        let exec_access = Arc::new(parking_lot::Mutex::new(crate::access_manager::AccessManager::new()));
         let exec = Arc::new(ExecTool::new(exec_config, exec_access));
 
         let tool = ProgramTool::from_definition(
@@ -199,7 +199,7 @@ mod tests {
         let host_reqs = ProgramHostRequirements::default();
 
         let exec_config = Arc::new(crate::config::ExecConfig::default());
-        let exec_access = Arc::new(tokio::sync::Mutex::new(crate::access_manager::AccessManager::new()));
+        let exec_access = Arc::new(parking_lot::Mutex::new(crate::access_manager::AccessManager::new()));
         let exec = Arc::new(ExecTool::new(exec_config, exec_access));
 
         let tool = ProgramTool::from_definition(

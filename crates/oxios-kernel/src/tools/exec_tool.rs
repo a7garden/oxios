@@ -25,7 +25,8 @@ use async_trait::async_trait;
 use oxi_agent::{AgentTool, AgentToolResult};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use tokio::sync::{Mutex, oneshot};
+use parking_lot::Mutex;
+use tokio::sync::oneshot;
 
 use crate::access_manager::AccessManager;
 use crate::config::ExecConfig;
@@ -59,17 +60,39 @@ pub struct ExecResult {
 /// Wraps both shell-string and structured binary+args execution behind a
 /// single `AgentTool` implementation that uses a `mode` parameter to
 /// dispatch to the appropriate method.
+///
+/// Access control is enforced based on `agent_name`:
+/// - **shell_exec**: audit logging (cannot sandbox arbitrary shell).
+/// - **structured_exec**: pre-flight permission check via `AccessManager`.
 pub struct ExecTool {
     /// Execution configuration (allowlist, timeouts).
     config: Arc<ExecConfig>,
     /// Access manager for permission checks.
     access: Arc<Mutex<AccessManager>>,
+    /// Agent name for access control and audit logging.
+    /// `None` = unrestricted (tests / development mode).
+    agent_name: Option<String>,
 }
 
 impl ExecTool {
     /// Create a new `ExecTool` with the given config and access manager.
+    ///
+    /// No agent context is attached, so access control is not enforced.
+    /// Use [`ExecTool::for_agent`] for production.
     pub fn new(config: Arc<ExecConfig>, access: Arc<Mutex<AccessManager>>) -> Self {
-        Self { config, access }
+        Self { config, access, agent_name: None }
+    }
+
+    /// Create a new `ExecTool` bound to a specific agent.
+    ///
+    /// All executions through this instance are attributed to `agent_name`
+    /// for access control and audit logging.
+    pub fn for_agent(
+        config: Arc<ExecConfig>,
+        access: Arc<Mutex<AccessManager>>,
+        agent_name: String,
+    ) -> Self {
+        Self { config, access, agent_name: Some(agent_name) }
     }
 
     /// Execute a raw command string via `bash -c <cmd>`.
@@ -82,8 +105,21 @@ impl ExecTool {
             return Err("shell_exec: command must not be empty".to_string());
         }
 
-        // Log execution for audit trail
-        tracing::debug!(mode = "shell", command = %command.chars().take(200).collect::<String>(), "ExecTool executing");
+        // Audit: log execution with agent attribution.
+        if let Some(ref name) = self.agent_name {
+            tracing::info!(
+                agent = %name,
+                mode = "shell",
+                command = %command.chars().take(200).collect::<String>(),
+                "ExecTool: executing shell command",
+            );
+        } else {
+            tracing::debug!(
+                mode = "shell",
+                command = %command.chars().take(200).collect::<String>(),
+                "ExecTool executing",
+            );
+        }
 
         let effective_timeout = timeout_ms.clamp(1_000, self.config.max_timeout_secs * 1_000);
 
@@ -137,6 +173,17 @@ impl ExecTool {
         args: Vec<String>,
         timeout_ms: u64,
     ) -> Result<ExecResult, String> {
+        // --- Access control ---
+        if let Some(ref name) = self.agent_name {
+            let mut access = self.access.lock();
+            if !access.can_use_tool(name, binary) {
+                return Err(format!(
+                    "structured_exec: agent '{}' is not allowed to execute '{}'",
+                    name, binary
+                ));
+            }
+        }
+
         // --- Binary validation ---
 
         // Log execution for audit trail

@@ -301,7 +301,11 @@ impl KernelBuilder {
         let memory_manager = Arc::new(memory_manager);
 
         let agent_runtime = agent_runtime
-            .with_memory_manager(memory_manager.clone());
+            .with_memory_manager(memory_manager.clone())
+            .with_exec_config(
+                Arc::new(config.exec.clone()),
+                access_manager.clone(),
+            );
 
         let supervisor: Arc<dyn Supervisor> = Arc::new(BasicSupervisor::new(
             event_bus.clone(),
