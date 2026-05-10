@@ -795,14 +795,14 @@ description = "A program that requires tools"
 author = "Test"
 
 [requires_tools]
-names = ["read", "container_exec"]
+names = ["read", "exec"]
 "#;
 
         fs::write(program_dir.join("program.toml"), toml_content).unwrap();
 
         let meta = ProgramMeta::load_from_dir(program_dir).unwrap();
 
-        assert_eq!(meta.dependencies, vec!["read", "container_exec"]);
+        assert_eq!(meta.dependencies, vec!["read", "exec"]);
     }
 
     #[test]

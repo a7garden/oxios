@@ -1,8 +1,6 @@
 //! Unified execution tool for Oxios agents.
 //!
-//! Replaces both `ContainerExecTool` and `HostExecTool` with a single `ExecTool`
-//! that provides two execution modes:
-//!
+//! Provides two execution modes:
 //! - **shell** — Execute a raw command string via `bash -c <cmd>`.
 //!   Intended for general-purpose workspace commands (compilation, tests, etc.).
 //!
