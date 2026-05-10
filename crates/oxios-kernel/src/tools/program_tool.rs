@@ -17,8 +17,8 @@ use crate::program::{ProgramHostRequirements, ToolDef};
 
 /// A tool defined by a Program, with automatic execution routing.
 ///
-/// All program tools now route to `host_exec` since Oxios runs inside
-/// a container and `host_exec` provides the execution bridge.
+/// All program tools route through `ExecTool` which provides the
+/// execution environment.
 pub struct ProgramTool {
     /// Full namespaced name: `"program:{program_name}:{tool_name}"`
     full_name: String,

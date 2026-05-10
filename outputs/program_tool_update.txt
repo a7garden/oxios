@@ -1,0 +1,40 @@
+ProgramTool Migration: HostExecTool → ExecTool
+===============================================
+
+File: crates/oxios-kernel/src/tools/program_tool.rs
+
+Changes Applied:
+----------------
+
+1. IMPORTS
+   - Changed: `use super::host_exec_tool::HostExecTool;` + `use crate::config::ContainerConfig;`
+   - To:     `use super::exec_tool::ExecTool;`
+   - Removed `ContainerConfig` import (no longer needed).
+
+2. STRUCT FIELD
+   - Changed: `host_exec: Arc<HostExecTool>,`
+   - To:     `exec_tool: Arc<ExecTool>,`
+
+3. `ProgramTool::from_definition()` SIGNATURE
+   - Changed: `..., _container_config: &ContainerConfig, host_exec: Arc<HostExecTool>)`
+   - To:     `..., exec: Arc<ExecTool>)`
+   - Removed `_container_config` parameter entirely.
+
+4. INTERNAL REFERENCES
+   - `self.host_exec` → `self.exec_tool`
+   - In `execute()`: `self.host_exec.execute(...)` → `self.exec_tool.execute(...)`
+   - Variable `host_params` → `exec_params`
+   - Comment "Route to host_exec" → "Route to exec_tool"
+
+5. DOC COMMENTS
+   - Module-level doc: references to `host_exec` → `ExecTool`
+   - Struct-level doc: references to `host_exec` → `ExecTool`
+   - `from_definition` doc: references to `host_exec` → `ExecTool`
+
+6. TESTS (3 tests updated)
+   - `test_command_parsing`: Removed `config` variable, `HostExecTool::new(...)` → `ExecTool::new(...)`, removed `&config` from `from_definition()` call
+   - `test_single_word_command`: Same pattern
+   - `test_command_with_flags`: Same pattern
+   - All variable names updated: `host_exec_bridge` → `exec_bridge`, `host_exec` → `exec`
+
+Status: COMPLETE — All HostExecTool references migrated to ExecTool. ContainerConfig parameter removed from struct and all call sites.
