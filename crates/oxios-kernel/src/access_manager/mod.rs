@@ -38,7 +38,7 @@ use crate::types::AgentId;
 /// access.assign_workspace("code-agent", "project-alpha");
 ///
 /// // Check permissions with sandbox enforcement
-/// if access.can_access_path_in_workspace("code-agent", "/workspace/file.rs", Some("project-alpha")) {
+/// if access.can_access_path_in_workspace(&agent_id, "code-agent", "/workspace/file.rs", Some("project-alpha")) {
 ///     // allow file access within workspace
 /// }
 ///
@@ -458,18 +458,24 @@ impl AccessManager {
     ///
     /// # Returns
     /// `true` if all checks pass, `false` otherwise
+    /// Check whether an agent can access a path within its workspace.
+    ///
+    /// Verifies RBAC permissions, path allow/deny lists, and workspace boundary.
+    ///
+    /// # Arguments
+    /// * `agent_id` - The agent's unique identifier
+    /// * `agent_name` - Human-readable agent name for permission lookup
+    /// * `path` - The path to check access for
+    /// * `workspace` - Optional explicit workspace name
     pub fn can_access_path_in_workspace(
         &mut self,
+        agent_id: &AgentId,
         agent_name: &str,
         path: &str,
         workspace: Option<&str>,
     ) -> bool {
-        // First check RBAC via the agent's role
-        // Use agent_name as the subject identifier (not a random UUID)
-        let subject = Subject::Agent(AgentId::new_v4());
-        // TODO: Pass actual AgentId from caller instead of generating new one.
-        //       This requires changing the method signature to accept AgentId.
-        //       For now, RBAC check uses agent_name-based path check below.
+        // RBAC check using the actual agent_id
+        let subject = Subject::Agent(*agent_id);
         let action = Action::AccessPath(path.to_string());
         let rbac_allowed = self.rbac.check_permission(&subject, &action, path);
 
