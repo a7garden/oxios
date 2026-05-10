@@ -39,7 +39,7 @@ pub async fn create_backup(
     };
 
     let categories = [
-        "seeds", "evals", "containers", "memory/conversations",
+        "seeds", "evals", "memory/conversations",
         "memory/sessions", "memory/facts", "memory/episodes",
         "memory/knowledge", "sessions", "agent_groups",
     ];
