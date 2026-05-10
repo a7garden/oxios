@@ -1,0 +1,53 @@
+Phase 1: ExecTool wired into AgentRuntime (alongside existing tools, nothing removed)
+======================================================================================
+
+File: crates/oxios-kernel/src/agent_runtime.rs
+
+Changes Made:
+-------------
+
+1. Import: Added `ExecTool` to the existing tools import line:
+   ```rust
+   use crate::tools::{ExecTool, HostExecTool, McpToolWrapper, ProgramTool};
+   ```
+
+2. AgentRuntime struct: Added new field:
+   ```rust
+   exec_tool: Option<Arc<ExecTool>>,
+   ```
+
+3. AgentRuntime::new(): Added `exec_tool: None,` to struct initialization.
+
+4. Builder method: Added `with_exec_tool()`:
+   ```rust
+   pub fn with_exec_tool(mut self, tool: Arc<ExecTool>) -> Self {
+       self.exec_tool = Some(tool);
+       self
+   }
+   ```
+
+5. execute() method: Passes `exec_tool` through to `run_agent_loop` via spawn_blocking.
+
+6. run_agent_loop(): 
+   - Added `exec_tool: Option<Arc<ExecTool>>` parameter.
+   - After HostExecTool registration, registers ExecTool if present:
+     ```rust
+     if let Some(ref exec) = exec_tool {
+         registry.register_arc(exec.clone());
+     }
+     ```
+
+7. ProgramTool::from_definition call site updated:
+   - The existing ProgramTool::from_definition signature was already changed to accept
+     `Arc<ExecTool>` instead of `&ContainerConfig` + `Arc<HostExecTool>`.
+   - Updated the call to use `exec.clone()` when exec_tool is Some, with a warning
+     log when it's None (program tools skipped gracefully).
+
+8. Prefixed `container_config` with underscore (`_container_config`) since it's no
+   longer used by ProgramTool (suppresses unused variable warning).
+
+Notes:
+- HostExecBridge and HostExecTool are preserved for backward compatibility (Phase 1).
+- The removal of host_bridge happens in Phase 3 as specified.
+- Compilation succeeds with no warnings in agent_runtime.rs.
+- ExecTool registration is placed immediately after HostExecTool in the tool tier hierarchy.

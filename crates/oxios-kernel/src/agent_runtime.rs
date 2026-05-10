@@ -328,7 +328,7 @@ fn run_agent_loop(
         if let Some(pm) = program_manager {
             let rt = tokio::runtime::Handle::current();
             let programs = rt.block_on(async { pm.list_enabled().await });
-            let container_config = oxios_config
+            let _container_config = oxios_config
                 .as_ref()
                 .map(|c| &c.container)
                 .cloned()
@@ -397,14 +397,21 @@ fn run_agent_loop(
 
                 for tool_def in &program.meta.tools {
                     if !tool_def.command.is_empty() {
-                        let tool = ProgramTool::from_definition(
-                            &program.meta.name,
-                            tool_def,
-                            &program.meta.host_requirements,
-                            &container_config,
-                            host_exec.clone(),
-                        );
-                        registry.register(tool);
+                        if let Some(ref exec) = exec_tool {
+                            let tool = ProgramTool::from_definition(
+                                &program.meta.name,
+                                tool_def,
+                                &program.meta.host_requirements,
+                                exec.clone(),
+                            );
+                            registry.register(tool);
+                        } else {
+                            tracing::warn!(
+                                program = %program.meta.name,
+                                tool = %tool_def.name,
+                                "Skipping program tool: no ExecTool available"
+                            );
+                        }
                     }
                 }
             }
