@@ -6,7 +6,7 @@ Oxios is an Agent Operating System built in Rust. It combines Unix philosophy (m
 
 **Engine:** `oxi-ai` + `oxi-agent` from `pi2oxi` are consumed as path dependencies. Never reimplement what oxi already provides.
 
-**Runtime:** Apple Container on macOS Silicon. Linux support is deferred.
+**Runtime:** Direct host execution via `ExecTool` with workspace-based sandboxing.
 
 ---
 
@@ -127,7 +127,7 @@ curl -X POST http://127.0.0.1:4200/api/cron-jobs \
 │                                                                │
 │  ┌────────────────────────────────────────────────────────┐   │
 │  │          Agent Runtime (oxi-agent)                      │   │
-│  │  tools: read, write, edit, bash, grep, find, ls         │   │
+│  │  tools: read, write, edit, exec, grep, find, ls         │   │
 │  │  LLM: oxi-ai (multi-provider)                         │   │
 │  └────────────────────────────────────────────────────────┘   │
 │                                                                │
@@ -140,12 +140,11 @@ curl -X POST http://127.0.0.1:4200/api/cron-jobs \
 │  │          Programs & MCP                                 │   │
 │  │  ProgramManager | McpBridge | HostToolValidator         │   │
 │  └────────────────────────────────────────────────────────┘   │
-└────────────────────────────────────────────────────────────────┘
-                      │
-                      ▼
-┌────────────────────────────────────────────────────────────────┐
-│              Container Garden (Apple Container)                │
-│              macOS Silicon only                                │
+│                                                                │
+│  ┌────────────────────────────────────────────────────────┐   │
+│  │          ExecTool (host execution)                      │   │
+│  │  workspace exec | structured commands | access control  │   │
+│  └────────────────────────────────────────────────────────┘   │
 └────────────────────────────────────────────────────────────────┘
 ```
 
@@ -180,9 +179,9 @@ max_agents = 16
 host = "127.0.0.1"
 port = 4200
 
-[container]
-garden_path = "~/.oxios/gardens"
-allowed_host_commands = ["git", "gh"]
+[exec]
+allowed_commands = ["git", "gh"]
+default_timeout_secs = 120
 
 [scheduler]
 max_concurrent = 8
@@ -208,14 +207,6 @@ oxios
 # Run a single prompt
 oxios run "do something"
 
-# Garden management
-oxios garden new <name>       # Create a new garden workspace
-oxios garden up <name>       # Start a garden container
-oxios garden down <name>      # Stop a garden container
-oxios garden remove <name>   # Remove a garden
-oxios garden list            # List all gardens
-oxios garden exec <name> -- cmd args...  # Execute command in garden
-
 # Program management
 oxios program install <path>  # Install a program from directory
 oxios program list           # List installed programs
@@ -235,12 +226,6 @@ oxios config get <key>       # Get a config value
 
 ### Options
 
-```bash
-oxios --help                 # Show help
-oxios -c ~/.oxios.toml       # Use custom config path
-oxios -v                     # Verbose logging (debug level)
-oxios garden new myapp       # Create garden "myapp"
-oxios garden up myapp        # Start the garden
 ```
 
 ---
@@ -264,15 +249,15 @@ Oxios uses TOML configuration at `~/.oxios/config.toml`.
 | `host` | String | `"127.0.0.1"` | Web server bind host |
 | `port` | u16 | `4200` | Web server port |
 
-### `[container]`
+### `[exec]`
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| `garden_path` | String | `~/.oxios/gardens` | Base directory for gardens |
-| `image_tag` | String | `"oxios:latest"` | Default container image |
-| `allowed_host_commands` | Vec\<String\> | `[]` (all allowed) | Whitelist for host exec |
-| `memory_limit` | String | `"4g"` | Default memory limit |
-| `cpu_limit` | u64 | `4` | Default CPU limit |
+| `allowed_commands` | Vec\<String\> | `[]` (all allowed) | Whitelist for host exec |
+| `default_timeout_secs` | u64 | `120` | Default timeout per exec call |
+| `max_timeout_secs` | u64 | `600` | Maximum allowed timeout |
+| `required_host_tools` | Vec\<String\> | `[]` | Host tools that MUST be present |
+| `optional_host_tools` | Vec\<String\> | `[]` | Host tools checked lazily |
 
 ### `[scheduler]`
 
@@ -371,15 +356,10 @@ GET  /api/memory             → [{ name, category }]
 GET  /api/memory/:name       → { name, category, content }
 ```
 
-### Gardens
+### Exec
 
 ```
-GET    /api/gardens                 → [{ name, image_tag, running, created_at }]
-POST   /api/gardens                 → { name } → garden summary
-POST   /api/gardens/:name/start    → { status, name }
-POST   /api/gardens/:name/stop     → { status, name }
-DELETE /api/gardens/:name          → { status, name }
-POST   /api/gardens/:name/exec     → { command, workdir? } → { stdout, stderr, exit_code, duration_ms }
+POST /api/exec     → { command, args?, workdir?, timeout? } → { stdout, stderr, exit_code, duration_ms }
 ```
 
 ### Programs (OS-level applications)
@@ -462,26 +442,28 @@ oxios/
 ├── CHANGELOG.md              # Release notes
 │
 ├── crates/
-│   ├── oxios-kernel/          # Core: supervisor, event bus, state store, container
+│   ├── oxios-kernel/          # Core: supervisor, event bus, state store, exec
 │   │   └── src/
 │   │       ├── lib.rs              # Public exports
 │   │       ├── supervisor.rs       # Agent lifecycle (fork/exec/wait/kill)
 │   │       ├── event_bus.rs        # Broadcast event bus (KernelEvent)
 │   │       ├── state_store.rs      # Markdown-based persistent state
 │   │       ├── config.rs           # TOML configuration (OxiosConfig)
-│   │       ├── container.rs         # Apple Container backend
-│   │       ├── garden.rs            # Garden lifecycle manager
-│   │       ├── host_exec.rs         # Secure host command execution bridge
 │   │       ├── orchestrator.rs      # Ouroboros lifecycle coordinator
 │   │       ├── agent_runtime.rs     # oxi-agent wrapper for seed execution
+│   │       ├── host_tools.rs         # HostToolValidator (required host tools)
 │   │       ├── program.rs            # ProgramManager (OS-level programs)
 │   │       ├── skill.rs              # SkillStore (markdown instruction templates)
 │   │       ├── mcp.rs                # McpBridge (MCP protocol awareness)
-│   │       ├── host_tools.rs         # HostToolValidator (minimal container)
 │   │       ├── scheduler.rs           # AgentScheduler (AIOS-inspired)
 │   │       ├── context_manager.rs      # ContextManager (3-tier hierarchy)
 │   │       ├── access_manager.rs      # AccessManager (OWASP-inspired)
 │   │       └── types.rs               # AgentId, AgentInfo, AgentStatus
+│   │       └── tools/
+│   │           ├── exec_tool.rs       # ExecTool (host command execution)
+│   │           ├── program_tool.rs    # ProgramTool (routes through ExecTool)
+│   │           ├── mcp_tool.rs        # MCP tool bridge
+│   │           └── memory_tools.rs    # Memory recall/store tools
 │   │
 │   ├── oxios-ouroboros/       # Ouroboros spec-first protocol
 │   │   └── src/
@@ -511,8 +493,7 @@ oxios/
 │       │   └── channel.rs     # WebChannel impl of Channel trait
 │       └── static/
 │           ├── index.html     # Dashboard UI
-│           ├── default-config.toml
-│           └── Containerfile
+│           └── default-config.toml
 │
 └── docs/
 ```
@@ -545,13 +526,18 @@ User → WebChannel → Gateway → Orchestrator → OuroborosEngine
                                                Result ← Gateway ← WebChannel ← User
 ```
 
-**Garden lifecycle:**
+**Execution model:**
 ```
-oxios garden new myapp     → Create directory structure + Containerfile
-oxios garden up myapp      → Apple Container run → garden running
-oxios garden exec myapp -- cmd   → container exec → result
-oxios garden down myapp    → container stop/delete
-oxios garden remove myapp  → Delete directory + metadata
+Agent needs to run a command
+        ↓
+ExecTool::call() invoked
+        ↓
+  ├── workspace mode → shell exec in workspace directory
+  └── structured mode → binary must be in allowed_commands allowlist
+        ↓
+AccessManager checks permissions → allow / deny
+        ↓
+Result returned to agent
 ```
 
 **Program lifecycle:**

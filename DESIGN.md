@@ -81,16 +81,10 @@ Both philosophies reject uncertainty. Unix fails fast on bad input. Ouroboros cl
 │  │  │  (OS-level apps) │ │  (MCP protocol awareness)    │ │   │
 │  │  └──────────────────┘ └───────────────────────────────┘ │   │
 │  │  ┌──────────────────────────────────────────────────┐  │   │
-│  │  │           HostToolValidator                       │  │   │
-│  │  │  (minimal container + host dependency check)     │  │   │
+│  │  │        ExecTool / HostToolValidator               │  │   │
+│  │  │  (secure host command execution & validation)    │  │   │
 │  │  └──────────────────────────────────────────────────┘  │   │
 │  └────────────────────────────────────────────────────────┘   │
-└────────────────────────────────────────────────────────────────┘
-                      │
-                      ▼
-┌────────────────────────────────────────────────────────────────┐
-│              Container (Apple Container)                      │
-│              macOS Silicon only                                 │
 └────────────────────────────────────────────────────────────────┘
 ```
 
@@ -109,7 +103,7 @@ Both philosophies reject uncertainty. Unix fails fast on bad input. Ouroboros cl
 | Daemon | Background agent | Background service |
 | /bin, /usr/bin | Tool registry | Built-in tools |
 | Filesystem | Workspace | Persistent storage |
-| Container | Container | Isolated execution environment |
+| ExecTool | ExecTool | Secure host command execution |
 | Device driver | MCP server | Protocol-aware tool extension |
 | Package dependency | host_tools | Host command availability |
 
@@ -134,9 +128,7 @@ oxios/
 │   │       ├── supervisor.rs   Supervisor trait, BasicSupervisor
 │   │       ├── agent_runtime.rs oxi-agent wrapper (AgentRuntime)
 │   │       ├── orchestrator.rs  Ouroboros lifecycle coordinator
-│   │       ├── container.rs    AppleBackend implements ContainerBackend
-│   │       ├── container_manager.rs ContainerManager (container lifecycle)
-│   │       ├── host_exec.rs   HostExecBridge (secure relay)
+│   │       ├── exec_tool.rs    ExecTool (secure host command execution)
 │   │       ├── program.rs     ProgramManager (OS-level programs)
 │   │       ├── skill.rs       SkillStore (markdown instruction templates)
 │   │       ├── mcp.rs         McpBridge (MCP protocol awareness)
@@ -174,8 +166,7 @@ oxios/
 │   │   │   └── channel.rs WebChannel implements Channel trait
 │   │   └── static/
 │   │       ├── index.html      Dashboard UI (SPA)
-│   │       ├── default-config.toml
-│   │       └── Containerfile
+│   │       └── default-config.toml
 │
 └── docs/
 ```
@@ -203,10 +194,9 @@ The OS kernel. Everything passes through here.
 - **State Store** — Markdown-based persistent state (sessions, memory, workspace)
 - **Agent Runtime** — Wraps oxi-agent for tool-calling loop execution
 - **Orchestrator** — Coordinates full Ouroboros lifecycle per message
-- **Container Manager** — Container lifecycle management
 - **Program Manager** — OS-level installable applications
 - **MCP Bridge** — Model Context Protocol awareness
-- **Host Tool Validator** — Minimal container + host dependency validation
+- **Host Tool Validator** — Host dependency validation
 - **Persona Manager** — Multi-persona support for future agent customization
 
 **Agent Lifecycle:**
@@ -357,7 +347,6 @@ pub struct ProgramMeta {
     pub author: String,
     pub tools: HashMap<String, ToolDef>,
     pub host_requirements: HostRequirements,
-    pub container: ContainerSpec,
 }
 
 impl ProgramManager {
@@ -404,9 +393,9 @@ impl McpBridge {
 }
 ```
 
-### 1f. Host Tool Validator (Minimal Container)
+### 1f. Host Tool Validator
 
-Validates host dependencies for container minimalism philosophy:
+Validates host command dependencies for the execution environment:
 
 ```rust
 pub struct HostRequirements {
@@ -433,7 +422,7 @@ impl HostToolValidator {
 }
 ```
 
-**Philosophy:** Container ships essential tools only. Rich functionality comes from host.
+**Philosophy:** Agents use host tools directly. Rich functionality comes from the host system.
 
 ### 1g. Session Management
 
@@ -552,10 +541,6 @@ check_security = { description = "Run security checks on code" }
 [host_requirements]
 required = ["git"]
 optional = ["gh"]
-
-# Container minimalism
-[container]
-minimal_tools = ["bash", "jq", "ripgrep"]
 ```
 
 ### Philosophy
@@ -564,35 +549,17 @@ Programs are **READ-ONLY** instruction sets. They don't execute themselves;
 they provide guidelines and tool definitions that agents consume.
 Think of them as man pages that come with metadata for discovery.
 
-### Minimal Container + Host Dependency
+### Host Dependency Validation
 
-The container ships only essential tools. Rich functionality comes from the host:
+Programs declare which host tools they need. The Host Tool Validator checks availability:
 
 ```toml
-[container]
-minimal_tools = ["curl", "git", "ripgrep", "jq", "sqlite3", "bash", "python3"]
-required_host_tools = ["git"]
-optional_host_tools = ["gh", "remindctl", "shortcuts", "osascript", "open"]
+[host_requirements]
+required = ["git"]
+optional = ["gh"]
 ```
 
-This embodies Unix philosophy: minimal inside, rich on host.
-
----
-
-## Container Isolation
-
-Apple Container based. Each Container is an isolated execution environment.
-
-**CLI:**
-
-```bash
-oxios container new project-a     ← Create container
-oxios container up project-a      ← Start container
-oxios container exec project-a -- ls /workspace
-oxios container down project-a    ← Stop container
-oxios container remove project-a  ← Delete everything
-oxios container list              ← List all containers
-```
+This embodies Unix philosophy: declare what you need, fail clearly if missing.
 
 ---
 
@@ -601,12 +568,6 @@ oxios container list              ← List all containers
 ```bash
 oxios                          Interactive mode (default — starts web server on port 4200)
 oxios run "do something"       Run single prompt through Ouroboros
-oxios container new <name>        Create container
-oxios container up <name>        Start
-oxios container down <name>      Stop
-oxios container remove <name>    Remove
-oxios container list              List
-oxios container exec <name> -- cmd args...  Execute in container
 oxios program install <path>   Install a program
 oxios program list             List installed programs
 oxios program uninstall <name> Uninstall a program
@@ -635,12 +596,11 @@ Phase 2: Ouroboros Protocol ✓
 Phase 3: Gateway + Web ✓
   ├── oxios-gateway (channel trait, routing) ✓
   ├── oxios-web (HTTP server, dashboard) ✓
-  └── Chat + Control + Browse + Containers ✓
+  └── Chat + Control + Browse ✓
 
-Phase 4: Container ✓
-  ├── Apple Container integration ✓
-  ├── Container lifecycle ✓
-  └── Host Exec Bridge ✓
+Phase 4: Exec Tool ✓
+  ├── ExecTool (secure host command execution) ✓
+  └── Host Tool Validator ✓
 
 Phase 5: AIOS Extensions ✓
   ├── AgentScheduler (priority/rate-limit) ✓
@@ -650,7 +610,7 @@ Phase 5: AIOS Extensions ✓
 Phase 6: Programs + MCP + Host Tools ✓
   ├── ProgramManager (OS-level programs) ✓
   ├── SkillStore (markdown instruction templates) ✓
-  ├── HostToolValidator (minimal container) ✓
+  ├── HostToolValidator (host dependency validation) ✓
   ├── McpBridge (MCP protocol awareness) ✓
   └── Default programs installation ✓
 
@@ -667,7 +627,7 @@ Phase 7: Channel expansion
 | Item | Value |
 |------|-------|
 | Language | Rust (edition 2021) |
-| Target | macOS Silicon (Apple Container) |
+| Target | macOS Silicon |
 | Engine | oxi-ai + oxi-agent (oxi path dependency) |
 | License | MIT |
 | Default port | 4200 |
