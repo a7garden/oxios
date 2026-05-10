@@ -70,7 +70,6 @@ Response:
   {
     "name": "my-project",
     "running": true,
-    "image_tag": "oxios:latest"
   }
 ]
 ```

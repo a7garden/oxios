@@ -74,7 +74,7 @@ impl ExecTool {
 
     /// Execute a raw command string via `bash -c <cmd>`.
     ///
-    /// This is the successor to `ContainerExecTool`'s shell execution path.
+    /// Primary shell execution path.
     /// The entire command string is forwarded to `bash -c`, so pipelines,
     /// redirects, and compound commands all work.
     pub async fn shell_exec(&self, command: &str, timeout_ms: u64) -> Result<ExecResult, String> {

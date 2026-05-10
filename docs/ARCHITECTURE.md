@@ -58,7 +58,7 @@
 │  │  EventBus      이벤트 브로드캐스트 (mqueue)             │  │
 │  │  CronScheduler 시간 기반 스케줄러 (cron)               │  │
 │  │  ResourceMon   시스템 리소스 모니터 (procfs)            │  │
-│  │  ContainerMgr  컨테이너 수명주기                        │  │
+│  │  ExecTool      호스트 명령 실행 (직접 실행)             │  │
 │  │  McpBridge     외부 프로토콜 연결 (net)                 │  │
 │  │  A2A           에이전트 간 통신 (signal)                │  │
 │  │  Orchestrator  Ouroboros 실행 엔진                     │  │
@@ -72,7 +72,7 @@
 │                                                              │
 └──────────────────────────┬──────────────────────────────────┘
                            │ kernel.spawn() → Agent 생성
-                           │ kernel.exec()  → Container/Host 실행
+                           │ kernel.exec()  → ExecTool 실행
                            ▼
 ┌─────────────────────────────────────────────────────────────┐
 │                        Runtime                               │
@@ -90,15 +90,15 @@
 │       ┌──────────────────────┼──────────────────────┐       │
 │       ▼                      ▼                      ▼       │
 │  ┌──────────┐         ┌──────────┐          ┌──────────┐    │
-│  │  Agent   │         │Container │          │   Host   │    │
+│  │  Agent   │         │ Workspace │          │   Host   │    │
 │  │          │         │          │          │          │    │
-│  │ Engine   │         │ Apple    │          │ macOS    │    │
-│  │ (oxi)    │         │Container │          │ 직접 실행 │    │
-│  │ LLM 추론 │         │ 격리 실행 │          │ git/gh   │    │
-│  │ Tool 호출│         │ 빌드/테스트│          │ osascript│    │
+│  │  (oxi)   │         │   bash    │          │ macOS    │    │
+│  │  LLM 추론 │         │  직접실행  │          │ git/gh   │    │
+│  │  Tool 호출│         │ 빌드/테스트│          │ osascript│    │
 │  └──────────┘         └──────────┘          └──────────┘    │
 │                                                              │
-│  실제로 무언가가 실행되는 곳                                    │
+│  Workspace: 디렉토리 기반 샌드박스                             │
+│  Host: ExecTool (allowlist + metachar blocking)              │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -112,7 +112,7 @@ Layer         Implementation                  Role
 Terminal      oxios-web, oxios-cli            접속 (사용자 인터페이스)
 Application   ProgramManager, programs        조합 (Kernel System Call 워크플로우)
 Kernel        oxios-kernel                    관리 (상태, 스케줄, 감사, 버전관리)
-Runtime       Agent + Container + Host        실행 (실제 작업)
+Runtime       Agent + Workspace + Host        실행 (실제 작업)
 Engine (oxi)  oxi-ai + oxi-agent              Kernel↔Runtime 양콕 핵심 (수평 종속성)
 ```
 
@@ -179,6 +179,6 @@ oxios/ (binary)    →  Kernel Assembly (KernelBuilder)
 | Kernel System Call | Kernel | ⚠️ 6 methods, need ~15 more |
 | Kernel Subsystems | Kernel | ✅ 20 subsystems implemented |
 | AgentRuntime | Runtime | ✅ oxi-agent wrapper |
-| Container | Runtime | ✅ Apple Container |
-| Host Exec | Runtime | ✅ UDS relay |
-| Engine (oxi) | Engine | ✅ oxi-ai 0.8.1 + oxi-agent 0.8.1 |
+| ExecTool | Runtime | ✅ Direct host execution via tokio::process::Command |
+| Workspace Sandbox | Runtime | ✅ Directory-based sandbox via AccessManager |
+| Engine (oxi) | Engine | ✅ oxi-ai + oxi-agent |
