@@ -328,12 +328,6 @@ fn run_agent_loop(
         if let Some(pm) = program_manager {
             let rt = tokio::runtime::Handle::current();
             let programs = rt.block_on(async { pm.list_enabled().await });
-            let _container_config = oxios_config
-                .as_ref()
-                .map(|c| &c.container)
-                .cloned()
-                .unwrap_or_default();
-
             // Use the pre-registered MCP bridge from kernel.rs (if available).
             // Collect server names from programs for tool registration.
             let mut mcp_server_names: Vec<String> = Vec::new();
