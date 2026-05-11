@@ -1,0 +1,23 @@
+[program]
+name = "lightpanda"
+version = "0.1.0"
+description = "Headless browser for web navigation, content extraction, and automation"
+author = "oxios"
+
+[host_requirements]
+required = ["lightpanda"]
+optional = []
+
+[tools.browse]
+description = "Open a URL and extract its text content as markdown"
+command = "lightpanda"
+arguments = [
+    { name = "url", description = "URL to browse", required = true },
+]
+
+[tools.screenshot]
+description = "Take a screenshot of a web page"
+command = "lightpanda"
+arguments = [
+    { name = "url", description = "URL to screenshot", required = true },
+]

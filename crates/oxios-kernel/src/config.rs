@@ -198,6 +198,9 @@ pub struct OxiosConfig {
     /// Channel activation configuration.
     #[serde(default)]
     pub channels: ChannelsConfig,
+    /// Headless browser configuration.
+    #[serde(default)]
+    pub browser: BrowserConfig,
 }
 
 /// Kernel configuration.
@@ -702,6 +705,57 @@ impl Default for OtelConfig {
             endpoint: default_otel_endpoint(),
             service_name: default_otel_service_name(),
             sampling_ratio: default_otel_sampling_ratio(),
+        }
+    }
+}
+
+/// Headless browser configuration.
+///
+/// Controls integration with Lightpanda CDP server.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct BrowserConfig {
+    /// Enable the browser integration.
+    #[serde(default)]
+    pub enabled: bool,
+    /// Path to the lightpanda binary.
+    /// Defaults to `"lightpanda"` (resolved from PATH).
+    #[serde(default = "default_lightpanda_binary")]
+    pub binary_path: String,
+    /// Host to bind the CDP server to.
+    #[serde(default = "default_browser_host")]
+    pub host: String,
+    /// Port for the CDP server.
+    #[serde(default = "default_browser_port")]
+    pub port: u16,
+    /// Default page load timeout in seconds.
+    #[serde(default = "default_browser_timeout")]
+    pub timeout_secs: u64,
+}
+
+fn default_lightpanda_binary() -> String {
+    "lightpanda".to_string()
+}
+
+fn default_browser_host() -> String {
+    "127.0.0.1".to_string()
+}
+
+fn default_browser_port() -> u16 {
+    9222
+}
+
+fn default_browser_timeout() -> u64 {
+    30
+}
+
+impl Default for BrowserConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            binary_path: default_lightpanda_binary(),
+            host: default_browser_host(),
+            port: default_browser_port(),
+            timeout_secs: default_browser_timeout(),
         }
     }
 }

@@ -9,6 +9,7 @@ license = "MIT"
 default = []
 otel = ["tracing-opentelemetry", "opentelemetry", "opentelemetry_sdk", "opentelemetry-otlp", "opentelemetry-stdout"]
 wasm-sandbox = ["dep:wasmtime", "dep:wasmtime-wasi"]
+browser = ["dep:chromiumoxide", "dep:base64"]
 
 [dependencies]
 oxios-ouroboros = { path = "../oxios-ouroboros" }
@@ -44,6 +45,10 @@ wasmtime = { version = "22", features = ["cranelift"], optional = true }
 wasmtime-wasi = { version = "22", optional = true }
 sysinfo = "0.35"
 dirs = "6"
+
+# Headless browser (optional)
+chromiumoxide = { version = "0.7", features = ["tokio-runtime"], optional = true }
+base64 = { version = "0.22", optional = true }
 
 # OpenTelemetry (optional)
 tracing-opentelemetry = { version = "0.28", optional = true }
