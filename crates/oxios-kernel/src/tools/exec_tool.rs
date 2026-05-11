@@ -105,8 +105,15 @@ impl ExecTool {
             return Err("shell_exec: command must not be empty".to_string());
         }
 
-        // Audit: log execution with agent attribution.
+        // Audit + access check.
         if let Some(ref name) = self.agent_name {
+            let mut access = self.access.lock();
+            if !access.can_use_tool(name, "bash") {
+                return Err(format!(
+                    "shell_exec: agent '{}' is not allowed to execute 'bash'",
+                    name
+                ));
+            }
             tracing::info!(
                 agent = %name,
                 mode = "shell",

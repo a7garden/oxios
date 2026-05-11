@@ -141,7 +141,7 @@ impl Supervisor for BasicSupervisor {
 
         tracing::info!(agent_id = %id, seed_id = %seed.id, "Running agent task");
 
-        match self.runtime.execute(seed).await {
+        match self.runtime.execute(id, seed).await {
             Ok(result) => {
                 tracing::info!(
                     agent_id = %id,

@@ -28,6 +28,7 @@ use crate::memory::{MemoryEntry, MemoryManager, MemoryType};
 use crate::tools::{ExecTool, McpToolWrapper, ProgramTool};
 use crate::config::ExecConfig;
 use crate::AccessManager;
+use crate::types::AgentId;
 use crate::tools::memory_tools::{MemoryWriteTool, MemoryReadTool, MemorySearchTool};
 use oxios_ouroboros::{ExecutionResult, Seed};
 
@@ -165,7 +166,7 @@ impl AgentRuntime {
     ///
     /// Runs inside `spawn_blocking` because `AgentLoop::run()` produces
     /// a `!Send` future (internal `Box<dyn Future>` without `Send` bound).
-    pub async fn execute(&self, seed: &Seed) -> Result<ExecutionResult> {
+    pub async fn execute(&self, agent_id: AgentId, seed: &Seed) -> Result<ExecutionResult> {
         let prompt = build_user_prompt(seed);
 
         // Collect SKILL.md content from enabled programs.
@@ -218,6 +219,7 @@ impl AgentRuntime {
         let memory_manager = self.memory_manager.clone();
         let exec_config = self.exec_config.clone();
         let exec_access = self.exec_access.clone();
+        let agent_id_clone = agent_id;
 
         let (final_content, steps_completed, success) =
             tokio::task::spawn_blocking(move || {
@@ -227,6 +229,7 @@ impl AgentRuntime {
                     system_prompt,
                     prompt,
                     seed_id,
+                    agent_id_clone,
                     program_manager,
                     oxios_config,
                     mcp_bridge_for_runtime,
@@ -268,6 +271,7 @@ fn run_agent_loop(
     system_prompt: String,
     prompt: String,
     seed_id: uuid::Uuid,
+    agent_id: AgentId,
     program_manager: Option<Arc<ProgramManager>>,
     oxios_config: Option<OxiosConfig>,
     mcp_bridge_for_runtime: Option<Arc<McpBridge>>,
@@ -298,7 +302,7 @@ fn run_agent_loop(
     registry.register(LsTool::new());
 
     // ── ExecTool: unified execution tool (per-agent instance) ──
-    let agent_name = format!("seed-{}", seed_id);
+    let agent_name = format!("agent-{}", agent_id);
     let exec_tool: Option<Arc<ExecTool>> = match (exec_config, exec_access) {
         (Some(cfg), Some(access)) => {
             let tool = ExecTool::for_agent(cfg, access, agent_name);
