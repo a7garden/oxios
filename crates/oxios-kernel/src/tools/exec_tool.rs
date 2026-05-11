@@ -789,4 +789,87 @@ mod tests {
     fn test_has_metacharacters_traversal() {
         assert!(has_metacharacters(&["../etc/passwd".into()]));
     }
+
+    // ── Access control tests ────────────────────────────────────
+
+    /// Helper: build ExecTool bound to a named agent with specific permissions.
+    fn make_agent_tool(agent_name: &str, allowed_tools: &[&str]) -> ExecTool {
+        let config = ExecConfig::default();
+        let mut access = AccessManager::new();
+        // Create default permissions, then set specific allowed tools.
+        {
+            let perms = access.get_or_create_permissions(agent_name);
+            // Clear defaults first, then add only requested tools.
+            perms.allowed_tools.clear();
+            for tool in allowed_tools {
+                perms.allow_tool(tool);
+            }
+        }
+        ExecTool::for_agent(
+            Arc::new(config),
+            Arc::new(Mutex::new(access)),
+            agent_name.to_string(),
+        )
+    }
+
+    #[tokio::test]
+    async fn test_for_agent_structured_exec_allowed() {
+        let tool = make_agent_tool("test-agent", &["echo", "ls"]);
+        let result = tool.structured_exec("echo", vec!["hello".into()], 5_000).await;
+        assert!(result.is_ok(), "Allowed binary should succeed");
+        let r = result.unwrap();
+        assert_eq!(r.exit_code, 0);
+        assert!(r.stdout.contains("hello"));
+    }
+
+    #[tokio::test]
+    async fn test_for_agent_structured_exec_denied() {
+        let tool = make_agent_tool("test-agent", &["ls"]); // no "echo"
+        let result = tool.structured_exec("echo", vec!["hello".into()], 5_000).await;
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(err.contains("not allowed to execute"), "Error should mention denial: {err}");
+        assert!(err.contains("echo"), "Error should name the denied binary: {err}");
+    }
+
+    #[tokio::test]
+    async fn test_for_agent_shell_exec_allowed() {
+        let tool = make_agent_tool("test-agent", &["bash"]);
+        let result = tool.shell_exec("echo hello", 5_000).await;
+        assert!(result.is_ok(), "Agent with 'bash' permission should succeed");
+        assert!(result.unwrap().stdout.contains("hello"));
+    }
+
+    #[tokio::test]
+    async fn test_for_agent_shell_exec_denied() {
+        let tool = make_agent_tool("test-agent", &["ls"]); // no "bash"
+        let result = tool.shell_exec("echo hello", 5_000).await;
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(err.contains("not allowed to execute"), "Error should mention denial: {err}");
+        assert!(err.contains("bash"), "Error should name 'bash': {err}");
+    }
+
+    #[tokio::test]
+    async fn test_no_agent_name_bypasses_access_control() {
+        // ExecTool::new() (agent_name=None) should NOT check permissions.
+        // This is the test/dev mode path.
+        let config = ExecConfig::default();
+        let access = AccessManager::new(); // empty — no permissions for anyone
+        let tool = ExecTool::new(Arc::new(config), Arc::new(Mutex::new(access)));
+        let result = tool.shell_exec("echo unrestricted", 5_000).await;
+        assert!(result.is_ok(), "No agent_name = no access check = unrestricted");
+    }
+
+    #[test]
+    fn test_agent_name_set_correctly() {
+        let tool = make_agent_tool("my-agent", &[]);
+        assert_eq!(tool.agent_name.as_deref(), Some("my-agent"));
+    }
+
+    #[test]
+    fn test_new_has_no_agent_name() {
+        let tool = make_tool(vec![]);
+        assert!(tool.agent_name.is_none());
+    }
 }
