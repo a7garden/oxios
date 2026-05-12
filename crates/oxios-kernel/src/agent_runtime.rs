@@ -19,13 +19,14 @@ use oxi_agent::agent_loop::config::ToolExecutionMode;
 use parking_lot::Mutex;
 use std::sync::Arc;
 
+use crate::a2a::A2AProtocol;
 use crate::circuit_breaker::CircuitBreaker;
 use crate::config::OxiosConfig;
 use crate::mcp::McpBridge;
 use crate::persona_manager::PersonaManager;
 use crate::program::ProgramManager;
 use crate::memory::{MemoryEntry, MemoryManager, MemoryType};
-use crate::tools::{ExecTool, McpToolWrapper, ProgramTool};
+use crate::tools::{A2aDelegateTool, A2aSendTool, A2aQueryTool, ExecTool, McpToolWrapper, ProgramTool};
 use crate::config::ExecConfig;
 use crate::AccessManager;
 use crate::types::AgentId;
@@ -91,6 +92,8 @@ pub struct AgentRuntime {
     exec_config: Option<Arc<ExecConfig>>,
     /// Access manager shared across per-agent ExecTool instances.
     exec_access: Option<Arc<Mutex<AccessManager>>>,
+    /// A2A protocol for inter-agent communication tools.
+    a2a: Option<Arc<A2AProtocol>>,
 }
 
 impl AgentRuntime {
@@ -109,6 +112,7 @@ impl AgentRuntime {
             memory_manager: None,
             exec_config: None,
             exec_access: None,
+            a2a: None,
         }
     }
 
@@ -154,6 +158,12 @@ impl AgentRuntime {
     ) -> Self {
         self.exec_config = Some(config);
         self.exec_access = Some(access);
+        self
+    }
+
+    /// Attach the A2A protocol for inter-agent communication tools.
+    pub fn with_a2a(mut self, a2a: Arc<A2AProtocol>) -> Self {
+        self.a2a = Some(a2a);
         self
     }
 
@@ -220,6 +230,7 @@ impl AgentRuntime {
         let exec_config = self.exec_config.clone();
         let exec_access = self.exec_access.clone();
         let agent_id_clone = agent_id;
+        let a2a_for_runtime = self.a2a.as_ref().map(Arc::clone);
 
         let (final_content, steps_completed, success) =
             tokio::task::spawn_blocking(move || {
@@ -236,6 +247,7 @@ impl AgentRuntime {
                     memory_manager,
                     exec_config,
                     exec_access,
+                    a2a_for_runtime,
                 )
             })
             .await??;
@@ -278,6 +290,7 @@ fn run_agent_loop(
     memory_manager: Option<Arc<MemoryManager>>,
     exec_config: Option<Arc<ExecConfig>>,
     exec_access: Option<Arc<Mutex<AccessManager>>>,
+    a2a_protocol: Option<Arc<A2AProtocol>>,
 ) -> Result<(String, usize, bool)> {
     // ── Workspace Scoping: restrict agent file access ──
     let workspace = std::env::temp_dir().join("oxios-agent-workspace");
@@ -411,6 +424,17 @@ fn run_agent_loop(
         registry.register_arc(read_tool);
         registry.register_arc(search_tool);
         tracing::debug!("Memory tools registered");
+    }
+
+    // ── Tier 6: A2A inter-agent communication tools ──
+    if let Some(ref a2a) = a2a_protocol {
+        let delegate_tool = Arc::new(A2aDelegateTool::new(a2a.clone(), agent_id));
+        let send_tool = Arc::new(A2aSendTool::new(a2a.clone(), agent_id));
+        let query_tool = Arc::new(A2aQueryTool::new(a2a.clone()));
+        registry.register_arc(delegate_tool);
+        registry.register_arc(send_tool);
+        registry.register_arc(query_tool);
+        tracing::debug!("A2A tools registered");
     }
 
     let tools = Arc::new(registry);

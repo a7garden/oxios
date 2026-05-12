@@ -63,6 +63,7 @@ pub use metrics::{registry, register_builtin_metrics, get_metrics};
 pub use a2a::{
     A2AMessage, A2AProtocol, A2ARequest, A2AResponse,
     AgentCard, AgentCardRegistry, TaskPriority, TaskSpec,
+    DelegationHandler,
 };
 
 // Access Manager exports (includes RBAC)

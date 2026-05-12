@@ -429,6 +429,12 @@ impl AgentQueue {
     }
 }
 
+/// Callback type invoked when a TaskDelegation message is received.
+///
+/// The dispatcher calls this with (from, to, task) and expects the
+/// handler to execute the work and return the result.
+pub type DelegationHandler = Arc<dyn Fn(AgentId, AgentId, TaskSpec) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<serde_json::Value>> + Send>> + Send + Sync>;
+
 /// A2A Protocol handler for inter-agent communication.
 #[derive(Clone)]
 pub struct A2AProtocol {
@@ -438,6 +444,8 @@ pub struct A2AProtocol {
     queues: Arc<RwLock<HashMap<AgentId, Arc<AgentQueue>>>>,
     /// Event bus for kernel events.
     event_bus: EventBus,
+    /// Optional handler invoked when a TaskDelegation message is received.
+    delegation_handler: Arc<RwLock<Option<DelegationHandler>>>,
 }
 
 impl A2AProtocol {
@@ -448,7 +456,18 @@ impl A2AProtocol {
             registry,
             queues: Arc::new(RwLock::new(HashMap::new())),
             event_bus,
+            delegation_handler: Arc::new(RwLock::new(None)),
         }
+    }
+
+    /// Register a handler that executes delegated tasks.
+    ///
+    /// When a `TaskDelegation` message arrives and a handler is set,
+    /// the protocol spawns a background task to execute it and sends
+    /// the result back as a `ResultSharing` message.
+    pub async fn set_delegation_handler(&self, handler: DelegationHandler) {
+        let mut h = self.delegation_handler.write().await;
+        *h = Some(handler);
     }
 
     /// Get or create a queue for the given agent.
@@ -463,6 +482,46 @@ impl A2AProtocol {
     /// Returns the agent card registry.
     pub fn registry(&self) -> &AgentCardRegistry {
         &self.registry
+    }
+
+    /// Execute a delegated task through the registered handler (blocking).
+    ///
+    /// Also enqueues the delegation message and publishes events for
+    /// audit trail purposes, then calls the handler directly and waits.
+    ///
+    /// Returns `None` if no handler is registered.
+    pub async fn execute_delegation(
+        &self,
+        from: AgentId,
+        to: AgentId,
+        task: TaskSpec,
+    ) -> Option<Result<serde_json::Value>> {
+        let handler = self.delegation_handler.read().await;
+        let handler_ref = handler.as_ref()?;
+
+        // Publish audit event.
+        let _ = self.event_bus.publish(KernelEvent::MessageReceived {
+            from,
+            content: format!("[task_delegation] {:?}", task.task_id),
+        });
+
+        tracing::info!(
+            from = %from,
+            to = %to,
+            task_id = %task.task_id,
+            "A2A execute_delegation: starting"
+        );
+
+        let result = handler_ref(from, to, task).await;
+
+        tracing::info!(
+            from = %from,
+            to = %to,
+            success = result.is_ok(),
+            "A2A execute_delegation: completed"
+        );
+
+        Some(result)
     }
 
     /// Sends a message from one agent to another.
@@ -521,7 +580,7 @@ impl A2AProtocol {
         to: AgentId,
         task_id: Uuid,
         progress: u8,
-        message: impl Into<String>,
+        message: String,
     ) -> Result<Uuid> {
         let message = A2AMessage::StatusUpdate {
             task_id,
@@ -539,7 +598,7 @@ impl A2AProtocol {
         to: AgentId,
         task_id: Uuid,
         result: serde_json::Value,
-        summary: impl Into<String>,
+        summary: String,
     ) -> Result<Uuid> {
         let message = A2AMessage::ResultSharing {
             task_id,

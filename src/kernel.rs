@@ -12,9 +12,9 @@ use oxios_kernel::{
     CronScheduler, EngineProvider, EventBus, GitLayer, HostToolValidator,
     McpBridge, McpServer, MemoryManager, Orchestrator, OxiosConfig, PersonaManager,
     ProgramManager, SkillStore, AgentScheduler, Supervisor,
-    AuditTrail, BudgetManager, ResourceMonitor,
+    AuditTrail, BudgetManager, ResourceMonitor, DelegationHandler,
 };
-use oxios_ouroboros::{OuroborosEngine, OuroborosProtocol};
+use oxios_ouroboros::{OuroborosEngine, OuroborosProtocol, Seed};
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::OnceLock;
@@ -305,7 +305,8 @@ impl KernelBuilder {
             .with_exec_config(
                 Arc::new(config.exec.clone()),
                 access_manager.clone(),
-            );
+            )
+            .with_a2a(a2a_protocol.clone());
 
         let supervisor: Arc<dyn Supervisor> = Arc::new(BasicSupervisor::new(
             event_bus.clone(),
@@ -321,6 +322,37 @@ impl KernelBuilder {
             config.security.max_execution_time_secs,
         );
 
+        // Register the A2A dispatch handler.
+        // When a TaskDelegation arrives, the handler spawns an agent via
+        // the lifecycle manager and returns the execution result.
+        let dispatch_lifecycle = lifecycle.clone();
+        a2a_protocol.set_delegation_handler(Arc::new(move |_from, _to, task| {
+            let lc = dispatch_lifecycle.clone();
+            Box::pin(async move {
+                let seed = Seed {
+                    id: task.task_id,
+                    goal: task.description.clone(),
+                    constraints: vec![],
+                    acceptance_criteria: vec!["Task completes successfully".into()],
+                    ontology: vec![],
+                    created_at: chrono::Utc::now(),
+                    generation: 0,
+                    parent_seed_id: None,
+                };
+                match lc.spawn_and_run(&seed, oxios_kernel::scheduler::Priority::Normal).await {
+                    Ok(result) => Ok(serde_json::json!({
+                        "output": result.output,
+                        "success": result.success,
+                        "steps": result.steps_completed,
+                    })),
+                    Err(e) => Ok(serde_json::json!({
+                        "error": e.to_string(),
+                        "success": false,
+                    })),
+                }
+            })
+        })).await;
+
         let mut orchestrator = Orchestrator::new(
             ouroboros,
             event_bus.clone(),
@@ -328,6 +360,7 @@ impl KernelBuilder {
             lifecycle,
         );
         orchestrator.set_git_layer(git_layer.clone());
+        orchestrator.set_a2a(a2a_protocol.clone());
         let orchestrator = Arc::new(orchestrator);
 
         let gateway = Gateway::new(orchestrator.clone());
