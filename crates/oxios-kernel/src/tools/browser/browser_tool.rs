@@ -27,7 +27,7 @@ use super::BrowserBackend;
 /// Agent tool for web browsing via headless browser.
 ///
 /// All browser operations are routed through the `BrowserBackend` trait,
-/// which abstracts away the CDP implementation details.
+/// which abstracts away the underlying browser engine implementation.
 pub struct BrowserTool {
     backend: Arc<dyn BrowserBackend>,
 }

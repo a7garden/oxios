@@ -57,6 +57,9 @@ impl OxibrowserBackend {
     }
 
     /// Ensure the browser is initialized and a session exists.
+    ///
+    /// If the current session is closed (e.g. after a fatal navigation error),
+    /// a fresh one is created automatically.
     async fn ensure_session(
         &self,
     ) -> Result<Arc<tokio::sync::RwLock<oxibrowser_core::session::Session>>> {
@@ -71,6 +74,7 @@ impl OxibrowserBackend {
                     config.user_agent = ua.clone();
                 }
                 config.max_sessions = self.config.max_sessions;
+                config.navigation_timeout_ms = self.config.timeout_secs * 1000;
                 if let Some(ref path) = self.config.cookie_file {
                     config.cookie_file = Some(std::path::PathBuf::from(path));
                 }
@@ -83,10 +87,15 @@ impl OxibrowserBackend {
             }
         }
 
-        // 2. Ensure a session exists.
+        // 2. Ensure a live session exists. Recreate if the previous one died.
         {
             let mut session_guard = self.session.lock().await;
-            if session_guard.is_none() {
+            let needs_new = match session_guard.as_ref() {
+                None => true,
+                Some(s) => s.read().await.is_closed(),
+            };
+
+            if needs_new {
                 let browser_guard = self.browser.lock().await;
                 let browser = browser_guard
                     .as_ref()
@@ -142,14 +151,19 @@ impl BrowserBackend for OxibrowserBackend {
         let session_arc = self.ensure_session().await?;
         let mut session = session_arc.write().await;
 
+        // Use JSON-serialized selector to prevent JS injection.
         let js = format!(
-            "document.querySelector('{}')?.click()",
-            selector.replace('\'', "\\'")
+            "(function() {{ var el = document.querySelector({}); if (!el) return 'element not found'; el.click(); return 'ok'; }})()",
+            serde_json::to_string(selector)?
         );
-        session
+        let result = session
             .evaluate_js(&js)
             .await
             .with_context(|| format!("Failed to click '{}'", selector))?;
+
+        if let Some(exception) = &result.exception {
+            anyhow::bail!("Click failed: {}", exception);
+        }
 
         tracing::debug!(selector = %selector, "Clicked element");
         Ok(())
@@ -161,15 +175,17 @@ impl BrowserBackend for OxibrowserBackend {
 
         let js = format!(
             r#"(function() {{
-                var el = document.querySelector('{}');
+                var el = document.querySelector({selector});
                 if (!el) return 'element not found';
-                el.value = {};
+                el.value = {value};
                 el.dispatchEvent(new Event('input', {{ bubbles: true }}));
                 el.dispatchEvent(new Event('change', {{ bubbles: true }}));
                 return 'ok';
             }})()"#,
-            selector.replace('\'', "\\'"),
-            serde_json::to_string(text)?
+            selector = serde_json::to_string(selector)
+                .context("Failed to serialize selector")?,
+            value = serde_json::to_string(text)
+                .context("Failed to serialize text")?,
         );
         let result = session
             .evaluate_js(&js)
@@ -228,8 +244,7 @@ impl BrowserBackend for OxibrowserBackend {
 
     async fn screenshot(&self) -> Result<Vec<u8>> {
         // OxiBrowser is a headless DOM-only engine — no rendering pipeline.
-        tracing::warn!("OxiBrowser does not support screenshots (no rendering pipeline)");
-        Ok(Vec::new())
+        anyhow::bail!("Screenshots are not supported: OxiBrowser is a DOM-only engine without a rendering pipeline");
     }
 
     async fn title(&self) -> Result<String> {
