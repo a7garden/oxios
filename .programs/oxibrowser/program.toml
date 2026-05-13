@@ -1,0 +1,23 @@
+[program]
+name = "oxibrowser"
+version = "0.2.0"
+description = "Embedded headless browser for web navigation, content extraction, and automation"
+author = "oxios"
+
+[host_requirements]
+required = []
+optional = []
+
+[tools.browse]
+description = "Open a URL and extract its text content as markdown"
+command = "oxibrowser"
+arguments = [
+    { name = "url", description = "URL to browse", required = true },
+]
+
+[tools.fetch]
+description = "Fetch a URL and dump its content"
+command = "oxibrowser"
+arguments = [
+    { name = "url", description = "URL to fetch", required = true },
+]

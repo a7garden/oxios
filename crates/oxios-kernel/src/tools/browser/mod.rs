@@ -1,13 +1,15 @@
 //! Headless browser integration for Oxios agents.
 //!
-//! Connects to a Lightpanda CDP server running on the host system.
-//! Agents can navigate, click, type, extract content, and take screenshots.
+//! Uses the embedded OxiBrowser engine (pure Rust) for web navigation,
+//! content extraction, JavaScript evaluation, and DOM queries.
 //!
 //! ## Architecture
 //!
 //! ```text
-//! Agent → BrowserTool (AgentTool) → BrowserBackend trait → CdpBackend → Lightpanda
+//! Agent → BrowserTool (AgentTool) → BrowserBackend trait → OxibrowserBackend → oxibrowser-core
 //! ```
+//!
+//! No external process is needed — OxiBrowser runs entirely in-process.
 //!
 //! ## Feature Gate
 //!
@@ -17,12 +19,10 @@
 //! ```
 
 mod browser_tool;
-mod cdp_backend;
-mod process;
+mod oxibrowser_backend;
 
 pub use browser_tool::BrowserTool;
-pub use cdp_backend::CdpBackend;
-pub use process::{LightpandaProcess, LightpandaConfig};
+pub use oxibrowser_backend::{OxibrowserBackend, OxibrowserConfig};
 
 use anyhow::Result;
 use async_trait::async_trait;
@@ -39,9 +39,8 @@ pub struct PageInfo {
 
 /// Backend-agnostic browser operations that agents can perform.
 ///
-/// This trait abstracts away the CDP implementation details so that
-/// agents interact with a clean, high-level API. The current implementation
-/// uses `chromiumoxide` to talk CDP, but the trait allows swapping backends.
+/// This trait abstracts away the browser implementation details so that
+/// agents interact with a clean, high-level API.
 #[async_trait]
 pub trait BrowserBackend: Send + Sync {
     /// Navigate to a URL and wait for the page to load.

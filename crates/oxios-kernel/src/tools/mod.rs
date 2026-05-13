@@ -20,4 +20,4 @@ pub use memory_tools::{MemoryReadTool, MemorySearchTool, MemoryWriteTool};
 pub use program_tool::ProgramTool;
 
 #[cfg(feature = "browser")]
-pub use browser::{BrowserTool, BrowserBackend, CdpBackend, LightpandaProcess, LightpandaConfig};
+pub use browser::{BrowserTool, BrowserBackend, OxibrowserBackend, OxibrowserConfig};

@@ -718,51 +718,43 @@ impl Default for OtelConfig {
 
 /// Headless browser configuration.
 ///
-/// Controls integration with Lightpanda CDP server.
+/// Controls integration with the embedded OxiBrowser engine.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct BrowserConfig {
     /// Enable the browser integration.
     #[serde(default)]
     pub enabled: bool,
-    /// Path to the lightpanda binary.
-    /// Defaults to `"lightpanda"` (resolved from PATH).
-    #[serde(default = "default_lightpanda_binary")]
-    pub binary_path: String,
-    /// Host to bind the CDP server to.
-    #[serde(default = "default_browser_host")]
-    pub host: String,
-    /// Port for the CDP server.
-    #[serde(default = "default_browser_port")]
-    pub port: u16,
+    /// User-Agent string for HTTP requests.
+    /// Defaults to the OxiBrowser built-in user agent.
+    #[serde(default)]
+    pub user_agent: Option<String>,
     /// Default page load timeout in seconds.
     #[serde(default = "default_browser_timeout")]
     pub timeout_secs: u64,
-}
-
-fn default_lightpanda_binary() -> String {
-    "lightpanda".to_string()
-}
-
-fn default_browser_host() -> String {
-    "127.0.0.1".to_string()
-}
-
-fn default_browser_port() -> u16 {
-    9222
+    /// Maximum number of concurrent browser sessions.
+    #[serde(default = "default_browser_max_sessions")]
+    pub max_sessions: usize,
+    /// Cookie persistence file path. Empty = in-memory only.
+    #[serde(default)]
+    pub cookie_file: Option<String>,
 }
 
 fn default_browser_timeout() -> u64 {
     30
 }
 
+fn default_browser_max_sessions() -> usize {
+    10
+}
+
 impl Default for BrowserConfig {
     fn default() -> Self {
         Self {
             enabled: false,
-            binary_path: default_lightpanda_binary(),
-            host: default_browser_host(),
-            port: default_browser_port(),
+            user_agent: None,
             timeout_secs: default_browser_timeout(),
+            max_sessions: default_browser_max_sessions(),
+            cookie_file: None,
         }
     }
 }
