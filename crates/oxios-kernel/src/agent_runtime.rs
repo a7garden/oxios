@@ -13,6 +13,7 @@ use anyhow::Result;
 use oxi_agent::{
     prelude::CompactionEvent, AgentEvent, AgentLoop, AgentLoopConfig, GrepTool, LsTool, ReadTool,
     SharedState, ToolRegistry, WriteTool, EditTool, FindTool,
+    WebSearchTool, SearchCache, GetSearchResultsTool,
 };
 use oxi_ai::{CompactionStrategy, Provider};
 use oxi_agent::agent_loop::config::ToolExecutionMode;
@@ -327,7 +328,7 @@ fn run_agent_loop(
 
     tracing::debug!(workspace = %workspace.display(), "Agent workspace scoped");
 
-    // ── Tier 1: oxi native tools (file operations) ──
+    // ── Tier 1: oxi native tools (file operations + web search) ──
     let registry = ToolRegistry::new();
     registry.register(ReadTool::new());
     registry.register(WriteTool::new());
@@ -335,6 +336,12 @@ fn run_agent_loop(
     registry.register(GrepTool::new());
     registry.register(FindTool::new());
     registry.register(LsTool::new());
+
+    // Web search tools (a3s-search, no external dependency)
+    let search_cache = Arc::new(SearchCache::new());
+    registry.register(WebSearchTool::new(search_cache.clone()));
+    registry.register(GetSearchResultsTool::new(search_cache));
+    tracing::debug!("Web search tools registered");
 
     // ── ExecTool: unified execution tool (per-agent instance) ──
     let agent_name = format!("agent-{}", agent_id);
