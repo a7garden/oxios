@@ -750,7 +750,7 @@ fn default_browser_max_sessions() -> usize {
 impl Default for BrowserConfig {
     fn default() -> Self {
         Self {
-            enabled: false,
+            enabled: true,
             user_agent: None,
             timeout_secs: default_browser_timeout(),
             max_sessions: default_browser_max_sessions(),

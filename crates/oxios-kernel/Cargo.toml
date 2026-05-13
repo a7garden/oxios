@@ -6,7 +6,7 @@ description = "Oxios kernel: supervisor, event bus, state store"
 license = "MIT"
 
 [features]
-default = []
+default = ["browser"]
 otel = ["tracing-opentelemetry", "opentelemetry", "opentelemetry_sdk", "opentelemetry-otlp", "opentelemetry-stdout"]
 wasm-sandbox = ["dep:wasmtime", "dep:wasmtime-wasi"]
 browser = ["dep:oxibrowser-core"]

@@ -56,7 +56,7 @@ oxi-ai = { path = "../oxi/oxi-ai" }
 oxi-agent = { path = "../oxi/oxi-agent" }
 
 [features]
-default = ["web", "cli"]
+default = ["web", "cli", "browser"]
 web = ["dep:oxios-web"]
 cli = ["dep:oxios-cli"]
 telegram = ["dep:oxios-telegram"]
