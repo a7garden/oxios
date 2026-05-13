@@ -103,6 +103,8 @@ pub use persona_manager::PersonaManager;
 pub use persona_store::PersonaStore;
 pub use supervisor::{BasicSupervisor, Supervisor};
 pub use tools::{ExecTool, ProgramTool};
+#[cfg(feature = "browser")]
+pub use tools::{BrowserTool, BrowserBackend, OxibrowserBackend, OxibrowserConfig};
 pub use types::{AgentId, AgentInfo, AgentStatus};
 
 pub use backup::{BackupManifest, BackupSection};

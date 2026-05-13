@@ -31,6 +31,11 @@ use crate::config::ExecConfig;
 use crate::AccessManager;
 use crate::types::AgentId;
 use crate::tools::memory_tools::{MemoryWriteTool, MemoryReadTool, MemorySearchTool};
+
+#[cfg(feature = "browser")]
+use crate::tools::{BrowserTool, OxibrowserBackend};
+#[cfg(feature = "browser")]
+use std::sync::Arc as StdArc;
 use oxios_ouroboros::{ExecutionResult, Seed};
 
 /// Global LLM circuit breaker instance.
@@ -94,6 +99,9 @@ pub struct AgentRuntime {
     exec_access: Option<Arc<Mutex<AccessManager>>>,
     /// A2A protocol for inter-agent communication tools.
     a2a: Option<Arc<A2AProtocol>>,
+    /// Headless browser backend (oxibrowser, feature-gated).
+    #[cfg(feature = "browser")]
+    browser_backend: Option<StdArc<OxibrowserBackend>>,
 }
 
 impl AgentRuntime {
@@ -113,6 +121,8 @@ impl AgentRuntime {
             exec_config: None,
             exec_access: None,
             a2a: None,
+            #[cfg(feature = "browser")]
+            browser_backend: None,
         }
     }
 
@@ -164,6 +174,13 @@ impl AgentRuntime {
     /// Attach the A2A protocol for inter-agent communication tools.
     pub fn with_a2a(mut self, a2a: Arc<A2AProtocol>) -> Self {
         self.a2a = Some(a2a);
+        self
+    }
+
+    /// Attach a headless browser backend for the browser tool.
+    #[cfg(feature = "browser")]
+    pub fn with_browser(mut self, backend: StdArc<OxibrowserBackend>) -> Self {
+        self.browser_backend = Some(backend);
         self
     }
 
@@ -231,6 +248,8 @@ impl AgentRuntime {
         let exec_access = self.exec_access.clone();
         let agent_id_clone = agent_id;
         let a2a_for_runtime = self.a2a.as_ref().map(Arc::clone);
+        #[cfg(feature = "browser")]
+        let browser_for_runtime = self.browser_backend.clone();
 
         let (final_content, steps_completed, success) =
             tokio::task::spawn_blocking(move || {
@@ -248,6 +267,8 @@ impl AgentRuntime {
                     exec_config,
                     exec_access,
                     a2a_for_runtime,
+                    #[cfg(feature = "browser")]
+                    browser_for_runtime,
                 )
             })
             .await??;
@@ -291,6 +312,7 @@ fn run_agent_loop(
     exec_config: Option<Arc<ExecConfig>>,
     exec_access: Option<Arc<Mutex<AccessManager>>>,
     a2a_protocol: Option<Arc<A2AProtocol>>,
+    #[cfg(feature = "browser")] browser_backend: Option<StdArc<OxibrowserBackend>>,
 ) -> Result<(String, usize, bool)> {
     // ── Workspace Scoping: restrict agent file access ──
     let workspace = std::env::temp_dir().join("oxios-agent-workspace");
@@ -435,6 +457,14 @@ fn run_agent_loop(
         registry.register_arc(send_tool);
         registry.register_arc(query_tool);
         tracing::debug!("A2A tools registered");
+    }
+
+    // ── Tier 7: Headless browser tool (feature-gated) ──
+    #[cfg(feature = "browser")]
+    if let Some(ref backend) = browser_backend {
+        let browser_tool = Arc::new(BrowserTool::new(backend.clone() as StdArc<dyn crate::tools::BrowserBackend>));
+        registry.register_arc(browser_tool);
+        tracing::debug!("Browser tool registered");
     }
 
     let tools = Arc::new(registry);

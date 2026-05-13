@@ -14,6 +14,9 @@ use oxios_kernel::{
     ProgramManager, SkillStore, AgentScheduler, Supervisor,
     AuditTrail, BudgetManager, ResourceMonitor,
 };
+
+#[cfg(feature = "browser")]
+use oxios_kernel::{OxibrowserBackend, OxibrowserConfig};
 use oxios_ouroboros::{OuroborosEngine, OuroborosProtocol, Seed};
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -310,6 +313,24 @@ impl KernelBuilder {
                 access_manager.clone(),
             )
             .with_a2a(a2a_protocol.clone());
+
+        #[cfg(feature = "browser")]
+        let agent_runtime = {
+            if config.browser.enabled {
+                let browser_config = OxibrowserConfig {
+                    user_agent: config.browser.user_agent.clone(),
+                    timeout_secs: config.browser.timeout_secs,
+                    max_sessions: config.browser.max_sessions,
+                    cookie_file: config.browser.cookie_file.clone(),
+                };
+                let backend = Arc::new(OxibrowserBackend::new(browser_config));
+                tracing::info!("Browser tool enabled (oxibrowser engine)");
+                agent_runtime.with_browser(backend)
+            } else {
+                tracing::debug!("Browser tool disabled in config");
+                agent_runtime
+            }
+        };
 
         let supervisor: Arc<dyn Supervisor> = Arc::new(BasicSupervisor::new(
             event_bus.clone(),

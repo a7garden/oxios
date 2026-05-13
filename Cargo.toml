@@ -60,6 +60,7 @@ default = ["web", "cli"]
 web = ["dep:oxios-web"]
 cli = ["dep:oxios-cli"]
 telegram = ["dep:oxios-telegram"]
+browser = ["oxios-kernel/browser"]
 
 [dependencies]
 oxios-kernel = { path = "crates/oxios-kernel" }
