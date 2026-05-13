@@ -285,7 +285,7 @@ fn run_agent_loop(
     seed_id: uuid::Uuid,
     agent_id: AgentId,
     program_manager: Option<Arc<ProgramManager>>,
-    oxios_config: Option<OxiosConfig>,
+    _oxios_config: Option<OxiosConfig>,
     mcp_bridge_for_runtime: Option<Arc<McpBridge>>,
     memory_manager: Option<Arc<MemoryManager>>,
     exec_config: Option<Arc<ExecConfig>>,

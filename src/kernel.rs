@@ -12,7 +12,7 @@ use oxios_kernel::{
     CronScheduler, EngineProvider, EventBus, GitLayer, HostToolValidator,
     McpBridge, McpServer, MemoryManager, Orchestrator, OxiosConfig, PersonaManager,
     ProgramManager, SkillStore, AgentScheduler, Supervisor,
-    AuditTrail, BudgetManager, ResourceMonitor, DelegationHandler,
+    AuditTrail, BudgetManager, ResourceMonitor,
 };
 use oxios_ouroboros::{OuroborosEngine, OuroborosProtocol, Seed};
 use std::path::PathBuf;
@@ -99,6 +99,7 @@ impl Kernel {
     }
 
     /// Gateway reference — for channel registration and message routing.
+    #[allow(dead_code)]
     pub fn gateway(&self) -> &Gateway {
         &self.gateway
     }
@@ -122,6 +123,7 @@ impl Kernel {
     }
 
     /// Run the gateway event loop (blocking).
+    #[allow(dead_code)]
     pub async fn run_gateway(&self) -> Result<()> {
         self.gateway.run().await
     }
@@ -208,6 +210,7 @@ impl KernelBuilder {
     }
 
     /// Set the LLM model ID (e.g., "anthropic/claude-sonnet-4-20250514").
+    #[allow(dead_code)]
     pub fn model_id(mut self, model: &str) -> Self {
         self.model_id = model.to_string();
         self

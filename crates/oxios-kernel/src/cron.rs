@@ -35,30 +35,45 @@ pub enum JobSource {
 /// A cron job definition.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CronJob {
+    /// Unique job identifier.
     pub id: Uuid,
+    /// Human-readable job name.
     pub name: String,
+    /// Cron expression (e.g. "0 */6 * * *").
     pub schedule: String,
+    /// Goal description for the agent.
     pub goal: String,
+    /// Constraints on agent behavior.
     #[serde(default)]
     pub constraints: Vec<String>,
+    /// Criteria that must be met for success.
     #[serde(default)]
     pub acceptance_criteria: Vec<String>,
+    /// Toolchain preset name.
     #[serde(default = "default_toolchain")]
     pub toolchain: String,
+    /// Job priority.
     #[serde(default)]
     pub priority: Priority,
+    /// Whether the job is active.
     #[serde(default = "default_true")]
     pub enabled: bool,
+    /// Timestamp of the last execution.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub last_run: Option<DateTime<Utc>>,
+    /// Timestamp of the next scheduled execution.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub next_run: Option<DateTime<Utc>>,
+    /// Number of times this job has run.
     #[serde(default)]
     pub run_count: u64,
+    /// Summary of the last execution result.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub last_result: Option<String>,
+    /// Whether the last execution succeeded.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub last_success: Option<bool>,
+    /// How the job was created.
     #[serde(default)]
     pub source: JobSource,
 }
@@ -97,24 +112,38 @@ impl CronJob {
 /// Result of a single cron job execution.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CronJobResult {
+    /// ID of the executed job.
     pub job_id: Uuid,
+    /// Name of the executed job.
     pub job_name: String,
+    /// When execution started.
     pub started_at: DateTime<Utc>,
+    /// When execution finished.
     pub finished_at: DateTime<Utc>,
+    /// Whether the execution succeeded.
     pub success: bool,
+    /// Human-readable result summary.
     pub summary: String,
 }
 
 /// Update fields for an existing cron job.
 #[derive(Debug, Default, Deserialize)]
 pub struct CronJobUpdate {
+    /// New name.
     pub name: Option<String>,
+    /// New cron expression.
     pub schedule: Option<String>,
+    /// New goal description.
     pub goal: Option<String>,
+    /// New constraints.
     pub constraints: Option<Vec<String>>,
+    /// New acceptance criteria.
     pub acceptance_criteria: Option<Vec<String>>,
+    /// New toolchain preset.
     pub toolchain: Option<String>,
+    /// New priority.
     pub priority: Option<Priority>,
+    /// Enable or disable.
     pub enabled: Option<bool>,
 }
 

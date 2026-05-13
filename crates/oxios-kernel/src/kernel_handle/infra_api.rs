@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-use crate::git_layer::{GitLayer, CommitInfo, LogEntry};
+use crate::git_layer::{GitLayer, LogEntry};
 use crate::scheduler::{AgentScheduler, SchedulerStats, ScheduledTask};
 use crate::cron::{CronScheduler, CronJob, CronJobUpdate};
 use crate::resource_monitor::{ResourceMonitor, ResourceSnapshot};

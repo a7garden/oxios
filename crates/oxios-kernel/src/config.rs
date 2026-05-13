@@ -40,16 +40,23 @@ fn default_tick_interval() -> u64 {
 /// Inline cron job definition in config.toml.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct InlineCronJob {
+    /// Cron expression (e.g. "0 */6 * * *").
     pub schedule: String,
+    /// Goal description for the agent.
     pub goal: String,
+    /// Constraints on agent behavior.
     #[serde(default)]
     pub constraints: Vec<String>,
+    /// Criteria that must be met for the job to be considered successful.
     #[serde(default)]
     pub acceptance_criteria: Vec<String>,
+    /// Toolchain preset name.
     #[serde(default = "default_toolchain_inline")]
     pub toolchain: String,
+    /// Job priority.
     #[serde(default)]
     pub priority: Priority,
+    /// Whether the job is active.
     #[serde(default = "default_true_inline")]
     pub enabled: bool,
 }

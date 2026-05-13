@@ -18,7 +18,6 @@
 //! and all arguments are validated against shell metacharacters (`;`, `|`, `$`,
 //! backtick, `<`, `>`, etc.) and path traversal (`..`).
 
-use std::collections::HashSet;
 use std::sync::Arc;
 
 use async_trait::async_trait;

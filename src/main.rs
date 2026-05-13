@@ -473,7 +473,8 @@ async fn main() -> Result<()> {
                     Ok(())
                 }
                 AgentAction::Kill { id } => {
-                    let uuid = uuid::Uuid::parse_str(&id)
+                    // Validate id is a well-formed UUID.
+                    let _ = uuid::Uuid::parse_str(&id)
                         .map_err(|e| anyhow::anyhow!("invalid agent id '{}': {}", id, e))?;
                     handle.agents.kill(&id).await
                         .map_err(|e| anyhow::anyhow!("failed to kill agent {}: {}", id, e))?;
