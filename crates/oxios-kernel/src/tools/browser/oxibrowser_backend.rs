@@ -8,6 +8,7 @@ use std::sync::Arc;
 
 use anyhow::{Context, Result};
 use async_trait::async_trait;
+use serde_json::Value;
 use tokio::sync::Mutex;
 
 use super::{BrowserBackend, PageInfo};
@@ -152,9 +153,16 @@ impl BrowserBackend for OxibrowserBackend {
         let mut session = session_arc.write().await;
 
         // Use JSON-serialized selector to prevent JS injection.
+        // Returns {ok: true} on success or {error: "..."} on failure so the
+        // agent gets a clear error rather than a silent no-op.
         let js = format!(
-            "(function() {{ var el = document.querySelector({}); if (!el) return 'element not found'; el.click(); return 'ok'; }})()",
-            serde_json::to_string(selector)?
+            r#"(function() {{
+                var el = document.querySelector({selector});
+                if (!el) return JSON.stringify({{error: 'element not found'}});
+                el.click();
+                return JSON.stringify({{ok: true}});
+            }})()"#,
+            selector = serde_json::to_string(selector)?
         );
         let result = session
             .evaluate_js(&js)
@@ -163,6 +171,15 @@ impl BrowserBackend for OxibrowserBackend {
 
         if let Some(exception) = &result.exception {
             anyhow::bail!("Click failed: {}", exception);
+        }
+
+        // Check the returned value for application-level errors.
+        if let Some(Value::String(s)) = &result.value {
+            if let Ok(obj) = serde_json::from_str::<serde_json::Map<String, Value>>(s) {
+                if let Some(err) = obj.get("error").and_then(|v| v.as_str()) {
+                    anyhow::bail!("Click failed: {}", err);
+                }
+            }
         }
 
         tracing::debug!(selector = %selector, "Clicked element");
@@ -176,11 +193,11 @@ impl BrowserBackend for OxibrowserBackend {
         let js = format!(
             r#"(function() {{
                 var el = document.querySelector({selector});
-                if (!el) return 'element not found';
+                if (!el) return JSON.stringify({{error: 'element not found'}});
                 el.value = {value};
                 el.dispatchEvent(new Event('input', {{ bubbles: true }}));
                 el.dispatchEvent(new Event('change', {{ bubbles: true }}));
-                return 'ok';
+                return JSON.stringify({{ok: true}});
             }})()"#,
             selector = serde_json::to_string(selector)
                 .context("Failed to serialize selector")?,
@@ -194,6 +211,15 @@ impl BrowserBackend for OxibrowserBackend {
 
         if let Some(exception) = &result.exception {
             anyhow::bail!("Type failed: {}", exception);
+        }
+
+        // Check the returned value for application-level errors.
+        if let Some(Value::String(s)) = &result.value {
+            if let Ok(obj) = serde_json::from_str::<serde_json::Map<String, Value>>(s) {
+                if let Some(err) = obj.get("error").and_then(|v| v.as_str()) {
+                    anyhow::bail!("Type failed: {}", err);
+                }
+            }
         }
 
         tracing::debug!(selector = %selector, text_len = text.len(), "Typed into element");
