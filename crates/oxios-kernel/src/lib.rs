@@ -93,6 +93,9 @@ pub use embedding::{EmbeddingProvider, EmbeddingVector, TfIdfEmbeddingProvider};
 pub use memory::{
     MemoryEntry, MemoryManager, MemoryType, TextVector,
     MemoryBudget, CurationReport, CurationCandidate, content_hash,
+    HnswIndex, MemoryGraph, ChunkConfig, TextChunk,
+    chunk_fixed, chunk_paragraphs, l2_normalize_f32, l2_normalize_f64, cosine_similarity_f32,
+    HnswMemoryIndex, SemanticHit,
 };
 pub use memory::auto_memory_bridge::{
     AutoMemoryBridge, SyncDirection, MemoryInsight, InsightCategory,

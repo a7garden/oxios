@@ -1,13 +1,21 @@
 //! Memory store operations: save/load, index management, search.
+//!
+//! Integrates HNSW index (usearch) for fast approximate nearest neighbor search
+//! alongside the existing file-based state store for persistence.
 
 use std::collections::HashMap;
+use std::path::PathBuf;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use anyhow::Result;
 use chrono::{DateTime, Utc};
+use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 
 use crate::embedding::EmbeddingVector;
 
+use super::hnsw::HnswIndex;
+use super::normalizer::l2_normalize_f32;
 use super::{MemoryEntry, MemoryManager, MemoryType, content_hash, dedup_by_id, extract_keywords};
 
 // ---------------------------------------------------------------------------
@@ -447,5 +455,374 @@ impl MemoryManager {
         }
         let id = self.remember(entry).await?;
         Ok(Some(id))
+    }
+}
+
+// ---------------------------------------------------------------------------
+// HNSW-augmented operations
+// ---------------------------------------------------------------------------
+
+/// Result of a semantic search hit.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SemanticHit {
+    /// Memory entry.
+    pub entry: MemoryEntry,
+    /// Cosine distance (0.0 = identical).
+    pub distance: f32,
+    /// Cosine similarity (1.0 = identical).
+    pub similarity: f32,
+}
+
+/// HNSW index manager for memory entries.
+///
+/// Maintains a mapping from u64 keys to String IDs, and the HNSW index
+/// itself. Thread-safe via `RwLock`.
+pub struct HnswMemoryIndex {
+    /// The HNSW index.
+    index: RwLock<HnswIndex>,
+    /// Map: u64 key → String memory ID.
+    key_to_id: RwLock<HashMap<u64, String>>,
+    /// Map: String memory ID → u64 key.
+    id_to_key: RwLock<HashMap<String, u64>>,
+    /// Next key counter.
+    next_key: AtomicU64,
+    /// Base path for index persistence.
+    persist_path: Option<PathBuf>,
+}
+
+impl std::fmt::Debug for HnswMemoryIndex {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("HnswMemoryIndex")
+            .field("size", &self.len())
+            .field("dimensions", &self.index.read().dimensions())
+            .finish()
+    }
+}
+
+impl HnswMemoryIndex {
+    /// Create a new HNSW memory index.
+    ///
+    /// # Arguments
+    /// * `dimensions` — Embedding vector dimensions.
+    /// * `capacity` — Initial capacity hint.
+    /// * `persist_path` — Optional directory for index file persistence.
+    pub fn new(dimensions: usize, capacity: usize, persist_path: Option<PathBuf>) -> Result<Self> {
+        let index = HnswIndex::new(dimensions, capacity)?;
+        Ok(Self {
+            index: RwLock::new(index),
+            key_to_id: RwLock::new(HashMap::new()),
+            id_to_key: RwLock::new(HashMap::new()),
+            next_key: AtomicU64::new(1), // 0 is used by usearch as sentinel
+            persist_path,
+        })
+    }
+
+    /// Try to restore from disk, fall back to new index.
+    pub fn restore_or_new(
+        dimensions: usize,
+        capacity: usize,
+        persist_path: Option<PathBuf>,
+    ) -> Result<Self> {
+        if let Some(ref path) = persist_path {
+            let index_path = path.join("memory.usearch");
+            let mapping_path = path.join("key_map.json");
+
+            if index_path.exists() && mapping_path.exists() {
+                tracing::info!(path = %index_path.display(), "Restoring HNSW index from disk");
+
+                if let Ok(index) = HnswIndex::load(&index_path) {
+                    if let Ok(data) = std::fs::read_to_string(&mapping_path) {
+                        if let Ok((k2i, i2k)) = serde_json::from_str::<(HashMap<u64, String>, HashMap<String, u64>)>(&data) {
+                            let max_key = k2i.keys().max().copied().unwrap_or(0);
+                            return Ok(Self {
+                                index: RwLock::new(index),
+                                key_to_id: RwLock::new(k2i),
+                                id_to_key: RwLock::new(i2k),
+                                next_key: AtomicU64::new(max_key + 1),
+                                persist_path,
+                            });
+                        }
+                    }
+                }
+
+                tracing::warn!("Failed to restore HNSW index, creating new one");
+            }
+        }
+
+        Self::new(dimensions, capacity, persist_path)
+    }
+
+    /// Get or create a u64 key for a String ID.
+    fn get_or_create_key(&self, id: &str) -> u64 {
+        // Fast path: check read lock
+        {
+            let i2k = self.id_to_key.read();
+            if let Some(&key) = i2k.get(id) {
+                return key;
+            }
+        }
+
+        // Slow path: write lock
+        let mut i2k = self.id_to_key.write();
+        let mut k2i = self.key_to_id.write();
+
+        // Double-check after acquiring write lock
+        if let Some(&key) = i2k.get(id) {
+            return key;
+        }
+
+        let key = self.next_key.fetch_add(1, Ordering::Relaxed);
+        i2k.insert(id.to_string(), key);
+        k2i.insert(key, id.to_string());
+        key
+    }
+
+    /// Add an entry to the HNSW index.
+    pub fn add_entry(&self, id: &str, vector: &[f32]) -> Result<()> {
+        let key = self.get_or_create_key(id);
+        let mut normalized = vector.to_vec();
+        l2_normalize_f32(&mut normalized);
+        self.index.write().add(key, &normalized)?;
+        Ok(())
+    }
+
+    /// Remove an entry from the index.
+    pub fn remove_entry(&self, id: &str) -> Result<()> {
+        let key = {
+            let i2k = self.id_to_key.read();
+            i2k.get(id).copied()
+        };
+        if let Some(key) = key {
+            self.index.write().remove(key)?;
+            let mut k2i = self.key_to_id.write();
+            let mut i2k = self.id_to_key.write();
+            k2i.remove(&key);
+            i2k.remove(id);
+        }
+        Ok(())
+    }
+
+    /// Search for k nearest neighbors.
+    ///
+    /// Returns (String ID, distance) pairs.
+    pub fn search(&self, query: &[f32], k: usize) -> Result<Vec<(String, f32)>> {
+        let mut normalized = query.to_vec();
+        l2_normalize_f32(&mut normalized);
+
+        let raw = self.index.read().search(&normalized, k)?;
+        let k2i = self.key_to_id.read();
+
+        let results = raw
+            .into_iter()
+            .filter_map(|(key, dist)| {
+                k2i.get(&key).map(|id| (id.clone(), dist))
+            })
+            .collect();
+
+        Ok(results)
+    }
+
+    /// Number of entries in the index.
+    pub fn len(&self) -> usize {
+        self.index.read().len()
+    }
+
+    /// Whether the index is empty.
+    pub fn is_empty(&self) -> bool {
+        self.index.read().is_empty()
+    }
+
+    /// Save the index and key mappings to disk.
+    pub fn persist(&self) -> Result<()> {
+        if let Some(ref path) = self.persist_path {
+            std::fs::create_dir_all(path)?;
+
+            let index_path = path.join("memory.usearch");
+            let mapping_path = path.join("key_map.json");
+
+            // Save index
+            self.index.read().save(&index_path)?;
+
+            // Save key mappings
+            let k2i = self.key_to_id.read();
+            let i2k = self.id_to_key.read();
+            let data = serde_json::to_string(&(k2i.clone(), &*i2k))?;
+            std::fs::write(&mapping_path, data)?;
+
+            tracing::debug!(path = %path.display(), entries = self.len(), "HNSW index persisted");
+        }
+        Ok(())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Semantic search on MemoryManager
+// ---------------------------------------------------------------------------
+
+impl MemoryManager {
+    /// Semantic search using HNSW index.
+    ///
+    /// Unlike `search()` which uses brute-force cosine similarity over the
+    /// in-memory HashMap, `semantic_search()` uses the HNSW approximate
+    /// nearest neighbor index for sub-linear time complexity.
+    ///
+    /// This is the preferred search method when the HNSW index is available
+    /// and populated with dense vectors.
+    ///
+    /// # Arguments
+    /// * `query` — Search query text.
+    /// * `memory_type` — Optional filter by memory type.
+    /// * `limit` — Maximum results to return.
+    /// * `hnsw_index` — The HNSW index to search against.
+    ///
+    /// # Returns
+    /// A list of `SemanticHit` with entry and similarity score.
+    pub async fn semantic_search(
+        &self,
+        query: &str,
+        memory_type: Option<MemoryType>,
+        limit: usize,
+        hnsw_index: &HnswMemoryIndex,
+    ) -> Result<Vec<SemanticHit>> {
+        // Skip if index is empty
+        if hnsw_index.is_empty() {
+            tracing::debug!("HNSW index empty, falling back to keyword search");
+            return self.keyword_search(query, memory_type, limit).await.map(|entries| {
+                entries
+                    .into_iter()
+                    .map(|entry| SemanticHit {
+                        entry,
+                        distance: 0.0,
+                        similarity: 0.0,
+                    })
+                    .collect()
+            });
+        }
+
+        // Generate embedding for query
+        let query_vector = self.embedding.embed(query).await?;
+        let query_f32 = match query_vector.to_f32_dense() {
+            Some(v) => v,
+            None => {
+                tracing::debug!("Query embedding is sparse, falling back to keyword search");
+                return self.keyword_search(query, memory_type, limit).await.map(|entries| {
+                    entries.into_iter().map(|entry| SemanticHit {
+                        entry,
+                        distance: 0.0,
+                        similarity: 0.0,
+                    }).collect()
+                });
+            }
+        };
+
+        // Search HNSW index
+        let raw_hits = hnsw_index.search(&query_f32, limit * 2)?;
+
+        // Determine which memory types to search
+        let all_types: &[MemoryType] = &[
+            MemoryType::Conversation,
+            MemoryType::Session,
+            MemoryType::Fact,
+            MemoryType::Episode,
+            MemoryType::Knowledge,
+        ];
+        let types: &[MemoryType] = match memory_type {
+            Some(ref t) => std::slice::from_ref(t),
+            None => all_types,
+        };
+
+        // Load entries and build results
+        let mut results = Vec::new();
+        for (id, distance) in raw_hits {
+            for mt in types {
+                if let Ok(Some(mut entry)) = self
+                    .state_store
+                    .load_json::<MemoryEntry>(mt.category(), &id)
+                    .await
+                {
+                    // Update access stats
+                    entry.access_count += 1;
+                    entry.accessed_at = chrono::Utc::now();
+
+                    let similarity = 1.0 - distance;
+                    results.push(SemanticHit {
+                        entry,
+                        distance,
+                        similarity,
+                    });
+                    break;
+                }
+            }
+            if results.len() >= limit {
+                break;
+            }
+        }
+
+        // Sort by similarity descending
+        results.sort_by(|a, b| {
+            b.similarity
+                .partial_cmp(&a.similarity)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+
+        tracing::debug!(
+            query = %query,
+            hits = results.len(),
+            "Semantic search complete"
+        );
+
+        // Fall back if no results
+        if results.is_empty() {
+            return self.keyword_search(query, memory_type, limit).await.map(|entries| {
+                entries.into_iter().map(|entry| SemanticHit {
+                    entry,
+                    distance: 0.0,
+                    similarity: 0.0,
+                }).collect()
+            });
+        }
+
+        Ok(results)
+    }
+
+    /// Rebuild the HNSW index from all stored memories.
+    ///
+    /// Call this at startup or after bulk operations.
+    pub async fn rebuild_hnsw_index(&self, hnsw_index: &HnswMemoryIndex) -> Result<usize> {
+        let mut count = 0;
+
+        for mt in &[
+            MemoryType::Conversation,
+            MemoryType::Session,
+            MemoryType::Fact,
+            MemoryType::Episode,
+            MemoryType::Knowledge,
+        ] {
+            if let Ok(names) = self.state_store.list_category(mt.category()).await {
+                for name in names {
+                    if let Ok(Some(entry)) = self
+                        .state_store
+                        .load_json::<MemoryEntry>(mt.category(), &name)
+                        .await
+                    {
+                        let vector = self.embedding.embed(&entry.content).await?;
+                        if let Some(f32_vec) = vector.to_f32_dense() {
+                            if let Err(e) = hnsw_index.add_entry(&entry.id, &f32_vec) {
+                                tracing::warn!(
+                                    id = %entry.id,
+                                    error = %e,
+                                    "Failed to add entry to HNSW index"
+                                );
+                                continue;
+                            }
+                            count += 1;
+                        }
+                    }
+                }
+            }
+        }
+
+        tracing::info!(entries = count, "HNSW index rebuilt");
+        Ok(count)
     }
 }

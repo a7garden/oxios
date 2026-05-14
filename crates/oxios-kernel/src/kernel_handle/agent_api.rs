@@ -4,6 +4,7 @@ use std::sync::Arc;
 use crate::supervisor::Supervisor;
 use crate::budget::{BudgetManager, BudgetInfo, BudgetLimit, BudgetExceeded};
 use crate::memory::{MemoryEntry, MemoryType, MemoryManager};
+use crate::memory::store::{HnswMemoryIndex, SemanticHit};
 use crate::types::AgentId;
 
 /// Agent management system calls.
@@ -11,6 +12,8 @@ pub struct AgentApi {
     pub(crate) supervisor: Arc<dyn Supervisor>,
     pub(crate) budget_manager: Arc<BudgetManager>,
     pub(crate) memory_manager: Arc<MemoryManager>,
+    /// HNSW index for semantic search (optional, initialized on demand).
+    pub(crate) hnsw_index: Option<Arc<HnswMemoryIndex>>,
 }
 
 impl AgentApi {
@@ -20,7 +23,12 @@ impl AgentApi {
         budget_manager: Arc<BudgetManager>,
         memory_manager: Arc<MemoryManager>,
     ) -> Self {
-        Self { supervisor, budget_manager, memory_manager }
+        Self { supervisor, budget_manager, memory_manager, hnsw_index: None }
+    }
+
+    /// Attach an HNSW index for semantic search.
+    pub fn set_hnsw_index(&mut self, index: Arc<HnswMemoryIndex>) {
+        self.hnsw_index = Some(index);
     }
     /// List running agents.
     pub async fn list(&self) -> anyhow::Result<Vec<crate::types::AgentInfo>> {
@@ -77,5 +85,41 @@ impl AgentApi {
         limit: usize,
     ) -> anyhow::Result<Vec<MemoryEntry>> {
         self.memory_manager.search(query, memory_type, limit).await
+    }
+
+    /// Semantic search using HNSW index.
+    ///
+    /// Falls back to regular search if HNSW index is not available.
+    pub async fn semantic_search_memory(
+        &self,
+        query: &str,
+        memory_type: Option<MemoryType>,
+        limit: usize,
+    ) -> anyhow::Result<Vec<SemanticHit>> {
+        if let Some(ref hnsw) = self.hnsw_index {
+            self.memory_manager
+                .semantic_search(query, memory_type, limit, hnsw)
+                .await
+        } else {
+            // Fallback to regular search, wrap results
+            let entries = self.search_memory(query, memory_type, limit).await?;
+            Ok(entries
+                .into_iter()
+                .map(|entry| SemanticHit {
+                    entry,
+                    distance: 0.0,
+                    similarity: 0.0,
+                })
+                .collect())
+        }
+    }
+
+    /// Rebuild the HNSW index from all stored memories.
+    pub async fn rebuild_hnsw_index(&self) -> anyhow::Result<usize> {
+        if let Some(ref hnsw) = self.hnsw_index {
+            self.memory_manager.rebuild_hnsw_index(hnsw).await
+        } else {
+            Err(anyhow::anyhow!("HNSW index not initialized"))
+        }
     }
 }
