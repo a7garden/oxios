@@ -101,6 +101,7 @@ struct ExecuteState {
 }
 
 /// Bundled context for `run_agent_loop()`, replacing 13+ positional parameters.
+#[allow(dead_code)]
 struct AgentLoopContext {
     provider: Arc<dyn Provider>,
     config: AgentRuntimeConfig,

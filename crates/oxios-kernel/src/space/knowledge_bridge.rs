@@ -95,12 +95,18 @@ impl KnowledgeBridge {
     ///
     /// Returns memory entries from `from_space` that match the query.
     /// Records the access in audit trail.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `memory_manager` is not properly initialized for cross-Space search.
+    /// This is a Phase 3 stub — actual cross-Space search requires Space-scoped MemoryManagers.
+    #[allow(unused_variables)]
     pub async fn reference(
         &self,
         from_space_id: SpaceId,
         to_space_id: SpaceId,
-        memory_manager: &MemoryManager,
-        query: &str,
+        _memory_manager: &MemoryManager,
+        _query: &str,
     ) -> anyhow::Result<Vec<MemoryEntry>> {
         // Check visibility
         let from_space = self.space_manager.get_space(&from_space_id).await?;
@@ -140,11 +146,16 @@ impl KnowledgeBridge {
     /// from existing Spaces.
     ///
     /// Returns the number of entries transferred.
+    ///
+    /// # Panics
+    ///
+    /// Panics if transfer is attempted with a private source Space.
+    #[allow(unused_variables)]
     pub async fn transfer(
         &self,
         from_space_id: SpaceId,
         to_space_id: SpaceId,
-        memory_manager: &MemoryManager,
+        _memory_manager: &MemoryManager,
         entries: Vec<MemoryEntry>,
     ) -> anyhow::Result<usize> {
         // Check visibility

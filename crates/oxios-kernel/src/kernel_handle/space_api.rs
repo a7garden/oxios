@@ -9,12 +9,14 @@
 use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 
-use crate::space::{Space, SpaceId, SpaceManager, CrossRefEntry};
+use crate::space::{Space, SpaceManager, CrossRefEntry};
+#[allow(unused_imports)]
 use crate::event_bus::EventBus;
 use anyhow::Context;
 
 /// Serialized Space info for API responses.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(missing_docs)]
 pub struct SpaceInfo {
     pub id: String,
     pub name: String,
@@ -43,6 +45,7 @@ impl From<&Space> for SpaceInfo {
 
 /// Serialized knowledge flow entry.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(missing_docs)]
 pub struct KnowledgeFlowInfo {
     pub from: String,
     pub to: String,
@@ -64,8 +67,12 @@ impl From<&CrossRefEntry> for KnowledgeFlowInfo {
 }
 
 /// Space system calls.
+#[allow(dead_code)]
 pub struct SpaceApi {
+    /// Space manager for Space lifecycle and routing.
     pub(crate) space_manager: Arc<SpaceManager>,
+    /// Event bus (reserved for future event publishing).
+    #[allow(dead_code)]
     pub(crate) event_bus: EventBus,
 }
 

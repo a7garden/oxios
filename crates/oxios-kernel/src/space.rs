@@ -20,7 +20,6 @@ pub use manager::{SpaceManager, SpaceManagerError};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
-use std::sync::OnceLock;
 use uuid::Uuid;
 
 /// Unique identifier for a Space.
@@ -183,7 +182,8 @@ impl Space {
     }
 }
 
-pub static DEFAULT_SPACE_ID: OnceLock<uuid::Uuid> = OnceLock::new();
+#[allow(missing_docs)]
+pub static DEFAULT_SPACE_ID: std::sync::OnceLock<uuid::Uuid> = std::sync::OnceLock::new();
 
 /// Get the default Space ID.
 pub fn default_space_id() -> SpaceId {

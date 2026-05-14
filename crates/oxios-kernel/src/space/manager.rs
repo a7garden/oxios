@@ -22,15 +22,19 @@ use crate::event_bus::{EventBus, KernelEvent};
 use crate::state_store::StateStore;
 
 const MAX_ARCHIVE_AGE_DAYS: i64 = 30;
+#[allow(dead_code)]
 const DEFAULT_WORKSPACE_DIR: &str = ".oxios/spaces";
 
 /// Errors from SpaceManager operations.
 #[derive(thiserror::Error, Debug)]
 pub enum SpaceManagerError {
+    /// Space not found.
     #[error("Space not found: {0}")]
     NotFound(SpaceId),
+    /// Cannot merge a Space with itself.
     #[error("Cannot merge a Space with itself")]
     SelfMerge,
+    /// Space is private and cannot be accessed.
     #[error("Space is private and cannot be accessed: {0}")]
     Private(SpaceId),
 }
@@ -51,6 +55,8 @@ pub struct SpaceManager {
     /// State store for persistence.
     state_store: Arc<StateStore>,
     /// Event bus for publishing Space events.
+    /// Number of turns since last topic check.
+    #[allow(dead_code)]
     event_bus: EventBus,
     /// Path matcher for Layer 1 detection.
     path_matcher: RwLock<PathMatcher>,
@@ -61,6 +67,8 @@ pub struct SpaceManager {
     /// Root directory for all Space data.
     root_dir: PathBuf,
     /// Number of turns since last topic check.
+    /// Number of turns since last topic check.
+    #[allow(dead_code)]
     turns_since_topic_check: Mutex<usize>,
 }
 
@@ -72,6 +80,9 @@ fn default_space_id() -> SpaceId {
 }
 
 impl SpaceManager {
+    /// Get the default Space ID (for tests only).
+    #[allow(missing_docs)]
+    #[cfg(test)]
     pub fn default_space_id_for_tests() -> SpaceId {
         // Used only in tests to avoid OnceLock issues
         uuid::Uuid::parse_str("00000000-0000-0000-0000-000000000001").unwrap()
