@@ -284,6 +284,35 @@ impl AuditTrail {
             if entries.len() > self.max_entries {
                 let excess = entries.len() - self.max_entries;
                 entries.drain(0..excess);
+                // Fix the chain: rebuild hashes from the first remaining entry.
+                // Mark the first remaining entry as a new chain root (pruned).
+                // Then re-link all subsequent entries since prev_hash references changed.
+                if let Some(first) = entries.first_mut() {
+                    first.prev_hash = "pruned".to_string();
+                    first.hash = compute_entry_hash(
+                        first.seq,
+                        &first.timestamp,
+                        &first.actor,
+                        &first.action,
+                        &first.resource,
+                        &first.prev_hash,
+                    );
+                }
+                // Re-link subsequent entries whose prev_hash pointed to pruned entries.
+                for i in 1..entries.len() {
+                    let prev_hash = entries[i - 1].hash.clone();
+                    if entries[i].prev_hash != prev_hash {
+                        entries[i].prev_hash = prev_hash;
+                        entries[i].hash = compute_entry_hash(
+                            entries[i].seq,
+                            &entries[i].timestamp,
+                            &entries[i].actor,
+                            &entries[i].action,
+                            &entries[i].resource,
+                            &entries[i].prev_hash,
+                        );
+                    }
+                }
             }
         }
 
@@ -291,11 +320,16 @@ impl AuditTrail {
     }
 
     /// Verify the integrity of the hash chain.
+    ///
+    /// The chain is valid if:
+    /// - The first entry has prev_hash "genesis" or "pruned" (after auto-pruning)
+    /// - Every subsequent entry's prev_hash matches the previous entry's hash
+    /// - Every entry's hash can be independently recomputed
     pub fn verify(&self) -> Result<bool, AuditError> {
         let entries = self.entries.read();
         let mut prev_hash = "genesis".to_string();
 
-        for entry in entries.iter() {
+        for (i, entry) in entries.iter().enumerate() {
             // Check sequence is correct
             if entry.seq == 0 {
                 return Err(AuditError::ChainBroken {
@@ -305,8 +339,10 @@ impl AuditTrail {
                 });
             }
 
-            // Check prev_hash matches
-            if entry.prev_hash != prev_hash {
+            // First entry after pruning gets a free pass on prev_hash matching
+            if i == 0 && entry.prev_hash == "pruned" {
+                // Accept "pruned" as a valid starting point
+            } else if entry.prev_hash != prev_hash {
                 return Err(AuditError::ChainBroken {
                     seq: entry.seq,
                     expected: prev_hash,
@@ -428,6 +464,63 @@ impl AuditTrail {
         state_store
             .save_audit_entries(&entries)
             .map_err(|e| AuditError::ExportFailed(e.to_string()))
+    }
+
+    /// Restore previously persisted entries.
+    ///
+    /// Sets `seq_counter` to `max(entries.seq) + 1` so new entries
+    /// don't collide with restored ones. Trims to `max_entries` if
+    /// the restored set is larger, re-linking the hash chain.
+    pub fn restore_from(&self, entries: Vec<AuditEntry>) {
+        if entries.is_empty() {
+            return;
+        }
+
+        // Advance seq_counter past the highest restored seq.
+        let max_seq = entries.iter().map(|e| e.seq).max().unwrap_or(0);
+        self.seq_counter.store(max_seq + 1, Ordering::SeqCst);
+
+        let mut current = self.entries.write();
+        *current = entries;
+
+        // Trim if restored set exceeds max_entries.
+        if current.len() > self.max_entries {
+            let excess = current.len() - self.max_entries;
+            current.drain(0..excess);
+
+            // Re-link the chain after pruning.
+            if let Some(first) = current.first_mut() {
+                first.prev_hash = "pruned".to_string();
+                first.hash = compute_entry_hash(
+                    first.seq,
+                    &first.timestamp,
+                    &first.actor,
+                    &first.action,
+                    &first.resource,
+                    &first.prev_hash,
+                );
+            }
+            for i in 1..current.len() {
+                let prev_hash = current[i - 1].hash.clone();
+                if current[i].prev_hash != prev_hash {
+                    current[i].prev_hash = prev_hash;
+                    current[i].hash = compute_entry_hash(
+                        current[i].seq,
+                        &current[i].timestamp,
+                        &current[i].actor,
+                        &current[i].action,
+                        &current[i].resource,
+                        &current[i].prev_hash,
+                    );
+                }
+            }
+        }
+
+        tracing::info!(
+            restored = current.len(),
+            next_seq = max_seq + 1,
+            "Audit trail restored from persistence"
+        );
     }
 }
 
@@ -806,6 +899,9 @@ mod tests {
         // First entry should be seq 6 (after pruning 1-5)
         assert_eq!(entries[0].seq, 6);
         assert_eq!(entries[4].seq, 10);
+
+        // After pruning, the chain should still be verifiable.
+        assert!(trail.verify().is_ok(), "Pruned trail should still verify");
     }
 
     #[test]
@@ -948,5 +1044,85 @@ mod tests {
         );
 
         assert_ne!(hash1, hash3);
+    }
+
+    #[test]
+    fn test_restore_from_empty() {
+        let trail = create_test_trail();
+        trail.restore_from(Vec::new());
+        assert!(trail.is_empty());
+        // seq_counter should remain at 1 (default)
+        assert_eq!(trail.all_entries().len(), 0);
+    }
+
+    #[test]
+    fn test_restore_from_advances_seq_counter() {
+        let trail = create_test_trail();
+
+        // Simulate persisted entries with seq 1..5
+        let ts = Utc::now();
+        let mut entries = Vec::new();
+        let mut prev = "genesis".to_string();
+        for i in 1..=5 {
+            let hash = compute_entry_hash(i, &ts, "agent-001", &AuditAction::Other { detail: format!("action-{}", i) }, "/resource", &prev);
+            entries.push(AuditEntry {
+                seq: i,
+                timestamp: ts,
+                actor: "agent-001".to_string(),
+                action: AuditAction::Other { detail: format!("action-{}", i) },
+                resource: "/resource".to_string(),
+                prev_hash: prev.clone(),
+                hash: hash.clone(),
+                metadata: None,
+            });
+            prev = hash;
+        }
+
+        trail.restore_from(entries);
+        assert_eq!(trail.len(), 5);
+
+        // Next append should get seq 6
+        let new_hash = trail.append(
+            "agent-001".to_string(),
+            AuditAction::Other { detail: "new".to_string() },
+            "/resource".to_string(),
+        );
+        assert!(!new_hash.is_empty());
+        assert_eq!(trail.len(), 6);
+
+        let all = trail.all_entries();
+        assert_eq!(all[5].seq, 6);
+    }
+
+    #[test]
+    fn test_restore_from_trims_to_max() {
+        let trail = AuditTrail::new(3);
+
+        let ts = Utc::now();
+        let mut entries = Vec::new();
+        let mut prev = "genesis".to_string();
+        for i in 1..=5 {
+            let hash = compute_entry_hash(i, &ts, "agent-001", &AuditAction::Other { detail: format!("action-{}", i) }, "/resource", &prev);
+            entries.push(AuditEntry {
+                seq: i,
+                timestamp: ts,
+                actor: "agent-001".to_string(),
+                action: AuditAction::Other { detail: format!("action-{}", i) },
+                resource: "/resource".to_string(),
+                prev_hash: prev.clone(),
+                hash: hash.clone(),
+                metadata: None,
+            });
+            prev = hash;
+        }
+
+        trail.restore_from(entries);
+        assert_eq!(trail.len(), 3);
+        // Should have trimmed to last 3 (seq 3, 4, 5)
+        let all = trail.all_entries();
+        assert_eq!(all[0].seq, 3);
+        assert_eq!(all[2].seq, 5);
+        // Pruned chain should verify
+        assert!(trail.verify().is_ok());
     }
 }

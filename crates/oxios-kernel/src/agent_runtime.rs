@@ -315,13 +315,26 @@ fn run_agent_loop(
     a2a_protocol: Option<Arc<A2AProtocol>>,
     #[cfg(feature = "browser")] browser_backend: Option<StdArc<OxibrowserBackend>>,
 ) -> Result<(String, usize, bool)> {
-    // ── Workspace Scoping: restrict agent file access ──
-    let workspace = std::env::temp_dir().join("oxios-agent-workspace");
+    // ── Workspace Scoping: per-agent workspace directory ──
+    // Each agent gets its own workspace subdirectory under /tmp/oxios-agent-workspace/.
+    //
+    // NOTE: `std::env::set_current_dir()` is process-global, so concurrent agents
+    // in separate `spawn_blocking` threads WILL race on the CWD. This is a known
+    // limitation. The proper fix is to add a `workspace_dir` field to
+    // `AgentLoopConfig` in oxi-agent so file tools use per-agent paths.
+    //
+    // For now, we create per-agent directories and set CWD before running the loop.
+    // This works correctly when agents run sequentially (which is the common case
+    // with the current Supervisor), but may cause issues under high concurrency.
+    let workspace = std::env::temp_dir()
+        .join("oxios-agent-workspace")
+        .join(agent_id.to_string());
 
     // Ensure workspace exists.
     let _ = std::fs::create_dir_all(&workspace);
 
     // Set current directory for file tools (read/write/edit).
+    // TODO: Move to AgentLoopConfig.workspace_dir when oxi-agent supports it.
     if let Err(e) = std::env::set_current_dir(&workspace) {
         tracing::warn!(error = %e, "Failed to set agent workspace dir");
     }

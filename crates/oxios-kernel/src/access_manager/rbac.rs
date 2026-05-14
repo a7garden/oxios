@@ -138,8 +138,35 @@ pub struct RbacPolicy {
 
 impl RbacPolicy {
     /// Checks whether this policy allows the given action.
+    ///
+    /// Supports wildcard matching for `UseTool("*")` (matches any tool name)
+    /// and `AccessPath("*")` (matches any path).
     pub fn allows(&self, action: &Action) -> bool {
-        self.allowed_actions.contains(action)
+        // First, try exact match.
+        if self.allowed_actions.contains(action) {
+            return true;
+        }
+
+        // Then, check wildcard patterns.
+        match action {
+            Action::UseTool(tool_name) => {
+                // Check if policy has UseTool("*") wildcard.
+                self.allowed_actions
+                    .iter()
+                    .any(|a| matches!(a, Action::UseTool(w) if w == "*"))
+                    // Also check if the specific tool name is listed.
+                    || self.allowed_actions.contains(&Action::UseTool(tool_name.clone()))
+            }
+            Action::AccessPath(path) => {
+                // Check if policy has AccessPath("*") wildcard.
+                self.allowed_actions
+                    .iter()
+                    .any(|a| matches!(a, Action::AccessPath(p) if p == "*"))
+                    || self.allowed_actions.contains(&Action::AccessPath(path.clone()))
+            }
+            // Non-parameterized actions: exact match only (already checked above).
+            _ => false,
+        }
     }
 }
 
@@ -277,7 +304,7 @@ impl RbacManager {
 
     /// Approves a pending approval request.
     pub fn approve(&mut self, id: uuid::Uuid) -> bool {
-        if let Some((_, s)) = self.pending_approvals.iter_mut().find(|(p, _)| p.id == id) {
+        if let Some((_, s)) = self.pending_approvals.iter_mut().find(|(p, s)| p.id == id && *s == ApprovalStatus::Pending) {
             *s = ApprovalStatus::Approved;
             return true;
         }
@@ -286,7 +313,7 @@ impl RbacManager {
 
     /// Rejects a pending approval request.
     pub fn reject(&mut self, id: uuid::Uuid) -> bool {
-        if let Some((_, s)) = self.pending_approvals.iter_mut().find(|(p, _)| p.id == id) {
+        if let Some((_, s)) = self.pending_approvals.iter_mut().find(|(p, s)| p.id == id && *s == ApprovalStatus::Pending) {
             *s = ApprovalStatus::Rejected;
             return true;
         }
@@ -311,4 +338,184 @@ impl RbacManager {
 
 impl Default for RbacManager {
     fn default() -> Self { Self::new() }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_default_policies_exist() {
+        let mgr = RbacManager::new();
+        assert!(mgr.policies.contains_key(&Role::User));
+        assert!(mgr.policies.contains_key(&Role::Superuser));
+        assert!(mgr.policies.contains_key(&Role::Admin));
+    }
+
+    #[test]
+    fn test_role_assignment() {
+        let mut mgr = RbacManager::new();
+        let subject = Subject::User("alice".into());
+        mgr.assign_role(subject.clone(), Role::Admin);
+        assert_eq!(mgr.get_role(&subject), Some(Role::Admin));
+
+        mgr.revoke_role(&subject);
+        assert_eq!(mgr.get_role(&subject), None);
+    }
+
+    #[test]
+    fn test_system_bypasses_rbac() {
+        let mut mgr = RbacManager::new();
+        let subject = Subject::System;
+        assert!(mgr.check_permission(
+            &subject,
+            &Action::ManageRBAC,
+            "test"
+        ));
+    }
+
+    #[test]
+    fn test_unknown_subject_denied() {
+        let mut mgr = RbacManager::new();
+        let subject = Subject::User("nobody".into());
+        assert!(!mgr.check_permission(
+            &subject,
+            &Action::UseTool("read".into()),
+            "test"
+        ));
+    }
+
+    #[test]
+    fn test_user_allowed_specific_tools() {
+        let mut mgr = RbacManager::new();
+        let subject = Subject::User("bob".into());
+        mgr.assign_role(subject.clone(), Role::User);
+
+        assert!(mgr.check_permission(&subject, &Action::UseTool("read".into()), "test"));
+        assert!(mgr.check_permission(&subject, &Action::UseTool("write".into()), "test"));
+        assert!(mgr.check_permission(&subject, &Action::UseTool("bash".into()), "test"));
+    }
+
+    #[test]
+    fn test_user_denied_admin_tools() {
+        let mut mgr = RbacManager::new();
+        let subject = Subject::User("bob".into());
+        mgr.assign_role(subject.clone(), Role::User);
+
+        assert!(!mgr.check_permission(&subject, &Action::ManageRBAC, "test"));
+        assert!(!mgr.check_permission(&subject, &Action::SystemConfig, "test"));
+    }
+
+    #[test]
+    fn test_admin_wildcard_allows_all_tools() {
+        let mut mgr = RbacManager::new();
+        let subject = Subject::User("admin".into());
+        mgr.assign_role(subject.clone(), Role::Admin);
+
+        // Admin should be able to use ANY tool via wildcard.
+        assert!(mgr.check_permission(&subject, &Action::UseTool("any_tool".into()), "test"));
+        assert!(mgr.check_permission(&subject, &Action::UseTool("custom_thing".into()), "test"));
+        assert!(mgr.check_permission(&subject, &Action::UseTool("dangerous".into()), "test"));
+    }
+
+    #[test]
+    fn test_superuser_wildcard_allows_all_tools() {
+        let mut mgr = RbacManager::new();
+        let subject = Subject::User("super".into());
+        mgr.assign_role(subject.clone(), Role::Superuser);
+
+        assert!(mgr.check_permission(&subject, &Action::UseTool("custom".into()), "test"));
+        assert!(mgr.check_permission(&subject, &Action::UseTool("anything".into()), "test"));
+    }
+
+    #[test]
+    fn test_admin_all_paths_wildcard() {
+        let mut mgr = RbacManager::new();
+        let subject = Subject::User("admin".into());
+        mgr.assign_role(subject.clone(), Role::Admin);
+
+        assert!(mgr.check_permission(&subject, &Action::AccessPath("/any/path".into()), "test"));
+        assert!(mgr.check_permission(&subject, &Action::AccessPath("/secret/data".into()), "test"));
+    }
+
+    #[test]
+    fn test_policy_allows_exact_match() {
+        let policy = Role::User.default_policy();
+        assert!(policy.allows(&Action::UseTool("read".into())));
+        assert!(policy.allows(&Action::UseTool("bash".into())));
+        assert!(!policy.allows(&Action::UseTool("unknown_tool".into())));
+    }
+
+    #[test]
+    fn test_policy_allows_wildcard() {
+        let policy = Role::Admin.default_policy();
+        assert!(policy.allows(&Action::UseTool("literally_anything".into())));
+        assert!(policy.allows(&Action::AccessPath("/some/random/path".into())));
+    }
+
+    #[test]
+    fn test_approval_request_lifecycle() {
+        let mut mgr = RbacManager::new();
+        let id = mgr.request_approval(
+            Subject::User("alice".into()),
+            Action::ManageRBAC,
+            "rbac".into(),
+            "need admin".into(),
+        );
+
+        let pending = mgr.pending_approvals();
+        assert_eq!(pending.len(), 1);
+        assert_eq!(pending[0].id, id);
+
+        assert!(mgr.approve(id));
+        assert!(mgr.pending_approvals().is_empty());
+
+        // Already approved
+        assert!(!mgr.approve(id));
+    }
+
+    #[test]
+    fn test_approval_rejection() {
+        let mut mgr = RbacManager::new();
+        let id = mgr.request_approval(
+            Subject::User("alice".into()),
+            Action::SystemConfig,
+            "config".into(),
+            "need config".into(),
+        );
+
+        assert!(mgr.reject(id));
+        assert!(mgr.pending_approvals().is_empty());
+    }
+
+    #[test]
+    fn test_approval_nonexistent() {
+        let mut mgr = RbacManager::new();
+        assert!(!mgr.approve(uuid::Uuid::new_v4()));
+        assert!(!mgr.reject(uuid::Uuid::new_v4()));
+    }
+
+    #[test]
+    fn test_audit_log_recorded() {
+        let mut mgr = RbacManager::new();
+        let subject = Subject::User("alice".into());
+        mgr.assign_role(subject.clone(), Role::User);
+
+        mgr.check_permission(&subject, &Action::UseTool("read".into()), "test");
+        assert!(!mgr.audit_log().is_empty());
+
+        let entry = &mgr.audit_log()[0];
+        assert!(entry.allowed);
+    }
+
+    #[test]
+    fn test_audit_log_denied_recorded() {
+        let mut mgr = RbacManager::new();
+        let subject = Subject::User("alice".into());
+        mgr.assign_role(subject.clone(), Role::User);
+
+        mgr.check_permission(&subject, &Action::ManageRBAC, "test");
+        let denied_entries: Vec<_> = mgr.audit_log().iter().filter(|e| !e.allowed).collect();
+        assert_eq!(denied_entries.len(), 1);
+    }
 }

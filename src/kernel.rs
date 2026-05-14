@@ -80,6 +80,7 @@ impl Kernel {
                     self.auth_manager.clone(),
                     self.audit_trail.clone(),
                     self.access_manager.clone(),
+                    self.state_store.clone(),
                 ),
                 oxios_kernel::PersonaApi::new(Arc::new(self.persona_manager.clone())),
                 oxios_kernel::ExtensionApi::new(
@@ -409,6 +410,15 @@ impl KernelBuilder {
         let cron_scheduler = Arc::new(cron_scheduler);
 
         let audit_trail = Arc::new(AuditTrail::new(config.audit.max_entries));
+
+        // Restore persisted audit entries from previous session.
+        if let Ok(entries) = state_store.load_audit_entries() {
+            if !entries.is_empty() {
+                tracing::info!(count = entries.len(), "Restored audit trail entries from previous session");
+                audit_trail.restore_from(entries);
+            }
+        }
+
         let budget_manager = Arc::new(BudgetManager::new());
         let resource_monitor = Arc::new(ResourceMonitor::new(
             config.resource_monitor.interval_secs,

@@ -239,11 +239,7 @@ impl AgentTool for MemoryReadTool {
                         memory_type_str,
                     );
                     for entry in &entries {
-                        let preview = if entry.content.len() > 100 {
-                            &entry.content[..100]
-                        } else {
-                            &entry.content
-                        };
+                        let preview = truncate_str(&entry.content, 100);
                         output.push_str(&format!(
                             "- [{}] {} (id: {}…, tags: {})\n",
                             entry.memory_type.label(),
@@ -338,11 +334,7 @@ impl AgentTool for MemorySearchTool {
                 }
                 let mut output = format!("Found {} matching entries:\n\n", entries.len());
                 for entry in &entries {
-                    let preview = if entry.content.len() > 100 {
-                        &entry.content[..100]
-                    } else {
-                        &entry.content
-                    };
+                    let preview = truncate_str(&entry.content, 100);
                     output.push_str(&format!(
                         "- [{}] {} (id: {}…, importance: {:.2}, tags: {})\n",
                         entry.memory_type.label(),
@@ -368,5 +360,89 @@ fn parse_memory_type(s: &str) -> MemoryType {
         "episode" => MemoryType::Episode,
         "knowledge" => MemoryType::Knowledge,
         _ => MemoryType::Fact,
+    }
+}
+
+/// Truncate a string to at most `max_chars` characters, respecting UTF-8 boundaries.
+fn truncate_str(s: &str, max_chars: usize) -> &str {
+    if s.len() <= max_chars {
+        return s;
+    }
+    // Find the largest valid char boundary <= max_chars.
+    let mut boundary = max_chars;
+    while boundary > 0 && !s.is_char_boundary(boundary) {
+        boundary -= 1;
+    }
+    &s[..boundary]
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_truncate_str_ascii() {
+        assert_eq!(truncate_str("hello world", 5), "hello");
+        assert_eq!(truncate_str("hello", 10), "hello");
+        assert_eq!(truncate_str("", 5), "");
+    }
+
+    #[test]
+    fn test_truncate_str_utf8_korean() {
+        // Each Korean character is 3 bytes in UTF-8.
+        let korean = "안녕하세요"; // 15 bytes
+        assert_eq!(truncate_str(korean, 6), "안녕"); // 6 bytes = 2 chars
+        assert_eq!(truncate_str(korean, 7), "안녕"); // 7 bytes splits char → back to 6
+        assert_eq!(truncate_str(korean, 15), "안녕하세요");
+    }
+
+    #[test]
+    fn test_truncate_str_mixed() {
+        let mixed = "Hi 안녕"; // 2 + 1 + 6 = 9 bytes
+        assert_eq!(truncate_str(mixed, 3), "Hi ");
+        assert_eq!(truncate_str(mixed, 4), "Hi "); // 4 splits 안 → back to 3
+    }
+
+    #[test]
+    fn test_parse_memory_type() {
+        assert!(matches!(parse_memory_type("fact"), MemoryType::Fact));
+        assert!(matches!(parse_memory_type("episode"), MemoryType::Episode));
+        assert!(matches!(parse_memory_type("knowledge"), MemoryType::Knowledge));
+        assert!(matches!(parse_memory_type("conversation"), MemoryType::Conversation));
+        assert!(matches!(parse_memory_type("session"), MemoryType::Session));
+        assert!(matches!(parse_memory_type("unknown"), MemoryType::Fact));
+    }
+
+    fn make_test_mm() -> std::sync::Arc<crate::memory::MemoryManager> {
+        let dir = std::env::temp_dir().join(format!("test-memory-{}", uuid::Uuid::new_v4()));
+        let state_store = std::sync::Arc::new(
+            crate::state_store::StateStore::new(dir).expect("test state store")
+        );
+        std::sync::Arc::new(crate::memory::MemoryManager::new(state_store))
+    }
+
+    #[test]
+    fn test_memory_write_tool_schema() {
+        let mm = make_test_mm();
+        let tool = MemoryWriteTool::new(mm);
+        assert_eq!(tool.name(), "memory_write");
+        let schema = tool.parameters_schema();
+        assert!(schema["required"].is_array());
+    }
+
+    #[test]
+    fn test_memory_read_tool_schema() {
+        let mm = make_test_mm();
+        let tool = MemoryReadTool::new(mm);
+        assert_eq!(tool.name(), "memory_read");
+    }
+
+    #[test]
+    fn test_memory_search_tool_schema() {
+        let mm = make_test_mm();
+        let tool = MemorySearchTool::new(mm);
+        assert_eq!(tool.name(), "memory_search");
+        let schema = tool.parameters_schema();
+        assert!(schema["required"].is_array());
     }
 }

@@ -24,7 +24,7 @@ mod types;
 
 pub use types::{
     ArgumentDef, HostRequirementsCheck, InstallSource, McpServerConfig, Program,
-    ProgramHostRequirements, ProgramMeta, ToolDef,
+    ProgramHostRequirements, ProgramMeta, ProgramState, ToolDef,
 };
 
 use std::collections::HashMap;
@@ -145,7 +145,7 @@ impl ProgramManager {
             meta,
             path: path.to_path_buf(),
             skill_content,
-            enabled: true,
+            enabled: self.load_program_state(path).map(|s| s.enabled).unwrap_or(true),
         })
     }
 
@@ -186,6 +186,11 @@ impl ProgramManager {
 
         // Copy the directory recursively
         copy_dir_all(source_path, &dest_path)?;
+
+        // Create initial state file
+        let state = ProgramState::new();
+        let state_json = serde_json::to_string_pretty(&state)?;
+        fs::write(dest_path.join("state.json"), state_json)?;
 
         // Create the program entry
         let program = Program {
@@ -348,7 +353,7 @@ impl ProgramManager {
         Ok(())
     }
 
-    /// Enable or disable a program
+    /// Enable or disable a program (persisted across restarts).
     pub async fn set_enabled(&self, name: &str, enabled: bool) -> Result<()> {
         let mut installed = self.installed.write().await;
 
@@ -356,6 +361,11 @@ impl ProgramManager {
             .ok_or_else(|| anyhow::anyhow!("Program '{}' not found", name))?;
 
         program.enabled = enabled;
+
+        // Persist to state.json
+        self.persist_state(&program.path, enabled)?;
+
+        tracing::info!(name, enabled, "Program enabled state persisted");
         Ok(())
     }
 
@@ -395,6 +405,144 @@ impl ProgramManager {
         let installed = self.installed.read().await;
         installed.get(name).map(|p| p.skill_content.clone())
     }
+
+    /// Upgrade an existing program, or install if not present.
+    ///
+    /// Compares versions using SemVer. If the new version is the same,
+    /// returns the existing program (no-op). If different, performs
+    /// atomic replace: uninstall old → install new, preserving the
+    /// enabled state.
+    pub async fn upgrade(&self, source_path: &Path) -> Result<Program> {
+        let source_meta = ProgramMeta::load_from_dir(source_path)?;
+
+        // Check if already installed
+        let existing = self.get_program(&source_meta.name).await;
+
+        if let Some(ref old) = existing {
+            let cmp = compare_versions(&source_meta.version, &old.meta.version);
+            match cmp {
+                VersionCmp::Equal => {
+                    tracing::info!(
+                        name = %source_meta.name,
+                        version = %source_meta.version,
+                        "Program already at same version — no upgrade needed"
+                    );
+                    return Ok(old.clone());
+                }
+                VersionCmp::Older => {
+                    tracing::warn!(
+                        name = %source_meta.name,
+                        old = %old.meta.version,
+                        new = %source_meta.version,
+                        "Downgrade requested — proceeding"
+                    );
+                }
+                VersionCmp::Newer => {
+                    tracing::info!(
+                        name = %source_meta.name,
+                        old = %old.meta.version,
+                        new = %source_meta.version,
+                        "Upgrading program"
+                    );
+                }
+            }
+
+            // Preserve enabled state across upgrade
+            let was_enabled = old.enabled;
+
+            // Atomic replace: uninstall old then install new
+            self.uninstall(&source_meta.name).await?;
+            let mut program = self.install(source_path).await?;
+
+            // Restore enabled state
+            if !was_enabled {
+                program.enabled = false;
+                self.persist_state(&program.path, false)?;
+                // Also update in-memory
+                let mut installed = self.installed.write().await;
+                if let Some(p) = installed.get_mut(&source_meta.name) {
+                    p.enabled = false;
+                }
+            }
+
+            tracing::info!(
+                name = %program.meta.name,
+                version = %program.meta.version,
+                enabled = program.enabled,
+                "Program upgraded"
+            );
+
+            Ok(program)
+        } else {
+            // Not installed — just install
+            tracing::info!(
+                name = %source_meta.name,
+                "Program not installed — performing fresh install"
+            );
+            self.install(source_path).await
+        }
+    }
+
+    // ── State Persistence Helpers ──
+
+    /// Load program state from state.json in the program directory.
+    fn load_program_state(&self, path: &Path) -> Result<ProgramState> {
+        let state_path = path.join("state.json");
+        if !state_path.exists() {
+            return Ok(ProgramState::default());
+        }
+        let json = fs::read_to_string(&state_path)?;
+        let state: ProgramState = serde_json::from_str(&json)?;
+        Ok(state)
+    }
+
+    /// Persist enabled state to state.json in the program directory.
+    fn persist_state(&self, program_path: &Path, enabled: bool) -> Result<()> {
+        let mut state = self.load_program_state(program_path).unwrap_or_default();
+        state.enabled = enabled;
+        state.last_modified = chrono::Utc::now().to_rfc3339();
+        let state_json = serde_json::to_string_pretty(&state)?;
+        fs::write(program_path.join("state.json"), state_json)?;
+        Ok(())
+    }
+}
+
+// ── Version Comparison ─────────────────────────────────────────────────────────
+
+/// Result of comparing two SemVer version strings.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum VersionCmp {
+    /// Versions are identical.
+    Equal,
+    /// First version is newer.
+    Newer,
+    /// First version is older.
+    Older,
+}
+
+/// Compare two SemVer version strings (major.minor.patch).
+///
+/// Handles `v` prefix and missing components gracefully.
+fn compare_versions(a: &str, b: &str) -> VersionCmp {
+    let parse = |v: &str| -> Vec<u32> {
+        v.strip_prefix('v')
+            .unwrap_or(v)
+            .split('.')
+            .filter_map(|s| s.parse().ok())
+            .collect()
+    };
+    let va = parse(a);
+    let vb = parse(b);
+    for i in 0..va.len().max(vb.len()) {
+        let na = va.get(i).unwrap_or(&0);
+        let nb = vb.get(i).unwrap_or(&0);
+        match na.cmp(nb) {
+            std::cmp::Ordering::Greater => return VersionCmp::Newer,
+            std::cmp::Ordering::Less => return VersionCmp::Older,
+            std::cmp::Ordering::Equal => continue,
+        }
+    }
+    VersionCmp::Equal
 }
 
 #[cfg(test)]
@@ -903,5 +1051,232 @@ optional = ["echo", "nonexistent-tool-xyz"]
         assert!(dst.join("file.txt").exists());
         assert!(dst.join("subdir").join("nested.txt").exists());
         assert_eq!(fs::read_to_string(dst.join("file.txt")).unwrap(), "content");
+    }
+
+    // ── Version Comparison Tests ──
+
+    #[test]
+    fn test_compare_versions_equal() {
+        assert_eq!(compare_versions("1.0.0", "1.0.0"), VersionCmp::Equal);
+        assert_eq!(compare_versions("2.3.4", "2.3.4"), VersionCmp::Equal);
+    }
+
+    #[test]
+    fn test_compare_versions_newer() {
+        assert_eq!(compare_versions("2.0.0", "1.0.0"), VersionCmp::Newer);
+        assert_eq!(compare_versions("1.1.0", "1.0.0"), VersionCmp::Newer);
+        assert_eq!(compare_versions("1.0.1", "1.0.0"), VersionCmp::Newer);
+        assert_eq!(compare_versions("1.0.0", "0.9.9"), VersionCmp::Newer);
+    }
+
+    #[test]
+    fn test_compare_versions_older() {
+        assert_eq!(compare_versions("1.0.0", "2.0.0"), VersionCmp::Older);
+        assert_eq!(compare_versions("1.0.0", "1.1.0"), VersionCmp::Older);
+    }
+
+    #[test]
+    fn test_compare_versions_with_v_prefix() {
+        assert_eq!(compare_versions("v1.0.0", "1.0.0"), VersionCmp::Equal);
+        assert_eq!(compare_versions("v2.0.0", "v1.0.0"), VersionCmp::Newer);
+    }
+
+    #[test]
+    fn test_compare_versions_missing_components() {
+        assert_eq!(compare_versions("1.0", "1.0.0"), VersionCmp::Equal);
+        assert_eq!(compare_versions("2", "1.0.0"), VersionCmp::Newer);
+    }
+
+    // ── State Persistence Tests ──
+
+    #[test]
+    fn test_program_state_default() {
+        let state = ProgramState::default();
+        assert!(state.enabled);
+        assert!(!state.installed_at.is_empty());
+        assert!(!state.last_modified.is_empty());
+    }
+
+    #[test]
+    fn test_program_state_with_enabled() {
+        let state = ProgramState::new().with_enabled(false);
+        assert!(!state.enabled);
+    }
+
+    #[tokio::test]
+    async fn test_state_json_created_on_install() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let programs_dir = temp_dir.path().join("programs");
+        let source_dir = temp_dir.path().join("source");
+        fs::create_dir_all(&source_dir).unwrap();
+        fs::write(source_dir.join("program.toml"), r#"
+[program]
+name = "state-test"
+version = "1.0.0"
+description = "Test"
+author = "Test"
+"#).unwrap();
+        fs::write(source_dir.join("SKILL.md"), "# Test").unwrap();
+
+        let manager = ProgramManager::new(programs_dir);
+        manager.init().await.unwrap();
+        let program = manager.install(&source_dir).await.unwrap();
+
+        // state.json should exist
+        let state_path = program.path.join("state.json");
+        assert!(state_path.exists());
+
+        let state: ProgramState =
+            serde_json::from_str(&fs::read_to_string(&state_path).unwrap()).unwrap();
+        assert!(state.enabled);
+    }
+
+    #[tokio::test]
+    async fn test_set_enabled_persists() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let programs_dir = temp_dir.path().join("programs");
+        let source_dir = temp_dir.path().join("source");
+        fs::create_dir_all(&source_dir).unwrap();
+        fs::write(source_dir.join("program.toml"), r#"
+[program]
+name = "toggle-test"
+version = "1.0.0"
+description = "Test"
+author = "Test"
+"#).unwrap();
+        fs::write(source_dir.join("SKILL.md"), "# Test").unwrap();
+
+        let manager = ProgramManager::new(programs_dir);
+        manager.init().await.unwrap();
+        let program = manager.install(&source_dir).await.unwrap();
+
+        // Disable
+        manager.set_enabled("toggle-test", false).await.unwrap();
+
+        // Verify state.json reflects disabled
+        let state: ProgramState =
+            serde_json::from_str(&fs::read_to_string(program.path.join("state.json")).unwrap()).unwrap();
+        assert!(!state.enabled);
+
+        // Re-enable
+        manager.set_enabled("toggle-test", true).await.unwrap();
+        let state: ProgramState =
+            serde_json::from_str(&fs::read_to_string(program.path.join("state.json")).unwrap()).unwrap();
+        assert!(state.enabled);
+    }
+
+    #[tokio::test]
+    async fn test_enabled_state_survives_reload() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let programs_dir = temp_dir.path().join("programs");
+        let source_dir = temp_dir.path().join("source");
+        fs::create_dir_all(&source_dir).unwrap();
+        fs::write(source_dir.join("program.toml"), r#"
+[program]
+name = "persist-test"
+version = "1.0.0"
+description = "Test"
+author = "Test"
+"#).unwrap();
+        fs::write(source_dir.join("SKILL.md"), "# Test").unwrap();
+
+        // First manager: install and disable
+        let manager = ProgramManager::new(programs_dir.clone());
+        manager.init().await.unwrap();
+        manager.install(&source_dir).await.unwrap();
+        manager.set_enabled("persist-test", false).await.unwrap();
+        drop(manager);
+
+        // Second manager: reload from disk — state should be disabled
+        let manager2 = ProgramManager::new(programs_dir);
+        manager2.init().await.unwrap();
+        let reloaded = manager2.get_program("persist-test").await.unwrap();
+        assert!(!reloaded.enabled, "disabled state should survive restart");
+    }
+
+    // ── Upgrade Tests ──
+
+    fn make_program_dir(parent: &Path, name: &str, version: &str) -> PathBuf {
+        let dir = parent.join(name);
+        fs::create_dir_all(&dir).unwrap();
+        let toml = format!(
+            "[program]\nname = \"{}\"\nversion = \"{}\"\ndescription = \"Test\"\nauthor = \"Test\"\n",
+            name, version,
+        );
+        fs::write(dir.join("program.toml"), toml).unwrap();
+        fs::write(dir.join("SKILL.md"), "# Test").unwrap();
+        dir
+    }
+
+    #[tokio::test]
+    async fn test_upgrade_same_version_is_noop() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let programs_dir = temp_dir.path().join("programs");
+
+        let manager = ProgramManager::new(programs_dir);
+        manager.init().await.unwrap();
+
+        // Install v1.0.0
+        let v1_dir = make_program_dir(temp_dir.path(), "up-test", "1.0.0");
+        manager.install(&v1_dir).await.unwrap();
+
+        // Upgrade to same v1.0.0 — should be no-op
+        let v1_dir2 = make_program_dir(&temp_dir.path().join("v1copy"), "up-test", "1.0.0");
+        let result = manager.upgrade(&v1_dir2).await.unwrap();
+        assert_eq!(result.meta.version, "1.0.0");
+    }
+
+    #[tokio::test]
+    async fn test_upgrade_newer_version() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let programs_dir = temp_dir.path().join("programs");
+
+        let manager = ProgramManager::new(programs_dir);
+        manager.init().await.unwrap();
+
+        // Install v1.0.0
+        let v1_dir = make_program_dir(temp_dir.path(), "up-test", "1.0.0");
+        manager.install(&v1_dir).await.unwrap();
+
+        // Upgrade to v2.0.0
+        let v2_dir = make_program_dir(&temp_dir.path().join("v2"), "up-test", "2.0.0");
+        let result = manager.upgrade(&v2_dir).await.unwrap();
+        assert_eq!(result.meta.version, "2.0.0");
+    }
+
+    #[tokio::test]
+    async fn test_upgrade_preserves_enabled_state() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let programs_dir = temp_dir.path().join("programs");
+
+        let manager = ProgramManager::new(programs_dir);
+        manager.init().await.unwrap();
+
+        // Install v1.0.0 and disable it
+        let v1_dir = make_program_dir(temp_dir.path(), "up-test", "1.0.0");
+        manager.install(&v1_dir).await.unwrap();
+        manager.set_enabled("up-test", false).await.unwrap();
+
+        // Upgrade to v2.0.0 — should stay disabled
+        let v2_dir = make_program_dir(&temp_dir.path().join("v2"), "up-test", "2.0.0");
+        let result = manager.upgrade(&v2_dir).await.unwrap();
+        assert_eq!(result.meta.version, "2.0.0");
+        assert!(!result.enabled, "disabled state should be preserved across upgrade");
+    }
+
+    #[tokio::test]
+    async fn test_upgrade_installs_if_not_present() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let programs_dir = temp_dir.path().join("programs");
+
+        let manager = ProgramManager::new(programs_dir);
+        manager.init().await.unwrap();
+
+        // Upgrade without prior install — should just install
+        let v1_dir = make_program_dir(temp_dir.path(), "fresh-test", "1.0.0");
+        let result = manager.upgrade(&v1_dir).await.unwrap();
+        assert_eq!(result.meta.name, "fresh-test");
+        assert_eq!(result.meta.version, "1.0.0");
+        assert!(result.enabled);
     }
 }

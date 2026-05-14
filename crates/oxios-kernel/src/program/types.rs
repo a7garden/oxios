@@ -126,3 +126,42 @@ pub struct HostRequirementsCheck {
     /// Availability status of optional tools
     pub optional_available: HashMap<String, bool>,
 }
+
+/// Runtime state of an installed program.
+///
+/// Persisted to `state.json` inside the program directory, separately
+/// from `program.toml` (which is author-controlled and read-only).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProgramState {
+    /// Whether the program is enabled.
+    pub enabled: bool,
+    /// When the program was first installed.
+    pub installed_at: String,
+    /// When the state was last modified.
+    pub last_modified: String,
+}
+
+impl Default for ProgramState {
+    fn default() -> Self {
+        let now = chrono::Utc::now().to_rfc3339();
+        Self {
+            enabled: true,
+            installed_at: now.clone(),
+            last_modified: now,
+        }
+    }
+}
+
+impl ProgramState {
+    /// Create a new state with `enabled = true`.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Set enabled and update `last_modified`.
+    pub fn with_enabled(mut self, enabled: bool) -> Self {
+        self.enabled = enabled;
+        self.last_modified = chrono::Utc::now().to_rfc3339();
+        self
+    }
+}

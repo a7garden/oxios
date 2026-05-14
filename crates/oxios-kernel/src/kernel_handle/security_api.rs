@@ -4,12 +4,14 @@ use std::sync::Arc;
 use crate::auth::AuthManager;
 use crate::audit_trail::{AuditTrail, AuditAction, AuditEntry};
 use crate::access_manager::{AccessManager, AgentPermissions, PermissionUpdate, PendingApproval, ApprovalStatus};
+use crate::state_store::StateStore;
 
 /// Security system calls.
 pub struct SecurityApi {
     pub(crate) auth_manager: Arc<parking_lot::Mutex<AuthManager>>,
     pub(crate) audit_trail: Arc<AuditTrail>,
     pub(crate) access_manager: Arc<parking_lot::Mutex<AccessManager>>,
+    pub(crate) state_store: Arc<StateStore>,
 }
 
 impl SecurityApi {
@@ -18,8 +20,9 @@ impl SecurityApi {
         auth_manager: Arc<parking_lot::Mutex<AuthManager>>,
         audit_trail: Arc<AuditTrail>,
         access_manager: Arc<parking_lot::Mutex<AccessManager>>,
+        state_store: Arc<StateStore>,
     ) -> Self {
-        Self { auth_manager, audit_trail, access_manager }
+        Self { auth_manager, audit_trail, access_manager, state_store }
     }
     /// Audit an action.
     pub fn audit(&self, actor: &str, action: AuditAction, resource: &str) -> String {
@@ -47,8 +50,14 @@ impl SecurityApi {
         self.audit_trail.len()
     }
 
-    /// Flush audit trail (commit to git via provided git_layer).
+    /// Flush audit trail to disk and commit to git.
+    ///
+    /// Persists all in-memory audit entries to the state store,
+    /// then commits the audit file to git for versioning.
     pub fn flush(&self, git: &crate::git_layer::GitLayer) -> anyhow::Result<()> {
+        // 1. Persist entries to state store
+        self.audit_trail.flush(&self.state_store)?;
+        // 2. Commit to git
         if git.is_enabled() {
             let _ = git.commit_file("audit", "audit trail flush");
         }

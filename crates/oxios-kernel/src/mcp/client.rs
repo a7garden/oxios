@@ -2,10 +2,15 @@
 //!
 //! `McpClient` spawns a child process and communicates with it over stdin/stdout
 //! using JSON-RPC 2.0 messages (one JSON object per line).
+//!
+//! I/O handles are stored persistently (not consumed via `take()`) so that
+//! multiple requests can be serialized through the same connection. A write
+//! lock on both stdin and stdout is held for the duration of each request-response
+//! cycle, ensuring correct ordering.
 
 use anyhow::{anyhow, Context, Result};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
-use tokio::process::{Child, Command};
+use tokio::process::{Child, ChildStdin, ChildStdout, Command};
 use tokio::sync::RwLock;
 use tokio::time::{timeout, Duration};
 
@@ -17,8 +22,8 @@ use super::protocol::*;
 
 /// Manages a single MCP server process with stdio JSON-RPC communication.
 ///
-/// `McpClient` spawns a child process and communicates with it over stdin/stdout
-/// using JSON-RPC 2.0 messages (one JSON object per line).
+/// I/O handles are stored persistently so that concurrent requests can be
+/// serialized through the same connection without consuming the handles.
 ///
 /// # Example
 ///
@@ -34,6 +39,10 @@ pub struct McpClient {
     server: McpServer,
     /// Child process handle (None when not running)
     child: RwLock<Option<Child>>,
+    /// Persistent stdin handle for writing to the server process.
+    stdin: RwLock<Option<tokio::io::BufWriter<ChildStdin>>>,
+    /// Persistent stdout handle for reading from the server process.
+    stdout: RwLock<Option<BufReader<ChildStdout>>>,
     /// Whether the server has been initialized
     initialized: RwLock<bool>,
     /// Cached tool list (invalidated on refresh_tools)
@@ -52,6 +61,8 @@ impl McpClient {
         Self {
             server,
             child: RwLock::new(None),
+            stdin: RwLock::new(None),
+            stdout: RwLock::new(None),
             initialized: RwLock::new(false),
             tool_cache: RwLock::new(None),
             server_info: RwLock::new(None),
@@ -87,19 +98,19 @@ impl McpClient {
         let stdout = child.stdout.take()
             .expect("stdout not captured — stdout was piped");
 
-        // Wrap in buffered async I/O
-        let reader = BufReader::new(stdout);
-        let writer = tokio::io::BufWriter::new(stdin);
+        // Store persistent I/O handles (separate from child process handle)
+        *self.stdin.write().await = Some(tokio::io::BufWriter::new(stdin));
+        *self.stdout.write().await = Some(BufReader::new(stdout));
 
         // Store child handle
         *self.child.write().await = Some(child);
 
-        // Send initialize request
+        // Send initialize request using persistent handles
         let params = InitializeParams::default();
         let request = McpRequest::new("initialize")
             .with_params(serde_json::to_value(&params)?);
 
-        let response = self.send_request_jsonl(request, reader, writer).await?;
+        let response = self.send_request(request).await?;
 
         // Parse initialize result
         let result_json = response.into_result()?;
@@ -110,7 +121,7 @@ impl McpClient {
 
         // Send initialised notification (JSON-RPC 2.0 requires this)
         let notification = McpRequest::new("notifications/initialized");
-        self.send_notification_jsonl(notification).await?;
+        self.send_notification(notification).await?;
 
         tracing::debug!(
             server = %self.server.name,
@@ -131,36 +142,38 @@ impl McpClient {
         self.server_info.read().await.clone()
     }
 
-    /// Send a JSON-RPC request and receive a response over stdio.
+    /// Send a JSON-RPC request using persistent I/O handles.
     ///
-    /// Uses a timeout to prevent hanging on unresponsive servers.
-    async fn send_request_jsonl<R, W>(
-        &self,
-        request: McpRequest,
-        reader: BufReader<R>,
-        writer: tokio::io::BufWriter<W>,
-    ) -> Result<McpResponse>
-    where
-        R: tokio::io::AsyncRead + Unpin,
-        W: tokio::io::AsyncWrite + Unpin,
-    {
+    /// Acquires write locks on both stdin and stdout for the duration of
+    /// the request-response cycle, serializing concurrent access.
+    async fn do_request(&self, request: McpRequest) -> Result<McpResponse> {
         let request_id = request.id.clone();
+
+        // Acquire stdin lock for writing
+        let mut stdin_guard = self.stdin.write().await;
+        let stdin = stdin_guard
+            .as_mut()
+            .ok_or_else(|| anyhow!("stdin not available on '{}'", self.server.name))?;
 
         // Write the request
         let json = request.to_jsonl()?;
         timeout(self.request_timeout, async {
-            let mut w = writer;
-            w.write_all(&json).await?;
-            w.flush().await?;
+            stdin.write_all(&json).await?;
+            stdin.flush().await?;
             Ok::<(), tokio::io::Error>(())
         })
         .await
         .map_err(|e| anyhow::anyhow!("MCP request timed out (write): {}", e))??;
 
+        // Acquire stdout lock for reading
+        let mut stdout_guard = self.stdout.write().await;
+        let stdout = stdout_guard
+            .as_mut()
+            .ok_or_else(|| anyhow!("stdout not available on '{}'", self.server.name))?;
+
         // Read the response (single JSON line)
         let line: std::io::Result<Option<String>> = timeout(self.request_timeout, async {
-            let mut lines = reader.lines();
-            lines.next_line().await
+            stdout.lines().next_line().await
         })
         .await
         .map_err(|e| anyhow::anyhow!("MCP request timed out (read): {}", e))?;
@@ -186,13 +199,10 @@ impl McpClient {
     }
 
     /// Send a JSON-RPC notification (no response expected).
-    async fn send_notification_jsonl(&self, notification: McpRequest) -> Result<()> {
-        let mut child_guard = self.child.write().await;
-        let child = child_guard
+    async fn send_notification(&self, notification: McpRequest) -> Result<()> {
+        let mut stdin_guard = self.stdin.write().await;
+        let stdin = stdin_guard
             .as_mut()
-            .ok_or_else(|| anyhow!("MCP server '{}' is not running", self.server.name))?;
-
-        let stdin = child.stdin.as_mut()
             .ok_or_else(|| anyhow!("stdin not available on '{}'", self.server.name))?;
 
         let json = notification.to_jsonl()?;
@@ -202,24 +212,17 @@ impl McpClient {
         Ok(())
     }
 
-    /// Call internal send_request using the stored child handle.
+    /// Send a JSON-RPC request via persistent I/O handles.
     pub(crate) async fn send_request(&self, request: McpRequest) -> Result<McpResponse> {
-        // Take stdin and stdout out of the child so we can use them
-        let (stdin, stdout) = {
-            let mut guard = self.child.write().await;
-            let child = guard.as_mut()
-                .ok_or_else(|| anyhow!("MCP server '{}' is not running", self.server.name))?;
-            let stdin = child.stdin.take()
-                .ok_or_else(|| anyhow!("stdin not available on '{}'", self.server.name))?;
-            let stdout = child.stdout.take()
-                .ok_or_else(|| anyhow!("stdout not available on '{}'", self.server.name))?;
-            (stdin, stdout)
-        };
+        // Verify server is running
+        {
+            let child = self.child.read().await;
+            if child.is_none() {
+                anyhow::bail!("MCP server '{}' is not running", self.server.name);
+            }
+        }
 
-        let reader = BufReader::new(stdout);
-        let writer = tokio::io::BufWriter::new(stdin);
-
-        self.send_request_jsonl(request, reader, writer).await
+        self.do_request(request).await
     }
 
     /// List all tools available from this MCP server.
@@ -303,9 +306,12 @@ impl McpClient {
 
     /// Gracefully shutdown the MCP server process.
     ///
-    /// Sends SIGTERM to the child process. Does NOT wait for confirmation
-    /// (the server may not support graceful shutdown).
+    /// Drops persistent I/O handles first, then kills the child process.
     pub async fn shutdown(&self) -> Result<()> {
+        // Drop persistent I/O handles first
+        *self.stdin.write().await = None;
+        *self.stdout.write().await = None;
+
         let mut child_guard = self.child.write().await;
 
         if let Some(mut child) = child_guard.take() {

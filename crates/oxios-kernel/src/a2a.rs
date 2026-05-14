@@ -658,25 +658,25 @@ impl A2AProtocol {
         self.pending_count(agent_id).await > 0
     }
 
-    /// Deliver all pending messages to an agent, publishing events for each.
+    /// Deliver all pending messages to an agent.
+    ///
+    /// Unlike `receive_messages` (which drains the queue silently),
+    /// this method does NOT re-publish `MessageReceived` events since
+    /// they were already published when the messages were originally sent.
     pub async fn deliver_pending_messages(
         &self,
         agent_id: AgentId,
     ) -> Result<Vec<A2ARequest>> {
-        let messages = self.receive_messages(agent_id).await;
-        for msg in &messages {
-            self.event_bus.publish(KernelEvent::MessageReceived {
-                from: msg.from,
-                content: format!("[A2A] {:?}", msg.request_id),
-            })?;
-        }
-        Ok(messages)
+        Ok(self.receive_messages(agent_id).await)
     }
 
     /// Send a message and wait for a response within a timeout.
     ///
     /// Uses `tokio::select!` with `Notify` instead of polling.
-    /// Matches by `request_id` echoed in `ResultSharing` payload.
+    /// Matches `ResultSharing` messages by checking if `task_id` equals the
+    /// **delegated task's ID** (not the envelope request_id). This works because
+    /// `delegate_task` creates a `TaskDelegation { task_id: task.task_id, ... }`
+    /// message, and the handler responds with `ResultSharing { task_id: task.task_id }`.
     pub async fn send_and_wait(
         &self,
         from: AgentId,
@@ -684,6 +684,12 @@ impl A2AProtocol {
         message: A2AMessage,
         timeout: std::time::Duration,
     ) -> Result<A2AResponse> {
+        // Extract the task_id from the outgoing message so we can match the response.
+        let wait_task_id = match &message {
+            A2AMessage::TaskDelegation { task_id, .. } => Some(*task_id),
+            _ => None,
+        };
+
         let request_id = self.send_message(from, to, message).await?;
         let queue = self.get_or_create_queue(from).await;
         let deadline = tokio::time::Instant::now() + timeout;
@@ -693,10 +699,17 @@ impl A2AProtocol {
             {
                 let mut msgs = queue.messages.lock();
                 let match_idx = msgs.iter().position(|p| {
-                    if let A2AMessage::ResultSharing { task_id, .. } = &p.request.message {
-                        *task_id == request_id
-                    } else {
-                        false
+                    match (&p.request.message, wait_task_id) {
+                        // For TaskDelegation: match by the delegated task_id.
+                        (A2AMessage::ResultSharing { task_id, .. }, Some(wait_id)) => {
+                            *task_id == wait_id
+                        }
+                        // For non-delegation messages: match by request_id echoed in payload.
+                        (A2AMessage::ResultSharing { result, .. }, None) => {
+                            result.get("request_id").and_then(|v| v.as_str())
+                                == Some(&request_id.to_string())
+                        }
+                        _ => false,
                     }
                 });
                 if let Some(idx) = match_idx {

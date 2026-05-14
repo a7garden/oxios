@@ -9,6 +9,7 @@ use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
+use std::sync::Arc;
 use sysinfo::System;
 
 /// Snapshot of system and agent resource usage at a point in time.
@@ -56,18 +57,21 @@ impl Default for OverloadThreshold {
 }
 
 /// Resource monitor collecting system and agent metrics.
+///
+/// Snapshots are automatically pushed to history when `record_snapshot()` is called.
+/// Use `start_sampling()` to spawn a background task that periodically records snapshots.
 pub struct ResourceMonitor {
     /// Sampling interval in seconds.
-    #[allow(dead_code)]
     interval_secs: u64,
     /// Maximum number of history entries to retain.
-    #[allow(dead_code)]
     history_max: usize,
     history: RwLock<VecDeque<ResourceSnapshot>>,
     total_token_usage: AtomicU64,
     active_agents: AtomicUsize,
     pending_tasks: AtomicUsize,
     overload_threshold: OverloadThreshold,
+    /// Shared `sysinfo::System` instance to avoid recreating on every snapshot.
+    sys: parking_lot::Mutex<System>,
 }
 
 impl Default for ResourceMonitor {
@@ -87,12 +91,16 @@ impl ResourceMonitor {
             active_agents: AtomicUsize::new(0),
             pending_tasks: AtomicUsize::new(0),
             overload_threshold: OverloadThreshold::default(),
+            sys: parking_lot::Mutex::new(System::new_all()),
         }
     }
 
     /// Take a snapshot of current resource usage.
+    ///
+    /// Uses the shared `sysinfo::System` instance (refreshed on each call)
+    /// instead of creating a new one each time.
     pub fn snapshot(&self) -> ResourceSnapshot {
-        let mut sys = System::new_all();
+        let mut sys = self.sys.lock();
         sys.refresh_all();
 
         // CPU: average across all cores
@@ -119,6 +127,35 @@ impl ResourceMonitor {
             disk_used_gb,
             load_avg_1m,
         }
+    }
+
+    /// Record a snapshot into the history buffer.
+    ///
+    /// Call this to push the current metrics into the history ring buffer.
+    /// Oldest entries are evicted when `history_max` is reached.
+    pub fn record_snapshot(&self) {
+        let snap = self.snapshot();
+        let mut history = self.history.write();
+        if history.len() >= self.history_max {
+            history.pop_front();
+        }
+        history.push_back(snap);
+    }
+
+    /// Spawn a background task that periodically records snapshots.
+    ///
+    /// Returns a `tokio::task::JoinHandle` that can be aborted to stop sampling.
+    /// Uses the `interval_secs` configured at construction time.
+    pub fn start_sampling(self: &Arc<Self>) -> tokio::task::JoinHandle<()> {
+        let monitor = Arc::clone(self);
+        let interval = self.interval_secs;
+        tokio::spawn(async move {
+            let mut ticker = tokio::time::interval(std::time::Duration::from_secs(interval));
+            loop {
+                ticker.tick().await;
+                monitor.record_snapshot();
+            }
+        })
     }
 
     /// Returns historical snapshots, newest first.
@@ -238,20 +275,28 @@ mod tests {
         // Initially empty
         assert!(monitor.history(10).is_empty());
 
-        // Take a few snapshots
+        // Record snapshots
         for _ in 0..3 {
-            let snap = monitor.snapshot();
-            let mut guard = monitor.history.read().clone();
-            if guard.len() < 5 {
-                guard.push_back(snap);
-            }
-            // Directly push into history (not exposed publicly; test via empty)
+            monitor.record_snapshot();
         }
 
-        // History starts empty until snapshots are pushed manually.
-        // Since `snapshot()` doesn't auto-push, history remains empty.
-        // This documents the expected behavior.
-        assert!(monitor.history(10).is_empty());
+        // History should now have 3 entries
+        let history = monitor.history(10);
+        assert_eq!(history.len(), 3);
+    }
+
+    #[test]
+    fn test_history_eviction() {
+        let monitor = ResourceMonitor::new(1, 3);
+
+        // Record more than capacity
+        for _ in 0..5 {
+            monitor.record_snapshot();
+        }
+
+        // Should only retain last 3
+        let history = monitor.history(10);
+        assert_eq!(history.len(), 3);
     }
 
     #[test]

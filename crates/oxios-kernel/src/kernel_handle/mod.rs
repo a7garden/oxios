@@ -118,9 +118,9 @@ impl KernelHandle {
         start_time: Instant,
     ) -> Self {
         Self {
+            security: SecurityApi::new(auth_manager, audit_trail, access_manager, state_store.clone()),
             state: StateApi::new(state_store),
             agents: AgentApi::new(supervisor, budget_manager, memory_manager),
-            security: SecurityApi::new(auth_manager, audit_trail, access_manager),
             persona: PersonaApi::new(persona_manager),
             extensions: ExtensionApi::new(program_manager, skill_store, host_tool_validator),
             mcp: McpApi::new(mcp_bridge),

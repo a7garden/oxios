@@ -298,17 +298,32 @@ pub struct McpTool {
 }
 
 impl McpTool {
-    /// Convert an MCP tool to an oxios ToolDef
+    /// Convert an MCP tool to an oxios ToolDef.
+    ///
+    /// Parses the `input_schema` as a JSON Schema object, extracting
+    /// properties from the top-level `"properties"` key (not from the
+    /// root object, which contains `type`, `properties`, `required`, etc.).
     pub fn to_tool_def(&self) -> ToolDef {
-        let arguments = if let Some(obj) = self.input_schema.as_object() {
-            obj.iter()
+        let arguments = if let Some(properties) = self.input_schema
+            .get("properties")
+            .and_then(|p| p.as_object())
+        {
+            let required_list: Vec<&str> = self.input_schema
+                .get("required")
+                .and_then(|r| r.as_array())
+                .map(|arr| arr.iter().filter_map(|v| v.as_str()).collect())
+                .unwrap_or_default();
+
+            properties
+                .iter()
                 .map(|(name, schema)| {
                     let description = schema
                         .get("description")
                         .and_then(|d| d.as_str())
                         .unwrap_or("No description")
                         .to_string();
-                    let required = schema.get("default").is_none();
+                    let required = required_list.iter().any(|r| *r == name)
+                        && schema.get("default").is_none();
 
                     crate::program::ArgumentDef {
                         name: name.clone(),
