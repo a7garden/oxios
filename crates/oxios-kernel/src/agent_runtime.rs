@@ -42,6 +42,16 @@ use oxios_ouroboros::{ExecutionResult, Seed};
 /// Global LLM circuit breaker instance.
 static LLM_CIRCUIT_BREAKER: std::sync::OnceLock<CircuitBreaker> = std::sync::OnceLock::new();
 
+/// Mutex to serialize `std::env::set_current_dir()` + agent loop execution.
+///
+/// `set_current_dir` is process-global, so concurrent agents in separate
+/// `spawn_blocking` threads WILL race on the CWD. This mutex ensures only
+/// one agent changes CWD and runs at a time.
+///
+/// TODO(upstream): Remove this mutex once oxi-agent's `AgentLoopConfig` gains
+/// a `workspace_dir` field so file tools use per-agent paths instead of CWD.
+static WORKSPACE_MUTEX: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
 /// Get the global LLM circuit breaker.
 fn get_llm_circuit_breaker() -> &'static CircuitBreaker {
     LLM_CIRCUIT_BREAKER.get_or_init(CircuitBreaker::default)
@@ -78,6 +88,25 @@ struct ExecuteState {
     final_content: String,
     steps_completed: usize,
     success: bool,
+}
+
+/// Bundled context for `run_agent_loop()`, replacing 13+ positional parameters.
+struct AgentLoopContext {
+    provider: Arc<dyn Provider>,
+    config: AgentRuntimeConfig,
+    system_prompt: String,
+    prompt: String,
+    seed_id: uuid::Uuid,
+    agent_id: AgentId,
+    program_manager: Option<Arc<ProgramManager>>,
+    oxios_config: Option<OxiosConfig>,
+    mcp_bridge: Option<Arc<McpBridge>>,
+    memory_manager: Option<Arc<MemoryManager>>,
+    exec_config: Option<Arc<ExecConfig>>,
+    exec_access: Option<Arc<Mutex<AccessManager>>>,
+    a2a_protocol: Option<Arc<A2AProtocol>>,
+    #[cfg(feature = "browser")]
+    browser_backend: Option<StdArc<OxibrowserBackend>>,
 }
 
 /// Runtime that wraps an oxi-agent `AgentLoop` for executing Seeds.
@@ -252,25 +281,27 @@ impl AgentRuntime {
         #[cfg(feature = "browser")]
         let browser_for_runtime = self.browser_backend.clone();
 
+        let ctx = AgentLoopContext {
+            provider,
+            config,
+            system_prompt,
+            prompt,
+            seed_id,
+            agent_id: agent_id_clone,
+            program_manager,
+            oxios_config,
+            mcp_bridge: mcp_bridge_for_runtime,
+            memory_manager,
+            exec_config,
+            exec_access,
+            a2a_protocol: a2a_for_runtime,
+            #[cfg(feature = "browser")]
+            browser_backend: browser_for_runtime,
+        };
+
         let (final_content, steps_completed, success) =
             tokio::task::spawn_blocking(move || {
-                run_agent_loop(
-                    provider,
-                    config,
-                    system_prompt,
-                    prompt,
-                    seed_id,
-                    agent_id_clone,
-                    program_manager,
-                    oxios_config,
-                    mcp_bridge_for_runtime,
-                    memory_manager,
-                    exec_config,
-                    exec_access,
-                    a2a_for_runtime,
-                    #[cfg(feature = "browser")]
-                    browser_for_runtime,
-                )
+                run_agent_loop(ctx)
             })
             .await??;
 
@@ -298,34 +329,34 @@ impl AgentRuntime {
 /// This function is called from `spawn_blocking` because `AgentLoop::run()`
 /// produces a `!Send` future. We use `tokio::runtime::Handle::block_on` to
 /// drive the async work from the blocking thread.
-#[allow(clippy::too_many_arguments)]
-fn run_agent_loop(
-    provider: Arc<dyn Provider>,
-    config: AgentRuntimeConfig,
-    system_prompt: String,
-    prompt: String,
-    seed_id: uuid::Uuid,
-    agent_id: AgentId,
-    program_manager: Option<Arc<ProgramManager>>,
-    _oxios_config: Option<OxiosConfig>,
-    mcp_bridge_for_runtime: Option<Arc<McpBridge>>,
-    memory_manager: Option<Arc<MemoryManager>>,
-    exec_config: Option<Arc<ExecConfig>>,
-    exec_access: Option<Arc<Mutex<AccessManager>>>,
-    a2a_protocol: Option<Arc<A2AProtocol>>,
-    #[cfg(feature = "browser")] browser_backend: Option<StdArc<OxibrowserBackend>>,
-) -> Result<(String, usize, bool)> {
+fn run_agent_loop(ctx: AgentLoopContext) -> Result<(String, usize, bool)> {
+    let AgentLoopContext {
+        provider,
+        config,
+        system_prompt,
+        prompt,
+        seed_id,
+        agent_id,
+        program_manager,
+        oxios_config: _,
+        mcp_bridge: mcp_bridge_for_runtime,
+        memory_manager,
+        exec_config,
+        exec_access,
+        a2a_protocol,
+        #[cfg(feature = "browser")]
+        browser_backend,
+    } = ctx;
     // ── Workspace Scoping: per-agent workspace directory ──
     // Each agent gets its own workspace subdirectory under /tmp/oxios-agent-workspace/.
     //
-    // NOTE: `std::env::set_current_dir()` is process-global, so concurrent agents
-    // in separate `spawn_blocking` threads WILL race on the CWD. This is a known
-    // limitation. The proper fix is to add a `workspace_dir` field to
-    // `AgentLoopConfig` in oxi-agent so file tools use per-agent paths.
+    // `std::env::set_current_dir()` is process-global, so we must serialize
+    // the CWD change + agent loop execution behind `WORKSPACE_MUTEX` to avoid
+    // races when concurrent agents run in separate `spawn_blocking` threads.
     //
-    // For now, we create per-agent directories and set CWD before running the loop.
-    // This works correctly when agents run sequentially (which is the common case
-    // with the current Supervisor), but may cause issues under high concurrency.
+    // TODO(upstream): Add a `workspace_dir` field to `AgentLoopConfig` in oxi-agent
+    // so file tools use per-agent paths instead of relying on CWD. Once that lands,
+    // remove `WORKSPACE_MUTEX` and the `set_current_dir` call entirely.
     let workspace = std::env::temp_dir()
         .join("oxios-agent-workspace")
         .join(agent_id.to_string());
@@ -333,13 +364,11 @@ fn run_agent_loop(
     // Ensure workspace exists.
     let _ = std::fs::create_dir_all(&workspace);
 
-    // Set current directory for file tools (read/write/edit).
-    // TODO: Move to AgentLoopConfig.workspace_dir when oxi-agent supports it.
-    if let Err(e) = std::env::set_current_dir(&workspace) {
-        tracing::warn!(error = %e, "Failed to set agent workspace dir");
-    }
-
     tracing::debug!(workspace = %workspace.display(), "Agent workspace scoped");
+
+    // Lock the workspace mutex for the duration of CWD change + agent loop.
+    // This prevents concurrent agents from racing on the process-global CWD.
+    let _workspace_guard = WORKSPACE_MUTEX.lock().expect("WORKSPACE_MUTEX poisoned");
 
     // ── Tier 1: oxi native tools (file operations + web search) ──
     let registry = ToolRegistry::new();

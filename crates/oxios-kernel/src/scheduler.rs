@@ -282,7 +282,8 @@ impl AgentScheduler {
             }
         }
 
-        // Pop the highest priority task with budget check.
+        // Pop tasks iteratively, skipping agents with exhausted budgets.
+        let mut discarded: usize = 0;
         let mut task = loop {
             let task_opt = {
                 let mut queue = self.queue.lock();
@@ -290,20 +291,31 @@ impl AgentScheduler {
             };
 
             match task_opt {
-                Some(t) => break t,
-                None => return None,
+                Some(t) => {
+                    // Check budget before scheduling (soft gate).
+                    if let (Some(ref bm), Some(ref agent_id)) = (&self.budget_manager, &t.agent_id) {
+                        if !bm.can_schedule(agent_id) {
+                            tracing::warn!(
+                                agent_id = %agent_id,
+                                "Agent budget exhausted, skipping task"
+                            );
+                            discarded += 1;
+                            continue; // skip, try next task
+                        }
+                    }
+                    break t;
+                }
+                None => {
+                    if discarded > 0 {
+                        tracing::info!(discarded, "All queued tasks had exhausted budgets");
+                    }
+                    return None;
+                }
             }
         };
 
-        // Check budget before scheduling (soft gate).
-        if let (Some(ref bm), Some(ref agent_id)) = (&self.budget_manager, &task.agent_id) {
-            if !bm.can_schedule(agent_id) {
-                tracing::warn!(
-                    agent_id = %agent_id,
-                    "Agent budget exhausted, skipping task"
-                );
-                return self.next_task(); // Try next task recursively.
-            }
+        if discarded > 0 {
+            tracing::info!(discarded, "Skipped tasks with exhausted budgets");
         }
 
         task.status = TaskStatus::Running;

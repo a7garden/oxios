@@ -71,6 +71,20 @@ pub enum KernelError {
         /// Detailed error reason.
         reason: String,
     },
+
+    /// Operation timed out.
+    #[error("Operation timed out: {context}")]
+    Timeout {
+        /// Context describing what timed out.
+        context: String,
+    },
+
+    /// Rate limit exceeded.
+    #[error("Rate limit exceeded: {context}")]
+    RateLimited {
+        /// Context describing what was rate limited.
+        context: String,
+    },
 }
 
 /// HTTP status code mapping (independent of any web framework).
@@ -86,6 +100,8 @@ pub enum HttpStatus {
     NotFound = 404,
     /// 409 Conflict
     Conflict = 409,
+    /// 429 Too Many Requests
+    TooManyRequests = 429,
     /// 500 Internal Server Error
     InternalServerError = 500,
     /// 503 Service Unavailable
@@ -115,6 +131,8 @@ impl KernelError {
             Self::SessionNotFound { .. } => HttpStatus::NotFound,
             Self::StateStore(_) => HttpStatus::InternalServerError,
             Self::Memory { .. } => HttpStatus::InternalServerError,
+            Self::Timeout { .. } => HttpStatus::ServiceUnavailable,
+            Self::RateLimited { .. } => HttpStatus::TooManyRequests,
             Self::Internal(_) => HttpStatus::InternalServerError,
         }
     }
@@ -159,5 +177,25 @@ mod tests {
         let err = KernelError::StateStore(std::io::Error::new(std::io::ErrorKind::NotFound, "gone"));
         assert!(err.to_string().contains("gone"));
         assert_eq!(u16::from(err.http_status()), 500);
+    }
+
+    #[test]
+    fn test_timeout_error_status() {
+        let err = KernelError::Timeout {
+            context: "agent execution exceeded 300s".into(),
+        };
+        assert!(err.to_string().contains("timed out"));
+        assert!(err.to_string().contains("300s"));
+        assert_eq!(u16::from(err.http_status()), 503);
+    }
+
+    #[test]
+    fn test_rate_limited_error_status() {
+        let err = KernelError::RateLimited {
+            context: "API calls exceeded 60/min".into(),
+        };
+        assert!(err.to_string().contains("Rate limit exceeded"));
+        assert!(err.to_string().contains("60/min"));
+        assert_eq!(u16::from(err.http_status()), 429);
     }
 }

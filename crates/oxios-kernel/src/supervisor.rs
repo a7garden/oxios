@@ -13,12 +13,22 @@ use oxios_ouroboros::Seed;
 use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
+use tokio::task::JoinHandle;
 
 use crate::agent_runtime::AgentRuntime;
 use crate::event_bus::EventBus;
 use crate::resource_monitor::ResourceMonitor;
 use crate::types::{AgentId, AgentInfo, AgentStatus};
 use oxios_ouroboros::ExecutionResult;
+
+/// Tracks the runtime handles needed to cancel a running agent.
+struct AgentHandle {
+    /// Flag set on `kill()` to cooperatively signal cancellation.
+    cancelled: Arc<AtomicBool>,
+    /// The tokio task running the agent execution. Aborted on `kill()`.
+    task: JoinHandle<Result<ExecutionResult>>,
+}
 
 /// Supervisor trait for managing agent lifecycles.
 #[async_trait]
@@ -46,6 +56,8 @@ pub trait Supervisor: Send + Sync {
 /// Basic in-memory supervisor implementation with AgentRuntime integration.
 pub struct BasicSupervisor {
     agents: RwLock<HashMap<AgentId, AgentInfo>>,
+    /// Per-agent cancellation tokens and join handles for task abortion.
+    handles: RwLock<HashMap<AgentId, AgentHandle>>,
     event_bus: EventBus,
     runtime: Arc<AgentRuntime>,
     resource_monitor: Option<Arc<ResourceMonitor>>,
@@ -56,6 +68,7 @@ impl BasicSupervisor {
     pub fn new(event_bus: EventBus, runtime: AgentRuntime) -> Self {
         Self {
             agents: RwLock::new(HashMap::new()),
+            handles: RwLock::new(HashMap::new()),
             event_bus,
             runtime: Arc::new(runtime),
             resource_monitor: None,
@@ -141,7 +154,54 @@ impl Supervisor for BasicSupervisor {
 
         tracing::info!(agent_id = %id, seed_id = %seed.id, "Running agent task");
 
-        match self.runtime.execute(id, seed).await {
+        // Spawn the execution as a tokio task so we can track and abort it.
+        let cancelled = Arc::new(AtomicBool::new(false));
+        let runtime = Arc::clone(&self.runtime);
+        let seed = seed.clone();
+        let cancelled_clone = cancelled.clone();
+
+        let handle: JoinHandle<Result<ExecutionResult>> = tokio::spawn(async move {
+            // Check for cancellation before starting.
+            if cancelled_clone.load(Ordering::Relaxed) {
+                return Ok(ExecutionResult {
+                    output: "Agent cancelled before execution".into(),
+                    steps_completed: 0,
+                    success: false,
+                });
+            }
+            runtime.execute(id, &seed).await
+        });
+
+        // Store the handle so kill() can abort the task.
+        {
+            let mut handles = self.handles.write();
+            handles.insert(id, AgentHandle { cancelled, task: handle });
+        }
+
+        // Await the spawned task.
+        let result = {
+            let mut handles = self.handles.write();
+            let agent_handle = handles.remove(&id);
+            drop(handles);
+
+            match agent_handle {
+                Some(ah) => match ah.task.await {
+                    Ok(res) => res,
+                    Err(join_err) => {
+                        // Task was aborted (e.g. kill()) or panicked.
+                        tracing::warn!(agent_id = %id, error = %join_err, "Agent task join error");
+                        Ok(ExecutionResult {
+                            output: format!("Agent task aborted: {join_err}"),
+                            steps_completed: 0,
+                            success: false,
+                        })
+                    }
+                },
+                None => anyhow::bail!("Agent {id} handle disappeared"),
+            }
+        };
+
+        match result {
             Ok(result) => {
                 tracing::info!(
                     agent_id = %id,
@@ -199,6 +259,16 @@ impl Supervisor for BasicSupervisor {
     }
 
     async fn kill(&self, id: AgentId) -> Result<()> {
+        // Cancel and abort the running task, if any.
+        {
+            let mut handles = self.handles.write();
+            if let Some(agent_handle) = handles.remove(&id) {
+                agent_handle.cancelled.store(true, Ordering::Relaxed);
+                agent_handle.task.abort();
+                tracing::info!(agent_id = %id, "Agent task aborted");
+            }
+        }
+
         {
             let mut agents = self.agents.write();
             if let Some(agent) = agents.get_mut(&id) {
@@ -219,5 +289,147 @@ impl Supervisor for BasicSupervisor {
     async fn list(&self) -> Result<Vec<AgentInfo>> {
         let agents = self.agents.read();
         Ok(agents.values().cloned().collect())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::event_bus::EventBus;
+    use crate::types::AgentStatus;
+    use async_trait::async_trait;
+    use futures::Stream;
+    use oxi_ai::{Context, Model, ProviderError, ProviderEvent, StreamOptions};
+    use oxios_ouroboros::Seed;
+    use std::pin::Pin;
+
+    /// Minimal mock LLM provider for constructing an AgentRuntime in tests.
+    struct MockProvider;
+
+    #[async_trait]
+    impl oxi_ai::Provider for MockProvider {
+        async fn stream(
+            &self,
+            _model: &Model,
+            _context: &Context,
+            _options: Option<StreamOptions>,
+        ) -> Result<Pin<Box<dyn Stream<Item = ProviderEvent> + Send>>, ProviderError> {
+            // Return an empty stream — never actually invoked in supervisor lifecycle tests.
+            let stream = futures::stream::empty();
+            Ok(Box::pin(stream))
+        }
+
+        fn name(&self) -> &str {
+            "mock"
+        }
+    }
+
+    /// Helper to create a real BasicSupervisor wired to a real EventBus.
+    fn make_supervisor() -> BasicSupervisor {
+        let event_bus = EventBus::new(64);
+        let provider = Arc::new(MockProvider);
+        let runtime = AgentRuntime::new(provider, "mock/model");
+        BasicSupervisor::new(event_bus, runtime)
+    }
+
+    /// Helper to create a minimal Seed for testing.
+    fn make_seed(goal: &str) -> Seed {
+        Seed {
+            id: uuid::Uuid::new_v4(),
+            goal: goal.to_string(),
+            constraints: vec![],
+            acceptance_criteria: vec![],
+            ontology: vec![],
+            created_at: chrono::Utc::now(),
+            generation: 0,
+            parent_seed_id: None,
+        }
+    }
+
+    #[tokio::test]
+    async fn test_fork_creates_agent() {
+        let supervisor = make_supervisor();
+        let seed = make_seed("Test agent");
+
+        let id = supervisor.fork(&seed).await.unwrap();
+
+        let agents = supervisor.list().await.unwrap();
+        assert_eq!(agents.len(), 1);
+        assert_eq!(agents[0].id, id);
+        assert_eq!(agents[0].name, "Test agent");
+        assert_eq!(agents[0].status, AgentStatus::Starting);
+        assert_eq!(agents[0].seed_id, Some(seed.id));
+    }
+
+    #[tokio::test]
+    async fn test_exec_updates_status_to_running() {
+        let supervisor = make_supervisor();
+        let seed = make_seed("Running agent");
+
+        let id = supervisor.fork(&seed).await.unwrap();
+        assert_eq!(supervisor.wait(id).await.unwrap(), AgentStatus::Starting);
+
+        supervisor.exec(id).await.unwrap();
+        assert_eq!(supervisor.wait(id).await.unwrap(), AgentStatus::Running);
+    }
+
+    #[tokio::test]
+    async fn test_kill_sets_stopped() {
+        let supervisor = make_supervisor();
+        let seed = make_seed("Doomed agent");
+
+        let id = supervisor.fork(&seed).await.unwrap();
+        supervisor.exec(id).await.unwrap();
+        assert_eq!(supervisor.wait(id).await.unwrap(), AgentStatus::Running);
+
+        supervisor.kill(id).await.unwrap();
+        assert_eq!(supervisor.wait(id).await.unwrap(), AgentStatus::Stopped);
+    }
+
+    #[tokio::test]
+    async fn test_kill_unknown_agent_returns_error() {
+        let supervisor = make_supervisor();
+        let unknown_id = uuid::Uuid::new_v4();
+
+        let result = supervisor.kill(unknown_id).await;
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("not found"));
+    }
+
+    #[tokio::test]
+    async fn test_list_returns_all_agents() {
+        let supervisor = make_supervisor();
+
+        let id1 = supervisor.fork(&make_seed("Agent 1")).await.unwrap();
+        let id2 = supervisor.fork(&make_seed("Agent 2")).await.unwrap();
+        let id3 = supervisor.fork(&make_seed("Agent 3")).await.unwrap();
+
+        let agents = supervisor.list().await.unwrap();
+        assert_eq!(agents.len(), 3);
+
+        let ids: std::collections::HashSet<AgentId> = agents.iter().map(|a| a.id).collect();
+        assert!(ids.contains(&id1));
+        assert!(ids.contains(&id2));
+        assert!(ids.contains(&id3));
+    }
+
+    #[tokio::test]
+    async fn test_exec_unknown_agent_returns_error() {
+        let supervisor = make_supervisor();
+        let unknown_id = uuid::Uuid::new_v4();
+
+        let result = supervisor.exec(unknown_id).await;
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("not found"));
+    }
+
+    #[tokio::test]
+    async fn test_wait_unknown_agent_returns_error() {
+        let supervisor = make_supervisor();
+        let unknown_id = uuid::Uuid::new_v4();
+
+        let result = supervisor.wait(unknown_id).await;
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("not found"));
     }
 }

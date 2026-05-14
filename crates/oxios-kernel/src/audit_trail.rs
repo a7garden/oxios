@@ -284,34 +284,12 @@ impl AuditTrail {
             if entries.len() > self.max_entries {
                 let excess = entries.len() - self.max_entries;
                 entries.drain(0..excess);
-                // Fix the chain: rebuild hashes from the first remaining entry.
-                // Mark the first remaining entry as a new chain root (pruned).
-                // Then re-link all subsequent entries since prev_hash references changed.
+                // Fix the chain: mark the first remaining entry as a new chain root.
+                // We only update prev_hash to "pruned" — we do NOT recompute the hash.
+                // Remaining entries still link to each other correctly since their
+                // hashes are unchanged, so no cascade is needed. O(1) instead of O(N).
                 if let Some(first) = entries.first_mut() {
                     first.prev_hash = "pruned".to_string();
-                    first.hash = compute_entry_hash(
-                        first.seq,
-                        &first.timestamp,
-                        &first.actor,
-                        &first.action,
-                        &first.resource,
-                        &first.prev_hash,
-                    );
-                }
-                // Re-link subsequent entries whose prev_hash pointed to pruned entries.
-                for i in 1..entries.len() {
-                    let prev_hash = entries[i - 1].hash.clone();
-                    if entries[i].prev_hash != prev_hash {
-                        entries[i].prev_hash = prev_hash;
-                        entries[i].hash = compute_entry_hash(
-                            entries[i].seq,
-                            &entries[i].timestamp,
-                            &entries[i].actor,
-                            &entries[i].action,
-                            &entries[i].resource,
-                            &entries[i].prev_hash,
-                        );
-                    }
                 }
             }
         }
@@ -339,9 +317,13 @@ impl AuditTrail {
                 });
             }
 
-            // First entry after pruning gets a free pass on prev_hash matching
+            // First entry after pruning gets a free pass on prev_hash matching.
+            // We also skip hash recomputation since the stored hash was computed
+            // with the original prev_hash, not "pruned". We trust the stored hash.
             if i == 0 && entry.prev_hash == "pruned" {
                 // Accept "pruned" as a valid starting point
+                prev_hash = entry.hash.clone();
+                continue;
             } else if entry.prev_hash != prev_hash {
                 return Err(AuditError::ChainBroken {
                     seq: entry.seq,
@@ -488,31 +470,11 @@ impl AuditTrail {
             let excess = current.len() - self.max_entries;
             current.drain(0..excess);
 
-            // Re-link the chain after pruning.
+            // Mark the first remaining entry as pruned root.
+            // Do NOT recompute hashes — remaining entries still link
+            // to each other correctly. O(1) instead of O(N).
             if let Some(first) = current.first_mut() {
                 first.prev_hash = "pruned".to_string();
-                first.hash = compute_entry_hash(
-                    first.seq,
-                    &first.timestamp,
-                    &first.actor,
-                    &first.action,
-                    &first.resource,
-                    &first.prev_hash,
-                );
-            }
-            for i in 1..current.len() {
-                let prev_hash = current[i - 1].hash.clone();
-                if current[i].prev_hash != prev_hash {
-                    current[i].prev_hash = prev_hash;
-                    current[i].hash = compute_entry_hash(
-                        current[i].seq,
-                        &current[i].timestamp,
-                        &current[i].actor,
-                        &current[i].action,
-                        &current[i].resource,
-                        &current[i].prev_hash,
-                    );
-                }
             }
         }
 

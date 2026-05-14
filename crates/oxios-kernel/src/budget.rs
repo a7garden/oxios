@@ -4,14 +4,17 @@
 //! Budgets track tokens and calls per agent, preventing resource exhaustion attacks
 //! and enforcing fair usage policies.
 
+use chrono::{DateTime, Utc};
 use parking_lot::RwLock;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::time::{Duration, Instant};
+use std::path::Path;
+use std::time::Duration;
 
 use crate::types::AgentId;
 
 /// Budget limit configuration for an agent.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BudgetLimit {
     /// The agent this budget applies to.
     pub agent_id: AgentId,
@@ -24,14 +27,14 @@ pub struct BudgetLimit {
 }
 
 /// Current usage state for an agent.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Usage {
     /// Tokens consumed in the current window.
     pub tokens_used: u64,
     /// Calls made in the current window.
     pub calls_used: u64,
     /// When the current window started.
-    pub window_start: Instant,
+    pub window_start: DateTime<Utc>,
 }
 
 /// Budget information returned to callers.
@@ -93,7 +96,7 @@ impl BudgetManager {
     /// Sets or updates the budget for an agent.
     pub fn set_budget(&self, limit: BudgetLimit) {
         let agent_id = limit.agent_id;
-        let now = Instant::now();
+        let now = Utc::now();
 
         {
             let mut budgets = self.budgets.write();
@@ -152,7 +155,7 @@ impl BudgetManager {
                 .or_insert_with(|| Usage {
                     tokens_used: 0,
                     calls_used: 0,
-                    window_start: Instant::now(),
+                    window_start: Utc::now(),
                 });
 
             reset_if_expired(usage_entry, limit.window_secs);
@@ -212,7 +215,7 @@ impl BudgetManager {
                 .or_insert_with(|| Usage {
                     tokens_used: 0,
                     calls_used: 0,
-                    window_start: Instant::now(),
+                    window_start: Utc::now(),
                 });
 
             reset_if_expired(usage_entry, limit.window_secs);
@@ -247,7 +250,10 @@ impl BudgetManager {
                 let usage_entry = usage.get(agent_id);
 
                 if let Some(entry) = usage_entry {
-                    let elapsed = entry.window_start.elapsed();
+                    let elapsed = Utc::now()
+                        .signed_duration_since(entry.window_start)
+                        .to_std()
+                        .unwrap_or(Duration::ZERO);
                     let window_remaining = Duration::from_secs(limit.window_secs)
                         .saturating_sub(elapsed)
                         .as_secs();
@@ -291,18 +297,63 @@ impl BudgetManager {
         if let Some(entry) = usage.get_mut(agent_id) {
             entry.tokens_used = 0;
             entry.calls_used = 0;
-            entry.window_start = Instant::now();
+            entry.window_start = Utc::now();
         }
     }
+
+    /// Persist budgets and usage to a JSON file at the given path.
+    pub fn persist(&self, path: &Path) -> anyhow::Result<()> {
+        let budgets = self.budgets.read();
+        let usage = self.usage.read();
+        let data = PersistedBudgets {
+            budgets: budgets.clone(),
+            usage: usage.clone(),
+        };
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+        let json = serde_json::to_string_pretty(&data)?;
+        std::fs::write(path, json)?;
+        Ok(())
+    }
+
+    /// Restore budgets and usage from a JSON file at the given path.
+    ///
+    /// Returns `Ok(())` if the file doesn't exist (empty state).
+    /// Returns an error if the file exists but cannot be parsed.
+    pub fn restore(&self, path: &Path) -> anyhow::Result<()> {
+        if !path.exists() {
+            return Ok(());
+        }
+        let json = std::fs::read_to_string(path)?;
+        let data: PersistedBudgets = serde_json::from_str(&json)?;
+        {
+            let mut budgets = self.budgets.write();
+            *budgets = data.budgets;
+        }
+        {
+            let mut usage = self.usage.write();
+            *usage = data.usage;
+        }
+        Ok(())
+    }
+}
+
+/// Intermediate struct for JSON persistence.
+#[derive(Serialize, Deserialize)]
+struct PersistedBudgets {
+    budgets: HashMap<AgentId, BudgetLimit>,
+    usage: HashMap<AgentId, Usage>,
 }
 
 /// Resets the usage window if it has expired (sliding window semantics).
 fn reset_if_expired(usage: &mut Usage, window_secs: u64) {
-    let window_duration = Duration::from_secs(window_secs);
-    if usage.window_start.elapsed() >= window_duration {
+    let window_duration = chrono::Duration::seconds(window_secs as i64);
+    let elapsed = Utc::now().signed_duration_since(usage.window_start);
+    if elapsed >= window_duration {
         usage.tokens_used = 0;
         usage.calls_used = 0;
-        usage.window_start = Instant::now();
+        usage.window_start = Utc::now();
     }
 }
 

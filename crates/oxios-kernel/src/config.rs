@@ -912,3 +912,115 @@ pub fn expand_home(path: &str) -> std::path::PathBuf {
     }
     std::path::PathBuf::from(path)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_default_config_validates() {
+        let config = OxiosConfig::default();
+        let (errors, _warnings) = config.validate();
+        assert!(errors.is_empty(), "Default config should have no errors: {:?}", errors);
+    }
+
+    #[test]
+    fn test_exec_config_default_allowed_commands() {
+        let config = ExecConfig::default();
+        // Empty allowed_commands means all commands are permitted.
+        assert!(config.allowed_commands.is_empty());
+        assert!(config.is_binary_allowed("anything"));
+        assert!(config.is_binary_allowed("bash"));
+        assert!(config.is_binary_allowed("rm"));
+    }
+
+    #[test]
+    fn test_is_binary_allowed_with_allowlist() {
+        let config = ExecConfig {
+            allowed_commands: vec!["git".into(), "echo".into()],
+            ..Default::default()
+        };
+        assert!(config.is_binary_allowed("git"));
+        assert!(config.is_binary_allowed("echo"));
+        assert!(!config.is_binary_allowed("bash"));
+        assert!(!config.is_binary_allowed("rm"));
+        assert!(!config.is_binary_allowed("sudo"));
+    }
+
+    #[test]
+    fn test_expand_home() {
+        // With HOME set.
+        let home = std::env::var("HOME").unwrap_or_else(|| "/tmp/testhome".into());
+        let expanded = expand_home("~/projects/test");
+        assert_eq!(expanded.to_str().unwrap(), format!("{}/projects/test", home));
+
+        // Non-tilde path should pass through unchanged.
+        let abs = expand_home("/absolute/path");
+        assert_eq!(abs, std::path::PathBuf::from("/absolute/path"));
+
+        // Just ~ without slash should not expand.
+        let bare = expand_home("~something");
+        assert_eq!(bare, std::path::PathBuf::from("~something"));
+    }
+
+    #[test]
+    fn test_invalid_cron_expression() {
+        let mut config = OxiosConfig::default();
+        config.cron.enabled = true;
+        config.cron.jobs.insert(
+            "bad-job".to_string(),
+            InlineCronJob {
+                schedule: "not a valid cron".to_string(),
+                goal: "Test goal".to_string(),
+                constraints: vec![],
+                acceptance_criteria: vec![],
+                toolchain: "default".to_string(),
+                priority: Priority::Normal,
+                enabled: true,
+            },
+        );
+
+        let (errors, _warnings) = config.validate();
+        assert!(!errors.is_empty(), "Expected validation error for invalid cron");
+        let has_cron_error = errors.iter().any(|e| e.contains("invalid cron expression"));
+        assert!(has_cron_error, "Expected 'invalid cron expression' error, got: {:?}", errors);
+    }
+
+    #[test]
+    fn test_config_serialization_roundtrip() {
+        let config = OxiosConfig::default();
+
+        // Serialize to TOML string.
+        let toml_str = toml::to_string(&config).expect("serialization should succeed");
+
+        // Deserialize back.
+        let deserialized: OxiosConfig = toml::from_str(&toml_str).expect("deserialization should succeed");
+
+        // Key fields should match.
+        assert_eq!(config.kernel.max_agents, deserialized.kernel.max_agents);
+        assert_eq!(config.kernel.workspace, deserialized.kernel.workspace);
+        assert_eq!(config.gateway.host, deserialized.gateway.host);
+        assert_eq!(config.gateway.port, deserialized.gateway.port);
+        assert_eq!(config.exec.default_timeout_secs, deserialized.exec.default_timeout_secs);
+        assert_eq!(config.exec.max_timeout_secs, deserialized.exec.max_timeout_secs);
+    }
+
+    #[test]
+    fn test_exec_timeout_validation() {
+        let mut config = OxiosConfig::default();
+        // default_timeout > max_timeout should be an error.
+        config.exec.default_timeout_secs = 999;
+        config.exec.max_timeout_secs = 100;
+        let (errors, _warnings) = config.validate();
+        let has_error = errors.iter().any(|e| e.contains("must not exceed"));
+        assert!(has_error, "Expected timeout ordering error, got: {:?}", errors);
+    }
+
+    #[test]
+    fn test_zero_max_agents_error() {
+        let mut config = OxiosConfig::default();
+        config.kernel.max_agents = 0;
+        let (errors, _warnings) = config.validate();
+        assert!(errors.iter().any(|e| e.contains("max_agents must be > 0")));
+    }
+}
