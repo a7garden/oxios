@@ -385,9 +385,21 @@ pub(crate) fn dedup_by_id(entries: &mut Vec<MemoryEntry>) {
 
 pub mod auto_memory_bridge;
 mod budget;
+mod chunking;
 pub mod flash_attention;
+mod graph;
 pub mod hyperbolic;
-mod store;
+mod hnsw;
+pub mod normalizer;
+pub(crate) mod store;
+
+pub use store::{HnswMemoryIndex, SemanticHit};
+
+// Re-export key types from sub-modules.
+pub use chunking::{ChunkConfig, TextChunk, chunk_fixed, chunk_paragraphs};
+pub use graph::MemoryGraph;
+pub use hnsw::HnswIndex;
+pub use normalizer::{l2_normalize_f32, l2_normalize_f64, cosine_similarity_f32};
 
 // ---------------------------------------------------------------------------
 // Tests

@@ -64,6 +64,13 @@ pub enum KernelError {
     /// An internal error wrapped from anyhow.
     #[error("{0}")]
     Internal(#[from] anyhow::Error),
+
+    /// Memory subsystem error (HNSW index, embedding, etc.).
+    #[error("Memory error: {reason}")]
+    Memory {
+        /// Detailed error reason.
+        reason: String,
+    },
 }
 
 /// HTTP status code mapping (independent of any web framework).
@@ -107,6 +114,7 @@ impl KernelError {
             Self::SeedNotFound { .. } => HttpStatus::NotFound,
             Self::SessionNotFound { .. } => HttpStatus::NotFound,
             Self::StateStore(_) => HttpStatus::InternalServerError,
+            Self::Memory { .. } => HttpStatus::InternalServerError,
             Self::Internal(_) => HttpStatus::InternalServerError,
         }
     }

@@ -627,3 +627,60 @@ pub(crate) async fn handle_memory_search(
         .collect();
     Ok(Json(serde_json::json!({ "count": results.len(), "entries": results })))
 }
+
+// ---------------------------------------------------------------------------
+// Semantic search (HNSW-powered)
+// ---------------------------------------------------------------------------
+
+/// Request body for semantic search.
+#[derive(Debug, Deserialize)]
+pub(crate) struct SemanticSearchRequest {
+    query: String,
+    memory_type: Option<String>,
+    limit: Option<usize>,
+}
+
+/// POST /api/memory/semantic — Semantic search using HNSW index.
+///
+/// Uses approximate nearest neighbor search for fast,
+/// high-quality similarity matching.
+pub(crate) async fn handle_memory_semantic_search(
+    state: State<Arc<AppState>>,
+    Json(body): Json<SemanticSearchRequest>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    let type_filter = body.memory_type.as_deref().and_then(|s| match s {
+        "conversation" => Some(MemoryType::Conversation),
+        "session" => Some(MemoryType::Session),
+        "fact" => Some(MemoryType::Fact),
+        "episode" => Some(MemoryType::Episode),
+        "knowledge" => Some(MemoryType::Knowledge),
+        _ => None,
+    });
+    let limit = body.limit.unwrap_or(10);
+
+    // Use semantic search from kernel (HNSW-powered)
+    let hits = state.kernel.agents.semantic_search_memory(&body.query, type_filter, limit).await
+        .map_err(|e| AppError::Internal(e.to_string()))?;
+
+    let results: Vec<serde_json::Value> = hits
+        .iter()
+        .map(|hit| {
+            serde_json::json!({
+                "id": hit.entry.id,
+                "type": hit.entry.memory_type.label(),
+                "content": hit.entry.content,
+                "tags": hit.entry.tags,
+                "importance": hit.entry.importance,
+                "similarity": hit.similarity,
+                "distance": hit.distance,
+                "created_at": hit.entry.created_at.to_rfc3339(),
+            })
+        })
+        .collect();
+
+    Ok(Json(serde_json::json!({
+        "count": results.len(),
+        "entries": results,
+        "engine": "hnsw",
+    })))
+}
