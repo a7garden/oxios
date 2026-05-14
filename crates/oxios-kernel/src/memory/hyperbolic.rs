@@ -138,28 +138,37 @@ pub fn mobius_add(a: &[f32], b: &[f32], curvature: f32) -> Vec<f32> {
     let norm_b_sq: f32 = b.iter().map(|v| v * v).sum();
     let dot_ab: f32 = a.iter().zip(b).map(|(x, y)| x * y).sum();
 
-    let numerator_factor = 1.0 + 2.0 * c * dot_ab + c * norm_b_sq;
     let denominator = 1.0 + 2.0 * c * dot_ab + c * c * norm_a_sq * norm_b_sq;
 
     if denominator.abs() < 1e-10 {
+        // Degenerate case: return origin (neutral element)
         return vec![0.0; a.len()];
     }
 
+    let scale_a = 1.0 + 2.0 * c * dot_ab + c * norm_b_sq;
+    let scale_b = 1.0 - c * norm_a_sq;
+
     a.iter()
         .zip(b)
-        .map(|(&ai, &bi)| (numerator_factor * ai + (1.0 - c * norm_a_sq) * bi) / denominator)
+        .map(|(&ai, &bi)| (scale_a * ai + scale_b * bi) / denominator)
         .collect()
 }
 
 /// Möbius scalar multiplication: scaling in hyperbolic space.
 ///
 /// s ⊗_c v = (1/√c) * tanh(s * arctanh(√c * ||v||)) * v / ||v||
-pub fn mobius_scalar_mul(scalar: f32, v: &[f32], curvature: f32) -> Vec<f32> {
+///
+/// # Arguments
+/// * `scalar` - Multiplication factor
+/// * `v` - Vector on the Poincaré ball
+/// * `curvature` - Negative curvature K
+/// * `epsilon` - Numerical stability margin (e.g. 1e-5)
+pub fn mobius_scalar_mul(scalar: f32, v: &[f32], curvature: f32, epsilon: f32) -> Vec<f32> {
     let c = curvature.abs();
     let norm_sq: f32 = v.iter().map(|x| x * x).sum();
     let norm = norm_sq.sqrt();
 
-    if norm < 1e-10 {
+    if norm < epsilon {
         return vec![0.0; v.len()];
     }
 
@@ -167,7 +176,7 @@ pub fn mobius_scalar_mul(scalar: f32, v: &[f32], curvature: f32) -> Vec<f32> {
     let w = c_sqrt * norm;
 
     // Clamp w to strictly less than 1 for numerical stability
-    let w = w.min(1.0 - 1e-5);
+    let w = w.min(1.0 - epsilon);
     let result_norm = (1.0 / c_sqrt) * (scalar * w.atanh()).tanh();
 
     let scale = result_norm / norm;
@@ -217,25 +226,21 @@ impl HyperbolicEmbedding {
         }
     }
 
-    /// Add a parent-child relationship by placing the child
-    /// farther from the origin than the parent.
+    /// Add a parent-child relationship using Möbius addition.
+    ///
+    /// The child is placed at `parent ⊕ child_euclidean`, which naturally
+    /// positions it farther from the origin along the parent's direction.
     pub fn add_child(&mut self, parent_id: &str, child_id: &str, child_euclidean: &[f32]) {
-        // Find parent embedding
-        let parent = self.embeddings.iter().find(|(name, _)| name == parent_id);
+        let child_on_ball = euclidean_to_poincare(child_euclidean, self.config.curvature);
 
-        let child_point = if let Some((_, parent_vec)) = parent {
-            // Move child away from origin in the direction of parent + offset
-            let offset: Vec<f32> = child_euclidean
-                .iter()
-                .enumerate()
-                .map(|(i, &v)| {
-                    let base = if i < parent_vec.len() { parent_vec[i] } else { 0.0 };
-                    base * 0.5 + v * 0.5
-                })
-                .collect();
-            euclidean_to_poincare(&offset, self.config.curvature)
+        let child_point = if let Some((_, parent_vec)) =
+            self.embeddings.iter().find(|(name, _)| name == parent_id)
+        {
+            // Use Möbius addition: child = parent ⊕ child_offset
+            // This naturally places the child deeper in the hierarchy
+            mobius_add(parent_vec, &child_on_ball, self.config.curvature)
         } else {
-            euclidean_to_poincare(child_euclidean, self.config.curvature)
+            child_on_ball
         };
 
         if let Some(pos) = self.embeddings.iter().position(|(name, _)| name == child_id) {
@@ -439,7 +444,7 @@ mod tests {
     #[test]
     fn test_mobius_scalar_mul_zero() {
         let v = euclidean_to_poincare(&[1.0, 2.0], -1.0);
-        let result = mobius_scalar_mul(0.0, &v, -1.0);
+        let result = mobius_scalar_mul(0.0, &v, -1.0, 1e-5);
         for r in &result {
             assert!(r.abs() < 1e-4, "0 ⊗ v should be ~0, got {}", r);
         }
@@ -448,7 +453,7 @@ mod tests {
     #[test]
     fn test_mobius_scalar_mul_one() {
         let v = euclidean_to_poincare(&[1.0, 2.0], -1.0);
-        let result = mobius_scalar_mul(1.0, &v, -1.0);
+        let result = mobius_scalar_mul(1.0, &v, -1.0, 1e-5);
         for (r, expected) in result.iter().zip(v.iter()) {
             assert!(
                 (r - expected).abs() < 1e-4,

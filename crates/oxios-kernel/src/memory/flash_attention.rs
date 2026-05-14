@@ -80,6 +80,7 @@ impl std::fmt::Display for BenchmarkResult {
 /// Instead of materializing the full N×N attention matrix, processes
 /// the computation in blocks that fit in L1/L2 cache, achieving
 /// O(N) memory complexity instead of O(N²).
+#[derive(Debug)]
 pub struct FlashAttention {
     config: FlashAttentionConfig,
 }
@@ -125,7 +126,11 @@ impl FlashAttention {
             return Vec::new();
         }
 
-        let dim = self.config.dimensions;
+        // Use actual vector length (may differ from config.dimensions)
+        let dim = queries.first().map_or(0, |v| v.len());
+        if dim == 0 {
+            return vec![vec![]; queries.len()];
+        }
         let scale = 1.0 / (self.config.temperature * (dim as f32).sqrt());
         let block_size = self.config.block_size.min(keys.len());
 
@@ -211,7 +216,11 @@ impl FlashAttention {
             return Vec::new();
         }
 
-        let dim = self.config.dimensions;
+        // Use actual vector length (may differ from config.dimensions)
+        let dim = queries.first().map_or(0, |v| v.len());
+        if dim == 0 {
+            return vec![vec![]; queries.len()];
+        }
         let scale = 1.0 / (self.config.temperature * (dim as f32).sqrt());
         let num_queries = queries.len();
         let num_keys = keys.len();
@@ -260,21 +269,32 @@ impl FlashAttention {
     /// Run a benchmark comparing naive vs flash attention.
     ///
     /// Generates random vectors and measures wall-clock time for both methods.
+    /// Also verifies that both implementations produce equivalent results.
     pub fn benchmark(&self, num_vectors: usize) -> BenchmarkResult {
         let vectors = generate_test_vectors(num_vectors, self.config.dimensions);
 
         let naive_start = std::time::Instant::now();
-        let _naive_result = self.naive_attention(&vectors, &vectors, &vectors);
+        let naive_result = self.naive_attention(&vectors, &vectors, &vectors);
         let naive_duration = naive_start.elapsed();
 
         let flash_start = std::time::Instant::now();
-        let _flash_result = self.attention(&vectors, &vectors, &vectors);
+        let flash_result = self.attention(&vectors, &vectors, &vectors);
         let flash_duration = flash_start.elapsed();
 
-        // Verify results are similar (within 1% tolerance)
-        let _naive_result = self.naive_attention(&vectors, &vectors, &vectors);
-        // Note: we recompute naive here for verification; in real benchmarks
-        // we'd store the first result.
+        // Verify results are similar (within 5% relative tolerance)
+        let mut max_rel_err = 0.0f32;
+        for (f_row, n_row) in flash_result.iter().zip(naive_result.iter()) {
+            for (f, n) in f_row.iter().zip(n_row.iter()) {
+                let err = (f - n).abs() / f.abs().max(n.abs()).max(1e-6);
+                max_rel_err = max_rel_err.max(err);
+            }
+        }
+        if max_rel_err > 0.05 {
+            tracing::warn!(
+                max_relative_error = max_rel_err,
+                "Flash vs naive attention results diverge"
+            );
+        }
 
         let naive_ms = naive_duration.as_secs_f64() * 1000.0;
         let flash_ms = flash_duration.as_secs_f64() * 1000.0;

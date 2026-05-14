@@ -180,7 +180,12 @@ impl AutoMemoryBridge {
 
         for file_path in &memory_files {
             match self.import_file(file_path).await {
-                Ok(count) => result.imported += count,
+                Ok(file_result) => {
+                    result.imported += file_result.imported;
+                    result.skipped_duplicates += file_result.skipped_duplicates;
+                    result.failed += file_result.failed;
+                    result.errors.extend(file_result.errors);
+                }
                 Err(e) => {
                     result.failed += 1;
                     result.errors.push(format!("{}: {}", file_path.display(), e));
@@ -254,56 +259,11 @@ impl AutoMemoryBridge {
                 sync_result.import = self.import_from_auto().await?;
             }
             SyncDirection::ToAuto => {
-                // Load all knowledge memories from Oxios as patterns
-                let entries = self
-                    .oxios_memory
-                    .list(MemoryType::Knowledge, 1000)
-                    .await
-                    .unwrap_or_default();
-
-                let patterns: Vec<GuidancePattern> = entries
-                    .iter()
-                    .map(|e| GuidancePattern {
-                        id: e.id.clone(),
-                        category: e
-                            .tags
-                            .first()
-                            .map(|t| InsightCategory::from_str_loose(t))
-                            .unwrap_or(InsightCategory::General),
-                        description: e.content.clone(),
-                        confidence: e.importance,
-                        usage_count: e.access_count,
-                    })
-                    .collect();
-
-                sync_result.export = self.export_to_auto(&patterns).await?;
+                sync_result.export = self.export_knowledge_to_auto().await?;
             }
             SyncDirection::Bidirectional => {
                 sync_result.import = self.import_from_auto().await?;
-
-                // After import, also export current state
-                let entries = self
-                    .oxios_memory
-                    .list(MemoryType::Knowledge, 1000)
-                    .await
-                    .unwrap_or_default();
-
-                let patterns: Vec<GuidancePattern> = entries
-                    .iter()
-                    .map(|e| GuidancePattern {
-                        id: e.id.clone(),
-                        category: e
-                            .tags
-                            .first()
-                            .map(|t| InsightCategory::from_str_loose(t))
-                            .unwrap_or(InsightCategory::General),
-                        description: e.content.clone(),
-                        confidence: e.importance,
-                        usage_count: e.access_count,
-                    })
-                    .collect();
-
-                sync_result.export = self.export_to_auto(&patterns).await?;
+                sync_result.export = self.export_knowledge_to_auto().await?;
             }
         }
 
@@ -313,6 +273,32 @@ impl AutoMemoryBridge {
     /// Returns the auto-memory directory path.
     pub fn auto_memory_dir(&self) -> &Path {
         &self.auto_memory_dir
+    }
+
+    /// Export all knowledge memories from Oxios to external format.
+    async fn export_knowledge_to_auto(&self) -> Result<ExportResult> {
+        let entries = self
+            .oxios_memory
+            .list(MemoryType::Knowledge, 1000)
+            .await
+            .unwrap_or_default();
+
+        let patterns: Vec<GuidancePattern> = entries
+            .iter()
+            .map(|e| GuidancePattern {
+                id: e.id.clone(),
+                category: e
+                    .tags
+                    .first()
+                    .map(|t| InsightCategory::from_str_loose(t))
+                    .unwrap_or(InsightCategory::General),
+                description: e.content.clone(),
+                confidence: e.importance,
+                usage_count: e.access_count,
+            })
+            .collect();
+
+        self.export_to_auto(&patterns).await
     }
 }
 
@@ -369,14 +355,15 @@ impl AutoMemoryBridge {
     }
 
     /// Import a single markdown file into Oxios memory.
-    async fn import_file(&self, path: &Path) -> Result<usize> {
+    async fn import_file(&self, path: &Path) -> Result<ImportResult> {
         let content = tokio::fs::read_to_string(path).await?;
         let insights = self.parse_markdown_insights(&content);
-        let mut imported = 0;
+        let mut result = ImportResult::default();
 
         for insight in &insights {
             // Check for duplicates
             if self.oxios_memory.is_duplicate(&insight.summary).await {
+                result.skipped_duplicates += 1;
                 continue;
             }
 
@@ -401,14 +388,16 @@ impl AutoMemoryBridge {
             };
 
             match self.oxios_memory.remember(entry).await {
-                Ok(_) => imported += 1,
+                Ok(_) => result.imported += 1,
                 Err(e) => {
+                    result.failed += 1;
+                    result.errors.push(e.to_string());
                     tracing::warn!(error = %e, "Failed to import memory insight");
                 }
             }
         }
 
-        Ok(imported)
+        Ok(result)
     }
 
     /// Parse insights from markdown content.
