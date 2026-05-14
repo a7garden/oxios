@@ -29,9 +29,9 @@ impl Default for ChunkConfig {
 pub struct TextChunk {
     /// The chunk text content.
     pub text: String,
-    /// Start byte offset in the original text.
+    /// Start char offset in the original text.
     pub start: usize,
-    /// End byte offset in the original text.
+    /// End char offset in the original text.
     pub end: usize,
     /// Chunk index (0-based).
     pub index: usize,

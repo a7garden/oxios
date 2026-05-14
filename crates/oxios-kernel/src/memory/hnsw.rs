@@ -107,6 +107,9 @@ impl HnswIndex {
             self.dimensions,
             query.len()
         );
+        if k == 0 {
+            return Ok(Vec::new());
+        }
 
         let results = self
             .index
@@ -161,8 +164,11 @@ impl HnswIndex {
 
     /// Save the index to a file.
     pub fn save(&self, path: &Path) -> Result<()> {
+        let path_str = path
+            .to_str()
+            .ok_or_else(|| anyhow::anyhow!("HNSW save path is not valid UTF-8: {}", path.display()))?;
         self.index
-            .save(path.to_str().unwrap_or(""))
+            .save(path_str)
             .map_err(|e| anyhow::anyhow!("HNSW save failed: {}", e))?;
         Ok(())
     }
@@ -171,7 +177,10 @@ impl HnswIndex {
     ///
     /// Returns a new `HnswIndex` with the same dimensions as the saved index.
     pub fn load(path: &Path) -> Result<Self> {
-        let index = Index::restore(path.to_str().unwrap_or(""))
+        let path_str = path
+            .to_str()
+            .ok_or_else(|| anyhow::anyhow!("HNSW load path is not valid UTF-8: {}", path.display()))?;
+        let index = Index::restore(path_str)
             .map_err(|e| anyhow::anyhow!("HNSW load failed: {}", e))?;
         let dimensions = index.dimensions();
         Ok(Self { index, dimensions })

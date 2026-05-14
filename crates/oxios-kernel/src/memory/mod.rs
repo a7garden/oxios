@@ -18,6 +18,7 @@ use crate::state_store::StateStore;
 
 // Re-export budget types so external `use crate::memory::X` paths still work.
 pub use budget::{CurationCandidate, CurationReport, MemoryBudget};
+pub use store::HnswMemoryIndex;
 
 // ---------------------------------------------------------------------------
 // Content hashing
@@ -204,6 +205,8 @@ pub struct MemoryManager {
     embedding: Arc<dyn EmbeddingProvider>,
     /// Optional git layer for version-controlled memory.
     git_layer: Option<Arc<GitLayer>>,
+    /// Optional HNSW index for fast ANN search.
+    hnsw_index: RwLock<Option<Arc<HnswMemoryIndex>>>,
 }
 
 impl std::fmt::Debug for MemoryManager {
@@ -224,12 +227,21 @@ impl MemoryManager {
             vector_index: RwLock::new(HashMap::new()),
             embedding: Arc::new(TfIdfEmbeddingProvider),
             git_layer: None,
+            hnsw_index: RwLock::new(None),
         }
     }
 
     /// Attach a git layer for version-controlled saves.
     pub fn set_git_layer(&mut self, gl: Arc<GitLayer>) {
         self.git_layer = Some(gl);
+    }
+
+    /// Attach an HNSW index for fast semantic search.
+    ///
+    /// Once attached, `remember()` and `forget()` automatically keep
+    /// the HNSW index in sync with the state store.
+    pub fn set_hnsw_index(&self, index: Arc<HnswMemoryIndex>) {
+        *self.hnsw_index.write() = Some(index);
     }
 
     /// Commit a file to git if git_layer is available.
@@ -393,7 +405,7 @@ mod hnsw;
 pub mod normalizer;
 pub(crate) mod store;
 
-pub use store::{HnswMemoryIndex, SemanticHit};
+pub use store::SemanticHit;
 
 // Re-export key types from sub-modules.
 pub use chunking::{ChunkConfig, TextChunk, chunk_fixed, chunk_paragraphs};

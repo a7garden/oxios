@@ -49,9 +49,6 @@ dirs = "6"
 # Vector search (HNSW)
 usearch = "2.25"
 
-# SQLite metadata store
-rusqlite = { version = "0.32", features = ["bundled"] }
-
 # Headless browser (optional)
 oxibrowser-core = { path = "../../../oxibrowser/crates/oxibrowser-core", optional = true }
 

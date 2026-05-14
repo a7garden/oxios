@@ -160,7 +160,17 @@ impl MemoryManager {
         // Update vector index
         {
             let mut index = self.vector_index.write();
-            index.insert(id.clone(), vector);
+            index.insert(id.clone(), vector.clone());
+        }
+
+        // Update HNSW index if attached
+        if let Some(f32_vec) = vector.to_f32_dense() {
+            let hnsw = self.hnsw_index.read();
+            if let Some(ref hnsw) = *hnsw {
+                if let Err(e) = hnsw.add_entry(&id, &f32_vec) {
+                    tracing::warn!(id = %id, error = %e, "Failed to update HNSW index on remember");
+                }
+            }
         }
 
         tracing::debug!(id = %id, ty = entry.memory_type.label(), "Memory stored");
@@ -176,7 +186,19 @@ impl MemoryManager {
 
     /// Delete a memory entry.
     pub async fn forget(&self, id: &str, memory_type: MemoryType) -> Result<bool> {
-        self.state_store.delete_file(memory_type.category(), id).await
+        let result = self.state_store.delete_file(memory_type.category(), id).await?;
+
+        // Remove from HNSW index if attached
+        {
+            let hnsw = self.hnsw_index.read();
+            if let Some(ref hnsw) = *hnsw {
+                if let Err(e) = hnsw.remove_entry(id) {
+                    tracing::warn!(id = %id, error = %e, "Failed to remove from HNSW index on forget");
+                }
+            }
+        }
+
+        Ok(result)
     }
 
     /// List memories of a given type, most recent first.
