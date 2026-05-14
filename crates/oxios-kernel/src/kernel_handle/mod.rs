@@ -7,6 +7,7 @@ pub mod persona_api;
 pub mod extension_api;
 pub mod mcp_api;
 pub mod infra_api;
+pub mod space_api;
 
 pub use state_api::StateApi;
 pub use agent_api::AgentApi;
@@ -15,6 +16,7 @@ pub use persona_api::PersonaApi;
 pub use extension_api::ExtensionApi;
 pub use mcp_api::McpApi;
 pub use infra_api::InfraApi;
+pub use space_api::SpaceApi;
 
 use serde::Serialize;
 use std::sync::Arc;
@@ -38,6 +40,7 @@ use crate::access_manager::AccessManager;
 use crate::host_tools::HostToolValidator;
 use crate::config::OxiosConfig;
 use crate::event_bus::EventBus;
+use crate::space::SpaceManager;
 
 /// Oxios kernel System Call API — composed of 7 domain Facades.
 ///
@@ -48,7 +51,7 @@ use crate::event_bus::EventBus;
 /// - [`PersonaApi`]  — multi-persona management
 /// - [`ExtensionApi`] — programs, skills, host tools
 /// - [`McpApi`]      — MCP server bridge
-/// - [`InfraApi`]    — Git, scheduler, cron, resources, events, system
+/// - [`SpaceApi`]    — Space management, knowledge flow
 pub struct KernelHandle {
     /// State management: save/load/sessions.
     pub state: StateApi,
@@ -64,10 +67,12 @@ pub struct KernelHandle {
     pub mcp: McpApi,
     /// Infrastructure: Git/scheduler/cron/resources/events/system.
     pub infra: InfraApi,
+    /// Space management: context partitioning, knowledge flow.
+    pub spaces: SpaceApi,
 }
 
 impl KernelHandle {
-    /// Create a new KernelHandle from 7 domain Facades.
+    /// Create a new KernelHandle from 8 domain Facades.
     ///
     /// Each Facade is assembled independently in `kernel.rs` and passed here.
     /// This enables testing individual Facades without the full kernel.
@@ -79,6 +84,7 @@ impl KernelHandle {
         extensions: ExtensionApi,
         mcp: McpApi,
         infra: InfraApi,
+        spaces: SpaceApi,
     ) -> Self {
         Self {
             state,
@@ -88,6 +94,7 @@ impl KernelHandle {
             extensions,
             mcp,
             infra,
+            spaces,
         }
     }
 
@@ -116,6 +123,7 @@ impl KernelHandle {
         host_tool_validator: Arc<HostToolValidator>,
         config: OxiosConfig,
         start_time: Instant,
+        space_manager: Arc<SpaceManager>,
     ) -> Self {
         Self {
             security: SecurityApi::new(auth_manager, audit_trail, access_manager, state_store.clone()),
@@ -124,7 +132,8 @@ impl KernelHandle {
             persona: PersonaApi::new(persona_manager),
             extensions: ExtensionApi::new(program_manager, skill_store, host_tool_validator),
             mcp: McpApi::new(mcp_bridge),
-            infra: InfraApi::new(git_layer, scheduler, cron_scheduler, resource_monitor, event_bus, config, start_time),
+            infra: InfraApi::new(git_layer, scheduler, cron_scheduler, resource_monitor, event_bus.clone(), config, start_time),
+            spaces: SpaceApi::new(space_manager, event_bus),
         }
     }
 

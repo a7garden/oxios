@@ -12,7 +12,7 @@ use oxios_kernel::{
     CronScheduler, EngineProvider, EventBus, GitLayer, HostToolValidator,
     McpBridge, McpServer, MemoryManager, Orchestrator, OxiosConfig, PersonaManager,
     ProgramManager, SkillStore, AgentScheduler, Supervisor,
-    AuditTrail, BudgetManager, ResourceMonitor,
+    AuditTrail, BudgetManager, ResourceMonitor, SpaceManager,
 };
 
 #[cfg(feature = "browser")]
@@ -48,6 +48,7 @@ pub struct Kernel {
     audit_trail: Arc<AuditTrail>,
     budget_manager: Arc<BudgetManager>,
     resource_monitor: Arc<ResourceMonitor>,
+    space_manager: Arc<SpaceManager>,
     start_time: std::time::Instant,
     /// Cached KernelHandle — created once, reused forever.
     handle_cache: OnceLock<Arc<oxios_kernel::KernelHandle>>,
@@ -97,6 +98,10 @@ impl Kernel {
                     self.event_bus.clone(),
                     self.config.clone(),
                     self.start_time,
+                ),
+                oxios_kernel::SpaceApi::new(
+                    self.space_manager.clone(),
+                    self.event_bus.clone(),
                 ),
             ))
         }).clone()
@@ -378,6 +383,10 @@ impl KernelBuilder {
             })
         })).await;
 
+        // ── Space Management ──
+        let space_manager = SpaceManager::new(state_store.clone(), event_bus.clone()).await?;
+        let space_manager = Arc::new(space_manager);
+
         let mut orchestrator = Orchestrator::new(
             ouroboros,
             event_bus.clone(),
@@ -386,6 +395,7 @@ impl KernelBuilder {
         );
         orchestrator.set_git_layer(git_layer.clone());
         orchestrator.set_a2a(a2a_protocol.clone());
+        orchestrator.set_space_manager(space_manager.clone());
         let orchestrator = Arc::new(orchestrator);
 
         let gateway = Gateway::new(orchestrator.clone());
@@ -427,6 +437,10 @@ impl KernelBuilder {
 
         event_bus.attach_audit_trail(audit_trail.clone());
 
+        // ── Space Management ──
+        let space_manager = SpaceManager::new(state_store.clone(), event_bus.clone()).await?;
+        let space_manager = Arc::new(space_manager);
+
         Ok(Kernel {
             orchestrator,
             gateway,
@@ -448,6 +462,7 @@ impl KernelBuilder {
             audit_trail,
             budget_manager,
             resource_monitor,
+            space_manager,
             start_time: std::time::Instant::now(),
             handle_cache: OnceLock::new(),
         })

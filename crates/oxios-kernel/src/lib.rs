@@ -56,7 +56,7 @@ pub use telemetry_stub as telemetry;
 
 pub mod kernel_handle;
 pub use kernel_handle::KernelHandle;
-pub use kernel_handle::{StateApi, AgentApi, SecurityApi, PersonaApi, ExtensionApi, McpApi, InfraApi};
+pub use kernel_handle::{StateApi, AgentApi, SecurityApi, PersonaApi, ExtensionApi, McpApi, InfraApi, SpaceApi};
 
 pub use circuit_breaker::CircuitBreaker;
 pub use metrics::{registry, register_builtin_metrics, get_metrics};
