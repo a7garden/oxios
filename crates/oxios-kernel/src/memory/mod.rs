@@ -5,6 +5,7 @@
 //! Supports embedding-based vector search using TF-IDF + cosine similarity.
 
 use std::collections::HashMap;
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use anyhow::Result;
@@ -234,6 +235,21 @@ impl MemoryManager {
     /// Attach a git layer for version-controlled saves.
     pub fn set_git_layer(&mut self, gl: Arc<GitLayer>) {
         self.git_layer = Some(gl);
+    }
+
+    /// Create a Space-scoped MemoryManager.
+    ///
+    /// Each Space gets its own StateStore under the given directory,
+    /// providing natural memory isolation between Spaces.
+    pub fn for_space(space_dir: PathBuf) -> Self {
+        let memory_dir = space_dir.join("memory");
+        let state_store = Arc::new(
+            StateStore::new(memory_dir).unwrap_or_else(|_| {
+                // Fallback: create in temp dir
+                StateStore::new(std::env::temp_dir().join("oxios-memory")).unwrap()
+            }),
+        );
+        Self::new(state_store)
     }
 
     /// Attach an HNSW index for fast semantic search.

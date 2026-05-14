@@ -32,6 +32,7 @@ use crate::config::ExecConfig;
 use crate::AccessManager;
 use crate::types::AgentId;
 use crate::tools::memory_tools::{MemoryWriteTool, MemoryReadTool, MemorySearchTool};
+use std::path::PathBuf;
 
 #[cfg(feature = "browser")]
 use crate::tools::{BrowserTool, OxibrowserBackend};
@@ -68,6 +69,12 @@ pub struct AgentRuntimeConfig {
     pub tool_execution: ToolExecutionMode,
     /// Whether auto-retry is enabled for retryable LLM errors.
     pub auto_retry_enabled: bool,
+    /// Space ID for scoped memory and workspace.
+    pub space_id: Option<uuid::Uuid>,
+    /// Bound project paths. AgentRuntime sets CWD to paths[0].
+    pub project_paths: Vec<PathBuf>,
+    /// Scratch workspace directory for temp files.
+    pub workspace_dir: Option<PathBuf>,
 }
 
 impl Default for AgentRuntimeConfig {
@@ -77,6 +84,9 @@ impl Default for AgentRuntimeConfig {
             max_iterations: 20,
             tool_execution: ToolExecutionMode::Parallel,
             auto_retry_enabled: true,
+            space_id: None,
+            project_paths: Vec::new(),
+            workspace_dir: None,
         }
     }
 }
@@ -347,19 +357,19 @@ fn run_agent_loop(ctx: AgentLoopContext) -> Result<(String, usize, bool)> {
         #[cfg(feature = "browser")]
         browser_backend,
     } = ctx;
-    // ── Workspace Scoping: per-agent workspace directory ──
-    // Each agent gets its own workspace subdirectory under /tmp/oxios-agent-workspace/.
-    //
-    // `std::env::set_current_dir()` is process-global, so we must serialize
-    // the CWD change + agent loop execution behind `WORKSPACE_MUTEX` to avoid
-    // races when concurrent agents run in separate `spawn_blocking` threads.
-    //
-    // TODO(upstream): Add a `workspace_dir` field to `AgentLoopConfig` in oxi-agent
-    // so file tools use per-agent paths instead of relying on CWD. Once that lands,
-    // remove `WORKSPACE_MUTEX` and the `set_current_dir` call entirely.
-    let workspace = std::env::temp_dir()
-        .join("oxios-agent-workspace")
-        .join(agent_id.to_string());
+    
+    // Extract workspace before using config
+    let workspace = if !config.project_paths.is_empty() {
+        config.project_paths[0].clone()
+    } else if let Some(ref ws) = config.workspace_dir {
+        ws.clone()
+    } else {
+        std::env::temp_dir()
+            .join("oxios-agent-workspace")
+            .join(agent_id.to_string())
+    };
+    
+
 
     // Ensure workspace exists.
     let _ = std::fs::create_dir_all(&workspace);
