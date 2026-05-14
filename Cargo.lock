@@ -4641,7 +4641,9 @@ dependencies = [
 
 [[package]]
 name = "oxibrowser-core"
-version = "0.2.0"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e2f6ee8399ff5be419e785559e1168ccfe9419ef13268766e2728f77bf20c3fb"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4670,7 +4672,9 @@ dependencies = [
 
 [[package]]
 name = "oxibrowser-webapi"
-version = "0.2.0"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "447306940e5b77b73eb21561767a1248b83d9c0a2c737a8dd7c93daca6b2d886"
 dependencies = [
  "html5ever",
  "markup5ever",

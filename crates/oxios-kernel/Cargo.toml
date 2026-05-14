@@ -6,10 +6,10 @@ description = "Oxios kernel: supervisor, event bus, state store"
 license = "MIT"
 
 [features]
-default = []
+default = ["browser"]
 otel = ["tracing-opentelemetry", "opentelemetry", "opentelemetry_sdk", "opentelemetry-otlp", "opentelemetry-stdout"]
 wasm-sandbox = ["dep:wasmtime", "dep:wasmtime-wasi"]
-browser = ["dep:oxibrowser-core"]
+browser = []
 
 [dependencies]
 oxios-ouroboros = { path = "../oxios-ouroboros" }
@@ -50,8 +50,8 @@ dirs = "6"
 # Vector search (HNSW)
 usearch = "2.25"
 
-# Headless browser (optional)
-oxibrowser-core = { path = "../../../oxibrowser/crates/oxibrowser-core", optional = true }
+# Headless browser (built-in)
+oxibrowser-core = "0.6.0"
 
 # OpenTelemetry (optional)
 tracing-opentelemetry = { version = "0.28", optional = true }

@@ -489,7 +489,7 @@ impl Orchestrator {
         // Record agent response in conversation buffer (for topic shift detection)
         {
             let mut buffer = self.conversation_buffer.write();
-            buffer.push_agent(&final_seed.content, &space_id);
+            buffer.push_agent(&final_seed.goal, &space_id);
         }
 
         Ok(OrchestrationResult {
