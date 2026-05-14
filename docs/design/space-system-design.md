@@ -52,9 +52,9 @@ OS 내부에서만 라우팅이 바뀐다.
 Space = 논리적 작업 파티션
   ├── 고유 ID (UUID)
   ├── 이름 (자동 생성 또는 사용자가 대화에서 지정)
+  ├── 바인딩된 경로 (실제 프로젝트/리소스 경로)
   ├── 독립된 Memory (해당 Space 관련 메모리만)
-  ├── 독립된 Workspace (해당 Space의 작업 디렉토리)
-  ├── 연결된 리소스 (파일시스템 경로, git repo 등)
+  ├── 독립된 Workspace (Space 전용 스크래치 공간)
   ├── 활성화 이력 (생성 시간, 마지막 사용 시간)
   └── 메타데이터 (태그, 생성 출처)
 ```
@@ -67,54 +67,115 @@ Space = 논리적 작업 파티션
 | `AutoTopic` | 주제 전환 감지 | 개발 → 일상 대화 전환 → "일상" Space |
 | `Manual` | 사용자 명시 | "새 스페이스 만들어" (드물겠지만 지원) |
 
-### 3.2 Space Isolation (계층적 격리)
+### 3.2 Space Isolation — Scoped Namespace + Controlled Bridge
 
-| 리소스 | 격리 수준 | 설명 |
+각 Space는 **scoped namespace**다. 기본적으로 메모리와 작업 공간이 격리되어 있지만,
+OS가 **controlled bridge**를 통해 필요시 다른 Space의 지식에 접근할 수 있다.
+"완전 격리"가 아니라 "기본은 닫힌, OS가 열쇠를 가진" 모델.
+
+| 리소스 | 격리 모델 | 설명 |
 |--------|----------|------|
-| Memory | **완전 격리** | 각 Space는 독립된 메모리 (facts, episodes, conversations) |
-| Workspace | **완전 격리** | 각 Space는 자체 작업 디렉토리 |
-| Agent | 전역 | 에이전트는 전역 리소스, Space가 필요시 요청해서 사용 |
+| Memory | Scoped namespace | 각 Space는 자체 메모리. OS가 KnowledgeBridge로 다른 Space 참조 가능 |
+| Workspace | 분리된 scratch | 각 Space는 자체 스크래치 디렉토리. 바인딩된 실제 경로와 분리 |
+| Agent | 전역 | 에이전트는 전역 리소스, 필요시 생성/소멸 |
 | Persona | 전역 | 페르소나는 전역, Space가 선택해서 사용 |
 | Program | 전역 | 프로그램은 전역, Space의 컨텍스트에 따라 활성화 여부 결정 |
 | EventBus | 태깅 | 전역이지만 모든 이벤트에 `space_id` 태그 부착, 필터링 가능 |
 
+### 3.3 Paths vs Workspace — 실제 경로와 스크래치 공간의 분리
+
+개발 Space의 작업 대상은 `~/.oxios/spaces/` 안이 아니라 **실제 프로젝트 경로**다.
+두 개념을 명확히 분리한다:
+
+| 필드 | 역할 | 예시 |
+|------|------|------|
+| `paths` | 실제 작업 대상 경로. AgentRuntime이 CWD로 설정 | `/Volumes/MERCURY/PROJECTS/oxios` |
+| `workspace_dir` | Space 전용 스크래치 공간. 임시 파일, 로그, 산출물 | `~/.oxios/spaces/{id}/workspace/` |
+
+```rust
+Space {
+    paths: vec!["/Volumes/MERCURY/PROJECTS/oxios"],
+    workspace_dir: "~/.oxios/spaces/{id}/workspace/",
+}
+// AgentRuntime:
+//   CWD = paths[0] (실제 코드를 편집해야 하니까)
+//   임시 파일, 로그 = workspace_dir (Space별로 격리)
+```
+
+경로가 없는 Space(일상, 요리 등)는 `paths`가 비어 있고,
+AgentRuntime은 `workspace_dir`만 사용한다.
+
 ## 4. Architecture
 
+### 4.1 SpaceManager는 Orchestrator 내부에 위치
+
+**핵심 결정**: SpaceManager를 Gateway와 Orchestrator 사이의 독립 계층이 아니라,
+**Orchestrator 내부 컴포넌트**로 둔다.
+
+이유:
+- Gateway는 "얇은 라우터"로 유지해야 한다. 책임이 무거워지면 안 된다.
+- Orchestrator가 이미 sessions, history, event_bus를 다 들고 있다.
+- Space 감지에는 대화 컨텍스트가 필요한데, 이건 Orchestrator만이 가지고 있다.
+- Gateway는 여전히 stateless.
+
 ```
-                     ┌──────────────────┐
-                     │     Gateway      │  단일 인터페이스
-                     │  (Web/CLI/TG...) │  사용자는 여기만 앎
-                     └────────┬─────────┘
-                              │ 모든 메시지
-                              ▼
-                     ┌─────────────────┐
-                     │  SpaceManager   │  ← NEW: 핵심 컴포넌트
-                     │                 │
-                     │ 1. Space 감지   │  메시지 → 어느 Space?
-                     │ 2. 라우팅      │  적절한 Space로 전달
-                     │ 3. 격리 관리   │  Memory/Workspace 스코핑
-                     │ 4. 자동 생성   │  필요시 새 Space 생성
-                     └────────┬────────┘
-                              │
-              ┌───────────────┼───────────────┐
-              ▼               ▼               ▼
-        ┌──────────┐   ┌──────────┐   ┌──────────┐
-        │ Space A  │   │ Space B  │   │ Space C  │
-        │ "oxios"  │   │ "일상"   │   │ "blog"   │
-        │──────────│   │──────────│   │──────────│
-        │ Memory ✓ │   │ Memory ✓ │   │ Memory ✓ │
-        │ Workdir ✓│   │ Workdir  │   │ Workdir ✓│
-        │ Paths:   │   │ Paths:   │   │ Paths:   │
-        │ /oxios   │   │ (none)   │   │ /blog    │
-        └─────┬────┘   └─────┬────┘   └─────┬────┘
-              │              │              │
-              └──────────────┼──────────────┘
-                             ▼
-                    ┌─────────────────┐
-                    │  Orchestrator   │  기존 + space_id 확장
-                    │  Supervisor     │
-                    │  Agents (전역)  │  Space가 필요시 대여
-                    └─────────────────┘
+Gateway (stateless, thin router)
+  │
+  │  IncomingMessage
+  ▼
+Orchestrator
+  ├── SpaceManager          ← 내부 컴포넌트
+  │   ├── ConversationBuffer  (최근 N턴 대화 유지)
+  │   ├── detect_or_create()  (3-레이어 감지)
+  │   └── KnowledgeBridge     (Cross-Space 지식 흐름)
+  │
+  ├── Ouroboros Protocol
+  ├── Supervisor / AgentRuntime
+  └── EventBus
+```
+
+### 4.2 전체 흐름
+
+```
+User: "oxios supervisor.rs에 버그 있어"
+  │
+  ▼
+Gateway.route(msg)   ← 변경 없음, stateless
+  │
+  ▼
+Orchestrator.handle_message(user_id, msg, session_id)
+  │
+  ├── 1. ConversationBuffer.push(msg)        ← 대화 기록 누적
+  │
+  ├── 2. SpaceManager.detect_or_create(msg, buffer)
+  │      → 1차: 경로 감지 → "/projects/oxios" → 기존 "oxios" Space 매칭
+  │      → Space 활성화, space_id 반환
+  │
+  ├── 3. space.memory_manager.recall()       ← oxios Space 전용 메모리
+  │
+  ├── 4. Ouroboros interview → seed → execute
+  │      → AgentRuntime에 space.workspace_dir, space.paths[0] 전달
+  │
+  └── 5. 결과를 ConversationBuffer에 기록
+         → 응답에 [🔧 oxios] 태그 부착
+```
+
+```
+User: "근데 오늘 저녁 뭐 먹지?"
+  │
+  ▼
+Orchestrator.handle_message(...)
+  │
+  ├── 1. ConversationBuffer.push(msg)
+  │
+  ├── 2. SpaceManager.detect_or_create(msg, buffer)
+  │      → 1차: 경로 없음
+  │      → 2차: 키워드 매칭 없음
+  │      → 3차: LLM 주제 분류 → "일상/음식"
+  │      → 기존 "일상" Space 있음 → 활성화
+  │      → 없으면 → 새 "일상" Space 자동 생성
+  │
+  └── 3. 일상 Space에서 처리 → [🏠 일상] 태그
 ```
 
 ## 5. SpaceManager
@@ -125,7 +186,7 @@ Space = 논리적 작업 파티션
 사용자는 나중에 대시보드에서 확인 및 수정 가능.
 
 ```
-SpaceManager.detect_space(message, conversation_history)
+SpaceManager.detect_space(message, conversation_buffer)
   │
   ├── 1차: 파일시스템 경로 추출 (정규식, 빠름, LLM 불필요)
   │     - "/projects/oxios/src/main.rs" → oxios Space
@@ -142,7 +203,39 @@ SpaceManager.detect_space(message, conversation_history)
         - 빈도 제한: N턴에 한 번, 또는 사용자 발화 패턴 변화 감지시
 ```
 
-### 5.2 감지 최적화
+### 5.2 ConversationBuffer — 대화 히스토리 유지
+
+3차 감지(LLM 주제 분류)를 하려면 최근 대화 컨텍스트가 필요하다.
+Orchestrator 내부에 메모리 상의 순환 버퍼를 둔다.
+
+```rust
+/// In-memory circular buffer of recent conversation turns.
+/// Used by SpaceManager for topic shift detection.
+pub struct ConversationBuffer {
+    /// Recent turns (bounded, oldest evicted first).
+    turns: VecDeque<ConversationTurn>,
+    /// Maximum number of turns to retain.
+    max_turns: usize,
+}
+
+pub struct ConversationTurn {
+    /// User message.
+    pub user: String,
+    /// Agent response (truncated to first 200 chars for efficiency).
+    pub agent: String,
+    /// Active Space at the time.
+    pub space_id: SpaceId,
+    /// Timestamp.
+    pub timestamp: DateTime<Utc>,
+}
+```
+
+- 기본 크기: 최근 50턴 유지
+- Orchestrator가 매 handle_message마다 push
+- SpaceManager가 3차 감지시 참조
+- 디스크에 저장하지 않음 (재시작시 빈 버퍼에서 시작, Space 감지는 1차/2차로 충분)
+
+### 5.3 감지 최적화
 
 LLM 호출은 비싸므로 최소화:
 
@@ -155,7 +248,7 @@ LLM 호출은 비싸므로 최소화:
 실제 사용에서 1차+2차로 80% 이상 커버될 것으로 예상.
 3차는 "오늘 날씨 어때?" 같이 경로/키워드가 전혀 없는 메시지에만 필요.
 
-### 5.3 전환 알림 전략
+### 5.4 전환 알림 전략
 
 Space 전환은 **조용히** 일어난다. 하지만 사용자가 혼동하지 않도록:
 
@@ -201,15 +294,21 @@ pub enum SpaceSource {
 pub struct Space {
     /// Unique identifier.
     pub id: SpaceId,
-    /// Human-readable name (auto-generated or user-specified).
+    /// Human-readable name.
+    /// - AutoResource: derived from directory name (e.g. "oxios")
+    /// - AutoTopic: estimated from LLM classification (e.g. "일상")
+    /// - Default Space: empty string (빈 문자열, 주제 형성 후 이름 부여)
     pub name: String,
     /// How this Space was created.
     pub source: SpaceSource,
-    /// Filesystem paths associated with this Space.
+    /// Actual filesystem paths bound to this Space.
+    /// AgentRuntime sets CWD to paths[0] when executing.
+    /// Empty for non-filesystem Spaces (일상, 요리 등).
     pub paths: Vec<PathBuf>,
-    /// Workspace directory for this Space.
+    /// Scratch workspace directory for this Space.
+    /// Temporary files, logs, build artifacts go here.
     pub workspace_dir: PathBuf,
-    /// Tags for keyword matching.
+    /// Tags for keyword matching (Layer 2 detection).
     pub tags: Vec<String>,
     /// Whether this Space is currently active.
     pub active: bool,
@@ -217,9 +316,15 @@ pub struct Space {
     pub created_at: DateTime<Utc>,
     /// When this Space was last active.
     pub last_active_at: DateTime<Utc>,
-    /// Conversation count in this Space.
+    /// Number of interactions in this Space.
     pub interaction_count: u64,
+    /// Whether this Space allows cross-Space knowledge access.
+    /// Default: true. Set to false for private Spaces.
+    #[serde(default = "default_true")]
+    pub knowledge_visible: bool,
 }
+
+fn default_true() -> bool { true }
 ```
 
 ### 6.2 Storage Layout
@@ -238,21 +343,137 @@ pub struct Space {
 │   │   │   └── knowledge/
 │   │   ├── state/
 │   │   │   └── sessions/
-│   │   └── workspace/           # Space 작업 디렉토리
-│   └── _default/                # 기본 Space (fallback)
-│       ├── space.json
-│       ├── memory/
-│       └── workspace/
+│   │   └── workspace/           # Space 전용 스크래치 공간
+│   │       ├── tmp/             # 임시 파일
+│   │       ├── logs/            # 에이전트 작업 로그
+│   │       └── artifacts/       # 빌드 산출물 등
+│   ├── _default/                # 기본 Space (fallback)
+│   │   ├── space.json
+│   │   ├── memory/
+│   │   └── workspace/
+│   └── _archived/               # 30일 비활성 Space 보관
+│       └── {space_id}/
 ├── global/
 │   ├── personas/
 │   ├── programs/
 │   └── skills/
 └── audit/
+    └── knowledge_flow.jsonl     # Cross-Space 지식 접근 로그
 ```
 
 ## 7. Integration Points
 
-### 7.1 KernelEvent 확장
+### 7.1 Gateway — 변경 없음
+
+Gateway는 stateless를 유지한다. Space 감지 로직이 Gateway에 추가되지 않는다.
+
+```rust
+// Gateway.route() — 기존 코드 그대로
+pub async fn route(&self, msg: IncomingMessage) -> Result<()> {
+    let session_id = msg.metadata.get("session_id").cloned();
+    let result = self.orchestrator
+        .handle_message(&msg.user_id, &msg.content, session_id.as_deref())
+        .await;
+    // ...
+}
+```
+
+### 7.2 Orchestrator 확장
+
+Orchestrator가 SpaceManager를 내부에 품는다.
+
+```rust
+pub struct Orchestrator {
+    // ... 기존 필드 ...
+    /// Space manager for context partitioning.
+    space_manager: SpaceManager,
+    /// Recent conversation buffer for topic detection.
+    conversation_buffer: ConversationBuffer,
+    /// Knowledge bridge for cross-Space knowledge flow.
+    knowledge_bridge: KnowledgeBridge,
+}
+
+impl Orchestrator {
+    pub async fn handle_message(
+        &self,
+        user_id: &str,
+        user_message: &str,
+        session_id: Option<&str>,
+    ) -> Result<OrchestrationResult> {
+        // 1. Record in conversation buffer.
+        self.conversation_buffer.push_user(user_message);
+
+        // 2. Detect or create Space.
+        let space_id = self.space_manager
+            .detect_or_create(user_message, &self.conversation_buffer)
+            .await?;
+
+        // 3. Get Space-scoped resources.
+        let space = self.space_manager.get_space(&space_id).await?;
+
+        // 4. Recall Space-scoped memories.
+        if let Some(ref mm) = space.memory_manager {
+            let memories = mm.recall(user_message).await?;
+            // inject into system prompt...
+        }
+
+        // 5. Run Ouroboros with Space context.
+        //    AgentRuntime receives space.paths, space.workspace_dir
+        let result = self.run_ouroboros(user_id, user_message, session_id, &space).await?;
+
+        // 6. Record response in buffer.
+        self.conversation_buffer.push_agent(&result.response, &space_id);
+
+        // 7. Tag response with Space indicator.
+        let tagged = self.tag_response(&result, &space);
+
+        Ok(tagged)
+    }
+}
+```
+
+### 7.3 AgentRuntime 확장
+
+```rust
+// AgentRuntimeConfig에 추가:
+pub struct AgentRuntimeConfig {
+    // ... 기존 필드 ...
+    /// Space ID for scoped memory and workspace.
+    pub space_id: Option<SpaceId>,
+    /// Bound project paths. AgentRuntime sets CWD to paths[0].
+    pub project_paths: Vec<PathBuf>,
+    /// Scratch workspace directory for temp files.
+    pub workspace_dir: Option<PathBuf>,
+}
+```
+
+AgentRuntime 실행시:
+```rust
+// run_agent_loop() 내부
+if let Some(cwd) = ctx.project_paths.first() {
+    std::env::set_current_dir(cwd)?;
+    // CWD = 실제 프로젝트 경로 (코드 편집, git 작업 등)
+} else if let Some(ref ws) = ctx.workspace_dir {
+    std::env::set_current_dir(ws)?;
+    // CWD = 스크래치 공간 (경로가 없는 Space)
+}
+```
+
+### 7.4 MemoryManager 확장
+
+```rust
+impl MemoryManager {
+    /// Create a Space-scoped MemoryManager.
+    pub fn for_space(space_dir: PathBuf) -> Self {
+        let state_store = Arc::new(StateStore::new(space_dir).unwrap());
+        Self::new(state_store)
+    }
+}
+```
+
+각 Space가 자체 `StateStore` 인스턴스를 가지면서 자연스럽게 메모리 namespace 분리.
+
+### 7.5 KernelEvent 확장
 
 ```rust
 // event_bus.rs에 추가
@@ -270,97 +491,198 @@ pub enum KernelEvent {
         space_id: SpaceId,
         name: String,
     },
-    /// A Space has been archived or merged.
+    /// A Space has been archived.
     SpaceArchived {
         space_id: SpaceId,
+        name: String,
+    },
+    /// Cross-Space knowledge accessed.
+    KnowledgeCrossReferenced {
+        from_space: SpaceId,
+        to_space: SpaceId,
+        entries: usize,
+        flow: String, // "reference" | "transfer" | "synthesis"
+    },
+    /// Spaces have been merged.
+    SpacesMerged {
+        survivor: SpaceId,
+        absorbed: SpaceId,
+        entries_migrated: usize,
     },
 }
 ```
 
-### 7.2 Orchestrator 확장
+## 8. Default Space의 명명 전략
 
-`handle_message`가 `space_id`를 받도록 변경:
+기본 Space는 빈 문자열 이름으로 시작하지만, **주제가 형성되면 자동으로 새 Space로 분리**된다.
 
-```rust
-// Before:
-orchestrator.handle_message(user_id, message, session_id).await
+```
+동작 흐름:
 
-// After:
-let space_id = space_manager.detect_or_create(message, history).await?;
-let space = space_manager.get_space(&space_id).await?;
-orchestrator.handle_message(user_id, message, session_id, &space).await
+1. 사용자가 첫 메시지: "오늘 날씨 어때?"
+   → 경로 감지 없음, 키워드 매칭 없음
+   → 기본 Space에 머뭄 (아직 주제 불명확)
+   → 기본 Space name = ""
+
+2. 사용자: "점심으로 파스타 만들고 싶은데 레시피 알려줘"
+   → 3차 LLM 감지: "요리/음식" 주제 감지
+   → 기본 Space에 계속 쌓이는 대신 새 Space 자동 생성
+   → 새 Space name = "요리" (LLM이 추정)
+   → 기본 Space의 최근 대화를 새 Space로 이관
+
+3. 이후 "요리" 관련 대화는 자동으로 "요리" Space로 라우팅
+   → 기본 Space는 다시 빈 상태로 대기
 ```
 
-Orchestrator는 `space.memory_manager`를 사용해서 Space-scoped 메모리에 접근하고,
-`space.workspace_dir`를 AgentRuntime에 전달해서 격리된 워크스페이스에서 작업한다.
+즉, **기본 Space는 대기실**이다. 주제가 명확해지면 대기실에서 적절한 Space로 분리된다.
+사용자는 이 과정을 전혀 의식하지 않는다.
 
-### 7.3 AgentRuntime 확장
+## 9. Knowledge Flow — Cross-Space 지식 흐름
+
+### 9.1 모델: Scoped Namespace + Controlled Bridge
+
+Space의 메모리는 기본적으로 자체 namespace에 격리되어 있다.
+하지만 OS가 **KnowledgeBridge**를 통해 필요시 다른 Space의 지식에 접근한다.
+
+"완전 격리"가 아니라 **"기본은 닫힌, OS가 열쇠를 가진"** 모델.
+
+### 9.2 세 가지 Flow 타입
+
+| 타입 | 설명 | 자동/수동 | 구현 시점 |
+|------|------|----------|-----------|
+| **Reference** | 다른 Space 메모리를 읽어와서 현재 작업에 활용 | OS 자동 | Phase 3 |
+| **Transfer** | 한 Space의 지식을 다른 Space로 복사 | 새 Space 생성시 OS 자동 | Phase 3 |
+| **Synthesis** | 여러 Space의 지식을 종합해서 새 통찰 생성 | 백그라운드 (cron) | Phase 6 (후속) |
+
+**주의**: Synthesis는 LLM 비용이 높으므로 Phase 6으로 분리한다.
+Phase 1-5에서는 Reference와 Transfer만 구현하고, 인프라만 준비한다.
+
+### 9.3 KnowledgeBridge
 
 ```rust
-// AgentRuntimeConfig에 추가:
-pub struct AgentRuntimeConfig {
-    // ... 기존 필드 ...
-    /// Space ID for scoped memory and workspace.
-    pub space_id: Option<SpaceId>,
-    /// Workspace directory override (from Space).
-    pub workspace_dir: Option<PathBuf>,
+/// Manages knowledge flow between Spaces.
+pub struct KnowledgeBridge {
+    space_manager: Arc<SpaceManager>,
+    /// Cross-reference log (appended to audit/knowledge_flow.jsonl).
+    xref_log: Arc<Mutex<Vec<CrossRefEntry>>>,
+}
+
+pub struct CrossRefEntry {
+    pub from: SpaceId,
+    pub to: SpaceId,
+    pub entry_ids: Vec<String>,
+    pub flow: KnowledgeFlow,
+    pub timestamp: DateTime<Utc>,
+}
+
+pub enum KnowledgeFlow {
+    /// Read-only access to another Space's memory.
+    Reference,
+    /// Copy entries from one Space to another.
+    Transfer,
+    /// Synthesize insights from multiple Spaces. (Phase 6)
+    Synthesis { sources: Vec<SpaceId> },
 }
 ```
 
-이걸로 `WORKSPACE_MUTEX` 문제도 자연스럽게 해결될 가능성이 있다 —
-각 Space가 자체 workspace_dir을 가지니까.
+### 9.4 자동 발동 시나리오
 
-### 7.4 MemoryManager 확장
+| 시나리오 | 트리거 | Flow 타입 | 구현 Phase |
+|----------|--------|-----------|-----------|
+| 작업 중 관련 지식 필요 | 에이전트 실행 중 | Reference | Phase 3 |
+| 새 Space 생성 | Space 생성시 | Transfer | Phase 3 |
+| 주기적 통합 분석 | 백그라운드 (cron) | Synthesis | Phase 6 |
+| 사용자 명시 요청 | "다른 스페이스에서 가져와" | Transfer/Reference | Phase 5 |
 
-```rust
-impl MemoryManager {
-    /// Create a Space-scoped MemoryManager.
-    pub fn for_space(space_dir: PathBuf) -> Self {
-        let state_store = Arc::new(StateStore::new(space_dir).unwrap());
-        Self::new(state_store)
-    }
-}
+### 9.5 프라이버시 제어
+
+- `knowledge_visible: false`인 Space는 KnowledgeBridge가 접근하지 않음
+- 개별 메모리에도 `private: true` 태그 가능 → Cross-Space 이전에서 제외
+- 모든 접근은 `audit/knowledge_flow.jsonl`에 기록
+- 대시보드에서 지식 흐름 이력 조회 가능
+
+## 10. Space 병합
+
+### 10.1 보수적 자동 병합 + 확인
+
+자동 병합은 **매우 보수적**으로 동작한다.
+
+**자동 병합 조건** (모두 충족해야 함):
+1. 두 Space가 **동일한 paths를 공유** (가장 강한 신호)
+2. 태그 유사도 0.9 이상
+3. 어느 한쪽의 interaction_count가 5 미만 (아직 활성화되지 않은 Space)
+
+**자동 병합 외의 경우** — OS가 1줄 제안:
+```
+AI: [🔧 oxios] 참, oxios-dev 스페이스와 oxios-bugfix 스페이스가
+    비슷한 것 같은데 합칠까요?
+User: 응
+AI: [🔧 oxios] 합쳤습니다. 23개 메모리가 통합되었어요.
 ```
 
-각 Space가 자체 `StateStore` 인스턴스를 가지면서 자연스럽게 메모리 격리.
+이건 "대화가 유일한 인터페이스" 원칙에 부합한다 — 확인이 필요한 경우에도
+별도 UI가 아니라 대화로 자연스럽게 이루어진다.
 
-## 8. Transparency Interface
+### 10.2 병합 이력과 되돌리기
 
-### 8.1 Dashboard (Web UI / TUI)
+- 병합 전 GitLayer에 커밋 → 언제든 되돌리기 가능
+- 감사 로그에 `SpacesMerged` 이벤트 기록
+- 대시보드에서 병합 이력 조회
+
+## 11. Space 보존 정책
+
+### 30일 자동 archive + 즉시 복구
+
+- `last_active_at` 기준 30일 비활성시 자동 archive
+- Archive된 Space의 **Memory와 Workspace는 디스크에 보존**
+- 에이전트는 항상 동적 생성/소멸이므로 archive와 무관
+- 사용자가 archive된 Space의 주제나 경로를 언급하면 **즉시 복구**
+- 대화로 복구: "oxios 작업 다시 하자" → archive에서 즉시 활성화
+
+### Archive 청소
+
+- Archive Space도 영구 보존 (기본)
+- 사용자가 "안 쓰는 스페이스 삭제해줘"라고 하면 그때 삭제
+- 삭제 전에 한 번 더 확인 (대화로)
+
+## 12. Transparency Interface
+
+### 12.1 Dashboard (Web UI / TUI)
 
 사용자가 "내부를 보고 싶을 때"를 위한 대시보드:
 
 ```
-┌─────────────────────────────────────────────┐
-│  Oxios Dashboard                             │
-│                                              │
-│  Active Spaces:                              │
-│  🔧 oxios    [active] 3 agents  /projects/oxios │
-│  🏠 일상              0 agents               │
-│  📝 blog     [active] 1 agent   /projects/blog │
-│                                              │
-│  Recent Activity (oxios):                    │
-│  14:32 Agent#7 started  "Fix supervisor bug" │
-│  14:31 Memory stored  "supervisor.rs pattern"│
-│  14:28 Space activated  "oxios"              │
-│                                              │
-│  Memory (oxios): 47 entries                  │
-│  - facts: 12  episodes: 8  convos: 27        │
-│                                              │
-│  [Switch Space]  [Archive]  [Merge]          │
-└─────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────┐
+│  Oxios Dashboard                                 │
+│                                                  │
+│  Spaces:                                         │
+│  🔧 oxios    [active]  /projects/oxios  47 mem   │
+│  🏠 일상               (no paths)       12 mem   │
+│  📦 blog     [archived] /projects/blog   8 mem   │
+│                                                  │
+│  Recent Activity (oxios):                        │
+│  14:32 Agent#7 started  "Fix supervisor bug"     │
+│  14:31 Memory stored  "supervisor.rs pattern"    │
+│  14:28 Space activated  "oxios"                  │
+│                                                  │
+│  Knowledge Flow:                                 │
+│  14:15 Reference: 일상→oxios (2 entries)         │
+│  13:40 Transfer: oxios→blog (3 entries)          │
+│                                                  │
+│  [Switch]  [Archive]  [Merge]  [Settings]        │
+└─────────────────────────────────────────────────┘
 ```
 
-### 8.2 대화 기반 조회
+### 12.2 대화 기반 조회
 
 사용자가 대화로도 내부 상태를 조회할 수 있다:
 
 ```
 User: 지금 어떤 스페이스 있어?
 AI: [🔧 oxios] 현재 3개 스페이스가 있어요:
-    - oxios (활성, 47개 메모리, 3 에이전트 작업 중)
+    - oxios (활성, 47개 메모리, 2 에이전트 작업 중)
     - 일상 (유휴, 12개 메모리)
-    - blog (유휴, 8개 메모리)
+    - blog (보관됨, 8개 메모리)
 
 User: 일상 스페이스 메모리 뭐 있어?
 AI: [🏠 일상] 저장된 메모리 12개 중 주요 것들:
@@ -368,19 +690,23 @@ AI: [🏠 일상] 저장된 메모리 12개 중 주요 것들:
     - 이번 주 장보기 리스트
     - ...
 
+User: blog 스페이스 복구해줘
+AI: [📝 blog] 보관된 blog 스페이스를 복구했어요.
+    8개 메모리가 그대로 있어요.
+
 User: blog 스페이스를 일상이랑 합쳐줘
 AI: [🏠 일상] blog 스페이스를 일상에 병합했습니다.
     메모리 8개가 이전되었어요.
 ```
 
-## 9. Detection Algorithm (Pseudocode)
+## 13. Detection Algorithm (Pseudocode)
 
 ```rust
 impl SpaceManager {
-    async fn detect_or_create(
+    pub async fn detect_or_create(
         &self,
         message: &str,
-        history: &[Message],
+        buffer: &ConversationBuffer,
     ) -> Result<SpaceId> {
         // Layer 1: Filesystem path detection (fast, free)
         if let Some(path) = extract_filesystem_path(message) {
@@ -389,7 +715,8 @@ impl SpaceManager {
                 return Ok(space.id);
             }
             // New path detected → create new Space
-            let space = self.create_from_path(&path).await?;
+            let name = path_name(&path); // e.g. "oxios" from "/projects/oxios"
+            let space = self.create_from_path(&name, &path).await?;
             return Ok(space.id);
         }
 
@@ -400,14 +727,29 @@ impl SpaceManager {
         }
 
         // Layer 3: Topic shift detection (LLM, only when needed)
-        if self.should_check_topic_shift(history) {
-            let topic = self.classify_topic(message).await?;
-            if let Some(space) = self.find_by_topic(&topic) {
-                self.activate(&space.id).await?;
+        if self.should_check_topic(buffer) {
+            let topic = self.classify_topic(message, buffer).await?;
+
+            // Check if current default Space should be promoted
+            if self.is_in_default_space() {
+                if topic.is_clear() {
+                    // Promote: split default into new named Space
+                    let space = self.promote_from_default(&topic).await?;
+                    return Ok(space.id);
+                }
+                // Topic unclear, stay in default
+                return Ok(self.default_space_id());
+            }
+
+            // Non-default: check for topic shift
+            if self.topic_shifted(&topic, buffer) {
+                if let Some(space) = self.find_by_topic(&topic) {
+                    self.activate(&space.id).await?;
+                    return Ok(space.id);
+                }
+                let space = self.create_from_topic(&topic).await?;
                 return Ok(space.id);
             }
-            let space = self.create_from_topic(&topic).await?;
-            return Ok(space.id);
         }
 
         // Default: stay in current Space
@@ -415,199 +757,51 @@ impl SpaceManager {
     }
 
     /// Should we invoke LLM for topic classification?
-    /// Heuristic: check every N turns, or when message pattern changes.
-    fn should_check_topic_shift(&self, history: &[Message]) -> bool {
-        let turns_since_last_check = self.turns_since_topic_check();
-        turns_since_last_check >= 3 // Every 3 turns
-            || self.pattern_changed(history) // Detectable shift in language
+    fn should_check_topic(&self, buffer: &ConversationBuffer) -> bool {
+        let turns_since_last = self.turns_since_topic_check();
+        turns_since_last >= 3
+            || buffer.pattern_changed()
     }
 }
 ```
 
-## 10. Implementation Plan
+## 14. Implementation Plan
 
 ### Phase 1: Foundation (SpaceManager + 데이터 모델)
 - `Space`, `SpaceId`, `SpaceSource` 타입 정의
-- `SpaceManager` 기본 구조 (create, list, activate, detect)
+- `SpaceManager` 기본 구조 (create, list, activate, get)
+- `ConversationBuffer` 구현
 - 파일시스템 저장소 레이아웃 (`~/.oxios/spaces/`)
+- 기본 Space(_default) 항상 존재 보장
 - KernelEvent에 Space 이벤트 추가
 
 ### Phase 2: Detection (1차 + 2차)
 - 파일시스템 경로 추출 (정규식)
 - 키워드/태그 매칭
 - 기존 Space와의 매칭 로직
-- 기본 Space(_default) 항상 존재 보장
+- Default Space → named Space 자동 승격 로직
 
-### Phase 3: Memory Isolation
+### Phase 3: Memory Isolation + Knowledge Reference/Transfer
 - Space-scoped MemoryManager
 - Space-scoped StateStore 경로
 - Orchestrator에 space_id 전달
-- AgentRuntime에 workspace_dir 전달
+- AgentRuntime에 project_paths, workspace_dir 전달
+- KnowledgeBridge: Reference (다른 Space 메모리 읽기)
+- KnowledgeBridge: Transfer (새 Space에 기존 지식 주입)
 
 ### Phase 4: Topic Detection (3차, LLM)
 - LLM 기반 주제 분류
 - 주제 전환 감지 휴리스틱
 - 자동 Space 생성/매핑
 
-### Phase 5: Transparency
+### Phase 5: Transparency + 병합/보존
 - Space 상태 조회 API (kernel_handle)
 - 대시보드용 이벤트 스트림 (EventBus 필터링)
 - 대화 기반 Space 관리 ("어떤 스페이스 있어?")
+- Space 병합 (자동 + 확인)
+- 30일 자동 archive + 즉시 복구
 
-## 11. Resolved Decisions
-
-### D1: Space 병합 — 자동 병합 + 감사 로그
-
-OS가 두 Space의 유사도를 판단해서 자동 병합한다.
-모든 병합 이력은 감사 로그에 기록되며, 대시보드에서 확인 가능.
-GitLayer를 활용해 병합 전 상태를 커밋해두면 되돌리기도 가능.
-
-```
-Space A "oxios-dev" + Space B "oxios-bugfix"
-→ OS: 두 Space의 paths, tags, 대화 주제가 유사함 (유사도 0.87)
-→ 자동 병합 → "oxios" Space로 통합
-→ 감사 로그: "merged oxios-bugfix into oxios at 2024-..."
-→ 대시보드에서 되돌리기 가능
-```
-
-### D2: Space 보존 — 30일 자동 archive + 즉시 복구
-
-- `last_active_at` 기준 30일 비활성시 자동 archive
-- Archive된 Space의 **Memory와 Workspace는 디스크에 보존**
-- 에이전트는 항상 동적 생성/소멸이므로 archive와 무관
-- 사용자가 archive된 Space의 주제나 경로를 언급하면 **즉시 복구**
-- 대화로 복구: "oxios 작업 다시 하자" → archive에서 즉시 활성화
-
-```
-~/.oxios/spaces/
-├── {space_id}/          # 활성 Space
-└── _archived/
-    └── {space_id}/      # 보존됨, 언제든 복구 가능
-```
-
-### D3: Cross-Space 지식 흐름 — OS가 지속적으로 자동 관리
-
-Space 간 지식은 **투명한 반투명 막**으로 연결되어 있다.
-기본적으로 각 Space는 독립된 메모리를 가지지만,
-OS가 지식의 흐름을 지속적으로 관리한다.
-
-#### D3-1: 참조 (Reading)
-
-OS가 현재 작업에 다른 Space의 메모리가 필요하다고 판단하면,
-다른 Space의 메모리를 검색해서 가져올 수 있다.
-
-- 사용자가 명시적으로 요청할 필요 없음
-- OS가 컨텍스트를 분석해서 자동으로 판단
-- 참조 시 해당 Space 메모리에 "Space X에서 참조됨" 로그 남김
-
-#### D3-2: 이전 (Transfer)
-
-한 Space에서 학습한 지식을 다른 Space로 자동 주입.
-
-```
-새 프로젝트 Space 생성됨
-→ OS: 기존 프로젝트 Space들에서 관련 패턴/지식 검색
-→ 관련 지식을 새 Space의 memory에 주입
-→ 로그: "5개 지식을 oxios→new-project로 이전"
-```
-
-#### D3-3: 통합 (Synthesis)
-
-OS가 주기적으로 여러 Space의 지식을 분석해서
-새로운 통찰을 자동 생성.
-
-```
-OS (주기적 분석):
-→ oxios, blog, side-project 세 Space에서
-  "에러 핸들링 패턴" 관련 메모리 발견
-→ 공통점 분석 → "사용자의 에러 핸들링 철학" 통찰 생성
-→ 현재 활성 Space에 통합 인사이트로 저장
-→ 감사 로그: "synthesized insight from 3 spaces"
-```
-
-### D4: Default Space — 이름 없음, 주제 형성시 자동 명명
-
-기본 Space는 **이름이 없다**.
-모든 메시지의 fallback이며, 사용자가 Space를 명시하지 않고
-경로/주제도 감지되지 않으면 여기로 떨어진다.
-
-- 대화가 진행되면서 주제가 형성되면 OS가 자동으로 이름을 붙임
-- 사용자가 "이거 일상 스페이스야"라고 하면 그때 이름이 명확해짐
-- 이름 없는 상태에서도 Memory, Workspace는 정상 작동
-
-```
-~/.oxios/spaces/
-└── _default/            # 이름 없는 기본 Space
-    ├── space.json       # name: "" 또는 null
-    ├── memory/
-    └── workspace/
-```
-
-### D5: Space 개수 — 무제한 + archive로 자연 관리
-
-Space 개수에 하드 리밋은 없다.
-대신 D2의 archive 정책(30일 비활성)으로 활성 Space 수가 자연스럽게 관리된다.
-
-- 활성 Space: 사용자가 최근 대화에서 언급한 것들
-- Archive Space: 30일 이상 비활성, 디스크에 보존
-- 복구: 언제든 대화로 즉시 복구
-- 성능: Space 인덱스는 메모리에 올리지만, archive는 lazy load
-
-## 12. Knowledge Flow Architecture
-
-D3의 지식 흐름을 구현하기 위한 아키텍처.
-
-### 12.1 KnowledgeBridge
-
-SpaceManager 내부에 KnowledgeBridge 컴포넌트가 지식 흐름을 관리.
-
-```rust
-/// Manages knowledge flow between Spaces.
-pub struct KnowledgeBridge {
-    space_manager: Arc<SpaceManager>,
-    /// Cross-reference log for audit trail.
-    xref_log: RwLock<Vec<CrossRefEntry>>,
-}
-
-/// Record of a cross-Space knowledge access.
-pub struct CrossRefEntry {
-    /// Source Space.
-    from: SpaceId,
-    /// Target Space.
-    to: SpaceId,
-    /// Memory entries accessed.
-    entries: Vec<String>,
-    /// Type of flow.
-    flow: KnowledgeFlow,
-    /// When this happened.
-    timestamp: DateTime<Utc>,
-}
-
-/// Type of knowledge flow.
-pub enum KnowledgeFlow {
-    /// Read from another Space (reference).
-    Reference,
-    /// Copied from one Space to another (transfer).
-    Transfer,
-    /// Synthesized from multiple Spaces (synthesis).
-    Synthesis { sources: Vec<SpaceId> },
-}
-```
-
-### 12.2 자동 발동 시나리오
-
-| 시나리오 | 트리거 | Flow 타입 | 빈도 |
-|----------|--------|-----------|------|
-| 새 Space 생성 | Space 생성시 | Transfer | 생성시 1회 |
-| 작업 중 관련 지식 발견 | 에이전트 작업 중 | Reference | 필요시 |
-| 주기적 통합 분석 | 백그라운드 (cron) | Synthesis | 일 1회 |
-| 사용자 명시 요청 | "다른 스페이스에서 가져와" | Transfer/Reference | 요청시 |
-
-### 12.3 보안/프라이버시 고려
-
-지식이 자동으로 흐르다 보니 프라이버시 우려가 있을 수 있다.
-
-- **민감 정보 태깅**: 사용자가 특정 메모리를 "이 Space에서만"으로 태그하면 자동 이전 불가
-- **Space visibility**: Space를 private로 설정하면 다른 Space에서 참조 불가
-- **감사 로그**: 모든 지식 흐름은 기록, 대시보드에서 확인 가능
-- **되돌리기**: 이전/통합된 지식은 삭제 가능 (GitLayer 활용)
+### Phase 6: Knowledge Synthesis (후속 설계)
+- 여러 Space 지식의 주기적 통합 분석
+- 비용/품질 트레이드오프 분석 후 별도 설계
+- 인프라는 Phase 3에서 준비 (KnowledgeFlow::Synthesis enum variant 등)
