@@ -27,6 +27,7 @@ use crate::event_bus::{EventBus, KernelEvent};
 use crate::git_layer::GitLayer;
 use crate::metrics::get_metrics;
 use crate::scheduler::Priority;
+use crate::space::{ConversationBuffer, SpaceId, SpaceManager};
 use crate::state_store::StateStore;
 use crate::types::AgentId;
 
@@ -95,6 +96,10 @@ pub struct Orchestrator {
     lifecycle: AgentLifecycleManager,
     /// A2A protocol for inter-agent task delegation.
     a2a: Option<Arc<crate::a2a::A2AProtocol>>,
+    /// Space manager for context partitioning.
+    space_manager: RwLock<Option<Arc<SpaceManager>>>,
+    /// Conversation buffer for topic shift detection.
+    conversation_buffer: RwLock<ConversationBuffer>,
 }
 
 impl Orchestrator {
@@ -113,7 +118,32 @@ impl Orchestrator {
             sessions: RwLock::new(std::collections::HashMap::new()),
             lifecycle,
             a2a: None,
+            space_manager: RwLock::new(None),
+            conversation_buffer: RwLock::new(ConversationBuffer::default()),
         }
+    }
+
+    /// Set the SpaceManager for context partitioning.
+    pub fn set_space_manager(&self, manager: Arc<SpaceManager>) {
+        *self.space_manager.write() = Some(manager);
+    }
+
+    /// Get the current Space ID, if SpaceManager is set.
+    pub fn current_space_id(&self) -> Option<SpaceId> {
+        self.space_manager.read().as_ref().map(|m| m.current_space_id())
+    }
+
+    /// Get the current Space name tag for response decoration.
+    pub fn current_space_tag(&self) -> String {
+        self.space_manager.read().as_ref().and_then(|m| {
+            m.current_space().map(|s| {
+                if s.is_default() {
+                    String::new()
+                } else {
+                    format!("[{} {}]", s.emoji(), s.name)
+                }
+            })
+        }).unwrap_or_default()
     }
 
     /// Set the A2A protocol for inter-agent task delegation.
@@ -158,6 +188,34 @@ impl Orchestrator {
             .unwrap_or_else(|| Uuid::new_v4().to_string());
 
         tracing::info!(session_id = %session_id, user_id = %user_id, content_len = user_message.len(), "Orchestrator handling message");
+
+        // ── Space Detection ──
+        let space_tag = self.current_space_tag();
+        let space_id = {
+            let buffer = self.conversation_buffer.read();
+            let space_manager = self.space_manager.read();
+            if let Some(ref sm) = *space_manager {
+                match sm.detect_or_create(user_message, &buffer).await {
+                    Ok(id) => {
+                        tracing::info!(space_id = %id, "Space detected/created for message");
+                        id
+                    }
+                    Err(e) => {
+                        tracing::warn!(error = %e, "Space detection failed, using default");
+                        sm.default_space_id()
+                    }
+                }
+            } else {
+                // No SpaceManager set — use zero ID
+                uuid::Uuid::nil()
+            }
+        };
+
+        // Record user message in conversation buffer
+        {
+            let mut buffer = self.conversation_buffer.write();
+            buffer.push_user(user_message);
+        }
 
         // Phase 1: Interview
         self.publish_phase_started(&session_id, Phase::Interview).await;
@@ -233,7 +291,9 @@ impl Orchestrator {
             self.publish_phase_completed(&session_id, Phase::Interview, "needs clarification").await;
 
             return Ok(OrchestrationResult {
-                session_id: Some(session_id),
+                session_id: Some(session_id.clone()),
+                space_id: Some(space_id),
+                space_tag: Some(space_tag.clone()),
                 response: format_questions(&questions),
                 seed_id: None,
                 agent_id: None,
@@ -295,6 +355,8 @@ impl Orchestrator {
 
                 return Ok(OrchestrationResult {
                     session_id: Some(session_id),
+                    space_id: Some(space_id),
+                    space_tag: Some(space_tag.clone()),
                     response: format_result_combined(&combined),
                     seed_id: Some(seed.id),
                     agent_id: None,
@@ -412,6 +474,8 @@ impl Orchestrator {
 
         Ok(OrchestrationResult {
             session_id: Some(session_id),
+            space_id: Some(space_id),
+            space_tag: Some(space_tag.clone()),
             response: format_result(&final_seed, &current_evaluation),
             seed_id: Some(final_seed.id),
             agent_id: None,
@@ -754,6 +818,12 @@ pub struct OrchestrationResult {
     /// Session ID for multi-turn interviews. Pass this on follow-up messages.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub session_id: Option<String>,
+    /// The Space ID that handled this message.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub space_id: Option<Uuid>,
+    /// Space decoration tag for the response (e.g. "[🔧 oxios]").
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub space_tag: Option<String>,
     /// The response to send back to the user.
     pub response: String,
     /// The seed that was created (if seed phase was reached).
