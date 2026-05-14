@@ -1,6 +1,7 @@
 //! File tree browser with breadcrumb and directory navigation.
 
 use crate::api;
+use crate::components::icons::{IconFile, IconFolder, IconArrowUp};
 use dioxus::prelude::*;
 
 #[component]
@@ -33,7 +34,7 @@ pub fn WorkspaceView() -> Element {
     let tree_content: Element = match &(resource.value())() {
         Some(Ok(entries)) if entries.is_empty() => rsx! {
             div { class: "empty-state",
-                div { class: "icon", "📂" }
+                div { class: "icon", IconFolder {} }
                 p { "Empty directory." }
             }
         },
@@ -42,7 +43,6 @@ pub fn WorkspaceView() -> Element {
                 let name = entry.name.clone();
                 let is_dir = entry.is_dir;
                 let click_name = name.clone();
-                let icon = if is_dir { "📁" } else { "📄" };
                 let item_class = if is_dir { "tree-item dir" } else { "tree-item file" };
                 let size_str = if is_dir { String::new() } else { format_bytes(entry.size) };
                 rsx! {
@@ -70,7 +70,13 @@ pub fn WorkspaceView() -> Element {
                                 });
                             }
                         },
-                        span { class: "icon", "{icon}" }
+                        span { class: "icon",
+                            if is_dir {
+                                rsx! { IconFolder {} }
+                            } else {
+                                rsx! { IconFile {} }
+                            }
+                        }
                         span { "{name}" }
                         span { style: "margin-left:auto;font-size:11px;color:var(--text-muted)", "{size_str}" }
                     }
@@ -98,7 +104,7 @@ pub fn WorkspaceView() -> Element {
             }
             None => rsx! {
                 div { class: "empty-state",
-                    div { class: "icon", "📄" }
+                    div { class: "icon", IconFile {} }
                     p { "Select a file from the tree to view its contents." }
                 }
             },
@@ -109,7 +115,10 @@ pub fn WorkspaceView() -> Element {
     rsx! {
         div { class: "panel-container",
             div { class: "panel-header",
-                h2 { "📁 Workspace" }
+                h2 {
+                    IconFolder {}
+                    "Workspace"
+                }
                 button {
                     class: "btn btn-sm",
                     onclick: move |_| {
@@ -140,14 +149,14 @@ pub fn WorkspaceView() -> Element {
                                     file_content.set(String::new());
                                     resource.restart();
                                 },
-                                span { class: "icon", "⬆️" }
+                                span { class: "icon", IconArrowUp {} }
                                 span { ".." }
                             }
                         })
                     }
                     {tree_content}
-                }
-                div { style: "flex:1;display:flex;flex-direction:column;overflow:hidden;",
+                </div>
+                div { style: "flex:1;display:flex;flex-direction:column;overflow:hidden",
                     div { class: "workspace-toolbar",
                         span { class: "breadcrumb", "{bc}" }
                     }

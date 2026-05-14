@@ -1,6 +1,7 @@
 //! Ouroboros 5-phase display with phase arrows and recent seeds list.
 
 use crate::api;
+use crate::components::icons::*;
 use dioxus::prelude::*;
 
 #[component]
@@ -12,7 +13,7 @@ pub fn ProtocolView() -> Element {
     let content: Element = match &(resource.value())() {
         Some(Ok(seeds)) if seeds.is_empty() => rsx! {
             div { class: "empty-state",
-                div { class: "icon", "🌱" }
+                IconLeaf { class: "empty-icon" }
                 p { "No seeds yet. Seeds are created through the Ouroboros interview process." }
             }
         },
@@ -40,28 +41,38 @@ pub fn ProtocolView() -> Element {
                         }
                         div { class: "phase-steps",
                             div { class: "phase-step completed",
-                                div { class: "phase-step-icon", "🤔" }
+                                div { class: "phase-step-icon",
+                                    IconChat { class: "step-icon" }
+                                }
                                 div { class: "phase-step-label", "Interview" }
                             }
                             div { class: "phase-step completed",
-                                div { class: "phase-step-icon", "📝" }
+                                div { class: "phase-step-icon",
+                                    IconFile { class: "step-icon" }
+                                }
                                 div { class: "phase-step-label", "Seed" }
                             }
                             div { class: "phase-step active",
-                                div { class: "phase-step-icon", "⚙️" }
+                                div { class: "phase-step-icon",
+                                    IconPlay { class: "step-icon" }
+                                }
                                 div { class: "phase-step-label", "Execute" }
                             }
                             div { class: "phase-step",
-                                div { class: "phase-step-icon", "✅" }
+                                div { class: "phase-step-icon",
+                                    IconCheckSquare { class: "step-icon" }
+                                }
                                 div { class: "phase-step-label", "Evaluate" }
                             }
                             div { class: "phase-step",
-                                div { class: "phase-step-icon", "🔄" }
+                                div { class: "phase-step-icon",
+                                    IconRefresh { class: "step-icon" }
+                                }
                                 div { class: "phase-step-label", "Evolve" }
                             }
                         }
                     }
-                    h3 { style: "font-family:var(--font-mono);font-size:13px;color:var(--accent);margin-top:16px;",
+                    h3 { style: "font-family:var(--font-mono);font-size:13px;color:var(--accent);margin-top:16px",
                         "Recent Seeds"
                     }
                     div { class: "item-list",
@@ -75,7 +86,7 @@ pub fn ProtocolView() -> Element {
         },
         None => rsx! {
             div { class: "empty-state",
-                div { class: "icon", "⏳" }
+                IconClock { class: "empty-icon" }
                 p { "Loading protocol status..." }
             }
         },
@@ -84,7 +95,7 @@ pub fn ProtocolView() -> Element {
     rsx! {
         div { class: "panel-container",
             div { class: "panel-header",
-                h2 { "🔌 Protocol" }
+                h2 { IconProtocol { class: "panel-icon" } "Protocol" }
                 button { class: "btn btn-sm", onclick: move |_| resource.restart(), "Refresh" }
             }
             div { class: "panel-body",

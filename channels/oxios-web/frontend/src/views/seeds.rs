@@ -1,6 +1,7 @@
 //! Seed cards showing goal, constraints, criteria, creation date.
 
 use crate::api;
+use crate::components::icons::*;
 use dioxus::prelude::*;
 
 #[component]
@@ -15,7 +16,7 @@ pub fn SeedsView() -> Element {
     let content: Element = match &(resource.value())() {
         Some(Ok(seeds)) if seeds.is_empty() => rsx! {
             div { class: "empty-state",
-                div { class: "icon", "🌱" }
+                div { class: "icon", IconSeeds { size: 48 } }
                 p { "No seeds yet. Seeds are created through the Ouroboros interview process." }
             }
         },
@@ -59,7 +60,7 @@ pub fn SeedsView() -> Element {
         },
         None => rsx! {
             div { class: "empty-state",
-                div { class: "icon", "⏳" }
+                div { class: "icon", IconLoading { size: 48 } }
                 p { "Loading seeds..." }
             }
         },
@@ -82,7 +83,8 @@ pub fn SeedsView() -> Element {
     rsx! {
         div { class: "panel-container",
             div { class: "panel-header",
-                h2 { "🌱 Seeds" }
+                IconSeeds { size: 24 }
+                h2 { "Seeds" }
                 button { class: "btn btn-sm", onclick: move |_| resource.restart(), "Refresh" }
             }
             div { class: "panel-body",
