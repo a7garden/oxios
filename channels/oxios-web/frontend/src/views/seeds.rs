@@ -16,7 +16,7 @@ pub fn SeedsView() -> Element {
     let content: Element = match &(resource.value())() {
         Some(Ok(seeds)) if seeds.is_empty() => rsx! {
             div { class: "empty-state",
-                div { class: "icon", IconSeeds { size: 48 } }
+                div { class: "empty-icon", IconSeeds { size: 40 } }
                 p { "No seeds yet. Seeds are created through the Ouroboros interview process." }
             }
         },
@@ -60,7 +60,7 @@ pub fn SeedsView() -> Element {
         },
         None => rsx! {
             div { class: "empty-state",
-                div { class: "icon", IconLoading { size: 48 } }
+                div { class: "empty-icon", IconLoading { size: 40 } }
                 p { "Loading seeds..." }
             }
         },
@@ -83,8 +83,7 @@ pub fn SeedsView() -> Element {
     rsx! {
         div { class: "panel-container",
             div { class: "panel-header",
-                IconSeeds { size: 24 }
-                h2 { "Seeds" }
+                h2 { IconSeeds { size: 20 } " Seeds" }
                 button { class: "btn btn-sm", onclick: move |_| resource.restart(), "Refresh" }
             }
             div { class: "panel-body",

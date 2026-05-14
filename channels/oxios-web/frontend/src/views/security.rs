@@ -1,6 +1,7 @@
 //! Audit log table with allow/deny coloring.
 
 use crate::api;
+use crate::components::icons::*;
 use dioxus::prelude::*;
 
 #[component]
@@ -12,7 +13,7 @@ pub fn SecurityView() -> Element {
     let content: Element = match &(resource.value())() {
         Some(Ok(entries)) if entries.is_empty() => rsx! {
             div { class: "empty-state",
-                div { class: "icon", "🔒" }
+                div { class: "empty-icon", IconShield { size: 40 } }
                 p { "No audit log entries yet." }
             }
         },
@@ -36,11 +37,11 @@ pub fn SecurityView() -> Element {
                     div { class: "agent-card", key: "{timestamp}-{action}-{agent}",
                         div { class: "agent-info",
                             div { class: "agent-name",
-                                span { style: "color:var(--text-primary)", "{agent}" }
-                                span { style: "color:var(--text-muted);margin:0 8px", "→" }
+                                span { style: "color:var(--text-0)", "{agent}" }
+                                span { style: "color:var(--text-3);margin:0 8px", "→" }
                                 span { style: "color:var(--accent)", "{action}" }
-                                span { style: "color:var(--text-muted);margin:0 8px", "on" }
-                                span { style: "color:var(--text-primary)", "{resource_name}" }
+                                span { style: "color:var(--text-3);margin:0 8px", "on" }
+                                span { style: "color:var(--text-0)", "{resource_name}" }
                             }
                             div { class: "agent-id", "{timestamp} · {reason}" }
                         }
@@ -55,7 +56,7 @@ pub fn SecurityView() -> Element {
         },
         None => rsx! {
             div { class: "empty-state",
-                div { class: "icon", "⏳" }
+                div { class: "empty-icon", IconLoading { size: 40 } }
                 p { "Loading audit log..." }
             }
         },
@@ -64,7 +65,7 @@ pub fn SecurityView() -> Element {
     rsx! {
         div { class: "panel-container",
             div { class: "panel-header",
-                h2 { "🔒 Security" }
+                h2 { IconShield { size: 20 } " Security" }
                 button { class: "btn btn-sm", onclick: move |_| resource.restart(), "Refresh" }
             }
             div { class: "panel-body",

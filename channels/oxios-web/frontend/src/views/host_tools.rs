@@ -1,6 +1,7 @@
 //! Tool status showing required/optional availability.
 
 use crate::api;
+use crate::components::icons::*;
 use dioxus::prelude::*;
 
 #[component]
@@ -12,7 +13,6 @@ pub fn HostToolsView() -> Element {
     let content: Element = match &(resource.value())() {
         Some(Ok(status)) => {
             let all_ok = status.all_required_present;
-            let status_icon = if all_ok { "✅" } else { "⚠️" };
             let status_text = if all_ok {
                 "All required tools available"
             } else {
@@ -31,11 +31,15 @@ pub fn HostToolsView() -> Element {
                 .collect();
 
             let optional_rows: Vec<Element> = optional_items.iter().map(|(name, available)| {
-                let icon = if *available { "✅" } else { "❌" };
                 let cls = if *available { "host-tool-item tool-available" } else { "host-tool-item tool-missing" };
+                let icon_el: Element = if *available {
+                    rsx! { span { class: "tool-icon", IconCircleCheck { size: 16 } } }
+                } else {
+                    rsx! { span { class: "tool-icon", IconCircleX { size: 16 } } }
+                };
                 rsx! {
                     div { class: "{cls}", key: "{name}",
-                        span { class: "tool-icon", "{icon}" }
+                        {icon_el}
                         span { class: "tool-name", "{name}" }
                     }
                 }
@@ -44,15 +48,21 @@ pub fn HostToolsView() -> Element {
             rsx! {
                 div {
                     div { class: "host-tools-summary",
-                        span { class: "tool-icon", "{status_icon}" }
+                        {if all_ok {
+                            rsx! { span { class: "tool-icon", IconCircleCheck { size: 20 } } }
+                        } else {
+                            rsx! { span { class: "tool-icon", IconAlertTriangle { size: 20 } } }
+                        }}
                         span { style: "font-weight:600", "{status_text}" }
                     }
                     div { class: "host-tools-section",
                         h3 { "Missing Required" }
                         div { class: "host-tool-item",
-                            span { class: if status.missing_required.is_empty() { "tool-available" } else { "tool-missing" },
-                                "{missing_text}"
-                            }
+                            {if status.missing_required.is_empty() {
+                                rsx! { span { class: "tool-available", "None" } }
+                            } else {
+                                rsx! { span { class: "tool-missing", "{missing_text}" } }
+                            }}
                         }
                     }
                     div { class: "host-tools-section",
@@ -67,7 +77,7 @@ pub fn HostToolsView() -> Element {
         },
         None => rsx! {
             div { class: "empty-state",
-                div { class: "icon", "⏳" }
+                div { class: "empty-icon", IconLoading { size: 40 } }
                 p { "Loading host tools..." }
             }
         },
@@ -76,7 +86,7 @@ pub fn HostToolsView() -> Element {
     rsx! {
         div { class: "panel-container",
             div { class: "panel-header",
-                h2 { "🔧 Host Tools" }
+                h2 { IconWrench { size: 20 } " Host Tools" }
                 button { class: "btn btn-sm", onclick: move |_| resource.restart(), "Refresh" }
             }
             div { class: "panel-body",

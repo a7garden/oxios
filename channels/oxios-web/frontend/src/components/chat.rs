@@ -18,7 +18,7 @@ pub fn ChatInput(on_send: EventHandler<String>) -> Element {
     };
 
     let handle_key = move |evt: KeyboardEvent| {
-        if evt.key() == Key::Enter && !evt.shift_key() {
+        if evt.key() == Key::Enter {
             let msg = text().trim().to_string();
             if !msg.is_empty() {
                 on_send.call(msg);

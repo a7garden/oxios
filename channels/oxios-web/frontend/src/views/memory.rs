@@ -1,6 +1,7 @@
 //! Split layout: list on left, content on right.
 
 use crate::api;
+use crate::components::icons::*;
 use dioxus::prelude::*;
 
 #[component]
@@ -15,7 +16,7 @@ pub fn MemoryView() -> Element {
     let list_content: Element = match &(resource.value())() {
         Some(Ok(entries)) if entries.is_empty() => rsx! {
             div { class: "empty-state",
-                div { class: "icon", "🧠" }
+                div { class: "empty-icon", IconMemory { size: 40 } }
                 p { "No memory entries yet. Agent conversations generate daily memory summaries." }
             }
         },
@@ -50,7 +51,7 @@ pub fn MemoryView() -> Element {
         },
         None => rsx! {
             div { class: "empty-state",
-                div { class: "icon", "⏳" }
+                div { class: "empty-icon", IconLoading { size: 40 } }
                 p { "Loading memory..." }
             }
         },
@@ -70,7 +71,7 @@ pub fn MemoryView() -> Element {
             }
             None => rsx! {
                 div { class: "empty-state",
-                    div { class: "icon", "📄" }
+                    div { class: "empty-icon", IconFile { size: 40 } }
                     p { "Select an entry from the list to view its content." }
                 }
             },
@@ -80,7 +81,7 @@ pub fn MemoryView() -> Element {
     rsx! {
         div { class: "panel-container",
             div { class: "panel-header",
-                h2 { "🧠 Memory" }
+                h2 { IconMemory { size: 20 } " Memory" }
                 button { class: "btn btn-sm", onclick: move |_| resource.restart(), "Refresh" }
             }
             div { class: "workspace-split",

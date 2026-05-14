@@ -1,12 +1,13 @@
 //! Display TOML config with pre block.
 
-use crate::api;
 use dioxus::prelude::*;
+
+use crate::components::icons::*;
 
 #[component]
 pub fn ConfigView() -> Element {
     let mut resource = use_resource(|| async move {
-        api::fetch_json::<serde_json::Value>("/api/config").await
+        crate::api::fetch_json::<serde_json::Value>("/api/config").await
     });
 
     let content: Element = match &(resource.value())() {
@@ -17,7 +18,7 @@ pub fn ConfigView() -> Element {
                     div { class: "config-section",
                         h3 { "Configuration" }
                         pre {
-                            style: "font-family:var(--font-mono);font-size:13px;line-height:1.6;white-space:pre-wrap;word-break:break-word;color:var(--text-primary);",
+                            style: "font-family:var(--font-mono);font-size:13px;line-height:1.6;white-space:pre-wrap;word-break:break-word;color:var(--text-1);",
                             "{pretty}"
                         }
                     }
@@ -29,7 +30,7 @@ pub fn ConfigView() -> Element {
         },
         None => rsx! {
             div { class: "empty-state",
-                div { class: "icon", "⏳" }
+                div { class: "empty-icon", IconLoading { size: 40 } }
                 p { "Loading configuration..." }
             }
         },
@@ -38,7 +39,7 @@ pub fn ConfigView() -> Element {
     rsx! {
         div { class: "panel-container",
             div { class: "panel-header",
-                h2 { "⚙️ Config" }
+                h2 { IconSettings { size: 20 } " Config" }
                 button { class: "btn btn-sm", onclick: move |_| resource.restart(), "Refresh" }
             }
             div { class: "panel-body",

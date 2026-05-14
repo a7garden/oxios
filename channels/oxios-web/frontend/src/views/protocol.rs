@@ -13,7 +13,7 @@ pub fn ProtocolView() -> Element {
     let content: Element = match &(resource.value())() {
         Some(Ok(seeds)) if seeds.is_empty() => rsx! {
             div { class: "empty-state",
-                IconLeaf { class: "empty-icon" }
+                div { class: "empty-icon", IconSeeds { size: 40 } }
                 p { "No seeds yet. Seeds are created through the Ouroboros interview process." }
             }
         },
@@ -33,7 +33,6 @@ pub fn ProtocolView() -> Element {
             }).collect();
             rsx! {
                 div { class: "ouroboros-panel",
-                    // Phase indicator
                     div { class: "phase-indicator",
                         div { class: "phase-current", "Ouroboros Lifecycle" }
                         div { class: "phase-progress-bar",
@@ -41,33 +40,23 @@ pub fn ProtocolView() -> Element {
                         }
                         div { class: "phase-steps",
                             div { class: "phase-step completed",
-                                div { class: "phase-step-icon",
-                                    IconChat { class: "step-icon" }
-                                }
+                                div { class: "phase-step-icon", IconChat { size: 16 } }
                                 div { class: "phase-step-label", "Interview" }
                             }
                             div { class: "phase-step completed",
-                                div { class: "phase-step-icon",
-                                    IconFile { class: "step-icon" }
-                                }
+                                div { class: "phase-step-icon", IconFile { size: 16 } }
                                 div { class: "phase-step-label", "Seed" }
                             }
                             div { class: "phase-step active",
-                                div { class: "phase-step-icon",
-                                    IconPlay { class: "step-icon" }
-                                }
+                                div { class: "phase-step-icon", IconPlay { size: 16 } }
                                 div { class: "phase-step-label", "Execute" }
                             }
                             div { class: "phase-step",
-                                div { class: "phase-step-icon",
-                                    IconCheckSquare { class: "step-icon" }
-                                }
+                                div { class: "phase-step-icon", IconCheckSquare { size: 16 } }
                                 div { class: "phase-step-label", "Evaluate" }
                             }
                             div { class: "phase-step",
-                                div { class: "phase-step-icon",
-                                    IconRefresh { class: "step-icon" }
-                                }
+                                div { class: "phase-step-icon", IconRefresh { size: 16 } }
                                 div { class: "phase-step-label", "Evolve" }
                             }
                         }
@@ -86,7 +75,7 @@ pub fn ProtocolView() -> Element {
         },
         None => rsx! {
             div { class: "empty-state",
-                IconClock { class: "empty-icon" }
+                div { class: "empty-icon", IconLoading { size: 40 } }
                 p { "Loading protocol status..." }
             }
         },
@@ -95,7 +84,7 @@ pub fn ProtocolView() -> Element {
     rsx! {
         div { class: "panel-container",
             div { class: "panel-header",
-                h2 { IconProtocol { class: "panel-icon" } "Protocol" }
+                h2 { IconProtocol { size: 20 } " Protocol" }
                 button { class: "btn btn-sm", onclick: move |_| resource.restart(), "Refresh" }
             }
             div { class: "panel-body",

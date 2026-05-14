@@ -13,7 +13,7 @@ pub fn ProgramsView() -> Element {
     let content: Element = match &(resource.value())() {
         Some(Ok(programs)) if programs.is_empty() => rsx! {
             div { class: "empty-state",
-                div { class: "icon", IconPackage {} }
+                div { class: "empty-icon", IconPackage { size: 40 } }
                 p { "No programs installed. Install a program to extend agent capabilities." }
             }
         },
@@ -33,7 +33,7 @@ pub fn ProgramsView() -> Element {
                                 span { class: "program-name", "{name}" }
                                 span { class: "program-version", "v{prog.version}" }
                                 span { class: "{enabled_class}", "{enabled_text}" }
-                            },
+                            }
                             {
                                 let an = action_name.clone();
                                 rsx! {
@@ -67,7 +67,7 @@ pub fn ProgramsView() -> Element {
         },
         None => rsx! {
             div { class: "empty-state",
-                div { class: "icon", IconLoader {} }
+                div { class: "empty-icon", IconLoading { size: 40 } }
                 p { "Loading programs..." }
             }
         },
@@ -76,7 +76,7 @@ pub fn ProgramsView() -> Element {
     rsx! {
         div { class: "panel-container",
             div { class: "panel-header",
-                h2 { IconPackage {} " Programs" }
+                h2 { IconPackage { size: 20 } " Programs" }
                 button { class: "btn btn-sm", onclick: move |_| resource.restart(), "Refresh" }
             }
             div { class: "panel-body",

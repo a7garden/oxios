@@ -90,7 +90,8 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
     // Public routes (no auth)
     let public = Router::new()
         .route("/health", get(handle_health))
-        .route("/dioxus", get(|| async { axum::response::Redirect::permanent("/dioxus/") }));
+        .route("/dioxus", get(|| async { axum::response::Redirect::permanent("/dioxus/") }))
+        .route("/", get(|| async { axum::response::Redirect::permanent("/dioxus/") }));
 
     // Protected API routes (auth middleware applied)
     let api = Router::new()

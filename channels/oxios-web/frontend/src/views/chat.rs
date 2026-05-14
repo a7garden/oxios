@@ -4,7 +4,7 @@ use dioxus::prelude::*;
 
 use crate::api::{self, ChatRequest, ChatResponse};
 use crate::components::chat::{ChatInput, ChatMessage, ProcessingIndicator};
-use crate::components::icons::*;
+use crate::components::icons::IconChat;
 
 /// A single message in the chat history.
 #[derive(Debug, Clone)]
@@ -59,8 +59,7 @@ pub fn ChatView() -> Element {
     rsx! {
         div { class: "panel-container chat-panel",
             div { class: "panel-header",
-                IconChat { size: 24 }
-                span { class: "panel-title", "Chat" }
+                h2 { IconChat { size: 20 } " Chat" }
             }
             div { class: "messages",
                 for msg in messages() {

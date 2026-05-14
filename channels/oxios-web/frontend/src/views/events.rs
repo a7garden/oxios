@@ -1,6 +1,7 @@
 //! SSE view: use gloo_net eventsource + futures_util StreamExt, keep last 200 events.
 
 use crate::api::EventEntry;
+use crate::components::icons::*;
 use dioxus::prelude::*;
 use futures_util::StreamExt;
 
@@ -19,7 +20,6 @@ pub fn EventsView() -> Element {
             match EventSource::new("/api/events") {
                 Ok(mut es) => {
                     connected.set(true);
-                    // Subscribe to "message" events (default SSE event type)
                     match es.subscribe("message") {
                         Ok(mut subscription) => {
                             while let Some(msg) = StreamExt::next(&mut subscription).await {
@@ -77,7 +77,7 @@ pub fn EventsView() -> Element {
         if evts.is_empty() {
             rsx! {
                 div { class: "empty-state",
-                    div { class: "icon", "📡" }
+                    div { class: "empty-icon", IconActivity { size: 40 } }
                     p { "Waiting for events..." }
                 }
             }
@@ -106,9 +106,9 @@ pub fn EventsView() -> Element {
     rsx! {
         div { class: "panel-container",
             div { class: "panel-header",
-                h2 { "📡 Events" }
+                h2 { IconActivity { size: 20 } " Events" }
                 div { style: "display:flex;gap:8px;align-items:center",
-                    span { style: "font-size:12px;color:var(--text-muted);font-family:var(--font-mono)",
+                    span { style: "font-size:12px;color:var(--text-3);font-family:var(--font-mono)",
                         "{conn_status} · {event_count} events"
                     }
                     button {

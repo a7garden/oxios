@@ -49,7 +49,7 @@ const NAV_ITEMS: &[NavItem] = &[
     NavItem { panel: Panel::Events,    label: "Events" },
     NavItem { panel: Panel::Personas,  label: "Personas" },
     NavItem { panel: Panel::HostTools, label: "Host Tools" },
-};
+];
 
 /// Render the icon for a given panel.
 fn panel_icon(panel: Panel) -> Element {
@@ -83,8 +83,10 @@ pub fn Sidebar() -> Element {
     let collapsed_val = collapsed();
     let is_dark = theme() == Theme::Dark;
 
+    let sidebar_class = if collapsed_val { "sidebar collapsed" } else { "sidebar" };
+
     rsx! {
-        aside { class: "sidebar {if collapsed_val { "collapsed" } else { "" }}",
+        aside { class: "{sidebar_class}",
             div { class: "sidebar-header",
                 if !collapsed_val {
                     span { class: "sidebar-brand", "OXIOS" }
@@ -97,21 +99,21 @@ pub fn Sidebar() -> Element {
                         onclick: move |_| {
                             theme.set(if theme() == Theme::Dark { Theme::Light } else { Theme::Dark });
                         },
-                        if is_dark {
+                        {if is_dark {
                             rsx! { IconSun { size: 16 } }
                         } else {
                             rsx! { IconMoon { size: 16 } }
-                        }
+                        }}
                     }
                     // Collapse toggle (desktop only)
                     button {
                         class: "icon-btn collapse-toggle",
                         onclick: move |_| collapsed.toggle(),
-                        if collapsed_val {
+                        {if collapsed_val {
                             rsx! { IconChevronRight { size: 16 } }
                         } else {
                             rsx! { IconChevronLeft { size: 16 } }
-                        }
+                        }}
                     }
                 }
             }

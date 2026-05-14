@@ -1,6 +1,7 @@
 //! Approval cards with approve/reject buttons (only for pending).
 
 use crate::api;
+use crate::components::icons::*;
 use dioxus::prelude::*;
 
 #[component]
@@ -12,7 +13,7 @@ pub fn ApprovalsView() -> Element {
     let content: Element = match &(resource.value())() {
         Some(Ok(approvals)) if approvals.is_empty() => rsx! {
             div { class: "empty-state",
-                div { class: "icon", "🛡️" }
+                div { class: "empty-icon", IconCheckSquare { size: 40 } }
                 p { "No approval requests." }
             }
         },
@@ -44,7 +45,7 @@ pub fn ApprovalsView() -> Element {
                             rsx! {
                                 button {
                                     class: "btn btn-sm",
-                                    style: "background:var(--green);color:#000",
+                                    style: "background:var(--success);color:#fff;border-color:var(--success)",
                                     onclick: move |_| {
                                         let a = aid.clone();
                                         spawn(async move {
@@ -97,7 +98,7 @@ pub fn ApprovalsView() -> Element {
         },
         None => rsx! {
             div { class: "empty-state",
-                div { class: "icon", "⏳" }
+                div { class: "empty-icon", IconLoading { size: 40 } }
                 p { "Loading approvals..." }
             }
         },
@@ -106,7 +107,7 @@ pub fn ApprovalsView() -> Element {
     rsx! {
         div { class: "panel-container",
             div { class: "panel-header",
-                h2 { "🛡️ Approvals" }
+                h2 { IconCheckSquare { size: 20 } " Approvals" }
                 button { class: "btn btn-sm", onclick: move |_| resource.restart(), "Refresh" }
             }
             div { class: "panel-body",

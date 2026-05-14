@@ -1,6 +1,7 @@
 //! Persona cards with active badge and set-active button.
 
 use crate::api;
+use crate::components::icons::*;
 use dioxus::prelude::*;
 
 #[component]
@@ -21,7 +22,7 @@ pub fn PersonasView() -> Element {
     let content: Element = match &(resource.value())() {
         Some(Ok(personas)) if personas.is_empty() => rsx! {
             div { class: "empty-state",
-                div { class: "icon", "🎭" }
+                div { class: "empty-icon", IconUsers { size: 40 } }
                 p { "No personas configured." }
             }
         },
@@ -84,7 +85,7 @@ pub fn PersonasView() -> Element {
         },
         None => rsx! {
             div { class: "empty-state",
-                div { class: "icon", "⏳" }
+                div { class: "empty-icon", IconLoading { size: 40 } }
                 p { "Loading personas..." }
             }
         },
@@ -93,7 +94,7 @@ pub fn PersonasView() -> Element {
     rsx! {
         div { class: "panel-container",
             div { class: "panel-header",
-                h2 { "🎭 Personas" }
+                h2 { IconUsers { size: 20 } " Personas" }
                 button {
                     class: "btn btn-sm",
                     onclick: move |_| {

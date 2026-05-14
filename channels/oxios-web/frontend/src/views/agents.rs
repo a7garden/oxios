@@ -13,7 +13,7 @@ pub fn AgentsView() -> Element {
     let content: Element = match &(resource.value())() {
         Some(Ok(agents)) if agents.is_empty() => rsx! {
             div { class: "empty-state",
-                IconUsers { class: "icon".to_string(), size: 48 }
+                div { class: "empty-icon", IconZap { size: 40 } }
                 p { "No agents running. Start a conversation to spawn agents." }
             }
         },
@@ -73,7 +73,7 @@ pub fn AgentsView() -> Element {
         },
         None => rsx! {
             div { class: "empty-state",
-                IconLoading { class: "icon".to_string(), size: 48 }
+                div { class: "empty-icon", IconLoading { size: 40 } }
                 p { "Loading agents..." }
             }
         },
@@ -82,12 +82,8 @@ pub fn AgentsView() -> Element {
     rsx! {
         div { class: "panel-container",
             div { class: "panel-header",
-                IconZap { class: "panel-icon".to_string(), size: 24 }
-                h2 { "Agent Monitor" }
-                button { class: "btn btn-sm", onclick: move |_| resource.restart(),
-                    IconRefresh { class: "btn-icon".to_string(), size: 16 }
-                    "Refresh"
-                }
+                h2 { IconAgents { size: 20 } " Agents" }
+                button { class: "btn btn-sm", onclick: move |_| resource.restart(), "Refresh" }
             }
             div { class: "panel-body",
                 {content}

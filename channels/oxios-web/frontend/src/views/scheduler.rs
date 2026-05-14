@@ -1,6 +1,7 @@
 //! Stats grid + progress bar. Compute percentage OUTSIDE rsx!
 
 use crate::api;
+use crate::components::icons::*;
 use dioxus::prelude::*;
 
 #[component]
@@ -15,7 +16,6 @@ pub fn SchedulerView() -> Element {
 
     let stats_content: Element = match &(stats_resource.value())() {
         Some(Ok(stats)) => {
-            // Compute percentages OUTSIDE rsx
             let capacity_pct = if stats.max_concurrent > 0 {
                 (stats.running as f64 / stats.max_concurrent as f64 * 100.0) as u32
             } else {
@@ -65,7 +65,7 @@ pub fn SchedulerView() -> Element {
         },
         None => rsx! {
             div { class: "empty-state",
-                div { class: "icon", "⏳" }
+                div { class: "empty-icon", IconLoading { size: 40 } }
                 p { "Loading scheduler stats..." }
             }
         },
@@ -116,7 +116,7 @@ pub fn SchedulerView() -> Element {
     rsx! {
         div { class: "panel-container",
             div { class: "panel-header",
-                h2 { "📋 Scheduler" }
+                h2 { IconClock { size: 20 } " Scheduler" }
                 button {
                     class: "btn btn-sm",
                     onclick: move |_| {

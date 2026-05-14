@@ -1,7 +1,7 @@
 //! Skill list — simple display, CRUD not needed in UI.
 
-use crate::components::icons::*;
 use crate::api;
+use crate::components::icons::*;
 use dioxus::prelude::*;
 
 #[component]
@@ -13,9 +13,7 @@ pub fn SkillsView() -> Element {
     let content: Element = match &(resource.value())() {
         Some(Ok(skills)) if skills.is_empty() => rsx! {
             div { class: "empty-state",
-                div { class: "empty-icon",
-                    IconFile { size: 48 }
-                }
+                div { class: "empty-icon", IconSkills { size: 40 } }
                 p { "No skills registered. Skills define agent instruction templates." }
             }
         },
@@ -37,9 +35,7 @@ pub fn SkillsView() -> Element {
         },
         None => rsx! {
             div { class: "empty-state",
-                div { class: "empty-icon",
-                    IconClock { size: 48 }
-                }
+                div { class: "empty-icon", IconLoading { size: 40 } }
                 p { "Loading skills..." }
             }
         },
@@ -48,10 +44,7 @@ pub fn SkillsView() -> Element {
     rsx! {
         div { class: "panel-container",
             div { class: "panel-header",
-                h2 {
-                    IconSkills { size: 20 }
-                    "Skills"
-                }
+                h2 { IconSkills { size: 20 } " Skills" }
                 button { class: "btn btn-sm", onclick: move |_| resource.restart(), "Refresh" }
             }
             div { class: "panel-body",
