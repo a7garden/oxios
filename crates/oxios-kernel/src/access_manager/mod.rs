@@ -19,6 +19,7 @@ pub use rbac::{
 
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use crate::types::AgentId;
 
@@ -69,6 +70,11 @@ pub struct AccessManager {
     agent_workspaces: HashMap<String, String>,
     /// Workspace-to-agents mapping: workspace_name -> set of agent_names.
     workspace_agents: HashMap<String, HashSet<String>>,
+    /// Bounded channel sender for async audit log writes.
+    audit_sender: Option<tokio::sync::mpsc::Sender<String>>,
+    /// Handle to the background audit writer task.
+    #[allow(dead_code)]
+    audit_writer_handle: Option<Arc<tokio::task::JoinHandle<()>>>,
 }
 
 impl AccessManager {
@@ -83,6 +89,8 @@ impl AccessManager {
             workspace_paths: HashMap::new(),
             agent_workspaces: HashMap::new(),
             workspace_agents: HashMap::new(),
+            audit_sender: None,
+            audit_writer_handle: None,
         }
     }
 
@@ -100,12 +108,41 @@ impl AccessManager {
             workspace_paths: HashMap::new(),
             agent_workspaces: HashMap::new(),
             workspace_agents: HashMap::new(),
+            audit_sender: None,
+            audit_writer_handle: None,
         }
     }
 
     /// Configure an audit log file path for persistence.
+    ///
+    /// Spawns a background tokio task that reads from a bounded channel
+    /// and appends audit entries to the file. Uses a bounded channel of
+    /// capacity 1000 to provide backpressure.
     pub fn with_audit_log_path(mut self, path: std::path::PathBuf) -> Self {
-        self.audit_log_path = Some(path);
+        self.audit_log_path = Some(path.clone());
+
+        // Create the bounded channel (capacity 1000)
+        let (tx, mut rx) = tokio::sync::mpsc::channel::<String>(1000);
+        self.audit_sender = Some(tx);
+
+        // Spawn the background writer task using the current tokio runtime
+        if let Ok(handle) = tokio::runtime::Handle::try_current() {
+            let audit_path = path;
+            let audit_handle = handle.spawn(async move {
+                while let Some(line) = rx.recv().await {
+                    if let Ok(mut f) = std::fs::OpenOptions::new()
+                        .create(true)
+                        .append(true)
+                        .open(&audit_path)
+                    {
+                        use std::io::Write;
+                        let _ = writeln!(f, "{}", line);
+                    }
+                }
+            });
+            self.audit_writer_handle = Some(Arc::new(audit_handle));
+        }
+
         self
     }
 
@@ -607,27 +644,29 @@ impl AccessManager {
     }
 
     /// Persists an audit entry to the configured log file.
-    /// Runs in a background thread to avoid blocking the main path.
+    ///
+    /// Sends the serialized entry through the bounded channel to the
+    /// background writer task. If the channel is full, a warning is logged
+    /// and the entry is dropped (better than blocking the caller).
     fn persist_audit_entry(&self, entry: &AuditEntry) {
-        let path = match &self.audit_log_path {
-            Some(p) => p.clone(),
-            None => return,
-        };
+        if self.audit_log_path.is_none() {
+            return;
+        }
         let line = match serde_json::to_string(entry) {
             Ok(s) => s,
             Err(_) => return,
         };
-        let path_for_thread = path;
-        std::thread::spawn(move || {
-            use std::io::Write;
-            if let Ok(mut f) = std::fs::OpenOptions::new()
-                .create(true)
-                .append(true)
-                .open(&path_for_thread)
-            {
-                let _ = writeln!(f, "{}", line);
+        if let Some(sender) = &self.audit_sender {
+            match sender.try_send(line) {
+                Ok(()) => {}
+                Err(tokio::sync::mpsc::error::TrySendError::Full(_)) => {
+                    tracing::warn!("Audit log channel full — dropping entry");
+                }
+                Err(tokio::sync::mpsc::error::TrySendError::Closed(_)) => {
+                    tracing::warn!("Audit log channel closed — dropping entry");
+                }
             }
-        });
+        }
     }
 
     /// Validates a permission set for correctness.

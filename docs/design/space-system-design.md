@@ -454,21 +454,160 @@ impl SpaceManager {
 - 대시보드용 이벤트 스트림 (EventBus 필터링)
 - 대화 기반 Space 관리 ("어떤 스페이스 있어?")
 
-## 11. Open Questions
+## 11. Resolved Decisions
 
-1. **Space 병합 기준** — 두 Space를 자동으로 병합해야 할 때가 있는가?
-   예: "oxios-dev"와 "oxios-bugfix"가 사실 같은 Space?
-   → 당분간은 수동만 지원, 이후 유사도 기반 제안
+### D1: Space 병합 — 자동 병합 + 감사 로그
 
-2. **Space 보존 정책** — 언제 Space를 archive/delete하는가?
-   → `last_active_at` 기반, 30일 비활성시 archive 제안
-   → Memory는 보존, Workspace는 정리
+OS가 두 Space의 유사도를 판단해서 자동 병합한다.
+모든 병합 이력은 감사 로그에 기록되며, 대시보드에서 확인 가능.
+GitLayer를 활용해 병합 전 상태를 커밋해두면 되돌리기도 가능.
 
-3. **Cross-Space 참조** — "oxios에서 배운 패턴을 blog에도 적용해" 같은 요청?
-   → Phase 1에서는 미지원. 이후 Cross-Space memory 검색으로 확장
+```
+Space A "oxios-dev" + Space B "oxios-bugfix"
+→ OS: 두 Space의 paths, tags, 대화 주제가 유사함 (유사도 0.87)
+→ 자동 병합 → "oxios" Space로 통합
+→ 감사 로그: "merged oxios-bugfix into oxios at 2024-..."
+→ 대시보드에서 되돌리기 가능
+```
 
-4. **Default Space** — 모든 메시지의 fallback. 이름은?
-   → "일반" 또는 "general". 사용자가 별도 Space가 필요없는 대화는 여기로.
+### D2: Space 보존 — 30일 자동 archive + 즉시 복구
 
-5. **Space 최대 개수** — 제한이 필요한가?
-   → 초기에는 제한 없음. 수백 개가 되면 성능 이슈 가능 → 그때 고려
+- `last_active_at` 기준 30일 비활성시 자동 archive
+- Archive된 Space의 **Memory와 Workspace는 디스크에 보존**
+- 에이전트는 항상 동적 생성/소멸이므로 archive와 무관
+- 사용자가 archive된 Space의 주제나 경로를 언급하면 **즉시 복구**
+- 대화로 복구: "oxios 작업 다시 하자" → archive에서 즉시 활성화
+
+```
+~/.oxios/spaces/
+├── {space_id}/          # 활성 Space
+└── _archived/
+    └── {space_id}/      # 보존됨, 언제든 복구 가능
+```
+
+### D3: Cross-Space 지식 흐름 — OS가 지속적으로 자동 관리
+
+Space 간 지식은 **투명한 반투명 막**으로 연결되어 있다.
+기본적으로 각 Space는 독립된 메모리를 가지지만,
+OS가 지식의 흐름을 지속적으로 관리한다.
+
+#### D3-1: 참조 (Reading)
+
+OS가 현재 작업에 다른 Space의 메모리가 필요하다고 판단하면,
+다른 Space의 메모리를 검색해서 가져올 수 있다.
+
+- 사용자가 명시적으로 요청할 필요 없음
+- OS가 컨텍스트를 분석해서 자동으로 판단
+- 참조 시 해당 Space 메모리에 "Space X에서 참조됨" 로그 남김
+
+#### D3-2: 이전 (Transfer)
+
+한 Space에서 학습한 지식을 다른 Space로 자동 주입.
+
+```
+새 프로젝트 Space 생성됨
+→ OS: 기존 프로젝트 Space들에서 관련 패턴/지식 검색
+→ 관련 지식을 새 Space의 memory에 주입
+→ 로그: "5개 지식을 oxios→new-project로 이전"
+```
+
+#### D3-3: 통합 (Synthesis)
+
+OS가 주기적으로 여러 Space의 지식을 분석해서
+새로운 통찰을 자동 생성.
+
+```
+OS (주기적 분석):
+→ oxios, blog, side-project 세 Space에서
+  "에러 핸들링 패턴" 관련 메모리 발견
+→ 공통점 분석 → "사용자의 에러 핸들링 철학" 통찰 생성
+→ 현재 활성 Space에 통합 인사이트로 저장
+→ 감사 로그: "synthesized insight from 3 spaces"
+```
+
+### D4: Default Space — 이름 없음, 주제 형성시 자동 명명
+
+기본 Space는 **이름이 없다**.
+모든 메시지의 fallback이며, 사용자가 Space를 명시하지 않고
+경로/주제도 감지되지 않으면 여기로 떨어진다.
+
+- 대화가 진행되면서 주제가 형성되면 OS가 자동으로 이름을 붙임
+- 사용자가 "이거 일상 스페이스야"라고 하면 그때 이름이 명확해짐
+- 이름 없는 상태에서도 Memory, Workspace는 정상 작동
+
+```
+~/.oxios/spaces/
+└── _default/            # 이름 없는 기본 Space
+    ├── space.json       # name: "" 또는 null
+    ├── memory/
+    └── workspace/
+```
+
+### D5: Space 개수 — 무제한 + archive로 자연 관리
+
+Space 개수에 하드 리밋은 없다.
+대신 D2의 archive 정책(30일 비활성)으로 활성 Space 수가 자연스럽게 관리된다.
+
+- 활성 Space: 사용자가 최근 대화에서 언급한 것들
+- Archive Space: 30일 이상 비활성, 디스크에 보존
+- 복구: 언제든 대화로 즉시 복구
+- 성능: Space 인덱스는 메모리에 올리지만, archive는 lazy load
+
+## 12. Knowledge Flow Architecture
+
+D3의 지식 흐름을 구현하기 위한 아키텍처.
+
+### 12.1 KnowledgeBridge
+
+SpaceManager 내부에 KnowledgeBridge 컴포넌트가 지식 흐름을 관리.
+
+```rust
+/// Manages knowledge flow between Spaces.
+pub struct KnowledgeBridge {
+    space_manager: Arc<SpaceManager>,
+    /// Cross-reference log for audit trail.
+    xref_log: RwLock<Vec<CrossRefEntry>>,
+}
+
+/// Record of a cross-Space knowledge access.
+pub struct CrossRefEntry {
+    /// Source Space.
+    from: SpaceId,
+    /// Target Space.
+    to: SpaceId,
+    /// Memory entries accessed.
+    entries: Vec<String>,
+    /// Type of flow.
+    flow: KnowledgeFlow,
+    /// When this happened.
+    timestamp: DateTime<Utc>,
+}
+
+/// Type of knowledge flow.
+pub enum KnowledgeFlow {
+    /// Read from another Space (reference).
+    Reference,
+    /// Copied from one Space to another (transfer).
+    Transfer,
+    /// Synthesized from multiple Spaces (synthesis).
+    Synthesis { sources: Vec<SpaceId> },
+}
+```
+
+### 12.2 자동 발동 시나리오
+
+| 시나리오 | 트리거 | Flow 타입 | 빈도 |
+|----------|--------|-----------|------|
+| 새 Space 생성 | Space 생성시 | Transfer | 생성시 1회 |
+| 작업 중 관련 지식 발견 | 에이전트 작업 중 | Reference | 필요시 |
+| 주기적 통합 분석 | 백그라운드 (cron) | Synthesis | 일 1회 |
+| 사용자 명시 요청 | "다른 스페이스에서 가져와" | Transfer/Reference | 요청시 |
+
+### 12.3 보안/프라이버시 고려
+
+지식이 자동으로 흐르다 보니 프라이버시 우려가 있을 수 있다.
+
+- **민감 정보 태깅**: 사용자가 특정 메모리를 "이 Space에서만"으로 태그하면 자동 이전 불가
+- **Space visibility**: Space를 private로 설정하면 다른 Space에서 참조 불가
+- **감사 로그**: 모든 지식 흐름은 기록, 대시보드에서 확인 가능
+- **되돌리기**: 이전/통합된 지식은 삭제 가능 (GitLayer 활용)

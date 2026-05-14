@@ -6,7 +6,7 @@
 mod kernel;
 mod otel;
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -307,8 +307,18 @@ async fn cmd_config(action: ConfigAction, config_path: &Path) -> Result<()> {
                 .ok_or_else(|| anyhow::anyhow!("Unknown config key: {}", key))?;
             println!("{}", value);
         }
-        ConfigAction::Set { key: _, value: _ } => {
-            bail!("Config set not yet implemented. Edit ~/.oxios/config.toml directly.");
+        ConfigAction::Set { key, value } => {
+            let mut config = if config_path.exists() {
+                let raw = std::fs::read_to_string(config_path)?;
+                toml::from_str(&raw)?
+            } else {
+                OxiosConfig::default()
+            };
+            set_config_value(&mut config, &key, &value)
+                .ok_or_else(|| anyhow::anyhow!("Unknown config key: {}", key))?;
+            let toml_str = toml::to_string_pretty(&config)?;
+            std::fs::write(config_path, toml_str)?;
+            println!("Set {} = {}", key, value);
         }
     }
     Ok(())
@@ -326,6 +336,29 @@ fn get_config_value(config: &OxiosConfig, key: &str) -> Option<String> {
         ["exec", "optional_host_tools"] => Some(config.exec.optional_host_tools.join(",")),
         ["exec", "default_timeout_secs"] => Some(config.exec.default_timeout_secs.to_string()),
         ["exec", "max_timeout_secs"] => Some(config.exec.max_timeout_secs.to_string()),
+        _ => None,
+    }
+}
+
+/// Set a config value by dotted key path. Returns `Some(())` on success, `None` if key unknown.
+fn set_config_value(config: &mut OxiosConfig, key: &str, value: &str) -> Option<()> {
+    let parts: Vec<&str> = key.split('.').collect();
+    match parts.as_slice() {
+        ["kernel", "workspace"] => { config.kernel.workspace = value.to_string(); Some(()) }
+        ["kernel", "event_bus_capacity"] => { config.kernel.event_bus_capacity = value.parse().ok()?; Some(()) }
+        ["kernel", "max_agents"] => { config.kernel.max_agents = value.parse().ok()?; Some(()) }
+        ["gateway", "host"] => { config.gateway.host = value.to_string(); Some(()) }
+        ["gateway", "port"] => { config.gateway.port = value.parse().ok()?; Some(()) }
+        ["exec", "default_timeout_secs"] => { config.exec.default_timeout_secs = value.parse().ok()?; Some(()) }
+        ["exec", "max_timeout_secs"] => { config.exec.max_timeout_secs = value.parse().ok()?; Some(()) }
+        ["exec", "required_host_tools"] => {
+            config.exec.required_host_tools = value.split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect();
+            Some(())
+        }
+        ["exec", "optional_host_tools"] => {
+            config.exec.optional_host_tools = value.split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect();
+            Some(())
+        }
         _ => None,
     }
 }
@@ -580,8 +613,25 @@ async fn main() -> Result<()> {
                     Ok(())
                 }
                 DaemonAction::Restart => {
-                    println!("Restart the entire server: pkill -f oxios && oxios");
-                    Ok(())
+                    tracing::info!("Daemon restart requested via CLI");
+                    let exe = std::env::current_exe()
+                        .context("failed to locate oxios binary")?;
+                    let args: Vec<_> = std::env::args().skip(1).collect();
+                    println!("Restarting oxios...");
+                    let mut cmd = std::process::Command::new(&exe);
+                    cmd.args(&args);
+                    // On Unix, perform exec to replace current process
+                    #[cfg(unix)]
+                    {
+                        use std::os::unix::process::CommandExt;
+                        // exec() only returns on error — on success the process is replaced
+                        return Err(anyhow::anyhow!("Failed to restart: {}", cmd.exec()));
+                    }
+                    #[cfg(not(unix))]
+                    {
+                        let _child = cmd.spawn()?;
+                        std::process::exit(0);
+                    }
                 }
             }
         }

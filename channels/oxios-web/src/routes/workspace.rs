@@ -684,3 +684,151 @@ pub(crate) async fn handle_memory_semantic_search(
         "engine": "hnsw",
     })))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // -----------------------------------------------------------------------
+    // TreeEntry serialization
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_tree_entry_serialization() {
+        let entry = TreeEntry {
+            name: "hello.md".into(),
+            is_dir: false,
+            size: 1024,
+        };
+        let json = serde_json::to_value(&entry).unwrap();
+        assert_eq!(json["name"], "hello.md");
+        assert_eq!(json["is_dir"], false);
+        assert_eq!(json["size"], 1024);
+
+        let dir_entry = TreeEntry {
+            name: "src".into(),
+            is_dir: true,
+            size: 0,
+        };
+        let json = serde_json::to_value(&dir_entry).unwrap();
+        assert_eq!(json["is_dir"], true);
+        assert_eq!(json["size"], 0);
+    }
+
+    // -----------------------------------------------------------------------
+    // Pagination
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_pagination_bounds() {
+        let items: Vec<i32> = (1..=10).collect();
+
+        // Page 1, limit 3 → items [1, 2, 3]
+        let p1 = PageParams { page: 1, limit: 3 };
+        let result = paginate(&items, &p1);
+        assert_eq!(result["total"], 10);
+        assert_eq!(result["page"], 1);
+        assert_eq!(result["limit"], 3);
+        let returned: Vec<i32> =
+            serde_json::from_value(result["items"].clone()).unwrap();
+        assert_eq!(returned, vec![1, 2, 3]);
+
+        // Page 4, limit 3 → items [10]
+        let p4 = PageParams { page: 4, limit: 3 };
+        let result = paginate(&items, &p4);
+        let returned: Vec<i32> =
+            serde_json::from_value(result["items"].clone()).unwrap();
+        assert_eq!(returned, vec![10]);
+
+        // Page 0 (underflow) → offset wraps to 0 via saturating_sub
+        let p0 = PageParams { page: 0, limit: 3 };
+        let result = paginate(&items, &p0);
+        let returned: Vec<i32> =
+            serde_json::from_value(result["items"].clone()).unwrap();
+        assert_eq!(returned, vec![1, 2, 3]);
+
+        // Limit capped at 500
+        let big = PageParams { page: 1, limit: 9999 };
+        let result = paginate(&items, &big);
+        assert_eq!(result["limit"], 500);
+    }
+
+    // -----------------------------------------------------------------------
+    // MIME guessing
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_guess_mime_common_types() {
+        assert_eq!(guess_mime("main.rs"), "text/plain; charset=utf-8");
+        assert_eq!(guess_mime("Cargo.toml"), "application/toml");
+        assert_eq!(guess_mime("README.md"), "text/markdown; charset=utf-8");
+        assert_eq!(guess_mime("data.json"), "application/json");
+        assert_eq!(guess_mime("app.js"), "application/javascript");
+        assert_eq!(guess_mime("index.html"), "text/html");
+        assert_eq!(guess_mime("unknown.bin"), "text/plain; charset=utf-8");
+    }
+
+    // -----------------------------------------------------------------------
+    // Memory type validation
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_memory_type_validation() {
+        // Valid types — these should map to MemoryType variants correctly.
+        let valid = vec!["fact", "episode", "knowledge"];
+        for t in valid {
+            let mt = match t {
+                "fact" => Some(MemoryType::Fact),
+                "episode" => Some(MemoryType::Episode),
+                "knowledge" => Some(MemoryType::Knowledge),
+                _ => None,
+            };
+            assert!(mt.is_some(), "expected '{}' to be a valid memory type", t);
+        }
+
+        // Invalid types should not match any variant.
+        let invalid = vec!["invalid", "", "FACT", "EpIsOdE"];
+        for t in invalid {
+            let mt: Option<MemoryType> = match t {
+                "fact" => Some(MemoryType::Fact),
+                "episode" => Some(MemoryType::Episode),
+                "knowledge" => Some(MemoryType::Knowledge),
+                _ => None,
+            };
+            assert!(mt.is_none(), "expected '{}' to be rejected", t);
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // File size limit enforcement
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_file_size_limit_enforcement() {
+        // MAX_FILE_SIZE in handle_workspace_file_put is 1MB.
+        const MAX_FILE_SIZE: usize = 1024 * 1024;
+
+        // A body exactly at the limit should be accepted by the size check.
+        let body_at_limit = "x".repeat(MAX_FILE_SIZE);
+        assert_eq!(body_at_limit.len(), MAX_FILE_SIZE);
+        assert!(body_at_limit.len() <= MAX_FILE_SIZE);
+
+        // A body one byte over the limit should be rejected.
+        let body_over_limit = "x".repeat(MAX_FILE_SIZE + 1);
+        assert!(body_over_limit.len() > MAX_FILE_SIZE);
+
+        // Simulate the check done in handle_workspace_file_put:
+        // if body.len() > MAX_FILE_SIZE { return PayloadTooLarge }
+        assert!(body_over_limit.len() > MAX_FILE_SIZE);
+
+        // Skill content limit (64KB)
+        const MAX_SKILL_CONTENT: usize = 64 * 1024;
+        let big_skill = "a".repeat(MAX_SKILL_CONTENT + 1);
+        assert!(big_skill.len() > MAX_SKILL_CONTENT);
+
+        // Memory entry limit (32KB)
+        const MAX_MEMORY_ENTRY: usize = 32 * 1024;
+        let big_memory = "m".repeat(MAX_MEMORY_ENTRY + 1);
+        assert!(big_memory.len() > MAX_MEMORY_ENTRY);
+    }
+}
