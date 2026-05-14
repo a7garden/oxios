@@ -72,6 +72,13 @@ fn default_space_id() -> SpaceId {
 }
 
 impl SpaceManager {
+    pub fn default_space_id_for_tests() -> SpaceId {
+        // Used only in tests to avoid OnceLock issues
+        uuid::Uuid::parse_str("00000000-0000-0000-0000-000000000001").unwrap()
+    }
+}
+
+impl SpaceManager {
     /// Create a new SpaceManager.
     ///
     /// Initializes from state store, creates default Space if none exist.
@@ -750,6 +757,7 @@ impl SpaceManager {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::space::SpaceSource;
 
     fn test_state_store() -> Arc<StateStore> {
         let dir = tempfile::tempdir().unwrap();

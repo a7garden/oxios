@@ -205,6 +205,35 @@ pub(crate) fn sanitize_event(event: &oxios_kernel::event_bus::KernelEvent) -> se
             "agent_id": agent_id.to_string(),
             "success": success,
         }),
+        KernelEvent::SpaceCreated { space_id, name, source } => serde_json::json!({
+            "type": "space_created",
+            "space_id": space_id.to_string(),
+            "name": name,
+            "source": format!("{:?}", source),
+        }),
+        KernelEvent::SpaceActivated { space_id, name } => serde_json::json!({
+            "type": "space_activated",
+            "space_id": space_id.to_string(),
+            "name": name,
+        }),
+        KernelEvent::SpaceArchived { space_id, name } => serde_json::json!({
+            "type": "space_archived",
+            "space_id": space_id.to_string(),
+            "name": name,
+        }),
+        KernelEvent::SpacesMerged { survivor, absorbed, entries_migrated, .. } => serde_json::json!({
+            "type": "spaces_merged",
+            "survivor": survivor.to_string(),
+            "absorbed": absorbed.to_string(),
+            "entries_migrated": entries_migrated,
+        }),
+        KernelEvent::KnowledgeCrossReferenced { from_space, to_space, entries, flow } => serde_json::json!({
+            "type": "knowledge_cross_referenced",
+            "from_space": from_space.to_string(),
+            "to_space": to_space.to_string(),
+            "entries": entries,
+            "flow": format!("{:?}", flow),
+        }),
     }
 }
 
