@@ -37,6 +37,7 @@ pub mod persona_store;
 pub mod program;
 pub mod resource_monitor;
 pub mod scheduler;
+pub mod space;
 pub mod skill;
 pub mod state_store;
 pub mod supervisor;
@@ -113,6 +114,14 @@ pub use memory::hyperbolic::{
 pub use program::{InstallSource, Program, ProgramManager, ProgramMeta, ToolDef, HostRequirementsCheck, ArgumentDef};
 pub use skill::{Skill, SkillMeta, SkillStore};
 pub use state_store::{AgentResponse, Session, SessionId, SessionSummary, StateStore};
+
+// Space exports
+pub use space::{
+    Space, SpaceId, SpaceSource, SpaceManager, SpaceManagerError,
+    ConversationBuffer, ConversationTurn,
+    KnowledgeBridge, KnowledgeFlow, CrossRefEntry,
+    extract_filesystem_path, match_keywords, PathMatcher,
+};
 
 #[cfg(feature = "wasm-sandbox")]
 pub use wasm_sandbox::{WasmSandbox, WasmConfig, WasmError, ResourceKind};

@@ -47,6 +47,7 @@ sha2 = "0.10"
 blake3 = "1.8"
 hex = "0.4"
 getrandom = "0.2"
+regex = "1"
 
 # Concurrency
 parking_lot = "0.12"

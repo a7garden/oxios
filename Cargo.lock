@@ -4769,6 +4769,7 @@ dependencies = [
  "oxios-gateway",
  "oxios-ouroboros",
  "parking_lot",
+ "regex",
  "serde",
  "serde_json",
  "sha2",

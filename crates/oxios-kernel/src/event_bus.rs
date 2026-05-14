@@ -132,6 +132,49 @@ pub enum KernelEvent {
         /// Whether the agent succeeded.
         success: bool,
     },
+    /// A new Space has been created.
+    SpaceCreated {
+        /// The Space's ID.
+        space_id: uuid::Uuid,
+        /// The Space's name.
+        name: String,
+        /// How it was created (auto_resource, auto_topic, manual).
+        source: String,
+    },
+    /// Active Space has changed.
+    SpaceActivated {
+        /// The Space's ID.
+        space_id: uuid::Uuid,
+        /// The Space's name.
+        name: String,
+    },
+    /// A Space has been archived.
+    SpaceArchived {
+        /// The Space's ID.
+        space_id: uuid::Uuid,
+        /// The Space's name.
+        name: String,
+    },
+    /// Cross-Space knowledge was accessed.
+    KnowledgeCrossReferenced {
+        /// Source Space.
+        from_space: uuid::Uuid,
+        /// Target Space.
+        to_space: uuid::Uuid,
+        /// Number of entries accessed.
+        entries: usize,
+        /// Flow type (reference, transfer, synthesis).
+        flow: String,
+    },
+    /// Spaces have been merged.
+    SpacesMerged {
+        /// The surviving Space.
+        survivor: uuid::Uuid,
+        /// The absorbed Space.
+        absorbed: uuid::Uuid,
+        /// Number of entries migrated.
+        entries_migrated: usize,
+    },
 }
 
 /// Convert a KernelEvent to an AuditAction for the audit trail.
@@ -185,6 +228,21 @@ pub fn kernel_event_to_audit_action(event: &KernelEvent) -> AuditAction {
         KernelEvent::AgentGroupMemberCompleted { group_id, agent_id, success } => AuditAction::Other {
             detail: format!("group_member_completed:{}:{}:{}", group_id, agent_id, success),
         },
+        KernelEvent::SpaceCreated { space_id, name, source } => AuditAction::Other {
+            detail: format!("space_created:{}:{}:{}", space_id, name, source),
+        },
+        KernelEvent::SpaceActivated { space_id, name } => AuditAction::Other {
+            detail: format!("space_activated:{}:{}", space_id, name),
+        },
+        KernelEvent::SpaceArchived { space_id, name } => AuditAction::Other {
+            detail: format!("space_archived:{}:{}", space_id, name),
+        },
+        KernelEvent::KnowledgeCrossReferenced { from_space, to_space, entries, flow } => AuditAction::Other {
+            detail: format!("knowledge_xref:{}->{}:{}:{}entries", from_space, to_space, flow, entries),
+        },
+        KernelEvent::SpacesMerged { survivor, absorbed, entries_migrated } => AuditAction::Other {
+            detail: format!("spaces_merged:{}<-{}:{}entries", survivor, absorbed, entries_migrated),
+        },
     }
 }
 
@@ -198,6 +256,7 @@ fn extract_agent_id(event: &KernelEvent) -> String {
         KernelEvent::MessageReceived { from, .. } => from.to_string(),
         KernelEvent::AgentOutput { agent_id, .. } => agent_id.to_string(),
         KernelEvent::AgentGroupMemberCompleted { agent_id, .. } => agent_id.to_string(),
+        KernelEvent::SpaceActivated { space_id, .. } => format!("space:{}", space_id),
         _ => "system".to_string(),
     }
 }
