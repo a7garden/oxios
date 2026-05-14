@@ -1,6 +1,7 @@
 //! Agent list table with kill button and refresh.
 
 use crate::api;
+use crate::components::icons::*;
 use dioxus::prelude::*;
 
 #[component]
@@ -12,7 +13,7 @@ pub fn AgentsView() -> Element {
     let content: Element = match &(resource.value())() {
         Some(Ok(agents)) if agents.is_empty() => rsx! {
             div { class: "empty-state",
-                div { class: "icon", "⚡" }
+                IconUsers { class: "icon".to_string(), size: 48 }
                 p { "No agents running. Start a conversation to spawn agents." }
             }
         },
@@ -72,7 +73,7 @@ pub fn AgentsView() -> Element {
         },
         None => rsx! {
             div { class: "empty-state",
-                div { class: "icon", "⏳" }
+                IconLoading { class: "icon".to_string(), size: 48 }
                 p { "Loading agents..." }
             }
         },
@@ -81,8 +82,12 @@ pub fn AgentsView() -> Element {
     rsx! {
         div { class: "panel-container",
             div { class: "panel-header",
-                h2 { "⚡ Agent Monitor" }
-                button { class: "btn btn-sm", onclick: move |_| resource.restart(), "Refresh" }
+                IconZap { class: "panel-icon".to_string(), size: 24 }
+                h2 { "Agent Monitor" }
+                button { class: "btn btn-sm", onclick: move |_| resource.restart(),
+                    IconRefresh { class: "btn-icon".to_string(), size: 16 }
+                    "Refresh"
+                }
             }
             div { class: "panel-body",
                 {content}
