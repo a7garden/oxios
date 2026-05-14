@@ -303,6 +303,14 @@ impl Orchestrator {
             });
         }
 
+        // Record agent response in conversation buffer (for topic shift detection)
+        // Note: interview phase returns questions, not a full agent response,
+        // but we record it for completeness.
+        {
+            let mut buffer = self.conversation_buffer.write();
+            buffer.push_agent("[interview: questions]", &space_id);
+        }
+
         // Interview complete and ready. Proceed to seed generation.
         self.publish_phase_completed(&session_id, Phase::Interview, "ready for seed").await;
         self.publish_phase_started(&session_id, Phase::Seed).await;
@@ -365,6 +373,12 @@ impl Orchestrator {
                     output: Some(combined),
                 });
             }
+        }
+
+        // Record agent response in conversation buffer (for multi-agent case)
+        {
+            let mut buffer = self.conversation_buffer.write();
+            buffer.push_agent("[multi-agent: complete]", &space_id);
         }
 
         // Phase 3: Fork and execute agent via lifecycle manager
@@ -470,6 +484,12 @@ impl Orchestrator {
             metrics.agents_completed.inc();
         } else {
             metrics.agents_failed.inc();
+        }
+
+        // Record agent response in conversation buffer (for topic shift detection)
+        {
+            let mut buffer = self.conversation_buffer.write();
+            buffer.push_agent(&final_seed.content, &space_id);
         }
 
         Ok(OrchestrationResult {
