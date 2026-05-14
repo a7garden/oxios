@@ -15,7 +15,7 @@ use chrono::Utc;
 use parking_lot::RwLock;
 use tokio::sync::Mutex;
 
-use super::{detection::{self, PathMatcher, Topic}, default_space_id, Space, SpaceId, SpaceSource};
+use super::{detection::{self, PathMatcher, Topic}, Space, SpaceId, SpaceSource};
 use super::conversation_buffer::ConversationBuffer;
 use super::knowledge_bridge::KnowledgeBridge;
 use crate::event_bus::{EventBus, KernelEvent};
@@ -62,6 +62,13 @@ pub struct SpaceManager {
     root_dir: PathBuf,
     /// Number of turns since last topic check.
     turns_since_topic_check: Mutex<usize>,
+}
+
+/// Get the default Space ID.
+fn default_space_id() -> SpaceId {
+    *crate::space::DEFAULT_SPACE_ID.get_or_init(|| {
+        uuid::Uuid::parse_str("00000000-0000-0000-0000-000000000001").unwrap()
+    })
 }
 
 impl SpaceManager {

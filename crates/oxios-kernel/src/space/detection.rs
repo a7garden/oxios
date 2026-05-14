@@ -183,15 +183,15 @@ pub fn classify_topic_stub(message: &str) -> Topic {
     let lower = message.to_lowercase();
 
     // Simple keyword-based classification
-    let categories = [
-        ("일상", &["저녁", "점심", "아침", "밥", "음식", "레시피", "요리", "장보기"]),
-        ("개발", &["code", "bug", "function", "import", "cargo", "rust", "git", "commit"]),
-        ("문서", &["readme", "docs", "documentation", "write", "문서", "글", "note"]),
-        ("공부", &["study", "learn", "book", "course", "공부", "학습", "책"]),
-        ("여행", &["travel", "trip", "flight", "hotel", "여행", "항공", "booking"]),
-        ("건강", &["health", "exercise", "gym", "workout", "건강", "운동", "diet"]),
-        ("업무", &["meeting", "email", "project", "deadline", "업무", "회의", "client"]),
-        ("기술", &["api", "server", "database", "cloud", "기술", "서버", "deploy"]),
+    let categories: [(&str, [&str; 8]); 8] = [
+        ("일상", ["저녁", "점심", "아침", "밥", "음식", "레시피", "요리", "장보기"]),
+        ("개발", ["code", "bug", "function", "import", "cargo", "rust", "git", "commit"]),
+        ("문서", ["readme", "docs", "documentation", "write", "문서", "글", "note", "read"]),
+        ("공부", ["study", "learn", "book", "course", "공부", "학습", "책", "class"]),
+        ("여행", ["travel", "trip", "flight", "hotel", "여행", "항공", "booking", "tour"]),
+        ("건강", ["health", "exercise", "gym", "workout", "건강", "운동", "diet", "run"]),
+        ("업무", ["meeting", "email", "project", "deadline", "업무", "회의", "client", "ppt"]),
+        ("기술", ["api", "server", "database", "cloud", "기술", "서버", "deploy", "k8s"]),
     ];
 
     for (topic, keywords) in categories {

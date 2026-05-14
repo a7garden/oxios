@@ -17,9 +17,6 @@ pub use knowledge_bridge::{
 };
 pub use manager::{SpaceManager, SpaceManagerError};
 
-// Re-export default_space_id for convenience
-pub use manager::default_space_id;
-
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
@@ -186,7 +183,7 @@ impl Space {
     }
 }
 
-pub const DEFAULT_SPACE_ID: OnceLock<uuid::Uuid> = OnceLock::new();
+pub static DEFAULT_SPACE_ID: OnceLock<uuid::Uuid> = OnceLock::new();
 
 /// Get the default Space ID.
 pub fn default_space_id() -> SpaceId {

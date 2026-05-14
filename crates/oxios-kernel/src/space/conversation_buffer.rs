@@ -94,8 +94,8 @@ impl ConversationBuffer {
     }
 
     /// Get all turns.
-    pub fn turns(&self) -> Vec<&ConversationTurn> {
-        self.turns.iter().collect()
+    pub fn turns(&self) -> std::collections::VecDeque<ConversationTurn> {
+        self.turns.clone()
     }
 
     /// Get the total number of turns.
