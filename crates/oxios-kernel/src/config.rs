@@ -950,7 +950,7 @@ mod tests {
     #[test]
     fn test_expand_home() {
         // With HOME set.
-        let home = std::env::var("HOME").unwrap_or_else(|| "/tmp/testhome".into());
+        let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp/testhome".into());
         let expanded = expand_home("~/projects/test");
         assert_eq!(expanded.to_str().unwrap(), format!("{}/projects/test", home));
 

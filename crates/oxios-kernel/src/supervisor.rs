@@ -180,9 +180,11 @@ impl Supervisor for BasicSupervisor {
 
         // Await the spawned task.
         let result = {
-            let mut handles = self.handles.write();
-            let agent_handle = handles.remove(&id);
-            drop(handles);
+            let agent_handle = {
+                let mut handles = self.handles.write();
+                handles.remove(&id)
+            };
+            // Guard is dropped above, safe to await.
 
             match agent_handle {
                 Some(ah) => match ah.task.await {
