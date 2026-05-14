@@ -163,6 +163,10 @@ pub struct CronScheduler {
     tick_interval_secs: u64,
     /// Optional git layer for version-controlled saves.
     git_layer: Option<Arc<GitLayer>>,
+    /// Maximum concurrent cron job executions (default: 3).
+    max_concurrent_jobs: usize,
+    /// Timeout for individual cron job execution in seconds (default: 600 = 10 minutes).
+    job_timeout_secs: u64,
 }
 
 impl CronScheduler {
@@ -181,7 +185,19 @@ impl CronScheduler {
             dirty: Arc::new(AtomicBool::new(false)),
             tick_interval_secs,
             git_layer: None,
+            max_concurrent_jobs: 3,
+            job_timeout_secs: 600,
         }
+    }
+
+    /// Set the maximum concurrent cron job executions.
+    pub fn set_max_concurrent_jobs(&mut self, max: usize) {
+        self.max_concurrent_jobs = max;
+    }
+
+    /// Set the timeout for individual cron job execution in seconds.
+    pub fn set_job_timeout_secs(&mut self, secs: u64) {
+        self.job_timeout_secs = secs;
     }
 
     /// Set the git layer for version-controlled saves.
@@ -408,12 +424,25 @@ impl CronScheduler {
     }
 
     /// Single tick: find due jobs and spawn execution.
+    ///
+    /// Enforces `max_concurrent_jobs` limit and `job_timeout_secs` per job.
     async fn tick_inner<F, Fut>(&self, executor: &Arc<F>)
     where
         F: Fn(Uuid, String) -> Fut + Send + Sync + 'static,
         Fut: std::future::Future<Output = (bool, String)> + Send + 'static,
     {
         let now = Utc::now();
+
+        // Check current concurrency before spawning more
+        let current_running = self.running_jobs.lock().len();
+        if current_running >= self.max_concurrent_jobs {
+            tracing::debug!(
+                running = current_running,
+                max = self.max_concurrent_jobs,
+                "Cron tick: max concurrent jobs reached, skipping"
+            );
+            return;
+        }
 
         let due: Vec<(Uuid, String)> = {
             let jobs = self.jobs.read();
@@ -427,13 +456,38 @@ impl CronScheduler {
                 .collect()
         };
 
+        let mut spawned = 0usize;
+        let total_due = due.len();
         for (id, goal) in due {
+            // Check concurrency limit before each spawn
+            if self.running_jobs.lock().len() >= self.max_concurrent_jobs {
+                tracing::info!(
+                    spawned,
+                    remaining = total_due - spawned,
+                    "Cron tick: max concurrent jobs reached, deferring remaining"
+                );
+                break;
+            }
+
             self.running_jobs.lock().insert(id);
+            spawned += 1;
             let exec = executor.clone();
             let me = self.clone();
+            let timeout_secs = self.job_timeout_secs;
             tokio::spawn(async move {
                 tracing::info!(%id, "Cron job triggered");
-                let (success, summary) = exec(id, goal).await;
+                let result = tokio::time::timeout(
+                    std::time::Duration::from_secs(timeout_secs),
+                    exec(id, goal),
+                ).await;
+
+                let (success, summary) = match result {
+                    Ok((s, m)) => (s, m),
+                    Err(_) => {
+                        tracing::error!(%id, timeout_secs, "Cron job timed out");
+                        (false, format!("Timed out after {} seconds", timeout_secs))
+                    }
+                };
                 tracing::info!(%id, success, "Cron job completed");
                 me.mark_job_completed(id, success, summary).await;
             });
@@ -544,11 +598,11 @@ impl Clone for CronScheduler {
             dirty: self.dirty.clone(),
             tick_interval_secs: self.tick_interval_secs,
             git_layer: self.git_layer.clone(),
+            max_concurrent_jobs: self.max_concurrent_jobs,
+            job_timeout_secs: self.job_timeout_secs,
         }
     }
 }
-
-// ── Tests ───────────────────────────────────────────────────
 
 #[cfg(test)]
 mod tests {
@@ -744,5 +798,23 @@ mod tests {
         assert!(after.is_some());
         // After completion, next_run should be set to a future time (>= now)
         assert!(after.unwrap() >= now);
+    }
+
+    #[test]
+    fn test_max_concurrent_enforced() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let store = Arc::new(StateStore::new(temp_dir.path().to_path_buf()).unwrap());
+        let mut scheduler = CronScheduler::new(store, 60);
+        scheduler.set_max_concurrent_jobs(2);
+        assert_eq!(scheduler.max_concurrent_jobs, 2);
+    }
+
+    #[test]
+    fn test_job_timeout_configurable() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let store = Arc::new(StateStore::new(temp_dir.path().to_path_buf()).unwrap());
+        let mut scheduler = CronScheduler::new(store, 60);
+        scheduler.set_job_timeout_secs(300);
+        assert_eq!(scheduler.job_timeout_secs, 300);
     }
 }

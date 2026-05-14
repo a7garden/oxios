@@ -450,20 +450,58 @@ impl ProgramManager {
             // Preserve enabled state across upgrade
             let was_enabled = old.enabled;
 
-            // Atomic replace: uninstall old then install new
-            self.uninstall(&source_meta.name).await?;
-            let mut program = self.install(source_path).await?;
+            // Atomic upgrade: copy to temp, validate, then swap
+            let target_path = self.programs_dir.join(&source_meta.name);
+            let temp_path = self.programs_dir.join(format!(".tmp-upgrade-{}", source_meta.name));
 
-            // Restore enabled state
-            if !was_enabled {
-                program.enabled = false;
-                self.persist_state(&program.path, false)?;
-                // Also update in-memory
-                let mut installed = self.installed.write().await;
-                if let Some(p) = installed.get_mut(&source_meta.name) {
-                    p.enabled = false;
-                }
+            // Clean up any leftover temp directory from a failed previous upgrade
+            if temp_path.exists() {
+                let _ = fs::remove_dir_all(&temp_path);
             }
+
+            // Step 1: Copy source to temp directory
+            if let Err(e) = copy_dir_all(source_path, &temp_path) {
+                let _ = fs::remove_dir_all(&temp_path);
+                return Err(e.context("Failed to copy program to temp directory for upgrade"));
+            }
+
+            // Step 2: Parse and validate the new program from the temp directory
+            let new_meta = match ProgramMeta::load_from_dir(&temp_path) {
+                Ok(meta) => meta,
+                Err(e) => {
+                    let _ = fs::remove_dir_all(&temp_path);
+                    return Err(e.context("Failed to validate upgraded program"));
+                }
+            };
+
+            let skill_path = temp_path.join("SKILL.md");
+            let skill_content = if skill_path.exists() {
+                fs::read_to_string(&skill_path).unwrap_or_default()
+            } else {
+                String::new()
+            };
+
+            // Step 3: Create state file in temp directory
+            let state = ProgramState::new().with_enabled(was_enabled);
+            let state_json = serde_json::to_string_pretty(&state)?;
+            fs::write(temp_path.join("state.json"), state_json)?;
+
+            // Step 4: Remove old directory and rename temp to target
+            if target_path.exists() {
+                fs::remove_dir_all(&target_path)?;
+            }
+            fs::rename(&temp_path, &target_path)?;
+
+            // Step 5: Update in-memory cache
+            let program = Program {
+                meta: new_meta,
+                path: target_path,
+                skill_content,
+                enabled: was_enabled,
+            };
+
+            let mut installed = self.installed.write().await;
+            installed.insert(program.meta.name.clone(), program.clone());
 
             tracing::info!(
                 name = %program.meta.name,
