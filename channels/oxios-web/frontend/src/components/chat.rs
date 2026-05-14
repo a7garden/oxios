@@ -1,4 +1,8 @@
+//! Chat input and message components.
+
 use dioxus::prelude::*;
+
+use crate::components::icons::IconSend;
 
 /// Chat text input with send button and Enter-key support.
 #[component]
@@ -14,7 +18,7 @@ pub fn ChatInput(on_send: EventHandler<String>) -> Element {
     };
 
     let handle_key = move |evt: KeyboardEvent| {
-        if evt.key() == Key::Enter {
+        if evt.key() == Key::Enter && !evt.shift_key() {
             let msg = text().trim().to_string();
             if !msg.is_empty() {
                 on_send.call(msg);
@@ -25,14 +29,17 @@ pub fn ChatInput(on_send: EventHandler<String>) -> Element {
 
     rsx! {
         div { class: "chat-input-row",
-            input {
-                r#type: "text",
-                placeholder: "Send a message…",
+            textarea {
+                class: "chat-textarea",
+                placeholder: "Send a message...",
                 value: "{text}",
+                rows: "1",
                 oninput: move |evt| text.set(evt.value()),
                 onkeydown: handle_key,
             }
-            button { class: "btn btn-primary", onclick: handle_send, "Send" }
+            button { class: "btn btn-primary btn-icon", onclick: handle_send,
+                IconSend { size: 18 }
+            }
         }
     }
 }
@@ -44,7 +51,7 @@ pub fn ChatMessage(text: String, msg_type: String, phase: Option<String>) -> Ele
 
     rsx! {
         div { class: "{class}",
-            "{text}"
+            div { class: "message-content", "{text}" }
             if let Some(p) = &phase {
                 span { class: "phase-tag", "{p}" }
             }
@@ -58,7 +65,7 @@ pub fn ProcessingIndicator(phase: String) -> Element {
     rsx! {
         div { class: "processing",
             div { class: "spinner" }
-            span { "Processing ({phase})…" }
+            span { "Processing ({phase})..." }
         }
     }
 }

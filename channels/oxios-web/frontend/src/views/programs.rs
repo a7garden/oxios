@@ -1,6 +1,7 @@
 //! Program list with enable/disable buttons.
 
 use crate::api;
+use crate::components::icons::*;
 use dioxus::prelude::*;
 
 #[component]
@@ -12,7 +13,7 @@ pub fn ProgramsView() -> Element {
     let content: Element = match &(resource.value())() {
         Some(Ok(programs)) if programs.is_empty() => rsx! {
             div { class: "empty-state",
-                div { class: "icon", "📦" }
+                div { class: "icon", IconPackage {} }
                 p { "No programs installed. Install a program to extend agent capabilities." }
             }
         },
@@ -27,12 +28,12 @@ pub fn ProgramsView() -> Element {
                 let action_name = name.clone();
                 rsx! {
                     div { class: "program-card", key: "{name}",
-                        div { style: "display:flex;align-items:center;justify-content:space-between;",
+                        div { style: "display:flex;align-items:center;justify-content:space-between",
                             div {
                                 span { class: "program-name", "{name}" }
                                 span { class: "program-version", "v{prog.version}" }
                                 span { class: "{enabled_class}", "{enabled_text}" }
-                            }
+                            },
                             {
                                 let an = action_name.clone();
                                 rsx! {
@@ -66,7 +67,7 @@ pub fn ProgramsView() -> Element {
         },
         None => rsx! {
             div { class: "empty-state",
-                div { class: "icon", "⏳" }
+                div { class: "icon", IconLoader {} }
                 p { "Loading programs..." }
             }
         },
@@ -75,7 +76,7 @@ pub fn ProgramsView() -> Element {
     rsx! {
         div { class: "panel-container",
             div { class: "panel-header",
-                h2 { "📦 Programs" }
+                h2 { IconPackage {} " Programs" }
                 button { class: "btn btn-sm", onclick: move |_| resource.restart(), "Refresh" }
             }
             div { class: "panel-body",

@@ -1,10 +1,11 @@
 use dioxus::prelude::*;
 
 use crate::api::{self, AgentInfo, SchedulerStats, StatusResponse};
+use crate::components::icons::*;
 
 /// Small stat card component.
 #[component]
-fn StatCard(icon: String, label: String, value: String, color: Option<String>) -> Element {
+fn StatCard(icon: Element, label: String, value: String, color: Option<String>) -> Element {
     let color_class = match color.as_deref() {
         Some("green")  => "stat-value green",
         Some("blue")   => "stat-value blue",
@@ -16,7 +17,7 @@ fn StatCard(icon: String, label: String, value: String, color: Option<String>) -
 
     rsx! {
         div { class: "stat-card",
-            div { class: "stat-icon", "{icon}" }
+            div { class: "stat-icon", {icon} }
             div { class: "stat-label", "{label}" }
             div { class: "{color_class}", "{value}" }
         }
@@ -42,19 +43,47 @@ pub fn DashboardView() -> Element {
 
     rsx! {
         div { class: "panel-container",
-            h1 { "📊 Dashboard" }
+            h1 {
+                IconDashboard { size: 24 }
+                "Dashboard"
+            }
 
             div { class: "stats-grid",
                 match &status_data {
                     Some(Ok(s)) => rsx! {
-                        StatCard { icon: "⏱".to_string(), label: "Uptime".to_string(), value: format!("{}s", s.uptime_secs), color: Some("blue".to_string()) }
-                        StatCard { icon: "🤖".to_string(), label: "Active Agents".to_string(), value: s.active_agents.to_string(), color: Some("green".to_string()) }
-                        StatCard { icon: "📁".to_string(), label: "Workspaces".to_string(), value: s.total_seeds.to_string(), color: Some("purple".to_string()) }
-                        StatCard { icon: "🌱".to_string(), label: "Seeds".to_string(), value: s.total_seeds.to_string(), color: Some("orange".to_string()) }
-                        StatCard { icon: "📡".to_string(), label: "Version".to_string(), value: s.version.clone(), color: None }
+                        StatCard {
+                            icon: rsx! { IconClock { size: 20 } },
+                            label: "Uptime".to_string(),
+                            value: format!("{}s", s.uptime_secs),
+                            color: Some("blue".to_string())
+                        }
+                        StatCard {
+                            icon: rsx! { IconAgents { size: 20 } },
+                            label: "Active Agents".to_string(),
+                            value: s.active_agents.to_string(),
+                            color: Some("green".to_string())
+                        }
+                        StatCard {
+                            icon: rsx! { IconFolder { size: 20 } },
+                            label: "Workspaces".to_string(),
+                            value: s.total_seeds.to_string(),
+                            color: Some("purple".to_string())
+                        }
+                        StatCard {
+                            icon: rsx! { IconSeed { size: 20 } },
+                            label: "Seeds".to_string(),
+                            value: s.total_seeds.to_string(),
+                            color: Some("orange".to_string())
+                        }
+                        StatCard {
+                            icon: rsx! { IconRadio { size: 20 } },
+                            label: "Version".to_string(),
+                            value: s.version.clone(),
+                            color: None
+                        }
                     },
                     Some(Err(e)) => rsx! { div { class: "error-box", "Status error: {e}" } },
-                    None => rsx! { div { class: "text-muted", "Loading status…" } },
+                    None => rsx! { div { class: "text-muted", "Loading status..." } },
                 }
             }
 
@@ -62,7 +91,7 @@ pub fn DashboardView() -> Element {
             match &agents_data {
                 Some(Ok(list)) if list.is_empty() => rsx! {
                     div { class: "empty-state",
-                        div { class: "empty-icon", "🤖" }
+                        div { class: "empty-icon", IconAgents { size: 48 } }
                         p { "No agents running" }
                     }
                 },
@@ -85,7 +114,7 @@ pub fn DashboardView() -> Element {
                     }
                 },
                 Some(Err(e)) => rsx! { div { class: "error-box", "Agents error: {e}" } },
-                None => rsx! { div { class: "text-muted", "Loading agents…" } },
+                None => rsx! { div { class: "text-muted", "Loading agents..." } },
             }
         }
     }

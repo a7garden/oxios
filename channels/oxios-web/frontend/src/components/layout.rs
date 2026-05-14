@@ -1,10 +1,21 @@
+//! App layout with responsive shell and mobile header.
+
 use dioxus::prelude::*;
 
+use crate::Theme;
 use crate::components::sidebar::Panel;
+use crate::components::icons::IconMenu;
 
 #[component]
 pub fn AppLayout() -> Element {
     let panel = use_context::<Signal<Panel>>();
+    let theme = use_context::<Signal<Theme>>();
+    let mut mobile_menu = use_context::<Signal<bool>>();
+
+    let theme_class = match theme() {
+        Theme::Dark => "app theme-dark",
+        Theme::Light => "app theme-light",
+    };
 
     let content: Element = match panel() {
         Panel::Chat      => rsx! { crate::views::chat::ChatView {} },
@@ -25,10 +36,24 @@ pub fn AppLayout() -> Element {
         Panel::HostTools => rsx! { crate::views::host_tools::HostToolsView {} },
     };
 
+    let mobile_open = if mobile_menu() { "mobile-open" } else { "" };
+
     rsx! {
-        crate::components::sidebar::Sidebar {}
-        main { class: "main-content",
-            {content}
+        div { class: "{theme_class} {mobile_open}",
+            // Mobile header bar
+            header { class: "mobile-header",
+                button {
+                    class: "icon-btn",
+                    onclick: move |_| mobile_menu.toggle(),
+                    IconMenu { size: 22 }
+                }
+                span { class: "mobile-brand", "OXIOS" }
+                div { style: "width:38px" }
+            }
+            crate::components::sidebar::Sidebar {}
+            main { class: "main-content",
+                {content}
+            }
         }
     }
 }

@@ -4554,6 +4554,7 @@ version = "0.2.0"
 dependencies = [
  "anyhow",
  "async-trait",
+ "base64 0.22.1",
  "boa_engine",
  "boa_gc",
  "bytes",
@@ -4564,6 +4565,7 @@ dependencies = [
  "markup5ever",
  "oxibrowser-webapi",
  "parking_lot",
+ "pollster",
  "reqwest",
  "serde",
  "serde_json",
