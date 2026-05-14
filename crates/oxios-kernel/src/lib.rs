@@ -90,7 +90,23 @@ pub use cron::{CronScheduler, CronJob, CronJobResult, CronJobUpdate, JobSource};
 pub use host_tools::{common as host_tools_common, HostToolStatus, HostToolValidator};
 pub use mcp::{McpBridge, McpCapabilities, McpServer, McpTool, McpToolCallResult as CallToolResult};
 pub use embedding::{EmbeddingProvider, EmbeddingVector, TfIdfEmbeddingProvider};
-pub use memory::{MemoryEntry, MemoryManager, MemoryType, TextVector, MemoryBudget, CurationReport, CurationCandidate, content_hash};
+pub use memory::{
+    MemoryEntry, MemoryManager, MemoryType, TextVector,
+    MemoryBudget, CurationReport, CurationCandidate, content_hash,
+};
+pub use memory::auto_memory_bridge::{
+    AutoMemoryBridge, SyncDirection, MemoryInsight, InsightCategory,
+    ImportResult, ExportResult, SyncResult, GuidancePattern,
+};
+pub use memory::flash_attention::{
+    FlashAttention, FlashAttentionConfig, BenchmarkResult as AttentionBenchmarkResult,
+    MemoryEstimate,
+};
+pub use memory::hyperbolic::{
+    HyperbolicEmbedding, HyperbolicConfig,
+    euclidean_to_poincare, hyperbolic_distance, mobius_add, mobius_scalar_mul,
+    batch_euclidean_to_poincare,
+};
 pub use program::{InstallSource, Program, ProgramManager, ProgramMeta, ToolDef, HostRequirementsCheck, ArgumentDef};
 pub use skill::{Skill, SkillMeta, SkillStore};
 pub use state_store::{AgentResponse, Session, SessionId, SessionSummary, StateStore};

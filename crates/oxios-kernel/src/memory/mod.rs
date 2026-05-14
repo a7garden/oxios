@@ -383,7 +383,10 @@ pub(crate) fn dedup_by_id(entries: &mut Vec<MemoryEntry>) {
 // Sub-modules
 // ---------------------------------------------------------------------------
 
+pub mod auto_memory_bridge;
 mod budget;
+pub mod flash_attention;
+pub mod hyperbolic;
 mod store;
 
 // ---------------------------------------------------------------------------
