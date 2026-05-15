@@ -140,7 +140,7 @@ impl AgentTool for PersonaTool {
                             "description": p.description,
                             "enabled": p.enabled,
                             "system_prompt": p.system_prompt,
-                            "traits": p.traits,
+                            "traits": p.personality_traits,
                         }),
                     ).unwrap_or_default())),
                     None => Ok(AgentToolResult::error(format!(

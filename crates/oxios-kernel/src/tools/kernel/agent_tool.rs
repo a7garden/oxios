@@ -14,7 +14,8 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use oxi_agent::{AgentTool, AgentToolResult};
+use oxi_agent::AgentTool as OxiAgentTool;
+use oxi_agent::AgentToolResult;
 use serde_json::{json, Value};
 use tokio::sync::oneshot;
 
@@ -63,7 +64,7 @@ impl std::fmt::Debug for AgentTool {
 }
 
 #[async_trait]
-impl AgentTool for AgentTool {
+impl OxiAgentTool for AgentTool {
     // Note: we implement the oxi_agent::AgentTool trait on our struct,
     // which is also named AgentTool. Rust resolves this by treating
     // `AgentTool` as the struct name and `oxi_agent::AgentTool` as the trait.

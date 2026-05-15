@@ -6,6 +6,7 @@
 
 pub mod a2a_tools;
 pub mod exec_tool;
+pub mod kernel;
 pub mod mcp_tool;
 pub mod memory_tools;
 pub mod program_tool;
@@ -16,6 +17,7 @@ pub mod browser;
 
 pub use a2a_tools::{A2aDelegateTool, A2aSendTool, A2aQueryTool};
 pub use exec_tool::ExecTool;
+pub use kernel::{SpaceTool, KernelAgentTool, PersonaTool, CronTool, SecurityTool, BudgetTool, ResourceTool};
 pub use mcp_tool::McpToolWrapper;
 pub use memory_tools::{MemoryReadTool, MemorySearchTool, MemoryWriteTool};
 pub use program_tool::ProgramTool;
