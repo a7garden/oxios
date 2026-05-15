@@ -154,7 +154,7 @@ impl KernelHandle {
             persona: PersonaApi::new(persona_manager),
             extensions: ExtensionApi::new(program_manager, skill_store, host_tool_validator),
             mcp: McpApi::new(mcp_bridge),
-            infra: InfraApi::new(git_layer, scheduler, cron_scheduler, resource_monitor, event_bus.clone(), config, start_time),
+            infra: InfraApi::new(git_layer, scheduler, cron_scheduler, resource_monitor, event_bus.clone(), config.clone(), start_time),
             spaces: SpaceApi::new(space_manager, event_bus),
             exec: ExecApi::new(Arc::new(config.exec.clone()), access_manager),
             browser: BrowserApi::default(),

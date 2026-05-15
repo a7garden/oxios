@@ -123,6 +123,29 @@ impl Kernel {
         &self.gateway
     }
 
+    /// Build a BrowserApi facade based on feature flag and config.
+    #[cfg(feature = "browser")]
+    fn build_browser_api(&self) -> oxios_kernel::BrowserApi {
+        if self.config.browser.enabled {
+            let browser_config = oxios_kernel::OxibrowserConfig {
+                user_agent: self.config.browser.user_agent.clone(),
+                timeout_secs: self.config.browser.timeout_secs,
+                max_sessions: self.config.browser.max_sessions,
+                cookie_file: self.config.browser.cookie_file.clone(),
+            };
+            let backend = Arc::new(oxios_kernel::OxibrowserBackend::new(browser_config));
+            oxios_kernel::BrowserApi::new(backend)
+        } else {
+            panic!("build_browser_api called with browser feature but browser disabled in config")
+        }
+    }
+
+    /// Build a BrowserApi facade (no-op when browser feature is disabled).
+    #[cfg(not(feature = "browser"))]
+    fn build_browser_api(&self) -> oxios_kernel::BrowserApi {
+        oxios_kernel::BrowserApi::default()
+    }
+
     /// Configuration reference.
     pub fn config(&self) -> &OxiosConfig {
         &self.config
