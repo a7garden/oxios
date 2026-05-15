@@ -52,6 +52,8 @@ pub struct Kernel {
     start_time: std::time::Instant,
     /// Cached KernelHandle — created once, reused forever.
     handle_cache: OnceLock<Arc<oxios_kernel::KernelHandle>>,
+    /// A2A protocol for inter-agent communication.
+    a2a_protocol: Arc<A2AProtocol>,
 }
 
 impl Kernel {
@@ -109,10 +111,7 @@ impl Kernel {
                 ),
                 self.build_browser_api(),
                 oxios_kernel::A2aApi::new(
-                    // Note: a2a_protocol is not stored on Kernel directly,
-                    // so we create a new one here.
-                    // TODO: store a2a_protocol on Kernel and pass it directly.
-                    Arc::new(oxios_kernel::A2AProtocol::new(self.event_bus.clone())),
+                    self.a2a_protocol.clone(),
                 ),
             ))
         }).clone()
@@ -476,6 +475,7 @@ impl KernelBuilder {
             space_manager,
             start_time: std::time::Instant::now(),
             handle_cache: OnceLock::new(),
+            a2a_protocol,
         })
     }
 }
