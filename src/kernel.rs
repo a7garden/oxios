@@ -401,6 +401,7 @@ impl KernelBuilder {
                     created_at: chrono::Utc::now(),
                     generation: 0,
                     parent_seed_id: None,
+                    cspace_hint: None,
                 };
                 match lc.spawn_and_run(&seed, oxios_kernel::scheduler::Priority::Normal).await {
                     Ok(result) => Ok(serde_json::json!({

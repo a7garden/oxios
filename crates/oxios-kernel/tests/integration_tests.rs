@@ -92,6 +92,7 @@ impl OuroborosProtocol for MockOuroboros {
             created_at: chrono::Utc::now(),
             generation: 0,
             parent_seed_id: None,
+            cspace_hint: None,
         })
     }
 
@@ -136,9 +137,9 @@ impl OuroborosProtocol for MockOuroboros {
             created_at: chrono::Utc::now(),
             generation: seed.generation + 1,
             parent_seed_id: Some(seed.id),
+            cspace_hint: None,
         }))
     }
-}
 
 // ---------------------------------------------------------------------------
 // Mock Supervisor

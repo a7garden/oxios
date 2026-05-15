@@ -10,6 +10,7 @@ pub mod kernel;
 pub mod mcp_tool;
 pub mod memory_tools;
 pub mod program_tool;
+pub mod registration;
 pub mod retrieval;
 
 #[cfg(feature = "browser")]

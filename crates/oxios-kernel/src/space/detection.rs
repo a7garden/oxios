@@ -7,7 +7,7 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-use super::{Space, SpaceId};
+use super::{Space, SpaceId, SpaceSource};
 
 /// A topic classification result.
 #[derive(Debug, Clone)]

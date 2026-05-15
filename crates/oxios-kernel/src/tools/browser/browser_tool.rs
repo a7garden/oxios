@@ -37,6 +37,15 @@ impl BrowserTool {
     pub fn new(backend: Arc<dyn BrowserBackend>) -> Self {
         Self { backend }
     }
+
+    /// Create a `BrowserTool` from a [`KernelHandle`].
+    ///
+    /// Extracts the browser backend from the kernel's browser facade.
+    /// Only available when the `browser` feature is enabled.
+    #[cfg(feature = "browser")]
+    pub fn from_kernel(kernel: &crate::kernel_handle::KernelHandle) -> Self {
+        Self::new(kernel.browser.backend().clone() as Arc<dyn BrowserBackend>)
+    }
 }
 
 impl std::fmt::Debug for BrowserTool {

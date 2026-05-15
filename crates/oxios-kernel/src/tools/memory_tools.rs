@@ -24,6 +24,13 @@ impl MemoryWriteTool {
     pub fn new(memory_manager: Arc<MemoryManager>) -> Self {
         Self { memory_manager }
     }
+
+    /// Create a `MemoryWriteTool` from a [`KernelHandle`].
+    ///
+    /// Extracts the memory manager from the kernel's agent facade.
+    pub fn from_kernel(kernel: &crate::kernel_handle::KernelHandle) -> Self {
+        Self::new(kernel.agents.memory_manager().clone())
+    }
 }
 
 impl std::fmt::Debug for MemoryWriteTool {
@@ -147,6 +154,13 @@ impl MemoryReadTool {
     pub fn new(memory_manager: Arc<MemoryManager>) -> Self {
         Self { memory_manager }
     }
+
+    /// Create a `MemoryReadTool` from a [`KernelHandle`].
+    ///
+    /// Extracts the memory manager from the kernel's agent facade.
+    pub fn from_kernel(kernel: &crate::kernel_handle::KernelHandle) -> Self {
+        Self::new(kernel.agents.memory_manager().clone())
+    }
 }
 
 impl std::fmt::Debug for MemoryReadTool {
@@ -265,6 +279,13 @@ impl MemorySearchTool {
     /// Create a new MemorySearchTool.
     pub fn new(memory_manager: Arc<MemoryManager>) -> Self {
         Self { memory_manager }
+    }
+
+    /// Create a `MemorySearchTool` from a [`KernelHandle`].
+    ///
+    /// Extracts the memory manager from the kernel's agent facade.
+    pub fn from_kernel(kernel: &crate::kernel_handle::KernelHandle) -> Self {
+        Self::new(kernel.agents.memory_manager().clone())
     }
 }
 

@@ -593,11 +593,11 @@ impl Orchestrator {
             created_at: chrono::Utc::now(),
             generation: parent_seed.generation + 1,
             parent_seed_id: Some(parent_seed.id),
+            cspace_hint: None,
         };
         match self.lifecycle.spawn_and_run(&child_seed, Priority::Normal).await {
             Ok(result) => {
                 task.result = Some(result.output.clone());
-                task.success = result.success;
             }
             Err(e) => {
                 task.result = Some(format!("Failed: {e}"));
@@ -973,6 +973,7 @@ async fn run_via_lifecycle(
         created_at: chrono::Utc::now(),
         generation: parent_seed.generation + 1,
         parent_seed_id: Some(parent_seed.id),
+        cspace_hint: None,
     };
     match lifecycle.spawn_and_run(&child_seed, Priority::Normal).await {
         Ok(result) => (result.output, result.success),

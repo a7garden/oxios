@@ -345,6 +345,7 @@ mod tests {
             created_at: chrono::Utc::now(),
             generation: 0,
             parent_seed_id: None,
+            cspace_hint: None,
         }
     }
 

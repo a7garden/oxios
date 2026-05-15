@@ -114,6 +114,11 @@ impl AgentApi {
         }
     }
 
+    /// Memory manager reference.
+    pub fn memory_manager(&self) -> &Arc<MemoryManager> {
+        &self.memory_manager
+    }
+
     /// Rebuild the HNSW index from all stored memories.
     pub async fn rebuild_hnsw_index(&self) -> anyhow::Result<usize> {
         if let Some(ref hnsw) = self.hnsw_index {

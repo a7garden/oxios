@@ -36,6 +36,13 @@ impl A2aDelegateTool {
             my_agent_id: agent_id,
         }
     }
+
+    /// Create an `A2aDelegateTool` from a [`KernelHandle`].
+    ///
+    /// Extracts the A2A protocol from the kernel's a2a facade.
+    pub fn from_kernel(kernel: &crate::kernel_handle::KernelHandle, agent_id: AgentId) -> Self {
+        Self::new(kernel.a2a.protocol().clone(), agent_id)
+    }
 }
 
 impl std::fmt::Debug for A2aDelegateTool {
@@ -193,6 +200,13 @@ impl A2aSendTool {
             my_agent_id: agent_id,
         }
     }
+
+    /// Create an `A2aSendTool` from a [`KernelHandle`].
+    ///
+    /// Extracts the A2A protocol from the kernel's a2a facade.
+    pub fn from_kernel(kernel: &crate::kernel_handle::KernelHandle, agent_id: AgentId) -> Self {
+        Self::new(kernel.a2a.protocol().clone(), agent_id)
+    }
 }
 
 impl std::fmt::Debug for A2aSendTool {
@@ -332,6 +346,13 @@ impl A2aQueryTool {
     /// Create a new A2A query tool.
     pub fn new(a2a: Arc<A2AProtocol>) -> Self {
         Self { a2a }
+    }
+
+    /// Create an `A2aQueryTool` from a [`KernelHandle`].
+    ///
+    /// Extracts the A2A protocol from the kernel's a2a facade.
+    pub fn from_kernel(kernel: &crate::kernel_handle::KernelHandle) -> Self {
+        Self::new(kernel.a2a.protocol().clone())
     }
 }
 

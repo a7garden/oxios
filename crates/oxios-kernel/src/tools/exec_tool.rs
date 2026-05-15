@@ -82,6 +82,18 @@ impl ExecTool {
         Self { config, access, agent_name: None }
     }
 
+    /// Create an `ExecTool` from a [`KernelHandle`].
+    ///
+    /// Extracts `ExecConfig` and `AccessManager` from the kernel's exec facade
+    /// and binds the tool to the default agent name `"oxios-agent"`.
+    pub fn from_kernel(kernel: &crate::kernel_handle::KernelHandle) -> Self {
+        Self::for_agent(
+            kernel.exec.config().clone(),
+            kernel.exec.access_manager().clone(),
+            "oxios-agent".to_string(),
+        )
+    }
+
     /// Create a new `ExecTool` bound to a specific agent.
     ///
     /// All executions through this instance are attributed to `agent_name`

@@ -63,6 +63,11 @@ impl McpApi {
         self.mcp_bridge.call_tool(server, tool, arguments).await
     }
 
+    /// MCP bridge reference.
+    pub fn bridge(&self) -> &Arc<McpBridge> {
+        &self.mcp_bridge
+    }
+
     /// Number of configured MCP servers.
     pub fn server_count(&self) -> usize {
         self.mcp_bridge.servers().len()

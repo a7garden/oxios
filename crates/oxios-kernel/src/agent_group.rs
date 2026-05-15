@@ -60,6 +60,7 @@ impl AgentGroup {
                     created_at: Utc::now(),
                     generation: parent_seed.generation + 1,
                     parent_seed_id: Some(parent_seed.id),
+                    cspace_hint: None,
                 };
                 GroupAgent {
                     id: Uuid::new_v4(),

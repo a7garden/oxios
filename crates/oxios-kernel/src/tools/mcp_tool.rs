@@ -48,6 +48,25 @@ impl McpToolWrapper {
             input_schema,
         }
     }
+
+    /// Create an `McpToolWrapper` from a [`KernelHandle`] for a specific MCP tool.
+    ///
+    /// Extracts the MCP bridge from the kernel's MCP facade.
+    pub fn from_kernel(
+        kernel: &crate::kernel_handle::KernelHandle,
+        server_name: &str,
+        tool_name: &str,
+        description: String,
+        input_schema: Value,
+    ) -> Self {
+        Self::new(
+            kernel.mcp.bridge().clone(),
+            server_name,
+            tool_name,
+            description,
+            input_schema,
+        )
+    }
 }
 
 impl std::fmt::Debug for McpToolWrapper {
