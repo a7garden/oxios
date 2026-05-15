@@ -103,6 +103,17 @@ impl Kernel {
                     self.space_manager.clone(),
                     self.event_bus.clone(),
                 ),
+                oxios_kernel::ExecApi::new(
+                    Arc::new(self.config.exec.clone()),
+                    self.access_manager.clone(),
+                ),
+                self.build_browser_api(),
+                oxios_kernel::A2aApi::new(
+                    // Note: a2a_protocol is not stored on Kernel directly,
+                    // so we create a new one here.
+                    // TODO: store a2a_protocol on Kernel and pass it directly.
+                    Arc::new(oxios_kernel::A2AProtocol::new(self.event_bus.clone())),
+                ),
             ))
         }).clone()
     }

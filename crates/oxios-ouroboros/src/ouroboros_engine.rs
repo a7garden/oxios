@@ -306,6 +306,7 @@ impl OuroborosProtocol for OuroborosEngine {
             created_at: Utc::now(),
             generation: 0,
             parent_seed_id: None,
+            cspace_hint: None,
         };
 
         tracing::info!(seed_id = %seed.id, goal = %seed.goal, "Seed generated");
@@ -488,6 +489,7 @@ impl OuroborosProtocol for OuroborosEngine {
             created_at: Utc::now(),
             generation: evolved.generation,
             parent_seed_id: evolved.parent_seed_id,
+            cspace_hint: evolved.cspace_hint,
         };
 
         tracing::info!(

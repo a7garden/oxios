@@ -1,4 +1,4 @@
-//! Kernel facade — 7 domain Facades composing the System Call API.
+//! Kernel facade — 10 domain Facades composing the System Call API.
 
 pub mod state_api;
 pub mod agent_api;
@@ -8,6 +8,9 @@ pub mod extension_api;
 pub mod mcp_api;
 pub mod infra_api;
 pub mod space_api;
+pub mod exec_api;
+pub mod browser_api;
+pub mod a2a_api;
 
 pub use state_api::StateApi;
 pub use agent_api::AgentApi;
@@ -17,6 +20,9 @@ pub use extension_api::ExtensionApi;
 pub use mcp_api::McpApi;
 pub use infra_api::InfraApi;
 pub use space_api::SpaceApi;
+pub use exec_api::ExecApi;
+pub use browser_api::BrowserApi;
+pub use a2a_api::A2aApi;
 
 use serde::Serialize;
 use std::sync::Arc;
@@ -38,11 +44,12 @@ use crate::mcp::McpBridge;
 use crate::auth::AuthManager;
 use crate::access_manager::AccessManager;
 use crate::host_tools::HostToolValidator;
-use crate::config::OxiosConfig;
+use crate::config::{OxiosConfig, ExecConfig};
 use crate::event_bus::EventBus;
 use crate::space::SpaceManager;
+use crate::a2a::A2AProtocol;
 
-/// Oxios kernel System Call API — composed of 7 domain Facades.
+/// Oxios kernel System Call API — composed of 10 domain Facades.
 ///
 /// Each Facade groups related system calls:
 /// - [`StateApi`]    — data persistence, sessions
@@ -52,6 +59,9 @@ use crate::space::SpaceManager;
 /// - [`ExtensionApi`] — programs, skills, host tools
 /// - [`McpApi`]      — MCP server bridge
 /// - [`SpaceApi`]    — Space management, knowledge flow
+/// - [`ExecApi`]     — execution config, access management
+/// - [`BrowserApi`]  — browser backend
+/// - [`A2aApi`]      — agent-to-agent communication
 pub struct KernelHandle {
     /// State management: save/load/sessions.
     pub state: StateApi,
@@ -69,10 +79,16 @@ pub struct KernelHandle {
     pub infra: InfraApi,
     /// Space management: context partitioning, knowledge flow.
     pub spaces: SpaceApi,
+    /// Execution: config + access management.
+    pub exec: ExecApi,
+    /// Browser backend (zero-sized when `browser` feature is disabled).
+    pub browser: BrowserApi,
+    /// Agent-to-agent communication.
+    pub a2a: A2aApi,
 }
 
 impl KernelHandle {
-    /// Create a new KernelHandle from 8 domain Facades.
+    /// Create a new KernelHandle from 11 domain Facades.
     ///
     /// Each Facade is assembled independently in `kernel.rs` and passed here.
     /// This enables testing individual Facades without the full kernel.
@@ -85,6 +101,9 @@ impl KernelHandle {
         mcp: McpApi,
         infra: InfraApi,
         spaces: SpaceApi,
+        exec: ExecApi,
+        browser: BrowserApi,
+        a2a: A2aApi,
     ) -> Self {
         Self {
             state,
@@ -95,6 +114,9 @@ impl KernelHandle {
             mcp,
             infra,
             spaces,
+            exec,
+            browser,
+            a2a,
         }
     }
 
@@ -126,7 +148,7 @@ impl KernelHandle {
         space_manager: Arc<SpaceManager>,
     ) -> Self {
         Self {
-            security: SecurityApi::new(auth_manager, audit_trail, access_manager, state_store.clone()),
+            security: SecurityApi::new(auth_manager.clone(), audit_trail, access_manager.clone(), state_store.clone()),
             state: StateApi::new(state_store),
             agents: AgentApi::new(supervisor, budget_manager, memory_manager),
             persona: PersonaApi::new(persona_manager),
@@ -134,6 +156,9 @@ impl KernelHandle {
             mcp: McpApi::new(mcp_bridge),
             infra: InfraApi::new(git_layer, scheduler, cron_scheduler, resource_monitor, event_bus.clone(), config, start_time),
             spaces: SpaceApi::new(space_manager, event_bus),
+            exec: ExecApi::new(Arc::new(config.exec.clone()), access_manager),
+            browser: BrowserApi::default(),
+            a2a: A2aApi::new(Arc::new(A2AProtocol::new(crate::EventBus::new(0)))),
         }
     }
 

@@ -38,6 +38,14 @@ pub struct Seed {
     /// Parent seed ID if this seed was evolved from another.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub parent_seed_id: Option<SeedId>,
+    /// Hint for the capability system to determine the agent's CSpace.
+    ///
+    /// Accepts a known template name ("worker", "standard", "operator",
+    /// "supervisor") or a JSON string describing custom capabilities.
+    /// When `None`, the kernel falls back to the persona role or the
+    /// default "worker" template.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cspace_hint: Option<String>,
 }
 
 impl Seed {
@@ -65,6 +73,7 @@ impl Seed {
             created_at: Utc::now(),
             generation: 0,
             parent_seed_id: None,
+            cspace_hint: None,
         }
     }
 
@@ -82,6 +91,7 @@ impl Seed {
             created_at: Utc::now(),
             generation: parent.generation + 1,
             parent_seed_id: Some(parent.id),
+            cspace_hint: parent.cspace_hint.clone(),
         }
     }
 }

@@ -8,6 +8,7 @@
 
 pub mod backup;
 pub mod budget;
+pub mod capability;
 pub mod circuit_breaker;
 pub mod metrics;
 pub mod a2a;
@@ -146,4 +147,11 @@ pub use git_layer::{GitLayer, CommitInfo, LogEntry};
 // Budget manager exports
 pub use budget::{BudgetExceeded, BudgetInfo, BudgetKind, BudgetLimit, BudgetManager};
 pub use resource_monitor::{OverloadThreshold, ResourceMonitor, ResourceSnapshot};
+
+// Capability system exports
+pub use capability::{
+    Capability, CapabilityId, CSpace, Issuer, ResourceRef, Rights,
+};
+pub use capability::template::CapabilityTemplate;
+pub use capability::resolve::resolve_cspace;
 

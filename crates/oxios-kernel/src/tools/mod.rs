@@ -9,6 +9,7 @@ pub mod exec_tool;
 pub mod mcp_tool;
 pub mod memory_tools;
 pub mod program_tool;
+pub mod retrieval;
 
 #[cfg(feature = "browser")]
 pub mod browser;
