@@ -3,50 +3,89 @@
 //! Wraps `oxibrowser_core::Browser` behind the `AgentTool` interface so agents
 //! can browse the web in their tool-calling loop.
 //!
-//! Three usage patterns:
-//! - **`browse`** — one-shot URL → Markdown (90% of agent requests)
-//! - **`goto`/`click`/`type`/...** — interactive session via `Tab`
-//! - **`run_script`** — YAML scenario execution via `ScriptRunner`
+//! The browser engine is initialized **lazily** on first tool invocation.
+//! This avoids panics from `block_on` inside an existing tokio runtime.
 
 use std::sync::Arc;
 
 use async_trait::async_trait;
 use oxi_sdk::{AgentTool, AgentToolResult, ToolContext};
 use serde_json::{json, Value};
-use tokio::sync::{oneshot, Mutex};
+use tokio::sync::{oneshot, Mutex, OnceCell};
 
 /// Agent tool for web browsing via the embedded OxiBrowser engine.
 ///
-/// Owns a `Browser` instance and lazily creates a `Tab` for interactive use.
+/// Lazily initializes the browser on first `execute()` call.
+/// `from_kernel()` is safe to call from sync context.
 pub struct BrowserTool {
-    browser: Arc<oxibrowser_core::Browser>,
+    /// Lazily-initialized browser engine.
+    browser: OnceCell<Arc<oxibrowser_core::Browser>>,
+    /// Config source for lazy initialization.
+    init: BrowserInit,
     tab: Arc<Mutex<Option<oxibrowser_core::Tab>>>,
+}
+
+/// How to obtain a Browser instance.
+enum BrowserInit {
+    /// Already have one — use directly.
+    Ready(Arc<oxibrowser_core::Browser>),
+    /// Initialize lazily from BrowserApi on first use.
+    #[cfg(feature = "browser")]
+    Lazy(std::sync::Arc<crate::kernel_handle::BrowserApi>),
 }
 
 impl BrowserTool {
     /// Create a new browser tool with an already-initialized browser.
     pub fn new(browser: Arc<oxibrowser_core::Browser>) -> Self {
+        let cell = OnceCell::new();
+        // We can't set it here because browser is moved, so we use Ready variant
         Self {
-            browser,
+            browser: cell,
+            init: BrowserInit::Ready(browser),
             tab: Arc::new(Mutex::new(None)),
         }
     }
 
     /// Create a `BrowserTool` from a [`KernelHandle`].
+    ///
+    /// Does **not** initialize the browser yet — that happens on first use.
+    /// This is safe to call from a synchronous context.
     #[cfg(feature = "browser")]
     pub fn from_kernel(kernel: &crate::kernel_handle::KernelHandle) -> Self {
-        Self::new(kernel.browser.browser().clone())
+        Self {
+            browser: OnceCell::new(),
+            init: BrowserInit::Lazy(Arc::new(kernel.browser.clone())),
+            tab: Arc::new(Mutex::new(None)),
+        }
+    }
+
+    /// Get or lazily initialize the browser engine.
+    async fn get_browser(&self) -> Result<Arc<oxibrowser_core::Browser>, String> {
+        let browser = self
+            .browser
+            .get_or_try_init(|| async {
+                match &self.init {
+                    BrowserInit::Ready(b) => Ok::<_, String>(b.clone()),
+                    #[cfg(feature = "browser")]
+                    BrowserInit::Lazy(api) => {
+                        api.browser().await.map(|b| b.clone()).map_err(|e| e.to_string())
+                    }
+                }
+            })
+            .await?;
+        Ok(browser.clone())
     }
 
     /// Get or create an interactive tab.
     async fn get_or_create_tab(&self) -> anyhow::Result<oxibrowser_core::Tab> {
+        let browser = self.get_browser().await.map_err(anyhow::Error::msg)?;
         let mut guard = self.tab.lock().await;
         let needs_new = match guard.as_ref() {
             None => true,
             Some(t) => t.is_closed(),
         };
         if needs_new {
-            let tab = self.browser.new_tab().await?;
+            let tab = browser.new_tab().await?;
             *guard = Some(tab.clone());
         }
         Ok(guard.as_ref().unwrap().clone())
@@ -158,11 +197,14 @@ impl AgentTool for BrowserTool {
             .and_then(|v| v.as_str())
             .ok_or_else(|| "Missing required parameter: action".to_string())?;
 
+        // Grab the browser reference (lazy init happens here if needed).
+        let browser = self.get_browser().await?;
+
         match action {
             // ── One-shot browse ────────────────────────────────────
             "browse" => {
                 let url = param_str(&params, "url", "browse requires 'url'")?;
-                match self.browser.browse(url).await {
+                match browser.browse(url).await {
                     Ok(r) => Ok(AgentToolResult::success(format_browse(&r))),
                     Err(e) => Ok(AgentToolResult::error(format!("Browse failed: {}", e))),
                 }
@@ -381,7 +423,6 @@ impl AgentTool for BrowserTool {
 fn format_browse(r: &oxibrowser_core::BrowseResult) -> String {
     let md = &r.markdown;
     if md.len() > 50_000 {
-        // Find a safe UTF-8 boundary near 50_000 to avoid panic on multi-byte chars.
         let cut = md.floor_char_boundary(50_000);
         format!(
             "URL: {} (status {})\nTitle: {}\n\n{}\n\n... (truncated, {} total chars)",
@@ -414,29 +455,13 @@ fn param_str<'a>(params: &'a Value, key: &str, error_msg: &str) -> Result<&'a st
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     #[test]
     fn test_schema_covers_all_actions() {
         let actions = vec![
-            "browse",
-            "goto",
-            "back",
-            "forward",
-            "reload",
-            "post",
-            "click",
-            "type",
-            "press_key",
-            "evaluate",
-            "evaluate_await",
-            "content",
-            "query_all",
-            "wait_for",
-            "load_resources",
-            "screenshot",
-            "run_script",
-            "close",
+            "browse", "goto", "back", "forward", "reload", "post",
+            "click", "type", "press_key", "evaluate", "evaluate_await",
+            "content", "query_all", "wait_for", "load_resources",
+            "screenshot", "run_script", "close",
         ];
         assert!(actions.len() >= 16);
         assert!(actions.contains(&"browse"));

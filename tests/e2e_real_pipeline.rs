@@ -22,7 +22,7 @@ mod tests {
         }
 
         let model_id = std::env::var("OXIOS_MODEL")
-            .unwrap_or_else(|_| "anthropic/claude-sonnet-4-20250514".into());
+            .expect("OXIOS_MODEL env var must be set (e.g. OXIOS_MODEL=anthropic/claude-sonnet-4-20250514)");
 
         let oxi = oxi_sdk::OxiBuilder::new().with_builtins().build();
         let model = oxi

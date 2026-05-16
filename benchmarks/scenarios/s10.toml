@@ -1,0 +1,14 @@
+[scenario]
+id = "s10"
+name = "프로그램 제거"
+tier = 2
+difficulty = "easy"
+time_limit_secs = 60
+goal = "설치된 프로그램 중 debug 프로그램을 제거해줘"
+
+[setup]
+commands = ["oxios pkg install .programs/debug 2>/dev/null || true"]
+
+[evaluation]
+min_expected = "debug 프로그램 제거 성공. 제거 후 목록에 debug가 없어야 함"
+quality_expected = "제거 전후 상태를 비교하여 보고해야 함"

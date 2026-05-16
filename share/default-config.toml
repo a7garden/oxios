@@ -9,7 +9,8 @@ max_agents = 10
 
 [engine]
 # Default model in "provider/model" format.
-default_model = "anthropic/claude-sonnet-4-20250514"
+# MUST be set before first run — onboarding wizard will prompt if empty.
+# default_model = ""
 # Explicit API key (highest priority).
 # If empty, falls back to ~/.oxi/auth.json, then environment variables.
 # api_key = ""

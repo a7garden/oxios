@@ -65,7 +65,7 @@ pub struct AgentRuntimeConfig {
 impl Default for AgentRuntimeConfig {
     fn default() -> Self {
         Self {
-            model_id: "anthropic/claude-sonnet-4-20250514".into(),
+            model_id: String::new(),
             max_iterations: 20,
             tool_execution: ToolExecutionMode::Parallel,
             auto_retry_enabled: true,

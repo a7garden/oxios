@@ -55,6 +55,7 @@ parking_lot = "0.12"
 
 # oxi engine — single dependency for everything
 oxi-sdk = "0.15.3"
+oxi-ai = "0.15.0"
 
 [features]
 default = ["web", "cli", "browser"]
@@ -64,7 +65,7 @@ telegram = ["dep:oxios-telegram"]
 browser = ["oxios-kernel/browser"]
 
 [dependencies]
-oxios-kernel = { version = "0.1.0", path = "crates/oxios-kernel" }
+oxios-kernel = { version = "0.1.0", path = "crates/oxios-kernel", default-features = false }
 oxios-ouroboros = { version = "0.1.0", path = "crates/oxios-ouroboros" }
 oxios-gateway = { version = "0.1.0", path = "crates/oxios-gateway" }
 oxios-web = { version = "0.1.0", path = "channels/oxios-web", optional = true }

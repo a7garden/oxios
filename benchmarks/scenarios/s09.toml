@@ -1,0 +1,11 @@
+[scenario]
+id = "s09"
+name = "커스텀 프로그램 생성"
+tier = 2
+difficulty = "hard"
+time_limit_secs = 120
+goal = "'translator'라는 oxios 프로그램을 만들어줘. 한국어 텍스트를 영어로 번역하는 기능이야. program.toml과 SKILL.md를 작성해줘."
+
+[evaluation]
+min_expected = "program.toml과 SKILL.md가 작성되어야 함. program.toml에 name, version, description이 포함되어야 함"
+quality_expected = "프로그램 구조가 oxios 프로그램 규격에 맞고, SKILL.md가 실용적인 사용 가이드를 포함해야 함"

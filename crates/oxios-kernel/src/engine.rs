@@ -22,10 +22,33 @@ impl OxiosEngine {
     /// Internally calls `OxiBuilder::new().with_builtins()` to load all
     /// 50+ built-in models and providers.
     pub fn new(default_model_id: impl Into<String>) -> Self {
-        let oxi = OxiBuilder::new().with_builtins().build();
+        let model_id = default_model_id.into();
+        let provider_name = model_id
+            .split_once('/')
+            .map(|(p, _)| p)
+            .unwrap_or("anthropic");
+
+        // Workaround: create_builtin_provider("zai") uses OpenAiProvider::with_base_url()
+        // without an API key. We register a custom provider with the key attached.
+        let mut builder = OxiBuilder::new().with_builtins();
+
+        if provider_name == "zai" {
+            let api_key = std::env::var("ZAI_API_KEY")
+                .or_else(|_| std::env::var("ANTHROPIC_API_KEY"))
+                .ok();
+
+            let zai_provider = oxi_ai::OpenAiProvider::with_base_url_and_key(
+                "https://open.bigmodel.cn/api/paas/v4",
+                api_key,
+            );
+            builder = builder.provider("zai", zai_provider);
+            tracing::info!("Registered zai provider with API key (OpenAI-compatible)");
+        }
+
+        let oxi = builder.build();
         Self {
             oxi,
-            default_model_id: default_model_id.into(),
+            default_model_id: model_id,
         }
     }
 

@@ -419,24 +419,29 @@ async fn cmd_status(kernel: &Kernel) -> Result<()> {
 
     // Credential source
     let provider = CredentialStore::provider_from_model(&config.engine.default_model);
-    match CredentialStore::resolve(provider, config.api_key().as_deref()) {
-        Some((key, source)) => {
-            let source_str = match source {
-                oxios_kernel::credential::CredentialSource::Config => {
-                    "config.toml (engine.api_key)"
-                }
-                oxios_kernel::credential::CredentialSource::OxiAuthStore => "~/.oxi/auth.json",
-                oxios_kernel::credential::CredentialSource::EnvVar => "environment variable",
-            };
-            let preview = if key.len() > 8 {
-                format!("{}...{}", &key[..4], &key[key.len() - 4..])
-            } else {
-                key.clone()
-            };
-            println!("  {:<16}  {} [{}]", "Credentials:", preview, source_str);
-        }
+    match provider {
+        Some(provider) => match CredentialStore::resolve(provider, config.api_key().as_deref()) {
+            Some((key, source)) => {
+                let source_str = match source {
+                    oxios_kernel::credential::CredentialSource::Config => {
+                        "config.toml (engine.api_key)"
+                    }
+                    oxios_kernel::credential::CredentialSource::OxiAuthStore => "~/.oxi/auth.json",
+                    oxios_kernel::credential::CredentialSource::EnvVar => "environment variable",
+                };
+                let preview = if key.len() > 8 {
+                    format!("{}...{}", &key[..4], &key[key.len() - 4..])
+                } else {
+                    key.clone()
+                };
+                println!("  {:<16}  {} [{}]", "Credentials:", preview, source_str);
+            }
+            None => {
+                println!("  {:<16}  ✗ none (run `oxios` to setup)", "Credentials:");
+            }
+        },
         None => {
-            println!("  {:<16}  ✗ none (run `oxios` to setup)", "Credentials:");
+            println!("  {:<16}  ✗ no model configured (run `oxios` to setup)", "Credentials:");
         }
     }
 

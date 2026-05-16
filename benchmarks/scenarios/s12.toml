@@ -1,0 +1,11 @@
+[scenario]
+id = "s12"
+name = "빈 입력"
+tier = 3
+difficulty = "easy"
+time_limit_secs = 30
+goal = ""
+
+[evaluation]
+min_expected = "도움말 또는 에러 메시지가 출력되어야 함. exit code가 0이 아니어야 함"
+quality_expected = "사용법(usage) 안내가 포함되어야 함"

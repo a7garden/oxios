@@ -4792,6 +4792,7 @@ dependencies = [
  "opentelemetry-otlp",
  "opentelemetry-stdout",
  "opentelemetry_sdk",
+ "oxi-ai",
  "oxi-sdk",
  "oxibrowser-core",
  "oxios-gateway",

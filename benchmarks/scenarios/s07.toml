@@ -1,0 +1,16 @@
+[scenario]
+id = "s07"
+name = "보안 코드 리뷰"
+tier = 2
+difficulty = "hard"
+time_limit_secs = 120
+goal = "이 코드에 있는 보안 문제와 버그를 찾아줘"
+
+[setup]
+files = [
+  { path = "/tmp/oxios-bench-review.rs", content = "use std::env;\n\nfn main() {\n    let password = \"admin123\";\n    println!(\"Password: {}\", password);\n    \n    let username = env::args().nth(1).unwrap();\n    let sql = format!(\"SELECT * FROM users WHERE name = '{}'\", username);\n    println!(\"Query: {}\", sql);\n    \n    let data = vec![1, 2, 3];\n    let val = data[10]; // index out of bounds\n    println!(\"Value: {}\", val);\n    \n    unsafe {\n        let ptr = std::ptr::null::<u8>();\n        println!(\"Deref: {}\", *ptr);\n    }\n}" }
+]
+
+[evaluation]
+min_expected = "최소 3개 이상의 문제를 식별해야 함: 하드코딩된 비밀번호, SQL 인젝션, 인덱스 초과, null 포인터 역참조"
+quality_expected = "각 문제에 대해 심각도, 원인, 해결 방법을 제시해야 함"

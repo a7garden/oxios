@@ -163,7 +163,8 @@ impl Default for TelegramChannelConfig {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct EngineConfig {
     /// Default model in "provider/model" format.
-    #[serde(default = "default_model")]
+    /// Empty string means no model configured — onboarding required.
+    #[serde(default)]
     pub default_model: String,
     /// Explicit API key override (highest priority).
     /// If empty/None, falls back to oxi auth store, then env vars.
@@ -171,14 +172,10 @@ pub struct EngineConfig {
     pub api_key: Option<String>,
 }
 
-fn default_model() -> String {
-    "anthropic/claude-sonnet-4-20250514".into()
-}
-
 impl Default for EngineConfig {
     fn default() -> Self {
         Self {
-            default_model: default_model(),
+            default_model: String::new(),
             api_key: None,
         }
     }

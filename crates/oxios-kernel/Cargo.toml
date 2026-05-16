@@ -15,6 +15,7 @@ browser = []
 [dependencies]
 oxios-ouroboros = { version = "0.1.0", path = "../oxios-ouroboros" }
 oxi-sdk = { workspace = true }
+oxi-ai = { workspace = true }
 tokio = { workspace = true }
 futures = { workspace = true }
 async-trait = { workspace = true }

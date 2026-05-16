@@ -73,11 +73,12 @@ impl CredentialStore {
 
     /// Extract the provider name from a model ID.
     /// "anthropic/claude-sonnet-4-20250514" → "anthropic"
-    pub fn provider_from_model(model_id: &str) -> &str {
-        model_id
-            .split_once('/')
-            .map(|(p, _)| p)
-            .unwrap_or("anthropic")
+    /// Returns `None` if the model ID is empty or has no provider prefix.
+    pub fn provider_from_model(model_id: &str) -> Option<&str> {
+        if model_id.is_empty() {
+            return None;
+        }
+        model_id.split_once('/').map(|(p, _)| p)
     }
 }
 
@@ -89,15 +90,19 @@ mod tests {
     fn test_provider_from_model() {
         assert_eq!(
             CredentialStore::provider_from_model("anthropic/claude-sonnet-4-20250514"),
-            "anthropic"
+            Some("anthropic")
         );
         assert_eq!(
             CredentialStore::provider_from_model("openai/gpt-4o"),
-            "openai"
+            Some("openai")
         );
         assert_eq!(
             CredentialStore::provider_from_model("bare-model"),
-            "anthropic"
+            None
+        );
+        assert_eq!(
+            CredentialStore::provider_from_model(""),
+            None
         );
     }
 

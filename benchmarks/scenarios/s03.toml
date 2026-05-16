@@ -1,0 +1,16 @@
+[scenario]
+id = "s03"
+name = "코드 분석"
+tier = 1
+difficulty = "medium"
+time_limit_secs = 90
+goal = "이 코드의 시간복잡도를 분석하고 최적화된 버전을 제안해줘"
+
+[setup]
+files = [
+  { path = "/tmp/oxios-bench-fib.rs", content = "fn fibonacci(n: u32) -> u64 {\n    if n <= 1 { return n as u64; }\n    fibonacci(n - 1) + fibonacci(n - 2)\n}\n\nfn main() {\n    println!(\"fib(10) = {}\", fibonacci(10));\n}" }
+]
+
+[evaluation]
+min_expected = "시간복잡도 O(2^n)을 정확히 지적하고, 메모이제이션이나 반복적 방법으로 최적화 코드를 제안해야 함"
+quality_expected = "원본 코드의 문제를 명확히 설명하고, 개선된 코드가 실행 가능해야 함"
