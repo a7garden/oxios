@@ -81,6 +81,11 @@ impl ExtensionApi {
         self.skill_store.delete_skill(name).await
     }
 
+    /// Program manager reference.
+    pub fn program_manager(&self) -> &Arc<ProgramManager> {
+        &self.program_manager
+    }
+
     /// Full host tool check.
     pub fn check_host_tools(&self) -> HostToolStatus {
         self.host_tool_validator.full_check()

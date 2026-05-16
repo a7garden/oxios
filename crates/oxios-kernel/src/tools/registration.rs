@@ -35,8 +35,8 @@ use oxi_agent::{
 use crate::capability::{CSpace, ResourceRef, Rights};
 use crate::tools::kernel::*;
 use crate::tools::{
-    A2aDelegateTool, A2aQueryTool, A2aSendTool, ExecTool, McpToolWrapper, MemoryReadTool,
-    MemorySearchTool, MemoryWriteTool, ProgramTool,
+    A2aDelegateTool, A2aQueryTool, A2aSendTool, ExecTool,
+    MemoryReadTool, MemorySearchTool, MemoryWriteTool,
 };
 use crate::types::AgentId;
 use crate::KernelHandle;
@@ -141,12 +141,12 @@ pub fn register_tools_from_cspace(
                     registry.register(A2aQueryTool::from_kernel(kernel));
                 }
                 "persona" => registry.register(PersonaTool::from_kernel(kernel)),
-                "program" => registry.register(ProgramTool::from_kernel(kernel)),
+                "program" => { /* ProgramTools are registered individually by agent_runtime, not via CSpace */ }
                 "cron" => registry.register(CronTool::from_kernel(kernel)),
                 "security" => registry.register(SecurityTool::from_kernel(kernel)),
                 "budget" => registry.register(BudgetTool::from_kernel(kernel)),
                 "resource" => registry.register(ResourceTool::from_kernel(kernel)),
-                "mcp" => registry.register(McpToolWrapper::from_kernel(kernel)),
+                "mcp" => { /* MCP tools are enumerated dynamically per agent */ }
                 _ => {} // Unknown domain — silently skip
             },
 
@@ -175,7 +175,7 @@ mod tests {
 
         // The always-on set is: read, write, edit, grep, find, ls, web_search, get_search_results
         // ToolRegistry doesn't expose a count, but we can verify individual tool names.
-        let tool_names = registry.tool_names();
+        let tool_names = registry.names();
         assert!(tool_names.contains(&"read".to_string()), "read tool should be registered");
         assert!(tool_names.contains(&"write".to_string()), "write tool should be registered");
         assert!(tool_names.contains(&"edit".to_string()), "edit tool should be registered");

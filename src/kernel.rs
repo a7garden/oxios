@@ -15,8 +15,6 @@ use oxios_kernel::{
     AuditTrail, BudgetManager, ResourceMonitor, SpaceManager,
 };
 
-#[cfg(feature = "browser")]
-use oxios_kernel::{OxibrowserBackend, OxibrowserConfig};
 use oxios_ouroboros::{OuroborosEngine, OuroborosProtocol, Seed};
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -136,7 +134,7 @@ impl Kernel {
             let backend = Arc::new(oxios_kernel::OxibrowserBackend::new(browser_config));
             oxios_kernel::BrowserApi::new(backend)
         } else {
-            panic!("build_browser_api called with browser feature but browser disabled in config")
+            oxios_kernel::BrowserApi::default()
         }
     }
 
@@ -335,41 +333,112 @@ impl KernelBuilder {
         }
         let mcp_bridge = Arc::new(mcp_bridge);
 
-        let agent_runtime = AgentRuntime::new(provider, model_id)
-            .with_program_manager(Arc::clone(&program_manager))
-            .with_oxios_config(config.clone())
-            .with_persona_manager(Arc::new(persona_manager.clone()))
-            .with_mcp_bridge(mcp_bridge.clone());
+        // ── Pre-create all kernel service objects ──
+        // These are needed before KernelHandle creation (for AgentRuntime).
+        // Order doesn't matter — they're independent.
 
         let mut memory_manager = MemoryManager::new(state_store.clone());
         memory_manager.set_git_layer(git_layer.clone());
         let memory_manager = Arc::new(memory_manager);
 
-        let agent_runtime = agent_runtime
-            .with_memory_manager(memory_manager.clone())
-            .with_exec_config(
-                Arc::new(config.exec.clone()),
-                access_manager.clone(),
-            )
-            .with_a2a(a2a_protocol.clone());
+        let budget_manager = Arc::new(BudgetManager::new());
 
-        #[cfg(feature = "browser")]
-        let agent_runtime = {
-            if config.browser.enabled {
-                let browser_config = OxibrowserConfig {
-                    user_agent: config.browser.user_agent.clone(),
-                    timeout_secs: config.browser.timeout_secs,
-                    max_sessions: config.browser.max_sessions,
-                    cookie_file: config.browser.cookie_file.clone(),
-                };
-                let backend = Arc::new(OxibrowserBackend::new(browser_config));
-                tracing::info!("Browser tool enabled (oxibrowser engine)");
-                agent_runtime.with_browser(backend)
-            } else {
-                tracing::debug!("Browser tool disabled in config");
-                agent_runtime
+        let host_tool_validator = HostToolValidator::new(
+            config.exec.required_host_tools.clone(),
+            config.exec.optional_host_tools.clone(),
+        );
+
+        let mut auth_manager = AuthManager::new();
+        let api_keys_path = PathBuf::from(&config.security.api_keys_path);
+        if let Err(e) = auth_manager.load_from_file(&api_keys_path) {
+            tracing::debug!(error = %e, "No API keys file loaded (this is normal on first run)");
+        }
+        let auth_manager = Arc::new(parking_lot::Mutex::new(auth_manager));
+
+        let audit_trail = Arc::new(AuditTrail::new(config.audit.max_entries));
+
+        let mut cron_scheduler = CronScheduler::new(
+            state_store.clone(),
+            config.cron.tick_interval_secs,
+        );
+        cron_scheduler.set_git_layer(git_layer.clone());
+        let cron_scheduler = Arc::new(cron_scheduler);
+
+        let resource_monitor = Arc::new(ResourceMonitor::new(
+            config.resource_monitor.interval_secs,
+            config.resource_monitor.history_max,
+        ));
+
+        event_bus.attach_audit_trail(audit_trail.clone());
+
+        // Restore persisted audit entries.
+        if let Ok(entries) = state_store.load_audit_entries() {
+            if !entries.is_empty() {
+                tracing::info!(count = entries.len(), "Restored audit trail entries");
+                audit_trail.restore_from(entries);
             }
-        };
+        }
+
+        // ── Space Management (early — needed for KernelHandle) ──
+        let space_manager = SpaceManager::new(state_store.clone(), event_bus.clone()).await?;
+        let space_manager = Arc::new(space_manager);
+
+        // ── KernelHandle — the syscall table for agent OS control ──
+        // Created inline here because AgentRuntime needs it.
+        // Will be cached again in the Kernel instance.
+        let kernel_handle: Arc<oxios_kernel::KernelHandle> = Arc::new(
+            oxios_kernel::KernelHandle::new(
+                oxios_kernel::StateApi::new(state_store.clone()),
+                oxios_kernel::AgentApi::new(
+                    // Placeholder supervisor — the real one needs AgentRuntime which needs this handle.
+                    // AgentApi.supervisor is only used for list/kill, not during tool registration.
+                    Arc::new(oxios_kernel::supervisor::NoOpSupervisor),
+                    budget_manager.clone(),
+                    memory_manager.clone(),
+                ),
+                oxios_kernel::SecurityApi::new(
+                    auth_manager.clone(),
+                    audit_trail.clone(),
+                    access_manager.clone(),
+                    state_store.clone(),
+                ),
+                oxios_kernel::PersonaApi::new(Arc::new(persona_manager.clone())),
+                oxios_kernel::ExtensionApi::new(
+                    program_manager.clone(),
+                    Arc::new(skill_store.clone()),
+                    Arc::new(host_tool_validator.clone()),
+                ),
+                oxios_kernel::McpApi::new(mcp_bridge.clone()),
+                oxios_kernel::InfraApi::new(
+                    git_layer.clone(),
+                    scheduler.clone(),
+                    cron_scheduler.clone(),
+                    resource_monitor.clone(),
+                    event_bus.clone(),
+                    config.clone(),
+                    std::time::Instant::now(),
+                ),
+                oxios_kernel::SpaceApi::new(
+                    space_manager.clone(),
+                    event_bus.clone(),
+                ),
+                oxios_kernel::ExecApi::new(
+                    Arc::new(config.exec.clone()),
+                    access_manager.clone(),
+                ),
+                build_browser_api_value(&config),
+                oxios_kernel::A2aApi::new(
+                    a2a_protocol.clone(),
+                ),
+            )
+        );
+
+        // Build ToolRetriever for semantic capability discovery.
+        let tool_retriever = build_tool_retriever(&program_manager).await;
+
+        let agent_runtime = AgentRuntime::new(provider, model_id, kernel_handle)
+            .with_persona_manager(Arc::new(persona_manager.clone()))
+            .with_tool_retriever(Arc::new(tool_retriever));
 
         let supervisor: Arc<dyn Supervisor> = Arc::new(BasicSupervisor::new(
             event_bus.clone(),
@@ -417,10 +486,6 @@ impl KernelBuilder {
             })
         })).await;
 
-        // ── Space Management ──
-        let space_manager = SpaceManager::new(state_store.clone(), event_bus.clone()).await?;
-        let space_manager = Arc::new(space_manager);
-
         let mut orchestrator = Orchestrator::new(
             ouroboros,
             event_bus.clone(),
@@ -433,47 +498,6 @@ impl KernelBuilder {
         let orchestrator = Arc::new(orchestrator);
 
         let gateway = Gateway::new(orchestrator.clone());
-
-        let host_tool_validator = HostToolValidator::new(
-            config.exec.required_host_tools.clone(),
-            config.exec.optional_host_tools.clone(),
-        );
-
-        let mut auth_manager = AuthManager::new();
-        let api_keys_path = PathBuf::from(&config.security.api_keys_path);
-        if let Err(e) = auth_manager.load_from_file(&api_keys_path) {
-            tracing::debug!(error = %e, "No API keys file loaded (this is normal on first run)");
-        }
-        let auth_manager = Arc::new(parking_lot::Mutex::new(auth_manager));
-
-        let mut cron_scheduler = CronScheduler::new(
-            state_store.clone(),
-            config.cron.tick_interval_secs,
-        );
-        cron_scheduler.set_git_layer(git_layer.clone());
-        let cron_scheduler = Arc::new(cron_scheduler);
-
-        let audit_trail = Arc::new(AuditTrail::new(config.audit.max_entries));
-
-        // Restore persisted audit entries from previous session.
-        if let Ok(entries) = state_store.load_audit_entries() {
-            if !entries.is_empty() {
-                tracing::info!(count = entries.len(), "Restored audit trail entries from previous session");
-                audit_trail.restore_from(entries);
-            }
-        }
-
-        let budget_manager = Arc::new(BudgetManager::new());
-        let resource_monitor = Arc::new(ResourceMonitor::new(
-            config.resource_monitor.interval_secs,
-            config.resource_monitor.history_max,
-        ));
-
-        event_bus.attach_audit_trail(audit_trail.clone());
-
-        // ── Space Management ──
-        let space_manager = SpaceManager::new(state_store.clone(), event_bus.clone()).await?;
-        let space_manager = Arc::new(space_manager);
 
         Ok(Kernel {
             orchestrator,
@@ -540,4 +564,88 @@ async fn init_mcp_bridge(config: &OxiosConfig) -> Result<McpBridge> {
     }
 
     Ok(bridge)
+}
+
+/// Build a ToolRetriever with all OS tools and installed programs indexed.
+async fn build_tool_retriever(pm: &Arc<ProgramManager>) -> oxios_kernel::tools::retrieval::ToolRetriever {
+    use oxios_kernel::tools::retrieval::ToolEntry;
+    use oxios_kernel::embedding::TfIdfEmbeddingProvider;
+
+    let embedder = Arc::new(TfIdfEmbeddingProvider);
+    let mut retriever = oxios_kernel::tools::retrieval::ToolRetriever::new(embedder);
+
+    // Index built-in OS tools.
+    let builtin_tools = vec![
+        ("exec", "os-tool", "Execute shell commands or structured binaries in workspace"),
+        ("read", "os-tool", "Read file contents"),
+        ("write", "os-tool", "Write content to files"),
+        ("edit", "os-tool", "Make precise text edits in files"),
+        ("grep", "os-tool", "Search file contents with regex"),
+        ("find", "os-tool", "Find files by name or pattern"),
+        ("ls", "os-tool", "List directory contents"),
+        ("web_search", "os-tool", "Search the web for information"),
+        ("memory_read", "os-tool", "Recall persistent memories"),
+        ("memory_write", "os-tool", "Store persistent memories"),
+        ("memory_search", "os-tool", "Semantic search over memories"),
+        ("browser", "os-tool", "Headless browser for web automation and scraping"),
+    ];
+
+    for (name, category, desc) in builtin_tools {
+        retriever.index_tool(ToolEntry {
+            name: name.to_string(),
+            category: category.to_string(),
+            description: desc.to_string(),
+            skill_path: None,
+            command: None,
+        }).await;
+    }
+
+    // Index installed programs.
+    let programs = pm.list_enabled().await;
+    for program in &programs {
+        let desc = program.meta.description.clone();
+        retriever.index_tool(ToolEntry {
+            name: format!("program:{}", program.meta.name),
+            category: "program".to_string(),
+            description: desc,
+            skill_path: Some(format!("programs/{}/SKILL.md", program.meta.name)),
+            command: Some(program.meta.name.clone()),
+        }).await;
+
+        // Index individual program tools.
+        for tool_def in &program.meta.tools {
+            retriever.index_tool(ToolEntry {
+                name: format!("{}:{}", program.meta.name, tool_def.name),
+                category: "program-tool".to_string(),
+                description: tool_def.description.clone(),
+                skill_path: Some(format!("programs/{}/SKILL.md", program.meta.name)),
+                command: Some(tool_def.command.clone()),
+            }).await;
+        }
+    }
+
+    tracing::info!(count = retriever.len(), "ToolRetriever indexed");
+    retriever
+}
+
+/// Build a BrowserApi from config (standalone, for use during KernelBuilder::build).
+#[cfg(feature = "browser")]
+fn build_browser_api_value(config: &OxiosConfig) -> oxios_kernel::BrowserApi {
+    if config.browser.enabled {
+        let browser_config = oxios_kernel::OxibrowserConfig {
+            user_agent: config.browser.user_agent.clone(),
+            timeout_secs: config.browser.timeout_secs,
+            max_sessions: config.browser.max_sessions,
+            cookie_file: config.browser.cookie_file.clone(),
+        };
+        let backend = Arc::new(oxios_kernel::OxibrowserBackend::new(browser_config));
+        oxios_kernel::BrowserApi::new(backend)
+    } else {
+        oxios_kernel::BrowserApi::default()
+    }
+}
+
+#[cfg(not(feature = "browser"))]
+fn build_browser_api_value(_config: &OxiosConfig) -> oxios_kernel::BrowserApi {
+    oxios_kernel::BrowserApi::default()
 }

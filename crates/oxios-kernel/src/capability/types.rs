@@ -328,6 +328,23 @@ impl CSpace {
     pub fn filter_resource(&self, f: impl Fn(&ResourceRef) -> bool) -> Vec<&Capability> {
         self.caps.values().filter(|c| f(&c.resource)).collect()
     }
+
+    /// Returns the unique kernel domain names active in this CSpace.
+    ///
+    /// Useful for building a kernel manifest for the system prompt.
+    pub fn active_domains(&self) -> Vec<&str> {
+        let mut domains: Vec<&str> = self.caps.values()
+            .filter_map(|cap| match &cap.resource {
+                ResourceRef::KernelDomain { domain } => Some(domain.as_str()),
+                ResourceRef::Exec { .. } => Some("exec"),
+                ResourceRef::Browser => Some("browser"),
+                _ => None,
+            })
+            .collect();
+        domains.sort();
+        domains.dedup();
+        domains
+    }
 }
 
 #[cfg(test)]

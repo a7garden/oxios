@@ -88,7 +88,7 @@ impl ExecTool {
     /// and binds the tool to the default agent name `"oxios-agent"`.
     pub fn from_kernel(kernel: &crate::kernel_handle::KernelHandle) -> Self {
         Self::for_agent(
-            kernel.exec.config().clone(),
+            Arc::new(kernel.exec.config().clone()),
             kernel.exec.access_manager().clone(),
             "oxios-agent".to_string(),
         )
