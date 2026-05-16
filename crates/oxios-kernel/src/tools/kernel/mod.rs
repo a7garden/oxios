@@ -14,25 +14,25 @@
 //! - [`BudgetTool`] — Budget management (check, set, reserve, reset)
 //! - [`ResourceTool`] — Resource monitoring (snapshot, history, overloaded)
 
-pub mod space_tool;
 pub mod agent_tool;
-pub mod persona_tool;
-pub mod cron_tool;
-pub mod security_tool;
 pub mod budget_tool;
+pub mod cron_tool;
+pub mod persona_tool;
 pub mod resource_tool;
+pub mod security_tool;
+pub mod space_tool;
 
-pub use space_tool::SpaceTool;
 pub use agent_tool::AgentTool as KernelAgentTool;
-pub use persona_tool::PersonaTool;
-pub use cron_tool::CronTool;
-pub use security_tool::SecurityTool;
 pub use budget_tool::BudgetTool;
+pub use cron_tool::CronTool;
+pub use persona_tool::PersonaTool;
 pub use resource_tool::ResourceTool;
+pub use security_tool::SecurityTool;
+pub use space_tool::SpaceTool;
 
 use crate::types::AgentId;
 use crate::KernelHandle;
-use oxi_agent::ToolRegistry;
+use oxi_sdk::ToolRegistry;
 
 /// Register all kernel domain tools into the registry.
 ///
@@ -59,13 +59,18 @@ pub fn register_all_kernel_tools(registry: &ToolRegistry, kernel: &KernelHandle,
     registry.register(ResourceTool::from_kernel(kernel));
 
     // A2A tools (each stores Arc<KernelHandle>)
-    registry.register(crate::tools::A2aDelegateTool::from_kernel(kernel, agent_uuid));
+    registry.register(crate::tools::A2aDelegateTool::from_kernel(
+        kernel, agent_uuid,
+    ));
     registry.register(crate::tools::A2aSendTool::from_kernel(kernel, agent_uuid));
     registry.register(crate::tools::A2aQueryTool::from_kernel(kernel));
 
     // MCP tool wrapper (stores Arc<KernelHandle>)
     registry.register(crate::tools::McpToolWrapper::from_kernel(
-        kernel, "", "", "MCP tools via bridge".into(),
+        kernel,
+        "",
+        "",
+        "MCP tools via bridge".into(),
         serde_json::json!({"type": "object", "properties": {}}),
     ));
 

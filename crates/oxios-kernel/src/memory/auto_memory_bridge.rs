@@ -57,7 +57,9 @@ impl InsightCategory {
     /// Parse from a string.
     pub fn from_str_loose(s: &str) -> Self {
         match s.to_lowercase().as_str() {
-            "project-patterns" | "project_patterns" | "patterns" => InsightCategory::ProjectPatterns,
+            "project-patterns" | "project_patterns" | "patterns" => {
+                InsightCategory::ProjectPatterns
+            }
             "debugging" | "debug" => InsightCategory::Debugging,
             "architecture" | "arch" => InsightCategory::Architecture,
             "performance" | "perf" => InsightCategory::Performance,
@@ -188,7 +190,9 @@ impl AutoMemoryBridge {
                 }
                 Err(e) => {
                     result.failed += 1;
-                    result.errors.push(format!("{}: {}", file_path.display(), e));
+                    result
+                        .errors
+                        .push(format!("{}: {}", file_path.display(), e));
                 }
             }
         }
@@ -337,12 +341,19 @@ impl AutoMemoryBridge {
             if let Ok(entries) = std::fs::read_dir(&self.auto_memory_dir) {
                 for entry in entries.flatten() {
                     let path = entry.path();
-                    if path.extension().map_or(false, |ext| ext == "md") {
+                    if path.extension().is_some_and(|ext| ext == "md") {
                         let name = path.file_name().unwrap_or_default().to_string_lossy();
                         // Skip already-added files
-                        if !["MEMORY.md", "patterns.md", "debugging.md",
-                             "architecture.md", "performance.md", "security.md", "general.md"]
-                            .contains(&name.as_ref())
+                        if ![
+                            "MEMORY.md",
+                            "patterns.md",
+                            "debugging.md",
+                            "architecture.md",
+                            "performance.md",
+                            "security.md",
+                            "general.md",
+                        ]
+                        .contains(&name.as_ref())
                         {
                             files.push(path);
                         }
@@ -443,7 +454,14 @@ impl AutoMemoryBridge {
                     let (summary, detail) = if let Some(pos) = description.find(':') {
                         let s = description[..pos].trim();
                         let d = description[pos + 1..].trim();
-                        (s.to_string(), if d.is_empty() { None } else { Some(d.to_string()) })
+                        (
+                            s.to_string(),
+                            if d.is_empty() {
+                                None
+                            } else {
+                                Some(d.to_string())
+                            },
+                        )
                     } else {
                         (description.to_string(), None)
                     };
@@ -505,7 +523,7 @@ impl AutoMemoryBridge {
 
         let end = item[2..].find("**")?;
         let category = &item[2..2 + end];
-        let rest = item[2 + end + 2..].trim_start_matches(|c: char| c == ' ' || c == ':');
+        let rest = item[2 + end + 2..].trim_start_matches([' ', ':']);
 
         Some((category, rest))
     }
@@ -573,16 +591,15 @@ mod tests {
     use std::sync::Arc;
 
     fn make_bridge(dir: &Path) -> AutoMemoryBridge {
-        let store = Arc::new(
-            crate::state_store::StateStore::new(dir.join("state")).unwrap(),
-        );
+        let store = Arc::new(crate::state_store::StateStore::new(dir.join("state")).unwrap());
         let memory = Arc::new(MemoryManager::new(store));
         AutoMemoryBridge::new(dir.join("auto"), memory)
     }
 
     #[test]
     fn test_parse_bold_category() {
-        let result = AutoMemoryBridge::extract_bold_category("**Debugging**: Use trace-level logging");
+        let result =
+            AutoMemoryBridge::extract_bold_category("**Debugging**: Use trace-level logging");
         assert!(result.is_some());
         let (cat, rest) = result.unwrap();
         assert_eq!(cat, "Debugging");
@@ -625,10 +642,14 @@ mod tests {
         assert!(!insights.is_empty());
 
         // Should have parsed the bullet points
-        let debugging = insights.iter().find(|i| i.category == InsightCategory::Debugging);
+        let debugging = insights
+            .iter()
+            .find(|i| i.category == InsightCategory::Debugging);
         assert!(debugging.is_some());
 
-        let security = insights.iter().find(|i| i.category == InsightCategory::Security);
+        let security = insights
+            .iter()
+            .find(|i| i.category == InsightCategory::Security);
         assert!(security.is_some());
     }
 
@@ -654,19 +675,36 @@ mod tests {
 
     #[test]
     fn test_insight_category_parsing() {
-        assert_eq!(InsightCategory::from_str_loose("patterns"), InsightCategory::ProjectPatterns);
-        assert_eq!(InsightCategory::from_str_loose("debug"), InsightCategory::Debugging);
-        assert_eq!(InsightCategory::from_str_loose("arch"), InsightCategory::Architecture);
-        assert_eq!(InsightCategory::from_str_loose("perf"), InsightCategory::Performance);
-        assert_eq!(InsightCategory::from_str_loose("sec"), InsightCategory::Security);
-        assert_eq!(InsightCategory::from_str_loose("unknown"), InsightCategory::General);
+        assert_eq!(
+            InsightCategory::from_str_loose("patterns"),
+            InsightCategory::ProjectPatterns
+        );
+        assert_eq!(
+            InsightCategory::from_str_loose("debug"),
+            InsightCategory::Debugging
+        );
+        assert_eq!(
+            InsightCategory::from_str_loose("arch"),
+            InsightCategory::Architecture
+        );
+        assert_eq!(
+            InsightCategory::from_str_loose("perf"),
+            InsightCategory::Performance
+        );
+        assert_eq!(
+            InsightCategory::from_str_loose("sec"),
+            InsightCategory::Security
+        );
+        assert_eq!(
+            InsightCategory::from_str_loose("unknown"),
+            InsightCategory::General
+        );
     }
 
     #[test]
     fn test_confidence_bar() {
         let bar = format_confidence_bar(0.8);
         assert!(bar.contains("80%"));
-
 
         let bar_low = format_confidence_bar(0.2);
         assert!(bar_low.contains("20%"));
@@ -693,7 +731,9 @@ mod tests {
         let md = r#"- **Debugging**: Use println! for quick debugging
 - **Architecture**: Keep modules small and focused
 "#;
-        tokio::fs::write(auto_dir.join("MEMORY.md"), md).await.unwrap();
+        tokio::fs::write(auto_dir.join("MEMORY.md"), md)
+            .await
+            .unwrap();
 
         let bridge = make_bridge(temp_dir.path());
         let result = bridge.import_from_auto().await.unwrap();
@@ -755,7 +795,10 @@ mod tests {
         .unwrap();
 
         let bridge = make_bridge(temp_dir.path());
-        let result = bridge.sync_session(SyncDirection::Bidirectional).await.unwrap();
+        let result = bridge
+            .sync_session(SyncDirection::Bidirectional)
+            .await
+            .unwrap();
 
         // Should have imported the insight
         assert!(result.import.imported >= 1 || result.import.skipped_duplicates > 0);

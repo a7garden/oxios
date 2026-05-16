@@ -19,7 +19,8 @@ fn bench_state_save(c: &mut Criterion) {
 
     c.bench_function("state_save_json", |b| {
         b.iter(|| {
-            rt.block_on(store.save_json("bench", "item", &data)).unwrap();
+            rt.block_on(store.save_json("bench", "item", &data))
+                .unwrap();
         });
     });
 }
@@ -70,9 +71,7 @@ fn bench_kernel_build(c: &mut Criterion) {
         b.iter(|| {
             // Benchmark state store creation
             let dir = TempDir::new().unwrap();
-            black_box(
-                oxios_kernel::state_store::StateStore::new(dir.path().into()).unwrap(),
-            );
+            black_box(oxios_kernel::state_store::StateStore::new(dir.path().into()).unwrap());
         });
     });
 }

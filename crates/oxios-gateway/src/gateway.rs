@@ -71,8 +71,12 @@ impl Gateway {
                 if let Some(ref sid) = orchestration.session_id {
                     response_metadata.insert("session_id".to_owned(), sid.clone());
                 }
-                response_metadata.insert("phase".to_owned(), orchestration.phase_reached.to_string());
-                response_metadata.insert("evaluation_passed".to_owned(), orchestration.evaluation_passed.to_string());
+                response_metadata
+                    .insert("phase".to_owned(), orchestration.phase_reached.to_string());
+                response_metadata.insert(
+                    "evaluation_passed".to_owned(),
+                    orchestration.evaluation_passed.to_string(),
+                );
 
                 let outgoing = OutgoingMessage::with_metadata(
                     &msg.channel,

@@ -1,14 +1,14 @@
-use std::convert::Infallible;
-use std::sync::Arc;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::response::sse::{Event as SseEvent, Sse};
 use axum::Json;
 use serde::Serialize;
+use std::convert::Infallible;
+use std::sync::Arc;
 use tokio_stream::wrappers::BroadcastStream;
 use tokio_stream::StreamExt as TokioStreamExt;
 
-use crate::routes::{PageParams, paginate};
+use crate::routes::{paginate, PageParams};
 use crate::server::AppState;
 
 // ---------------------------------------------------------------------------
@@ -166,13 +166,22 @@ pub(crate) fn sanitize_event(event: &oxios_kernel::event_bus::KernelEvent) -> se
             "type": "phase_completed",
             "phase": format!("{phase:?}"),
         }),
-        KernelEvent::AgentOutput { session_id, agent_id, .. } => serde_json::json!({
+        KernelEvent::AgentOutput {
+            session_id,
+            agent_id,
+            ..
+        } => serde_json::json!({
             "type": "agent_output",
             "session_id": session_id,
             "agent_id": agent_id.to_string(),
             // content excluded
         }),
-        KernelEvent::ApprovalRequested { id, action, resource, .. } => serde_json::json!({
+        KernelEvent::ApprovalRequested {
+            id,
+            action,
+            resource,
+            ..
+        } => serde_json::json!({
             "type": "approval_requested",
             "id": id.to_string(),
             "action": action,
@@ -183,7 +192,11 @@ pub(crate) fn sanitize_event(event: &oxios_kernel::event_bus::KernelEvent) -> se
             "id": id.to_string(),
             "approved": approved,
         }),
-        KernelEvent::MemoryStored { id, memory_type, source } => serde_json::json!({
+        KernelEvent::MemoryStored {
+            id,
+            memory_type,
+            source,
+        } => serde_json::json!({
             "type": "memory_stored",
             "id": id,
             "memory_type": memory_type,
@@ -194,18 +207,29 @@ pub(crate) fn sanitize_event(event: &oxios_kernel::event_bus::KernelEvent) -> se
             "query": query,
             "count": count,
         }),
-        KernelEvent::AgentGroupCreated { group_id, agent_count } => serde_json::json!({
+        KernelEvent::AgentGroupCreated {
+            group_id,
+            agent_count,
+        } => serde_json::json!({
             "type": "agent_group_created",
             "group_id": group_id.to_string(),
             "agent_count": agent_count,
         }),
-        KernelEvent::AgentGroupMemberCompleted { group_id, agent_id, success } => serde_json::json!({
+        KernelEvent::AgentGroupMemberCompleted {
+            group_id,
+            agent_id,
+            success,
+        } => serde_json::json!({
             "type": "agent_group_member_completed",
             "group_id": group_id.to_string(),
             "agent_id": agent_id.to_string(),
             "success": success,
         }),
-        KernelEvent::SpaceCreated { space_id, name, source } => serde_json::json!({
+        KernelEvent::SpaceCreated {
+            space_id,
+            name,
+            source,
+        } => serde_json::json!({
             "type": "space_created",
             "space_id": space_id.to_string(),
             "name": name,
@@ -221,13 +245,23 @@ pub(crate) fn sanitize_event(event: &oxios_kernel::event_bus::KernelEvent) -> se
             "space_id": space_id.to_string(),
             "name": name,
         }),
-        KernelEvent::SpacesMerged { survivor, absorbed, entries_migrated, .. } => serde_json::json!({
+        KernelEvent::SpacesMerged {
+            survivor,
+            absorbed,
+            entries_migrated,
+            ..
+        } => serde_json::json!({
             "type": "spaces_merged",
             "survivor": survivor.to_string(),
             "absorbed": absorbed.to_string(),
             "entries_migrated": entries_migrated,
         }),
-        KernelEvent::KnowledgeCrossReferenced { from_space, to_space, entries, flow } => serde_json::json!({
+        KernelEvent::KnowledgeCrossReferenced {
+            from_space,
+            to_space,
+            entries,
+            flow,
+        } => serde_json::json!({
             "type": "knowledge_cross_referenced",
             "from_space": from_space.to_string(),
             "to_space": to_space.to_string(),
@@ -257,7 +291,10 @@ pub(crate) struct ApprovalResponse {
 pub(crate) async fn handle_approvals_list(
     state: State<Arc<AppState>>,
 ) -> Json<Vec<ApprovalResponse>> {
-    let approvals: Vec<ApprovalResponse> = state.kernel.security.list_approvals()
+    let approvals: Vec<ApprovalResponse> = state
+        .kernel
+        .security
+        .list_approvals()
         .iter()
         .map(|(p, s)| {
             let subject_str = match &p.subject {
@@ -270,7 +307,9 @@ pub(crate) async fn handle_approvals_list(
                 oxios_kernel::access_manager::Action::AccessPath(p) => format!("access_path:{}", p),
                 oxios_kernel::access_manager::Action::ManageAgents => "manage_agents".into(),
                 oxios_kernel::access_manager::Action::ManagePrograms => "manage_programs".into(),
-                oxios_kernel::access_manager::Action::ManageWorkspaces => "manage_workspaces".into(),
+                oxios_kernel::access_manager::Action::ManageWorkspaces => {
+                    "manage_workspaces".into()
+                }
                 oxios_kernel::access_manager::Action::ManageRBAC => "manage_rbac".into(),
                 oxios_kernel::access_manager::Action::ViewAuditLog => "view_audit_log".into(),
                 oxios_kernel::access_manager::Action::SystemConfig => "system_config".into(),
@@ -304,14 +343,18 @@ pub(crate) async fn handle_approval_approve(
         Ok(u) => u,
         Err(_) => return Err(StatusCode::BAD_REQUEST),
     };
-    
+
     if state.kernel.security.approve(uuid) {
         tracing::info!(approval_id = %uuid, "Approval granted");
         // Publish event so SSE clients update automatically
-        let _ = state.kernel.infra.publish(oxios_kernel::event_bus::KernelEvent::ApprovalResolved {
-            id: uuid,
-            approved: true,
-        });
+        let _ =
+            state
+                .kernel
+                .infra
+                .publish(oxios_kernel::event_bus::KernelEvent::ApprovalResolved {
+                    id: uuid,
+                    approved: true,
+                });
         Ok(Json(serde_json::json!({
             "status": "approved",
             "id": id,
@@ -330,14 +373,18 @@ pub(crate) async fn handle_approval_reject(
         Ok(u) => u,
         Err(_) => return Err(StatusCode::BAD_REQUEST),
     };
-    
+
     if state.kernel.security.reject(uuid) {
         tracing::info!(approval_id = %uuid, "Approval rejected");
         // Publish event so SSE clients update automatically
-        let _ = state.kernel.infra.publish(oxios_kernel::event_bus::KernelEvent::ApprovalResolved {
-            id: uuid,
-            approved: false,
-        });
+        let _ =
+            state
+                .kernel
+                .infra
+                .publish(oxios_kernel::event_bus::KernelEvent::ApprovalResolved {
+                    id: uuid,
+                    approved: false,
+                });
         Ok(Json(serde_json::json!({
             "status": "rejected",
             "id": id,

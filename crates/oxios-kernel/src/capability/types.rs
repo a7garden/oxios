@@ -23,8 +23,8 @@ use std::fmt;
 
 use serde::{Deserialize, Serialize};
 
-use crate::types::AgentId;
 use crate::space::SpaceId;
+use crate::types::AgentId;
 
 /// Unique identifier for a capability.
 ///
@@ -135,22 +135,34 @@ impl fmt::Display for Rights {
             return write!(f, "NONE");
         }
         let mut parts = Vec::new();
-        if self.contains(Rights::READ) { parts.push("R"); }
-        if self.contains(Rights::WRITE) { parts.push("W"); }
-        if self.contains(Rights::EXECUTE) { parts.push("X"); }
-        if self.contains(Rights::DELEGATE) { parts.push("D"); }
+        if self.contains(Rights::READ) {
+            parts.push("R");
+        }
+        if self.contains(Rights::WRITE) {
+            parts.push("W");
+        }
+        if self.contains(Rights::EXECUTE) {
+            parts.push("X");
+        }
+        if self.contains(Rights::DELEGATE) {
+            parts.push("D");
+        }
         write!(f, "{}", parts.join("|"))
     }
 }
 
 impl std::ops::BitOr for Rights {
     type Output = Self;
-    fn bitor(self, rhs: Self) -> Self { Rights(self.0 | rhs.0) }
+    fn bitor(self, rhs: Self) -> Self {
+        Rights(self.0 | rhs.0)
+    }
 }
 
 impl std::ops::BitAnd for Rights {
     type Output = Self;
-    fn bitand(self, rhs: Self) -> Self { Rights(self.0 & rhs.0) }
+    fn bitand(self, rhs: Self) -> Self {
+        Rights(self.0 & rhs.0)
+    }
 }
 
 /// A reference to a protected resource.
@@ -301,7 +313,9 @@ impl CSpace {
     /// Returns true if any capability in this space matches the resource
     /// and grants the requested rights.
     pub fn can(&self, resource: &ResourceRef, required: Rights) -> bool {
-        self.caps.values().any(|cap| &cap.resource == resource && cap.grants(required))
+        self.caps
+            .values()
+            .any(|cap| &cap.resource == resource && cap.grants(required))
     }
 
     /// Returns an iterator over all capabilities in this space.
@@ -333,7 +347,9 @@ impl CSpace {
     ///
     /// Useful for building a kernel manifest for the system prompt.
     pub fn active_domains(&self) -> Vec<&str> {
-        let mut domains: Vec<&str> = self.caps.values()
+        let mut domains: Vec<&str> = self
+            .caps
+            .values()
             .filter_map(|cap| match &cap.resource {
                 ResourceRef::KernelDomain { domain } => Some(domain.as_str()),
                 ResourceRef::Exec { .. } => Some("exec"),
@@ -374,13 +390,25 @@ mod tests {
         let agent = AgentId::new_v4();
         let mut cs = CSpace::new(agent);
         let cap = Capability::kernel(
-            ResourceRef::Exec { mode: "shell".into() },
+            ResourceRef::Exec {
+                mode: "shell".into(),
+            },
             Rights::READ | Rights::EXECUTE,
         );
         cs.insert(cap);
 
-        assert!(cs.can(&ResourceRef::Exec { mode: "shell".into() }, Rights::EXECUTE));
-        assert!(!cs.can(&ResourceRef::Exec { mode: "shell".into() }, Rights::WRITE));
+        assert!(cs.can(
+            &ResourceRef::Exec {
+                mode: "shell".into()
+            },
+            Rights::EXECUTE
+        ));
+        assert!(!cs.can(
+            &ResourceRef::Exec {
+                mode: "shell".into()
+            },
+            Rights::WRITE
+        ));
         assert!(!cs.can(&ResourceRef::Browser, Rights::READ));
     }
 

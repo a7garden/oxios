@@ -1,8 +1,8 @@
 //! Exec API — execution configuration and access management facade.
 
-use std::sync::Arc;
-use crate::config::ExecConfig;
 use crate::access_manager::AccessManager;
+use crate::config::ExecConfig;
+use std::sync::Arc;
 
 /// Execution management system calls.
 ///
@@ -19,7 +19,10 @@ impl ExecApi {
         config: Arc<ExecConfig>,
         access_manager: Arc<parking_lot::Mutex<AccessManager>>,
     ) -> Self {
-        Self { config, access_manager }
+        Self {
+            config,
+            access_manager,
+        }
     }
 
     /// Execution configuration reference.

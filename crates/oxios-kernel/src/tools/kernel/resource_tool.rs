@@ -102,8 +102,8 @@ impl AgentTool for ResourceTool {
         match action {
             "snapshot" => {
                 let snap = self.resource_monitor.snapshot();
-                Ok(AgentToolResult::success(serde_json::to_string_pretty(
-                    &json!({
+                Ok(AgentToolResult::success(
+                    serde_json::to_string_pretty(&json!({
                         "timestamp": snap.timestamp.to_rfc3339(),
                         "cpu_percent": format!("{:.1}%", snap.cpu_percent),
                         "memory_used_mb": snap.memory_used_mb,
@@ -121,8 +121,9 @@ impl AgentTool for ResourceTool {
                         "total_token_usage": snap.total_token_usage,
                         "disk_used_gb": format!("{:.2}", snap.disk_used_gb),
                         "load_avg_1m": format!("{:.2}", snap.load_avg_1m),
-                    }),
-                ).unwrap_or_default()))
+                    }))
+                    .unwrap_or_default(),
+                ))
             }
 
             "history" => {
@@ -148,22 +149,24 @@ impl AgentTool for ResourceTool {
                     })
                     .collect();
 
-                Ok(AgentToolResult::success(serde_json::to_string_pretty(
-                    &json!({
+                Ok(AgentToolResult::success(
+                    serde_json::to_string_pretty(&json!({
                         "snapshots": display,
                         "count": display.len(),
-                    }),
-                ).unwrap_or_default()))
+                    }))
+                    .unwrap_or_default(),
+                ))
             }
 
             "overloaded" => {
                 let overloaded = self.resource_monitor.is_overloaded();
-                Ok(AgentToolResult::success(serde_json::to_string(
-                    &json!({
+                Ok(AgentToolResult::success(
+                    serde_json::to_string(&json!({
                         "overloaded": overloaded,
                         "status": if overloaded { "OVERLOADED" } else { "NOMINAL" },
-                    }),
-                ).unwrap_or_default()))
+                    }))
+                    .unwrap_or_default(),
+                ))
             }
 
             other => Err(format!(
@@ -192,9 +195,7 @@ mod tests {
             "required": ["action"]
         });
 
-        let actions = schema["properties"]["action"]["enum"]
-            .as_array()
-            .unwrap();
+        let actions = schema["properties"]["action"]["enum"].as_array().unwrap();
         assert_eq!(actions.len(), 3);
         assert!(actions.iter().any(|a| a == "snapshot"));
         assert!(actions.iter().any(|a| a == "history"));

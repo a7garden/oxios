@@ -105,16 +105,11 @@ impl BudgetManager {
 
         // Initialize usage for new agents or keep existing if already set
         let mut usage = self.usage.write();
-        if !usage.contains_key(&agent_id) {
-            usage.insert(
-                agent_id,
-                Usage {
+        usage.entry(agent_id).or_insert(Usage {
                     tokens_used: 0,
                     calls_used: 0,
                     window_start: now,
-                },
-            );
-        }
+                });
     }
 
     /// Removes the budget for an agent.
@@ -150,13 +145,11 @@ impl BudgetManager {
 
         {
             let mut usage = self.usage.write();
-            let usage_entry = usage
-                .entry(*agent_id)
-                .or_insert_with(|| Usage {
-                    tokens_used: 0,
-                    calls_used: 0,
-                    window_start: Utc::now(),
-                });
+            let usage_entry = usage.entry(*agent_id).or_insert_with(|| Usage {
+                tokens_used: 0,
+                calls_used: 0,
+                window_start: Utc::now(),
+            });
 
             reset_if_expired(usage_entry, limit.window_secs);
 
@@ -210,13 +203,11 @@ impl BudgetManager {
 
         {
             let mut usage = self.usage.write();
-            let usage_entry = usage
-                .entry(*agent_id)
-                .or_insert_with(|| Usage {
-                    tokens_used: 0,
-                    calls_used: 0,
-                    window_start: Utc::now(),
-                });
+            let usage_entry = usage.entry(*agent_id).or_insert_with(|| Usage {
+                tokens_used: 0,
+                calls_used: 0,
+                window_start: Utc::now(),
+            });
 
             reset_if_expired(usage_entry, limit.window_secs);
 

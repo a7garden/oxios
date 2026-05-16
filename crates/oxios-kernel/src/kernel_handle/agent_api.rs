@@ -1,11 +1,11 @@
 //! Agent API — agent lifecycle, budget, memory.
 
-use std::sync::Arc;
-use crate::supervisor::Supervisor;
-use crate::budget::{BudgetManager, BudgetInfo, BudgetLimit, BudgetExceeded};
-use crate::memory::{MemoryEntry, MemoryType, MemoryManager};
+use crate::budget::{BudgetExceeded, BudgetInfo, BudgetLimit, BudgetManager};
 use crate::memory::store::{HnswMemoryIndex, SemanticHit};
+use crate::memory::{MemoryEntry, MemoryManager, MemoryType};
+use crate::supervisor::Supervisor;
 use crate::types::AgentId;
+use std::sync::Arc;
 
 /// Agent management system calls.
 pub struct AgentApi {
@@ -23,7 +23,12 @@ impl AgentApi {
         budget_manager: Arc<BudgetManager>,
         memory_manager: Arc<MemoryManager>,
     ) -> Self {
-        Self { supervisor, budget_manager, memory_manager, hnsw_index: None }
+        Self {
+            supervisor,
+            budget_manager,
+            memory_manager,
+            hnsw_index: None,
+        }
     }
 
     /// Attach an HNSW index for semantic search.
@@ -32,14 +37,20 @@ impl AgentApi {
     }
     /// List running agents.
     pub async fn list(&self) -> anyhow::Result<Vec<crate::types::AgentInfo>> {
-        self.supervisor.list().await.map_err(|e| anyhow::anyhow!("supervisor: {e}"))
+        self.supervisor
+            .list()
+            .await
+            .map_err(|e| anyhow::anyhow!("supervisor: {e}"))
     }
 
     /// Kill a running agent.
     pub async fn kill(&self, agent_id: &str) -> anyhow::Result<()> {
         let id = uuid::Uuid::parse_str(agent_id)
             .map_err(|e| anyhow::anyhow!("invalid agent id: {e}"))?;
-        self.supervisor.kill(id).await.map_err(|e| anyhow::anyhow!("supervisor: {e}"))
+        self.supervisor
+            .kill(id)
+            .await
+            .map_err(|e| anyhow::anyhow!("supervisor: {e}"))
     }
 
     /// Check budget for an agent.
@@ -69,7 +80,10 @@ impl AgentApi {
 
     /// Get memory stats.
     pub async fn memory_stats(&self) -> (usize, usize) {
-        (self.memory_manager.vector_index_size(), self.memory_manager.total_entries().await)
+        (
+            self.memory_manager.vector_index_size(),
+            self.memory_manager.total_entries().await,
+        )
     }
 
     /// Store a memory entry.

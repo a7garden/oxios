@@ -1,10 +1,10 @@
 //! Extension API — programs, skills, host tools.
 
-use std::sync::Arc;
-use crate::program::{ProgramManager, Program, ProgramMeta, InstallSource, HostRequirementsCheck};
-use crate::skill::{SkillStore, Skill, SkillMeta};
 use crate::host_tools::HostToolStatus;
 use crate::host_tools::HostToolValidator;
+use crate::program::{HostRequirementsCheck, InstallSource, Program, ProgramManager, ProgramMeta};
+use crate::skill::{Skill, SkillMeta, SkillStore};
+use std::sync::Arc;
 
 /// Extension system calls.
 pub struct ExtensionApi {
@@ -20,11 +20,16 @@ impl ExtensionApi {
         skill_store: Arc<SkillStore>,
         host_tool_validator: Arc<HostToolValidator>,
     ) -> Self {
-        Self { program_manager, skill_store, host_tool_validator }
+        Self {
+            program_manager,
+            skill_store,
+            host_tool_validator,
+        }
     }
     /// List installed programs.
     pub async fn list_programs(&self) -> Vec<ProgramMeta> {
-        self.program_manager.list_programs()
+        self.program_manager
+            .list_programs()
             .await
             .into_iter()
             .map(|p| p.meta)
@@ -57,7 +62,10 @@ impl ExtensionApi {
     }
 
     /// Check host requirements for a program.
-    pub async fn check_host_requirements(&self, name: &str) -> anyhow::Result<HostRequirementsCheck> {
+    pub async fn check_host_requirements(
+        &self,
+        name: &str,
+    ) -> anyhow::Result<HostRequirementsCheck> {
         self.program_manager.check_host_requirements(name).await
     }
 
@@ -72,8 +80,15 @@ impl ExtensionApi {
     }
 
     /// Create a new skill.
-    pub async fn create_skill(&self, name: &str, description: &str, content: &str) -> anyhow::Result<()> {
-        self.skill_store.create_skill(name, description, content).await
+    pub async fn create_skill(
+        &self,
+        name: &str,
+        description: &str,
+        content: &str,
+    ) -> anyhow::Result<()> {
+        self.skill_store
+            .create_skill(name, description, content)
+            .await
     }
 
     /// Delete a skill.

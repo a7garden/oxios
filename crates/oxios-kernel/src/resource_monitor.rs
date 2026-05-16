@@ -104,8 +104,8 @@ impl ResourceMonitor {
         sys.refresh_all();
 
         // CPU: average across all cores
-        let cpu_percent = sys.cpus().iter().map(|c| c.cpu_usage()).sum::<f32>()
-            / sys.cpus().len().max(1) as f32;
+        let cpu_percent =
+            sys.cpus().iter().map(|c| c.cpu_usage()).sum::<f32>() / sys.cpus().len().max(1) as f32;
 
         let total_memory = sys.total_memory();
         let used_memory = sys.used_memory();

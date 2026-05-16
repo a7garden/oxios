@@ -12,9 +12,7 @@ pub mod manager;
 
 pub use conversation_buffer::{ConversationBuffer, ConversationTurn};
 pub use detection::{extract_filesystem_path, match_keywords, PathMatcher};
-pub use knowledge_bridge::{
-    CrossRefEntry, KnowledgeBridge, KnowledgeFlow,
-};
+pub use knowledge_bridge::{CrossRefEntry, KnowledgeBridge, KnowledgeFlow};
 pub use manager::{SpaceManager, SpaceManagerError};
 
 use chrono::{DateTime, Utc};
@@ -187,9 +185,8 @@ pub static DEFAULT_SPACE_ID: std::sync::OnceLock<uuid::Uuid> = std::sync::OnceLo
 
 /// Get the default Space ID.
 pub fn default_space_id() -> SpaceId {
-    *DEFAULT_SPACE_ID.get_or_init(|| {
-        uuid::Uuid::parse_str("00000000-0000-0000-0000-000000000001").unwrap()
-    })
+    *DEFAULT_SPACE_ID
+        .get_or_init(|| uuid::Uuid::parse_str("00000000-0000-0000-0000-000000000001").unwrap())
 }
 
 #[cfg(test)]

@@ -7,12 +7,11 @@
 use anyhow::{Context, Result};
 use oxios_gateway::Gateway;
 use oxios_kernel::{
-    access_manager::AccessManager, auth::AuthManager, config::load_config,
-    A2AProtocol, AgentRuntime, BasicSupervisor,
-    CronScheduler, EngineProvider, EventBus, GitLayer, HostToolValidator,
-    McpBridge, McpServer, MemoryManager, Orchestrator, OxiosConfig, PersonaManager,
-    ProgramManager, SkillStore, AgentScheduler, Supervisor,
-    AuditTrail, BudgetManager, ResourceMonitor, SpaceManager,
+    access_manager::AccessManager, auth::AuthManager, config::load_config, A2AProtocol,
+    AgentRuntime, AgentScheduler, AuditTrail, BasicSupervisor, BudgetManager, CronScheduler,
+    EngineProvider, EventBus, GitLayer, HostToolValidator, McpBridge, McpServer, MemoryManager,
+    Orchestrator, OxiosConfig, PersonaManager, ProgramManager, ResourceMonitor, SkillStore,
+    SpaceManager, Supervisor,
 };
 
 use oxios_ouroboros::{OuroborosEngine, OuroborosProtocol, Seed};
@@ -68,50 +67,47 @@ impl Kernel {
     ///
     /// Cached after first call. Use this for all kernel operations.
     pub fn handle(&self) -> Arc<oxios_kernel::KernelHandle> {
-        self.handle_cache.get_or_init(|| {
-            Arc::new(oxios_kernel::KernelHandle::new(
-                oxios_kernel::StateApi::new(self.state_store.clone()),
-                oxios_kernel::AgentApi::new(
-                    self.supervisor.clone(),
-                    self.budget_manager.clone(),
-                    self.memory_manager.clone(),
-                ),
-                oxios_kernel::SecurityApi::new(
-                    self.auth_manager.clone(),
-                    self.audit_trail.clone(),
-                    self.access_manager.clone(),
-                    self.state_store.clone(),
-                ),
-                oxios_kernel::PersonaApi::new(Arc::new(self.persona_manager.clone())),
-                oxios_kernel::ExtensionApi::new(
-                    self.program_manager.clone(),
-                    Arc::new(self.skill_store.clone()),
-                    Arc::new(self.host_tool_validator.clone()),
-                ),
-                oxios_kernel::McpApi::new(self.mcp_bridge.clone()),
-                oxios_kernel::InfraApi::new(
-                    self.git_layer.clone(),
-                    self.scheduler.clone(),
-                    self.cron_scheduler.clone(),
-                    self.resource_monitor.clone(),
-                    self.event_bus.clone(),
-                    self.config.clone(),
-                    self.start_time,
-                ),
-                oxios_kernel::SpaceApi::new(
-                    self.space_manager.clone(),
-                    self.event_bus.clone(),
-                ),
-                oxios_kernel::ExecApi::new(
-                    Arc::new(self.config.exec.clone()),
-                    self.access_manager.clone(),
-                ),
-                self.build_browser_api(),
-                oxios_kernel::A2aApi::new(
-                    self.a2a_protocol.clone(),
-                ),
-            ))
-        }).clone()
+        self.handle_cache
+            .get_or_init(|| {
+                Arc::new(oxios_kernel::KernelHandle::new(
+                    oxios_kernel::StateApi::new(self.state_store.clone()),
+                    oxios_kernel::AgentApi::new(
+                        self.supervisor.clone(),
+                        self.budget_manager.clone(),
+                        self.memory_manager.clone(),
+                    ),
+                    oxios_kernel::SecurityApi::new(
+                        self.auth_manager.clone(),
+                        self.audit_trail.clone(),
+                        self.access_manager.clone(),
+                        self.state_store.clone(),
+                    ),
+                    oxios_kernel::PersonaApi::new(Arc::new(self.persona_manager.clone())),
+                    oxios_kernel::ExtensionApi::new(
+                        self.program_manager.clone(),
+                        Arc::new(self.skill_store.clone()),
+                        Arc::new(self.host_tool_validator.clone()),
+                    ),
+                    oxios_kernel::McpApi::new(self.mcp_bridge.clone()),
+                    oxios_kernel::InfraApi::new(
+                        self.git_layer.clone(),
+                        self.scheduler.clone(),
+                        self.cron_scheduler.clone(),
+                        self.resource_monitor.clone(),
+                        self.event_bus.clone(),
+                        self.config.clone(),
+                        self.start_time,
+                    ),
+                    oxios_kernel::SpaceApi::new(self.space_manager.clone(), self.event_bus.clone()),
+                    oxios_kernel::ExecApi::new(
+                        Arc::new(self.config.exec.clone()),
+                        self.access_manager.clone(),
+                    ),
+                    self.build_browser_api(),
+                    oxios_kernel::A2aApi::new(self.a2a_protocol.clone()),
+                ))
+            })
+            .clone()
     }
 
     /// Gateway reference — for channel registration and message routing.
@@ -176,8 +172,7 @@ impl Kernel {
             for entry in std::fs::read_dir(&programs_dir)? {
                 let entry = entry?;
                 let name = entry.file_name().to_str().unwrap_or("").to_string();
-                if entry.path().is_dir()
-                    && self.program_manager.get_program(&name).await.is_none()
+                if entry.path().is_dir() && self.program_manager.get_program(&name).await.is_none()
                 {
                     if let Err(e) = self.program_manager.install(&entry.path()).await {
                         tracing::warn!(error = %e, program = ?entry.file_name(), "Failed to install default program");
@@ -192,7 +187,10 @@ impl Kernel {
     pub async fn init_mcp_servers(&self) -> Result<()> {
         if !self.config.mcp.servers.is_empty() {
             self.mcp_bridge.initialize_all().await?;
-            tracing::info!(count = self.config.mcp.servers.len(), "MCP servers initialized");
+            tracing::info!(
+                count = self.config.mcp.servers.len(),
+                "MCP servers initialized"
+            );
         }
         Ok(())
     }
@@ -207,18 +205,36 @@ impl Kernel {
 
                 if let Ok(valid) = handle.security.verify_chain() {
                     if !valid {
-                        handle.security.audit("guardian", AuditAction::Other { detail: "AUDIT CHAIN BROKEN".into() }, "guardian");
+                        handle.security.audit(
+                            "guardian",
+                            AuditAction::Other {
+                                detail: "AUDIT CHAIN BROKEN".into(),
+                            },
+                            "guardian",
+                        );
                     }
                 }
 
                 if handle.infra.is_overloaded() {
                     let snap = handle.infra.resource_snapshot();
-                    handle.security.audit("guardian", AuditAction::Other { detail: format!("OVERLOADED: cpu={:.1}%", snap.cpu_percent) }, "guardian");
+                    handle.security.audit(
+                        "guardian",
+                        AuditAction::Other {
+                            detail: format!("OVERLOADED: cpu={:.1}%", snap.cpu_percent),
+                        },
+                        "guardian",
+                    );
                 }
 
                 if let Ok(valid) = handle.infra.git_verify() {
                     if !valid {
-                        handle.security.audit("guardian", AuditAction::Other { detail: "GIT REPOSITORY CORRUPTED".into() }, "guardian");
+                        handle.security.audit(
+                            "guardian",
+                            AuditAction::Other {
+                                detail: "GIT REPOSITORY CORRUPTED".into(),
+                            },
+                            "guardian",
+                        );
                     }
                 }
 
@@ -253,9 +269,9 @@ impl KernelBuilder {
         };
 
         let event_bus = EventBus::new(config.kernel.event_bus_capacity);
-        let state_store = Arc::new(oxios_kernel::state_store::StateStore::new(
-            PathBuf::from(&config.kernel.workspace),
-        )?);
+        let state_store = Arc::new(oxios_kernel::state_store::StateStore::new(PathBuf::from(
+            &config.kernel.workspace,
+        ))?);
 
         // Model comes from config, not hardcoded default
         let model_id = &config.engine.default_model;
@@ -340,10 +356,8 @@ impl KernelBuilder {
 
         let audit_trail = Arc::new(AuditTrail::new(config.audit.max_entries));
 
-        let mut cron_scheduler = CronScheduler::new(
-            state_store.clone(),
-            config.cron.tick_interval_secs,
-        );
+        let mut cron_scheduler =
+            CronScheduler::new(state_store.clone(), config.cron.tick_interval_secs);
         cron_scheduler.set_git_layer(git_layer.clone());
         let cron_scheduler = Arc::new(cron_scheduler);
 
@@ -369,8 +383,8 @@ impl KernelBuilder {
         // ── KernelHandle — the syscall table for agent OS control ──
         // Created inline here because AgentRuntime needs it.
         // Will be cached again in the Kernel instance.
-        let kernel_handle: Arc<oxios_kernel::KernelHandle> = Arc::new(
-            oxios_kernel::KernelHandle::new(
+        let kernel_handle: Arc<oxios_kernel::KernelHandle> =
+            Arc::new(oxios_kernel::KernelHandle::new(
                 oxios_kernel::StateApi::new(state_store.clone()),
                 oxios_kernel::AgentApi::new(
                     // Placeholder supervisor — the real one needs AgentRuntime which needs this handle.
@@ -401,20 +415,11 @@ impl KernelBuilder {
                     config.clone(),
                     std::time::Instant::now(),
                 ),
-                oxios_kernel::SpaceApi::new(
-                    space_manager.clone(),
-                    event_bus.clone(),
-                ),
-                oxios_kernel::ExecApi::new(
-                    Arc::new(config.exec.clone()),
-                    access_manager.clone(),
-                ),
+                oxios_kernel::SpaceApi::new(space_manager.clone(), event_bus.clone()),
+                oxios_kernel::ExecApi::new(Arc::new(config.exec.clone()), access_manager.clone()),
                 build_browser_api_value(&config),
-                oxios_kernel::A2aApi::new(
-                    a2a_protocol.clone(),
-                ),
-            )
-        );
+                oxios_kernel::A2aApi::new(a2a_protocol.clone()),
+            ));
 
         // Build ToolRetriever for semantic capability discovery.
         let tool_retriever = build_tool_retriever(&program_manager).await;
@@ -423,10 +428,8 @@ impl KernelBuilder {
             .with_persona_manager(Arc::new(persona_manager.clone()))
             .with_tool_retriever(Arc::new(tool_retriever));
 
-        let supervisor: Arc<dyn Supervisor> = Arc::new(BasicSupervisor::new(
-            event_bus.clone(),
-            agent_runtime,
-        ));
+        let supervisor: Arc<dyn Supervisor> =
+            Arc::new(BasicSupervisor::new(event_bus.clone(), agent_runtime));
 
         let lifecycle = oxios_kernel::AgentLifecycleManager::new(
             supervisor.clone(),
@@ -441,40 +444,41 @@ impl KernelBuilder {
         // When a TaskDelegation arrives, the handler spawns an agent via
         // the lifecycle manager and returns the execution result.
         let dispatch_lifecycle = lifecycle.clone();
-        a2a_protocol.set_delegation_handler(Arc::new(move |_from, _to, task| {
-            let lc = dispatch_lifecycle.clone();
-            Box::pin(async move {
-                let seed = Seed {
-                    id: task.task_id,
-                    goal: task.description.clone(),
-                    constraints: vec![],
-                    acceptance_criteria: vec!["Task completes successfully".into()],
-                    ontology: vec![],
-                    created_at: chrono::Utc::now(),
-                    generation: 0,
-                    parent_seed_id: None,
-                    cspace_hint: None,
-                };
-                match lc.spawn_and_run(&seed, oxios_kernel::scheduler::Priority::Normal).await {
-                    Ok(result) => Ok(serde_json::json!({
-                        "output": result.output,
-                        "success": result.success,
-                        "steps": result.steps_completed,
-                    })),
-                    Err(e) => Ok(serde_json::json!({
-                        "error": e.to_string(),
-                        "success": false,
-                    })),
-                }
-            })
-        })).await;
+        a2a_protocol
+            .set_delegation_handler(Arc::new(move |_from, _to, task| {
+                let lc = dispatch_lifecycle.clone();
+                Box::pin(async move {
+                    let seed = Seed {
+                        id: task.task_id,
+                        goal: task.description.clone(),
+                        constraints: vec![],
+                        acceptance_criteria: vec!["Task completes successfully".into()],
+                        ontology: vec![],
+                        created_at: chrono::Utc::now(),
+                        generation: 0,
+                        parent_seed_id: None,
+                        cspace_hint: None,
+                    };
+                    match lc
+                        .spawn_and_run(&seed, oxios_kernel::scheduler::Priority::Normal)
+                        .await
+                    {
+                        Ok(result) => Ok(serde_json::json!({
+                            "output": result.output,
+                            "success": result.success,
+                            "steps": result.steps_completed,
+                        })),
+                        Err(e) => Ok(serde_json::json!({
+                            "error": e.to_string(),
+                            "success": false,
+                        })),
+                    }
+                })
+            }))
+            .await;
 
-        let mut orchestrator = Orchestrator::new(
-            ouroboros,
-            event_bus.clone(),
-            state_store.clone(),
-            lifecycle,
-        );
+        let mut orchestrator =
+            Orchestrator::new(ouroboros, event_bus.clone(), state_store.clone(), lifecycle);
         orchestrator.set_git_layer(git_layer.clone());
         orchestrator.set_a2a(a2a_protocol.clone());
         orchestrator.set_space_manager(space_manager.clone());
@@ -537,7 +541,9 @@ async fn init_mcp_bridge(config: &OxiosConfig) -> Result<McpBridge> {
             if let Ok(env_str) = std::env::var(format!("OXIOS_MCP_{}_ENV", name)) {
                 for pair in env_str.split(',') {
                     if let Some((k, v)) = pair.split_once('=') {
-                        server.env.insert(k.trim().to_string(), v.trim().to_string());
+                        server
+                            .env
+                            .insert(k.trim().to_string(), v.trim().to_string());
                     }
                 }
             }
@@ -550,16 +556,22 @@ async fn init_mcp_bridge(config: &OxiosConfig) -> Result<McpBridge> {
 }
 
 /// Build a ToolRetriever with all OS tools and installed programs indexed.
-async fn build_tool_retriever(pm: &Arc<ProgramManager>) -> oxios_kernel::tools::retrieval::ToolRetriever {
-    use oxios_kernel::tools::retrieval::ToolEntry;
+async fn build_tool_retriever(
+    pm: &Arc<ProgramManager>,
+) -> oxios_kernel::tools::retrieval::ToolRetriever {
     use oxios_kernel::embedding::TfIdfEmbeddingProvider;
+    use oxios_kernel::tools::retrieval::ToolEntry;
 
     let embedder = Arc::new(TfIdfEmbeddingProvider);
     let mut retriever = oxios_kernel::tools::retrieval::ToolRetriever::new(embedder);
 
     // Index built-in OS tools.
     let builtin_tools = vec![
-        ("exec", "os-tool", "Execute shell commands or structured binaries in workspace"),
+        (
+            "exec",
+            "os-tool",
+            "Execute shell commands or structured binaries in workspace",
+        ),
         ("read", "os-tool", "Read file contents"),
         ("write", "os-tool", "Write content to files"),
         ("edit", "os-tool", "Make precise text edits in files"),
@@ -570,40 +582,50 @@ async fn build_tool_retriever(pm: &Arc<ProgramManager>) -> oxios_kernel::tools::
         ("memory_read", "os-tool", "Recall persistent memories"),
         ("memory_write", "os-tool", "Store persistent memories"),
         ("memory_search", "os-tool", "Semantic search over memories"),
-        ("browser", "os-tool", "Headless browser for web automation and scraping"),
+        (
+            "browser",
+            "os-tool",
+            "Headless browser for web automation and scraping",
+        ),
     ];
 
     for (name, category, desc) in builtin_tools {
-        retriever.index_tool(ToolEntry {
-            name: name.to_string(),
-            category: category.to_string(),
-            description: desc.to_string(),
-            skill_path: None,
-            command: None,
-        }).await;
+        retriever
+            .index_tool(ToolEntry {
+                name: name.to_string(),
+                category: category.to_string(),
+                description: desc.to_string(),
+                skill_path: None,
+                command: None,
+            })
+            .await;
     }
 
     // Index installed programs.
     let programs = pm.list_enabled().await;
     for program in &programs {
         let desc = program.meta.description.clone();
-        retriever.index_tool(ToolEntry {
-            name: format!("program:{}", program.meta.name),
-            category: "program".to_string(),
-            description: desc,
-            skill_path: Some(format!("programs/{}/SKILL.md", program.meta.name)),
-            command: Some(program.meta.name.clone()),
-        }).await;
+        retriever
+            .index_tool(ToolEntry {
+                name: format!("program:{}", program.meta.name),
+                category: "program".to_string(),
+                description: desc,
+                skill_path: Some(format!("programs/{}/SKILL.md", program.meta.name)),
+                command: Some(program.meta.name.clone()),
+            })
+            .await;
 
         // Index individual program tools.
         for tool_def in &program.meta.tools {
-            retriever.index_tool(ToolEntry {
-                name: format!("{}:{}", program.meta.name, tool_def.name),
-                category: "program-tool".to_string(),
-                description: tool_def.description.clone(),
-                skill_path: Some(format!("programs/{}/SKILL.md", program.meta.name)),
-                command: Some(tool_def.command.clone()),
-            }).await;
+            retriever
+                .index_tool(ToolEntry {
+                    name: format!("{}:{}", program.meta.name, tool_def.name),
+                    category: "program-tool".to_string(),
+                    description: tool_def.description.clone(),
+                    skill_path: Some(format!("programs/{}/SKILL.md", program.meta.name)),
+                    command: Some(tool_def.command.clone()),
+                })
+                .await;
         }
     }
 

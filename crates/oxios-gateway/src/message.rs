@@ -27,7 +27,11 @@ pub struct IncomingMessage {
 
 impl IncomingMessage {
     /// Creates a new incoming message with the current timestamp and empty metadata.
-    pub fn new(channel: impl Into<String>, user_id: impl Into<String>, content: impl Into<String>) -> Self {
+    pub fn new(
+        channel: impl Into<String>,
+        user_id: impl Into<String>,
+        content: impl Into<String>,
+    ) -> Self {
         Self {
             id: uuid::Uuid::new_v4(),
             channel: channel.into(),
@@ -59,7 +63,11 @@ pub struct OutgoingMessage {
 
 impl OutgoingMessage {
     /// Creates a new outgoing message with the current timestamp.
-    pub fn new(channel: impl Into<String>, user_id: impl Into<String>, content: impl Into<String>) -> Self {
+    pub fn new(
+        channel: impl Into<String>,
+        user_id: impl Into<String>,
+        content: impl Into<String>,
+    ) -> Self {
         Self {
             id: uuid::Uuid::new_v4(),
             channel: channel.into(),

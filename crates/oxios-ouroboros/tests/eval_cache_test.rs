@@ -34,10 +34,7 @@ fn test_execution(output: &str) -> ExecutionResult {
 
 #[test]
 fn mechanical_eval_all_criteria_pass() {
-    let criteria = vec![
-        "hello world".to_string(),
-        "success".to_string(),
-    ];
+    let criteria = vec!["hello world".to_string(), "success".to_string()];
     let output = "The program printed hello world and reported success.";
     let result = MechanicalEvalResult::evaluate(&criteria, output);
     assert!(result.all_passed);
@@ -48,10 +45,7 @@ fn mechanical_eval_all_criteria_pass() {
 
 #[test]
 fn mechanical_eval_some_criteria_fail() {
-    let criteria = vec![
-        "hello world".to_string(),
-        "missing keyword".to_string(),
-    ];
+    let criteria = vec!["hello world".to_string(), "missing keyword".to_string()];
     let output = "The program printed hello world.";
     let result = MechanicalEvalResult::evaluate(&criteria, output);
     assert!(!result.all_passed);

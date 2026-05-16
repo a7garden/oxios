@@ -2,9 +2,9 @@
 //!
 //! Provides authentication and rate limiting for API endpoints.
 
+use parking_lot::Mutex;
 use std::sync::Arc;
 use std::time::Instant;
-use parking_lot::Mutex;
 
 use axum::{
     extract::{Request, State},
@@ -50,7 +50,7 @@ impl RateLimiter {
         let mut state = self.state.lock();
         let now = Instant::now();
         let elapsed = (now - state.last_refill).as_secs_f64();
-        
+
         // Refill tokens based on elapsed time.
         state.tokens = (state.tokens + elapsed * self.refill_rate).min(self.max_tokens);
         state.last_refill = now;
@@ -109,8 +109,8 @@ pub async fn require_auth(
 
     // Allow only actual static asset paths (prefix-based, not suffix)
     let static_prefixes = ["/assets/", "/dioxus/", "/favicon"];
-    let is_static = static_prefixes.iter().any(|p| path.starts_with(p))
-        || path == "/" || path == "/index.html";
+    let is_static =
+        static_prefixes.iter().any(|p| path.starts_with(p)) || path == "/" || path == "/index.html";
     if is_static {
         return Ok(next.run(request).await);
     }
@@ -127,7 +127,9 @@ pub async fn require_auth(
         .ok_or(StatusCode::UNAUTHORIZED)?;
 
     // Also allow OXIOS_API_KEY env var or static config key as fallback
-    let env_key = std::env::var("OXIOS_API_KEY").ok().filter(|k| !k.is_empty());
+    let env_key = std::env::var("OXIOS_API_KEY")
+        .ok()
+        .filter(|k| !k.is_empty());
     let config_key = state.config.read().api_key();
 
     let is_valid = {

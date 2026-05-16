@@ -119,9 +119,8 @@ impl HnswIndex {
         Ok(results
             .keys
             .into_iter()
-            .zip(results.distances.into_iter())
-            .filter(|(k, _)| *k != 0) // usearch returns 0 for unfilled slots
-            .map(|(k, d)| (k, d as f32))
+            .zip(results.distances)
+            .filter(|(k, _)| *k != 0)
             .collect())
     }
 
@@ -164,9 +163,9 @@ impl HnswIndex {
 
     /// Save the index to a file.
     pub fn save(&self, path: &Path) -> Result<()> {
-        let path_str = path
-            .to_str()
-            .ok_or_else(|| anyhow::anyhow!("HNSW save path is not valid UTF-8: {}", path.display()))?;
+        let path_str = path.to_str().ok_or_else(|| {
+            anyhow::anyhow!("HNSW save path is not valid UTF-8: {}", path.display())
+        })?;
         self.index
             .save(path_str)
             .map_err(|e| anyhow::anyhow!("HNSW save failed: {}", e))?;
@@ -177,11 +176,11 @@ impl HnswIndex {
     ///
     /// Returns a new `HnswIndex` with the same dimensions as the saved index.
     pub fn load(path: &Path) -> Result<Self> {
-        let path_str = path
-            .to_str()
-            .ok_or_else(|| anyhow::anyhow!("HNSW load path is not valid UTF-8: {}", path.display()))?;
-        let index = Index::restore(path_str)
-            .map_err(|e| anyhow::anyhow!("HNSW load failed: {}", e))?;
+        let path_str = path.to_str().ok_or_else(|| {
+            anyhow::anyhow!("HNSW load path is not valid UTF-8: {}", path.display())
+        })?;
+        let index =
+            Index::restore(path_str).map_err(|e| anyhow::anyhow!("HNSW load failed: {}", e))?;
         let dimensions = index.dimensions();
         Ok(Self { index, dimensions })
     }
@@ -231,7 +230,11 @@ mod tests {
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].0, 1);
         // Cosine distance should be ~0 for identical vectors
-        assert!(results[0].1 < 0.01, "Distance should be ~0, got {}", results[0].1);
+        assert!(
+            results[0].1 < 0.01,
+            "Distance should be ~0, got {}",
+            results[0].1
+        );
     }
 
     #[test]

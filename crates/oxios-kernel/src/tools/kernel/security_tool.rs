@@ -18,8 +18,8 @@ use oxi_sdk::{AgentTool, AgentToolResult, ToolContext};
 use serde_json::{json, Value};
 use tokio::sync::oneshot;
 
-use crate::kernel_handle::KernelHandle;
 use crate::audit_trail::AuditTrail;
+use crate::kernel_handle::KernelHandle;
 
 /// Agent tool for security audit operations.
 ///
@@ -104,20 +104,19 @@ impl AgentTool for SecurityTool {
             .ok_or_else(|| "Missing required parameter: action".to_string())?;
 
         match action {
-            "verify_chain" => {
-                match self.audit_trail.verify() {
-                    Ok(valid) => Ok(AgentToolResult::success(serde_json::to_string(
-                        &json!({
-                            "chain_integrity": valid,
-                            "status": if valid { "intact" } else { "TAMPERED" },
-                        }),
-                    ).unwrap_or_default())),
-                    Err(e) => Ok(AgentToolResult::error(format!(
-                        "Chain verification failed: {:?}",
-                        e
-                    ))),
-                }
-            }
+            "verify_chain" => match self.audit_trail.verify() {
+                Ok(valid) => Ok(AgentToolResult::success(
+                    serde_json::to_string(&json!({
+                        "chain_integrity": valid,
+                        "status": if valid { "intact" } else { "TAMPERED" },
+                    }))
+                    .unwrap_or_default(),
+                )),
+                Err(e) => Ok(AgentToolResult::error(format!(
+                    "Chain verification failed: {:?}",
+                    e
+                ))),
+            },
 
             "query_audit" => {
                 let from_seq = params["from_seq"].as_u64().unwrap_or(0);
@@ -143,19 +142,21 @@ impl AgentTool for SecurityTool {
                     })
                     .collect();
 
-                Ok(AgentToolResult::success(serde_json::to_string_pretty(
-                    &json!({
+                Ok(AgentToolResult::success(
+                    serde_json::to_string_pretty(&json!({
                         "entries": display,
                         "count": display.len(),
-                    }),
-                ).unwrap_or_default()))
+                    }))
+                    .unwrap_or_default(),
+                ))
             }
 
             "audit_count" => {
                 let count = self.audit_trail.len();
-                Ok(AgentToolResult::success(serde_json::to_string(
-                    &json!({ "audit_entry_count": count }),
-                ).unwrap_or_default()))
+                Ok(AgentToolResult::success(
+                    serde_json::to_string(&json!({ "audit_entry_count": count }))
+                        .unwrap_or_default(),
+                ))
             }
 
             other => Err(format!(
@@ -185,9 +186,7 @@ mod tests {
             "required": ["action"]
         });
 
-        let actions = schema["properties"]["action"]["enum"]
-            .as_array()
-            .unwrap();
+        let actions = schema["properties"]["action"]["enum"].as_array().unwrap();
         assert_eq!(actions.len(), 3);
         assert!(actions.iter().any(|a| a == "verify_chain"));
         assert!(actions.iter().any(|a| a == "query_audit"));

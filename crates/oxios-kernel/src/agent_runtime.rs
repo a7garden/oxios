@@ -19,31 +19,24 @@
 //! to stay compatible with the `Supervisor` trait's `Send` bounds.
 
 use anyhow::Result;
-use oxi_agent::{
-    prelude::CompactionEvent, SearchCache,
-};
-use oxi_sdk::{
-    AgentEvent, AgentLoop, AgentLoopConfig,
-    SharedState, ToolRegistry,
-};
-use oxi_sdk::{CompactionStrategy, Provider};
+use oxi_agent::{prelude::CompactionEvent, SearchCache};
 use oxi_sdk::ToolExecutionMode;
+use oxi_sdk::{AgentEvent, AgentLoop, AgentLoopConfig, SharedState, ToolRegistry};
+use oxi_sdk::{CompactionStrategy, Provider};
 use parking_lot::Mutex;
 use std::sync::Arc;
 
+use crate::capability::resolve::resolve_cspace;
 use crate::circuit_breaker::CircuitBreaker;
-use crate::persona_manager::PersonaManager;
 use crate::memory::{MemoryEntry, MemoryManager, MemoryType};
+use crate::persona_manager::PersonaManager;
 use crate::tools::registration::register_tools_from_cspace;
 use crate::types::AgentId;
-use oxios_ouroboros::{ExecutionResult, Seed};
 use crate::KernelHandle;
-use crate::capability::resolve::resolve_cspace;
+use oxios_ouroboros::{ExecutionResult, Seed};
 
 /// Global LLM circuit breaker instance.
 static LLM_CIRCUIT_BREAKER: std::sync::OnceLock<CircuitBreaker> = std::sync::OnceLock::new();
-
-
 
 /// Get the global LLM circuit breaker.
 fn get_llm_circuit_breaker() -> &'static CircuitBreaker {
@@ -106,6 +99,7 @@ struct AgentLoopContext {
     kernel_handle: Arc<KernelHandle>,
     cspace: crate::capability::CSpace,
     /// Persona prompt for system prompt blending.
+    #[allow(dead_code)]
     persona_prompt: Option<String>,
 }
 
@@ -161,7 +155,10 @@ impl AgentRuntime {
     }
 
     /// Attach a ToolRetriever for semantic capability discovery.
-    pub fn with_tool_retriever(mut self, retriever: Arc<crate::tools::retrieval::ToolRetriever>) -> Self {
+    pub fn with_tool_retriever(
+        mut self,
+        retriever: Arc<crate::tools::retrieval::ToolRetriever>,
+    ) -> Self {
         self.tool_retriever = Some(retriever);
         self
     }
@@ -235,7 +232,8 @@ impl AgentRuntime {
         // Rebuild system prompt with capabilities and manifest if available.
         if capabilities_xml.is_some() || kernel_manifest.is_some() {
             system_prompt = build_system_prompt(
-                seed, persona_prompt.as_deref(),
+                seed,
+                persona_prompt.as_deref(),
                 capabilities_xml.as_deref(),
                 kernel_manifest.as_deref(),
             );
@@ -271,10 +269,7 @@ impl AgentRuntime {
         };
 
         let (final_content, steps_completed, success) =
-            tokio::task::spawn_blocking(move || {
-                run_agent_loop(ctx)
-            })
-            .await??;
+            tokio::task::spawn_blocking(move || run_agent_loop(ctx)).await??;
 
         tracing::info!(
             seed_id = %seed_id,
@@ -346,12 +341,18 @@ fn run_agent_loop(ctx: AgentLoopContext) -> Result<(String, usize, bool)> {
     let pm = kernel_handle.extensions.program_manager();
 
     // Create a separate ExecTool for program routing (needed by ProgramTool).
-    let exec_for_programs: Option<std::sync::Arc<crate::tools::ExecTool>> =
-        if cspace.can(&crate::capability::ResourceRef::Exec { mode: "shell".into() }, crate::capability::Rights::EXECUTE) {
-            Some(std::sync::Arc::new(crate::tools::ExecTool::from_kernel(&kernel_handle)))
-        } else {
-            None
-        };
+    let exec_for_programs: Option<std::sync::Arc<crate::tools::ExecTool>> = if cspace.can(
+        &crate::capability::ResourceRef::Exec {
+            mode: "shell".into(),
+        },
+        crate::capability::Rights::EXECUTE,
+    ) {
+        Some(std::sync::Arc::new(crate::tools::ExecTool::from_kernel(
+            &kernel_handle,
+        )))
+    } else {
+        None
+    };
 
     {
         let rt = tokio::runtime::Handle::current();
@@ -445,7 +446,7 @@ fn run_agent_loop(ctx: AgentLoopContext) -> Result<(String, usize, bool)> {
         auto_retry_max_attempts: 3,
         auto_retry_base_delay_ms: 2000,
         api_key: None,
-        workspace_dir: config.project_paths.first().cloned(),  // Use first project path as workspace
+        workspace_dir: config.project_paths.first().cloned(), // Use first project path as workspace
     };
 
     let state = SharedState::new();
@@ -466,10 +467,16 @@ fn run_agent_loop(ctx: AgentLoopContext) -> Result<(String, usize, bool)> {
             .run(prompt, move |event| {
                 let mut s = exec_state_clone.lock();
                 match event {
-                    AgentEvent::ToolExecutionEnd { is_error: false, .. } => {
+                    AgentEvent::ToolExecutionEnd {
+                        is_error: false, ..
+                    } => {
                         s.steps_completed += 1;
                     }
-                    AgentEvent::AgentEnd { messages, stop_reason, .. } => {
+                    AgentEvent::AgentEnd {
+                        messages,
+                        stop_reason,
+                        ..
+                    } => {
                         if let Some(oxi_ai::Message::Assistant(a)) = messages.last() {
                             s.final_content = a.text_content();
                         }
@@ -589,7 +596,7 @@ fn build_system_prompt(
 
     // Inject kernel manifest (from CSpace)
     if let Some(manifest) = kernel_manifest {
-        prompt.push_str("\n");
+        prompt.push('\n');
         prompt.push_str(manifest);
         prompt.push('\n');
     }
@@ -635,8 +642,8 @@ mod tests {
     use super::*;
     use async_trait::async_trait;
     use oxi_agent::tools::{AgentTool, ToolError};
-    use serde_json::Value;
     use oxios_ouroboros::Entity;
+    use serde_json::Value;
 
     /// A test tool that does nothing — used to populate the registry.
     struct DummyTool {
@@ -645,10 +652,18 @@ mod tests {
 
     #[async_trait]
     impl AgentTool for DummyTool {
-        fn name(&self) -> &str { &self.name }
-        fn label(&self) -> &str { &self.name }
-        fn description(&self) -> &str { "Test tool" }
-        fn parameters_schema(&self) -> Value { serde_json::json!({"type": "object"}) }
+        fn name(&self) -> &str {
+            &self.name
+        }
+        fn label(&self) -> &str {
+            &self.name
+        }
+        fn description(&self) -> &str {
+            "Test tool"
+        }
+        fn parameters_schema(&self) -> Value {
+            serde_json::json!({"type": "object"})
+        }
 
         async fn execute(
             &self,
@@ -666,8 +681,12 @@ mod tests {
         let registry = ToolRegistry::new();
 
         // Register the tools the program depends on.
-        registry.register(DummyTool { name: "read".into() });
-        registry.register(DummyTool { name: "exec".into() });
+        registry.register(DummyTool {
+            name: "read".into(),
+        });
+        registry.register(DummyTool {
+            name: "exec".into(),
+        });
 
         // Simulate a program that requires "read" and "exec".
         let required_tools = vec!["read".to_string(), "exec".to_string()];
@@ -679,7 +698,11 @@ mod tests {
             .map(|s| s.as_str())
             .collect();
 
-        assert!(missing.is_empty(), "Expected no missing tools, got: {:?}", missing);
+        assert!(
+            missing.is_empty(),
+            "Expected no missing tools, got: {:?}",
+            missing
+        );
     }
 
     /// Test that requires_tools validation fails when a tool is missing.
@@ -688,12 +711,14 @@ mod tests {
         let registry = ToolRegistry::new();
 
         // Only register "read", not "exec" or "nonexistent".
-        registry.register(DummyTool { name: "read".into() });
+        registry.register(DummyTool {
+            name: "read".into(),
+        });
 
         // Simulate a program that requires tools that don't exist.
         let required_tools = vec![
-            "read".to_string(),       // exists
-            "exec".to_string(), // missing
+            "read".to_string(),        // exists
+            "exec".to_string(),        // missing
             "nonexistent".to_string(), // missing
         ];
 
@@ -714,13 +739,11 @@ mod tests {
             goal: "Build a web server".into(),
             constraints: vec!["Must use Rust".into()],
             acceptance_criteria: vec!["Server responds to requests".into()],
-            ontology: vec![
-                Entity {
-                    name: "HttpServer".into(),
-                    entity_type: "struct".into(),
-                    description: "The main server struct".into(),
-                },
-            ],
+            ontology: vec![Entity {
+                name: "HttpServer".into(),
+                entity_type: "struct".into(),
+                description: "The main server struct".into(),
+            }],
             created_at: chrono::Utc::now(),
             generation: 0,
             parent_seed_id: None,

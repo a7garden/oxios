@@ -29,7 +29,10 @@ pub fn has_credentials(config: &OxiosConfig) -> bool {
 ///
 /// Returns `Ok(true)` if onboarding completed (new credentials stored).
 /// Returns `Ok(false)` if skipped (already configured).
-pub fn run_onboarding(oxios_home: &std::path::Path, config: &mut OxiosConfig) -> anyhow::Result<bool> {
+pub fn run_onboarding(
+    oxios_home: &std::path::Path,
+    config: &mut OxiosConfig,
+) -> anyhow::Result<bool> {
     let provider = CredentialStore::provider_from_model(&config.engine.default_model);
 
     // Check if already configured
@@ -47,10 +50,14 @@ pub fn run_onboarding(oxios_home: &std::path::Path, config: &mut OxiosConfig) ->
     if let Ok(Some(token)) = oxi_ai::oauth::load_token(provider) {
         if !token.access_token.is_empty() {
             println!();
-            println!("  ── Detected ~/.oxi/auth.json with '{}' credentials ──", provider);
+            println!(
+                "  ── Detected ~/.oxi/auth.json with '{}' credentials ──",
+                provider
+            );
             if prompt_bool("  Use existing credentials?", true) {
                 // Update config with the provider's default model
-                config.engine.default_model = format!("{}/{}", provider, default_model_for(provider));
+                config.engine.default_model =
+                    format!("{}/{}", provider, default_model_for(provider));
                 write_config(oxios_home, config)?;
                 print_success(oxios_home, &config.engine.default_model);
                 return Ok(true);
@@ -90,7 +97,9 @@ pub fn run_onboarding(oxios_home: &std::path::Path, config: &mut OxiosConfig) ->
     } else {
         workspace.trim().to_string()
     };
-    let workspace = crate::config::expand_home(&workspace).to_string_lossy().to_string();
+    let workspace = crate::config::expand_home(&workspace)
+        .to_string_lossy()
+        .to_string();
 
     // 6. Store credentials in ~/.oxi/auth.json
     print!("\n  Storing credentials... ");
@@ -139,7 +148,11 @@ fn prompt_provider() -> anyhow::Result<&'static str> {
         print!("  Enter choice [1]: ");
         io::stdout().flush()?;
         let input = read_line();
-        let choice = if input.trim().is_empty() { "1" } else { input.trim() };
+        let choice = if input.trim().is_empty() {
+            "1"
+        } else {
+            input.trim()
+        };
         let provider = match choice {
             "1" => "anthropic",
             "2" => "openai",

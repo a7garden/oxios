@@ -52,9 +52,10 @@ impl PersonaManager {
     /// Sets the active persona by ID.
     pub fn set_active_persona(&self, id: &str) -> Result<()> {
         // Verify the persona exists and is enabled.
-        let persona = self.store.get(id).ok_or_else(|| {
-            anyhow::anyhow!("Persona '{}' not found", id)
-        })?;
+        let persona = self
+            .store
+            .get(id)
+            .ok_or_else(|| anyhow::anyhow!("Persona '{}' not found", id))?;
         if !persona.enabled {
             anyhow::bail!("Persona '{}' is disabled", id);
         }
@@ -70,7 +71,8 @@ impl PersonaManager {
             .map(|p| p.system_prompt.clone())
             .unwrap_or_else(|| {
                 "You are a helpful AI assistant that follows the Ouroboros methodology: \
-                 specify before you build, evaluate before you ship.".to_string()
+                 specify before you build, evaluate before you ship."
+                    .to_string()
             })
     }
 

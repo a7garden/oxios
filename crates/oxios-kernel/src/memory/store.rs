@@ -16,7 +16,7 @@ use crate::embedding::EmbeddingVector;
 
 use super::hnsw::HnswIndex;
 use super::normalizer::l2_normalize_f32;
-use super::{MemoryEntry, MemoryManager, MemoryType, content_hash, dedup_by_id, extract_keywords};
+use super::{content_hash, dedup_by_id, extract_keywords, MemoryEntry, MemoryManager, MemoryType};
 
 // ---------------------------------------------------------------------------
 // VectorIndexSnapshot
@@ -93,7 +93,10 @@ impl MemoryManager {
             }
         }
 
-        tracing::info!(entries = self.vector_index.read().len(), "Memory vector index rebuilt");
+        tracing::info!(
+            entries = self.vector_index.read().len(),
+            "Memory vector index rebuilt"
+        );
         Ok(())
     }
 
@@ -114,7 +117,10 @@ impl MemoryManager {
 
         self.git_commit("memory/vector_index_snapshot.json", "memory: snapshot save");
 
-        tracing::debug!(entries = snapshot.entry_count, "Vector index snapshot saved");
+        tracing::debug!(
+            entries = snapshot.entry_count,
+            "Vector index snapshot saved"
+        );
         Ok(())
     }
 
@@ -148,9 +154,7 @@ impl MemoryManager {
         let id = entry.id.clone();
         let vector = self.embedding.embed(&entry.content).await?;
         let category = entry.memory_type.category();
-        self.state_store
-            .save_json(category, &id, &entry)
-            .await?;
+        self.state_store.save_json(category, &id, &entry).await?;
 
         self.git_commit(
             &format!("{}/{}.json", category, id),
@@ -179,14 +183,15 @@ impl MemoryManager {
 
     /// Retrieve a single memory by ID.
     pub async fn get(&self, id: &str, memory_type: MemoryType) -> Result<Option<MemoryEntry>> {
-        self.state_store
-            .load_json(memory_type.category(), id)
-            .await
+        self.state_store.load_json(memory_type.category(), id).await
     }
 
     /// Delete a memory entry.
     pub async fn forget(&self, id: &str, memory_type: MemoryType) -> Result<bool> {
-        let result = self.state_store.delete_file(memory_type.category(), id).await?;
+        let result = self
+            .state_store
+            .delete_file(memory_type.category(), id)
+            .await?;
 
         // Remove from HNSW index if attached
         {
@@ -207,12 +212,16 @@ impl MemoryManager {
         let names = self.state_store.list_category(category).await?;
         let mut entries = Vec::new();
         for name in names.into_iter().take(limit * 2) {
-            if let Ok(Some(entry)) = self.state_store.load_json::<MemoryEntry>(category, &name).await {
+            if let Ok(Some(entry)) = self
+                .state_store
+                .load_json::<MemoryEntry>(category, &name)
+                .await
+            {
                 entries.push(entry);
             }
         }
         // Sort by created_at descending (most recent first)
-        entries.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+        entries.sort_by_key(|b| std::cmp::Reverse(b.created_at));
         entries.truncate(limit);
         Ok(entries)
     }
@@ -314,7 +323,10 @@ impl MemoryManager {
                 let matches = keywords.iter().any(|k| {
                     let k_lower = k.to_lowercase();
                     entry.content.to_lowercase().contains(&k_lower)
-                        || entry.tags.iter().any(|t| t.to_lowercase().contains(&k_lower))
+                        || entry
+                            .tags
+                            .iter()
+                            .any(|t| t.to_lowercase().contains(&k_lower))
                 });
                 if matches {
                     results.push(entry);
@@ -339,7 +351,10 @@ impl MemoryManager {
         let limit = self.max_recall;
 
         // 1. Recent conversation summaries (always include)
-        let recent = self.list(MemoryType::Conversation, 3).await.unwrap_or_default();
+        let recent = self
+            .list(MemoryType::Conversation, 3)
+            .await
+            .unwrap_or_default();
 
         // 2. Recent session summaries
         let sessions = self.list(MemoryType::Session, 2).await.unwrap_or_default();
@@ -368,9 +383,7 @@ impl MemoryManager {
             .collect::<Vec<_>>()
             .join("\n");
 
-        format!(
-            "{system_prompt}\n\n## Relevant Memory\n\n{memory_block}"
-        )
+        format!("{system_prompt}\n\n## Relevant Memory\n\n{memory_block}")
     }
 
     /// Create a session summary memory entry from a completed session.
@@ -413,7 +426,11 @@ impl MemoryManager {
 
         let content = summary_parts.join("\n");
         let entry = MemoryEntry {
-            id: format!("session-{}-{}", session.id.0, chrono::Utc::now().timestamp()),
+            id: format!(
+                "session-{}-{}",
+                session.id.0,
+                chrono::Utc::now().timestamp()
+            ),
             memory_type: MemoryType::Session,
             content,
             source: "session_summary".to_string(),
@@ -442,7 +459,9 @@ impl MemoryManager {
         };
         let similar = {
             let index = self.vector_index.read();
-            index.iter().any(|(_, vector)| query_vector.cosine_similarity(vector) > 0.95)
+            index
+                .iter()
+                .any(|(_, vector)| query_vector.cosine_similarity(vector) > 0.95)
         };
         if similar {
             return true;
@@ -554,7 +573,11 @@ impl HnswMemoryIndex {
 
                 if let Ok(index) = HnswIndex::load(&index_path) {
                     if let Ok(data) = std::fs::read_to_string(&mapping_path) {
-                        if let Ok((k2i, i2k)) = serde_json::from_str::<(HashMap<u64, String>, HashMap<String, u64>)>(&data) {
+                        if let Ok((k2i, i2k)) = serde_json::from_str::<(
+                            HashMap<u64, String>,
+                            HashMap<String, u64>,
+                        )>(&data)
+                        {
                             let max_key = k2i.keys().max().copied().unwrap_or(0);
                             return Ok(Self {
                                 index: RwLock::new(index),
@@ -636,9 +659,7 @@ impl HnswMemoryIndex {
 
         let results = raw
             .into_iter()
-            .filter_map(|(key, dist)| {
-                k2i.get(&key).map(|id| (id.clone(), dist))
-            })
+            .filter_map(|(key, dist)| k2i.get(&key).map(|id| (id.clone(), dist)))
             .collect();
 
         Ok(results)
@@ -709,16 +730,19 @@ impl MemoryManager {
         // Skip if index is empty
         if hnsw_index.is_empty() {
             tracing::debug!("HNSW index empty, falling back to keyword search");
-            return self.keyword_search(query, memory_type, limit).await.map(|entries| {
-                entries
-                    .into_iter()
-                    .map(|entry| SemanticHit {
-                        entry,
-                        distance: 0.0,
-                        similarity: 0.0,
-                    })
-                    .collect()
-            });
+            return self
+                .keyword_search(query, memory_type, limit)
+                .await
+                .map(|entries| {
+                    entries
+                        .into_iter()
+                        .map(|entry| SemanticHit {
+                            entry,
+                            distance: 0.0,
+                            similarity: 0.0,
+                        })
+                        .collect()
+                });
         }
 
         // Generate embedding for query
@@ -727,13 +751,19 @@ impl MemoryManager {
             Some(v) => v,
             None => {
                 tracing::debug!("Query embedding is sparse, falling back to keyword search");
-                return self.keyword_search(query, memory_type, limit).await.map(|entries| {
-                    entries.into_iter().map(|entry| SemanticHit {
-                        entry,
-                        distance: 0.0,
-                        similarity: 0.0,
-                    }).collect()
-                });
+                return self
+                    .keyword_search(query, memory_type, limit)
+                    .await
+                    .map(|entries| {
+                        entries
+                            .into_iter()
+                            .map(|entry| SemanticHit {
+                                entry,
+                                distance: 0.0,
+                                similarity: 0.0,
+                            })
+                            .collect()
+                    });
             }
         };
 
@@ -795,13 +825,19 @@ impl MemoryManager {
 
         // Fall back if no results
         if results.is_empty() {
-            return self.keyword_search(query, memory_type, limit).await.map(|entries| {
-                entries.into_iter().map(|entry| SemanticHit {
-                    entry,
-                    distance: 0.0,
-                    similarity: 0.0,
-                }).collect()
-            });
+            return self
+                .keyword_search(query, memory_type, limit)
+                .await
+                .map(|entries| {
+                    entries
+                        .into_iter()
+                        .map(|entry| SemanticHit {
+                            entry,
+                            distance: 0.0,
+                            similarity: 0.0,
+                        })
+                        .collect()
+                });
         }
 
         Ok(results)

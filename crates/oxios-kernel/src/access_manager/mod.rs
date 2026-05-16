@@ -230,8 +230,7 @@ impl AccessManager {
     pub fn can_execute_for(&self, agent_name: &str, duration_secs: u64) -> bool {
         match self.permissions.get(agent_name) {
             Some(perms) => {
-                perms.max_execution_time_secs == 0
-                    || duration_secs <= perms.max_execution_time_secs
+                perms.max_execution_time_secs == 0 || duration_secs <= perms.max_execution_time_secs
             }
             None => false,
         }
@@ -284,8 +283,13 @@ impl AccessManager {
     ///
     /// Creates default permissions if the agent doesn't exist.
     /// Only updates fields that are Some() in the update.
-    pub fn update_permissions(&mut self, agent_name: &str, update: PermissionUpdate) -> anyhow::Result<()> {
-        let perms = self.permissions
+    pub fn update_permissions(
+        &mut self,
+        agent_name: &str,
+        update: PermissionUpdate,
+    ) -> anyhow::Result<()> {
+        let perms = self
+            .permissions
             .entry(agent_name.to_string())
             .or_insert_with(|| AgentPermissions::for_new_agent(agent_name));
         update.apply(perms);
@@ -355,7 +359,8 @@ impl AccessManager {
     /// * `workspace_name` - Name of the workspace
     /// * `workspace_path` - Absolute path to the workspace directory
     pub fn register_workspace_path(&mut self, workspace_name: &str, workspace_path: PathBuf) {
-        self.workspace_paths.insert(workspace_name.to_string(), workspace_path);
+        self.workspace_paths
+            .insert(workspace_name.to_string(), workspace_path);
         tracing::debug!(workspace = %workspace_name, "Workspace path registered");
     }
 
@@ -383,7 +388,8 @@ impl AccessManager {
         }
 
         // Assign to new workspace
-        self.agent_workspaces.insert(agent_name.to_string(), workspace_name.to_string());
+        self.agent_workspaces
+            .insert(agent_name.to_string(), workspace_name.to_string());
         self.workspace_agents
             .entry(workspace_name.to_string())
             .or_default()
@@ -752,7 +758,9 @@ mod tests {
         assert!(perms.allowed_paths.contains(&"/workspace/**".to_string()));
 
         perms.deny_path("/workspace/.secret/**");
-        assert!(perms.denied_paths.contains(&"/workspace/.secret/**".to_string()));
+        assert!(perms
+            .denied_paths
+            .contains(&"/workspace/.secret/**".to_string()));
     }
 
     #[test]
@@ -1164,7 +1172,9 @@ mod tests {
         let warnings = access.validate_permissions(&perms);
         assert!(warnings.iter().any(|w| w.contains("network access")));
         assert!(warnings.iter().any(|w| w.contains("fork sub-agents")));
-        assert!(warnings.iter().any(|w| w.contains("no execution time limit")));
+        assert!(warnings
+            .iter()
+            .any(|w| w.contains("no execution time limit")));
         assert!(warnings.iter().any(|w| w.contains("no memory limit")));
     }
 
@@ -1185,7 +1195,10 @@ mod tests {
         access.register_workspace_path("my-workspace", PathBuf::from("/workspace/my-workspace"));
 
         assert_eq!(access.list_workspaces(), vec!["my-workspace"]);
-        assert_eq!(access.get_workspace_path("my-workspace"), Some(&PathBuf::from("/workspace/my-workspace")));
+        assert_eq!(
+            access.get_workspace_path("my-workspace"),
+            Some(&PathBuf::from("/workspace/my-workspace"))
+        );
     }
 
     #[test]
@@ -1197,7 +1210,10 @@ mod tests {
         assert!(access.assign_workspace("agent-1", "project-alpha"));
 
         // Check agent is assigned
-        assert_eq!(access.get_workspace_for_agent("agent-1"), Some("project-alpha".to_string()));
+        assert_eq!(
+            access.get_workspace_for_agent("agent-1"),
+            Some("project-alpha".to_string())
+        );
         assert!(access.can_access_workspace("agent-1", "project-alpha"));
         assert!(!access.can_access_workspace("agent-1", "other-workspace"));
     }
@@ -1219,11 +1235,17 @@ mod tests {
 
         // Assign to first workspace
         access.assign_workspace("agent-1", "workspace-a");
-        assert_eq!(access.get_workspace_for_agent("agent-1"), Some("workspace-a".to_string()));
+        assert_eq!(
+            access.get_workspace_for_agent("agent-1"),
+            Some("workspace-a".to_string())
+        );
 
         // Reassign to second workspace
         access.assign_workspace("agent-1", "workspace-b");
-        assert_eq!(access.get_workspace_for_agent("agent-1"), Some("workspace-b".to_string()));
+        assert_eq!(
+            access.get_workspace_for_agent("agent-1"),
+            Some("workspace-b".to_string())
+        );
 
         // Agent should not be in first workspace anymore
         assert!(!access.can_access_workspace("agent-1", "workspace-a"));

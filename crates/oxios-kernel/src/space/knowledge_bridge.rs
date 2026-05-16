@@ -112,10 +112,7 @@ impl KnowledgeBridge {
         let from_space = self.space_manager.get_space(&from_space_id).await?;
         if let Some(space) = from_space {
             if !space.knowledge_visible {
-                anyhow::bail!(
-                    "Space {} is private and cannot be accessed",
-                    from_space_id
-                );
+                anyhow::bail!("Space {} is private and cannot be accessed", from_space_id);
             }
         }
 
@@ -213,7 +210,10 @@ impl KnowledgeBridge {
                 crate::audit_trail::AuditAction::Other {
                     detail: format!(
                         "knowledge_{}: {}->{} ({} entries)",
-                        entry.flow, entry.from, entry.to, entry.entry_ids.len()
+                        entry.flow,
+                        entry.from,
+                        entry.to,
+                        entry.entry_ids.len()
                     ),
                 },
                 format!("{:?}", entry),

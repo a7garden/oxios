@@ -8,11 +8,11 @@ use std::path::PathBuf;
 use tempfile::TempDir;
 
 use oxios_kernel::{
-    state_store::{StateStore, Session},
+    audit_trail::{AuditAction, AuditTrail},
+    budget::{BudgetLimit, BudgetManager},
     git_layer::GitLayer,
-    audit_trail::{AuditTrail, AuditAction},
-    budget::{BudgetManager, BudgetLimit},
     resource_monitor::ResourceMonitor,
+    state_store::{Session, StateStore},
 };
 
 fn setup() -> TempDir {
@@ -74,9 +74,18 @@ async fn test_state_list_category() {
     let store = StateStore::new(PathBuf::from(dir.path())).unwrap();
 
     // Save multiple items
-    store.save_json("test", "item1", &serde_json::json!({})).await.unwrap();
-    store.save_json("test", "item2", &serde_json::json!({})).await.unwrap();
-    store.save_json("test", "item3", &serde_json::json!({})).await.unwrap();
+    store
+        .save_json("test", "item1", &serde_json::json!({}))
+        .await
+        .unwrap();
+    store
+        .save_json("test", "item2", &serde_json::json!({}))
+        .await
+        .unwrap();
+    store
+        .save_json("test", "item3", &serde_json::json!({}))
+        .await
+        .unwrap();
 
     // List
     let items = store.list_category("test").await.unwrap();
@@ -92,7 +101,10 @@ async fn test_state_delete_file() {
     let store = StateStore::new(PathBuf::from(dir.path())).unwrap();
 
     // Save then delete
-    store.save_json("test", "item", &serde_json::json!({"key": "value"})).await.unwrap();
+    store
+        .save_json("test", "item", &serde_json::json!({"key": "value"}))
+        .await
+        .unwrap();
     let deleted = store.delete_file("test", "item").await.unwrap();
     assert!(deleted);
 
@@ -113,7 +125,10 @@ async fn test_state_markdown() {
     let markdown = "# Hello\n\nThis is **markdown** content.";
 
     // Save markdown
-    store.save_markdown("docs", "intro", markdown).await.unwrap();
+    store
+        .save_markdown("docs", "intro", markdown)
+        .await
+        .unwrap();
 
     // Load markdown
     let loaded = store.load_markdown("docs", "intro").await.unwrap();
@@ -736,10 +751,14 @@ async fn test_state_and_git_integration() {
         "message": "Hello",
         "timestamp": "2024-01-01T00:00:00Z"
     });
-    state_store.save_json("messages", "msg1", &data).await.unwrap();
+    state_store
+        .save_json("messages", "msg1", &data)
+        .await
+        .unwrap();
 
     // Commit to git
-    git.commit_file("messages/msg1.json", "add message").unwrap();
+    git.commit_file("messages/msg1.json", "add message")
+        .unwrap();
 
     // Verify in both systems
     let loaded: serde_json::Value = state_store

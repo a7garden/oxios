@@ -15,9 +15,7 @@ use std::sync::Arc;
 
 use anyhow::{Context, Result};
 use chrono;
-use oxios_ouroboros::{
-    EvaluationResult, InterviewResult, OuroborosProtocol, Phase, Seed,
-};
+use oxios_ouroboros::{EvaluationResult, InterviewResult, OuroborosProtocol, Phase, Seed};
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -40,7 +38,6 @@ pub enum AgentRole {
     /// Coordinates subtasks, synthesizes results.
     Manager,
 }
-
 
 /// A subtask within a multi-agent plan.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -130,20 +127,27 @@ impl Orchestrator {
 
     /// Get the current Space ID, if SpaceManager is set.
     pub fn current_space_id(&self) -> Option<SpaceId> {
-        self.space_manager.read().as_ref().map(|m| m.current_space_id())
+        self.space_manager
+            .read()
+            .as_ref()
+            .map(|m| m.current_space_id())
     }
 
     /// Get the current Space name tag for response decoration.
     pub fn current_space_tag(&self) -> String {
-        self.space_manager.read().as_ref().and_then(|m| {
-            m.current_space().map(|s| {
-                if s.is_default() {
-                    String::new()
-                } else {
-                    format!("[{} {}]", s.emoji(), s.name)
-                }
+        self.space_manager
+            .read()
+            .as_ref()
+            .and_then(|m| {
+                m.current_space().map(|s| {
+                    if s.is_default() {
+                        String::new()
+                    } else {
+                        format!("[{} {}]", s.emoji(), s.name)
+                    }
+                })
             })
-        }).unwrap_or_default()
+            .unwrap_or_default()
     }
 
     /// Set the A2A protocol for inter-agent task delegation.
@@ -192,6 +196,7 @@ impl Orchestrator {
         // ── Space Detection ──
         let space_tag = self.current_space_tag();
         let space_id = {
+            #[allow(clippy::await_holding_lock)]
             let buffer = self.conversation_buffer.read();
             let space_manager = self.space_manager.read();
             if let Some(ref sm) = *space_manager {
@@ -218,7 +223,8 @@ impl Orchestrator {
         }
 
         // Phase 1: Interview
-        self.publish_phase_started(&session_id, Phase::Interview).await;
+        self.publish_phase_started(&session_id, Phase::Interview)
+            .await;
 
         // Get or create the interview session.
         let needs_interview = {
@@ -288,7 +294,8 @@ impl Orchestrator {
                 "Interview needs clarification"
             );
 
-            self.publish_phase_completed(&session_id, Phase::Interview, "needs clarification").await;
+            self.publish_phase_completed(&session_id, Phase::Interview, "needs clarification")
+                .await;
 
             return Ok(OrchestrationResult {
                 session_id: Some(session_id.clone()),
@@ -312,7 +319,8 @@ impl Orchestrator {
         }
 
         // Interview complete and ready. Proceed to seed generation.
-        self.publish_phase_completed(&session_id, Phase::Interview, "ready for seed").await;
+        self.publish_phase_completed(&session_id, Phase::Interview, "ready for seed")
+            .await;
         self.publish_phase_started(&session_id, Phase::Seed).await;
 
         // Phase 2: Generate seed
@@ -326,8 +334,10 @@ impl Orchestrator {
         self.event_bus
             .publish(KernelEvent::SeedCreated { seed_id: seed.id })?;
 
-        self.publish_phase_completed(&session_id, Phase::Seed, "generated").await;
-        self.publish_phase_started(&session_id, Phase::Execute).await;
+        self.publish_phase_completed(&session_id, Phase::Seed, "generated")
+            .await;
+        self.publish_phase_started(&session_id, Phase::Execute)
+            .await;
 
         // Check if the seed should be split into multi-agent execution.
         // When the seed has 3+ acceptance criteria, we treat each criterion
@@ -335,7 +345,11 @@ impl Orchestrator {
         if should_split_seed(&seed) {
             let subtasks = split_into_subtasks(&seed);
             if subtasks.len() > 1 {
-                tracing::info!(phase = "delegate", subtasks = subtasks.len(), "Delegating to multi-agent");
+                tracing::info!(
+                    phase = "delegate",
+                    subtasks = subtasks.len(),
+                    "Delegating to multi-agent"
+                );
                 let results = self.delegate_subtasks(subtasks, &seed).await?;
 
                 // Combine successful results
@@ -383,14 +397,19 @@ impl Orchestrator {
 
         // Phase 3: Fork and execute agent via lifecycle manager
         tracing::info!(phase = "execute", "Starting execution phase");
-        let exec_result = self.lifecycle.spawn_and_run(&seed, Priority::Normal).await?;
+        let exec_result = self
+            .lifecycle
+            .spawn_and_run(&seed, Priority::Normal)
+            .await?;
 
         // Periodically reap zombie tasks.
         self.lifecycle.reap_zombies();
 
         // Phase 4: Evaluate
-        self.publish_phase_completed(&session_id, Phase::Execute, "completed").await;
-        self.publish_phase_started(&session_id, Phase::Evaluate).await;
+        self.publish_phase_completed(&session_id, Phase::Execute, "completed")
+            .await;
+        self.publish_phase_started(&session_id, Phase::Evaluate)
+            .await;
 
         tracing::info!(phase = "evaluate", "Starting evaluation phase");
         let evaluation = self.ouroboros.evaluate(&seed, &exec_result).await?;
@@ -399,50 +418,76 @@ impl Orchestrator {
             &session_id,
             Phase::Evaluate,
             &format!("score={:.2}", evaluation.score),
-        ).await;
+        )
+        .await;
 
         self.event_bus.publish(KernelEvent::EvaluationComplete {
             seed_id: seed.id,
             passed: evaluation.all_passed(),
         })?;
 
-
         // Save evaluation to state store for lineage tracking.
         self.save_evaluation(&seed, &evaluation).await?;
-
 
         // Phase 5: Evolve if needed
         let mut current_seed = Some(seed);
         let mut current_evaluation = evaluation;
         let mut iterations = 0;
 
-        while !current_evaluation.all_passed() && current_evaluation.score < 0.8 && iterations < MAX_EVOLUTION_ITERATIONS {
+        while !current_evaluation.all_passed()
+            && current_evaluation.score < 0.8
+            && iterations < MAX_EVOLUTION_ITERATIONS
+        {
             iterations += 1;
             self.publish_phase_started(&session_id, Phase::Evolve).await;
 
-            tracing::info!(phase = "evolve", iteration = iterations, "Starting evolve phase");
-            let evolve_result = self.ouroboros.evolve(
-                current_seed.as_ref().expect("seed exists"),
-                &current_evaluation,
-            ).await?;
+            tracing::info!(
+                phase = "evolve",
+                iteration = iterations,
+                "Starting evolve phase"
+            );
+            let evolve_result = self
+                .ouroboros
+                .evolve(
+                    current_seed.as_ref().expect("seed exists"),
+                    &current_evaluation,
+                )
+                .await?;
 
             if let Some(evolved) = evolve_result {
                 current_seed = Some(evolved.clone());
 
                 // Save evolved seed.
                 self.save_seed(&evolved).await?;
-                self.event_bus.publish(KernelEvent::SeedCreated { seed_id: evolved.id })?;
+                self.event_bus.publish(KernelEvent::SeedCreated {
+                    seed_id: evolved.id,
+                })?;
 
-                self.publish_phase_completed(&session_id, Phase::Evolve, "evolved").await;
-                self.publish_phase_started(&session_id, Phase::Execute).await;
+                self.publish_phase_completed(&session_id, Phase::Evolve, "evolved")
+                    .await;
+                self.publish_phase_started(&session_id, Phase::Execute)
+                    .await;
 
-                tracing::info!(phase = "re-execute", iteration = iterations, "Re-executing with evolved seed");
-                let new_exec = self.lifecycle.spawn_and_run(&evolved, Priority::High).await?;
+                tracing::info!(
+                    phase = "re-execute",
+                    iteration = iterations,
+                    "Re-executing with evolved seed"
+                );
+                let new_exec = self
+                    .lifecycle
+                    .spawn_and_run(&evolved, Priority::High)
+                    .await?;
 
-                self.publish_phase_completed(&session_id, Phase::Execute, "completed").await;
-                self.publish_phase_started(&session_id, Phase::Evaluate).await;
+                self.publish_phase_completed(&session_id, Phase::Execute, "completed")
+                    .await;
+                self.publish_phase_started(&session_id, Phase::Evaluate)
+                    .await;
 
-                tracing::info!(phase = "re-evaluate", iteration = iterations, "Re-evaluating evolved result");
+                tracing::info!(
+                    phase = "re-evaluate",
+                    iteration = iterations,
+                    "Re-evaluating evolved result"
+                );
                 let new_eval = self.ouroboros.evaluate(&evolved, &new_exec).await?;
                 current_evaluation = new_eval;
 
@@ -450,12 +495,14 @@ impl Orchestrator {
                     &session_id,
                     Phase::Evaluate,
                     &format!("score={:.2}", current_evaluation.score),
-                ).await;
+                )
+                .await;
                 // Save evolved seed evaluation for lineage tracking.
                 self.save_evaluation(&evolved, &current_evaluation).await?;
             } else {
                 // No evolution possible.
-                self.publish_phase_completed(&session_id, Phase::Evolve, "no evolution").await;
+                self.publish_phase_completed(&session_id, Phase::Evolve, "no evolution")
+                    .await;
                 break;
             }
         }
@@ -479,7 +526,9 @@ impl Orchestrator {
 
         // Measure orchestration duration.
         let metrics = get_metrics();
-        metrics.orch_duration.observe(orch_start.elapsed().as_secs_f64());
+        metrics
+            .orch_duration
+            .observe(orch_start.elapsed().as_secs_f64());
         if passed {
             metrics.agents_completed.inc();
         } else {
@@ -518,7 +567,6 @@ impl Orchestrator {
 
         Ok(())
     }
-
 
     /// Save an evaluation result to the state store.
     async fn save_evaluation(&self, seed: &Seed, evaluation: &EvaluationResult) -> Result<()> {
@@ -595,7 +643,11 @@ impl Orchestrator {
             parent_seed_id: Some(parent_seed.id),
             cspace_hint: None,
         };
-        match self.lifecycle.spawn_and_run(&child_seed, Priority::Normal).await {
+        match self
+            .lifecycle
+            .spawn_and_run(&child_seed, Priority::Normal)
+            .await
+        {
             Ok(result) => {
                 task.result = Some(result.output.clone());
             }
@@ -711,8 +763,12 @@ impl Orchestrator {
         let mut results: Vec<Option<SubTask>> = vec![None; subtask_count];
         while let Some(join_result) = join_set.join_next().await {
             match join_result {
-                Ok((idx, subtask)) => { results[idx] = Some(subtask); }
-                Err(e) => { tracing::error!(error = %e, "A2A task panicked"); }
+                Ok((idx, subtask)) => {
+                    results[idx] = Some(subtask);
+                }
+                Err(e) => {
+                    tracing::error!(error = %e, "A2A task panicked");
+                }
             }
         }
 
@@ -748,7 +804,11 @@ impl Orchestrator {
             "Starting parallel multi-agent execution"
         );
 
-        let mut join_set: JoinSet<(usize, crate::types::AgentId, Result<oxios_ouroboros::ExecutionResult>)> = JoinSet::new();
+        let mut join_set: JoinSet<(
+            usize,
+            crate::types::AgentId,
+            Result<oxios_ouroboros::ExecutionResult>,
+        )> = JoinSet::new();
 
         for (idx, agent_entry) in group.agents.iter().enumerate() {
             let child_seed = agent_entry.seed.clone();
@@ -766,11 +826,13 @@ impl Orchestrator {
         while let Some(join_result) = join_set.join_next().await {
             match join_result {
                 Ok((idx, agent_id, Ok(exec_result))) => {
-                    let _ = self.event_bus.publish(KernelEvent::AgentGroupMemberCompleted {
-                        group_id,
-                        agent_id,
-                        success: exec_result.success,
-                    });
+                    let _ = self
+                        .event_bus
+                        .publish(KernelEvent::AgentGroupMemberCompleted {
+                            group_id,
+                            agent_id,
+                            success: exec_result.success,
+                        });
                     completed[idx] = Some(SubTask {
                         id: subtasks[idx].id,
                         description: subtasks[idx].description.clone(),
@@ -782,11 +844,13 @@ impl Orchestrator {
                 }
                 Ok((idx, agent_id, Err(e))) => {
                     tracing::warn!(subtask_index = idx, error = %e, "Subtask failed");
-                    let _ = self.event_bus.publish(KernelEvent::AgentGroupMemberCompleted {
-                        group_id,
-                        agent_id,
-                        success: false,
-                    });
+                    let _ = self
+                        .event_bus
+                        .publish(KernelEvent::AgentGroupMemberCompleted {
+                            group_id,
+                            agent_id,
+                            success: false,
+                        });
                     completed[idx] = Some(SubTask {
                         id: subtasks[idx].id,
                         description: subtasks[idx].description.clone(),
@@ -814,8 +878,14 @@ impl Orchestrator {
         );
 
         // Persist group state
-        let _ = self.state_store.save_json("agent_groups", &group_id.to_string(), &group).await;
-        self.git_commit(&format!("agent_groups/{}.json", group_id), "orchestrator: save group");
+        let _ = self
+            .state_store
+            .save_json("agent_groups", &group_id.to_string(), &group)
+            .await;
+        self.git_commit(
+            &format!("agent_groups/{}.json", group_id),
+            "orchestrator: save group",
+        );
 
         Ok(completed)
     }
@@ -883,10 +953,7 @@ fn format_result(seed: &Seed, evaluation: &EvaluationResult) -> String {
     let passed = evaluation.all_passed();
 
     let mut lines = Vec::new();
-    lines.push(format!(
-        "Task '{}' completed.",
-        seed.goal
-    ));
+    lines.push(format!("Task '{}' completed.", seed.goal));
 
     if passed {
         lines.push("✅ Evaluation passed.".to_string());
@@ -934,7 +1001,10 @@ fn split_into_subtasks(seed: &Seed) -> Vec<SubTask> {
                 Some("testing".to_string())
             } else if desc_lower.contains("refactor") || desc_lower.contains("improve") {
                 Some("refactoring".to_string())
-            } else if desc_lower.contains("write") || desc_lower.contains("create") || desc_lower.contains("implement") {
+            } else if desc_lower.contains("write")
+                || desc_lower.contains("create")
+                || desc_lower.contains("implement")
+            {
                 Some("code-generation".to_string())
             } else if desc_lower.contains("debug") || desc_lower.contains("fix") {
                 Some("debugging".to_string())

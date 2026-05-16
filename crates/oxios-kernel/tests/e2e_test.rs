@@ -14,17 +14,16 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
 
 use anyhow::Result;
-use oxios_kernel::{
-    AccessManager, AgentLifecycleManager, A2AProtocol,
-    EventBus, KernelEvent, Orchestrator,
-};
-use oxios_ouroboros::{
-    EvaluationResult, ExecutionResult, InterviewResult,
-    OuroborosProtocol, Phase, Seed, AmbiguityScore,
-};
+use chrono::Utc;
 use oxios_kernel::supervisor::Supervisor;
 use oxios_kernel::types::{AgentId, AgentInfo, AgentStatus};
-use chrono::Utc;
+use oxios_kernel::{
+    A2AProtocol, AccessManager, AgentLifecycleManager, EventBus, KernelEvent, Orchestrator,
+};
+use oxios_ouroboros::{
+    AmbiguityScore, EvaluationResult, ExecutionResult, InterviewResult, OuroborosProtocol, Phase,
+    Seed,
+};
 
 // ---------------------------------------------------------------------------
 // Mock OuroborosProtocol — deterministic, no LLM calls
@@ -87,7 +86,11 @@ impl OuroborosProtocol for MockOuroboros {
         })
     }
 
-    async fn evaluate(&self, _seed: &Seed, _execution: &ExecutionResult) -> Result<EvaluationResult> {
+    async fn evaluate(
+        &self,
+        _seed: &Seed,
+        _execution: &ExecutionResult,
+    ) -> Result<EvaluationResult> {
         self.evaluate_called.fetch_add(1, Ordering::SeqCst);
         let passes = self.evaluation_passes.load(Ordering::SeqCst);
         // Make it pass on next call (evolve loop terminates).
@@ -145,18 +148,27 @@ impl Supervisor for MockSupervisor {
             seed_id: Some(spec.id),
         };
         self.agents.write().insert(id, info);
-        let _ = self.event_bus.publish(KernelEvent::AgentCreated { id, name: spec.goal.clone() });
+        let _ = self.event_bus.publish(KernelEvent::AgentCreated {
+            id,
+            name: spec.goal.clone(),
+        });
         Ok(id)
     }
 
     async fn exec(&self, id: AgentId) -> Result<()> {
-        self.agents.write().get_mut(&id).map(|a| a.status = AgentStatus::Running);
+        self.agents
+            .write()
+            .get_mut(&id)
+            .map(|a| a.status = AgentStatus::Running);
         Ok(())
     }
 
     async fn run_with_seed(&self, id: AgentId, _seed: &Seed) -> Result<ExecutionResult> {
         self.run_called.fetch_add(1, Ordering::SeqCst);
-        self.agents.write().get_mut(&id).map(|a| a.status = AgentStatus::Idle);
+        self.agents
+            .write()
+            .get_mut(&id)
+            .map(|a| a.status = AgentStatus::Idle);
         let _ = self.event_bus.publish(KernelEvent::AgentStarted { id });
         let _ = self.event_bus.publish(KernelEvent::AgentStopped { id });
         Ok(ExecutionResult {
@@ -167,11 +179,19 @@ impl Supervisor for MockSupervisor {
     }
 
     async fn wait(&self, id: AgentId) -> Result<AgentStatus> {
-        Ok(self.agents.read().get(&id).map(|a| a.status).unwrap_or(AgentStatus::Stopped))
+        Ok(self
+            .agents
+            .read()
+            .get(&id)
+            .map(|a| a.status)
+            .unwrap_or(AgentStatus::Stopped))
     }
 
     async fn kill(&self, id: AgentId) -> Result<()> {
-        self.agents.write().get_mut(&id).map(|a| a.status = AgentStatus::Stopped);
+        self.agents
+            .write()
+            .get_mut(&id)
+            .map(|a| a.status = AgentStatus::Stopped);
         Ok(())
     }
 
@@ -208,12 +228,7 @@ async fn build_test_orchestrator() -> Result<Orchestrator> {
         300, // max_execution_time_secs
     );
 
-    let orchestrator = Orchestrator::new(
-        ouroboros,
-        event_bus,
-        state_store,
-        lifecycle,
-    );
+    let orchestrator = Orchestrator::new(ouroboros, event_bus, state_store, lifecycle);
 
     Ok(orchestrator)
 }
@@ -229,7 +244,11 @@ async fn test_orchestrator_handles_message() -> Result<()> {
     let orchestrator = build_test_orchestrator().await?;
 
     let result = orchestrator
-        .handle_message("test-user", "Fix the bug in main.rs that causes crashes", None)
+        .handle_message(
+            "test-user",
+            "Fix the bug in main.rs that causes crashes",
+            None,
+        )
         .await?;
 
     // Response should not be empty.
@@ -280,12 +299,7 @@ async fn test_orchestrator_evolution_loop() -> Result<()> {
         300, // max_execution_time_secs
     );
 
-    let orchestrator = Orchestrator::new(
-        ouroboros,
-        event_bus,
-        state_store,
-        lifecycle,
-    );
+    let orchestrator = Orchestrator::new(ouroboros, event_bus, state_store, lifecycle);
 
     let result = orchestrator
         .handle_message("test-user", "Something that needs evolution", None)
@@ -326,7 +340,10 @@ async fn test_session_continuation() -> Result<()> {
         "Session ID should be preserved in follow-up"
     );
 
-    println!("Session continuation: {:?} → {:?}", result1.phase_reached, result2.phase_reached);
+    println!(
+        "Session continuation: {:?} → {:?}",
+        result1.phase_reached, result2.phase_reached
+    );
 
     Ok(())
 }
@@ -348,8 +365,10 @@ async fn test_multiple_sessions_independent() -> Result<()> {
     assert_eq!(result_b.session_id.as_deref(), Some("session-b"));
     assert_ne!(result_a.session_id, result_b.session_id);
 
-    println!("Session A: phase={:?}, Session B: phase={:?}",
-        result_a.phase_reached, result_b.phase_reached);
+    println!(
+        "Session A: phase={:?}, Session B: phase={:?}",
+        result_a.phase_reached, result_b.phase_reached
+    );
 
     Ok(())
 }
@@ -404,12 +423,7 @@ async fn test_phase_events_published() -> Result<()> {
         300, // max_execution_time_secs
     );
 
-    let orchestrator = Orchestrator::new(
-        ouroboros,
-        event_bus.clone(),
-        state_store,
-        lifecycle,
-    );
+    let orchestrator = Orchestrator::new(ouroboros, event_bus.clone(), state_store, lifecycle);
 
     // Run orchestration in background.
     let handle = tokio::spawn(async move {
@@ -456,7 +470,10 @@ async fn test_phase_events_published() -> Result<()> {
 
     let _ = handle.await?;
 
-    println!("Phase events: started={}, completed={}", phase_started, phase_completed);
+    println!(
+        "Phase events: started={}, completed={}",
+        phase_started, phase_completed
+    );
 
     Ok(())
 }

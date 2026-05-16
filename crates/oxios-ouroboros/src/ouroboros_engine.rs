@@ -120,10 +120,7 @@ impl OuroborosEngine {
         ctx.set_system_prompt(effective_system);
         ctx.add_message(Message::User(UserMessage::new(user_message)));
 
-        let stream = self
-            .provider
-            .stream(&self.model, &ctx, None)
-            .await?;
+        let stream = self.provider.stream(&self.model, &ctx, None).await?;
 
         // Collect the stream into a single text string.
         let mut text = String::new();
@@ -196,9 +193,8 @@ impl OuroborosEngine {
                     &raw[..raw.len().min(500)]
                 );
                 let retry_raw = self.llm_complete(system_prompt, &retry_msg).await?;
-                Self::parse_json::<T>(&retry_raw).map_err(|e2| {
-                    anyhow::anyhow!("JSON parse failed after retry: {}", e2)
-                })
+                Self::parse_json::<T>(&retry_raw)
+                    .map_err(|e2| anyhow::anyhow!("JSON parse failed after retry: {}", e2))
             }
         }
     }
@@ -227,9 +223,7 @@ impl OuroborosProtocol for OuroborosEngine {
         let parsed: InterviewResponse = Self::parse_json(&raw).unwrap_or_else(|e| {
             tracing::warn!(error = %e, "Failed to parse interview LLM response, using defaults");
             InterviewResponse {
-                questions: vec![
-                    "Could you describe the goal in more detail?".into(),
-                ],
+                questions: vec!["Could you describe the goal in more detail?".into()],
                 scores: AmbiguityScores {
                     goal_clarity: 0.3,
                     constraint_clarity: 0.2,
@@ -328,11 +322,7 @@ impl OuroborosProtocol for OuroborosEngine {
         })
     }
 
-    async fn evaluate(
-        &self,
-        seed: &Seed,
-        execution: &ExecutionResult,
-    ) -> Result<EvaluationResult> {
+    async fn evaluate(&self, seed: &Seed, execution: &ExecutionResult) -> Result<EvaluationResult> {
         self.set_phase(Phase::Evaluate);
 
         // Check cache first
@@ -354,7 +344,9 @@ impl OuroborosProtocol for OuroborosEngine {
                 semantic_pass: None,
                 consensus_pass: None,
                 score: 1.0,
-                notes: mechanical.criterion_results.iter()
+                notes: mechanical
+                    .criterion_results
+                    .iter()
                     .map(|r| format!("✓ {}", r.criterion))
                     .collect(),
             };
@@ -364,7 +356,9 @@ impl OuroborosProtocol for OuroborosEngine {
         }
 
         // Stage 2: Semantic evaluation via LLM (with retry)
-        let mechanical_notes: String = mechanical.criterion_results.iter()
+        let mechanical_notes: String = mechanical
+            .criterion_results
+            .iter()
             .map(|r| format!("- {}: {} ({})", r.criterion, r.passed, r.reason))
             .collect::<Vec<_>>()
             .join("\n");
@@ -381,7 +375,9 @@ impl OuroborosProtocol for OuroborosEngine {
              - \"score\": 0.0 to 1.0\n\
              - \"notes\": list of evaluation notes",
             seed.goal,
-            seed.acceptance_criteria.iter().enumerate()
+            seed.acceptance_criteria
+                .iter()
+                .enumerate()
                 .map(|(i, c)| format!("{}. {}", i + 1, c))
                 .collect::<Vec<_>>()
                 .join("\n"),
@@ -390,7 +386,10 @@ impl OuroborosProtocol for OuroborosEngine {
             mechanical.all_passed,
         );
 
-        let parsed = match self.llm_json::<EvaluationResponse>(system_prompt, &user_message).await {
+        let parsed = match self
+            .llm_json::<EvaluationResponse>(system_prompt, &user_message)
+            .await
+        {
             Ok(p) => p,
             Err(e) => {
                 tracing::warn!(error = %e, "Evaluation JSON parse failed after retry, using mechanical-only");
@@ -424,11 +423,7 @@ impl OuroborosProtocol for OuroborosEngine {
         Ok(result)
     }
 
-    async fn evolve(
-        &self,
-        seed: &Seed,
-        evaluation: &EvaluationResult,
-    ) -> Result<Option<Seed>> {
+    async fn evolve(&self, seed: &Seed, evaluation: &EvaluationResult) -> Result<Option<Seed>> {
         self.set_phase(Phase::Evolve);
 
         // If the evaluation passed, no need to evolve.

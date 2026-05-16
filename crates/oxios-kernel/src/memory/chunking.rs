@@ -191,7 +191,15 @@ mod tests {
 
         // Verify overlap: consecutive chunks share some prefix/suffix
         if chunks.len() >= 2 {
-            let suffix: String = chunks[0].text.chars().rev().take(20).collect::<Vec<_>>().into_iter().rev().collect();
+            let suffix: String = chunks[0]
+                .text
+                .chars()
+                .rev()
+                .take(20)
+                .collect::<Vec<_>>()
+                .into_iter()
+                .rev()
+                .collect();
             let prefix: String = chunks[1].text.chars().take(20).collect();
             assert_eq!(suffix, prefix, "Overlapping region should match");
         }

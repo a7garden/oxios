@@ -9,8 +9,8 @@ use std::sync::Arc;
 
 use tokio::time::{timeout, Duration};
 
-use crate::access_manager::AccessManager;
 use crate::a2a::{A2AProtocol, AgentCard};
+use crate::access_manager::AccessManager;
 use crate::event_bus::{EventBus, KernelEvent};
 use crate::metrics::get_metrics;
 use crate::scheduler::{AgentScheduler, Priority, ScheduledTask};
@@ -74,11 +74,8 @@ impl AgentLifecycleManager {
 
         // 4. Submit and start task
         get_metrics().agents_forked.inc();
-        let task = ScheduledTask::for_agent(
-            agent_id,
-            format!("Execute seed '{}'", seed.goal),
-            priority,
-        );
+        let task =
+            ScheduledTask::for_agent(agent_id, format!("Execute seed '{}'", seed.goal), priority);
         let task_id = self.scheduler.submit(task)?;
         self.scheduler.start_task(task_id)?;
 
@@ -124,7 +121,9 @@ impl AgentLifecycleManager {
         if let Err(e) = self.a2a.registry().unregister_agent(agent_id).await {
             tracing::warn!(agent_id = %agent_id, error = %e, "Failed to unregister A2A card");
         }
-        let _ = self.event_bus.publish(KernelEvent::AgentStopped { id: agent_id });
+        let _ = self
+            .event_bus
+            .publish(KernelEvent::AgentStopped { id: agent_id });
         Ok(())
     }
 
@@ -150,7 +149,10 @@ impl AgentLifecycleManager {
         if goal_lower.contains("refactor") || goal_lower.contains("improve") {
             card = card.with_capability("refactoring");
         }
-        if goal_lower.contains("write") || goal_lower.contains("create") || goal_lower.contains("implement") {
+        if goal_lower.contains("write")
+            || goal_lower.contains("create")
+            || goal_lower.contains("implement")
+        {
             card = card.with_capability("code-generation");
         }
         if goal_lower.contains("debug") || goal_lower.contains("fix") {

@@ -13,7 +13,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use oxi_sdk::{AgentTool, AgentToolResult, ToolContext};
 use serde_json::{json, Value};
-use tokio::sync::{Mutex, oneshot};
+use tokio::sync::{oneshot, Mutex};
 
 /// Agent tool for web browsing via the embedded OxiBrowser engine.
 ///
@@ -419,11 +419,22 @@ mod tests {
     #[test]
     fn test_schema_covers_all_actions() {
         let actions = vec![
-            "browse", "goto", "back", "forward", "reload", "post",
-            "click", "type", "press_key",
-            "evaluate", "evaluate_await",
-            "content", "query_all",
-            "wait_for", "load_resources", "screenshot",
+            "browse",
+            "goto",
+            "back",
+            "forward",
+            "reload",
+            "post",
+            "click",
+            "type",
+            "press_key",
+            "evaluate",
+            "evaluate_await",
+            "content",
+            "query_all",
+            "wait_for",
+            "load_resources",
+            "screenshot",
             "run_script",
             "close",
         ];

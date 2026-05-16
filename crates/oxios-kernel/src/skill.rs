@@ -7,7 +7,7 @@
 //! Skill files are structured as:
 //! ```markdown
 //! ---
- //! name: skill-name
+//! name: skill-name
 //! description: Brief description of what this skill provides
 //! ---
 //!
@@ -16,9 +16,9 @@
 //! Detailed instructions and guidelines...
 //! ```
 
-use std::path::PathBuf;
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 use tokio::fs;
 
 /// Metadata extracted from SKILL.md frontmatter.
@@ -142,12 +142,13 @@ impl SkillStore {
             while let Some(entry) = entries.next_entry().await? {
                 let src = entry.path();
                 if src.is_dir() {
-                    let skill_name = src.file_name()
+                    let skill_name = src
+                        .file_name()
                         .and_then(|n| n.to_str())
                         .unwrap_or("unknown");
                     let dest = self.skills_dir.join(skill_name);
                     fs::create_dir_all(&dest).await?;
-                    
+
                     let mut skill_files = fs::read_dir(&src).await?;
                     while let Some(sfile) = skill_files.next_entry().await? {
                         if sfile.file_name() == "SKILL.md" {
@@ -199,7 +200,7 @@ impl SkillStore {
     /// Looks for `<name>/SKILL.md` in the skills directory.
     pub async fn load_skill(&self, name: &str) -> Result<Option<Skill>> {
         let skill_path = self.skills_dir.join(name).join("SKILL.md");
-        
+
         if !skill_path.exists() {
             return Ok(None);
         }
@@ -217,20 +218,13 @@ impl SkillStore {
     /// Create a new skill with the given metadata and content.
     ///
     /// The skill will be saved as `<skills_dir>/<name>/SKILL.md`.
-    pub async fn create_skill(
-        &self,
-        name: &str,
-        description: &str,
-        content: &str,
-    ) -> Result<()> {
+    pub async fn create_skill(&self, name: &str, description: &str, content: &str) -> Result<()> {
         fs::create_dir_all(self.skills_dir.join(name)).await?;
 
         let skill_file = self.skills_dir.join(name).join("SKILL.md");
         let frontmatter = format!(
             "---\nname: {}\ndescription: {}\n---\n\n{}",
-            name,
-            description,
-            content
+            name, description, content
         );
 
         fs::write(&skill_file, frontmatter).await?;

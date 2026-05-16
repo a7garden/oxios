@@ -24,12 +24,10 @@
 //! assert!(cspace.len() > 0);
 //! ```
 
-use crate::types::AgentId;
 use crate::space::SpaceId;
+use crate::types::AgentId;
 
-use super::types::{
-    Capability, CapabilityId, CSpace, Issuer, ResourceRef, Rights,
-};
+use super::types::{CSpace, Capability, CapabilityId, Issuer, ResourceRef, Rights};
 
 /// Builder for constructing preset capability spaces.
 ///
@@ -50,10 +48,13 @@ impl CapabilityTemplate {
     pub fn worker() -> Self {
         let mut t = Self { caps: Vec::new() };
         t.caps.push((
-            ResourceRef::Exec { mode: "shell".into() },
+            ResourceRef::Exec {
+                mode: "shell".into(),
+            },
             Rights::EXECUTE | Rights::READ,
         ));
-        t.caps.push((ResourceRef::Browser, Rights::READ | Rights::EXECUTE));
+        t.caps
+            .push((ResourceRef::Browser, Rights::READ | Rights::EXECUTE));
         t
     }
 
@@ -64,7 +65,9 @@ impl CapabilityTemplate {
     pub fn standard() -> Self {
         let mut t = Self::worker();
         t.caps.push((
-            ResourceRef::KernelDomain { domain: "memory".into() },
+            ResourceRef::KernelDomain {
+                domain: "memory".into(),
+            },
             Rights::READ,
         ));
         t
@@ -78,18 +81,39 @@ impl CapabilityTemplate {
     pub fn operator() -> Self {
         let mut t = Self::standard();
         let extra = vec![
-            (ResourceRef::Space { id: SpaceId::nil() }, Rights::READ | Rights::WRITE),
-            (ResourceRef::Agent { id: AgentId::nil() }, Rights::READ | Rights::WRITE),
-            (ResourceRef::A2a, Rights::READ | Rights::WRITE | Rights::EXECUTE),
-            (ResourceRef::KernelDomain { domain: "persona".into() }, Rights::READ | Rights::WRITE),
-            (ResourceRef::KernelDomain { domain: "program".into() }, Rights::READ | Rights::WRITE | Rights::EXECUTE),
+            (
+                ResourceRef::Space { id: SpaceId::nil() },
+                Rights::READ | Rights::WRITE,
+            ),
+            (
+                ResourceRef::Agent { id: AgentId::nil() },
+                Rights::READ | Rights::WRITE,
+            ),
+            (
+                ResourceRef::A2a,
+                Rights::READ | Rights::WRITE | Rights::EXECUTE,
+            ),
+            (
+                ResourceRef::KernelDomain {
+                    domain: "persona".into(),
+                },
+                Rights::READ | Rights::WRITE,
+            ),
+            (
+                ResourceRef::KernelDomain {
+                    domain: "program".into(),
+                },
+                Rights::READ | Rights::WRITE | Rights::EXECUTE,
+            ),
             (
                 ResourceRef::Mcp { server: "*".into() },
                 Rights::READ | Rights::EXECUTE,
             ),
             // Upgrade memory to RW
             (
-                ResourceRef::KernelDomain { domain: "memory".into() },
+                ResourceRef::KernelDomain {
+                    domain: "memory".into(),
+                },
                 Rights::READ | Rights::WRITE,
             ),
         ];
@@ -104,10 +128,30 @@ impl CapabilityTemplate {
     pub fn supervisor() -> Self {
         let mut t = Self::operator();
         let admin = vec![
-            (ResourceRef::KernelDomain { domain: "security".into() }, Rights::ALL),
-            (ResourceRef::KernelDomain { domain: "budget".into() }, Rights::READ | Rights::WRITE),
-            (ResourceRef::KernelDomain { domain: "resource".into() }, Rights::READ | Rights::WRITE),
-            (ResourceRef::KernelDomain { domain: "cron".into() }, Rights::READ | Rights::WRITE | Rights::EXECUTE),
+            (
+                ResourceRef::KernelDomain {
+                    domain: "security".into(),
+                },
+                Rights::ALL,
+            ),
+            (
+                ResourceRef::KernelDomain {
+                    domain: "budget".into(),
+                },
+                Rights::READ | Rights::WRITE,
+            ),
+            (
+                ResourceRef::KernelDomain {
+                    domain: "resource".into(),
+                },
+                Rights::READ | Rights::WRITE,
+            ),
+            (
+                ResourceRef::KernelDomain {
+                    domain: "cron".into(),
+                },
+                Rights::READ | Rights::WRITE | Rights::EXECUTE,
+            ),
         ];
         t.caps.extend(admin);
         t
@@ -122,7 +166,9 @@ impl CapabilityTemplate {
         let mut t = Self::worker();
         for name in names {
             t.caps.push((
-                ResourceRef::Program { name: (*name).into() },
+                ResourceRef::Program {
+                    name: (*name).into(),
+                },
                 Rights::EXECUTE | Rights::READ,
             ));
         }
@@ -181,7 +227,12 @@ mod tests {
     #[test]
     fn worker_has_exec_and_browser() {
         let cs = CapabilityTemplate::worker().build();
-        assert!(cs.can(&ResourceRef::Exec { mode: "shell".into() }, Rights::EXECUTE));
+        assert!(cs.can(
+            &ResourceRef::Exec {
+                mode: "shell".into()
+            },
+            Rights::EXECUTE
+        ));
         assert!(cs.can(&ResourceRef::Browser, Rights::READ));
         assert_eq!(cs.len(), 2);
     }
@@ -189,8 +240,18 @@ mod tests {
     #[test]
     fn standard_adds_memory_read() {
         let cs = CapabilityTemplate::standard().build();
-        assert!(cs.can(&ResourceRef::KernelDomain { domain: "memory".into() }, Rights::READ));
-        assert!(!cs.can(&ResourceRef::KernelDomain { domain: "memory".into() }, Rights::WRITE));
+        assert!(cs.can(
+            &ResourceRef::KernelDomain {
+                domain: "memory".into()
+            },
+            Rights::READ
+        ));
+        assert!(!cs.can(
+            &ResourceRef::KernelDomain {
+                domain: "memory".into()
+            },
+            Rights::WRITE
+        ));
     }
 
     #[test]
@@ -203,26 +264,46 @@ mod tests {
     #[test]
     fn supervisor_has_security_all() {
         let cs = CapabilityTemplate::supervisor().build();
-        assert!(cs.can(&ResourceRef::KernelDomain { domain: "security".into() }, Rights::ALL));
+        assert!(cs.can(
+            &ResourceRef::KernelDomain {
+                domain: "security".into()
+            },
+            Rights::ALL
+        ));
     }
 
     #[test]
     fn with_programs_scoped() {
         let cs = CapabilityTemplate::with_programs(&["git", "gh"]).build();
-        assert!(cs.can(&ResourceRef::Program { name: "git".into() }, Rights::EXECUTE));
+        assert!(cs.can(
+            &ResourceRef::Program { name: "git".into() },
+            Rights::EXECUTE
+        ));
         assert!(cs.can(&ResourceRef::Program { name: "gh".into() }, Rights::EXECUTE));
-        assert!(!cs.can(&ResourceRef::Program { name: "curl".into() }, Rights::EXECUTE));
+        assert!(!cs.can(
+            &ResourceRef::Program {
+                name: "curl".into()
+            },
+            Rights::EXECUTE
+        ));
     }
 
     #[test]
     fn builder_chaining() {
         let cs = CapabilityTemplate::worker()
             .with(
-                ResourceRef::KernelDomain { domain: "custom".into() },
+                ResourceRef::KernelDomain {
+                    domain: "custom".into(),
+                },
                 Rights::READ,
             )
             .build();
-        assert!(cs.can(&ResourceRef::KernelDomain { domain: "custom".into() }, Rights::READ));
+        assert!(cs.can(
+            &ResourceRef::KernelDomain {
+                domain: "custom".into()
+            },
+            Rights::READ
+        ));
     }
 
     #[test]

@@ -6,8 +6,8 @@
 //! - Zombie task detection and reaping
 //! - Maximum concurrent task enforcement
 
-use crate::types::AgentId;
 use crate::budget::BudgetManager;
+use crate::types::AgentId;
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use parking_lot::Mutex;
@@ -212,7 +212,11 @@ impl AgentScheduler {
     /// * `max_concurrent` - Maximum number of tasks that can run simultaneously
     /// * `rate_limit_per_minute` - Maximum LLM API calls per minute
     /// * `zombie_timeout_secs` - How long before a running task is considered a zombie
-    pub fn new(max_concurrent: usize, rate_limit_per_minute: u32, zombie_timeout_secs: u64) -> Self {
+    pub fn new(
+        max_concurrent: usize,
+        rate_limit_per_minute: u32,
+        zombie_timeout_secs: u64,
+    ) -> Self {
         Self {
             queue: Arc::new(Mutex::new(BinaryHeap::new())),
             running: Arc::new(Mutex::new(HashMap::new())),
@@ -278,10 +282,7 @@ impl AgentScheduler {
         {
             let mut limiter = self.rate_limiter.lock();
             if !limiter.allow() {
-                tracing::debug!(
-                    remaining = limiter.remaining(),
-                    "Rate limit exceeded"
-                );
+                tracing::debug!(remaining = limiter.remaining(), "Rate limit exceeded");
                 return None;
             }
         }
@@ -297,7 +298,8 @@ impl AgentScheduler {
             match task_opt {
                 Some(t) => {
                     // Check budget before scheduling (soft gate).
-                    if let (Some(ref bm), Some(ref agent_id)) = (&self.budget_manager, &t.agent_id) {
+                    if let (Some(ref bm), Some(ref agent_id)) = (&self.budget_manager, &t.agent_id)
+                    {
                         if !bm.can_schedule(agent_id) {
                             tracing::warn!(
                                 agent_id = %agent_id,
@@ -435,7 +437,10 @@ impl AgentScheduler {
         for id in zombie_ids {
             if let Some(mut task) = running.remove(&id) {
                 task.status = TaskStatus::Failed;
-                task.error = Some(format!("zombie: ran for >{} seconds", self.zombie_timeout_secs));
+                task.error = Some(format!(
+                    "zombie: ran for >{} seconds",
+                    self.zombie_timeout_secs
+                ));
                 reaped.push(id);
                 tracing::warn!(
                     task_id = %id,
@@ -546,7 +551,7 @@ impl AgentScheduler {
         let mut tasks: Vec<ScheduledTask> = heap.iter().cloned().collect();
         // Sort ascending by priority so highest priority is at the end
         // (matches the original Vec-based behavior for test compatibility).
-        tasks.sort_by(|a, b| a.priority.cmp(&b.priority));
+        tasks.sort_by_key(|a| a.priority);
         tasks
     }
 
@@ -607,9 +612,18 @@ mod tests {
     fn test_submit_and_next_high_priority_first() {
         let scheduler = AgentScheduler::new(10, 10_000, 60);
 
-        scheduler.submit(ScheduledTask::new("Low priority".into(), Priority::Low)).unwrap();
-        scheduler.submit(ScheduledTask::new("High priority".into(), Priority::High)).unwrap();
-        scheduler.submit(ScheduledTask::new("Normal priority".into(), Priority::Normal)).unwrap();
+        scheduler
+            .submit(ScheduledTask::new("Low priority".into(), Priority::Low))
+            .unwrap();
+        scheduler
+            .submit(ScheduledTask::new("High priority".into(), Priority::High))
+            .unwrap();
+        scheduler
+            .submit(ScheduledTask::new(
+                "Normal priority".into(),
+                Priority::Normal,
+            ))
+            .unwrap();
 
         // High priority should come first.
         let next = scheduler.next_task().unwrap();
@@ -628,10 +642,18 @@ mod tests {
     fn test_submit_and_next_critical_first() {
         let scheduler = AgentScheduler::new(10, 10_000, 60);
 
-        scheduler.submit(ScheduledTask::new("Low".into(), Priority::Low)).unwrap();
-        scheduler.submit(ScheduledTask::new("Normal".into(), Priority::Normal)).unwrap();
-        scheduler.submit(ScheduledTask::new("High".into(), Priority::High)).unwrap();
-        scheduler.submit(ScheduledTask::new("Critical".into(), Priority::Critical)).unwrap();
+        scheduler
+            .submit(ScheduledTask::new("Low".into(), Priority::Low))
+            .unwrap();
+        scheduler
+            .submit(ScheduledTask::new("Normal".into(), Priority::Normal))
+            .unwrap();
+        scheduler
+            .submit(ScheduledTask::new("High".into(), Priority::High))
+            .unwrap();
+        scheduler
+            .submit(ScheduledTask::new("Critical".into(), Priority::Critical))
+            .unwrap();
 
         // Critical should be first.
         let next = scheduler.next_task().unwrap();
@@ -653,9 +675,15 @@ mod tests {
 
         // Multiple tasks at same priority — BinaryHeap does not guarantee
         // FIFO/LIFO within the same priority level.
-        scheduler.submit(ScheduledTask::new("First".into(), Priority::Normal)).unwrap();
-        scheduler.submit(ScheduledTask::new("Second".into(), Priority::Normal)).unwrap();
-        scheduler.submit(ScheduledTask::new("Third".into(), Priority::Normal)).unwrap();
+        scheduler
+            .submit(ScheduledTask::new("First".into(), Priority::Normal))
+            .unwrap();
+        scheduler
+            .submit(ScheduledTask::new("Second".into(), Priority::Normal))
+            .unwrap();
+        scheduler
+            .submit(ScheduledTask::new("Third".into(), Priority::Normal))
+            .unwrap();
 
         // All three should be popped with Normal priority; exact order is unspecified.
         let mut descriptions = Vec::new();
@@ -672,9 +700,15 @@ mod tests {
     fn test_max_concurrent_blocks() {
         let scheduler = AgentScheduler::new(2, 10_000, 60);
 
-        scheduler.submit(ScheduledTask::new("Task 1".into(), Priority::Normal)).unwrap();
-        scheduler.submit(ScheduledTask::new("Task 2".into(), Priority::Normal)).unwrap();
-        scheduler.submit(ScheduledTask::new("Task 3".into(), Priority::Normal)).unwrap();
+        scheduler
+            .submit(ScheduledTask::new("Task 1".into(), Priority::Normal))
+            .unwrap();
+        scheduler
+            .submit(ScheduledTask::new("Task 2".into(), Priority::Normal))
+            .unwrap();
+        scheduler
+            .submit(ScheduledTask::new("Task 3".into(), Priority::Normal))
+            .unwrap();
 
         assert!(scheduler.next_task().is_some());
         assert!(scheduler.next_task().is_some());
@@ -686,14 +720,18 @@ mod tests {
     fn test_max_concurrent_allows_when_slot_frees() {
         let scheduler = AgentScheduler::new(2, 10_000, 60); // 2 max concurrent.
 
-        let _ = scheduler.submit(ScheduledTask::new("Task 1".into(), Priority::Normal)).unwrap();
-        let _id2 = scheduler.submit(ScheduledTask::new("Task 2".into(), Priority::Normal)).unwrap();
+        let _ = scheduler
+            .submit(ScheduledTask::new("Task 1".into(), Priority::Normal))
+            .unwrap();
+        let _id2 = scheduler
+            .submit(ScheduledTask::new("Task 2".into(), Priority::Normal))
+            .unwrap();
         // Queue (insert at 0 prepends): [Task 2, Task 1]
 
         // Start 2 tasks (fills max_concurrent).
         let t1 = scheduler.next_task().unwrap(); // Task 2 (first popped).
         let t2 = scheduler.next_task().unwrap(); // Task 1 (second popped).
-        // Running: [Task 2, Task 1], Queue: []
+                                                 // Running: [Task 2, Task 1], Queue: []
         assert!(scheduler.next_task().is_none()); // Blocked.
 
         // Complete both tasks.
@@ -701,7 +739,9 @@ mod tests {
         scheduler.complete_task(t2.id).unwrap();
 
         // Submit a new task now that slots have freed.
-        let _id3 = scheduler.submit(ScheduledTask::new("Task 3".into(), Priority::Normal)).unwrap();
+        let _id3 = scheduler
+            .submit(ScheduledTask::new("Task 3".into(), Priority::Normal))
+            .unwrap();
 
         // Now next_task should work.
         let task = scheduler.next_task().unwrap();
@@ -785,7 +825,9 @@ mod tests {
         let id1 = scheduler
             .submit(ScheduledTask::new("Queued".into(), Priority::Normal))
             .unwrap();
-        scheduler.submit(ScheduledTask::new("Queued 2".into(), Priority::Low)).unwrap();
+        scheduler
+            .submit(ScheduledTask::new("Queued 2".into(), Priority::Low))
+            .unwrap();
 
         // Start one task.
         let started = scheduler.next_task().unwrap();
@@ -866,7 +908,9 @@ mod tests {
 
         // Consume all rate limit by calling next_task (not submit).
         for i in 0..5 {
-            scheduler.submit(ScheduledTask::new(format!("T{}", i), Priority::Normal)).unwrap();
+            scheduler
+                .submit(ScheduledTask::new(format!("T{}", i), Priority::Normal))
+                .unwrap();
             let _ = scheduler.next_task();
         }
 
@@ -903,7 +947,9 @@ mod tests {
         scheduler
             .submit(ScheduledTask::new("R1".into(), Priority::Normal))
             .unwrap();
-        scheduler.submit(ScheduledTask::new("R2".into(), Priority::Normal)).unwrap();
+        scheduler
+            .submit(ScheduledTask::new("R2".into(), Priority::Normal))
+            .unwrap();
 
         let _ = scheduler.next_task();
         let _ = scheduler.next_task();
@@ -937,16 +983,26 @@ mod tests {
         });
 
         // Attach budget manager to scheduler.
-        scheduler.lock().set_budget_manager(Arc::clone(&budget_manager));
+        scheduler
+            .lock()
+            .set_budget_manager(Arc::clone(&budget_manager));
 
         // Submit two tasks for the same agent.
         scheduler
             .lock()
-            .submit(ScheduledTask::for_agent(agent_id, "Task 1".into(), Priority::Normal))
+            .submit(ScheduledTask::for_agent(
+                agent_id,
+                "Task 1".into(),
+                Priority::Normal,
+            ))
             .unwrap();
         scheduler
             .lock()
-            .submit(ScheduledTask::for_agent(agent_id, "Task 2".into(), Priority::Normal))
+            .submit(ScheduledTask::for_agent(
+                agent_id,
+                "Task 2".into(),
+                Priority::Normal,
+            ))
             .unwrap();
 
         // First task should run (track_call succeeds).
@@ -979,16 +1035,26 @@ mod tests {
             });
         }
 
-        scheduler.lock().set_budget_manager(Arc::clone(&budget_manager));
+        scheduler
+            .lock()
+            .set_budget_manager(Arc::clone(&budget_manager));
 
         // Submit tasks for both agents.
         scheduler
             .lock()
-            .submit(ScheduledTask::for_agent(agent1, "A1".into(), Priority::Normal))
+            .submit(ScheduledTask::for_agent(
+                agent1,
+                "A1".into(),
+                Priority::Normal,
+            ))
             .unwrap();
         scheduler
             .lock()
-            .submit(ScheduledTask::for_agent(agent2, "B1".into(), Priority::Normal))
+            .submit(ScheduledTask::for_agent(
+                agent2,
+                "B1".into(),
+                Priority::Normal,
+            ))
             .unwrap();
 
         // Both should run.
@@ -1004,7 +1070,9 @@ mod tests {
         let scheduler = Arc::new(Mutex::new(AgentScheduler::new(2, 10_000, 60)));
         let budget_manager = Arc::new(BudgetManager::new());
 
-        scheduler.lock().set_budget_manager(Arc::clone(&budget_manager));
+        scheduler
+            .lock()
+            .set_budget_manager(Arc::clone(&budget_manager));
 
         // Submit a task without an agent ID.
         scheduler

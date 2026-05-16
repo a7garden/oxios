@@ -113,7 +113,10 @@ impl McpBridge {
             let client = Arc::new(McpClient::new(server.clone()));
             match client.initialize().await {
                 Ok(()) => {
-                    self.clients.write().await.insert(server.name.clone(), client);
+                    self.clients
+                        .write()
+                        .await
+                        .insert(server.name.clone(), client);
                     tracing::info!(server = %server.name, "MCP server started");
                 }
                 Err(e) => {
@@ -132,7 +135,10 @@ impl McpBridge {
 
     /// Initialize a specific server by name.
     pub async fn initialize_server(&self, name: &str) -> Result<()> {
-        let server = self.servers.read().iter()
+        let server = self
+            .servers
+            .read()
+            .iter()
             .find(|s| s.name == name)
             .cloned()
             .ok_or_else(|| anyhow!("MCP server '{}' not found", name))?;
@@ -161,7 +167,10 @@ impl McpBridge {
                 let defs: Vec<ToolDef> = mcp_tools.iter().map(|t| t.to_tool_def()).collect();
                 let start = all_tools.len();
                 all_tools.extend(defs);
-                *self.tool_cache.write().await
+                *self
+                    .tool_cache
+                    .write()
+                    .await
                     .entry(name.clone())
                     .or_insert_with(Vec::new) = all_tools[start..].to_vec();
             }
@@ -183,7 +192,8 @@ impl McpBridge {
         args: serde_json::Value,
     ) -> Result<McpToolCallResult> {
         let clients = self.clients.read().await;
-        let client = clients.get(server_name)
+        let client = clients
+            .get(server_name)
             .ok_or_else(|| anyhow!("MCP server '{}' not connected", server_name))?;
 
         client.call_tool(tool_name, args).await
@@ -206,13 +216,17 @@ impl McpBridge {
     /// Refresh tools from a specific server.
     pub async fn refresh_tools(&self, server_name: &str) -> Result<Vec<ToolDef>> {
         let clients = self.clients.read().await;
-        let client = clients.get(server_name)
+        let client = clients
+            .get(server_name)
             .ok_or_else(|| anyhow!("MCP server '{}' not connected", server_name))?;
 
         let mcp_tools = client.refresh_tools().await?;
         let defs: Vec<ToolDef> = mcp_tools.iter().map(|t| t.to_tool_def()).collect();
 
-        *self.tool_cache.write().await
+        *self
+            .tool_cache
+            .write()
+            .await
             .entry(server_name.to_string())
             .or_insert_with(Vec::new) = defs.clone();
 
@@ -273,11 +287,10 @@ mod tests {
 
     #[test]
     fn test_mcp_request_with_params() {
-        let request = McpRequest::new("tools/call")
-            .with_params(serde_json::json!({
-                "name": "my_tool",
-                "arguments": {"arg1": "value1"}
-            }));
+        let request = McpRequest::new("tools/call").with_params(serde_json::json!({
+            "name": "my_tool",
+            "arguments": {"arg1": "value1"}
+        }));
 
         let json = serde_json::to_string(&request).unwrap();
         assert!(json.contains("my_tool"));
@@ -362,11 +375,19 @@ mod tests {
         assert_eq!(tool_def.description, "A test tool");
         assert_eq!(tool_def.arguments.len(), 2);
 
-        let arg1 = tool_def.arguments.iter().find(|a| a.name == "arg1").unwrap();
+        let arg1 = tool_def
+            .arguments
+            .iter()
+            .find(|a| a.name == "arg1")
+            .unwrap();
         assert!(arg1.required);
         assert_eq!(arg1.description, "First argument");
 
-        let arg2 = tool_def.arguments.iter().find(|a| a.name == "arg2").unwrap();
+        let arg2 = tool_def
+            .arguments
+            .iter()
+            .find(|a| a.name == "arg2")
+            .unwrap();
         assert!(!arg2.required);
         assert_eq!(arg2.default, Some("42".to_string()));
     }
@@ -422,7 +443,10 @@ mod tests {
     #[tokio::test]
     async fn test_bridge_initialize_all_empty() {
         let bridge = McpBridge::new();
-        bridge.initialize_all().await.expect("empty bridge should initialize");
+        bridge
+            .initialize_all()
+            .await
+            .expect("empty bridge should initialize");
     }
 
     #[tokio::test]
@@ -439,7 +463,10 @@ mod tests {
     #[tokio::test]
     async fn test_bridge_shutdown_all_empty() {
         let bridge = McpBridge::new();
-        bridge.shutdown_all().await.expect("empty bridge shutdown should succeed");
+        bridge
+            .shutdown_all()
+            .await
+            .expect("empty bridge shutdown should succeed");
     }
 
     #[tokio::test]
@@ -496,8 +523,8 @@ done
         bridge.initialize_all().await.unwrap();
 
         let client = bridge.client("echo-server").await.unwrap();
-        let request = McpRequest::new("tools/list")
-            .with_params(serde_json::json!({"test": "value"}));
+        let request =
+            McpRequest::new("tools/list").with_params(serde_json::json!({"test": "value"}));
         let response = client.send_request(request).await;
 
         // The bash echo server will echo back the request JSON as a "response-like" string.

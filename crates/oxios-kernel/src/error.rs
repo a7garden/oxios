@@ -156,13 +156,44 @@ mod tests {
     #[test]
     fn test_all_http_status_mappings() {
         let id = crate::types::AgentId::new_v4();
-        assert_eq!(u16::from(KernelError::AgentNotFound { id }.http_status()), 404);
-        assert_eq!(u16::from(KernelError::PermissionDenied { reason: "test".into() }.http_status()), 403);
-        assert_eq!(u16::from(KernelError::ProgramNotFound { name: "p".into() }.http_status()), 404);
-        assert_eq!(u16::from(KernelError::ProgramAlreadyExists { name: "p".into() }.http_status()), 409);
-        assert_eq!(u16::from(KernelError::InvalidConfig { detail: "bad".into() }.http_status()), 400);
-        assert_eq!(u16::from(KernelError::SeedNotFound { id: "s".into() }.http_status()), 404);
-        assert_eq!(u16::from(KernelError::SessionNotFound { id: "s".into() }.http_status()), 404);
+        assert_eq!(
+            u16::from(KernelError::AgentNotFound { id }.http_status()),
+            404
+        );
+        assert_eq!(
+            u16::from(
+                KernelError::PermissionDenied {
+                    reason: "test".into()
+                }
+                .http_status()
+            ),
+            403
+        );
+        assert_eq!(
+            u16::from(KernelError::ProgramNotFound { name: "p".into() }.http_status()),
+            404
+        );
+        assert_eq!(
+            u16::from(KernelError::ProgramAlreadyExists { name: "p".into() }.http_status()),
+            409
+        );
+        assert_eq!(
+            u16::from(
+                KernelError::InvalidConfig {
+                    detail: "bad".into()
+                }
+                .http_status()
+            ),
+            400
+        );
+        assert_eq!(
+            u16::from(KernelError::SeedNotFound { id: "s".into() }.http_status()),
+            404
+        );
+        assert_eq!(
+            u16::from(KernelError::SessionNotFound { id: "s".into() }.http_status()),
+            404
+        );
     }
 
     #[test]
@@ -174,7 +205,8 @@ mod tests {
 
     #[test]
     fn test_io_error_conversion() {
-        let err = KernelError::StateStore(std::io::Error::new(std::io::ErrorKind::NotFound, "gone"));
+        let err =
+            KernelError::StateStore(std::io::Error::new(std::io::ErrorKind::NotFound, "gone"));
         assert!(err.to_string().contains("gone"));
         assert_eq!(u16::from(err.http_status()), 500);
     }

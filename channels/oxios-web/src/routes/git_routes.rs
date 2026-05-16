@@ -1,18 +1,21 @@
 //! Git version control API routes.
 
-use std::sync::Arc;
+use crate::error::AppError;
+use crate::server::AppState;
 use axum::extract::State;
 use axum::Json;
 use serde::Deserialize;
-use crate::error::AppError;
-use crate::server::AppState;
 use serde_json;
+use std::sync::Arc;
 
 /// GET /api/git/log — Return commit log entries.
 pub(crate) async fn handle_git_log(
     state: State<Arc<AppState>>,
 ) -> Result<Json<serde_json::Value>, AppError> {
-    let log = state.kernel.infra.git_log(100)
+    let log = state
+        .kernel
+        .infra
+        .git_log(100)
         .map_err(|e| AppError::Internal(e.to_string()))?;
     Ok(Json(serde_json::json!({ "entries": log })))
 }
@@ -21,7 +24,10 @@ pub(crate) async fn handle_git_log(
 pub(crate) async fn handle_git_tags(
     state: State<Arc<AppState>>,
 ) -> Result<Json<serde_json::Value>, AppError> {
-    let tags = state.kernel.infra.git_tags()
+    let tags = state
+        .kernel
+        .infra
+        .git_tags()
         .map_err(|e| AppError::Internal(e.to_string()))?;
     Ok(Json(serde_json::json!({ "tags": tags })))
 }
@@ -30,7 +36,10 @@ pub(crate) async fn handle_git_tags(
 pub(crate) async fn handle_git_verify(
     state: State<Arc<AppState>>,
 ) -> Result<Json<serde_json::Value>, AppError> {
-    let valid = state.kernel.infra.git_verify()
+    let valid = state
+        .kernel
+        .infra
+        .git_verify()
         .map_err(|e| AppError::Internal(e.to_string()))?;
     Ok(Json(serde_json::json!({ "valid": valid })))
 }
@@ -49,7 +58,10 @@ pub(crate) async fn handle_git_restore(
     state: State<Arc<AppState>>,
     Json(body): Json<RestoreRequest>,
 ) -> Result<Json<serde_json::Value>, AppError> {
-    state.kernel.infra.git_restore(&body.path, &body.hash)
+    state
+        .kernel
+        .infra
+        .git_restore(&body.path, &body.hash)
         .map_err(|e| AppError::Internal(e.to_string()))?;
     Ok(Json(serde_json::json!({
         "restored": body.path,

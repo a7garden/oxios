@@ -9,8 +9,7 @@ use std::sync::Arc;
 use oxi_agent::SearchCache;
 use oxi_sdk::ToolRegistry;
 use oxi_sdk::{
-    KernelToolContext as SdkKernelToolContext,
-    KernelToolProvider as SdkKernelToolProvider,
+    KernelToolContext as SdkKernelToolContext, KernelToolProvider as SdkKernelToolProvider,
 };
 
 use crate::tools::registration::register_always_on;
@@ -44,11 +43,29 @@ impl SdkKernelToolProvider for OxiosKernelBridge {
     fn tool_names(&self) -> Vec<&str> {
         vec![
             // Always-on file tools
-            "read", "write", "edit", "grep", "find", "ls",
+            "read",
+            "write",
+            "edit",
+            "grep",
+            "find",
+            "ls",
             // Kernel domain
-            "exec", "memory_read", "memory_write", "memory_search",
-            "space", "agent", "a2a_delegate", "a2a_send", "a2a_query",
-            "persona", "program", "cron", "security", "budget", "resource", "mcp",
+            "exec",
+            "memory_read",
+            "memory_write",
+            "memory_search",
+            "space",
+            "agent",
+            "a2a_delegate",
+            "a2a_send",
+            "a2a_query",
+            "persona",
+            "program",
+            "cron",
+            "security",
+            "budget",
+            "resource",
+            "mcp",
             "browser",
         ]
     }
@@ -75,8 +92,10 @@ mod tests {
     fn test_tool_names_length() {
         // Build a minimal KernelHandle for testing
         let state_store = Arc::new(
-            oxios_kernel::state_store::StateStore::new(std::path::PathBuf::from("/tmp/oxios-test-workspace"))
-                .unwrap(),
+            oxios_kernel::state_store::StateStore::new(std::path::PathBuf::from(
+                "/tmp/oxios-test-workspace",
+            ))
+            .unwrap(),
         );
 
         let kernel = Arc::new(oxios_kernel::KernelHandle::new(
@@ -84,10 +103,14 @@ mod tests {
             oxios_kernel::AgentApi::new(
                 Arc::new(oxios_kernel::supervisor::NoOpSupervisor),
                 Arc::new(oxios_kernel::budget::BudgetManager::new()),
-                Arc::new(oxios_kernel::memory::MemoryManager::new(state_store.clone())),
+                Arc::new(oxios_kernel::memory::MemoryManager::new(
+                    state_store.clone(),
+                )),
             ),
             oxios_kernel::SecurityApi::new(
-                Arc::new(parking_lot::Mutex::new(oxios_kernel::auth::AuthManager::new())),
+                Arc::new(parking_lot::Mutex::new(
+                    oxios_kernel::auth::AuthManager::new(),
+                )),
                 Arc::new(oxios_kernel::audit_trail::AuditTrail::new(100)),
                 Arc::new(parking_lot::Mutex::new(
                     oxios_kernel::access_manager::AccessManager::new(),
@@ -98,16 +121,19 @@ mod tests {
                 oxios_kernel::persona_manager::PersonaManager::new(),
             )),
             oxios_kernel::ExtensionApi::new(
-                Arc::new(oxios_kernel::program::ProgramManager::new(std::path::PathBuf::from(
-                    "/tmp/oxios-test/programs",
-                ))),
+                Arc::new(oxios_kernel::program::ProgramManager::new(
+                    std::path::PathBuf::from("/tmp/oxios-test/programs"),
+                )),
                 Arc::new(
                     oxios_kernel::skill::SkillStore::new(std::path::PathBuf::from(
                         "/tmp/oxios-test/skills",
                     ))
                     .unwrap(),
                 ),
-                Arc::new(oxios_kernel::host_tools::HostToolValidator::new(vec![], vec![])),
+                Arc::new(oxios_kernel::host_tools::HostToolValidator::new(
+                    vec![],
+                    vec![],
+                )),
             ),
             oxios_kernel::McpApi::new(Arc::new(oxios_kernel::mcp::McpBridge::new())),
             oxios_kernel::InfraApi::new(
@@ -119,7 +145,10 @@ mod tests {
                     .unwrap(),
                 ),
                 Arc::new(oxios_kernel::scheduler::AgentScheduler::new(5, 60, 300)),
-                Arc::new(oxios_kernel::cron::CronScheduler::new(state_store.clone(), 60)),
+                Arc::new(oxios_kernel::cron::CronScheduler::new(
+                    state_store.clone(),
+                    60,
+                )),
                 Arc::new(oxios_kernel::resource_monitor::ResourceMonitor::new(60, 60)),
                 Arc::new(oxios_kernel::event_bus::EventBus::new(256)),
                 oxios_kernel::OxiosConfig::default(),
@@ -127,9 +156,10 @@ mod tests {
             ),
             oxios_kernel::SpaceApi::new(
                 Arc::new(
-                    oxios_kernel::space::SpaceManager::new(state_store.clone(), Arc::new(
-                        oxios_kernel::event_bus::EventBus::new(256),
-                    ))
+                    oxios_kernel::space::SpaceManager::new(
+                        state_store.clone(),
+                        Arc::new(oxios_kernel::event_bus::EventBus::new(256)),
+                    )
                     .unwrap(),
                 ),
                 Arc::new(oxios_kernel::event_bus::EventBus::new(256)),

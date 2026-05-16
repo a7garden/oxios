@@ -34,7 +34,9 @@ impl Role {
                     Action::ManageRBAC,
                     Action::ViewAuditLog,
                     Action::SystemConfig,
-                ].into_iter().collect(),
+                ]
+                .into_iter()
+                .collect(),
                 resource_patterns: vec!["*".into()],
                 max_concurrent_agents: usize::MAX,
             },
@@ -47,7 +49,9 @@ impl Role {
                     Action::ManagePrograms,
                     Action::ManageWorkspaces,
                     Action::ViewAuditLog,
-                ].into_iter().collect(),
+                ]
+                .into_iter()
+                .collect(),
                 resource_patterns: vec!["/workspace/**".into(), "/tmp/**".into()],
                 max_concurrent_agents: 10,
             },
@@ -62,7 +66,9 @@ impl Role {
                     Action::UseTool("find".into()),
                     Action::AccessPath("/workspace/**".into()),
                     Action::ManageAgents,
-                ].into_iter().collect(),
+                ]
+                .into_iter()
+                .collect(),
                 resource_patterns: vec!["/workspace/**".into()],
                 max_concurrent_agents: 2,
             },
@@ -162,7 +168,9 @@ impl RbacPolicy {
                 self.allowed_actions
                     .iter()
                     .any(|a| matches!(a, Action::AccessPath(p) if p == "*"))
-                    || self.allowed_actions.contains(&Action::AccessPath(path.clone()))
+                    || self
+                        .allowed_actions
+                        .contains(&Action::AccessPath(path.clone()))
             }
             // Non-parameterized actions: exact match only (already checked above).
             _ => false,
@@ -189,8 +197,21 @@ pub struct RbacAuditEntry {
 
 impl RbacAuditEntry {
     /// Creates a new RBAC audit entry.
-    pub(crate) fn new(subject: Subject, action: Action, resource: String, allowed: bool, reason: Option<String>) -> Self {
-        Self { timestamp: Utc::now(), subject, action, resource, allowed, reason }
+    pub(crate) fn new(
+        subject: Subject,
+        action: Action,
+        resource: String,
+        allowed: bool,
+        reason: Option<String>,
+    ) -> Self {
+        Self {
+            timestamp: Utc::now(),
+            subject,
+            action,
+            resource,
+            allowed,
+            reason,
+        }
     }
 }
 
@@ -284,19 +305,37 @@ impl RbacManager {
             action.clone(),
             resource.to_string(),
             allowed,
-            if allowed { None } else { Some(format!("role {:?} does not allow {:?}", role, action)) },
+            if allowed {
+                None
+            } else {
+                Some(format!("role {:?} does not allow {:?}", role, action))
+            },
         ));
         if self.audit_log.len() > self.max_audit_entries {
-            self.audit_log.drain(0..self.audit_log.len() - self.max_audit_entries);
+            self.audit_log
+                .drain(0..self.audit_log.len() - self.max_audit_entries);
         }
         allowed
     }
 
     /// Creates a new approval request for a high-risk action.
-    pub fn request_approval(&mut self, subject: Subject, action: Action, resource: String, reason: String) -> uuid::Uuid {
+    pub fn request_approval(
+        &mut self,
+        subject: Subject,
+        action: Action,
+        resource: String,
+        reason: String,
+    ) -> uuid::Uuid {
         let id = uuid::Uuid::new_v4();
         self.pending_approvals.push((
-            PendingApproval { id, subject, action, resource, reason, created_at: Utc::now() },
+            PendingApproval {
+                id,
+                subject,
+                action,
+                resource,
+                reason,
+                created_at: Utc::now(),
+            },
             ApprovalStatus::Pending,
         ));
         id
@@ -304,7 +343,11 @@ impl RbacManager {
 
     /// Approves a pending approval request.
     pub fn approve(&mut self, id: uuid::Uuid) -> bool {
-        if let Some((_, s)) = self.pending_approvals.iter_mut().find(|(p, s)| p.id == id && *s == ApprovalStatus::Pending) {
+        if let Some((_, s)) = self
+            .pending_approvals
+            .iter_mut()
+            .find(|(p, s)| p.id == id && *s == ApprovalStatus::Pending)
+        {
             *s = ApprovalStatus::Approved;
             return true;
         }
@@ -313,7 +356,11 @@ impl RbacManager {
 
     /// Rejects a pending approval request.
     pub fn reject(&mut self, id: uuid::Uuid) -> bool {
-        if let Some((_, s)) = self.pending_approvals.iter_mut().find(|(p, s)| p.id == id && *s == ApprovalStatus::Pending) {
+        if let Some((_, s)) = self
+            .pending_approvals
+            .iter_mut()
+            .find(|(p, s)| p.id == id && *s == ApprovalStatus::Pending)
+        {
             *s = ApprovalStatus::Rejected;
             return true;
         }
@@ -322,7 +369,11 @@ impl RbacManager {
 
     /// Returns all currently pending approval requests.
     pub fn pending_approvals(&self) -> Vec<&PendingApproval> {
-        self.pending_approvals.iter().filter(|(_, s)| matches!(s, ApprovalStatus::Pending)).map(|(p, _)| p).collect()
+        self.pending_approvals
+            .iter()
+            .filter(|(_, s)| matches!(s, ApprovalStatus::Pending))
+            .map(|(p, _)| p)
+            .collect()
     }
 
     /// Returns all approval requests (pending + history) with their status.
@@ -337,7 +388,9 @@ impl RbacManager {
 }
 
 impl Default for RbacManager {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[cfg(test)]
@@ -367,22 +420,14 @@ mod tests {
     fn test_system_bypasses_rbac() {
         let mut mgr = RbacManager::new();
         let subject = Subject::System;
-        assert!(mgr.check_permission(
-            &subject,
-            &Action::ManageRBAC,
-            "test"
-        ));
+        assert!(mgr.check_permission(&subject, &Action::ManageRBAC, "test"));
     }
 
     #[test]
     fn test_unknown_subject_denied() {
         let mut mgr = RbacManager::new();
         let subject = Subject::User("nobody".into());
-        assert!(!mgr.check_permission(
-            &subject,
-            &Action::UseTool("read".into()),
-            "test"
-        ));
+        assert!(!mgr.check_permission(&subject, &Action::UseTool("read".into()), "test"));
     }
 
     #[test]

@@ -93,8 +93,10 @@ impl FlashAttention {
 
     /// Create with default configuration.
     pub fn with_dimensions(dimensions: usize) -> Self {
-        let mut config = FlashAttentionConfig::default();
-        config.dimensions = dimensions;
+        let config = FlashAttentionConfig {
+            dimensions,
+            ..Default::default()
+        };
         Self { config }
     }
 
@@ -116,6 +118,7 @@ impl FlashAttention {
     ///
     /// # Returns
     /// Output vectors [N_q × D]
+    #[allow(clippy::needless_range_loop)]
     pub fn attention(
         &self,
         queries: &[Vec<f32>],
@@ -329,11 +332,7 @@ impl FlashAttention {
     /// Compute cross-attention between two sequences.
     ///
     /// Queries from one sequence attend to keys/values from another.
-    pub fn cross_attention(
-        &self,
-        queries: &[Vec<f32>],
-        kv_sequence: &[Vec<f32>],
-    ) -> Vec<Vec<f32>> {
+    pub fn cross_attention(&self, queries: &[Vec<f32>], kv_sequence: &[Vec<f32>]) -> Vec<Vec<f32>> {
         self.attention(queries, kv_sequence, kv_sequence)
     }
 
@@ -390,7 +389,9 @@ fn generate_test_vectors(count: usize, dim: usize) -> Vec<Vec<f32>> {
         let mut v = Vec::with_capacity(dim);
         for _ in 0..dim {
             // LCG: x_{n+1} = (a * x_n + c) mod m
-            rng_state = rng_state.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+            rng_state = rng_state
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
             let val = ((rng_state >> 33) as f32 / (1u64 << 31) as f32) - 1.0;
             v.push(val);
         }
@@ -428,7 +429,8 @@ mod tests {
                 assert!(
                     diff / max_val < 0.01,
                     "Flash and naive outputs differ: flash={:.6}, naive={:.6}",
-                    f, n
+                    f,
+                    n
                 );
             }
         }
@@ -471,7 +473,10 @@ mod tests {
         let estimate = fa.memory_estimate(1000);
 
         assert!(estimate.flash_bytes < estimate.naive_bytes);
-        assert!(estimate.reduction_ratio > 0.5, "Should achieve >50% memory reduction");
+        assert!(
+            estimate.reduction_ratio > 0.5,
+            "Should achieve >50% memory reduction"
+        );
 
         // For 1000×128: naive = 1000*1000*4 + overhead, flash much less
         // The attention matrix alone is 4MB for naive, ~0 for flash
@@ -518,7 +523,8 @@ mod tests {
                 assert!(
                     (v1 - v2).abs() < 1e-4,
                     "Block size shouldn't affect output: {} vs {}",
-                    v1, v2
+                    v1,
+                    v2
                 );
             }
         }
@@ -554,7 +560,10 @@ mod tests {
                 }
             }
         }
-        assert!(different, "Different temperatures should produce different outputs");
+        assert!(
+            different,
+            "Different temperatures should produce different outputs"
+        );
     }
 
     #[test]

@@ -145,8 +145,8 @@ impl AgentTool for SpaceTool {
                     .ok_or_else(|| "get requires 'id' parameter".to_string())?;
 
                 match api.get_space(id).await {
-                    Some(info) => Ok(AgentToolResult::success(serde_json::to_string_pretty(
-                        &json!({
+                    Some(info) => Ok(AgentToolResult::success(
+                        serde_json::to_string_pretty(&json!({
                             "id": info.id,
                             "name": info.name,
                             "source": info.source,
@@ -155,12 +155,10 @@ impl AgentTool for SpaceTool {
                             "interaction_count": info.interaction_count,
                             "knowledge_visible": info.knowledge_visible,
                             "last_active": info.last_active,
-                        }),
-                    ).unwrap_or_default())),
-                    None => Ok(AgentToolResult::error(format!(
-                        "Space '{}' not found",
-                        id
-                    ))),
+                        }))
+                        .unwrap_or_default(),
+                    )),
+                    None => Ok(AgentToolResult::error(format!("Space '{}' not found", id))),
                 }
             }
 
@@ -257,9 +255,7 @@ mod tests {
             "required": ["action"]
         });
 
-        let actions = schema["properties"]["action"]["enum"]
-            .as_array()
-            .unwrap();
+        let actions = schema["properties"]["action"]["enum"].as_array().unwrap();
         assert_eq!(actions.len(), 6);
         assert!(actions.iter().any(|a| a == "list"));
         assert!(actions.iter().any(|a| a == "get"));

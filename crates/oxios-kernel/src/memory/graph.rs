@@ -102,11 +102,8 @@ impl MemoryGraph {
             .collect();
 
         // Compute out-degree for each node
-        let out_degree: HashMap<u64, usize> = self
-            .edges
-            .iter()
-            .map(|(&k, v)| (k, v.len()))
-            .collect();
+        let out_degree: HashMap<u64, usize> =
+            self.edges.iter().map(|(&k, v)| (k, v.len())).collect();
 
         // Iterative PageRank
         for _ in 0..iterations {
@@ -197,7 +194,10 @@ mod tests {
         // Both nodes should have similar scores (symmetric graph)
         let s1 = scores.get(&1).unwrap();
         let s2 = scores.get(&2).unwrap();
-        assert!((s1 - s2).abs() < 0.01, "Symmetric graph should have equal scores");
+        assert!(
+            (s1 - s2).abs() < 0.01,
+            "Symmetric graph should have equal scores"
+        );
     }
 
     #[test]

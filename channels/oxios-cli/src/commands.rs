@@ -33,7 +33,10 @@ impl MetaCommand {
 
         let parts: Vec<&str> = trimmed.splitn(2, whitespace_or_end).collect();
         let cmd = parts[0];
-        let arg = parts.get(1).map(|s| s.trim().to_string()).filter(|s| !s.is_empty());
+        let arg = parts
+            .get(1)
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty());
 
         match cmd {
             ".quit" | ".exit" | ".q" => Some(Self::Quit),

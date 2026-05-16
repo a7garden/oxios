@@ -1,8 +1,8 @@
 //! State API — data persistence, session management.
 
+use crate::state_store::{Session, SessionId, SessionSummary, StateStore};
+use serde::{de::DeserializeOwned, Serialize};
 use std::sync::Arc;
-use serde::{Serialize, de::DeserializeOwned};
-use crate::state_store::{StateStore, Session, SessionId, SessionSummary};
 
 /// State management system calls.
 ///
@@ -17,22 +17,42 @@ impl StateApi {
         Self { state_store }
     }
     /// Save JSON data.
-    pub async fn save<T: Serialize>(&self, category: &str, name: &str, data: &T) -> anyhow::Result<()> {
+    pub async fn save<T: Serialize>(
+        &self,
+        category: &str,
+        name: &str,
+        data: &T,
+    ) -> anyhow::Result<()> {
         self.state_store.save_json(category, name, data).await
     }
 
     /// Save markdown content.
-    pub async fn save_markdown(&self, category: &str, name: &str, content: &str) -> anyhow::Result<()> {
-        self.state_store.save_markdown(category, name, content).await
+    pub async fn save_markdown(
+        &self,
+        category: &str,
+        name: &str,
+        content: &str,
+    ) -> anyhow::Result<()> {
+        self.state_store
+            .save_markdown(category, name, content)
+            .await
     }
 
     /// Load JSON data.
-    pub async fn load<T: DeserializeOwned>(&self, category: &str, name: &str) -> anyhow::Result<Option<T>> {
+    pub async fn load<T: DeserializeOwned>(
+        &self,
+        category: &str,
+        name: &str,
+    ) -> anyhow::Result<Option<T>> {
         self.state_store.load_json(category, name).await
     }
 
     /// Load markdown content.
-    pub async fn load_markdown(&self, category: &str, name: &str) -> anyhow::Result<Option<String>> {
+    pub async fn load_markdown(
+        &self,
+        category: &str,
+        name: &str,
+    ) -> anyhow::Result<Option<String>> {
         self.state_store.load_markdown(category, name).await
     }
 
@@ -47,11 +67,16 @@ impl StateApi {
     }
 
     /// Commit all changes to git via the provided GitLayer.
-    pub fn commit_all(&self, git: &crate::git_layer::GitLayer, message: &str) -> anyhow::Result<Option<crate::git_layer::CommitInfo>> {
+    pub fn commit_all(
+        &self,
+        git: &crate::git_layer::GitLayer,
+        message: &str,
+    ) -> anyhow::Result<Option<crate::git_layer::CommitInfo>> {
         if !git.is_enabled() {
             return Ok(None);
         }
-        git.commit_file(".", message).ok()
+        git.commit_file(".", message)
+            .ok()
             .map_or(Ok(None), |info| Ok(Some(info)))
     }
 

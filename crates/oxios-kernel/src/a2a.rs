@@ -81,8 +81,7 @@ impl A2AMessage {
 }
 
 /// Priority level for delegated tasks.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum TaskPriority {
     /// Low priority, best-effort.
     Low,
@@ -94,7 +93,6 @@ pub enum TaskPriority {
     /// Critical, immediate attention required.
     Critical,
 }
-
 
 /// Specification for a delegated task.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -185,7 +183,12 @@ pub struct A2AResponse {
 
 impl A2AResponse {
     /// Creates a success response.
-    pub fn success(request_id: Uuid, from: AgentId, to: AgentId, payload: serde_json::Value) -> Self {
+    pub fn success(
+        request_id: Uuid,
+        from: AgentId,
+        to: AgentId,
+        payload: serde_json::Value,
+    ) -> Self {
         Self {
             response_id: Uuid::new_v4(),
             request_id,
@@ -253,11 +256,7 @@ pub struct AgentCard {
 
 impl AgentCard {
     /// Creates a new agent card.
-    pub fn new(
-        agent_id: AgentId,
-        name: impl Into<String>,
-        description: impl Into<String>,
-    ) -> Self {
+    pub fn new(agent_id: AgentId, name: impl Into<String>, description: impl Into<String>) -> Self {
         Self {
             agent_id,
             name: name.into(),
@@ -348,7 +347,8 @@ impl AgentCardRegistry {
             tracing::info!(agent_id = %agent_id, name = %card.name, "Agent unregistered from A2A registry");
             drop(cards);
 
-            self.event_bus.publish(KernelEvent::AgentStopped { id: agent_id })?;
+            self.event_bus
+                .publish(KernelEvent::AgentStopped { id: agent_id })?;
         }
         Ok(())
     }
@@ -433,7 +433,16 @@ impl AgentQueue {
 ///
 /// The dispatcher calls this with (from, to, task) and expects the
 /// handler to execute the work and return the result.
-pub type DelegationHandler = Arc<dyn Fn(AgentId, AgentId, TaskSpec) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<serde_json::Value>> + Send>> + Send + Sync>;
+pub type DelegationHandler = Arc<
+    dyn Fn(
+            AgentId,
+            AgentId,
+            TaskSpec,
+        )
+            -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<serde_json::Value>> + Send>>
+        + Send
+        + Sync,
+>;
 
 /// A2A Protocol handler for inter-agent communication.
 #[derive(Clone)]
@@ -537,7 +546,10 @@ impl A2AProtocol {
 
         // Push to the target agent's queue and notify.
         let queue = self.get_or_create_queue(to).await;
-        queue.messages.lock().push(PendingMessage::new(request.clone()));
+        queue
+            .messages
+            .lock()
+            .push(PendingMessage::new(request.clone()));
         queue.notify.notify_one();
 
         self.event_bus.publish(KernelEvent::MessageReceived {
@@ -557,12 +569,7 @@ impl A2AProtocol {
     }
 
     /// Delegates a task from one agent to another.
-    pub async fn delegate_task(
-        &self,
-        from: AgentId,
-        to: AgentId,
-        task: TaskSpec,
-    ) -> Result<Uuid> {
+    pub async fn delegate_task(&self, from: AgentId, to: AgentId, task: TaskSpec) -> Result<Uuid> {
         let message = A2AMessage::TaskDelegation {
             task_id: task.task_id,
             description: task.description.clone(),
@@ -585,7 +592,7 @@ impl A2AProtocol {
         let message = A2AMessage::StatusUpdate {
             task_id,
             progress,
-            message: message.into(),
+            message,
         };
 
         self.send_message(from, to, message).await
@@ -603,7 +610,7 @@ impl A2AProtocol {
         let message = A2AMessage::ResultSharing {
             task_id,
             result,
-            summary: summary.into(),
+            summary,
         };
 
         self.send_message(from, to, message).await
@@ -663,10 +670,7 @@ impl A2AProtocol {
     /// Unlike `receive_messages` (which drains the queue silently),
     /// this method does NOT re-publish `MessageReceived` events since
     /// they were already published when the messages were originally sent.
-    pub async fn deliver_pending_messages(
-        &self,
-        agent_id: AgentId,
-    ) -> Result<Vec<A2ARequest>> {
+    pub async fn deliver_pending_messages(&self, agent_id: AgentId) -> Result<Vec<A2ARequest>> {
         Ok(self.receive_messages(agent_id).await)
     }
 
@@ -782,8 +786,7 @@ mod tests {
         let registry = AgentCardRegistry::new(bus);
 
         let agent_id = create_test_agent_id();
-        let card = AgentCard::new(agent_id, "register-test", "Test agent")
-            .with_capability("test");
+        let card = AgentCard::new(agent_id, "register-test", "Test agent").with_capability("test");
 
         registry.register_agent(card.clone()).await.unwrap();
         assert_eq!(registry.agent_count().await, 1);
@@ -809,8 +812,7 @@ mod tests {
 
         registry
             .register_agent(
-                AgentCard::new(id1, "agent-1", "First agent")
-                    .with_capability("code-review"),
+                AgentCard::new(id1, "agent-1", "First agent").with_capability("code-review"),
             )
             .await
             .unwrap();
@@ -824,7 +826,10 @@ mod tests {
             .await
             .unwrap();
 
-        let reviewers = registry.find_agents_by_capability("code-review").await.unwrap();
+        let reviewers = registry
+            .find_agents_by_capability("code-review")
+            .await
+            .unwrap();
         assert_eq!(reviewers.len(), 2);
     }
 

@@ -87,24 +87,22 @@ impl AgentTool for MemoryWriteTool {
         _signal: Option<tokio::sync::oneshot::Receiver<()>>,
         _ctx: &ToolContext,
     ) -> Result<AgentToolResult, oxi_agent::tools::ToolError> {
-        let content = params["content"]
-            .as_str()
-            .unwrap_or("")
-            .to_string();
+        let content = params["content"].as_str().unwrap_or("").to_string();
         if content.is_empty() {
             return Ok(AgentToolResult::error("content is required"));
         }
 
-        let memory_type_str = params["memory_type"]
-            .as_str()
-            .unwrap_or("fact");
+        let memory_type_str = params["memory_type"].as_str().unwrap_or("fact");
         let memory_type = match memory_type_str {
             "fact" => MemoryType::Fact,
             "episode" => MemoryType::Episode,
             "knowledge" => MemoryType::Knowledge,
-            _ => return Ok(AgentToolResult::error(
-                format!("Invalid memory_type '{}'. Must be one of: fact, episode, knowledge", memory_type_str),
-            )),
+            _ => {
+                return Ok(AgentToolResult::error(format!(
+                    "Invalid memory_type '{}'. Must be one of: fact, episode, knowledge",
+                    memory_type_str
+                )))
+            }
         };
 
         let tags: Vec<String> = params["tags"]
@@ -116,9 +114,7 @@ impl AgentTool for MemoryWriteTool {
             })
             .unwrap_or_default();
 
-        let importance = params["importance"]
-            .as_f64()
-            .unwrap_or(0.5) as f32;
+        let importance = params["importance"].as_f64().unwrap_or(0.5) as f32;
 
         let now = Utc::now();
         let entry = MemoryEntry {
@@ -140,7 +136,9 @@ impl AgentTool for MemoryWriteTool {
                 "Memory entry saved (id: {}, type: {})",
                 entry_id, memory_type_str,
             ))),
-            Err(e) => Ok(AgentToolResult::error(format!("Failed to write memory: {e}"))),
+            Err(e) => Ok(AgentToolResult::error(format!(
+                "Failed to write memory: {e}"
+            ))),
         }
     }
 }
@@ -233,8 +231,13 @@ impl AgentTool for MemoryReadTool {
                     );
                     Ok(AgentToolResult::success(&output))
                 }
-                Ok(None) => Ok(AgentToolResult::error(format!("Memory entry '{}' not found", id))),
-                Err(e) => Ok(AgentToolResult::error(format!("Failed to read memory: {e}"))),
+                Ok(None) => Ok(AgentToolResult::error(format!(
+                    "Memory entry '{}' not found",
+                    id
+                ))),
+                Err(e) => Ok(AgentToolResult::error(format!(
+                    "Failed to read memory: {e}"
+                ))),
             }
         } else {
             // List entries by type
@@ -249,11 +252,8 @@ impl AgentTool for MemoryReadTool {
                             memory_type_str,
                         )));
                     }
-                    let mut output = format!(
-                        "Found {} {} entries:\n\n",
-                        entries.len(),
-                        memory_type_str,
-                    );
+                    let mut output =
+                        format!("Found {} {} entries:\n\n", entries.len(), memory_type_str,);
                     for entry in &entries {
                         let preview = truncate_str(&entry.content, 100);
                         output.push_str(&format!(
@@ -266,7 +266,9 @@ impl AgentTool for MemoryReadTool {
                     }
                     Ok(AgentToolResult::success(&output))
                 }
-                Err(e) => Ok(AgentToolResult::error(format!("Failed to list memory: {e}"))),
+                Err(e) => Ok(AgentToolResult::error(format!(
+                    "Failed to list memory: {e}"
+                ))),
             }
         }
     }
@@ -347,14 +349,14 @@ impl AgentTool for MemorySearchTool {
 
         let limit = params["limit"].as_u64().unwrap_or(10) as usize;
 
-        let memory_type = params["memory_type"]
-            .as_str()
-            .map(parse_memory_type);
+        let memory_type = params["memory_type"].as_str().map(parse_memory_type);
 
         match self.memory_manager.search(query, memory_type, limit).await {
             Ok(entries) => {
                 if entries.is_empty() {
-                    return Ok(AgentToolResult::success("No matching memory entries found."));
+                    return Ok(AgentToolResult::success(
+                        "No matching memory entries found.",
+                    ));
                 }
                 let mut output = format!("Found {} matching entries:\n\n", entries.len());
                 for entry in &entries {
@@ -370,7 +372,9 @@ impl AgentTool for MemorySearchTool {
                 }
                 Ok(AgentToolResult::success(&output))
             }
-            Err(e) => Ok(AgentToolResult::error(format!("Failed to search memory: {e}"))),
+            Err(e) => Ok(AgentToolResult::error(format!(
+                "Failed to search memory: {e}"
+            ))),
         }
     }
 }
@@ -431,8 +435,14 @@ mod tests {
     fn test_parse_memory_type() {
         assert!(matches!(parse_memory_type("fact"), MemoryType::Fact));
         assert!(matches!(parse_memory_type("episode"), MemoryType::Episode));
-        assert!(matches!(parse_memory_type("knowledge"), MemoryType::Knowledge));
-        assert!(matches!(parse_memory_type("conversation"), MemoryType::Conversation));
+        assert!(matches!(
+            parse_memory_type("knowledge"),
+            MemoryType::Knowledge
+        ));
+        assert!(matches!(
+            parse_memory_type("conversation"),
+            MemoryType::Conversation
+        ));
         assert!(matches!(parse_memory_type("session"), MemoryType::Session));
         assert!(matches!(parse_memory_type("unknown"), MemoryType::Fact));
     }
@@ -440,7 +450,7 @@ mod tests {
     fn make_test_mm() -> std::sync::Arc<crate::memory::MemoryManager> {
         let dir = std::env::temp_dir().join(format!("test-memory-{}", uuid::Uuid::new_v4()));
         let state_store = std::sync::Arc::new(
-            crate::state_store::StateStore::new(dir).expect("test state store")
+            crate::state_store::StateStore::new(dir).expect("test state store"),
         );
         std::sync::Arc::new(crate::memory::MemoryManager::new(state_store))
     }

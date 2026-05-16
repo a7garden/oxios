@@ -1,7 +1,7 @@
 //! A2A API — agent-to-agent communication facade.
 
-use std::sync::Arc;
 use crate::a2a::A2AProtocol;
+use std::sync::Arc;
 
 /// Agent-to-agent communication system calls.
 ///

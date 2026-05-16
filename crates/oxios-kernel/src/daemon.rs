@@ -10,9 +10,11 @@ use std::path::{Path, PathBuf};
 #[derive(Debug, Clone)]
 pub enum DaemonStatus {
     /// Daemon is running.
-    Running { pid: u32 },
+    Running { /// Process ID.
+    pid: u32 },
     /// PID file exists but process is dead (stale).
-    Stale { pid: u32 },
+    Stale { /// Process ID of the dead process.
+    pid: u32 },
     /// Daemon is not running.
     Stopped,
 }
@@ -69,8 +71,7 @@ impl DaemonManager {
         }
 
         // Ensure log directory exists
-        std::fs::create_dir_all(&self.log_dir)
-            .context("failed to create log directory")?;
+        std::fs::create_dir_all(&self.log_dir).context("failed to create log directory")?;
 
         let log_file = self.log_dir.join("oxios.log");
         let exe = std::env::current_exe().context("failed to locate oxios binary")?;
@@ -267,7 +268,11 @@ WantedBy=multi-user.target
             let unit_path = PathBuf::from("/etc/systemd/system/oxiosd.service");
             if unit_path.exists() {
                 if let Err(e) = std::fs::remove_file(&unit_path) {
-                    anyhow::bail!("Failed to remove {} — run with sudo: {}", unit_path.display(), e);
+                    anyhow::bail!(
+                        "Failed to remove {} — run with sudo: {}",
+                        unit_path.display(),
+                        e
+                    );
                 }
                 println!("✓ Removed systemd service");
             } else {

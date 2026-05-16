@@ -204,31 +204,59 @@ pub fn kernel_event_to_audit_action(event: &KernelEvent) -> AuditAction {
         KernelEvent::PhaseStarted { session_id, phase } => AuditAction::Other {
             detail: format!("phase_started:{}:{}", session_id, phase),
         },
-        KernelEvent::PhaseCompleted { session_id, phase, result_summary } => AuditAction::Other {
-            detail: format!("phase_completed:{}:{}:{}", session_id, phase, result_summary),
+        KernelEvent::PhaseCompleted {
+            session_id,
+            phase,
+            result_summary,
+        } => AuditAction::Other {
+            detail: format!(
+                "phase_completed:{}:{}:{}",
+                session_id, phase, result_summary
+            ),
         },
         KernelEvent::AgentOutput { output, .. } => AuditAction::Other {
             detail: format!("agent_output:{}", output),
         },
-        KernelEvent::ApprovalRequested { id, action, resource, reason: _ } => AuditAction::Other {
+        KernelEvent::ApprovalRequested {
+            id,
+            action,
+            resource,
+            reason: _,
+        } => AuditAction::Other {
             detail: format!("approval_requested:{}:{}:{}", id, action, resource),
         },
         KernelEvent::ApprovalResolved { id, approved } => AuditAction::Other {
             detail: format!("approval_resolved:{}:{}", id, approved),
         },
-        KernelEvent::MemoryStored { id, memory_type, .. } => AuditAction::MemoryWrite {
+        KernelEvent::MemoryStored {
+            id, memory_type, ..
+        } => AuditAction::MemoryWrite {
             entry_id: format!("{}:{}", id, memory_type),
         },
         KernelEvent::MemoryRecalled { query, count } => AuditAction::MemoryRead {
             entry_id: format!("query:{}:{}results", query, count),
         },
-        KernelEvent::AgentGroupCreated { group_id, agent_count } => AuditAction::Other {
+        KernelEvent::AgentGroupCreated {
+            group_id,
+            agent_count,
+        } => AuditAction::Other {
             detail: format!("group_created:{}:{}agents", group_id, agent_count),
         },
-        KernelEvent::AgentGroupMemberCompleted { group_id, agent_id, success } => AuditAction::Other {
-            detail: format!("group_member_completed:{}:{}:{}", group_id, agent_id, success),
+        KernelEvent::AgentGroupMemberCompleted {
+            group_id,
+            agent_id,
+            success,
+        } => AuditAction::Other {
+            detail: format!(
+                "group_member_completed:{}:{}:{}",
+                group_id, agent_id, success
+            ),
         },
-        KernelEvent::SpaceCreated { space_id, name, source } => AuditAction::Other {
+        KernelEvent::SpaceCreated {
+            space_id,
+            name,
+            source,
+        } => AuditAction::Other {
             detail: format!("space_created:{}:{}:{}", space_id, name, source),
         },
         KernelEvent::SpaceActivated { space_id, name } => AuditAction::Other {
@@ -237,11 +265,26 @@ pub fn kernel_event_to_audit_action(event: &KernelEvent) -> AuditAction {
         KernelEvent::SpaceArchived { space_id, name } => AuditAction::Other {
             detail: format!("space_archived:{}:{}", space_id, name),
         },
-        KernelEvent::KnowledgeCrossReferenced { from_space, to_space, entries, flow } => AuditAction::Other {
-            detail: format!("knowledge_xref:{}->{}:{}:{}entries", from_space, to_space, flow, entries),
+        KernelEvent::KnowledgeCrossReferenced {
+            from_space,
+            to_space,
+            entries,
+            flow,
+        } => AuditAction::Other {
+            detail: format!(
+                "knowledge_xref:{}->{}:{}:{}entries",
+                from_space, to_space, flow, entries
+            ),
         },
-        KernelEvent::SpacesMerged { survivor, absorbed, entries_migrated } => AuditAction::Other {
-            detail: format!("spaces_merged:{}<-{}:{}entries", survivor, absorbed, entries_migrated),
+        KernelEvent::SpacesMerged {
+            survivor,
+            absorbed,
+            entries_migrated,
+        } => AuditAction::Other {
+            detail: format!(
+                "spaces_merged:{}<-{}:{}entries",
+                survivor, absorbed, entries_migrated
+            ),
         },
     }
 }

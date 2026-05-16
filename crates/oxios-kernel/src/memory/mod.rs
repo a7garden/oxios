@@ -243,12 +243,10 @@ impl MemoryManager {
     /// providing natural memory isolation between Spaces.
     pub fn for_space(space_dir: PathBuf) -> Self {
         let memory_dir = space_dir.join("memory");
-        let state_store = Arc::new(
-            StateStore::new(memory_dir).unwrap_or_else(|_| {
-                // Fallback: create in temp dir
-                StateStore::new(std::env::temp_dir().join("oxios-memory")).unwrap()
-            }),
-        );
+        let state_store = Arc::new(StateStore::new(memory_dir).unwrap_or_else(|_| {
+            // Fallback: create in temp dir
+            StateStore::new(std::env::temp_dir().join("oxios-memory")).unwrap()
+        }));
         Self::new(state_store)
     }
 
@@ -334,7 +332,11 @@ impl MemoryManager {
 
         // Actually remove candidates
         for candidate in &report.candidates_for_removal {
-            if self.forget(&candidate.id, candidate.memory_type).await.is_ok() {
+            if self
+                .forget(&candidate.id, candidate.memory_type)
+                .await
+                .is_ok()
+            {
                 report.removed += 1;
             }
         }
@@ -376,18 +378,16 @@ impl MemoryManager {
 /// Simple implementation: split on whitespace, lowercase, filter stop words.
 pub(crate) fn extract_keywords(query: &str) -> Vec<String> {
     const STOP_WORDS: &[&str] = &[
-        "a", "an", "the", "is", "are", "was", "were", "be", "been", "being",
-        "have", "has", "had", "do", "does", "did", "will", "would", "could",
-        "should", "may", "might", "can", "shall", "to", "of", "in", "for",
-        "on", "with", "at", "by", "from", "as", "into", "through", "during",
-        "before", "after", "above", "below", "between", "out", "off", "over",
-        "under", "again", "further", "then", "once", "and", "but", "or", "nor",
-        "not", "so", "yet", "both", "either", "neither", "each", "every",
-        "all", "any", "few", "more", "most", "other", "some", "such", "no",
-        "only", "own", "same", "than", "too", "very", "just", "because",
-        "if", "when", "where", "how", "what", "which", "who", "whom", "this",
-        "that", "these", "those", "i", "me", "my", "we", "our", "you", "your",
-        "he", "him", "his", "she", "her", "it", "its", "they", "them", "their",
+        "a", "an", "the", "is", "are", "was", "were", "be", "been", "being", "have", "has", "had",
+        "do", "does", "did", "will", "would", "could", "should", "may", "might", "can", "shall",
+        "to", "of", "in", "for", "on", "with", "at", "by", "from", "as", "into", "through",
+        "during", "before", "after", "above", "below", "between", "out", "off", "over", "under",
+        "again", "further", "then", "once", "and", "but", "or", "nor", "not", "so", "yet", "both",
+        "either", "neither", "each", "every", "all", "any", "few", "more", "most", "other", "some",
+        "such", "no", "only", "own", "same", "than", "too", "very", "just", "because", "if",
+        "when", "where", "how", "what", "which", "who", "whom", "this", "that", "these", "those",
+        "i", "me", "my", "we", "our", "you", "your", "he", "him", "his", "she", "her", "it", "its",
+        "they", "them", "their",
     ];
 
     query
@@ -416,18 +416,18 @@ mod budget;
 mod chunking;
 pub mod flash_attention;
 mod graph;
-pub mod hyperbolic;
 mod hnsw;
+pub mod hyperbolic;
 pub mod normalizer;
 pub(crate) mod store;
 
 pub use store::SemanticHit;
 
 // Re-export key types from sub-modules.
-pub use chunking::{ChunkConfig, TextChunk, chunk_fixed, chunk_paragraphs};
+pub use chunking::{chunk_fixed, chunk_paragraphs, ChunkConfig, TextChunk};
 pub use graph::MemoryGraph;
 pub use hnsw::HnswIndex;
-pub use normalizer::{l2_normalize_f32, l2_normalize_f64, cosine_similarity_f32};
+pub use normalizer::{cosine_similarity_f32, l2_normalize_f32, l2_normalize_f64};
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -469,14 +469,18 @@ mod tests {
 
     #[test]
     fn test_blend_into_prompt_empty() {
-        let mgr = MemoryManager::new(Arc::new(StateStore::new(std::env::temp_dir().join("test")).unwrap()));
+        let mgr = MemoryManager::new(Arc::new(
+            StateStore::new(std::env::temp_dir().join("test")).unwrap(),
+        ));
         let result = mgr.blend_into_prompt(&[], "You are an agent.");
         assert_eq!(result, "You are an agent.");
     }
 
     #[test]
     fn test_blend_into_prompt_with_memories() {
-        let mgr = MemoryManager::new(Arc::new(StateStore::new(std::env::temp_dir().join("test")).unwrap()));
+        let mgr = MemoryManager::new(Arc::new(
+            StateStore::new(std::env::temp_dir().join("test")).unwrap(),
+        ));
         let memories = vec![make_entry("test", MemoryType::Fact)];
         let result = mgr.blend_into_prompt(&memories, "You are an agent.");
         assert!(result.contains("## Relevant Memory"));
@@ -510,14 +514,8 @@ mod tests {
         let v2 = TextVector::from_text("null pointer 오류를 수정했습니다");
         let v3 = TextVector::from_text("문서 업데이트 배포 가이드");
 
-        assert!(
-            v1.cosine_similarity(&v2) > 0.1,
-            "Korean+code similarity"
-        );
-        assert!(
-            v1.cosine_similarity(&v3) < 0.1,
-            "Korean different topics"
-        );
+        assert!(v1.cosine_similarity(&v2) > 0.1, "Korean+code similarity");
+        assert!(v1.cosine_similarity(&v3) < 0.1, "Korean different topics");
     }
 
     #[test]
@@ -582,9 +580,15 @@ mod tests {
         mgr.remember(entry2).await.unwrap();
 
         // Vector search should find the Rust entry for a Rust-related query
-        let results = mgr.search("systems programming with rust", None, 5).await.unwrap();
+        let results = mgr
+            .search("systems programming with rust", None, 5)
+            .await
+            .unwrap();
         assert!(!results.is_empty(), "Vector search should find results");
-        assert_eq!(results[0].id, "vec-test-1", "Should find the Rust entry first");
+        assert_eq!(
+            results[0].id, "vec-test-1",
+            "Should find the Rust entry first"
+        );
     }
 
     #[tokio::test]
@@ -606,7 +610,10 @@ mod tests {
             accessed_at: Utc::now(),
             access_count: 0,
         };
-        store.save_json("memory/facts", "rebuild-test-1", &entry).await.unwrap();
+        store
+            .save_json("memory/facts", "rebuild-test-1", &entry)
+            .await
+            .unwrap();
 
         // Index should be empty before rebuild
         assert_eq!(mgr.vector_index.read().len(), 0);

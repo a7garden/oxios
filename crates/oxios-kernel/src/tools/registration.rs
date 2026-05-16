@@ -36,8 +36,8 @@ use oxi_sdk::ToolRegistry;
 use crate::capability::{CSpace, ResourceRef, Rights};
 use crate::tools::kernel::*;
 use crate::tools::{
-    A2aDelegateTool, A2aQueryTool, A2aSendTool, ExecTool,
-    MemoryReadTool, MemorySearchTool, MemoryWriteTool,
+    A2aDelegateTool, A2aQueryTool, A2aSendTool, ExecTool, MemoryReadTool, MemorySearchTool,
+    MemoryWriteTool,
 };
 use crate::types::AgentId;
 use crate::KernelHandle;
@@ -142,7 +142,8 @@ pub fn register_tools_from_cspace(
                     registry.register(A2aQueryTool::from_kernel(kernel));
                 }
                 "persona" => registry.register(PersonaTool::from_kernel(kernel)),
-                "program" => { /* ProgramTools are registered individually by agent_runtime, not via CSpace */ }
+                "program" => { /* ProgramTools are registered individually by agent_runtime, not via CSpace */
+                }
                 "cron" => registry.register(CronTool::from_kernel(kernel)),
                 "security" => registry.register(SecurityTool::from_kernel(kernel)),
                 "budget" => registry.register(BudgetTool::from_kernel(kernel)),
@@ -177,13 +178,34 @@ mod tests {
         // The always-on set is: read, write, edit, grep, find, ls, web_search, get_search_results
         // ToolRegistry doesn't expose a count, but we can verify individual tool names.
         let tool_names = registry.names();
-        assert!(tool_names.contains(&"read".to_string()), "read tool should be registered");
-        assert!(tool_names.contains(&"write".to_string()), "write tool should be registered");
-        assert!(tool_names.contains(&"edit".to_string()), "edit tool should be registered");
-        assert!(tool_names.contains(&"grep".to_string()), "grep tool should be registered");
-        assert!(tool_names.contains(&"find".to_string()), "find tool should be registered");
-        assert!(tool_names.contains(&"ls".to_string()), "ls tool should be registered");
-        assert!(tool_names.contains(&"web_search".to_string()), "web_search tool should be registered");
+        assert!(
+            tool_names.contains(&"read".to_string()),
+            "read tool should be registered"
+        );
+        assert!(
+            tool_names.contains(&"write".to_string()),
+            "write tool should be registered"
+        );
+        assert!(
+            tool_names.contains(&"edit".to_string()),
+            "edit tool should be registered"
+        );
+        assert!(
+            tool_names.contains(&"grep".to_string()),
+            "grep tool should be registered"
+        );
+        assert!(
+            tool_names.contains(&"find".to_string()),
+            "find tool should be registered"
+        );
+        assert!(
+            tool_names.contains(&"ls".to_string()),
+            "ls tool should be registered"
+        );
+        assert!(
+            tool_names.contains(&"web_search".to_string()),
+            "web_search tool should be registered"
+        );
         assert!(
             tool_names.contains(&"get_search_results".to_string()),
             "get_search_results tool should be registered"

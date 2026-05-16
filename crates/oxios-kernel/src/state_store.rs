@@ -5,7 +5,7 @@
 
 use anyhow::{bail, Result};
 use chrono::{DateTime, Utc};
-use serde::{de::DeserializeOwned, Deserialize, Serialize, Deserializer, Serializer};
+use serde::{de::DeserializeOwned, Deserialize, Deserializer, Serialize, Serializer};
 use std::path::PathBuf;
 use tokio::fs;
 
@@ -223,7 +223,11 @@ impl StateStore {
         if category.contains("..") || category.contains('\\') {
             bail!("invalid category name: '{}'", category);
         }
-        if category.is_empty() || category.starts_with('/') || category.ends_with('/') || category.contains("//") {
+        if category.is_empty()
+            || category.starts_with('/')
+            || category.ends_with('/')
+            || category.contains("//")
+        {
             bail!("invalid category name: '{}'", category);
         }
         Ok(())
@@ -289,7 +293,12 @@ impl StateStore {
     }
 
     /// Save a serializable value as JSON under the given category.
-    pub async fn save_json<T: Serialize>(&self, category: &str, name: &str, data: &T) -> Result<()> {
+    pub async fn save_json<T: Serialize>(
+        &self,
+        category: &str,
+        name: &str,
+        data: &T,
+    ) -> Result<()> {
         Self::validate_category(category)?;
         Self::validate_name(name)?;
         let dir = self.base_path.join(category);
@@ -307,7 +316,11 @@ impl StateStore {
     }
 
     /// Load a deserializable value from JSON in the given category.
-    pub async fn load_json<T: DeserializeOwned>(&self, category: &str, name: &str) -> Result<Option<T>> {
+    pub async fn load_json<T: DeserializeOwned>(
+        &self,
+        category: &str,
+        name: &str,
+    ) -> Result<Option<T>> {
         Self::validate_category(category)?;
         Self::validate_name(name)?;
         let path = self.base_path.join(category).join(format!("{name}.json"));
@@ -377,13 +390,16 @@ impl StateStore {
         }
 
         // Sort by updated_at descending (most recent first)
-        sessions.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
+        sessions.sort_by_key(|b| std::cmp::Reverse(b.updated_at));
         Ok(sessions)
     }
 
     /// Deletes a session by ID.
     pub async fn delete_session(&self, session_id: &SessionId) -> Result<bool> {
-        let path = self.base_path.join("sessions").join(format!("{}.json", session_id.0));
+        let path = self
+            .base_path
+            .join("sessions")
+            .join(format!("{}.json", session_id.0));
         match fs::remove_file(&path).await {
             Ok(()) => {
                 tracing::info!(session_id = %session_id, "Session deleted");
@@ -521,10 +537,7 @@ mod tests {
         let store = StateStore::new(temp_dir.path().to_path_buf()).unwrap();
 
         // Get or create without existing session should create new
-        let session = store
-            .get_or_create_session("user-456", None)
-            .await
-            .unwrap();
+        let session = store.get_or_create_session("user-456", None).await.unwrap();
         assert_eq!(session.user_id, "user-456");
         assert!(session.user_messages.is_empty());
     }

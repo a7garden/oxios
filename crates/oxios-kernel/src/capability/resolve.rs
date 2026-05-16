@@ -113,7 +113,9 @@ mod tests {
         // supervisor has security domain, worker does not
         use super::super::types::{ResourceRef, Rights};
         assert!(cs.can(
-            &ResourceRef::KernelDomain { domain: "security".into() },
+            &ResourceRef::KernelDomain {
+                domain: "security".into()
+            },
             Rights::ALL,
         ));
     }
@@ -131,7 +133,12 @@ mod tests {
         let id = AgentId::new_v4();
         let cs = resolve_cspace(None, None, None, id);
         use super::super::types::{ResourceRef, Rights};
-        assert!(cs.can(&ResourceRef::Exec { mode: "shell".into() }, Rights::EXECUTE));
+        assert!(cs.can(
+            &ResourceRef::Exec {
+                mode: "shell".into()
+            },
+            Rights::EXECUTE
+        ));
         // Worker should NOT have A2A
         assert!(!cs.can(&ResourceRef::A2a, Rights::READ));
     }
@@ -141,7 +148,12 @@ mod tests {
         let id = AgentId::new_v4();
         let cs = resolve_cspace(None, None, Some("standard"), id);
         use super::super::types::{ResourceRef, Rights};
-        assert!(cs.can(&ResourceRef::KernelDomain { domain: "memory".into() }, Rights::READ));
+        assert!(cs.can(
+            &ResourceRef::KernelDomain {
+                domain: "memory".into()
+            },
+            Rights::READ
+        ));
     }
 
     #[test]
@@ -157,7 +169,12 @@ mod tests {
         let id = AgentId::new_v4();
         let cs = resolve_cspace(Some("nonexistent"), None, None, id);
         use super::super::types::{ResourceRef, Rights};
-        assert!(cs.can(&ResourceRef::Exec { mode: "shell".into() }, Rights::EXECUTE));
+        assert!(cs.can(
+            &ResourceRef::Exec {
+                mode: "shell".into()
+            },
+            Rights::EXECUTE
+        ));
     }
 
     #[test]
@@ -166,6 +183,11 @@ mod tests {
         let cs = resolve_cspace(Some(r#"{"custom": true}"#), None, None, id);
         use super::super::types::ResourceRef;
         // Falls back to worker
-        assert!(cs.can(&ResourceRef::Exec { mode: "shell".into() }, super::super::types::Rights::EXECUTE));
+        assert!(cs.can(
+            &ResourceRef::Exec {
+                mode: "shell".into()
+            },
+            super::super::types::Rights::EXECUTE
+        ));
     }
 }

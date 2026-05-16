@@ -21,8 +21,7 @@ use uuid::Uuid;
 // ── Data types ─────────────────────────────────────────────
 
 /// Source of a cron job.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum JobSource {
     /// Defined in config.toml.
@@ -233,9 +232,13 @@ impl CronScheduler {
         let id = job.id;
 
         self.schedules.lock().insert(id, schedule);
-        self.jobs
-            .write()
-            .insert(id, CronJob { next_run: next, ..job });
+        self.jobs.write().insert(
+            id,
+            CronJob {
+                next_run: next,
+                ..job
+            },
+        );
         self.dirty.store(true, Ordering::Relaxed);
         self.persist_jobs().await;
 
@@ -314,8 +317,14 @@ impl CronScheduler {
 
     /// Toggle a job enabled/disabled.
     pub async fn toggle_job(&self, id: Uuid, enabled: bool) -> Result<()> {
-        self.update_job(id, CronJobUpdate { enabled: Some(enabled), ..Default::default() })
-            .await
+        self.update_job(
+            id,
+            CronJobUpdate {
+                enabled: Some(enabled),
+                ..Default::default()
+            },
+        )
+        .await
     }
 
     /// List all jobs.
@@ -406,9 +415,13 @@ impl CronScheduler {
         Fut: std::future::Future<Output = (bool, String)> + Send + 'static,
     {
         let executor = Arc::new(executor);
-        let mut interval = tokio::time::interval(std::time::Duration::from_secs(self.tick_interval_secs));
+        let mut interval =
+            tokio::time::interval(std::time::Duration::from_secs(self.tick_interval_secs));
 
-        tracing::info!(interval_secs = self.tick_interval_secs, "Cron scheduler started");
+        tracing::info!(
+            interval_secs = self.tick_interval_secs,
+            "Cron scheduler started"
+        );
 
         loop {
             tokio::select! {
@@ -456,9 +469,8 @@ impl CronScheduler {
                 .collect()
         };
 
-        let mut spawned = 0usize;
         let total_due = due.len();
-        for (id, goal) in due {
+        for (spawned, (id, goal)) in due.into_iter().enumerate() {
             // Check concurrency limit before each spawn
             if self.running_jobs.lock().len() >= self.max_concurrent_jobs {
                 tracing::info!(
@@ -470,7 +482,6 @@ impl CronScheduler {
             }
 
             self.running_jobs.lock().insert(id);
-            spawned += 1;
             let exec = executor.clone();
             let me = self.clone();
             let timeout_secs = self.job_timeout_secs;
@@ -479,7 +490,8 @@ impl CronScheduler {
                 let result = tokio::time::timeout(
                     std::time::Duration::from_secs(timeout_secs),
                     exec(id, goal),
-                ).await;
+                )
+                .await;
 
                 let (success, summary) = match result {
                     Ok((s, m)) => (s, m),
@@ -513,7 +525,11 @@ impl CronScheduler {
 
     /// Restore jobs from disk on startup.
     pub async fn restore_jobs(&self) {
-        match self.state_store.load_json::<Vec<CronJob>>("cron", "jobs").await {
+        match self
+            .state_store
+            .load_json::<Vec<CronJob>>("cron", "jobs")
+            .await
+        {
             Ok(Some(job_list)) => {
                 for mut job in job_list {
                     // Re-parse schedule and recompute next_run

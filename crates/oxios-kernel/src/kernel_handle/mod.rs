@@ -1,53 +1,53 @@
 //! Kernel facade — 10 domain Facades composing the System Call API.
 
-pub mod state_api;
-pub mod agent_api;
-pub mod security_api;
-pub mod persona_api;
-pub mod extension_api;
-pub mod mcp_api;
-pub mod infra_api;
-pub mod space_api;
-pub mod exec_api;
-pub mod browser_api;
 pub mod a2a_api;
+pub mod agent_api;
+pub mod browser_api;
+pub mod exec_api;
+pub mod extension_api;
+pub mod infra_api;
+pub mod mcp_api;
+pub mod persona_api;
+pub mod security_api;
+pub mod space_api;
+pub mod state_api;
 
-pub use state_api::StateApi;
-pub use agent_api::AgentApi;
-pub use security_api::SecurityApi;
-pub use persona_api::PersonaApi;
-pub use extension_api::ExtensionApi;
-pub use mcp_api::McpApi;
-pub use infra_api::InfraApi;
-pub use space_api::SpaceApi;
-pub use exec_api::ExecApi;
-pub use browser_api::BrowserApi;
 pub use a2a_api::A2aApi;
+pub use agent_api::AgentApi;
+pub use browser_api::BrowserApi;
+pub use exec_api::ExecApi;
+pub use extension_api::ExtensionApi;
+pub use infra_api::InfraApi;
+pub use mcp_api::McpApi;
+pub use persona_api::PersonaApi;
+pub use security_api::SecurityApi;
+pub use space_api::SpaceApi;
+pub use state_api::StateApi;
 
+use crate::a2a::A2AProtocol;
+use crate::access_manager::AccessManager;
+use crate::audit_trail::AuditTrail;
+use crate::auth::AuthManager;
+use crate::budget::BudgetManager;
+use crate::config::OxiosConfig;
+use crate::cron::CronScheduler;
+use crate::event_bus::EventBus;
+use crate::git_layer::CommitInfo;
+use crate::git_layer::GitLayer;
+use crate::host_tools::HostToolValidator;
+use crate::mcp::McpBridge;
+use crate::memory::MemoryManager;
+use crate::persona_manager::PersonaManager;
+use crate::program::ProgramManager;
+use crate::resource_monitor::ResourceMonitor;
+use crate::scheduler::AgentScheduler;
+use crate::skill::SkillStore;
+use crate::space::SpaceManager;
+use crate::state_store::StateStore;
+use crate::supervisor::Supervisor;
 use serde::Serialize;
 use std::sync::Arc;
 use std::time::Instant;
-use crate::git_layer::CommitInfo;
-use crate::state_store::StateStore;
-use crate::supervisor::Supervisor;
-use crate::scheduler::AgentScheduler;
-use crate::memory::MemoryManager;
-use crate::git_layer::GitLayer;
-use crate::audit_trail::AuditTrail;
-use crate::budget::BudgetManager;
-use crate::resource_monitor::ResourceMonitor;
-use crate::cron::CronScheduler;
-use crate::program::ProgramManager;
-use crate::skill::SkillStore;
-use crate::persona_manager::PersonaManager;
-use crate::mcp::McpBridge;
-use crate::auth::AuthManager;
-use crate::access_manager::AccessManager;
-use crate::host_tools::HostToolValidator;
-use crate::config::OxiosConfig;
-use crate::event_bus::EventBus;
-use crate::space::SpaceManager;
-use crate::a2a::A2AProtocol;
 
 /// Oxios kernel System Call API — composed of 10 domain Facades.
 ///
@@ -92,6 +92,7 @@ impl KernelHandle {
     ///
     /// Each Facade is assembled independently in `kernel.rs` and passed here.
     /// This enables testing individual Facades without the full kernel.
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         state: StateApi,
         agents: AgentApi,
@@ -148,13 +149,26 @@ impl KernelHandle {
         space_manager: Arc<SpaceManager>,
     ) -> Self {
         Self {
-            security: SecurityApi::new(auth_manager.clone(), audit_trail, access_manager.clone(), state_store.clone()),
+            security: SecurityApi::new(
+                auth_manager.clone(),
+                audit_trail,
+                access_manager.clone(),
+                state_store.clone(),
+            ),
             state: StateApi::new(state_store),
             agents: AgentApi::new(supervisor, budget_manager, memory_manager),
             persona: PersonaApi::new(persona_manager),
             extensions: ExtensionApi::new(program_manager, skill_store, host_tool_validator),
             mcp: McpApi::new(mcp_bridge),
-            infra: InfraApi::new(git_layer, scheduler, cron_scheduler, resource_monitor, event_bus.clone(), config.clone(), start_time),
+            infra: InfraApi::new(
+                git_layer,
+                scheduler,
+                cron_scheduler,
+                resource_monitor,
+                event_bus.clone(),
+                config.clone(),
+                start_time,
+            ),
             spaces: SpaceApi::new(space_manager, event_bus),
             exec: ExecApi::new(Arc::new(config.exec.clone()), access_manager),
             browser: BrowserApi::default(),
@@ -199,11 +213,7 @@ impl KernelHandle {
     }
 
     /// Delete a file and commit the removal to git (State + Infra).
-    pub async fn delete_and_commit(
-        &self,
-        category: &str,
-        name: &str,
-    ) -> anyhow::Result<bool> {
+    pub async fn delete_and_commit(&self, category: &str, name: &str) -> anyhow::Result<bool> {
         let deleted = self.state.delete(category, name).await?;
         if deleted {
             let git = self.infra.git();
@@ -244,8 +254,8 @@ impl KernelHandle {
 
     /// Unschedule a cron job by string ID (convenience wrapper).
     pub async fn unschedule(&self, job_id: &str) -> anyhow::Result<bool> {
-        let uuid = uuid::Uuid::parse_str(job_id)
-            .map_err(|e| anyhow::anyhow!("invalid job id: {e}"))?;
+        let uuid =
+            uuid::Uuid::parse_str(job_id).map_err(|e| anyhow::anyhow!("invalid job id: {e}"))?;
         match self.infra.remove_cron(uuid).await {
             Ok(()) => Ok(true),
             Err(_) => Ok(false),
@@ -258,7 +268,11 @@ impl KernelHandle {
     }
 
     /// Load JSON from state store.
-    pub async fn load_json<T: serde::de::DeserializeOwned>(&self, category: &str, name: &str) -> anyhow::Result<Option<T>> {
+    pub async fn load_json<T: serde::de::DeserializeOwned>(
+        &self,
+        category: &str,
+        name: &str,
+    ) -> anyhow::Result<Option<T>> {
         self.state.load(category, name).await
     }
 

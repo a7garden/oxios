@@ -6,9 +6,7 @@ use std::path::Path;
 
 use anyhow::{Context, Result};
 
-use super::types::{
-    ArgumentDef, McpServerConfig, ProgramHostRequirements, ProgramMeta, ToolDef,
-};
+use super::types::{ArgumentDef, McpServerConfig, ProgramHostRequirements, ProgramMeta, ToolDef};
 
 /// Parsed program.toml structure
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -70,37 +68,42 @@ impl ProgramMeta {
         let toml: TomlProgram = toml::from_str(&content)
             .with_context(|| format!("Failed to parse {}", toml_path.display()))?;
 
-        let tools = toml.tools.map(|t| {
-            t.into_iter()
-                .map(|(name, tool)| {
-                    let arguments = tool.arguments.unwrap_or_default().into_iter()
-                        .map(|arg| ArgumentDef {
-                            name: arg.name,
-                            description: arg.description,
-                            required: arg.required.unwrap_or(true),
-                            default: arg.default,
-                        })
-                        .collect();
-                    ToolDef {
-                        name,
-                        description: tool.description,
-                        arguments,
-                        command: tool.command,
-                    }
-                })
-                .collect()
-        }).unwrap_or_default();
+        let tools = toml
+            .tools
+            .map(|t| {
+                t.into_iter()
+                    .map(|(name, tool)| {
+                        let arguments = tool
+                            .arguments
+                            .unwrap_or_default()
+                            .into_iter()
+                            .map(|arg| ArgumentDef {
+                                name: arg.name,
+                                description: arg.description,
+                                required: arg.required.unwrap_or(true),
+                                default: arg.default,
+                            })
+                            .collect();
+                        ToolDef {
+                            name,
+                            description: tool.description,
+                            arguments,
+                            command: tool.command,
+                        }
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
 
-        let host_requirements = toml.host_requirements
+        let host_requirements = toml
+            .host_requirements
             .map(|hr| ProgramHostRequirements {
                 required: hr.required.unwrap_or_default(),
                 optional: hr.optional.unwrap_or_default(),
             })
             .unwrap_or_default();
 
-        let dependencies = toml.requires_tools
-            .map(|rt| rt.names)
-            .unwrap_or_default();
+        let dependencies = toml.requires_tools.map(|rt| rt.names).unwrap_or_default();
 
         let mcp_servers = toml.mcp.unwrap_or_default();
 

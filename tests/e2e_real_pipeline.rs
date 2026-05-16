@@ -9,8 +9,8 @@
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
     use oxios_ouroboros::OuroborosProtocol;
+    use std::sync::Arc;
 
     fn should_run() -> bool {
         std::env::var("OXIOS_E2E").is_ok()
@@ -24,15 +24,17 @@ mod tests {
         let model_id = std::env::var("OXIOS_MODEL")
             .unwrap_or_else(|_| "anthropic/claude-sonnet-4-20250514".into());
 
-        let oxi = oxi_sdk::OxiBuilder::new()
-            .with_builtins()
-            .build();
-        let model = oxi.resolve_model(&model_id)
+        let oxi = oxi_sdk::OxiBuilder::new().with_builtins().build();
+        let model = oxi
+            .resolve_model(&model_id)
             .unwrap_or_else(|_| panic!("Model '{}' not found", model_id));
-        let provider = oxi.create_provider(&model.provider)
+        let provider = oxi
+            .create_provider(&model.provider)
             .unwrap_or_else(|_| panic!("Provider '{}' not available", model.provider));
 
-        Some(Arc::new(oxios_ouroboros::OuroborosEngine::new(provider, model)))
+        Some(Arc::new(oxios_ouroboros::OuroborosEngine::new(
+            provider, model,
+        )))
     }
 
     #[tokio::test]
@@ -85,7 +87,10 @@ mod tests {
         };
 
         // First call: mechanical pass → skip LLM
-        let result = engine.evaluate(&seed, &execution).await.expect("eval failed");
+        let result = engine
+            .evaluate(&seed, &execution)
+            .await
+            .expect("eval failed");
         assert!(result.mechanical_pass, "Should mechanically pass");
         assert_eq!(result.score, 1.0, "Score should be 1.0 for mechanical pass");
 

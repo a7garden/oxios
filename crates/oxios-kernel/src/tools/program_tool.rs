@@ -45,7 +45,8 @@ impl ProgramTool {
         let exec = Arc::new(ExecTool::from_kernel(kernel));
         Self {
             full_name: "program".to_string(),
-            description: "Run installable program tools. Pass {name: tool-name, args: [...]}".to_string(),
+            description: "Run installable program tools. Pass {name: tool-name, args: [...]}"
+                .to_string(),
             binary: "".to_string(),
             default_args: Vec::new(),
             exec_tool: exec,
@@ -167,15 +168,12 @@ mod tests {
         let host_reqs = ProgramHostRequirements::default();
 
         let exec_config = Arc::new(crate::config::ExecConfig::default());
-        let exec_access = Arc::new(parking_lot::Mutex::new(crate::access_manager::AccessManager::new()));
+        let exec_access = Arc::new(parking_lot::Mutex::new(
+            crate::access_manager::AccessManager::new(),
+        ));
         let exec = Arc::new(ExecTool::new(exec_config, exec_access));
 
-        let tool = ProgramTool::from_definition(
-            "github",
-            &tool_def,
-            &host_reqs,
-            exec,
-        );
+        let tool = ProgramTool::from_definition("github", &tool_def, &host_reqs, exec);
 
         assert_eq!(tool.full_name, "program:github:create_pr");
         assert_eq!(tool.binary, "gh");
@@ -194,15 +192,12 @@ mod tests {
         let host_reqs = ProgramHostRequirements::default();
 
         let exec_config = Arc::new(crate::config::ExecConfig::default());
-        let exec_access = Arc::new(parking_lot::Mutex::new(crate::access_manager::AccessManager::new()));
+        let exec_access = Arc::new(parking_lot::Mutex::new(
+            crate::access_manager::AccessManager::new(),
+        ));
         let exec = Arc::new(ExecTool::new(exec_config, exec_access));
 
-        let tool = ProgramTool::from_definition(
-            "git-tools",
-            &tool_def,
-            &host_reqs,
-            exec,
-        );
+        let tool = ProgramTool::from_definition("git-tools", &tool_def, &host_reqs, exec);
 
         assert_eq!(tool.full_name, "program:git-tools:status");
         assert_eq!(tool.binary, "git");
@@ -221,15 +216,12 @@ mod tests {
         let host_reqs = ProgramHostRequirements::default();
 
         let exec_config = Arc::new(crate::config::ExecConfig::default());
-        let exec_access = Arc::new(parking_lot::Mutex::new(crate::access_manager::AccessManager::new()));
+        let exec_access = Arc::new(parking_lot::Mutex::new(
+            crate::access_manager::AccessManager::new(),
+        ));
         let exec = Arc::new(ExecTool::new(exec_config, exec_access));
 
-        let tool = ProgramTool::from_definition(
-            "git-tools",
-            &tool_def,
-            &host_reqs,
-            exec,
-        );
+        let tool = ProgramTool::from_definition("git-tools", &tool_def, &host_reqs, exec);
 
         assert_eq!(tool.binary, "git");
         assert_eq!(tool.default_args, vec!["fetch", "--all", "--prune"]);

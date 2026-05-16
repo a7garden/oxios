@@ -1,13 +1,13 @@
 //! Infra API — Git, scheduler, cron, resources, events, system.
 
+use crate::config::OxiosConfig;
+use crate::cron::{CronJob, CronJobUpdate, CronScheduler};
+use crate::event_bus::{EventBus, KernelEvent};
+use crate::git_layer::{GitLayer, LogEntry};
+use crate::resource_monitor::{ResourceMonitor, ResourceSnapshot};
+use crate::scheduler::{AgentScheduler, ScheduledTask, SchedulerStats};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-use crate::git_layer::{GitLayer, LogEntry};
-use crate::scheduler::{AgentScheduler, SchedulerStats, ScheduledTask};
-use crate::cron::{CronScheduler, CronJob, CronJobUpdate};
-use crate::resource_monitor::{ResourceMonitor, ResourceSnapshot};
-use crate::event_bus::{EventBus, KernelEvent};
-use crate::config::OxiosConfig;
 
 /// Infrastructure system calls.
 pub struct InfraApi {
@@ -113,7 +113,9 @@ impl InfraApi {
 
     /// Mark cron job completed.
     pub async fn complete_cron(&self, id: uuid::Uuid, success: bool, summary: String) {
-        self.cron_scheduler.mark_job_completed(id, success, summary).await
+        self.cron_scheduler
+            .mark_job_completed(id, success, summary)
+            .await
     }
 
     /// List all cron jobs.
@@ -143,7 +145,9 @@ impl InfraApi {
 
     /// Publish a kernel event.
     pub fn publish(&self, event: KernelEvent) -> anyhow::Result<()> {
-        self.event_bus.publish(event).map_err(|e| anyhow::anyhow!("broadcast error: {e}"))
+        self.event_bus
+            .publish(event)
+            .map_err(|e| anyhow::anyhow!("broadcast error: {e}"))
     }
 
     /// Get config reference.

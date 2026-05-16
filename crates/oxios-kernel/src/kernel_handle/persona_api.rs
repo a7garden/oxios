@@ -1,8 +1,8 @@
 //! Persona API — multi-persona management.
 
-use std::sync::Arc;
-use crate::persona_manager::PersonaManager;
 use crate::persona::Persona;
+use crate::persona_manager::PersonaManager;
+use std::sync::Arc;
 
 /// Persona management system calls.
 pub struct PersonaApi {

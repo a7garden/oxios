@@ -145,7 +145,9 @@ impl AmbiguityScore {
     /// assert!(score.is_ready());
     /// ```
     pub fn ambiguity(&self) -> f64 {
-        1.0 - (self.goal_clarity * 0.4 + self.constraint_clarity * 0.3 + self.success_criteria * 0.3)
+        1.0 - (self.goal_clarity * 0.4
+            + self.constraint_clarity * 0.3
+            + self.success_criteria * 0.3)
     }
 
     /// Returns true if the ambiguity is low enough to proceed to execution.

@@ -11,9 +11,9 @@ use anyhow::Result;
 use async_trait::async_trait;
 use oxios_gateway::channel::Channel;
 use oxios_gateway::message::{IncomingMessage, OutgoingMessage};
-use tokio::sync::Mutex;
 use std::sync::Arc;
 use tokio::sync::mpsc;
+use tokio::sync::Mutex;
 
 use crate::session::Session;
 
@@ -101,12 +101,13 @@ impl CliChannelHandle {
         let mut msg = IncomingMessage::new("cli", "cli-user", &content);
         {
             let session = self.session.lock().unwrap();
-            msg.metadata.insert(
-                "session_id".to_owned(),
-                session.id.to_string(),
-            );
+            msg.metadata
+                .insert("session_id".to_owned(), session.id.to_string());
         }
-        self.incoming_tx.send(msg).await.map_err(|e| anyhow::anyhow!("{e}"))?;
+        self.incoming_tx
+            .send(msg)
+            .await
+            .map_err(|e| anyhow::anyhow!("{e}"))?;
         Ok(())
     }
 

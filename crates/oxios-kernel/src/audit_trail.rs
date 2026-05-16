@@ -194,7 +194,7 @@ fn compute_entry_hash(
 // ─── Audit Trail ─────────────────────────────────────────────────────────────
 
 /// A tamper-evident audit trail with cryptographic hash chain.
-/// 
+///
 /// Each entry is cryptographically linked to the previous entry using
 /// blake3 hashing. This makes it possible to detect any tampering with
 /// historical entries.
@@ -241,12 +241,7 @@ impl AuditTrail {
     }
 
     /// Append an audit entry. Computes hash chain automatically.
-    pub fn append(
-        &self,
-        actor: AgentId,
-        action: AuditAction,
-        resource: String,
-    ) -> HashDigest {
+    pub fn append(&self, actor: AgentId, action: AuditAction, resource: String) -> HashDigest {
         self.append_with_meta(actor, action, resource, None)
     }
 
@@ -279,7 +274,7 @@ impl AuditTrail {
         {
             let mut entries = self.entries.write();
             entries.push(entry);
-            
+
             // Auto-prune if over limit
             if entries.len() > self.max_entries {
                 let excess = entries.len() - self.max_entries;
@@ -426,10 +421,7 @@ impl AuditTrail {
     /// Export entries from a sequence number as JSON.
     pub fn export_json(&self, from_seq: u64) -> Result<String, AuditError> {
         let entries = self.entries.read();
-        let filtered: Vec<&AuditEntry> = entries
-            .iter()
-            .filter(|e| e.seq >= from_seq)
-            .collect();
+        let filtered: Vec<&AuditEntry> = entries.iter().filter(|e| e.seq >= from_seq).collect();
 
         serde_json::to_string_pretty(&filtered).map_err(|e| AuditError::ExportFailed(e.to_string()))
     }
@@ -730,7 +722,7 @@ mod tests {
         );
 
         let json = trail.export_json(0).unwrap();
-        
+
         // Should be valid JSON
         let parsed: Vec<serde_json::Value> = serde_json::from_str(&json).unwrap();
         assert_eq!(parsed.len(), 1);
@@ -893,7 +885,7 @@ mod tests {
     #[test]
     fn test_genesis_hash() {
         let trail = create_test_trail();
-        
+
         // First entry should have prev_hash = "genesis"
         trail.append(
             "agent-001".to_string(),
@@ -946,26 +938,49 @@ mod tests {
         let trail = create_test_trail();
 
         let actions = vec![
-            AuditAction::AgentSpawn { task_type: "test".to_string() },
-            AuditAction::AgentExit { reason: "done".to_string() },
-            AuditAction::ToolCall { tool: "bash".to_string(), args_json: "{}".to_string() },
-            AuditAction::ToolResult { tool: "bash".to_string(), success: true },
-            AuditAction::MemoryWrite { entry_id: "mem-001".to_string() },
-            AuditAction::MemoryRead { entry_id: "mem-001".to_string() },
-            AuditAction::ConfigChange { key: "max_agents".to_string() },
-            AuditAction::ProgramInstall { program: "test-program".to_string(), version: "1.0.0".to_string() },
-            AuditAction::CronTrigger { job_id: "job-001".to_string() },
-            AuditAction::GitCommit { message: "test commit".to_string() },
-            AuditAction::AccessDenied { permission: "write".to_string() },
-            AuditAction::Other { detail: "misc".to_string() },
+            AuditAction::AgentSpawn {
+                task_type: "test".to_string(),
+            },
+            AuditAction::AgentExit {
+                reason: "done".to_string(),
+            },
+            AuditAction::ToolCall {
+                tool: "bash".to_string(),
+                args_json: "{}".to_string(),
+            },
+            AuditAction::ToolResult {
+                tool: "bash".to_string(),
+                success: true,
+            },
+            AuditAction::MemoryWrite {
+                entry_id: "mem-001".to_string(),
+            },
+            AuditAction::MemoryRead {
+                entry_id: "mem-001".to_string(),
+            },
+            AuditAction::ConfigChange {
+                key: "max_agents".to_string(),
+            },
+            AuditAction::ProgramInstall {
+                program: "test-program".to_string(),
+                version: "1.0.0".to_string(),
+            },
+            AuditAction::CronTrigger {
+                job_id: "job-001".to_string(),
+            },
+            AuditAction::GitCommit {
+                message: "test commit".to_string(),
+            },
+            AuditAction::AccessDenied {
+                permission: "write".to_string(),
+            },
+            AuditAction::Other {
+                detail: "misc".to_string(),
+            },
         ];
 
         for (i, action) in actions.into_iter().enumerate() {
-            trail.append(
-                "agent-001".to_string(),
-                action,
-                format!("/resource/{}", i),
-            );
+            trail.append("agent-001".to_string(), action, format!("/resource/{}", i));
         }
 
         assert_eq!(trail.len(), 12);
@@ -975,12 +990,14 @@ mod tests {
     #[test]
     fn test_hash_different_for_different_inputs() {
         let ts = Utc::now();
-        
+
         let hash1 = compute_entry_hash(
             1,
             &ts,
             "agent-001",
-            &AuditAction::AgentSpawn { task_type: "test".to_string() },
+            &AuditAction::AgentSpawn {
+                task_type: "test".to_string(),
+            },
             "/resource",
             "genesis",
         );
@@ -989,7 +1006,9 @@ mod tests {
             2,
             &ts,
             "agent-001",
-            &AuditAction::AgentSpawn { task_type: "test".to_string() },
+            &AuditAction::AgentSpawn {
+                task_type: "test".to_string(),
+            },
             "/resource",
             "genesis",
         );
@@ -1000,7 +1019,9 @@ mod tests {
             1,
             &ts,
             "agent-002",
-            &AuditAction::AgentSpawn { task_type: "test".to_string() },
+            &AuditAction::AgentSpawn {
+                task_type: "test".to_string(),
+            },
             "/resource",
             "genesis",
         );
@@ -1026,12 +1047,23 @@ mod tests {
         let mut entries = Vec::new();
         let mut prev = "genesis".to_string();
         for i in 1..=5 {
-            let hash = compute_entry_hash(i, &ts, "agent-001", &AuditAction::Other { detail: format!("action-{}", i) }, "/resource", &prev);
+            let hash = compute_entry_hash(
+                i,
+                &ts,
+                "agent-001",
+                &AuditAction::Other {
+                    detail: format!("action-{}", i),
+                },
+                "/resource",
+                &prev,
+            );
             entries.push(AuditEntry {
                 seq: i,
                 timestamp: ts,
                 actor: "agent-001".to_string(),
-                action: AuditAction::Other { detail: format!("action-{}", i) },
+                action: AuditAction::Other {
+                    detail: format!("action-{}", i),
+                },
                 resource: "/resource".to_string(),
                 prev_hash: prev.clone(),
                 hash: hash.clone(),
@@ -1046,7 +1078,9 @@ mod tests {
         // Next append should get seq 6
         let new_hash = trail.append(
             "agent-001".to_string(),
-            AuditAction::Other { detail: "new".to_string() },
+            AuditAction::Other {
+                detail: "new".to_string(),
+            },
             "/resource".to_string(),
         );
         assert!(!new_hash.is_empty());
@@ -1064,12 +1098,23 @@ mod tests {
         let mut entries = Vec::new();
         let mut prev = "genesis".to_string();
         for i in 1..=5 {
-            let hash = compute_entry_hash(i, &ts, "agent-001", &AuditAction::Other { detail: format!("action-{}", i) }, "/resource", &prev);
+            let hash = compute_entry_hash(
+                i,
+                &ts,
+                "agent-001",
+                &AuditAction::Other {
+                    detail: format!("action-{}", i),
+                },
+                "/resource",
+                &prev,
+            );
             entries.push(AuditEntry {
                 seq: i,
                 timestamp: ts,
                 actor: "agent-001".to_string(),
-                action: AuditAction::Other { detail: format!("action-{}", i) },
+                action: AuditAction::Other {
+                    detail: format!("action-{}", i),
+                },
                 resource: "/resource".to_string(),
                 prev_hash: prev.clone(),
                 hash: hash.clone(),

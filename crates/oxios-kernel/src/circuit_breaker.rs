@@ -63,12 +63,15 @@ impl CircuitBreaker {
 
         match state {
             STATE_CLOSED => true,
-            STATE_OPEN => {
+            STATE_OPEN
                 // Check if enough time has passed to attempt a reset.
-                if self.should_attempt_reset() {
+                if self.should_attempt_reset() => {
                     // Atomically transition to half-open. Only one caller wins.
                     match self.state.compare_exchange(
-                        STATE_OPEN, STATE_HALF_OPEN, Ordering::AcqRel, Ordering::Acquire
+                        STATE_OPEN,
+                        STATE_HALF_OPEN,
+                        Ordering::AcqRel,
+                        Ordering::Acquire,
                     ) {
                         Ok(_) => {
                             // The winner claims the single probe slot.
@@ -83,10 +86,7 @@ impl CircuitBreaker {
                                 .is_ok()
                         }
                     }
-                } else {
-                    false
                 }
-            }
             STATE_HALF_OPEN => {
                 // Only allow a single probe request through in half-open state.
                 // compare_exchange ensures only one caller wins the race.

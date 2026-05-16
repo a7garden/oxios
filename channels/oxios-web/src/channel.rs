@@ -13,7 +13,7 @@ use oxios_gateway::channel::Channel;
 use oxios_gateway::message::{IncomingMessage, OutgoingMessage};
 use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::sync::{broadcast, mpsc, oneshot, RwLock, Mutex};
+use tokio::sync::{broadcast, mpsc, oneshot, Mutex, RwLock};
 
 /// The web channel adapter.
 ///
@@ -143,7 +143,10 @@ impl WebChannelHandle {
 
     /// Send an incoming message to the gateway pipeline.
     pub async fn send_incoming(&self, msg: IncomingMessage) -> Result<()> {
-        self.incoming_tx.send(msg).await.map_err(|e| anyhow::anyhow!("{e}"))
+        self.incoming_tx
+            .send(msg)
+            .await
+            .map_err(|e| anyhow::anyhow!("{e}"))
     }
 
     /// Send a message and wait for a response.
@@ -161,9 +164,13 @@ impl WebChannelHandle {
         }
 
         // Send the message.
-        self.incoming_tx.send(msg).await.map_err(|e| anyhow::anyhow!("{e}"))?;
+        self.incoming_tx
+            .send(msg)
+            .await
+            .map_err(|e| anyhow::anyhow!("{e}"))?;
 
         // Wait for the response.
-        rx.await.map_err(|e| anyhow::anyhow!("Response channel dropped: {e}"))
+        rx.await
+            .map_err(|e| anyhow::anyhow!("Response channel dropped: {e}"))
     }
 }

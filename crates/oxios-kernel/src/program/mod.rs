@@ -145,7 +145,10 @@ impl ProgramManager {
             meta,
             path: path.to_path_buf(),
             skill_content,
-            enabled: self.load_program_state(path).map(|s| s.enabled).unwrap_or(true),
+            enabled: self
+                .load_program_state(path)
+                .map(|s| s.enabled)
+                .unwrap_or(true),
         })
     }
 
@@ -211,7 +214,9 @@ impl ProgramManager {
     pub async fn install_from(&self, source: InstallSource) -> Result<Program> {
         match source {
             InstallSource::Local(path) => self.install_from_local(&path).await,
-            InstallSource::Git { url, branch } => self.install_from_git(&url, branch.as_deref()).await,
+            InstallSource::Git { url, branch } => {
+                self.install_from_git(&url, branch.as_deref()).await
+            }
             InstallSource::Tarball { url } => self.install_from_tarball(&url).await,
         }
     }
@@ -238,7 +243,9 @@ impl ProgramManager {
         cmd.arg(url);
         cmd.arg(clone_path);
 
-        let output = cmd.output().await
+        let output = cmd
+            .output()
+            .await
             .with_context(|| format!("Failed to run git clone for '{}'", url))?;
 
         if !output.status.success() {
@@ -342,7 +349,8 @@ impl ProgramManager {
     pub async fn uninstall(&self, name: &str) -> Result<()> {
         let mut installed = self.installed.write().await;
 
-        let program = installed.remove(name)
+        let program = installed
+            .remove(name)
             .ok_or_else(|| anyhow::anyhow!("Program '{}' not found", name))?;
 
         // Remove the directory
@@ -357,7 +365,8 @@ impl ProgramManager {
     pub async fn set_enabled(&self, name: &str, enabled: bool) -> Result<()> {
         let mut installed = self.installed.write().await;
 
-        let program = installed.get_mut(name)
+        let program = installed
+            .get_mut(name)
             .ok_or_else(|| anyhow::anyhow!("Program '{}' not found", name))?;
 
         program.enabled = enabled;
@@ -373,7 +382,8 @@ impl ProgramManager {
     pub async fn check_host_requirements(&self, name: &str) -> Result<HostRequirementsCheck> {
         let installed = self.installed.read().await;
 
-        let program = installed.get(name)
+        let program = installed
+            .get(name)
             .ok_or_else(|| anyhow::anyhow!("Program '{}' not found", name))?;
 
         let validator = HostToolValidator::new(
@@ -394,7 +404,8 @@ impl ProgramManager {
     /// Get tool schemas for all enabled programs
     pub async fn all_tool_schemas(&self) -> Vec<ToolDef> {
         let installed = self.installed.read().await;
-        installed.values()
+        installed
+            .values()
             .filter(|p| p.enabled)
             .flat_map(|p| p.meta.tools.clone())
             .collect()
@@ -452,7 +463,9 @@ impl ProgramManager {
 
             // Atomic upgrade: copy to temp, validate, then swap
             let target_path = self.programs_dir.join(&source_meta.name);
-            let temp_path = self.programs_dir.join(format!(".tmp-upgrade-{}", source_meta.name));
+            let temp_path = self
+                .programs_dir
+                .join(format!(".tmp-upgrade-{}", source_meta.name));
 
             // Clean up any leftover temp directory from a failed previous upgrade
             if temp_path.exists() {
@@ -608,7 +621,11 @@ my_tool = { description = "A test tool" }
 "#;
 
         fs::write(program_dir.join("program.toml"), toml_content).unwrap();
-        fs::write(program_dir.join("SKILL.md"), "# Test Program\n\nThis is a test.").unwrap();
+        fs::write(
+            program_dir.join("SKILL.md"),
+            "# Test Program\n\nThis is a test.",
+        )
+        .unwrap();
 
         let meta = ProgramMeta::load_from_dir(program_dir).unwrap();
 
@@ -653,15 +670,27 @@ arguments = []
         assert_eq!(meta.tools.len(), 2);
 
         // Find greet by name (order may vary).
-        let greet = meta.tools.iter().find(|t| t.name == "greet").expect("greet tool");
+        let greet = meta
+            .tools
+            .iter()
+            .find(|t| t.name == "greet")
+            .expect("greet tool");
         assert_eq!(greet.arguments.len(), 2);
 
         // Verify arguments exist and have correct structure.
-        let name_arg = greet.arguments.iter().find(|a| a.name == "name").expect("name arg");
+        let name_arg = greet
+            .arguments
+            .iter()
+            .find(|a| a.name == "name")
+            .expect("name arg");
         assert!(name_arg.required, "name should be required");
         assert_eq!(name_arg.description, "User name");
 
-        let loud_arg = greet.arguments.iter().find(|a| a.name == "loud").expect("loud arg");
+        let loud_arg = greet
+            .arguments
+            .iter()
+            .find(|a| a.name == "loud")
+            .expect("loud arg");
         assert_eq!(loud_arg.default, Some("false".to_string()));
     }
 
@@ -891,7 +920,10 @@ author = "X"
         manager.install(&source1).await.unwrap();
         let result = manager.install(&source2).await;
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("already installed"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("already installed"));
     }
 
     #[tokio::test]
@@ -901,13 +933,17 @@ author = "X"
         let source = temp_dir.path().join("to-uninstall");
 
         fs::create_dir_all(&source).unwrap();
-        fs::write(source.join("program.toml"), r#"
+        fs::write(
+            source.join("program.toml"),
+            r#"
 [program]
 name = "removable"
 version = "1.0.0"
 description = "X"
 author = "X"
-"#).unwrap();
+"#,
+        )
+        .unwrap();
 
         let manager = ProgramManager::new(programs_dir.clone());
         manager.init().await.unwrap();
@@ -939,13 +975,17 @@ author = "X"
         let source = temp_dir.path().join("toggle-me");
 
         fs::create_dir_all(&source).unwrap();
-        fs::write(source.join("program.toml"), r#"
+        fs::write(
+            source.join("program.toml"),
+            r#"
 [program]
 name = "toggle-me"
 version = "1.0.0"
 description = "X"
 author = "X"
-"#).unwrap();
+"#,
+        )
+        .unwrap();
 
         let manager = ProgramManager::new(programs_dir.clone());
         manager.init().await.unwrap();
@@ -973,7 +1013,8 @@ author = "X"
         for (name, tool_name) in [("prog-a", "tool-a"), ("prog-b", "tool-b")] {
             let src = temp_dir.path().join(name);
             fs::create_dir_all(&src).unwrap();
-            let toml = format!(r#"
+            let toml = format!(
+                r#"
 [program]
 name = "{}"
 version = "1.0.0"
@@ -982,7 +1023,9 @@ author = "X"
 
 [tools.{}]
 description = "A tool"
-"#, name, tool_name);
+"#,
+                name, tool_name
+            );
             fs::write(src.join("program.toml"), toml).unwrap();
         }
 
@@ -1008,13 +1051,17 @@ description = "A tool"
         let source = temp_dir.path().join("skill-test");
 
         fs::create_dir_all(&source).unwrap();
-        fs::write(source.join("program.toml"), r#"
+        fs::write(
+            source.join("program.toml"),
+            r#"
 [program]
 name = "skill-test"
 version = "1.0.0"
 description = "X"
 author = "X"
-"#).unwrap();
+"#,
+        )
+        .unwrap();
         fs::write(
             source.join("SKILL.md"),
             "# Skill Test\n\nUse this program like so.",
@@ -1038,7 +1085,9 @@ author = "X"
         let source = temp_dir.path().join("req-check");
 
         fs::create_dir_all(&source).unwrap();
-        fs::write(source.join("program.toml"), r#"
+        fs::write(
+            source.join("program.toml"),
+            r#"
 [program]
 name = "req-check"
 version = "1.0.0"
@@ -1048,7 +1097,9 @@ author = "X"
 [host_requirements]
 required = ["git"]
 optional = ["echo", "nonexistent-tool-xyz"]
-"#).unwrap();
+"#,
+        )
+        .unwrap();
 
         let manager = ProgramManager::new(programs_dir.clone());
         manager.init().await.unwrap();
@@ -1147,13 +1198,17 @@ optional = ["echo", "nonexistent-tool-xyz"]
         let programs_dir = temp_dir.path().join("programs");
         let source_dir = temp_dir.path().join("source");
         fs::create_dir_all(&source_dir).unwrap();
-        fs::write(source_dir.join("program.toml"), r#"
+        fs::write(
+            source_dir.join("program.toml"),
+            r#"
 [program]
 name = "state-test"
 version = "1.0.0"
 description = "Test"
 author = "Test"
-"#).unwrap();
+"#,
+        )
+        .unwrap();
         fs::write(source_dir.join("SKILL.md"), "# Test").unwrap();
 
         let manager = ProgramManager::new(programs_dir);
@@ -1175,13 +1230,17 @@ author = "Test"
         let programs_dir = temp_dir.path().join("programs");
         let source_dir = temp_dir.path().join("source");
         fs::create_dir_all(&source_dir).unwrap();
-        fs::write(source_dir.join("program.toml"), r#"
+        fs::write(
+            source_dir.join("program.toml"),
+            r#"
 [program]
 name = "toggle-test"
 version = "1.0.0"
 description = "Test"
 author = "Test"
-"#).unwrap();
+"#,
+        )
+        .unwrap();
         fs::write(source_dir.join("SKILL.md"), "# Test").unwrap();
 
         let manager = ProgramManager::new(programs_dir);
@@ -1193,13 +1252,15 @@ author = "Test"
 
         // Verify state.json reflects disabled
         let state: ProgramState =
-            serde_json::from_str(&fs::read_to_string(program.path.join("state.json")).unwrap()).unwrap();
+            serde_json::from_str(&fs::read_to_string(program.path.join("state.json")).unwrap())
+                .unwrap();
         assert!(!state.enabled);
 
         // Re-enable
         manager.set_enabled("toggle-test", true).await.unwrap();
         let state: ProgramState =
-            serde_json::from_str(&fs::read_to_string(program.path.join("state.json")).unwrap()).unwrap();
+            serde_json::from_str(&fs::read_to_string(program.path.join("state.json")).unwrap())
+                .unwrap();
         assert!(state.enabled);
     }
 
@@ -1209,13 +1270,17 @@ author = "Test"
         let programs_dir = temp_dir.path().join("programs");
         let source_dir = temp_dir.path().join("source");
         fs::create_dir_all(&source_dir).unwrap();
-        fs::write(source_dir.join("program.toml"), r#"
+        fs::write(
+            source_dir.join("program.toml"),
+            r#"
 [program]
 name = "persist-test"
 version = "1.0.0"
 description = "Test"
 author = "Test"
-"#).unwrap();
+"#,
+        )
+        .unwrap();
         fs::write(source_dir.join("SKILL.md"), "# Test").unwrap();
 
         // First manager: install and disable
@@ -1299,7 +1364,10 @@ author = "Test"
         let v2_dir = make_program_dir(&temp_dir.path().join("v2"), "up-test", "2.0.0");
         let result = manager.upgrade(&v2_dir).await.unwrap();
         assert_eq!(result.meta.version, "2.0.0");
-        assert!(!result.enabled, "disabled state should be preserved across upgrade");
+        assert!(
+            !result.enabled,
+            "disabled state should be preserved across upgrade"
+        );
     }
 
     #[tokio::test]

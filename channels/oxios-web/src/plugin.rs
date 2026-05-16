@@ -57,7 +57,10 @@ impl ChannelPlugin for WebPlugin {
         let api_routes = routes::build_routes(state.clone());
 
         // CORS layer — origins from config
-        let cors_origins: Vec<_> = config.security.cors_origins.iter()
+        let cors_origins: Vec<_> = config
+            .security
+            .cors_origins
+            .iter()
             .filter_map(|o| o.parse::<axum::http::HeaderValue>().ok())
             .collect();
         let cors = tower_http::cors::CorsLayer::new()

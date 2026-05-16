@@ -89,9 +89,13 @@ pub struct MemoryConfig {
     pub retention_days: u32,
 }
 
-fn default_true() -> bool { true }
+fn default_true() -> bool {
+    true
+}
 
-fn default_max_recall() -> usize { 10 }
+fn default_max_recall() -> usize {
+    10
+}
 
 impl Default for MemoryConfig {
     fn default() -> Self {
@@ -341,8 +345,6 @@ impl Default for GatewayConfig {
     }
 }
 
-
-
 /// Exec configuration.
 ///
 /// Governs how the kernel dispatches commands for execution.
@@ -553,7 +555,6 @@ pub struct PersonaConfig {
     #[serde(default = "default_max_concurrent_personas")]
     pub max_concurrent_personas: usize,
 }
-
 
 fn default_max_concurrent_personas() -> usize {
     5
@@ -922,14 +923,13 @@ impl OxiosConfig {
                 warnings.push(format!("channels.enabled: unknown channel '{}'", name));
             }
         }
-        if self.channels.enabled.iter().any(|c| c == "telegram") {
-            if std::env::var(&self.channels.telegram.bot_token_env).is_err() {
+        if self.channels.enabled.iter().any(|c| c == "telegram")
+            && std::env::var(&self.channels.telegram.bot_token_env).is_err() {
                 warnings.push(format!(
                     "channels.telegram: {} env var not set — telegram channel will fail",
                     self.channels.telegram.bot_token_env
                 ));
             }
-        }
 
         (errors, warnings)
     }
@@ -955,7 +955,11 @@ mod tests {
     fn test_default_config_validates() {
         let config = OxiosConfig::default();
         let (errors, _warnings) = config.validate();
-        assert!(errors.is_empty(), "Default config should have no errors: {:?}", errors);
+        assert!(
+            errors.is_empty(),
+            "Default config should have no errors: {:?}",
+            errors
+        );
     }
 
     #[test]
@@ -986,7 +990,10 @@ mod tests {
         // With HOME set.
         let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp/testhome".into());
         let expanded = expand_home("~/projects/test");
-        assert_eq!(expanded.to_str().unwrap(), format!("{}/projects/test", home));
+        assert_eq!(
+            expanded.to_str().unwrap(),
+            format!("{}/projects/test", home)
+        );
 
         // Non-tilde path should pass through unchanged.
         let abs = expand_home("/absolute/path");
@@ -1015,9 +1022,16 @@ mod tests {
         );
 
         let (errors, _warnings) = config.validate();
-        assert!(!errors.is_empty(), "Expected validation error for invalid cron");
+        assert!(
+            !errors.is_empty(),
+            "Expected validation error for invalid cron"
+        );
         let has_cron_error = errors.iter().any(|e| e.contains("invalid cron expression"));
-        assert!(has_cron_error, "Expected 'invalid cron expression' error, got: {:?}", errors);
+        assert!(
+            has_cron_error,
+            "Expected 'invalid cron expression' error, got: {:?}",
+            errors
+        );
     }
 
     #[test]
@@ -1028,15 +1042,22 @@ mod tests {
         let toml_str = toml::to_string(&config).expect("serialization should succeed");
 
         // Deserialize back.
-        let deserialized: OxiosConfig = toml::from_str(&toml_str).expect("deserialization should succeed");
+        let deserialized: OxiosConfig =
+            toml::from_str(&toml_str).expect("deserialization should succeed");
 
         // Key fields should match.
         assert_eq!(config.kernel.max_agents, deserialized.kernel.max_agents);
         assert_eq!(config.kernel.workspace, deserialized.kernel.workspace);
         assert_eq!(config.gateway.host, deserialized.gateway.host);
         assert_eq!(config.gateway.port, deserialized.gateway.port);
-        assert_eq!(config.exec.default_timeout_secs, deserialized.exec.default_timeout_secs);
-        assert_eq!(config.exec.max_timeout_secs, deserialized.exec.max_timeout_secs);
+        assert_eq!(
+            config.exec.default_timeout_secs,
+            deserialized.exec.default_timeout_secs
+        );
+        assert_eq!(
+            config.exec.max_timeout_secs,
+            deserialized.exec.max_timeout_secs
+        );
     }
 
     #[test]
@@ -1047,7 +1068,11 @@ mod tests {
         config.exec.max_timeout_secs = 100;
         let (errors, _warnings) = config.validate();
         let has_error = errors.iter().any(|e| e.contains("must not exceed"));
-        assert!(has_error, "Expected timeout ordering error, got: {:?}", errors);
+        assert!(
+            has_error,
+            "Expected timeout ordering error, got: {:?}",
+            errors
+        );
     }
 
     #[test]

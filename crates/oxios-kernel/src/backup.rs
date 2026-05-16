@@ -39,9 +39,15 @@ pub async fn create_backup(
     };
 
     let categories = [
-        "seeds", "evals", "memory/conversations",
-        "memory/sessions", "memory/facts", "memory/episodes",
-        "memory/knowledge", "sessions", "agent_groups",
+        "seeds",
+        "evals",
+        "memory/conversations",
+        "memory/sessions",
+        "memory/facts",
+        "memory/episodes",
+        "memory/knowledge",
+        "sessions",
+        "agent_groups",
     ];
 
     for category in &categories {
@@ -87,7 +93,10 @@ pub async fn restore_backup(
     Ok(manifest)
 }
 
-fn copy_dir_recursive<'a>(src: &'a Path, dest: &'a Path) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<()>> + Send + 'a>> {
+fn copy_dir_recursive<'a>(
+    src: &'a Path,
+    dest: &'a Path,
+) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<()>> + Send + 'a>> {
     Box::pin(async move {
         tokio::fs::create_dir_all(dest).await?;
         let mut entries = tokio::fs::read_dir(src).await?;

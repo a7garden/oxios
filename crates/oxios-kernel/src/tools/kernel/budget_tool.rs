@@ -19,8 +19,8 @@ use oxi_sdk::{AgentTool, AgentToolResult, ToolContext};
 use serde_json::{json, Value};
 use tokio::sync::oneshot;
 
+use crate::budget::{BudgetLimit, BudgetManager};
 use crate::kernel_handle::KernelHandle;
-use crate::budget::{BudgetManager, BudgetLimit};
 use crate::types::AgentId;
 
 /// Agent tool for budget management.
@@ -123,15 +123,16 @@ impl AgentTool for BudgetTool {
         match action {
             "check" => {
                 let info = self.budget_manager.remaining(&agent_id);
-                Ok(AgentToolResult::success(serde_json::to_string_pretty(
-                    &json!({
+                Ok(AgentToolResult::success(
+                    serde_json::to_string_pretty(&json!({
                         "agent_id": agent_id_str,
                         "tokens_remaining": info.tokens_remaining,
                         "calls_remaining": info.calls_remaining,
                         "window_remaining_secs": info.window_remaining_secs,
                         "is_exhausted": info.is_exhausted,
-                    }),
-                ).unwrap_or_default()))
+                    }))
+                    .unwrap_or_default(),
+                ))
             }
 
             "set" => {
@@ -208,9 +209,7 @@ mod tests {
             "required": ["action", "agent_id"]
         });
 
-        let actions = schema["properties"]["action"]["enum"]
-            .as_array()
-            .unwrap();
+        let actions = schema["properties"]["action"]["enum"].as_array().unwrap();
         assert_eq!(actions.len(), 4);
         assert!(actions.iter().any(|a| a == "check"));
         assert!(actions.iter().any(|a| a == "set"));

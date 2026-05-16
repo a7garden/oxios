@@ -13,25 +13,26 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use kernel::Kernel;
-use oxios_kernel::{
-    DaemonManager, OxiosConfig,
-    credential::CredentialStore,
-};
+use oxios_kernel::{credential::CredentialStore, DaemonManager, OxiosConfig};
 
-#[cfg(feature = "web")]
-use oxios_web::WebPlugin;
 #[cfg(feature = "cli")]
 use oxios_cli::CliPlugin;
 #[cfg(feature = "telegram")]
 use oxios_telegram::TelegramPlugin;
+#[cfg(feature = "web")]
+use oxios_web::WebPlugin;
 
-use oxios_gateway::plugin::{ChannelPlugin, ChannelContext};
+use oxios_gateway::plugin::{ChannelContext, ChannelPlugin};
 
 // ─── CLI ───────────────────────────────────────────────────────────────────
 
 /// Oxios Agent OS
 #[derive(Debug, Parser)]
-#[command(name = "oxios", version, about = "Oxios Agent OS — Agent Operating System")]
+#[command(
+    name = "oxios",
+    version,
+    about = "Oxios Agent OS — Agent Operating System"
+)]
 struct Cli {
     /// Run in foreground (do not daemonize).
     #[arg(long, global = true)]
@@ -77,9 +78,7 @@ enum Command {
     },
 
     /// Restore Oxios state from a backup.
-    Restore {
-        input: String,
-    },
+    Restore { input: String },
 
     /// Show or modify configuration.
     Config {
@@ -109,9 +108,7 @@ enum Command {
     },
 
     /// Show agent budget information.
-    Budget {
-        agent_id: Option<String>,
-    },
+    Budget { agent_id: Option<String> },
 
     /// Manage system service (launchd/systemd).
     Daemon {
@@ -127,9 +124,7 @@ enum Command {
     },
 
     /// Show program skill file and usage.
-    Program {
-        name: String,
-    },
+    Program { name: String },
 }
 
 #[derive(Debug, Subcommand)]
@@ -141,8 +136,14 @@ enum ConfigAction {
 
 #[derive(Debug, Subcommand)]
 enum PkgAction {
-    Install { source: String, #[arg(short, long)] branch: Option<String> },
-    Uninstall { name: String },
+    Install {
+        source: String,
+        #[arg(short, long)]
+        branch: Option<String>,
+    },
+    Uninstall {
+        name: String,
+    },
     List,
     Search,
 }
@@ -155,8 +156,13 @@ enum AgentAction {
 
 #[derive(Debug, Subcommand)]
 enum GitAction {
-    Log { limit: Option<usize> },
-    Tag { name: String, message: Option<String> },
+    Log {
+        limit: Option<usize>,
+    },
+    Tag {
+        name: String,
+        message: Option<String>,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -170,8 +176,13 @@ enum DaemonAction {
 // ─── Constants & helpers ───────────────────────────────────────────────────
 
 const WORKSPACE_SUBDIRS: &[&str] = &[
-    "workspace", "workspace/memory", "workspace/memory/knowledge",
-    "workspace/seeds", "workspace/sessions", "workspace/skills", "workspace/programs",
+    "workspace",
+    "workspace/memory",
+    "workspace/memory/knowledge",
+    "workspace/seeds",
+    "workspace/sessions",
+    "workspace/skills",
+    "workspace/programs",
 ];
 
 const DEFAULT_CONFIG: &str = include_str!("../share/default-config.toml");
@@ -240,14 +251,20 @@ async fn cmd_pkg(kernel: &Kernel, action: &PkgAction) -> Result<()> {
             let source = source.clone();
             let branch = branch.clone();
             let install_source = if source.ends_with(".git") || source.starts_with("git@") {
-                oxios_kernel::InstallSource::Git { url: source, branch }
+                oxios_kernel::InstallSource::Git {
+                    url: source,
+                    branch,
+                }
             } else if source.starts_with("http://") || source.starts_with("https://") {
                 oxios_kernel::InstallSource::Tarball { url: source }
             } else {
                 oxios_kernel::InstallSource::Local(PathBuf::from(&source))
             };
             let program = handle.extensions.install_program(install_source).await?;
-            println!("Installed '{}' v{}", program.meta.name, program.meta.version);
+            println!(
+                "Installed '{}' v{}",
+                program.meta.name, program.meta.version
+            );
         }
         PkgAction::Uninstall { name } => {
             handle.extensions.uninstall_program(&name).await?;
@@ -337,21 +354,56 @@ fn get_config_value(config: &OxiosConfig, key: &str) -> Option<String> {
 fn set_config_value(config: &mut OxiosConfig, key: &str, value: &str) -> Option<()> {
     let parts: Vec<&str> = key.split('.').collect();
     match parts.as_slice() {
-        ["kernel", "workspace"] => { config.kernel.workspace = value.to_string(); Some(()) }
-        ["kernel", "event_bus_capacity"] => { config.kernel.event_bus_capacity = value.parse().ok()?; Some(()) }
-        ["kernel", "max_agents"] => { config.kernel.max_agents = value.parse().ok()?; Some(()) }
-        ["engine", "default_model"] => { config.engine.default_model = value.to_string(); Some(()) }
-        ["engine", "api_key"] => { config.engine.api_key = Some(value.to_string()); Some(()) }
-        ["gateway", "host"] => { config.gateway.host = value.to_string(); Some(()) }
-        ["gateway", "port"] => { config.gateway.port = value.parse().ok()?; Some(()) }
-        ["exec", "default_timeout_secs"] => { config.exec.default_timeout_secs = value.parse().ok()?; Some(()) }
-        ["exec", "max_timeout_secs"] => { config.exec.max_timeout_secs = value.parse().ok()?; Some(()) }
+        ["kernel", "workspace"] => {
+            config.kernel.workspace = value.to_string();
+            Some(())
+        }
+        ["kernel", "event_bus_capacity"] => {
+            config.kernel.event_bus_capacity = value.parse().ok()?;
+            Some(())
+        }
+        ["kernel", "max_agents"] => {
+            config.kernel.max_agents = value.parse().ok()?;
+            Some(())
+        }
+        ["engine", "default_model"] => {
+            config.engine.default_model = value.to_string();
+            Some(())
+        }
+        ["engine", "api_key"] => {
+            config.engine.api_key = Some(value.to_string());
+            Some(())
+        }
+        ["gateway", "host"] => {
+            config.gateway.host = value.to_string();
+            Some(())
+        }
+        ["gateway", "port"] => {
+            config.gateway.port = value.parse().ok()?;
+            Some(())
+        }
+        ["exec", "default_timeout_secs"] => {
+            config.exec.default_timeout_secs = value.parse().ok()?;
+            Some(())
+        }
+        ["exec", "max_timeout_secs"] => {
+            config.exec.max_timeout_secs = value.parse().ok()?;
+            Some(())
+        }
         ["exec", "required_host_tools"] => {
-            config.exec.required_host_tools = value.split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect();
+            config.exec.required_host_tools = value
+                .split(',')
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty())
+                .collect();
             Some(())
         }
         ["exec", "optional_host_tools"] => {
-            config.exec.optional_host_tools = value.split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect();
+            config.exec.optional_host_tools = value
+                .split(',')
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty())
+                .collect();
             Some(())
         }
         _ => None,
@@ -374,11 +426,17 @@ async fn cmd_status(kernel: &Kernel) -> Result<()> {
     match CredentialStore::resolve(provider, config.api_key().as_deref()) {
         Some((key, source)) => {
             let source_str = match source {
-                oxios_kernel::credential::CredentialSource::Config => "config.toml (engine.api_key)",
+                oxios_kernel::credential::CredentialSource::Config => {
+                    "config.toml (engine.api_key)"
+                }
                 oxios_kernel::credential::CredentialSource::OxiAuthStore => "~/.oxi/auth.json",
                 oxios_kernel::credential::CredentialSource::EnvVar => "environment variable",
             };
-            let preview = if key.len() > 8 { format!("{}...{}", &key[..4], &key[key.len()-4..]) } else { key.clone() };
+            let preview = if key.len() > 8 {
+                format!("{}...{}", &key[..4], &key[key.len() - 4..])
+            } else {
+                key.clone()
+            };
             println!("  {:<16}  {} [{}]", "Credentials:", preview, source_str);
         }
         None => {
@@ -390,13 +448,22 @@ async fn cmd_status(kernel: &Kernel) -> Result<()> {
     let mcp_count = kernel.handle().mcp.server_count();
     println!("  {:<16}  {}", "MCP Servers:", mcp_count);
 
-    let agents = kernel.handle().agents.list().await
+    let agents = kernel
+        .handle()
+        .agents
+        .list()
+        .await
         .map_err(|e| anyhow::anyhow!("failed to list agents: {}", e))?;
     println!("  {:<16}  {}", "Active Agents:", agents.len());
     if !agents.is_empty() {
         println!();
         for agent in &agents {
-            println!("    • {}  {:10}  {}", agent.id, format!("{:?}", agent.status), agent.name);
+            println!(
+                "    • {}  {:10}  {}",
+                agent.id,
+                format!("{:?}", agent.status),
+                agent.name
+            );
         }
     }
 
@@ -428,14 +495,13 @@ async fn main() -> Result<()> {
     let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
     Box::leak(Box::new(_guard));
 
-    let env_filter = tracing_subscriber::EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| {
-            if cli.verbose {
-                tracing_subscriber::EnvFilter::new("debug")
-            } else {
-                tracing_subscriber::EnvFilter::new("info")
-            }
-        });
+    let env_filter = tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
+        if cli.verbose {
+            tracing_subscriber::EnvFilter::new("debug")
+        } else {
+            tracing_subscriber::EnvFilter::new("info")
+        }
+    });
 
     tracing_subscriber::fmt()
         .with_env_filter(env_filter)
@@ -564,7 +630,8 @@ async fn main() -> Result<()> {
                         .unwrap_or_default()
                         .as_secs();
                     PathBuf::from(kernel.config().kernel.workspace.clone())
-                        .join("backups").join(ts.to_string())
+                        .join("backups")
+                        .join(ts.to_string())
                 }
             };
             oxios_kernel::backup::create_backup(&handle.state.store(), &output_path).await?;
@@ -578,15 +645,16 @@ async fn main() -> Result<()> {
             Ok(())
         }
 
-        Some(Command::Pkg { action }) => {
-            cmd_pkg(&kernel, action).await
-        }
+        Some(Command::Pkg { action }) => cmd_pkg(&kernel, action).await,
 
         Some(Command::Agent { action }) => {
             let handle = kernel.handle();
             match action {
                 AgentAction::List => {
-                    let agents = handle.agents.list().await
+                    let agents = handle
+                        .agents
+                        .list()
+                        .await
                         .map_err(|e| anyhow::anyhow!("failed to list agents: {}", e))?;
                     if agents.is_empty() {
                         println!("No active agents.");
@@ -594,9 +662,13 @@ async fn main() -> Result<()> {
                         println!("{:36} {:10} {:20} {}", "ID", "STATUS", "NAME", "CREATED");
                         println!("{}", "-".repeat(90));
                         for agent in &agents {
-                            println!("{:36} {:10} {:20} {}",
-                                agent.id, format!("{:?}", agent.status), agent.name,
-                                agent.created_at.format("%Y-%m-%d %H:%M"));
+                            println!(
+                                "{:36} {:10} {:20} {}",
+                                agent.id,
+                                format!("{:?}", agent.status),
+                                agent.name,
+                                agent.created_at.format("%Y-%m-%d %H:%M")
+                            );
                         }
                         println!("\n{} agent(s) active.", agents.len());
                     }
@@ -605,7 +677,10 @@ async fn main() -> Result<()> {
                 AgentAction::Kill { id } => {
                     let _ = uuid::Uuid::parse_str(id)
                         .map_err(|e| anyhow::anyhow!("invalid agent id '{}': {}", id, e))?;
-                    handle.agents.kill(id).await
+                    handle
+                        .agents
+                        .kill(id)
+                        .await
                         .map_err(|e| anyhow::anyhow!("failed to kill agent {}: {}", id, e))?;
                     println!("Agent {} terminated.", id);
                     Ok(())
@@ -628,14 +703,19 @@ async fn main() -> Result<()> {
                 println!("No audit entries yet.");
             } else {
                 println!("Recent Audit Entries (showing last {}):", entries.len());
-                println!("{:10} {:20} {:15} {}", "SEQ", "TIMESTAMP", "ACTOR", "ACTION");
+                println!(
+                    "{:10} {:20} {:15} {}",
+                    "SEQ", "TIMESTAMP", "ACTOR", "ACTION"
+                );
                 println!("{}", "-".repeat(70));
                 for entry in &entries {
-                    println!("{:10} {:20} {:15} {}",
+                    println!(
+                        "{:10} {:20} {:15} {}",
                         entry.seq,
                         entry.timestamp.format("%Y-%m-%d %H:%M:%S"),
                         entry.actor,
-                        format!("{:?}", entry.action));
+                        format!("{:?}", entry.action)
+                    );
                 }
             }
             println!("\nTotal entries: {}", handle.security.audit_count());
@@ -647,7 +727,9 @@ async fn main() -> Result<()> {
             match action {
                 GitAction::Log { limit } => {
                     let limit = limit.unwrap_or(20);
-                    let entries = handle.infra.git_log(limit)
+                    let entries = handle
+                        .infra
+                        .git_log(limit)
                         .map_err(|e| anyhow::anyhow!("failed to get git log: {}", e))?;
                     if entries.is_empty() {
                         println!("No commits yet.");
@@ -665,10 +747,14 @@ async fn main() -> Result<()> {
                 }
                 GitAction::Tag { name, message } => {
                     let msg = message.as_deref().unwrap_or("");
-                    handle.infra.git_tag(name, msg)
+                    handle
+                        .infra
+                        .git_tag(name, msg)
                         .map_err(|e| anyhow::anyhow!("failed to create tag: {}", e))?;
                     println!("Tagged '{}'.", name);
-                    if !msg.is_empty() { println!("  Message: {}", msg); }
+                    if !msg.is_empty() {
+                        println!("  Message: {}", msg);
+                    }
                     Ok(())
                 }
             }
@@ -685,9 +771,19 @@ async fn main() -> Result<()> {
                     println!("  {}", "─".repeat(40));
                     println!("  {:<22}  {}", "Tokens remaining:", budget.tokens_remaining);
                     println!("  {:<22}  {}", "Calls remaining:", budget.calls_remaining);
-                    println!("  {:<22}  {} seconds", "Window remaining:", budget.window_remaining_secs);
-                    println!("  {:<22}  {}", "Status:",
-                        if budget.is_exhausted { "⚠ EXHAUSTED" } else { "✓ OK" });
+                    println!(
+                        "  {:<22}  {} seconds",
+                        "Window remaining:", budget.window_remaining_secs
+                    );
+                    println!(
+                        "  {:<22}  {}",
+                        "Status:",
+                        if budget.is_exhausted {
+                            "⚠ EXHAUSTED"
+                        } else {
+                            "✓ OK"
+                        }
+                    );
                     println!();
                     Ok(())
                 }
@@ -721,22 +817,32 @@ async fn main() -> Result<()> {
                         }
                     }
                     if !program.meta.host_requirements.required.is_empty() {
-                        println!("\n  Required host tools: {}", program.meta.host_requirements.required.join(", "));
+                        println!(
+                            "\n  Required host tools: {}",
+                            program.meta.host_requirements.required.join(", ")
+                        );
                     }
                     if !program.meta.host_requirements.optional.is_empty() {
-                        println!("  Optional host tools:   {}", program.meta.host_requirements.optional.join(", "));
+                        println!(
+                            "  Optional host tools:   {}",
+                            program.meta.host_requirements.optional.join(", ")
+                        );
                     }
                     println!();
                     Ok(())
                 }
                 None => Err(anyhow::anyhow!(
-                    "program '{}' not found. Install with `oxios pkg install`", name)),
+                    "program '{}' not found. Install with `oxios pkg install`",
+                    name
+                )),
             }
         }
 
         // Handled before kernel assembly above — unreachable here
-        Some(Command::Stop) | Some(Command::Daemon { .. })
-        | Some(Command::Log { .. }) | Some(Command::Config { .. }) => unreachable!(),
+        Some(Command::Stop)
+        | Some(Command::Daemon { .. })
+        | Some(Command::Log { .. })
+        | Some(Command::Config { .. }) => unreachable!(),
     }
 }
 
@@ -767,9 +873,16 @@ async fn cmd_serve(kernel: &Kernel, config_path: &Path) -> Result<()> {
     println!();
     println!("  ⬡ Oxios Agent OS  v{}", env!("CARGO_PKG_VERSION"));
     println!("  {}", "─".repeat(48));
-    println!("  Gateway:  http://{}:{}", config.gateway.host, config.gateway.port);
+    println!(
+        "  Gateway:  http://{}:{}",
+        config.gateway.host, config.gateway.port
+    );
     println!();
-    tracing::info!("Oxios started on http://{}:{}", config.gateway.host, config.gateway.port);
+    tracing::info!(
+        "Oxios started on http://{}:{}",
+        config.gateway.host,
+        config.gateway.port
+    );
 
     // Wait for ctrl+c
     tokio::signal::ctrl_c().await.ok();
@@ -817,8 +930,8 @@ async fn activate_channels(
     config_path: &Path,
 ) -> Result<Vec<tokio::task::JoinHandle<()>>> {
     let plugins = build_channel_plugins();
-    let plugin_map: std::collections::HashMap<&str, &dyn ChannelPlugin> = plugins
-        .iter().map(|p| (p.name(), p.as_ref())).collect();
+    let plugin_map: std::collections::HashMap<&str, &dyn ChannelPlugin> =
+        plugins.iter().map(|p| (p.name(), p.as_ref())).collect();
 
     let config = kernel.config();
     let mut all_tasks = Vec::new();
@@ -837,7 +950,9 @@ async fn activate_channels(
                         kernel.register_channel(bundle.channel).await;
                         all_tasks.extend(bundle.tasks);
                     }
-                    Err(e) => tracing::error!(channel = %name, error = %e, "Failed to activate channel"),
+                    Err(e) => {
+                        tracing::error!(channel = %name, error = %e, "Failed to activate channel")
+                    }
                 }
             }
             None => tracing::warn!(

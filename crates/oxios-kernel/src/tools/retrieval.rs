@@ -160,7 +160,11 @@ impl ToolRetriever {
             .collect();
 
         // Sort descending by score.
-        scored.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+        scored.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         scored.truncate(top_k);
         scored
@@ -217,7 +221,10 @@ pub fn format_capability_index(tools: &[ScoredTool]) -> String {
 
     for tool in tools {
         xml.push_str("  <capability>\n");
-        xml.push_str(&format!("    <name>{}</name>\n", escape_xml(&tool.entry.name)));
+        xml.push_str(&format!(
+            "    <name>{}</name>\n",
+            escape_xml(&tool.entry.name)
+        ));
         xml.push_str(&format!(
             "    <category>{}</category>\n",
             escape_xml(&tool.entry.category)
@@ -261,14 +268,7 @@ fn escape_xml(s: &str) -> String {
 
 /// Well-known domain names that can appear in a kernel manifest.
 const KNOWN_DOMAINS: &[&str] = &[
-    "space",
-    "agent",
-    "a2a",
-    "memory",
-    "security",
-    "budget",
-    "resource",
-    "program",
+    "space", "agent", "a2a", "memory", "security", "budget", "resource", "program",
 ];
 
 /// Build a markdown kernel manifest from the set of active domains.
@@ -371,7 +371,9 @@ mod tests {
         assert!(retriever.is_empty());
         assert_eq!(retriever.len(), 0);
 
-        retriever.index_tool(mock_entry("exec", "os-tool", "Run commands")).await;
+        retriever
+            .index_tool(mock_entry("exec", "os-tool", "Run commands"))
+            .await;
         retriever
             .index_tool(mock_entry("git", "program", "Git operations"))
             .await;
@@ -525,7 +527,10 @@ mod tests {
     #[test]
     fn test_escape_xml() {
         assert_eq!(escape_xml("hello"), "hello");
-        assert_eq!(escape_xml("a&b<c>d\"e'f"), "a&amp;b&lt;c&gt;d&quot;e&apos;f");
+        assert_eq!(
+            escape_xml("a&b<c>d\"e'f"),
+            "a&amp;b&lt;c&gt;d&quot;e&apos;f"
+        );
     }
 
     #[test]
@@ -609,7 +614,11 @@ mod tests {
             })
             .await;
 
-        let query_embedding = retriever.embedder().embed("run a bash command").await.unwrap();
+        let query_embedding = retriever
+            .embedder()
+            .embed("run a bash command")
+            .await
+            .unwrap();
         let results = retriever.retrieve(&query_embedding, 2);
 
         assert_eq!(results.len(), 2);

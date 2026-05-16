@@ -15,9 +15,12 @@ use chrono::Utc;
 use parking_lot::RwLock;
 use tokio::sync::Mutex;
 
-use super::{detection::{self, PathMatcher, Topic}, Space, SpaceId, SpaceSource};
 use super::conversation_buffer::ConversationBuffer;
 use super::knowledge_bridge::KnowledgeBridge;
+use super::{
+    detection::{self, PathMatcher, Topic},
+    Space, SpaceId, SpaceSource,
+};
 use crate::event_bus::{EventBus, KernelEvent};
 use crate::state_store::StateStore;
 
@@ -74,9 +77,8 @@ pub struct SpaceManager {
 
 /// Get the default Space ID.
 fn default_space_id() -> SpaceId {
-    *crate::space::DEFAULT_SPACE_ID.get_or_init(|| {
-        uuid::Uuid::parse_str("00000000-0000-0000-0000-000000000001").unwrap()
-    })
+    *crate::space::DEFAULT_SPACE_ID
+        .get_or_init(|| uuid::Uuid::parse_str("00000000-0000-0000-0000-000000000001").unwrap())
 }
 
 impl SpaceManager {
@@ -139,7 +141,8 @@ impl SpaceManager {
         // Load index
         let index_path = spaces_dir.join("_index.json");
         if index_path.exists() {
-            let ids: Vec<SpaceId> = match self.state_store.load_json("_spaces", "_index.json").await {
+            let ids: Vec<SpaceId> = match self.state_store.load_json("_spaces", "_index.json").await
+            {
                 Ok(Some(ids)) => ids,
                 Ok(None) => Vec::new(),
                 Err(e) => {
@@ -163,12 +166,15 @@ impl SpaceManager {
 
     /// Load a single Space from file.
     async fn load_space_from_file(&self, path: &PathBuf) -> Result<Space> {
-        let content = std::fs::read_to_string(path).with_context(|| format!("reading {}", path.display()))?;
-        let space: Space = serde_json::from_str(&content).with_context(|| format!("parsing {}", path.display()))?;
+        let content =
+            std::fs::read_to_string(path).with_context(|| format!("reading {}", path.display()))?;
+        let space: Space = serde_json::from_str(&content)
+            .with_context(|| format!("parsing {}", path.display()))?;
         Ok(space)
     }
 
     /// Ensure the default Space exists.
+    #[allow(clippy::await_holding_lock)]
     async fn ensure_default_space(&self) -> Result<()> {
         let spaces = self.spaces.read();
         if spaces.contains_key(&default_space_id()) {
@@ -271,6 +277,7 @@ impl SpaceManager {
     /// 1. Filesystem path extraction (fast, free)
     /// 2. Keyword/tag matching (fast, free)
     /// 3. LLM topic classification (slow, only when needed)
+    #[allow(clippy::await_holding_lock)]
     pub async fn detect_or_create(
         &self,
         message: &str,
@@ -493,7 +500,9 @@ impl SpaceManager {
             last_active_at: Utc::now(),
             interaction_count: 1,
             knowledge_visible: true,
-        }).await.ok(); // Ignore save errors here
+        })
+        .await
+        .ok(); // Ignore save errors here
 
         self.event_bus.publish(KernelEvent::SpaceActivated {
             space_id: *space_id,
@@ -539,11 +548,7 @@ impl SpaceManager {
     ///
     /// The `absorbed` Space is merged into `survivor`.
     /// Memory entries from absorbed are transferred to survivor.
-    pub async fn merge_spaces(
-        &self,
-        survivor_id: SpaceId,
-        absorbed_id: SpaceId,
-    ) -> Result<()> {
+    pub async fn merge_spaces(&self, survivor_id: SpaceId, absorbed_id: SpaceId) -> Result<()> {
         if survivor_id == absorbed_id {
             bail!(SpaceManagerError::SelfMerge);
         }
@@ -588,7 +593,10 @@ impl SpaceManager {
 
         // Archive absorbed space directory
         let absorbed_dir = self.root_dir.join(absorbed_id.to_string());
-        let archived_dir = self.root_dir.join("_archived").join(absorbed_id.to_string());
+        let archived_dir = self
+            .root_dir
+            .join("_archived")
+            .join(absorbed_id.to_string());
         if absorbed_dir.exists() {
             let _ = std::fs::create_dir_all(archived_dir.parent().unwrap());
             let _ = std::fs::rename(&absorbed_dir, &archived_dir);
@@ -622,7 +630,9 @@ impl SpaceManager {
         }
 
         let paths_overlap = a.paths.iter().any(|ap| {
-            b.paths.iter().any(|bp| ap == bp || ap.starts_with(bp) || bp.starts_with(ap))
+            b.paths
+                .iter()
+                .any(|bp| ap == bp || ap.starts_with(bp) || bp.starts_with(ap))
         });
 
         if !paths_overlap {
@@ -630,12 +640,10 @@ impl SpaceManager {
         }
 
         // Tag similarity must be high
-        let a_tags: std::collections::HashSet<_> = a.tags.iter()
-            .map(|t| t.to_lowercase())
-            .collect();
-        let b_tags: std::collections::HashSet<_> = b.tags.iter()
-            .map(|t| t.to_lowercase())
-            .collect();
+        let a_tags: std::collections::HashSet<_> =
+            a.tags.iter().map(|t| t.to_lowercase()).collect();
+        let b_tags: std::collections::HashSet<_> =
+            b.tags.iter().map(|t| t.to_lowercase()).collect();
 
         if a_tags.is_empty() && b_tags.is_empty() {
             // Both have no tags — could be candidates
@@ -854,9 +862,14 @@ mod tests {
         let bus = test_event_bus();
         let manager = SpaceManager::new(store, bus).await.unwrap();
 
-        let result = manager.merge_spaces(default_space_id(), default_space_id()).await;
+        let result = manager
+            .merge_spaces(default_space_id(), default_space_id())
+            .await;
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err().downcast_ref(), Some(SpaceManagerError::SelfMerge)));
+        assert!(matches!(
+            result.unwrap_err().downcast_ref(),
+            Some(SpaceManagerError::SelfMerge)
+        ));
     }
 
     #[tokio::test]

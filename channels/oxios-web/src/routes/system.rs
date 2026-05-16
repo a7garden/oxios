@@ -5,7 +5,7 @@ use axum::Json;
 use serde::Serialize;
 
 use crate::error::AppError;
-use crate::routes::{PageParams, paginate};
+use crate::routes::{paginate, PageParams};
 use crate::server::AppState;
 
 // ---------------------------------------------------------------------------
@@ -92,9 +92,7 @@ pub(crate) struct StatusResponse {
 }
 
 /// GET /api/status — System status with component health.
-pub(crate) async fn handle_status(
-    state: State<Arc<AppState>>,
-) -> Json<StatusResponse> {
+pub(crate) async fn handle_status(state: State<Arc<AppState>>) -> Json<StatusResponse> {
     let uptime = state.start_time.elapsed();
     let uptime_str = format!(
         "{}h {}m {}s",
@@ -118,10 +116,24 @@ pub(crate) async fn handle_status(
     };
 
     // Agent health — count active from supervisor, metrics from export
-    let active_count = state.kernel.agents.list().await
-        .map(|agents| agents.iter().filter(|a| {
-            matches!(a.status, oxios_kernel::AgentStatus::Running | oxios_kernel::AgentStatus::Starting | oxios_kernel::AgentStatus::Idle)
-        }).count())
+    let active_count = state
+        .kernel
+        .agents
+        .list()
+        .await
+        .map(|agents| {
+            agents
+                .iter()
+                .filter(|a| {
+                    matches!(
+                        a.status,
+                        oxios_kernel::AgentStatus::Running
+                            | oxios_kernel::AgentStatus::Starting
+                            | oxios_kernel::AgentStatus::Idle
+                    )
+                })
+                .count()
+        })
         .unwrap_or(0);
 
     let (total_forked, total_completed, total_failed) = parse_agent_metrics();
@@ -136,7 +148,11 @@ pub(crate) async fn handle_status(
     let components = Some(ComponentHealth {
         state_store: ComponentStatus {
             healthy: state_store_healthy,
-            detail: if state_store_healthy { None } else { Some("base path not found".to_string()) },
+            detail: if state_store_healthy {
+                None
+            } else {
+                Some("base path not found".to_string())
+            },
         },
         event_bus: ComponentStatus {
             healthy: event_bus_healthy,
@@ -165,11 +181,23 @@ fn parse_agent_metrics() -> (u64, u64, u64) {
     let mut failed = 0u64;
     for line in export.lines() {
         if line.starts_with("oxios_agents_forked_total ") {
-            forked = line.rsplit(' ').next().and_then(|v| v.parse().ok()).unwrap_or(0);
+            forked = line
+                .rsplit(' ')
+                .next()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(0);
         } else if line.starts_with("oxios_agents_completed_total ") {
-            completed = line.rsplit(' ').next().and_then(|v| v.parse().ok()).unwrap_or(0);
+            completed = line
+                .rsplit(' ')
+                .next()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(0);
         } else if line.starts_with("oxios_agents_failed_total ") {
-            failed = line.rsplit(' ').next().and_then(|v| v.parse().ok()).unwrap_or(0);
+            failed = line
+                .rsplit(' ')
+                .next()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(0);
         }
     }
     (forked, completed, failed)
@@ -222,11 +250,10 @@ pub(crate) async fn handle_agent_kill(
     Path(id): Path<String>,
 ) -> Result<(), AppError> {
     tracing::info!(agent_id = %id, "Kill agent requested");
-    state.kernel.agents.kill(&id).await
-        .map_err(|e| {
-            tracing::warn!(error = %e, "Agent not found");
-            AppError::NotFound("agent not found".into())
-        })
+    state.kernel.agents.kill(&id).await.map_err(|e| {
+        tracing::warn!(error = %e, "Agent not found");
+        AppError::NotFound("agent not found".into())
+    })
 }
 
 // ---------------------------------------------------------------------------

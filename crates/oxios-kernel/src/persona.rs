@@ -45,12 +45,7 @@ impl Default for Persona {
 
 impl Persona {
     /// Creates a new persona with the given parameters.
-    pub fn new(
-        name: &str,
-        role: &str,
-        description: &str,
-        system_prompt: &str,
-    ) -> Self {
+    pub fn new(name: &str, role: &str, description: &str, system_prompt: &str) -> Self {
         Self {
             id: uuid::Uuid::new_v4().to_string(),
             name: name.to_string(),
@@ -96,7 +91,8 @@ pub fn default_personas() -> Vec<Persona> {
                 implementing working solutions quickly. You value clean code, \
                 but prioritize shipping over perfection. When asked to build something, \
                 you consider: what is the minimal viable approach? You suggest \
-                practical solutions using proven tools and patterns.".to_string(),
+                practical solutions using proven tools and patterns."
+                .to_string(),
             enabled: true,
             model: None,
             personality_traits: vec![
@@ -115,7 +111,8 @@ pub fn default_personas() -> Vec<Persona> {
                 edge cases, bugs, and design flaws. You question whether the \
                 approach scales and whether error conditions are handled. When \
                 reviewing code or specs, you identify potential problems before \
-                they become production issues.".to_string(),
+                they become production issues."
+                .to_string(),
             enabled: true,
             model: None,
             personality_traits: vec![
@@ -134,7 +131,8 @@ pub fn default_personas() -> Vec<Persona> {
                 You look for evidence, benchmarks, and best practices before \
                 recommending approaches. You ask clarifying questions and \
                 consider edge cases thoroughly. You prefer well-reasoned \
-                arguments backed by data.".to_string(),
+                arguments backed by data."
+                .to_string(),
             enabled: true,
             model: None,
             personality_traits: vec![

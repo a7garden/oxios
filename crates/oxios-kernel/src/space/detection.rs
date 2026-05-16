@@ -7,7 +7,7 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-use super::{Space, SpaceId, SpaceSource};
+use super::{Space, SpaceId};
 
 /// A topic classification result.
 #[derive(Debug, Clone)]
@@ -185,14 +185,68 @@ pub fn classify_topic_stub(message: &str) -> Topic {
 
     // Simple keyword-based classification
     let categories: [(&str, [&str; 8]); 8] = [
-        ("일상", ["저녁", "점심", "아침", "밥", "음식", "레시피", "요리", "장보기"]),
-        ("개발", ["code", "bug", "function", "import", "cargo", "rust", "git", "commit"]),
-        ("문서", ["readme", "docs", "documentation", "write", "문서", "글", "note", "read"]),
-        ("공부", ["study", "learn", "book", "course", "공부", "학습", "책", "class"]),
-        ("여행", ["travel", "trip", "flight", "hotel", "여행", "항공", "booking", "tour"]),
-        ("건강", ["health", "exercise", "gym", "workout", "건강", "운동", "diet", "run"]),
-        ("업무", ["meeting", "email", "project", "deadline", "업무", "회의", "client", "ppt"]),
-        ("기술", ["api", "server", "database", "cloud", "기술", "서버", "deploy", "k8s"]),
+        (
+            "일상",
+            [
+                "저녁",
+                "점심",
+                "아침",
+                "밥",
+                "음식",
+                "레시피",
+                "요리",
+                "장보기",
+            ],
+        ),
+        (
+            "개발",
+            [
+                "code", "bug", "function", "import", "cargo", "rust", "git", "commit",
+            ],
+        ),
+        (
+            "문서",
+            [
+                "readme",
+                "docs",
+                "documentation",
+                "write",
+                "문서",
+                "글",
+                "note",
+                "read",
+            ],
+        ),
+        (
+            "공부",
+            [
+                "study", "learn", "book", "course", "공부", "학습", "책", "class",
+            ],
+        ),
+        (
+            "여행",
+            [
+                "travel", "trip", "flight", "hotel", "여행", "항공", "booking", "tour",
+            ],
+        ),
+        (
+            "건강",
+            [
+                "health", "exercise", "gym", "workout", "건강", "운동", "diet", "run",
+            ],
+        ),
+        (
+            "업무",
+            [
+                "meeting", "email", "project", "deadline", "업무", "회의", "client", "ppt",
+            ],
+        ),
+        (
+            "기술",
+            [
+                "api", "server", "database", "cloud", "기술", "서버", "deploy", "k8s",
+            ],
+        ),
     ];
 
     for (topic, keywords) in categories {
@@ -219,13 +273,13 @@ pub fn classify_topic_stub(message: &str) -> Topic {
 /// - Canonicalizes `.` and `..`
 /// - Lowercases drive letters on Windows
 #[cfg(unix)]
-fn normalize_path(path: &PathBuf) -> PathBuf {
+fn normalize_path(path: &Path) -> PathBuf {
     let s = path.to_string_lossy();
 
     // Expand ~
-    let expanded = if s.starts_with("~/") {
+    let expanded = if let Some(rest) = s.strip_prefix("~/") {
         if let Ok(home) = std::env::var("HOME") {
-            format!("{}/{}", home, &s[2..])
+            format!("{}/{}", home, rest)
         } else {
             s.to_string()
         }
@@ -237,14 +291,14 @@ fn normalize_path(path: &PathBuf) -> PathBuf {
 }
 
 /// Check if two paths overlap (one is a prefix of the other).
-fn paths_overlap(a: &PathBuf, b: &PathBuf) -> bool {
+fn paths_overlap(a: &Path, b: &Path) -> bool {
     let a_str = a.to_string_lossy().to_lowercase();
     let b_str = b.to_string_lossy().to_lowercase();
     a_str.starts_with(&b_str) || b_str.starts_with(&a_str)
 }
 
 /// Extract a display name from a filesystem path.
-pub fn path_name(path: &PathBuf) -> String {
+pub fn path_name(path: &Path) -> String {
     path.file_name()
         .and_then(|n| n.to_str())
         .unwrap_or("unknown")
@@ -352,7 +406,10 @@ mod tests {
     #[test]
     fn test_path_name() {
         assert_eq!(path_name(&PathBuf::from("/projects/oxios")), "oxios");
-        assert_eq!(path_name(&PathBuf::from("/home/user/Documents")), "Documents");
+        assert_eq!(
+            path_name(&PathBuf::from("/home/user/Documents")),
+            "Documents"
+        );
         // skip dot case
     }
 }

@@ -19,8 +19,8 @@ use oxi_sdk::{AgentTool, AgentToolResult, ToolContext};
 use serde_json::{json, Value};
 use tokio::sync::oneshot;
 
-use crate::kernel_handle::KernelHandle;
 use crate::cron::CronScheduler;
+use crate::kernel_handle::KernelHandle;
 
 /// Agent tool for cron scheduling.
 ///
@@ -131,9 +131,12 @@ impl AgentTool for CronTool {
                     })
                     .collect();
 
-                Ok(AgentToolResult::success(serde_json::to_string_pretty(
-                    &json!({ "jobs": display, "count": display.len() }),
-                ).unwrap_or_default()))
+                Ok(AgentToolResult::success(
+                    serde_json::to_string_pretty(
+                        &json!({ "jobs": display, "count": display.len() }),
+                    )
+                    .unwrap_or_default(),
+                ))
             }
 
             "add" => {
@@ -153,13 +156,14 @@ impl AgentTool for CronTool {
                 );
 
                 match self.cron_scheduler.add_job(job).await {
-                    Ok(job_id) => Ok(AgentToolResult::success(serde_json::to_string(
-                        &json!({
+                    Ok(job_id) => Ok(AgentToolResult::success(
+                        serde_json::to_string(&json!({
                             "job_id": job_id.to_string(),
                             "schedule": expression,
                             "goal": task,
-                        }),
-                    ).unwrap_or_default())),
+                        }))
+                        .unwrap_or_default(),
+                    )),
                     Err(e) => Ok(AgentToolResult::error(format!(
                         "Failed to add cron job: {}",
                         e
@@ -241,9 +245,7 @@ mod tests {
             "required": ["action"]
         });
 
-        let actions = schema["properties"]["action"]["enum"]
-            .as_array()
-            .unwrap();
+        let actions = schema["properties"]["action"]["enum"].as_array().unwrap();
         assert_eq!(actions.len(), 4);
         assert!(actions.iter().any(|a| a == "list"));
         assert!(actions.iter().any(|a| a == "add"));

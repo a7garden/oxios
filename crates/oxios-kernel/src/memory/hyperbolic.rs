@@ -44,7 +44,10 @@ impl Default for HyperbolicConfig {
 impl HyperbolicConfig {
     /// Create a new config with validation.
     pub fn new(curvature: f32, dimensions: usize) -> Self {
-        assert!(curvature < 0.0, "Curvature must be negative for hyperbolic space");
+        assert!(
+            curvature < 0.0,
+            "Curvature must be negative for hyperbolic space"
+        );
         Self {
             curvature,
             dimensions,
@@ -94,7 +97,10 @@ pub fn euclidean_to_poincare(vector: &[f32], curvature: f32) -> Vec<f32> {
 
 /// Batch-convert Euclidean vectors to Poincaré ball points.
 pub fn batch_euclidean_to_poincare(vectors: &[Vec<f32>], curvature: f32) -> Vec<Vec<f32>> {
-    vectors.iter().map(|v| euclidean_to_poincare(v, curvature)).collect()
+    vectors
+        .iter()
+        .map(|v| euclidean_to_poincare(v, curvature))
+        .collect()
 }
 
 /// Compute the hyperbolic distance between two points on the Poincaré ball.
@@ -208,8 +214,10 @@ impl HyperbolicEmbedding {
 
     /// Create with default configuration.
     pub fn with_dimensions(dimensions: usize) -> Self {
-        let mut config = HyperbolicConfig::default();
-        config.dimensions = dimensions;
+        let config = HyperbolicConfig {
+            dimensions,
+            ..Default::default()
+        };
         Self::new(config)
     }
 
@@ -243,7 +251,11 @@ impl HyperbolicEmbedding {
             child_on_ball
         };
 
-        if let Some(pos) = self.embeddings.iter().position(|(name, _)| name == child_id) {
+        if let Some(pos) = self
+            .embeddings
+            .iter()
+            .position(|(name, _)| name == child_id)
+        {
             self.embeddings[pos] = (child_id.to_string(), child_point);
         } else {
             self.embeddings.push((child_id.to_string(), child_point));
@@ -252,7 +264,10 @@ impl HyperbolicEmbedding {
 
     /// Get the hyperbolic embedding for a given id.
     pub fn get(&self, id: &str) -> Option<&[f32]> {
-        self.embeddings.iter().find(|(name, _)| name == id).map(|(_, v)| v.as_slice())
+        self.embeddings
+            .iter()
+            .find(|(name, _)| name == id)
+            .map(|(_, v)| v.as_slice())
     }
 
     /// Find the k nearest neighbors in hyperbolic space.
@@ -327,7 +342,10 @@ impl HyperbolicEmbedding {
 
     /// Returns all embedding ids.
     pub fn ids(&self) -> Vec<&str> {
-        self.embeddings.iter().map(|(name, _)| name.as_str()).collect()
+        self.embeddings
+            .iter()
+            .map(|(name, _)| name.as_str())
+            .collect()
     }
 
     /// Get the hyperbolic distance of a point from the origin.
@@ -434,10 +452,7 @@ mod tests {
         let zero = vec![0.0, 0.0];
         let result = mobius_add(&a, &zero, -1.0);
         for (r, expected) in result.iter().zip(a.iter()) {
-            assert!(
-                (r - expected).abs() < 1e-4,
-                "a ⊕ 0 should equal a"
-            );
+            assert!((r - expected).abs() < 1e-4, "a ⊕ 0 should equal a");
         }
     }
 
@@ -455,10 +470,7 @@ mod tests {
         let v = euclidean_to_poincare(&[1.0, 2.0], -1.0);
         let result = mobius_scalar_mul(1.0, &v, -1.0, 1e-5);
         for (r, expected) in result.iter().zip(v.iter()) {
-            assert!(
-                (r - expected).abs() < 1e-4,
-                "1 ⊗ v should equal v"
-            );
+            assert!((r - expected).abs() < 1e-4, "1 ⊗ v should equal v");
         }
     }
 
@@ -477,8 +489,14 @@ mod tests {
         let nn = he.nearest_neighbors("child_a", 2);
         assert_eq!(nn.len(), 2);
         // grandchild should be closer to child_a than child_b
-        let gc_dist = nn.iter().find(|(name, _)| name == "grandchild").map(|(_, d)| *d);
-        let cb_dist = nn.iter().find(|(name, _)| name == "child_b").map(|(_, d)| *d);
+        let gc_dist = nn
+            .iter()
+            .find(|(name, _)| name == "grandchild")
+            .map(|(_, d)| *d);
+        let cb_dist = nn
+            .iter()
+            .find(|(name, _)| name == "child_b")
+            .map(|(_, d)| *d);
         if let (Some(gc), Some(cb)) = (gc_dist, cb_dist) {
             assert!(
                 gc < cb,
@@ -529,11 +547,7 @@ mod tests {
 
     #[test]
     fn test_batch_conversion() {
-        let vectors = vec![
-            vec![1.0, 2.0],
-            vec![3.0, 4.0],
-            vec![0.0, 0.0],
-        ];
+        let vectors = vec![vec![1.0, 2.0], vec![3.0, 4.0], vec![0.0, 0.0]];
         let results = batch_euclidean_to_poincare(&vectors, -1.0);
         assert_eq!(results.len(), 3);
         // Last should be zero

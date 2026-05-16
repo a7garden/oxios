@@ -25,21 +25,21 @@ pub struct PersonaSummary {
 }
 
 /// GET /api/personas — List all personas.
-pub async fn handle_personas_list(
-    state: State<Arc<AppState>>,
-) -> Json<Vec<PersonaSummary>> {
+pub async fn handle_personas_list(state: State<Arc<AppState>>) -> Json<Vec<PersonaSummary>> {
     let personas = state.kernel.persona.list();
-    Json(personas
-        .into_iter()
-        .map(|p| PersonaSummary {
-            id: p.id,
-            name: p.name,
-            role: p.role,
-            description: p.description,
-            enabled: p.enabled,
-            personality_traits: p.personality_traits,
-        })
-        .collect())
+    Json(
+        personas
+            .into_iter()
+            .map(|p| PersonaSummary {
+                id: p.id,
+                name: p.name,
+                role: p.role,
+                description: p.description,
+                enabled: p.enabled,
+                personality_traits: p.personality_traits,
+            })
+            .collect(),
+    )
 }
 
 /// GET /api/personas/:id — Get a specific persona.
@@ -126,7 +126,10 @@ pub async fn handle_persona_update(
     Json(body): Json<PersonaUpdateRequest>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
     use oxios_kernel::Persona;
-    let existing = state.kernel.persona.get(&id)
+    let existing = state
+        .kernel
+        .persona
+        .get(&id)
         .ok_or_else(|| (StatusCode::NOT_FOUND, format!("Persona '{}' not found", id)))?;
 
     let updated = Persona {
@@ -137,10 +140,15 @@ pub async fn handle_persona_update(
         system_prompt: body.system_prompt.unwrap_or(existing.system_prompt),
         enabled: body.enabled.unwrap_or(existing.enabled),
         model: body.model.or(existing.model),
-        personality_traits: body.personality_traits.unwrap_or(existing.personality_traits),
+        personality_traits: body
+            .personality_traits
+            .unwrap_or(existing.personality_traits),
     };
 
-    state.kernel.persona.update(&id, updated.clone())
+    state
+        .kernel
+        .persona
+        .update(&id, updated.clone())
         .map_err(|e: anyhow::Error| (StatusCode::BAD_REQUEST, e.to_string()))?;
     tracing::info!(persona_id = %id, "Persona updated via API");
     Ok(Json(serde_json::json!({
@@ -156,10 +164,16 @@ pub async fn handle_persona_delete(
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
     // Prevent deleting the last persona.
     if state.kernel.persona.count() <= 1 {
-        return Err((StatusCode::BAD_REQUEST, "Cannot delete the last persona".to_string()));
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "Cannot delete the last persona".to_string(),
+        ));
     }
 
-    state.kernel.persona.delete(&id)
+    state
+        .kernel
+        .persona
+        .delete(&id)
         .map_err(|e: anyhow::Error| (StatusCode::NOT_FOUND, e.to_string()))?;
 
     // If deleted persona was active, clear the active reference.
@@ -180,9 +194,7 @@ pub async fn handle_persona_delete(
 }
 
 /// GET /api/personas/active — Get the currently active persona.
-pub async fn handle_persona_active_get(
-    state: State<Arc<AppState>>,
-) -> Json<serde_json::Value> {
+pub async fn handle_persona_active_get(state: State<Arc<AppState>>) -> Json<serde_json::Value> {
     match state.kernel.persona.active() {
         Some(p) => Json(serde_json::json!({
             "id": p.id,
@@ -210,7 +222,10 @@ pub async fn handle_persona_active_set(
     state: State<Arc<AppState>>,
     Json(body): Json<PersonaActiveRequest>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
-    state.kernel.persona.set_active(&body.id)
+    state
+        .kernel
+        .persona
+        .set_active(&body.id)
         .map_err(|e: anyhow::Error| (StatusCode::BAD_REQUEST, e.to_string()))?;
 
     let persona = state.kernel.persona.active();

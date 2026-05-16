@@ -16,39 +16,67 @@ mod cron_jobs;
 mod events;
 mod git_routes;
 mod infra;
-mod resources;
 mod resource_routes;
+mod resources;
 mod system;
 mod workspace;
 
 use std::sync::Arc;
 
-use axum::{routing::{delete, get, post, put}, Router};
+use axum::{
+    routing::{delete, get, post, put},
+    Router,
+};
 use serde::Deserialize;
 
-use crate::middleware::{require_auth, rate_limit_layer};
-use crate::server::AppState;
+use crate::middleware::{rate_limit_layer, require_auth};
 use crate::persona_routes;
+use crate::server::AppState;
 
 // Re-export all handlers for use in build_routes
-pub(crate) use chat::{handle_chat, handle_chat_stream};
-pub(crate) use cron_jobs::{handle_cron_jobs_list, handle_cron_job_create, handle_cron_job_get, handle_cron_job_delete, update_cron_job, handle_cron_job_trigger};
-pub(crate) use events::{handle_events, handle_sessions_list, handle_session_get, handle_session_delete, handle_approvals_list, handle_approval_approve, handle_approval_reject};
-pub(crate) use infra::{handle_audit_log, handle_metrics, handle_permissions_get, handle_permissions_put, handle_scheduler_stats, handle_scheduler_tasks};
-pub(crate) use resources::{handle_programs_list, handle_program_get, handle_program_install, handle_program_uninstall, handle_program_enable, handle_program_disable, handle_program_host_requirements, handle_host_tools_check};
-pub(crate) use resource_routes::{handle_resource_snapshot, handle_resource_history, handle_resource_overload};
-pub(crate) use system::{handle_health, handle_status, handle_agents_list, handle_agent_kill, handle_config_get, handle_config_put};
-pub(crate) use agent_groups::{handle_agent_groups_list, handle_agent_group_get};
+pub(crate) use agent_groups::{handle_agent_group_get, handle_agent_groups_list};
 pub(crate) use audit_routes::{
-    handle_audit_entries,
+    handle_audit_by_agent, handle_audit_entries, handle_audit_export, handle_audit_flush,
     handle_audit_verify,
-    handle_audit_by_agent,
-    handle_audit_export,
-    handle_audit_flush,
 };
-pub(crate) use budget_routes::{handle_budget_get, handle_budget_set, handle_budget_remove, handle_budget_reserve, handle_budget_reset};
-pub(crate) use git_routes::{handle_git_log, handle_git_tags, handle_git_verify, handle_git_restore};
-pub(crate) use workspace::{handle_workspace_tree, handle_workspace_file_get, handle_workspace_file_put, handle_seeds_list, handle_seed_get, handle_seed_evolution, handle_skills_list, handle_skill_get, handle_skill_create, handle_skill_delete, handle_memory_list, handle_memory_get, handle_memory_create, handle_memory_search, handle_memory_semantic_search};
+pub(crate) use budget_routes::{
+    handle_budget_get, handle_budget_remove, handle_budget_reserve, handle_budget_reset,
+    handle_budget_set,
+};
+pub(crate) use chat::{handle_chat, handle_chat_stream};
+pub(crate) use cron_jobs::{
+    handle_cron_job_create, handle_cron_job_delete, handle_cron_job_get, handle_cron_job_trigger,
+    handle_cron_jobs_list, update_cron_job,
+};
+pub(crate) use events::{
+    handle_approval_approve, handle_approval_reject, handle_approvals_list, handle_events,
+    handle_session_delete, handle_session_get, handle_sessions_list,
+};
+pub(crate) use git_routes::{
+    handle_git_log, handle_git_restore, handle_git_tags, handle_git_verify,
+};
+pub(crate) use infra::{
+    handle_audit_log, handle_metrics, handle_permissions_get, handle_permissions_put,
+    handle_scheduler_stats, handle_scheduler_tasks,
+};
+pub(crate) use resource_routes::{
+    handle_resource_history, handle_resource_overload, handle_resource_snapshot,
+};
+pub(crate) use resources::{
+    handle_host_tools_check, handle_program_disable, handle_program_enable, handle_program_get,
+    handle_program_host_requirements, handle_program_install, handle_program_uninstall,
+    handle_programs_list,
+};
+pub(crate) use system::{
+    handle_agent_kill, handle_agents_list, handle_config_get, handle_config_put, handle_health,
+    handle_status,
+};
+pub(crate) use workspace::{
+    handle_memory_create, handle_memory_get, handle_memory_list, handle_memory_search,
+    handle_memory_semantic_search, handle_seed_evolution, handle_seed_get, handle_seeds_list,
+    handle_skill_create, handle_skill_delete, handle_skill_get, handle_skills_list,
+    handle_workspace_file_get, handle_workspace_file_put, handle_workspace_tree,
+};
 
 // ---------------------------------------------------------------------------
 // Shared pagination types
@@ -65,12 +93,19 @@ pub struct PageParams {
     pub limit: usize,
 }
 
-fn default_page() -> usize { 1 }
-fn default_limit() -> usize { 50 }
+fn default_page() -> usize {
+    1
+}
+fn default_limit() -> usize {
+    50
+}
 
 /// Apply pagination to a slice of items.
 /// Returns a JSON value with `{items, total, page, limit}`.
-pub fn paginate<T: Clone + serde::Serialize>(items: &[T], params: &PageParams) -> serde_json::Value {
+pub fn paginate<T: Clone + serde::Serialize>(
+    items: &[T],
+    params: &PageParams,
+) -> serde_json::Value {
     let total = items.len();
     let limit = params.limit.min(500);
     let offset = (params.page.saturating_sub(1)) * limit;
@@ -90,8 +125,14 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
     // Public routes (no auth)
     let public = Router::new()
         .route("/health", get(handle_health))
-        .route("/dioxus", get(|| async { axum::response::Redirect::permanent("/dioxus/") }))
-        .route("/", get(|| async { axum::response::Redirect::permanent("/dioxus/") }));
+        .route(
+            "/dioxus",
+            get(|| async { axum::response::Redirect::permanent("/dioxus/") }),
+        )
+        .route(
+            "/",
+            get(|| async { axum::response::Redirect::permanent("/dioxus/") }),
+        );
 
     // Protected API routes (auth middleware applied)
     let api = Router::new()
@@ -107,8 +148,14 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         .route("/api/config", put(handle_config_put))
         // Workspace
         .route("/api/workspace/tree", get(handle_workspace_tree))
-        .route("/api/workspace/file/{*path}", get(handle_workspace_file_get))
-        .route("/api/workspace/file/{*path}", put(handle_workspace_file_put))
+        .route(
+            "/api/workspace/file/{*path}",
+            get(handle_workspace_file_get),
+        )
+        .route(
+            "/api/workspace/file/{*path}",
+            put(handle_workspace_file_put),
+        )
         // Seeds
         .route("/api/seeds", get(handle_seeds_list))
         .route("/api/seeds/{id}", get(handle_seed_get))
@@ -146,7 +193,10 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         .route("/api/programs/{name}", delete(handle_program_uninstall))
         .route("/api/programs/{name}/enable", post(handle_program_enable))
         .route("/api/programs/{name}/disable", post(handle_program_disable))
-        .route("/api/programs/{name}/host-requirements", get(handle_program_host_requirements))
+        .route(
+            "/api/programs/{name}/host-requirements",
+            get(handle_program_host_requirements),
+        )
         // Host tools
         .route("/api/host-tools", get(handle_host_tools_check))
         // Resources
@@ -161,11 +211,26 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         // Personas (delegated to persona_routes)
         .route("/api/personas", get(persona_routes::handle_personas_list))
         .route("/api/personas", post(persona_routes::handle_persona_create))
-        .route("/api/personas/{id}", get(persona_routes::handle_persona_get))
-        .route("/api/personas/{id}", put(persona_routes::handle_persona_update))
-        .route("/api/personas/{id}", delete(persona_routes::handle_persona_delete))
-        .route("/api/personas/active", get(persona_routes::handle_persona_active_get))
-        .route("/api/personas/active", put(persona_routes::handle_persona_active_set))
+        .route(
+            "/api/personas/{id}",
+            get(persona_routes::handle_persona_get),
+        )
+        .route(
+            "/api/personas/{id}",
+            put(persona_routes::handle_persona_update),
+        )
+        .route(
+            "/api/personas/{id}",
+            delete(persona_routes::handle_persona_delete),
+        )
+        .route(
+            "/api/personas/active",
+            get(persona_routes::handle_persona_active_get),
+        )
+        .route(
+            "/api/personas/active",
+            put(persona_routes::handle_persona_active_set),
+        )
         // Sessions
         .route("/api/sessions", get(handle_sessions_list))
         .route("/api/sessions/{id}", get(handle_session_get))
@@ -190,10 +255,19 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         .route("/api/budget/{agent_id}", get(handle_budget_get))
         .route("/api/budget/{agent_id}", post(handle_budget_set))
         .route("/api/budget/{agent_id}", delete(handle_budget_remove))
-        .route("/api/budget/{agent_id}/reserve", post(handle_budget_reserve))
+        .route(
+            "/api/budget/{agent_id}/reserve",
+            post(handle_budget_reserve),
+        )
         .route("/api/budget/{agent_id}/reset", post(handle_budget_reset))
-        .layer(axum::middleware::from_fn_with_state(state.clone(), require_auth))
-        .layer(axum::middleware::from_fn_with_state(state.clone().rate_limiter.clone(), rate_limit_layer))
+        .layer(axum::middleware::from_fn_with_state(
+            state.clone(),
+            require_auth,
+        ))
+        .layer(axum::middleware::from_fn_with_state(
+            state.clone().rate_limiter.clone(),
+            rate_limit_layer,
+        ))
         .layer(axum::extract::DefaultBodyLimit::max(API_BODY_LIMIT))
         .with_state(state.clone());
 

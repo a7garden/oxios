@@ -12,7 +12,7 @@ use oxi_sdk::{AgentTool, AgentToolResult, ToolContext, ToolError};
 use serde_json::{json, Value};
 use uuid::Uuid;
 
-use crate::a2a::{A2AProtocol, A2AMessage, TaskPriority, TaskSpec};
+use crate::a2a::{A2AMessage, A2AProtocol, TaskPriority, TaskSpec};
 use crate::types::AgentId;
 // ─── A2aDelegateTool ───────────────────────────────────────────────────
 
@@ -100,20 +100,18 @@ impl AgentTool for A2aDelegateTool {
         _shutdown: Option<tokio::sync::oneshot::Receiver<()>>,
         _ctx: &ToolContext,
     ) -> Result<AgentToolResult, ToolError> {
-        let description = params["description"]
-            .as_str()
-            .unwrap_or("")
-            .to_string();
+        let description = params["description"].as_str().unwrap_or("").to_string();
         if description.is_empty() {
-            return Ok(AgentToolResult::error("Missing required parameter: description"));
+            return Ok(AgentToolResult::error(
+                "Missing required parameter: description",
+            ));
         }
 
-        let capability = params["capability"]
-            .as_str()
-            .unwrap_or("")
-            .to_string();
+        let capability = params["capability"].as_str().unwrap_or("").to_string();
         if capability.is_empty() {
-            return Ok(AgentToolResult::error("Missing required parameter: capability"));
+            return Ok(AgentToolResult::error(
+                "Missing required parameter: capability",
+            ));
         }
 
         let payload = params.get("payload").cloned().unwrap_or(json!({}));
@@ -124,7 +122,11 @@ impl AgentTool for A2aDelegateTool {
         // 1. Find agents with the required capability.
         let candidates = match self.a2a.query_capabilities(&capability).await {
             Ok(c) => c,
-            Err(e) => return Ok(AgentToolResult::error(&format!("Failed to query capabilities: {e}"))),
+            Err(e) => {
+                return Ok(AgentToolResult::error(format!(
+                    "Failed to query capabilities: {e}"
+                )))
+            }
         };
 
         if candidates.is_empty() {
@@ -148,34 +150,38 @@ impl AgentTool for A2aDelegateTool {
         );
 
         // 3. Create task spec and delegate via A2A.
-        let task = TaskSpec::new(&description, payload.clone())
-            .with_priority(priority);
+        let task = TaskSpec::new(&description, payload.clone()).with_priority(priority);
         let task_id = task.task_id;
 
         // 4. Execute via dispatch handler (blocking — waits for result).
         match self.a2a.execute_delegation(my_id, target_id, task).await {
-            Some(Ok(result)) => {
-                Ok(AgentToolResult::success(serde_json::to_string(&json!({
+            Some(Ok(result)) => Ok(AgentToolResult::success(
+                serde_json::to_string(&json!({
                     "task_id": task_id.to_string(),
                     "delegated_to": target.name,
                     "delegated_to_id": target_id.to_string(),
                     "status": "completed",
                     "result": result,
-                })).unwrap_or_default()))
-            }
-            Some(Err(e)) => Ok(AgentToolResult::error(&format!(
+                }))
+                .unwrap_or_default(),
+            )),
+            Some(Err(e)) => Ok(AgentToolResult::error(format!(
                 "A2A delegation failed: {}",
                 e
             ))),
             None => {
                 // No handler registered — fall back to fire-and-forget.
                 tracing::warn!("No A2A dispatch handler registered, using fire-and-forget");
-                match self.a2a.delegate_task(my_id, target_id, TaskSpec::new(&description, payload)).await {
+                match self
+                    .a2a
+                    .delegate_task(my_id, target_id, TaskSpec::new(&description, payload))
+                    .await
+                {
                     Ok(_) => Ok(AgentToolResult::success(format!(
                         "Task delegated to '{}' (no handler — fire-and-forget). Task ID: {}",
                         target.name, task_id
                     ))),
-                    Err(e) => Ok(AgentToolResult::error(&format!("Delegation failed: {e}"))),
+                    Err(e) => Ok(AgentToolResult::error(format!("Delegation failed: {e}"))),
                 }
             }
         }
@@ -272,21 +278,18 @@ impl AgentTool for A2aSendTool {
         _shutdown: Option<tokio::sync::oneshot::Receiver<()>>,
         _ctx: &ToolContext,
     ) -> Result<AgentToolResult, ToolError> {
-        let target_str = params["target_agent_id"]
-            .as_str()
-            .unwrap_or("");
+        let target_str = params["target_agent_id"].as_str().unwrap_or("");
         let target_id: AgentId = match Uuid::parse_str(target_str) {
             Ok(id) => id,
-            Err(e) => return Ok(AgentToolResult::error(&format!("Invalid target_agent_id: {e}"))),
+            Err(e) => {
+                return Ok(AgentToolResult::error(format!(
+                    "Invalid target_agent_id: {e}"
+                )))
+            }
         };
 
-        let message_type = params["message_type"]
-            .as_str()
-            .unwrap_or("status_update");
-        let content = params["content"]
-            .as_str()
-            .unwrap_or("")
-            .to_string();
+        let message_type = params["message_type"].as_str().unwrap_or("status_update");
+        let content = params["content"].as_str().unwrap_or("").to_string();
         let payload = params.get("payload").cloned().unwrap_or(json!({}));
         let progress = params["progress"].as_u64().unwrap_or(0) as u8;
         let task_id: Uuid = params["task_id"]
@@ -297,20 +300,16 @@ impl AgentTool for A2aSendTool {
         let my_id = self.my_agent_id;
 
         let message = match message_type {
-            "status_update" => {
-                A2AMessage::StatusUpdate {
-                    task_id,
-                    progress,
-                    message: content,
-                }
-            }
-            "result_sharing" => {
-                A2AMessage::ResultSharing {
-                    task_id,
-                    result: payload,
-                    summary: content,
-                }
-            }
+            "status_update" => A2AMessage::StatusUpdate {
+                task_id,
+                progress,
+                message: content,
+            },
+            "result_sharing" => A2AMessage::ResultSharing {
+                task_id,
+                result: payload,
+                summary: content,
+            },
             "handshake" => {
                 let card = self.a2a.registry().get_agent(my_id).await;
                 let (name, capabilities) = card
@@ -322,15 +321,22 @@ impl AgentTool for A2aSendTool {
                     capabilities,
                 }
             }
-            _ => return Ok(AgentToolResult::error(&format!("Unknown message_type: {message_type}"))),
+            _ => {
+                return Ok(AgentToolResult::error(format!(
+                    "Unknown message_type: {message_type}"
+                )))
+            }
         };
 
         match self.a2a.send_message(my_id, target_id, message).await {
-            Ok(request_id) => Ok(AgentToolResult::success(serde_json::to_string(&json!({
-                "request_id": request_id.to_string(),
-                "sent_to": target_str,
-            })).unwrap_or_default())),
-            Err(e) => Ok(AgentToolResult::error(&format!("Failed to send: {e}"))),
+            Ok(request_id) => Ok(AgentToolResult::success(
+                serde_json::to_string(&json!({
+                    "request_id": request_id.to_string(),
+                    "sent_to": target_str,
+                }))
+                .unwrap_or_default(),
+            )),
+            Err(e) => Ok(AgentToolResult::error(format!("Failed to send: {e}"))),
         }
     }
 }
@@ -413,12 +419,12 @@ impl AgentTool for A2aQueryTool {
         let agents = if let Some(cap) = capability {
             match self.a2a.query_capabilities(cap).await {
                 Ok(a) => a,
-                Err(e) => return Ok(AgentToolResult::error(&format!("Query failed: {e}"))),
+                Err(e) => return Ok(AgentToolResult::error(format!("Query failed: {e}"))),
             }
         } else if let Some(sk) = skill {
             match self.a2a.registry().find_agents_by_skill(sk).await {
                 Ok(a) => a,
-                Err(e) => return Ok(AgentToolResult::error(&format!("Query failed: {e}"))),
+                Err(e) => return Ok(AgentToolResult::error(format!("Query failed: {e}"))),
             }
         } else {
             // No filter — return all agents.
@@ -440,10 +446,13 @@ impl AgentTool for A2aQueryTool {
             })
             .collect();
 
-        Ok(AgentToolResult::success(serde_json::to_string(&json!({
-            "agents": cards,
-            "count": cards.len(),
-        })).unwrap_or_default()))
+        Ok(AgentToolResult::success(
+            serde_json::to_string(&json!({
+                "agents": cards,
+                "count": cards.len(),
+            }))
+            .unwrap_or_default(),
+        ))
     }
 }
 
@@ -555,8 +564,7 @@ mod tests {
         let target_id = Uuid::new_v4();
 
         // Register self so handshake can look up name.
-        let card = crate::a2a::AgentCard::new(my_id, "me", "Test agent")
-            .with_capability("test");
+        let card = crate::a2a::AgentCard::new(my_id, "me", "Test agent").with_capability("test");
         a2a.registry().register_agent(card).await.unwrap();
 
         let tool = A2aSendTool::new(a2a.clone(), my_id);
@@ -573,8 +581,14 @@ mod tests {
     fn test_parse_priority() {
         assert!(matches!(parse_priority(Some("low")), TaskPriority::Low));
         assert!(matches!(parse_priority(Some("high")), TaskPriority::High));
-        assert!(matches!(parse_priority(Some("critical")), TaskPriority::Critical));
+        assert!(matches!(
+            parse_priority(Some("critical")),
+            TaskPriority::Critical
+        ));
         assert!(matches!(parse_priority(None), TaskPriority::Normal));
-        assert!(matches!(parse_priority(Some("unknown")), TaskPriority::Normal));
+        assert!(matches!(
+            parse_priority(Some("unknown")),
+            TaskPriority::Normal
+        ));
     }
 }

@@ -12,18 +12,18 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 
-use oxios_kernel::a2a::A2AProtocol;
 use oxios_gateway::channel::Channel;
 use oxios_gateway::gateway::Gateway;
 use oxios_gateway::message::{IncomingMessage, OutgoingMessage};
+use oxios_kernel::a2a::A2AProtocol;
+use oxios_kernel::access_manager::{AccessManager, AgentPermissions};
+use oxios_kernel::agent_lifecycle::AgentLifecycleManager;
 use oxios_kernel::event_bus::{EventBus, KernelEvent};
 use oxios_kernel::orchestrator::Orchestrator;
+use oxios_kernel::scheduler::AgentScheduler;
 use oxios_kernel::state_store::StateStore;
 use oxios_kernel::supervisor::Supervisor;
 use oxios_kernel::types::{AgentId, AgentInfo, AgentStatus};
-use oxios_kernel::access_manager::{AccessManager, AgentPermissions};
-use oxios_kernel::agent_lifecycle::AgentLifecycleManager;
-use oxios_kernel::scheduler::AgentScheduler;
 use oxios_ouroboros::evaluation::EvaluationResult;
 use oxios_ouroboros::interview::InterviewResult;
 use oxios_ouroboros::protocol::{ExecutionResult, OuroborosProtocol, Phase};
@@ -140,6 +140,7 @@ impl OuroborosProtocol for MockOuroboros {
             cspace_hint: None,
         }))
     }
+}
 
 // ---------------------------------------------------------------------------
 // Mock Supervisor
@@ -180,9 +181,10 @@ impl Supervisor for MockSupervisor {
             let mut agents = self.agents.write();
             agents.insert(id, info);
         }
-        let _ = self
-            .event_bus
-            .publish(KernelEvent::AgentCreated { id, name: spec.goal.clone() });
+        let _ = self.event_bus.publish(KernelEvent::AgentCreated {
+            id,
+            name: spec.goal.clone(),
+        });
         Ok(id)
     }
 
@@ -195,11 +197,7 @@ impl Supervisor for MockSupervisor {
         Ok(())
     }
 
-    async fn run_with_seed(
-        &self,
-        id: AgentId,
-        _seed: &Seed,
-    ) -> anyhow::Result<ExecutionResult> {
+    async fn run_with_seed(&self, id: AgentId, _seed: &Seed) -> anyhow::Result<ExecutionResult> {
         self.run_called.fetch_add(1, Ordering::SeqCst);
         {
             let mut agents = self.agents.write();
@@ -442,12 +440,8 @@ async fn test_orchestrator_happy_path() {
         event_bus.clone(),
         300,
     );
-    let orchestrator = Orchestrator::new(
-        ouroboros.clone(),
-        event_bus.clone(),
-        state_store,
-        lifecycle,
-    );
+    let orchestrator =
+        Orchestrator::new(ouroboros.clone(), event_bus.clone(), state_store, lifecycle);
 
     let result = orchestrator
         .handle_message("test-user", "Do something useful", None)
@@ -491,12 +485,8 @@ async fn test_orchestrator_evolution_loop() {
         event_bus.clone(),
         300,
     );
-    let orchestrator = Orchestrator::new(
-        ouroboros.clone(),
-        event_bus.clone(),
-        state_store,
-        lifecycle,
-    );
+    let orchestrator =
+        Orchestrator::new(ouroboros.clone(), event_bus.clone(), state_store, lifecycle);
 
     let result = orchestrator
         .handle_message("test-user", "Do something tricky", None)
@@ -531,12 +521,7 @@ async fn test_orchestrator_events_published() {
         event_bus.clone(),
         300,
     );
-    let orchestrator = Orchestrator::new(
-        ouroboros,
-        event_bus.clone(),
-        state_store,
-        lifecycle,
-    );
+    let orchestrator = Orchestrator::new(ouroboros, event_bus.clone(), state_store, lifecycle);
 
     // Run orchestration in background.
     let handle = tokio::spawn(async move {
@@ -606,14 +591,9 @@ async fn test_gateway_routes_message_through_orchestrator() {
             access_manager.clone(),
             a2a.clone(),
             event_bus.clone(),
-        300,
+            300,
         );
-        Orchestrator::new(
-            ouroboros,
-            event_bus.clone(),
-            state_store,
-            lifecycle,
-        )
+        Orchestrator::new(ouroboros, event_bus.clone(), state_store, lifecycle)
     });
 
     let gateway = Gateway::new(orchestrator);
@@ -652,14 +632,9 @@ async fn test_gateway_unknown_channel() {
             access_manager.clone(),
             a2a.clone(),
             event_bus.clone(),
-        300,
+            300,
         );
-        Orchestrator::new(
-            ouroboros,
-            event_bus.clone(),
-            state_store,
-            lifecycle,
-        )
+        Orchestrator::new(ouroboros, event_bus.clone(), state_store, lifecycle)
     });
 
     let gateway = Gateway::new(orchestrator);
@@ -714,7 +689,10 @@ impl Supervisor for SchedulerAwareSupervisor {
             let mut agents = self.agents.write();
             agents.insert(id, info);
         }
-        let _ = self.event_bus.publish(KernelEvent::AgentCreated { id, name: spec.goal.clone() });
+        let _ = self.event_bus.publish(KernelEvent::AgentCreated {
+            id,
+            name: spec.goal.clone(),
+        });
         Ok(id)
     }
 
@@ -728,7 +706,8 @@ impl Supervisor for SchedulerAwareSupervisor {
 
     async fn run_with_seed(&self, id: AgentId, _seed: &Seed) -> anyhow::Result<ExecutionResult> {
         // Submit to the scheduler before running.
-        let task = ScheduledTask::for_agent(id, format!("Agent {} execution", id), Priority::Normal);
+        let task =
+            ScheduledTask::for_agent(id, format!("Agent {} execution", id), Priority::Normal);
         self.scheduler.submit(task)?;
 
         self.tasks_claimed.fetch_add(1, Ordering::SeqCst);
@@ -741,7 +720,11 @@ impl Supervisor for SchedulerAwareSupervisor {
         }
         let _ = self.event_bus.publish(KernelEvent::AgentStarted { id });
         let _ = self.event_bus.publish(KernelEvent::AgentStopped { id });
-        Ok(ExecutionResult { output: "Task completed".into(), steps_completed: 1, success: true })
+        Ok(ExecutionResult {
+            output: "Task completed".into(),
+            steps_completed: 1,
+            success: true,
+        })
     }
 
     async fn wait(&self, id: AgentId) -> anyhow::Result<AgentStatus> {
@@ -776,7 +759,10 @@ async fn test_scheduler_orchestrator_integration() {
     let a2a = Arc::new(A2AProtocol::new(event_bus.clone()));
     let scheduler = Arc::new(AgentScheduler::new(3, 100, 60));
     let ouroboros = Arc::new(MockOuroboros::new());
-    let supervisor = Arc::new(SchedulerAwareSupervisor::new(scheduler.clone(), event_bus.clone()));
+    let supervisor = Arc::new(SchedulerAwareSupervisor::new(
+        scheduler.clone(),
+        event_bus.clone(),
+    ));
     let access_manager = Arc::new(parking_lot::Mutex::new(AccessManager::new()));
     let lifecycle = AgentLifecycleManager::new(
         supervisor,
@@ -786,12 +772,7 @@ async fn test_scheduler_orchestrator_integration() {
         event_bus.clone(),
         300,
     );
-    let orchestrator = Orchestrator::new(
-        ouroboros,
-        event_bus.clone(),
-        state_store,
-        lifecycle,
-    );
+    let orchestrator = Orchestrator::new(ouroboros, event_bus.clone(), state_store, lifecycle);
 
     // Run a single orchestration.
     let result = orchestrator
@@ -807,7 +788,10 @@ async fn test_scheduler_orchestrator_integration() {
     // They may still be queued if next_task was never called, or running if called.
     let stats = scheduler.stats();
     // Tasks were submitted, so at least some may exist in queue or running.
-    assert!(stats.queued + stats.running >= 1, "Expected at least one task");
+    assert!(
+        stats.queued + stats.running >= 1,
+        "Expected at least one task"
+    );
 }
 
 #[tokio::test]
@@ -820,10 +804,30 @@ async fn test_scheduler_priority_ordering_in_orchestration() {
     let scheduler = Arc::new(AgentScheduler::new(10, 10_000, 60));
 
     // Submit tasks of varying priorities.
-    scheduler.submit(ScheduledTask::new("Low priority task".into(), Priority::Low)).unwrap();
-    scheduler.submit(ScheduledTask::new("High priority task".into(), Priority::High)).unwrap();
-    scheduler.submit(ScheduledTask::new("Normal priority task".into(), Priority::Normal)).unwrap();
-    scheduler.submit(ScheduledTask::new("Critical task".into(), Priority::Critical)).unwrap();
+    scheduler
+        .submit(ScheduledTask::new(
+            "Low priority task".into(),
+            Priority::Low,
+        ))
+        .unwrap();
+    scheduler
+        .submit(ScheduledTask::new(
+            "High priority task".into(),
+            Priority::High,
+        ))
+        .unwrap();
+    scheduler
+        .submit(ScheduledTask::new(
+            "Normal priority task".into(),
+            Priority::Normal,
+        ))
+        .unwrap();
+    scheduler
+        .submit(ScheduledTask::new(
+            "Critical task".into(),
+            Priority::Critical,
+        ))
+        .unwrap();
 
     // Drain in priority order.
     let task1 = scheduler.next_task().unwrap();
@@ -840,7 +844,10 @@ async fn test_scheduler_priority_ordering_in_orchestration() {
 
     // Verify the scheduler and orchestrator can coexist.
     let ouroboros = Arc::new(MockOuroboros::new());
-    let supervisor = Arc::new(SchedulerAwareSupervisor::new(scheduler.clone(), event_bus.clone()));
+    let supervisor = Arc::new(SchedulerAwareSupervisor::new(
+        scheduler.clone(),
+        event_bus.clone(),
+    ));
     let access_manager = Arc::new(parking_lot::Mutex::new(AccessManager::new()));
 
     let lifecycle = AgentLifecycleManager::new(
@@ -851,12 +858,7 @@ async fn test_scheduler_priority_ordering_in_orchestration() {
         event_bus.clone(),
         300,
     );
-    let _orchestrator = Orchestrator::new(
-        ouroboros,
-        event_bus,
-        state_store,
-        lifecycle,
-    );
+    let _orchestrator = Orchestrator::new(ouroboros, event_bus, state_store, lifecycle);
     // Orchestrator is created successfully — shared state is fine.
 }
 
@@ -864,8 +866,8 @@ async fn test_scheduler_priority_ordering_in_orchestration() {
 // Program Install + Execution Flow
 // ===========================================================================
 
-use std::fs;
 use oxios_kernel::program::ProgramManager;
+use std::fs;
 
 #[tokio::test]
 async fn test_program_install_then_orchestrate() {
@@ -879,7 +881,9 @@ async fn test_program_install_then_orchestrate() {
     // Create and install a program.
     let source = temp_dir.path().join("hello-program");
     fs::create_dir_all(&source).unwrap();
-    fs::write(source.join("program.toml"), r#"
+    fs::write(
+        source.join("program.toml"),
+        r#"
 [program]
 name = "hello"
 version = "1.0.0"
@@ -892,8 +896,14 @@ arguments = [{ name = "name", description = "Your name", required = true }]
 
 [host_requirements]
 required = ["echo"]
-"#).unwrap();
-    fs::write(source.join("SKILL.md"), "# Hello Program\n\nUse say_hello to greet users.").unwrap();
+"#,
+    )
+    .unwrap();
+    fs::write(
+        source.join("SKILL.md"),
+        "# Hello Program\n\nUse say_hello to greet users.",
+    )
+    .unwrap();
 
     let installed = manager.install(&source).await.unwrap();
     assert_eq!(installed.meta.name, "hello");
@@ -927,12 +937,7 @@ required = ["echo"]
         event_bus.clone(),
         300,
     );
-    let orchestrator = Orchestrator::new(
-        ouroboros,
-        event_bus.clone(),
-        state_store,
-        lifecycle,
-    );
+    let orchestrator = Orchestrator::new(ouroboros, event_bus.clone(), state_store, lifecycle);
 
     // Orchestrate a message — the installed program should be discoverable
     // via the program manager if the orchestrator needs to reference it.
@@ -942,7 +947,10 @@ required = ["echo"]
         .unwrap();
 
     // phase_reached is always Evaluate or later after a successful run
-assert!(matches!(result.phase_reached, Phase::Evaluate | Phase::Evolve | Phase::Execute | Phase::Seed));
+    assert!(matches!(
+        result.phase_reached,
+        Phase::Evaluate | Phase::Evolve | Phase::Execute | Phase::Seed
+    ));
 
     // Uninstall and verify removal.
     manager.uninstall("hello").await.unwrap();
@@ -962,13 +970,16 @@ async fn test_program_manager_all_tool_schemas() {
     ] {
         let src = temp_dir.path().join(prog_name);
         fs::create_dir_all(&src).unwrap();
-        let mut toml = format!(r#"
+        let mut toml = format!(
+            r#"
 [program]
 name = "{}"
 version = "1.0.0"
 description = "X"
 author = "X"
-"#, prog_name);
+"#,
+            prog_name
+        );
 
         for tool in &tool_names {
             toml.push_str(&format!("\n[tools.{}]\ndescription = \"A {}\"", tool, tool));
@@ -980,8 +991,14 @@ author = "X"
     let manager = ProgramManager::new(programs_dir);
     manager.init().await.unwrap();
 
-    manager.install(&temp_dir.path().join("adder")).await.unwrap();
-    manager.install(&temp_dir.path().join("mover")).await.unwrap();
+    manager
+        .install(&temp_dir.path().join("adder"))
+        .await
+        .unwrap();
+    manager
+        .install(&temp_dir.path().join("mover"))
+        .await
+        .unwrap();
 
     let schemas = manager.all_tool_schemas().await;
     assert_eq!(schemas.len(), 4);
@@ -1012,11 +1029,11 @@ async fn test_access_manager_blocks_dangerous_tools() {
     access.set_permissions(perms);
 
     // Verify dangerous tools are blocked.
-    assert!(!access.can_use_tool("safe-agent", "bash"));   // bash not allowed.
-    assert!(!access.can_use_tool("safe-agent", "rm"));     // rm not allowed.
-    assert!(!access.can_use_tool("safe-agent", "sudo"));   // sudo not allowed.
-    assert!(access.can_use_tool("safe-agent", "read"));    // read is allowed.
-    assert!(access.can_use_tool("safe-agent", "grep"));    // grep is allowed.
+    assert!(!access.can_use_tool("safe-agent", "bash")); // bash not allowed.
+    assert!(!access.can_use_tool("safe-agent", "rm")); // rm not allowed.
+    assert!(!access.can_use_tool("safe-agent", "sudo")); // sudo not allowed.
+    assert!(access.can_use_tool("safe-agent", "read")); // read is allowed.
+    assert!(access.can_use_tool("safe-agent", "grep")); // grep is allowed.
 
     // Unknown agent gets no tools.
     assert!(!access.can_use_tool("unknown-agent", "read"));
@@ -1059,7 +1076,7 @@ async fn test_access_manager_audit_log_on_denied_access() {
     access.set_permissions(perms);
 
     // Attempt denied operations.
-    access.can_use_tool("audited-agent", "network");   // not in allowed set.
+    access.can_use_tool("audited-agent", "network"); // not in allowed set.
     access.can_access_path("audited-agent", "/etc/shadow"); // path not allowed.
 
     let log = access.audit_log();
@@ -1121,7 +1138,9 @@ async fn test_access_manager_permission_lifecycle() {
     access.set_permissions(AgentPermissions::for_new_agent("lifecycle-agent"));
 
     // Check agent is listed.
-    assert!(access.list_agents().contains(&"lifecycle-agent".to_string()));
+    assert!(access
+        .list_agents()
+        .contains(&"lifecycle-agent".to_string()));
 
     // Grant a tool.
     let perms = access.get_or_create_permissions("lifecycle-agent");
@@ -1134,7 +1153,9 @@ async fn test_access_manager_permission_lifecycle() {
     access.remove_permissions("lifecycle-agent");
 
     // Agent no longer listed.
-    assert!(!access.list_agents().contains(&"lifecycle-agent".to_string()));
+    assert!(!access
+        .list_agents()
+        .contains(&"lifecycle-agent".to_string()));
 
     // All access denied for removed agent.
     assert!(!access.can_use_tool("lifecycle-agent", "custom-tool"));

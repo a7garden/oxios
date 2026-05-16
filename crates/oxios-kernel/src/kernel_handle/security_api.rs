@@ -1,10 +1,12 @@
 //! Security API — authentication, audit trail, RBAC, approvals.
 
-use std::sync::Arc;
+use crate::access_manager::{
+    AccessManager, AgentPermissions, ApprovalStatus, PendingApproval, PermissionUpdate,
+};
+use crate::audit_trail::{AuditAction, AuditEntry, AuditTrail};
 use crate::auth::AuthManager;
-use crate::audit_trail::{AuditTrail, AuditAction, AuditEntry};
-use crate::access_manager::{AccessManager, AgentPermissions, PermissionUpdate, PendingApproval, ApprovalStatus};
 use crate::state_store::StateStore;
+use std::sync::Arc;
 
 /// Security system calls.
 pub struct SecurityApi {
@@ -22,16 +24,23 @@ impl SecurityApi {
         access_manager: Arc<parking_lot::Mutex<AccessManager>>,
         state_store: Arc<StateStore>,
     ) -> Self {
-        Self { auth_manager, audit_trail, access_manager, state_store }
+        Self {
+            auth_manager,
+            audit_trail,
+            access_manager,
+            state_store,
+        }
     }
     /// Audit an action.
     pub fn audit(&self, actor: &str, action: AuditAction, resource: &str) -> String {
-        self.audit_trail.append(actor.to_string(), action, resource.to_string())
+        self.audit_trail
+            .append(actor.to_string(), action, resource.to_string())
     }
 
     /// Verify audit chain integrity.
     pub fn verify_chain(&self) -> anyhow::Result<bool> {
-        self.audit_trail.verify()
+        self.audit_trail
+            .verify()
             .map_err(|e| anyhow::anyhow!("audit verify failed: {:?}", e))
     }
 
@@ -81,7 +90,10 @@ impl SecurityApi {
 
     /// Ensure permissions exist for an agent (get or create).
     pub fn ensure_permissions(&self, agent: &str) -> AgentPermissions {
-        self.access_manager.lock().get_or_create_permissions(agent).clone()
+        self.access_manager
+            .lock()
+            .get_or_create_permissions(agent)
+            .clone()
     }
 
     /// Update permissions for an agent.
@@ -97,7 +109,11 @@ impl SecurityApi {
 
     /// List all pending approvals.
     pub fn list_approvals(&self) -> Vec<(PendingApproval, ApprovalStatus)> {
-        self.access_manager.lock().rbac_manager().all_approvals().to_vec()
+        self.access_manager
+            .lock()
+            .rbac_manager()
+            .all_approvals()
+            .to_vec()
     }
 
     /// Approve a pending request.

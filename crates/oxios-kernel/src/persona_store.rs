@@ -39,11 +39,7 @@ impl PersonaStore {
     /// Returns all enabled personas.
     pub fn list_enabled(&self) -> Vec<Persona> {
         let personas = self.personas.read();
-        personas
-            .values()
-            .filter(|p| p.enabled)
-            .cloned()
-            .collect()
+        personas.values().filter(|p| p.enabled).cloned().collect()
     }
 
     /// Returns all personas (enabled and disabled).

@@ -6,10 +6,10 @@ use axum::Json;
 use serde::{Deserialize, Serialize};
 
 use oxios_kernel::access_manager::AuditEntry;
-use oxios_kernel::ArgumentDef;
 use oxios_kernel::metrics::registry;
+use oxios_kernel::ArgumentDef;
 
-use crate::routes::{PageParams, paginate};
+use crate::routes::{paginate, PageParams};
 use crate::server::AppState;
 
 // ---------------------------------------------------------------------------
@@ -139,8 +139,12 @@ pub struct AuditLogParams {
     pub limit: usize,
 }
 
-fn default_page() -> usize { 1 }
-fn default_limit() -> usize { 50 }
+fn default_page() -> usize {
+    1
+}
+fn default_limit() -> usize {
+    50
+}
 
 /// GET /api/audit — Get security audit log (paginated).
 pub(crate) async fn handle_audit_log(
@@ -151,7 +155,13 @@ pub(crate) async fn handle_audit_log(
     let total = entries.len();
     let limit = params.limit.min(500);
     let offset = (params.page.saturating_sub(1)) * limit;
-    let page_entries: Vec<_> = entries.iter().rev().skip(offset).take(limit).map(AuditEntryResponse::from).collect();
+    let page_entries: Vec<_> = entries
+        .iter()
+        .rev()
+        .skip(offset)
+        .take(limit)
+        .map(AuditEntryResponse::from)
+        .collect();
     Ok(Json(serde_json::json!({
         "items": page_entries,
         "total": total,
@@ -176,15 +186,39 @@ impl PermissionsUpdate {
     /// Parse from JSON value.
     pub fn from_json(value: serde_json::Value) -> Self {
         Self {
-            allowed_tools: value.get("allowed_tools").and_then(|v| v.as_array())
-                .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect()),
-            allowed_paths: value.get("allowed_paths").and_then(|v| v.as_array())
-                .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect()),
-            denied_paths: value.get("denied_paths").and_then(|v| v.as_array())
-                .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect()),
+            allowed_tools: value
+                .get("allowed_tools")
+                .and_then(|v| v.as_array())
+                .map(|arr| {
+                    arr.iter()
+                        .filter_map(|v| v.as_str().map(String::from))
+                        .collect()
+                }),
+            allowed_paths: value
+                .get("allowed_paths")
+                .and_then(|v| v.as_array())
+                .map(|arr| {
+                    arr.iter()
+                        .filter_map(|v| v.as_str().map(String::from))
+                        .collect()
+                }),
+            denied_paths: value
+                .get("denied_paths")
+                .and_then(|v| v.as_array())
+                .map(|arr| {
+                    arr.iter()
+                        .filter_map(|v| v.as_str().map(String::from))
+                        .collect()
+                }),
             network_access: value.get("network_access").and_then(|v| v.as_bool()),
-            max_execution_time_secs: value.get("max_execution_time_secs").and_then(|v| v.as_u64()).map(|v| v as u64),
-            max_memory_mb: value.get("max_memory_mb").and_then(|v| v.as_u64()).map(|v| v as u64),
+            max_execution_time_secs: value
+                .get("max_execution_time_secs")
+                .and_then(|v| v.as_u64())
+                .map(|v| v as u64),
+            max_memory_mb: value
+                .get("max_memory_mb")
+                .and_then(|v| v.as_u64())
+                .map(|v| v as u64),
             can_fork: value.get("can_fork").and_then(|v| v.as_bool()),
         }
     }
@@ -192,7 +226,9 @@ impl PermissionsUpdate {
     /// Convert to kernel PermissionUpdate.
     pub fn into_kernel(self) -> oxios_kernel::access_manager::PermissionUpdate {
         oxios_kernel::access_manager::PermissionUpdate {
-            allowed_tools: self.allowed_tools.map(|t| t.into_iter().collect::<std::collections::HashSet<String>>()),
+            allowed_tools: self
+                .allowed_tools
+                .map(|t| t.into_iter().collect::<std::collections::HashSet<String>>()),
             allowed_paths: self.allowed_paths,
             denied_paths: self.denied_paths,
             network_access: self.network_access,
@@ -230,7 +266,10 @@ pub(crate) async fn handle_permissions_put(
     Json(body): Json<serde_json::Value>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
     let update = PermissionsUpdate::from_json(body).into_kernel();
-    state.kernel.security.update_permissions(&agent, update)
+    state
+        .kernel
+        .security
+        .update_permissions(&agent, update)
         .map_err(|e: anyhow::Error| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     tracing::info!(agent = %agent, "Permissions updated");
@@ -263,7 +302,10 @@ pub(crate) async fn handle_mcp_servers_list(
     let servers = state.kernel.mcp.list_servers();
     let mut results = Vec::new();
     for name in servers {
-        let (command, args, enabled) = state.kernel.mcp.get_server(&name)
+        let (command, args, enabled) = state
+            .kernel
+            .mcp
+            .get_server(&name)
             .map(|s| (s.command.clone(), s.args.clone(), s.enabled))
             .unwrap_or_else(|| ("unknown".to_string(), Vec::new(), false));
         let initialized = state.kernel.mcp.client_status(&name).await.unwrap_or(false);
@@ -300,11 +342,10 @@ pub(crate) async fn handle_mcp_server_register(
     server.args = body.args;
     server.enabled = true;
     state.kernel.mcp.register_server(server);
-    state.kernel.mcp.init_server(&name).await
-        .map_err(|e| {
-            tracing::error!(server = %name, error = %e, "Failed to start MCP server");
-            (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
-        })?;
+    state.kernel.mcp.init_server(&name).await.map_err(|e| {
+        tracing::error!(server = %name, error = %e, "Failed to start MCP server");
+        (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+    })?;
     tracing::info!(server = %name, command = %command, "MCP server registered and started");
     Ok(Json(serde_json::json!({
         "status": "registered",
@@ -388,7 +429,8 @@ pub(crate) async fn handle_mcp_tool_call(
         })?;
 
     // Serialize the content blocks.
-    let content: Vec<serde_json::Value> = result.content
+    let content: Vec<serde_json::Value> = result
+        .content
         .iter()
         .map(|block| serde_json::to_value(block).unwrap_or_default())
         .collect();

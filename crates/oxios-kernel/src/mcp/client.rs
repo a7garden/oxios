@@ -93,9 +93,13 @@ impl McpClient {
             .spawn()
             .with_context(|| format!("Failed to spawn MCP server '{}'", self.server.name))?;
 
-        let stdin = child.stdin.take()
+        let stdin = child
+            .stdin
+            .take()
             .expect("stdin not captured — stdin was piped");
-        let stdout = child.stdout.take()
+        let stdout = child
+            .stdout
+            .take()
             .expect("stdout not captured — stdout was piped");
 
         // Store persistent I/O handles (separate from child process handle)
@@ -107,8 +111,7 @@ impl McpClient {
 
         // Send initialize request using persistent handles
         let params = InitializeParams::default();
-        let request = McpRequest::new("initialize")
-            .with_params(serde_json::to_value(&params)?);
+        let request = McpRequest::new("initialize").with_params(serde_json::to_value(&params)?);
 
         // Use do_request directly (not send_request) to avoid recursion
         // since send_request may call restart() which calls initialize().

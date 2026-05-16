@@ -1,7 +1,10 @@
 use std::sync::Arc;
 
-use axum::extract::{ws::{Message, WebSocket}, State, WebSocketUpgrade};
 use axum::extract::Query;
+use axum::extract::{
+    ws::{Message, WebSocket},
+    State, WebSocketUpgrade,
+};
 use axum::response::IntoResponse;
 use axum::Json;
 use futures_util::{SinkExt, StreamExt as FuturesStreamExt};
@@ -67,15 +70,12 @@ pub(crate) async fn handle_chat(
     tracing::info!(content = %body.content, user = %body.user_id, "Chat message received");
 
     // Build the incoming message.
-    let mut msg = IncomingMessage::new(
-        "web",
-        &body.user_id,
-        &body.content,
-    );
+    let mut msg = IncomingMessage::new("web", &body.user_id, &body.content);
 
     // Include session_id from request if provided (for multi-turn conversations).
     if !body.session_id.is_empty() {
-        msg.metadata.insert("session_id".to_owned(), body.session_id.clone());
+        msg.metadata
+            .insert("session_id".to_owned(), body.session_id.clone());
     }
 
     let msg_id = msg.id.to_string();
@@ -88,7 +88,10 @@ pub(crate) async fn handle_chat(
 
             // Persist session
             {
-                let session_id_for_save = response.metadata.get("session_id").cloned()
+                let session_id_for_save = response
+                    .metadata
+                    .get("session_id")
+                    .cloned()
                     .unwrap_or_else(|| msg_id.clone());
                 let session_id = oxios_kernel::state_store::SessionId(session_id_for_save.clone());
                 match state.kernel.state.load_session(&session_id).await {
@@ -99,7 +102,10 @@ pub(crate) async fn handle_chat(
                             session_id: Some(session_id.0),
                             seed_id: response.metadata.get("seed_id").cloned(),
                             phase_reached: response.metadata.get("phase").cloned(),
-                            evaluation_passed: response.metadata.get("evaluation_passed").and_then(|v| v.parse().ok()),
+                            evaluation_passed: response
+                                .metadata
+                                .get("evaluation_passed")
+                                .and_then(|v| v.parse().ok()),
                             timestamp: chrono::Utc::now(),
                         });
                         if let Err(e) = state.kernel.state.save_session(&session).await {
@@ -108,15 +114,20 @@ pub(crate) async fn handle_chat(
                     }
                     Ok(None) => {
                         // Create new session
-                        let mut session = oxios_kernel::state_store::Session::new(body.user_id.clone());
-                        session.id = oxios_kernel::state_store::SessionId(session_id_for_save.clone());
+                        let mut session =
+                            oxios_kernel::state_store::Session::new(body.user_id.clone());
+                        session.id =
+                            oxios_kernel::state_store::SessionId(session_id_for_save.clone());
                         session.add_user_message(&content_echo);
                         session.add_agent_response(oxios_kernel::state_store::AgentResponse {
                             content: response.content.clone(),
                             session_id: Some(session_id.0),
                             seed_id: response.metadata.get("seed_id").cloned(),
                             phase_reached: response.metadata.get("phase").cloned(),
-                            evaluation_passed: response.metadata.get("evaluation_passed").and_then(|v| v.parse().ok()),
+                            evaluation_passed: response
+                                .metadata
+                                .get("evaluation_passed")
+                                .and_then(|v| v.parse().ok()),
                             timestamp: chrono::Utc::now(),
                         });
                         if let Err(e) = state.kernel.state.save_session(&session).await {
@@ -196,7 +207,7 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
                 Message::Text(text) => {
                     let incoming = oxios_gateway::message::IncomingMessage::new(
                         "web",
-                        "session",  // TODO: derive from token when user system exists
+                        "session", // TODO: derive from token when user system exists
                         text.to_string(),
                     );
                     if send_tx.send(incoming).await.is_err() {

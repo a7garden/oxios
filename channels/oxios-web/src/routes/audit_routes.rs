@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 use axum::extract::{Path, Query, State};
 use axum::Json;
-use serde::{Deserialize};
+use serde::Deserialize;
 use serde_json::json;
 
 use crate::error::AppError;
@@ -96,7 +96,8 @@ pub(crate) async fn handle_audit_verify(
                 }
             }
             if msg.contains("timestamp in the future") {
-                let seq = msg.lines()
+                let seq = msg
+                    .lines()
                     .find(|l| l.contains("seq"))
                     .and_then(|l| l.split(":").nth(1))
                     .map(|s| s.trim().parse::<u64>().unwrap_or(0))

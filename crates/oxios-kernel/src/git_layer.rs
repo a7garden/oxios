@@ -1,13 +1,13 @@
 //! Git-based version control layer using gix.
 //! Provides in-process commits, logs, tags, and restore.
 
-use std::path::PathBuf;
 use anyhow::{bail, Result};
+use gix::bstr::BStr;
 use gix::hash::ObjectId;
 use gix::objs::tree::EntryKind;
 use gix::refs::transaction::PreviousValue;
-use gix::bstr::BStr;
 use parking_lot::Mutex;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 const GITIGNORE: &str = r#"# Oxios
@@ -98,7 +98,7 @@ impl GitLayer {
         repo.head_id().ok().map(|id| id.detach())
     }
 
-    fn create_initial_commit(repo: &Arc<Mutex<gix::Repository>>, root: &PathBuf) -> Result<()> {
+    fn create_initial_commit(repo: &Arc<Mutex<gix::Repository>>, root: &Path) -> Result<()> {
         let repo_lock = repo.lock();
         let gitignore = root.join(".gitignore");
         let content = std::fs::read(&gitignore)?;
@@ -235,10 +235,13 @@ impl GitLayer {
         std::fs::OpenOptions::new()
             .create(true)
             .append(true)
-            .write(true)
+            
             .open(self.root.join(&filename))?
             .write_all(entry.as_bytes())?;
-        self.commit_file(&filename, &format!("audit: {} {} {}", agent, action, target))?;
+        self.commit_file(
+            &filename,
+            &format!("audit: {} {} {}", agent, action, target),
+        )?;
         Ok(())
     }
 
@@ -324,9 +327,7 @@ impl GitLayer {
             .entries
             .iter()
             .find(|e| e.filename == rel_bytes)
-            .ok_or_else(|| {
-                anyhow::anyhow!("Path {} not found in commit {}", rel_path, hash)
-            })?;
+            .ok_or_else(|| anyhow::anyhow!("Path {} not found in commit {}", rel_path, hash))?;
 
         let blob = repo.find_blob(entry.oid.to_owned())?;
         std::fs::write(self.root.join(rel_path), &blob.data)?;
@@ -514,9 +515,7 @@ mod tests {
         let first = layer.commit_file("state.json", "v1").unwrap();
         std::fs::write(dir.path().join("state.json"), b"v2").unwrap();
         layer.commit_file("state.json", "v2").unwrap();
-        layer
-            .restore_file("state.json", &first.short_hash)
-            .unwrap();
+        layer.restore_file("state.json", &first.short_hash).unwrap();
         let content = std::fs::read_to_string(dir.path().join("state.json")).unwrap();
         assert_eq!(content, "v1");
     }

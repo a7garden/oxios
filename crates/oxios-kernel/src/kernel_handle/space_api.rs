@@ -6,12 +6,12 @@
 //! - Space merge and archive operations
 //! - Knowledge flow monitoring
 
-use std::sync::Arc;
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 
-use crate::space::{Space, SpaceManager, CrossRefEntry};
 #[allow(unused_imports)]
 use crate::event_bus::EventBus;
+use crate::space::{CrossRefEntry, Space, SpaceManager};
 use anyhow::Context;
 
 /// Serialized Space info for API responses.
@@ -35,7 +35,11 @@ impl From<&Space> for SpaceInfo {
             name: space.name.clone(),
             source: space.source.to_string(),
             active: space.active,
-            paths: space.paths.iter().map(|p| p.to_string_lossy().to_string()).collect(),
+            paths: space
+                .paths
+                .iter()
+                .map(|p| p.to_string_lossy().to_string())
+                .collect(),
             interaction_count: space.interaction_count,
             knowledge_visible: space.knowledge_visible,
             last_active: space.last_active_at.to_rfc3339(),
@@ -116,8 +120,7 @@ impl SpaceApi {
 
     /// Activate a Space by ID.
     pub async fn activate(&self, id: &str) -> anyhow::Result<()> {
-        let space_id = uuid::Uuid::parse_str(id)
-            .context("Invalid Space ID")?;
+        let space_id = uuid::Uuid::parse_str(id).context("Invalid Space ID")?;
         self.space_manager
             .activate(&space_id)
             .await
@@ -126,30 +129,28 @@ impl SpaceApi {
 
     /// Archive a Space by ID.
     pub async fn archive(&self, id: &str) -> anyhow::Result<()> {
-        let space_id = uuid::Uuid::parse_str(id)
-            .context("Invalid Space ID")?;
-        
-        let space = self.space_manager
+        let space_id = uuid::Uuid::parse_str(id).context("Invalid Space ID")?;
+
+        let space = self
+            .space_manager
             .get_space(&space_id)
             .await?
             .context("Space not found")?;
-        
+
         // Remove from active and save
         self.space_manager
             .activate(&self.space_manager.default_space_id())
             .await?;
-        
+
         tracing::info!(space_id = %space_id, name = %space.name, "Space archived");
         Ok(())
     }
 
     /// Merge two Spaces.
     pub async fn merge(&self, survivor_id: &str, absorbed_id: &str) -> anyhow::Result<()> {
-        let survivor = uuid::Uuid::parse_str(survivor_id)
-            .context("Invalid survivor Space ID")?;
-        let absorbed = uuid::Uuid::parse_str(absorbed_id)
-            .context("Invalid absorbed Space ID")?;
-        
+        let survivor = uuid::Uuid::parse_str(survivor_id).context("Invalid survivor Space ID")?;
+        let absorbed = uuid::Uuid::parse_str(absorbed_id).context("Invalid absorbed Space ID")?;
+
         self.space_manager
             .merge_spaces(survivor, absorbed)
             .await
@@ -158,9 +159,8 @@ impl SpaceApi {
 
     /// Restore an archived Space.
     pub async fn restore(&self, id: &str) -> anyhow::Result<()> {
-        let space_id = uuid::Uuid::parse_str(id)
-            .context("Invalid Space ID")?;
-        
+        let space_id = uuid::Uuid::parse_str(id).context("Invalid Space ID")?;
+
         self.space_manager
             .restore_from_archive(&space_id)
             .await
@@ -190,7 +190,7 @@ impl SpaceApi {
                 .references_for(space_id)
                 .iter()
                 .map(KnowledgeFlowInfo::from)
-                .collect()
+                .collect(),
         )
     }
 }

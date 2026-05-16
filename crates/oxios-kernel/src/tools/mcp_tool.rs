@@ -82,11 +82,15 @@ fn format_content_block(block: &McpContentBlock) -> String {
     match block {
         McpContentBlock::Text { text } => text.clone(),
         McpContentBlock::Image { data, mime_type } => {
-            format!("[Image ({}): {} bytes]", mime_type.as_deref().unwrap_or("?"), data.len())
+            format!(
+                "[Image ({}): {} bytes]",
+                mime_type.as_deref().unwrap_or("?"),
+                data.len()
+            )
         }
         McpContentBlock::Resource { resource } => {
             format!("[Resource: {}]", resource.uri)
-        },
+        }
     }
 }
 

@@ -22,9 +22,9 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use oxi_sdk::{AgentTool, AgentToolResult, ToolContext};
+use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use parking_lot::Mutex;
 use tokio::sync::oneshot;
 
 use crate::access_manager::AccessManager;
@@ -79,7 +79,11 @@ impl ExecTool {
     /// No agent context is attached, so access control is not enforced.
     /// Use [`ExecTool::for_agent`] for production.
     pub fn new(config: Arc<ExecConfig>, access: Arc<Mutex<AccessManager>>) -> Self {
-        Self { config, access, agent_name: None }
+        Self {
+            config,
+            access,
+            agent_name: None,
+        }
     }
 
     /// Create an `ExecTool` from a [`KernelHandle`].
@@ -103,7 +107,11 @@ impl ExecTool {
         access: Arc<Mutex<AccessManager>>,
         agent_name: String,
     ) -> Self {
-        Self { config, access, agent_name: Some(agent_name) }
+        Self {
+            config,
+            access,
+            agent_name: Some(agent_name),
+        }
     }
 
     /// Execute a raw command string via `bash -c <cmd>`.
@@ -392,19 +400,25 @@ impl AgentTool for ExecTool {
         _signal: Option<oneshot::Receiver<()>>,
         _ctx: &ToolContext,
     ) -> Result<AgentToolResult, String> {
-        let mode = params
-            .get("mode")
-            .and_then(|v| v.as_str())
-            .ok_or_else(|| "Missing required parameter: mode (expected 'shell' or 'structured')".to_string())?;
+        let mode = params.get("mode").and_then(|v| v.as_str()).ok_or_else(|| {
+            "Missing required parameter: mode (expected 'shell' or 'structured')".to_string()
+        })?;
 
-        let timeout_secs = params.get("timeout").and_then(|v| v.as_u64()).unwrap_or(self.config.default_timeout_secs);
+        let timeout_secs = params
+            .get("timeout")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(self.config.default_timeout_secs);
         let timeout_ms = (timeout_secs * 1000).min(self.config.max_timeout_secs * 1000);
 
         match mode {
             "shell" => {
                 let command = match params.get("command").and_then(|v| v.as_str()) {
                     Some(c) => c,
-                    None => return Ok(AgentToolResult::error("shell mode requires 'command' parameter")),
+                    None => {
+                        return Ok(AgentToolResult::error(
+                            "shell mode requires 'command' parameter",
+                        ))
+                    }
                 };
 
                 match self.shell_exec(command, timeout_ms).await {
@@ -423,7 +437,11 @@ impl AgentTool for ExecTool {
             "structured" => {
                 let binary = match params.get("binary").and_then(|v| v.as_str()) {
                     Some(b) => b,
-                    None => return Ok(AgentToolResult::error("structured mode requires 'binary' parameter")),
+                    None => {
+                        return Ok(AgentToolResult::error(
+                            "structured mode requires 'binary' parameter",
+                        ))
+                    }
                 };
 
                 let args: Vec<String> = params
@@ -547,9 +565,7 @@ mod tests {
     #[tokio::test]
     async fn test_structured_exec_path_binary() {
         let tool = make_tool(vec![]);
-        let result = tool
-            .structured_exec("/usr/bin/echo", vec![], 5_000)
-            .await;
+        let result = tool.structured_exec("/usr/bin/echo", vec![], 5_000).await;
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("bare name"));
     }
@@ -557,9 +573,7 @@ mod tests {
     #[tokio::test]
     async fn test_structured_exec_traversal_binary() {
         let tool = make_tool(vec![]);
-        let result = tool
-            .structured_exec("../bin/evil", vec![], 5_000)
-            .await;
+        let result = tool.structured_exec("../bin/evil", vec![], 5_000).await;
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("path traversal"));
     }
@@ -660,9 +674,13 @@ mod tests {
     #[tokio::test]
     async fn test_agent_tool_missing_mode() {
         let tool = make_tool(vec![]);
-        let result = tool.execute("test-3", json!({ "command": "echo hi" }), None).await;
+        let result = tool
+            .execute("test-3", json!({ "command": "echo hi" }), None)
+            .await;
         assert!(result.is_err());
-        assert!(result.unwrap_err().contains("Missing required parameter: mode"));
+        assert!(result
+            .unwrap_err()
+            .contains("Missing required parameter: mode"));
     }
 
     #[tokio::test]
@@ -696,7 +714,9 @@ mod tests {
         assert!(result.is_ok());
         let r = result.unwrap();
         assert!(!r.success);
-        assert!(r.output.contains("structured mode requires 'binary' parameter"));
+        assert!(r
+            .output
+            .contains("structured mode requires 'binary' parameter"));
     }
 
     #[tokio::test]
@@ -827,7 +847,9 @@ mod tests {
     #[tokio::test]
     async fn test_for_agent_structured_exec_allowed() {
         let tool = make_agent_tool("test-agent", &["echo", "ls"]);
-        let result = tool.structured_exec("echo", vec!["hello".into()], 5_000).await;
+        let result = tool
+            .structured_exec("echo", vec!["hello".into()], 5_000)
+            .await;
         assert!(result.is_ok(), "Allowed binary should succeed");
         let r = result.unwrap();
         assert_eq!(r.exit_code, 0);
@@ -837,18 +859,29 @@ mod tests {
     #[tokio::test]
     async fn test_for_agent_structured_exec_denied() {
         let tool = make_agent_tool("test-agent", &["ls"]); // no "echo"
-        let result = tool.structured_exec("echo", vec!["hello".into()], 5_000).await;
+        let result = tool
+            .structured_exec("echo", vec!["hello".into()], 5_000)
+            .await;
         assert!(result.is_err());
         let err = result.unwrap_err();
-        assert!(err.contains("not allowed to execute"), "Error should mention denial: {err}");
-        assert!(err.contains("echo"), "Error should name the denied binary: {err}");
+        assert!(
+            err.contains("not allowed to execute"),
+            "Error should mention denial: {err}"
+        );
+        assert!(
+            err.contains("echo"),
+            "Error should name the denied binary: {err}"
+        );
     }
 
     #[tokio::test]
     async fn test_for_agent_shell_exec_allowed() {
         let tool = make_agent_tool("test-agent", &["bash"]);
         let result = tool.shell_exec("echo hello", 5_000).await;
-        assert!(result.is_ok(), "Agent with 'bash' permission should succeed");
+        assert!(
+            result.is_ok(),
+            "Agent with 'bash' permission should succeed"
+        );
         assert!(result.unwrap().stdout.contains("hello"));
     }
 
@@ -858,7 +891,10 @@ mod tests {
         let result = tool.shell_exec("echo hello", 5_000).await;
         assert!(result.is_err());
         let err = result.unwrap_err();
-        assert!(err.contains("not allowed to execute"), "Error should mention denial: {err}");
+        assert!(
+            err.contains("not allowed to execute"),
+            "Error should mention denial: {err}"
+        );
         assert!(err.contains("bash"), "Error should name 'bash': {err}");
     }
 
@@ -870,7 +906,10 @@ mod tests {
         let access = AccessManager::new(); // empty — no permissions for anyone
         let tool = ExecTool::new(Arc::new(config), Arc::new(Mutex::new(access)));
         let result = tool.shell_exec("echo unrestricted", 5_000).await;
-        assert!(result.is_ok(), "No agent_name = no access check = unrestricted");
+        assert!(
+            result.is_ok(),
+            "No agent_name = no access check = unrestricted"
+        );
     }
 
     #[test]

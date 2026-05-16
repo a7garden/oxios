@@ -5,8 +5,8 @@
 
 #![allow(missing_docs)]
 
-use std::sync::atomic::{AtomicU64, Ordering};
 use parking_lot::{Mutex, RwLock};
+use std::sync::atomic::{AtomicU64, Ordering};
 
 /// Thread-safe metrics registry.
 #[derive(Default)]
@@ -23,7 +23,12 @@ impl MetricsRegistry {
     }
 
     /// Register a new counter and return a handle.
-    pub fn counter(&self, name: &'static str, help: &'static str, labels: &[(&'static str, &'static str)]) -> CounterHandle {
+    pub fn counter(
+        &self,
+        name: &'static str,
+        help: &'static str,
+        labels: &[(&'static str, &'static str)],
+    ) -> CounterHandle {
         let mut counters = self.counters.write();
         let id = counters.len();
         counters.push(Counter {
@@ -48,7 +53,12 @@ impl MetricsRegistry {
     }
 
     /// Register a new histogram and return a handle.
-    pub fn histogram(&self, name: &'static str, help: &'static str, buckets: Vec<f64>) -> HistogramHandle {
+    pub fn histogram(
+        &self,
+        name: &'static str,
+        help: &'static str,
+        buckets: Vec<f64>,
+    ) -> HistogramHandle {
         let mut histograms = self.histograms.write();
         let id = histograms.len();
         let counts: Vec<usize> = vec![0; buckets.len() + 1];
@@ -77,7 +87,14 @@ impl MetricsRegistry {
                 let labels_str = if c.labels.is_empty() {
                     String::new()
                 } else {
-                    format!("{{{}}}", c.labels.iter().map(|(k, v)| format!("{}=\"{}\"", k, v)).collect::<Vec<_>>().join(","))
+                    format!(
+                        "{{{}}}",
+                        c.labels
+                            .iter()
+                            .map(|(k, v)| format!("{}=\"{}\"", k, v))
+                            .collect::<Vec<_>>()
+                            .join(",")
+                    )
                 };
                 out.push_str(&format!("{}{} {}\n", c.name, labels_str, value));
             }
@@ -108,7 +125,10 @@ impl MetricsRegistry {
                 for (i, _) in bucket_values.iter().enumerate() {
                     cumulative += counts[i];
                     let boundary = bucket_values[i];
-                    out.push_str(&format!("{}{{le=\"{}\"}} {}\n", h.name, boundary, cumulative));
+                    out.push_str(&format!(
+                        "{}{{le=\"{}\"}} {}\n",
+                        h.name, boundary, cumulative
+                    ));
                 }
                 // +Inf bucket
                 out.push_str(&format!("{}{{le=\"+Inf\"}} {}\n", h.name, cumulative));
@@ -130,7 +150,9 @@ pub fn registry() -> &'static MetricsRegistry {
 }
 
 #[derive(Clone)]
-pub struct CounterHandle { id: usize }
+pub struct CounterHandle {
+    id: usize,
+}
 
 impl CounterHandle {
     /// Increment the counter by 1.
@@ -144,7 +166,9 @@ impl CounterHandle {
 }
 
 #[derive(Clone)]
-pub struct GaugeHandle { id: usize }
+pub struct GaugeHandle {
+    id: usize,
+}
 
 impl GaugeHandle {
     /// Set the gauge to a specific value.
@@ -178,7 +202,10 @@ impl GaugeHandle {
 }
 
 #[derive(Clone)]
-pub struct HistogramHandle { id: usize, buckets: Vec<f64> }
+pub struct HistogramHandle {
+    id: usize,
+    buckets: Vec<f64>,
+}
 
 impl HistogramHandle {
     /// Observe a value, adding it to the histogram.
@@ -276,9 +303,17 @@ pub fn get_metrics() -> &'static MetricsHandles {
         let r = registry();
         MetricsHandles {
             agents_forked: r.counter("oxios_agents_forked_total", "Total agents forked", &[]),
-            agents_completed: r.counter("oxios_agents_completed_total", "Total agents completed", &[]),
+            agents_completed: r.counter(
+                "oxios_agents_completed_total",
+                "Total agents completed",
+                &[],
+            ),
             agents_failed: r.counter("oxios_agents_failed_total", "Total agents failed", &[]),
-            orch_duration: r.histogram("oxios_orchestration_duration_seconds", "Orchestration duration", vec![0.1, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0, 60.0]),
+            orch_duration: r.histogram(
+                "oxios_orchestration_duration_seconds",
+                "Orchestration duration",
+                vec![0.1, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0, 60.0],
+            ),
             messages: r.counter("oxios_messages_processed_total", "Messages processed", &[]),
         }
     })
@@ -291,22 +326,46 @@ pub fn register_builtin_metrics() {
     // Agent metrics
     r.counter("oxios_agents_forked_total", "Total agents forked", &[]);
     r.gauge("oxios_agents_running", "Currently running agents", 0.0);
-    r.counter("oxios_agents_completed_total", "Total agents completed", &[]);
+    r.counter(
+        "oxios_agents_completed_total",
+        "Total agents completed",
+        &[],
+    );
     r.counter("oxios_agents_failed_total", "Total agents failed", &[]);
 
     // Message metrics
-    r.counter("oxios_messages_processed_total", "User messages processed", &[]);
-    r.histogram("oxios_orchestration_duration_seconds", "Full orchestration duration", vec![0.1, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0, 60.0]);
-    r.histogram("oxios_phase_duration_seconds", "Phase duration", vec![0.01, 0.05, 0.1, 0.5, 1.0, 2.5, 5.0, 10.0]);
+    r.counter(
+        "oxios_messages_processed_total",
+        "User messages processed",
+        &[],
+    );
+    r.histogram(
+        "oxios_orchestration_duration_seconds",
+        "Full orchestration duration",
+        vec![0.1, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0, 60.0],
+    );
+    r.histogram(
+        "oxios_phase_duration_seconds",
+        "Phase duration",
+        vec![0.01, 0.05, 0.1, 0.5, 1.0, 2.5, 5.0, 10.0],
+    );
 
     // LLM metrics
     r.counter("oxios_llm_calls_total", "LLM API calls", &[]);
-    r.histogram("oxios_llm_duration_seconds", "LLM call duration", vec![0.1, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0]);
+    r.histogram(
+        "oxios_llm_duration_seconds",
+        "LLM call duration",
+        vec![0.1, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0],
+    );
     r.counter("oxios_llm_errors_total", "LLM API errors", &[]);
 
     // Tool metrics
     r.counter("oxios_tool_calls_total", "Tool calls", &[]);
-    r.histogram("oxios_tool_duration_seconds", "Tool call duration", vec![0.01, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0]);
+    r.histogram(
+        "oxios_tool_duration_seconds",
+        "Tool call duration",
+        vec![0.01, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0],
+    );
     r.counter("oxios_tool_errors_total", "Tool errors", &[]);
 
     // Memory metrics
@@ -315,7 +374,11 @@ pub fn register_builtin_metrics() {
 
     // Container metrics
     r.counter("oxios_exec_total", "Exec calls", &[]);
-    r.histogram("oxios_exec_duration_seconds", "Exec duration", vec![0.1, 0.5, 1.0, 5.0, 10.0, 30.0]);
+    r.histogram(
+        "oxios_exec_duration_seconds",
+        "Exec duration",
+        vec![0.1, 0.5, 1.0, 5.0, 10.0, 30.0],
+    );
 
     // Session metrics
     r.gauge("oxios_active_sessions", "Active sessions", 0.0);

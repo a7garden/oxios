@@ -5,7 +5,7 @@ use axum::http::StatusCode;
 use axum::Json;
 use serde::{Deserialize, Serialize};
 
-use crate::routes::{PageParams, paginate};
+use crate::routes::{paginate, PageParams};
 use crate::server::AppState;
 
 // ---------------------------------------------------------------------------
@@ -80,25 +80,40 @@ pub(crate) async fn handle_program_install(
     // Validate install source URL length (proxy for sanity check)
     const MAX_SOURCE_LENGTH: usize = 8192;
     if body.path.len() > MAX_SOURCE_LENGTH {
-        return Err((StatusCode::PAYLOAD_TOO_LARGE, format!(
-            "Source URL too long: {} bytes exceeds limit of {} bytes",
-            body.path.len(),
-            MAX_SOURCE_LENGTH,
-        )));
+        return Err((
+            StatusCode::PAYLOAD_TOO_LARGE,
+            format!(
+                "Source URL too long: {} bytes exceeds limit of {} bytes",
+                body.path.len(),
+                MAX_SOURCE_LENGTH,
+            ),
+        ));
     }
 
     use oxios_kernel::InstallSource;
 
     // Only allow remote sources via API (no local path traversal)
     let source = if body.path.ends_with(".git") || body.path.starts_with("git@") {
-        InstallSource::Git { url: body.path.clone(), branch: None }
+        InstallSource::Git {
+            url: body.path.clone(),
+            branch: None,
+        }
     } else if body.path.starts_with("http://") || body.path.starts_with("https://") {
-        InstallSource::Tarball { url: body.path.clone() }
+        InstallSource::Tarball {
+            url: body.path.clone(),
+        }
     } else {
-        return Err((StatusCode::BAD_REQUEST, "Local path installation not allowed via API. Use git URL or tarball URL.".into()));
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "Local path installation not allowed via API. Use git URL or tarball URL.".into(),
+        ));
     };
 
-    state.kernel.extensions.install_program(source).await
+    state
+        .kernel
+        .extensions
+        .install_program(source)
+        .await
         .map(|program| {
             tracing::info!(program = %program.meta.name, "Program installed via API");
             Json(serde_json::json!({
@@ -115,7 +130,11 @@ pub(crate) async fn handle_program_uninstall(
     state: State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
-    state.kernel.extensions.uninstall_program(&name).await
+    state
+        .kernel
+        .extensions
+        .uninstall_program(&name)
+        .await
         .map(|_| {
             tracing::info!(program = %name, "Program uninstalled via API");
             Json(serde_json::json!({"status": "uninstalled", "name": name}))
@@ -128,7 +147,11 @@ pub(crate) async fn handle_program_enable(
     state: State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
-    state.kernel.extensions.enable_program(&name).await
+    state
+        .kernel
+        .extensions
+        .enable_program(&name)
+        .await
         .map(|_| Json(serde_json::json!({"status": "enabled", "name": name})))
         .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))
 }
@@ -138,7 +161,11 @@ pub(crate) async fn handle_program_disable(
     state: State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
-    state.kernel.extensions.disable_program(&name).await
+    state
+        .kernel
+        .extensions
+        .disable_program(&name)
+        .await
         .map(|_| Json(serde_json::json!({"status": "disabled", "name": name})))
         .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))
 }
@@ -148,7 +175,11 @@ pub(crate) async fn handle_program_host_requirements(
     state: State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
-    state.kernel.extensions.check_host_requirements(&name).await
+    state
+        .kernel
+        .extensions
+        .check_host_requirements(&name)
+        .await
         .map(|check| serde_json::to_value(&check).map(Json))
         .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))

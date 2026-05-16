@@ -24,6 +24,4 @@ pub mod template;
 pub mod types;
 
 // Re-export core types at module root for convenience.
-pub use types::{
-    Capability, CapabilityId, CSpace, Issuer, ResourceRef, Rights,
-};
+pub use types::{CSpace, Capability, CapabilityId, Issuer, ResourceRef, Rights};

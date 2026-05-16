@@ -75,17 +75,16 @@ impl MechanicalEvalResult {
 
         for criterion in criteria {
             let c_lower = criterion.to_lowercase();
-            let (passed, reason) = if c_lower.contains("exit code")
-                || c_lower.contains("exit status")
-            {
-                let has_zero = output_lower.contains("exit code 0")
-                    || output_lower.contains("exit status 0");
-                (has_zero, format!("exit_code_0={}", has_zero))
-            } else {
-                // Default: substring containment (language-agnostic)
-                let contains = output.contains(criterion);
-                (contains, format!("substring_match={}", contains))
-            };
+            let (passed, reason) =
+                if c_lower.contains("exit code") || c_lower.contains("exit status") {
+                    let has_zero = output_lower.contains("exit code 0")
+                        || output_lower.contains("exit status 0");
+                    (has_zero, format!("exit_code_0={}", has_zero))
+                } else {
+                    // Default: substring containment (language-agnostic)
+                    let contains = output.contains(criterion);
+                    (contains, format!("substring_match={}", contains))
+                };
             results.push(CriterionResult {
                 criterion: criterion.clone(),
                 passed,

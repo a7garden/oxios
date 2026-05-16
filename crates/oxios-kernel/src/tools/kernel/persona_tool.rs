@@ -134,16 +134,17 @@ impl AgentTool for PersonaTool {
                     .ok_or_else(|| "get requires 'id' parameter".to_string())?;
 
                 match api.get(id) {
-                    Some(p) => Ok(AgentToolResult::success(serde_json::to_string_pretty(
-                        &json!({
+                    Some(p) => Ok(AgentToolResult::success(
+                        serde_json::to_string_pretty(&json!({
                             "id": p.id,
                             "name": p.name,
                             "description": p.description,
                             "enabled": p.enabled,
                             "system_prompt": p.system_prompt,
                             "traits": p.personality_traits,
-                        }),
-                    ).unwrap_or_default())),
+                        }))
+                        .unwrap_or_default(),
+                    )),
                     None => Ok(AgentToolResult::error(format!(
                         "Persona '{}' not found",
                         id
@@ -195,9 +196,7 @@ mod tests {
             "required": ["action"]
         });
 
-        let actions = schema["properties"]["action"]["enum"]
-            .as_array()
-            .unwrap();
+        let actions = schema["properties"]["action"]["enum"].as_array().unwrap();
         assert_eq!(actions.len(), 3);
         assert!(actions.iter().any(|a| a == "list"));
         assert!(actions.iter().any(|a| a == "get"));

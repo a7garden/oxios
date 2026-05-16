@@ -31,8 +31,8 @@ impl Default for TelemetryConfig {
 ///
 /// Returns tracing-subscriber compatible layers that can be added
 /// to the subscriber. Returns empty vec if disabled.
-pub fn init_telemetry_layers() -> Result<Vec<Box<dyn Layer<tracing_subscriber::Registry> + Send + Sync>>>
-{
+pub fn init_telemetry_layers(
+) -> Result<Vec<Box<dyn Layer<tracing_subscriber::Registry> + Send + Sync>>> {
     // OTel feature is enabled but layers are not yet initialized.
     // This serves as the foundation for future OTel pipeline setup.
     // To activate: create an OTLP exporter from config.endpoint,

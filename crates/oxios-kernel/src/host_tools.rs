@@ -113,27 +113,20 @@ pub mod common {
 
     /// Optional tools that enhance functionality
     pub const OPTIONAL: &[&str] = &[
-        "gh",           // GitHub CLI
-        "remindctl",    // Reminders CLI
-        "shortcuts",    // macOS Shortcuts
-        "osascript",    // AppleScript execution
-        "open",         // Open files/URLs
-        "jq",           // JSON processing
-        "curl",         // HTTP client
-        "ripgrep",      // Better grep
-        "sqlite3",      // SQLite CLI
+        "gh",        // GitHub CLI
+        "remindctl", // Reminders CLI
+        "shortcuts", // macOS Shortcuts
+        "osascript", // AppleScript execution
+        "open",      // Open files/URLs
+        "jq",        // JSON processing
+        "curl",      // HTTP client
+        "ripgrep",   // Better grep
+        "sqlite3",   // SQLite CLI
     ];
 
     /// Tools pre-installed in the minimal container
-    pub const CONTAINER_MINIMAL: &[&str] = &[
-        "bash",
-        "python3",
-        "git",
-        "curl",
-        "jq",
-        "ripgrep",
-        "sqlite3",
-    ];
+    pub const CONTAINER_MINIMAL: &[&str] =
+        &["bash", "python3", "git", "curl", "jq", "ripgrep", "sqlite3"];
 }
 
 #[cfg(test)]
@@ -166,10 +159,7 @@ mod tests {
     #[test]
     fn test_validate_required_multiple_missing() {
         let validator = HostToolValidator::new(
-            vec![
-                "not-real-1".to_string(),
-                "not-real-2".to_string(),
-            ],
+            vec!["not-real-1".to_string(), "not-real-2".to_string()],
             Vec::new(),
         );
 
@@ -207,10 +197,7 @@ mod tests {
 
     #[test]
     fn test_full_check() {
-        let validator = HostToolValidator::new(
-            vec!["echo".to_string()],
-            vec!["cat".to_string()],
-        );
+        let validator = HostToolValidator::new(vec!["echo".to_string()], vec!["cat".to_string()]);
 
         let status = validator.full_check();
         assert!(status.all_required_present);
@@ -221,10 +208,7 @@ mod tests {
     #[test]
     fn test_full_check_missing_required() {
         let validator = HostToolValidator::new(
-            vec![
-                "echo".to_string(),
-                "not-real-xyz".to_string(),
-            ],
+            vec!["echo".to_string(), "not-real-xyz".to_string()],
             Vec::new(),
         );
 

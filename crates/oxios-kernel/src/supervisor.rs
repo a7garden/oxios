@@ -12,8 +12,8 @@ use chrono::Utc;
 use oxios_ouroboros::Seed;
 use parking_lot::RwLock;
 use std::collections::HashMap;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use tokio::task::JoinHandle;
 
 use crate::agent_runtime::AgentRuntime;
@@ -108,10 +108,12 @@ impl Supervisor for BasicSupervisor {
 
         self.update_agent_count();
 
-        let _ = self.event_bus.publish(crate::event_bus::KernelEvent::AgentCreated {
-            id,
-            name: spec.goal.clone(),
-        });
+        let _ = self
+            .event_bus
+            .publish(crate::event_bus::KernelEvent::AgentCreated {
+                id,
+                name: spec.goal.clone(),
+            });
 
         tracing::info!(agent_id = %id, "Forked new agent from seed");
         Ok(id)
@@ -175,7 +177,13 @@ impl Supervisor for BasicSupervisor {
         // Store the handle so kill() can abort the task.
         {
             let mut handles = self.handles.write();
-            handles.insert(id, AgentHandle { cancelled, task: handle });
+            handles.insert(
+                id,
+                AgentHandle {
+                    cancelled,
+                    task: handle,
+                },
+            );
         }
 
         // Await the spawned task.
@@ -223,7 +231,9 @@ impl Supervisor for BasicSupervisor {
                     }
                 }
 
-                let _ = self.event_bus.publish(crate::event_bus::KernelEvent::AgentStopped { id });
+                let _ = self
+                    .event_bus
+                    .publish(crate::event_bus::KernelEvent::AgentStopped { id });
                 self.update_agent_count();
                 Ok(result)
             }
@@ -237,10 +247,12 @@ impl Supervisor for BasicSupervisor {
                     }
                 }
 
-                let _ = self.event_bus.publish(crate::event_bus::KernelEvent::AgentFailed {
-                    id,
-                    error: e.to_string(),
-                });
+                let _ = self
+                    .event_bus
+                    .publish(crate::event_bus::KernelEvent::AgentFailed {
+                        id,
+                        error: e.to_string(),
+                    });
                 self.update_agent_count();
 
                 Ok(ExecutionResult {
@@ -337,16 +349,14 @@ mod tests {
         let tmp = std::env::temp_dir().join(format!("oxios-test-{}", uuid::Uuid::new_v4()));
         let _ = std::fs::create_dir_all(&tmp);
 
-        let state_store_2 = Arc::new(
-            crate::state_store::StateStore::new(tmp.join("state"))
-                .expect("state store")
-        );
+        let state_store_2 =
+            Arc::new(crate::state_store::StateStore::new(tmp.join("state")).expect("state store"));
         let state_store = state_store_2.clone();
         let state_store_for_space = state_store_2.clone();
         let memory_manager = Arc::new({
             let mut mm = crate::memory::MemoryManager::new(state_store.clone());
             mm.set_git_layer(Arc::new(
-                crate::git_layer::GitLayer::new(tmp.join("git"), false).expect("git layer")
+                crate::git_layer::GitLayer::new(tmp.join("git"), false).expect("git layer"),
             ));
             mm
         });
@@ -361,10 +371,16 @@ mod tests {
             crate::kernel_handle::SecurityApi::new(
                 Arc::new(parking_lot::Mutex::new(crate::auth::AuthManager::new())),
                 Arc::new(crate::audit_trail::AuditTrail::new(100)),
-                Arc::new(parking_lot::Mutex::new(crate::access_manager::AccessManager::new())),
-                Arc::new(crate::state_store::StateStore::new(tmp.join("state2")).expect("state store 2")),
+                Arc::new(parking_lot::Mutex::new(
+                    crate::access_manager::AccessManager::new(),
+                )),
+                Arc::new(
+                    crate::state_store::StateStore::new(tmp.join("state2")).expect("state store 2"),
+                ),
             ),
-            crate::kernel_handle::PersonaApi::new(Arc::new(crate::persona_manager::PersonaManager::new())),
+            crate::kernel_handle::PersonaApi::new(Arc::new(
+                crate::persona_manager::PersonaManager::new(),
+            )),
             crate::kernel_handle::ExtensionApi::new(
                 Arc::new(crate::program::ProgramManager::new(tmp.join("programs"))),
                 Arc::new(crate::skill::SkillStore::new(tmp.join("skills")).expect("skill store")),
@@ -372,11 +388,15 @@ mod tests {
             ),
             crate::kernel_handle::McpApi::new(Arc::new(crate::mcp::McpBridge::new())),
             crate::kernel_handle::InfraApi::new(
-                Arc::new(crate::git_layer::GitLayer::new(tmp.join("git"), false).expect("git layer")),
+                Arc::new(
+                    crate::git_layer::GitLayer::new(tmp.join("git"), false).expect("git layer"),
+                ),
                 Arc::new(crate::scheduler::AgentScheduler::new(4, 60, 300)),
                 Arc::new(crate::cron::CronScheduler::new(
-                    Arc::new(crate::state_store::StateStore::new(tmp.join("cron")).expect("cron state")),
-                    60
+                    Arc::new(
+                        crate::state_store::StateStore::new(tmp.join("cron")).expect("cron state"),
+                    ),
+                    60,
                 )),
                 Arc::new(crate::resource_monitor::ResourceMonitor::new(60, 100)),
                 EventBus::new(64),
@@ -384,19 +404,26 @@ mod tests {
                 std::time::Instant::now(),
             ),
             crate::kernel_handle::SpaceApi::new(
-                Arc::new(tokio::runtime::Handle::current().block_on(
-                    crate::space::SpaceManager::new(state_store_for_space, EventBus::new(64))
-                ).expect("space mgr")),
+                Arc::new(
+                    tokio::runtime::Handle::current()
+                        .block_on(crate::space::SpaceManager::new(
+                            state_store_for_space,
+                            EventBus::new(64),
+                        ))
+                        .expect("space mgr"),
+                ),
                 EventBus::new(64),
             ),
             crate::kernel_handle::ExecApi::new(
                 Arc::new(crate::config::ExecConfig::default()),
-                Arc::new(parking_lot::Mutex::new(crate::access_manager::AccessManager::new())),
+                Arc::new(parking_lot::Mutex::new(
+                    crate::access_manager::AccessManager::new(),
+                )),
             ),
             crate::kernel_handle::BrowserApi::default(),
-            crate::kernel_handle::A2aApi::new(
-                Arc::new(crate::a2a::A2AProtocol::new(EventBus::new(64))),
-            ),
+            crate::kernel_handle::A2aApi::new(Arc::new(crate::a2a::A2AProtocol::new(
+                EventBus::new(64),
+            ))),
         ));
 
         let runtime = AgentRuntime::new(provider, "mock/model", kernel_handle);
@@ -516,19 +543,29 @@ pub struct NoOpSupervisor;
 #[async_trait::async_trait]
 impl Supervisor for NoOpSupervisor {
     async fn fork(&self, _spec: &Seed) -> Result<AgentId> {
-        Err(anyhow::anyhow!("NoOpSupervisor: fork not available during build"))
+        Err(anyhow::anyhow!(
+            "NoOpSupervisor: fork not available during build"
+        ))
     }
     async fn exec(&self, _id: AgentId) -> Result<()> {
-        Err(anyhow::anyhow!("NoOpSupervisor: exec not available during build"))
+        Err(anyhow::anyhow!(
+            "NoOpSupervisor: exec not available during build"
+        ))
     }
     async fn run_with_seed(&self, _id: AgentId, _seed: &Seed) -> Result<ExecutionResult> {
-        Err(anyhow::anyhow!("NoOpSupervisor: run_with_seed not available during build"))
+        Err(anyhow::anyhow!(
+            "NoOpSupervisor: run_with_seed not available during build"
+        ))
     }
     async fn wait(&self, _id: AgentId) -> Result<AgentStatus> {
-        Err(anyhow::anyhow!("NoOpSupervisor: wait not available during build"))
+        Err(anyhow::anyhow!(
+            "NoOpSupervisor: wait not available during build"
+        ))
     }
     async fn kill(&self, _id: AgentId) -> Result<()> {
-        Err(anyhow::anyhow!("NoOpSupervisor: kill not available during build"))
+        Err(anyhow::anyhow!(
+            "NoOpSupervisor: kill not available during build"
+        ))
     }
     async fn list(&self) -> Result<Vec<AgentInfo>> {
         Ok(Vec::new())

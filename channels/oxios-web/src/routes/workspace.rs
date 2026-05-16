@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use oxios_kernel::memory::{MemoryEntry, MemoryType};
 
 use crate::error::AppError;
-use crate::routes::{PageParams, paginate};
+use crate::routes::{paginate, PageParams};
 use crate::server::AppState;
 
 // ---------------------------------------------------------------------------
@@ -43,8 +43,7 @@ pub(crate) async fn handle_workspace_tree(
     Query(query): Query<TreeQuery>,
 ) -> Result<Json<Vec<TreeEntry>>, AppError> {
     let base = state.kernel.state.workspace_path();
-    let canonical_base = base.canonicalize()
-        .unwrap_or_else(|_| base.to_path_buf());
+    let canonical_base = base.canonicalize().unwrap_or_else(|_| base.to_path_buf());
     let dir = match &query.dir {
         Some(d) => {
             let candidate = base.join(d);
@@ -75,9 +74,7 @@ pub(crate) async fn handle_workspace_tree(
         }
     }
 
-    entries.sort_by(|a, b| {
-        b.is_dir.cmp(&a.is_dir).then(a.name.cmp(&b.name))
-    });
+    entries.sort_by(|a, b| b.is_dir.cmp(&a.is_dir).then(a.name.cmp(&b.name)));
 
     Ok(Json(entries))
 }
@@ -136,10 +133,12 @@ pub(crate) async fn handle_workspace_file_put(
     let canonical_base = base.canonicalize().unwrap_or_else(|_| base.to_path_buf());
     if let Some(parent) = full_path.parent() {
         if !parent.exists() {
-            tokio::fs::create_dir_all(parent).await
+            tokio::fs::create_dir_all(parent)
+                .await
                 .map_err(|e| AppError::Internal(format!("failed to create directory: {e}")))?;
         }
-        let canonical_parent = parent.canonicalize()
+        let canonical_parent = parent
+            .canonicalize()
             .map_err(|e| AppError::Internal(format!("failed to resolve path: {e}")))?;
         if !canonical_parent.starts_with(&canonical_base) {
             return Err(AppError::Forbidden("path traversal denied".into()));
@@ -286,7 +285,10 @@ pub(crate) async fn handle_seed_evolution(
                 };
                 let seed: Seed = match serde_json::from_str(&content) {
                     Ok(s) => s,
-                    Err(e) => { tracing::warn!(error = %e, "Skipping invalid seed"); continue }
+                    Err(e) => {
+                        tracing::warn!(error = %e, "Skipping invalid seed");
+                        continue;
+                    }
                 };
 
                 // Push parent first so it's processed before children (reversed order).
@@ -335,7 +337,6 @@ pub(crate) async fn handle_seed_evolution(
 // ---------------------------------------------------------------------------
 // Skills
 // ---------------------------------------------------------------------------
-
 
 /// Skill summary for listing.
 #[derive(Debug, Serialize, Clone)]
@@ -415,7 +416,11 @@ pub(crate) async fn handle_skill_create(
         });
     }
 
-    state.kernel.extensions.create_skill(&body.name, &body.description, &body.content).await
+    state
+        .kernel
+        .extensions
+        .create_skill(&body.name, &body.description, &body.content)
+        .await
         .map_err(|e| {
             tracing::error!(error = %e, skill = %body.name, "Failed to create skill");
             AppError::BadRequest(e.to_string())
@@ -433,7 +438,11 @@ pub(crate) async fn handle_skill_delete(
     state: State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> Result<Json<serde_json::Value>, AppError> {
-    state.kernel.extensions.delete_skill(&name).await
+    state
+        .kernel
+        .extensions
+        .delete_skill(&name)
+        .await
         .map_err(|e| {
             tracing::error!(error = %e, skill = %name, "Failed to delete skill");
             AppError::BadRequest(e.to_string())
@@ -504,7 +513,12 @@ pub(crate) async fn handle_memory_get(
         .into_response());
     }
 
-    if let Ok(Some(content)) = state.kernel.state.load_markdown("memory/knowledge", &name).await {
+    if let Ok(Some(content)) = state
+        .kernel
+        .state
+        .load_markdown("memory/knowledge", &name)
+        .await
+    {
         return Ok(Json(serde_json::json!({
             "name": name,
             "category": "knowledge",
@@ -580,9 +594,13 @@ pub(crate) async fn handle_memory_create(
         accessed_at: chrono::Utc::now(),
         access_count: 0,
     };
-    
+
     // Use memory manager from kernel
-    let id = state.kernel.agents.remember(entry).await
+    let id = state
+        .kernel
+        .agents
+        .remember(entry)
+        .await
         .map_err(|e| AppError::Internal(e.to_string()))?;
     Ok(Json(serde_json::json!({ "id": id, "status": "created" })))
 }
@@ -608,9 +626,13 @@ pub(crate) async fn handle_memory_search(
         _ => None,
     });
     let limit = body.limit.unwrap_or(10);
-    
+
     // Use memory manager from kernel
-    let entries = state.kernel.agents.search_memory(&body.query, type_filter, limit).await
+    let entries = state
+        .kernel
+        .agents
+        .search_memory(&body.query, type_filter, limit)
+        .await
         .map_err(|e| AppError::Internal(e.to_string()))?;
     let results: Vec<serde_json::Value> = entries
         .iter()
@@ -625,7 +647,9 @@ pub(crate) async fn handle_memory_search(
             })
         })
         .collect();
-    Ok(Json(serde_json::json!({ "count": results.len(), "entries": results })))
+    Ok(Json(
+        serde_json::json!({ "count": results.len(), "entries": results }),
+    ))
 }
 
 // ---------------------------------------------------------------------------
@@ -659,7 +683,11 @@ pub(crate) async fn handle_memory_semantic_search(
     let limit = body.limit.unwrap_or(10);
 
     // Use semantic search from kernel (HNSW-powered)
-    let hits = state.kernel.agents.semantic_search_memory(&body.query, type_filter, limit).await
+    let hits = state
+        .kernel
+        .agents
+        .semantic_search_memory(&body.query, type_filter, limit)
+        .await
         .map_err(|e| AppError::Internal(e.to_string()))?;
 
     let results: Vec<serde_json::Value> = hits
@@ -729,26 +757,26 @@ mod tests {
         assert_eq!(result["total"], 10);
         assert_eq!(result["page"], 1);
         assert_eq!(result["limit"], 3);
-        let returned: Vec<i32> =
-            serde_json::from_value(result["items"].clone()).unwrap();
+        let returned: Vec<i32> = serde_json::from_value(result["items"].clone()).unwrap();
         assert_eq!(returned, vec![1, 2, 3]);
 
         // Page 4, limit 3 → items [10]
         let p4 = PageParams { page: 4, limit: 3 };
         let result = paginate(&items, &p4);
-        let returned: Vec<i32> =
-            serde_json::from_value(result["items"].clone()).unwrap();
+        let returned: Vec<i32> = serde_json::from_value(result["items"].clone()).unwrap();
         assert_eq!(returned, vec![10]);
 
         // Page 0 (underflow) → offset wraps to 0 via saturating_sub
         let p0 = PageParams { page: 0, limit: 3 };
         let result = paginate(&items, &p0);
-        let returned: Vec<i32> =
-            serde_json::from_value(result["items"].clone()).unwrap();
+        let returned: Vec<i32> = serde_json::from_value(result["items"].clone()).unwrap();
         assert_eq!(returned, vec![1, 2, 3]);
 
         // Limit capped at 500
-        let big = PageParams { page: 1, limit: 9999 };
+        let big = PageParams {
+            page: 1,
+            limit: 9999,
+        };
         let result = paginate(&items, &big);
         assert_eq!(result["limit"], 500);
     }

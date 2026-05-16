@@ -304,11 +304,13 @@ impl McpTool {
     /// properties from the top-level `"properties"` key (not from the
     /// root object, which contains `type`, `properties`, `required`, etc.).
     pub fn to_tool_def(&self) -> ToolDef {
-        let arguments = if let Some(properties) = self.input_schema
+        let arguments = if let Some(properties) = self
+            .input_schema
             .get("properties")
             .and_then(|p| p.as_object())
         {
-            let required_list: Vec<&str> = self.input_schema
+            let required_list: Vec<&str> = self
+                .input_schema
                 .get("required")
                 .and_then(|r| r.as_array())
                 .map(|arr| arr.iter().filter_map(|v| v.as_str()).collect())
@@ -322,14 +324,16 @@ impl McpTool {
                         .and_then(|d| d.as_str())
                         .unwrap_or("No description")
                         .to_string();
-                    let required = required_list.iter().any(|r| *r == name)
-                        && schema.get("default").is_none();
+                    let required =
+                        required_list.iter().any(|r| *r == name) && schema.get("default").is_none();
 
                     crate::program::ArgumentDef {
                         name: name.clone(),
                         description,
                         required,
-                        default: schema.get("default").and_then(|d| d.as_str().map(String::from)),
+                        default: schema
+                            .get("default")
+                            .and_then(|d| d.as_str().map(String::from)),
                     }
                 })
                 .collect()

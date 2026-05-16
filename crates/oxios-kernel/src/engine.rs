@@ -7,8 +7,8 @@
 //! The `OxiosEngine` struct wraps the SDK instance and exposes a clean API.
 
 use anyhow::Result;
-use std::sync::Arc;
 use oxi_sdk::{Oxi, OxiBuilder};
+use std::sync::Arc;
 
 /// The kernel's engine — wraps oxi-sdk's Oxi instance.
 pub struct OxiosEngine {
@@ -22,9 +22,7 @@ impl OxiosEngine {
     /// Internally calls `OxiBuilder::new().with_builtins()` to load all
     /// 50+ built-in models and providers.
     pub fn new(default_model_id: impl Into<String>) -> Self {
-        let oxi = OxiBuilder::new()
-            .with_builtins()
-            .build();
+        let oxi = OxiBuilder::new().with_builtins().build();
         Self {
             oxi,
             default_model_id: default_model_id.into(),
@@ -137,7 +135,10 @@ mod tests {
     #[test]
     fn test_default_model_id() {
         let engine = OxiEngineProvider::new("anthropic/claude-sonnet-4-20250514");
-        assert_eq!(engine.default_model_id(), "anthropic/claude-sonnet-4-20250514");
+        assert_eq!(
+            engine.default_model_id(),
+            "anthropic/claude-sonnet-4-20250514"
+        );
     }
 
     #[test]

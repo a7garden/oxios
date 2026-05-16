@@ -17,9 +17,11 @@ pub mod retrieval;
 #[cfg(feature = "browser")]
 pub mod browser;
 
-pub use a2a_tools::{A2aDelegateTool, A2aSendTool, A2aQueryTool};
+pub use a2a_tools::{A2aDelegateTool, A2aQueryTool, A2aSendTool};
 pub use exec_tool::ExecTool;
-pub use kernel::{SpaceTool, KernelAgentTool, PersonaTool, CronTool, SecurityTool, BudgetTool, ResourceTool};
+pub use kernel::{
+    BudgetTool, CronTool, KernelAgentTool, PersonaTool, ResourceTool, SecurityTool, SpaceTool,
+};
 pub use mcp_tool::McpToolWrapper;
 pub use memory_tools::{MemoryReadTool, MemorySearchTool, MemoryWriteTool};
 pub use program_tool::ProgramTool;

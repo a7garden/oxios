@@ -57,7 +57,7 @@ impl ConversationBuffer {
     pub fn push_user(&mut self, message: &str) {
         let turn = ConversationTurn {
             user: message.to_string(),
-            agent: String::new(), // filled later by push_agent
+            agent: String::new(),     // filled later by push_agent
             space_id: SpaceId::nil(), // filled later
             timestamp: Utc::now(),
         };
@@ -142,21 +142,16 @@ impl ConversationBuffer {
         let recent = &all_turns[all_turns.len() - 2..];
         let previous = &all_turns[all_turns.len() - 4..all_turns.len() - 2];
 
-        let avg_word_count_recent = recent
-            .iter()
-            .map(|t| word_count(&t.user))
-            .sum::<usize>() as f64
-            / recent.len() as f64;
+        let avg_word_count_recent =
+            recent.iter().map(|t| word_count(&t.user)).sum::<usize>() as f64 / recent.len() as f64;
 
-        let avg_word_count_prev = previous
-            .iter()
-            .map(|t| word_count(&t.user))
-            .sum::<usize>() as f64
+        let avg_word_count_prev = previous.iter().map(|t| word_count(&t.user)).sum::<usize>()
+            as f64
             / previous.len() as f64;
 
         // If average word count changed by more than 50%, consider it a pattern change
         let ratio = avg_word_count_recent / avg_word_count_prev.max(1.0);
-        if ratio < 0.5 || ratio > 2.0 {
+        if !(0.5..=2.0).contains(&ratio) {
             return true;
         }
 
@@ -172,8 +167,14 @@ impl ConversationBuffer {
             ("Cargo", "장보기"),
         ];
 
-        let recent_text = recent.iter().map(|t| t.user.to_lowercase()).collect::<String>();
-        let prev_text = previous.iter().map(|t| t.user.to_lowercase()).collect::<String>();
+        let recent_text = recent
+            .iter()
+            .map(|t| t.user.to_lowercase())
+            .collect::<String>();
+        let prev_text = previous
+            .iter()
+            .map(|t| t.user.to_lowercase())
+            .collect::<String>();
 
         for (prev_kw, recent_kw) in domain_shift_keywords {
             let has_prev = prev_text.contains(prev_kw);

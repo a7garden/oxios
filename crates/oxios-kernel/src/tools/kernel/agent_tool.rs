@@ -18,9 +18,9 @@ use oxi_sdk::{AgentTool as OxiAgentTool, AgentToolResult, ToolContext};
 use serde_json::{json, Value};
 use tokio::sync::oneshot;
 
+use crate::budget::BudgetManager;
 use crate::kernel_handle::KernelHandle;
 use crate::supervisor::Supervisor;
-use crate::budget::BudgetManager;
 use crate::types::AgentId;
 
 /// Agent tool for agent lifecycle management.
@@ -121,7 +121,11 @@ impl OxiAgentTool for AgentTool {
 
                 let agents = match self.supervisor.list().await {
                     Ok(a) => a,
-                    Err(e) => return Ok(AgentToolResult::error(format!("Failed to list agents: {e}"))),
+                    Err(e) => {
+                        return Ok(AgentToolResult::error(format!(
+                            "Failed to list agents: {e}"
+                        )))
+                    }
                 };
 
                 if agents.is_empty() {
@@ -141,9 +145,10 @@ impl OxiAgentTool for AgentTool {
                     .collect();
 
                 let count = display.len();
-                Ok(AgentToolResult::success(serde_json::to_string_pretty(
-                    &json!({ "agents": display, "count": count }),
-                ).unwrap_or_default()))
+                Ok(AgentToolResult::success(
+                    serde_json::to_string_pretty(&json!({ "agents": display, "count": count }))
+                        .unwrap_or_default(),
+                ))
             }
 
             "kill" => {
@@ -162,9 +167,7 @@ impl OxiAgentTool for AgentTool {
                         "Agent '{}' killed.",
                         id_str
                     ))),
-                    Err(e) => Ok(AgentToolResult::error(format!(
-                        "Failed to kill agent: {e}"
-                    ))),
+                    Err(e) => Ok(AgentToolResult::error(format!("Failed to kill agent: {e}"))),
                 }
             }
 
@@ -180,15 +183,16 @@ impl OxiAgentTool for AgentTool {
                 };
 
                 let info = self.budget_manager.remaining(&agent_id);
-                Ok(AgentToolResult::success(serde_json::to_string_pretty(
-                    &json!({
+                Ok(AgentToolResult::success(
+                    serde_json::to_string_pretty(&json!({
                         "agent_id": id_str,
                         "tokens_remaining": info.tokens_remaining,
                         "calls_remaining": info.calls_remaining,
                         "window_remaining_secs": info.window_remaining_secs,
                         "is_exhausted": info.is_exhausted,
-                    }),
-                ).unwrap_or_default()))
+                    }))
+                    .unwrap_or_default(),
+                ))
             }
 
             other => Err(format!(
@@ -226,9 +230,7 @@ mod tests {
             "required": ["action"]
         });
 
-        let actions = schema["properties"]["action"]["enum"]
-            .as_array()
-            .unwrap();
+        let actions = schema["properties"]["action"]["enum"].as_array().unwrap();
         assert_eq!(actions.len(), 3);
     }
 }
