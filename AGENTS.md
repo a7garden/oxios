@@ -14,7 +14,7 @@ User → Channel (Web/CLI/Telegram) → Gateway → Kernel (supervisor + ourobor
 ```
 
 ```
-oxios/                     # Main binary (src/main.rs, src/kernel.rs)
+oxios/                     # Main binary (src/main.rs, src/kernel.rs, src/cmd_run.rs)
 ├── crates/
 │   ├── oxios-kernel/      # Core: supervisor, event bus, state store, tools, memory
 │   ├── oxios-ouroboros/   # Spec-first protocol (interview → seed → execute → evaluate → evolve)
@@ -55,6 +55,40 @@ cargo test --workspace     # Run all tests (must pass at every commit)
 cargo run                  # Run oxios
 ```
 
+## CLI for Self-Testing
+
+Oxios CLI is designed for **programmatic consumption** — agents can call it via `exec` tool:
+
+```bash
+# JSON output — parse response, session_id, evaluation_passed, exit_code
+oxios run --json "review this code"
+
+# Pass file as context (use `-` for stdin)
+cat file.rs | oxios run --json --context-file - "describe this"
+
+# Exit code for script integration: 0=passed, 1=failed
+oxios run --exit-code --json "run tests"
+echo $?  # 0 or 1
+
+# Multi-turn session (pass session_id from response)
+SID=$(oxios run --json "initial prompt" | jq -r '.session_id')
+oxios run --json --session "$SID" "follow-up"
+```
+
+**JSON output shape:**
+```json
+{
+  "response": "...",
+  "session_id": "uuid",
+  "seed_id": "uuid | null",
+  "agent_id": "uuid | null",
+  "phase_reached": "Execute",
+  "evaluation_passed": true,
+  "exit_code": 0,
+  "duration_ms": 3500
+}
+```
+
 ## Conventions
 
 - **Language:** Code, comments, docs, commits — English. User-facing messages — Korean.
@@ -72,6 +106,7 @@ cargo run                  # Run oxios
 - **AccessManager** (`access_manager/`) — OWASP-inspired least-privilege. RBAC, path sandboxing, audit logging.
 - **Memory** (`memory/`) — Vector store with hyperbolic embeddings, HNSW indexing, flash attention, reasoning bank.
 - **KernelHandle** (`kernel_handle/`) — Facade exposing typed APIs (AgentApi, SpaceApi, SecurityApi, etc.) to tools.
+- **Kernel** (`src/kernel.rs`) — `Kernel::builder().build().await` assembles all components. `execute_prompt_with_session()` for CLI execution.
 - **Program** (`program/`) — OS-level installable capabilities. See `.programs/` for examples.
 - **A2A** (`a2a.rs`) — Google's agent-to-agent protocol. Horizontal agent communication.
 
@@ -85,3 +120,9 @@ cargo run                  # Run oxios
 | `docs/refactoring-design.md` | Before large-scale refactoring |
 | `docs/program-development.md` | Before creating or modifying programs |
 | `share/default-config.toml` | Before changing configuration options |
+
+## Pitfalls
+
+- **Workspace deps**: If `cargo build` fails with missing `oxi-ai`/`oxi-agent`, ensure they're in `[workspace.dependencies]` in `Cargo.toml` AND `[dependencies]` in the crate using them.
+- **Stdin blocking**: `oxios run --context-file -` reads stdin to EOF. Don't use with interactive input — it blocks.
+- **Session IDs**: Sessions live in orchestrator memory. Process restart loses them. Use `--session` only within a single CLI session chain.

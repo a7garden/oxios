@@ -52,10 +52,8 @@ regex = "1"
 # Concurrency
 parking_lot = "0.12"
 
-# oxi engine — oxi-sdk is the primary entry point (0.15.2+)
-# oxi-ai is needed directly only for credential management (oauth helpers)
-oxi-sdk = "0.15.2"
-oxi-ai = "0.15"
+# oxi engine — single dependency for everything
+oxi-sdk = "0.15.3"
 
 [features]
 default = ["web", "cli", "browser"]
