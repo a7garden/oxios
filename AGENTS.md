@@ -7,7 +7,7 @@
 
 Oxios is an **Agent Operating System** in Rust. It's an OS where AI agents execute real work on behalf of users — fork, exec, wait, kill, just like Unix processes.
 
-**Stack:** Rust 2021, tokio async, serde (JSON+TOML), oxi-sdk (crates.io). ~51K lines across 179 source files.
+**Stack:** Rust 2021, tokio async, serde (JSON+TOML), oxi-sdk + oxi-ai (crates.io). ~52K lines across 179 source files.
 
 ```
 User → Channel (Web/CLI/Telegram) → Gateway → Kernel (supervisor + scheduler + ouroboros + agent_runtime)
@@ -31,6 +31,7 @@ oxios/                     # Main binary (src/main.rs, src/kernel.rs, src/cmd_ru
 **Dependency graph:**
 ```
 oxios → oxios-kernel → oxi-sdk (crates.io, NOT path dep)
+                    → oxi-ai (provider construction)
                     → oxios-ouroboros
       → oxios-gateway
       → oxios-web/oxios-cli/oxios-telegram (channel plugins, feature-gated)
@@ -42,7 +43,7 @@ oxios → oxios-kernel → oxi-sdk (crates.io, NOT path dep)
 | Fact | Value |
 |------|-------|
 | **Language** | Rust 2021 |
-| **Version** | 0.3.0-alpha |
+| **Version** | 0.1.0 |
 | **License** | MIT |
 | **CI** | GitHub Actions (macOS-latest, fmt+clippy+test+audit) |
 | **Build** | `cargo build` |
@@ -136,13 +137,21 @@ oxios run --json --session "$SID" "follow-up"
 - **Scheduler** (`scheduler.rs`) — Priority-based task queue (AIOS/AgentRM-inspired). Rate-limit-aware admission, zombie detection, max concurrent enforcement.
 - **Orchestrator** (`orchestrator.rs`) — Runs the Ouroboros protocol end-to-end. The "brain".
 - **AgentRuntime** (`agent_runtime.rs`) — Wraps oxi-agent's tool-calling loop.
-- **OxiosEngine** (`engine.rs`) — Thin wrapper around `oxi_sdk::Oxi`. Provider/model resolution via `OxiBuilder`.
+- **OxiosEngine** (`engine.rs`) — Thin wrapper around `oxi_sdk::Oxi`. Provider/model resolution via `OxiBuilder`. Uses `oxi_ai` for provider construction.
 - **ExecTool** (`tools/exec_tool.rs`) — Two modes: `shell` (bash -c, RBAC-enforced) and `structured` (binary allowlist + metacharacter blocking).
 - **Kernel tools** (`tools/kernel/`) — Agent, Space, Persona, Security, Budget, Cron, Resource tools. Each wraps a KernelHandle API.
 - **AccessManager** (`access_manager/`) — OWASP-inspired least-privilege. RBAC, path sandboxing, audit logging.
 - **AuditTrail** (`audit_trail.rs`) — Merkle-chain style tamper-evident audit log. Each entry cryptographically linked.
 - **Memory** (`memory/`) — Vector store with hyperbolic embeddings, HNSW indexing, flash attention, reasoning bank, Sona learning engine, RVF store.
-- **KernelHandle** (`kernel_handle/`) — Facade exposing typed APIs: AgentApi, SpaceApi, SecurityApi, PersonaApi, ExecApi, BrowserApi, McpApi, ExtensionApi, InfraApi, A2aApi, StateApi.
+- **MCP** (`mcp/`) — Model Context Protocol client, protocol handler, and server integration. Wrapped by `McpApi` in kernel_handle.
+- **Auth** (`auth.rs`) — Authentication manager. Used by KernelHandle for identity verification.
+- **Workers** (`workers/`) — Background worker pool for async task processing.
+- **WasmSandbox** (`wasm_sandbox.rs`) — WASM-based sandbox for executing untrusted code.
+- **Onboarding** (`onboarding.rs`) — Interactive setup wizard triggered on first run.
+- **Space** (`space/`) — Directory: `manager.rs` (CRUD), `conversation_buffer.rs`, `knowledge_bridge.rs` (auto-knowledge extraction), `detection.rs` (intent classification).
+- **Telemetry** (`telemetry_otel.rs` / `telemetry_stub.rs`) — OpenTelemetry integration with compile-time feature toggle to stub.
+- **ResourceMonitor** (`resource_monitor.rs`) — System resource tracking for agent budget enforcement.
+- **KernelHandle** (`kernel_handle/`) — Facade exposing 11 typed APIs: AgentApi, SpaceApi, SecurityApi, PersonaApi, ExecApi, BrowserApi, McpApi, ExtensionApi, InfraApi, A2aApi, StateApi.
 - **Kernel** (`src/kernel.rs`) — `Kernel::builder().build().await` assembles all components. `execute_prompt_with_session()` for CLI execution.
 - **Program** (`program/`) — OS-level installable capabilities. See `.programs/` for examples.
 - **Capability** (`capability/`) — Template-based capability resolution for agent tool discovery.
