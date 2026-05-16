@@ -1,6 +1,6 @@
 [program]
 name = "oxibrowser"
-version = "0.2.0"
+version = "0.3.0"
 description = "Embedded headless browser for web navigation, content extraction, and automation"
 author = "oxios"
 
@@ -9,7 +9,7 @@ required = []
 optional = []
 
 [tools.browse]
-description = "Open a URL and extract its text content as markdown"
+description = "Navigate to a URL and extract page content as text"
 command = "oxibrowser"
 arguments = [
     { name = "url", description = "URL to browse", required = true },
@@ -21,3 +21,84 @@ command = "oxibrowser"
 arguments = [
     { name = "url", description = "URL to fetch", required = true },
 ]
+
+[tools.navigate]
+description = "Navigate to a URL and get page info (title, final URL)"
+command = "oxibrowser"
+arguments = [
+    { name = "url", description = "URL to navigate to", required = true },
+]
+
+[tools.click]
+description = "Click an element by CSS selector"
+command = "oxibrowser"
+arguments = [
+    { name = "selector", description = "CSS selector for target element", required = true },
+]
+
+[tools.type_text]
+description = "Type text into an input element by CSS selector"
+command = "oxibrowser"
+arguments = [
+    { name = "selector", description = "CSS selector for target element", required = true },
+    { name = "text", description = "Text to type", required = true },
+]
+
+[tools.evaluate]
+description = "Execute JavaScript and return the result as JSON"
+command = "oxibrowser"
+arguments = [
+    { name = "javascript", description = "JavaScript code to evaluate", required = true },
+    { name = "await_promise", description = "Whether to await Promise resolution", required = false },
+]
+
+[tools.html]
+description = "Get the page's full HTML content"
+command = "oxibrowser"
+
+[tools.text]
+description = "Get the page's visible text content (extracted from DOM)"
+command = "oxibrowser"
+
+[tools.markdown]
+description = "Get the page content as proper Markdown (headings, bold, links, lists, etc.)"
+command = "oxibrowser"
+
+[tools.screenshot]
+description = "Capture a PNG screenshot of the page"
+command = "oxibrowser"
+
+[tools.query_all]
+description = "Get text content of all elements matching a CSS selector"
+command = "oxibrowser"
+arguments = [
+    { name = "selector", description = "CSS selector", required = true },
+]
+
+[tools.wait_for]
+description = "Wait for an element matching the CSS selector to appear"
+command = "oxibrowser"
+arguments = [
+    { name = "selector", description = "CSS selector to wait for", required = true },
+    { name = "timeout_ms", description = "Timeout in milliseconds", required = false },
+]
+
+[tools.back]
+description = "Navigate back in browsing history"
+command = "oxibrowser"
+
+[tools.forward]
+description = "Navigate forward in browsing history"
+command = "oxibrowser"
+
+[tools.reload]
+description = "Reload the current page"
+command = "oxibrowser"
+
+[tools.load_sub_resources]
+description = "Preload sub-resources (JS, CSS, images) referenced by the current page"
+command = "oxibrowser"
+
+[tools.close]
+description = "Close the current page (creates a new blank page for next operation)"
+command = "oxibrowser"

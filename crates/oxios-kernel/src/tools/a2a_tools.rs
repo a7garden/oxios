@@ -8,7 +8,7 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use oxi_agent::{AgentTool, AgentToolResult, tools::ToolError};
+use oxi_agent::{AgentTool, AgentToolResult, ToolContext, tools::ToolError};
 use serde_json::{json, Value};
 use uuid::Uuid;
 
@@ -98,6 +98,7 @@ impl AgentTool for A2aDelegateTool {
         _tool_call_id: &str,
         params: Value,
         _shutdown: Option<tokio::sync::oneshot::Receiver<()>>,
+        _ctx: &ToolContext,
     ) -> Result<AgentToolResult, ToolError> {
         let description = params["description"]
             .as_str()
@@ -269,6 +270,7 @@ impl AgentTool for A2aSendTool {
         _tool_call_id: &str,
         params: Value,
         _shutdown: Option<tokio::sync::oneshot::Receiver<()>>,
+        _ctx: &ToolContext,
     ) -> Result<AgentToolResult, ToolError> {
         let target_str = params["target_agent_id"]
             .as_str()
@@ -402,6 +404,7 @@ impl AgentTool for A2aQueryTool {
         _tool_call_id: &str,
         params: Value,
         _shutdown: Option<tokio::sync::oneshot::Receiver<()>>,
+        _ctx: &ToolContext,
     ) -> Result<AgentToolResult, ToolError> {
         let capability = params["capability"].as_str();
         let skill = params["skill"].as_str();

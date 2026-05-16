@@ -21,7 +21,7 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use oxi_agent::{AgentTool, AgentToolResult};
+use oxi_agent::{AgentTool, AgentToolResult, ToolContext};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use parking_lot::Mutex;
@@ -390,6 +390,7 @@ impl AgentTool for ExecTool {
         _tool_call_id: &str,
         params: Value,
         _signal: Option<oneshot::Receiver<()>>,
+        _ctx: &ToolContext,
     ) -> Result<AgentToolResult, String> {
         let mode = params
             .get("mode")

@@ -15,7 +15,7 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use oxi_agent::{AgentTool, AgentToolResult};
+use oxi_agent::{AgentTool, AgentToolResult, ToolContext};
 use serde_json::{json, Value};
 use tokio::sync::oneshot;
 
@@ -102,6 +102,7 @@ impl AgentTool for CronTool {
         _tool_call_id: &str,
         params: Value,
         _signal: Option<oneshot::Receiver<()>>,
+        _ctx: &ToolContext,
     ) -> Result<AgentToolResult, String> {
         let action = params
             .get("action")

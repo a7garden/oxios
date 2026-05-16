@@ -46,6 +46,15 @@ pub trait BrowserBackend: Send + Sync {
     /// Navigate to a URL and wait for the page to load.
     async fn navigate(&self, url: &str) -> Result<PageInfo>;
 
+    /// Navigate back in history.
+    async fn go_back(&self) -> Result<()>;
+
+    /// Navigate forward in history.
+    async fn go_forward(&self) -> Result<()>;
+
+    /// Reload the current page.
+    async fn reload(&self) -> Result<()>;
+
     /// Click an element matching the CSS selector.
     async fn click(&self, selector: &str) -> Result<()>;
 
@@ -55,11 +64,20 @@ pub trait BrowserBackend: Send + Sync {
     /// Execute JavaScript and return the result as JSON.
     async fn evaluate(&self, js: &str) -> Result<serde_json::Value>;
 
+    /// Execute JavaScript, optionally awaiting Promise resolution.
+    ///
+    /// When `await_promise` is true and the result is a Promise,
+    /// the runtime drains microtasks and returns the settled value.
+    async fn evaluate_with_await(&self, js: &str, await_promise: bool) -> Result<serde_json::Value>;
+
     /// Get the page's full HTML content.
     async fn html(&self) -> Result<String>;
 
     /// Get the page's visible text content (extracted from DOM).
     async fn text(&self) -> Result<String>;
+
+    /// Render the page as proper Markdown (headings, bold, links, etc.).
+    async fn markdown(&self) -> Result<String>;
 
     /// Take a screenshot and return PNG bytes.
     async fn screenshot(&self) -> Result<Vec<u8>>;
@@ -69,6 +87,12 @@ pub trait BrowserBackend: Send + Sync {
 
     /// Get text content of all elements matching a CSS selector.
     async fn query_all(&self, selector: &str) -> Result<Vec<String>>;
+
+    /// Wait for an element matching the CSS selector to appear.
+    async fn wait_for(&self, selector: &str, timeout_ms: u64) -> Result<()>;
+
+    /// Load sub-resources (JS, CSS, images) referenced by the current page.
+    async fn load_sub_resources(&self) -> Result<usize>;
 
     /// Close the current page (creates a new blank page for next operation).
     async fn close(&self) -> Result<()>;

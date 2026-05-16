@@ -148,6 +148,36 @@ impl BrowserBackend for OxibrowserBackend {
         })
     }
 
+    async fn go_back(&self) -> Result<()> {
+        let session_arc = self.ensure_session().await?;
+        let mut session = session_arc.write().await;
+        session
+            .go_back()
+            .await
+            .context("Failed to go back in history")?;
+        Ok(())
+    }
+
+    async fn go_forward(&self) -> Result<()> {
+        let session_arc = self.ensure_session().await?;
+        let mut session = session_arc.write().await;
+        session
+            .go_forward()
+            .await
+            .context("Failed to go forward in history")?;
+        Ok(())
+    }
+
+    async fn reload(&self) -> Result<()> {
+        let session_arc = self.ensure_session().await?;
+        let mut session = session_arc.write().await;
+        session
+            .reload()
+            .await
+            .context("Failed to reload page")?;
+        Ok(())
+    }
+
     async fn click(&self, selector: &str) -> Result<()> {
         let session_arc = self.ensure_session().await?;
         let mut session = session_arc.write().await;
@@ -227,11 +257,15 @@ impl BrowserBackend for OxibrowserBackend {
     }
 
     async fn evaluate(&self, js: &str) -> Result<serde_json::Value> {
+        self.evaluate_with_await(js, false).await
+    }
+
+    async fn evaluate_with_await(&self, js: &str, await_promise: bool) -> Result<serde_json::Value> {
         let session_arc = self.ensure_session().await?;
         let mut session = session_arc.write().await;
 
         let result = session
-            .evaluate_js(js)
+            .evaluate_js_with_await(js, await_promise)
             .await
             .context("JavaScript evaluation failed")?;
 
@@ -268,9 +302,26 @@ impl BrowserBackend for OxibrowserBackend {
         Ok(text)
     }
 
+    async fn markdown(&self) -> Result<String> {
+        let session_arc = self.ensure_session().await?;
+        let session = session_arc.read().await;
+
+        let page = session
+            .page()
+            .context("No page loaded — navigate first")?;
+
+        Ok(page.to_markdown())
+    }
+
     async fn screenshot(&self) -> Result<Vec<u8>> {
-        // OxiBrowser is a headless DOM-only engine — no rendering pipeline.
-        anyhow::bail!("Screenshots are not supported: OxiBrowser is a DOM-only engine without a rendering pipeline");
+        let session_arc = self.ensure_session().await?;
+        let session = session_arc.read().await;
+
+        let page = session
+            .page()
+            .context("No page loaded — navigate first")?;
+
+        page.to_screenshot_png(1280).map_err(|e| anyhow::anyhow!("{}", e))
     }
 
     async fn title(&self) -> Result<String> {
@@ -304,6 +355,22 @@ impl BrowserBackend for OxibrowserBackend {
             .collect();
 
         Ok(texts)
+    }
+
+    async fn wait_for(&self, selector: &str, timeout_ms: u64) -> Result<()> {
+        let session_arc = self.ensure_session().await?;
+        let mut session = session_arc.write().await;
+        session
+            .wait_for(selector, timeout_ms)
+            .await
+            .context(format!("wait_for('{}') timed out after {}ms", selector, timeout_ms))?;
+        Ok(())
+    }
+
+    async fn load_sub_resources(&self) -> Result<usize> {
+        let session_arc = self.ensure_session().await?;
+        let mut session = session_arc.write().await;
+        Ok(session.load_sub_resources().await)
     }
 
     async fn close(&self) -> Result<()> {

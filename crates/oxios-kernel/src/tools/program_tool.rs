@@ -7,7 +7,7 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use oxi_agent::{AgentTool, AgentToolResult};
+use oxi_agent::{AgentTool, AgentToolResult, ToolContext};
 use serde_json::{json, Value};
 use tokio::sync::oneshot;
 
@@ -98,6 +98,7 @@ impl AgentTool for ProgramTool {
         _tool_call_id: &str,
         params: Value,
         signal: Option<oneshot::Receiver<()>>,
+        _ctx: &ToolContext,
     ) -> Result<AgentToolResult, String> {
         // Extract user-provided args
         let user_args: Vec<String> = params
@@ -123,8 +124,9 @@ impl AgentTool for ProgramTool {
             "binary": self.binary,
             "args": all_args,
         });
+        let ctx = oxi_agent::ToolContext::default();
         self.exec_tool
-            .execute(&format!("pg:{}", self.full_name), exec_params, signal)
+            .execute(&format!("pg:{}", self.full_name), exec_params, signal, &ctx)
             .await
     }
 }

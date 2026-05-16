@@ -4641,9 +4641,9 @@ dependencies = [
 
 [[package]]
 name = "oxibrowser-core"
-version = "0.6.0"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e2f6ee8399ff5be419e785559e1168ccfe9419ef13268766e2728f77bf20c3fb"
+checksum = "a5a1c61a66a5d02f5d0539bdb77f275b905eb6fde5843f35e77c5c3ee07f8872"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4653,6 +4653,7 @@ dependencies = [
  "bytes",
  "encoding_rs",
  "futures",
+ "getrandom 0.3.4",
  "html5ever",
  "image",
  "markup5ever",
@@ -4672,9 +4673,9 @@ dependencies = [
 
 [[package]]
 name = "oxibrowser-webapi"
-version = "0.6.0"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "447306940e5b77b73eb21561767a1248b83d9c0a2c737a8dd7c93daca6b2d886"
+checksum = "418f44a5403e43114ae7f30669a1b0f065a41106bc2cba3efbce1221a117c885"
 dependencies = [
  "html5ever",
  "markup5ever",

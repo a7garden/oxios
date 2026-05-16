@@ -9,7 +9,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use chrono::Utc;
-use oxi_agent::{AgentTool, AgentToolResult};
+use oxi_agent::{AgentTool, AgentToolResult, ToolContext};
 use serde_json::{json, Value};
 
 use crate::memory::{MemoryEntry, MemoryManager, MemoryType};
@@ -85,6 +85,7 @@ impl AgentTool for MemoryWriteTool {
         _tool_call_id: &str,
         params: Value,
         _signal: Option<tokio::sync::oneshot::Receiver<()>>,
+        _ctx: &ToolContext,
     ) -> Result<AgentToolResult, oxi_agent::tools::ToolError> {
         let content = params["content"]
             .as_str()
@@ -209,6 +210,7 @@ impl AgentTool for MemoryReadTool {
         _tool_call_id: &str,
         params: Value,
         _signal: Option<tokio::sync::oneshot::Receiver<()>>,
+        _ctx: &ToolContext,
     ) -> Result<AgentToolResult, oxi_agent::tools::ToolError> {
         let limit = params["limit"].as_u64().unwrap_or(10) as usize;
 
@@ -336,6 +338,7 @@ impl AgentTool for MemorySearchTool {
         _tool_call_id: &str,
         params: Value,
         _signal: Option<tokio::sync::oneshot::Receiver<()>>,
+        _ctx: &ToolContext,
     ) -> Result<AgentToolResult, oxi_agent::tools::ToolError> {
         let query = params["query"].as_str().unwrap_or("");
         if query.is_empty() {

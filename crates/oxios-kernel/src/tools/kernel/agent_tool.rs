@@ -14,8 +14,7 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use oxi_agent::AgentTool as OxiAgentTool;
-use oxi_agent::AgentToolResult;
+use oxi_agent::{AgentTool as OxiAgentTool, AgentToolResult, ToolContext};
 use serde_json::{json, Value};
 use tokio::sync::oneshot;
 
@@ -109,6 +108,7 @@ impl OxiAgentTool for AgentTool {
         _tool_call_id: &str,
         params: Value,
         _signal: Option<oneshot::Receiver<()>>,
+        _ctx: &ToolContext,
     ) -> Result<AgentToolResult, String> {
         let action = params
             .get("action")

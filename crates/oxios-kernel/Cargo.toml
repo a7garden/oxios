@@ -51,7 +51,7 @@ dirs = "6"
 usearch = "2.25"
 
 # Headless browser (built-in)
-oxibrowser-core = "0.6.0"
+oxibrowser-core = "0.7.0"
 
 # OpenTelemetry (optional)
 tracing-opentelemetry = { version = "0.28", optional = true }
