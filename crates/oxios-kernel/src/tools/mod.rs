@@ -24,4 +24,4 @@ pub use memory_tools::{MemoryReadTool, MemorySearchTool, MemoryWriteTool};
 pub use program_tool::ProgramTool;
 
 #[cfg(feature = "browser")]
-pub use browser::{BrowserTool, BrowserBackend, OxibrowserBackend, OxibrowserConfig};
+pub use browser::BrowserTool;

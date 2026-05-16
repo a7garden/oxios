@@ -1,58 +1,54 @@
 //! Agent-facing browser tool.
 //!
-//! Wraps `BrowserBackend` behind the `AgentTool` interface so agents
+//! Wraps `oxibrowser_core::Browser` behind the `AgentTool` interface so agents
 //! can browse the web in their tool-calling loop.
 //!
-//! ## Tool Schema
-//!
-//! The tool exposes a single `action` parameter with sub-operations:
-//! - `navigate` — go to a URL
-//! - `back` — navigate back in history
-//! - `forward` — navigate forward in history
-//! - `reload` — reload the current page
-//! - `click` — click an element
-//! - `type` — type text into an element
-//! - `evaluate` — run JavaScript
-//! - `evaluate_with_await` — run JavaScript, awaiting Promise resolution
-//! - `html` — get page HTML
-//! - `text` — get page text content
-//! - `markdown` — get page content as proper Markdown
-//! - `screenshot` — capture PNG screenshot (returned as base64)
-//! - `query_all` — get text of all matching elements
-//! - `wait_for` — wait for element to appear
-//! - `load_sub_resources` — preload JS/CSS/images
-//! - `close` — close current page
+//! Two usage patterns:
+//! - **`browse`** — one-shot URL → Markdown (90% of agent requests)
+//! - **`goto`/`click`/`type`/...** — interactive session via `Tab`
 
 use std::sync::Arc;
 
 use async_trait::async_trait;
 use oxi_agent::{AgentTool, AgentToolResult, ToolContext};
 use serde_json::{json, Value};
-use tokio::sync::oneshot;
+use tokio::sync::{Mutex, oneshot};
 
-use super::BrowserBackend;
-
-/// Agent tool for web browsing via headless browser.
+/// Agent tool for web browsing via the embedded OxiBrowser engine.
 ///
-/// All browser operations are routed through the `BrowserBackend` trait,
-/// which abstracts away the underlying browser engine implementation.
+/// Owns a `Browser` instance and lazily creates a `Tab` for interactive use.
 pub struct BrowserTool {
-    backend: Arc<dyn BrowserBackend>,
+    browser: Arc<oxibrowser_core::Browser>,
+    tab: Arc<Mutex<Option<oxibrowser_core::Tab>>>,
 }
 
 impl BrowserTool {
-    /// Create a new browser tool with the given backend.
-    pub fn new(backend: Arc<dyn BrowserBackend>) -> Self {
-        Self { backend }
+    /// Create a new browser tool with an already-initialized browser.
+    pub fn new(browser: Arc<oxibrowser_core::Browser>) -> Self {
+        Self {
+            browser,
+            tab: Arc::new(Mutex::new(None)),
+        }
     }
 
     /// Create a `BrowserTool` from a [`KernelHandle`].
-    ///
-    /// Extracts the browser backend from the kernel's browser facade.
-    /// Only available when the `browser` feature is enabled.
     #[cfg(feature = "browser")]
     pub fn from_kernel(kernel: &crate::kernel_handle::KernelHandle) -> Self {
-        Self::new(kernel.browser.backend().clone() as Arc<dyn BrowserBackend>)
+        Self::new(kernel.browser.browser().clone())
+    }
+
+    /// Get or create an interactive tab.
+    async fn get_or_create_tab(&self) -> anyhow::Result<oxibrowser_core::Tab> {
+        let mut guard = self.tab.lock().await;
+        let needs_new = match guard.as_ref() {
+            None => true,
+            Some(t) => t.is_closed(),
+        };
+        if needs_new {
+            let tab = self.browser.new_tab().await?;
+            *guard = Some(tab.clone());
+        }
+        Ok(guard.as_ref().unwrap().clone())
     }
 }
 
@@ -73,7 +69,7 @@ impl AgentTool for BrowserTool {
     }
 
     fn description(&self) -> &'static str {
-        "Browse the web using a headless browser. Actions: navigate(url), back(), forward(), reload(), click(selector), type(selector, text), evaluate(js), evaluate_with_await(js, await_promise), html(), text(), markdown(), screenshot(), query_all(selector), wait_for(selector, timeout_ms), load_sub_resources(), close()"
+        "Browse the web using a headless browser. Actions: browse(url), goto(url), back(), forward(), reload(), post(url, body, content_type), click(selector), type(selector, text), press_key(key), evaluate(js), evaluate_await(js), content(), query_all(selector), wait_for(selector, timeout_ms), load_resources(), screenshot(), close()"
     }
 
     fn parameters_schema(&self) -> Value {
@@ -83,48 +79,61 @@ impl AgentTool for BrowserTool {
                 "action": {
                     "type": "string",
                     "enum": [
-                        "navigate",
+                        "browse",
+                        "goto",
                         "back",
                         "forward",
                         "reload",
+                        "post",
                         "click",
                         "type",
+                        "press_key",
                         "evaluate",
-                        "evaluate_with_await",
-                        "html",
-                        "text",
-                        "markdown",
-                        "screenshot",
+                        "evaluate_await",
+                        "content",
                         "query_all",
                         "wait_for",
-                        "load_sub_resources",
+                        "load_resources",
+                        "screenshot",
                         "close"
                     ],
                     "description": "Browser action to perform"
                 },
                 "url": {
                     "type": "string",
-                    "description": "URL to navigate to (navigate action)"
+                    "description": "URL (browse, goto, post actions)"
                 },
                 "selector": {
                     "type": "string",
-                    "description": "CSS selector for the target element (click, type, query_all, wait_for actions)"
+                    "description": "CSS selector (click, type, query_all, wait_for actions)"
                 },
                 "text": {
                     "type": "string",
-                    "description": "Text to type into the element (type action)"
+                    "description": "Text to type (type action)"
+                },
+                "key": {
+                    "type": "string",
+                    "description": "Key to press (press_key action, e.g. 'Enter', 'Tab')"
                 },
                 "javascript": {
                     "type": "string",
-                    "description": "JavaScript code to evaluate (evaluate, evaluate_with_await actions)"
+                    "description": "JavaScript code (evaluate, evaluate_await actions)"
                 },
-                "await_promise": {
-                    "type": "boolean",
-                    "description": "Whether to await Promise resolution (evaluate_with_await action)"
+                "body": {
+                    "type": "string",
+                    "description": "Request body (post action)"
+                },
+                "content_type": {
+                    "type": "string",
+                    "description": "Content-Type header (post action)"
                 },
                 "timeout_ms": {
                     "type": "integer",
                     "description": "Timeout in milliseconds (wait_for action)"
+                },
+                "width": {
+                    "type": "integer",
+                    "description": "Viewport width for screenshot (default 1280)"
                 }
             },
             "required": ["action"]
@@ -144,71 +153,73 @@ impl AgentTool for BrowserTool {
             .ok_or_else(|| "Missing required parameter: action".to_string())?;
 
         match action {
-            "navigate" => {
-                let url = params
-                    .get("url")
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| "navigate requires 'url' parameter".to_string())?;
-
-                match self.backend.navigate(url).await {
-                    Ok(info) => Ok(AgentToolResult::success(format!(
-                        "Navigated to '{}'. Title: '{}'",
-                        info.url, info.title
-                    ))),
-                    Err(e) => Ok(AgentToolResult::error(format!(
-                        "Navigation failed: {}",
-                        e
-                    ))),
+            // ── One-shot browse ────────────────────────────────────
+            "browse" => {
+                let url = param_str(&params, "url", "browse requires 'url'")?;
+                match self.browser.browse(url).await {
+                    Ok(r) => Ok(AgentToolResult::success(format_browse(&r))),
+                    Err(e) => Ok(AgentToolResult::error(format!("Browse failed: {}", e))),
                 }
             }
 
+            // ── Interactive navigation ─────────────────────────────
+            "goto" => {
+                let url = param_str(&params, "url", "goto requires 'url'")?;
+                let tab = self.get_or_create_tab().await.map_err(|e| e.to_string())?;
+                match tab.goto(url).await {
+                    Ok(r) => Ok(AgentToolResult::success(format_browse(&r))),
+                    Err(e) => Ok(AgentToolResult::error(format!("Navigation failed: {}", e))),
+                }
+            }
             "back" => {
-                match self.backend.go_back().await {
-                    Ok(()) => Ok(AgentToolResult::success("Navigated back")),
-                    Err(e) => Ok(AgentToolResult::error(format!("Go back failed: {}", e))),
+                let tab = self.get_or_create_tab().await.map_err(|e| e.to_string())?;
+                match tab.back().await {
+                    Ok(r) => Ok(AgentToolResult::success(format_browse(&r))),
+                    Err(e) => Ok(AgentToolResult::error(format!("Back failed: {}", e))),
                 }
             }
-
             "forward" => {
-                match self.backend.go_forward().await {
-                    Ok(()) => Ok(AgentToolResult::success("Navigated forward")),
-                    Err(e) => Ok(AgentToolResult::error(format!("Go forward failed: {}", e))),
+                let tab = self.get_or_create_tab().await.map_err(|e| e.to_string())?;
+                match tab.forward().await {
+                    Ok(r) => Ok(AgentToolResult::success(format_browse(&r))),
+                    Err(e) => Ok(AgentToolResult::error(format!("Forward failed: {}", e))),
                 }
             }
-
             "reload" => {
-                match self.backend.reload().await {
-                    Ok(()) => Ok(AgentToolResult::success("Page reloaded")),
+                let tab = self.get_or_create_tab().await.map_err(|e| e.to_string())?;
+                match tab.reload().await {
+                    Ok(r) => Ok(AgentToolResult::success(format_browse(&r))),
                     Err(e) => Ok(AgentToolResult::error(format!("Reload failed: {}", e))),
                 }
             }
-
-            "click" => {
-                let selector = params
-                    .get("selector")
+            "post" => {
+                let url = param_str(&params, "url", "post requires 'url'")?;
+                let body = param_str(&params, "body", "post requires 'body'")?;
+                let ct = params
+                    .get("content_type")
                     .and_then(|v| v.as_str())
-                    .ok_or_else(|| "click requires 'selector' parameter".to_string())?;
-
-                match self.backend.click(selector).await {
-                    Ok(()) => Ok(AgentToolResult::success(format!(
-                        "Clicked '{}'",
-                        selector
-                    ))),
-                    Err(e) => Ok(AgentToolResult::error(format!("Click failed: {}", e))),
+                    .unwrap_or("application/json");
+                let tab = self.get_or_create_tab().await.map_err(|e| e.to_string())?;
+                match tab.post(url, body, ct).await {
+                    Ok(r) => Ok(AgentToolResult::success(format_browse(&r))),
+                    Err(e) => Ok(AgentToolResult::error(format!("POST failed: {}", e))),
                 }
             }
 
+            // ── Interaction ────────────────────────────────────────
+            "click" => {
+                let selector = param_str(&params, "selector", "click requires 'selector'")?;
+                let tab = self.get_or_create_tab().await.map_err(|e| e.to_string())?;
+                match tab.click(selector).await {
+                    Ok(()) => Ok(AgentToolResult::success(format!("Clicked '{}'", selector))),
+                    Err(e) => Ok(AgentToolResult::error(format!("Click failed: {}", e))),
+                }
+            }
             "type" => {
-                let selector = params
-                    .get("selector")
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| "type requires 'selector' parameter".to_string())?;
-                let text = params
-                    .get("text")
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| "type requires 'text' parameter".to_string())?;
-
-                match self.backend.r#type(selector, text).await {
+                let selector = param_str(&params, "selector", "type requires 'selector'")?;
+                let text = param_str(&params, "text", "type requires 'text'")?;
+                let tab = self.get_or_create_tab().await.map_err(|e| e.to_string())?;
+                match tab.r#type(selector, text).await {
                     Ok(()) => Ok(AgentToolResult::success(format!(
                         "Typed {} chars into '{}'",
                         text.len(),
@@ -217,118 +228,27 @@ impl AgentTool for BrowserTool {
                     Err(e) => Ok(AgentToolResult::error(format!("Type failed: {}", e))),
                 }
             }
-
-            "evaluate" => {
-                let js = params
-                    .get("javascript")
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| "evaluate requires 'javascript' parameter".to_string())?;
-
-                match self.backend.evaluate(js).await {
-                    Ok(value) => {
-                        let output = serde_json::to_string_pretty(&value)
-                            .unwrap_or_else(|_| value.to_string());
-                        Ok(AgentToolResult::success(output))
-                    }
-                    Err(e) => Ok(AgentToolResult::error(format!(
-                        "JS evaluation failed: {}",
-                        e
-                    ))),
+            "press_key" => {
+                let key = param_str(&params, "key", "press_key requires 'key'")?;
+                let tab = self.get_or_create_tab().await.map_err(|e| e.to_string())?;
+                match tab.press_key(key).await {
+                    Ok(()) => Ok(AgentToolResult::success(format!("Pressed '{}'", key))),
+                    Err(e) => Ok(AgentToolResult::error(format!("Press key failed: {}", e))),
                 }
             }
 
-            "evaluate_with_await" => {
-                let js = params
-                    .get("javascript")
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| "evaluate_with_await requires 'javascript' parameter".to_string())?;
-                let await_promise = params
-                    .get("await_promise")
-                    .and_then(|v| v.as_bool())
-                    .unwrap_or(false);
-
-                match self.backend.evaluate_with_await(js, await_promise).await {
-                    Ok(value) => {
-                        let output = serde_json::to_string_pretty(&value)
-                            .unwrap_or_else(|_| value.to_string());
-                        Ok(AgentToolResult::success(output))
-                    }
-                    Err(e) => Ok(AgentToolResult::error(format!(
-                        "JS evaluation failed: {}",
-                        e
-                    ))),
+            // ── Content extraction ─────────────────────────────────
+            "content" => {
+                let tab = self.get_or_create_tab().await.map_err(|e| e.to_string())?;
+                match tab.content().await {
+                    Ok(r) => Ok(AgentToolResult::success(format_browse(&r))),
+                    Err(e) => Ok(AgentToolResult::error(format!("Content failed: {}", e))),
                 }
             }
-
-            "html" => match self.backend.html().await {
-                Ok(html) => {
-                    // Truncate large HTML to avoid context bloat.
-                    let truncated = if html.len() > 50_000 {
-                        format!(
-                            "{}\n\n... (truncated, {} total chars)",
-                            &html[..50_000],
-                            html.len()
-                        )
-                    } else {
-                        html
-                    };
-                    Ok(AgentToolResult::success(truncated))
-                }
-                Err(e) => Ok(AgentToolResult::error(format!("Get HTML failed: {}", e))),
-            },
-
-            "text" => match self.backend.text().await {
-                Ok(text) => {
-                    let truncated = if text.len() > 50_000 {
-                        format!(
-                            "{}\n\n... (truncated, {} total chars)",
-                            &text[..50_000],
-                            text.len()
-                        )
-                    } else {
-                        text
-                    };
-                    Ok(AgentToolResult::success(truncated))
-                }
-                Err(e) => Ok(AgentToolResult::error(format!("Get text failed: {}", e))),
-            },
-
-            "markdown" => match self.backend.markdown().await {
-                Ok(md) => {
-                    let truncated = if md.len() > 50_000 {
-                        format!(
-                            "{}\n\n... (truncated, {} total chars)",
-                            &md[..50_000],
-                            md.len()
-                        )
-                    } else {
-                        md
-                    };
-                    Ok(AgentToolResult::success(truncated))
-                }
-                Err(e) => Ok(AgentToolResult::error(format!("Get markdown failed: {}", e))),
-            },
-
-            "screenshot" => match self.backend.screenshot().await {
-                Ok(png_bytes) => {
-                    Ok(AgentToolResult::success(format!(
-                        "Screenshot captured: {} bytes (PNG)",
-                        png_bytes.len()
-                    )))
-                }
-                Err(e) => Ok(AgentToolResult::error(format!(
-                    "Screenshot failed: {}",
-                    e
-                ))),
-            },
-
             "query_all" => {
-                let selector = params
-                    .get("selector")
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| "query_all requires 'selector' parameter".to_string())?;
-
-                match self.backend.query_all(selector).await {
+                let selector = param_str(&params, "selector", "query_all requires 'selector'")?;
+                let tab = self.get_or_create_tab().await.map_err(|e| e.to_string())?;
+                match tab.query_all(selector).await {
                     Ok(texts) => {
                         let output = if texts.is_empty() {
                             format!("No elements found matching '{}'", selector)
@@ -342,57 +262,129 @@ impl AgentTool for BrowserTool {
                         };
                         Ok(AgentToolResult::success(output))
                     }
-                    Err(e) => Ok(AgentToolResult::error(format!(
-                        "Query failed: {}",
-                        e
-                    ))),
+                    Err(e) => Ok(AgentToolResult::error(format!("Query failed: {}", e))),
+                }
+            }
+            "evaluate" => {
+                let js = param_str(&params, "javascript", "evaluate requires 'javascript'")?;
+                let tab = self.get_or_create_tab().await.map_err(|e| e.to_string())?;
+                match tab.evaluate(js).await {
+                    Ok(value) => {
+                        let output =
+                            serde_json::to_string_pretty(&value).unwrap_or_else(|_| value.to_string());
+                        Ok(AgentToolResult::success(output))
+                    }
+                    Err(e) => Ok(AgentToolResult::error(format!("JS evaluation failed: {}", e))),
+                }
+            }
+            "evaluate_await" => {
+                let js = param_str(&params, "javascript", "evaluate_await requires 'javascript'")?;
+                let tab = self.get_or_create_tab().await.map_err(|e| e.to_string())?;
+                match tab.evaluate_await(js).await {
+                    Ok(value) => {
+                        let output =
+                            serde_json::to_string_pretty(&value).unwrap_or_else(|_| value.to_string());
+                        Ok(AgentToolResult::success(output))
+                    }
+                    Err(e) => Ok(AgentToolResult::error(format!("JS evaluation failed: {}", e))),
                 }
             }
 
+            // ── Waiting ────────────────────────────────────────────
             "wait_for" => {
-                let selector = params
-                    .get("selector")
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| "wait_for requires 'selector' parameter".to_string())?;
-                let timeout_ms = params
-                    .get("timeout_ms")
-                    .and_then(|v| v.as_u64())
-                    .unwrap_or(30_000);
-
-                match self.backend.wait_for(selector, timeout_ms).await {
+                let selector = param_str(&params, "selector", "wait_for requires 'selector'")?;
+                let timeout_ms = params.get("timeout_ms").and_then(|v| v.as_u64()).unwrap_or(30_000);
+                let tab = self.get_or_create_tab().await.map_err(|e| e.to_string())?;
+                match tab.wait_for(selector, timeout_ms).await {
                     Ok(()) => Ok(AgentToolResult::success(format!(
                         "Element '{}' found within {}ms",
                         selector, timeout_ms
                     ))),
-                    Err(e) => Ok(AgentToolResult::error(format!(
-                        "wait_for failed: {}",
-                        e
-                    ))),
+                    Err(e) => Ok(AgentToolResult::error(format!("wait_for failed: {}", e))),
                 }
             }
 
-            "load_sub_resources" => match self.backend.load_sub_resources().await {
-                Ok(count) => Ok(AgentToolResult::success(format!(
-                    "Loaded {} sub-resources",
-                    count
-                ))),
-                Err(e) => Ok(AgentToolResult::error(format!(
-                    "load_sub_resources failed: {}",
-                    e
-                ))),
-            },
+            // ── Sub-resources ──────────────────────────────────────
+            "load_resources" => {
+                let tab = self.get_or_create_tab().await.map_err(|e| e.to_string())?;
+                match tab.load_resources().await {
+                    Ok(count) => {
+                        Ok(AgentToolResult::success(format!("Loaded {} resources", count)))
+                    }
+                    Err(e) => {
+                        Ok(AgentToolResult::error(format!("load_resources failed: {}", e)))
+                    }
+                }
+            }
 
-            "close" => match self.backend.close().await {
-                Ok(()) => Ok(AgentToolResult::success("Page closed")),
-                Err(e) => Ok(AgentToolResult::error(format!("Close failed: {}", e))),
-            },
+            // ── Screenshot ─────────────────────────────────────────
+            "screenshot" => {
+                let width = params.get("width").and_then(|v| v.as_u64()).unwrap_or(1280) as u32;
+                let tab = self.get_or_create_tab().await.map_err(|e| e.to_string())?;
+                match tab.screenshot(width).await {
+                    Ok(png) => Ok(AgentToolResult::success(format!(
+                        "Screenshot: {} bytes (PNG, {}px wide)",
+                        png.len(),
+                        width
+                    ))),
+                    Err(e) => Ok(AgentToolResult::error(format!("Screenshot failed: {}", e))),
+                }
+            }
+
+            // ── Lifecycle ──────────────────────────────────────────
+            "close" => {
+                let mut guard = self.tab.lock().await;
+                if let Some(t) = guard.take() {
+                    let _ = t.close().await;
+                }
+                Ok(AgentToolResult::success("Tab closed"))
+            }
 
             other => Err(format!(
-                "Unknown browser action '{}'. Valid: navigate, back, forward, reload, click, type, evaluate, evaluate_with_await, html, text, markdown, screenshot, query_all, wait_for, load_sub_resources, close",
+                "Unknown browser action '{}'. Valid: browse, goto, back, forward, reload, post, click, type, press_key, evaluate, evaluate_await, content, query_all, wait_for, load_resources, screenshot, close",
                 other
             )),
         }
     }
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/// Format a `BrowseResult` for agent consumption.
+fn format_browse(r: &oxibrowser_core::BrowseResult) -> String {
+    let md = &r.markdown;
+    if md.len() > 50_000 {
+        // Find a safe UTF-8 boundary near 50_000 to avoid panic on multi-byte chars.
+        let cut = md.floor_char_boundary(50_000);
+        format!(
+            "URL: {} (status {})\nTitle: {}\n\n{}\n\n... (truncated, {} total chars)",
+            r.url,
+            r.status,
+            r.title,
+            &md[..cut],
+            md.len()
+        )
+    } else if md.is_empty() {
+        format!(
+            "URL: {} (status {})\nTitle: {}\n(no content)",
+            r.url, r.status, r.title
+        )
+    } else {
+        format!(
+            "URL: {} (status {})\nTitle: {}\n\n{}",
+            r.url, r.status, r.title, md
+        )
+    }
+}
+
+/// Extract a required string parameter (borrowed).
+fn param_str<'a>(params: &'a Value, key: &str, error_msg: &str) -> Result<&'a str, String> {
+    params
+        .get(key)
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| error_msg.to_string())
 }
 
 #[cfg(test)]
@@ -400,11 +392,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_name_and_label() {
-        let actions = vec!["navigate", "back", "forward", "reload", "click", "type", "evaluate", "evaluate_with_await", "html", "text", "markdown", "screenshot", "query_all", "wait_for", "load_sub_resources", "close"];
+    fn test_schema_covers_all_actions() {
+        let actions = vec![
+            "browse", "goto", "back", "forward", "reload", "post",
+            "click", "type", "press_key",
+            "evaluate", "evaluate_await",
+            "content", "query_all",
+            "wait_for", "load_resources", "screenshot", "close",
+        ];
         assert!(actions.len() >= 15);
-        assert!(actions.iter().any(|a| *a == "navigate"));
-        assert!(actions.iter().any(|a| *a == "markdown"));
-        assert!(actions.iter().any(|a| *a == "wait_for"));
+        assert!(actions.contains(&"browse"));
+        assert!(actions.contains(&"goto"));
+        assert!(actions.contains(&"press_key"));
     }
 }

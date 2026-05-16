@@ -125,14 +125,7 @@ impl Kernel {
     #[cfg(feature = "browser")]
     fn build_browser_api(&self) -> oxios_kernel::BrowserApi {
         if self.config.browser.enabled {
-            let browser_config = oxios_kernel::OxibrowserConfig {
-                user_agent: self.config.browser.user_agent.clone(),
-                timeout_secs: self.config.browser.timeout_secs,
-                max_sessions: self.config.browser.max_sessions,
-                cookie_file: self.config.browser.cookie_file.clone(),
-            };
-            let backend = Arc::new(oxios_kernel::OxibrowserBackend::new(browser_config));
-            oxios_kernel::BrowserApi::new(backend)
+            oxios_kernel::BrowserApi::from_config(&self.config.browser.engine)
         } else {
             oxios_kernel::BrowserApi::default()
         }
@@ -632,14 +625,7 @@ async fn build_tool_retriever(pm: &Arc<ProgramManager>) -> oxios_kernel::tools::
 #[cfg(feature = "browser")]
 fn build_browser_api_value(config: &OxiosConfig) -> oxios_kernel::BrowserApi {
     if config.browser.enabled {
-        let browser_config = oxios_kernel::OxibrowserConfig {
-            user_agent: config.browser.user_agent.clone(),
-            timeout_secs: config.browser.timeout_secs,
-            max_sessions: config.browser.max_sessions,
-            cookie_file: config.browser.cookie_file.clone(),
-        };
-        let backend = Arc::new(oxios_kernel::OxibrowserBackend::new(browser_config));
-        oxios_kernel::BrowserApi::new(backend)
+        oxios_kernel::BrowserApi::from_config(&config.browser.engine)
     } else {
         oxios_kernel::BrowserApi::default()
     }

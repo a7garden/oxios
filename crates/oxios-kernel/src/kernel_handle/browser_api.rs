@@ -1,37 +1,51 @@
 //! Browser API — browser backend facade.
+//!
+//! When the `browser` feature is enabled, holds an `Arc<oxibrowser_core::Browser>`
+//! that can be shared with `BrowserTool` instances.
 
 use std::sync::Arc;
 
-#[cfg(feature = "browser")]
-use crate::tools::OxibrowserBackend;
-
 /// Browser management system calls.
 ///
-/// When the `browser` feature is enabled, wraps [`OxibrowserBackend`].
-/// Otherwise, this is a zero-sized placeholder.
+/// Wraps the embedded OxiBrowser engine. `BrowserTool` borrows the `Browser`
+/// via `browser()` for agent tool calls.
 #[cfg(feature = "browser")]
 pub struct BrowserApi {
-    backend: Arc<OxibrowserBackend>,
+    browser: Arc<oxibrowser_core::Browser>,
 }
 
 #[cfg(feature = "browser")]
 impl BrowserApi {
-    /// Create a new BrowserApi.
-    pub fn new(backend: Arc<OxibrowserBackend>) -> Self {
-        Self { backend }
+    /// Create a new BrowserApi by initializing a Browser from config.
+    pub fn from_config(config: &oxibrowser_core::BrowserConfig) -> Self {
+        let rt = tokio::runtime::Handle::current();
+        let engine = config.clone();
+        let browser = rt
+            .block_on(oxibrowser_core::Browser::new(engine))
+            .expect("Failed to initialize browser engine");
+        Self {
+            browser: Arc::new(browser),
+        }
     }
 
-    /// Browser backend reference.
-    pub fn backend(&self) -> &Arc<OxibrowserBackend> {
-        &self.backend
+    /// Create a new BrowserApi from an already-initialized Browser.
+    pub fn new(browser: Arc<oxibrowser_core::Browser>) -> Self {
+        Self { browser }
+    }
+
+    /// Browser engine reference.
+    pub fn browser(&self) -> &Arc<oxibrowser_core::Browser> {
+        &self.browser
+    }
+
+    /// Shut down the browser engine.
+    pub async fn shutdown(&self) -> anyhow::Result<()> {
+        self.browser.close().await?;
+        Ok(())
     }
 }
 
-/// Default (no-op) construction for `from_subsystems`.
-/// This is used by the deprecated constructor which has no browser backend available.
-///
-/// **Panics** if the `browser` feature is enabled, because a real backend is required.
-/// Use [`KernelHandle::new()`] instead.
+/// Default (no-op) placeholder for `from_subsystems` without browser.
 #[cfg(feature = "browser")]
 impl Default for BrowserApi {
     fn default() -> Self {

@@ -718,43 +718,38 @@ impl Default for OtelConfig {
 
 /// Headless browser configuration.
 ///
-/// Controls integration with the embedded OxiBrowser engine.
+/// Wraps `oxibrowser_core::BrowserConfig` (Deserialize/Serialize supported)
+/// with an `enabled` toggle. The engine config is passed through directly
+/// to the browser — no field-by-field duplication.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct BrowserConfig {
     /// Enable the browser integration.
-    #[serde(default)]
+    #[serde(default = "default_browser_enabled")]
     pub enabled: bool,
-    /// User-Agent string for HTTP requests.
-    /// Defaults to the OxiBrowser built-in user agent.
+
+    /// Engine configuration — passed directly to `oxibrowser_core::Browser::new()`.
+    ///
+    /// All fields have sensible defaults; override only what you need:
+    ///
+    /// ```toml
+    /// [browser.engine]
+    /// user_agent = "MyBot/1.0"
+    /// obey_robots = false
+    /// js_timeout_ms = 10000
+    /// ```
     #[serde(default)]
-    pub user_agent: Option<String>,
-    /// Default page load timeout in seconds.
-    #[serde(default = "default_browser_timeout")]
-    pub timeout_secs: u64,
-    /// Maximum number of concurrent browser sessions.
-    #[serde(default = "default_browser_max_sessions")]
-    pub max_sessions: usize,
-    /// Cookie persistence file path. Empty = in-memory only.
-    #[serde(default)]
-    pub cookie_file: Option<String>,
+    pub engine: oxibrowser_core::BrowserConfig,
 }
 
-fn default_browser_timeout() -> u64 {
-    30
-}
-
-fn default_browser_max_sessions() -> usize {
-    10
+fn default_browser_enabled() -> bool {
+    true
 }
 
 impl Default for BrowserConfig {
     fn default() -> Self {
         Self {
             enabled: true,
-            user_agent: None,
-            timeout_secs: default_browser_timeout(),
-            max_sessions: default_browser_max_sessions(),
-            cookie_file: None,
+            engine: oxibrowser_core::BrowserConfig::headless(),
         }
     }
 }
