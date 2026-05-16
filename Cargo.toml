@@ -53,10 +53,11 @@ regex = "1"
 parking_lot = "0.12"
 
 # oxi engine — local path for co-development
-# oxi-sdk is the primary entry point; oxi-ai and oxi-agent are transitive
+# oxi-sdk is the primary entry point for all AI engine types.
+# oxi-ai and oxi-agent are kept only as transitive deps for backward compat.
 oxi-sdk = { path = "../oxi/oxi-sdk" }
-oxi-ai = { path = "../oxi/oxi-ai" }
-oxi-agent = { path = "../oxi/oxi-agent" }
+oxi-ai = { path = "../oxi/oxi-ai" }   # transitive — remove when oxios-ouroboros migrates
+oxi-agent = { path = "../oxi/oxi-agent" } # transitive — remove when kernel fully migrates
 
 [features]
 default = ["web", "cli", "browser"]
