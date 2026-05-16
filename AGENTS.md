@@ -92,6 +92,8 @@ oxios run --json --session "$SID" "follow-up"
 {
   "response": "...",
   "session_id": "uuid",
+  "space_id": "uuid | null",
+  "space_tag": "[emoji label] | null",
   "seed_id": "uuid | null",
   "agent_id": "uuid | null",
   "phase_reached": "Execute",
