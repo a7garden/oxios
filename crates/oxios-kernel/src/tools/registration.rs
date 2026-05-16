@@ -15,7 +15,7 @@
 //!
 //! ```ignore
 //! use std::sync::Arc;
-//! use oxi_agent::{ToolRegistry, SearchCache};
+//! use oxi_sdk::{ToolRegistry, SearchCache};
 //! use oxios_kernel::capability::template::CapabilityTemplate;
 //! use oxios_kernel::tools::registration::register_tools_from_cspace;
 //!
