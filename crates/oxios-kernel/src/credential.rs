@@ -34,14 +34,14 @@ impl CredentialStore {
         }
 
         // 2. oxi auth store (~/.oxi/auth.json)
-        if let Ok(Some(token)) = oxi_ai::oauth::load_token(provider) {
+        if let Ok(Some(token)) = oxi_sdk::load_token(provider) {
             if !token.access_token.is_empty() {
                 return Some((token.access_token, CredentialSource::OxiAuthStore));
             }
         }
 
         // 3. oxi-ai env var fallback
-        if let Some(key) = oxi_ai::get_env_api_key(provider) {
+        if let Some(key) = oxi_sdk::get_env_api_key(provider) {
             return Some((key, CredentialSource::EnvVar));
         }
 
@@ -58,7 +58,7 @@ impl CredentialStore {
     /// This is called by the onboarding wizard. If oxi CLI is also
     /// installed on this machine, it will pick up the same credential.
     pub fn store(provider: &str, api_key: &str) -> Result<()> {
-        let token = oxi_ai::oauth::TokenBundle {
+        let token = oxi_sdk::TokenBundle {
             access_token: api_key.to_string(),
             refresh_token: None,
             token_type: "Bearer".to_string(),
@@ -66,7 +66,7 @@ impl CredentialStore {
             expires_in: 0,
             scope: None,
         };
-        oxi_ai::oauth::save_token(provider, &token)?;
+        oxi_sdk::save_token(provider, &token)?;
         tracing::info!(provider = %provider, "API key stored to oxi auth store");
         Ok(())
     }

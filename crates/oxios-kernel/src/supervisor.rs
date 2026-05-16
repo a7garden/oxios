@@ -321,7 +321,7 @@ mod tests {
     struct MockProvider;
 
     #[async_trait]
-    impl oxi_ai::Provider for MockProvider {
+    impl oxi_sdk::Provider for MockProvider {
         async fn stream(
             &self,
             _model: &Model,

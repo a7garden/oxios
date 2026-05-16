@@ -4645,9 +4645,9 @@ dependencies = [
 
 [[package]]
 name = "oxi-sdk"
-version = "0.15.2"
+version = "0.15.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f6562d36172f0f63df658aea39e14ea1bfce8739b391e61a42ab90730fa80b06"
+checksum = "c1cac56de7134af3432c06a5cbc58345a88a0bba6854e38e9c371d998c1c5e4e"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4792,7 +4792,6 @@ dependencies = [
  "opentelemetry-otlp",
  "opentelemetry-stdout",
  "opentelemetry_sdk",
- "oxi-ai",
  "oxi-sdk",
  "oxibrowser-core",
  "oxios-gateway",

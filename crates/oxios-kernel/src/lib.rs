@@ -171,7 +171,7 @@ pub use daemon::{DaemonManager, DaemonStatus};
 // See ../oxi/docs/proposals/sdk-consumer-requirements.md
 pub use oxi_sdk::{
     AgentEvent,
-    // Agent loop (used by agent_runtime.rs — currently via oxi_agent directly,
+    // Agent loop (used by agent_runtime.rs — via oxi_sdk re-exports,
     // will switch when oxi-sdk re-exports them)
     AgentLoop,
     InterAgentMessage,

@@ -47,7 +47,7 @@ pub fn run_onboarding(
     let provider = prompt_provider()?;
 
     // 2. Check if oxi auth.json already has credentials for this provider
-    if let Ok(Some(token)) = oxi_ai::oauth::load_token(provider) {
+    if let Ok(Some(token)) = oxi_sdk::load_token(provider) {
         if !token.access_token.is_empty() {
             println!();
             println!(
