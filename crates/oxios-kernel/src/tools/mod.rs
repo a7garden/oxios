@@ -7,6 +7,7 @@
 pub mod a2a_tools;
 pub mod exec_tool;
 pub mod kernel;
+pub mod kernel_bridge;
 pub mod mcp_tool;
 pub mod memory_tools;
 pub mod program_tool;
@@ -25,3 +26,5 @@ pub use program_tool::ProgramTool;
 
 #[cfg(feature = "browser")]
 pub use browser::BrowserTool;
+
+pub use kernel_bridge::OxiosKernelBridge;

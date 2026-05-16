@@ -155,11 +155,74 @@ impl Default for TelegramChannelConfig {
     }
 }
 
+/// LLM engine configuration.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct EngineConfig {
+    /// Default model in "provider/model" format.
+    #[serde(default = "default_model")]
+    pub default_model: String,
+    /// Explicit API key override (highest priority).
+    /// If empty/None, falls back to oxi auth store, then env vars.
+    #[serde(default)]
+    pub api_key: Option<String>,
+}
+
+fn default_model() -> String {
+    "anthropic/claude-sonnet-4-20250514".into()
+}
+
+impl Default for EngineConfig {
+    fn default() -> Self {
+        Self {
+            default_model: default_model(),
+            api_key: None,
+        }
+    }
+}
+
+/// Daemon mode configuration.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct DaemonConfig {
+    /// PID file path.
+    #[serde(default = "default_pid_file")]
+    pub pid_file: String,
+    /// Log directory.
+    #[serde(default = "default_daemon_log_dir")]
+    pub log_dir: String,
+}
+
+fn default_pid_file() -> String {
+    dirs::home_dir()
+        .map(|h| format!("{}/.oxios/oxios.pid", h.display()))
+        .unwrap_or_else(|| "./oxios.pid".into())
+}
+
+fn default_daemon_log_dir() -> String {
+    dirs::home_dir()
+        .map(|h| format!("{}/.oxios/logs", h.display()))
+        .unwrap_or_else(|| "./logs".into())
+}
+
+impl Default for DaemonConfig {
+    fn default() -> Self {
+        Self {
+            pid_file: default_pid_file(),
+            log_dir: default_daemon_log_dir(),
+        }
+    }
+}
+
 /// Top-level Oxios configuration.
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
 pub struct OxiosConfig {
     /// Kernel settings.
     pub kernel: KernelConfig,
+    /// LLM engine settings.
+    #[serde(default)]
+    pub engine: EngineConfig,
+    /// Daemon mode settings.
+    #[serde(default)]
+    pub daemon: DaemonConfig,
     /// Gateway settings.
     #[serde(default)]
     pub gateway: GatewayConfig,
@@ -421,13 +484,6 @@ pub struct SecurityConfig {
     /// Enable API key authentication.
     #[serde(default)]
     pub auth_enabled: bool,
-    /// Path to API keys file (JSON with SHA-256 hashed keys).
-    #[serde(default = "default_api_keys_path")]
-    pub api_keys_path: String,
-    /// Static API key for simple deployments.
-    /// Set this OR use the file at `api_keys_path`, not both.
-    #[serde(default)]
-    pub default_api_key: Option<String>,
     /// Allowed CORS origins.
     #[serde(default = "default_cors_origins")]
     pub cors_origins: Vec<String>,
@@ -462,18 +518,12 @@ fn default_max_audit() -> usize {
     10_000
 }
 
-fn default_api_keys_path() -> String {
-    dirs::home_dir()
-        .map(|h| format!("{}/.oxios/api-keys.json", h.display()))
-        .unwrap_or_else(|| "./api-keys.json".into())
+fn default_rate_limit_per_minute() -> u32 {
+    120
 }
 
 fn default_cors_origins() -> Vec<String> {
     vec!["http://localhost:4200".to_string()]
-}
-
-fn default_rate_limit_per_minute() -> u32 {
-    120
 }
 
 impl Default for SecurityConfig {
@@ -486,8 +536,6 @@ impl Default for SecurityConfig {
             can_fork: false,
             max_audit_entries: default_max_audit(),
             auth_enabled: false,
-            api_keys_path: default_api_keys_path(),
-            default_api_key: None,
             cors_origins: default_cors_origins(),
             audit_log_path: None,
             rate_limit_per_minute: default_rate_limit_per_minute(),
@@ -770,9 +818,9 @@ pub fn load_config(path: &std::path::Path) -> anyhow::Result<OxiosConfig> {
 }
 
 impl OxiosConfig {
-    /// Returns the effective API key from the config file.
+    /// Returns the effective API key from the engine config.
     pub fn api_key(&self) -> Option<String> {
-        self.security.default_api_key.clone().filter(|k| !k.is_empty())
+        self.engine.api_key.clone().filter(|k| !k.is_empty())
     }
 
     /// Validate configuration values and return a list of warnings.
@@ -831,15 +879,6 @@ impl OxiosConfig {
         }
 
         // Security validation
-        if self.security.auth_enabled {
-            let keys_path = std::path::Path::new(&self.security.api_keys_path);
-            if !keys_path.exists() {
-                warnings.push(format!(
-                    "security.api_keys_path '{}' does not exist — auth will fail",
-                    self.security.api_keys_path
-                ));
-            }
-        }
         if self.security.max_execution_time_secs == 0 {
             warnings.push("security.max_execution_time_secs is 0 — no timeout".into());
         }

@@ -13,6 +13,7 @@ use tokio::sync::oneshot;
 
 use super::exec_tool::ExecTool;
 use crate::program::{ProgramHostRequirements, ToolDef};
+use crate::KernelHandle;
 
 /// A tool defined by a Program, with automatic execution routing.
 ///
@@ -32,6 +33,25 @@ pub struct ProgramTool {
 }
 
 impl ProgramTool {
+    /// Create a placeholder ProgramTool from a KernelHandle.
+    ///
+    /// This is used by the `OxiosKernelBridge` during agent build to register
+    /// the program tool slot. Actual program tools with concrete definitions
+    /// are created via `from_definition()` and registered via CSpace.
+    ///
+    /// This placeholder's `name()` returns `"program"` so the LLM can call
+    /// `program` with arguments like `{"name": "tool-name", "args": [...]}`.
+    pub fn from_kernel(kernel: &KernelHandle) -> Self {
+        let exec = Arc::new(ExecTool::from_kernel(kernel));
+        Self {
+            full_name: "program".to_string(),
+            description: "Run installable program tools. Pass {name: tool-name, args: [...]}".to_string(),
+            binary: "".to_string(),
+            default_args: Vec::new(),
+            exec_tool: exec,
+        }
+    }
+
     /// Create a ProgramTool from a program's tool definition.
     ///
     /// All program tools route through `ExecTool` which provides the

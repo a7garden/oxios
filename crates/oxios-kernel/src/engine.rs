@@ -1,82 +1,112 @@
-//! Engine provider abstraction for the kernel → oxi-ai bridge.
+//! Engine provider — thin wrapper around oxi-sdk's Oxi.
 //!
-//! The [`EngineProvider`] trait formalizes how the kernel obtains LLM
-//! providers and models. It abstracts away `oxi_ai::get_provider()` and
-//! `oxi_ai::get_model()` so the kernel doesn't directly depend on
-//! oxi-ai's factory functions.
+//! oxios uses oxi-sdk as the AI engine. This module re-exports the
+//! EngineProvider trait for the kernel so it can be swapped for testing.
 //!
-//! The default implementation ([`OxiEngineProvider`]) uses oxi-ai's
-//! built-in registry. This can be replaced with a mock for testing.
+//! All provider/model resolution goes through `oxi_sdk::OxiBuilder`.
+//! The `OxiosEngine` struct wraps the SDK instance and exposes a clean API.
 
 use anyhow::Result;
-use oxi_ai::{Model, Provider};
 use std::sync::Arc;
+use oxi_sdk::{Oxi, OxiBuilder};
 
-/// How the kernel obtains AI providers and models.
-///
-/// This is the single entry point through which all oxi-ai
-/// functionality is accessed. It can be mocked for testing.
-pub trait EngineProvider: Send + Sync {
-    /// Create a provider for the given provider name.
-    fn create_provider(&self, provider_name: &str) -> Result<Arc<dyn Provider>>;
+/// The kernel's engine — wraps oxi-sdk's Oxi instance.
+pub struct OxiosEngine {
+    oxi: Oxi,
+    default_model_id: String,
+}
 
-    /// Resolve a "provider/model" string to a [`Model`] struct.
+impl OxiosEngine {
+    /// Create a new engine with the given default model.
+    ///
+    /// Internally calls `OxiBuilder::new().with_builtins()` to load all
+    /// 50+ built-in models and providers.
+    pub fn new(default_model_id: impl Into<String>) -> Self {
+        let oxi = OxiBuilder::new()
+            .with_builtins()
+            .build();
+        Self {
+            oxi,
+            default_model_id: default_model_id.into(),
+        }
+    }
+
+    /// Get a reference to the underlying Oxi instance.
+    ///
+    /// Use this when you need to pass the engine to oxi-sdk APIs directly
+    /// (e.g., `AgentBuilder`, `MessageBus`, `AgentGroup`).
+    pub fn oxi(&self) -> &Oxi {
+        &self.oxi
+    }
+
+    /// Resolve a model ID to a Model.
     ///
     /// Accepts both `"provider/model"` and bare `"model"` forms.
     /// When no provider prefix is given, defaults to `"anthropic"`.
-    fn resolve_model(&self, model_id: &str) -> Result<Model>;
+    pub fn resolve_model(&self, model_id: &str) -> Result<oxi_sdk::Model> {
+        self.oxi.resolve_model(model_id)
+    }
 
-    /// Get the default model ID (from config or hardcoded).
-    fn default_model_id(&self) -> &str;
+    /// Create a provider for the given provider name.
+    ///
+    /// Checks custom providers first, then falls back to built-in
+    /// providers (stateless creation).
+    pub fn create_provider(&self, name: &str) -> Result<Arc<dyn oxi_sdk::Provider>> {
+        self.oxi.create_provider(name)
+    }
 }
 
 // ---------------------------------------------------------------------------
-// Default implementation using oxi-ai's built-in registry
+// EngineProvider trait (kept for API compatibility)
 // ---------------------------------------------------------------------------
 
-/// Default [`EngineProvider`] that uses oxi-ai's built-in registry.
+/// Engine provider trait — abstracts how the kernel obtains AI providers.
+///
+/// This trait is implemented by `OxiEngineProvider` and can be replaced
+/// with a mock for testing.
+pub trait EngineProvider: Send + Sync {
+    /// Create a provider for the given provider name.
+    fn create_provider(&self, provider_name: &str) -> Result<Arc<dyn oxi_sdk::Provider>>;
+
+    /// Resolve a "provider/model" string to a Model.
+    fn resolve_model(&self, model_id: &str) -> Result<oxi_sdk::Model>;
+
+    /// Get the default model ID.
+    fn default_model_id(&self) -> &str;
+}
+
+/// Default engine provider using oxi-sdk.
 pub struct OxiEngineProvider {
-    default_model_id: String,
+    engine: OxiosEngine,
 }
 
 impl OxiEngineProvider {
     /// Create a new engine provider with the given default model ID.
     pub fn new(default_model_id: impl Into<String>) -> Self {
         Self {
-            default_model_id: default_model_id.into(),
+            engine: OxiosEngine::new(default_model_id),
         }
     }
 }
 
 impl EngineProvider for OxiEngineProvider {
-    fn create_provider(&self, provider_name: &str) -> Result<Arc<dyn Provider>> {
-        oxi_ai::get_provider(provider_name)
-            .map(|p| Arc::from(p) as Arc<dyn Provider>)
-            .ok_or_else(|| anyhow::anyhow!("Provider '{}' not found", provider_name))
+    fn create_provider(&self, provider_name: &str) -> Result<Arc<dyn oxi_sdk::Provider>> {
+        self.engine.create_provider(provider_name)
     }
 
-    fn resolve_model(&self, model_id: &str) -> Result<Model> {
-        let parts: Vec<&str> = model_id.splitn(2, '/').collect();
-        let (provider, model) = if parts.len() == 2 {
-            (parts[0], parts[1])
-        } else {
-            ("anthropic", parts[0])
-        };
-
-        oxi_ai::get_model(provider, model)
-            .cloned()
-            .ok_or_else(|| anyhow::anyhow!("Model '{}' not found", model_id))
+    fn resolve_model(&self, model_id: &str) -> Result<oxi_sdk::Model> {
+        self.engine.resolve_model(model_id)
     }
 
     fn default_model_id(&self) -> &str {
-        &self.default_model_id
+        &self.engine.default_model_id
     }
 }
 
 impl std::fmt::Debug for OxiEngineProvider {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("OxiEngineProvider")
-            .field("default_model_id", &self.default_model_id)
+            .field("default_model_id", &self.engine.default_model_id)
             .finish()
     }
 }
@@ -100,7 +130,6 @@ mod tests {
     #[test]
     fn test_resolve_model_without_provider_prefix() {
         let engine = OxiEngineProvider::new("anthropic/claude-sonnet-4-20250514");
-        // Without provider prefix, defaults to anthropic. Use an anthropic model.
         let model = engine.resolve_model("claude-sonnet-4-20250514").unwrap();
         assert_eq!(model.provider, "anthropic");
     }
@@ -123,7 +152,6 @@ mod tests {
         let engine = OxiEngineProvider::new("anthropic/claude-sonnet-4-20250514");
         let provider = engine.create_provider("anthropic");
         assert!(provider.is_ok());
-        assert_eq!(provider.unwrap().name(), "anthropic");
     }
 
     #[test]

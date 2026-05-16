@@ -1,7 +1,8 @@
 //! Oxios Agent OS — main binary.
 //!
-//! Assembles the kernel once, then dispatches to subcommands.
-//! The default mode (no arguments) starts all channels from config.
+//! Default invocation (`oxios`) starts the daemon in the background.
+//! Use `oxios --foreground` to run in the foreground (for debugging).
+//! First run without credentials triggers an interactive setup wizard.
 
 mod kernel;
 mod otel;
@@ -12,7 +13,10 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use kernel::Kernel;
-use oxios_kernel::{OxiosConfig, InstallSource};
+use oxios_kernel::{
+    DaemonManager, OxiosConfig,
+    credential::CredentialStore,
+};
 
 #[cfg(feature = "web")]
 use oxios_web::WebPlugin;
@@ -29,6 +33,10 @@ use oxios_gateway::plugin::{ChannelPlugin, ChannelContext};
 #[derive(Debug, Parser)]
 #[command(name = "oxios", version, about = "Oxios Agent OS — Agent Operating System")]
 struct Cli {
+    /// Run in foreground (do not daemonize).
+    #[arg(long, global = true)]
+    foreground: bool,
+
     /// Enable verbose logging.
     #[arg(short, long, global = true)]
     verbose: bool,
@@ -43,7 +51,16 @@ struct Cli {
 
 #[derive(Debug, Subcommand)]
 enum Command {
-    /// Run a single prompt through the Ouroboros interview → seed → execute flow.
+    /// Stop the running daemon.
+    Stop,
+
+    /// Restart the daemon.
+    Restart,
+
+    /// Show system status (daemon, credentials, agents).
+    Status,
+
+    /// Run a single prompt through the Ouroboros flow.
     #[command(arg_required_else_help = true)]
     Run {
         /// The prompt to execute.
@@ -55,19 +72,14 @@ enum Command {
 
     /// Backup Oxios state.
     Backup {
-        /// Output directory for the backup (default: <workspace>/backups/<timestamp>).
         #[arg(short, long)]
         output: Option<String>,
     },
 
     /// Restore Oxios state from a backup.
     Restore {
-        /// Input backup directory path.
         input: String,
     },
-
-    /// Show system status.
-    Status,
 
     /// Show or modify configuration.
     Config {
@@ -98,87 +110,68 @@ enum Command {
 
     /// Show agent budget information.
     Budget {
-        /// Show budget for a specific agent (UUID).
         agent_id: Option<String>,
     },
 
-    /// Daemon management.
+    /// Manage system service (launchd/systemd).
     Daemon {
         #[command(subcommand)]
         action: DaemonAction,
     },
 
+    /// Tail daemon log.
+    Log {
+        /// Number of lines to show.
+        #[arg(short, long, default_value = "50")]
+        lines: usize,
+    },
+
     /// Show program skill file and usage.
     Program {
-        /// Program name to display.
         name: String,
     },
 }
 
 #[derive(Debug, Subcommand)]
 enum ConfigAction {
-    /// Show the current configuration.
     Show,
-    /// Set a configuration value.
     Set { key: String, value: String },
-    /// Get a configuration value.
     Get { key: String },
 }
 
 #[derive(Debug, Subcommand)]
 enum PkgAction {
-    /// Install a program from a URL or local path.
-    Install {
-        #[arg(value_name = "SOURCE")]
-        source: String,
-        #[arg(short, long)]
-        branch: Option<String>,
-    },
-    /// Uninstall a program by name.
+    Install { source: String, #[arg(short, long)] branch: Option<String> },
     Uninstall { name: String },
-    /// List all installed programs.
     List,
-    /// Search programs (stub — lists installed programs).
     Search,
 }
 
-/// Agent subcommands.
 #[derive(Debug, Subcommand)]
 enum AgentAction {
-    /// List all active agents.
     List,
-    /// Kill a running agent by ID.
     Kill { id: String },
 }
 
-/// Git subcommands.
 #[derive(Debug, Subcommand)]
 enum GitAction {
-    /// Show recent commits.
     Log { limit: Option<usize> },
-    /// Create a tag.
     Tag { name: String, message: Option<String> },
 }
 
-/// Daemon subcommands.
 #[derive(Debug, Subcommand)]
 enum DaemonAction {
-    /// Show daemon status.
-    Status,
-    /// Restart the guardian daemon.
-    Restart,
+    /// Install as system service (launchd/systemd).
+    Install,
+    /// Uninstall system service.
+    Uninstall,
 }
 
 // ─── Constants & helpers ───────────────────────────────────────────────────
 
 const WORKSPACE_SUBDIRS: &[&str] = &[
-    "workspace",
-    "workspace/memory",
-    "workspace/memory/knowledge",
-    "workspace/seeds",
-    "workspace/sessions",
-    "workspace/skills",
-    "workspace/programs",
+    "workspace", "workspace/memory", "workspace/memory/knowledge",
+    "workspace/seeds", "workspace/sessions", "workspace/skills", "workspace/programs",
 ];
 
 const DEFAULT_CONFIG: &str = include_str!("../share/default-config.toml");
@@ -217,7 +210,6 @@ fn oxios_home_from_config(config_path: &Path) -> PathBuf {
 async fn cmd_run_async(kernel: &Kernel, prompt: &str) -> Result<()> {
     tracing::info!(prompt = %prompt, "Processing prompt");
 
-    // Audit: cmd_run bypasses Gateway, so we log directly for traceability
     kernel.handle().security.audit(
         "cli",
         oxios_kernel::audit_trail::AuditAction::Other {
@@ -246,11 +238,11 @@ async fn cmd_pkg(kernel: &Kernel, action: PkgAction) -> Result<()> {
     match action {
         PkgAction::Install { source, branch } => {
             let install_source = if source.ends_with(".git") || source.starts_with("git@") {
-                InstallSource::Git { url: source, branch }
+                oxios_kernel::InstallSource::Git { url: source, branch }
             } else if source.starts_with("http://") || source.starts_with("https://") {
-                InstallSource::Tarball { url: source }
+                oxios_kernel::InstallSource::Tarball { url: source }
             } else {
-                InstallSource::Local(PathBuf::from(&source))
+                oxios_kernel::InstallSource::Local(PathBuf::from(&source))
             };
             let program = handle.extensions.install_program(install_source).await?;
             println!("Installed '{}' v{}", program.meta.name, program.meta.version);
@@ -291,7 +283,7 @@ async fn cmd_pkg(kernel: &Kernel, action: PkgAction) -> Result<()> {
     Ok(())
 }
 
-async fn cmd_config(action: ConfigAction, config_path: &Path) -> Result<()> {
+async fn cmd_config(action: &ConfigAction, config_path: &Path) -> Result<()> {
     let config = if config_path.exists() {
         oxios_kernel::config::load_config(config_path)?
     } else {
@@ -303,7 +295,7 @@ async fn cmd_config(action: ConfigAction, config_path: &Path) -> Result<()> {
             println!("{}", toml_str);
         }
         ConfigAction::Get { key } => {
-            let value = get_config_value(&config, &key)
+            let value = get_config_value(&config, key)
                 .ok_or_else(|| anyhow::anyhow!("Unknown config key: {}", key))?;
             println!("{}", value);
         }
@@ -314,7 +306,7 @@ async fn cmd_config(action: ConfigAction, config_path: &Path) -> Result<()> {
             } else {
                 OxiosConfig::default()
             };
-            set_config_value(&mut config, &key, &value)
+            set_config_value(&mut config, key, value)
                 .ok_or_else(|| anyhow::anyhow!("Unknown config key: {}", key))?;
             let toml_str = toml::to_string_pretty(&config)?;
             std::fs::write(config_path, toml_str)?;
@@ -330,23 +322,22 @@ fn get_config_value(config: &OxiosConfig, key: &str) -> Option<String> {
         ["kernel", "workspace"] => Some(config.kernel.workspace.clone()),
         ["kernel", "event_bus_capacity"] => Some(config.kernel.event_bus_capacity.to_string()),
         ["kernel", "max_agents"] => Some(config.kernel.max_agents.to_string()),
+        ["engine", "default_model"] => Some(config.engine.default_model.clone()),
         ["gateway", "host"] => Some(config.gateway.host.clone()),
         ["gateway", "port"] => Some(config.gateway.port.to_string()),
-        ["exec", "required_host_tools"] => Some(config.exec.required_host_tools.join(",")),
-        ["exec", "optional_host_tools"] => Some(config.exec.optional_host_tools.join(",")),
         ["exec", "default_timeout_secs"] => Some(config.exec.default_timeout_secs.to_string()),
         ["exec", "max_timeout_secs"] => Some(config.exec.max_timeout_secs.to_string()),
         _ => None,
     }
 }
 
-/// Set a config value by dotted key path. Returns `Some(())` on success, `None` if key unknown.
 fn set_config_value(config: &mut OxiosConfig, key: &str, value: &str) -> Option<()> {
     let parts: Vec<&str> = key.split('.').collect();
     match parts.as_slice() {
         ["kernel", "workspace"] => { config.kernel.workspace = value.to_string(); Some(()) }
         ["kernel", "event_bus_capacity"] => { config.kernel.event_bus_capacity = value.parse().ok()?; Some(()) }
         ["kernel", "max_agents"] => { config.kernel.max_agents = value.parse().ok()?; Some(()) }
+        ["engine", "default_model"] => { config.engine.default_model = value.to_string(); Some(()) }
         ["gateway", "host"] => { config.gateway.host = value.to_string(); Some(()) }
         ["gateway", "port"] => { config.gateway.port = value.parse().ok()?; Some(()) }
         ["exec", "default_timeout_secs"] => { config.exec.default_timeout_secs = value.parse().ok()?; Some(()) }
@@ -363,25 +354,35 @@ fn set_config_value(config: &mut OxiosConfig, key: &str, value: &str) -> Option<
     }
 }
 
-async fn cmd_status(kernel: &Kernel) -> Result<()> {
+async fn cmd_status(kernel: &Kernel, config_path: &Path) -> Result<()> {
     let config = kernel.config();
-    let handle = kernel.handle();
-    println!("Oxios Agent OS");
-    println!("{}", "=".repeat(40));
-    println!("  Version: {}", env!("CARGO_PKG_VERSION"));
-    println!("  Workspace: {}", config.kernel.workspace);
+    let daemon = DaemonManager::new(&config.daemon.pid_file, &config.daemon.log_dir);
+
+    println!("⬡ Oxios Agent OS");
+    println!("{}", "─".repeat(50));
+    println!("  Version:    {}", env!("CARGO_PKG_VERSION"));
+    println!("  Workspace:  {}", config.kernel.workspace);
+    println!("  Model:      {}", config.engine.default_model);
+    println!("  Daemon:     {}", daemon.status());
     println!();
 
-    let api_key_vars = ["ANTHROPIC_API_KEY", "OPENAI_API_KEY", "API_KEY"];
-    let has_key = api_key_vars.iter().any(|v| std::env::var(v).is_ok());
-    println!("API Keys:");
-    println!("  Configured: {} ({})",
-        if has_key { "yes" } else { "no" },
-        if has_key { "found" } else { "set ANTHROPIC_API_KEY or API_KEY" });
+    // Credential status
+    let provider = CredentialStore::provider_from_model(&config.engine.default_model);
+    match CredentialStore::resolve(provider, config.api_key().as_deref()) {
+        Some((_, source)) => {
+            let source_str = match source {
+                oxios_kernel::credential::CredentialSource::Config => "config.toml",
+                oxios_kernel::credential::CredentialSource::OxiAuthStore => "~/.oxi/auth.json",
+                oxios_kernel::credential::CredentialSource::EnvVar => "environment variable",
+            };
+            println!("  Credentials: ✓ (via {})", source_str);
+        }
+        None => println!("  Credentials: ✗ (run 'oxios' to setup)"),
+    }
 
-    let mcp_count = handle.mcp.server_count();
-    println!();
-    println!("MCP Servers: {} configured", mcp_count);
+    // MCP
+    let mcp_count = kernel.handle().mcp.server_count();
+    println!("  MCP Servers: {}", mcp_count);
 
     Ok(())
 }
@@ -396,12 +397,19 @@ async fn main() -> Result<()> {
     let oxios_home = oxios_home_from_config(&config_path);
     ensure_workspace(&oxios_home)?;
 
+    // ── Load config ──
+    let mut config = if config_path.exists() {
+        oxios_kernel::config::load_config(&config_path)?
+    } else {
+        OxiosConfig::default()
+    };
+
     // ── Tracing setup ──
-    let log_dir = oxios_home.join("logs");
+    let log_dir = oxios_kernel::config::expand_home(&config.daemon.log_dir);
     std::fs::create_dir_all(&log_dir)?;
     let file_appender = tracing_appender::rolling::daily(&log_dir, "oxios.log");
     let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
-    Box::leak(Box::new(_guard)); // Keep alive for program duration
+    Box::leak(Box::new(_guard));
 
     let env_filter = tracing_subscriber::EnvFilter::try_from_default_env()
         .unwrap_or_else(|_| {
@@ -422,22 +430,73 @@ async fn main() -> Result<()> {
         .with_writer(non_blocking)
         .init();
 
-    // ── OpenTelemetry (no-op when disabled) ──
-    let early_config = if config_path.exists() {
-        oxios_kernel::config::load_config(&config_path).unwrap_or_default()
-    } else {
-        OxiosConfig::default()
-    };
-    let _otel_guard = otel::init_otel(&early_config.otel).await?;
+    // ── OpenTelemetry ──
+    let _otel_guard = otel::init_otel(&config.otel).await?;
     Box::leak(Box::new(_otel_guard));
 
-    // ── Kernel assembly — once ──
+    // ── Onboarding gate ──
+    // Commands that DON'T need onboarding: stop, status, daemon, config, log
+    let needs_kernel = !matches!(
+        cli.command,
+        Some(Command::Stop)
+        | Some(Command::Status)
+        | Some(Command::Daemon { .. })
+        | Some(Command::Log { .. })
+        | Some(Command::Config { .. })
+    );
+
+    // Check credentials for commands that need the engine
+    if needs_kernel && !oxios_kernel::onboarding::has_credentials(&config) {
+        // Need to run onboarding before starting the kernel
+        let completed = oxios_kernel::onboarding::run_onboarding(&oxios_home, &mut config)?;
+        if completed {
+            // Reload config (onboarding may have updated it)
+            if config_path.exists() {
+                config = oxios_kernel::config::load_config(&config_path)?;
+            }
+        }
+    }
+
+    // ── Commands that don't need kernel assembly ──
+    match &cli.command {
+        Some(Command::Stop) => {
+            let daemon = DaemonManager::new(&config.daemon.pid_file, &config.daemon.log_dir);
+            return daemon.stop();
+        }
+        Some(Command::Daemon { action }) => {
+            let daemon = DaemonManager::new(&config.daemon.pid_file, &config.daemon.log_dir);
+            return match action {
+                DaemonAction::Install => daemon.install_service(),
+                DaemonAction::Uninstall => daemon.uninstall_service(),
+            };
+        }
+        Some(Command::Log { lines }) => {
+            let log_file = log_dir.join("oxios.log");
+            if !log_file.exists() {
+                println!("No log file found at {}", log_file.display());
+                return Ok(());
+            }
+            // Tail the last N lines
+            let output = std::process::Command::new("tail")
+                .args(["-n", &lines.to_string()])
+                .arg(&log_file)
+                .output()?;
+            print!("{}", String::from_utf8_lossy(&output.stdout));
+            return Ok(());
+        }
+        Some(Command::Config { ref action }) => {
+            return cmd_config(action, &config_path).await;
+        }
+        _ => {}
+    }
+
+    // ── Kernel assembly ──
     let kernel = Kernel::builder()
         .config_path(config_path.clone())
         .build()
         .await?;
 
-    // ── Dispatch ──
+    // ── Dispatch subcommands ──
     match cli.command {
         Some(Command::Run { prompt }) => cmd_run_async(&kernel, &prompt).await,
 
@@ -453,7 +512,7 @@ async fn main() -> Result<()> {
             }
             #[cfg(not(feature = "cli"))]
             {
-                bail!("CLI channel not compiled in. Rebuild with --features cli");
+                anyhow::bail!("CLI channel not compiled in. Rebuild with --features cli");
             }
         }
 
@@ -471,19 +530,18 @@ async fn main() -> Result<()> {
                 }
             };
             oxios_kernel::backup::create_backup(&handle.state.store(), &output_path).await?;
-                    Ok(())
+            Ok(())
         }
 
         Some(Command::Restore { input }) => {
             let handle = kernel.handle();
             let input_path = PathBuf::from(&input);
             oxios_kernel::backup::restore_backup(&handle.state.store(), &input_path).await?;
-                    Ok(())
+            Ok(())
         }
 
-        Some(Command::Config { action }) => cmd_config(action, &config_path).await,
+        Some(Command::Status) => cmd_status(&kernel, &config_path).await,
         Some(Command::Pkg { action }) => cmd_pkg(&kernel, action).await,
-        Some(Command::Status) => cmd_status(&kernel).await,
 
         Some(Command::Agent { action }) => {
             let handle = kernel.handle();
@@ -506,7 +564,6 @@ async fn main() -> Result<()> {
                     Ok(())
                 }
                 AgentAction::Kill { id } => {
-                    // Validate id is a well-formed UUID.
                     let _ = uuid::Uuid::parse_str(&id)
                         .map_err(|e| anyhow::anyhow!("invalid agent id '{}': {}", id, e))?;
                     handle.agents.kill(&id).await
@@ -553,6 +610,7 @@ async fn main() -> Result<()> {
                     let limit = limit.unwrap_or(20);
                     let entries = handle.infra.git_log(limit)
                         .map_err(|e| anyhow::anyhow!("failed to get git log: {}", e))?;
+                    let entries: Vec<_> = entries.into_iter().take(limit).collect();
                     if entries.is_empty() {
                         println!("No commits yet.");
                     } else {
@@ -589,7 +647,7 @@ async fn main() -> Result<()> {
                     println!("{}", "-".repeat(40));
                     println!("  Tokens remaining: {}", budget.tokens_remaining);
                     println!("  Calls remaining:  {}", budget.calls_remaining);
-                    println!("  Window remaining:   {} seconds", budget.window_remaining_secs);
+                    println!("  Window remaining: {} seconds", budget.window_remaining_secs);
                     println!("  Status: {}", if budget.is_exhausted { "EXHAUSTED" } else { "OK" });
                     Ok(())
                 }
@@ -603,38 +661,14 @@ async fn main() -> Result<()> {
             }
         }
 
-        Some(Command::Daemon { action }) => {
-            match action {
-                DaemonAction::Status => {
-                    println!("Guardian Daemon");
-                    println!("{}", "-".repeat(30));
-                    println!("  Status: running (background tokio task)");
-                    println!("  Start the server with 'oxios' to activate the daemon.");
-                    Ok(())
-                }
-                DaemonAction::Restart => {
-                    tracing::info!("Daemon restart requested via CLI");
-                    let exe = std::env::current_exe()
-                        .context("failed to locate oxios binary")?;
-                    let args: Vec<_> = std::env::args().skip(1).collect();
-                    println!("Restarting oxios...");
-                    let mut cmd = std::process::Command::new(&exe);
-                    cmd.args(&args);
-                    // On Unix, perform exec to replace current process
-                    #[cfg(unix)]
-                    {
-                        use std::os::unix::process::CommandExt;
-                        // exec() only returns on error — on success the process is replaced
-                        return Err(anyhow::anyhow!("Failed to restart: {}", cmd.exec()));
-                    }
-                    #[cfg(not(unix))]
-                    {
-                        let _child = cmd.spawn()?;
-                        std::process::exit(0);
-                    }
-                }
-            }
+        Some(Command::Restart) => {
+            let daemon = DaemonManager::new(&config.daemon.pid_file, &config.daemon.log_dir);
+            daemon.restart(&config_path)
         }
+
+        // Commands handled before kernel assembly — unreachable here
+        Some(Command::Stop) | Some(Command::Daemon { .. })
+        | Some(Command::Log { .. }) | Some(Command::Config { .. }) => unreachable!(),
 
         Some(Command::Program { name }) => {
             let handle = kernel.handle();
@@ -662,12 +696,22 @@ async fn main() -> Result<()> {
             }
         }
 
-        // ── Default: start server ──
-        None => cmd_serve(&kernel, &config_path).await,
+        // ── Default: start daemon ──
+        None => {
+            let daemon = DaemonManager::new(&config.daemon.pid_file, &config.daemon.log_dir);
+
+            if cli.foreground {
+                // Foreground mode — run inline
+                cmd_serve(&kernel, &config_path).await
+            } else {
+                // Background daemon
+                daemon.start(&config_path)
+            }
+        }
     }
 }
 
-// ─── Server mode ────────────────────────────────────────────────────────────
+// ─── Server mode (foreground) ────────────────────────────────────────────────
 
 async fn cmd_serve(kernel: &Kernel, config_path: &Path) -> Result<()> {
     // Initialize MCP servers
@@ -684,15 +728,12 @@ async fn cmd_serve(kernel: &Kernel, config_path: &Path) -> Result<()> {
         tracing::warn!(error = %e, "Failed to initialize default programs");
     }
 
-    // Activate channels via plugin system
+    // Activate channels
     let channel_tasks = activate_channels(kernel, config_path).await?;
 
-    // Start guardian daemon
+    // Start guardian
     kernel.start_guardian();
 
-    // Gateway runs inline (it holds references to channels).
-    // Shutdown is handled by ctrl+c signal inside gateway.run().
-    // We wrap it in a select with our own shutdown signal.
     let config = kernel.config();
     tracing::info!("Oxios started on http://{}:{}", config.gateway.host, config.gateway.port);
 
@@ -700,12 +741,10 @@ async fn cmd_serve(kernel: &Kernel, config_path: &Path) -> Result<()> {
     tokio::signal::ctrl_c().await.ok();
     tracing::info!("Received shutdown signal, starting graceful shutdown...");
 
-    // Stop channel tasks
     for task in channel_tasks {
         task.abort();
     }
 
-    // Stop running agents
     let handle = kernel.handle();
     if let Ok(agents) = handle.agents.list().await {
         for agent in &agents {
@@ -718,7 +757,6 @@ async fn cmd_serve(kernel: &Kernel, config_path: &Path) -> Result<()> {
         }
     }
 
-    // Stop MCP servers
     if let Err(e) = handle.mcp.shutdown_all().await {
         tracing::warn!(error = %e, "MCP shutdown error");
     }

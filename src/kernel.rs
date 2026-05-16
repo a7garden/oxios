@@ -59,7 +59,6 @@ impl Kernel {
     pub fn builder() -> KernelBuilder {
         KernelBuilder {
             config_path: oxios_kernel::config::expand_home("~/.oxios/config.toml"),
-            model_id: "anthropic/claude-sonnet-4-20250514".to_string(),
         }
     }
 
@@ -232,7 +231,6 @@ impl Kernel {
 /// Builder for assembling the Oxios kernel.
 pub struct KernelBuilder {
     config_path: PathBuf,
-    model_id: String,
 }
 
 impl KernelBuilder {
@@ -242,17 +240,9 @@ impl KernelBuilder {
         self
     }
 
-    /// Set the LLM model ID (e.g., "anthropic/claude-sonnet-4-20250514").
-    #[allow(dead_code)]
-    pub fn model_id(mut self, model: &str) -> Self {
-        self.model_id = model.to_string();
-        self
-    }
-
     /// Assemble all kernel components and wire them together.
     pub async fn build(self) -> Result<Kernel> {
         let config_path = self.config_path;
-        let model_id = &self.model_id;
 
         let config = if config_path.exists() {
             tracing::info!(path = %config_path.display(), "Loading config");
@@ -267,13 +257,15 @@ impl KernelBuilder {
             PathBuf::from(&config.kernel.workspace),
         )?);
 
+        // Model comes from config, not hardcoded default
+        let model_id = &config.engine.default_model;
         let engine_provider = oxios_kernel::OxiEngineProvider::new(model_id);
         let model = engine_provider
             .resolve_model(model_id)
-            .context("Failed to resolve model")?;
+            .context(format!("Failed to resolve model: {}", model_id))?;
         let provider = engine_provider
             .create_provider(&model.provider)
-            .context("Failed to create provider")?;
+            .context(format!("Failed to create provider: {}", model.provider))?;
 
         let ouroboros: Arc<dyn OuroborosProtocol> =
             Arc::new(OuroborosEngine::new(Arc::clone(&provider), model));
@@ -342,10 +334,8 @@ impl KernelBuilder {
         );
 
         let mut auth_manager = AuthManager::new();
-        let api_keys_path = PathBuf::from(&config.security.api_keys_path);
-        if let Err(e) = auth_manager.load_from_file(&api_keys_path) {
-            tracing::debug!(error = %e, "No API keys file loaded (this is normal on first run)");
-        }
+        // API key auth is now via engine.api_key or ~/.oxi/auth.json
+        // No more security.api_keys_path
         let auth_manager = Arc::new(parking_lot::Mutex::new(auth_manager));
 
         let audit_trail = Arc::new(AuditTrail::new(config.audit.max_entries));

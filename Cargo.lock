@@ -4582,7 +4582,7 @@ checksum = "1a80800c0488c3a21695ea981a54918fbb37abf04f4d0720c453632255e2ff0e"
 
 [[package]]
 name = "oxi-agent"
-version = "0.13.0"
+version = "0.14.0"
 dependencies = [
  "a3s-search",
  "anyhow",
@@ -4607,7 +4607,7 @@ dependencies = [
 
 [[package]]
 name = "oxi-ai"
-version = "0.13.0"
+version = "0.14.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4637,6 +4637,20 @@ dependencies = [
  "tracing-subscriber",
  "url",
  "uuid",
+]
+
+[[package]]
+name = "oxi-sdk"
+version = "0.14.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "oxi-agent",
+ "oxi-ai",
+ "parking_lot",
+ "serde",
+ "serde_json",
+ "tokio",
 ]
 
 [[package]]
@@ -4688,7 +4702,7 @@ dependencies = [
 
 [[package]]
 name = "oxios"
-version = "0.2.0-alpha"
+version = "0.3.0-alpha"
 dependencies = [
  "anyhow",
  "chrono",
@@ -4696,7 +4710,7 @@ dependencies = [
  "criterion",
  "hex",
  "mockall",
- "oxi-ai",
+ "oxi-sdk",
  "oxios-cli",
  "oxios-gateway",
  "oxios-kernel",
@@ -4763,6 +4777,7 @@ dependencies = [
  "gix",
  "glob",
  "hex",
+ "libc",
  "once_cell",
  "opentelemetry",
  "opentelemetry-otlp",
@@ -4770,6 +4785,7 @@ dependencies = [
  "opentelemetry_sdk",
  "oxi-agent",
  "oxi-ai",
+ "oxi-sdk",
  "oxibrowser-core",
  "oxios-gateway",
  "oxios-ouroboros",

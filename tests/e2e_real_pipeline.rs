@@ -16,15 +16,6 @@ mod tests {
         std::env::var("OXIOS_E2E").is_ok()
     }
 
-    /// Parse a "provider/model-id" string into (provider, model_id).
-    fn parse_model_id(model_id: &str) -> Option<(&str, &str)> {
-        let (provider, mid) = model_id.split_once('/')?;
-        if provider.is_empty() || mid.is_empty() {
-            return None;
-        }
-        Some((provider, mid))
-    }
-
     fn create_real_engine() -> Option<Arc<oxios_ouroboros::OuroborosEngine>> {
         if !should_run() {
             return None;
@@ -33,15 +24,13 @@ mod tests {
         let model_id = std::env::var("OXIOS_MODEL")
             .unwrap_or_else(|_| "anthropic/claude-sonnet-4-20250514".into());
 
-        let (provider_name, short_model_id) = parse_model_id(&model_id)
-            .unwrap_or_else(|| panic!("Invalid model ID format: '{}', expected 'provider/model'", model_id));
-
-        let model = oxi_ai::lookup_model(provider_name, short_model_id)
-            .unwrap_or_else(|| panic!("Model '{}' not found in registry", model_id));
-
-        let provider_box = oxi_ai::get_provider(provider_name)
-            .unwrap_or_else(|| panic!("Provider '{}' not available", provider_name));
-        let provider: Arc<dyn oxi_ai::Provider> = Arc::from(provider_box);
+        let oxi = oxi_sdk::OxiBuilder::new()
+            .with_builtins()
+            .build();
+        let model = oxi.resolve_model(&model_id)
+            .unwrap_or_else(|_| panic!("Model '{}' not found", model_id));
+        let provider = oxi.create_provider(&model.provider)
+            .unwrap_or_else(|_| panic!("Provider '{}' not available", model.provider));
 
         Some(Arc::new(oxios_ouroboros::OuroborosEngine::new(provider, model)))
     }
@@ -86,6 +75,7 @@ mod tests {
             created_at: chrono::Utc::now(),
             generation: 0,
             parent_seed_id: None,
+            cspace_hint: None,
         };
 
         let execution = oxios_ouroboros::ExecutionResult {

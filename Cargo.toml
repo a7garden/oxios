@@ -1,8 +1,8 @@
 [package]
 name = "oxios"
-version = "0.2.0-alpha"
+version = "0.3.0-alpha"
 edition = "2021"
-description = "Oxios Agent OS"
+description = "Oxios Agent OS — Agent Operating System powered by oxi-sdk"
 license = "MIT"
 
 [workspace]
@@ -52,7 +52,9 @@ regex = "1"
 # Concurrency
 parking_lot = "0.12"
 
-# oxi engine crates — local path for co-development
+# oxi engine — local path for co-development
+# oxi-sdk is the primary entry point; oxi-ai and oxi-agent are transitive
+oxi-sdk = { path = "../oxi/oxi-sdk" }
 oxi-ai = { path = "../oxi/oxi-ai" }
 oxi-agent = { path = "../oxi/oxi-agent" }
 
@@ -71,7 +73,7 @@ oxios-web = { path = "channels/oxios-web", optional = true }
 oxios-cli = { path = "channels/oxios-cli", optional = true }
 oxios-telegram = { path = "channels/oxios-telegram", optional = true }
 hex = { workspace = true }
-oxi-ai = { workspace = true }
+oxi-sdk = { workspace = true }
 uuid = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
@@ -87,7 +89,7 @@ chrono = { workspace = true }
 
 [dev-dependencies]
 oxios-ouroboros = { path = "crates/oxios-ouroboros" }
-oxi-ai = { workspace = true }
+oxi-sdk = { workspace = true }
 uuid = { workspace = true }
 chrono = { workspace = true }
 tokio = { workspace = true }

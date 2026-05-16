@@ -128,7 +128,7 @@ pub async fn require_auth(
 
     // Also allow OXIOS_API_KEY env var or static config key as fallback
     let env_key = std::env::var("OXIOS_API_KEY").ok().filter(|k| !k.is_empty());
-    let config_key = state.config.read().security.default_api_key.clone();
+    let config_key = state.config.read().api_key();
 
     let is_valid = {
         // Validate against auth_manager (kernel subsystem), OXIOS_API_KEY env, or config key

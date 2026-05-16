@@ -730,11 +730,11 @@ impl Orchestrator {
         subtasks: Vec<SubTask>,
         parent_seed: &Seed,
     ) -> Result<Vec<SubTask>> {
-        use crate::agent_group::AgentGroup;
+        use crate::agent_group::OxiosAgentGroup;
         use tokio::task::JoinSet;
 
         let descriptions: Vec<String> = subtasks.iter().map(|st| st.description.clone()).collect();
-        let group = AgentGroup::new(parent_seed, descriptions);
+        let group = OxiosAgentGroup::new(parent_seed, descriptions);
         let group_id = group.id;
 
         self.event_bus.publish(KernelEvent::AgentGroupCreated {

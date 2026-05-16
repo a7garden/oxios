@@ -14,6 +14,7 @@ browser = []
 [dependencies]
 oxios-ouroboros = { path = "../oxios-ouroboros" }
 oxi-ai = { workspace = true }
+oxi-sdk = { workspace = true }
 oxi-agent = { workspace = true }
 tokio = { workspace = true }
 futures = { workspace = true }
@@ -46,6 +47,7 @@ wasmtime = { version = "22", features = ["cranelift"], optional = true }
 wasmtime-wasi = { version = "22", optional = true }
 sysinfo = "0.35"
 dirs = "6"
+libc = "0.2"
 
 # Vector search (HNSW)
 usearch = "2.25"

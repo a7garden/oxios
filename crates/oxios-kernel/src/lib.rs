@@ -20,6 +20,8 @@ pub mod audit_trail;
 
 pub mod auth;
 pub mod config;
+pub mod credential;
+pub mod daemon;
 pub mod embedding;
 pub mod engine;
 pub mod error;
@@ -31,6 +33,7 @@ pub mod wasm_sandbox;
 pub mod host_tools;
 pub mod memory;
 pub mod mcp;
+pub mod onboarding;
 pub mod orchestrator;
 pub mod persona;
 pub mod persona_manager;
@@ -76,12 +79,12 @@ pub use access_manager::{
     PendingApproval, ApprovalStatus,
 };
 
-pub use agent_group::{AgentGroup, AgentGroupStatus, GroupAgent};
+pub use agent_group::{OxiosAgentGroup, OxiosAgentGroupStatus, OxiosGroupAgent};
 pub use agent_lifecycle::AgentLifecycleManager;
 pub use agent_runtime::AgentRuntime;
 pub use error::{HttpStatus, KernelError, KernelResult};
-pub use engine::{EngineProvider, OxiEngineProvider};
-pub use config::{ExecConfig, OxiosConfig, MemoryConfig, PersonaConfig, McpConfig, McpServerDef, CronConfig, InlineCronJob, GitConfig, ChannelsConfig, TelegramChannelConfig, BrowserConfig};
+pub use engine::{OxiosEngine, OxiEngineProvider, EngineProvider};
+pub use config::{EngineConfig, DaemonConfig, ExecConfig, OxiosConfig, MemoryConfig, PersonaConfig, McpConfig, McpServerDef, CronConfig, InlineCronJob, GitConfig, ChannelsConfig, TelegramChannelConfig, BrowserConfig};
 
 // Auth manager exports
 pub use auth::{AuthManager, KeyMeta};
@@ -153,5 +156,23 @@ pub use capability::{
     Capability, CapabilityId, CSpace, Issuer, ResourceRef, Rights,
 };
 pub use capability::template::CapabilityTemplate;
-pub use capability::resolve::resolve_cspace;
+pub use credential::CredentialStore;
+pub use daemon::{DaemonManager, DaemonStatus};
+// Re-export oxi-sdk types we want available in the kernel.
+// Note: oxios has its own `AgentGroup` (struct for orchestration state)
+// but we also re-export oxi_sdk's AgentGroup for SDK usage.
+pub use oxi_sdk::{
+    MessageBus, InterAgentMessage,
+    AgentMetrics as SdkAgentMetrics, MetricsSnapshot as SdkMetricsSnapshot,
+    ProviderPool, RateLimitPolicy,
+    Provider, ProviderRegistry, Model, StreamOptions,
+    Agent, AgentLoop, AgentConfig, AgentEvent,
+    StructuredOutput, OutputMode,
+    KernelToolProvider, KernelToolContext,
+    Oxi, OxiBuilder, AgentBuilder,
+    AgentGroup as SdkAgentGroup,
+    GroupResult as SdkGroupResult,
+    GroupStrategy as SdkGroupStrategy,
+    AgentGroupOutput as SdkAgentGroupOutput,
+};
 
