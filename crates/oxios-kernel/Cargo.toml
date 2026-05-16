@@ -13,9 +13,8 @@ browser = []
 
 [dependencies]
 oxios-ouroboros = { path = "../oxios-ouroboros" }
-oxi-ai = { workspace = true }
 oxi-sdk = { workspace = true }
-oxi-agent = { workspace = true }
+oxi-ai = { workspace = true }
 tokio = { workspace = true }
 futures = { workspace = true }
 async-trait = { workspace = true }
@@ -66,5 +65,4 @@ opentelemetry-stdout = { version = "0.27", optional = true }
 tempfile = "3"
 oxios-ouroboros = { path = "../oxios-ouroboros" }
 oxios-gateway = { path = "../oxios-gateway" }
-oxi-ai = { workspace = true }
 async-trait = { workspace = true }

@@ -12,7 +12,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use chrono::Utc;
 use futures::StreamExt;
-use oxi_ai::{Context, Message, Model, Provider, UserMessage};
+use oxi_sdk::{Context, Message, Model, Provider, UserMessage};
 use serde::Deserialize;
 use std::sync::Arc;
 
@@ -67,7 +67,7 @@ struct EvaluationResponse {
 
 /// LLM-powered implementation of the Ouroboros protocol.
 ///
-/// The engine uses the injected `oxi_ai::Provider` to make LLM calls
+/// The engine uses the injected `oxi_sdk::Provider` to make LLM calls
 /// for interview, seed generation, evaluation, and evolution.
 pub struct OuroborosEngine {
     provider: Arc<dyn Provider>,
@@ -127,11 +127,11 @@ impl OuroborosEngine {
         tokio::pin!(stream);
         while let Some(event) = stream.next().await {
             match event {
-                oxi_ai::ProviderEvent::TextDelta { delta, .. } => {
+                oxi_sdk::ProviderEvent::TextDelta { delta, .. } => {
                     text.push_str(&delta);
                 }
-                oxi_ai::ProviderEvent::Done { .. } => break,
-                oxi_ai::ProviderEvent::Error { error, .. } => {
+                oxi_sdk::ProviderEvent::Done { .. } => break,
+                oxi_sdk::ProviderEvent::Error { error, .. } => {
                     // Try to extract text from the error message.
                     let msg_text = error.text_content();
                     if !msg_text.is_empty() {

@@ -137,12 +137,16 @@ impl Kernel {
         &self.config
     }
 
-    /// Execute a prompt through the Orchestrator directly (bypasses Gateway).
+    /// Execute a prompt with an optional session ID for multi-turn conversations.
     ///
-    /// Used by `oxios run` for one-shot execution where the Gateway
-    /// event loop is not running. Audit logging compensates for the bypass.
-    pub async fn execute_prompt(&self, prompt: &str) -> Result<oxios_kernel::OrchestrationResult> {
-        self.orchestrator.handle_message("cli", prompt, None).await
+    /// Pass `Some(session_id)` to continue an existing interview;
+    /// pass `None` to start a new session.
+    pub async fn execute_prompt_with_session(
+        &self,
+        prompt: &str,
+        session_id: Option<&str>,
+    ) -> Result<oxios_kernel::OrchestrationResult> {
+        self.orchestrator.handle_message("cli", prompt, session_id).await
     }
 
     /// Register a channel with the gateway.

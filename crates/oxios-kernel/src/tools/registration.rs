@@ -27,11 +27,10 @@
 
 use std::sync::Arc;
 
-use oxi_agent::{
+use oxi_sdk::{
     EditTool, FindTool, GetSearchResultsTool, GrepTool, LsTool, ReadTool, SearchCache,
-    WebSearchTool, WriteTool,
+    WebSearchTool, WriteTool, ToolRegistry,
 };
-use oxi_sdk::ToolRegistry;
 
 use crate::capability::{CSpace, ResourceRef, Rights};
 use crate::tools::kernel::*;

@@ -6,7 +6,7 @@ description = "Ouroboros spec-first protocol for Oxios"
 license = "MIT"
 
 [dependencies]
-oxi-ai = { workspace = true }
+oxi-sdk = "0.15.2"
 tokio = { workspace = true }
 futures = { workspace = true }
 async-trait = { workspace = true }

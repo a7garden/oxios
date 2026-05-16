@@ -4582,9 +4582,9 @@ checksum = "1a80800c0488c3a21695ea981a54918fbb37abf04f4d0720c453632255e2ff0e"
 
 [[package]]
 name = "oxi-agent"
-version = "0.15.0"
+version = "0.15.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "904e85db7b87b01e54f62db1d4e7da01a85676b40c8d6d3926118ab931129608"
+checksum = "37607621fc902eda9148dee8818edeb913990f7fd2fb94bafd9e047e0c40f806"
 dependencies = [
  "a3s-search",
  "anyhow",
@@ -4645,9 +4645,9 @@ dependencies = [
 
 [[package]]
 name = "oxi-sdk"
-version = "0.15.0"
+version = "0.15.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ac5a4e1ee54d9c702f0daede915b8c13cfaca459a79611309bf08e8de14ef30d"
+checksum = "f6562d36172f0f63df658aea39e14ea1bfce8739b391e61a42ab90730fa80b06"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4792,7 +4792,6 @@ dependencies = [
  "opentelemetry-otlp",
  "opentelemetry-stdout",
  "opentelemetry_sdk",
- "oxi-agent",
  "oxi-ai",
  "oxi-sdk",
  "oxibrowser-core",
@@ -4825,7 +4824,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "futures",
- "oxi-ai",
+ "oxi-sdk",
  "parking_lot",
  "serde",
  "serde_json",

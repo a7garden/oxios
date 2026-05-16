@@ -19,7 +19,7 @@
 //! to stay compatible with the `Supervisor` trait's `Send` bounds.
 
 use anyhow::Result;
-use oxi_agent::{prelude::CompactionEvent, SearchCache};
+use oxi_sdk::{CompactionEvent, SearchCache};
 use oxi_sdk::ToolExecutionMode;
 use oxi_sdk::{AgentEvent, AgentLoop, AgentLoopConfig, SharedState, ToolRegistry};
 use oxi_sdk::{CompactionStrategy, Provider};
@@ -477,7 +477,7 @@ fn run_agent_loop(ctx: AgentLoopContext) -> Result<(String, usize, bool)> {
                         stop_reason,
                         ..
                     } => {
-                        if let Some(oxi_ai::Message::Assistant(a)) = messages.last() {
+                        if let Some(oxi_sdk::Message::Assistant(a)) = messages.last() {
                             s.final_content = a.text_content();
                         }
                         s.success = stop_reason.as_deref() == Some("Stop");
@@ -641,7 +641,7 @@ impl std::fmt::Debug for AgentRuntime {
 mod tests {
     use super::*;
     use async_trait::async_trait;
-    use oxi_agent::tools::{AgentTool, ToolError};
+    use oxi_sdk::{AgentTool, ToolError};
     use oxios_ouroboros::Entity;
     use serde_json::Value;
 
@@ -670,8 +670,8 @@ mod tests {
             _tool_call_id: &str,
             _params: Value,
             _shutdown: Option<tokio::sync::oneshot::Receiver<()>>,
-        ) -> Result<oxi_agent::AgentToolResult, ToolError> {
-            Ok(oxi_agent::AgentToolResult::success("ok"))
+        ) -> Result<oxi_sdk::AgentToolResult, ToolError> {
+            Ok(oxi_sdk::AgentToolResult::success("ok"))
         }
     }
 

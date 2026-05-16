@@ -6,7 +6,7 @@
 
 use std::sync::Arc;
 
-use oxi_agent::SearchCache;
+use oxi_sdk::SearchCache;
 use oxi_sdk::ToolRegistry;
 use oxi_sdk::{
     KernelToolContext as SdkKernelToolContext, KernelToolProvider as SdkKernelToolProvider,

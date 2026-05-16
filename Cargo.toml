@@ -52,10 +52,10 @@ regex = "1"
 # Concurrency
 parking_lot = "0.12"
 
-# oxi engine — crates.io releases
-oxi-sdk = "0.15"
+# oxi engine — oxi-sdk is the primary entry point (0.15.2+)
+# oxi-ai is needed directly only for credential management (oauth helpers)
+oxi-sdk = "0.15.2"
 oxi-ai = "0.15"
-oxi-agent = "0.15"
 
 [features]
 default = ["web", "cli", "browser"]
@@ -99,4 +99,3 @@ criterion = { version = "0.5", features = ["async"] }
 [[bench]]
 name = "kernel_bench"
 harness = false
-

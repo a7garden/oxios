@@ -313,7 +313,7 @@ mod tests {
     use crate::types::AgentStatus;
     use async_trait::async_trait;
     use futures::Stream;
-    use oxi_ai::{Context, Model, ProviderError, ProviderEvent, StreamOptions};
+    use oxi_sdk::{Context, Model, ProviderError, ProviderEvent, StreamOptions};
     use oxios_ouroboros::Seed;
     use std::pin::Pin;
 

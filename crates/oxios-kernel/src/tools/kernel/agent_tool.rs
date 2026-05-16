@@ -37,7 +37,7 @@ use crate::types::AgentId;
 /// | `budget` | Check budget for an agent | `id`            | —               |
 ///
 /// **Note:** Named `AgentTool` in this module but re-exported as
-/// `KernelAgentTool` to avoid collision with oxi_agent's `AgentTool` trait.
+/// `KernelAgentTool` to avoid collision with oxi_sdk's `AgentTool` trait.
 pub struct AgentTool {
     supervisor: Arc<dyn Supervisor>,
     budget_manager: Arc<BudgetManager>,
@@ -64,9 +64,9 @@ impl std::fmt::Debug for AgentTool {
 
 #[async_trait]
 impl OxiAgentTool for AgentTool {
-    // Note: we implement the oxi_agent::AgentTool trait on our struct,
+    // Note: we implement the oxi_sdk::AgentTool trait on our struct,
     // which is also named AgentTool. Rust resolves this by treating
-    // `AgentTool` as the struct name and `oxi_agent::AgentTool` as the trait.
+    // `AgentTool` as the struct name and `oxi_sdk::AgentTool` as the trait.
 
     fn name(&self) -> &str {
         "kernel_agent"
@@ -210,7 +210,7 @@ mod tests {
     #[test]
     fn test_tool_name() {
         // Validate the tool name does not collide with the trait name.
-        // The tool is called "kernel_agent" to distinguish from oxi_agent's AgentTool trait.
+        // The tool is called "kernel_agent" to distinguish from oxi_sdk's AgentTool trait.
         // We can't construct the struct without a real KernelHandle, so we test the design.
         assert_eq!("kernel_agent", "kernel_agent");
     }

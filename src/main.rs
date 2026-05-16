@@ -4,6 +4,7 @@
 //! Use `oxios --foreground` to run in the foreground (for debugging).
 //! First run without credentials triggers an interactive setup wizard.
 
+mod cmd_run;
 mod kernel;
 mod otel;
 
@@ -66,6 +67,24 @@ enum Command {
     Run {
         /// The prompt to execute.
         prompt: String,
+
+        /// Output result as JSON (machine-readable).
+        #[arg(long)]
+        json: bool,
+
+        /// Session ID for multi-turn conversation.
+        /// Omit to start a new session.
+        #[arg(long)]
+        session: Option<String>,
+
+        /// File to prepend as context to the prompt.
+        /// Use `-` to read from stdin.
+        #[arg(long)]
+        context_file: Option<String>,
+
+        /// Set exit code: 0 = evaluation passed, 1 = failed.
+        #[arg(long)]
+        exit_code: bool,
     },
 
     /// Start an interactive CLI chat session.
@@ -218,31 +237,8 @@ fn oxios_home_from_config(config_path: &Path) -> PathBuf {
 
 // ─── Subcommands ───────────────────────────────────────────────────────────
 
-async fn cmd_run_async(kernel: &Kernel, prompt: &str) -> Result<()> {
-    tracing::info!(prompt = %prompt, "Processing prompt");
-
-    kernel.handle().security.audit(
-        "cli",
-        oxios_kernel::audit_trail::AuditAction::Other {
-            detail: format!("run: {}", prompt.chars().take(100).collect::<String>()),
-        },
-        "cli-user",
-    );
-
-    let result = kernel.execute_prompt(prompt).await?;
-
-    println!("{}", result.response);
-    if let Some(seed_id) = result.seed_id {
-        println!("\nSeed: {}", seed_id);
-    }
-    if !result.evaluation_passed {
-        println!("\n⚠️  Evaluation did not fully pass.");
-        if let Some(output) = result.output {
-            println!("Notes: {}", output);
-        }
-    }
-    Ok(())
-}
+// cmd_run_async removed — replaced by cmd_run module.
+// The old human-only text output is now handled by cmd_run::cmd_run().
 
 async fn cmd_pkg(kernel: &Kernel, action: &PkgAction) -> Result<()> {
     let handle = kernel.handle();
@@ -600,7 +596,22 @@ async fn main() -> Result<()> {
             daemon.restart(&config_path)
         }
 
-        Some(Command::Run { prompt }) => cmd_run_async(&kernel, prompt).await,
+        Some(Command::Run {
+            prompt,
+            json,
+            session,
+            context_file,
+            exit_code,
+        }) => {
+            let opts = cmd_run::RunOptions {
+                json: *json,
+                session_id: session.clone(),
+                context_file: context_file.clone(),
+                exit_code: *exit_code,
+            };
+            let code = cmd_run::cmd_run(&kernel, prompt, &opts).await?;
+            std::process::exit(code);
+        }
 
         Some(Command::Status) => cmd_status(&kernel).await,
 

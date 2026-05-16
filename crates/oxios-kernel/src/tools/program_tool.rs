@@ -145,7 +145,7 @@ impl AgentTool for ProgramTool {
             "binary": self.binary,
             "args": all_args,
         });
-        let ctx = oxi_agent::ToolContext::default();
+        let ctx = oxi_sdk::ToolContext::default();
         self.exec_tool
             .execute(&format!("pg:{}", self.full_name), exec_params, signal, &ctx)
             .await
