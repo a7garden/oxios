@@ -64,5 +64,5 @@ opentelemetry-stdout = { version = "0.27", optional = true }
 [dev-dependencies]
 tempfile = "3"
 oxios-ouroboros = { version = "0.1.0", path = "../oxios-ouroboros" }
-oxios-gateway = { version = "0.1.0", path = "../oxios-gateway" }
+oxios-gateway = { path = "../oxios-gateway" }
 async-trait = { workspace = true }
