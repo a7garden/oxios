@@ -73,7 +73,6 @@ oxios-web = { path = "channels/oxios-web", optional = true }
 oxios-cli = { path = "channels/oxios-cli", optional = true }
 oxios-telegram = { path = "channels/oxios-telegram", optional = true }
 hex = { workspace = true }
-oxi-sdk = { workspace = true }
 uuid = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }

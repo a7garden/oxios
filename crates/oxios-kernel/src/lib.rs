@@ -158,21 +158,24 @@ pub use capability::{
 pub use capability::template::CapabilityTemplate;
 pub use credential::CredentialStore;
 pub use daemon::{DaemonManager, DaemonStatus};
-// Re-export oxi-sdk types we want available in the kernel.
-// Note: oxios has its own `AgentGroup` (struct for orchestration state)
-// but we also re-export oxi_sdk's AgentGroup for SDK usage.
+// ── oxi-sdk re-exports ──────────────────────────────────────────────
+//
+// Only types that are actually USED by kernel modules are re-exported.
+// Dead re-exports were removed (see audit 2026-05-16).
+//
+// When oxi-sdk adds full re-exports of oxi-ai/oxi-agent types,
+// we can drop direct oxi-ai/oxi-agent dependencies entirely.
+// See ../oxi/docs/proposals/sdk-consumer-requirements.md
 pub use oxi_sdk::{
+    // A2A messaging (used by kernel_handle/a2a_api.rs)
     MessageBus, InterAgentMessage,
-    AgentMetrics as SdkAgentMetrics, MetricsSnapshot as SdkMetricsSnapshot,
-    ProviderPool, RateLimitPolicy,
-    Provider, ProviderRegistry, Model, StreamOptions,
-    Agent, AgentLoop, AgentConfig, AgentEvent,
-    StructuredOutput, OutputMode,
+    // Engine (used by engine.rs)
+    Provider, Model, StreamOptions,
+    Oxi, OxiBuilder,
+    // Agent loop (used by agent_runtime.rs — currently via oxi_agent directly,
+    // will switch when oxi-sdk re-exports them)
+    AgentLoop, AgentEvent,
+    // Kernel tool bridge (used by tools/kernel_bridge.rs)
     KernelToolProvider, KernelToolContext,
-    Oxi, OxiBuilder, AgentBuilder,
-    AgentGroup as SdkAgentGroup,
-    GroupResult as SdkGroupResult,
-    GroupStrategy as SdkGroupStrategy,
-    AgentGroupOutput as SdkAgentGroupOutput,
 };
 
