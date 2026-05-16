@@ -1,9 +1,10 @@
 [package]
 name = "oxios"
-version = "0.3.0-alpha"
+version = "0.1.0"
 edition = "2021"
 description = "Oxios Agent OS — Agent Operating System powered by oxi-sdk"
 license = "MIT"
+repository = "https://github.com/a7garden/oxios"
 
 [workspace]
 resolver = "2"
@@ -63,12 +64,12 @@ telegram = ["dep:oxios-telegram"]
 browser = ["oxios-kernel/browser"]
 
 [dependencies]
-oxios-kernel = { path = "crates/oxios-kernel" }
-oxios-ouroboros = { path = "crates/oxios-ouroboros" }
-oxios-gateway = { path = "crates/oxios-gateway" }
-oxios-web = { path = "channels/oxios-web", optional = true }
-oxios-cli = { path = "channels/oxios-cli", optional = true }
-oxios-telegram = { path = "channels/oxios-telegram", optional = true }
+oxios-kernel = { version = "0.1.0", path = "crates/oxios-kernel" }
+oxios-ouroboros = { version = "0.1.0", path = "crates/oxios-ouroboros" }
+oxios-gateway = { version = "0.1.0", path = "crates/oxios-gateway" }
+oxios-web = { version = "0.1.0", path = "channels/oxios-web", optional = true }
+oxios-cli = { version = "0.1.0", path = "channels/oxios-cli", optional = true }
+oxios-telegram = { version = "0.1.0", path = "channels/oxios-telegram", optional = true }
 hex = { workspace = true }
 uuid = { workspace = true }
 tokio = { workspace = true }
@@ -84,7 +85,7 @@ serde_json = { workspace = true }
 chrono = { workspace = true }
 
 [dev-dependencies]
-oxios-ouroboros = { path = "crates/oxios-ouroboros" }
+oxios-ouroboros = { version = "0.1.0", path = "crates/oxios-ouroboros" }
 oxi-sdk = { workspace = true }
 uuid = { workspace = true }
 chrono = { workspace = true }

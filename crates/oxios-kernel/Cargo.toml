@@ -1,9 +1,10 @@
 [package]
 name = "oxios-kernel"
-version = "0.2.0-alpha"
+version = "0.1.0"
 edition = "2021"
 description = "Oxios kernel: supervisor, event bus, state store"
 license = "MIT"
+repository = "https://github.com/a7garden/oxios"
 
 [features]
 default = ["browser"]
@@ -12,7 +13,7 @@ wasm-sandbox = ["dep:wasmtime", "dep:wasmtime-wasi"]
 browser = []
 
 [dependencies]
-oxios-ouroboros = { path = "../oxios-ouroboros" }
+oxios-ouroboros = { version = "0.1.0", path = "../oxios-ouroboros" }
 oxi-sdk = { workspace = true }
 tokio = { workspace = true }
 futures = { workspace = true }
@@ -62,6 +63,6 @@ opentelemetry-stdout = { version = "0.27", optional = true }
 
 [dev-dependencies]
 tempfile = "3"
-oxios-ouroboros = { path = "../oxios-ouroboros" }
-oxios-gateway = { path = "../oxios-gateway" }
+oxios-ouroboros = { version = "0.1.0", path = "../oxios-ouroboros" }
+oxios-gateway = { version = "0.1.0", path = "../oxios-gateway" }
 async-trait = { workspace = true }
