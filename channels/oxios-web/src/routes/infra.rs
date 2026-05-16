@@ -213,12 +213,8 @@ impl PermissionsUpdate {
             network_access: value.get("network_access").and_then(|v| v.as_bool()),
             max_execution_time_secs: value
                 .get("max_execution_time_secs")
-                .and_then(|v| v.as_u64())
-                .map(|v| v as u64),
-            max_memory_mb: value
-                .get("max_memory_mb")
-                .and_then(|v| v.as_u64())
-                .map(|v| v as u64),
+                .and_then(|v| v.as_u64()),
+            max_memory_mb: value.get("max_memory_mb").and_then(|v| v.as_u64()),
             can_fork: value.get("can_fork").and_then(|v| v.as_bool()),
         }
     }

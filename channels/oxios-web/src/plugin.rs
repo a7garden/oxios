@@ -26,6 +26,12 @@ impl WebPlugin {
     }
 }
 
+impl Default for WebPlugin {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[async_trait]
 impl ChannelPlugin for WebPlugin {
     fn name(&self) -> &str {

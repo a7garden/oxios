@@ -7,7 +7,7 @@
 //! - Manages knowledge flow via KnowledgeBridge
 
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use anyhow::{bail, Context, Result};
@@ -448,7 +448,7 @@ impl SpaceManager {
     }
 
     /// Create a Space from a filesystem path.
-    pub async fn create_from_path(&self, name: &str, path: &PathBuf) -> Result<Space> {
+    pub async fn create_from_path(&self, name: &str, path: &Path) -> Result<Space> {
         let mut space = Space::from_path(path);
         if !name.is_empty() {
             space.name = name.to_string();

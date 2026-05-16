@@ -5,7 +5,7 @@
 //! Layer 3: LLM topic classification (slow, only when needed)
 
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use super::{Space, SpaceId};
 
@@ -42,7 +42,7 @@ impl PathMatcher {
     }
 
     /// Find a Space that matches the given path.
-    pub fn find_space(&self, path: &PathBuf) -> Option<SpaceId> {
+    pub fn find_space(&self, path: &Path) -> Option<SpaceId> {
         let normalized = normalize_path(path);
 
         for (space_id, prefix) in &self.space_paths {
@@ -58,7 +58,7 @@ impl PathMatcher {
     }
 
     /// Check if any registered Space matches this path.
-    pub fn matches(&self, path: &PathBuf) -> bool {
+    pub fn matches(&self, path: &Path) -> bool {
         self.find_space(path).is_some()
     }
 }

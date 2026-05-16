@@ -924,12 +924,13 @@ impl OxiosConfig {
             }
         }
         if self.channels.enabled.iter().any(|c| c == "telegram")
-            && std::env::var(&self.channels.telegram.bot_token_env).is_err() {
-                warnings.push(format!(
-                    "channels.telegram: {} env var not set — telegram channel will fail",
-                    self.channels.telegram.bot_token_env
-                ));
-            }
+            && std::env::var(&self.channels.telegram.bot_token_env).is_err()
+        {
+            warnings.push(format!(
+                "channels.telegram: {} env var not set — telegram channel will fail",
+                self.channels.telegram.bot_token_env
+            ));
+        }
 
         (errors, warnings)
     }

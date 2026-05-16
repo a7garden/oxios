@@ -106,10 +106,10 @@ impl BudgetManager {
         // Initialize usage for new agents or keep existing if already set
         let mut usage = self.usage.write();
         usage.entry(agent_id).or_insert(Usage {
-                    tokens_used: 0,
-                    calls_used: 0,
-                    window_start: now,
-                });
+            tokens_used: 0,
+            calls_used: 0,
+            window_start: now,
+        });
     }
 
     /// Removes the budget for an agent.

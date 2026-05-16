@@ -235,7 +235,6 @@ impl GitLayer {
         std::fs::OpenOptions::new()
             .create(true)
             .append(true)
-            
             .open(self.root.join(&filename))?
             .write_all(entry.as_bytes())?;
         self.commit_file(

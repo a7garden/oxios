@@ -49,7 +49,7 @@ pub(crate) async fn handle_resource_history(
 ) -> Result<Json<serde_json::Value>, AppError> {
     let snapshots = state.kernel.infra.resource_history(params.last_n);
     let count = snapshots.len();
-    serde_json::to_value(&serde_json::json!({
+    serde_json::to_value(serde_json::json!({
         "snapshots": snapshots,
         "count": count,
     }))
@@ -64,7 +64,7 @@ pub(crate) async fn handle_resource_overload(
     let overloaded = state.kernel.infra.is_overloaded();
     let rm_config = &state.kernel.infra.config().resource_monitor;
 
-    serde_json::to_value(&serde_json::json!({
+    serde_json::to_value(serde_json::json!({
         "overloaded": overloaded,
         "threshold": {
             "cpu_percent": rm_config.cpu_threshold,

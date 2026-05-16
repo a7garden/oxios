@@ -267,7 +267,7 @@ async fn cmd_pkg(kernel: &Kernel, action: &PkgAction) -> Result<()> {
             );
         }
         PkgAction::Uninstall { name } => {
-            handle.extensions.uninstall_program(&name).await?;
+            handle.extensions.uninstall_program(name).await?;
             println!("Uninstalled '{}'", name);
         }
         PkgAction::List => {
@@ -634,14 +634,14 @@ async fn main() -> Result<()> {
                         .join(ts.to_string())
                 }
             };
-            oxios_kernel::backup::create_backup(&handle.state.store(), &output_path).await?;
+            oxios_kernel::backup::create_backup(handle.state.store(), &output_path).await?;
             Ok(())
         }
 
         Some(Command::Restore { input }) => {
             let handle = kernel.handle();
             let input_path = PathBuf::from(&input);
-            oxios_kernel::backup::restore_backup(&handle.state.store(), &input_path).await?;
+            oxios_kernel::backup::restore_backup(handle.state.store(), &input_path).await?;
             Ok(())
         }
 
@@ -659,7 +659,7 @@ async fn main() -> Result<()> {
                     if agents.is_empty() {
                         println!("No active agents.");
                     } else {
-                        println!("{:36} {:10} {:20} {}", "ID", "STATUS", "NAME", "CREATED");
+                        println!("{:36} {:10} {:20} CREATED", "ID", "STATUS", "NAME");
                         println!("{}", "-".repeat(90));
                         for agent in &agents {
                             println!(
@@ -703,18 +703,15 @@ async fn main() -> Result<()> {
                 println!("No audit entries yet.");
             } else {
                 println!("Recent Audit Entries (showing last {}):", entries.len());
-                println!(
-                    "{:10} {:20} {:15} {}",
-                    "SEQ", "TIMESTAMP", "ACTOR", "ACTION"
-                );
+                println!("{:10} {:20} {:15} ACTION", "SEQ", "TIMESTAMP", "ACTOR");
                 println!("{}", "-".repeat(70));
                 for entry in &entries {
                     println!(
-                        "{:10} {:20} {:15} {}",
+                        "{:10} {:20} {:15} {:?}",
                         entry.seq,
                         entry.timestamp.format("%Y-%m-%d %H:%M:%S"),
                         entry.actor,
-                        format!("{:?}", entry.action)
+                        entry.action
                     );
                 }
             }
@@ -915,7 +912,8 @@ async fn cmd_serve(kernel: &Kernel, config_path: &Path) -> Result<()> {
 // ─── Channel plugin helpers ───────────────────────────────────────────────
 
 fn build_channel_plugins() -> Vec<Box<dyn ChannelPlugin>> {
-    let mut plugins: Vec<Box<dyn ChannelPlugin>> = Vec::new();
+    let plugins: Vec<Box<dyn ChannelPlugin>> = vec![];
+    let mut plugins = plugins;
     #[cfg(feature = "web")]
     plugins.push(Box::new(WebPlugin::new()));
     #[cfg(feature = "cli")]

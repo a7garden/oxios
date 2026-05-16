@@ -23,6 +23,12 @@ impl CliPlugin {
     }
 }
 
+impl Default for CliPlugin {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[async_trait]
 impl ChannelPlugin for CliPlugin {
     fn name(&self) -> &str {

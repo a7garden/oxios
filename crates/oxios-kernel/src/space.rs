@@ -17,7 +17,7 @@ pub use manager::{SpaceManager, SpaceManagerError};
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use uuid::Uuid;
 
 /// Unique identifier for a Space.
@@ -110,14 +110,14 @@ impl Space {
     }
 
     /// Create a Space from a detected filesystem path.
-    pub fn from_path(path: &PathBuf) -> Self {
+    pub fn from_path(path: &Path) -> Self {
         let name = path
             .file_name()
             .and_then(|n| n.to_str())
             .unwrap_or("unknown")
             .to_string();
         let mut space = Self::new(&name, SpaceSource::AutoResource);
-        space.paths.push(path.clone());
+        space.paths.push(path.to_path_buf());
         space
     }
 

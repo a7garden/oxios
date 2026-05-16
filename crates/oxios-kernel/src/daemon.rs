@@ -10,11 +10,15 @@ use std::path::{Path, PathBuf};
 #[derive(Debug, Clone)]
 pub enum DaemonStatus {
     /// Daemon is running.
-    Running { /// Process ID.
-    pid: u32 },
+    Running {
+        /// Process ID.
+        pid: u32,
+    },
     /// PID file exists but process is dead (stale).
-    Stale { /// Process ID of the dead process.
-    pid: u32 },
+    Stale {
+        /// Process ID of the dead process.
+        pid: u32,
+    },
     /// Daemon is not running.
     Stopped,
 }

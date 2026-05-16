@@ -177,6 +177,7 @@ impl Orchestrator {
     /// the result will contain the questions and the phase will be
     /// `Phase::Interview`. The caller should send these questions to
     /// the user and include the `session_id` in follow-up messages.
+    #[allow(clippy::await_holding_lock)]
     pub async fn handle_message(
         &self,
         user_id: &str,
@@ -196,7 +197,6 @@ impl Orchestrator {
         // ── Space Detection ──
         let space_tag = self.current_space_tag();
         let space_id = {
-            #[allow(clippy::await_holding_lock)]
             let buffer = self.conversation_buffer.read();
             let space_manager = self.space_manager.read();
             if let Some(ref sm) = *space_manager {
