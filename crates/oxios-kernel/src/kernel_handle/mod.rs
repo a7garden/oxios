@@ -44,7 +44,7 @@ use crate::mcp::McpBridge;
 use crate::auth::AuthManager;
 use crate::access_manager::AccessManager;
 use crate::host_tools::HostToolValidator;
-use crate::config::{OxiosConfig, ExecConfig};
+use crate::config::OxiosConfig;
 use crate::event_bus::EventBus;
 use crate::space::SpaceManager;
 use crate::a2a::A2AProtocol;

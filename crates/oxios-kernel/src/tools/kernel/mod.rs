@@ -38,20 +38,18 @@ use oxi_agent::ToolRegistry;
 ///
 /// Called by [`super::kernel_bridge::OxiosKernelBridge`] during agent build.
 /// This is the canonical list of kernel tools available in oxios agents.
-pub fn register_all_kernel_tools(registry: &ToolRegistry, kernel: &KernelHandle, agent_id: &str) {
+pub fn register_all_kernel_tools(registry: &ToolRegistry, kernel: &KernelHandle, _agent_id: &str) {
     let agent_uuid = AgentId::new_v4();
 
-    // ExecTool
-    registry.register(crate::tools::ExecTool::from_kernel(kernel.clone()));
+    // ExecTool (stores Arc<KernelHandle>)
+    registry.register(crate::tools::ExecTool::from_kernel(kernel));
 
+    // Memory tools (each stores Arc<KernelHandle>)
+    registry.register(crate::tools::MemoryReadTool::from_kernel(kernel));
+    registry.register(crate::tools::MemorySearchTool::from_kernel(kernel));
+    registry.register(crate::tools::MemoryWriteTool::from_kernel(kernel));
 
-    // Memory tools
-    registry.register(crate::tools::MemoryReadTool::from_kernel(kernel.clone()));
-    registry.register(crate::tools::MemorySearchTool::from_kernel(kernel.clone()));
-    registry.register(crate::tools::MemoryWriteTool::from_kernel(kernel.clone()));
-
-
-    // Kernel domain tools
+    // Kernel domain tools (take &KernelHandle)
     registry.register(SpaceTool::from_kernel(kernel));
     registry.register(KernelAgentTool::from_kernel(kernel));
     registry.register(PersonaTool::from_kernel(kernel));
@@ -60,26 +58,23 @@ pub fn register_all_kernel_tools(registry: &ToolRegistry, kernel: &KernelHandle,
     registry.register(BudgetTool::from_kernel(kernel));
     registry.register(ResourceTool::from_kernel(kernel));
 
-    // A2A tools
-    registry.register(crate::tools::A2aDelegateTool::from_kernel(kernel.clone(), agent_uuid));
-    registry.register(crate::tools::A2aSendTool::from_kernel(kernel.clone(), agent_uuid));
-    registry.register(crate::tools::A2aQueryTool::from_kernel(kernel.clone()));
+    // A2A tools (each stores Arc<KernelHandle>)
+    registry.register(crate::tools::A2aDelegateTool::from_kernel(kernel, agent_uuid));
+    registry.register(crate::tools::A2aSendTool::from_kernel(kernel, agent_uuid));
+    registry.register(crate::tools::A2aQueryTool::from_kernel(kernel));
 
-    // MCP tool wrapper (singleton — dynamic MCP tools are handled via bridge)
+    // MCP tool wrapper (stores Arc<KernelHandle>)
     registry.register(crate::tools::McpToolWrapper::from_kernel(
-        kernel.clone(),
-        "",
-        "",
-        "MCP tools via bridge".into(),
+        kernel, "", "", "MCP tools via bridge".into(),
         serde_json::json!({"type": "object", "properties": {}}),
     ));
 
-    // ProgramTool (dynamic — actual tool instances come from ProgramManager)
+    // ProgramTool (takes &KernelHandle)
     registry.register(crate::tools::ProgramTool::from_kernel(kernel));
 
-    // Browser (optional feature)
+    // Browser (optional feature, stores Arc<KernelHandle>)
     #[cfg(feature = "browser")]
     {
-        registry.register(crate::tools::BrowserTool::from_kernel(kernel.clone()));
+        registry.register(crate::tools::BrowserTool::from_kernel(kernel));
     }
 }

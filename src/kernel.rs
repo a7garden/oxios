@@ -333,7 +333,7 @@ impl KernelBuilder {
             config.exec.optional_host_tools.clone(),
         );
 
-        let mut auth_manager = AuthManager::new();
+        let auth_manager = AuthManager::new();
         // API key auth is now via engine.api_key or ~/.oxi/auth.json
         // No more security.api_keys_path
         let auth_manager = Arc::new(parking_lot::Mutex::new(auth_manager));
