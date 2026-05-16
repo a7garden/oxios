@@ -262,7 +262,7 @@ pub fn run_onboarding(oxios_home: &Path, config: &mut OxiosConfig) -> anyhow::Re
                     "r" | "reset" => {
                         // Continue fresh — fall through to wizard
                     }
-                    "m" | "modify" | _ => {
+                    _ => {
                         // Continue with current model as default context
                     }
                 }
@@ -461,7 +461,7 @@ fn scan_env_vars() -> Option<&'static str> {
 }
 
 /// Step 1: Prompt the user to select a provider.
-fn prompt_provider<'a>(catalog: &'a [ProviderInfo]) -> anyhow::Result<&'a ProviderInfo> {
+fn prompt_provider(catalog: &[ProviderInfo]) -> anyhow::Result<&ProviderInfo> {
     println!();
     println!("  [1/{}] Select an LLM provider:", TOTAL_STEPS);
     println!();
