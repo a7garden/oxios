@@ -297,9 +297,11 @@ impl AgentRuntime {
 
 /// Run the AgentLoop inside a blocking thread.
 ///
-/// This function is called from `spawn_blocking` because `AgentLoop::run()`
-/// produces a `!Send` future. We use `tokio::runtime::Handle::block_on` to
-/// drive the async work from the blocking thread.
+/// Run the agent loop inside a blocking thread.
+///
+/// `AgentLoop::run()` still captures non-`Send` state internally
+/// (`FinalizedToolCallEntry::Future` lacks `+ Send`). Until oxi fixes this,
+/// we use `spawn_blocking` + `Handle::block_on`.
 fn run_agent_loop(ctx: AgentLoopContext) -> Result<(String, usize, bool)> {
     let AgentLoopContext {
         provider,
@@ -455,7 +457,8 @@ fn run_agent_loop(ctx: AgentLoopContext) -> Result<(String, usize, bool)> {
     let memory_for_callback: Arc<MemoryManager> = (*kernel_handle.agents.memory_manager()).clone();
     let session_id_for_callback = seed_id.to_string();
 
-    // Run the async AgentLoop inside the blocking thread.
+    // Run the agent loop inside a blocking thread.
+    // AgentLoop::run() captures !Send state internally.
     let rt = tokio::runtime::Handle::current();
     let rt_for_callback = rt.clone();
     rt.block_on(async {
@@ -520,7 +523,7 @@ fn run_agent_loop(ctx: AgentLoopContext) -> Result<(String, usize, bool)> {
             seed_id = %seed_id,
             steps = s.steps_completed,
             success = s.success,
-            "AgentLoop completed inside blocking thread"
+            "AgentLoop completed"
         );
         Ok((s.final_content.clone(), s.steps_completed, s.success))
     })

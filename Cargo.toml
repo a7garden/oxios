@@ -52,12 +52,10 @@ regex = "1"
 # Concurrency
 parking_lot = "0.12"
 
-# oxi engine — local path for co-development
-# oxi-sdk is the primary entry point for all AI engine types.
-# oxi-ai and oxi-agent are kept only as transitive deps for backward compat.
-oxi-sdk = { path = "../oxi/oxi-sdk" }
-oxi-ai = { path = "../oxi/oxi-ai" }   # transitive — remove when oxios-ouroboros migrates
-oxi-agent = { path = "../oxi/oxi-agent" } # transitive — remove when kernel fully migrates
+# oxi engine — crates.io releases
+oxi-sdk = "0.15"
+oxi-ai = "0.15"
+oxi-agent = "0.15"
 
 [features]
 default = ["web", "cli", "browser"]
@@ -101,3 +99,4 @@ criterion = { version = "0.5", features = ["async"] }
 [[bench]]
 name = "kernel_bench"
 harness = false
+
