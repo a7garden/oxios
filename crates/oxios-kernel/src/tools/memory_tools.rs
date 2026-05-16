@@ -9,7 +9,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use chrono::Utc;
-use oxi_agent::{AgentTool, AgentToolResult, ToolContext};
+use oxi_sdk::{AgentTool, AgentToolResult, ToolContext};
 use serde_json::{json, Value};
 
 use crate::memory::{MemoryEntry, MemoryManager, MemoryType};

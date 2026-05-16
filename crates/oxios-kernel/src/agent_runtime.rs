@@ -20,11 +20,14 @@
 
 use anyhow::Result;
 use oxi_agent::{
-    prelude::CompactionEvent, AgentEvent, AgentLoop, AgentLoopConfig,
-    SharedState, ToolRegistry, SearchCache,
+    prelude::CompactionEvent, SearchCache,
 };
-use oxi_ai::{CompactionStrategy, Provider};
-use oxi_agent::agent_loop::config::ToolExecutionMode;
+use oxi_sdk::{
+    AgentEvent, AgentLoop, AgentLoopConfig,
+    SharedState, ToolRegistry,
+};
+use oxi_sdk::{CompactionStrategy, Provider};
+use oxi_sdk::ToolExecutionMode;
 use parking_lot::Mutex;
 use std::sync::Arc;
 

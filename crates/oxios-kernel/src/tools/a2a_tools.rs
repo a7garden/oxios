@@ -8,7 +8,7 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use oxi_agent::{AgentTool, AgentToolResult, ToolContext, tools::ToolError};
+use oxi_sdk::{AgentTool, AgentToolResult, ToolContext, ToolError};
 use serde_json::{json, Value};
 use uuid::Uuid;
 

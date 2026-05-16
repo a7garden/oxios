@@ -29,8 +29,9 @@ use std::sync::Arc;
 
 use oxi_agent::{
     EditTool, FindTool, GetSearchResultsTool, GrepTool, LsTool, ReadTool, SearchCache,
-    ToolRegistry, WebSearchTool, WriteTool,
+    WebSearchTool, WriteTool,
 };
+use oxi_sdk::ToolRegistry;
 
 use crate::capability::{CSpace, ResourceRef, Rights};
 use crate::tools::kernel::*;
