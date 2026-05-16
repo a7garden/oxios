@@ -53,7 +53,7 @@ libc = "0.2"
 usearch = "2.25"
 
 # Headless browser (built-in)
-oxibrowser-core = "0.8.0"
+oxibrowser-core = "0.9.1"
 
 # OpenTelemetry (optional)
 tracing-opentelemetry = { version = "0.28", optional = true }

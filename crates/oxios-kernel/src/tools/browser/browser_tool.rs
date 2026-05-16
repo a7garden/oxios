@@ -1,11 +1,12 @@
-//! Agent-facing browser tool.
+//! Agent-facing browser tool — the single gateway to all browser capabilities.
 //!
 //! Wraps `oxibrowser_core::Browser` behind the `AgentTool` interface so agents
 //! can browse the web in their tool-calling loop.
 //!
-//! Two usage patterns:
+//! Three usage patterns:
 //! - **`browse`** — one-shot URL → Markdown (90% of agent requests)
 //! - **`goto`/`click`/`type`/...** — interactive session via `Tab`
+//! - **`run_script`** — YAML scenario execution via `ScriptRunner`
 
 use std::sync::Arc;
 
@@ -69,7 +70,7 @@ impl AgentTool for BrowserTool {
     }
 
     fn description(&self) -> &'static str {
-        "Browse the web using a headless browser. Actions: browse(url), goto(url), back(), forward(), reload(), post(url, body, content_type), click(selector), type(selector, text), press_key(key), evaluate(js), evaluate_await(js), content(), query_all(selector), wait_for(selector, timeout_ms), load_resources(), screenshot(), close()"
+        "Browse the web using a headless browser. Actions: browse(url), goto(url), back(), forward(), reload(), post(url, body, content_type), click(selector), type(selector, text), press_key(key), evaluate(js), evaluate_await(js), content(), query_all(selector), wait_for(selector, timeout_ms), load_resources(), screenshot(), run_script(yaml), close()"
     }
 
     fn parameters_schema(&self) -> Value {
@@ -95,6 +96,7 @@ impl AgentTool for BrowserTool {
                         "wait_for",
                         "load_resources",
                         "screenshot",
+                        "run_script",
                         "close"
                     ],
                     "description": "Browser action to perform"
@@ -134,6 +136,10 @@ impl AgentTool for BrowserTool {
                 "width": {
                     "type": "integer",
                     "description": "Viewport width for screenshot (default 1280)"
+                },
+                "script": {
+                    "type": "string",
+                    "description": "YAML script for run_script action. Supports: goto, click, fill, type, wait, evaluate, extract, screenshot, if, retry, set, echo, sleep, and more."
                 }
             },
             "required": ["action"]
@@ -331,6 +337,25 @@ impl AgentTool for BrowserTool {
                 }
             }
 
+            // ── Script execution ────────────────────────────────────
+            "run_script" => {
+                let yaml =
+                    param_str(&params, "script", "run_script requires 'script' (YAML string)")?;
+                let tab = self.get_or_create_tab().await.map_err(|e| e.to_string())?;
+                let mut runner = oxibrowser_core::script::ScriptRunner::new(&tab);
+                match runner.run(yaml).await {
+                    Ok(result) => {
+                        let output = serde_json::to_string_pretty(&result)
+                            .unwrap_or_else(|e| format!("{{\"error\": \"{}\"}}", e));
+                        Ok(AgentToolResult::success(output))
+                    }
+                    Err(e) => Ok(AgentToolResult::error(format!(
+                        "Script failed: {}",
+                        e
+                    ))),
+                }
+            }
+
             // ── Lifecycle ──────────────────────────────────────────
             "close" => {
                 let mut guard = self.tab.lock().await;
@@ -341,7 +366,7 @@ impl AgentTool for BrowserTool {
             }
 
             other => Err(format!(
-                "Unknown browser action '{}'. Valid: browse, goto, back, forward, reload, post, click, type, press_key, evaluate, evaluate_await, content, query_all, wait_for, load_resources, screenshot, close",
+                "Unknown browser action '{}'. Valid: browse, goto, back, forward, reload, post, click, type, press_key, evaluate, evaluate_await, content, query_all, wait_for, load_resources, screenshot, run_script, close",
                 other
             )),
         }
@@ -398,11 +423,13 @@ mod tests {
             "click", "type", "press_key",
             "evaluate", "evaluate_await",
             "content", "query_all",
-            "wait_for", "load_resources", "screenshot", "close",
+            "wait_for", "load_resources", "screenshot",
+            "run_script",
+            "close",
         ];
-        assert!(actions.len() >= 15);
+        assert!(actions.len() >= 16);
         assert!(actions.contains(&"browse"));
         assert!(actions.contains(&"goto"));
-        assert!(actions.contains(&"press_key"));
+        assert!(actions.contains(&"run_script"));
     }
 }

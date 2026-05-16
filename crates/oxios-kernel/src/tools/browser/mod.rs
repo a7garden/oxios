@@ -1,15 +1,20 @@
 //! Headless browser integration for Oxios agents.
 //!
-//! Uses the `oxibrowser-core` SDK directly — `Browser::browse()` for one-shot
-//! reads and `Browser::new_tab()` for interactive sessions.
+//! Single gateway: `BrowserTool` wraps `oxibrowser_core::Browser` behind
+//! the `AgentTool` interface. Every browser operation — one-shot reads,
+//! interactive sessions, and YAML script execution — goes through this
+//! one tool.
 //!
 //! ## Architecture
 //!
 //! ```text
 //! Agent → BrowserTool (AgentTool) → oxibrowser_core::Browser / Tab
+//!                                     └── ScriptRunner (run_script action)
 //! ```
 //!
 //! No external process is needed — OxiBrowser runs entirely in-process.
+//! The `oxibrowser` CLI binary is a developer debugging tool only;
+//! agents never invoke it via ExecTool.
 //!
 //! ## Feature Gate
 //!
