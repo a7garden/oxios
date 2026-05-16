@@ -36,6 +36,18 @@ oxios → oxios-kernel → oxi-sdk/oxi-agent/oxi-ai (crates.io, NOT path deps)
       → oxios-web/oxios-cli/oxios-telegram (channel plugins, feature-gated)
 ```
 
+
+## Quick Facts
+
+| Fact | Value |
+|------|-------|
+| **Language** | Rust 2021 |
+| **Version** | 0.3.0-alpha |
+| **License** | MIT |
+| **CI** | GitHub Actions (macOS-latest, check+test) |
+| **Build** | `cargo build` |
+| **Test** | `cargo test --workspace` |
+
 ## Why
 
 | Principle | Meaning |
@@ -89,6 +101,20 @@ oxios run --json --session "$SID" "follow-up"
 }
 ```
 
+
+## File Locations
+
+| Path | Purpose |
+|------|---------|
+| `~/.oxios/` | Oxios home directory |
+| `~/.oxios/config.toml` | Main configuration |
+| `~/.oxios/workspace/` | Agent working directory |
+| `~/.oxios/workspace/sessions/` | Session data (ephemeral) |
+| `~/.oxios/workspace/seeds/` | Ouroboros seed specs |
+| `~/.oxios/workspace/programs/` | Installed programs |
+| `~/.oxios/workspace/skills/` | Skill definitions |
+| `~/.oxi/auth.json` | oxi-cli credentials (separate from Oxios) |
+
 ## Conventions
 
 - **Language:** Code, comments, docs, commits — English. User-facing messages — Korean.
@@ -109,6 +135,26 @@ oxios run --json --session "$SID" "follow-up"
 - **Kernel** (`src/kernel.rs`) — `Kernel::builder().build().await` assembles all components. `execute_prompt_with_session()` for CLI execution.
 - **Program** (`program/`) — OS-level installable capabilities. See `.programs/` for examples.
 - **A2A** (`a2a.rs`) — Google's agent-to-agent protocol. Horizontal agent communication.
+
+## Adding a New Tool
+
+1. **Define** the tool in `crates/oxios-kernel/src/tools/<name>_tool.rs`
+   - Implement `AgentTool` from `oxi_sdk`
+   - Return `AgentToolResult::success()` or `AgentToolResult::error()`
+2. **Register** in `registration.rs` via `tool_registry.register()`
+3. **Test** with `oxios run --json "<command that triggers tool>"`
+4. **Audit** the execution path in `access_manager/` if sensitive
+
+**Tool signature pattern:**
+```rust
+#[async_trait]
+impl AgentTool for MyTool {
+    fn name(&self) -> &str { "my_tool" }
+    fn description(&self) -> &'static str { "..." }
+    fn parameters_schema(&self) -> Value { json!({...}) }
+    async fn execute(&self, tool_call_id: &str, params: Value, ...) -> Result<AgentToolResult, String>
+}
+```
 
 ## Detailed Docs (read when relevant)
 
