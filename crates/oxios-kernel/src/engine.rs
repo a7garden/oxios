@@ -33,9 +33,9 @@ impl OxiosEngine {
         let mut builder = OxiBuilder::new().with_builtins();
 
         if provider_name == "zai" {
-            let api_key = std::env::var("ZAI_API_KEY")
-                .or_else(|_| std::env::var("ANTHROPIC_API_KEY"))
-                .ok();
+            // Use CredentialStore to read API key from ~/.oxi/auth.json
+            let api_key = crate::credential::CredentialStore::resolve("zai", None)
+                .map(|(key, _)| key);
 
             let zai_base_url = std::env::var("ZAI_BASE_URL")
                 .unwrap_or_else(|_| "https://api.z.ai/api/coding/paas/v4".to_string());
