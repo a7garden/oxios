@@ -37,12 +37,15 @@ impl OxiosEngine {
                 .or_else(|_| std::env::var("ANTHROPIC_API_KEY"))
                 .ok();
 
+            let zai_base_url = std::env::var("ZAI_BASE_URL")
+                .unwrap_or_else(|_| "https://api.z.ai/api/coding/paas/v4".to_string());
+
             let zai_provider = oxi_ai::OpenAiProvider::with_base_url_and_key(
-                "https://open.bigmodel.cn/api/paas/v4",
+                &zai_base_url,
                 api_key,
             );
             builder = builder.provider("zai", zai_provider);
-            tracing::info!("Registered zai provider with API key (OpenAI-compatible)");
+            tracing::info!("Registered zai provider with API key (OpenAI-compatible, base_url: {})", zai_base_url);
         }
 
         let oxi = builder.build();
