@@ -7,7 +7,7 @@
 
 Oxios is an **Agent Operating System** in Rust. It's an OS where AI agents execute real work on behalf of users — fork, exec, wait, kill, just like Unix processes.
 
-**Stack:** Rust 2021, tokio async, serde (JSON+TOML), oxi-sdk + oxi-ai (crates.io). ~52K lines across 179 source files.
+**Stack:** Rust 2021, tokio async, serde (JSON+TOML), oxi-sdk + oxi-ai (crates.io). ~56K lines across 184 source files.
 
 ```
 User → Channel (Web/CLI/Telegram) → Gateway → Kernel (supervisor + scheduler + ouroboros + agent_runtime)
@@ -43,7 +43,7 @@ oxios → oxios-kernel → oxi-sdk (crates.io, NOT path dep)
 | Fact | Value |
 |------|-------|
 | **Language** | Rust 2021 |
-| **Version** | 0.1.0 |
+| **Version** | 0.1.2 |
 | **License** | MIT |
 | **CI** | GitHub Actions (macOS-latest, fmt+clippy+test+audit) |
 | **Build** | `cargo build` |
@@ -138,8 +138,10 @@ oxios run --json --session "$SID" "follow-up"
 - **Orchestrator** (`orchestrator.rs`) — Runs the Ouroboros protocol end-to-end. The "brain".
 - **AgentRuntime** (`agent_runtime.rs`) — Wraps oxi-agent's tool-calling loop.
 - **OxiosEngine** (`engine.rs`) — Thin wrapper around `oxi_sdk::Oxi`. Provider/model resolution via `OxiBuilder`. Uses `oxi_ai` for provider construction.
+- **KernelBridge** (`tools/kernel_bridge.rs`) — Registers all kernel domain tools into an agent's `ToolRegistry` during agent build.
 - **ExecTool** (`tools/exec_tool.rs`) — Two modes: `shell` (bash -c, RBAC-enforced) and `structured` (binary allowlist + metacharacter blocking).
-- **Kernel tools** (`tools/kernel/`) — Agent, Space, Persona, Security, Budget, Cron, Resource tools. Each wraps a KernelHandle API.
+- **Kernel tools** (`tools/kernel/`) — Space, Agent, Persona, Cron, Security, Budget, Resource tools. Each wraps a KernelHandle API domain.
+- **KernelHandle** (`kernel_handle/`) — Facade exposing 12 typed APIs: AgentApi, SpaceApi, SecurityApi, PersonaApi, ExecApi, BrowserApi, McpApi, ExtensionApi, InfraApi, A2aApi, StateApi (+ CredentialApi via `credential.rs`).
 - **AccessManager** (`access_manager/`) — OWASP-inspired least-privilege. RBAC, path sandboxing, audit logging.
 - **AuditTrail** (`audit_trail.rs`) — Merkle-chain style tamper-evident audit log. Each entry cryptographically linked.
 - **Memory** (`memory/`) — Vector store with hyperbolic embeddings, HNSW indexing, flash attention, reasoning bank, Sona learning engine, RVF store.
@@ -151,7 +153,6 @@ oxios run --json --session "$SID" "follow-up"
 - **Space** (`space/`) — Directory: `manager.rs` (CRUD), `conversation_buffer.rs`, `knowledge_bridge.rs` (auto-knowledge extraction), `detection.rs` (intent classification).
 - **Telemetry** (`telemetry_otel.rs` / `telemetry_stub.rs`) — OpenTelemetry integration with compile-time feature toggle to stub.
 - **ResourceMonitor** (`resource_monitor.rs`) — System resource tracking for agent budget enforcement.
-- **KernelHandle** (`kernel_handle/`) — Facade exposing 11 typed APIs: AgentApi, SpaceApi, SecurityApi, PersonaApi, ExecApi, BrowserApi, McpApi, ExtensionApi, InfraApi, A2aApi, StateApi.
 - **Kernel** (`src/kernel.rs`) — `Kernel::builder().build().await` assembles all components. `execute_prompt_with_session()` for CLI execution.
 - **Program** (`program/`) — OS-level installable capabilities. See `.programs/` for examples.
 - **Capability** (`capability/`) — Template-based capability resolution for agent tool discovery.
@@ -169,7 +170,7 @@ oxios run --json --session "$SID" "follow-up"
 1. **Define** the tool in `crates/oxios-kernel/src/tools/<name>_tool.rs` (or `tools/kernel/` for kernel facade tools)
    - Implement `AgentTool` from `oxi_sdk`
    - Return `AgentToolResult::success()` or `AgentToolResult::error()`
-2. **Register** in `registration.rs` via `tool_registry.register()`
+2. **Register** in `tools/kernel_bridge.rs` via `register_all_kernel_tools()` — this is the canonical registration point
 3. **Test** with `oxios run --json "<command that triggers tool>"`
 4. **Audit** the execution path in `access_manager/` if sensitive
 5. If the tool wraps a KernelHandle API, add a corresponding `*_api.rs` in `kernel_handle/`
@@ -207,4 +208,5 @@ impl AgentTool for MyTool {
 - **Kernel binary vs library**: `src/kernel.rs` (the assembler/builder) lives in the **binary crate**, not `oxios-kernel`. The library provides components; the binary wires them together.
 - **Agent lifecycle split**: `Supervisor` handles low-level process management. `AgentLifecycleManager` handles the full orchestrated lifecycle (A2A registration, scheduling, permissions). Don't add lifecycle logic to Orchestrator directly — use `AgentLifecycleManager`.
 - **CI oxi checkout**: CI checks out `a7garden/oxi` at `v0.4.4` alongside oxios. If tests fail with oxi-related errors, check that the oxi ref matches.
-- **Feature gates**: Web, CLI, Telegram, and browser are feature-gated. If a channel doesn't compile, check `cargo build -p oxios --features <feature>`.
+- **Feature gates**: Web, CLI, Telegram are feature-gated. Browser is enabled by default (default feature). If a channel doesn't compile, check `cargo build -p oxios --features <feature>`.
+- **Tool registration**: All kernel tools must be registered in `tools/kernel_bridge.rs::register_all_kernel_tools()`. Don't add tools directly to `registration.rs` for kernel operations.
