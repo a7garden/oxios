@@ -54,8 +54,8 @@ regex = "1"
 parking_lot = "0.12"
 
 # oxi engine — single dependency for everything
-oxi-sdk = "0.15.3"
-oxi-ai = "0.15.0"
+oxi-sdk = "0.16.0"
+oxi-ai = "0.16.0"
 
 [features]
 default = ["web", "cli", "browser"]
@@ -95,6 +95,11 @@ serde_json = { workspace = true }
 tempfile = "3"
 mockall = "0.12"
 criterion = { version = "0.5", features = ["async"] }
+
+[patch.crates-io]
+# Use local oxi for provider catalog access (model_db, env_api_keys)
+oxi-sdk = { path = "../oxi/oxi-sdk" }
+oxi-ai = { path = "../oxi/oxi-ai" }
 
 [[bench]]
 name = "kernel_bench"

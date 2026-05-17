@@ -7,7 +7,7 @@ license = "MIT"
 repository = "https://github.com/a7garden/oxios"
 
 [dependencies]
-oxi-sdk = "0.15.2"
+oxi-sdk = { workspace = true }
 tokio = { workspace = true }
 futures = { workspace = true }
 async-trait = { workspace = true }
