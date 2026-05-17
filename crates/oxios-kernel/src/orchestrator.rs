@@ -78,7 +78,7 @@ impl SubTask {
 }
 
 /// Maximum number of Ouroboros loops before giving up.
-const MAX_EVOLUTION_ITERATIONS: usize = 3;
+const MAX_EVOLUTION_ITERATIONS: usize = 1;
 
 /// The orchestrator coordinates the full Ouroboros lifecycle.
 pub struct Orchestrator {
@@ -1011,7 +1011,10 @@ fn format_result(seed: &Seed, evaluation: &EvaluationResult) -> String {
 /// Simple heuristic: if the seed has 3 or more acceptance criteria,
 /// it likely contains distinct concerns that can be parallelized.
 fn should_split_seed(seed: &Seed) -> bool {
-    seed.acceptance_criteria.len() >= 3
+    // Only split for genuinely complex tasks with many criteria.
+    // Simple tasks (even with 3-4 criteria) are better handled by a single agent
+    // to preserve context coherence.
+    seed.acceptance_criteria.len() >= 5
 }
 
 /// Split a seed into subtasks based on acceptance criteria.

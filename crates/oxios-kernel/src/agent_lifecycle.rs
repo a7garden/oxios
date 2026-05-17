@@ -165,12 +165,12 @@ impl AgentLifecycleManager {
     /// Ensure default tool permissions exist for an agent.
     fn ensure_permissions(&self, agent_name: &str) {
         let mut access = self.access_manager.lock();
-        for tool in ["bash", "read", "write", "edit", "grep", "find"] {
-            access.can_use_tool(agent_name, tool);
-        }
-        if access.get_permissions(agent_name).is_none() {
-            tracing::warn!(agent = %agent_name, "Agent has no permissions, using default");
-            access.get_or_create_permissions(agent_name);
+        let perms = access.get_or_create_permissions(agent_name);
+        // Grant default tool set to new agents
+        for tool in ["bash", "read", "write", "edit", "grep", "find", "exec", "ls"] {
+            if !perms.allowed_tools.contains(tool) {
+                perms.allow_tool(tool);
+            }
         }
     }
 

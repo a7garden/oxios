@@ -255,6 +255,7 @@ impl OuroborosProtocol for OuroborosEngine {
         // Non-task message — return direct chat response
         if !parsed.is_task {
             let mut result = InterviewResult::new();
+            result.original_message = user_input.to_string();
             result.is_task = false;
             result.chat_response = if parsed.chat_response.is_empty() {
                 "Hello! How can I help you today?".to_string()
@@ -287,6 +288,7 @@ impl OuroborosProtocol for OuroborosEngine {
         let ambiguity_value = ambiguity.ambiguity();
 
         let mut result = InterviewResult::new();
+        result.original_message = user_input.to_string();
         for q in &parsed.questions {
             result.add_exchange(q, "");
         }
@@ -305,25 +307,39 @@ impl OuroborosProtocol for OuroborosEngine {
     async fn generate_seed(&self, interview: &InterviewResult) -> Result<Seed> {
         self.set_phase(Phase::Seed);
 
-        let qa_block = interview
-            .questions
-            .iter()
-            .zip(interview.answers.iter())
-            .map(|(q, a)| format!("Q: {}\nA: {}", q, a))
-            .collect::<Vec<_>>()
-            .join("\n\n");
+        // Build context: combine original user message with any Q&A
+        let original_message = if interview.original_message.is_empty() {
+            interview.questions.first().cloned().unwrap_or_default()
+        } else {
+            interview.original_message.clone()
+        };
+        let has_answers = interview.answers.iter().any(|a| !a.is_empty());
+
+        let context_block = if has_answers {
+            let qa_block = interview
+                .questions
+                .iter()
+                .zip(interview.answers.iter())
+                .map(|(q, a)| format!("Q: {}\nA: {}", q, a))
+                .collect::<Vec<_>>()
+                .join("\n\n");
+            format!("## Original Request\n{}\n\n## Clarification Q&A\n{}", original_message, qa_block)
+        } else {
+            format!("## Original Request\n{}", original_message)
+        };
 
         let system_prompt = SEED_SYSTEM_PROMPT;
         let user_message = format!(
-            "Based on the following interview, generate a Seed specification.\n\n\
-             ## Interview\n\
-             {}\n\n\
+            "{}\n\n\
+             Generate a Seed specification that faithfully captures the user's ORIGINAL request.\n\
+             The goal MUST preserve exact details (filenames, content, paths, languages) from the request.\n\
+             Do NOT generalize or abstract — keep the specific details.\n\n\
              Produce a JSON object with:\n\
-             - \"goal\": a single clear goal statement\n\
+             - \"goal\": a single clear goal that preserves ALL specifics from the original request\n\
              - \"constraints\": list of constraints\n\
-             - \"acceptance_criteria\": list of measurable acceptance criteria\n\
+             - \"acceptance_criteria\": list of measurable acceptance criteria that verify the specific details\n\
              - \"ontology\": list of {{ \"name\": \"\", \"entity_type\": \"\", \"description\": \"\" }} domain entities",
-            qa_block
+            context_block
         );
 
         let raw = self.llm_complete(system_prompt, &user_message).await?;
@@ -580,14 +596,18 @@ Do not include any text outside the JSON object.";
 
 const EVALUATE_SYSTEM_PROMPT: &str = "\
 You are an Evaluator for an AI agent operating system. \
-Your job is to verify whether an agent's execution output satisfies the specification.
-
-Evaluate in two stages:
-1. **Mechanical** — Does the output literally mention/address each acceptance criterion?
-2. **Semantic** — Does the output actually solve the user's intent, not just tick boxes?
-
-Be fair but rigorous. A score of 1.0 means perfect execution, 0.0 means complete failure.
-
+Your job is to verify whether an agent's execution output satisfies the specification.\n\
+Evaluate in two stages:\n\
+1. **Mechanical** — Does the output mention or demonstrate each acceptance criterion?\n\
+2. **Semantic** — Does the output actually solve the user's intent?\n\
+\n\
+SCORING GUIDELINES:\n\
+- If the agent reports creating a file and shows its content matching the requirement, that is EVIDENCE of success.\n\
+- If the agent ran commands and reported their output, trust the reported output unless contradictory.\n\
+- Score 0.8+ if the task was clearly accomplished even if minor details differ.\n\
+- Score 0.5-0.7 if partially accomplished with some issues.\n\
+- Score below 0.5 only if the task clearly failed or produced nothing useful.\n\
+- Be GENEROUS — if the output plausibly shows the task was done, mark it as passed.\n\n\
 Always respond with valid JSON in the exact format requested. \
 Do not include any text outside the JSON object.";
 

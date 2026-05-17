@@ -609,7 +609,10 @@ fn build_system_prompt(
 
     prompt.push_str(
         "\nUse the available tools to accomplish the goal. \
-         Work methodically and verify your work against the acceptance criteria.",
+         Work methodically and verify your work against the acceptance criteria. \
+         After completing the task, ALWAYS verify your work by reading back any files \
+         you created or checking the results of commands you ran. \
+         Include the verification output in your final response.",
     );
 
     prompt

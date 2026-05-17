@@ -10,6 +10,9 @@ use crate::seed::AmbiguityScore;
 /// Result of an interview session.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct InterviewResult {
+    /// The original user message that triggered this interview.
+    #[serde(default)]
+    pub original_message: String,
     /// Clarifying questions asked during the interview.
     pub questions: Vec<String>,
     /// Answers collected for each question.
@@ -35,6 +38,7 @@ impl InterviewResult {
     /// Creates a new empty interview result with maximum ambiguity.
     pub fn new() -> Self {
         Self {
+            original_message: String::new(),
             questions: Vec::new(),
             answers: Vec::new(),
             ambiguity: AmbiguityScore::default(),
