@@ -219,12 +219,22 @@ fn word_count(s: &str) -> usize {
     s.split_whitespace().count()
 }
 
-/// Truncate response to max_len chars.
+/// Truncate response to max_len bytes, respecting UTF-8 char boundaries.
 fn truncate_response(response: &str, max_len: usize) -> String {
     if response.len() <= max_len {
         response.to_string()
     } else {
-        format!("{}...", &response[..max_len])
+        // Find the nearest char boundary at or before max_len
+        let end = response.char_indices()
+            .take_while(|(idx, _)| *idx <= max_len)
+            .last()
+            .map(|(idx, c)| idx + c.len_utf8())
+            .unwrap_or(0);
+        if end == 0 {
+            "...".to_string()
+        } else {
+            format!("{}...", &response[..end])
+        }
     }
 }
 

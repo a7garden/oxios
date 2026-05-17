@@ -276,7 +276,7 @@ impl Orchestrator {
             // Record agent response in conversation buffer
             {
                 let mut buffer = self.conversation_buffer.write();
-                buffer.push_agent(&response_text, &space_id.to_string());
+                buffer.push_agent(&response_text, &space_id);
             }
 
             self.publish_phase_completed(&session_id, Phase::Interview, "chat")
