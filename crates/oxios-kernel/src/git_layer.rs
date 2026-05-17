@@ -137,7 +137,9 @@ impl GitLayer {
         editor.upsert(rel_path, EntryKind::Blob, blob_id)?;
         let tree_id = editor.write()?;
 
-        let parent = Self::head_id_detached(&self.repo);
+        // BUGFIX: Use the already-locked repo reference instead of self.repo
+        // which would deadlock (parking_lot::Mutex is not reentrant).
+        let parent = repo.head_id().ok().map(|id| id.detach());
         let _sig = self_signature_ref();
         let commit_id = repo.commit_as(
             self_signature_ref(),
@@ -170,7 +172,9 @@ impl GitLayer {
         }
         let tree_id = editor.write()?;
 
-        let parent = Self::head_id_detached(&self.repo);
+        // BUGFIX: Use the already-locked repo reference instead of self.repo
+        // which would deadlock (parking_lot::Mutex is not reentrant).
+        let parent = repo.head_id().ok().map(|id| id.detach());
         let _sig = self_signature_ref();
         let commit_id = repo.commit_as(
             self_signature_ref(),
@@ -195,7 +199,7 @@ impl GitLayer {
         editor.remove(rel_path)?;
         let tree_id = editor.write()?;
 
-        let parent = Self::head_id_detached(&self.repo);
+        let parent = repo.head_id().ok().map(|id| id.detach());
         let _sig = self_signature_ref();
         let commit_id = repo.commit_as(
             self_signature_ref(),
@@ -250,7 +254,8 @@ impl GitLayer {
             return Ok(());
         }
         let repo = self.repo.lock();
-        let head_id = Self::head_id_detached(&self.repo)
+        let head_id = repo.head_id().ok()
+            .map(|id| id.detach())
             .ok_or_else(|| anyhow::anyhow!("No HEAD commit to tag"))?;
         let _sig = self_signature_ref();
         repo.tag(
