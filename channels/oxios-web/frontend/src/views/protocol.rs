@@ -117,10 +117,23 @@ pub fn ProtocolView() -> Element {
                             let count = seed.constraints_count;
                             let date = seed.created_at.clone();
                             let short = if id.len() >= 8 { &id[..8] } else { &id };
+                            let id_for_evo = id.clone();
                             rsx! {
                                 div { class: "item-card", key: "{id}",
                                     div { class: "item-title", "{goal}" }
                                     div { class: "item-subtitle", "{short} · {count} constraints · {date}" }
+                                    button {
+                                        class: "btn btn-sm",
+                                        style: "margin-top:4px",
+                                        onclick: move |_| {
+                                            let sid = id_for_evo.clone();
+                                            spawn(async move {
+                                                let _ = api::fetch_json::<serde_json::Value>(&format!("/api/seeds/{sid}/evolution")).await;
+                                                // TODO: display evolution timeline in a modal
+                                            });
+                                        },
+                                        "View Evolution"
+                                    }
                                 }
                             }
                         }).collect();

@@ -18,6 +18,7 @@ pub fn CronJobsView() -> Element {
     });
 
     let mut show_modal = use_signal(|| false);
+    let mut editing_id = use_signal(|| None::<String>);
     let mut form_name = use_signal(String::new);
     let mut form_schedule = use_signal(String::new);
     let mut form_goal = use_signal(String::new);
@@ -69,6 +70,17 @@ pub fn CronJobsView() -> Element {
                                 IconPlay { size: 14 } " Trigger"
                             }
                             button {
+                                class: "btn btn-sm",
+                                style: "margin-left:4px",
+                                title: "Edit this job",
+                                onclick: move |_| {
+                                    let jid = id.clone();
+                                    editing_id.set(Some(jid.clone()));
+                                    show_modal.set(true);
+                                },
+                                IconSettings { size: 14 }
+                            }
+                            button {
                                 class: "btn btn-danger btn-sm",
                                 title: "Delete this job",
                                 onclick: move |_| {
@@ -102,7 +114,7 @@ pub fn CronJobsView() -> Element {
             div { class: "modal-overlay",
                 div { class: "modal",
                     div { class: "modal-header",
-                        h3 { "Create Cron Job" }
+                        h3 { if editing_id().is_some() { "Edit Cron Job" } else { "Create Cron Job" } }
                         button {
                             class: "icon-btn",
                             onclick: move |_| show_modal.set(false),
@@ -185,8 +197,13 @@ pub fn CronJobsView() -> Element {
                                         acceptance_criteria: ac,
                                         toolchain: "default".to_string(),
                                     };
-                                    let _ = api::post_json::<serde_json::Value, _>("/api/cron-jobs", &req).await;
+                                    if let Some(eid) = editing_id() {
+                                        let _ = api::post_json::<serde_json::Value, _>(&format!("/api/cron-jobs/{eid}/edit"), &req).await;
+                                    } else {
+                                        let _ = api::post_json::<serde_json::Value, _>("/api/cron-jobs", &req).await;
+                                    }
                                     show_modal.set(false);
+                                    editing_id.set(None);
                                     form_name.set(String::new());
                                     form_schedule.set(String::new());
                                     form_goal.set(String::new());
@@ -195,7 +212,7 @@ pub fn CronJobsView() -> Element {
                                     resource.restart();
                                 });
                             },
-                            "Create"
+                            if editing_id().is_some() { "Save" } else { "Create" }
                         }
                     }
                 }

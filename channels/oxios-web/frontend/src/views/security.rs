@@ -1,4 +1,4 @@
-//! Audit log table with allow/deny coloring, plus permissions management tab.
+//! Audit log with agent filter, export, verify + permissions management tab.
 
 use crate::api;
 use crate::components::icons::*;
@@ -21,58 +21,44 @@ fn AuditLogTab() -> Element {
     });
     let mut verify_valid = use_signal(|| Option::<bool>::None);
     let mut is_exporting = use_signal(|| false);
+    let mut agent_filter = use_signal(String::new);
+    let mut filtered_data = use_signal(|| Option::<Vec<api::AuditLogEntry>>::None);
 
-    let content: Element = match &(resource.value())() {
-        Some(Ok(entries)) if entries.is_empty() => rsx! {
-            div { class: "empty-state",
-                div { class: "empty-icon", IconShield { size: 40 } }
-                p { "No audit log entries yet." }
-            }
-        },
-        Some(Ok(entries)) => {
-            let rows: Vec<Element> = entries.iter().map(|entry| {
-                let timestamp = entry.timestamp.clone();
-                let agent = entry.agent_name.clone();
-                let action = entry.action.clone();
-                let resource_name = entry.resource.clone();
-                let allowed = entry.allowed;
-                let reason = entry.reason.clone().unwrap_or_default();
-
-                let status_class = if allowed {
-                    "status-badge status-badge-active"
-                } else {
-                    "status-badge status-badge-inactive"
-                };
-                let status_text = if allowed { "Allow" } else { "Deny" };
-
-                rsx! {
-                    div { class: "agent-card", key: "{timestamp}-{action}-{agent}",
-                        div { class: "agent-info",
-                            div { class: "agent-name",
-                                span { style: "color:var(--text-0)", "{agent}" }
-                                span { style: "color:var(--text-3);margin:0 8px", "→" }
-                                span { style: "color:var(--accent)", "{action}" }
-                                span { style: "color:var(--text-3);margin:0 8px", "on" }
-                                span { style: "color:var(--text-0)", "{resource_name}" }
-                            }
-                            div { class: "agent-id", "{timestamp} · {reason}" }
-                        }
-                        span { class: "{status_class}", "{status_text}" }
-                    }
-                }
-            }).collect();
-            rsx! { div { {rows.into_iter()} } }
-        },
-        Some(Err(e)) => rsx! {
-            div { class: "empty-state", p { { format!("Error: {e}") } } }
-        },
-        None => rsx! {
-            div { class: "empty-state",
-                div { class: "empty-icon", IconLoading { size: 40 } }
-                p { "Loading audit log..." }
-            }
-        },
+    let base_entries: Option<Vec<api::AuditLogEntry>> = match &(resource.value())() {
+        Some(Ok(entries)) => Some(entries.clone()),
+        _ => None,
     };
+
+    let display_entries = filtered_data().unwrap_or_else(|| base_entries.clone().unwrap_or_default());
+
+    let rows: Vec<Element> = display_entries.iter().map(|entry| {
+        let timestamp = entry.timestamp.clone();
+        let agent = entry.agent_name.clone();
+        let action = entry.action.clone();
+        let resource_name = entry.resource.clone();
+        let allowed = entry.allowed;
+        let reason = entry.reason.clone().unwrap_or_default();
+        let status_class = if allowed { "status-badge status-badge-active" } else { "status-badge status-badge-inactive" };
+        let status_text = if allowed { "Allow" } else { "Deny" };
+
+        rsx! {
+            div { class: "agent-card", key: "{timestamp}-{action}-{agent}",
+                div { class: "agent-info",
+                    div { class: "agent-name",
+                        span { style: "color:var(--text-0)", "{agent}" }
+                        span { style: "color:var(--text-3);margin:0 8px", "→" }
+                        span { style: "color:var(--accent)", "{action}" }
+                        span { style: "color:var(--text-3);margin:0 8px", "on" }
+                        span { style: "color:var(--text-0)", "{resource_name}" }
+                    }
+                    div { class: "agent-id", "{timestamp} · {reason}" }
+                }
+                span { class: "{status_class}", "{status_text}" }
+            }
+        }
+    }).collect();
+
+    let is_loading = base_entries.is_none() && filtered_data().is_none();
 
     let verify_msg = match verify_valid() {
         Some(true) => "✓ Integrity verified: log is intact",
@@ -82,6 +68,46 @@ fn AuditLogTab() -> Element {
 
     rsx! {
         div { class: "tab-content",
+            // Agent filter
+            div { class: "form-row", style: "margin-bottom:8px;gap:6px",
+                input {
+                    class: "input input-sm",
+                    placeholder: "Filter by agent name...",
+                    value: "{agent_filter}",
+                    oninput: move |e| {
+                        let name = e.value();
+                        agent_filter.set(name.clone());
+                        if name.trim().is_empty() {
+                            filtered_data.set(None);
+                        } else {
+                            spawn(async move {
+                                let result = api::fetch_json::<serde_json::Value>(&format!("/api/audit/agent/{name}")).await;
+                                match result {
+                                    Ok(val) => {
+                                        if let Some(entries) = val.as_array() {
+                                            let parsed: Vec<api::AuditLogEntry> = entries.iter().filter_map(|e| serde_json::from_value(e.clone()).ok()).collect();
+                                            filtered_data.set(Some(parsed));
+                                        } else {
+                                            filtered_data.set(Some(vec![]));
+                                        }
+                                    }
+                                    Err(_) => filtered_data.set(Some(vec![])),
+                                }
+                            });
+                        }
+                    },
+                }
+                if !agent_filter().trim().is_empty() {
+                    button {
+                        class: "btn btn-sm",
+                        onclick: move |_| {
+                            agent_filter.set(String::new());
+                            filtered_data.set(None);
+                        },
+                        "Clear"
+                    }
+                }
+            }
             div { class: "action-bar",
                 button {
                     class: "btn btn-sm",
@@ -89,18 +115,11 @@ fn AuditLogTab() -> Element {
                     onclick: move |_| {
                         is_exporting.set(true);
                         spawn(async move {
-                            match api::post_action("/api/audit/export").await {
-                                Ok(_) => {
-                                    is_exporting.set(false);
-                                }
-                                Err(_) => {
-                                    is_exporting.set(false);
-                                }
-                            }
+                            let _ = api::post_action("/api/audit/export").await;
+                            is_exporting.set(false);
                         });
                     },
-                    IconCopy { size: 14 }
-                    " Export"
+                    IconCopy { size: 14 } " Export"
                 }
                 button {
                     class: "btn btn-sm",
@@ -115,14 +134,27 @@ fn AuditLogTab() -> Element {
                             }
                         });
                     },
-                    IconShield { size: 14 }
-                    " Verify Integrity"
+                    IconShield { size: 14 } " Verify Integrity"
                 }
                 if !verify_msg.is_empty() {
                     span { class: "verify-result", "{verify_msg}" }
                 }
             }
-            div { class: "panel-body", {content} }
+            div { class: "panel-body",
+                if is_loading {
+                    div { class: "empty-state",
+                        div { class: "empty-icon", IconLoading { size: 40 } }
+                        p { "Loading audit log..." }
+                    }
+                } else if rows.is_empty() {
+                    div { class: "empty-state",
+                        div { class: "empty-icon", IconShield { size: 40 } }
+                        p { "No audit log entries found." }
+                    }
+                } else {
+                    div { {rows.into_iter()} }
+                }
+            }
             div { class: "panel-footer",
                 button { class: "btn btn-sm", onclick: move |_| resource.restart(), "Refresh" }
             }
@@ -144,6 +176,30 @@ fn PermissionsTab() -> Element {
     let mut success_msg = use_signal(|| Option::<String>::None);
     let mut editor_content = use_signal(|| String::new());
 
+    let mut do_lookup = move || {
+        let name = agent_name().trim().to_string();
+        if name.is_empty() {
+            error_msg.set(Some("Agent name required".to_string()));
+            return;
+        }
+        error_msg.set(None);
+        success_msg.set(None);
+        is_loading.set(true);
+        spawn(async move {
+            match api::fetch_json::<serde_json::Value>(&format!("/api/permissions/{name}")).await {
+                Ok(data) => {
+                    permissions_data.set(Some(data.clone()));
+                    editor_content.set(serde_json::to_string_pretty(&data).unwrap_or_default());
+                    is_loading.set(false);
+                }
+                Err(e) => {
+                    error_msg.set(Some(format!("Error: {e}")));
+                    is_loading.set(false);
+                }
+            }
+        });
+    };
+
     rsx! {
         div { class: "tab-content",
             div { class: "permissions-toolbar",
@@ -154,60 +210,15 @@ fn PermissionsTab() -> Element {
                     oninput: move |e| agent_name.set(e.value().clone()),
                     onkeydown: move |e| {
                         if e.key().to_string() == "Enter" {
-                            let name = agent_name().trim().to_string();
-                            if name.is_empty() {
-                                error_msg.set(Some("Agent name required".to_string()));
-                                return;
-                            }
-                            error_msg.set(None);
-                            success_msg.set(None);
-                            is_loading.set(true);
-                            let name_clone = name.clone();
-                            spawn(async move {
-                                match api::fetch_json::<serde_json::Value>(&format!("/api/permissions/{name_clone}")).await {
-                                    Ok(data) => {
-                                        permissions_data.set(Some(data.clone()));
-                                        editor_content.set(serde_json::to_string_pretty(&data).unwrap_or_default());
-                                        is_loading.set(false);
-                                    }
-                                    Err(e) => {
-                                        error_msg.set(Some(format!("Error: {e}")));
-                                        is_loading.set(false);
-                                    }
-                                }
-                            });
+                            do_lookup();
                         }
                     }
                 }
                 button {
                     class: "btn btn-sm",
                     disabled: is_loading(),
-                    onclick: move |_| {
-                        let name = agent_name().trim().to_string();
-                        if name.is_empty() {
-                            error_msg.set(Some("Agent name required".to_string()));
-                            return;
-                        }
-                        error_msg.set(None);
-                        success_msg.set(None);
-                        is_loading.set(true);
-                        let name_clone = name.clone();
-                        spawn(async move {
-                            match api::fetch_json::<serde_json::Value>(&format!("/api/permissions/{name_clone}")).await {
-                                Ok(data) => {
-                                    permissions_data.set(Some(data.clone()));
-                                    editor_content.set(serde_json::to_string_pretty(&data).unwrap_or_default());
-                                    is_loading.set(false);
-                                }
-                                Err(e) => {
-                                    error_msg.set(Some(format!("Error: {e}")));
-                                    is_loading.set(false);
-                                }
-                            }
-                        });
-                    },
-                    IconSearch { size: 14 }
-                    " Lookup"
+                    onclick: move |_| do_lookup(),
+                    IconSearch { size: 14 } " Lookup"
                 }
             }
             if let Some(err) = error_msg() {
@@ -240,9 +251,8 @@ fn PermissionsTab() -> Element {
                                         error_msg.set(None);
                                         success_msg.set(None);
                                         is_saving.set(true);
-                                        let name_clone = name.clone();
                                         spawn(async move {
-                                            match api::put_json::<(), _>(&format!("/api/permissions/{name_clone}"), &json).await {
+                                            match api::put_json::<(), _>(&format!("/api/permissions/{name}"), &json).await {
                                                 Ok(_) => {
                                                     success_msg.set(Some("Permissions saved successfully".to_string()));
                                                     is_saving.set(false);
@@ -259,8 +269,7 @@ fn PermissionsTab() -> Element {
                                     }
                                 }
                             },
-                            IconCheck { size: 14 }
-                            " Save"
+                            IconCheck { size: 14 } " Save"
                         }
                     }
                     textarea {
@@ -290,11 +299,7 @@ pub fn SecurityView() -> Element {
     let mut active_tab = use_signal(|| SecurityTab::AuditLog);
 
     let tab_class = |tab: SecurityTab| -> String {
-        if active_tab() == tab {
-            "tab tab-active".to_string()
-        } else {
-            "tab".to_string()
-        }
+        if active_tab() == tab { "tab tab-active".to_string() } else { "tab".to_string() }
     };
 
     rsx! {
@@ -306,14 +311,12 @@ pub fn SecurityView() -> Element {
                 div {
                     class: "{tab_class(SecurityTab::AuditLog)}",
                     onclick: move |_| active_tab.set(SecurityTab::AuditLog),
-                    IconShield { size: 16 }
-                    " Audit Log"
+                    IconShield { size: 16 } " Audit Log"
                 }
                 div {
                     class: "{tab_class(SecurityTab::Permissions)}",
                     onclick: move |_| active_tab.set(SecurityTab::Permissions),
-                    IconKey { size: 16 }
-                    " Permissions"
+                    IconKey { size: 16 } " Permissions"
                 }
             }
             if active_tab() == SecurityTab::AuditLog {
