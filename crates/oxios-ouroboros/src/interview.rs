@@ -18,6 +18,17 @@ pub struct InterviewResult {
     pub ambiguity: AmbiguityScore,
     /// Whether the interview has gathered enough clarity for seed generation.
     pub ready_for_seed: bool,
+    /// Whether this message is a task requiring execution.
+    /// If false, the message is conversational and should get a direct response.
+    #[serde(default = "default_is_task")]
+    pub is_task: bool,
+    /// Direct conversational response when is_task = false.
+    #[serde(default)]
+    pub chat_response: String,
+}
+
+fn default_is_task() -> bool {
+    true
 }
 
 impl InterviewResult {
@@ -28,6 +39,8 @@ impl InterviewResult {
             answers: Vec::new(),
             ambiguity: AmbiguityScore::default(),
             ready_for_seed: false,
+            is_task: true,
+            chat_response: String::new(),
         }
     }
 

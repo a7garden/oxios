@@ -1,9 +1,1533 @@
-# Oxios Architecture
+# Oxios Architecture Reference
 
-> **This document has been replaced.** For the current architecture reference, see [Architecture (English)](architecture.md).
+> **Version:** 0.1.0 · **Stack:** Rust 2021, tokio, serde (JSON+TOML), oxi-sdk · **License:** MIT
 
-This older architecture document was written in Korean. It has been superseded by a comprehensive English-language reference:
+This document is a standalone reference for every subsystem in the Oxios Agent OS.
+Read it before modifying kernel structure, adding modules, or onboarding onto the project.
 
-- **[Architecture Reference](architecture.md)** — Complete system architecture with diagrams
+---
 
-The new document covers all layers (Terminal, Application, Kernel, Runtime, Engine), all 20+ subsystems, the KernelHandle facade, data flow, dependency graph, security model, and architectural invariants.
+## Table of Contents
+
+1. [Overview](#1-overview)
+2. [Layer Architecture](#2-layer-architecture)
+3. [Kernel Subsystems](#3-kernel-subsystems)
+4. [KernelHandle Facade](#4-kernelhandle-facade)
+5. [Data Flow](#5-data-flow)
+6. [Dependency Graph](#6-dependency-graph)
+7. [Security Model](#7-security-model)
+8. [Unix Philosophy Mapping](#8-unix-philosophy-mapping)
+9. [Dependency Rules](#9-dependency-rules)
+
+---
+
+## 1. Overview
+
+### What is Oxios?
+
+Oxios is an **Agent Operating System** — an OS where AI agents execute real work on behalf of users. Agents fork, exec, wait, and kill just like Unix processes. The user talks, the OS handles the rest. Users never see how many agents are running.
+
+### Design Philosophy
+
+Oxios is built on two foundational metaphors:
+
+| Metaphor | Realization |
+|----------|-------------|
+| **Unix** | Every component does one thing. Compose small pieces. Fork/exec/wait/kill for agents. Pipes for events. No containers — direct host execution. |
+| **Ouroboros** | Never execute without a spec. The protocol cycles: Interview → Seed → Execute → Evaluate → Evolve. Seeds can evolve up to 3 iterations. |
+
+### Key Principles
+
+| Principle | Meaning |
+|-----------|---------|
+| **Ouroboros-first** | Every task goes through the full spec-generate-execute-evaluate-evolve lifecycle |
+| **No reimplementation** | Reuse `oxi-sdk` (crates.io). Never reimplement what oxi already provides |
+| **Channel agnostic** | Gateway doesn't care where messages come from (Web, CLI, Telegram) |
+| **User invisible** | Users don't know how many agents are running |
+| **Least privilege** | Agents start with minimal permissions, must be explicitly granted more |
+| **Tamper-evident** | Every security-relevant action is recorded in a cryptographically-chained audit trail |
+
+---
+
+## 2. Layer Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         CHANNELS (User-facing)                         │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌───────────┐              │
+│  │   Web     │  │   CLI    │  │ Telegram │  │  (more)   │              │
+│  └────┬─────┘  └────┬─────┘  └────┬─────┘  └─────┬─────┘              │
+│       │              │              │              │                    │
+├───────┴──────────────┴──────────────┴──────────────┴────────────────────┤
+│                         GATEWAY (oxios-gateway)                         │
+│              Channel-agnostic message hub. Routes user messages         │
+│              from any channel to the Orchestrator.                      │
+│       ┌──────────────────┴───────────────────┐                         │
+├───────┴──────────────────────────────────────┴─────────────────────────┤
+│                         KERNEL (oxios-kernel)                           │
+│  ┌──────────────────────────────────────────────────────────────────┐   │
+│  │                    Orchestrator ("The Brain")                    │   │
+│  │  Runs Ouroboros protocol end-to-end: Interview → Seed → Exec →  │   │
+│  │  Evaluate → Evolve. Manages multi-agent delegation via A2A.     │   │
+│  └───────────────────┬──────────────────────────────────────────────┘   │
+│                      │                                                  │
+│  ┌───────────────────┴──────────────────────────────────────────────┐   │
+│  │                 Supervisor ("The Init")                          │   │
+│  │  Agent lifecycle: fork / exec / wait / kill. Manages agent       │   │
+│  │  task handles, cooperative cancellation, status tracking.        │   │
+│  └───────────────────┬──────────────────────────────────────────────┘   │
+│                      │                                                  │
+│  ┌───────────┐  ┌────┴────┐  ┌──────────┐  ┌─────────────┐            │
+│  │ Scheduler │  │Runtime  │  │EventBus  │  │ StateStore  │            │
+│  └───────────┘  └─────────┘  └──────────┘  └─────────────┘            │
+│  ┌────────────┐ ┌──────────┐ ┌──────────┐  ┌───────────────┐          │
+│  │AccessMgr   │ │AuditTrail│ │BudgetMgr │  │ResourceMon    │          │
+│  └────────────┘ └──────────┘ └──────────┘  └───────────────┘          │
+│  ┌────────────┐ ┌──────────┐ ┌──────────┐  ┌───────────────┐          │
+│  │MemoryMgr   │ │SpaceMgr  │ │McpBridge │  │GitLayer       │          │
+│  └────────────┘ └──────────┘ └──────────┘  └───────────────┘          │
+│  ┌────────────┐ ┌──────────┐ ┌──────────┐  ┌───────────────┐          │
+│  │PersonaMgr  │ │SkillStore│ │ProgramMgr│  │CronScheduler  │          │
+│  └────────────┘ └──────────┘ └──────────┘  └───────────────┘          │
+│  ┌────────────┐ ┌──────────┐ ┌────────────────────────────┐           │
+│  │AuthManager │ │CircuitBkr│ │A2AProtocol + CardRegistry  │           │
+│  └────────────┘ └──────────┘ └────────────────────────────┘           │
+│                                                                        │
+│  ┌──────────────────────────────────────────────────────────────────┐   │
+│  │                  KernelHandle (Facade / Syscall Table)           │   │
+│  │  11 typed APIs: State · Agent · Security · Persona · Extension  │   │
+│  │  MCP · Infra · Space · Exec · Browser · A2A                     │   │
+│  └──────────────────────────────────────────────────────────────────┘   │
+└────────────────────────────────────────────────────────────────────────┘
+       │
+├──────┴─────────────────────────────────────────────────────────────────┤
+│                         RUNTIME (oxios-ouroboros)                       │
+│  Spec-first protocol engine. Interview → Seed generation → Execution   │
+│  result → Evaluation scoring → Evolution of failing seeds.             │
+│  Defines Seed, Phase, ExecutionResult, EvaluationResult types.         │
+└────────────────────────────────────────────────────────────────────────┘
+       │
+├──────┴─────────────────────────────────────────────────────────────────┤
+│                         ENGINE (oxi-sdk / oxi-ai)                       │
+│  Thin wrapper around oxi_sdk::Oxi. Provider/model resolution via       │
+│  OxiBuilder. Uses oxi-ai for provider construction (Anthropic,         │
+│  OpenAI, etc.). AgentLoop provides multi-turn tool-calling loop.       │
+└────────────────────────────────────────────────────────────────────────┘
+```
+
+### Layer Summary
+
+```
+  Channel (Web / CLI / Telegram)
+        │
+        ▼
+  Gateway ─── routes messages, channel-agnostic
+        │
+        ▼
+  Kernel ─── Orchestrator + Supervisor + all subsystems
+        │
+        ├── KernelHandle ─── typed facade (11 APIs)
+        │       │
+        │       └── AgentRuntime ─── wraps oxi-sdk AgentLoop
+        │
+        ├── Ouroboros ─── spec-first protocol engine
+        │
+        └── Engine (oxi-sdk) ─── LLM provider abstraction
+```
+
+---
+
+## 3. Kernel Subsystems
+
+### 3.1 Supervisor — Agent Process Management
+
+The Supervisor is the "init" of Oxios. It manages agent lifecycles using Unix-like primitives.
+
+```
+                    ┌─────────────────────┐
+                    │     Supervisor      │
+                    │  (dyn trait: Send+Sync) │
+                    └──────┬──────────────┘
+                           │
+          ┌────────────────┼────────────────┐
+          │                │                │
+          ▼                ▼                ▼
+    ┌──────────┐    ┌──────────┐    ┌──────────┐
+    │  fork()  │    │  exec()  │    │  kill()  │
+    │ Create   │    │ Start    │    │ Cancel + │
+    │ AgentId  │    │ running  │    │ abort    │
+    └──────────┘    └──────────┘    └──────────┘
+          │                │                │
+          ▼                ▼                ▼
+    ┌──────────────────────────────────────────┐
+    │          AgentStatus Enum                │
+    │  Starting → Running → Idle | Failed      │
+    │                  → Stopped               │
+    └──────────────────────────────────────────┘
+
+    fork(spec: Seed)          → AgentId
+    exec(id: AgentId)         → ()
+    run_with_seed(id, seed)   → ExecutionResult
+    wait(id: AgentId)         → AgentStatus
+    kill(id: AgentId)         → ()
+    list()                    → Vec<AgentInfo>
+```
+
+**Implementation (`BasicSupervisor`):**
+- Maintains `HashMap<AgentId, AgentInfo>` for agent metadata
+- Spawns each execution as a `tokio::task::JoinHandle` with cooperative cancellation via `AtomicBool`
+- Kill sets the cancellation flag and aborts the tokio task
+- Emits `AgentCreated`, `AgentStarted`, `AgentStopped`, `AgentFailed` events on the EventBus
+- `NoOpSupervisor` placeholder breaks the `KernelHandle → AgentRuntime → Supervisor` circular dependency during build
+
+**Source:** `crates/oxios-kernel/src/supervisor.rs`
+
+---
+
+### 3.2 Orchestrator — The Brain
+
+The Orchestrator coordinates the full Ouroboros lifecycle for user messages. It is the top-level coordinator that does NOT know about channels or HTTP.
+
+```
+  User Message
+       │
+       ▼
+  ┌────────────────────────────────────────────────────────┐
+  │                    Orchestrator                         │
+  │                                                        │
+  │  ┌──────────────────────────────────────────────────┐  │
+  │  │  1. Space Detection (3-layer)                    │  │
+  │  │     Path → Keyword → Topic classification        │  │
+  │  └──────────────────────────────────────────────────┘  │
+  │  ┌──────────────────────────────────────────────────┐  │
+  │  │  2. Chat Bypass                                  │  │
+  │  │     Simple messages get direct LLM response       │  │
+  │  └──────────────────────────────────────────────────┘  │
+  │  ┌──────────────────────────────────────────────────┐  │
+  │  │  3. Interview Phase                              │  │
+  │  │     Clarify ambiguity → Q&A accumulation          │  │
+  │  │     If ambiguity > 0.2: return questions          │  │
+  │  └──────────────────────────────────────────────────┘  │
+  │  ┌──────────────────────────────────────────────────┐  │
+  │  │  4. Seed Generation                              │  │
+  │  │     Create spec with goal, constraints, criteria  │  │
+  │  └──────────────────────────────────────────────────┘  │
+  │  ┌──────────────────────────────────────────────────┐  │
+  │  │  5. Multi-Agent Split (if ≥3 acceptance criteria) │  │
+  │  │     Split → delegate via A2A or lifecycle         │  │
+  │  └──────────────────────────────────────────────────┘  │
+  │  ┌──────────────────────────────────────────────────┐  │
+  │  │  6. Execute Phase                               │  │
+  │  │     spawn_and_run via AgentLifecycleManager       │  │
+  │  └──────────────────────────────────────────────────┘  │
+  │  ┌──────────────────────────────────────────────────┐  │
+  │  │  7. Evaluate Phase                              │  │
+  │  │     Score result against acceptance criteria      │  │
+  │  └──────────────────────────────────────────────────┘  │
+  │  ┌──────────────────────────────────────────────────┐  │
+  │  │  8. Evolve Loop (max 3 iterations)              │  │
+  │  │     If score < 0.8: evolve seed → re-execute     │  │
+  │  └──────────────────────────────────────────────────┘  │
+  └────────────────────────────────────────────────────────┘
+       │
+       ▼
+  OrchestrationResult { response, session_id, seed_id,
+                        phase_reached, evaluation_passed, space_id }
+```
+
+**Multi-Agent Delegation:**
+- When a seed has 3+ acceptance criteria, each becomes a subtask
+- Subtasks run in parallel via `JoinSet`
+- A2A protocol used when available (queries `AgentCardRegistry` for capable agents)
+- Falls back to direct lifecycle execution without A2A
+
+**Source:** `crates/oxios-kernel/src/orchestrator.rs`
+
+---
+
+### 3.3 AgentLifecycleManager — Full Orchestrated Lifecycle
+
+Extracted from the Orchestrator to reduce scope. Handles the complete lifecycle of a single agent from fork to cleanup.
+
+```
+  Seed + Priority
+       │
+       ▼
+  ┌─────────────────────────────────────────────────┐
+  │          AgentLifecycleManager                   │
+  │                                                  │
+  │  1. fork()           → AgentId                   │
+  │  2. register A2A     → AgentCard                 │
+  │  3. deliver pending   → A2A messages             │
+  │  4. ensure perms      → AccessManager            │
+  │  5. submit+start task → Scheduler                │
+  │  6. run_with_seed     → Supervisor → AgentRuntime│
+  │  7. cleanup           → unregister A2A, complete │
+  │                                                  │
+  │  Timeout: max_execution_time_secs (configurable) │
+  │  Zombie reaping via scheduler.reap_zombies()     │
+  └─────────────────────────────────────────────────┘
+       │
+       ▼
+  ExecutionResult { output, steps_completed, success }
+```
+
+**Key behaviors:**
+- Wraps execution in `tokio::time::timeout` when `max_execution_time_secs > 0`
+- Infers A2A capabilities from seed goal (e.g., "review" → "code-review")
+- Always cleans up (A2A unregister + scheduler complete/fail) even on failure
+
+**Source:** `crates/oxios-kernel/src/agent_lifecycle.rs`
+
+---
+
+### 3.4 AgentRuntime — Tool-Calling Loop
+
+Wraps `oxi_sdk::AgentLoop` for executing Seeds through the multi-turn LLM tool-calling loop.
+
+```
+  ┌──────────────────────────────────────────────────────┐
+  │                    AgentRuntime                       │
+  │                                                      │
+  │  execute(agent_id, seed) → ExecutionResult           │
+  │                                                      │
+  │  ┌──────────────┐  ┌──────────────┐  ┌────────────┐ │
+  │  │ Persona Mgr  │  │Tool Retriever│  │Memory Mgr  │ │
+  │  │ (system      │  │(semantic     │  │(recall +   │ │
+  │  │  prompt)     │  │ capability)  │  │ blend)     │ │
+  │  └──────┬───────┘  └──────┬───────┘  └─────┬──────┘ │
+  │         │                 │                │         │
+  │         ▼                 ▼                ▼         │
+  │  ┌──────────────────────────────────────────────────┐│
+  │  │          System Prompt Assembly                  ││
+  │  │  Goal + Constraints + Criteria + Persona +       ││
+  │  │  Capability Index (XML) + Kernel Manifest +      ││
+  │  │  Recalled Memories                               ││
+  │  └──────────────────────┬───────────────────────────┘│
+  │                         │                             │
+  │  ┌──────────────────────┴───────────────────────────┐│
+  │  │         CSpace Resolution                        ││
+  │  │  persona role → seed hint → default "worker"     ││
+  │  └──────────────────────┬───────────────────────────┘│
+  │                         │                             │
+  │  ┌──────────────────────┴───────────────────────────┐│
+  │  │    Tool Registration (from CSpace)               ││
+  │  │  Tier 1: Always-on (read, write, edit, grep,     ││
+  │  │          find, ls, web_search)                    ││
+  │  │  Tier 2: CSpace-driven (exec, memory, space,     ││
+  │  │          agent, a2a, persona, cron, security,    ││
+  │  │          budget, resource)                        ││
+  │  │  Tier 3: Program tools + MCP tools               ││
+  │  └──────────────────────┬───────────────────────────┘│
+  │                         │                             │
+  │  ┌──────────────────────┴───────────────────────────┐│
+  │  │         oxi_sdk::AgentLoop::run()                ││
+  │  │  Multi-turn LLM tool-calling loop                ││
+  │  │  Callbacks: ToolEnd, AgentEnd, Error, Compaction ││
+  │  │  Runs inside spawn_blocking (AgentLoop !Send)    ││
+  │  └──────────────────────────────────────────────────┘│
+  └──────────────────────────────────────────────────────┘
+```
+
+**Circuit Breaker:** Global `CircuitBreaker` protects against cascading LLM provider failures.
+Records success/failure after each agent execution.
+
+**Source:** `crates/oxios-kernel/src/agent_runtime.rs`
+
+---
+
+### 3.5 Scheduler — Priority Task Queue
+
+AIOS/AgentRM-inspired priority-based task queue.
+
+```
+  ┌───────────────────────────────────────────────────┐
+  │                 AgentScheduler                     │
+  │                                                   │
+  │  ┌─────────────────────────────────────────────┐  │
+  │  │            Priority Queue                    │  │
+  │  │  BinaryHeap<ScheduledTask>                   │  │
+  │  │                                              │  │
+  │  │  Critical (3) > High (2) > Normal (1) > Low │  │
+  │  │  Within same priority: newest first (LIFO)  │  │
+  │  └─────────────────────────────────────────────┘  │
+  │                                                   │
+  │  ┌──────────────┐  ┌──────────────────────────┐   │
+  │  │Rate Limiter  │  │  Max Concurrent Enforcer │   │
+  │  │requests/min  │  │  (default: 5)            │   │
+  │  └──────────────┘  └──────────────────────────┘   │
+  │                                                   │
+  │  ┌──────────────────────────────────────────────┐ │
+  │  │  Zombie Detection                            │ │
+  │  │  Tasks running > zombie_timeout_secs → reaped│ │
+  │  │  default: 300s                               │ │
+  │  └──────────────────────────────────────────────┘ │
+  │                                                   │
+  │  ┌──────────────────────────────────────────────┐ │
+  │  │  Budget Manager Integration                  │ │
+  │  │  Checks can_schedule() before starting task  │ │
+  │  │  Skips tasks for exhausted agents            │ │
+  │  └──────────────────────────────────────────────┘ │
+  └───────────────────────────────────────────────────┘
+
+  Task lifecycle:
+  Queued → Running → Completed | Failed | Cancelled
+```
+
+**Source:** `crates/oxios-kernel/src/scheduler.rs`
+
+---
+
+### 3.6 StateStore — File-Based Persistence
+
+JSON file storage for all kernel state.
+
+```
+  ┌──────────────────────────────────────────────┐
+  │              StateStore                       │
+  │                                              │
+  │  Base path: ~/.oxios/workspace/              │
+  │  ├── seeds/{id}.json          Seed specs     │
+  │  ├── evals/{id}-eval.json     Evaluations    │
+  │  ├── memory/{type}/{id}.json  Memories       │
+  │  ├── audit/trail.json         Audit entries  │
+  │  ├── agent_groups/{id}.json   Group state    │
+  │  └── {category}/{name}.json   Arbitrary data │
+  │                                              │
+  │  Operations:                                  │
+  │  save_json(category, name, T)                 │
+  │  load_json(category, name) → Option<T>        │
+  │  save_markdown(category, name, content)       │
+  │  delete(category, name) → bool                │
+  │  save_audit_entries(entries)                  │
+  │  load_audit_entries() → Vec<AuditEntry>       │
+  └──────────────────────────────────────────────┘
+```
+
+**Source:** `crates/oxios-kernel/src/state_store.rs`
+
+---
+
+### 3.7 EventBus — Broadcast Pipe
+
+The "pipe" of Oxios. All agents and subsystems communicate through kernel events on the bus.
+
+```
+  ┌──────────────────────────────────────────────────────┐
+  │                      EventBus                        │
+  │            tokio::sync::broadcast channel             │
+  │                                                      │
+  │  Publishers:                                         │
+  │  ┌────────────┐ ┌────────────┐ ┌─────────────────┐  │
+  │  │ Supervisor │ │Orchestrator│ │ AgentLifecycle   │  │
+  │  └─────┬──────┘ └─────┬──────┘ └────────┬────────┘  │
+  │        │              │                  │            │
+  │        └──────────────┼──────────────────┘            │
+  │                       ▼                               │
+  │              ┌────────────────┐                       │
+  │              │  broadcast::   │                       │
+  │              │    Sender      │                       │
+  │              └───────┬────────┘                       │
+  │                      │                                │
+  │       ┌──────────────┼──────────────┐                 │
+  │       ▼              ▼              ▼                 │
+  │  ┌─────────┐  ┌───────────┐  ┌──────────────┐       │
+  │  │Subscriber│  │Subscriber │  │AuditTrail    │       │
+  │  │(monitor) │  │(channel)  │  │(auto-attach) │       │
+  │  └─────────┘  └───────────┘  └──────────────┘       │
+  └──────────────────────────────────────────────────────┘
+
+  KernelEvent variants:
+  AgentCreated · AgentStarted · AgentStopped · AgentFailed
+  MessageReceived · SeedCreated · EvaluationComplete
+  PhaseStarted · PhaseCompleted · AgentOutput
+  ApprovalRequested · ApprovalResolved
+  MemoryStored · MemoryRecalled
+  AgentGroupCreated · AgentGroupMemberCompleted
+  SpaceCreated · SpaceActivated · SpaceArchived
+  SpacesMerged · KnowledgeCrossReferenced
+```
+
+**Auto-audit:** When `attach_audit_trail()` is called, a background task forwards all events to the AuditTrail as `AuditAction` entries.
+
+**Source:** `crates/oxios-kernel/src/event_bus.rs`
+
+---
+
+### 3.8 AccessManager — RBAC + Path Sandboxing
+
+OWASP-inspired least-privilege security for agents.
+
+```
+  ┌──────────────────────────────────────────────────────────┐
+  │                    AccessManager                          │
+  │                                                          │
+  │  ┌────────────────────────────────────────────────────┐  │
+  │  │              AgentPermissions                      │  │
+  │  │  allowed_tools: HashSet<String>                    │  │
+  │  │  allowed_paths: Vec<String> (glob patterns)        │  │
+  │  │  denied_paths: Vec<String>  (takes precedence)     │  │
+  │  │  network_access: bool                              │  │
+  │  │  can_fork: bool                                    │  │
+  │  │  max_execution_time_secs: u64                      │  │
+  │  │  max_memory_mb: u64                                │  │
+  │  └────────────────────────────────────────────────────┘  │
+  │                                                          │
+  │  ┌────────────────────────────────────────────────────┐  │
+  │  │              RbacManager                           │  │
+  │  │  Role-based access control with HitL approvals     │  │
+  │  │  Subjects: Agent(UUID), User(String), Role(String) │  │
+  │  │  Actions: ExecuteTool, AccessPath, Network, Fork   │  │
+  │  │  Pending approvals with approve/reject workflow    │  │
+  │  └────────────────────────────────────────────────────┘  │
+  │                                                          │
+  │  ┌────────────────────────────────────────────────────┐  │
+  │  │           Workspace Sandboxing                     │  │
+  │  │  workspace_paths: name → PathBuf                   │  │
+  │  │  agent_workspaces: agent_name → workspace_name     │  │
+  │  │  Path boundary enforcement via canonicalize()      │  │
+  │  └────────────────────────────────────────────────────┘  │
+  │                                                          │
+  │  Full sandbox check:                                     │
+  │  can_access_path_in_workspace(agent_id, name, path, ws) │
+  │    → RBAC check                                          │
+  │    → Path allow/deny check                               │
+  │    → Workspace boundary check                            │
+  │    → All three must pass                                 │
+  │                                                          │
+  │  Audit log: every access decision recorded               │
+  │  Async file persistence via bounded mpsc channel (1000)  │
+  └──────────────────────────────────────────────────────────┘
+```
+
+**Source:** `crates/oxios-kernel/src/access_manager/mod.rs`
+
+---
+
+### 3.9 AuditTrail — Tamper-Evident Hash Chain
+
+Merkle-chain style cryptographic audit log. Each entry is linked to the previous via blake3 hashing.
+
+```
+  Genesis ──► Entry 1 ──► Entry 2 ──► Entry 3 ──► ...
+              hash=abc    hash=def    hash=ghi
+              prev=       prev=       prev=
+              "genesis"   abc         def
+
+  ┌─────────────────────────────────────────────────────┐
+  │                   AuditEntry                         │
+  │  seq: u64                                           │
+  │  timestamp: DateTime<Utc>                           │
+  │  actor: AgentId                                     │
+  │  action: AuditAction (tagged enum)                  │
+  │  resource: String                                   │
+  │  prev_hash: blake3 hex digest                       │
+  │  hash: blake3 hex digest                            │
+  │  metadata: Option<JSON>                             │
+  └─────────────────────────────────────────────────────┘
+
+  AuditAction variants:
+  AgentSpawn · AgentExit · ToolCall · ToolResult
+  MemoryWrite · MemoryRead · ConfigChange · ProgramInstall
+  CronTrigger · GitCommit · AccessDenied · Other
+
+  Integrity:
+  verify() → checks:
+    1. prev_hash chain linked correctly
+    2. No future timestamps
+    3. Hash recomputation matches stored hash
+    4. First entry: prev_hash = "genesis" | "pruned"
+
+  Auto-pruning:
+  - When entries > max_entries: oldest pruned
+  - Pruned root marked with prev_hash = "pruned"
+  - No hash recomputation cascade (O(1))
+```
+
+**Source:** `crates/oxios-kernel/src/audit_trail.rs`
+
+---
+
+### 3.10 BudgetManager — Token/Cost Enforcement
+
+Per-agent budget tracking for LLM API calls.
+
+```
+  ┌──────────────────────────────────────────────┐
+  │             BudgetManager                     │
+  │                                              │
+  │  BudgetLimit per agent:                      │
+  │  { agent_id, token_budget, calls_budget,     │
+  │    window_secs }                             │
+  │                                              │
+  │  can_schedule(agent_id) → bool               │
+  │  track_call(agent_id) → Result               │
+  │  set_budget(BudgetLimit)                     │
+  └──────────────────────────────────────────────┘
+```
+
+**Integration:** The Scheduler checks `can_schedule()` before popping tasks. Agents with exhausted budgets are skipped.
+
+**Source:** `crates/oxios-kernel/src/budget.rs`
+
+---
+
+### 3.11 ResourceMonitor — System Tracking
+
+```
+  ┌──────────────────────────────────────────────┐
+  │            ResourceMonitor                    │
+  │                                              │
+  │  Tracks: CPU%, memory MB, active agents      │
+  │  Configurable interval + history ring buffer  │
+  │  is_overloaded() → bool                      │
+  │  resource_snapshot() → Snapshot               │
+  │  set_active_agents(count)                     │
+  └──────────────────────────────────────────────┘
+```
+
+**Integration:** The Guardian daemon checks `is_overloaded()` every 5 minutes and logs warnings to the audit trail.
+
+**Source:** `crates/oxios-kernel/src/resource_monitor.rs`
+
+---
+
+### 3.12 GitLayer — In-Process Version Control
+
+```
+  ┌──────────────────────────────────────────────┐
+  │               GitLayer                        │
+  │          (powered by gix crate)               │
+  │                                              │
+  │  Workspace: ~/.oxios/workspace/              │
+  │  Auto-commit on state saves                  │
+  │                                              │
+  │  commit_file(rel_path, message)              │
+  │  remove_file(rel_path, message)              │
+  │  log(limit) → Vec<CommitInfo>                │
+  │  verify() → bool                             │
+  │  tag(name, message)                          │
+  │  restore(tag)                                │
+  └──────────────────────────────────────────────┘
+```
+
+**Integration:** Called by Orchestrator after saving seeds/evaluations, by MemoryManager after writes, and by the Guardian daemon for periodic verification.
+
+**Source:** `crates/oxios-kernel/src/git_layer.rs`
+
+---
+
+### 3.13 CronScheduler — Scheduled Job Execution
+
+```
+  ┌──────────────────────────────────────────────┐
+  │            CronScheduler                      │
+  │                                              │
+  │  CronJob { id, cron_expr, task, last_run }   │
+  │  Tick-based evaluation (configurable interval)│
+  │  Persistent state via StateStore              │
+  │  GitLayer integration for auto-commits        │
+  │                                              │
+  │  add_cron(job) → Uuid                        │
+  │  remove_cron(id) → Result                    │
+  │  list_crons() → Vec<CronJob>                 │
+  └──────────────────────────────────────────────┘
+```
+
+**Source:** `crates/oxios-kernel/src/cron.rs`
+
+---
+
+### 3.14 MemoryManager — Vector Store with Semantic Search
+
+```
+  ┌──────────────────────────────────────────────────────────┐
+  │                    MemoryManager                          │
+  │                                                          │
+  │  Storage: StateStore (JSON files per entry)              │
+  │  Index: TF-IDF + cosine similarity (in-memory)           │
+  │  Optional: HNSW index for fast ANN search                │
+  │                                                          │
+  │  Memory Types:                                           │
+  │  ┌────────────┐┌─────────┐┌──────┐┌────────┐┌──────────┐│
+  │  │Conversation││ Session ││ Fact ││Episode ││Knowledge ││
+  │  │(auto-comp) ││(summary)││      ││(event) ││(static)  ││
+  │  └────────────┘└─────────┘└──────┘└────────┘└──────────┘│
+  │                                                          │
+  │  Operations:                                             │
+  │  remember(entry)              → save + index             │
+  │  recall(query)                → Vec<MemoryEntry>         │
+  │  search(query, type, limit)   → Vec<SemanticHit>         │
+  │  forget(id, type)             → remove                   │
+  │  blend_into_prompt(memories)  → enriched system prompt   │
+  │  rebuild_index()              → full re-index            │
+  │  curate(budget)               → prune low-importance     │
+  │                                                          │
+  │  Sub-modules:                                            │
+  │  ┌─────────────────────────────────────────────────────┐ │
+  │  │ hyperbolic/   → Hyperbolic embeddings               │ │
+  │  │ flash_attention/ → Attention-weighted retrieval      │ │
+  │  │ hnsw/         → HNSW approximate nearest neighbor   │ │
+  │  │ graph/        → MemoryGraph (entity relationships)   │ │
+  │  │ chunking/     → Text chunking (fixed + paragraph)   │ │
+  │  │ normalizer/   → L2 normalize, cosine similarity     │ │
+  │  │ store/        → HnswMemoryIndex                     │ │
+  │  │ budget/       → MemoryBudget, CurationReport        │ │
+  │  └─────────────────────────────────────────────────────┘ │
+  │                                                          │
+  │  Space-scoped: MemoryManager::for_space(space_dir)       │
+  │  Each Space gets isolated memory via separate StateStore  │
+  └──────────────────────────────────────────────────────────┘
+```
+
+**Effective importance:** `base_importance × (1 + ln(1 + access_count))` — frequently accessed memories get a boost.
+
+**Source:** `crates/oxios-kernel/src/memory/mod.rs`
+
+---
+
+### 3.15 SpaceManager — Context Partitioning
+
+Spaces partition conversations and resources into isolated contexts. Auto-detected from messages.
+
+```
+  ┌──────────────────────────────────────────────────────────┐
+  │                    SpaceManager                           │
+  │                                                          │
+  │  ┌────────────────────────────────────────────────────┐  │
+  │  │       3-Layer Detection Strategy                   │  │
+  │  │                                                    │  │
+  │  │  Layer 1: Filesystem Path (fast, free)             │  │
+  │  │    "/projects/oxios/src/main.rs" → oxios Space     │  │
+  │  │    → PathMatcher: glob-based path → SpaceId map    │  │
+  │  │                                                    │  │
+  │  │  Layer 2: Keyword/Tag (fast, free)                 │  │
+  │  │    Message contains Space tags → match             │  │
+  │  │                                                    │  │
+  │  │  Layer 3: Topic Classification (LLM, slow)         │  │
+  │  │    classify_topic_stub() → Topic { name, clear? }  │  │
+  │  │    Topic shift detection via ConversationBuffer     │  │
+  │  └────────────────────────────────────────────────────┘  │
+  │                                                          │
+  │  Space Lifecycle:                                        │
+  │  Created (auto/manual) → Active → Archived → Restored   │
+  │                                                          │
+  │  ┌───────────────┐  ┌──────────────────┐                │
+  │  │Default Space  │  │Named Spaces      │                │
+  │  │(unnamed, id=1)│  │(auto-created or  │                │
+  │  │Always exists  │  │ manual)          │                │
+  │  └───────────────┘  └──────────────────┘                │
+  │                                                          │
+  │  Operations:                                             │
+  │  detect_or_create(msg, buffer) → SpaceId                 │
+  │  create_from_path(name, path) → Space                    │
+  │  create_from_topic(topic) → Space                        │
+  │  activate(space_id)                                      │
+  │  merge_spaces(survivor, absorbed)                        │
+  │  archive_stale() → Vec<SpaceId>                          │
+  │  restore_from_archive(space_id)                          │
+  │                                                          │
+  │  Persistence:                                            │
+  │  ~/.oxios/spaces/_index.json                             │
+  │  ~/.oxios/spaces/{space_id}/space.json                   │
+  │  ~/.oxios/spaces/{space_id}/workspace/                   │
+  │  ~/.oxios/spaces/_archived/{space_id}/                   │
+  └──────────────────────────────────────────────────────────┘
+```
+
+**Auto-merge:** Spaces sharing paths with low activity (<5 interactions) are candidates for automatic merging.
+
+**Source:** `crates/oxios-kernel/src/space/manager.rs`
+
+---
+
+### 3.16 McpBridge — Model Context Protocol
+
+```
+  ┌──────────────────────────────────────────────────────────┐
+  │                    McpBridge                              │
+  │                                                          │
+  │  Model Context Protocol client for external tool servers │
+  │                                                          │
+  │  Server sources:                                         │
+  │  1. config.toml [mcp.servers]                            │
+  │  2. Environment variables (OXIOS_MCP_{NAME}_COMMAND)     │
+  │  3. Program MCP server configs                           │
+  │                                                          │
+  │  Operations:                                             │
+  │  register_server(McpServer)                              │
+  │  initialize_all() → starts all servers                   │
+  │  list_tools() → enumerate all server tools               │
+  │  cached_tools(server_name) → cached tool definitions     │
+  │  call_tool(server, tool, args) → result                  │
+  │                                                          │
+  │  McpServer { name, command, args, env, enabled }         │
+  └──────────────────────────────────────────────────────────┘
+```
+
+**Integration:** Program-level MCP servers are registered during `ProgramManager.init()`. Tools are surfaced to agents via `McpToolWrapper` in the tool registry.
+
+**Source:** `crates/oxios-kernel/src/mcp/`
+
+---
+
+### 3.17 A2AProtocol — Agent-to-Agent Communication
+
+Google's A2A protocol for horizontal agent↔agent communication. Unlike MCP (vertical, agent→tool), A2A enables agents to discover, delegate, and share results.
+
+```
+  ┌──────────────────────────────────────────────────────────┐
+  │                    A2AProtocol                            │
+  │                                                          │
+  │  ┌────────────────────────────────────────────────────┐  │
+  │  │              AgentCardRegistry                      │  │
+  │  │  HashMap<AgentId, AgentCard>                        │  │
+  │  │                                                    │  │
+  │  │  AgentCard { agent_id, name, description,          │  │
+  │  │    capabilities[], skills[], endpoint, status }    │  │
+  │  │                                                    │  │
+  │  │  register_agent(card)                              │  │
+  │  │  find_agents_by_capability(cap) → Vec<AgentCard>   │  │
+  │  │  find_agents_by_skill(skill) → Vec<AgentCard>      │  │
+  │  └────────────────────────────────────────────────────┘  │
+  │                                                          │
+  │  ┌────────────────────────────────────────────────────┐  │
+  │  │            Per-Agent Message Queues                 │  │
+  │  │  HashMap<AgentId, AgentQueue>                       │  │
+  │  │  AgentQueue: messages + tokio::sync::Notify         │  │
+  │  │                                                    │  │
+  │  │  send_message(from, to, message) → request_id      │  │
+  │  │  receive_messages(agent_id) → Vec<A2ARequest>       │  │
+  │  │  send_and_wait(from, to, msg, timeout) → Response  │  │
+  │  └────────────────────────────────────────────────────┘  │
+  │                                                          │
+  │  Message Types:                                          │
+  │  TaskDelegation { task_id, description, payload, priority}│
+  │  StatusUpdate { task_id, progress, message }             │
+  │  ResultSharing { task_id, result, summary }              │
+  │  CapabilityQuery { query, required_capabilities }         │
+  │  Handshake { agent_id, name, capabilities }              │
+  │                                                          │
+  │  Delegation Handler:                                     │
+  │  set_delegation_handler(callback)                        │
+  │  execute_delegation(from, to, task) → Option<Result>     │
+  │  Default handler: spawns agent via AgentLifecycleManager │
+  └──────────────────────────────────────────────────────────┘
+```
+
+**Source:** `crates/oxios-kernel/src/a2a.rs`
+
+---
+
+### 3.18 CircuitBreaker — LLM Provider Protection
+
+3-state circuit breaker preventing cascading LLM provider failures.
+
+```
+          ┌─────────┐  threshold    ┌──────┐
+          │ CLOSED  │  failures     │ OPEN │
+          │ (normal)│──────────────►│(fail)│
+          └────┬────┘               └──┬───┘
+               ▲                       │
+               │ success               │ timeout
+               │                       ▼
+          ┌────┴────┐            ┌──────────┐
+          │ CLOSED  │◄───────────│HALF-OPEN │
+          │         │  success   │ (probe)  │
+          └─────────┘            └────┬─────┘
+                                      │ failure
+                                      ▼
+                                 ┌────────┐
+                                 │  OPEN  │
+                                 └────────┘
+
+  Default: threshold=5, timeout=30s
+  Single probe in half-open state (atomic CAS gate)
+  Global singleton via OnceLock
+```
+
+**Source:** `crates/oxios-kernel/src/circuit_breaker.rs`
+
+---
+
+### 3.19 PersonaManager — Multi-Persona System
+
+```
+  ┌──────────────────────────────────────────────┐
+  │           PersonaManager                      │
+  │                                              │
+  │  Personas define agent behavior:             │
+  │  - name, system_prompt, role                 │
+  │  - enabled/disabled state                    │
+  │                                              │
+  │  first_enabled() → Option<&Persona>          │
+  │  get_active_persona() → Option<&Persona>     │
+  │  active_system_prompt() → String             │
+  │                                              │
+  │  Integration:                                │
+  │  - OuroborosEngine: set_persona_prompt()     │
+  │  - AgentRuntime: injects into system prompt  │
+  │  - CSpace resolution: role → capability set  │
+  └──────────────────────────────────────────────┘
+```
+
+**Source:** `crates/oxios-kernel/src/persona_manager.rs`
+
+---
+
+### 3.20 ProgramManager — OS-Level Installable Capabilities
+
+```
+  ┌──────────────────────────────────────────────────────┐
+  │                ProgramManager                         │
+  │                                                      │
+  │  Programs are installable capabilities:              │
+  │  ~/.oxios/workspace/programs/{name}/                 │
+  │    ├── PROGRAM.toml    (metadata + tool definitions) │
+  │    └── SKILL.md        (usage guide)                 │
+  │                                                      │
+  │  ProgramMeta:                                        │
+  │  { name, description, version, enabled,              │
+  │    tools: [{name, description, command}],             │
+  │    dependencies: [required tool names],               │
+  │    mcp_servers: [{name, command, args, env}],         │
+  │    host_requirements }                               │
+  │                                                      │
+  │  Operations:                                         │
+  │  install(path) → Result                              │
+  │  list_enabled() → Vec<Program>                       │
+  │  get_program(name) → Option<Program>                 │
+  │  init() → scan + validate                            │
+  └──────────────────────────────────────────────────────┘
+```
+
+**Built-in programs** (in `.programs/`): code-review, debug, deploy, guardian, refactor, program-creator
+
+**Source:** `crates/oxios-kernel/src/program/`
+
+---
+
+### 3.21 SkillStore — Skill Definitions
+
+```
+  ┌──────────────────────────────────────────────┐
+  │              SkillStore                       │
+  │                                              │
+  │  Skills are reusable agent capabilities      │
+  │  Stored in: ~/.oxios/workspace/skills/       │
+  │                                              │
+  │  init_defaults(defaults_dir) → populate      │
+  │  Default skills from share/default-skills/   │
+  └──────────────────────────────────────────────┘
+```
+
+**Source:** `crates/oxios-kernel/src/skill.rs`
+
+---
+
+### 3.22 HostToolValidator — Binary Allowlist
+
+```
+  ┌──────────────────────────────────────────────┐
+  │          HostToolValidator                    │
+  │                                              │
+  │  Validates that host system tools exist:     │
+  │  required_host_tools: must be present        │
+  │  optional_host_tools: nice to have           │
+  │                                              │
+  │  Used by ProgramManager to check deps        │
+  └──────────────────────────────────────────────┘
+```
+
+**Source:** `crates/oxios-kernel/src/host_tools.rs`
+
+---
+
+### 3.23 AuthManager — Identity Verification
+
+```
+  ┌──────────────────────────────────────────────┐
+  │            AuthManager                        │
+  │                                              │
+  │  Authentication for kernel operations.       │
+  │  API keys resolved via:                      │
+  │  1. engine.api_key (config)                  │
+  │  2. ~/.oxi/auth.json (oxi credentials)       │
+  │  3. Environment variables                    │
+  │                                              │
+  │  Used by KernelHandle's SecurityApi          │
+  └──────────────────────────────────────────────┘
+```
+
+**Source:** `crates/oxios-kernel/src/auth.rs`
+
+---
+
+### 3.24 CredentialStore — Multi-Source Credential Resolution
+
+```
+  ┌──────────────────────────────────────────────┐
+  │          CredentialStore                      │
+  │                                              │
+  │  Resolution chain:                           │
+  │  config.toml → oxi auth.json → env vars      │
+  │                                              │
+  │  Used for LLM provider API keys              │
+  └──────────────────────────────────────────────┘
+```
+
+**Source:** `crates/oxios-kernel/src/credential.rs`
+
+---
+
+### 3.25 WasmSandbox — Untrusted Code Execution
+
+```
+  ┌──────────────────────────────────────────────┐
+  │           WasmSandbox                         │
+  │                                              │
+  │  WASM-based sandbox for executing            │
+  │  untrusted code in isolation                 │
+  └──────────────────────────────────────────────┘
+```
+
+**Source:** `crates/oxios-kernel/src/wasm_sandbox.rs`
+
+---
+
+### 3.26 ContextManager — Context Window Management
+
+```
+  ┌──────────────────────────────────────────────┐
+  │          ContextManager                       │
+  │                                              │
+  │  Manages LLM context window:                 │
+  │  - Token counting and budgeting              │
+  │  - Compaction strategy (threshold: 0.8)      │
+  │  - Memory blending into prompts              │
+  └──────────────────────────────────────────────┘
+```
+
+**Source:** Integrated into `AgentRuntime` via `oxi_sdk::AgentLoop` compaction callbacks.
+
+---
+
+## 4. KernelHandle Facade
+
+The KernelHandle is the **syscall table** of the Agent OS. It is a facade composed of 11 typed APIs that provide the single path for all kernel operations.
+
+```
+  ┌──────────────────────────────────────────────────────────────────┐
+  │                       KernelHandle                               │
+  │                     (cached via OnceLock)                        │
+  │                                                                  │
+  │  ┌──────────┐ ┌──────────┐ ┌───────────┐ ┌──────────┐          │
+  │  │ StateApi │ │ AgentApi │ │SecurityApi│ │PersonaApi│          │
+  │  │          │ │          │ │           │ │          │          │
+  │  │save/load │ │supervisor│ │auth       │ │personas  │          │
+  │  │sessions  │ │budget    │ │audit trail│ │system    │          │
+  │  │markdown  │ │memory    │ │RBAC       │ │prompts   │          │
+  │  └──────────┘ └──────────┘ │access mgr │ └──────────┘          │
+  │                            └───────────┘                        │
+  │  ┌──────────────┐ ┌────────┐ ┌────────┐ ┌──────────┐           │
+  │  │ExtensionApi  │ │ McpApi │ │InfraApi│ │ SpaceApi │           │
+  │  │              │ │        │ │        │ │          │           │
+  │  │programs     │ │bridge  │ │git     │ │spaces    │           │
+  │  │skills       │ │servers │ │scheduler│ │knowledge │           │
+  │  │host_tools   │ │        │ │cron    │ │          │           │
+  │  └──────────────┘ └────────┘ │resource│ └──────────┘           │
+  │                              │events  │                        │
+  │                              │config  │                        │
+  │                              └────────┘                        │
+  │  ┌──────────┐ ┌──────────┐ ┌──────────┐                      │
+  │  │ ExecApi  │ │BrowserApi│ │  A2aApi  │                      │
+  │  │          │ │          │ │          │                      │
+  │  │exec cfg  │ │headless  │ │A2A proto │                      │
+  │  │access mgr│ │browser   │ │registry  │                      │
+  │  └──────────┘ └──────────┘ └──────────┘                      │
+  │                                                                  │
+  │  Cross-Facade convenience methods:                               │
+  │  save_and_commit()  — State + Git                               │
+  │  delete_and_commit() — State + Git                              │
+  │  commit_all()       — flush state to git                        │
+  │  flush_audit()      — Security + Git                            │
+  │  schedule()         — Cron wrapper                              │
+  └──────────────────────────────────────────────────────────────────┘
+```
+
+### Construction Order
+
+The KernelHandle is created **twice** during `KernelBuilder::build()`:
+
+1. **Placeholder Handle** — Created with `NoOpSupervisor` to break the circular dependency:
+   `KernelHandle → AgentRuntime → Supervisor → KernelHandle`
+
+2. **Final Handle** — Cached in `Kernel.handle_cache` (via `OnceLock`) with the real `BasicSupervisor`.
+
+The first handle is discarded after the real supervisor is constructed.
+
+**Source:** `crates/oxios-kernel/src/kernel_handle/mod.rs`
+
+---
+
+## 5. Data Flow
+
+### 5.1 User Message Flow
+
+Complete path of a user message through the system:
+
+```
+  User: "Refactor the authentication module to use JWT tokens"
+       │
+       ▼
+  ┌─────────────────┐
+  │   CLI / Web /   │  Channel receives raw message
+  │   Telegram      │
+  └────────┬────────┘
+           │
+           ▼
+  ┌─────────────────┐
+  │    Gateway      │  Routes to Orchestrator.handle_message()
+  │ (oxios-gateway) │  (user_id, message, session_id)
+  └────────┬────────┘
+           │
+           ▼
+  ┌─────────────────────────────────────────────────────┐
+  │              Space Detection (3-layer)               │
+  │  Path? → Keyword? → Topic classification            │
+  │  Creates/activates appropriate Space                 │
+  └────────┬────────────────────────────────────────────┘
+           │
+           ▼
+  ┌─────────────────────────────────────────────────────┐
+  │              Chat Bypass Check                       │
+  │  Is this a simple greeting/question?                │
+  │  YES → Direct LLM response → return to user         │
+  │  NO  → Continue to Ouroboros pipeline                │
+  └────────┬────────────────────────────────────────────┘
+           │
+           ▼
+  ╔═══════════════════════════════════════════════════════╗
+  ║         OUROBOROS PROTOCOL (Phase 1: Interview)      ║
+  ║  OuroborosEngine.interview(message)                  ║
+  ║  → InterviewResult { questions, ambiguity, ready }   ║
+  ║  If ambiguity > 0.2: return questions to user        ║
+  ║  User answers → follow-up interview                  ║
+  ╚══════════════╤════════════════════════════════════════╝
+                 │ (ambiguity ≤ 0.2, ready for seed)
+                 ▼
+  ╔═══════════════════════════════════════════════════════╗
+  ║         OUROBOROS PROTOCOL (Phase 2: Seed)           ║
+  ║  OuroborosEngine.generate_seed(interview)            ║
+  ║  → Seed { id, goal, constraints, criteria, ontology }║
+  ║  Save to StateStore → emit SeedCreated event         ║
+  ╚══════════════╤════════════════════════════════════════╝
+                 │
+                 ▼
+  ┌─────────────────────────────────────────────────────┐
+  │         Multi-Agent Split Check                      │
+  │  acceptance_criteria.len() ≥ 3?                      │
+  │  YES → split into subtasks → delegate in parallel    │
+  │  NO  → single agent execution                        │
+  └────────┬────────────────────────────────────────────┘
+           │
+           ▼
+  ╔═══════════════════════════════════════════════════════╗
+  ║    AGENT LIFECYCLE (Phase 3: Execute)                ║
+  ║  AgentLifecycleManager.spawn_and_run(seed, priority) ║
+  ║                                                      ║
+  ║  1. fork() → AgentId                                 ║
+  ║  2. Register A2A AgentCard                           ║
+  ║  3. Ensure AccessManager permissions                 ║
+  ║  4. Submit to Scheduler → start_task()               ║
+  ║  5. Supervisor.run_with_seed(agent_id, seed)         ║
+  ║     └── AgentRuntime.execute(agent_id, seed)         ║
+  ║         ├── Resolve CSpace                           ║
+  ║         ├── Register tools (always-on + CSpace)      ║
+  ║         ├── Recall memories → blend into prompt      ║
+  ║         ├── Semantic capability retrieval             ║
+  ║         └── oxi_sdk::AgentLoop::run()                ║
+  ║             └── Multi-turn LLM tool-calling loop     ║
+  ║                 ├── Tool calls: exec, read, write... ║
+  ║                 ├── Circuit breaker on LLM errors    ║
+  ║                 └── Compaction → save memory          ║
+  ║  6. Cleanup: unregister A2A, complete/fail task      ║
+  ╚══════════════╤════════════════════════════════════════╝
+                 │ ExecutionResult
+                 ▼
+  ╔═══════════════════════════════════════════════════════╗
+  ║    OUROBOROS PROTOCOL (Phase 4: Evaluate)            ║
+  ║  OuroborosEngine.evaluate(seed, exec_result)         ║
+  ║  → EvaluationResult { score, criteria_results, notes }║
+  ╚══════════════╤════════════════════════════════════════╝
+                 │
+                 ▼
+  ┌─────────────────────────────────────────────────────┐
+  │         Score Check                                   │
+  │  score ≥ 0.8 and all_passed?                         │
+  │  YES → Return success result                         │
+  │  NO  → Enter evolve loop (max 3 iterations)          │
+  └────────┬────────────────────────────────────────────┘
+           │ (score < 0.8)
+           ▼
+  ╔═══════════════════════════════════════════════════════╗
+  ║    OUROBOROS PROTOCOL (Phase 5: Evolve)              ║
+  ║  OuroborosEngine.evolve(seed, evaluation)            ║
+  ║  → Option<Seed> (evolved version)                    ║
+  ║  → Re-execute with Priority::High                    ║
+  ║  → Re-evaluate                                       ║
+  ║  → Repeat until pass or max iterations reached       ║
+  ╚═══════════════════════════════════════════════════════╝
+           │
+           ▼
+  OrchestrationResult {
+    session_id, space_id, space_tag, response,
+    seed_id, phase_reached, evaluation_passed, output
+  }
+```
+
+---
+
+## 6. Dependency Graph
+
+### Crate Dependencies
+
+```
+  ┌─────────────────────────────────────────────────────────┐
+  │                    oxios (binary)                        │
+  │  src/main.rs, src/kernel.rs, src/cmd_run.rs             │
+  │                                                         │
+  │  Depends on:                                            │
+  │  ├── oxios-kernel     (core subsystems)                 │
+  │  ├── oxios-ouroboros  (protocol engine)                 │
+  │  ├── oxios-gateway    (message hub)                     │
+  │  ├── oxios-web        (web channel, feature-gated)      │
+  │  ├── oxios-cli        (CLI channel, feature-gated)      │
+  │  └── oxios-telegram   (Telegram channel, feature-gated) │
+  └───────────────────┬─────────────────────────────────────┘
+                      │
+          ┌───────────┼───────────────────┐
+          │           │                   │
+          ▼           ▼                   ▼
+  ┌──────────────┐ ┌───────────────┐ ┌──────────────┐
+  │ oxios-kernel │ │oxios-ouroboros│ │ oxios-gateway│
+  │              │ │               │ │              │
+  │ Core:        │ │ Protocol:     │ │ Channel-     │
+  │ Supervisor   │ │ Interview     │ │ agnostic     │
+  │ Scheduler    │ │ Seed gen      │ │ message hub  │
+  │ EventBus     │ │ Execute       │ │              │
+  │ StateStore   │ │ Evaluate      │ │ Depends on:  │
+  │ AccessMgr    │ │ Evolve        │ │ oxios-kernel │
+  │ AuditTrail   │ │               │ │ (Orchestrator│
+  │ Memory       │ │ Depends on:   │ │  reference)  │
+  │ Space        │ │ oxi-sdk       │ └──────────────┘
+  │ MCP Bridge   │ │ (Provider)    │
+  │ A2A          │ └───────────────┘
+  │ PersonaMgr   │
+  │ ProgramMgr   │   ┌──────────────────────┐
+  │ GitLayer     │   │  oxi-sdk (crates.io) │
+  │ CronSched    │   │  NOT a path dep!     │
+  │ BudgetMgr    │   │  AgentLoop, Provider,│
+  │ ResourceMon  │   │  ToolRegistry, etc.  │
+  │ CircuitBkr   │   └──────────────────────┘
+  │ KernelHandle │          ▲
+  │              │          │
+  │ Depends on:  │──────────┘
+  │ oxi-sdk      │   + oxi-ai (provider construction)
+  │ oxi-ai       │   + oxios-ouroboros
+  │ oxios-ourobo │
+  └──────────────┘
+```
+
+### Feature Gates
+
+```
+  [features]
+  web       → oxios-web channel
+  cli       → oxios-cli channel
+  telegram  → oxios-telegram channel
+  browser   → BrowserTool + BrowserApi (headless browser)
+  telemetry → OpenTelemetry integration (compile-time toggle)
+```
+
+### Directory Structure
+
+```
+  oxios/
+  ├── src/                    # Binary crate
+  │   ├── main.rs             # Entry point, daemon mode
+  │   ├── kernel.rs           # Kernel builder + assembly
+  │   └── cmd_run.rs          # CLI run subcommand
+  ├── crates/
+  │   ├── oxios-kernel/       # Core library
+  │   │   └── src/
+  │   │       ├── supervisor.rs
+  │   │       ├── orchestrator.rs
+  │   │       ├── agent_lifecycle.rs
+  │   │       ├── agent_runtime.rs
+  │   │       ├── scheduler.rs
+  │   │       ├── event_bus.rs
+  │   │       ├── audit_trail.rs
+  │   │       ├── circuit_breaker.rs
+  │   │       ├── a2a.rs
+  │   │       ├── access_manager/
+  │   │       ├── memory/
+  │   │       ├── space/
+  │   │       ├── kernel_handle/
+  │   │       ├── tools/
+  │   │       │   ├── registration.rs
+  │   │       │   ├── exec_tool.rs
+  │   │       │   ├── kernel/        # Kernel facade tools
+  │   │       │   └── retrieval.rs   # ToolRetriever
+  │   │       ├── config.rs
+  │   │       ├── budget.rs
+  │   │       ├── cron.rs
+  │   │       ├── git_layer.rs
+  │   │       ├── resource_monitor.rs
+  │   │       ├── persona_manager.rs
+  │   │       ├── program/
+  │   │       ├── skill.rs
+  │   │       ├── host_tools.rs
+  │   │       ├── auth.rs
+  │   │       ├── credential.rs
+  │   │       ├── wasm_sandbox.rs
+  │   │       ├── mcp/
+  │   │       ├── capability/
+  │   │       ├── agent_group.rs
+  │   │       ├── metrics.rs
+  │   │       ├── onboarding.rs
+  │   │       ├── daemon.rs
+  │   │       └── state_store.rs
+  │   ├── oxios-ouroboros/     # Protocol engine
+  │   └── oxios-gateway/       # Message hub
+  ├── channels/
+  │   ├── oxios-web/           # Axum + Dioxus/WASM
+  │   ├── oxios-cli/           # CLI channel
+  │   └── oxios-telegram/      # Telegram channel
+  ├── .programs/               # OS-level programs
+  ├── share/                   # Default configs, skills, programs
+  └── docs/                    # Architecture docs, RFCs
+```
+
+---
+
+## 7. Security Model
+
+### 7.1 Overview
+
+```
+  ┌─────────────────────────────────────────────────────────┐
+  │                   Security Layers                        │
+  │                                                         │
+  │  Layer 1: Authentication (AuthManager)                  │
+  │    ↓ API key resolution: config → oxi auth → env        │
+  │                                                         │
+  │  Layer 2: Authorization (AccessManager + RBAC)          │
+  │    ↓ Least privilege, tool/path/network controls        │
+  │                                                         │
+  │  Layer 3: Sandbox (Workspace isolation)                 │
+  │    ↓ Path boundary enforcement per workspace            │
+  │                                                         │
+  │  Layer 4: Execution Security (ExecTool)                 │
+  │    ↓ Shell mode: RBAC-enforced bash -c                  │
+  │    ↓ Structured mode: binary allowlist + meta blocking  │
+  │                                                         │
+  │  Layer 5: Audit (AuditTrail)                            │
+  │    ↓ Tamper-evident blake3 hash chain                   │
+  │    ↓ Every access decision logged                       │
+  │                                                         │
+  │  Layer 6: Guardian Daemon                               │
+  │    ↓ Periodic integrity checks (audit chain, git, load) │
+  └─────────────────────────────────────────────────────────┘
+```
+
+### 7.2 RBAC (Role-Based Access Control)
+
+```
+  ┌──────────────────────────────────────────────────┐
+  │                 RbacManager                       │
+  │                                                  │
+  │  Subjects:  Agent(UUID) | User(String) | Role    │
+  │  Actions:   ExecuteTool | AccessPath | Network   │
+  │             Fork | ManageAgents | ConfigChange    │
+  │  Policies:  Subject + Action + Resource → Allow   │
+  │                                                  │
+  │  Human-in-the-Loop (HitL):                       │
+  │  PendingApproval { id, subject, action, resource }│
+  │  approve(id) / reject(id)                        │
+  │  Approval flow: submit → queue → approve/reject  │
+  └──────────────────────────────────────────────────┘
+```
+
+### 7.3 Path Sandboxing
+
+```
+  Agent requests: /workspace/secret/key.pem
+       │
+       ▼
+  ┌──────────────────────────────────────┐
+  │  1. RBAC Check                       │
+  │     Subject.Agent → Action.AccessPath│
+  │     → allowed?                       │
+  ├──────────────────────────────────────┤
+  │  2. Path Permission Check            │
+  │     denied_paths matches? → BLOCK    │
+  │     allowed_paths matches? → ALLOW   │
+  ├──────────────────────────────────────┤
+  │  3. Workspace Boundary Check         │
+  │     canonicalize(path)               │
+  │     starts_with(workspace_path)?     │
+  │     NO → "sandbox violation" logged  │
+  └──────────────────────────────────────┘
+  All three must pass for access to be granted
+```
+
+### 7.4 ExecTool Security
+
+```
+  ┌──────────────────────────────────────────────────┐
+  │              ExecTool                            │
+  │                                                  │
+  │  Shell Mode:                                     │
+  │    bash -c "{command}"                           │
+  │    RBAC-enforced: agent must have bash allowed    │
+  │    Working directory: workspace                  │
+  │                                                  │
+  │  Structured Mode:                                │
+  │    Binary allowlist only                         │
+  │    Metacharacter blocking (|, ;, &, etc.)        │
+  │    Safer for production use                      │
+  └──────────────────────────────────────────────────┘
+```
+
+### 7.5 Audit Trail Integrity
+
+```
+  Every security-relevant action:
+    ↓
+  AuditEntry { seq, timestamp, actor, action, resource, prev_hash, hash }
+    ↓
+  blake3 hash links entry to predecessor
+    ↓
+  verify() detects any tampering:
+    - Chain broken (prev_hash mismatch)
+    - Hash recomputation fails
+    - Future timestamps
+    ↓
+  Guardian daemon checks every 5 minutes:
+    - Audit chain validity
+    - Git repository integrity
+    - System overload
+```
+
+---
+
+## 8. Unix Philosophy Mapping
+
+| Unix Concept       | Oxios Equivalent                           | Description                                    |
+|--------------------|--------------------------------------------|------------------------------------------------|
+| `init` (PID 1)    | `Supervisor`                               | Manages all agent lifecycles                   |
+| `fork()`          | `Supervisor::fork(seed)`                   | Create new agent from seed specification       |
+| `exec()`          | `Supervisor::exec(id)` / `run_with_seed()` | Start executing an agent                       |
+| `wait()`          | `Supervisor::wait(id)`                     | Wait for agent completion                      |
+| `kill()`          | `Supervisor::kill(id)`                     | Terminate an agent (cooperative + abort)       |
+| `ps`              | `Supervisor::list()`                       | List all known agents                          |
+| Pipes             | `EventBus` (broadcast channel)             | Inter-agent communication                      |
+| Signals           | `KernelEvent` variants                     | AgentCreated, AgentStopped, etc.               |
+| `/proc`           | `StateStore` + `Scheduler::stats()`        | Agent state inspection                         |
+| `nice` / priority | `Priority` enum (Low→Critical)             | Task scheduling priority                       |
+| `ulimit`          | `BudgetManager` + `AccessManager`          | Resource limits per agent                      |
+| `chroot`          | Workspace sandboxing                       | Path boundary enforcement                      |
+| `auditd`          | `AuditTrail`                               | Tamper-evident cryptographic audit log         |
+| `cron`            | `CronScheduler`                            | Scheduled job execution                        |
+| `git`             | `GitLayer`                                 | In-process version control via gix             |
+| `/etc`            | `OxiosConfig` (config.toml)                | System configuration                           |
+| Programs          | `ProgramManager` + `.programs/`            | Installable OS-level capabilities              |
+| `man` pages       | `SKILL.md` per program                     | Usage documentation for capabilities           |
+| Shell             | `ExecTool` (shell/structured modes)        | Command execution with RBAC                    |
+| Sudo / polkit     | HitL Approval (RbacManager)                | Human-in-the-loop approval for dangerous ops   |
+
+---
+
+## 9. Dependency Rules
+
+### Invariant Rules
+
+| Rule | Description |
+|------|-------------|
+| **oxi-sdk is crates.io only** | `oxi-sdk` is a published crate, NOT a path dependency. Never reimplement what oxi provides. |
+| **Kernel binary assembles, library provides** | `src/kernel.rs` (binary) assembles components. `oxios-kernel` (library) provides them. |
+| **KernelHandle is the syscall table** | All tool access goes through `KernelHandle`. Never bypass it with direct subsystem references in tools. |
+| **Supervisor ≠ AgentLifecycleManager** | `Supervisor` = low-level process management. `AgentLifecycleManager` = full orchestrated lifecycle (A2A, scheduling, permissions). Never add lifecycle logic to Orchestrator directly. |
+| **Lifecycle split** | Don't add lifecycle logic to `Orchestrator` — use `AgentLifecycleManager`. |
+| **No containers** | Direct host execution. Security via `AccessManager` (RBAC + path sandboxing). |
+| **Channel agnostic** | Gateway doesn't care where messages come from. Channels are feature-gated plugins. |
+| **Feature gates** | Web, CLI, Telegram, browser, telemetry are all feature-gated. Check `cargo build -p oxios --features <feature>`. |
+
+### Circular Dependency Break
+
+The construction order solves the `KernelHandle → AgentRuntime → Supervisor → KernelHandle` cycle:
+
+```
+  1. Create placeholder KernelHandle with NoOpSupervisor
+  2. Create AgentRuntime with placeholder handle
+  3. Create BasicSupervisor with AgentRuntime
+  4. Build real Kernel
+  5. Kernel::handle() returns cached handle via OnceLock
+     (real supervisor, not NoOp)
+```
+
+### Testing Conventions
+
+| Convention | Description |
+|------------|-------------|
+| Unit tests | `#[cfg(test)] mod tests` in each file |
+| Integration tests | `tests/` per crate |
+| Mock providers | `MockProvider` implements `oxi_sdk::Provider` with empty streams |
+| Temp directories | Use `tempfile::tempdir()` for state store tests |
+| Must pass | `cargo test --workspace` at every commit |
+| CI check | `a7garden/oxi` at `v0.4.4` checked out alongside for oxi-related tests |
+
+---
+
+## Appendix: Quick Reference
+
+### Key File Locations
+
+| Path | Purpose |
+|------|---------|
+| `~/.oxios/config.toml` | Main configuration |
+| `~/.oxios/workspace/` | Agent working directory |
+| `~/.oxios/workspace/seeds/` | Ouroboros seed specs |
+| `~/.oxios/workspace/programs/` | Installed programs |
+| `~/.oxios/workspace/skills/` | Skill definitions |
+| `~/.oxios/workspace/sessions/` | Session data (ephemeral) |
+| `~/.oxios/spaces/` | Space data (index + per-space dirs) |
+| `~/.oxi/auth.json` | oxi-cli credentials |
+
+### CLI Quick Reference
+
+```bash
+cargo build                          # Build everything
+cargo test --workspace               # Run all tests
+cargo run                            # Start daemon (background)
+cargo run -- --foreground            # Start in foreground
+cargo run -- run --json "prompt"     # Single-shot execution
+cargo run -- run --json --session "$SID" "follow-up"  # Multi-turn
+```
+
+### OrchestrationResult JSON Shape
+
+```json
+{
+  "response": "string",
+  "session_id": "uuid",
+  "space_id": "uuid | null",
+  "space_tag": "[emoji label] | null",
+  "seed_id": "uuid | null",
+  "agent_id": "uuid | null",
+  "phase_reached": "Interview | Seed | Execute | Evaluate | Evolve",
+  "evaluation_passed": true,
+  "output": "string | null"
+}
+```

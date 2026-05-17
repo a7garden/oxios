@@ -69,14 +69,6 @@ pub trait OuroborosProtocol: Send + Sync {
     /// Evolve the seed based on evaluation, returning a new seed if needed.
     async fn evolve(&self, seed: &Seed, evaluation: &EvaluationResult) -> Result<Option<Seed>>;
 
-    /// Generate a direct conversational response without entering
-    /// the full Ouroboros pipeline. Used for greetings, small talk,
-    /// and non-task messages.
-    async fn chat(&self, user_message: &str) -> Result<String> {
-        // Default: just echo back a generic response
-        Ok(format!("Received: {}", user_message))
-    }
-
     /// Inject a persona system prompt for voice customization.
     /// When set, this is prepended to every LLM call in all phases.
     #[inline]

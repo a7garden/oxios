@@ -28,10 +28,22 @@ use crate::seed::{AmbiguityScore, Entity, Seed};
 /// Expected LLM response shape for the interview phase.
 #[derive(Debug, Deserialize)]
 struct InterviewResponse {
-    /// Socratic questions to ask the user.
+    /// Whether this message requires task execution (tools, files, etc.)
+    /// or is just conversational (greetings, questions, small talk).
+    #[serde(default = "default_true")]
+    is_task: bool,
+    /// Direct conversational response (only used when is_task = false).
+    #[serde(default)]
+    chat_response: String,
+    /// Socratic questions to ask the user (only used when is_task = true).
+    #[serde(default)]
     questions: Vec<String>,
     /// Ambiguity scores along each dimension (0.0–1.0 clarity).
-    scores: AmbiguityScores,
+    scores: Option<AmbiguityScores>,
+}
+
+fn default_true() -> bool {
+    true
 }
 
 /// Ambiguity sub-scores from the LLM.
@@ -206,28 +218,22 @@ impl OuroborosProtocol for OuroborosEngine {
         *self.persona_prompt.lock() = prompt;
     }
 
-    async fn chat(&self, user_message: &str) -> Result<String> {
-        let system_prompt = CHAT_SYSTEM_PROMPT;
-        self.llm_complete(system_prompt, user_message).await
-    }
-
     async fn interview(&self, user_input: &str) -> Result<InterviewResult> {
         self.set_phase(Phase::Interview);
 
         let system_prompt = INTERVIEW_SYSTEM_PROMPT;
         let user_message = format!(
             "The user said:\n\"{}\"\n\n\
-             Analyze this request. Produce a JSON object with:\n\
-             - \"questions\": list of Socratic clarifying questions (max 5)\n\
-             - \"scores\": {{ \"goal_clarity\": 0.0-1.0, \"constraint_clarity\": 0.0-1.0, \"success_criteria\": 0.0-1.0 }}\n\n\
-             IMPORTANT SCORING GUIDELINES:\n\
-             - Score GOAL_CLARITY 0.9+ if the user states ANY concrete action (create, read, write, run, find, list, etc.)\n\
+             Analyze this message and produce a JSON object with:\n\
+             - \"is_task\": true if the message requests a concrete action (create, read, write, run, find, fix, analyze, deploy, etc.) or describes something to build/execute. false for greetings, small talk, questions, gratitude, opinions, or conversational messages.\n\
+             - \"chat_response\": (only when is_task=false) A natural, friendly response in the user's language. Be warm, concise, and helpful. Skip this field when is_task=true.\n\
+             - \"questions\": (only when is_task=true) Up to 3 Socratic clarifying questions. Empty array when is_task=false.\n\
+             - \"scores\": (only when is_task=true) {{ \"goal_clarity\": 0.0-1.0, \"constraint_clarity\": 0.0-1.0, \"success_criteria\": 0.0-1.0 }}. Skip this field when is_task=false.\n\n\
+             IMPORTANT SCORING (when is_task=true):\n\
+             - Score GOAL_CLARITY 0.9+ if the user states ANY concrete action\n\
              - Score CONSTRAINT_CLARITY 0.8+ if the request includes ANY specifics (filename, content, path, language)\n\
-             - Score SUCCESS_CRITERIA 0.7+ if you can infer what 'done' looks like even if not explicit\n\
-             - Only score below 0.5 if the request is genuinely vague with NO actionable content\n\
-             - A request like 'Create a file called X with content Y' should score goal_clarity=1.0, constraint_clarity=0.9, success_criteria=0.9\n\
-             - A request like 'Write Python code to sort a list' should score goal_clarity=0.9, constraint_clarity=0.7, success_criteria=0.8\n\
-             Be GENEROUS with clarity scores. When in doubt, score higher. The system can always ask follow-up questions later.",
+             - Score SUCCESS_CRITERIA 0.7+ if you can infer what 'done' looks like\n\
+             - Be GENEROUS with clarity scores. When in doubt, score higher.",
             user_input
         );
 
@@ -235,19 +241,47 @@ impl OuroborosProtocol for OuroborosEngine {
         let parsed: InterviewResponse = Self::parse_json(&raw).unwrap_or_else(|e| {
             tracing::warn!(error = %e, "Failed to parse interview LLM response, using defaults");
             InterviewResponse {
+                is_task: true,
+                chat_response: String::new(),
                 questions: vec!["Could you describe the goal in more detail?".into()],
-                scores: AmbiguityScores {
+                scores: Some(AmbiguityScores {
                     goal_clarity: 0.3,
                     constraint_clarity: 0.2,
                     success_criteria: 0.2,
-                },
+                }),
             }
         });
 
+        // Non-task message — return direct chat response
+        if !parsed.is_task {
+            let mut result = InterviewResult::new();
+            result.is_task = false;
+            result.chat_response = if parsed.chat_response.is_empty() {
+                "Hello! How can I help you today?".to_string()
+            } else {
+                parsed.chat_response
+            };
+            result.ready_for_seed = false;
+
+            tracing::info!(
+                is_task = false,
+                "Interview phase complete (chat)"
+            );
+
+            return Ok(result);
+        }
+
+        // Task message — evaluate ambiguity
+        let scores = parsed.scores.unwrap_or(AmbiguityScores {
+            goal_clarity: 0.5,
+            constraint_clarity: 0.5,
+            success_criteria: 0.5,
+        });
+
         let ambiguity = AmbiguityScore::new(
-            parsed.scores.goal_clarity,
-            parsed.scores.constraint_clarity,
-            parsed.scores.success_criteria,
+            scores.goal_clarity,
+            scores.constraint_clarity,
+            scores.success_criteria,
         );
 
         let ambiguity_value = ambiguity.ambiguity();
@@ -262,7 +296,7 @@ impl OuroborosProtocol for OuroborosEngine {
             ambiguity = ambiguity_value,
             ready = result.ready_for_seed,
             questions = parsed.questions.len(),
-            "Interview phase complete"
+            "Interview phase complete (task)"
         );
 
         Ok(result)
@@ -512,15 +546,6 @@ impl OuroborosProtocol for OuroborosEngine {
 // ---------------------------------------------------------------------------
 // System prompts
 // ---------------------------------------------------------------------------
-
-const CHAT_SYSTEM_PROMPT: &str = "\
-You are a friendly, helpful AI assistant built into Oxios — an Agent Operating System. \
-You respond naturally in the user's language. \
-Keep responses concise and conversational. \
-If the user asks a question, answer it directly. \
-If the user greets you, greet them back warmly. \
-Do NOT ask clarifying questions or try to create tasks. \
-Just be a pleasant conversational partner.";
 
 const INTERVIEW_SYSTEM_PROMPT: &str = "\
 You are a Socratic interviewer for an AI agent operating system. \
