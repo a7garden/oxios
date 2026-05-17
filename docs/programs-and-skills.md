@@ -1,0 +1,1 @@
+Now let me check the CLI for skill commands:
