@@ -123,16 +123,7 @@ pub fn paginate<T: Clone + serde::Serialize>(
 /// `/health` and static assets are excluded from auth.
 pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
     // Public routes (no auth)
-    let public = Router::new()
-        .route("/health", get(handle_health))
-        .route(
-            "/dioxus",
-            get(|| async { axum::response::Redirect::permanent("/dioxus/") }),
-        )
-        .route(
-            "/",
-            get(|| async { axum::response::Redirect::permanent("/dioxus/") }),
-        );
+    let public = Router::new().route("/health", get(handle_health));
 
     // Protected API routes (auth middleware applied)
     let api = Router::new()
