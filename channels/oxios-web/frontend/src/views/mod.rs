@@ -17,3 +17,6 @@ pub mod approvals;
 pub mod events;
 pub mod personas;
 pub mod host_tools;
+pub mod cron_jobs;
+pub mod sessions;
+pub mod git;

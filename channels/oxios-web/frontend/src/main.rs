@@ -43,6 +43,18 @@ fn local_storage_set(key: &str, value: &str) {
     ls_set(key, value);
 }
 
+/// Remove a value from localStorage via wasm-bindgen.
+pub fn local_storage_remove(key: &str) {
+    use wasm_bindgen::prelude::*;
+
+    #[wasm_bindgen(inline_js = "export function ls_remove(k) { localStorage.removeItem(k); }")]
+    extern "C" {
+        fn ls_remove(k: &str);
+    }
+
+    ls_remove(key);
+}
+
 #[component]
 fn App() -> Element {
     let panel = use_signal(|| Panel::Chat);
@@ -53,6 +65,13 @@ fn App() -> Element {
         }
     });
     let mobile_menu = use_signal(|| false);
+
+    // Initialize auth token from localStorage
+    if let Some(key) = local_storage_get("oxios-api-key") {
+        if !key.is_empty() {
+            api::set_auth_token(Some(key));
+        }
+    }
 
     // Persist theme changes
     use_effect(move || {

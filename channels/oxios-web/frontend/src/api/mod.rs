@@ -5,11 +5,14 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 // ---------------------------------------------------------------------------
-// Global error toast
+// Global signals
 // ---------------------------------------------------------------------------
 
 /// Global signal for the last API error (consumed by AppLayout toast).
 static LAST_ERROR: GlobalSignal<Option<String>> = Signal::global(|| None);
+
+/// Global signal for the API authentication token.
+static AUTH_TOKEN: GlobalSignal<Option<String>> = Signal::global(|| None);
 
 /// Read the current global API error.
 pub fn last_api_error() -> Option<String> {
@@ -24,6 +27,21 @@ fn set_api_error(msg: String) {
 /// Clear the global API error (dismiss toast).
 pub fn clear_api_error() {
     *LAST_ERROR.write() = None;
+}
+
+/// Read the current auth token.
+pub fn auth_token() -> Option<String> {
+    AUTH_TOKEN().clone()
+}
+
+/// Set the auth token (called from login UI or localStorage init).
+pub fn set_auth_token(token: Option<String>) {
+    *AUTH_TOKEN.write() = token;
+}
+
+/// Build the Authorization header value if a token is set.
+fn auth_header() -> Option<String> {
+    AUTH_TOKEN().as_ref().map(|t| format!("Bearer {t}"))
 }
 
 // ---------------------------------------------------------------------------
@@ -48,7 +66,11 @@ fn check_status(response: &gloo_net::http::Response, method: &str, path: &str) -
 
 /// GET JSON from `path`, deserializing into `T`.
 pub async fn fetch_json<T: serde::de::DeserializeOwned>(path: &str) -> Result<T, String> {
-    let resp = gloo_net::http::Request::get(path)
+    let mut req = gloo_net::http::Request::get(path);
+    if let Some(hdr) = auth_header() {
+        req = req.header("Authorization", &hdr);
+    }
+    let resp = req
         .send()
         .await
         .map_err(|e| format!("GET {path}: {e}"))?;
@@ -63,7 +85,11 @@ pub async fn post_json<T: serde::de::DeserializeOwned, B: Serialize>(
     path: &str,
     body: &B,
 ) -> Result<T, String> {
-    let resp = gloo_net::http::Request::post(path)
+    let mut req = gloo_net::http::Request::post(path);
+    if let Some(hdr) = auth_header() {
+        req = req.header("Authorization", &hdr);
+    }
+    let resp = req
         .json(body)
         .map_err(|e| format!("POST {path} encode: {e}"))?
         .send()
@@ -78,7 +104,11 @@ pub async fn post_json<T: serde::de::DeserializeOwned, B: Serialize>(
 /// POST with no body, deserializing the response into `T`.
 #[allow(dead_code)]
 pub async fn post_empty<T: serde::de::DeserializeOwned>(path: &str) -> Result<T, String> {
-    let resp = gloo_net::http::Request::post(path)
+    let mut req = gloo_net::http::Request::post(path);
+    if let Some(hdr) = auth_header() {
+        req = req.header("Authorization", &hdr);
+    }
+    let resp = req
         .send()
         .await
         .map_err(|e| format!("POST {path}: {e}"))?;
@@ -94,7 +124,11 @@ pub async fn put_json<T: serde::de::DeserializeOwned, B: Serialize>(
     path: &str,
     body: &B,
 ) -> Result<T, String> {
-    let resp = gloo_net::http::Request::put(path)
+    let mut req = gloo_net::http::Request::put(path);
+    if let Some(hdr) = auth_header() {
+        req = req.header("Authorization", &hdr);
+    }
+    let resp = req
         .json(body)
         .map_err(|e| format!("PUT {path} encode: {e}"))?
         .send()
@@ -109,7 +143,11 @@ pub async fn put_json<T: serde::de::DeserializeOwned, B: Serialize>(
 /// DELETE `path`, deserializing the response into `T`.
 #[allow(dead_code)]
 pub async fn delete_json<T: serde::de::DeserializeOwned>(path: &str) -> Result<T, String> {
-    let resp = gloo_net::http::Request::delete(path)
+    let mut req = gloo_net::http::Request::delete(path);
+    if let Some(hdr) = auth_header() {
+        req = req.header("Authorization", &hdr);
+    }
+    let resp = req
         .send()
         .await
         .map_err(|e| format!("DELETE {path}: {e}"))?;
@@ -122,7 +160,11 @@ pub async fn delete_json<T: serde::de::DeserializeOwned>(path: &str) -> Result<T
 /// POST with no body, checking for HTTP errors. Used for action endpoints
 /// that return status codes or simple JSON we don't need to parse.
 pub async fn post_action(path: &str) -> Result<(), String> {
-    let resp = gloo_net::http::Request::post(path)
+    let mut req = gloo_net::http::Request::post(path);
+    if let Some(hdr) = auth_header() {
+        req = req.header("Authorization", &hdr);
+    }
+    let resp = req
         .send()
         .await
         .map_err(|e| format!("POST {path}: {e}"))?;
@@ -131,7 +173,11 @@ pub async fn post_action(path: &str) -> Result<(), String> {
 
 /// DELETE, checking for HTTP errors.
 pub async fn delete_action(path: &str) -> Result<(), String> {
-    let resp = gloo_net::http::Request::delete(path)
+    let mut req = gloo_net::http::Request::delete(path);
+    if let Some(hdr) = auth_header() {
+        req = req.header("Authorization", &hdr);
+    }
+    let resp = req
         .send()
         .await
         .map_err(|e| format!("DELETE {path}: {e}"))?;
@@ -160,7 +206,11 @@ pub async fn fetch_text(path: &str) -> Result<String, String> {
 /// PUT raw text body to `path`.
 #[allow(dead_code)]
 pub async fn put_text(path: &str, body: &str) -> Result<(), String> {
-    let resp = gloo_net::http::Request::put(path)
+    let mut req = gloo_net::http::Request::put(path);
+    if let Some(hdr) = auth_header() {
+        req = req.header("Authorization", &hdr);
+    }
+    let resp = req
         .body(body)
         .map_err(|e| format!("PUT {path} encode: {e}"))?
         .send()
@@ -173,20 +223,38 @@ pub async fn put_text(path: &str, body: &str) -> Result<(), String> {
 // Chat types
 // ---------------------------------------------------------------------------
 
-/// Chat request sent to the backend.
+/// Chat request sent to the backend (matches backend `routes::chat::ChatRequest`).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChatRequest {
-    pub message: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub session_id: Option<String>,
+    /// The user's message content.
+    pub content: String,
+    /// User identifier (defaults to "default").
+    #[serde(default = "default_user_id")]
+    pub user_id: String,
+    /// Session ID for multi-turn conversations.
+    #[serde(default)]
+    pub session_id: String,
 }
 
-/// Chat response from the backend.
+fn default_user_id() -> String {
+    "default".to_string()
+}
+
+/// Chat response from the backend (matches backend `routes::chat::ChatResponse`).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChatResponse {
-    pub response: String,
-    pub session_id: String,
+    /// The message ID.
+    pub id: String,
+    /// Echo of the user's message.
+    #[allow(dead_code)]
+    pub echo: String,
+    /// The response from the orchestrator.
+    pub reply: String,
+    /// Session ID for multi-turn conversations.
+    pub session_id: Option<String>,
+    /// Phase reached during orchestration.
     pub phase: Option<String>,
+    /// Evaluation metadata (optional).
     pub evaluation: Option<EvaluationInfo>,
 }
 
@@ -454,4 +522,127 @@ pub struct EventEntry {
     pub time: String,
     pub event_type: String,
     pub data: String,
+}
+
+// ---------------------------------------------------------------------------
+// Cron Jobs (backend /api/cron-jobs)
+// ---------------------------------------------------------------------------
+
+/// Cron job summary.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CronJobSummary {
+    pub id: String,
+    pub name: String,
+    pub schedule: String,
+    pub goal: String,
+    #[serde(default)]
+    pub constraints: Vec<String>,
+    #[serde(default)]
+    pub enabled: bool,
+    #[serde(default)]
+    pub last_run: Option<String>,
+    #[serde(default)]
+    pub next_run: Option<String>,
+}
+
+/// Create/edit cron job request.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateCronJobRequest {
+    pub name: String,
+    pub schedule: String,
+    pub goal: String,
+    #[serde(default)]
+    pub constraints: Vec<String>,
+    #[serde(default)]
+    pub acceptance_criteria: Vec<String>,
+    #[serde(default = "default_toolchain")]
+    pub toolchain: String,
+}
+
+fn default_toolchain() -> String {
+    "default".to_string()
+}
+
+// ---------------------------------------------------------------------------
+// Sessions (backend /api/sessions)
+// ---------------------------------------------------------------------------
+
+/// Session summary for listing.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SessionListItem {
+    pub id: String,
+    pub user_id: String,
+    pub message_count: usize,
+    #[serde(default)]
+    pub active_seed_id: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+// ---------------------------------------------------------------------------
+// Git (backend /api/git)
+// ---------------------------------------------------------------------------
+
+/// Git commit log entry.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GitLogEntry {
+    pub hash: String,
+    #[serde(default)]
+    pub author: Option<String>,
+    #[serde(default)]
+    pub message: Option<String>,
+    #[serde(default)]
+    pub timestamp: Option<String>,
+}
+
+/// Git tag.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GitTag {
+    pub name: String,
+    #[serde(default)]
+    pub hash: Option<String>,
+}
+
+// ---------------------------------------------------------------------------
+// Budget (backend /api/budget)
+// ---------------------------------------------------------------------------
+
+/// Budget info for an agent.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BudgetInfo {
+    pub agent_id: String,
+    pub tokens_remaining: u64,
+    pub calls_remaining: u64,
+    pub window_remaining_secs: u64,
+    pub is_exhausted: bool,
+}
+
+/// Set budget request.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SetBudgetRequest {
+    pub token_budget: u64,
+    pub calls_budget: u64,
+    pub window_secs: u64,
+}
+
+// ---------------------------------------------------------------------------
+// Resources (backend /api/resources)
+// ---------------------------------------------------------------------------
+
+/// System overload status.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OverloadStatus {
+    pub overloaded: bool,
+    pub threshold: ThresholdInfo,
+}
+
+/// Resource threshold configuration.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ThresholdInfo {
+    #[serde(default)]
+    pub cpu_percent: f64,
+    #[serde(default)]
+    pub memory_percent: f64,
+    #[serde(default)]
+    pub load_avg: f64,
 }
