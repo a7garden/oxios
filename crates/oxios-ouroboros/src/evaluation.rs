@@ -81,9 +81,26 @@ impl MechanicalEvalResult {
                         || output_lower.contains("exit status 0");
                     (has_zero, format!("exit_code_0={}", has_zero))
                 } else {
-                    // Default: substring containment (language-agnostic)
-                    let contains = output.contains(criterion);
-                    (contains, format!("substring_match={}", contains))
+                    // Extract key tokens from the criterion (words > 3 chars)
+                    // and check if most of them appear in the output
+                    let key_tokens: Vec<&str> = c_lower
+                        .split_whitespace()
+                        .filter(|w| w.len() > 3 && !matches!(*w, "must" | "should" | "shall" | "where" | "which" | "that" | "with" | "from" | "this"))
+                        .collect();
+
+                    if key_tokens.is_empty() {
+                        // Fallback to full substring match
+                        let contains = output_lower.contains(&c_lower);
+                        (contains, format!("substring_match={}", contains))
+                    } else {
+                        // Check how many key tokens appear in the output
+                        let matched = key_tokens.iter()
+                            .filter(|t| output_lower.contains(*t))
+                            .count();
+                        let ratio = matched as f64 / key_tokens.len() as f64;
+                        let passed = ratio >= 0.5; // At least half the key tokens match
+                        (passed, format!("keyword_match={}/{} ({:.0}%)", matched, key_tokens.len(), ratio * 100.0))
+                    }
                 };
             results.push(CriterionResult {
                 criterion: criterion.clone(),
