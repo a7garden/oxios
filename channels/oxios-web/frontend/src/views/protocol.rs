@@ -36,12 +36,26 @@ async fn fetch_current_phase() -> Option<(usize, String)> {
     Some((idx, phase))
 }
 
+#[derive(Debug, Clone)]
+struct ProtocolData {
+    current_index: usize,
+    current_phase: String,
+    seeds: Vec<api::SeedSummary>,
+}
+
 #[component]
 pub fn ProtocolView() -> Element {
     let mut resource = use_resource(|| async move {
         let phase_data = fetch_current_phase().await;
         let seeds: Vec<api::SeedSummary> = api::fetch_paginated("/api/seeds").await.unwrap_or_default();
-        (phase_data, seeds)
+        
+        let (current_index, current_phase) = phase_data.unwrap_or((2, "Execute".to_string()));
+        
+        ProtocolData {
+            current_index,
+            current_phase,
+            seeds,
+        }
     });
 
     rsx! {
@@ -51,22 +65,19 @@ pub fn ProtocolView() -> Element {
                 button { class: "btn btn-sm", onclick: move |_| resource.restart(), "Refresh" }
             }
             div { class: "panel-body",
-                match resource.value() {
-                    Some(Ok((phase_data, seeds))) if seeds.is_empty() => rsx! {
+                match &(resource.value())() {
+                    Some(Ok(data)) if data.seeds.is_empty() => rsx! {
                         div { class: "empty-state",
                             div { class: "empty-icon", IconSeeds { size: 40 } }
                             p { "No seeds yet. Seeds are created through the Ouroboros interview process." }
                         }
                     },
-                    Some(Ok((phase_data, seeds))) => {
-                        // Determine phase state
-                        let (current_index, current_phase) = phase_data.clone().unwrap_or((2, "Execute".to_string()));
-                        let completed_steps = current_index;
-                        let active_step = current_index;
-                        let progress_pct = if completed_steps == 0 {
+                    Some(Ok(data)) => {
+                        let active_step = data.current_index;
+                        let progress_pct = if data.current_index == 0 {
                             0.0
                         } else {
-                            (completed_steps as f64 / 5.0) * 100.0
+                            (data.current_index as f64 / 5.0) * 100.0
                         };
 
                         rsx! {
@@ -74,7 +85,7 @@ pub fn ProtocolView() -> Element {
                                 div { class: "phase-indicator",
                                     div { class: "phase-current", "Ouroboros Lifecycle" }
                                     div { class: "phase-phase-label", style: "font-size:11px;color:var(--text-3);margin-bottom:8px",
-                                        "Current: {current_phase}"
+                                        "Current: {data.current_phase}"
                                     }
                                     div { class: "phase-progress-bar",
                                         div {
@@ -205,7 +216,7 @@ pub fn ProtocolView() -> Element {
                                     "Recent Seeds"
                                 }
                                 div { class: "item-list",
-                                    {seeds.iter().take(5).map(|seed| {
+                                    {data.seeds.iter().take(5).map(|seed| {
                                         let id = seed.id.clone();
                                         let goal = seed.goal.clone();
                                         let count = seed.constraints_count;
@@ -231,7 +242,6 @@ pub fn ProtocolView() -> Element {
                             p { "Loading protocol status..." }
                         }
                     },
-                    _ => rsx! { div { } },
                 }
             }
         }

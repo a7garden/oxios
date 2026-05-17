@@ -11,7 +11,7 @@ pub fn SessionsView() -> Element {
     });
 
     let mut expanded_id = use_signal(|| Option::<String>::None);
-    let mut detail_resource = use_signal(|| Option<serde_json::Value>::None);
+    let mut detail_resource = use_signal(|| None::<serde_json::Value>);
     let mut loading_detail = use_signal(|| false);
 
     fn truncate_id(id: &str) -> String {
