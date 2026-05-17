@@ -1,0 +1,99 @@
+- generic [ref=e3]:
+  - complementary [ref=e4]:
+    - generic [ref=e5]:
+      - generic [ref=e6]: OXIOS
+      - generic [ref=e7]:
+        - button "Switch to light" [ref=e8] [cursor=pointer]:
+          - img [ref=e9]
+        - button [ref=e12] [cursor=pointer]:
+          - img [ref=e13]
+    - navigation [ref=e15]:
+      - generic [ref=e16]: Core
+      - button "Chat" [ref=e17] [cursor=pointer]:
+        - img [ref=e19]
+        - generic [ref=e21]: Chat
+      - button "Dashboard" [ref=e22] [cursor=pointer]:
+        - img [ref=e24]
+        - generic [ref=e29]: Dashboard
+      - button "Config" [ref=e30] [cursor=pointer]:
+        - img [ref=e32]
+        - generic [ref=e35]: Config
+      - generic [ref=e36]: Agents
+      - button "Agents" [ref=e37] [cursor=pointer]:
+        - img [ref=e39]
+        - generic [ref=e43]: Agents
+      - button "Agent Groups" [ref=e44] [cursor=pointer]:
+        - img [ref=e46]
+        - generic [ref=e50]: Agent Groups
+      - button "Personas" [ref=e51] [cursor=pointer]:
+        - img [ref=e53]
+        - generic [ref=e58]: Personas
+      - button "Budget" [ref=e59] [cursor=pointer]:
+        - img [ref=e61]
+        - generic [ref=e63]: Budget
+      - button "Scheduler" [ref=e64] [cursor=pointer]:
+        - img [ref=e66]
+        - generic [ref=e69]: Scheduler
+      - generic [ref=e70]: Ouroboros
+      - button "Protocol" [ref=e71] [cursor=pointer]:
+        - img [ref=e73]
+        - generic [ref=e78]: Protocol
+      - button "Seeds" [ref=e79] [cursor=pointer]:
+        - img [ref=e81]
+        - generic [ref=e85]: Seeds
+      - generic [ref=e86]: System
+      - button "Workspace" [ref=e87] [cursor=pointer]:
+        - img [ref=e89]
+        - generic [ref=e91]: Workspace
+      - button "Skills" [ref=e92] [cursor=pointer]:
+        - img [ref=e94]
+        - generic [ref=e96]: Skills
+      - button "Programs" [ref=e97] [cursor=pointer]:
+        - img [ref=e99]
+        - generic [ref=e102]: Programs
+      - button "Cron Jobs" [ref=e103] [cursor=pointer]:
+        - img [ref=e105]
+        - generic [ref=e108]: Cron Jobs
+      - button "Git" [ref=e109] [cursor=pointer]:
+        - img [ref=e111]
+        - generic [ref=e114]: Git
+      - button "Memory" [ref=e115] [cursor=pointer]:
+        - img [ref=e117]
+        - generic [ref=e121]: Memory
+      - button "Host Tools" [ref=e122] [cursor=pointer]:
+        - img [ref=e124]
+        - generic [ref=e126]: Host Tools
+      - generic [ref=e127]: Security
+      - button "Security" [ref=e128] [cursor=pointer]:
+        - img [ref=e130]
+        - generic [ref=e132]: Security
+      - button "Approvals" [ref=e133] [cursor=pointer]:
+        - img [ref=e135]
+        - generic [ref=e138]: Approvals
+      - generic [ref=e139]: Monitor
+      - button "Events" [ref=e140] [cursor=pointer]:
+        - img [ref=e142]
+        - generic [ref=e144]: Events
+      - button "Sessions" [ref=e145] [cursor=pointer]:
+        - img [ref=e147]
+        - generic [ref=e151]: Sessions
+      - button "Resources" [ref=e152] [cursor=pointer]:
+        - img [ref=e154]
+        - generic [ref=e158]: Resources
+    - button "🔑 Set API Key" [ref=e160] [cursor=pointer]
+  - main [ref=e161]:
+    - generic [ref=e229]:
+      - generic [ref=e230]:
+        - heading "Chat" [level=2] [ref=e231]:
+          - img [ref=e232]
+          - text: Chat
+        - generic [ref=e234]: ● REST mode
+      - generic [ref=e235]:
+        - generic [ref=e243]: what skills do you have available?
+        - generic [ref=e247]:
+          - generic [ref=e248]: "I can help with quite a lot! Here's a quick rundown: **Code & Development:** Write, debug, refactor, and explain code across most languages and frameworks. **Analysis & Problem-Solving:** Analyze data, review architectures, troubleshoot issues, and propose solutions. **Writing & Documentation:** Draft docs, READMEs, comments, technical specs, and user guides. **DevOps & Infrastructure:** Help with Docker, CI/CD pipelines, deployment configs, and cloud setups. **Learning & Exploration:** Explain concepts, compare technologies, walk through algorithms. **File Operations:** Read, create, and edit files when you need hands-on help. What are you working on? Throw me a specific task and I'll dig in."
+          - generic [ref=e249]: interview
+      - generic [ref=e236]:
+        - textbox "Send a message..." [active] [ref=e237]
+        - button [ref=e238] [cursor=pointer]:
+          - img [ref=e239]

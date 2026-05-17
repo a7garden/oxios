@@ -48,7 +48,8 @@ impl MemoryManager {
             MemoryType::Episode,
             MemoryType::Knowledge,
         ] {
-            if let Ok(entries) = self.list(mt, usize::MAX).await {
+            // Use a large fixed limit to avoid overflow with usize::MAX
+            if let Ok(entries) = self.list(mt, 1_000_000).await {
                 total += entries.len();
             }
         }
@@ -211,7 +212,7 @@ impl MemoryManager {
         let category = memory_type.category();
         let names = self.state_store.list_category(category).await?;
         let mut entries = Vec::new();
-        for name in names.into_iter().take(limit * 2) {
+        for name in names.into_iter().take(limit.saturating_mul(2)) {
             if let Ok(Some(entry)) = self
                 .state_store
                 .load_json::<MemoryEntry>(category, &name)

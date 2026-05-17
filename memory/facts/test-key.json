@@ -1,0 +1,11 @@
+{
+  "id": "test-key",
+  "memory_type": "fact",
+  "content": "test-value",
+  "source": "agent",
+  "tags": [],
+  "importance": 0.5,
+  "created_at": "2025-01-01T00:00:00Z",
+  "accessed_at": "2025-01-01T00:00:00Z",
+  "access_count": 0
+}

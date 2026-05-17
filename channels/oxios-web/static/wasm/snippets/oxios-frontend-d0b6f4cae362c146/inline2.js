@@ -1,0 +1,1 @@
+export function ls_set(k, v) { localStorage.setItem(k, v); }

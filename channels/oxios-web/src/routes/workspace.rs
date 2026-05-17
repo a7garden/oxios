@@ -475,23 +475,16 @@ pub(crate) async fn handle_memory_list(
 ) -> Json<serde_json::Value> {
     let mut entries = Vec::new();
 
-    // List daily memory files
-    if let Ok(names) = state.kernel.state.list_category("memory").await {
-        for name in names {
-            entries.push(MemorySummary {
-                name,
-                category: "daily".into(),
-            });
-        }
-    }
-
-    // List knowledge base entries
-    if let Ok(names) = state.kernel.state.list_category("memory/knowledge").await {
-        for name in names {
-            entries.push(MemorySummary {
-                name,
-                category: "knowledge".into(),
-            });
+    // List all memory categories
+    for category in ["memory/facts", "memory/episodes", "memory/knowledge", "memory/sessions"] {
+        if let Ok(names) = state.kernel.state.list_category(category).await {
+            let cat = category.split('/').nth(1).unwrap_or("fact");
+            for name in names {
+                entries.push(MemorySummary {
+                    name,
+                    category: cat.into(),
+                });
+            }
         }
     }
 
@@ -503,28 +496,21 @@ pub(crate) async fn handle_memory_get(
     state: State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> Result<impl IntoResponse, AppError> {
-    // Try memory/ first, then memory/knowledge/
-    if let Ok(Some(content)) = state.kernel.state.load_markdown("memory", &name).await {
-        return Ok(Json(serde_json::json!({
-            "name": name,
-            "category": "daily",
-            "content": content,
-        }))
-        .into_response());
-    }
-
-    if let Ok(Some(content)) = state
-        .kernel
-        .state
-        .load_markdown("memory/knowledge", &name)
-        .await
-    {
-        return Ok(Json(serde_json::json!({
-            "name": name,
-            "category": "knowledge",
-            "content": content,
-        }))
-        .into_response());
+    // Memory entries are stored as JSON, not markdown.
+    // Try all known memory categories to find the entry.
+    for category in ["memory/facts", "memory/episodes", "memory/knowledge", "memory/sessions"] {
+        if let Ok(Some(entry)) = state.kernel.state.load::<oxios_kernel::memory::MemoryEntry>(category, &name).await {
+            return Ok(Json(serde_json::json!({
+                "id": entry.id,
+                "name": entry.id,
+                "category": entry.memory_type.label(),
+                "content": entry.content,
+                "tags": entry.tags,
+                "importance": entry.importance,
+                "created_at": entry.created_at.to_rfc3339(),
+            }))
+            .into_response());
+        }
     }
 
     Err(AppError::NotFound("memory entry not found".into()))

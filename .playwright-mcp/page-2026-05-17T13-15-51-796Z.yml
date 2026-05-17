@@ -1,0 +1,104 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e5] [cursor=pointer]:
+    - generic [ref=e6]:
+      - img [ref=e7]
+      - heading [level=3] [ref=e11]: Your app is being rebuilt.
+    - paragraph [ref=e12]: A non-hot-reloadable change occurred and we must rebuild.
+  - generic [ref=e14]:
+    - banner [ref=e15]:
+      - button [ref=e16]:
+        - img [ref=e17]
+      - text: OXIOS
+    - complementary [ref=e19]:
+      - generic [ref=e20]:
+        - text: OXIOS
+        - generic [ref=e21]:
+          - button "Switch to light" [ref=e22]:
+            - img [ref=e23]
+          - button [ref=e26]:
+            - img [ref=e27]
+      - navigation [ref=e29]:
+        - generic [ref=e30]: Core
+        - button "Chat" [ref=e31]:
+          - img [ref=e33]
+          - text: Chat
+        - button "Dashboard" [ref=e35]:
+          - img [ref=e37]
+          - text: Dashboard
+        - button "Config" [ref=e42]:
+          - img [ref=e44]
+          - text: Config
+        - generic [ref=e47]: Agents
+        - button "Agents" [ref=e48]:
+          - img [ref=e50]
+          - text: Agents
+        - button "Agent Groups" [ref=e54]:
+          - img [ref=e56]
+          - text: Agent Groups
+        - button "Personas" [ref=e60]:
+          - img [ref=e62]
+          - text: Personas
+        - button "Budget" [ref=e67]:
+          - img [ref=e69]
+          - text: Budget
+        - button "Scheduler" [ref=e71]:
+          - img [ref=e73]
+          - text: Scheduler
+        - generic [ref=e76]: Ouroboros
+        - button "Protocol" [ref=e77]:
+          - img [ref=e79]
+          - text: Protocol
+        - button "Seeds" [ref=e84]:
+          - img [ref=e86]
+          - text: Seeds
+        - generic [ref=e90]: System
+        - button "Workspace" [ref=e91]:
+          - img [ref=e93]
+          - text: Workspace
+        - button "Skills" [ref=e95]:
+          - img [ref=e97]
+          - text: Skills
+        - button "Programs" [ref=e99]:
+          - img [ref=e101]
+          - text: Programs
+        - button "Cron Jobs" [ref=e104]:
+          - img [ref=e106]
+          - text: Cron Jobs
+        - button "Git" [ref=e109]:
+          - img [ref=e111]
+          - text: Git
+        - button "Memory" [ref=e114]:
+          - img [ref=e116]
+          - text: Memory
+        - button "Host Tools" [ref=e120]:
+          - img [ref=e122]
+          - text: Host Tools
+        - generic [ref=e124]: Security
+        - button "Security" [ref=e125]:
+          - img [ref=e127]
+          - text: Security
+        - button "Approvals" [ref=e129]:
+          - img [ref=e131]
+          - text: Approvals
+        - generic [ref=e134]: Monitor
+        - button "Events" [ref=e135]:
+          - img [ref=e137]
+          - text: Events
+        - button "Sessions" [ref=e139]:
+          - img [ref=e141]
+          - text: Sessions
+        - button "Resources" [ref=e145]:
+          - img [ref=e147]
+          - text: Resources
+      - button "🔑 Set API Key" [ref=e152]
+    - main [ref=e153]:
+      - generic [ref=e154]:
+        - generic [ref=e155]:
+          - heading "Chat" [level=2] [ref=e156]:
+            - img [ref=e157]
+            - text: Chat
+          - text: ● REST mode
+        - generic [ref=e159]:
+          - textbox "Send a message..." [ref=e160]
+          - button [ref=e161]:
+            - img [ref=e162]

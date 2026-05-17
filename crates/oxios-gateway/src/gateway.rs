@@ -78,7 +78,8 @@ impl Gateway {
                     orchestration.evaluation_passed.to_string(),
                 );
 
-                let outgoing = OutgoingMessage::with_metadata(
+                let outgoing = OutgoingMessage::with_id_and_metadata(
+                    msg.id,
                     &msg.channel,
                     &msg.user_id,
                     &orchestration.response,
@@ -89,7 +90,8 @@ impl Gateway {
             Err(e) => {
                 tracing::error!(error = %e, "Orchestration failed");
 
-                let outgoing = OutgoingMessage::new(
+                let outgoing = OutgoingMessage::with_id(
+                    msg.id,
                     &msg.channel,
                     &msg.user_id,
                     format!("An error occurred: {e}"),
@@ -133,8 +135,8 @@ impl Gateway {
                 // Drain every pending message from this channel.
                 loop {
                     let msg = {
-                        let channels = self.channels.read().await;
-                        if let Some(ch) = channels.get(name) {
+                        let mut channels = self.channels.write().await;
+                        if let Some(ch) = channels.get_mut(name) {
                             ch.receive().await.ok().flatten()
                         } else {
                             break;

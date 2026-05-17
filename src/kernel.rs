@@ -25,7 +25,7 @@ use std::sync::OnceLock;
 /// through typed methods or [`Kernel::handle()`] for the KernelHandle facade.
 pub struct Kernel {
     orchestrator: Arc<Orchestrator>,
-    gateway: Gateway,
+    gateway: Arc<Gateway>,
     event_bus: EventBus,
     state_store: Arc<oxios_kernel::state_store::StateStore>,
     config: OxiosConfig,
@@ -111,9 +111,8 @@ impl Kernel {
     }
 
     /// Gateway reference — for channel registration and message routing.
-    #[allow(dead_code)]
-    pub fn gateway(&self) -> &Gateway {
-        &self.gateway
+    pub fn gateway(&self) -> Arc<Gateway> {
+        self.gateway.clone()
     }
 
     /// Build a BrowserApi facade based on feature flag and config.
@@ -488,7 +487,7 @@ impl KernelBuilder {
         orchestrator.set_space_manager(space_manager.clone());
         let orchestrator = Arc::new(orchestrator);
 
-        let gateway = Gateway::new(orchestrator.clone());
+        let gateway = Arc::new(Gateway::new(orchestrator.clone()));
 
         Ok(Kernel {
             orchestrator,

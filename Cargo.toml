@@ -1,4 +1,106 @@
 [package]
-name = "hello_world"
-version = "0.1.0"
+name = "oxios"
+version = "0.1.2"
 edition = "2021"
+description = "Oxios Agent OS — Agent Operating System powered by oxi-sdk"
+license = "MIT"
+repository = "https://github.com/a7garden/oxios"
+
+[workspace]
+resolver = "2"
+members = [
+    "crates/oxios-kernel",
+    "crates/oxios-ouroboros",
+    "crates/oxios-gateway",
+    "channels/oxios-web",
+    "channels/oxios-cli",
+    "channels/oxios-telegram",
+]
+
+[workspace.dependencies]
+# Async
+tokio = { version = "1", features = ["full"] }
+futures = "0.3"
+async-trait = "0.1"
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.8"
+
+# IDs
+uuid = { version = "1", features = ["v4", "serde"] }
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing-appender = "0.2"
+
+# Error handling
+anyhow = "1"
+thiserror = "1"
+
+# Time
+chrono = { version = "0.4", features = ["serde"] }
+
+# Cryptography / hashing
+sha2 = "0.10"
+blake3 = "1.8"
+hex = "0.4"
+getrandom = "0.2"
+regex = "1"
+
+# Concurrency
+parking_lot = "0.12"
+
+# oxi engine — single dependency for everything
+oxi-sdk = "0.16.1"
+oxi-ai = "0.16.1"
+
+[features]
+default = ["web", "cli", "browser"]
+web = ["dep:oxios-web"]
+cli = ["dep:oxios-cli"]
+telegram = ["dep:oxios-telegram"]
+browser = ["oxios-kernel/browser"]
+
+[dependencies]
+oxios-kernel = { version = "0.1.2", path = "crates/oxios-kernel", default-features = false }
+oxios-ouroboros = { version = "0.1.2", path = "crates/oxios-ouroboros" }
+oxios-gateway = { version = "0.1.2", path = "crates/oxios-gateway" }
+oxi-sdk = { workspace = true }
+oxios-web = { version = "0.1.2", path = "channels/oxios-web", optional = true }
+oxios-cli = { version = "0.1.2", path = "channels/oxios-cli", optional = true }
+oxios-telegram = { version = "0.1.2", path = "channels/oxios-telegram", optional = true }
+hex = { workspace = true }
+uuid = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+anyhow = { workspace = true }
+serde = { workspace = true }
+clap = { version = "4", features = ["derive"] }
+toml = { workspace = true }
+parking_lot = { workspace = true }
+tracing-appender = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+inquire = "0.9"
+libc = "0.2"
+console = "0.15"
+clap_complete = "4"
+
+[dev-dependencies]
+oxios-ouroboros = { version = "0.1.2", path = "crates/oxios-ouroboros" }
+oxi-sdk = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+tokio = { workspace = true }
+serde_json = { workspace = true }
+tempfile = "3"
+mockall = "0.12"
+criterion = { version = "0.5", features = ["async"] }
+
+[[bench]]
+name = "kernel_bench"
+harness = false

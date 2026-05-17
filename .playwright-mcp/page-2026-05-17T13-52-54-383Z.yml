@@ -1,0 +1,378 @@
+- generic [ref=e3]:
+  - complementary [ref=e4]:
+    - generic [ref=e5]:
+      - generic [ref=e6]: OXIOS
+      - generic [ref=e7]:
+        - button "Switch to light" [ref=e8] [cursor=pointer]:
+          - img [ref=e9]
+        - button [ref=e12] [cursor=pointer]:
+          - img [ref=e13]
+    - navigation [ref=e15]:
+      - generic [ref=e16]: Core
+      - button "Chat" [ref=e17] [cursor=pointer]:
+        - img [ref=e19]
+        - generic [ref=e21]: Chat
+      - button "Dashboard" [ref=e22] [cursor=pointer]:
+        - img [ref=e24]
+        - generic [ref=e29]: Dashboard
+      - button "Config" [ref=e30] [cursor=pointer]:
+        - img [ref=e32]
+        - generic [ref=e35]: Config
+      - generic [ref=e36]: Agents
+      - button "Agents" [ref=e37] [cursor=pointer]:
+        - img [ref=e39]
+        - generic [ref=e43]: Agents
+      - button "Agent Groups" [ref=e44] [cursor=pointer]:
+        - img [ref=e46]
+        - generic [ref=e50]: Agent Groups
+      - button "Personas" [ref=e51] [cursor=pointer]:
+        - img [ref=e53]
+        - generic [ref=e58]: Personas
+      - button "Budget" [ref=e59] [cursor=pointer]:
+        - img [ref=e61]
+        - generic [ref=e63]: Budget
+      - button "Scheduler" [ref=e64] [cursor=pointer]:
+        - img [ref=e66]
+        - generic [ref=e69]: Scheduler
+      - generic [ref=e70]: Ouroboros
+      - button "Protocol" [ref=e71] [cursor=pointer]:
+        - img [ref=e73]
+        - generic [ref=e78]: Protocol
+      - button "Seeds" [ref=e79] [cursor=pointer]:
+        - img [ref=e81]
+        - generic [ref=e85]: Seeds
+      - generic [ref=e86]: System
+      - button "Workspace" [ref=e87] [cursor=pointer]:
+        - img [ref=e89]
+        - generic [ref=e91]: Workspace
+      - button "Skills" [ref=e92] [cursor=pointer]:
+        - img [ref=e94]
+        - generic [ref=e96]: Skills
+      - button "Programs" [ref=e97] [cursor=pointer]:
+        - img [ref=e99]
+        - generic [ref=e102]: Programs
+      - button "Cron Jobs" [ref=e103] [cursor=pointer]:
+        - img [ref=e105]
+        - generic [ref=e108]: Cron Jobs
+      - button "Git" [ref=e109] [cursor=pointer]:
+        - img [ref=e111]
+        - generic [ref=e114]: Git
+      - button "Memory" [ref=e115] [cursor=pointer]:
+        - img [ref=e117]
+        - generic [ref=e121]: Memory
+      - button "Host Tools" [ref=e122] [cursor=pointer]:
+        - img [ref=e124]
+        - generic [ref=e126]: Host Tools
+      - generic [ref=e127]: Security
+      - button "Security" [ref=e128] [cursor=pointer]:
+        - img [ref=e130]
+        - generic [ref=e132]: Security
+      - button "Approvals" [ref=e133] [cursor=pointer]:
+        - img [ref=e135]
+        - generic [ref=e138]: Approvals
+      - generic [ref=e139]: Monitor
+      - button "Events" [ref=e140] [cursor=pointer]:
+        - img [ref=e142]
+        - generic [ref=e144]: Events
+      - button "Sessions" [active] [ref=e145] [cursor=pointer]:
+        - img [ref=e147]
+        - generic [ref=e151]: Sessions
+      - button "Resources" [ref=e152] [cursor=pointer]:
+        - img [ref=e154]
+        - generic [ref=e158]: Resources
+    - button "🔑 Set API Key" [ref=e160] [cursor=pointer]
+  - main [ref=e161]:
+    - generic [ref=e295]:
+      - generic [ref=e296]:
+        - heading "Sessions" [level=2] [ref=e297]:
+          - img [ref=e298]
+          - text: Sessions
+        - button "Refresh" [ref=e302] [cursor=pointer]
+      - generic [ref=e304]:
+        - generic [ref=e305]:
+          - generic [ref=e306]:
+            - generic [ref=e307]: 37b8d48d…
+            - generic [ref=e308]: "User: default · Messages: 2"
+            - generic [ref=e309]: "Created: 2026-05-17T13:52:04.628308+00:00 · Updated: 2026-05-17T13:52:36.361633+00:00"
+          - button "Delete this session" [ref=e311] [cursor=pointer]:
+            - img [ref=e312]
+        - generic [ref=e314]:
+          - generic [ref=e315]:
+            - generic [ref=e316]: 5ecdf442…
+            - generic [ref=e317]: "User: default · Messages: 1"
+            - generic [ref=e318]: "Created: 2026-05-17T13:52:14.582656+00:00 · Updated: 2026-05-17T13:52:14.582685+00:00"
+          - button "Delete this session" [ref=e320] [cursor=pointer]:
+            - img [ref=e321]
+        - generic [ref=e323]:
+          - generic [ref=e324]:
+            - generic [ref=e325]: 8a216cd7…
+            - generic [ref=e326]: "User: default · Messages: 1"
+            - generic [ref=e327]: "Created: 2026-05-17T13:50:33.847393+00:00 · Updated: 2026-05-17T13:50:33.847463+00:00"
+          - button "Delete this session" [ref=e329] [cursor=pointer]:
+            - img [ref=e330]
+        - generic [ref=e332]:
+          - generic [ref=e333]:
+            - generic [ref=e334]: 92bca257…
+            - generic [ref=e335]: "User: default · Messages: 1"
+            - generic [ref=e336]: "Created: 2026-05-17T13:42:01.894894+00:00 · Updated: 2026-05-17T13:42:01.894918+00:00"
+          - button "Delete this session" [ref=e338] [cursor=pointer]:
+            - img [ref=e339]
+        - generic [ref=e341]:
+          - generic [ref=e342]:
+            - generic [ref=e343]: 4bc0754e…
+            - generic [ref=e344]: "User: default · Messages: 3"
+            - generic [ref=e345]: "Created: 2026-05-17T13:37:36.086352+00:00 · Updated: 2026-05-17T13:39:44.816221+00:00"
+          - button "Delete this session" [ref=e347] [cursor=pointer]:
+            - img [ref=e348]
+        - generic [ref=e350]:
+          - generic [ref=e351]:
+            - generic [ref=e352]: 46974780…
+            - generic [ref=e353]: "User: test · Messages: 1"
+            - generic [ref=e354]: "Created: 2026-05-17T13:39:01.697081+00:00 · Updated: 2026-05-17T13:39:01.697096+00:00"
+          - button "Delete this session" [ref=e356] [cursor=pointer]:
+            - img [ref=e357]
+        - generic [ref=e359]:
+          - generic [ref=e360]:
+            - generic [ref=e361]: ff188509…
+            - generic [ref=e362]: "User: default · Messages: 4"
+            - generic [ref=e363]: "Created: 2026-05-17T13:29:36.704535+00:00 · Updated: 2026-05-17T13:35:22.041051+00:00"
+          - button "Delete this session" [ref=e365] [cursor=pointer]:
+            - img [ref=e366]
+        - generic [ref=e368]:
+          - generic [ref=e369]:
+            - generic [ref=e370]: 85b41d6c…
+            - generic [ref=e371]: "User: test · Messages: 1"
+            - generic [ref=e372]: "Created: 2026-05-17T13:34:11.416684+00:00 · Updated: 2026-05-17T13:34:11.416711+00:00"
+          - button "Delete this session" [ref=e374] [cursor=pointer]:
+            - img [ref=e375]
+        - generic [ref=e377]:
+          - generic [ref=e378]:
+            - generic [ref=e379]: 4f7c723a…
+            - generic [ref=e380]: "User: test · Messages: 1"
+            - generic [ref=e381]: "Created: 2026-05-17T13:29:10.923760+00:00 · Updated: 2026-05-17T13:29:10.923780+00:00"
+          - button "Delete this session" [ref=e383] [cursor=pointer]:
+            - img [ref=e384]
+        - generic [ref=e386]:
+          - generic [ref=e387]:
+            - generic [ref=e388]: 4bc7a0d5…
+            - generic [ref=e389]: "User: test · Messages: 1"
+            - generic [ref=e390]: "Created: 2026-05-17T13:27:57.815091+00:00 · Updated: 2026-05-17T13:27:57.815109+00:00"
+          - button "Delete this session" [ref=e392] [cursor=pointer]:
+            - img [ref=e393]
+        - generic [ref=e395]:
+          - generic [ref=e396]:
+            - generic [ref=e397]: 2c005088…
+            - generic [ref=e398]: "User: default · Messages: 3"
+            - generic [ref=e399]: "Created: 2026-05-17T13:22:17.883472+00:00 · Updated: 2026-05-17T13:23:45.157660+00:00"
+          - button "Delete this session" [ref=e401] [cursor=pointer]:
+            - img [ref=e402]
+        - generic [ref=e404]:
+          - generic [ref=e405]:
+            - generic [ref=e406]: afbc2074…
+            - generic [ref=e407]: "User: default · Messages: 1"
+            - generic [ref=e408]: "Created: 2026-05-17T13:19:58.948940+00:00 · Updated: 2026-05-17T13:19:58.948960+00:00"
+          - button "Delete this session" [ref=e410] [cursor=pointer]:
+            - img [ref=e411]
+        - generic [ref=e413]:
+          - generic [ref=e414]:
+            - generic [ref=e415]: 55519a1a…
+            - generic [ref=e416]: "User: default · Messages: 1"
+            - generic [ref=e417]: "Created: 2026-05-17T13:06:38.509250+00:00 · Updated: 2026-05-17T13:06:38.509268+00:00"
+          - button "Delete this session" [ref=e419] [cursor=pointer]:
+            - img [ref=e420]
+        - generic [ref=e422]:
+          - generic [ref=e423]:
+            - generic [ref=e424]: 62bde9ca…
+            - generic [ref=e425]: "User: default · Messages: 1"
+            - generic [ref=e426]: "Created: 2026-05-17T13:00:26.338422+00:00 · Updated: 2026-05-17T13:00:26.338437+00:00"
+          - button "Delete this session" [ref=e428] [cursor=pointer]:
+            - img [ref=e429]
+        - generic [ref=e431]:
+          - generic [ref=e432]:
+            - generic [ref=e433]: 3429bb33…
+            - generic [ref=e434]: "User: test · Messages: 1"
+            - generic [ref=e435]: "Created: 2026-05-17T12:59:25.425902+00:00 · Updated: 2026-05-17T12:59:25.425918+00:00"
+          - button "Delete this session" [ref=e437] [cursor=pointer]:
+            - img [ref=e438]
+        - generic [ref=e440]:
+          - generic [ref=e441]:
+            - generic [ref=e442]: f6316b24…
+            - generic [ref=e443]: "User: test · Messages: 1"
+            - generic [ref=e444]: "Created: 2026-05-17T12:53:55.389774+00:00 · Updated: 2026-05-17T12:53:55.389791+00:00"
+          - button "Delete this session" [ref=e446] [cursor=pointer]:
+            - img [ref=e447]
+        - generic [ref=e449]:
+          - generic [ref=e450]:
+            - generic [ref=e451]: 017854f3…
+            - generic [ref=e452]: "User: test · Messages: 1"
+            - generic [ref=e453]: "Created: 2026-05-17T12:53:50.482073+00:00 · Updated: 2026-05-17T12:53:50.482108+00:00"
+          - button "Delete this session" [ref=e455] [cursor=pointer]:
+            - img [ref=e456]
+        - generic [ref=e458]:
+          - generic [ref=e459]:
+            - generic [ref=e460]: 85f14f55…
+            - generic [ref=e461]: "User: test · Messages: 1"
+            - generic [ref=e462]: "Created: 2026-05-17T12:42:18.631148+00:00 · Updated: 2026-05-17T12:42:18.631167+00:00"
+          - button "Delete this session" [ref=e464] [cursor=pointer]:
+            - img [ref=e465]
+        - generic [ref=e467]:
+          - generic [ref=e468]:
+            - generic [ref=e469]: 0cecca15…
+            - generic [ref=e470]: "User: test · Messages: 1"
+            - generic [ref=e471]: "Created: 2026-05-17T12:42:05.846012+00:00 · Updated: 2026-05-17T12:42:05.846027+00:00"
+          - button "Delete this session" [ref=e473] [cursor=pointer]:
+            - img [ref=e474]
+        - generic [ref=e476]:
+          - generic [ref=e477]:
+            - generic [ref=e478]: 2e803bc1…
+            - generic [ref=e479]: "User: test · Messages: 1"
+            - generic [ref=e480]: "Created: 2026-05-17T12:41:30.215716+00:00 · Updated: 2026-05-17T12:41:30.216107+00:00"
+          - button "Delete this session" [ref=e482] [cursor=pointer]:
+            - img [ref=e483]
+        - generic [ref=e485]:
+          - generic [ref=e486]:
+            - generic [ref=e487]: 997873fc…
+            - generic [ref=e488]: "User: test · Messages: 1"
+            - generic [ref=e489]: "Created: 2026-05-17T12:37:31.157087+00:00 · Updated: 2026-05-17T12:37:31.157095+00:00"
+          - button "Delete this session" [ref=e491] [cursor=pointer]:
+            - img [ref=e492]
+        - generic [ref=e494]:
+          - generic [ref=e495]:
+            - generic [ref=e496]: 3da3cb6e…
+            - generic [ref=e497]: "User: test · Messages: 1"
+            - generic [ref=e498]: "Created: 2026-05-17T12:37:21.198360+00:00 · Updated: 2026-05-17T12:37:21.198375+00:00"
+          - button "Delete this session" [ref=e500] [cursor=pointer]:
+            - img [ref=e501]
+        - generic [ref=e503]:
+          - generic [ref=e504]:
+            - generic [ref=e505]: 4a5ac0e5…
+            - generic [ref=e506]: "User: test · Messages: 1"
+            - generic [ref=e507]: "Created: 2026-05-17T12:36:32.872011+00:00 · Updated: 2026-05-17T12:36:32.872040+00:00"
+          - button "Delete this session" [ref=e509] [cursor=pointer]:
+            - img [ref=e510]
+        - generic [ref=e512]:
+          - generic [ref=e513]:
+            - generic [ref=e514]: 00fb8b5f…
+            - generic [ref=e515]: "User: test · Messages: 1"
+            - generic [ref=e516]: "Created: 2026-05-17T12:36:27.738903+00:00 · Updated: 2026-05-17T12:36:27.738918+00:00"
+          - button "Delete this session" [ref=e518] [cursor=pointer]:
+            - img [ref=e519]
+        - generic [ref=e521]:
+          - generic [ref=e522]:
+            - generic [ref=e523]: 758e7e93…
+            - generic [ref=e524]: "User: test · Messages: 1"
+            - generic [ref=e525]: "Created: 2026-05-17T12:35:58.493760+00:00 · Updated: 2026-05-17T12:35:58.493774+00:00"
+          - button "Delete this session" [ref=e527] [cursor=pointer]:
+            - img [ref=e528]
+        - generic [ref=e530]:
+          - generic [ref=e531]:
+            - generic [ref=e532]: 92cfebd7…
+            - generic [ref=e533]: "User: test · Messages: 1"
+            - generic [ref=e534]: "Created: 2026-05-17T12:35:52.236333+00:00 · Updated: 2026-05-17T12:35:52.236354+00:00"
+          - button "Delete this session" [ref=e536] [cursor=pointer]:
+            - img [ref=e537]
+        - generic [ref=e539]:
+          - generic [ref=e540]:
+            - generic [ref=e541]: f2974fa7…
+            - generic [ref=e542]: "User: test · Messages: 1"
+            - generic [ref=e543]: "Created: 2026-05-17T12:35:45.274210+00:00 · Updated: 2026-05-17T12:35:45.274229+00:00"
+          - button "Delete this session" [ref=e545] [cursor=pointer]:
+            - img [ref=e546]
+        - generic [ref=e548]:
+          - generic [ref=e549]:
+            - generic [ref=e550]: f40b4ded…
+            - generic [ref=e551]: "User: test · Messages: 1"
+            - generic [ref=e552]: "Created: 2026-05-17T12:33:33.151788+00:00 · Updated: 2026-05-17T12:33:33.151816+00:00"
+          - button "Delete this session" [ref=e554] [cursor=pointer]:
+            - img [ref=e555]
+        - generic [ref=e557]:
+          - generic [ref=e558]:
+            - generic [ref=e559]: 10687f04…
+            - generic [ref=e560]: "User: test · Messages: 1"
+            - generic [ref=e561]: "Created: 2026-05-17T12:33:25.494339+00:00 · Updated: 2026-05-17T12:33:25.494353+00:00"
+          - button "Delete this session" [ref=e563] [cursor=pointer]:
+            - img [ref=e564]
+        - generic [ref=e566]:
+          - generic [ref=e567]:
+            - generic [ref=e568]: b45e8a70…
+            - generic [ref=e569]: "User: test · Messages: 1"
+            - generic [ref=e570]: "Created: 2026-05-17T12:33:16.497281+00:00 · Updated: 2026-05-17T12:33:16.497299+00:00"
+          - button "Delete this session" [ref=e572] [cursor=pointer]:
+            - img [ref=e573]
+        - generic [ref=e575]:
+          - generic [ref=e576]:
+            - generic [ref=e577]: a4f0de44…
+            - generic [ref=e578]: "User: test · Messages: 1"
+            - generic [ref=e579]: "Created: 2026-05-17T12:32:35.303802+00:00 · Updated: 2026-05-17T12:32:35.303822+00:00"
+          - button "Delete this session" [ref=e581] [cursor=pointer]:
+            - img [ref=e582]
+        - generic [ref=e584]:
+          - generic [ref=e585]:
+            - generic [ref=e586]: d94efa00…
+            - generic [ref=e587]: "User: test · Messages: 1"
+            - generic [ref=e588]: "Created: 2026-05-17T12:32:28.572392+00:00 · Updated: 2026-05-17T12:32:28.572427+00:00"
+          - button "Delete this session" [ref=e590] [cursor=pointer]:
+            - img [ref=e591]
+        - generic [ref=e593]:
+          - generic [ref=e594]:
+            - generic [ref=e595]: e73dc5b0…
+            - generic [ref=e596]: "User: test · Messages: 1"
+            - generic [ref=e597]: "Created: 2026-05-17T12:29:48.459731+00:00 · Updated: 2026-05-17T12:29:48.459765+00:00"
+          - button "Delete this session" [ref=e599] [cursor=pointer]:
+            - img [ref=e600]
+        - generic [ref=e602]:
+          - generic [ref=e603]:
+            - generic [ref=e604]: 54c3b1d7…
+            - generic [ref=e605]: "User: test · Messages: 1"
+            - generic [ref=e606]: "Created: 2026-05-17T12:29:15.965613+00:00 · Updated: 2026-05-17T12:29:15.965626+00:00"
+          - button "Delete this session" [ref=e608] [cursor=pointer]:
+            - img [ref=e609]
+        - generic [ref=e611]:
+          - generic [ref=e612]:
+            - generic [ref=e613]: d35c86ce…
+            - generic [ref=e614]: "User: test · Messages: 1"
+            - generic [ref=e615]: "Created: 2026-05-17T12:28:58.890292+00:00 · Updated: 2026-05-17T12:28:58.890319+00:00"
+          - button "Delete this session" [ref=e617] [cursor=pointer]:
+            - img [ref=e618]
+        - generic [ref=e620]:
+          - generic [ref=e621]:
+            - generic [ref=e622]: cf7f0a3e…
+            - generic [ref=e623]: "User: test · Messages: 2"
+            - generic [ref=e624]: "Created: 2026-05-17T12:22:48.729203+00:00 · Updated: 2026-05-17T12:22:58.383802+00:00"
+          - button "Delete this session" [ref=e626] [cursor=pointer]:
+            - img [ref=e627]
+        - generic [ref=e629]:
+          - generic [ref=e630]:
+            - generic [ref=e631]: e743095b…
+            - generic [ref=e632]: "User: test · Messages: 3"
+            - generic [ref=e633]: "Created: 2026-05-17T12:21:05.960670+00:00 · Updated: 2026-05-17T12:21:20.950469+00:00"
+          - button "Delete this session" [ref=e635] [cursor=pointer]:
+            - img [ref=e636]
+        - generic [ref=e638]:
+          - generic [ref=e639]:
+            - generic [ref=e640]: 08657f6c…
+            - generic [ref=e641]: "User: test · Messages: 2"
+            - generic [ref=e642]: "Created: 2026-05-17T12:20:27.375334+00:00 · Updated: 2026-05-17T12:20:37.612633+00:00"
+          - button "Delete this session" [ref=e644] [cursor=pointer]:
+            - img [ref=e645]
+        - generic [ref=e647]:
+          - generic [ref=e648]:
+            - generic [ref=e649]: 699c473d…
+            - generic [ref=e650]: "User: test · Messages: 1"
+            - generic [ref=e651]: "Created: 2026-05-17T12:19:49.535236+00:00 · Updated: 2026-05-17T12:19:49.535249+00:00"
+          - button "Delete this session" [ref=e653] [cursor=pointer]:
+            - img [ref=e654]
+        - generic [ref=e656]:
+          - generic [ref=e657]:
+            - generic [ref=e658]: 52da726a…
+            - generic [ref=e659]: "User: test · Messages: 1"
+            - generic [ref=e660]: "Created: 2026-05-17T12:17:51.115609+00:00 · Updated: 2026-05-17T12:17:51.115663+00:00"
+          - button "Delete this session" [ref=e662] [cursor=pointer]:
+            - img [ref=e663]
+        - generic [ref=e665]:
+          - generic [ref=e666]:
+            - generic [ref=e667]: 0f62a0d4…
+            - generic [ref=e668]: "User: test · Messages: 1"
+            - generic [ref=e669]: "Created: 2026-05-17T12:14:36.791579+00:00 · Updated: 2026-05-17T12:14:36.791622+00:00"
+          - button "Delete this session" [ref=e671] [cursor=pointer]:
+            - img [ref=e672]

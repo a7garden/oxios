@@ -23,6 +23,7 @@ use crate::server::AppState;
 #[derive(Debug, Deserialize)]
 pub(crate) struct ChatRequest {
     /// The user's message content.
+    #[serde(alias = "message")]
     content: String,
     /// Optional user identifier (defaults to "default").
     #[serde(default = "default_user")]
@@ -82,6 +83,7 @@ pub(crate) async fn handle_chat(
     let content_echo = body.content.clone();
 
     // Send and wait for response from the gateway pipeline.
+    tracing::info!("Sending message to gateway...");
     match state.channel.send_and_wait(msg).await {
         Ok(response) => {
             tracing::info!(reply_len = response.content.len(), "Chat response received");

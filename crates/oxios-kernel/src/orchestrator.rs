@@ -229,7 +229,9 @@ impl Orchestrator {
         // Get or create the interview session.
         let needs_interview = {
             let sessions = self.sessions.read();
-            !sessions.contains_key(&session_id)
+            let exists = sessions.contains_key(&session_id);
+            tracing::debug!(session_id = %session_id, exists = exists, "Session lookup");
+            !exists
         };
 
         // Conduct the interview.
@@ -239,27 +241,30 @@ impl Orchestrator {
                 self.ouroboros.interview(user_message).await?
             } else {
                 // This is a follow-up message in an existing interview.
-                // Record the user's answer in the session and extract the Q&A context.
-                let qa_context = {
+                // Build multi-turn context from conversation history.
+                let multi_turn_context = {
                     let mut sessions = self.sessions.write();
-                    if let Some(session) = sessions.get_mut(&session_id) {
-                        session.interview.add_exchange("", user_message);
+                    let session = sessions.get_mut(&session_id).expect("session exists");
+
+                    // Record user's answer in Q&A (for compatibility)
+                    let last_question = session.interview.questions.last().cloned().unwrap_or_default();
+                    session.interview.add_exchange(&last_question, user_message);
+
+                    // Build full conversation history for context
+                    let history = &session.interview.conversation_history;
+                    let mut context_parts = Vec::new();
+
+                    for exchange in history {
+                        context_parts.push(format!("User: {}\nAgent: {}", exchange.user, exchange.agent));
                     }
-                    // Extract Q&A context while holding the write lock, then drop.
-                    let sessions = self.sessions.read();
-                    let session = sessions.get(&session_id).expect("session exists");
-                    session
-                        .interview
-                        .questions
-                        .iter()
-                        .zip(session.interview.answers.iter())
-                        .map(|(q, a)| format!("Q: {}\nA: {}", q, a))
-                        .collect::<Vec<_>>()
-                        .join("\n\n")
+                    // Add current user message
+                    context_parts.push(format!("User: {}", user_message));
+
+                    context_parts.join("\n\n")
                 };
 
-                // Run another interview pass with accumulated context.
-                self.ouroboros.interview(&qa_context).await?
+                // Run another interview pass with full conversation history.
+                self.ouroboros.interview(&multi_turn_context).await?
             }
         };
 
@@ -277,6 +282,32 @@ impl Orchestrator {
             {
                 let mut buffer = self.conversation_buffer.write();
                 buffer.push_agent(&response_text, &space_id);
+            }
+
+            // Record exchange in conversation history for multi-turn
+            // and store session so multi-turn works on follow-up messages
+            {
+                let mut sessions = self.sessions.write();
+                if let Some(session) = sessions.get_mut(&session_id) {
+                    tracing::debug!(session_id = %session_id, history_len = session.interview.conversation_history.len(), "Adding to existing session history");
+                    session.interview.add_to_history(user_message, &response_text);
+                } else {
+                    // First non-task message — create a minimal session for history
+                    let mut interview = InterviewResult::new();
+                    interview.is_task = false;
+                    interview.chat_response = response_text.clone();
+                    interview.add_to_history(user_message, &response_text);
+                    sessions.insert(
+                        session_id.clone(),
+                        InterviewSession {
+                            id: session_id.clone(),
+                            interview,
+                            phase: Phase::Interview,
+                            seed_id: None,
+                            agent_id: None,
+                        },
+                    );
+                }
             }
 
             self.publish_phase_completed(&session_id, Phase::Interview, "chat")
@@ -297,6 +328,21 @@ impl Orchestrator {
 
         // If ambiguity is too high, return questions for the user to answer.
         if !interview.ready_for_seed {
+            // Record this exchange in conversation history before storing
+            {
+                let mut sessions = self.sessions.write();
+                let session = sessions.get_mut(&session_id).expect("session exists");
+                // The session already has user's answer recorded via add_exchange above.
+                // Record the questions as the agent's response in history.
+                let questions_text = interview.questions.join("\n");
+                let last_answer = session.interview.answers.last().cloned();
+                if let Some(ref ans) = last_answer {
+                    if !ans.is_empty() {
+                        session.interview.add_to_history(ans, &questions_text);
+                    }
+                }
+            }
+
             // Store the interview so follow-up messages continue it.
             {
                 let mut sessions = self.sessions.write();

@@ -1,0 +1,1 @@
+export function cp(t) { navigator.clipboard.writeText(t); }

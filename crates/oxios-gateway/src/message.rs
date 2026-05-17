@@ -68,8 +68,18 @@ impl OutgoingMessage {
         user_id: impl Into<String>,
         content: impl Into<String>,
     ) -> Self {
+        Self::with_id(uuid::Uuid::new_v4(), channel, user_id, content)
+    }
+
+    /// Creates a new outgoing message with a specific ID (preserving correlation with the request).
+    pub fn with_id(
+        id: uuid::Uuid,
+        channel: impl Into<String>,
+        user_id: impl Into<String>,
+        content: impl Into<String>,
+    ) -> Self {
         Self {
-            id: uuid::Uuid::new_v4(),
+            id,
             channel: channel.into(),
             user_id: user_id.into(),
             content: content.into(),
@@ -85,13 +95,30 @@ impl OutgoingMessage {
         content: impl Into<String>,
         metadata: HashMap<String, String>,
     ) -> Self {
+        Self::with_id(uuid::Uuid::new_v4(), channel, user_id, content).with_metadata_only(metadata)
+    }
+
+    /// Creates a new outgoing message with a specific ID and metadata.
+    pub fn with_id_and_metadata(
+        id: uuid::Uuid,
+        channel: impl Into<String>,
+        user_id: impl Into<String>,
+        content: impl Into<String>,
+        metadata: HashMap<String, String>,
+    ) -> Self {
         Self {
-            id: uuid::Uuid::new_v4(),
+            id,
             channel: channel.into(),
             user_id: user_id.into(),
             content: content.into(),
             timestamp: Utc::now(),
             metadata,
         }
+    }
+
+    /// Sets metadata on this message (builder pattern).
+    pub fn with_metadata_only(mut self, metadata: HashMap<String, String>) -> Self {
+        self.metadata = metadata;
+        self
     }
 }

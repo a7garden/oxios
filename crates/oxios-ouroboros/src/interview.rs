@@ -28,6 +28,19 @@ pub struct InterviewResult {
     /// Direct conversational response when is_task = false.
     #[serde(default)]
     pub chat_response: String,
+    /// Full conversation history for multi-turn context.
+    /// Each exchange is a user message + agent response (questions or chat).
+    #[serde(default)]
+    pub conversation_history: Vec<Exchange>,
+}
+
+/// A single exchange in the conversation history.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct Exchange {
+    /// The user's message.
+    pub user: String,
+    /// The agent's response (questions asked or chat response).
+    pub agent: String,
 }
 
 fn default_is_task() -> bool {
@@ -45,6 +58,7 @@ impl InterviewResult {
             ready_for_seed: false,
             is_task: true,
             chat_response: String::new(),
+            conversation_history: Vec::new(),
         }
     }
 
@@ -58,6 +72,14 @@ impl InterviewResult {
     pub fn update_ambiguity(&mut self, score: AmbiguityScore) {
         self.ready_for_seed = score.is_ready();
         self.ambiguity = score;
+    }
+
+    /// Adds a user-agent exchange to the conversation history.
+    pub fn add_to_history(&mut self, user: impl Into<String>, agent: impl Into<String>) {
+        self.conversation_history.push(Exchange {
+            user: user.into(),
+            agent: agent.into(),
+        });
     }
 }
 
