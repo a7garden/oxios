@@ -32,7 +32,8 @@ use oxios_gateway::plugin::{ChannelContext, ChannelPlugin};
 #[command(
     name = "oxios",
     version,
-    about = "Oxios Agent OS — Agent Operating System"
+    about = "Oxios Agent OS — Agent Operating System",
+    after_help = "Examples:\n  oxios start                  Start the daemon\n  oxios onboard                Run the setup wizard\n  oxios run \"review this code\"  Execute a single prompt\n  oxios chat                   Start interactive chat\n  oxios status                 Show system status\n  oxios help                   Show all commands"
 )]
 struct Cli {
     /// Run in foreground (do not daemonize).
@@ -53,11 +54,26 @@ struct Cli {
 
 #[derive(Debug, Subcommand)]
 enum Command {
+    /// Start the daemon (default when no command is given).
+    #[command(visible_alias("serve"))]
+    Start,
+
     /// Stop the running daemon.
     Stop,
 
     /// Restart the daemon.
     Restart,
+
+    /// Run the interactive setup wizard.
+    #[command(visible_alias("setup"))]
+    Onboard,
+
+    /// Reset all configuration and data (with confirmation).
+    Reset {
+        /// Skip confirmation prompt.
+        #[arg(long)]
+        yes: bool,
+    },
 
     /// Show system status (daemon, credentials, agents).
     Status,
@@ -89,6 +105,9 @@ enum Command {
 
     /// Start an interactive CLI chat session.
     Chat,
+
+    /// Check system health and diagnose issues.
+    Doctor,
 
     /// Backup Oxios state.
     Backup {
@@ -547,6 +566,16 @@ async fn main() -> Result<()> {
         Some(Command::Config { action }) => {
             return cmd_config(action, &config_path).await;
         }
+        Some(Command::Onboard) => {
+            let completed = oxios_kernel::onboarding::run_onboarding(&oxios_home, &mut config)?;
+            if !completed {
+                println!("  Onboarding skipped or cancelled.");
+            }
+            return Ok(());
+        }
+        Some(Command::Reset { yes }) => {
+            return cmd_reset(&oxios_home, *yes);
+        }
         _ => {}
     }
 
@@ -554,9 +583,11 @@ async fn main() -> Result<()> {
     // Commands that need the kernel assembled (and therefore credentials).
     let needs_kernel = matches!(
         cli.command.as_ref(),
-        None | Some(Command::Run { .. })
+        None | Some(Command::Start)
+            | Some(Command::Run { .. })
             | Some(Command::Chat)
             | Some(Command::Status)
+            | Some(Command::Doctor)
             | Some(Command::Agent { .. })
             | Some(Command::Backup { .. })
             | Some(Command::Restore { .. })

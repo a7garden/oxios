@@ -2,10 +2,13 @@
 //!
 //! Uses oxi-sdk's provider/model catalog and env key detection.
 //! No hardcoded provider lists — everything comes from oxi-ai.
+//!
+//! UI powered by `inquire` — arrow-key navigation for all selections.
 
 use crate::config::OxiosConfig;
 use crate::credential::CredentialStore;
-use std::io::{self, IsTerminal, Write};
+use inquire::{Confirm, CustomType, Select, Text};
+use std::io::{self, IsTerminal};
 use std::path::Path;
 
 // ── Constants ───────────────────────────────────────────────────────────────
@@ -28,18 +31,51 @@ const NO_KEY_PROVIDERS: &[&str] = &[];
 /// Providers to exclude from the interactive list (cloud gateways, regional variants).
 /// Users who need these can set them up via config.toml directly.
 const HIDDEN_PROVIDERS: &[&str] = &[
-    "amazon-bedrock",      // requires AWS setup, not a simple API key
+    "amazon-bedrock",         // requires AWS setup, not a simple API key
     "azure-openai-responses", // requires Azure deployment
     "cloudflare-ai-gateway",
     "cloudflare-workers-ai",
-    "google-vertex",       // requires ADC, not a simple API key
+    "google-vertex", // requires ADC, not a simple API key
     "minimax-cn",
     "moonshotai-cn",
-    "openai-codex",        // subset of openai
+    "openai-codex", // subset of openai
     "opencode-go",
     "vercel-ai-gateway",
     "xiaomi",
 ];
+
+// ── Helpers for formatted display items ─────────────────────────────────────
+
+/// A provider entry in the selection list.
+#[derive(Clone)]
+struct ProviderEntry {
+    id: String,
+    display: String,
+}
+
+impl std::fmt::Display for ProviderEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.display)
+    }
+}
+
+/// A model entry in the selection list.
+#[derive(Clone)]
+struct ModelEntry {
+    /// Full model ID: "provider/model-id"
+    full_id: String,
+    /// Display label
+    display: String,
+}
+
+impl std::fmt::Display for ModelEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.display)
+    }
+}
+
+/// Manual model entry sentinel.
+const MANUAL_MODEL_DISPLAY: &str = "✎ Enter model ID manually...";
 
 // ── Public API ──────────────────────────────────────────────────────────────
 
@@ -74,15 +110,23 @@ pub fn run_onboarding(oxios_home: &Path, config: &mut OxiosConfig) -> anyhow::Re
                     "  Already configured as '{}'.",
                     config.engine.default_model
                 );
-                println!("  [K]eep / [M]odify / [R]eset?");
-                print!("  > ");
-                io::stdout().flush()?;
-                let input = read_line();
-                match input.trim().to_lowercase().as_str() {
-                    "k" | "keep" | "" => {
+
+                let ans = Select::new(
+                    "  What would you like to do?",
+                    vec![
+                        "Keep current configuration",
+                        "Modify (re-run wizard)",
+                        "Reset (clear everything)",
+                    ],
+                )
+                .with_starting_cursor(0)
+                .prompt()?;
+
+                match ans {
+                    "Keep current configuration" => {
                         return Ok(false);
                     }
-                    "r" | "reset" => { /* fall through to wizard */ }
+                    "Reset (clear everything)" => { /* fall through to wizard */ }
                     _ => { /* modify — fall through */ }
                 }
             }
@@ -118,7 +162,10 @@ pub fn run_onboarding(oxios_home: &Path, config: &mut OxiosConfig) -> anyhow::Re
                 "  Detected {} in environment for '{}'.",
                 var_name, provider
             );
-            if prompt_confirm("  Use this provider?", true) {
+            let use_it = Confirm::new("  Use this provider?")
+                .with_default(true)
+                .prompt()?;
+            if use_it {
                 return finish_with_provider(oxios_home, config, provider);
             }
         }
@@ -155,7 +202,10 @@ fn finish_with_provider(
                 "  Found existing credentials for '{}' in ~/.oxi/auth.json.",
                 provider
             );
-            if prompt_confirm("  Use them?", true) {
+            let use_it = Confirm::new("  Use them?")
+                .with_default(true)
+                .prompt()?;
+            if use_it {
                 skip_key = true;
             }
         }
@@ -190,7 +240,7 @@ fn finish_with_provider(
         mask_key(api_key.as_deref().unwrap_or("(none)"))
     };
 
-    if !confirm_summary(provider, &model, &key_preview, &workspace) {
+    if !confirm_summary(provider, &model, &key_preview, &workspace)? {
         println!();
         println!("  Setup cancelled.");
         return Ok(false);
@@ -211,86 +261,57 @@ fn finish_with_provider(
 
 // ── Prompt steps ─────────────────────────────────────────────────────────────
 
-/// Step 1: Show providers from oxi model DB and let user pick one.
+/// Step 1: Show providers from oxi model DB — arrow-key selection.
 fn prompt_provider<'a>(providers: &[&'a str]) -> anyhow::Result<&'a str> {
+    let entries: Vec<ProviderEntry> = providers
+        .iter()
+        .map(|&p| {
+            let mut suffix = String::new();
+            if oxi_sdk::has_env_key(p) {
+                suffix = " 🔑".to_string();
+            }
+            let model_count = oxi_sdk::get_provider_models(p).len();
+            ProviderEntry {
+                id: p.to_string(),
+                display: format!("{} [{} models]{}", p, model_count, suffix),
+            }
+        })
+        .collect();
+
     println!();
     println!("  [1/{}] Select an LLM provider:", TOTAL_STEPS);
-    println!();
 
-    // Show providers with "(key detected)" if env var is present
-    for (i, provider) in providers.iter().enumerate() {
-        let mut suffix = String::new();
-        if oxi_sdk::has_env_key(provider) {
-            suffix = " (key detected)".to_string();
-        }
-        let model_count = oxi_sdk::get_provider_models(provider).len();
-        println!(
-            "    {:>2}) {} [{} models]{}",
-            i + 1,
-            provider,
-            model_count,
-            suffix
-        );
-    }
-    println!();
+    let selected = Select::new("  Provider:", entries)
+        .with_starting_cursor(0)
+        .prompt()?;
 
-    loop {
-        print!("  > ");
-        io::stdout().flush()?;
-        let input = read_line();
-        // Accept number or provider name
-        if let Ok(n) = input.trim().parse::<usize>() {
-            if n >= 1 && n <= providers.len() {
-                return Ok(providers[n - 1]);
-            }
-        }
-        // Also accept provider name directly
-        let name = input.trim();
-        if let Some(&p) = providers.iter().find(|&&p| p == name) {
-            return Ok(p);
-        }
-        println!(
-            "  Enter a number between 1 and {}, or a provider name.",
-            providers.len()
-        );
-    }
+    // Find the original &str by matching the id
+    Ok(providers.iter().find(|&&p| p == selected.id).unwrap())
 }
 
-/// Step 2: Prompt for API key with retry.
+/// Step 2: Prompt for API key (masked input).
 fn prompt_api_key(provider: &str) -> anyhow::Result<String> {
     println!();
     println!("  [2/{}] Enter your {} API key:", TOTAL_STEPS, provider);
-    loop {
-        print!("  API key: ");
-        io::stdout().flush()?;
-        let input = read_line();
-        let key = input.trim();
-        if key.is_empty() {
-            println!("  API key is required. (Ctrl+C to cancel)");
-            continue;
-        }
-        return Ok(key.to_string());
-    }
+
+    let key = CustomType::<String>::new("  API key:")
+        .with_placeholder("sk-...")
+        .with_error_message("API key is required")
+        .prompt()?;
+    Ok(key)
 }
 
-/// Step 3: Model selection from oxi model DB.
-///
-/// Shows models for the provider from the built-in catalog.
-/// User picks by number or enters manually.
+/// Step 3: Model selection — arrow-key selection with manual entry option.
 fn prompt_model(provider: &str) -> anyhow::Result<String> {
     let models = oxi_sdk::get_provider_models(provider);
 
     println!();
     println!("  [3/{}] Select a model for {}:", TOTAL_STEPS, provider);
-    println!();
 
     if models.is_empty() {
         // Unknown provider — manual entry
-        println!("  No built-in models for this provider.");
-        print!("  Enter model ID: ");
-        io::stdout().flush()?;
-        let input = read_line();
-        let model = input.trim().to_string();
+        let model = Text::new("  Enter model ID:")
+            .prompt()?;
         if model.is_empty() {
             anyhow::bail!("Model ID is required.");
         }
@@ -301,84 +322,66 @@ fn prompt_model(provider: &str) -> anyhow::Result<String> {
         });
     }
 
-    // Show up to 8 models (skip duplicates with "latest" aliases — prefer dated versions)
-    let mut shown = Vec::new();
+    // Build model entries (skip "latest" aliases, up to 8)
+    let mut entries: Vec<ModelEntry> = Vec::new();
     for entry in models.iter() {
-        // Skip "latest" aliases to keep the list short
         if entry.name.contains("latest") {
             continue;
         }
-        shown.push(entry);
-        if shown.len() >= 8 {
-            break;
-        }
-    }
-
-    for (i, entry) in shown.iter().enumerate() {
         let ctx = if entry.context_window >= 1_000_000 {
             format!("{}M ctx", entry.context_window / 1_000_000)
         } else {
             format!("{}K ctx", entry.context_window / 1000)
         };
-        let reasoning = if entry.reasoning { " reasoning" } else { "" };
-        println!("    {:>2}) {:<40} {:>8}{}", i + 1, entry.name, ctx, reasoning);
-    }
-    let manual_idx = shown.len() + 1;
-    println!("    {:>2}) Enter model ID manually", manual_idx);
-    println!();
-
-    loop {
-        print!("  > ");
-        io::stdout().flush()?;
-        let input = read_line();
-        match input.trim().parse::<usize>() {
-            Ok(n) if n >= 1 && n <= shown.len() => {
-                let entry = shown[n - 1];
-                return Ok(format!("{}/{}", provider, entry.id));
-            }
-            Ok(n) if n == manual_idx => {
-                print!("  Model ID: ");
-                io::stdout().flush()?;
-                let manual = read_line();
-                let model = manual.trim();
-                if model.is_empty() {
-                    println!("  Model ID cannot be empty.");
-                    continue;
-                }
-                return Ok(if model.contains('/') {
-                    model.to_string()
-                } else {
-                    format!("{}/{}", provider, model)
-                });
-            }
-            _ => {
-                println!(
-                    "  Enter a number between 1 and {}.",
-                    manual_idx
-                );
-                continue;
-            }
+        let reasoning = if entry.reasoning { " ✦reasoning" } else { "" };
+        entries.push(ModelEntry {
+            full_id: format!("{}/{}", provider, entry.id),
+            display: format!("{:<40} {:>10}{}", entry.name, ctx, reasoning),
+        });
+        if entries.len() >= 8 {
+            break;
         }
     }
+
+    // Add manual entry option
+    let manual_entry = ModelEntry {
+        full_id: String::new(), // sentinel
+        display: MANUAL_MODEL_DISPLAY.to_string(),
+    };
+    entries.push(manual_entry);
+
+    let selected = Select::new("  Model:", entries)
+        .with_starting_cursor(0)
+        .prompt()?;
+
+    if selected.display == MANUAL_MODEL_DISPLAY {
+        let manual = Text::new("  Model ID:").prompt()?;
+        if manual.is_empty() {
+            anyhow::bail!("Model ID cannot be empty.");
+        }
+        return Ok(if manual.contains('/') {
+            manual
+        } else {
+            format!("{}/{}", provider, manual)
+        });
+    }
+
+    Ok(selected.full_id.clone())
 }
 
-/// Step 4: Workspace path.
+/// Step 4: Workspace path with default.
 fn prompt_workspace() -> anyhow::Result<String> {
     let default_workspace = dirs::home_dir()
         .map(|h| format!("{}/.oxios/workspace", h.display()))
         .unwrap_or_else(|| "~/.oxios/workspace".to_string());
 
     println!();
-    println!("  [4/{}] Workspace path (Enter for default):", TOTAL_STEPS);
-    print!("  Workspace [{}]: ", default_workspace);
-    io::stdout().flush()?;
+    println!("  [4/{}] Workspace path:", TOTAL_STEPS);
 
-    let input = read_line();
-    let workspace = if input.trim().is_empty() {
-        default_workspace
-    } else {
-        input.trim().to_string()
-    };
+    let workspace = Text::new("  Workspace:")
+        .with_default(&default_workspace)
+        .prompt()?;
+
     Ok(crate::config::expand_home(&workspace)
         .to_string_lossy()
         .to_string())
@@ -390,7 +393,7 @@ fn confirm_summary(
     model: &str,
     key_preview: &str,
     workspace: &str,
-) -> bool {
+) -> anyhow::Result<bool> {
     println!();
     println!("  ┌─────────────────────────────────────────────┐");
     println!("  │            Configuration Summary             │");
@@ -402,7 +405,11 @@ fn confirm_summary(
     println!("  └─────────────────────────────────────────────┘");
     println!();
     println!("  [5/{}] Write configuration?", TOTAL_STEPS);
-    prompt_confirm("  >", true)
+
+    Confirm::new("  Save this configuration?")
+        .with_default(true)
+        .prompt()
+        .map_err(Into::into)
 }
 
 // ── Persistence ──────────────────────────────────────────────────────────────
@@ -417,7 +424,7 @@ fn persist_config(
     workspace: &str,
 ) -> anyhow::Result<()> {
     print!("\n  Saving configuration... ");
-    io::stdout().flush()?;
+    std::io::stdout().flush()?;
 
     if !api_key.is_empty() {
         CredentialStore::store(provider, api_key)?;
@@ -453,6 +460,7 @@ fn print_banner() {
     println!("  ╚═══════════════════════════════════════════╝");
     println!();
     println!("  This wizard will configure your API credentials.");
+    println!("  Use ↑↓ arrow keys to navigate, Enter to confirm.");
     println!("  Press Ctrl+C at any time to cancel.");
 }
 
@@ -475,24 +483,7 @@ fn print_success(oxios_home: &Path, model: &str) {
     println!();
 }
 
-// ── IO helpers ───────────────────────────────────────────────────────────────
-
-fn read_line() -> String {
-    let mut buf = String::new();
-    io::stdin().read_line(&mut buf).unwrap_or_default();
-    buf.trim_end().to_string()
-}
-
-fn prompt_confirm(prompt: &str, default: bool) -> bool {
-    let suffix = if default { " [Y/n]" } else { " [y/N]" };
-    print!("{}{} ", prompt, suffix);
-    io::stdout().flush().unwrap_or_default();
-    let input = read_line();
-    if input.trim().is_empty() {
-        return default;
-    }
-    matches!(input.trim().to_lowercase().as_str(), "y" | "yes")
-}
+// ── Helpers ──────────────────────────────────────────────────────────────────
 
 fn mask_key(key: &str) -> String {
     if key.len() <= 8 {
