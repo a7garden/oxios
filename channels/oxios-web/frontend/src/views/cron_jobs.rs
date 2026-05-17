@@ -46,6 +46,7 @@ pub fn CronJobsView() -> Element {
 
                 let id_for_trigger = id.clone();
                 let id_for_delete = id.clone();
+                let job_for_edit = job.clone();
 
                 rsx! {
                     div { class: "agent-card", key: "{id}",
@@ -74,8 +75,12 @@ pub fn CronJobsView() -> Element {
                                 style: "margin-left:4px",
                                 title: "Edit this job",
                                 onclick: move |_| {
-                                    let jid = id.clone();
-                                    editing_id.set(Some(jid.clone()));
+                                    editing_id.set(Some(job_for_edit.id.clone()));
+                                    form_name.set(job_for_edit.name.clone());
+                                    form_schedule.set(job_for_edit.schedule.clone());
+                                    form_goal.set(job_for_edit.goal.clone());
+                                    form_constraints.set(job_for_edit.constraints.join(", "));
+                                    form_ac.set(String::new());
                                     show_modal.set(true);
                                 },
                                 IconSettings { size: 14 }
@@ -111,8 +116,8 @@ pub fn CronJobsView() -> Element {
 
     let modal: Element = if show_modal() {
         rsx! {
-            div { class: "modal-overlay",
-                div { class: "modal",
+            div { class: "modal-overlay", onclick: move |_| show_modal.set(false),
+                div { class: "modal", onclick: move |e| e.stop_propagation(),
                     div { class: "modal-header",
                         h3 { if editing_id().is_some() { "Edit Cron Job" } else { "Create Cron Job" } }
                         button {

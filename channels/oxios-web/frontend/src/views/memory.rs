@@ -44,8 +44,8 @@ fn CreateMemoryModal(
     let mut error_msg = use_signal(|| Option::<String>::None);
 
     rsx! {
-        div { class: "modal-overlay",
-            div { class: "modal",
+        div { class: "modal-overlay", onclick: move |_| on_close(()),
+            div { class: "modal", onclick: move |e| e.stop_propagation(),
                 div { class: "modal-header",
                     h3 { "Create Memory Entry" }
                     button { class: "btn-close", onclick: move |_| on_close(()),
