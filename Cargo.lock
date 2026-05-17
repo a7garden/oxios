@@ -4583,6 +4583,8 @@ checksum = "1a80800c0488c3a21695ea981a54918fbb37abf04f4d0720c453632255e2ff0e"
 [[package]]
 name = "oxi-agent"
 version = "0.16.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f5707d466fc276d86922b5518d368a9f570461f414939fa395fa288480ffab20"
 dependencies = [
  "a3s-search",
  "anyhow",
@@ -4608,6 +4610,8 @@ dependencies = [
 [[package]]
 name = "oxi-ai"
 version = "0.16.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "08a6712dfa950a0c75ddd0c26f4771d28bffe2466e006a59a007ff860c71abd9"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4641,7 +4645,9 @@ dependencies = [
 
 [[package]]
 name = "oxi-sdk"
-version = "0.16.0"
+version = "0.16.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "07cc5a3c3edc4fa92992d6c1129567a4132dc80110669189991d13bdd55073bf"
 dependencies = [
  "anyhow",
  "async-trait",
