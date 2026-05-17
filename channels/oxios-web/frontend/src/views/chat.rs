@@ -24,16 +24,60 @@ enum WsState {
     Connected,
 }
 
-/// Send a message via WebSocket.
-#[wasm_bindgen(inline_js = "export function ws_send(ws, msg) { if (ws && ws.readyState === 1) { ws.send(msg); } }")]
+/// JS helper: create WebSocket and return it.
+#[wasm_bindgen(inline_js = r#"
+export function create_ws(url) {
+    try { return new WebSocket(url); } catch(e) { return null; }
+}
+"#)]
 extern "C" {
-    fn ws_send(ws: &JsValue, msg: &str);
+    fn create_ws(url: &str) -> Option<js_sys::Object>;
 }
 
-/// Get WebSocket readyState.
-#[wasm_bindgen(inline_js = "export function ws_state(ws) { return ws ? ws.readyState : -1; }")]
+/// JS helper: send a message on a WebSocket.
+#[wasm_bindgen(inline_js = "export function ws_send(ws, msg) { if (ws && ws.readyState === 1) { ws.send(msg); } }")]
 extern "C" {
-    fn ws_state(ws: &JsValue) -> i32;
+    fn ws_send(ws: &js_sys::Object, msg: &str);
+}
+
+/// JS helper: get WebSocket readyState.
+#[wasm_bindgen(inline_js = "export function ws_ready(ws) { return ws ? ws.readyState : -1; }")]
+extern "C" {
+    fn ws_ready(ws: &js_sys::Object) -> i32;
+}
+
+/// JS helper: extract the "data" field from a MessageEvent.
+#[wasm_bindgen(inline_js = "export function evt_data(evt) { return evt.data; }")]
+extern "C" {
+    fn evt_data(evt: &JsValue) -> String;
+}
+
+/// JS helper: set onmessage callback on WebSocket.
+#[wasm_bindgen(inline_js = r#"
+export function ws_on_msg(ws, cb) {
+    ws.onmessage = cb;
+}
+"#)]
+extern "C" {
+    fn ws_on_msg(ws: &js_sys::Object, cb: &js_sys::Function);
+}
+
+/// JS helper: set onclose callback on WebSocket.
+#[wasm_bindgen(inline_js = "export function ws_on_close(ws, cb) { ws.onclose = cb; }")]
+extern "C" {
+    fn ws_on_close(ws: &js_sys::Object, cb: &js_sys::Function);
+}
+
+/// JS helper: set onerror callback on WebSocket.
+#[wasm_bindgen(inline_js = "export function ws_on_err(ws, cb) { ws.onerror = cb; }")]
+extern "C" {
+    fn ws_on_err(ws: &js_sys::Object, cb: &js_sys::Function);
+}
+
+/// JS helper: set onopen callback on WebSocket.
+#[wasm_bindgen(inline_js = "export function ws_on_open(ws, cb) { ws.onopen = cb; }")]
+extern "C" {
+    fn ws_on_open(ws: &js_sys::Object, cb: &js_sys::Function);
 }
 
 #[component]
@@ -44,7 +88,7 @@ pub fn ChatView() -> Element {
     let mut error = use_signal(|| None::<String>);
     let mut ws_state = use_signal(|| WsState::Disconnected);
 
-    // WebSocket reference stored as a raw JsValue
+    // WebSocket handle stored as JsValue
     let mut ws_handle: Signal<Option<js_sys::Object>> = use_signal(|| None);
 
     // Establish WebSocket connection on mount
@@ -54,64 +98,57 @@ pub fn ChatView() -> Element {
         }
 
         let token = api::auth_token();
+        let host = window_location_host();
         let ws_url = match token {
-            Some(t) => format!(
-                "ws://{}{}",
-                window_location_host(),
-                format!("/api/chat/stream?token={}", t)
-            ),
-            None => format!(
-                "ws://{}/api/chat/stream",
-                window_location_host()
-            ),
+            Some(ref t) => format!("ws://{host}/api/chat/stream?token={t}"),
+            None => format!("ws://{host}/api/chat/stream"),
         };
 
         ws_state.set(WsState::Connecting);
 
-        match web_sys::WebSocket::new(&ws_url) {
-            Ok(ws) => {
-                ws_handle.set(Some(ws.clone().into()));
+        if let Some(ws_obj) = create_ws(&ws_url) {
+            ws_handle.set(Some(ws_obj.clone()));
+
+            // onopen
+            let on_open = Closure::<dyn FnMut(JsValue)>::new(move |_| {
                 ws_state.set(WsState::Connected);
+            });
+            ws_on_open(&ws_obj, on_open.as_ref().unchecked_ref());
+            on_open.forget();
 
-                let ws_clone = ws.clone();
-                let on_message = Closure::<dyn FnMut(JsValue)>::new(move |evt: JsValue| {
-                    let text = js_sys::Reflect::get(&evt, &JsValue::from_str("data"))
-                        .ok()
-                        .and_then(|v| v.as_string());
-                    if let Some(json_str) = text {
-                        if let Ok(resp) = serde_json::from_str::<ChatResponse>(&json_str) {
-                            if let Some(sid) = &resp.session_id {
-                                session_id.set(sid.clone());
-                            }
-                            messages.write().push(MessageEntry {
-                                text: resp.reply,
-                                msg_type: "agent".to_string(),
-                                phase: resp.phase,
-                            });
-                            processing.set(false);
-                        }
+            // onmessage
+            let on_msg = Closure::<dyn FnMut(JsValue)>::new(move |evt: JsValue| {
+                let json_str = evt_data(&evt);
+                if let Ok(resp) = serde_json::from_str::<ChatResponse>(&json_str) {
+                    if let Some(sid) = &resp.session_id {
+                        session_id.set(sid.clone());
                     }
-                    // Prevent Rust from collecting the closure early
-                    let _ = &ws_clone;
-                });
-                let _ = ws.set_onmessage(Some(on_message.as_ref().unchecked_ref()));
-                on_message.forget();
+                    messages.write().push(MessageEntry {
+                        text: resp.reply,
+                        msg_type: "agent".to_string(),
+                        phase: resp.phase,
+                    });
+                    processing.set(false);
+                }
+            });
+            ws_on_msg(&ws_obj, on_msg.as_ref().unchecked_ref());
+            on_msg.forget();
 
-                let on_close = Closure::<dyn FnMut(JsValue)>::new(move |_| {
-                    ws_state.set(WsState::Disconnected);
-                });
-                let _ = ws.set_onclose(Some(on_close.as_ref().unchecked_ref()));
-                on_close.forget();
-
-                let on_error = Closure::<dyn FnMut(JsValue)>::new(move |_| {
-                    ws_state.set(WsState::Disconnected);
-                });
-                let _ = ws.set_onerror(Some(on_error.as_ref().unchecked_ref()));
-                on_error.forget();
-            }
-            Err(_) => {
+            // onclose
+            let on_close = Closure::<dyn FnMut(JsValue)>::new(move |_| {
                 ws_state.set(WsState::Disconnected);
-            }
+            });
+            ws_on_close(&ws_obj, on_close.as_ref().unchecked_ref());
+            on_close.forget();
+
+            // onerror
+            let on_err = Closure::<dyn FnMut(JsValue)>::new(move |_| {
+                ws_state.set(WsState::Disconnected);
+            });
+            ws_on_err(&ws_obj, on_err.as_ref().unchecked_ref());
+            on_err.forget();
+        } else {
+            ws_state.set(WsState::Disconnected);
         }
     });
 
@@ -125,16 +162,14 @@ pub fn ChatView() -> Element {
         processing.set(true);
         error.set(None);
 
-        let sid = session_id();
-
         // Try WebSocket first
         if let Some(ws) = &*ws_handle.read() {
-            if ws_state(ws) == 1 {
+            if ws_ready(ws) == 1 {
                 // OPEN
                 let request = ChatRequest {
-                    content: msg,
+                    content: msg.clone(),
                     user_id: "default".to_string(),
-                    session_id: sid,
+                    session_id: session_id(),
                 };
                 if let Ok(json) = serde_json::to_string(&request) {
                     ws_send(ws, &json);
@@ -144,12 +179,12 @@ pub fn ChatView() -> Element {
         }
 
         // Fallback to REST POST
-        let sid_for_rest = session_id();
+        let sid = session_id();
         spawn(async move {
             let req = ChatRequest {
                 content: msg,
                 user_id: "default".to_string(),
-                session_id: sid_for_rest,
+                session_id: sid,
             };
             match api::post_json::<ChatResponse, _>("/api/chat", &req).await {
                 Ok(resp) => {

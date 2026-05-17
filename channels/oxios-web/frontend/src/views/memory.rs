@@ -14,6 +14,7 @@ enum SearchMode {
 struct MemorySearchResult {
     name: String,
     category: String,
+    #[allow(dead_code)]
     content: String,
     #[serde(default)]
     score: Option<f64>,
@@ -23,6 +24,7 @@ struct MemorySearchResult {
 struct CreateMemoryRequest {
     name: String,
     category: String,
+    #[allow(dead_code)]
     content: String,
 }
 

@@ -128,7 +128,7 @@ pub fn PersonasView() -> Element {
                         }
                     };
 
-                    let edit_id = id.clone();
+                    let _edit_id = id.clone();
                     let edit_persona = persona.clone();
                     let del_id = id.clone();
                     let del_name = persona.name.clone();

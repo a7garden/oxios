@@ -1963,6 +1963,7 @@ dependencies = [
  "futures-util",
  "gloo-net",
  "gloo-timers 0.4.0",
+ "js-sys",
  "serde",
  "serde_json",
  "wasm-bindgen",

@@ -1,8 +1,9 @@
-//! Sidebar navigation with section grouping, theme toggle, and mobile support.
+//! Sidebar navigation with section grouping, theme toggle, API key, and mobile support.
 
 use dioxus::prelude::*;
 
-use crate::Theme;
+use crate::api;
+use crate::{local_storage_remove, local_storage_set, Theme};
 use crate::components::icons::*;
 
 /// Top-level navigation panels.
@@ -12,18 +13,24 @@ pub enum Panel {
     Dashboard,
     Config,
     Agents,
+    AgentGroups,
     Personas,
+    Budget,
     Scheduler,
     Protocol,
     Seeds,
     Workspace,
     Skills,
     Programs,
+    CronJobs,
+    Git,
     Memory,
     HostTools,
     Security,
     Approvals,
     Events,
+    Sessions,
+    Resources,
 }
 
 /// Section label for grouping navigation items.
@@ -63,9 +70,11 @@ const NAV_ITEMS: &[NavItem] = &[
     NavItem { panel: Panel::Dashboard, label: "Dashboard",  section: Section::Core },
     NavItem { panel: Panel::Config,    label: "Config",     section: Section::Core },
     // Agents
-    NavItem { panel: Panel::Agents,    label: "Agents",     section: Section::Agents },
-    NavItem { panel: Panel::Personas,  label: "Personas",   section: Section::Agents },
-    NavItem { panel: Panel::Scheduler, label: "Scheduler",  section: Section::Agents },
+    NavItem { panel: Panel::Agents,     label: "Agents",       section: Section::Agents },
+    NavItem { panel: Panel::AgentGroups, label: "Agent Groups", section: Section::Agents },
+    NavItem { panel: Panel::Personas,   label: "Personas",    section: Section::Agents },
+    NavItem { panel: Panel::Budget,     label: "Budget",      section: Section::Agents },
+    NavItem { panel: Panel::Scheduler,  label: "Scheduler",   section: Section::Agents },
     // Ouroboros
     NavItem { panel: Panel::Protocol,  label: "Protocol",   section: Section::Ouroboros },
     NavItem { panel: Panel::Seeds,     label: "Seeds",      section: Section::Ouroboros },
@@ -73,6 +82,8 @@ const NAV_ITEMS: &[NavItem] = &[
     NavItem { panel: Panel::Workspace, label: "Workspace",  section: Section::System },
     NavItem { panel: Panel::Skills,    label: "Skills",     section: Section::System },
     NavItem { panel: Panel::Programs,  label: "Programs",   section: Section::System },
+    NavItem { panel: Panel::CronJobs,  label: "Cron Jobs",  section: Section::System },
+    NavItem { panel: Panel::Git,       label: "Git",        section: Section::System },
     NavItem { panel: Panel::Memory,    label: "Memory",     section: Section::System },
     NavItem { panel: Panel::HostTools, label: "Host Tools", section: Section::System },
     // Security
@@ -80,27 +91,35 @@ const NAV_ITEMS: &[NavItem] = &[
     NavItem { panel: Panel::Approvals, label: "Approvals",  section: Section::Security },
     // Monitor
     NavItem { panel: Panel::Events,    label: "Events",     section: Section::Monitor },
+    NavItem { panel: Panel::Sessions,  label: "Sessions",   section: Section::Monitor },
+    NavItem { panel: Panel::Resources, label: "Resources",  section: Section::Monitor },
 ];
 
 /// Render the icon for a given panel.
 fn panel_icon(panel: Panel) -> Element {
     match panel {
-        Panel::Chat      => rsx! { IconChat { size: 18 } },
-        Panel::Dashboard => rsx! { IconDashboard { size: 18 } },
-        Panel::Config    => rsx! { IconSettings { size: 18 } },
-        Panel::Agents    => rsx! { IconAgents { size: 18 } },
-        Panel::Personas  => rsx! { IconUsers { size: 18 } },
-        Panel::Scheduler => rsx! { IconClock { size: 18 } },
-        Panel::Protocol  => rsx! { IconProtocol { size: 18 } },
-        Panel::Seeds     => rsx! { IconSeeds { size: 18 } },
-        Panel::Workspace => rsx! { IconFolder { size: 18 } },
-        Panel::Skills    => rsx! { IconSkills { size: 18 } },
-        Panel::Programs  => rsx! { IconPackage { size: 18 } },
-        Panel::Memory    => rsx! { IconMemory { size: 18 } },
-        Panel::HostTools => rsx! { IconWrench { size: 18 } },
-        Panel::Security  => rsx! { IconShield { size: 18 } },
-        Panel::Approvals => rsx! { IconCheckSquare { size: 18 } },
-        Panel::Events    => rsx! { IconActivity { size: 18 } },
+        Panel::Chat       => rsx! { IconChat { size: 18 } },
+        Panel::Dashboard  => rsx! { IconDashboard { size: 18 } },
+        Panel::Config     => rsx! { IconSettings { size: 18 } },
+        Panel::Agents     => rsx! { IconAgents { size: 18 } },
+        Panel::AgentGroups => rsx! { IconLayers { size: 18 } },
+        Panel::Personas   => rsx! { IconUsers { size: 18 } },
+        Panel::Budget     => rsx! { IconDollarSign { size: 18 } },
+        Panel::Scheduler  => rsx! { IconClock { size: 18 } },
+        Panel::Protocol   => rsx! { IconProtocol { size: 18 } },
+        Panel::Seeds      => rsx! { IconSeeds { size: 18 } },
+        Panel::Workspace  => rsx! { IconFolder { size: 18 } },
+        Panel::Skills     => rsx! { IconSkills { size: 18 } },
+        Panel::Programs   => rsx! { IconPackage { size: 18 } },
+        Panel::CronJobs   => rsx! { IconClock { size: 18 } },
+        Panel::Git        => rsx! { IconGit { size: 18 } },
+        Panel::Memory     => rsx! { IconMemory { size: 18 } },
+        Panel::HostTools  => rsx! { IconWrench { size: 18 } },
+        Panel::Security   => rsx! { IconShield { size: 18 } },
+        Panel::Approvals  => rsx! { IconCheckSquare { size: 18 } },
+        Panel::Events     => rsx! { IconActivity { size: 18 } },
+        Panel::Sessions   => rsx! { IconDatabase { size: 18 } },
+        Panel::Resources  => rsx! { IconCpu { size: 18 } },
     }
 }
 
@@ -110,9 +129,13 @@ pub fn Sidebar() -> Element {
     let mut theme = use_context::<Signal<Theme>>();
     let mut mobile_menu = use_context::<Signal<bool>>();
     let mut collapsed = use_signal(|| false);
+    let mut show_api_key = use_signal(|| false);
+    let mut api_key_input = use_signal(String::new);
+    let mut api_key_saved = use_signal(|| false);
 
     let collapsed_val = collapsed();
     let is_dark = theme() == Theme::Dark;
+    let has_api_key = api::auth_token().is_some();
 
     let sidebar_class = if collapsed_val { "sidebar collapsed" } else { "sidebar" };
 
@@ -189,6 +212,62 @@ pub fn Sidebar() -> Element {
             }
             nav { class: "sidebar-nav",
                 {nav_elements.into_iter()}
+            }
+            // API Key section at bottom
+            if !collapsed_val {
+                div { class: "sidebar-footer",
+                    button {
+                        class: "btn btn-sm btn-block",
+                        style: "margin-bottom:4px",
+                        onclick: move |_| show_api_key.set(true),
+                        if has_api_key {
+                            "🔑 API Key Set"
+                        } else {
+                            "🔑 Set API Key"
+                        }
+                    }
+                }
+            }
+            if show_api_key() {
+                div { class: "modal-overlay", onclick: move |_| show_api_key.set(false),
+                    div { class: "modal", style: "max-width:400px", onclick: move |e| e.stop_propagation(),
+                        div { class: "modal-header",
+                            h3 { "API Key" }
+                        }
+                        div { class: "modal-body",
+                            p { style: "font-size:13px;color:var(--text-secondary);margin-bottom:12px",
+                                "Enter the API key for authenticating with the Oxios backend."
+                            }
+                            input {
+                                r#type: "password",
+                                class: "form-input",
+                                placeholder: "API key...",
+                                value: "{api_key_input}",
+                                oninput: move |e| {
+                                    api_key_input.set(e.value());
+                                    api_key_saved.set(false);
+                                },
+                            }
+                            if api_key_saved() {
+                                p { style: "font-size:12px;color:var(--green);margin-top:8px", "✓ Saved" }
+                            }
+                        }
+                        div { class: "modal-footer",
+                            button { class: "btn", onclick: move |_| show_api_key.set(false), "Close" }
+                            button { class: "btn btn-primary", onclick: move |_| {
+                                let key = api_key_input();
+                                if key.is_empty() {
+                                    local_storage_remove("oxios-api-key");
+                                    api::set_auth_token(None);
+                                } else {
+                                    local_storage_set("oxios-api-key", &key);
+                                    api::set_auth_token(Some(key));
+                                }
+                                api_key_saved.set(true);
+                            }, "Save" }
+                        }
+                    }
+                }
             }
         }
         // Mobile overlay

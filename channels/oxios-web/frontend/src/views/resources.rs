@@ -135,7 +135,7 @@ pub fn ResourcesView() -> Element {
                                 div { class: "agent-info",
                                     div { class: "agent-name",
                                         if status.overloaded {
-                                            rsx! { IconAlertTriangle { size: 16 } }
+                                            IconAlertTriangle { size: 16 }
                                         }
                                         "System Load"
                                     }
