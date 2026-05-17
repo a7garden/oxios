@@ -153,7 +153,7 @@ fn PermissionsTab() -> Element {
                     value: "{agent_name}",
                     oninput: move |e| agent_name.set(e.value().clone()),
                     onkeydown: move |e| {
-                        if e.key() == "Enter" {
+                        if e.key().to_string() == "Enter" {
                             let name = agent_name().trim().to_string();
                             if name.is_empty() {
                                 error_msg.set(Some("Agent name required".to_string()));

@@ -16,17 +16,10 @@ struct GitTagsResponse {
     tags: Vec<api::GitTag>,
 }
 
-/// Restore form state.
-#[derive(Default)]
-struct RestoreForm {
+#[derive(Debug, Clone, serde::Serialize)]
+struct RestoreRequest {
     commit: String,
     path: String,
-}
-
-#[derive(Default)]
-struct RestoreResult {
-    success: bool,
-    message: String,
 }
 
 #[component]
@@ -41,10 +34,11 @@ pub fn GitView() -> Element {
 
     let mut active_tab = use_signal(|| String::from("log"));
     let mut verifying = use_signal(|| false);
-    let mut verify_result = use_signal(|| Option::<(bool, String)>::None);
+    let mut verify_result = use_signal(|| None::<String>);
 
-    let mut restore_form = use_signal(|| RestoreForm::default());
-    let mut restore_result = use_signal(|| Option::<RestoreResult>::None);
+    let mut restore_commit = use_signal(String::new);
+    let mut restore_path = use_signal(String::new);
+    let mut restore_result = use_signal(|| None::<String>);
 
     let tab_class = |tab: &str, active: &str| -> String {
         if tab == active {
@@ -124,7 +118,7 @@ pub fn GitView() -> Element {
 
                 rsx! {
                     div { class: "git-entry", key: "{name}",
-                        div { class: "git-hash", "—".to_string() }
+                        div { class: "git-hash", "—" }
                         div { class: "git-info",
                             div { class: "git-msg", "{name}" }
                             div { class: "git-meta", "hash: {hash}" }
@@ -145,11 +139,16 @@ pub fn GitView() -> Element {
         },
     };
 
+    let verify_btn_text = if verifying() { "Verifying..." } else { "Verify" };
+
     let verify_section: Element = {
-        let (v_class, v_text) = match verify_result() {
-            Some((true, ref msg)) => ("text-success", format!("✓ Integrity verified: {}", msg)),
-            Some((false, ref msg)) => ("text-danger", format!("✗ Integrity check failed: {}", msg)),
-            None => ("", ""),
+        let result_text = verify_result().unwrap_or_default();
+        let result_class = if result_text.starts_with('✓') {
+            "text-success"
+        } else if result_text.starts_with('✗') {
+            "text-danger"
+        } else {
+            ""
         };
         rsx! {
             div { class: "git-verify",
@@ -166,101 +165,86 @@ pub fn GitView() -> Element {
                             match result {
                                 Ok(resp) => {
                                     let valid = resp.get("valid").and_then(|v| v.as_bool()).unwrap_or(false);
-                                    let msg = resp.get("message").and_then(|v| v.as_str()).unwrap_or("").to_string();
-                                    verify_result.set(Some((valid, msg)));
+                                    let msg = resp.get("message").and_then(|v| v.as_str()).unwrap_or("");
+                                    let text = if valid {
+                                        format!("✓ Integrity verified: {}", msg)
+                                    } else {
+                                        format!("✗ Integrity check failed: {}", msg)
+                                    };
+                                    verify_result.set(Some(text));
                                 }
                                 Err(e) => {
-                                    verify_result.set(Some((false, e)));
+                                    verify_result.set(Some(format!("✗ {e}")));
                                 }
                             }
                         });
                     },
-                    if verifying() { "Verifying..." } else { "Verify" }
+                    "{verify_btn_text}"
                 }
-                if !v_text.is_empty() {
-                    p { class: "{v_class}", style: "margin-top:8px;font-size:12px;font-family:var(--font-mono)", "{v_text}" }
+                if !result_text.is_empty() {
+                    p { class: "{result_class}", style: "margin-top:8px;font-size:12px;font-family:var(--font-mono)", "{result_text}" }
                 }
             }
         }
     };
 
-    let restore_section: Element = {
-        let f = restore_form();
-        let commit_val = f.commit.clone();
-        let path_val = f.path.clone();
+    let restore_result_text = restore_result().unwrap_or_default();
+    let restore_class = if restore_result_text.starts_with('✓') {
+        "text-success"
+    } else if restore_result_text.starts_with('✗') {
+        "text-danger"
+    } else {
+        ""
+    };
 
-        let result_text = restore_result().map(|r| {
-            if r.success {
-                format!("✓ {}", r.message)
-            } else {
-                format!("✗ {}", r.message)
-            }
-        });
-
-        rsx! {
-            div { class: "git-restore",
-                h3 { IconRefresh { size: 16 } " Restore File" }
-                div { class: "form-row",
-                    input {
-                        class: "form-input",
-                        style: "flex:1",
-                        placeholder: "Commit hash",
-                        value: "{commit_val}",
-                        oninput: move |e| {
-                            let mut f = restore_form();
-                            f.commit = e.value();
-                            restore_form.set(f);
+    let restore_section: Element = rsx! {
+        div { class: "git-restore",
+            h3 { IconRefresh { size: 16 } " Restore File" }
+            div { class: "form-row",
+                input {
+                    class: "form-input",
+                    style: "flex:1",
+                    placeholder: "Commit hash",
+                    value: "{restore_commit}",
+                    oninput: move |e| restore_commit.set(e.value()),
+                }
+                input {
+                    class: "form-input",
+                    style: "flex:2",
+                    placeholder: "File path",
+                    value: "{restore_path}",
+                    oninput: move |e| restore_path.set(e.value()),
+                }
+                button {
+                    class: "btn btn-sm",
+                    onclick: move |_| {
+                        let commit = restore_commit();
+                        let path = restore_path();
+                        if commit.is_empty() || path.is_empty() {
+                            restore_result.set(Some("✗ Commit and path are required.".to_string()));
+                            return;
                         }
-                    }
-                    input {
-                        class: "form-input",
-                        style: "flex:2",
-                        placeholder: "File path",
-                        value: "{path_val}",
-                        oninput: move |e| {
-                            let mut f = restore_form();
-                            f.path = e.value();
-                            restore_form.set(f);
-                        }
-                    }
-                    button {
-                        class: "btn btn-sm",
-                        onclick: move |_| {
-                            let f = restore_form();
-                            if f.commit.is_empty() || f.path.is_empty() {
-                                restore_result.set(Some(RestoreResult {
-                                    success: false,
-                                    message: "Commit and path are required.".to_string(),
-                                }));
-                                return;
-                            }
-                            spawn(async move {
-                                let body = serde_json::json!({
-                                    "commit": f.commit,
-                                    "path": f.path,
-                                });
-                                let result = api::post_json::<serde_json::Value, _>("/api/git/restore", &body).await;
-                                match result {
-                                    Ok(resp) => {
-                                        let msg = resp.get("message").and_then(|v| v.as_str()).unwrap_or("Restored successfully").to_string();
-                                        restore_result.set(Some(RestoreResult { success: true, message: msg }));
-                                    }
-                                    Err(e) => {
-                                        restore_result.set(Some(RestoreResult { success: false, message: e }));
-                                    }
+                        spawn(async move {
+                            let body = RestoreRequest {
+                                commit,
+                                path,
+                            };
+                            match api::post_json::<serde_json::Value, _>("/api/git/restore", &body).await {
+                                Ok(resp) => {
+                                    let msg = resp.get("message").and_then(|v| v.as_str()).unwrap_or("Restored successfully");
+                                    restore_result.set(Some(format!("✓ {}", msg)));
                                 }
-                            });
-                        },
-                        "Restore"
-                    }
+                                Err(e) => {
+                                    restore_result.set(Some(format!("✗ {}", e)));
+                                }
+                            }
+                        });
+                    },
+                    "Restore"
                 }
-                if let Some(text) = result_text {
-                    p {
-                        class: if text.starts_with('✓') { "text-success" } else { "text-danger" },
-                        style: "margin-top:8px;font-size:12px;font-family:var(--font-mono)",
-                        "{text}"
-                    }
-                }
+            }
+            if !restore_result_text.is_empty() {
+                p { class: "{restore_class}", style: "margin-top:8px;font-size:12px;font-family:var(--font-mono)", "{restore_result_text}" }
             }
         }
     };
@@ -275,10 +259,14 @@ pub fn GitView() -> Element {
         div { class: "panel-container",
             div { class: "panel-header",
                 h2 { IconGit { size: 20 } " Git" }
-                button { class: "btn btn-sm", onclick: move |_| {
-                    log_resource.restart();
-                    tags_resource.restart();
-                }, "Refresh" }
+                button {
+                    class: "btn btn-sm",
+                    onclick: move |_| {
+                        log_resource.restart();
+                        tags_resource.restart();
+                    },
+                    "Refresh"
+                }
             }
             div { class: "panel-body",
                 {tab_bar}

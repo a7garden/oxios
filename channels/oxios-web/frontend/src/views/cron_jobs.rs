@@ -10,16 +10,7 @@ struct CronJobsListResponse {
     jobs: Vec<api::CronJobSummary>,
 }
 
-/// Create job form state.
-#[derive(Default)]
-struct CreateForm {
-    name: String,
-    schedule: String,
-    goal: String,
-    constraints: String,
-    acceptance_criteria: String,
-}
-
+/// Modal form state for creating a new cron job.
 #[component]
 pub fn CronJobsView() -> Element {
     let mut resource = use_resource(|| async move {
@@ -27,7 +18,11 @@ pub fn CronJobsView() -> Element {
     });
 
     let mut show_modal = use_signal(|| false);
-    let mut form = use_signal(|| CreateForm::default());
+    let mut form_name = use_signal(String::new);
+    let mut form_schedule = use_signal(String::new);
+    let mut form_goal = use_signal(String::new);
+    let mut form_constraints = use_signal(String::new);
+    let mut form_ac = use_signal(String::new);
 
     let content: Element = match &(resource.value())() {
         Some(Ok(resp)) if resp.jobs.is_empty() => rsx! {
@@ -48,6 +43,9 @@ pub fn CronJobsView() -> Element {
                 let last_run = job.last_run.clone().unwrap_or_else(|| "never".to_string());
                 let next_run = job.next_run.clone().unwrap_or_else(|| "—".to_string());
 
+                let id_for_trigger = id.clone();
+                let id_for_delete = id.clone();
+
                 rsx! {
                     div { class: "agent-card", key: "{id}",
                         div { class: "agent-info",
@@ -62,7 +60,7 @@ pub fn CronJobsView() -> Element {
                                 class: "btn btn-sm",
                                 title: "Manually trigger this job",
                                 onclick: move |_| {
-                                    let jid = id.clone();
+                                    let jid = id_for_trigger.clone();
                                     spawn(async move {
                                         let _ = api::post_action(&format!("/api/cron-jobs/{jid}/trigger")).await;
                                         resource.restart();
@@ -74,7 +72,7 @@ pub fn CronJobsView() -> Element {
                                 class: "btn btn-danger btn-sm",
                                 title: "Delete this job",
                                 onclick: move |_| {
-                                    let jid = id.clone();
+                                    let jid = id_for_delete.clone();
                                     spawn(async move {
                                         let _ = api::delete_action(&format!("/api/cron-jobs/{jid}")).await;
                                         resource.restart();
@@ -100,12 +98,6 @@ pub fn CronJobsView() -> Element {
     };
 
     let modal: Element = if show_modal() {
-        let name = form().name.clone();
-        let schedule = form().schedule.clone();
-        let goal = form().goal.clone();
-        let constraints = form().constraints.clone();
-        let ac = form().acceptance_criteria.clone();
-
         rsx! {
             div { class: "modal-overlay",
                 div { class: "modal",
@@ -123,12 +115,8 @@ pub fn CronJobsView() -> Element {
                             input {
                                 class: "form-input",
                                 placeholder: "My Job",
-                                value: "{name}",
-                                oninput: move |e| {
-                                    let mut f = form();
-                                    f.name = e.value();
-                                    form.set(f);
-                                }
+                                value: "{form_name}",
+                                oninput: move |e| form_name.set(e.value()),
                             }
                         }
                         div { class: "form-group",
@@ -136,12 +124,8 @@ pub fn CronJobsView() -> Element {
                             input {
                                 class: "form-input",
                                 placeholder: "0 * * * *",
-                                value: "{schedule}",
-                                oninput: move |e| {
-                                    let mut f = form();
-                                    f.schedule = e.value();
-                                    form.set(f);
-                                }
+                                value: "{form_schedule}",
+                                oninput: move |e| form_schedule.set(e.value()),
                             }
                         }
                         div { class: "form-group",
@@ -150,12 +134,8 @@ pub fn CronJobsView() -> Element {
                                 class: "form-input",
                                 placeholder: "Describe what this job should accomplish...",
                                 rows: "3",
-                                value: "{goal}",
-                                oninput: move |e| {
-                                    let mut f = form();
-                                    f.goal = e.value();
-                                    form.set(f);
-                                }
+                                value: "{form_goal}",
+                                oninput: move |e| form_goal.set(e.value()),
                             }
                         }
                         div { class: "form-group",
@@ -163,12 +143,8 @@ pub fn CronJobsView() -> Element {
                             input {
                                 class: "form-input",
                                 placeholder: "max_time=30, allow_network=true",
-                                value: "{constraints}",
-                                oninput: move |e| {
-                                    let mut f = form();
-                                    f.constraints = e.value();
-                                    form.set(f);
-                                }
+                                value: "{form_constraints}",
+                                oninput: move |e| form_constraints.set(e.value()),
                             }
                         }
                         div { class: "form-group",
@@ -176,33 +152,25 @@ pub fn CronJobsView() -> Element {
                             input {
                                 class: "form-input",
                                 placeholder: "exit_code=0, output_contains=success",
-                                value: "{ac}",
-                                oninput: move |e| {
-                                    let mut f = form();
-                                    f.acceptance_criteria = e.value();
-                                    form.set(f);
-                                }
+                                value: "{form_ac}",
+                                oninput: move |e| form_ac.set(e.value()),
                             }
                         }
                     }
                     div { class: "modal-footer",
-                        button {
-                            class: "btn",
-                            onclick: move |_| show_modal.set(false),
-                            "Cancel"
-                        }
+                        button { class: "btn", onclick: move |_| show_modal.set(false), "Cancel" }
                         button {
                             class: "btn btn-primary",
                             onclick: move |_| {
-                                let f = form();
-                                let constraints_vec: Vec<String> = f
-                                    .constraints
+                                let name = form_name();
+                                let schedule = form_schedule();
+                                let goal = form_goal();
+                                let constraints: Vec<String> = form_constraints()
                                     .split(',')
                                     .map(|s| s.trim().to_string())
                                     .filter(|s| !s.is_empty())
                                     .collect();
-                                let ac_vec: Vec<String> = f
-                                    .acceptance_criteria
+                                let ac: Vec<String> = form_ac()
                                     .split(',')
                                     .map(|s| s.trim().to_string())
                                     .filter(|s| !s.is_empty())
@@ -210,17 +178,20 @@ pub fn CronJobsView() -> Element {
 
                                 spawn(async move {
                                     let req = api::CreateCronJobRequest {
-                                        name: f.name.clone(),
-                                        schedule: f.schedule.clone(),
-                                        goal: f.goal.clone(),
-                                        constraints: constraints_vec,
-                                        acceptance_criteria: ac_vec,
+                                        name,
+                                        schedule,
+                                        goal,
+                                        constraints,
+                                        acceptance_criteria: ac,
                                         toolchain: "default".to_string(),
                                     };
                                     let _ = api::post_json::<serde_json::Value, _>("/api/cron-jobs", &req).await;
                                     show_modal.set(false);
-                                    let mut blank = CreateForm::default();
-                                    form.set(blank);
+                                    form_name.set(String::new());
+                                    form_schedule.set(String::new());
+                                    form_goal.set(String::new());
+                                    form_constraints.set(String::new());
+                                    form_ac.set(String::new());
                                     resource.restart();
                                 });
                             },
@@ -238,7 +209,11 @@ pub fn CronJobsView() -> Element {
         div { class: "panel-container",
             div { class: "panel-header",
                 h2 { IconClock { size: 20 } " Cron Jobs" }
-                button { class: "btn btn-sm", onclick: move |_| show_modal.set(true), IconClock { size: 14 } " New Job" }
+                button {
+                    class: "btn btn-sm",
+                    onclick: move |_| show_modal.set(true),
+                    IconClock { size: 14 } " New Job"
+                }
                 button { class: "btn btn-sm", onclick: move |_| resource.restart(), "Refresh" }
             }
             div { class: "panel-body",

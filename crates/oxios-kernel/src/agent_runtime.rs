@@ -66,7 +66,7 @@ impl Default for AgentRuntimeConfig {
     fn default() -> Self {
         Self {
             model_id: String::new(),
-            max_iterations: 20,
+            max_iterations: 8,
             tool_execution: ToolExecutionMode::Parallel,
             auto_retry_enabled: true,
             space_id: None,

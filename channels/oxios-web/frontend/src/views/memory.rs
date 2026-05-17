@@ -154,7 +154,7 @@ pub fn MemoryView() -> Element {
     let mut show_create_modal = use_signal(|| false);
 
     // Load detail when an entry is selected
-    let load_detail = move |name: String| {
+    let mut load_detail = move |name: String| {
         selected_name.set(Some(name.clone()));
         spawn(async move {
             match api::fetch_json::<api::MemoryDetail>(&format!("/api/memory/{name}")).await {
@@ -280,7 +280,7 @@ pub fn MemoryView() -> Element {
                     value: "{search_query}",
                     oninput: move |e| search_query.set(e.value().clone()),
                     onkeydown: move |e| {
-                        if e.key() == "Enter" {
+                        if e.key().to_string() == "Enter" {
                             let query = search_query().trim().to_string();
                             if query.is_empty() {
                                 search_error.set(Some("Enter a search query".to_string()));

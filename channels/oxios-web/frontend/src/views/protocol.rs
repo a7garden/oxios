@@ -45,7 +45,7 @@ struct ProtocolData {
 
 #[component]
 pub fn ProtocolView() -> Element {
-    let mut resource = use_resource(|| async move {
+    let mut resource = use_resource::<ProtocolData, _>(|| async move {
         let phase_data = fetch_current_phase().await;
         let seeds: Vec<api::SeedSummary> = api::fetch_paginated("/api/seeds").await.unwrap_or_default();
         
@@ -58,6 +58,37 @@ pub fn ProtocolView() -> Element {
         }
     });
 
+    let render_steps = |active_step: usize| -> Vec<Element> {
+        let mut steps = Vec::new();
+        let phase_names = ["Interview", "Seed", "Execute", "Evaluate", "Evolve"];
+        
+        for i in 0..5 {
+            let state_class = if i < active_step {
+                "phase-step completed"
+            } else if i == active_step {
+                "phase-step active"
+            } else {
+                "phase-step"
+            };
+            
+            let icon: Element = match i {
+                0 => rsx! { IconChat { size: 16 } },
+                1 => rsx! { IconFile { size: 16 } },
+                2 => rsx! { IconPlay { size: 16 } },
+                3 => rsx! { IconCheckSquare { size: 16 } },
+                _ => rsx! { IconRefresh { size: 16 } },
+            };
+            
+            steps.push(rsx! {
+                div { class: "{state_class}",
+                    div { class: "phase-step-icon", {icon} }
+                    div { class: "phase-step-label", "{phase_names[i]}" }
+                }
+            });
+        }
+        steps
+    };
+
     rsx! {
         div { class: "panel-container",
             div { class: "panel-header",
@@ -66,19 +97,33 @@ pub fn ProtocolView() -> Element {
             }
             div { class: "panel-body",
                 match &(resource.value())() {
-                    Some(Ok(data)) if data.seeds.is_empty() => rsx! {
+                    Some(data) if data.seeds.is_empty() => rsx! {
                         div { class: "empty-state",
                             div { class: "empty-icon", IconSeeds { size: 40 } }
                             p { "No seeds yet. Seeds are created through the Ouroboros interview process." }
                         }
                     },
-                    Some(Ok(data)) => {
+                    Some(data) => {
                         let active_step = data.current_index;
                         let progress_pct = if data.current_index == 0 {
                             0.0
                         } else {
                             (data.current_index as f64 / 5.0) * 100.0
                         };
+                        let step_elements = render_steps(active_step);
+                        let seed_cards: Vec<Element> = data.seeds.iter().take(5).map(|seed| {
+                            let id = seed.id.clone();
+                            let goal = seed.goal.clone();
+                            let count = seed.constraints_count;
+                            let date = seed.created_at.clone();
+                            let short = if id.len() >= 8 { &id[..8] } else { &id };
+                            rsx! {
+                                div { class: "item-card", key: "{id}",
+                                    div { class: "item-title", "{goal}" }
+                                    div { class: "item-subtitle", "{short} · {count} constraints · {date}" }
+                                }
+                            }
+                        }).collect();
 
                         rsx! {
                             div { class: "ouroboros-panel",
@@ -94,147 +139,17 @@ pub fn ProtocolView() -> Element {
                                         }
                                     }
                                     div { class: "phase-steps",
-                                        if active_step == 0 {
-                                            rsx! {
-                                                div { class: "phase-step active",
-                                                    div { class: "phase-step-icon", IconChat { size: 16 } }
-                                                    div { class: "phase-step-label", "Interview" }
-                                                }
-                                                div { class: "phase-step",
-                                                    div { class: "phase-step-icon", IconFile { size: 16 } }
-                                                    div { class: "phase-step-label", "Seed" }
-                                                }
-                                                div { class: "phase-step",
-                                                    div { class: "phase-step-icon", IconPlay { size: 16 } }
-                                                    div { class: "phase-step-label", "Execute" }
-                                                }
-                                                div { class: "phase-step",
-                                                    div { class: "phase-step-icon", IconCheckSquare { size: 16 } }
-                                                    div { class: "phase-step-label", "Evaluate" }
-                                                }
-                                                div { class: "phase-step",
-                                                    div { class: "phase-step-icon", IconRefresh { size: 16 } }
-                                                    div { class: "phase-step-label", "Evolve" }
-                                                }
-                                            }
-                                        } else if active_step == 1 {
-                                            rsx! {
-                                                div { class: "phase-step completed",
-                                                    div { class: "phase-step-icon", IconChat { size: 16 } }
-                                                    div { class: "phase-step-label", "Interview" }
-                                                }
-                                                div { class: "phase-step active",
-                                                    div { class: "phase-step-icon", IconFile { size: 16 } }
-                                                    div { class: "phase-step-label", "Seed" }
-                                                }
-                                                div { class: "phase-step",
-                                                    div { class: "phase-step-icon", IconPlay { size: 16 } }
-                                                    div { class: "phase-step-label", "Execute" }
-                                                }
-                                                div { class: "phase-step",
-                                                    div { class: "phase-step-icon", IconCheckSquare { size: 16 } }
-                                                    div { class: "phase-step-label", "Evaluate" }
-                                                }
-                                                div { class: "phase-step",
-                                                    div { class: "phase-step-icon", IconRefresh { size: 16 } }
-                                                    div { class: "phase-step-label", "Evolve" }
-                                                }
-                                            }
-                                        } else if active_step == 2 {
-                                            rsx! {
-                                                div { class: "phase-step completed",
-                                                    div { class: "phase-step-icon", IconChat { size: 16 } }
-                                                    div { class: "phase-step-label", "Interview" }
-                                                }
-                                                div { class: "phase-step completed",
-                                                    div { class: "phase-step-icon", IconFile { size: 16 } }
-                                                    div { class: "phase-step-label", "Seed" }
-                                                }
-                                                div { class: "phase-step active",
-                                                    div { class: "phase-step-icon", IconPlay { size: 16 } }
-                                                    div { class: "phase-step-label", "Execute" }
-                                                }
-                                                div { class: "phase-step",
-                                                    div { class: "phase-step-icon", IconCheckSquare { size: 16 } }
-                                                    div { class: "phase-step-label", "Evaluate" }
-                                                }
-                                                div { class: "phase-step",
-                                                    div { class: "phase-step-icon", IconRefresh { size: 16 } }
-                                                    div { class: "phase-step-label", "Evolve" }
-                                                }
-                                            }
-                                        } else if active_step == 3 {
-                                            rsx! {
-                                                div { class: "phase-step completed",
-                                                    div { class: "phase-step-icon", IconChat { size: 16 } }
-                                                    div { class: "phase-step-label", "Interview" }
-                                                }
-                                                div { class: "phase-step completed",
-                                                    div { class: "phase-step-icon", IconFile { size: 16 } }
-                                                    div { class: "phase-step-label", "Seed" }
-                                                }
-                                                div { class: "phase-step completed",
-                                                    div { class: "phase-step-icon", IconPlay { size: 16 } }
-                                                    div { class: "phase-step-label", "Execute" }
-                                                }
-                                                div { class: "phase-step active",
-                                                    div { class: "phase-step-icon", IconCheckSquare { size: 16 } }
-                                                    div { class: "phase-step-label", "Evaluate" }
-                                                }
-                                                div { class: "phase-step",
-                                                    div { class: "phase-step-icon", IconRefresh { size: 16 } }
-                                                    div { class: "phase-step-label", "Evolve" }
-                                                }
-                                            }
-                                        } else {
-                                            rsx! {
-                                                div { class: "phase-step completed",
-                                                    div { class: "phase-step-icon", IconChat { size: 16 } }
-                                                    div { class: "phase-step-label", "Interview" }
-                                                }
-                                                div { class: "phase-step completed",
-                                                    div { class: "phase-step-icon", IconFile { size: 16 } }
-                                                    div { class: "phase-step-label", "Seed" }
-                                                }
-                                                div { class: "phase-step completed",
-                                                    div { class: "phase-step-icon", IconPlay { size: 16 } }
-                                                    div { class: "phase-step-label", "Execute" }
-                                                }
-                                                div { class: "phase-step completed",
-                                                    div { class: "phase-step-icon", IconCheckSquare { size: 16 } }
-                                                    div { class: "phase-step-label", "Evaluate" }
-                                                }
-                                                div { class: "phase-step active",
-                                                    div { class: "phase-step-icon", IconRefresh { size: 16 } }
-                                                    div { class: "phase-step-label", "Evolve" }
-                                                }
-                                            }
-                                        }
+                                        {step_elements.into_iter()}
                                     }
                                 }
                                 h3 { style: "font-family:var(--font-mono);font-size:13px;color:var(--accent);margin-top:16px",
                                     "Recent Seeds"
                                 }
                                 div { class: "item-list",
-                                    {data.seeds.iter().take(5).map(|seed| {
-                                        let id = seed.id.clone();
-                                        let goal = seed.goal.clone();
-                                        let count = seed.constraints_count;
-                                        let date = seed.created_at.clone();
-                                        let short = if id.len() >= 8 { &id[..8] } else { &id };
-                                        rsx! {
-                                            div { class: "item-card", key: "{id}",
-                                                div { class: "item-title", "{goal}" }
-                                                div { class: "item-subtitle", "{short} · {count} constraints · {date}" }
-                                            }
-                                        }
-                                    }).collect::<Vec<_>>()}
+                                    {seed_cards.into_iter()}
                                 }
                             }
                         }
-                    },
-                    Some(Err(e)) => rsx! {
-                        div { class: "empty-state", p { { format!("Error: {e}") } } }
                     },
                     None => rsx! {
                         div { class: "empty-state",
