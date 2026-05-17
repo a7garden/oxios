@@ -92,87 +92,87 @@ mod tests {
     fn test_tool_names_length() {
         // Build a minimal KernelHandle for testing
         let state_store = Arc::new(
-            oxios_kernel::state_store::StateStore::new(std::path::PathBuf::from(
+            crate::state_store::StateStore::new(std::path::PathBuf::from(
                 "/tmp/oxios-test-workspace",
             ))
             .unwrap(),
         );
 
-        let kernel = Arc::new(oxios_kernel::KernelHandle::new(
-            oxios_kernel::StateApi::new(state_store.clone()),
-            oxios_kernel::AgentApi::new(
-                Arc::new(oxios_kernel::supervisor::NoOpSupervisor),
-                Arc::new(oxios_kernel::budget::BudgetManager::new()),
-                Arc::new(oxios_kernel::memory::MemoryManager::new(
+        let kernel = Arc::new(crate::KernelHandle::new(
+            crate::StateApi::new(state_store.clone()),
+            crate::AgentApi::new(
+                Arc::new(crate::supervisor::NoOpSupervisor),
+                Arc::new(crate::budget::BudgetManager::new()),
+                Arc::new(crate::memory::MemoryManager::new(
                     state_store.clone(),
                 )),
             ),
-            oxios_kernel::SecurityApi::new(
+            crate::SecurityApi::new(
                 Arc::new(parking_lot::Mutex::new(
-                    oxios_kernel::auth::AuthManager::new(),
+                    crate::auth::AuthManager::new(),
                 )),
-                Arc::new(oxios_kernel::audit_trail::AuditTrail::new(100)),
+                Arc::new(crate::audit_trail::AuditTrail::new(100)),
                 Arc::new(parking_lot::Mutex::new(
-                    oxios_kernel::access_manager::AccessManager::new(),
+                    crate::access_manager::AccessManager::new(),
                 )),
                 state_store.clone(),
             ),
-            oxios_kernel::PersonaApi::new(Arc::new(
-                oxios_kernel::persona_manager::PersonaManager::new(),
+            crate::PersonaApi::new(Arc::new(
+                crate::persona_manager::PersonaManager::new(),
             )),
-            oxios_kernel::ExtensionApi::new(
-                Arc::new(oxios_kernel::program::ProgramManager::new(
+            crate::ExtensionApi::new(
+                Arc::new(crate::program::ProgramManager::new(
                     std::path::PathBuf::from("/tmp/oxios-test/programs"),
                 )),
                 Arc::new(
-                    oxios_kernel::skill::SkillStore::new(std::path::PathBuf::from(
+                    crate::skill::SkillStore::new(std::path::PathBuf::from(
                         "/tmp/oxios-test/skills",
                     ))
                     .unwrap(),
                 ),
-                Arc::new(oxios_kernel::host_tools::HostToolValidator::new(
+                Arc::new(crate::host_tools::HostToolValidator::new(
                     vec![],
                     vec![],
                 )),
             ),
-            oxios_kernel::McpApi::new(Arc::new(oxios_kernel::mcp::McpBridge::new())),
-            oxios_kernel::InfraApi::new(
+            crate::McpApi::new(Arc::new(crate::mcp::McpBridge::new())),
+            crate::InfraApi::new(
                 Arc::new(
-                    oxios_kernel::git_layer::GitLayer::new(
+                    crate::git_layer::GitLayer::new(
                         std::path::PathBuf::from("/tmp/oxios-test"),
                         false,
                     )
                     .unwrap(),
                 ),
-                Arc::new(oxios_kernel::scheduler::AgentScheduler::new(5, 60, 300)),
-                Arc::new(oxios_kernel::cron::CronScheduler::new(
+                Arc::new(crate::scheduler::AgentScheduler::new(5, 60, 300)),
+                Arc::new(crate::cron::CronScheduler::new(
                     state_store.clone(),
                     60,
                 )),
-                Arc::new(oxios_kernel::resource_monitor::ResourceMonitor::new(60, 60)),
-                Arc::new(oxios_kernel::event_bus::EventBus::new(256)),
-                oxios_kernel::OxiosConfig::default(),
+                Arc::new(crate::resource_monitor::ResourceMonitor::new(60, 60)),
+                Arc::new(crate::event_bus::EventBus::new(256)),
+                crate::OxiosConfig::default(),
                 std::time::Instant::now(),
             ),
-            oxios_kernel::SpaceApi::new(
+            crate::SpaceApi::new(
                 Arc::new(
-                    oxios_kernel::space::SpaceManager::new(
+                    crate::space::SpaceManager::new(
                         state_store.clone(),
-                        Arc::new(oxios_kernel::event_bus::EventBus::new(256)),
+                        Arc::new(crate::event_bus::EventBus::new(256)),
                     )
                     .unwrap(),
                 ),
-                Arc::new(oxios_kernel::event_bus::EventBus::new(256)),
+                Arc::new(crate::event_bus::EventBus::new(256)),
             ),
-            oxios_kernel::ExecApi::new(
-                Arc::new(oxios_kernel::config::ExecConfig::default()),
+            crate::ExecApi::new(
+                Arc::new(crate::config::ExecConfig::default()),
                 Arc::new(parking_lot::Mutex::new(
-                    oxios_kernel::access_manager::AccessManager::new(),
+                    crate::access_manager::AccessManager::new(),
                 )),
             ),
-            oxios_kernel::BrowserApi::default(),
-            oxios_kernel::A2aApi::new(Arc::new(oxios_kernel::a2a::A2AProtocol::new(Arc::new(
-                oxios_kernel::event_bus::EventBus::new(256),
+            crate::BrowserApi::default(),
+            crate::A2aApi::new(Arc::new(crate::a2a::A2AProtocol::new(Arc::new(
+                crate::event_bus::EventBus::new(256),
             )))),
         ));
 

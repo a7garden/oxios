@@ -222,6 +222,49 @@ impl Orchestrator {
             buffer.push_user(user_message);
         }
 
+        // ── Chat Bypass ──
+        // Simple conversational messages (greetings, small talk, questions
+        // that don't need tool execution) should get a direct LLM response
+        // instead of entering the full Ouroboros pipeline.
+        let is_chat = Self::is_chat_message(user_message);
+
+        if is_chat {
+            tracing::info!(session_id = %session_id, "Chat bypass: responding directly");
+            self.publish_phase_started(&session_id, Phase::Interview).await;
+
+            // Use the ouroboros engine's LLM to generate a direct response.
+            let response = self.lifecycle.chat_response(user_message).await;
+
+            let response_text = match response {
+                Ok(text) => text,
+                Err(e) => {
+                    tracing::warn!(error = %e, "Chat response failed, using fallback");
+                    format!("죄송합니다, 응답을 생성하는 중 오류가 발생했습니다. 다시 시도해주세요.")
+                }
+            };
+
+            // Record agent response in conversation buffer
+            {
+                let mut buffer = self.conversation_buffer.write();
+                buffer.push_agent(&response_text, &space_id.to_string());
+            }
+
+            self.publish_phase_completed(&session_id, Phase::Interview, "chat response")
+                .await;
+
+            return Ok(OrchestrationResult {
+                session_id: Some(session_id.clone()),
+                space_id: Some(space_id),
+                space_tag: Some(space_tag.clone()),
+                response: response_text,
+                seed_id: None,
+                agent_id: None,
+                phase_reached: Phase::Interview,
+                evaluation_passed: false,
+                output: None,
+            });
+        }
+
         // Phase 1: Interview
         self.publish_phase_started(&session_id, Phase::Interview)
             .await;
@@ -888,6 +931,61 @@ impl Orchestrator {
         );
 
         Ok(completed)
+    }
+
+    /// Detect whether a message is conversational (no tool execution needed).
+    ///
+    /// Chat messages are greetings, small talk, questions about the system,
+    /// gratitude, emoji, or generally short messages that don't describe
+    /// a concrete task to execute.
+    fn is_chat_message(msg: &str) -> bool {
+        let trimmed = msg.trim();
+        let lower = trimmed.to_lowercase();
+
+        // Empty or very short
+        if trimmed.len() <= 2 {
+            return true;
+        }
+
+        // Pure emoji / symbols
+        if trimmed.chars().all(|c| !c.is_alphanumeric()) {
+            return true;
+        }
+
+        // Common greeting patterns (Korean + English)
+        let chat_patterns = [
+            "안녕", "하이", "헬로", "hello", "hi", "hey", "good morning",
+            "good evening", "좋은 아침", "좋은 저녁", "반가",
+            "고마워", "감사", "thanks", "thank you", "thx",
+            "잘했어", "수고", "good job", "nice", "great",
+            "네", "아니요", "yes", "no", "ok", "okay", "ㅇㅇ",
+            "ㅎㅎ", "ㅋㅋ", "ㅠㅠ", "^^", "😀", "👍",
+        ];
+        for pat in &chat_patterns {
+            if lower.contains(pat) {
+                return true;
+            }
+        }
+
+        // If the message is short (< 30 chars) and doesn't contain
+        // action verbs, treat as chat
+        if trimmed.len() < 30 {
+            let action_verbs = [
+                "만들", "생성", "실행", "수정", "삭", "작성", "읽", "찾", "검색",
+                "create", "make", "write", "run", "execute", "build", "delete",
+                "fix", "read", "find", "search", "list", "show", "get",
+                "분석", "디버그", "리팩토링", "배포", "테스트",
+                "deploy", "test", "debug", "refactor", "analyze",
+                "파일", "코드", "스크립트",
+                "file", "code", "script",
+            ];
+            let has_action = action_verbs.iter().any(|v| lower.contains(v));
+            if !has_action {
+                return true;
+            }
+        }
+
+        false
     }
 }
 

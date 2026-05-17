@@ -1,7 +1,7 @@
 # Oxios Agent OS — REST API Reference
 
 > **Base URL:** `http://127.0.0.1:4200`
-> **API Version:** v0.2.0-alpha
+> **API Version:** 0.1.2
 > **Body Size Limit:** 10 MB per request
 > **Date:** 2026-05-17
 
@@ -2216,7 +2216,7 @@ List all Git tags.
 
 ```json
 {
-  "tags": ["v0.1.0", "v0.2.0-alpha", "seed-evolution-3"]
+  "tags": ["v0.1.0", "0.1.2", "seed-evolution-3"]
 }
 ```
 

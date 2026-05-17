@@ -206,6 +206,11 @@ impl OuroborosProtocol for OuroborosEngine {
         *self.persona_prompt.lock() = prompt;
     }
 
+    async fn chat(&self, user_message: &str) -> Result<String> {
+        let system_prompt = CHAT_SYSTEM_PROMPT;
+        self.llm_complete(system_prompt, user_message).await
+    }
+
     async fn interview(&self, user_input: &str) -> Result<InterviewResult> {
         self.set_phase(Phase::Interview);
 
@@ -215,7 +220,14 @@ impl OuroborosProtocol for OuroborosEngine {
              Analyze this request. Produce a JSON object with:\n\
              - \"questions\": list of Socratic clarifying questions (max 5)\n\
              - \"scores\": {{ \"goal_clarity\": 0.0-1.0, \"constraint_clarity\": 0.0-1.0, \"success_criteria\": 0.0-1.0 }}\n\n\
-             Score 1.0 if the dimension is perfectly clear from context, 0.0 if totally ambiguous.",
+             IMPORTANT SCORING GUIDELINES:\n\
+             - Score GOAL_CLARITY 0.9+ if the user states ANY concrete action (create, read, write, run, find, list, etc.)\n\
+             - Score CONSTRAINT_CLARITY 0.8+ if the request includes ANY specifics (filename, content, path, language)\n\
+             - Score SUCCESS_CRITERIA 0.7+ if you can infer what 'done' looks like even if not explicit\n\
+             - Only score below 0.5 if the request is genuinely vague with NO actionable content\n\
+             - A request like 'Create a file called X with content Y' should score goal_clarity=1.0, constraint_clarity=0.9, success_criteria=0.9\n\
+             - A request like 'Write Python code to sort a list' should score goal_clarity=0.9, constraint_clarity=0.7, success_criteria=0.8\n\
+             Be GENEROUS with clarity scores. When in doubt, score higher. The system can always ask follow-up questions later.",
             user_input
         );
 
@@ -500,6 +512,15 @@ impl OuroborosProtocol for OuroborosEngine {
 // ---------------------------------------------------------------------------
 // System prompts
 // ---------------------------------------------------------------------------
+
+const CHAT_SYSTEM_PROMPT: &str = "\
+You are a friendly, helpful AI assistant built into Oxios — an Agent Operating System. \
+You respond naturally in the user's language. \
+Keep responses concise and conversational. \
+If the user asks a question, answer it directly. \
+If the user greets you, greet them back warmly. \
+Do NOT ask clarifying questions or try to create tasks. \
+Just be a pleasant conversational partner.";
 
 const INTERVIEW_SYSTEM_PROMPT: &str = "\
 You are a Socratic interviewer for an AI agent operating system. \

@@ -472,7 +472,7 @@ The Oxios guardian program should periodically verify audit trail integrity:
 
 ```bash
 # CLI verification (if exposed)
-oxios security audit-verify
+oxios audit
 ```
 
 Programmatically, the guardian can schedule verification at regular intervals:
@@ -1080,7 +1080,7 @@ auth_enabled = true
 Generate and securely distribute API keys:
 
 ```bash
-oxios security generate-key "production-api"
+# API keys are managed via the onboarding wizard or config
 # Save the displayed key securely — it won't be shown again
 ```
 
@@ -1161,7 +1161,7 @@ or a cron job:
 
 ```bash
 # Manual verification
-oxios security audit-verify
+oxios audit
 ```
 
 #### 8. Monitor Circuit Breaker State
@@ -1240,8 +1240,8 @@ manager.set_budget(BudgetLimit {
 
 6. **Rotate API keys** if credential exposure is suspected:
    ```bash
-   oxios security revoke-key "compromised-key"
-   oxios security generate-key "replacement-key"
+   # Revoke by removing from config and restarting
+   # Generate new key via onboarding wizard
    ```
 
 #### LLM Provider Failure (Circuit Breaker Open)
@@ -1372,11 +1372,11 @@ If an agent accesses files outside its workspace:
 oxios agent kill <agent-id>
 
 # Revoke an API key
-oxios security revoke-key <key-name>
+# Revoke by editing config.toml
 
 # Verify audit trail
-oxios security audit-verify
+oxios audit
 
 # Generate new API key
-oxios security generate-key <name>
+# Use oxios onboard to configure credentials
 ```
