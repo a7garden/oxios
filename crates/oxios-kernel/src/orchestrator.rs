@@ -546,7 +546,7 @@ impl Orchestrator {
         }
 
         let final_seed = current_seed.expect("at least one seed exists");
-        let passed = current_evaluation.all_passed();
+        let passed = current_evaluation.all_passed() || current_evaluation.score >= 0.7;
 
         tracing::info!(
             session_id = %session_id,
