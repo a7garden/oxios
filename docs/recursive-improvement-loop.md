@@ -55,7 +55,7 @@ pi-agent가 일반 사용자처럼 oxios를 조작하고, 문제를 발견하면
 | `oxios status` | ✅ | 데몬 정상 |
 | `oxios doctor` | ✅ | 8/8 통과 |
 | `oxios run --json "간단한 질문"` | ✅ | Interview 응답 (15-25초) |
-| `oxios run --json "코드 작성"` | ❌ | Seed 생성 후 Execute 진입 안 함 (timeout) |
+| `oxios run --json "코드 작성"` | ✅ | Execute Phase 진입 성공 (~137초) |
 | `oxios chat` | ⚠️ | 미테스트 |
 | `oxios config show` | ✅ | 동작 |
 | `oxios models` | ⚠️ | 미테스트 |
@@ -67,6 +67,7 @@ pi-agent가 일반 사용자처럼 oxios를 조작하고, 문제를 발견하면
 | PATCH-1 | ZAI 엔드포인트 `api.z.ai` + 환경변수 오버라이드 | ✅ 적용됨 |
 | PATCH-2 | browser feature 전이 차단 | ✅ 적용됨 |
 | PATCH-3 | oxi-ai 직접 의존성 | ✅ 적용됨 |
+| PATCH-4 | GitLayer mutex deadlock 수정 | ✅ 적용됨 (commit f99d96b) |
 
 ---
 
@@ -83,10 +84,10 @@ pi-agent가 일반 사용자처럼 oxios를 조작하고, 문제를 발견하면
 |---|------|------|------|--------|
 | C01 | Ouroboros Interview | `ouroboros/interview.rs` | **L1** | - |
 | C02 | Ouroboros Seed 생성 | `ouroboros/seed.rs` | **L1** | - |
-| C03 | Ouroboros Execute | `orchestrator.rs` | **L0** | ⛔ Seed 후 진입 안 함 |
-| C04 | Ouroboros Evaluate | `ouroboros/evaluation.rs` | **L0** | C03 블로킹 |
-| C05 | Ouroboros Evolve | `ouroboros_engine.rs` | **L0** | C03 블로킹 |
-| C06 | Multi-turn 세션 | `orchestrator.rs` | **L0** | C03 블로킹 |
+| C03 | Ouroboros Execute | `orchestrator.rs` | **L1** | - |
+| C04 | Ouroboros Evaluate | `ouroboros/evaluation.rs` | **L1** | C03 해결 |
+| C05 | Ouroboros Evolve | `ouroboros_engine.rs` | **L1** | C03 해결 |
+| C06 | Multi-turn 세션 | `orchestrator.rs` | **L0** | C03 해결 |
 | C07 | Persona 시스템 | `persona.rs`, `persona_manager.rs` | **L1** | - |
 
 ### 3.2 엔진 & 인증
@@ -262,7 +263,8 @@ pi-agent가 일반 사용자처럼 oxios를 조작하고, 문제를 발견하면
 | 순서 | 작업 | 대상 | 상태 |
 |------|------|------|------|
 | **1-1** | 테스트 컴파일 에러 52개 수정 | `tests/` | 🔴 TODO |
-| **1-2** | Execute Phase 진입 버그 수정 | `orchestrator.rs` | 🔴 TODO |
+| **1-2** | Execute Phase 진입 버그 수정 | `git_layer.rs` | ✅ **완료** |
+| **1-3** | 테스트 컴파일 에러 52개 수정 | `tests/` | 🔴 TODO |
 | **1-3** | Evaluate Phase 동작 확인 | `evaluation.rs` | 🔴 TODO |
 | **1-4** | `oxios run --json` E2E 동작 확인 | CLI | 🔴 TODO |
 | **1-5** | Multi-turn 세션 동작 확인 | `--session` 옵션 | 🔴 TODO |
@@ -418,7 +420,7 @@ PROGRESS.md                           # ← 진행 로그
 
 | ID | 심각도 | 설명 | 파일 | 상태 |
 |----|--------|------|------|------|
-| BUG-001 | 🔴 Critical | Execute Phase 진입 안 함 | `orchestrator.rs` | 미수정 |
+| BUG-001 | 🔴 Critical | Execute Phase 진입 안 함 | `git_layer.rs` | ✅ **수정됨** (deadlock) |
 | BUG-002 | 🔴 Critical | 테스트 52개 컴파일 에러 | `tests/` | 미수정 |
 | BUG-003 | 🟡 Medium | `oxios config set` 미동작 | `main.rs` | 미수정 |
 | BUG-004 | 🟡 Medium | BrowserApi panic (runtime 중첩) | `browser_api.rs` | 워크어라운드 (feature off) |
