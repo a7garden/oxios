@@ -9,7 +9,10 @@ mod kernel;
 mod otel;
 
 use anyhow::{Context, Result};
-use clap::{Parser, Subcommand};
+use clap::{CommandFactory, Parser, Subcommand};
+use clap_complete::{generate, Shell};
+use console::style;
+use std::net::TcpStream;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -33,7 +36,7 @@ use oxios_gateway::plugin::{ChannelContext, ChannelPlugin};
     name = "oxios",
     version,
     about = "Oxios Agent OS — Agent Operating System",
-    after_help = "Examples:\n  oxios start                  Start the daemon\n  oxios onboard                Run the setup wizard\n  oxios run \"review this code\"  Execute a single prompt\n  oxios chat                   Start interactive chat\n  oxios status                 Show system status\n  oxios help                   Show all commands"
+    after_help = "Examples:\n  oxios start                  Start the daemon\n  oxios onboard                Run the setup wizard\n  oxios run \"review this code\"  Execute a single prompt\n  oxios chat                   Start interactive chat\n  oxios status                 Show system status\n  oxios doctor                 Diagnose issues\n  oxios help                   Show all commands"
 )]
 struct Cli {
     /// Run in foreground (do not daemonize).
@@ -109,6 +112,13 @@ enum Command {
     /// Check system health and diagnose issues.
     Doctor,
 
+    /// List available models for the configured (or specified) provider.
+    Models {
+        /// Provider to list models for (default: current provider).
+        #[arg(short, long)]
+        provider: Option<String>,
+    },
+
     /// Backup Oxios state.
     Backup {
         #[arg(short, long)]
@@ -118,10 +128,10 @@ enum Command {
     /// Restore Oxios state from a backup.
     Restore { input: String },
 
-    /// Show or modify configuration.
+    /// Show or modify configuration (default: show).
     Config {
         #[command(subcommand)]
-        action: ConfigAction,
+        action: Option<ConfigAction>,
     },
 
     /// Manage installable programs.
@@ -163,9 +173,12 @@ enum Command {
 
     /// Show program skill file and usage.
     Program { name: String },
+
+    /// Generate shell completion script.
+    Completion { shell: Shell },
 }
 
-#[derive(Debug, Subcommand)]
+#[derive(Debug, Clone, Subcommand)]
 enum ConfigAction {
     Show,
     Set { key: String, value: String },
@@ -254,10 +267,16 @@ fn oxios_home_from_config(config_path: &Path) -> PathBuf {
         })
 }
 
-// ─── Subcommands ───────────────────────────────────────────────────────────
+/// Read the last `n` lines from a file without external commands.
+fn tail_file(path: &Path, lines: usize) -> Result<String> {
+    let content = std::fs::read_to_string(path)
+        .with_context(|| format!("failed to read {}", path.display()))?;
+    let all_lines: Vec<&str> = content.lines().collect();
+    let start = all_lines.len().saturating_sub(lines);
+    Ok(all_lines[start..].join("\n"))
+}
 
-// cmd_run_async removed — replaced by cmd_run module.
-// The old human-only text output is now handled by cmd_run::cmd_run().
+// ─── Subcommands ───────────────────────────────────────────────────────────
 
 async fn cmd_pkg(kernel: &Kernel, action: &PkgAction) -> Result<()> {
     let handle = kernel.handle();
@@ -277,36 +296,37 @@ async fn cmd_pkg(kernel: &Kernel, action: &PkgAction) -> Result<()> {
             };
             let program = handle.extensions.install_program(install_source).await?;
             println!(
-                "Installed '{}' v{}",
-                program.meta.name, program.meta.version
+                "  {} '{}'",
+                style("Installed").green().bold(),
+                style(format!("{} v{}", program.meta.name, program.meta.version)).bold(),
             );
         }
         PkgAction::Uninstall { name } => {
             handle.extensions.uninstall_program(name).await?;
-            println!("Uninstalled '{}'", name);
+            println!("  {} '{}'", style("Uninstalled").green(), name);
         }
         PkgAction::List => {
             let programs = handle.extensions.list_programs().await;
             if programs.is_empty() {
-                println!("No programs installed.");
+                println!("  No programs installed.");
             } else {
                 println!("{:30} {:10} {:40}", "NAME", "VERSION", "DESCRIPTION");
-                println!("{}", "-".repeat(82));
+                println!("{}", "─".repeat(82));
                 for p in &programs {
-                    println!("{:30} {:10} {:40}", p.name, p.version, p.description);
+                    println!("{:30} {:10} {:40}", p.meta.name, p.meta.version, p.meta.description);
                 }
             }
         }
         PkgAction::Search => {
             let programs = handle.extensions.list_programs().await;
             if programs.is_empty() {
-                println!("No programs installed.");
+                println!("  No programs installed.");
             } else {
                 for p in &programs {
-                    println!("{} ({})", p.name, p.version);
-                    println!("  {}", p.description);
-                    if !p.tools.is_empty() {
-                        let tools: Vec<_> = p.tools.iter().map(|t| t.name.clone()).collect();
+                    println!("{} ({})", style(&p.meta.name).bold(), p.meta.version);
+                    println!("  {}", p.meta.description);
+                    if !p.meta.tools.is_empty() {
+                        let tools: Vec<_> = p.meta.tools.iter().map(|t| t.name.clone()).collect();
                         println!("  Tools: {}", tools.join(", "));
                     }
                     println!();
@@ -344,7 +364,7 @@ async fn cmd_config(action: &ConfigAction, config_path: &Path) -> Result<()> {
                 .ok_or_else(|| anyhow::anyhow!("Unknown config key: {}", key))?;
             let toml_str = toml::to_string_pretty(&config)?;
             std::fs::write(config_path, toml_str)?;
-            println!("Set {} = {}", key, value);
+            println!("  {} {} = {}", style("Set").green(), key, value);
         }
     }
     Ok(())
@@ -429,11 +449,19 @@ async fn cmd_status(kernel: &Kernel) -> Result<()> {
     let config = kernel.config();
     let daemon = DaemonManager::new(&config.daemon.pid_file, &config.daemon.log_dir);
 
-    println!("\n  ⬡ Oxios Agent OS  v{}", env!("CARGO_PKG_VERSION"));
+    println!();
+    println!("  {} {}", style("⬡ Oxios Agent OS").bold(), style(format!("v{}", env!("CARGO_PKG_VERSION"))).dim());
     println!("  {}", "─".repeat(48));
     println!("  {:<16}  {}", "Workspace:", config.kernel.workspace);
-    println!("  {:<16}  {}", "Model:", config.engine.default_model);
-    println!("  {:<16}  {}", "Daemon:", daemon.status());
+    println!("  {:<16}  {}", "Model:", style(&config.engine.default_model).cyan());
+
+    let daemon_status = daemon.status();
+    let is_running = matches!(daemon_status, oxios_kernel::DaemonStatus::Running { .. });
+    if is_running {
+        println!("  {:<16}  {}", "Daemon:", style(daemon_status.to_string()).green());
+    } else {
+        println!("  {:<16}  {}", "Daemon:", style(daemon_status.to_string()).yellow());
+    }
     println!();
 
     // Credential source
@@ -442,25 +470,36 @@ async fn cmd_status(kernel: &Kernel) -> Result<()> {
         Some(provider) => match CredentialStore::resolve(provider, config.api_key().as_deref()) {
             Some((key, source)) => {
                 let source_str = match source {
-                    oxios_kernel::credential::CredentialSource::Config => {
-                        "config.toml (engine.api_key)"
-                    }
+                    oxios_kernel::credential::CredentialSource::Config => "config.toml",
                     oxios_kernel::credential::CredentialSource::OxiAuthStore => "~/.oxi/auth.json",
-                    oxios_kernel::credential::CredentialSource::EnvVar => "environment variable",
+                    oxios_kernel::credential::CredentialSource::EnvVar => "env var",
                 };
                 let preview = if key.len() > 8 {
                     format!("{}...{}", &key[..4], &key[key.len() - 4..])
                 } else {
                     key.clone()
                 };
-                println!("  {:<16}  {} [{}]", "Credentials:", preview, source_str);
+                println!(
+                    "  {:<16}  {} [{}]",
+                    "Credentials:",
+                    style(preview).green(),
+                    style(source_str).dim()
+                );
             }
             None => {
-                println!("  {:<16}  ✗ none (run `oxios` to setup)", "Credentials:");
+                println!(
+                    "  {:<16}  {}",
+                    "Credentials:",
+                    style("✗ none (run `oxios onboard` to setup)").red()
+                );
             }
         },
         None => {
-            println!("  {:<16}  ✗ no model configured (run `oxios` to setup)", "Credentials:");
+            println!(
+                "  {:<16}  {}",
+                "Credentials:",
+                style("✗ no model configured").red()
+            );
         }
     }
 
@@ -478,10 +517,16 @@ async fn cmd_status(kernel: &Kernel) -> Result<()> {
     if !agents.is_empty() {
         println!();
         for agent in &agents {
+            let status_str = format!("{:?}", agent.status);
+            let styled_status = if matches!(agent.status, oxios_kernel::types::AgentStatus::Running) {
+                style(&status_str).green()
+            } else {
+                style(&status_str).yellow()
+            };
             println!(
-                "    • {}  {:10}  {}",
-                agent.id,
-                format!("{:?}", agent.status),
+                "    {}  {}  {}",
+                style(&agent.id.to_string()).dim(),
+                styled_status,
                 agent.name
             );
         }
@@ -491,10 +536,350 @@ async fn cmd_status(kernel: &Kernel) -> Result<()> {
     Ok(())
 }
 
-// ─── Main ────────────────────────────────────────────────────────────────────
+// ─── Reset command ───────────────────────────────────────────────────────────
+
+fn cmd_reset(oxios_home: &Path, skip_confirm: bool, pid_file: &Path) -> Result<()> {
+    if !oxios_home.exists() {
+        println!("  {} does not exist — nothing to reset.", oxios_home.display());
+        return Ok(());
+    }
+
+    println!();
+    println!(
+        "  {}  This will delete all Oxios configuration and data:",
+        style("⚠").yellow().bold()
+    );
+    println!("     {}", oxios_home.display());
+    println!();
+
+    if !skip_confirm {
+        let confirm = inquire::Confirm::new("  Are you sure?")
+            .with_default(false)
+            .prompt()?;
+        if !confirm {
+            println!("  Reset cancelled.");
+            return Ok(());
+        }
+    }
+
+    // Stop daemon first if running
+    if pid_file.exists() {
+        let pid_str = std::fs::read_to_string(pid_file).unwrap_or_default();
+        if let Ok(pid) = pid_str.trim().parse::<u32>() {
+            unsafe {
+                libc::kill(pid as i32, libc::SIGTERM);
+            }
+            std::thread::sleep(std::time::Duration::from_millis(500));
+        }
+    }
+
+    std::fs::remove_dir_all(oxios_home)?;
+
+    println!();
+    println!(
+        "  {} {} removed.",
+        style("✓").green().bold(),
+        oxios_home.display()
+    );
+    println!(
+        "  Run {} to set up again.",
+        style("`oxios onboard`").cyan()
+    );
+    println!();
+    Ok(())
+}
+
+// ─── Doctor command ──────────────────────────────────────────────────────────
+
+async fn cmd_doctor(kernel: &Kernel, config_path: &Path) -> Result<()> {
+    let config = kernel.config();
+    let mut issues = Vec::new();
+    let mut checks = 0u32;
+
+    println!();
+    println!("  {}", style("⬡ Oxios Doctor — System Diagnostics").bold());
+    println!("  {}", "─".repeat(48));
+
+    // 1. Config file exists
+    checks += 1;
+    if config_path.exists() {
+        println!(
+            "  {} Config file present ({})",
+            style("✓").green(),
+            style(config_path.display()).dim()
+        );
+    } else {
+        println!("  {} Config file missing", style("✗").red().bold());
+        issues.push("Config file not found. Run `oxios onboard` to create it.".to_string());
+    }
+
+    // 2. Credentials
+    checks += 1;
+    let provider = CredentialStore::provider_from_model(&config.engine.default_model);
+    match provider {
+        Some(provider) => {
+            match CredentialStore::resolve(provider, config.api_key().as_deref()) {
+                Some((key, source)) => {
+                    let source_str = match source {
+                        oxios_kernel::credential::CredentialSource::Config => "config.toml",
+                        oxios_kernel::credential::CredentialSource::OxiAuthStore => "~/.oxi/auth.json",
+                        oxios_kernel::credential::CredentialSource::EnvVar => "env var",
+                    };
+                    let preview = if key.len() > 8 {
+                        format!("{}...{}", &key[..4], &key[key.len() - 4..])
+                    } else {
+                        "(set)".to_string()
+                    };
+                    println!(
+                        "  {} Credentials found ({}, via {})",
+                        style("✓").green(),
+                        style(preview).cyan(),
+                        style(source_str).dim()
+                    );
+                }
+                None => {
+                    println!(
+                        "  {} No credentials for provider '{}'",
+                        style("✗").red().bold(),
+                        style(provider).cyan()
+                    );
+                    issues.push(format!(
+                        "No API key for '{}'. Run `oxios onboard` to configure.",
+                        provider
+                    ));
+                }
+            }
+        }
+        None => {
+            println!("  {} No model configured", style("✗").red().bold());
+            issues.push("No model set. Run `oxios onboard` to configure.".to_string());
+        }
+    }
+
+    // 3. Workspace directory
+    checks += 1;
+    let workspace = oxios_kernel::config::expand_home(&config.kernel.workspace);
+    if workspace.exists() {
+        println!(
+            "  {} Workspace directory ({})",
+            style("✓").green(),
+            style(workspace.display()).dim()
+        );
+    } else {
+        println!(
+            "  {} Workspace directory missing ({})",
+            style("✗").red().bold(),
+            workspace.display()
+        );
+        issues.push("Workspace directory not found. It will be created on first run.".to_string());
+    }
+
+    // 4. Daemon status
+    checks += 1;
+    let daemon = DaemonManager::new(&config.daemon.pid_file, &config.daemon.log_dir);
+    let daemon_status = daemon.status();
+    let is_running = matches!(daemon_status, oxios_kernel::DaemonStatus::Running { .. });
+    if is_running {
+        println!("  {} Daemon is running", style("✓").green());
+    } else {
+        println!(
+            "  {} Daemon is not running ({})",
+            style("⚠").yellow().bold(),
+            daemon_status
+        );
+        issues.push("Daemon not running. Start with `oxios start`.".to_string());
+    }
+
+    // 5. MCP servers
+    checks += 1;
+    let mcp_count = kernel.handle().mcp.server_count();
+    if mcp_count > 0 {
+        println!(
+            "  {} {} MCP server(s) connected",
+            style("✓").green(),
+            mcp_count
+        );
+    } else {
+        println!("  {} No MCP servers configured", style("⚠").yellow().bold());
+    }
+
+    // 6. Model is set
+    checks += 1;
+    if !config.engine.default_model.is_empty() {
+        println!(
+            "  {} Default model: {}",
+            style("✓").green(),
+            style(&config.engine.default_model).cyan()
+        );
+    } else {
+        println!("  {} No default model set", style("✗").red().bold());
+        issues.push("No default model configured.".to_string());
+    }
+
+    // 7. oxi CLI installed
+    checks += 1;
+    let oxi_auth_exists = {
+        let home = std::env::var("HOME").unwrap_or_default();
+        std::path::PathBuf::from(format!("{}/.oxi/auth.json", home)).exists()
+    };
+    let oxi_bin_exists = std::path::PathBuf::from("/usr/local/bin/oxi").exists()
+        || std::path::PathBuf::from(std::env::var("HOME").unwrap_or_default() + "/.cargo/bin/oxi").exists();
+    let oxi_installed = oxi_auth_exists || oxi_bin_exists;
+    if oxi_installed {
+        println!("  {} oxi CLI available (shared auth store)", style("✓").green());
+    } else {
+        println!("  {} oxi CLI not detected", style("⚠").yellow().bold());
+        issues.push("Install oxi CLI for shared credential management: `cargo install oxi-cli`".to_string());
+    }
+
+    // 8. Gateway port available
+    checks += 1;
+    let port = config.gateway.port;
+    let port_in_use = TcpStream::connect(format!("127.0.0.1:{}", port)).is_ok();
+    if port_in_use && !is_running {
+        println!(
+            "  {} Port {} is already in use",
+            style("✗").red().bold(),
+            style(port).cyan()
+        );
+        issues.push(format!(
+            "Port {} is occupied. Change with `oxios config set gateway.port <port>`.",
+            port
+        ));
+    } else if port_in_use && is_running {
+        println!(
+            "  {} Port {} listening (daemon active)",
+            style("✓").green(),
+            style(port).cyan()
+        );
+    } else {
+        println!(
+            "  {} Port {} available",
+            style("✓").green(),
+            style(port).cyan()
+        );
+    }
+
+    // Summary
+    println!("  {}", "─".repeat(48));
+    if issues.is_empty() {
+        println!(
+            "  {} checks passed, no issues found. {}",
+            checks,
+            style("All good!").green().bold()
+        );
+    } else {
+        println!(
+            "  {} checks, {} issue(s):",
+            checks,
+            style(issues.len()).yellow().bold()
+        );
+        println!();
+        for (i, issue) in issues.iter().enumerate() {
+            println!("    {}. {}", i + 1, issue);
+        }
+    }
+    println!();
+
+    Ok(())
+}
+
+// ─── Models command ──────────────────────────────────────────────────────────
+
+fn cmd_models(provider: Option<&str>) -> Result<()> {
+    // Resolve provider from arg or from config
+    let provider_id = match provider {
+        Some(p) => p.to_string(),
+        None => {
+            // Try reading from config
+            let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
+            let config_path = oxios_kernel::config::expand_home(
+                &format!("{}/.oxios/config.toml", home),
+            );
+            if config_path.exists() {
+                let config = oxios_kernel::config::load_config(&config_path)?;
+                if config.engine.default_model.is_empty() {
+                    anyhow::bail!(
+                        "No provider configured. Run `oxios onboard` or use `--provider <name>`."
+                    );
+                }
+                CredentialStore::provider_from_model(&config.engine.default_model)
+                    .map(|s| s.to_string())
+                    .unwrap_or_default()
+            } else {
+                anyhow::bail!(
+                    "No config found. Run `oxios onboard` or use `--provider <name>`."
+                );
+            }
+        }
+    };
+
+    if provider_id.is_empty() {
+        anyhow::bail!("Could not determine provider. Use `--provider <name>`.");
+    }
+
+    let models = oxi_sdk::get_provider_models(&provider_id);
+    if models.is_empty() {
+        println!(
+            "  No models found for '{}'. Check the provider name.",
+            provider_id
+        );
+        return Ok(());
+    }
+
+    println!();
+    println!(
+        "  {} for {}",
+        style("Available Models").bold(),
+        style(&provider_id).cyan()
+    );
+    println!("  {}", "─".repeat(60));
+
+    for entry in models.iter() {
+        let ctx = if entry.context_window >= 1_000_000 {
+            format!("{}M", entry.context_window / 1_000_000)
+        } else {
+            format!("{}K", entry.context_window / 1000)
+        };
+        let reasoning = if entry.reasoning {
+            format!(" {}", style("✦reasoning").magenta())
+        } else {
+            String::new()
+        };
+        println!(
+            "  {}  {} ctx{}",
+            style(&entry.name).bold(),
+            style(ctx).dim(),
+            reasoning,
+        );
+    }
+
+    println!();
+    println!(
+        "  {} models total. Use full ID: {}/<model-id>",
+        models.len(),
+        provider_id
+    );
+    println!();
+    Ok(())
+}
+
+// ─── Entry point ─────────────────────────────────────────────────────────────
 
 #[tokio::main]
-async fn main() -> Result<()> {
+async fn main() {
+    if let Err(e) = run().await {
+        eprintln!();
+        eprintln!("  {} {}", style("error:").red().bold(), e);
+        eprintln!(
+            "  Run {} for diagnostics.\n",
+            style("`oxios doctor`").cyan()
+        );
+        std::process::exit(1);
+    }
+}
+
+async fn run() -> Result<()> {
     let cli = Cli::parse();
 
     let config_path = oxios_kernel::config::expand_home(&cli.config);
@@ -553,18 +938,15 @@ async fn main() -> Result<()> {
         Some(Command::Log { lines }) => {
             let log_file = log_dir.join("oxios.log");
             if !log_file.exists() {
-                println!("No log file at {}", log_file.display());
+                println!("  No log file at {}", log_file.display());
                 return Ok(());
             }
-            let output = std::process::Command::new("tail")
-                .args(["-n", &lines.to_string()])
-                .arg(&log_file)
-                .output()?;
-            print!("{}", String::from_utf8_lossy(&output.stdout));
+            print!("{}", tail_file(&log_file, *lines)?);
             return Ok(());
         }
         Some(Command::Config { action }) => {
-            return cmd_config(action, &config_path).await;
+            let action = action.clone().unwrap_or(ConfigAction::Show);
+            return cmd_config(&action, &config_path).await;
         }
         Some(Command::Onboard) => {
             let completed = oxios_kernel::onboarding::run_onboarding(&oxios_home, &mut config)?;
@@ -574,7 +956,17 @@ async fn main() -> Result<()> {
             return Ok(());
         }
         Some(Command::Reset { yes }) => {
-            return cmd_reset(&oxios_home, *yes);
+            let pid_file = oxios_kernel::config::expand_home(&config.daemon.pid_file);
+            return cmd_reset(&oxios_home, *yes, &pid_file);
+        }
+        Some(Command::Models { provider }) => {
+            return cmd_models(provider.as_deref());
+        }
+        Some(Command::Completion { shell }) => {
+            let mut cmd = Cli::command();
+            let name = cmd.get_name().to_string();
+            generate(*shell, &mut cmd, name, &mut std::io::stdout());
+            return Ok(());
         }
         _ => {}
     }
@@ -604,21 +996,40 @@ async fn main() -> Result<()> {
             if config_path.exists() {
                 config = oxios_kernel::config::load_config(&config_path)?;
             }
+
+            // ── Onboarding → start flow ──
+            let start_now = inquire::Confirm::new("  Start daemon now?")
+                .with_default(true)
+                .prompt()?;
+            if !start_now {
+                println!(
+                    "  Run {} when ready.",
+                    style("`oxios start`").cyan()
+                );
+                return Ok(());
+            }
+            // fall through to kernel assembly → daemon start
         } else {
             return Ok(());
         }
     }
 
-    // ── Kernel assembly (needed by most commands) ──
+    // ── Kernel assembly ──
+    let term = console::Term::stderr();
+    let _ = term.write_str(&format!("  {} Starting Oxios...\r", style("⠋").cyan()));
+    let _ = term.flush();
+
     let kernel = Kernel::builder()
         .config_path(config_path.clone())
         .build()
         .await?;
 
+    let _ = term.clear_line();
+
     // ── Dispatch subcommands ──
     match cli.command.as_ref() {
-        // Default: start daemon
-        None => {
+        // Default / start: launch daemon
+        None | Some(Command::Start) => {
             let daemon = DaemonManager::new(&config.daemon.pid_file, &config.daemon.log_dir);
             if cli.foreground {
                 cmd_serve(&kernel, &config_path).await
@@ -650,6 +1061,8 @@ async fn main() -> Result<()> {
         }
 
         Some(Command::Status) => cmd_status(&kernel).await,
+
+        Some(Command::Doctor) => cmd_doctor(&kernel, &config_path).await,
 
         Some(Command::Chat) => {
             #[cfg(feature = "cli")]
@@ -704,10 +1117,10 @@ async fn main() -> Result<()> {
                         .await
                         .map_err(|e| anyhow::anyhow!("failed to list agents: {}", e))?;
                     if agents.is_empty() {
-                        println!("No active agents.");
+                        println!("  No active agents.");
                     } else {
                         println!("{:36} {:10} {:20} CREATED", "ID", "STATUS", "NAME");
-                        println!("{}", "-".repeat(90));
+                        println!("{}", "─".repeat(90));
                         for agent in &agents {
                             println!(
                                 "{:36} {:10} {:20} {}",
@@ -729,7 +1142,11 @@ async fn main() -> Result<()> {
                         .kill(id)
                         .await
                         .map_err(|e| anyhow::anyhow!("failed to kill agent {}: {}", id, e))?;
-                    println!("Agent {} terminated.", id);
+                    println!(
+                        "  {} Agent {} terminated.",
+                        style("✓").green(),
+                        style(id).cyan()
+                    );
                     Ok(())
                 }
             }
@@ -738,20 +1155,27 @@ async fn main() -> Result<()> {
         Some(Command::Audit) => {
             let handle = kernel.handle();
             match handle.security.verify_chain() {
-                Ok(_) => println!("✓ Audit trail verified — chain intact."),
+                Ok(_) => println!(
+                    "  {} Audit trail verified — chain intact.",
+                    style("✓").green().bold()
+                ),
                 Err(e) => {
-                    eprintln!("✗ Audit verification failed: {:?}", e);
+                    eprintln!(
+                        "  {} Audit verification failed: {:?}",
+                        style("✗").red().bold(),
+                        e
+                    );
                     println!("  Some entries may have been tampered with.");
                 }
             }
             let entries = handle.security.query_audit(0, 20);
             println!();
             if entries.is_empty() {
-                println!("No audit entries yet.");
+                println!("  No audit entries yet.");
             } else {
-                println!("Recent Audit Entries (showing last {}):", entries.len());
+                println!("  Recent Audit Entries (showing last {}):", entries.len());
                 println!("{:10} {:20} {:15} ACTION", "SEQ", "TIMESTAMP", "ACTOR");
-                println!("{}", "-".repeat(70));
+                println!("{}", "─".repeat(70));
                 for entry in &entries {
                     println!(
                         "{:10} {:20} {:15} {:?}",
@@ -762,7 +1186,7 @@ async fn main() -> Result<()> {
                     );
                 }
             }
-            println!("\nTotal entries: {}", handle.security.audit_count());
+            println!("\n  Total entries: {}", handle.security.audit_count());
             Ok(())
         }
 
@@ -776,10 +1200,10 @@ async fn main() -> Result<()> {
                         .git_log(limit)
                         .map_err(|e| anyhow::anyhow!("failed to get git log: {}", e))?;
                     if entries.is_empty() {
-                        println!("No commits yet.");
+                        println!("  No commits yet.");
                     } else {
                         println!("{:8} {:20} {:40}", "HASH", "AUTHOR", "MESSAGE");
-                        println!("{}", "-".repeat(75));
+                        println!("{}", "─".repeat(75));
                         for entry in entries {
                             let short_hash = &entry.hash[..8.min(entry.hash.len())];
                             let author = entry.author.chars().take(20).collect::<String>();
@@ -795,7 +1219,7 @@ async fn main() -> Result<()> {
                         .infra
                         .git_tag(name, msg)
                         .map_err(|e| anyhow::anyhow!("failed to create tag: {}", e))?;
-                    println!("Tagged '{}'.", name);
+                    println!("  {} '{}'.", style("Tagged").green(), style(name).cyan());
                     if !msg.is_empty() {
                         println!("  Message: {}", msg);
                     }
@@ -823,9 +1247,9 @@ async fn main() -> Result<()> {
                         "  {:<22}  {}",
                         "Status:",
                         if budget.is_exhausted {
-                            "⚠ EXHAUSTED"
+                            style("⚠ EXHAUSTED").yellow().bold().to_string()
                         } else {
-                            "✓ OK"
+                            style("✓ OK").green().to_string()
                         }
                     );
                     println!();
@@ -846,7 +1270,7 @@ async fn main() -> Result<()> {
             let handle = kernel.handle();
             match handle.extensions.get_program(name).await {
                 Some(program) => {
-                    println!("\n  {} v{}", program.meta.name, program.meta.version);
+                    println!("\n  {} {}", style(&program.meta.name).bold(), style(format!("v{}", program.meta.version)).dim());
                     println!("  {}", "─".repeat(50));
                     if !program.meta.description.is_empty() {
                         println!("  {}", program.meta.description);
@@ -857,7 +1281,7 @@ async fn main() -> Result<()> {
                     if !program.meta.tools.is_empty() {
                         println!("\n  Tools:");
                         for tool in &program.meta.tools {
-                            println!("    • {}: {}", tool.name, tool.description);
+                            println!("    {} {}: {}", style("•").dim(), tool.name, tool.description);
                         }
                     }
                     if !program.meta.host_requirements.required.is_empty() {
@@ -886,7 +1310,11 @@ async fn main() -> Result<()> {
         Some(Command::Stop)
         | Some(Command::Daemon { .. })
         | Some(Command::Log { .. })
-        | Some(Command::Config { .. }) => unreachable!(),
+        | Some(Command::Config { .. })
+        | Some(Command::Onboard)
+        | Some(Command::Reset { .. })
+        | Some(Command::Models { .. })
+        | Some(Command::Completion { .. }) => unreachable!(),
     }
 }
 
@@ -915,11 +1343,15 @@ async fn cmd_serve(kernel: &Kernel, config_path: &Path) -> Result<()> {
 
     let config = kernel.config();
     println!();
-    println!("  ⬡ Oxios Agent OS  v{}", env!("CARGO_PKG_VERSION"));
+    println!(
+        "  {} {}",
+        style("⬡ Oxios Agent OS").bold(),
+        style(format!("v{}", env!("CARGO_PKG_VERSION"))).dim()
+    );
     println!("  {}", "─".repeat(48));
     println!(
-        "  Gateway:  http://{}:{}",
-        config.gateway.host, config.gateway.port
+        "  Gateway:  {}",
+        style(format!("http://{}:{}", config.gateway.host, config.gateway.port)).cyan()
     );
     println!();
     tracing::info!(

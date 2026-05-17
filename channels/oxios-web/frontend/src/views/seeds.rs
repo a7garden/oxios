@@ -7,7 +7,7 @@ use dioxus::prelude::*;
 #[component]
 pub fn SeedsView() -> Element {
     let mut resource = use_resource(|| async move {
-        api::fetch_json::<Vec<api::SeedSummary>>("/api/seeds").await
+        api::fetch_paginated::<api::SeedSummary>("/api/seeds").await
     });
 
     let mut selected_id = use_signal(|| None::<String>);

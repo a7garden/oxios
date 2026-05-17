@@ -180,10 +180,6 @@ icon!(IconAlertTriangle,
     path { d: "M12 17h.01" }
 );
 
-icon!(IconPlus,
-    path { d: "M12 5v14M5 12h14" }
-);
-
 icon!(IconTrash,
     path { d: "M3 6h18" }
     path { d: "M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" }
@@ -196,16 +192,6 @@ icon!(IconLoading,
 icon!(IconEye,
     path { d: "M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" }
     circle { cx: "12", cy: "12", r: "3" }
-);
-
-icon!(IconChevronDown,
-    path { d: "M6 9l6 6 6-6" }
-);
-
-icon!(IconLogOut,
-    path { d: "M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" }
-    path { d: "M16 17l5-5-5-5" }
-    path { d: "M21 12H9" }
 );
 
 icon!(IconZap,
@@ -222,12 +208,6 @@ icon!(IconCopy,
     path { d: "M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" }
 );
 
-icon!(IconExternalLink,
-    path { d: "M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" }
-    path { d: "M15 3h6v6" }
-    path { d: "M10 14L21 3" }
-);
-
 icon!(IconCircleCheck,
     path { d: "M22 11.08V12a10 10 0 1 1-5.93-9.14" }
     path { d: "M22 4L12 14.01l-3-3" }
@@ -236,18 +216,6 @@ icon!(IconCircleCheck,
 icon!(IconCircleX,
     circle { cx: "12", cy: "12", r: "10" }
     path { d: "M15 9l-6 6M9 9l6 6" }
-);
-
-icon!(IconInfo,
-    circle { cx: "12", cy: "12", r: "10" }
-    path { d: "M12 16v-4" }
-    path { d: "M12 8h.01" }
-);
-
-icon!(IconDatabase,
-    ellipse { cx: "12", cy: "5", rx: "9", ry: "3" }
-    path { d: "M21 12c0 1.66-4 3-9 3s-9-1.34-9-3" }
-    path { d: "M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" }
 );
 
 icon!(IconPlay,

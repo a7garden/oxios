@@ -1,7 +1,46 @@
 //! API types and fetch helpers for the Oxios backend.
 
+use dioxus::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+
+// ---------------------------------------------------------------------------
+// Global error toast
+// ---------------------------------------------------------------------------
+
+/// Global signal for the last API error (consumed by AppLayout toast).
+static LAST_ERROR: GlobalSignal<Option<String>> = Signal::global(|| None);
+
+/// Read the current global API error.
+pub fn last_api_error() -> Option<String> {
+    LAST_ERROR().clone()
+}
+
+/// Set the global API error (shown as toast).
+fn set_api_error(msg: String) {
+    *LAST_ERROR.write() = Some(msg);
+}
+
+/// Clear the global API error (dismiss toast).
+pub fn clear_api_error() {
+    *LAST_ERROR.write() = None;
+}
+
+// ---------------------------------------------------------------------------
+// HTTP response helpers
+// ---------------------------------------------------------------------------
+
+/// Check HTTP status and return an error for 4xx/5xx responses.
+fn check_status(response: &gloo_net::http::Response, method: &str, path: &str) -> Result<(), String> {
+    let status = response.status();
+    if status >= 400 {
+        let msg = format!("{method} {path}: HTTP {status}");
+        set_api_error(msg.clone());
+        Err(msg)
+    } else {
+        Ok(())
+    }
+}
 
 // ---------------------------------------------------------------------------
 // Fetch helpers (gloo-net)
@@ -9,11 +48,12 @@ use std::collections::HashMap;
 
 /// GET JSON from `path`, deserializing into `T`.
 pub async fn fetch_json<T: serde::de::DeserializeOwned>(path: &str) -> Result<T, String> {
-    gloo_net::http::Request::get(path)
+    let resp = gloo_net::http::Request::get(path)
         .send()
         .await
-        .map_err(|e| format!("GET {path}: {e}"))?
-        .json::<T>()
+        .map_err(|e| format!("GET {path}: {e}"))?;
+    check_status(&resp, "GET", path)?;
+    resp.json::<T>()
         .await
         .map_err(|e| format!("GET {path} decode: {e}"))
 }
@@ -23,13 +63,14 @@ pub async fn post_json<T: serde::de::DeserializeOwned, B: Serialize>(
     path: &str,
     body: &B,
 ) -> Result<T, String> {
-    gloo_net::http::Request::post(path)
+    let resp = gloo_net::http::Request::post(path)
         .json(body)
         .map_err(|e| format!("POST {path} encode: {e}"))?
         .send()
         .await
-        .map_err(|e| format!("POST {path}: {e}"))?
-        .json::<T>()
+        .map_err(|e| format!("POST {path}: {e}"))?;
+    check_status(&resp, "POST", path)?;
+    resp.json::<T>()
         .await
         .map_err(|e| format!("POST {path} decode: {e}"))
 }
@@ -37,11 +78,12 @@ pub async fn post_json<T: serde::de::DeserializeOwned, B: Serialize>(
 /// POST with no body, deserializing the response into `T`.
 #[allow(dead_code)]
 pub async fn post_empty<T: serde::de::DeserializeOwned>(path: &str) -> Result<T, String> {
-    gloo_net::http::Request::post(path)
+    let resp = gloo_net::http::Request::post(path)
         .send()
         .await
-        .map_err(|e| format!("POST {path}: {e}"))?
-        .json::<T>()
+        .map_err(|e| format!("POST {path}: {e}"))?;
+    check_status(&resp, "POST", path)?;
+    resp.json::<T>()
         .await
         .map_err(|e| format!("POST {path} decode: {e}"))
 }
@@ -52,13 +94,14 @@ pub async fn put_json<T: serde::de::DeserializeOwned, B: Serialize>(
     path: &str,
     body: &B,
 ) -> Result<T, String> {
-    gloo_net::http::Request::put(path)
+    let resp = gloo_net::http::Request::put(path)
         .json(body)
         .map_err(|e| format!("PUT {path} encode: {e}"))?
         .send()
         .await
-        .map_err(|e| format!("PUT {path}: {e}"))?
-        .json::<T>()
+        .map_err(|e| format!("PUT {path}: {e}"))?;
+    check_status(&resp, "PUT", path)?;
+    resp.json::<T>()
         .await
         .map_err(|e| format!("PUT {path} decode: {e}"))
 }
@@ -66,41 +109,50 @@ pub async fn put_json<T: serde::de::DeserializeOwned, B: Serialize>(
 /// DELETE `path`, deserializing the response into `T`.
 #[allow(dead_code)]
 pub async fn delete_json<T: serde::de::DeserializeOwned>(path: &str) -> Result<T, String> {
-    gloo_net::http::Request::delete(path)
+    let resp = gloo_net::http::Request::delete(path)
         .send()
         .await
-        .map_err(|e| format!("DELETE {path}: {e}"))?
-        .json::<T>()
+        .map_err(|e| format!("DELETE {path}: {e}"))?;
+    check_status(&resp, "DELETE", path)?;
+    resp.json::<T>()
         .await
         .map_err(|e| format!("DELETE {path} decode: {e}"))
 }
 
-/// POST with no body, ignoring the response body. Used for action endpoints
+/// POST with no body, checking for HTTP errors. Used for action endpoints
 /// that return status codes or simple JSON we don't need to parse.
 pub async fn post_action(path: &str) -> Result<(), String> {
-    gloo_net::http::Request::post(path)
+    let resp = gloo_net::http::Request::post(path)
         .send()
         .await
         .map_err(|e| format!("POST {path}: {e}"))?;
-    Ok(())
+    check_status(&resp, "POST", path)
 }
 
-/// DELETE, ignoring the response body.
+/// DELETE, checking for HTTP errors.
 pub async fn delete_action(path: &str) -> Result<(), String> {
-    gloo_net::http::Request::delete(path)
+    let resp = gloo_net::http::Request::delete(path)
         .send()
         .await
         .map_err(|e| format!("DELETE {path}: {e}"))?;
-    Ok(())
+    check_status(&resp, "DELETE", path)
+}
+
+/// GET paginated JSON from `path`, returning just the items vector.
+pub async fn fetch_paginated<T: serde::de::DeserializeOwned>(path: &str) -> Result<Vec<T>, String> {
+    fetch_json::<PaginatedResponse<T>>(path)
+        .await
+        .map(|r| r.items)
 }
 
 /// GET raw text from `path`.
 pub async fn fetch_text(path: &str) -> Result<String, String> {
-    gloo_net::http::Request::get(path)
+    let resp = gloo_net::http::Request::get(path)
         .send()
         .await
-        .map_err(|e| format!("GET {path}: {e}"))?
-        .text()
+        .map_err(|e| format!("GET {path}: {e}"))?;
+    check_status(&resp, "GET", path)?;
+    resp.text()
         .await
         .map_err(|e| format!("GET {path} text: {e}"))
 }
@@ -108,13 +160,13 @@ pub async fn fetch_text(path: &str) -> Result<String, String> {
 /// PUT raw text body to `path`.
 #[allow(dead_code)]
 pub async fn put_text(path: &str, body: &str) -> Result<(), String> {
-    gloo_net::http::Request::put(path)
+    let resp = gloo_net::http::Request::put(path)
         .body(body)
         .map_err(|e| format!("PUT {path} encode: {e}"))?
         .send()
         .await
         .map_err(|e| format!("PUT {path}: {e}"))?;
-    Ok(())
+    check_status(&resp, "PUT", path)
 }
 
 // ---------------------------------------------------------------------------
@@ -151,42 +203,65 @@ pub struct EvaluationInfo {
 // Dashboard / Status types
 // ---------------------------------------------------------------------------
 
-/// System status response.
+/// System status response (matches backend `routes::system::StatusResponse`).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[allow(dead_code)]
 pub struct StatusResponse {
-    pub version: String,
-    pub uptime_secs: u64,
-    pub active_agents: usize,
-
-    pub total_seeds: usize,
-    #[serde(default)]
-    pub kernel_status: Option<String>,
-}
-
-/// Agent information (used by dashboard).
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[allow(dead_code)]
-pub struct AgentInfo {
-    pub id: String,
-    pub name: String,
+    pub service: String,
     pub status: String,
+    pub version: String,
     #[serde(default)]
-    pub pid: Option<u32>,
+    pub channels: Vec<String>,
+    pub uptime: String,
     #[serde(default)]
-    pub started_at: Option<String>,
+    pub components: Option<ComponentHealth>,
 }
 
-/// Scheduler statistics (used by dashboard).
+/// Component-level health (matches backend `routes::system::ComponentHealth`).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[allow(dead_code)]
-pub struct SchedulerStats {
-    pub pending_tasks: usize,
-    pub running_tasks: usize,
-    pub completed_tasks: usize,
-    pub failed_tasks: usize,
+pub struct ComponentHealth {
+    pub state_store: ComponentStatus,
+    pub event_bus: ComponentStatus,
+    pub memory: MemoryHealth,
+    pub agents: AgentHealth,
+}
+
+/// Individual component status.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(dead_code)]
+pub struct ComponentStatus {
+    pub healthy: bool,
     #[serde(default)]
-    pub uptime_secs: Option<u64>,
+    pub detail: Option<String>,
+}
+
+/// Memory subsystem health.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(dead_code)]
+pub struct MemoryHealth {
+    pub enabled: bool,
+    pub index_size: usize,
+    pub total_entries: usize,
+}
+
+/// Agent subsystem health.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(dead_code)]
+pub struct AgentHealth {
+    pub active_count: usize,
+    pub total_forked: u64,
+    pub total_completed: u64,
+    pub total_failed: u64,
+}
+
+/// Paginated response wrapper from the backend.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PaginatedResponse<T> {
+    pub items: Vec<T>,
+    pub total: usize,
+    pub page: usize,
+    pub limit: usize,
 }
 
 // ---------------------------------------------------------------------------
@@ -217,24 +292,6 @@ pub struct SeedSummary {
     pub created_at: String,
 }
 
-/// Detailed seed info — kept for backward compat.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[allow(dead_code)]
-pub struct SeedInfo {
-    pub id: String,
-    pub name: String,
-    pub phase: String,
-    pub spec: String,
-    #[serde(default)]
-    pub evaluation_score: Option<f64>,
-    #[serde(default)]
-    pub iterations: Option<u32>,
-    #[serde(default)]
-    pub created_at: Option<String>,
-    #[serde(default)]
-    pub updated_at: Option<String>,
-}
-
 // ---------------------------------------------------------------------------
 // Skills (backend /api/skills)
 // ---------------------------------------------------------------------------
@@ -245,25 +302,11 @@ pub struct SeedInfo {
 pub struct SkillInfo {
     pub name: String,
     pub description: String,
-    #[serde(default)]
-    pub path: Option<String>,
 }
 
 // ---------------------------------------------------------------------------
 // Memory (backend /api/memory)
 // ---------------------------------------------------------------------------
-
-/// Memory / knowledge entry — kept for backward compat.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[allow(dead_code)]
-pub struct MemoryEntry {
-    pub key: String,
-    pub value: String,
-    #[serde(default)]
-    pub category: Option<String>,
-    #[serde(default)]
-    pub updated_at: Option<String>,
-}
 
 /// Memory list item from backend.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -317,19 +360,6 @@ pub struct SchedulerTasks {
 // Security / Audit (backend /api/audit)
 // ---------------------------------------------------------------------------
 
-/// Audit log entry — kept for backward compat.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[allow(dead_code)]
-pub struct AuditEntry {
-    pub timestamp: String,
-    pub action: String,
-    pub agent: String,
-    #[serde(default)]
-    pub resource: Option<String>,
-    #[serde(default)]
-    pub result: Option<String>,
-}
-
 /// Audit entry from backend.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AuditLogEntry {
@@ -345,20 +375,6 @@ pub struct AuditLogEntry {
 // ---------------------------------------------------------------------------
 // Approvals (backend /api/approvals)
 // ---------------------------------------------------------------------------
-
-/// Approval request information — kept for backward compat.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[allow(dead_code)]
-pub struct ApprovalInfo {
-    pub id: String,
-    pub agent: String,
-    pub action: String,
-    pub status: String,
-    #[serde(default)]
-    pub requested_at: Option<String>,
-    #[serde(default)]
-    pub resolved_at: Option<String>,
-}
 
 /// Approval response from backend.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -376,21 +392,6 @@ pub struct ApprovalResponse {
 // Programs (backend /api/programs)
 // ---------------------------------------------------------------------------
 
-/// Program information — kept for backward compat.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[allow(dead_code)]
-pub struct ProgramInfo {
-    pub name: String,
-    pub version: String,
-    pub description: String,
-    #[serde(default)]
-    pub author: Option<String>,
-    #[serde(default)]
-    pub tools: Vec<String>,
-    #[serde(default)]
-    pub installed_at: Option<String>,
-}
-
 /// Program summary from backend listing.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProgramSummary {
@@ -407,17 +408,6 @@ pub struct ProgramSummary {
 // Host Tools (backend /api/host-tools)
 // ---------------------------------------------------------------------------
 
-/// Host tool status — kept for backward compat.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[allow(dead_code)]
-pub struct HostToolStatus {
-    pub all_required_present: bool,
-    #[serde(default)]
-    pub missing_required: Vec<String>,
-    #[serde(default)]
-    pub optional_available: Vec<String>,
-}
-
 /// Host tools status from backend.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HostToolsStatusResponse {
@@ -429,17 +419,6 @@ pub struct HostToolsStatusResponse {
 // ---------------------------------------------------------------------------
 // Personas (backend /api/personas)
 // ---------------------------------------------------------------------------
-
-/// Persona information — kept for backward compat.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[allow(dead_code)]
-pub struct PersonaInfo {
-    pub id: String,
-    pub name: String,
-    pub description: String,
-    #[serde(default)]
-    pub active: Option<bool>,
-}
 
 /// Persona summary from backend listing.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -454,47 +433,8 @@ pub struct PersonaSummary {
 }
 
 // ---------------------------------------------------------------------------
-// MCP (stub)
-// ---------------------------------------------------------------------------
-
-/// MCP server information.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[allow(dead_code)]
-pub struct McpServerInfo {
-    pub name: String,
-    pub status: String,
-    #[serde(default)]
-    pub url: Option<String>,
-    #[serde(default)]
-    pub tools_count: Option<usize>,
-}
-
-// ---------------------------------------------------------------------------
-// Config (backend /api/config)
-// ---------------------------------------------------------------------------
-
-/// Configuration response — kept for backward compat.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[allow(dead_code)]
-pub struct ConfigResponse {
-    pub toml: String,
-    #[serde(default)]
-    pub path: Option<String>,
-}
-
-// ---------------------------------------------------------------------------
 // Workspace (backend /api/workspace)
 // ---------------------------------------------------------------------------
-
-/// Workspace tree entry — kept for backward compat.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[allow(dead_code)]
-pub struct TreeEntryOld {
-    pub name: String,
-    pub kind: String,
-    #[serde(default)]
-    pub children: Vec<TreeEntryOld>,
-}
 
 /// Workspace tree entry from backend.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -508,36 +448,10 @@ pub struct TreeEntry {
 // SSE events
 // ---------------------------------------------------------------------------
 
-/// SSE event from the event bus — kept for backward compat.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[allow(dead_code)]
-pub struct SseEvent {
-    pub event_type: String,
-    #[serde(default)]
-    pub payload: Option<serde_json::Value>,
-    #[serde(default)]
-    pub timestamp: Option<String>,
-}
-
 /// SSE event entry stored for display.
 #[derive(Debug, Clone)]
 pub struct EventEntry {
     pub time: String,
     pub event_type: String,
     pub data: String,
-}
-
-// ---------------------------------------------------------------------------
-// Sessions
-// ---------------------------------------------------------------------------
-
-/// Session information.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[allow(dead_code)]
-pub struct SessionInfo {
-    pub id: String,
-    #[serde(default)]
-    pub created_at: Option<String>,
-    #[serde(default)]
-    pub message_count: Option<usize>,
 }

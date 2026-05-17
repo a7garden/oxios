@@ -33,13 +33,13 @@ pub(crate) async fn handle_programs_list(
     let summaries: Vec<ProgramSummary> = programs
         .into_iter()
         .map(|p| ProgramSummary {
-            name: p.name,
-            version: p.version,
-            description: p.description,
-            author: p.author,
-            enabled: false, // ProgramMeta doesn't have enabled; check original
-            tools_count: p.tools.len(),
-            has_skill_content: false, // ProgramMeta doesn't have skill_content
+            name: p.meta.name,
+            version: p.meta.version,
+            description: p.meta.description,
+            author: p.meta.author,
+            enabled: p.enabled,
+            tools_count: p.meta.tools.len(),
+            has_skill_content: !p.skill_content.is_empty(),
         })
         .collect();
     Json(paginate(&summaries, &params))

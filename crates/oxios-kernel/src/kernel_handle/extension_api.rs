@@ -27,13 +27,8 @@ impl ExtensionApi {
         }
     }
     /// List installed programs.
-    pub async fn list_programs(&self) -> Vec<ProgramMeta> {
-        self.program_manager
-            .list_programs()
-            .await
-            .into_iter()
-            .map(|p| p.meta)
-            .collect()
+    pub async fn list_programs(&self) -> Vec<Program> {
+        self.program_manager.list_programs().await
     }
 
     /// Get program details.

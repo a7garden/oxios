@@ -7,7 +7,7 @@ use dioxus::prelude::*;
 #[component]
 pub fn MemoryView() -> Element {
     let mut resource = use_resource(|| async move {
-        api::fetch_json::<Vec<api::MemoryListItem>>("/api/memory").await
+        api::fetch_paginated::<api::MemoryListItem>("/api/memory").await
     });
 
     let mut selected_name = use_signal(|| None::<String>);

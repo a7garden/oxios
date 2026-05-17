@@ -68,6 +68,7 @@ browser = ["oxios-kernel/browser"]
 oxios-kernel = { version = "0.1.1", path = "crates/oxios-kernel", default-features = false }
 oxios-ouroboros = { version = "0.1.1", path = "crates/oxios-ouroboros" }
 oxios-gateway = { version = "0.1.1", path = "crates/oxios-gateway" }
+oxi-sdk = { workspace = true }
 oxios-web = { version = "0.1.1", path = "channels/oxios-web", optional = true }
 oxios-cli = { version = "0.1.1", path = "channels/oxios-cli", optional = true }
 oxios-telegram = { version = "0.1.1", path = "channels/oxios-telegram", optional = true }
@@ -84,6 +85,10 @@ parking_lot = { workspace = true }
 tracing-appender = { workspace = true }
 serde_json = { workspace = true }
 chrono = { workspace = true }
+inquire = "0.9"
+libc = "0.2"
+console = "0.15"
+clap_complete = "4"
 
 [dev-dependencies]
 oxios-ouroboros = { version = "0.1.1", path = "crates/oxios-ouroboros" }

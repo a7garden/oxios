@@ -7,8 +7,9 @@
 
 use crate::config::OxiosConfig;
 use crate::credential::CredentialStore;
+use console::style;
 use inquire::{Confirm, CustomType, Select, Text};
-use std::io::{self, IsTerminal};
+use std::io::{self, IsTerminal, Write};
 use std::path::Path;
 
 // ── Constants ───────────────────────────────────────────────────────────────
@@ -456,30 +457,35 @@ fn write_config(oxios_home: &Path, config: &OxiosConfig) -> anyhow::Result<()> {
 fn print_banner() {
     println!();
     println!("  ╔═══════════════════════════════════════════╗");
-    println!("  ║       ⬡  Oxios — First-time Setup        ║");
+    println!("  ║       {}  ║", style("⬡  Oxios — First-time Setup").bold());
     println!("  ╚═══════════════════════════════════════════╝");
     println!();
     println!("  This wizard will configure your API credentials.");
-    println!("  Use ↑↓ arrow keys to navigate, Enter to confirm.");
-    println!("  Press Ctrl+C at any time to cancel.");
+    println!("  Use {} arrow keys to navigate, Enter to confirm.", style("↑↓").cyan());
+    println!("  Press {} at any time to cancel.", style("Ctrl+C").yellow());
 }
 
 fn print_success(oxios_home: &Path, model: &str) {
     println!();
     println!("  ╔═══════════════════════════════════════════╗");
-    println!("  ║             Setup Complete!               ║");
+    println!("  ║             {}               ║", style("Setup Complete!").green().bold());
     println!("  ╚═══════════════════════════════════════════╝");
     println!();
     println!(
-        "    Config:   {}",
+        "    {}   {}",
+        style("Config:").dim(),
         oxios_home.join("config.toml").display()
     );
-    println!("    Model:    {}", model);
+    println!(
+        "    {}    {}",
+        style("Model:").dim(),
+        style(model).cyan()
+    );
     println!();
     println!("  Next steps:");
-    println!("    oxios               → start the daemon");
-    println!("    oxios daemon install → register as system service");
-    println!("    open http://127.0.0.1:4200");
+    println!("    {} → start the daemon", style("oxios start").cyan());
+    println!("    {} → register as system service", style("oxios daemon install").cyan());
+    println!("    {} → open web dashboard", style("open http://127.0.0.1:4200").cyan());
     println!();
 }
 

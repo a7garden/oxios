@@ -7,7 +7,7 @@ use dioxus::prelude::*;
 #[component]
 pub fn ProgramsView() -> Element {
     let mut resource = use_resource(|| async move {
-        api::fetch_json::<Vec<api::ProgramSummary>>("/api/programs").await
+        api::fetch_paginated::<api::ProgramSummary>("/api/programs").await
     });
 
     let content: Element = match &(resource.value())() {

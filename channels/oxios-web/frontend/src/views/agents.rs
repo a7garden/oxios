@@ -1,13 +1,15 @@
 //! Agent list table with kill button and refresh.
 
-use crate::api;
+use crate::api::{self, AgentSummary, PaginatedResponse};
 use crate::components::icons::*;
 use dioxus::prelude::*;
 
 #[component]
 pub fn AgentsView() -> Element {
     let mut resource = use_resource(|| async move {
-        api::fetch_json::<Vec<api::AgentSummary>>("/api/agents").await
+        api::fetch_json::<PaginatedResponse<AgentSummary>>("/api/agents")
+            .await
+            .map(|r| r.items)
     });
 
     let content: Element = match &(resource.value())() {

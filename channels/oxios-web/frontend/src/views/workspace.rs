@@ -4,6 +4,14 @@ use crate::api;
 use crate::components::icons::*;
 use dioxus::prelude::*;
 
+/// Copy text to clipboard via JS interop.
+fn copy_to_clipboard(text: &str) {
+    use wasm_bindgen::prelude::*;
+    #[wasm_bindgen(inline_js = "export function cp(t) { navigator.clipboard.writeText(t); }")]
+    extern "C" { fn cp(t: &str); }
+    cp(text);
+}
+
 #[component]
 pub fn WorkspaceView() -> Element {
     let mut current_dir = use_signal(String::new);
@@ -64,7 +72,14 @@ pub fn WorkspaceView() -> Element {
                                 selected_file.set(Some(cn));
                                 spawn(async move {
                                     match api::fetch_text(&format!("/api/workspace/file/{full}")).await {
-                                        Ok(c) => file_content.set(c),
+                                        Ok(c) => {
+                                            // Detect binary files by checking for null bytes
+                                            if c.contains('\0') {
+                                                file_content.set("Binary file — cannot display as text.".to_string());
+                                            } else {
+                                                file_content.set(c);
+                                            }
+                                        }
                                         Err(e) => file_content.set(format!("Error: {e}")),
                                     }
                                 });
@@ -98,9 +113,23 @@ pub fn WorkspaceView() -> Element {
     let viewer_content: Element = {
         let sel = (selected_file()).clone();
         match sel {
-            Some(_name) => {
+            Some(name) => {
                 let content = file_content().clone();
-                rsx! { pre { "{content}" } }
+                rsx! {
+                    div { style: "display:flex;align-items:center;gap:6px;margin-bottom:8px;color:var(--text-3);font-size:12px",
+                        IconEye { size: 14 }
+                        span { "{name}" }
+                        button {
+                            class: "btn btn-sm",
+                            style: "margin-left:auto",
+                            onclick: move |_| {
+                                copy_to_clipboard(&content);
+                            },
+                            IconCopy { size: 12 }
+                        }
+                    }
+                    pre { "{content}" }
+                }
             }
             None => rsx! {
                 div { class: "empty-state",
@@ -129,6 +158,10 @@ pub fn WorkspaceView() -> Element {
             }
             div { class: "workspace-split",
                 div { class: "workspace-tree",
+                    // Breadcrumb above the tree
+                    div { class: "workspace-toolbar",
+                        span { class: "breadcrumb", "{bc}" }
+                    }
                     {
                         let dir = current_dir().clone();
                         let has_parent = !dir.is_empty();
@@ -153,13 +186,8 @@ pub fn WorkspaceView() -> Element {
                     }
                     {tree_content}
                 }
-                div { style: "flex:1;display:flex;flex-direction:column;overflow:hidden",
-                    div { class: "workspace-toolbar",
-                        span { class: "breadcrumb", "{bc}" }
-                    }
-                    div { class: "workspace-viewer",
-                        {viewer_content}
-                    }
+                div { class: "workspace-viewer",
+                    {viewer_content}
                 }
             }
         }

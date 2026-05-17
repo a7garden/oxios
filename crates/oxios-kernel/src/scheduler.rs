@@ -124,6 +124,8 @@ pub struct SchedulerStats {
     pub max_concurrent: usize,
     /// Rate limit (requests per minute).
     pub rate_limit_per_minute: u32,
+    /// Remaining rate limit capacity.
+    pub rate_remaining: u32,
 }
 
 impl Default for SchedulerStats {
@@ -135,6 +137,7 @@ impl Default for SchedulerStats {
             failed: 0,
             max_concurrent: 5,
             rate_limit_per_minute: 60,
+            rate_remaining: 60,
         }
     }
 }
@@ -537,6 +540,7 @@ impl AgentScheduler {
             failed: _failed,
             max_concurrent: self.max_concurrent,
             rate_limit_per_minute: rate_limiter.max_requests,
+            rate_remaining: rate_limiter.remaining(),
         }
     }
 

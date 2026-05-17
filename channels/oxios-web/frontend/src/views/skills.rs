@@ -1,4 +1,4 @@
-//! Skill list — simple display, CRUD not needed in UI.
+//! Skill list with delete support.
 
 use crate::api;
 use crate::components::icons::*;
@@ -7,7 +7,7 @@ use dioxus::prelude::*;
 #[component]
 pub fn SkillsView() -> Element {
     let mut resource = use_resource(|| async move {
-        api::fetch_json::<Vec<api::SkillInfo>>("/api/skills").await
+        api::fetch_paginated::<api::SkillInfo>("/api/skills").await
     });
 
     let content: Element = match &(resource.value())() {
@@ -21,10 +21,31 @@ pub fn SkillsView() -> Element {
             let items: Vec<Element> = skills.iter().map(|skill| {
                 let name = skill.name.clone();
                 let desc = skill.description.clone();
+                let del_name = name.clone();
                 rsx! {
                     div { class: "item-card", key: "{name}",
-                        div { class: "item-title", "{name}" }
-                        div { class: "item-subtitle", "{desc}" }
+                        div { style: "display:flex;justify-content:space-between;align-items:center",
+                            div {
+                                div { class: "item-title", "{name}" }
+                                div { class: "item-subtitle", "{desc}" }
+                            }
+                            {
+                                let dn = del_name.clone();
+                                rsx! {
+                                    button {
+                                        class: "btn btn-danger btn-sm",
+                                        onclick: move |_| {
+                                            let n = dn.clone();
+                                            spawn(async move {
+                                                let _ = api::delete_action(&format!("/api/skills/{n}")).await;
+                                                resource.restart();
+                                            });
+                                        },
+                                        IconTrash { size: 14 }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }).collect();

@@ -168,7 +168,8 @@ pub struct EngineConfig {
     pub default_model: String,
     /// Explicit API key override (highest priority).
     /// If empty/None, falls back to oxi auth store, then env vars.
-    #[serde(default)]
+    /// Masked when serialized to API responses.
+    #[serde(default, skip_serializing)]
     pub api_key: Option<String>,
 }
 

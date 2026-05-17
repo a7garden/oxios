@@ -7,7 +7,7 @@ use dioxus::prelude::*;
 #[component]
 pub fn SecurityView() -> Element {
     let mut resource = use_resource(|| async move {
-        api::fetch_json::<Vec<api::AuditLogEntry>>("/api/audit").await
+        api::fetch_paginated::<api::AuditLogEntry>("/api/audit").await
     });
 
     let content: Element = match &(resource.value())() {

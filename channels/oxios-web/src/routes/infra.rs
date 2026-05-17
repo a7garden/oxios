@@ -45,7 +45,7 @@ pub(crate) async fn handle_scheduler_stats(
         running: stats.running,
         max_concurrent: stats.max_concurrent,
         rate_limit_per_minute: stats.rate_limit_per_minute,
-        rate_remaining: stats.rate_limit_per_minute,
+        rate_remaining: stats.rate_remaining,
     })
 }
 
@@ -60,10 +60,10 @@ pub(crate) struct TaskSummary {
     error: Option<String>,
 }
 
-/// GET /api/scheduler/tasks — List queued and running tasks (paginated).
+/// GET /api/scheduler/tasks — List queued and running tasks.
 pub(crate) async fn handle_scheduler_tasks(
     state: State<Arc<AppState>>,
-    Query(params): Query<PageParams>,
+    _params: Query<PageParams>,
 ) -> Json<serde_json::Value> {
     let queued: Vec<TaskSummary> = state
         .kernel
@@ -95,11 +95,10 @@ pub(crate) async fn handle_scheduler_tasks(
         })
         .collect();
 
-    // Combine and paginate
-    let mut all_tasks = Vec::new();
-    all_tasks.extend(queued);
-    all_tasks.extend(running);
-    Json(paginate(&all_tasks, &params))
+    Json(serde_json::json!({
+        "queued": queued,
+        "running": running,
+    }))
 }
 
 // ---------------------------------------------------------------------------
