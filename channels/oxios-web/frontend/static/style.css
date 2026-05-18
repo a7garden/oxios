@@ -1909,6 +1909,376 @@ option {
 }
 
 /* ==========================================================================
+   Settings UI — Toggle, Slider, Tags, Fields
+   ========================================================================== */
+
+/* Settings field — label + control side by side */
+.settings-field {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border-subtle);
+    gap: 16px;
+}
+
+.settings-field:last-child {
+    border-bottom: none;
+}
+
+.settings-field-label {
+    flex: 1;
+    min-width: 0;
+}
+
+.settings-field-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-0);
+    display: block;
+}
+
+.settings-field-control {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.settings-field .description {
+    font-size: 12px;
+    color: var(--text-3);
+    margin-top: 3px;
+    line-height: 1.4;
+}
+
+/* Toggle switch */
+.settings-toggle {
+    width: 44px;
+    height: 24px;
+    border-radius: 12px;
+    background: var(--bg-3);
+    cursor: pointer;
+    position: relative;
+    transition: background 0.2s ease;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    padding: 2px;
+}
+
+.settings-toggle.dangerous {
+    background: var(--danger-muted);
+}
+
+.settings-toggle-thumb {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--text-3);
+    transition: transform 0.2s ease, background 0.2s ease;
+}
+
+.settings-toggle-thumb.active {
+    background: var(--accent);
+    transform: translateX(20px);
+}
+
+.settings-toggle.dangerous .settings-toggle-thumb.active {
+    background: var(--danger);
+}
+
+/* Danger badge */
+.danger-badge {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    background: var(--danger-muted);
+    color: var(--danger);
+    padding: 2px 6px;
+    border-radius: 3px;
+    margin-left: 8px;
+}
+
+/* Range slider */
+.settings-slider {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 160px;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--bg-3);
+    outline: none;
+    cursor: pointer;
+}
+
+.settings-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+    transition: transform 0.15s ease;
+}
+
+.settings-slider::-webkit-slider-thumb:hover {
+    transform: scale(1.2);
+}
+
+.settings-slider-control {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.settings-slider-value {
+    font-size: 12px;
+    font-family: var(--font-mono);
+    color: var(--text-2);
+    min-width: 60px;
+    text-align: right;
+}
+
+/* Number input */
+.settings-number-input {
+    width: 100px;
+}
+
+.settings-number-input.error {
+    border-color: var(--danger) !important;
+}
+
+.error-text {
+    color: var(--danger) !important;
+}
+
+/* Tag chips */
+.settings-tag-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+}
+
+.tag-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--accent-muted);
+    color: var(--accent);
+    border-radius: 12px;
+    padding: 3px 8px;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.tag-chip-remove {
+    background: none;
+    border: none;
+    color: var(--accent);
+    cursor: pointer;
+    font-size: 14px;
+    line-height: 1;
+    padding: 0;
+    opacity: 0.6;
+    display: flex;
+    align-items: center;
+}
+
+.tag-chip-remove:hover {
+    opacity: 1;
+}
+
+.settings-tag-input {
+    width: 140px;
+    min-width: 100px;
+}
+
+/* Password input */
+.settings-password-container {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.settings-password-input {
+    width: 240px;
+}
+
+.settings-password-toggle {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+}
+
+.password-status-set {
+    font-size: 12px;
+    color: var(--success);
+}
+
+.password-status-none {
+    font-size: 12px;
+    color: var(--text-3);
+}
+
+.password-status-new {
+    font-size: 12px;
+    color: var(--info);
+}
+
+/* Select group */
+.settings-select-group {
+    display: flex;
+    gap: 0;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+}
+
+.settings-select-group .btn {
+    border: none;
+    border-radius: 0;
+    border-right: 1px solid var(--border);
+}
+
+.settings-select-group .btn:last-child {
+    border-right: none;
+}
+
+/* Multi-checkbox */
+.settings-multi-checkbox {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.settings-checkbox-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    user-select: none;
+}
+
+.settings-checkbox {
+    width: 16px;
+    height: 16px;
+    border: 2px solid var(--border);
+    border-radius: 3px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s ease;
+}
+
+.settings-checkbox.checked {
+    background: var(--accent);
+    border-color: var(--accent);
+}
+
+.settings-checkbox.checked::after {
+    content: "✓";
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+/* Section card extras */
+.section-description {
+    font-size: 12px;
+    color: var(--text-3);
+    margin-bottom: 12px;
+    line-height: 1.4;
+}
+
+.settings-fields {
+    /* No extra spacing — fields have their own padding */
+}
+
+/* Settings tabs */
+.settings-tabs {
+    display: flex;
+    gap: 0;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 20px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+}
+
+.settings-tabs::-webkit-scrollbar {
+    display: none;
+}
+
+.settings-tabs .tab {
+    padding: 10px 18px;
+    font-size: 13px;
+    color: var(--text-3);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.15s ease;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: none;
+    border-left: none;
+    border-right: none;
+    border-top: none;
+    white-space: nowrap;
+}
+
+.settings-tabs .tab:hover {
+    color: var(--text-0);
+}
+
+.settings-tabs .tab.tab-active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+}
+
+/* Tab content wrapper */
+.settings-tab-content {
+    max-width: 800px;
+}
+
+/* Save bar */
+.settings-save-bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+/* Restart banner */
+.restart-banner {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: var(--warning-muted);
+    border: 1px solid var(--warning);
+    border-radius: var(--radius-sm);
+    color: var(--warning);
+    font-size: 13px;
+}
+
+/* Dirty dot on tab */
+.tab-dirty::after {
+    content: "";
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    margin-left: 4px;
+}
+
+/* ==========================================================================
    Mobile Responsive (< 768px)
    ========================================================================== */
 

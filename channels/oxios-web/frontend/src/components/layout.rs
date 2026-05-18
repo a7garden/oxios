@@ -21,7 +21,7 @@ pub fn AppLayout() -> Element {
     let content: Element = match panel() {
         Panel::Chat       => rsx! { crate::views::chat::ChatView {} },
         Panel::Dashboard  => rsx! { crate::views::dashboard::DashboardView {} },
-        Panel::Config     => rsx! { crate::views::config::ConfigView {} },
+        Panel::Config     => rsx! { crate::views::settings::SettingsView {} },
         Panel::Spaces     => rsx! { crate::views::spaces::SpacesView {} },
         Panel::Protocol   => rsx! { crate::views::protocol::ProtocolView {} },
         Panel::Agents     => rsx! { crate::views::agents::AgentsView {} },

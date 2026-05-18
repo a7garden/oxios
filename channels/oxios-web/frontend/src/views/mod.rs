@@ -5,7 +5,7 @@ pub mod dashboard;
 
 pub mod protocol;
 pub mod agents;
-pub mod config;
+pub mod settings;
 pub mod seeds;
 pub mod workspace;
 pub mod skills;

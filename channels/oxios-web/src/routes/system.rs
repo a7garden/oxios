@@ -267,7 +267,11 @@ pub(crate) async fn handle_config_get(
     // Serialize the actual config from AppState (read lock).
     let config = state.config.read();
     match serde_json::to_value(&*config) {
-        Ok(json) => Ok(Json(json)),
+        Ok(mut json) => {
+            // Add api_key_set flag so the frontend knows if a key is currently set
+            json["engine"]["api_key_set"] = serde_json::Value::Bool(config.engine.api_key.is_some());
+            Ok(Json(json))
+        }
         Err(e) => {
             tracing::error!(error = %e, "Failed to serialize config");
             Err(AppError::Internal("failed to serialize config".into()))
