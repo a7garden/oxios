@@ -148,6 +148,8 @@ pub fn format_duration(ms: u64) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{BenchmarkConfig, BenchmarkId};
+    use chrono::Utc;
 
     #[test]
     fn test_compute_stats() {

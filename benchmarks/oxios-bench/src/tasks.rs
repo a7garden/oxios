@@ -133,8 +133,8 @@ pub fn session_memory() -> TaskDefinition {
         id: "session_memory",
         name: "Remember user preference",
         category: TaskCategory::Memory,
-        command: "remember this: my favorite color is blue",
-        expected_outcomes: vec!["remember", "blue"],
+        command: "save this to memory: favorite_color = blue",
+        expected_outcomes: vec!["memory", "saved"],
         evaluation_fn: |resp| memory_evaluation(resp, "blue"),
     }
 }

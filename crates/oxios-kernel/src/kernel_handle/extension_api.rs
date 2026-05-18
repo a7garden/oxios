@@ -2,7 +2,7 @@
 
 use crate::host_tools::HostToolStatus;
 use crate::host_tools::HostToolValidator;
-use crate::program::{HostRequirementsCheck, InstallSource, Program, ProgramManager, ProgramMeta};
+use crate::program::{HostRequirementsCheck, InstallSource, Program, ProgramManager};
 use crate::skill::{Skill, SkillMeta, SkillStore};
 use std::sync::Arc;
 

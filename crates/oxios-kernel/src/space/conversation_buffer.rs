@@ -127,6 +127,30 @@ impl ConversationBuffer {
         self.should_check_topic(min_turns)
     }
 
+    /// Static version of should_check_topic that works on a slice of ConversationTurns.
+    ///
+    /// Returns false if we don't have enough history (safe default — skips
+    /// expensive LLM-based detection). Returns true if 3+ turns have passed
+    /// since last check or pattern changed.
+    pub fn should_check_topic_from_messages(turns: &[ConversationTurn], _min_turns: usize) -> bool {
+        // Not enough history → skip expensive LLM detection (safe default)
+        if turns.len() < 4 {
+            return false;
+        }
+
+        // Check message length changes (basic pattern detection)
+        let recent = &turns[turns.len() - 2..];
+        let previous = &turns[turns.len() - 4..turns.len() - 2];
+
+        let avg_recent =
+            recent.iter().map(|t| word_count(&t.user)).sum::<usize>() as f64 / recent.len() as f64;
+        let avg_prev =
+            previous.iter().map(|t| word_count(&t.user)).sum::<usize>() as f64 / previous.len() as f64;
+
+        let ratio = avg_recent / avg_prev.max(1.0);
+        !(0.5..=2.0).contains(&ratio)
+    }
+
     /// Detect if the conversation pattern has changed.
     ///
     /// Looks at average word count and average message length to detect

@@ -15,7 +15,7 @@ use chrono::Utc;
 use parking_lot::RwLock;
 use tokio::sync::Mutex;
 
-use super::conversation_buffer::ConversationBuffer;
+use super::conversation_buffer::{ConversationBuffer, ConversationTurn};
 use super::knowledge_bridge::KnowledgeBridge;
 use super::{
     detection::{self, PathMatcher, Topic},
@@ -281,7 +281,7 @@ impl SpaceManager {
     pub async fn detect_or_create(
         &self,
         message: &str,
-        buffer: &ConversationBuffer,
+        turns: &[ConversationTurn],
     ) -> Result<SpaceId> {
         let spaces = self.spaces.read().clone();
         let spaces_vec: Vec<_> = spaces.into_values().collect();
@@ -321,7 +321,7 @@ impl SpaceManager {
         }
 
         // ── Layer 3: Topic shift detection (LLM-based) ──
-        let should_check = buffer.should_check_topic(3);
+        let should_check = ConversationBuffer::should_check_topic_from_messages(turns, 3);
         if should_check {
             let topic = detection::classify_topic_stub(message);
 

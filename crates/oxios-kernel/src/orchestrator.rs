@@ -196,24 +196,27 @@ impl Orchestrator {
 
         // ── Space Detection ──
         let space_tag = self.current_space_tag();
-        let space_id = {
+        let (turns, sm_arc) = {
             let buffer = self.conversation_buffer.read();
-            let space_manager = self.space_manager.read();
-            if let Some(ref sm) = *space_manager {
-                match sm.detect_or_create(user_message, &buffer).await {
-                    Ok(id) => {
-                        tracing::info!(space_id = %id, "Space detected/created for message");
-                        id
-                    }
-                    Err(e) => {
-                        tracing::warn!(error = %e, "Space detection failed, using default");
-                        sm.default_space_id()
-                    }
+            let sm_guard = self.space_manager.read();
+            let turns: Vec<_> = buffer.turns().iter().cloned().collect();
+            // Extract Arc from guard and drop guard before .await
+            let sm_arc = sm_guard.as_ref().cloned();
+            (turns, sm_arc)
+        };
+        let space_id = if let Some(ref sm) = sm_arc {
+            match sm.detect_or_create(user_message, &turns).await {
+                Ok(id) => {
+                    tracing::info!(space_id = %id, "Space detected/created for message");
+                    id
                 }
-            } else {
-                // No SpaceManager set — use zero ID
-                uuid::Uuid::nil()
+                Err(e) => {
+                    tracing::warn!(error = %e, "Space detection failed, using default");
+                    sm.default_space_id()
+                }
             }
+        } else {
+            uuid::Uuid::nil()
         };
 
         // Record user message in conversation buffer
@@ -226,13 +229,19 @@ impl Orchestrator {
         self.publish_phase_started(&session_id, Phase::Interview)
             .await;
 
-        // Get or create the interview session.
-        let needs_interview = {
+        // Get or create the interview session (pre-fetch to avoid lock across await).
+        let needs_interview;
+        let existing_history: Option<Vec<_>>;
+        {
             let sessions = self.sessions.read();
-            let exists = sessions.contains_key(&session_id);
-            tracing::debug!(session_id = %session_id, exists = exists, "Session lookup");
-            !exists
-        };
+            needs_interview = !sessions.contains_key(&session_id);
+            existing_history = if !needs_interview {
+                sessions.get(&session_id).map(|s| s.interview.conversation_history.clone())
+            } else {
+                None
+            };
+            // Lock dropped here before any .await
+        }
 
         // Conduct the interview.
         let interview = {
@@ -243,25 +252,24 @@ impl Orchestrator {
                 // This is a follow-up message in an existing interview.
                 // Build multi-turn context from conversation history.
                 let multi_turn_context = {
-                    let mut sessions = self.sessions.write();
-                    let session = sessions.get_mut(&session_id).expect("session exists");
-
-                    // Record user's answer in Q&A (for compatibility)
-                    let last_question = session.interview.questions.last().cloned().unwrap_or_default();
-                    session.interview.add_exchange(&last_question, user_message);
-
-                    // Build full conversation history for context
-                    let history = &session.interview.conversation_history;
                     let mut context_parts = Vec::new();
-
-                    for exchange in history {
-                        context_parts.push(format!("User: {}\nAgent: {}", exchange.user, exchange.agent));
+                    if let Some(ref history) = existing_history {
+                        for exchange in history {
+                            context_parts.push(format!("User: {}\nAgent: {}", exchange.user, exchange.agent));
+                        }
                     }
-                    // Add current user message
                     context_parts.push(format!("User: {}", user_message));
-
                     context_parts.join("\n\n")
                 };
+
+                // Record user's answer in session for future turns (brief write lock)
+                {
+                    let mut sessions = self.sessions.write();
+                    if let Some(s) = sessions.get_mut(&session_id) {
+                        let last_q = s.interview.questions.last().cloned().unwrap_or_default();
+                        s.interview.add_exchange(&last_q, user_message);
+                    }
+                }
 
                 // Run another interview pass with full conversation history.
                 self.ouroboros.interview(&multi_turn_context).await?
@@ -328,34 +336,25 @@ impl Orchestrator {
 
         // If ambiguity is too high, return questions for the user to answer.
         if !interview.ready_for_seed {
-            // Record this exchange in conversation history before storing
-            {
-                let mut sessions = self.sessions.write();
-                let session = sessions.get_mut(&session_id).expect("session exists");
-                // The session already has user's answer recorded via add_exchange above.
-                // Record the questions as the agent's response in history.
-                let questions_text = interview.questions.join("\n");
-                let last_answer = session.interview.answers.last().cloned();
-                if let Some(ref ans) = last_answer {
-                    if !ans.is_empty() {
-                        session.interview.add_to_history(ans, &questions_text);
-                    }
+            // Record this exchange in conversation history and store the interview.
+            let mut sessions = self.sessions.write();
+            let session = sessions.entry(session_id.clone()).or_insert_with(|| {
+                InterviewSession {
+                    id: session_id.clone(),
+                    interview: interview.clone(),
+                    phase: Phase::Interview,
+                    seed_id: None,
+                    agent_id: None,
                 }
-            }
-
-            // Store the interview so follow-up messages continue it.
-            {
-                let mut sessions = self.sessions.write();
-                sessions.insert(
-                    session_id.clone(),
-                    InterviewSession {
-                        id: session_id.clone(),
-                        interview: interview.clone(),
-                        phase: Phase::Interview,
-                        seed_id: None,
-                        agent_id: None,
-                    },
-                );
+            });
+            // The session already has user's answer recorded via add_exchange above.
+            // Record the questions as the agent's response in history.
+            let questions_text = interview.questions.join("\n");
+            let last_answer = session.interview.answers.last().cloned();
+            if let Some(ref ans) = last_answer {
+                if !ans.is_empty() {
+                    session.interview.add_to_history(ans, &questions_text);
+                }
             }
 
             let questions = interview
