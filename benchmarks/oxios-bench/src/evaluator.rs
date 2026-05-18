@@ -2,7 +2,7 @@
 //!
 //! Evaluates task completion based on expected outcomes and response content.
 
-use crate::{TaskCategory, TaskResult};
+use crate::{TaskResult};
 
 /// Default evaluation function that checks for keyword presence
 pub fn keyword_evaluation(response: &str, expected: &[&str]) -> TaskResult {

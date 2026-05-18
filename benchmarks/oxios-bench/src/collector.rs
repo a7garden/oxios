@@ -3,14 +3,10 @@
 //! Subscribes to Oxios event bus and collects events during benchmark execution.
 
 use chrono::Utc;
-use serde_json::json;
-use std::sync::Arc;
-use tokio::sync::broadcast;
-use tokio::time::{timeout, Duration};
 
 use crate::{
     AgentSummary, EvaluationSummary, ExecutionTrace, KernelEventEnvelope, MemorySummary,
-    PhaseSummary, SeedSummary, SpaceSummary, TaskResult, TraceReport,
+    PhaseSummary, SeedSummary, SpaceSummary, TraceReport,
 };
 
 /// Event collector that subscribes to the Oxios kernel event bus.
@@ -167,6 +163,7 @@ impl TraceAnalyzer {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::json;
 
     #[test]
     fn test_event_collector() {

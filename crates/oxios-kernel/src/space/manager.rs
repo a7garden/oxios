@@ -288,9 +288,13 @@ impl SpaceManager {
 
         // ── Layer 1: Filesystem path detection ──
         if let Some(path) = detection::extract_filesystem_path(message) {
-            // Check if this path matches an existing Space
-            let matcher = self.path_matcher.read();
-            if let Some(space_id) = matcher.find_space(&path) {
+            // Check if this path matches an existing Space (read lock, brief)
+            let matched_space_id = {
+                let matcher = self.path_matcher.read();
+                matcher.find_space(&path)
+            };
+
+            if let Some(space_id) = matched_space_id {
                 self.activate(&space_id).await?;
                 return Ok(space_id);
             }

@@ -357,15 +357,19 @@ mod tests {
             name: "test_tool".to_string(),
             description: "A test tool".to_string(),
             input_schema: serde_json::json!({
-                "arg1": {
-                    "type": "string",
-                    "description": "First argument"
+                "type": "object",
+                "properties": {
+                    "arg1": {
+                        "type": "string",
+                        "description": "First argument"
+                    },
+                    "arg2": {
+                        "type": "number",
+                        "description": "Second argument",
+                        "default": "42"
+                    }
                 },
-                "arg2": {
-                    "type": "number",
-                    "description": "Second argument",
-                    "default": "42"
-                }
+                "required": ["arg1"]
             }),
         };
 

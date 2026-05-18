@@ -1,0 +1,15 @@
+{
+  "id": "favorite_color",
+  "memory_type": "fact",
+  "content": "favorite_color = blue",
+  "source": "agent",
+  "tags": ["preference", "favorite_color"],
+  "importance": 0.8,
+  "metadata": {
+    "key": "favorite_color",
+    "value": "blue"
+  },
+  "created_at": "2025-01-23T12:00:00Z",
+  "accessed_at": "2025-06-18T00:00:00Z",
+  "access_count": 1
+}

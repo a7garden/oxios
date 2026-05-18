@@ -9,7 +9,7 @@ use oxios_kernel::access_manager::AuditEntry;
 use oxios_kernel::metrics::registry;
 use oxios_kernel::ArgumentDef;
 
-use crate::routes::{paginate, PageParams};
+use crate::routes::PageParams;
 use crate::server::AppState;
 
 // ---------------------------------------------------------------------------

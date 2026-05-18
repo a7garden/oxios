@@ -141,6 +141,61 @@ impl KernelError {
 /// Convenience alias for results using [`KernelError`].
 pub type KernelResult<T> = Result<T, KernelError>;
 
+/// Error categories for recovery decisions and monitoring.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ErrorCategory {
+    /// Entity not found.
+    NotFound,
+    /// Resource already exists (conflict).
+    Conflict,
+    /// Permission/security violation.
+    Security,
+    /// Operation timed out.
+    Timeout,
+    /// Rate limit exceeded.
+    RateLimit,
+    /// Invalid configuration.
+    Config,
+    /// Execution failed (agent crash, etc.).
+    Execution,
+    /// Infrastructure error (disk, network, etc.).
+    Infrastructure,
+    /// Internal/unknown error.
+    Internal,
+}
+
+impl KernelError {
+    /// Classify this error into a category.
+    ///
+    /// Useful for error monitoring, alerting, and retry decisions.
+    pub fn category(&self) -> ErrorCategory {
+        match self {
+            Self::AgentNotFound { .. } => ErrorCategory::NotFound,
+            Self::SeedNotFound { .. } => ErrorCategory::NotFound,
+            Self::SessionNotFound { .. } => ErrorCategory::NotFound,
+            Self::PermissionDenied { .. } => ErrorCategory::Security,
+            Self::ProgramNotFound { .. } => ErrorCategory::NotFound,
+            Self::ProgramAlreadyExists { .. } => ErrorCategory::Conflict,
+            Self::InvalidConfig { .. } => ErrorCategory::Config,
+            Self::StateStore(_) => ErrorCategory::Infrastructure,
+            Self::Memory { .. } => ErrorCategory::Infrastructure,
+            Self::Timeout { .. } => ErrorCategory::Timeout,
+            Self::RateLimited { .. } => ErrorCategory::RateLimit,
+            Self::Internal(_) => ErrorCategory::Internal,
+        }
+    }
+    /// Whether this error is retryable.
+    ///
+    /// Timeout and rate limit errors are retryable after backoff.
+    /// Infrastructure errors may be retryable.
+    pub fn is_retryable(&self) -> bool {
+        matches!(
+            self.category(),
+            ErrorCategory::Timeout | ErrorCategory::RateLimit | ErrorCategory::Infrastructure
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

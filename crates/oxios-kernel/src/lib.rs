@@ -11,6 +11,7 @@
 pub mod agent_group;
 pub mod agent_lifecycle;
 pub mod agent_runtime;
+pub mod a2a_circuit_breaker;
 pub mod daemon;
 pub mod supervisor;
 
@@ -163,8 +164,8 @@ pub use wasm_sandbox::{ResourceKind, WasmConfig, WasmError, WasmSandbox};
 // ─── State & Config ─────────────────────────────────────────────────
 pub use state_store::{AgentResponse, Session, SessionId, SessionSummary, StateStore};
 pub use config::{
-    BrowserConfig, ChannelsConfig, CronConfig, DaemonConfig, EngineConfig, ExecConfig, GitConfig,
-    InlineCronJob, McpConfig, McpServerDef, MemoryConfig, OxiosConfig, PersonaConfig,
+    BrowserConfig, ChannelsConfig, CronConfig, DaemonConfig, EngineConfig, ExecConfig, ExecMode, GitConfig,
+    InlineCronJob, McpConfig, McpServerDef, MemoryConfig, OrchestratorConfig, OxiosConfig, PersonaConfig,
     TelegramChannelConfig,
 };
 pub use backup::{BackupManifest, BackupSection};

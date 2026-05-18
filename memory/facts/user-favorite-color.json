@@ -1,0 +1,15 @@
+{
+  "id": "user-favorite-color",
+  "memory_type": "fact",
+  "content": "The user's favorite color is blue",
+  "source": "user",
+  "tags": ["user-preference", "favorite-color"],
+  "importance": 0.8,
+  "metadata": {
+    "preference_type": "favorite_color",
+    "value": "blue"
+  },
+  "created_at": "2025-01-23T12:00:00Z",
+  "accessed_at": "2025-01-23T12:00:00Z",
+  "access_count": 0
+}

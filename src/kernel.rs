@@ -483,7 +483,7 @@ impl KernelBuilder {
             .await;
 
         let mut orchestrator =
-            Orchestrator::new(ouroboros, event_bus.clone(), state_store.clone(), lifecycle);
+            Orchestrator::with_config(ouroboros, event_bus.clone(), state_store.clone(), lifecycle, config.orchestrator.clone());
         orchestrator.set_git_layer(git_layer.clone());
         orchestrator.set_a2a(a2a_protocol.clone());
         orchestrator.set_space_manager(space_manager.clone());

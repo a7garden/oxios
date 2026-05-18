@@ -6,7 +6,6 @@
 //!   oxios-bench run --task math_simple # Run single task
 //!   oxios-bench report --latest         # Show latest report
 
-use anyhow::Result;
 use chrono::Utc;
 use clap::Parser;
 use reqwest::Client;
@@ -22,6 +21,7 @@ struct ChatRequest {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct ChatResponse {
     id: String,
     echo: String,

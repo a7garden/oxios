@@ -412,6 +412,7 @@ pub(crate) fn dedup_by_id(entries: &mut Vec<MemoryEntry>) {
 // ---------------------------------------------------------------------------
 
 pub mod auto_memory_bridge;
+pub mod embedding_cache;
 mod budget;
 mod chunking;
 pub mod flash_attention;
@@ -422,6 +423,7 @@ pub mod normalizer;
 pub(crate) mod store;
 
 pub use store::SemanticHit;
+pub use embedding_cache::{CacheStats, EmbeddingCache};
 
 // Re-export key types from sub-modules.
 pub use chunking::{chunk_fixed, chunk_paragraphs, ChunkConfig, TextChunk};

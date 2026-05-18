@@ -87,6 +87,15 @@ pub struct MemoryConfig {
     /// Memory retention in days (0 = unlimited).
     #[serde(default)]
     pub retention_days: u32,
+    /// Enable embedding cache.
+    #[serde(default = "default_true")]
+    pub cache_enabled: bool,
+    /// Embedding cache TTL in seconds.
+    #[serde(default = "default_cache_ttl")]
+    pub cache_ttl_secs: u64,
+    /// Maximum embedding cache entries.
+    #[serde(default = "default_cache_max_entries")]
+    pub cache_max_entries: usize,
 }
 
 fn default_true() -> bool {
@@ -97,6 +106,14 @@ fn default_max_recall() -> usize {
     10
 }
 
+fn default_cache_ttl() -> u64 {
+    3600  // 1 hour
+}
+
+fn default_cache_max_entries() -> usize {
+    10000
+}
+
 impl Default for MemoryConfig {
     fn default() -> Self {
         Self {
@@ -105,6 +122,9 @@ impl Default for MemoryConfig {
             auto_summarize: true,
             capture_compaction: true,
             retention_days: 0,
+            cache_enabled: true,
+            cache_ttl_secs: 3600,
+            cache_max_entries: 10000,
         }
     }
 }
@@ -231,6 +251,9 @@ pub struct OxiosConfig {
     /// Scheduler settings (AIOS-inspired task scheduling).
     #[serde(default)]
     pub scheduler: SchedulerConfig,
+    /// Orchestrator settings (Ouroboros protocol execution).
+    #[serde(default)]
+    pub orchestrator: OrchestratorConfig,
     /// Context manager settings (LLM context window management).
     #[serde(default)]
     pub context: ContextConfig,
@@ -343,11 +366,36 @@ impl Default for GatewayConfig {
     }
 }
 
+/// Execution mode for commands.
+///
+/// - `Structured`: Binary allowlist + metacharacter blocking (recommended)
+/// - `Shell`: Raw bash execution (dangerous, requires `allow_shell_mode=true`)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ExecMode {
+    /// Structured binary execution with allowlist and metacharacter blocking.
+    Structured,
+    /// Shell execution via `bash -c`. DANGEROUS — requires explicit enable.
+    Shell,
+}
+
+impl Default for ExecMode {
+    fn default() -> Self {
+        Self::Structured
+    }
+}
+
 /// Exec configuration.
 ///
 /// Governs how the kernel dispatches commands for execution.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ExecConfig {
+    /// Default execution mode.
+    #[serde(default)]
+    pub default_mode: ExecMode,
+    /// Allow shell mode. DANGEROUS — should be false in production.
+    #[serde(default = "default_false")]
+    pub allow_shell_mode: bool,
     /// Commands allowed to run on the host.
     /// If empty, *all* bare-name commands are permitted (development mode).
     #[serde(default)]
@@ -364,6 +412,10 @@ pub struct ExecConfig {
     /// Host tools that are optional (checked lazily when needed).
     #[serde(default)]
     pub optional_host_tools: Vec<String>,
+}
+
+fn default_false() -> bool {
+    false
 }
 
 fn default_exec_timeout() -> u64 {
@@ -387,6 +439,8 @@ impl ExecConfig {
 impl Default for ExecConfig {
     fn default() -> Self {
         Self {
+            default_mode: ExecMode::default(),
+            allow_shell_mode: default_false(),
             allowed_commands: Vec::new(),
             default_timeout_secs: default_exec_timeout(),
             max_timeout_secs: default_exec_max_timeout(),
@@ -428,6 +482,47 @@ impl Default for SchedulerConfig {
             max_concurrent: default_max_concurrent(),
             rate_limit_per_minute: default_rate_limit(),
             zombie_timeout_secs: default_zombie_timeout(),
+        }
+    }
+}
+
+/// Orchestrator configuration (Ouroboros protocol execution).
+///
+/// Controls how the orchestrator runs the Ouroboros protocol:
+/// - Evolution iterations: How many times to retry failed tasks
+/// - Evaluation thresholds: Score cutoffs for pass/fail
+///
+/// # Example
+///
+/// ```toml
+/// [orchestrator]
+/// max_evolution_iterations = 3
+/// min_evaluation_score = 0.8
+/// ```
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct OrchestratorConfig {
+    /// Maximum Ouroboros evolution iterations before giving up.
+    #[serde(default = "default_max_evolution_iterations")]
+    pub max_evolution_iterations: usize,
+    /// Minimum evaluation score for task to be considered passed.
+    /// Below this, evolution will retry if iterations remain.
+    #[serde(default = "default_min_evaluation_score")]
+    pub min_evaluation_score: f64,
+}
+
+fn default_max_evolution_iterations() -> usize {
+    3
+}
+
+fn default_min_evaluation_score() -> f64 {
+    0.8
+}
+
+impl Default for OrchestratorConfig {
+    fn default() -> Self {
+        Self {
+            max_evolution_iterations: default_max_evolution_iterations(),
+            min_evaluation_score: default_min_evaluation_score(),
         }
     }
 }

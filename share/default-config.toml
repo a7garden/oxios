@@ -28,6 +28,11 @@ host = "0.0.0.0"
 port = 4200
 
 [exec]
+# Default execution mode: "structured" (recommended) or "shell".
+# Shell mode is DANGEROUS — requires explicit allow_shell_mode=true.
+default_mode = "structured"
+# Allow shell mode (bash -c execution). DANGEROUS — keep false in production.
+allow_shell_mode = false
 # Commands allowed for structured execution.
 allowed_commands = ["git", "gh", "open", "shortcuts", "osascript"]
 # Default command timeout in seconds.
@@ -39,6 +44,12 @@ max_timeout_secs = 600
 max_concurrent = 5
 rate_limit_per_minute = 60
 zombie_timeout_secs = 300
+
+[orchestrator]
+# Maximum Ouroboros evolution iterations before giving up.
+max_evolution_iterations = 3
+# Minimum evaluation score for task to be considered passed.
+min_evaluation_score = 0.8
 
 [context]
 active_limit_tokens = 100000

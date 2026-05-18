@@ -12,6 +12,7 @@
 //! coordinates Ouroboros + Supervisor + EventBus + StateStore + Scheduler + AccessManager.
 
 use std::sync::Arc;
+use std::time::Duration;
 
 use anyhow::{Context, Result};
 use chrono;
@@ -77,9 +78,6 @@ impl SubTask {
     }
 }
 
-/// Maximum number of Ouroboros loops before giving up.
-const MAX_EVOLUTION_ITERATIONS: usize = 1;
-
 /// The orchestrator coordinates the full Ouroboros lifecycle.
 pub struct Orchestrator {
     ouroboros: Arc<dyn OuroborosProtocol>,
@@ -97,6 +95,44 @@ pub struct Orchestrator {
     space_manager: RwLock<Option<Arc<SpaceManager>>>,
     /// Conversation buffer for topic shift detection.
     conversation_buffer: RwLock<ConversationBuffer>,
+    /// Orchestrator configuration (Ouroboros protocol settings).
+    config: crate::config::OrchestratorConfig,
+    /// Delegation configuration for A2A retries.
+    delegation_config: DelegationConfig,
+    /// A2A circuit breaker for delegation reliability.
+    a2a_breaker: Arc<crate::a2a_circuit_breaker::A2ACircuitBreaker>,
+}
+
+/// Configuration for A2A delegation retries.
+#[derive(Debug, Clone)]
+struct DelegationConfig {
+    /// Maximum retry attempts for A2A delegation.
+    max_retries: u32,
+    /// Base delay for exponential backoff (milliseconds).
+    base_delay_ms: u64,
+    /// Maximum delay cap for exponential backoff (milliseconds).
+    max_delay_ms: u64,
+    /// Timeout per delegation attempt (milliseconds).
+    timeout_ms: u64,
+}
+
+impl Default for DelegationConfig {
+    fn default() -> Self {
+        Self {
+            max_retries: 3,
+            base_delay_ms: 100,
+            max_delay_ms: 5000,
+            timeout_ms: 5000,
+        }
+    }
+}
+
+impl DelegationConfig {
+    /// Calculate exponential backoff delay.
+    fn backoff_delay(&self, attempt: u32) -> u64 {
+        let delay = self.base_delay_ms * 2_u64.saturating_pow(attempt.min(10) as u32);
+        delay.min(self.max_delay_ms)
+    }
 }
 
 impl Orchestrator {
@@ -106,6 +142,23 @@ impl Orchestrator {
         event_bus: EventBus,
         state_store: Arc<StateStore>,
         lifecycle: AgentLifecycleManager,
+    ) -> Self {
+        Self::with_config(
+            ouroboros,
+            event_bus,
+            state_store,
+            lifecycle,
+            crate::config::OrchestratorConfig::default(),
+        )
+    }
+
+    /// Creates a new orchestrator with custom config.
+    pub fn with_config(
+        ouroboros: Arc<dyn OuroborosProtocol>,
+        event_bus: EventBus,
+        state_store: Arc<StateStore>,
+        lifecycle: AgentLifecycleManager,
+        config: crate::config::OrchestratorConfig,
     ) -> Self {
         Self {
             ouroboros,
@@ -117,6 +170,9 @@ impl Orchestrator {
             a2a: None,
             space_manager: RwLock::new(None),
             conversation_buffer: RwLock::new(ConversationBuffer::default()),
+            config,
+            delegation_config: DelegationConfig::default(),
+            a2a_breaker: Arc::new(crate::a2a_circuit_breaker::A2ACircuitBreaker::new(5, 30)),
         }
     }
 
@@ -337,25 +393,27 @@ impl Orchestrator {
         // If ambiguity is too high, return questions for the user to answer.
         if !interview.ready_for_seed {
             // Record this exchange in conversation history and store the interview.
-            let mut sessions = self.sessions.write();
-            let session = sessions.entry(session_id.clone()).or_insert_with(|| {
-                InterviewSession {
-                    id: session_id.clone(),
-                    interview: interview.clone(),
-                    phase: Phase::Interview,
-                    seed_id: None,
-                    agent_id: None,
+            {
+                let mut sessions = self.sessions.write();
+                let session = sessions.entry(session_id.clone()).or_insert_with(|| {
+                    InterviewSession {
+                        id: session_id.clone(),
+                        interview: interview.clone(),
+                        phase: Phase::Interview,
+                        seed_id: None,
+                        agent_id: None,
+                    }
+                });
+                // The session already has user's answer recorded via add_exchange above.
+                // Record the questions as the agent's response in history.
+                let questions_text = interview.questions.join("\n");
+                let last_answer = session.interview.answers.last().cloned();
+                if let Some(ref ans) = last_answer {
+                    if !ans.is_empty() {
+                        session.interview.add_to_history(ans, &questions_text);
+                    }
                 }
-            });
-            // The session already has user's answer recorded via add_exchange above.
-            // Record the questions as the agent's response in history.
-            let questions_text = interview.questions.join("\n");
-            let last_answer = session.interview.answers.last().cloned();
-            if let Some(ref ans) = last_answer {
-                if !ans.is_empty() {
-                    session.interview.add_to_history(ans, &questions_text);
-                }
-            }
+            } // Lock dropped before .await
 
             let questions = interview
                 .questions
@@ -512,8 +570,8 @@ impl Orchestrator {
         let mut iterations = 0;
 
         while !current_evaluation.all_passed()
-            && current_evaluation.score < 0.8
-            && iterations < MAX_EVOLUTION_ITERATIONS
+            && current_evaluation.score < self.config.min_evaluation_score
+            && iterations < self.config.max_evolution_iterations
         {
             iterations += 1;
             self.publish_phase_started(&session_id, Phase::Evolve).await;
@@ -521,6 +579,7 @@ impl Orchestrator {
             tracing::info!(
                 phase = "evolve",
                 iteration = iterations,
+                max_iterations = self.config.max_evolution_iterations,
                 "Starting evolve phase"
             );
             let evolve_result = self
@@ -679,7 +738,7 @@ impl Orchestrator {
     /// Execute multiple subtasks using separate agents in parallel.
     ///
     /// When A2A is available, the orchestrator delegates tasks through the
-    /// A2A protocol — finding capable agents via the AgentCardRegistry.
+    /// A2A protocol with circuit breaker and retry support.
     /// Otherwise, falls back to direct lifecycle execution.
     ///
     /// Results are collected as they complete using `JoinSet`.
@@ -695,11 +754,65 @@ impl Orchestrator {
 
         // Try A2A-based delegation when the protocol is available.
         if let Some(ref a2a) = self.a2a {
-            return self.delegate_via_a2a(subtasks, parent_seed, a2a).await;
+            // Check circuit breaker
+            if !self.a2a_breaker.is_allowed() {
+                tracing::warn!(
+                    state = ?self.a2a_breaker.state(),
+                    "A2A circuit breaker open, using lifecycle fallback"
+                );
+                return self.delegate_via_lifecycle(subtasks, parent_seed).await;
+            }
+            
+            // Delegate with retry
+            return self.delegate_with_retry(subtasks, parent_seed, a2a).await;
         }
 
         // Fallback: direct lifecycle execution (no A2A).
         self.delegate_via_lifecycle(subtasks, parent_seed).await
+    }
+
+    /// Delegate subtasks via A2A with circuit breaker and retry support.
+    async fn delegate_with_retry(
+        &self,
+        subtasks: Vec<SubTask>,
+        parent_seed: &Seed,
+        a2a: &Arc<crate::a2a::A2AProtocol>,
+    ) -> Result<Vec<SubTask>> {
+        let mut attempt = 0;
+        let max_retries = self.delegation_config.max_retries;
+        
+        loop {
+            match self.delegate_via_a2a(subtasks.clone(), parent_seed, a2a).await {
+                Ok(results) => {
+                    self.a2a_breaker.record_success();
+                    return Ok(results);
+                }
+                Err(e) => {
+                    self.a2a_breaker.record_failure();
+                    attempt += 1;
+                    
+                    if attempt >= max_retries {
+                        tracing::error!(
+                            attempts = attempt,
+                            error = %e,
+                            "A2A delegation exhausted after {} attempts, using lifecycle fallback",
+                            attempt
+                        );
+                        return self.delegate_via_lifecycle(subtasks, parent_seed).await;
+                    }
+                    
+                    // Exponential backoff
+                    let delay = self.delegation_config.backoff_delay(attempt);
+                    tracing::warn!(
+                        attempt,
+                        delay_ms = delay,
+                        error = %e,
+                        "A2A delegation failed, retrying with backoff"
+                    );
+                    tokio::time::sleep(Duration::from_millis(delay)).await;
+                }
+            }
+        }
     }
 
     /// Execute a single subtask directly via lifecycle manager.

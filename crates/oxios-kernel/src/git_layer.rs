@@ -2,7 +2,7 @@
 //! Provides in-process commits, logs, tags, and restore.
 
 use anyhow::{bail, Result};
-use gix::bstr::BStr;
+use gix::bstr::{BStr, ByteSlice};
 use gix::hash::ObjectId;
 use gix::objs::tree::EntryKind;
 use gix::refs::transaction::PreviousValue;
@@ -315,13 +315,40 @@ impl GitLayer {
         Ok(entries)
     }
 
+    /// Resolve a partial commit hash to full ObjectId.
+    ///
+    /// Git allows abbreviating commit hashes (e.g., "abc1234") as long as
+    /// they're unique within the repository. This method uses `rev_parse_single`
+    /// to resolve partial hashes to full commit IDs.
+    ///
+    /// # Arguments
+    /// * `partial` - A partial hash (4-40 hex characters)
+    ///
+    /// # Returns
+    /// The resolved `ObjectId` or error if the hash cannot be resolved.
+    pub fn resolve_partial_hash(&self, partial: &str) -> Result<ObjectId> {
+        if partial.len() < 4 {
+            bail!("Partial hash too short (minimum 4 characters)");
+        }
+        // Check if it's already a full hash (40 hex chars for SHA-1)
+        if partial.len() >= 40 {
+            // Full hash - validate and return directly
+            return Ok(ObjectId::from_hex(partial.as_bytes())?);
+        }
+        // Partial hash - use rev_parse_single to resolve
+        let repo = self.repo.lock();
+        // rev_parse_single handles both full and partial hashes
+        let id = repo.rev_parse_single(BStr::new(partial))?;
+        Ok(id.detach())
+    }
+
     /// Restore a file to its state in a specific commit.
     pub fn restore_file(&self, rel_path: &str, hash: &str) -> Result<()> {
+        let commit_id = self.resolve_partial_hash(hash)?;
         let repo = self.repo.lock();
-        let commit_id = ObjectId::from_hex(hash.as_bytes())?;
         let commit = repo.find_commit(commit_id)?;
         let decoded = commit.decode()?;
-        let tree_id = ObjectId::from_hex(decoded.tree)?;
+        let tree_id = ObjectId::from_hex(decoded.tree.as_bytes())?;
         let tree = repo.find_tree(tree_id)?;
         let decoded_tree = tree.decode()?;
 
@@ -345,7 +372,10 @@ impl GitLayer {
         for reference in refs.all()? {
             let _ = reference.map_err(|e| anyhow::anyhow!("ref verify: {e:#}"))?;
         }
-        repo.head_id()?;
+        // head_id() fails on an empty repo (no commits yet) — that's fine.
+        if repo.head_id().is_err() {
+            tracing::debug!("verify: no HEAD yet (empty repository)");
+        }
         Ok(true)
     }
 
