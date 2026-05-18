@@ -308,12 +308,12 @@ pub fn SecurityView() -> Element {
                 h2 { IconShield { size: 20 } " Security" }
             }
             div { class: "tabs",
-                div {
+                button {
                     class: "{tab_class(SecurityTab::AuditLog)}",
                     onclick: move |_| active_tab.set(SecurityTab::AuditLog),
                     IconShield { size: 16 } " Audit Log"
                 }
-                div {
+                button {
                     class: "{tab_class(SecurityTab::Permissions)}",
                     onclick: move |_| active_tab.set(SecurityTab::Permissions),
                     IconKey { size: 16 } " Permissions"

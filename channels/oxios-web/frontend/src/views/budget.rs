@@ -36,8 +36,6 @@ pub fn BudgetView() -> Element {
 
     let budget_content: Element = match &budget_data {
         Some(Some(info)) => {
-            let tokens_pct = info.tokens_remaining as f64;
-            let calls_pct = info.calls_remaining as f64;
             let exhausted_class =
                 if info.is_exhausted { "status-badge status-badge-inactive" } else { "status-badge status-badge-active" };
             let exhausted_text = if info.is_exhausted { "Exhausted" } else { "Active" };
@@ -57,23 +55,12 @@ pub fn BudgetView() -> Element {
                 div { class: "stats-grid",
                     div { class: "stat-card",
                         div { class: "stat-label", "Tokens Remaining" }
-                        div { class: "progress-bar-container",
-                            div {
-                                class: "progress-bar-fill",
-                                style: "width: {tokens_pct.min(100.0)}%; background: var(--accent)",
-                            }
-                        }
-                        div { class: "stat-value", "{info.tokens_remaining}" }
+                        div { class: "stat-value purple", "{info.tokens_remaining}" }
+                        div { class: "text-xs text-muted mt-8", "Window: {info.window_remaining_secs}s left" }
                     }
                     div { class: "stat-card",
                         div { class: "stat-label", "Calls Remaining" }
-                        div { class: "progress-bar-container",
-                            div {
-                                class: "progress-bar-fill",
-                                style: "width: {calls_pct.min(100.0)}%; background: var(--accent)",
-                            }
-                        }
-                        div { class: "stat-value", "{info.calls_remaining}" }
+                        div { class: "stat-value blue", "{info.calls_remaining}" }
                     }
                 }
 

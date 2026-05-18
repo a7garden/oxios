@@ -14,9 +14,8 @@
 //! 3. Optionally queries `ToolRetriever` for semantic capability hints
 //! 4. Runs the agent loop with the assembled tool set
 //!
-//! Note: `AgentLoop::run()` produces a `!Send` future (the internal tool
-//! execution uses `Box<dyn Future>` without `Send`). We keep `spawn_blocking`
-//! to stay compatible with the `Supervisor` trait's `Send` bounds.
+//! Note: Since oxi-sdk 0.19+, `AgentLoop::run()` produces a `Send` future.
+//! We call it directly from async context without `spawn_blocking`.
 
 use anyhow::Result;
 use oxi_sdk::{CompactionEvent, SearchCache};
@@ -268,8 +267,7 @@ impl AgentRuntime {
             persona_prompt,
         };
 
-        let (final_content, steps_completed, success) =
-            tokio::task::spawn_blocking(move || run_agent_loop(ctx)).await??;
+        let (final_content, steps_completed, success) = run_agent_loop(ctx).await?;
 
         tracing::info!(
             seed_id = %seed_id,
@@ -290,14 +288,11 @@ impl AgentRuntime {
     }
 }
 
-/// Run the AgentLoop inside a blocking thread.
+/// Run the AgentLoop.
 ///
-/// Run the agent loop inside a blocking thread.
-///
-/// `AgentLoop::run()` still captures non-`Send` state internally
-/// (`FinalizedToolCallEntry::Future` lacks `+ Send`). Until oxi fixes this,
-/// we use `spawn_blocking` + `Handle::block_on`.
-fn run_agent_loop(ctx: AgentLoopContext) -> Result<(String, usize, bool)> {
+/// Since oxi-sdk 0.19+, `AgentLoop::run()` produces a `Send` future,
+/// so we can call it directly from async context without `spawn_blocking`.
+async fn run_agent_loop(ctx: AgentLoopContext) -> Result<(String, usize, bool)> {
     let AgentLoopContext {
         provider,
         config,
@@ -354,72 +349,65 @@ fn run_agent_loop(ctx: AgentLoopContext) -> Result<(String, usize, bool)> {
         None
     };
 
-    {
-        let rt = tokio::runtime::Handle::current();
-        let programs: Vec<_> = rt.block_on(async { pm.list_enabled().await });
+    // ── Load programs and register their tools ──
+    let programs: Vec<_> = pm.list_enabled().await;
 
-        // MCP bridge tools from program configs
-        let mut mcp_server_names: Vec<String> = Vec::new();
-        for program in &programs {
-            for server_config in &program.meta.mcp_servers {
-                if server_config.enabled {
-                    mcp_server_names.push(server_config.name.clone());
-                }
+    // MCP bridge tools from program configs
+    let mut mcp_server_names: Vec<String> = Vec::new();
+    for program in &programs {
+        for server_config in &program.meta.mcp_servers {
+            if server_config.enabled {
+                mcp_server_names.push(server_config.name.clone());
             }
         }
+    }
 
-        if !mcp_server_names.is_empty() {
-            let bridge = kernel_handle.mcp.bridge();
-            if let Err(e) = rt.block_on(bridge.initialize_all()) {
-                tracing::warn!(error = %e, "MCP bridge init failed — skipping MCP tools");
-            } else {
-                let _ = rt.block_on(bridge.list_tools());
-                for server_name in &mcp_server_names {
-                    if let Some(tool_defs) = rt.block_on(bridge.cached_tools(server_name)) {
-                        for tool_def in tool_defs {
-                            let wrapper = crate::tools::McpToolWrapper::new(
-                                bridge.clone(),
-                                server_name,
-                                &tool_def.name,
-                                tool_def.description.clone(),
-                                serde_json::json!({"type": "object", "properties": {}}),
-                            );
-                            registry.register(wrapper);
-                        }
-                    }
-                }
-            }
-        }
-
-        // Program-defined tools
-        for program in &programs {
-            let missing_tools: Vec<&str> = program
-                .meta
-                .dependencies
-                .iter()
-                .filter(|tool_name| registry.get(tool_name).is_none())
-                .map(|s| s.as_str())
-                .collect();
-            if !missing_tools.is_empty() {
-                tracing::warn!(
-                    program = %program.meta.name,
-                    missing_tools = ?missing_tools,
-                    "Skipping program: required tools not found"
-                );
-                continue;
-            }
-
-            for tool_def in &program.meta.tools {
-                if !tool_def.command.is_empty() {
-                    if let Some(ref exec) = exec_for_programs {
-                        let tool = crate::tools::ProgramTool::from_definition(
-                            &program.meta.name,
-                            tool_def,
-                            &program.meta.host_requirements,
-                            exec.clone(),
+    if !mcp_server_names.is_empty() {
+        let bridge = kernel_handle.mcp.bridge();
+        if let Err(e) = bridge.initialize_all().await {
+            tracing::warn!(error = %e, "MCP bridge init failed — skipping MCP tools");
+        } else {
+            let _ = bridge.list_tools().await;
+            for server_name in &mcp_server_names {
+                if let Some(tool_defs) = bridge.cached_tools(server_name).await {
+                    for tool_def in tool_defs {
+                        let wrapper = crate::tools::McpToolWrapper::new(
+                            bridge.clone(),
+                            server_name,
+                            &tool_def.name,
+                            tool_def.description.clone(),
+                            serde_json::json!({"type": "object", "properties": {}}),
                         );
-                        registry.register(tool);
+                        registry.register(wrapper);
                     }
+                }
+            }
+        }
+    }
+
+    // Program-defined tools
+    for program in &programs {
+        let dep_names: Vec<&str> = program.meta.dependencies.iter().map(|s| s.as_str()).collect();
+        let missing = registry.missing(&dep_names);
+        if !missing.is_empty() {
+            tracing::warn!(
+                program = %program.meta.name,
+                missing_tools = ?missing,
+                "Skipping program: required tools not found"
+            );
+            continue;
+        }
+
+        for tool_def in &program.meta.tools {
+            if !tool_def.command.is_empty() {
+                if let Some(ref exec) = exec_for_programs {
+                    let tool = crate::tools::ProgramTool::from_definition(
+                        &program.meta.name,
+                        tool_def,
+                        &program.meta.host_requirements,
+                        exec.clone(),
+                    );
+                    registry.register(tool);
                 }
             }
         }
@@ -458,17 +446,14 @@ fn run_agent_loop(ctx: AgentLoopContext) -> Result<(String, usize, bool)> {
     let memory_for_callback: Arc<MemoryManager> = (*kernel_handle.agents.memory_manager()).clone();
     let session_id_for_callback = seed_id.to_string();
 
-    // Run the agent loop inside a blocking thread.
-    // AgentLoop::run() captures !Send state internally.
-    let rt = tokio::runtime::Handle::current();
-    let rt_for_callback = rt.clone();
-    rt.block_on(async {
-        let result = agent_loop
+    // Run the agent loop. Since oxi-sdk 0.19+, `run()` produces a `Send` future.
+    let result = agent_loop
             .run(prompt, move |event| {
                 let mut s = exec_state_clone.lock();
                 match event {
                     AgentEvent::ToolExecutionEnd {
-                        is_error: false, ..
+                        is_error: false,
+                        ..
                     } => {
                         s.steps_completed += 1;
                     }
@@ -482,7 +467,10 @@ fn run_agent_loop(ctx: AgentLoopContext) -> Result<(String, usize, bool)> {
                         }
                         s.success = stop_reason.as_deref() == Some("Stop");
                     }
-                    AgentEvent::Error { message, .. } => {
+                    AgentEvent::Error {
+                        message,
+                        ..
+                    } => {
                         s.final_content = message.clone();
                         s.success = false;
                     }
@@ -501,9 +489,13 @@ fn run_agent_loop(ctx: AgentLoopContext) -> Result<(String, usize, bool)> {
                                 accessed_at: chrono::Utc::now(),
                                 access_count: 0,
                             };
-                            if let Err(e) = rt_for_callback.block_on(mm.remember(entry)) {
-                                tracing::warn!(error = %e, "Failed to save compaction summary");
-                            }
+                            // Fire-and-forget: spawn async remember from sync callback
+                            let mm = mm.clone();
+                            tokio::spawn(async move {
+                                if let Err(e) = mm.remember(entry).await {
+                                    tracing::warn!(error = %e, "Failed to save compaction summary");
+                                }
+                            });
                         }
                     }
                     _ => {}
@@ -533,7 +525,6 @@ fn run_agent_loop(ctx: AgentLoopContext) -> Result<(String, usize, bool)> {
             "AgentLoop completed"
         );
         Ok((s.final_content.clone(), s.steps_completed, s.success))
-    })
 }
 
 /// Build a system prompt from the Seed's goal, constraints, persona,
@@ -644,7 +635,7 @@ impl std::fmt::Debug for AgentRuntime {
 mod tests {
     use super::*;
     use async_trait::async_trait;
-    use oxi_sdk::{AgentTool, ToolError};
+    use oxi_sdk::{AgentTool, ToolContext, ToolError};
     use oxios_ouroboros::Entity;
     use serde_json::Value;
 
@@ -673,6 +664,7 @@ mod tests {
             _tool_call_id: &str,
             _params: Value,
             _shutdown: Option<tokio::sync::oneshot::Receiver<()>>,
+            _ctx: &ToolContext,
         ) -> Result<oxi_sdk::AgentToolResult, ToolError> {
             Ok(oxi_sdk::AgentToolResult::success("ok"))
         }
@@ -695,11 +687,7 @@ mod tests {
         let required_tools = vec!["read".to_string(), "exec".to_string()];
 
         // Validation: all required tools must exist in the registry.
-        let missing: Vec<&str> = required_tools
-            .iter()
-            .filter(|name| registry.get(name).is_none())
-            .map(|s| s.as_str())
-            .collect();
+        let missing = registry.missing(&["read", "exec"]);
 
         assert!(
             missing.is_empty(),
@@ -726,11 +714,7 @@ mod tests {
         ];
 
         // Validation: find missing tools.
-        let missing: Vec<&str> = required_tools
-            .iter()
-            .filter(|name| registry.get(name).is_none())
-            .map(|s| s.as_str())
-            .collect();
+        let missing = registry.missing(&["read", "exec", "nonexistent"]);
 
         assert_eq!(missing, vec!["exec", "nonexistent"]);
     }

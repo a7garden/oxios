@@ -142,7 +142,7 @@ pub fn ProtocolView() -> Element {
                             div { class: "ouroboros-panel",
                                 div { class: "phase-indicator",
                                     div { class: "phase-current", "Ouroboros Lifecycle" }
-                                    div { class: "phase-phase-label", style: "font-size:11px;color:var(--text-3);margin-bottom:8px",
+                                    div { class: "text-xs text-muted", style: "margin-bottom:8px",
                                         "Current: {data.current_phase}"
                                     }
                                     div { class: "phase-progress-bar",

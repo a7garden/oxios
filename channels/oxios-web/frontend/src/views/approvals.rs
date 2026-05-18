@@ -44,8 +44,7 @@ pub fn ApprovalsView() -> Element {
                             let aid = approve_id.clone();
                             rsx! {
                                 button {
-                                    class: "btn btn-sm",
-                                    style: "background:var(--success);color:#fff;border-color:var(--success)",
+                                    class: "btn btn-success btn-sm",
                                     onclick: move |_| {
                                         let a = aid.clone();
                                         spawn(async move {
@@ -94,7 +93,7 @@ pub fn ApprovalsView() -> Element {
             rsx! { div { {cards.into_iter()} } }
         },
         Some(Err(e)) => rsx! {
-            div { class: "empty-state", p { { format!("Error: {e}") } } }
+            div { class: "error-box", { format!("Error: {e}") } }
         },
         None => rsx! {
             div { class: "empty-state",

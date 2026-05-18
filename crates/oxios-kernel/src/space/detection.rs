@@ -388,6 +388,7 @@ mod tests {
     #[test]
     fn test_path_matcher() {
         use super::super::Space;
+        use crate::SpaceSource;
 
         let mut space = Space::new("oxios", SpaceSource::AutoResource);
         space.paths.push(PathBuf::from("/projects/oxios"));

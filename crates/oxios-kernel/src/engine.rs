@@ -10,6 +10,37 @@ use anyhow::Result;
 use oxi_sdk::{Oxi, OxiBuilder};
 use std::sync::Arc;
 
+/// Register OpenAI-compatible providers via factory.
+///
+/// Each provider is registered lazily — credentials are resolved at first use,
+/// not at build time. This allows the engine to be built without all
+/// credentials available upfront.
+fn register_compatible_providers(builder: OxiBuilder, _default_provider: &str) -> OxiBuilder {
+    let compatible_providers: &[(&str, &str)] = &[
+        ("zai", "https://api.z.ai/api/coding/paas/v4"),
+        // Future OpenAI-compatible providers can be added here
+    ];
+
+    let mut builder = builder;
+    for (name, default_url) in compatible_providers {
+        let name_owned = name.to_string();
+        let url_owned = default_url.to_string();
+        builder = builder.provider_factory(name, move || {
+            let api_key = crate::credential::CredentialStore::resolve(&name_owned, None)
+                .map(|(key, _)| key);
+            let base_url = std::env::var(format!("{}_BASE_URL", name_owned.to_uppercase()))
+                .unwrap_or_else(|_| url_owned.clone());
+            let provider = oxi_ai::OpenAiProvider::with_base_url_and_key(&base_url, api_key);
+            tracing::info!(
+                "Registered {} provider (OpenAI-compatible, base_url: {})",
+                name_owned, base_url
+            );
+            Ok(Arc::new(provider))
+        });
+    }
+    builder
+}
+
 /// The kernel's engine — wraps oxi-sdk's Oxi instance.
 pub struct OxiosEngine {
     oxi: Oxi,
@@ -32,21 +63,8 @@ impl OxiosEngine {
         // without an API key. We register a custom provider with the key attached.
         let mut builder = OxiBuilder::new().with_builtins();
 
-        if provider_name == "zai" {
-            // Use CredentialStore to read API key from ~/.oxi/auth.json
-            let api_key = crate::credential::CredentialStore::resolve("zai", None)
-                .map(|(key, _)| key);
-
-            let zai_base_url = std::env::var("ZAI_BASE_URL")
-                .unwrap_or_else(|_| "https://api.z.ai/api/coding/paas/v4".to_string());
-
-            let zai_provider = oxi_ai::OpenAiProvider::with_base_url_and_key(
-                &zai_base_url,
-                api_key,
-            );
-            builder = builder.provider("zai", zai_provider);
-            tracing::info!("Registered zai provider with API key (OpenAI-compatible, base_url: {})", zai_base_url);
-        }
+        // Register OpenAI-compatible providers via factory (lazy credential resolution)
+        builder = register_compatible_providers(builder, provider_name);
 
         let oxi = builder.build();
         Self {

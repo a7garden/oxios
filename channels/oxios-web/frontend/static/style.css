@@ -396,6 +396,13 @@ body {
     margin-top: 6px;
 }
 
+/* Error bubble inside chat */
+.message-error-bubble {
+    border-color: var(--danger) !important;
+    background: var(--danger-muted) !important;
+    color: var(--danger) !important;
+}
+
 .chat-input-row {
     display: flex;
     gap: 8px;
@@ -1026,6 +1033,19 @@ body {
     margin-bottom: 8px;
 }
 
+/* ---------- Heading Reset ---------- */
+h1, h2, h3, h4, h5, h6 {
+    color: var(--text-0);
+}
+
+p {
+    color: var(--text-1);
+}
+
+label {
+    color: var(--text-2);
+}
+
 /* ---------- Config ---------- */
 .config-grid {
     display: grid;
@@ -1201,6 +1221,7 @@ code {
     font-family: var(--font-mono);
     font-size: 12px;
     background: var(--bg-3);
+    color: var(--text-1);
     padding: 2px 6px;
     border-radius: 3px;
 }
@@ -1334,6 +1355,559 @@ code {
     to   { opacity: 1; transform: translateY(0); }
 }
 
+/* ---------- Modal ---------- */
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: var(--overlay);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 500;
+    animation: modal-fade-in 0.15s ease;
+}
+
+@keyframes modal-fade-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+.modal {
+    background: var(--bg-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    width: 90%;
+    max-width: 540px;
+    max-height: 85vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: var(--shadow-lg);
+    animation: modal-slide-in 0.15s ease;
+}
+
+.modal.modal-sm {
+    max-width: 400px;
+}
+
+@keyframes modal-slide-in {
+    from { opacity: 0; transform: translateY(-12px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+.modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+}
+
+.modal-header h3 {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-0);
+}
+
+.modal-body {
+    padding: 20px;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.modal-footer {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 12px 20px;
+    border-top: 1px solid var(--border);
+}
+
+/* ---------- Forms ---------- */
+.form-group {
+    margin-bottom: 14px;
+}
+
+.form-group label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-2);
+    margin-bottom: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+.form-group input[type="text"],
+.form-group input[type="password"],
+.form-group input[type="number"],
+.form-group textarea,
+.form-group select {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg-0);
+    color: var(--text-0);
+    font-size: 13px;
+    font-family: var(--font-sans);
+    outline: none;
+    transition: border-color var(--transition);
+}
+
+.form-group input:focus,
+.form-group textarea:focus,
+.form-group select:focus {
+    border-color: var(--accent);
+}
+
+.form-group textarea {
+    resize: vertical;
+    min-height: 60px;
+}
+
+/* Generic input/select/textarea — dark-mode safe */
+.input, .form-input {
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg-0);
+    color: var(--text-0);
+    font-size: 13px;
+    font-family: var(--font-sans);
+    outline: none;
+    transition: border-color var(--transition);
+}
+
+.input:focus, .form-input:focus {
+    border-color: var(--accent);
+}
+
+.input-sm {
+    padding: 6px 10px;
+    font-size: 12px;
+}
+
+.select {
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg-0);
+    color: var(--text-0);
+    font-size: 13px;
+    font-family: var(--font-sans);
+    outline: none;
+    transition: border-color var(--transition);
+}
+
+.select:focus {
+    border-color: var(--accent);
+}
+
+.textarea {
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg-0);
+    color: var(--text-0);
+    font-size: 13px;
+    font-family: var(--font-sans);
+    outline: none;
+    resize: vertical;
+    transition: border-color var(--transition);
+}
+
+.textarea:focus {
+    border-color: var(--accent);
+}
+
+/* ---------- Form Row ---------- */
+.form-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.form-field {
+    margin-bottom: 14px;
+}
+
+.form-field label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-2);
+    margin-bottom: 4px;
+}
+
+.btn-success {
+    background: var(--success);
+    border-color: var(--success);
+    color: #fff;
+}
+
+.btn-success:hover {
+    opacity: 0.9;
+}
+
+/* ---------- Buttons (extended) ---------- */
+.btn-block {
+    display: block;
+    width: 100%;
+}
+
+.btn-close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border: none;
+    border-radius: var(--radius-sm);
+    background: none;
+    color: var(--text-3);
+    cursor: pointer;
+    transition: all var(--transition);
+}
+
+.btn-close:hover {
+    background: var(--bg-3);
+    color: var(--text-0);
+}
+
+.btn-active {
+    background: var(--accent-muted);
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+/* ---------- Tabs (view variant) ---------- */
+.tabs {
+    display: flex;
+    gap: 0;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 16px;
+}
+
+.tab {
+    padding: 8px 16px;
+    font-size: 13px;
+    color: var(--text-3);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all var(--transition);
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: none;
+    border-left: none;
+    border-right: none;
+    border-top: none;
+}
+
+.tab:hover { color: var(--text-0); }
+
+.tab-active, .tab.tab-active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+}
+
+.tab-btn {
+    padding: 8px 16px;
+    font-size: 13px;
+    color: var(--text-3);
+    cursor: pointer;
+    border: none;
+    border-bottom: 2px solid transparent;
+    transition: all var(--transition);
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: none;
+}
+
+.tab-btn:hover { color: var(--text-0); }
+
+.tab-btn-active {
+    color: var(--accent);
+    border-bottom: 2px solid var(--accent);
+}
+
+.tab-content {
+    /* Container for tab content */
+}
+
+/* ---------- Progress Bar (alternate naming) ---------- */
+.progress-bar-container {
+    width: 100%;
+    height: 6px;
+    background: var(--bg-3);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-top: 4px;
+}
+
+.progress-bar-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.4s ease;
+}
+
+/* ---------- Search Toolbar ---------- */
+.search-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+}
+
+.search-toggle {
+    display: flex;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    margin-left: auto;
+}
+
+.toggle-btn {
+    padding: 4px 12px;
+    font-size: 12px;
+    color: var(--text-3);
+    cursor: pointer;
+    background: var(--bg-2);
+    border: none;
+    transition: all var(--transition);
+}
+
+.toggle-btn:hover {
+    color: var(--text-1);
+}
+
+.toggle-btn-active {
+    background: var(--accent-muted);
+    color: var(--accent);
+    font-weight: 600;
+}
+
+/* ---------- Code Block ---------- */
+.code-block {
+    margin-top: 8px;
+}
+
+.code-block pre {
+    margin: 0;
+}
+
+/* ---------- Git View ---------- */
+.git-entry {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.git-hash {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--accent);
+    min-width: 56px;
+    padding-top: 2px;
+}
+
+.git-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.git-msg {
+    font-size: 13px;
+    color: var(--text-0);
+    line-height: 1.4;
+}
+
+.git-meta {
+    font-size: 12px;
+    color: var(--text-3);
+    margin-top: 2px;
+}
+
+.git-verify,
+.git-restore {
+    margin-top: 20px;
+    padding: 16px;
+    background: var(--bg-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+}
+
+.git-verify h3,
+.git-restore h3 {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-2);
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* ---------- Session View ---------- */
+.session-row {
+    /* Clickable row wrapper */
+}
+
+.session-detail {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border-subtle);
+}
+
+/* ---------- Security View ---------- */
+.action-bar {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+}
+
+.verify-result {
+    font-size: 12px;
+    font-family: var(--font-mono);
+}
+
+.permissions-toolbar {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+.permissions-editor {
+    margin-top: 12px;
+}
+
+.editor-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-2);
+}
+
+.json-editor {
+    width: 100%;
+    min-height: 300px;
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg-0);
+    color: var(--text-0);
+    font-family: var(--font-mono);
+    font-size: 13px;
+    resize: vertical;
+    outline: none;
+    line-height: 1.5;
+}
+
+.json-editor:focus {
+    border-color: var(--accent);
+}
+
+/* ---------- Status / Messages ---------- */
+.status-message {
+    margin-top: 12px;
+    padding: 8px 14px;
+    font-size: 13px;
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text-1);
+}
+
+.loading-state {
+    text-align: center;
+    padding: 32px 20px;
+    color: var(--text-3);
+}
+
+.message-error {
+    background: var(--danger-muted);
+    border: 1px solid var(--danger);
+    border-radius: var(--radius-sm);
+    padding: 8px 14px;
+    color: var(--danger);
+    font-size: 13px;
+    margin-bottom: 12px;
+}
+
+.message-success {
+    background: var(--success-muted);
+    border: 1px solid var(--success);
+    border-radius: var(--radius-sm);
+    padding: 8px 14px;
+    color: var(--success);
+    font-size: 13px;
+    margin-bottom: 12px;
+}
+
+/* ---------- Panel Footer ---------- */
+.panel-footer {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+}
+
+/* ---------- Sidebar Footer ---------- */
+.sidebar-footer {
+    padding: 8px 10px;
+    border-top: 1px solid var(--border);
+}
+
+/* ---------- Chat Status ---------- */
+.ws-status {
+    font-size: 11px;
+    color: var(--text-3);
+    font-family: var(--font-mono);
+    padding: 2px 8px;
+    background: var(--bg-2);
+    border-radius: 10px;
+}
+
+/* ---------- Tool Name ---------- */
+.tool-name {
+    font-size: 13px;
+    color: var(--text-1);
+}
+
+/* ---------- Global Form Reset (dark mode) ---------- */
+input[type="text"],
+input[type="password"],
+input[type="number"],
+input[type="email"],
+textarea,
+select {
+    background: var(--bg-0);
+    color: var(--text-0);
+    border: 1px solid var(--border);
+}
+
+input::placeholder,
+textarea::placeholder {
+    color: var(--text-3);
+    opacity: 1;
+}
+
+option {
+    background: var(--bg-0);
+    color: var(--text-0);
+}
+
 /* ==========================================================================
    Mobile Responsive (< 768px)
    ========================================================================== */
@@ -1416,6 +1990,36 @@ code {
     .phase-step {
         flex: 0 0 auto;
         min-width: 60px;
+    }
+
+    .modal {
+        width: 95%;
+        max-width: none;
+        max-height: 90vh;
+    }
+
+    .modal-header,
+    .modal-body,
+    .modal-footer {
+        padding-left: 16px;
+        padding-right: 16px;
+    }
+
+    .panel-header {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .form-row {
+        flex-wrap: wrap;
+    }
+
+    .action-bar {
+        flex-wrap: wrap;
+    }
+
+    .search-toolbar {
+        flex-wrap: wrap;
     }
 }
 

@@ -88,8 +88,8 @@ mod tests {
     use super::*;
 
     /// Verify that `tool_names()` returns the expected number of tool names.
-    #[test]
-    fn test_tool_names_length() {
+    #[tokio::test]
+    async fn test_tool_names_length() {
         // Build a minimal KernelHandle for testing
         let state_store = Arc::new(
             crate::state_store::StateStore::new(std::path::PathBuf::from(
@@ -106,6 +106,7 @@ mod tests {
                 Arc::new(crate::memory::MemoryManager::new(
                     state_store.clone(),
                 )),
+                None,
             ),
             crate::SecurityApi::new(
                 Arc::new(parking_lot::Mutex::new(
@@ -150,7 +151,7 @@ mod tests {
                     60,
                 )),
                 Arc::new(crate::resource_monitor::ResourceMonitor::new(60, 60)),
-                Arc::new(crate::event_bus::EventBus::new(256)),
+                crate::event_bus::EventBus::new(256),
                 crate::OxiosConfig::default(),
                 std::time::Instant::now(),
             ),
@@ -158,11 +159,12 @@ mod tests {
                 Arc::new(
                     crate::space::SpaceManager::new(
                         state_store.clone(),
-                        Arc::new(crate::event_bus::EventBus::new(256)),
+                        crate::event_bus::EventBus::new(256),
                     )
+                    .await
                     .unwrap(),
                 ),
-                Arc::new(crate::event_bus::EventBus::new(256)),
+                crate::event_bus::EventBus::new(256),
             ),
             crate::ExecApi::new(
                 Arc::new(crate::config::ExecConfig::default()),
@@ -171,15 +173,15 @@ mod tests {
                 )),
             ),
             crate::BrowserApi::default(),
-            crate::A2aApi::new(Arc::new(crate::a2a::A2AProtocol::new(Arc::new(
+            crate::A2aApi::new(Arc::new(crate::a2a::A2AProtocol::new(
                 crate::event_bus::EventBus::new(256),
-            )))),
+            ))),
         ));
 
         let bridge = OxiosKernelBridge::new(kernel);
 
         let names = bridge.tool_names();
         // 6 always-on + 12 kernel domain = 18 tools
-        assert_eq!(names.len(), 18, "expected 18 tools, got {:?}", names);
+        assert_eq!(names.len(), 23, "expected 23 tools, got {:?}", names);
     }
 }

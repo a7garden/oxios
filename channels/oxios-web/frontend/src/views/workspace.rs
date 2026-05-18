@@ -115,7 +115,7 @@ pub fn WorkspaceView() -> Element {
                                 }}
                             }
                             span { "{name}" }
-                            span { style: "margin-left:auto;font-size:11px;color:var(--text-muted)", "{size_str}" }
+                            span { style: "margin-left:auto;font-size:11px;color:var(--text-3)", "{size_str}" }
                         }
                     }
                 })
@@ -123,7 +123,7 @@ pub fn WorkspaceView() -> Element {
             rsx! { div { {items.into_iter()} } }
         },
         Some(Err(e)) => rsx! {
-            div { class: "empty-state", p { { format!("Error: {e}") } } }
+            div { class: "error-box", { format!("Error: {e}") } }
         },
         None => rsx! {
             div { class: "empty-state",
@@ -202,7 +202,7 @@ pub fn WorkspaceView() -> Element {
                     rsx! {
                         div { style: "display:flex;flex-direction:column;gap:8px",
                             textarea {
-                                style: "width:100%;min-height:300px;font-family:monospace;font-size:13px;padding:8px;border:1px solid var(--border);border-radius:4px;background:var(--bg-primary);color:var(--text-primary);resize:vertical",
+                                style: "width:100%;min-height:300px;font-family:var(--font-mono);font-size:13px;padding:8px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg-1);color:var(--text-0);resize:vertical",
                                 value: "{edit_content}",
                                 oninput: move |evt| edit_content.set(evt.value()),
                             }

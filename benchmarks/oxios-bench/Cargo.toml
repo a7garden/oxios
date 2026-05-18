@@ -1,0 +1,50 @@
+[package]
+name = "oxios-bench"
+version = "0.1.2"
+edition = "2021"
+description = "Benchmark system for Oxios task execution evaluation"
+license = "MIT"
+repository = "https://github.com/a7garden/oxios"
+
+[dependencies]
+# HTTP client for benchmark orchestrator
+reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
+
+# Async runtime
+tokio = { workspace = true }
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# Time
+chrono = { workspace = true }
+
+# UUID
+uuid = { workspace = true }
+
+# Logging
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+# Error handling
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+
+# Async traits
+async-trait = { workspace = true }
+
+# Futures
+futures = { workspace = true }
+futures-util = "0.3"
+
+# CLI
+clap = { version = "4", features = ["derive"] }
+
+[dev-dependencies]
+tokio-test = "0.4"
+tempfile = "3"
+
+[[bin]]
+name = "oxios-bench"
+path = "src/main.rs"

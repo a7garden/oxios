@@ -1,4 +1,4 @@
-//! Dashboard — stat cards and agent table.
+//! Dashboard — stat cards and agent table with Space overview.
 
 use dioxus::prelude::*;
 
@@ -38,8 +38,19 @@ pub fn DashboardView() -> Element {
             .map(|r| r.items)
     });
 
+    let spaces = use_resource(|| async move {
+        api::fetch_json::<serde_json::Value>("/api/spaces").await.ok()
+    });
+
     let status_data = (status.value())();
     let agents_data = (agents.value())();
+    let spaces_data = (spaces.value())();
+
+    // Extract space stats from the JSON response
+    let space_count: u64 = spaces_data
+        .flatten()  // Option<Result> -> Option (Ok only)
+        .and_then(|v| v.get("total").and_then(|t| t.as_u64()))
+        .unwrap_or(0);
 
     rsx! {
         div { class: "panel-container",
@@ -64,6 +75,7 @@ pub fn DashboardView() -> Element {
                             StatCard { icon: rsx! { IconAgents { size: 20 } }, label: "Active Agents".to_string(), value: active_agents, color: Some("green".to_string()) }
                             StatCard { icon: rsx! { IconZap { size: 20 } }, label: "Total Forked".to_string(), value: total_forked, color: Some("orange".to_string()) }
                             StatCard { icon: rsx! { IconMemory { size: 20 } }, label: "Memory Entries".to_string(), value: memory_entries, color: Some("purple".to_string()) }
+                            StatCard { icon: rsx! { IconLayers { size: 20 } }, label: "Spaces".to_string(), value: space_count.to_string(), color: Some("green".to_string()) }
                             StatCard { icon: rsx! { IconActivity { size: 20 } }, label: "Version".to_string(), value: s.version.clone(), color: None }
                         }
                     },
@@ -72,7 +84,9 @@ pub fn DashboardView() -> Element {
                 }
             }
 
-            h2 { "Agents" }
+            div { class: "panel-header mb-16",
+                h2 { IconAgents { size: 18 } " Agents" }
+            }
             match &agents_data {
                 Some(Ok(list)) if list.is_empty() => rsx! {
                     div { class: "empty-state",

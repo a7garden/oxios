@@ -129,7 +129,7 @@ pub fn SkillsView() -> Element {
             rsx! { div { class: "item-list", {items.into_iter()} } }
         },
         Some(Err(e)) => rsx! {
-            div { class: "empty-state", p { { format!("Error: {e}") } } }
+            div { class: "error-box", { format!("Error: {e}") } }
         },
         None => rsx! {
             div { class: "empty-state",
@@ -194,7 +194,7 @@ pub fn SkillsView() -> Element {
                             label { "Content (Markdown)" }
                             textarea {
                                 rows: "10",
-                                style: "font-family:monospace;font-size:13px",
+                                style: "font-family:var(--font-mono);font-size:13px",
                                 value: "{cm.content}",
                                 oninput: move |evt| {
                                     let mut m = create_modal();

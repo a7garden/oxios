@@ -1,6 +1,7 @@
 //! Agent API — agent lifecycle, budget, memory.
 
 use crate::budget::{BudgetExceeded, BudgetInfo, BudgetLimit, BudgetManager};
+use crate::event_bus::{EventBus, KernelEvent};
 use crate::memory::store::{HnswMemoryIndex, SemanticHit};
 use crate::memory::{MemoryEntry, MemoryManager, MemoryType};
 use crate::supervisor::Supervisor;
@@ -14,6 +15,8 @@ pub struct AgentApi {
     pub(crate) memory_manager: Arc<MemoryManager>,
     /// HNSW index for semantic search (optional, initialized on demand).
     pub(crate) hnsw_index: Option<Arc<HnswMemoryIndex>>,
+    /// Event bus for publishing agent-related events.
+    pub(crate) event_bus: Option<EventBus>,
 }
 
 impl AgentApi {
@@ -22,18 +25,27 @@ impl AgentApi {
         supervisor: Arc<dyn Supervisor>,
         budget_manager: Arc<BudgetManager>,
         memory_manager: Arc<MemoryManager>,
+        event_bus: Option<EventBus>,
     ) -> Self {
         Self {
             supervisor,
             budget_manager,
             memory_manager,
             hnsw_index: None,
+            event_bus,
         }
     }
 
     /// Attach an HNSW index for semantic search.
     pub fn set_hnsw_index(&mut self, index: Arc<HnswMemoryIndex>) {
         self.hnsw_index = Some(index);
+    }
+
+    /// Publish a kernel event if the event bus is available.
+    fn publish(&self, event: KernelEvent) {
+        if let Some(ref eb) = self.event_bus {
+            let _ = eb.publish(event);
+        }
     }
     /// List running agents.
     pub async fn list(&self) -> anyhow::Result<Vec<crate::types::AgentInfo>> {
@@ -88,7 +100,16 @@ impl AgentApi {
 
     /// Store a memory entry.
     pub async fn remember(&self, entry: MemoryEntry) -> anyhow::Result<String> {
-        self.memory_manager.remember(entry).await
+        let id = self.memory_manager.remember(entry.clone()).await?;
+
+        // Publish MemoryStored event
+        self.publish(KernelEvent::MemoryStored {
+            id: id.clone(),
+            memory_type: entry.memory_type.label().to_string(),
+            source: entry.source.clone(),
+        });
+
+        Ok(id)
     }
 
     /// Search memory entries.

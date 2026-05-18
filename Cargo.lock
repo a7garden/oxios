@@ -4703,9 +4703,9 @@ checksum = "1a80800c0488c3a21695ea981a54918fbb37abf04f4d0720c453632255e2ff0e"
 
 [[package]]
 name = "oxi-agent"
-version = "0.16.0"
+version = "0.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f5707d466fc276d86922b5518d368a9f570461f414939fa395fa288480ffab20"
+checksum = "9d32cd788970bfd7956190ec2d842ae8e048abadcf26c8ca570023f6ad44315f"
 dependencies = [
  "a3s-search",
  "anyhow",
@@ -4730,9 +4730,9 @@ dependencies = [
 
 [[package]]
 name = "oxi-ai"
-version = "0.16.1"
+version = "0.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "08a6712dfa950a0c75ddd0c26f4771d28bffe2466e006a59a007ff860c71abd9"
+checksum = "a023e37c2b8cc77699800033a43a56f0183bf545b0a0a41f147adc67a29f8907"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4766,9 +4766,9 @@ dependencies = [
 
 [[package]]
 name = "oxi-sdk"
-version = "0.16.1"
+version = "0.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "07cc5a3c3edc4fa92992d6c1129567a4132dc80110669189991d13bdd55073bf"
+checksum = "ca52535326ace07b2abc17bf12a445477745d625ac336eb729c75a6c2ac2badb"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4859,6 +4859,28 @@ dependencies = [
  "toml",
  "tracing",
  "tracing-appender",
+ "tracing-subscriber",
+ "uuid",
+]
+
+[[package]]
+name = "oxios-bench"
+version = "0.1.2"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "chrono",
+ "clap",
+ "futures",
+ "futures-util",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 1.0.69",
+ "tokio",
+ "tokio-test",
+ "tracing",
  "tracing-subscriber",
  "uuid",
 ]
@@ -6795,6 +6817,17 @@ dependencies = [
  "pin-project-lite",
  "tokio",
  "tokio-util",
+]
+
+[[package]]
+name = "tokio-test"
+version = "0.4.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3f6d24790a10a7af737693a3e8f1d03faef7e6ca0cc99aae5066f533766de545"
+dependencies = [
+ "futures-core",
+ "tokio",
+ "tokio-stream",
 ]
 
 [[package]]

@@ -339,7 +339,7 @@ mod tests {
     }
 
     /// Helper to create a real BasicSupervisor wired to a real EventBus.
-    fn make_supervisor() -> BasicSupervisor {
+    async fn make_supervisor() -> BasicSupervisor {
         use std::path::PathBuf;
 
         let event_bus = EventBus::new(64);
@@ -367,6 +367,7 @@ mod tests {
                 Arc::new(crate::supervisor::NoOpSupervisor),
                 Arc::new(crate::budget::BudgetManager::new()),
                 memory_manager,
+                Some(event_bus.clone()),
             ),
             crate::kernel_handle::SecurityApi::new(
                 Arc::new(parking_lot::Mutex::new(crate::auth::AuthManager::new())),
@@ -405,12 +406,12 @@ mod tests {
             ),
             crate::kernel_handle::SpaceApi::new(
                 Arc::new(
-                    tokio::runtime::Handle::current()
-                        .block_on(crate::space::SpaceManager::new(
-                            state_store_for_space,
-                            EventBus::new(64),
-                        ))
-                        .expect("space mgr"),
+                    crate::space::SpaceManager::new(
+                        state_store_for_space,
+                        EventBus::new(64),
+                    )
+                    .await
+                    .expect("space mgr"),
                 ),
                 EventBus::new(64),
             ),
@@ -447,7 +448,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_fork_creates_agent() {
-        let supervisor = make_supervisor();
+        let supervisor = make_supervisor().await;
         let seed = make_seed("Test agent");
 
         let id = supervisor.fork(&seed).await.unwrap();
@@ -462,7 +463,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_exec_updates_status_to_running() {
-        let supervisor = make_supervisor();
+        let supervisor = make_supervisor().await;
         let seed = make_seed("Running agent");
 
         let id = supervisor.fork(&seed).await.unwrap();
@@ -474,7 +475,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_kill_sets_stopped() {
-        let supervisor = make_supervisor();
+        let supervisor = make_supervisor().await;
         let seed = make_seed("Doomed agent");
 
         let id = supervisor.fork(&seed).await.unwrap();
@@ -487,7 +488,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_kill_unknown_agent_returns_error() {
-        let supervisor = make_supervisor();
+        let supervisor = make_supervisor().await;
         let unknown_id = uuid::Uuid::new_v4();
 
         let result = supervisor.kill(unknown_id).await;
@@ -497,7 +498,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_list_returns_all_agents() {
-        let supervisor = make_supervisor();
+        let supervisor = make_supervisor().await;
 
         let id1 = supervisor.fork(&make_seed("Agent 1")).await.unwrap();
         let id2 = supervisor.fork(&make_seed("Agent 2")).await.unwrap();
@@ -514,7 +515,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_exec_unknown_agent_returns_error() {
-        let supervisor = make_supervisor();
+        let supervisor = make_supervisor().await;
         let unknown_id = uuid::Uuid::new_v4();
 
         let result = supervisor.exec(unknown_id).await;
@@ -524,7 +525,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_wait_unknown_agent_returns_error() {
-        let supervisor = make_supervisor();
+        let supervisor = make_supervisor().await;
         let unknown_id = uuid::Uuid::new_v4();
 
         let result = supervisor.wait(unknown_id).await;

@@ -24,7 +24,6 @@ pub fn ChatView() -> Element {
     let mut messages = use_signal(Vec::<MessageEntry>::new);
     let mut processing = use_signal(|| false);
     let mut session_id = use_signal(String::new);
-    let mut error = use_signal(|| None::<String>);
 
     let on_send = move |msg: String| {
         let user_msg = MessageEntry {
@@ -34,7 +33,6 @@ pub fn ChatView() -> Element {
         };
         messages.push(user_msg);
         processing.set(true);
-        error.set(None);
 
         let sid = session_id();
         spawn(async move {
@@ -84,9 +82,6 @@ pub fn ChatView() -> Element {
                 if processing() {
                     ProcessingIndicator { phase: "Processing".to_string() }
                 }
-            }
-            if let Some(err) = error() {
-                div { class: "error-box", "{err}" }
             }
             ChatInput { on_send: on_send }
         }

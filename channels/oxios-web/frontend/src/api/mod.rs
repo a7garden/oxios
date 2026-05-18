@@ -626,6 +626,33 @@ pub struct SetBudgetRequest {
 }
 
 // ---------------------------------------------------------------------------
+// Spaces (backend /api/spaces)
+// ---------------------------------------------------------------------------
+
+/// Space summary for listing.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SpaceInfo {
+    pub id: String,
+    pub name: String,
+    pub source: String,
+    pub active: bool,
+    pub paths: Vec<String>,
+    pub interaction_count: u64,
+    pub knowledge_visible: bool,
+    pub last_active: String,
+}
+
+/// Knowledge flow entry.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct KnowledgeFlowInfo {
+    pub from: String,
+    pub to: String,
+    pub flow_type: String,
+    pub entry_count: usize,
+    pub timestamp: String,
+}
+
+// ---------------------------------------------------------------------------
 // Resources (backend /api/resources)
 // ---------------------------------------------------------------------------
 

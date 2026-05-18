@@ -137,25 +137,25 @@ pub fn EventsView() -> Element {
         div { class: "panel-container",
             div { class: "panel-header",
                 h2 { IconActivity { size: 20 } " Events" }
-                div { style: "display:flex;gap:8px;align-items:center;margin-bottom:12px",
-                    div { style: "display:flex;align-items:center;gap:6px;flex:1;background:var(--bg-2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:4px 8px",
-                        IconSearch { size: 14 }
-                        input {
-                            style: "border:none;background:transparent;color:var(--text-0);font-size:12px;font-family:var(--font-mono);outline:none;flex:1",
-                            placeholder: "Filter events...",
-                            value: "{filter}",
-                            oninput: move |evt| filter.set(evt.value()),
-                        }
-                    }
-                    span { class: "{conn_class}", style: "font-size:12px;font-family:var(--font-mono);white-space:nowrap",
-                        "{conn_status} · {event_count}"
-                    }
-                    button {
-                        class: "btn btn-danger btn-sm",
-                        onclick: move |_| {
-                            events.write().clear();
-                        },
-                        IconTrash { size: 14 } " Clear"
+                span { class: "{conn_class}", style: "font-size:12px;font-family:var(--font-mono);white-space:nowrap",
+                    "{conn_status} · {event_count}"
+                }
+                button {
+                    class: "btn btn-danger btn-sm",
+                    onclick: move |_| {
+                        events.write().clear();
+                    },
+                    IconTrash { size: 14 } " Clear"
+                }
+            }
+            div { class: "action-bar",
+                div { style: "display:flex;align-items:center;gap:6px;flex:1;background:var(--bg-2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:4px 8px",
+                    IconSearch { size: 14 }
+                    input {
+                        style: "border:none;background:transparent;color:var(--text-0);font-size:12px;font-family:var(--font-mono);outline:none;flex:1",
+                        placeholder: "Filter events...",
+                        value: "{filter}",
+                        oninput: move |evt| filter.set(evt.value()),
                     }
                 }
             }

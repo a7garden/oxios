@@ -1,0 +1,40 @@
+{
+  "id": "ecb6957a-334f-4241-9195-28dfb705ac60",
+  "started_at": "2026-05-17T21:47:05.838957Z",
+  "completed_at": "2026-05-17T21:47:05.838958Z",
+  "task_results": [
+    {
+      "task_id": "math_simple",
+      "passed": true,
+      "score": 100.0,
+      "response": "17 × 23 = 391",
+      "expected": [
+        "391"
+      ],
+      "evaluation_notes": "Correct answer '391' found",
+      "duration_ms": 6070
+    },
+    {
+      "task_id": "math_sqrt",
+      "passed": true,
+      "score": 80.0,
+      "response": "The square root of 144 is 12! 🎯",
+      "expected": [
+        "12"
+      ],
+      "evaluation_notes": "Correct answer '12' found",
+      "duration_ms": 4273
+    }
+  ],
+  "trace": null,
+  "config": {
+    "categories": [
+      "Math",
+      "WebSearch",
+      "Knowledge",
+      "Memory"
+    ],
+    "timeout_secs": 60,
+    "collect_events": true
+  }
+}

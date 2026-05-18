@@ -644,6 +644,7 @@ mod tests {
                 "test-1",
                 json!({ "mode": "shell", "command": "echo hello" }),
                 None,
+                &ToolContext::default(),
             )
             .await;
 
@@ -662,6 +663,7 @@ mod tests {
                 "test-2",
                 json!({ "mode": "structured", "binary": "echo", "args": ["hi"] }),
                 None,
+                &ToolContext::default(),
             )
             .await;
 
@@ -675,7 +677,7 @@ mod tests {
     async fn test_agent_tool_missing_mode() {
         let tool = make_tool(vec![]);
         let result = tool
-            .execute("test-3", json!({ "command": "echo hi" }), None)
+            .execute("test-3", json!({ "command": "echo hi" }), None, &ToolContext::default())
             .await;
         assert!(result.is_err());
         assert!(result
@@ -687,7 +689,7 @@ mod tests {
     async fn test_agent_tool_invalid_mode() {
         let tool = make_tool(vec![]);
         let result = tool
-            .execute("test-4", json!({ "mode": "docker" }), None)
+            .execute("test-4", json!({ "mode": "docker" }), None, &ToolContext::default())
             .await;
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("Invalid mode"));
@@ -697,7 +699,7 @@ mod tests {
     async fn test_agent_tool_shell_missing_command() {
         let tool = make_tool(vec![]);
         let result = tool
-            .execute("test-5", json!({ "mode": "shell" }), None)
+            .execute("test-5", json!({ "mode": "shell" }), None, &ToolContext::default())
             .await;
         assert!(result.is_ok());
         let r = result.unwrap();
@@ -709,7 +711,7 @@ mod tests {
     async fn test_agent_tool_structured_missing_binary() {
         let tool = make_tool(vec![]);
         let result = tool
-            .execute("test-6", json!({ "mode": "structured" }), None)
+            .execute("test-6", json!({ "mode": "structured" }), None, &ToolContext::default())
             .await;
         assert!(result.is_ok());
         let r = result.unwrap();
@@ -728,6 +730,7 @@ mod tests {
                 "test-7",
                 json!({ "mode": "shell", "command": "exit 7" }),
                 None,
+                &ToolContext::default(),
             )
             .await;
 

@@ -1,0 +1,29 @@
+{
+  "id": "01b75cfa-8aa9-443f-8ebd-8bf5599350b9",
+  "started_at": "2026-05-17T21:46:52.513049Z",
+  "completed_at": "2026-05-17T21:46:52.513051Z",
+  "task_results": [
+    {
+      "task_id": "math_simple",
+      "passed": true,
+      "score": 100.0,
+      "response": "17 × 23 = 391",
+      "expected": [
+        "391"
+      ],
+      "evaluation_notes": "Correct answer '391' found",
+      "duration_ms": 5417
+    }
+  ],
+  "trace": null,
+  "config": {
+    "categories": [
+      "Math",
+      "WebSearch",
+      "Knowledge",
+      "Memory"
+    ],
+    "timeout_secs": 60,
+    "collect_events": true
+  }
+}

@@ -18,6 +18,7 @@ mod git_routes;
 mod infra;
 mod resource_routes;
 mod resources;
+mod space_routes;
 mod system;
 mod workspace;
 
@@ -66,6 +67,11 @@ pub(crate) use resources::{
     handle_host_tools_check, handle_program_disable, handle_program_enable, handle_program_get,
     handle_program_host_requirements, handle_program_install, handle_program_uninstall,
     handle_programs_list,
+};
+pub(crate) use space_routes::{
+    handle_knowledge_flow, handle_knowledge_flow_for, handle_space_activate, handle_space_archive,
+    handle_space_current, handle_space_get, handle_space_merge, handle_space_restore,
+    handle_spaces_list,
 };
 pub(crate) use system::{
     handle_agent_kill, handle_agents_list, handle_config_get, handle_config_put, handle_health,
@@ -242,6 +248,16 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         .route("/api/git/tags", get(handle_git_tags))
         .route("/api/git/verify", post(handle_git_verify))
         .route("/api/git/restore", post(handle_git_restore))
+        // Spaces
+        .route("/api/spaces", get(handle_spaces_list))
+        .route("/api/spaces/current", get(handle_space_current))
+        .route("/api/spaces/{id}", get(handle_space_get))
+        .route("/api/spaces/{id}/activate", post(handle_space_activate))
+        .route("/api/spaces/{id}/archive", post(handle_space_archive))
+        .route("/api/spaces/{id}/restore", post(handle_space_restore))
+        .route("/api/spaces/merge", post(handle_space_merge))
+        .route("/api/spaces/knowledge-flow", get(handle_knowledge_flow))
+        .route("/api/spaces/{id}/knowledge-flow", get(handle_knowledge_flow_for))
         // Budget
         .route("/api/budget/{agent_id}", get(handle_budget_get))
         .route("/api/budget/{agent_id}", post(handle_budget_set))

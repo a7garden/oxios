@@ -12,6 +12,7 @@ pub enum Panel {
     Chat,
     Dashboard,
     Config,
+    Spaces,
     Agents,
     AgentGroups,
     Personas,
@@ -69,6 +70,8 @@ const NAV_ITEMS: &[NavItem] = &[
     NavItem { panel: Panel::Chat,      label: "Chat",      section: Section::Core },
     NavItem { panel: Panel::Dashboard, label: "Dashboard",  section: Section::Core },
     NavItem { panel: Panel::Config,    label: "Config",     section: Section::Core },
+    // Context
+    NavItem { panel: Panel::Spaces,    label: "Spaces",     section: Section::Core },
     // Agents
     NavItem { panel: Panel::Agents,     label: "Agents",       section: Section::Agents },
     NavItem { panel: Panel::AgentGroups, label: "Agent Groups", section: Section::Agents },
@@ -101,6 +104,7 @@ fn panel_icon(panel: Panel) -> Element {
         Panel::Chat       => rsx! { IconChat { size: 18 } },
         Panel::Dashboard  => rsx! { IconDashboard { size: 18 } },
         Panel::Config     => rsx! { IconSettings { size: 18 } },
+        Panel::Spaces     => rsx! { IconLayers { size: 18 } },
         Panel::Agents     => rsx! { IconAgents { size: 18 } },
         Panel::AgentGroups => rsx! { IconLayers { size: 18 } },
         Panel::Personas   => rsx! { IconUsers { size: 18 } },
@@ -221,9 +225,9 @@ pub fn Sidebar() -> Element {
                         style: "margin-bottom:4px",
                         onclick: move |_| show_api_key.set(true),
                         if has_api_key {
-                            "🔑 API Key Set"
+                            "API Key Set"
                         } else {
-                            "🔑 Set API Key"
+                            "Set API Key"
                         }
                     }
                 }
@@ -235,7 +239,7 @@ pub fn Sidebar() -> Element {
                             h3 { "API Key" }
                         }
                         div { class: "modal-body",
-                            p { style: "font-size:13px;color:var(--text-secondary);margin-bottom:12px",
+                            p { style: "font-size:13px;color:var(--text-2);margin-bottom:12px",
                                 "Enter the API key for authenticating with the Oxios backend."
                             }
                             input {
@@ -249,7 +253,7 @@ pub fn Sidebar() -> Element {
                                 },
                             }
                             if api_key_saved() {
-                                p { style: "font-size:12px;color:var(--green);margin-top:8px", "✓ Saved" }
+                                p { style: "font-size:12px;color:var(--success);margin-top:8px", "✓ Saved" }
                             }
                         }
                         div { class: "modal-footer",

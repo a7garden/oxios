@@ -31,25 +31,24 @@ pub fn SessionsView() -> Element {
                 let id_for_delete = id.clone();
 
                 rsx! {
-                    div { class: "agent-card", key: "{id}",
-                        div {
-                            class: "session-row",
-                            style: "display:flex;align-items:center;justify-content:space-between;cursor:pointer",
-                            onclick: move |_| {
-                                if expanded_id().as_ref() == Some(&id_for_expand) {
-                                    expanded_id.set(None);
-                                } else {
-                                    expanded_id.set(Some(id_for_expand.clone()));
-                                    loading_detail.set(true);
-                                    let target = id_for_expand.clone();
-                                    spawn(async move {
-                                        let detail = api::fetch_json::<serde_json::Value>(&format!("/api/sessions/{target}")).await;
-                                        detail_data.set(Some(detail.unwrap_or_default()));
-                                        loading_detail.set(false);
-                                    });
-                                }
+                    div {
+                        class: "agent-card",
+                        key: "{id}",
+                        style: "cursor:pointer",
+                        onclick: move |_| {
+                            if expanded_id().as_ref() == Some(&id_for_expand) {
+                                expanded_id.set(None);
+                            } else {
+                                expanded_id.set(Some(id_for_expand.clone()));
+                                loading_detail.set(true);
+                                let target = id_for_expand.clone();
+                                spawn(async move {
+                                    let detail = api::fetch_json::<serde_json::Value>(&format!("/api/sessions/{target}")).await;
+                                    detail_data.set(Some(detail.unwrap_or_default()));
+                                    loading_detail.set(false);
+                                });
                             }
-                        }
+                        },
                         div { class: "agent-info",
                             div { class: "agent-name", "{short_id}" }
                             div { class: "agent-id", "User: {session.user_id} · Messages: {session.message_count}" }
@@ -62,7 +61,8 @@ pub fn SessionsView() -> Element {
                             button {
                                 class: "btn btn-danger btn-sm",
                                 title: "Delete this session",
-                                onclick: move |_| {
+                                onclick: move |e| {
+                                    e.stop_propagation();
                                     let sid = id_for_delete.clone();
                                     spawn(async move {
                                         let _ = api::delete_action(&format!("/api/sessions/{sid}")).await;
@@ -95,7 +95,7 @@ pub fn SessionsView() -> Element {
             rsx! { div { {rows.into_iter()} } }
         },
         Some(Err(e)) => rsx! {
-            div { class: "empty-state", p { { format!("Error: {e}") } } }
+            div { class: "error-box", { format!("Error: {e}") } }
         },
         None => rsx! {
             div { class: "empty-state",

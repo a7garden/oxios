@@ -232,7 +232,7 @@ pub fn CronJobsView() -> Element {
             div { class: "panel-header",
                 h2 { IconClock { size: 20 } " Cron Jobs" }
                 button {
-                    class: "btn btn-sm",
+                    class: "btn btn-primary btn-sm",
                     onclick: move |_| show_modal.set(true),
                     IconClock { size: 14 } " New Job"
                 }

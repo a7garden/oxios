@@ -107,7 +107,7 @@ pub fn ConfigView() -> Element {
             }
         }
         Some(Err(e)) => rsx! {
-            div { class: "empty-state", p { { format!("Error: {e}") } } }
+            div { class: "error-box", { format!("Error: {e}") } }
         },
         None => rsx! {
             div { class: "empty-state",

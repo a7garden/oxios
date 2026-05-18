@@ -60,7 +60,7 @@ pub fn AgentGroupsView() -> Element {
             rsx! { div { class: "item-list", {rows.into_iter()} } }
         },
         Some(None) => rsx! {
-            div { class: "empty-state", p { "Failed to load groups." } }
+            div { class: "error-box", "Failed to load groups." }
         },
         None => rsx! {
             div { class: "empty-state",

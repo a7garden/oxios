@@ -23,3 +23,4 @@ pub mod git;
 pub mod budget;
 pub mod agent_groups;
 pub mod resources;
+pub mod spaces;

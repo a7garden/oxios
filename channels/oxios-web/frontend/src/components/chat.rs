@@ -47,7 +47,11 @@ pub fn ChatInput(on_send: EventHandler<String>) -> Element {
 /// Single chat message bubble.
 #[component]
 pub fn ChatMessage(text: String, msg_type: String, phase: Option<String>) -> Element {
-    let class = if msg_type == "user" { "message user" } else { "message agent" };
+    let class = match msg_type.as_str() {
+        "user" => "message user",
+        "error" => "message agent message-error-bubble",
+        _ => "message agent",
+    };
 
     rsx! {
         div { class: "{class}",

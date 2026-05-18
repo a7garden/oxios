@@ -236,7 +236,7 @@ pub fn MemoryView() -> Element {
                 rsx! { div { class: "item-list", {items.into_iter()} } }
             },
             Some(Err(e)) => rsx! {
-                div { class: "empty-state", p { { format!("Error: {e}") } } }
+                div { class: "error-box", { format!("Error: {e}") } }
             },
             None => rsx! {
                 div { class: "empty-state",

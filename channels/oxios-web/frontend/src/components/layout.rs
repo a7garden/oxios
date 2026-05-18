@@ -5,12 +5,12 @@ use dioxus::prelude::*;
 use crate::Theme;
 use crate::api;
 use crate::components::sidebar::Panel;
-use crate::components::icons::{IconMenu, IconX};
+use crate::components::icons::{IconMenu, IconSun, IconMoon, IconX};
 
 #[component]
 pub fn AppLayout() -> Element {
     let panel = use_context::<Signal<Panel>>();
-    let theme = use_context::<Signal<Theme>>();
+    let mut theme = use_context::<Signal<Theme>>();
     let mut mobile_menu = use_context::<Signal<bool>>();
 
     let theme_class = match theme() {
@@ -22,6 +22,7 @@ pub fn AppLayout() -> Element {
         Panel::Chat       => rsx! { crate::views::chat::ChatView {} },
         Panel::Dashboard  => rsx! { crate::views::dashboard::DashboardView {} },
         Panel::Config     => rsx! { crate::views::config::ConfigView {} },
+        Panel::Spaces     => rsx! { crate::views::spaces::SpacesView {} },
         Panel::Protocol   => rsx! { crate::views::protocol::ProtocolView {} },
         Panel::Agents     => rsx! { crate::views::agents::AgentsView {} },
         Panel::AgentGroups => rsx! { crate::views::agent_groups::AgentGroupsView {} },
@@ -68,7 +69,17 @@ pub fn AppLayout() -> Element {
                     IconMenu { size: 22 }
                 }
                 span { class: "mobile-brand", "OXIOS" }
-                div { style: "width:38px" }
+                button {
+                    class: "icon-btn",
+                    onclick: move |_| {
+                        theme.set(if theme() == Theme::Dark { Theme::Light } else { Theme::Dark });
+                    },
+                    {if theme() == Theme::Dark {
+                        rsx! { IconSun { size: 18 } }
+                    } else {
+                        rsx! { IconMoon { size: 18 } }
+                    }}
+                }
             }
             crate::components::sidebar::Sidebar {}
             main { class: "main-content",

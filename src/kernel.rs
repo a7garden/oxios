@@ -75,6 +75,7 @@ impl Kernel {
                         self.supervisor.clone(),
                         self.budget_manager.clone(),
                         self.memory_manager.clone(),
+                        Some(self.event_bus.clone()),
                     ),
                     oxios_kernel::SecurityApi::new(
                         self.auth_manager.clone(),
@@ -395,6 +396,7 @@ impl KernelBuilder {
                     Arc::new(oxios_kernel::supervisor::NoOpSupervisor),
                     budget_manager.clone(),
                     memory_manager.clone(),
+                    None,
                 ),
                 oxios_kernel::SecurityApi::new(
                     auth_manager.clone(),
