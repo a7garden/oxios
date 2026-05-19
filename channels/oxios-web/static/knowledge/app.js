@@ -32,35 +32,9 @@ async function init() {
         log('Storage persisted:', persisted);
     }
 
-    // Authorize if we have one-time token in URL.
-    const urlParams = new URLSearchParams(window.location.search);
-    const oneTimeToken = urlParams.get('token');
-    if (oneTimeToken) {
-        try {
-            // Exchange one-time token for permanent token
-            const response = await fetch(`${API_URL}/issuePermanentToken`, {
-                method: 'POST',
-                credentials: 'include',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    oneTimeToken: oneTimeToken
-                })
-            });
-
-            if (response.ok) {
-                // Server sets the auth cookie via Set-Cookie on this response.
-                markServerOk();
-                const url = new URL(window.location);
-                url.searchParams.delete('token');
-                window.history.replaceState({}, '', url);
-            } else {
-                alert('The token has expired or is invalid. Please try to request a new link.');
-                logError('Token exchange failed:', response.status);
-            }
-        } catch (error) {
-            alert('The token has expired or is invalid. Please try to request a new link.');
+    // Oxios: token exchange not needed — auth is handled by Oxios middleware
+    // If running inside Oxios web channel, mark server as ready immediately.
+    markServerOk();
             logError('Error exchanging token:', error);
         }
     }
