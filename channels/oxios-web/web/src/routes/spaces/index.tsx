@@ -53,7 +53,13 @@ function SpacesListPage() {
     {
       header: '',
       accessor: (row: Space) => (
-        <div role="group" className="flex gap-1" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+        // biome-ignore lint/a11y/useSemanticElements: wrapper div for button group is intentional
+        <div
+          role="group"
+          className="flex gap-1"
+          onClick={(e) => e.stopPropagation()}
+          onKeyDown={(e) => e.stopPropagation()}
+        >
           {row.status !== 'active' && (
             <Button variant="ghost" size="icon" onClick={() => activateMutation.mutate(row.id)}>
               <Play className="h-4 w-4 text-emerald-500" />

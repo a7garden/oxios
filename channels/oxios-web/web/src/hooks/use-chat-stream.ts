@@ -21,7 +21,11 @@ export function useChatStream() {
           }
           return [
             ...updated,
-            { role: 'assistant' as const, content: tokenContent, timestamp: new Date().toISOString() },
+            {
+              role: 'assistant' as const,
+              content: tokenContent,
+              timestamp: new Date().toISOString(),
+            },
           ]
         })
       } else if (chunk.type === 'done') {

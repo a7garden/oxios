@@ -159,7 +159,7 @@ function SettingsPage() {
       if (!sectionConfig) continue
       values[section.key] = {}
       for (const field of section.fields) {
-        values[section.key]![field.key] = String(sectionConfig[field.key] ?? '')
+        values[section.key][field.key] = String(sectionConfig[field.key] ?? '')
       }
     }
     setFormValues(values)
@@ -229,7 +229,9 @@ function SettingsPage() {
               <CardContent className="space-y-4">
                 {section.fields.map((field) => (
                   <div key={field.key} className="grid gap-2 md:grid-cols-3 items-center">
-                    <label htmlFor={field.key} className="text-sm font-medium">{field.label}</label>
+                    <label htmlFor={field.key} className="text-sm font-medium">
+                      {field.label}
+                    </label>
                     <div className="md:col-span-2">
                       <Input
                         id={field.key}

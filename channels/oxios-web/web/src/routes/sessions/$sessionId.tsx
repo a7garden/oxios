@@ -84,7 +84,11 @@ function SessionDetailPage() {
           {messages && messages.length > 0 ? (
             <div className="space-y-3">
               {messages.map((msg, i) => (
-                <div key={`msg-${i}`} className="flex gap-3">
+                <div
+                  // biome-ignore lint/suspicious/noArrayIndexKey: session messages have no unique ID
+                  key={`msg-${i}`}
+                  className="flex gap-3"
+                >
                   <Badge
                     variant={msg.role === 'user' ? 'default' : 'secondary'}
                     className="shrink-0 h-6"

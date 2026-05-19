@@ -70,7 +70,12 @@ function WorkspacePage() {
           className="flex items-center gap-2 py-1.5 px-2 hover:bg-muted/50 rounded cursor-pointer text-sm"
           style={{ paddingLeft: `${depth * 16 + 8}px` }}
           onClick={() => node.type === 'directory' && toggleExpand(node)}
-          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); node.type === 'directory' && toggleExpand(node) } }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault()
+              node.type === 'directory' && toggleExpand(node)
+            }
+          }}
         >
           {node.type === 'directory' ? (
             <>

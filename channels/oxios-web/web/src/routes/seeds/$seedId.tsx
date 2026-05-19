@@ -60,10 +60,14 @@ function SeedDetailPage() {
           {seed.evolution_log && seed.evolution_log.length > 0 ? (
             <div className="relative space-y-0">
               {seed.evolution_log.map((entry, i) => (
-                <div key={`evolution-${i}`} className="flex gap-4 pb-6 relative">
+                <div
+                  // biome-ignore lint/suspicious/noArrayIndexKey: evolution entries have no unique ID
+                  key={`evolution-${i}`}
+                  className="flex gap-4 pb-6 relative"
+                >
                   <div className="flex flex-col items-center">
                     <div className="h-3 w-3 rounded-full bg-primary mt-1" />
-                    {i < seed.evolution_log!.length - 1 && (
+                    {i < seed.evolution_log?.length - 1 && (
                       <div className="w-0.5 flex-1 bg-border" />
                     )}
                   </div>

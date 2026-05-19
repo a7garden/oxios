@@ -35,7 +35,11 @@ function ChatPage() {
           ) : (
             <div className="space-y-4">
               {messages.map((msg, i) => (
-                <div key={`${msg.role}-${i}`} className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : ''}`}>
+                <div
+                  // biome-ignore lint/suspicious/noArrayIndexKey: messages lack unique IDs, using role+index as fallback
+                  key={`${msg.role}-${i}`}
+                  className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : ''}`}
+                >
                   {msg.role === 'assistant' && (
                     <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
                       <Bot className="h-4 w-4" />
