@@ -1,0 +1,60 @@
+@media (prefers-color-scheme: dark) {
+    :root {
+        --font: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", Ubuntu, Cantarell, "Helvetica Neue", Arial, sans-serif !important;
+        /*--font: Rubik, Cambria, "Times New Roman", Times, serif;*/
+        --col-tx: #FAF9F4;
+        --col-tx-alt: #C2C0B7;
+        --col-bg: #262624;
+        --col-bg-alt: #1F1E1D;
+        --col-inline-code: #E76B6B;
+        --col-inline-code-bg: #2E2E2B;
+        --col-link: #6cb4d9;
+        --col-link-hover: #68B5ED;
+        --col-url: #AAB0BE;
+        --col-tx-sel: color-mix(in srgb, var(--col-link), transparent 45%) !important;
+        --col-msg-sel: color-mix(in srgb, var(--col-link), transparent 80%) !important;
+        --col-bg-active: #0F0F0E;
+        --col-border: #3C3B38;
+    }
+
+    .cm-s-hypermd-light span.cm-formatting-task {
+        background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAwCAYAAAALiLqjAAAABHNCSVQICAgIfAhkiAAAAfRJREFUWIXtlrFqFFEUhr+7LEHE3cLCakMsLE2jL7APoEUeQAQbkYCdKMRKFLFTUmiTQhv7aOMbWKRLY7GFkjQbsApGiYHPYs8uN5PZ3TC7CxZzYJmZM2f/794zZ+YcANSOuqn2nd36odUBSHHyFrgFHAB7wAnVrAksA1eAz8CDJvA4xD8BG8APwIqABKwAL4DbwHdiS311taLoGVNXh7pE3nbU9hwB7dC0Eb4TqqellBGaNKYEzmw1oAbUgBrwPwGaDJrFvCyFJg0GbXKZQSeal62E5gHRoFW3oxO11VbFXzs0tkNzc+FNH1js2LLwKqrnolKb61ykdtUttZv5RnPREPBVbVUQ7wyF1J/qevhboemsVfQIuBnnl4EbxYDKAHUNuJe5esDruQDUq8Az4FK4/gKvUkq7MwPUJeAJcD1zfwQ+lMVX2cEacCe77gEvU0rH5wJEiXXLqkq9BjwFLobrD/A8pfRt7HLyMg3xd+qvOLazuKWo99y2ImVFzVGZFgEbBYERRL2r/s7u7caOyhY9AjQL9/aBoywF9+MP7yM1F8J/FKnpjU1NWYri+qF6mK30WN0r2dmZ1ExNURZQhOS24+A9mLToyYAJkEMHb/C0rEwHjIG8mSY+DjD2c62uxzP4YvTZcwBOfa4X3nDquahop+aif1R4DBMenXj1AAAAAElFTkSuQmCC");
+    }
+
+    .message.user {
+        background-color: color-mix(in srgb, var(--col-bg-alt) 95%, white 5%) !important;
+    }
+
+    .message.bot {
+        background-color: var(--col-bg-alt) !important;
+    }
+
+    .button-container button {
+        background-color: var(--col-bg-alt) !important;
+    }
+
+    .to-recent-btn, .action-btn svg {
+        fill: var(--col-link);
+        color: var(--col-link) !important;
+        stroke: var(--col-link) !important;
+    }
+
+    #open-chat-modal svg {
+        stroke: var(--col-link) !important;
+    }
+
+    #open-chat-modal:hover svg {
+        stroke: var(--col-tx) !important;
+    }
+
+    #close-chat:hover, #fullscreen-chat:hover, #close-sidebar:hover, #close-editor2:hover, #go-backward:hover svg, #go-forward:hover svg {
+        color: var(--col-tx) !important;
+        stroke: var(--col-tx) !important;
+    }
+
+    .message.own {
+        background: color-mix(in srgb, var(--col-bg) 25%, transparent);
+    }
+
+}
+

@@ -1,4 +1,4 @@
-//! Kernel facade — 10 domain Facades composing the System Call API.
+//! Kernel facade — 12 domain Facades composing the System Call API.
 
 pub mod a2a_api;
 pub mod agent_api;
@@ -6,6 +6,7 @@ pub mod browser_api;
 pub mod exec_api;
 pub mod extension_api;
 pub mod infra_api;
+pub mod knowledge_api;
 pub mod mcp_api;
 pub mod persona_api;
 pub mod security_api;
@@ -18,6 +19,7 @@ pub use browser_api::BrowserApi;
 pub use exec_api::ExecApi;
 pub use extension_api::ExtensionApi;
 pub use infra_api::InfraApi;
+pub use knowledge_api::KnowledgeApi;
 pub use mcp_api::McpApi;
 pub use persona_api::PersonaApi;
 pub use security_api::SecurityApi;
@@ -45,23 +47,25 @@ use crate::skill::SkillStore;
 use crate::space::SpaceManager;
 use crate::state_store::StateStore;
 use crate::supervisor::Supervisor;
+use parking_lot::RwLock;
 use serde::Serialize;
 use std::sync::Arc;
 use std::time::Instant;
 
-/// Oxios kernel System Call API — composed of 10 domain Facades.
+/// Oxios kernel System Call API — composed of 12 domain Facades.
 ///
 /// Each Facade groups related system calls:
-/// - [`StateApi`]    — data persistence, sessions
-/// - [`AgentApi`]    — agent lifecycle, budgets, memory
-/// - [`SecurityApi`] — auth, audit trail, RBAC, approvals
-/// - [`PersonaApi`]  — multi-persona management
+/// - [`StateApi`]     — data persistence, sessions
+/// - [`AgentApi`]     — agent lifecycle, budgets, memory
+/// - [`SecurityApi`]  — auth, audit trail, RBAC, approvals
+/// - [`PersonaApi`]   — multi-persona management
 /// - [`ExtensionApi`] — programs, skills, host tools
-/// - [`McpApi`]      — MCP server bridge
-/// - [`SpaceApi`]    — Space management, knowledge flow
-/// - [`ExecApi`]     — execution config, access management
-/// - [`BrowserApi`]  — browser backend
-/// - [`A2aApi`]      — agent-to-agent communication
+/// - [`McpApi`]       — MCP server bridge
+/// - [`SpaceApi`]     — Space management, knowledge flow
+/// - [`ExecApi`]      — execution config, access management
+/// - [`BrowserApi`]   — browser backend
+/// - [`A2aApi`]       — agent-to-agent communication
+/// - [`KnowledgeApi`] — markdown note management, backlinks, memory sync
 pub struct KernelHandle {
     /// State management: save/load/sessions.
     pub state: StateApi,
@@ -85,10 +89,12 @@ pub struct KernelHandle {
     pub browser: BrowserApi,
     /// Agent-to-agent communication.
     pub a2a: A2aApi,
+    /// Knowledge base: markdown notes, backlinks, memory sync.
+    pub knowledge: KnowledgeApi,
 }
 
 impl KernelHandle {
-    /// Create a new KernelHandle from 11 domain Facades.
+    /// Create a new KernelHandle from 12 domain Facades.
     ///
     /// Each Facade is assembled independently in `kernel.rs` and passed here.
     /// This enables testing individual Facades without the full kernel.
@@ -105,6 +111,7 @@ impl KernelHandle {
         exec: ExecApi,
         browser: BrowserApi,
         a2a: A2aApi,
+        knowledge: KnowledgeApi,
     ) -> Self {
         Self {
             state,
@@ -118,6 +125,7 @@ impl KernelHandle {
             exec,
             browser,
             a2a,
+            knowledge,
         }
     }
 
@@ -148,6 +156,8 @@ impl KernelHandle {
         start_time: Instant,
         space_manager: Arc<SpaceManager>,
     ) -> Self {
+        let knowledge_dir = state_store.base_path.join("knowledge");
+        let knowledge = KnowledgeApi::new(knowledge_dir, memory_manager.clone());
         Self {
             security: SecurityApi::new(
                 auth_manager.clone(),
@@ -178,6 +188,7 @@ impl KernelHandle {
             exec: ExecApi::new(Arc::new(config.exec.clone()), access_manager),
             browser: BrowserApi::default(),
             a2a: A2aApi::new(Arc::new(A2AProtocol::new(crate::EventBus::new(0)))),
+            knowledge,
         }
     }
 

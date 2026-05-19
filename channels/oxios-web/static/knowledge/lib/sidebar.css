@@ -1,0 +1,227 @@
+.tree-container *{
+	position: relative;
+	box-sizing: border-box;
+}
+
+.tree-container ul{
+	padding-left: 0em;
+	margin: 0;
+	list-style-type: none;
+	cursor: pointer;
+}
+
+.tree-container > ul:first-of-type{
+	padding: 0;
+}
+
+.tree-container li span.tree-item{
+	white-space: nowrap;
+	overflow:hidden;
+	text-overflow: ellipsis;
+
+	padding: 2px 4px;
+	cursor: pointer;
+	display: flex;
+	align-items: center;
+	border-radius: 5px;
+
+	-webkit-touch-callout: none;
+	-webkit-user-select: none;
+	-khtml-user-select: none;
+	-moz-user-select: none;
+	-ms-user-select: none;
+	user-select: none;
+
+	text-align: left;
+
+	font-size: 1.1em;
+}
+
+.tree-container li span.tree-item:hover{
+	background-color: var(--col-bg-active);
+}
+
+.tree-container li span.tree-mod_icon {
+	display: inline-block;
+	padding: -9px 0 0 0 !important;
+}
+
+.tree-mod_icon {
+	padding-right: 5px;
+}
+
+.tree-mod_icon svg {
+	stroke: var(--col-tx-alt);
+	height: 1.1em;
+}
+
+.tree-container li span.tree-icon {
+	display: none;
+}
+
+.tree-container li span.tree-mod_icon, .tree-container li span.tree-mod_icon *{
+	transform: translateY(1px);
+}
+
+.tree-container ul ul li span.tree-item.tree-leaf {
+	padding-left: 2em;
+}
+
+.tree-container li[disabled=""]{
+	color: #b5b5b5;
+}
+
+.tree-container li[disabled=""]:hover span.tree-item{
+	cursor: default;
+	background-color: inherit;
+}
+
+.tree-container span.tree-item.selected{
+	background-color: var(--col-bg-active);
+}
+
+.tree-container span.tree-item.selected:hover{
+	background-color: var(--col-bg-active);
+}
+
+/*Drag'n'drop styles*/
+.tree-dragging {
+	opacity: 0.5;
+	/*transform: rotate(2deg);*/
+	transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.tree-drop_indicator {
+	position: absolute;
+	height: 1.5px;
+	background-color: var(--col-link);
+	opacity: 0;
+	transition: opacity 0.2s ease;
+	pointer-events: none;
+}
+
+.tree-drop_indicator.active {
+	opacity: 1;
+}
+
+.tree-drop_target {
+	background-color: var(--col-bg-active);
+	color: var(--col-link);
+	/*border: 2px solid var(--color-border) !important;*/
+	border-radius: 5px;
+}
+
+.tree-item[draggable="true"] {
+	cursor: grab;
+}
+
+.tree-item[draggable="true"]:active {
+	cursor: grabbing;
+}
+
+/*.tree-container .tree-item[draggable="true"]:hover {*/
+/*	background-color: var(--color-bg-active);*/
+/*	!*border: 1px solid transparent;*!*/
+/*}*/
+
+.tree-group_title {
+	font-size: 0.8em;
+	/*text-transform: uppercase;*/
+	letter-spacing: 0.5px;
+	padding: 5px 5px;
+	display: block;
+	/*// Make less visible than color-tx-alt*/
+	color: color-mix(in srgb, var(--col-tx-alt) 70%, transparent);
+}
+
+#sidebar {
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
+}
+
+#tree {
+	flex: 1;
+	overflow-y: auto;
+	overflow-x: hidden;
+}
+
+#sidebar ul {
+	margin-top: 0;
+}
+
+/*#open-folder {*/
+/*    display: none;*/
+/*    padding: 8px;*/
+/*}*/
+
+#sidebar-container {
+	position: relative;
+	z-index: 1;
+}
+
+.resize {
+	position: absolute;
+	right: 0;
+	top: 0;
+	bottom: 0;
+	width: 25px;
+	cursor: col-resize;
+	background: transparent;
+	z-index: 11;
+}
+
+.resize:hover {
+	background: color-mix(in srgb, var(--col-bg-active) 50%, transparent);
+}
+
+.resize::after {
+	content: '';
+	position: absolute;
+	right: 0;
+	top: 0;
+	bottom: 0;
+	width: 1px;
+	background: transparent;
+}
+
+.resize:hover::after {
+	background: var(--col-border);
+}
+
+#close-sidebar {
+	position: absolute;
+	top: 2px;
+	right: -1px;
+	opacity: 0;
+	cursor: pointer;
+	font-size: 27px;
+	color: var(--col-link);
+	transition: opacity 0.2s;
+	border: none;
+	background: transparent;
+	z-index: 12;
+}
+
+.sidebar-ctx-menu {
+	position: fixed;
+	background: var(--col-bg, #fff);
+	color: var(--col-tx, #000);
+	border: 1px solid var(--col-border, rgba(0, 0, 0, 0.15));
+	border-radius: 6px;
+	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+	padding: 4px 0;
+	z-index: 10000;
+	min-width: 140px;
+	font-size: 14px;
+	user-select: none;
+}
+
+.sidebar-ctx-menu-item {
+	padding: 6px 12px;
+	cursor: pointer;
+}
+
+.sidebar-ctx-menu-item:hover {
+	background: color-mix(in srgb, var(--col-tx, #000) 10%, transparent);
+}

@@ -5002,6 +5002,7 @@ dependencies = [
  "oxi-sdk",
  "oxibrowser-core",
  "oxios-gateway",
+ "oxios-markdown",
  "oxios-ouroboros",
  "parking_lot",
  "regex",

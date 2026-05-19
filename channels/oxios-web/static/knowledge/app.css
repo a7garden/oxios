@@ -1,0 +1,777 @@
+:root {
+    --col-tx-hover: #24837b;
+    --col-inline-code: #6F6E69;
+    --col-inline-code-bg: var(--col-bg-alt);
+    --col-msg-sel: color-mix(in srgb, var(--col-link), transparent 70%) !important;
+    --col-bg: #FFFCF0; /* Paper color */
+    --col-code-keyword: #1F5EA5;
+    --col-code-op: #BC5215;
+    --col-code-bg: #f2f0e5;
+    --col-border: #e0e0e0;
+    --font: -apple-system, BlinkMacSystemFont, 'Inter', 'IBM Plex Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
+    --font-smaller: 1.3rem;
+    --font-mono: ui-monospace, SFMono-Regular, "Cascadia Code", "IBM Plex Mono",
+    "Roboto Mono", "DejaVu Sans Mono", "Liberation Mono", Menlo, Monaco,
+    "Consolas", "Source Code Pro", monospace;
+    --normal-width: 800px;
+    -webkit-font-smoothing: antialiased;
+    color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: light) {
+    meta[name="theme-color"] {
+        content: "#ff0000";
+    }
+}
+
+html {
+    box-sizing: border-box;
+    width: 100%;
+    height: 100%;
+    font-size: 64%
+}
+
+body {
+    overscroll-behavior: none;
+    background-color: var(--col-bg-alt);
+    color: var(--col-tx);
+    font-size: 1.7rem;
+    font-size: calc(1.5rem + 0.2vw);
+    font-family: var(--font);
+    text-rendering: optimizeLegibility;
+    display: flex;
+    height: 100vh;
+}
+
+/*Add border for PWA app only*/
+@media (display-mode: standalone) {
+    body {
+        border-top: 1px solid var(--col-border);
+        box-sizing: border-box;
+    }
+
+    #chat-container {
+        height: calc(100vh - 1px) !important;
+    }
+}
+
+.CodeMirror-wrap {
+    /*border-radius: 5px;*/
+    /*background-color: var(--color-bg);*/
+    /*border: 1px solid var(--color-border);*/
+}
+
+.CodeMirror-code {
+    text-rendering: optimizeLegibility !important;
+    font-family: var(--font) !important;
+}
+
+#sidebar {
+    flex-shrink: 0; /* Prevent flexbox from shrinking */
+    box-sizing: content-box !important;
+    display: block;
+    width: 280px !important;
+    /*min-width: 220px;*/
+    /*max-width: 800px;*/
+    position: relative;
+    overflow: auto;
+    height: 100%;
+    background: var(--col-bg-alt);
+    color: var(--col-tx-alt);
+    font-size: calc(1.5rem);
+    padding-left: 5px;
+    border-right: 1px solid var(--col-border);
+}
+
+#sidebar > ul {
+    margin: 8px;
+}
+
+#sidebar li {
+    line-height: 1.3;
+}
+
+/* CTA shown at the bottom of the sidebar while we're on the in-memory FS,
+   so first-time users have an obvious way to connect a real folder.
+   Toggled to display:flex from app.js when isMemFS is true. */
+#open-folder {
+    align-items: center;
+    gap: 8px;
+    /* left margin compensates for #sidebar's 5px padding-left so all four
+       gaps look equal (top/right/bottom = 8px, left = 3 + 5 = 8). */
+    margin: 8px 8px 8px 3px;
+    padding: 10px 12px;
+    background: var(--col-bg);
+    border: 1px solid var(--col-border);
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: calc(1.4rem);
+    color: var(--col-tx);
+}
+
+#open-folder:hover {
+    background: var(--col-bg-active);
+}
+
+#open-folder svg {
+    flex-shrink: 0;
+    stroke: var(--col-tx-alt);
+}
+
+#content {
+    overflow: auto;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    background: var(--col-bg);
+}
+#editor-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    max-height: 100vh;
+}
+
+#editor2-container {
+    flex: 1;
+    display: none;
+    flex-direction: column;
+    border-left: 1px solid var(--col-border);
+    position: fixed;
+    right: 0;
+    top: 0;
+    width: 50%;
+    height: 100vh;
+    background: var(--col-bg);
+    z-index: 10;
+    transform: translateX(100%);
+    transition: transform 0.3s ease;
+}
+
+#editor2-container.show {
+    display: flex;
+    transform: translateX(0);
+}
+
+/* Original (disabled): when the sidebar was hidden and editor2 was open,
+   editor1 was shrunk to 50% via a row flex layout. That collapsed
+   editor1's container width and forced its content to re-wrap - a
+   visible "jump". Editor2 is `position: fixed`, so it overlays without
+   needing editor1 to shrink. Keeping editor1 at full width means its
+   content keeps the same wrap; the padding-shift rule lower in this
+   file moves the (unchanged-width) content into the left half. */
+/*
+body:has(#sidebar[style*="display: none"]):has(#editor2-container.show) #content {
+    flex-direction: row;
+}
+
+body:has(#sidebar[style*="display: none"]):has(#editor2-container.show) #editor-container {
+    flex: 0 0 50%;
+}
+*/
+
+#editor {
+    flex: 1;
+}
+
+#editor2-container {
+    border-left: 2px solid var(--col-border);
+    box-shadow: -2px 0 4px rgba(0, 0, 0, 0.1);
+}
+
+
+#content table, th, td {
+    border-collapse: collapse;
+    border: 1px solid #878787;
+}
+
+td {
+    text-align: center;
+}
+
+th {
+    padding: 3px;
+}
+
+td {
+    padding: 2px;
+}
+
+a {
+    color: var(--col-tx) !important;
+    text-decoration: underline;
+}
+
+a:hover {
+    color: var(--col-tx-hover);
+}
+
+#search, #move {
+    position: fixed;
+    width: 500px;
+    padding: 5px;
+    box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.15);
+    border-radius: 8px;
+    background: var(--col-bg);
+    display: flex;
+    flex-direction: column;
+    z-index: 10000;
+}
+
+#search-input, #move-input {
+    width: 100%;
+    padding: 8px;
+    font-size: 16px;
+    margin-bottom: 4px;
+    box-sizing: border-box;
+    border: 2px solid var(--col-border);
+    border-radius: 4px;
+    background: var(--col-bg);
+}
+
+#search-input:focus, #move-input:focus {
+    outline: none;
+}
+
+#search-results, #move-results {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+#search-results li, #move-results li {
+    padding: 8px;
+    cursor: pointer;
+    text-overflow: ellipsis;
+    word-break: break-all; /* Break long paths anywhere */
+    overflow: hidden;
+    white-space: nowrap;
+}
+
+#search-results .focused, #move-results .focused {
+    background-color: var(--col-bg-active);
+    border-radius: 5px;
+}
+
+.CodeMirror-scroll {
+    padding: 2em 0;
+}
+
+/*Center editor1 when there's no editor2*/
+.CodeMirror-scroll {
+    padding: 2em calc((100% - var(--normal-width)) / 2);
+}
+
+/* When editor2 opens, shift editor1's content into the left half of the
+   viewport so the right half (covered by editor2) doesn't hide it -
+   while keeping the content's WIDTH identical to its closed state
+   (--normal-width) so the text doesn't re-wrap. The padding sum stays
+   at (container - normal-width); left padding shrinks by 25vw (half of
+   editor2's 50vw overlay), right padding grows by the same amount.
+   `max(0px, ...)` clamps gracefully on narrow viewports where the
+   ideal left padding would go negative - in that case content snaps
+   to the editor1 container's left edge, but its width still equals
+   --normal-width so no re-flow happens. */
+#content:has(#editor2-container.show) .CodeMirror-scroll {
+    padding-top: 2em;
+    padding-bottom: 2em;
+    padding-left: max(0px, calc((100% - var(--normal-width)) / 2 - 25vw));
+    padding-right: calc(100% - var(--normal-width) - max(0px, calc((100% - var(--normal-width)) / 2 - 25vw)));
+}
+
+.CodeMirror-lines::after {
+    content: "";
+    display: block;
+    height: 20em;
+}
+
+.CodeMirror-foldmarker {
+    color: blue;
+    text-shadow: #b9f 1px 1px 2px, #b9f -1px -1px 2px, #b9f 1px -1px 2px, #b9f -1px 1px 2px;
+    line-height: .3;
+    cursor: pointer;
+}
+
+.CodeMirror-foldgutter {
+    width: .7em;
+}
+
+.CodeMirror-foldgutter-open,
+.CodeMirror-foldgutter-folded {
+    cursor: pointer;
+}
+
+.CodeMirror-foldgutter-open:after {
+    content: "\25BE";
+}
+
+.CodeMirror-foldgutter-folded:after {
+    content: "\25B8";
+}
+
+.HyperMD-codeblock-bg {
+    background: var(--col-bg-alt) !important;
+}
+
+.cm-inline-code:not(.cm-formatting):not(.cm-hmd-indented-code) {
+    background: var(--col-inline-code-bg) !important;
+    color: var(--col-inline-code) !important;
+    font-family: var(--font-mono) !important;
+    font-size: var(--font-smaller) !important;
+}
+
+::selection {
+    background: var(--col-tx-sel);
+}
+
+::-moz-selection {
+    background: var(--col-tx-sel);
+}
+
+.CodeMirror-selected {
+    background: var(--col-tx-sel) !important;
+}
+
+.CodeMirror-hints {
+    background-color: var(--col-bg-alt) !important;
+    border: 1px solid var(--col-border) !important;
+    max-width: 400px;
+    box-shadow: none !important;
+    border-radius: 5px !important;
+}
+
+.CodeMirror-hint {
+    color: var(--col-tx-alt) !important;
+    padding: 5px 10px !important;
+    cursor: pointer;
+}
+
+.CodeMirror-hint-active {
+    background-color: var(--col-bg-active) !important;
+}
+
+.cm-s-hypermd-light pre.HyperMD-codeblock {
+    color: var(--col-tx-alt) !important;
+    font-family: var(--font-mono) !important;
+    font-size: var(--font-smaller) !important;
+}
+
+.cm-s-hypermd-light span.cm-link, .cm-s-hypermd-light .cm-string.cm-url.cm-hmd-barelink {
+    color: var(--col-link) !important;
+    font-weight: 450;
+    border-bottom:0.04em solid var(--col-border);
+}
+
+.cm-s-hypermd-light span.cm-link:hover, .cm-s-hypermd-light .cm-string.cm-url.cm-hmd-barelink:hover {
+    cursor: pointer;
+    color: var(--col-link-hover) !important;
+    text-decoration: none !important;
+    border-bottom:0.08em solid var(--col-link-hover);
+}
+
+#welcome {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    background: var(--col-bg-alt);
+    text-align: center;
+    border: 1px solid var(--col-border);
+    display: none;
+}
+
+.hmd-image {
+    border-radius: 8px;
+}
+
+.CodeMirror .HyperMD-list-line-1 {
+    padding-left: 25px !important;
+}
+
+.CodeMirror .HyperMD-list-line-2 {
+    padding-left: 55px !important;
+}
+
+.CodeMirror .HyperMD-list-line-3 {
+    padding-left: 85px !important;
+}
+
+
+/*.cm-formatting-list-ul::before {*/
+/*    content: '';*/
+/*    display: inline-block;*/
+/*    width: 24px;*/
+/*    height: 24px;*/
+
+/*    !*<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">*!*/
+/*    !*<g clip-path="url(#clip0_952_6527)">*!*/
+/*    !*<circle cx="12" cy="12" r="3"></circle>*!*/
+/*    !*</g>*!*/
+/*    !*<defs>*!*/
+/*    !*<clipPath id="clip0_952_6527">*!*/
+/*    !*<rect width="24" height="24"></rect>*!*/
+/*    !*</clipPath>*!*/
+/*    !*</defs>*!*/
+/*    !*</svg>*!*/
+/*    !*    with fill=#73777f;*!*/
+/*    background-image: url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0Ij4KICAgIDxnIGNsaXAtcGF0aD0idXJsKCNjbGlwMF85NTJfNjUyNykiPgogICAgICA8Y2lyY2xlIGN4PSIxMiIgY3k9IjEyIiByPSIzIiBmaWxsPSIjNzM3NzdmIj48L2NpcmNsZT4KICAgIDwvZz4KICAgIDxkZWZzPgogICAgICA8Y2xpcFBhdGggaWQ9ImNsaXAwXzk1Ml82NTI3Ij4KICAgICAgICA8cmVjdCB3aWR0aD0iMjQiIGhlaWdodD0iMjQiPjwvcmVjdD4KICAgICAgPC9jbGlwUGF0aD4KICAgIDwvZGVmcz4KICA8L3N2Zz4=');*/
+/*    background-size: contain;*/
+/*    background-repeat: no-repeat;*/
+/*    background-position: center;*/
+/*    vertical-align: middle;*/
+/*}*/
+
+/*.cm-formatting-list-ul::before svg {*/
+/*    fill: #73777f;*/
+/*}*/
+
+.cm-formatting-list-ul {
+    /*font-size: 0; !* Hide the "-" character *!*/
+    /*color: transparent; !* Backup to hide the character *!*/
+}
+
+.cm-formatting-list-ul {
+    color: var(--col-tx-alt) !important;
+}
+
+/*Hide bulletpoints when tasks*/
+.cm-formatting-list-ul:has(+ .cm-formatting-task) {
+    width: 0;
+}
+
+/* Hide the list formatting only when task formatting IS hidden */
+.cm-formatting-list-ul:has(+ .cm-formatting-task.hmd-hidden-token) {
+    display: none;
+    width: 0;
+}
+
+.cm-s-hypermd-light span.cm-formatting-task:not(.hmd-hidden-token) {
+    /*background-color: red;*/
+}
+
+.cm-formatting-list-ul:has(+ .cm-formatting-task.hmd-hidden-token) + .cm-formatting-task.hmd-hidden-token {
+    margin-left: -24px;
+}
+
+/*For some reason ``` in code aren't hidden*/
+.HyperMD-codeblock .hmd-hidden-token {
+    display: none !important;
+}
+
+/*Hide (...) in links. Don't hide links after images*/
+.CodeMirror span:not(:has(.cm-image)) > span.cm-url.hmd-hidden-token.cm-url {
+    display: inline;
+    font-size: 0 !important;
+    letter-spacing: -1ch;
+    color: transparent;
+}
+
+ #toolbar {
+     z-index: 5;
+     position: fixed;
+     left: 240px;
+     top: 30px;
+     background: var(--col-bg-alt);
+     text-align: center;
+ }
+
+#toolbar button {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 2px;
+}
+
+button svg {
+    display: block;
+    stroke: var(--col-link);
+    /*stroke: var(--color-tx-alt) !important;*/
+}
+
+button svg circle {
+    fill: #3A9AE5 !important;
+}
+
+#toolbar button:hover svg {
+    border-radius: 4px;
+    stroke:  var(--col-tx) !important;
+}
+
+#toolbar {
+    position: sticky;       /* stays at the top while scrolling */
+    top: 0;
+    padding-top: 8px;
+    z-index: 10;
+}
+
+
+body.dragging {
+    user-select: none;
+    cursor: col-resize !important;
+}
+
+body.dragging * {
+    cursor: col-resize !important;
+}
+
+.CodeMirror-gutters {
+    visibility: hidden;
+}
+
+.CodeMirror-cursor {
+    background: red !important;
+    color: green;
+}
+
+.cm-formatting.cm-formatting-link-string.cm-string.cm-url, .cm-formatting.cm-formatting-link.cm-link {
+    color: var(--col-tx-alt) !important;
+}
+
+.hmd-image-preview {
+    border: var(--col-border);
+}
+
+.cm-s-hypermd-light .HyperMD-codeblock::before {
+    content: '';
+    display: inline-block;
+    width: 8px;
+}
+
+.cm-s-hypermd-light .HyperMD-codeblock-bg {
+    margin-left: 4px;
+    width: calc(100% - 4px);
+}
+
+.cm-s-hypermd-light .CodeMirror-line.HyperMD-codeblock {
+    padding-left: 10px;
+    color: var(--col-tx-alt) !important;
+}
+
+.cm-s-hypermd-light .HyperMD-codeblock::before {
+    display: none;
+}
+
+.cm-formatting.cm-formatting-code.cm-inline-code {
+    background: none !important;
+}
+
+.cm-s-hypermd-light img.hmd-image {
+    /*PATCHED*/
+    max-width: 400px;
+    display: inline-block;
+
+    margin-left: 25%;
+    margin-top: 0.6em;
+    margin-bottom: 0.6em;
+}
+
+@media (max-width: 768px) {
+    .cm-s-hypermd-light img.hmd-image {
+        margin-left: 20%;
+    }
+}
+
+@media (max-width: 670px) {
+    .cm-s-hypermd-light img.hmd-image {
+        max-width: 300px;
+        margin-left: 17%;
+    }
+
+    #sidebar {
+        width: 140px !important;
+    }
+}
+
+.cm-s-hypermd-light span.cm-formatting-task {
+    color: var(--col-tx) !important;
+}
+
+.cm-s-hypermd-light span.cm-formatting-task:not(.hmd-hidden-token) {
+    background-image: none;
+}
+
+.cm-s-hypermd-light span.cm-attribute, .cm-s-hypermd-light span.cm-def, .cm-s-hypermd-light span.cm-string {
+    color: var(--col-link) !important;
+}
+
+.cmd-pressed .cm-inline-code:hover {
+    cursor: pointer;
+}
+
+#move, #search {
+    z-index: 10000;
+}
+
+
+#close-editor2 {
+    position: relative;
+    cursor: pointer;
+    font-size: 27px;
+    color: var(--col-link);
+    background: none;
+    border: none;
+    top: -2px;
+}
+
+#go-backward, #go-backward {
+    stroke: var(--col-link);
+}
+
+#sidebar:hover #close-sidebar {
+    opacity: 1;
+}
+
+#open-sidebar {
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 18px;
+    height: 100vh;
+    opacity: 0;
+    cursor: pointer;
+    background: color-mix(in srgb, var(--col-bg-active) 50%, transparent);
+    transition: opacity 0.2s;
+    z-index: 1000;
+}
+
+#open-sidebar:hover {
+    opacity: 1;
+}
+
+#sidebar:not([style*="display: none"]) ~ #open-sidebar {
+    display: none;
+}
+
+.cm-s-hypermd-light .cm-header {
+    font-weight: 550 !important;
+}
+
+.cm-s-hypermd-light span.cm-inline-code:not(.cm-formatting):not(.cm-hmd-indented-code) {
+    background: rgba(135, 131, 120, .15) !important;
+    border-radius: 4px;
+    vertical-align: baseline;
+    padding: 0.16em 0.32em !important;
+    font-size: 0.9em !important;
+}
+
+/* The backtick tokens appear when the cursor enters inline code; size them
+   to match the code body so the revealed tokens don't push the line height. */
+.cm-s-hypermd-light span.cm-formatting-code:not(.hmd-hidden-token) {
+    font-size: 0.9em !important;
+}
+
+.cm-s-hypermd-light div.HyperMD-codeblock-bg {
+    border-left: 1px solid var(--col-border);
+    border-right: 1px solid var(--col-border);
+}
+
+.cm-s-hypermd-light div.HyperMD-codeblock-begin-bg {
+    /*border-top: 1px solid var(--col-border);*/
+    border-top: none;
+}
+
+.cm-s-hypermd-light div.HyperMD-codeblock-end-bg {
+    /*border-bottom: 1px solid var(--col-border);*/
+    border-bottom: none;
+}
+
+.cm-s-hypermd-light div.HyperMD-codeblock-bg {
+    border-left: none;
+    border-right: none;
+}
+
+.cm-s-hypermd-light div.HyperMD-codeblock-begin-bg {
+    border-top-left-radius: 10px !important;
+    border-top-right-radius: 10px !important;
+}
+.cm-s-hypermd-light div.HyperMD-codeblock-end-bg {
+    border-bottom-left-radius: 10px !important;
+    border-bottom-right-radius: 10px !important;
+}
+
+.nav-button {
+    position: relative;
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+}
+
+
+.nav-button:disabled {
+    cursor: not-allowed;
+}
+
+#nav-buttons {
+    background: var(--col-bg-alt);
+    border-radius: 10px;
+    display: flex;
+    position: absolute;
+    padding: 0;
+    top: 2px;
+    right: 2px;
+}
+
+.sidebar-blink {
+    animation: sidebar-highlight 4s ease-out;
+}
+
+@keyframes sidebar-highlight {
+    0% { color: var(--col-link); background-color: var(--col-bg-active); opacity: 1; }
+    20% { color: var(--col-link); background-color: var(--col-bg-active); opacity: 0.7; }
+    25% { color: var(--col-link); background-color: var(--col-bg-active); opacity: 0.5; }
+    30% { color: var(--col-link); background-color: var(--col-bg-active); opacity: 0.7; }
+    45% { color: var(--col-link); background-color: var(--col-bg-active); opacity: 1; }
+    50% { color: var(--col-link); background-color: var(--col-bg-active); opacity: 0.5; }
+    55% { color: var(--col-link); background-color: var(--col-bg-active); opacity: 0.7; }
+    75% { color: var(--col-link); background-color: var(--col-bg-active); opacity: 1; }
+    100% { color: var(--col-link); background-color: var(--col-bg-active); opacity: 1; }
+}
+
+/*.tree-container li ul li ul li .tree-item {*/
+/*    padding-left: 120px !important;*/
+/*}*/
+
+.tree-container ul ul li span.tree-item:not(.tree-leaf) {
+    padding-left: 2em;
+}
+
+.tree-container ul ul ul li span.tree-item {
+    padding-left: 4em !important;
+}
+
+.hmd-inactive-line .cm-hmd-indent-in-quote {
+    position: absolute;
+    width: 0;
+    /*overflow: hidden;*/
+}
+
+.cm-s-hypermd-light pre.HyperMD-quote-1 {
+    text-indent: -10px !important;
+    padding-inline-start: 24px !important;
+}
+
+.HyperMD-list-line:has(.cm-formatting-task) {
+    padding-left: 30px !important;
+}
+
+.HyperMD-list-line:has(.cm-formatting-task.hmd-hidden-token) {
+    text-indent: -5px !important;
+}
+
+.cm-formatting-task.cm-property ~ .cm-list-1 {
+    text-decoration: line-through;
+    opacity: 0.6;
+    color: #888;
+}
+
+.cm-formatting-task.cm-property {
+    opacity: 0.6;
+}

@@ -1,0 +1,164 @@
+@media (prefers-color-scheme: light) {
+    :root {
+        --font: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", Ubuntu, Cantarell, "Helvetica Neue", Arial, sans-serif !important;
+        /*--font: Rubik, Cambria, "Times New Roman", Times, serif;*/
+        --col-tx: #100F0F;
+        --col-tx-alt: #878787;
+        --col-bg: #FFF;
+        --col-bg-alt: #F9F9F9;
+        --col-inline-code: #657b83;
+        --col-inline-code-bg: #d8dae0;
+        --col-link: #3A9AE5;
+        --col-link-hover: #68B5ED;
+        --col-url: #706f6b;
+        --col-tx-sel: color-mix(in srgb, var(--col-link), transparent 40%) !important;
+        --col-msg-sel: color-mix(in srgb, var(--col-link), transparent 60%) !important;
+        --col-bg-active: #EFEFEF;
+        --col-border: #e0e0e0;
+    }
+
+    .cm-s-hypermd-light span.cm-formatting-task {
+        background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAwCAMAAAA8VkqRAAAAclBMVEUAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACa4vOeAAAAJXRSTlMADcjpDswcLZOzsvOYBvWdbtvTX0D69+ORa1dRJCDtuaF7ZDkoQyuUXgAAAMhJREFUOMvt0reywjAUhOFjKxmcrgMZboL//V8Rm6GwkNUx0LClvhkVZ1fEZoqHqMwO7wuUSb0YxcJKxtLpxIt2SzJRykkQp5RgdAjaIKRJCEn6gWdA9OzRoqLVRscQnc9bdtXX/eyurOF7N3erLVDPwCGHxoVwamH1LwGUBfBbhrCvoLlMitL9DY8trLtJg7qoCj18VAN1OYE/YJBuDe1RJtBVo5wbqPb+GL5yWG1GLX0YZYw5iQ93yQ/yAHfZzu5qt/mxr97VFS15JGSVM0C6AAAAAElFTkSuQmCC");
+    }
+
+    .to-recent-btn, .action-btn svg {
+        fill: var(--col-tx-alt);
+        color: var(--col-tx-alt) !important;
+        stroke: var(--col-tx-alt) !important;
+    }
+
+    .to-recent-btn:hover, .action-btn:hover svg {
+        fill: var(--col-link);
+        color: var(--col-link) !important;
+        stroke: var(--col-link) !important;
+    }
+
+    #toolbar svg {
+        stroke: var(--col-tx-alt) !important;
+    }
+
+    #toolbar button:hover svg {
+        border-radius: 4px;
+        stroke:  var(--col-link) !important;
+        background: var(--col-bg-active);
+    }
+
+    #close-chat, #fullscreen-chat {
+        color: var(--col-tx-alt) !important;
+    }
+
+    #open-chat-modal:hover svg {
+       stroke: var(--col-link) !important;
+    }
+
+    #close-chat:hover, #fullscreen-chat:hover {
+        color: var(--col-link) !important;
+    }
+
+    #close-chat:hover {
+        color: var(--col-link) !important;
+    }
+
+    #open-chat-modal svg {
+        stroke: #F5F5F5 !important;
+    }
+
+    #close-sidebar, #close-editor2, #go-forward svg, #go-backward svg {
+        color: var(--col-tx-alt) !important;
+        stroke: var(--col-tx-alt) !important;
+    }
+
+    #close-sidebar:hover, #close-editor2:hover, #go-forward:hover svg, #go-backward:hover svg {
+        color: var(--col-link) !important;
+        stroke: var(--col-link) !important;
+    }
+
+    #open-sidebar {
+        background: var(--col-bg-active);
+    }
+
+    .message.own {
+        background: color-mix(in srgb, var(--col-bg) 60%, transparent);
+    }
+}
+
+.cm-s-hypermd-light .cm-header.cm-header-1 {
+    font-size: 32px !important;
+    line-height: 38px !important;
+    font-weight: 700 !important;
+}
+
+/* padding-top has to sit on the block-level pre wrapper; the cm-header span
+   is inline so padding there has no effect on line height. */
+.cm-s-hypermd-light pre.HyperMD-header.HyperMD-header-1 {
+    padding-top: 18px !important;
+}
+
+/* Skip the gap for the very first line of the doc - usually the doc title.
+   CodeMirror appends each line as a direct child of .CodeMirror-code.
+   Compensate with extra bottom padding so the title doesn't sit on top of
+   the next line. */
+.cm-s-hypermd-light .CodeMirror-code > pre.HyperMD-header.HyperMD-header-1:first-child,
+.cm-s-hypermd-light .CodeMirror-code > :first-child pre.HyperMD-header.HyperMD-header-1 {
+    padding-top: 0 !important;
+    padding-bottom: 11px !important;
+}
+
+.cm-s-hypermd-light pre.HyperMD-header.HyperMD-header-2 {
+    padding-top: 18px !important;
+    font-size: 24px !important;
+    line-height: 30px !important;
+}
+
+.cm-s-hypermd-light pre.HyperMD-header.HyperMD-header-3 {
+    padding-top: 16px !important;
+    font-size: 22px !important;
+    line-height: 28px !important;
+}
+
+.cm-s-hypermd-light pre.HyperMD-header.HyperMD-header-4 {
+    padding-top: 14px !important;
+    font-size: 20px !important;
+    line-height: 26px !important;
+}
+
+.cm-s-hypermd-light pre.HyperMD-header.HyperMD-header-5 {
+    padding-top: 12px;
+    font-size: 18px;
+    line-height: 24px !important;
+}
+
+.cm-s-hypermd-light pre.HyperMD-header.HyperMD-header-6 .cm-header-6{
+    padding-top: 12px;
+    font-size: 16px;
+    font-weight: 600;
+    line-height: 22px
+}
+
+
+.cm-s-hypermd-light .cm-header, .cm-s-hypermd-light .cm-strong, .cm-s-hypermd-light span.cm-url {
+    font-family: var(--font) !important;
+    font-weight: 400;
+}
+
+.cm-s-hypermd-light span.cm-formatting-list-ol {
+    color: var(--col-tx-alt) !important;
+}
+
+.cm-s-hypermd-light .cm-strong {
+    font-weight: 600;
+}
+
+/*Otherwise cursor height is not correct*/
+.cm-s-hypermd-light pre.HyperMD-list-line {
+    padding-top: 0 !important;
+}
+
+.cm-s-hypermd-light span.cm-url:not(.cm-string) {
+    color: var(--col-url) !important;
+    font-weight: 400;
+}
+
+.cm-s-hypermd-light .cm-link, .cm-s-hypermd-light .cm-string.cm-url.cm-hmd-barelink {
+    line-height: 1.6 !important;
+}
