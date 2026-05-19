@@ -6,6 +6,11 @@ description = "Ouroboros spec-first protocol for Oxios"
 license = "MIT"
 repository = "https://github.com/a7garden/oxios"
 
+# The specification-first protocol concept (interview → seed → execute → evaluate → evolve)
+# and ambiguity scoring model are derived from the Ouroboros project by Q00.
+# See THIRD-PARTY-NOTICES.md for full attribution.
+# Original: https://github.com/Q00/ouroboros (MIT License, Copyright (c) 2025 Q00)
+
 [dependencies]
 oxi-sdk = { workspace = true }
 tokio = { workspace = true }

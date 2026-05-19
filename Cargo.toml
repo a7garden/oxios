@@ -10,6 +10,7 @@ repository = "https://github.com/a7garden/oxios"
 resolver = "2"
 members = [
     "crates/oxios-kernel",
+    "crates/oxios-markdown",
     "crates/oxios-ouroboros",
     "crates/oxios-gateway",
     "channels/oxios-web",

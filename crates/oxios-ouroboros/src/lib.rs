@@ -3,6 +3,11 @@
 //! This crate implements the five-phase Ouroboros methodology:
 //! interview → seed → execute → evaluate → evolve.
 //!
+//! The protocol concept and ambiguity scoring model are derived from
+//! the Ouroboros project by Q00 (https://github.com/Q00/ouroboros).
+//! Rust implementation is original — no source code was copied.
+//! See THIRD-PARTY-NOTICES.md for full attribution.
+//!
 //! Never execute without a spec. Clarify until ambiguity ≤ 0.2.
 
 #![warn(missing_docs)]

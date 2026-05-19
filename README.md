@@ -669,7 +669,7 @@ See [AGENTS.md](AGENTS.md) for detailed onboarding documentation.
 
 ## License
 
-[MIT](LICENSE)
+[MIT](LICENSE) · [Third-Party Notices](THIRD-PARTY-NOTICES.md)
 
 ---
 
