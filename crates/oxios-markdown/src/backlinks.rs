@@ -210,6 +210,13 @@ impl BacklinkIndex {
     pub fn is_empty(&self) -> bool {
         self.forward.is_empty()
     }
+
+    /// Clear all indexed data.
+    pub fn clear(&mut self) {
+        self.forward.clear();
+        self.backward.clear();
+        self.details.clear();
+    }
 }
 
 #[cfg(test)]

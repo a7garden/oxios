@@ -10,6 +10,11 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
+function getChartColor(token: string): string {
+  if (typeof window === 'undefined') return '#888'
+  return getComputedStyle(document.documentElement).getPropertyValue(token).trim() || '#888'
+}
+
 import { LoadingCards } from '@/components/shared/loading'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { api } from '@/lib/api-client'
@@ -64,8 +69,8 @@ function ResourcesPage() {
               <div className="text-2xl font-bold">{latest.cpu_percent.toFixed(1)}%</div>
               <div className="mt-2 h-2 rounded-full bg-muted overflow-hidden">
                 <div
-                  className="h-full rounded-full bg-blue-500 transition-all"
-                  style={{ width: `${latest.cpu_percent}%` }}
+                  className="h-full rounded-full transition-all"
+                  style={{ width: `${latest.cpu_percent}%`, backgroundColor: getChartColor('--chart-1') }}
                 />
               </div>
             </CardContent>
@@ -78,8 +83,8 @@ function ResourcesPage() {
               <div className="text-2xl font-bold">{latest.memory_percent.toFixed(1)}%</div>
               <div className="mt-2 h-2 rounded-full bg-muted overflow-hidden">
                 <div
-                  className="h-full rounded-full bg-purple-500 transition-all"
-                  style={{ width: `${latest.memory_percent}%` }}
+                  className="h-full rounded-full transition-all"
+                  style={{ width: `${latest.memory_percent}%`, backgroundColor: getChartColor('--chart-2') }}
                 />
               </div>
             </CardContent>
@@ -92,8 +97,8 @@ function ResourcesPage() {
               <div className="text-2xl font-bold">{latest.disk_percent.toFixed(1)}%</div>
               <div className="mt-2 h-2 rounded-full bg-muted overflow-hidden">
                 <div
-                  className="h-full rounded-full bg-amber-500 transition-all"
-                  style={{ width: `${latest.disk_percent}%` }}
+                  className="h-full rounded-full transition-all"
+                  style={{ width: `${latest.disk_percent}%`, backgroundColor: getChartColor('--chart-3') }}
                 />
               </div>
             </CardContent>
@@ -117,33 +122,34 @@ function ResourcesPage() {
                 <YAxis className="text-xs" tick={{ fontSize: 12 }} domain={[0, 100]} />
                 <RechartsTooltip
                   contentStyle={{
-                    backgroundColor: 'hsl(var(--card))',
-                    border: '1px solid hsl(var(--border))',
+                    backgroundColor: 'var(--card)',
+                    border: '1px solid var(--border)',
                     borderRadius: '8px',
                     fontSize: '12px',
+                    color: 'var(--foreground)',
                   }}
                 />
                 <Area
                   type="monotone"
                   dataKey="cpu"
-                  stroke="#3b82f6"
-                  fill="#3b82f6"
+                  stroke={getChartColor('--chart-1')}
+                  fill={getChartColor('--chart-1')}
                   fillOpacity={0.1}
                   name="CPU %"
                 />
                 <Area
                   type="monotone"
                   dataKey="memory"
-                  stroke="#a855f7"
-                  fill="#a855f7"
+                  stroke={getChartColor('--chart-2')}
+                  fill={getChartColor('--chart-2')}
                   fillOpacity={0.1}
                   name="Memory %"
                 />
                 <Area
                   type="monotone"
                   dataKey="disk"
-                  stroke="#f59e0b"
-                  fill="#f59e0b"
+                  stroke={getChartColor('--chart-3')}
+                  fill={getChartColor('--chart-3')}
                   fillOpacity={0.1}
                   name="Disk %"
                 />

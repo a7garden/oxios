@@ -103,7 +103,7 @@ export function Sidebar() {
             <span className="font-bold text-lg">Oxios</span>
           </div>
         )}
-        <button type="button" onClick={toggle} className="rounded-md p-1.5 hover:bg-sidebar-accent">
+        <button type="button" onClick={toggle} className="rounded-md p-1.5 hover:bg-sidebar-accent" aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}>
           {collapsed ? <PanelLeft className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
         </button>
       </div>
@@ -160,6 +160,7 @@ export function Sidebar() {
             setTheme(next)
           }}
           className="flex items-center gap-3 rounded-lg px-2.5 py-2 text-sm w-full hover:bg-sidebar-accent/50"
+          aria-label="Toggle theme"
         >
           {theme === 'system' ? (
             <Monitor className="h-4 w-4" />
