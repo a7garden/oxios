@@ -1,6 +1,6 @@
 # RFC: Settings UI — Form-Based Configuration
 
-> **Status**: Draft (v2 — 리뷰 반영)
+> **Status**: Implemented (v0.1.3)
 > **Date**: 2025-05-19
 > **Scope**: `channels/oxios-web/frontend/src/views/config.rs`, backend `system.rs`
 

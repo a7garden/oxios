@@ -1,5 +1,7 @@
 /target
 channels/oxios-web/frontend/target/
+channels/oxios-web/static/wasm/*.wasm
+channels/oxios-web/static/assets/*.wasm
 channels/oxios-web/static/dioxus/wasm/*.wasm
 channels/oxios-web/static/dioxus/wasm/snippets/
 channels/oxios-web/static/dioxus/assets/
