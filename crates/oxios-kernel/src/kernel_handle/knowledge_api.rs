@@ -109,6 +109,11 @@ impl KnowledgeApi {
         self.fs.read().root().to_path_buf()
     }
 
+    /// Get the default model ID used for copilot chat.
+    pub fn model_id(&self) -> &str {
+        &self.default_model
+    }
+
     /// Space 전환 시 knowledge base 루트를 교체.
     pub fn switch_space(&self, space_dir: &std::path::Path) -> Result<()> {
         let new_root = space_dir.join("knowledge");
