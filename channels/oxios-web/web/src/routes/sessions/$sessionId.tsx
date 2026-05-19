@@ -1,12 +1,12 @@
-import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
-import { api } from '@/lib/api-client'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { LoadingCards } from '@/components/shared/loading'
+import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { ArrowLeft, Clock, MessageSquare } from 'lucide-react'
-import type { Session, ChatMessage } from '@/types'
+import { LoadingCards } from '@/components/shared/loading'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { api } from '@/lib/api-client'
+import type { ChatMessage, Session } from '@/types'
 
 export const Route = createFileRoute('/sessions/$sessionId')({
   component: SessionDetailPage,
@@ -35,7 +35,10 @@ function SessionDetailPage() {
     { label: 'Space ID', value: session.space_id ?? '—' },
     { label: 'Messages', value: session.message_count ?? 0 },
     { label: 'Created', value: new Date(session.created_at).toLocaleString() },
-    { label: 'Updated', value: session.updated_at ? new Date(session.updated_at).toLocaleString() : '—' },
+    {
+      label: 'Updated',
+      value: session.updated_at ? new Date(session.updated_at).toLocaleString() : '—',
+    },
   ]
 
   return (
@@ -59,7 +62,10 @@ function SessionDetailPage() {
         <CardContent>
           <div className="grid gap-3 md:grid-cols-2">
             {details.map((d) => (
-              <div key={d.label} className="flex items-center justify-between rounded-lg border p-3">
+              <div
+                key={d.label}
+                className="flex items-center justify-between rounded-lg border p-3"
+              >
                 <span className="text-sm text-muted-foreground">{d.label}</span>
                 <span className="text-sm font-medium">{d.value}</span>
               </div>
@@ -78,8 +84,11 @@ function SessionDetailPage() {
           {messages && messages.length > 0 ? (
             <div className="space-y-3">
               {messages.map((msg, i) => (
-                <div key={i} className="flex gap-3">
-                  <Badge variant={msg.role === 'user' ? 'default' : 'secondary'} className="shrink-0 h-6">
+                <div key={`msg-${i}`} className="flex gap-3">
+                  <Badge
+                    variant={msg.role === 'user' ? 'default' : 'secondary'}
+                    className="shrink-0 h-6"
+                  >
                     {msg.role}
                   </Badge>
                   <div className="flex-1 rounded-lg bg-muted p-3">

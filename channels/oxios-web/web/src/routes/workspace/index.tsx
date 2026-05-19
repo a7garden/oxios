@@ -1,12 +1,12 @@
-import { createFileRoute } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
-import { api } from '@/lib/api-client'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { LoadingCards } from '@/components/shared/loading'
-import { EmptyState } from '@/components/shared/empty-state'
-import { FolderOpen, RefreshCw, ChevronRight, ChevronDown, File, Folder } from 'lucide-react'
+import { createFileRoute } from '@tanstack/react-router'
+import { ChevronDown, ChevronRight, File, Folder, FolderOpen, RefreshCw } from 'lucide-react'
 import { useState } from 'react'
+import { EmptyState } from '@/components/shared/empty-state'
+import { LoadingCards } from '@/components/shared/loading'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { api } from '@/lib/api-client'
 import type { FileNode } from '@/types'
 
 export const Route = createFileRoute('/workspace/')({ component: WorkspacePage })
@@ -14,7 +14,12 @@ export const Route = createFileRoute('/workspace/')({ component: WorkspacePage }
 function WorkspacePage() {
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set())
 
-  const { data: root, isLoading, refetch, isFetching } = useQuery({
+  const {
+    data: root,
+    isLoading,
+    refetch,
+    isFetching,
+  } = useQuery({
     queryKey: ['workspace'],
     queryFn: () => api.get<FileNode>('/api/workspace'),
   })
@@ -32,7 +37,7 @@ function WorkspacePage() {
     })
   }
 
-  const { data: children, refetch: refetchChildren } = useQuery({
+  const { data: children } = useQuery({
     queryKey: ['workspace-children', [...expandedPaths]],
     queryFn: async () => {
       const result: Record<string, FileNode[]> = {}
@@ -53,18 +58,27 @@ function WorkspacePage() {
 
   const renderNode = (node: FileNode, depth: number = 0) => {
     const isExpanded = expandedPaths.has(node.path)
-    const nodeChildren = isExpanded ? children?.[node.path] ?? node.children ?? [] : node.children ?? []
+    const nodeChildren = isExpanded
+      ? (children?.[node.path] ?? node.children ?? [])
+      : (node.children ?? [])
 
     return (
       <div key={node.path}>
         <div
+          role="treeitem"
+          tabIndex={0}
           className="flex items-center gap-2 py-1.5 px-2 hover:bg-muted/50 rounded cursor-pointer text-sm"
           style={{ paddingLeft: `${depth * 16 + 8}px` }}
           onClick={() => node.type === 'directory' && toggleExpand(node)}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); node.type === 'directory' && toggleExpand(node) } }}
         >
           {node.type === 'directory' ? (
             <>
-              {isExpanded ? <ChevronDown className="h-4 w-4 shrink-0" /> : <ChevronRight className="h-4 w-4 shrink-0" />}
+              {isExpanded ? (
+                <ChevronDown className="h-4 w-4 shrink-0" />
+              ) : (
+                <ChevronRight className="h-4 w-4 shrink-0" />
+              )}
               <Folder className="h-4 w-4 text-amber-500 shrink-0" />
             </>
           ) : (

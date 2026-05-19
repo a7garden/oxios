@@ -685,7 +685,7 @@ mod tests {
         });
 
         // Simulate a program that requires "read" and "exec".
-        let required_tools = vec!["read".to_string(), "exec".to_string()];
+        let _required_tools = vec!["read".to_string(), "exec".to_string()];
 
         // Validation: all required tools must exist in the registry.
         let missing = registry.missing(&["read", "exec"]);
@@ -708,7 +708,7 @@ mod tests {
         });
 
         // Simulate a program that requires tools that don't exist.
-        let required_tools = vec![
+        let _required_tools = vec![
             "read".to_string(),        // exists
             "exec".to_string(),        // missing
             "nonexistent".to_string(), // missing

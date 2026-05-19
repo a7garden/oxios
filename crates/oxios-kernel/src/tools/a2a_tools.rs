@@ -471,22 +471,11 @@ fn parse_priority(s: Option<&str>) -> TaskPriority {
 mod tests {
     use super::*;
     use crate::event_bus::EventBus;
-    use crate::types::AgentStatus;
 
     fn test_a2a() -> Arc<A2AProtocol> {
         Arc::new(A2AProtocol::new(EventBus::new(256)))
     }
 
-    fn register_test_agent(a2a: &A2AProtocol, name: &str, caps: &[&str]) -> AgentId {
-        let id = Uuid::new_v4();
-        let mut card = crate::a2a::AgentCard::new(id, name, format!("Test agent: {name}"));
-        for cap in caps {
-            card = card.with_capability(*cap);
-        }
-        // Caller must be in async context.
-        // Use `futures::executor::block_on` or call from #[tokio::test].
-        id
-    }
 
     async fn register_agent_async(a2a: &A2AProtocol, name: &str, caps: &[&str]) -> AgentId {
         let id = Uuid::new_v4();

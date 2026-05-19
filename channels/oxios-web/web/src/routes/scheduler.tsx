@@ -1,12 +1,12 @@
-import { createFileRoute } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
-import { api } from '@/lib/api-client'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { LoadingCards } from '@/components/shared/loading'
+import { createFileRoute } from '@tanstack/react-router'
+import { Calendar, CheckCircle, Clock, Loader2, RefreshCw } from 'lucide-react'
 import { EmptyState } from '@/components/shared/empty-state'
-import { Calendar, RefreshCw, CheckCircle, Clock, Loader2 } from 'lucide-react'
+import { LoadingCards } from '@/components/shared/loading'
 import { StatusIndicator } from '@/components/shared/status-indicator'
+import { Badge } from '@/components/ui/badge'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { api } from '@/lib/api-client'
 
 interface SchedulerStatus {
   running: boolean
@@ -46,6 +46,7 @@ function SchedulerPage() {
           <p className="text-muted-foreground">Task scheduling and queue management</p>
         </div>
         <button
+          type="button"
           onClick={() => refetch()}
           disabled={isFetching}
           className="rounded-md p-2 hover:bg-muted"
@@ -108,7 +109,10 @@ function SchedulerPage() {
           ) : (
             <div className="space-y-2">
               {tasks.map((task) => (
-                <div key={task.id} className="flex items-center justify-between rounded-lg border p-3">
+                <div
+                  key={task.id}
+                  className="flex items-center justify-between rounded-lg border p-3"
+                >
                   <div className="flex items-center gap-3">
                     {task.status === 'running' ? (
                       <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
@@ -122,13 +126,23 @@ function SchedulerPage() {
                     <div>
                       <p className="font-medium text-sm">{task.id.slice(0, 12)}...</p>
                       {task.agent_id && (
-                        <p className="text-xs text-muted-foreground">Agent: {task.agent_id.slice(0, 8)}...</p>
+                        <p className="text-xs text-muted-foreground">
+                          Agent: {task.agent_id.slice(0, 8)}...
+                        </p>
                       )}
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
                     <Badge variant="outline">P{task.priority}</Badge>
-                    <Badge variant={task.status === 'running' ? 'success' : task.status === 'failed' ? 'destructive' : 'secondary'}>
+                    <Badge
+                      variant={
+                        task.status === 'running'
+                          ? 'success'
+                          : task.status === 'failed'
+                            ? 'destructive'
+                            : 'secondary'
+                      }
+                    >
                       {task.status}
                     </Badge>
                   </div>

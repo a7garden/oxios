@@ -498,11 +498,6 @@ mod tests {
         ExecTool::new(Arc::new(config), Arc::new(Mutex::new(AccessManager::new())))
     }
 
-    fn make_tool_with_config(config: ExecConfig) -> ExecTool {
-        let mut cfg = config.clone();
-        cfg.allow_shell_mode = true; // Enable for tests
-        ExecTool::new(Arc::new(cfg), Arc::new(Mutex::new(AccessManager::new())))
-    }
 
     // ─── shell_exec ──────────────────────────────────────────────────
 

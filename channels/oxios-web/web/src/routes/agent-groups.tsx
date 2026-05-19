@@ -1,11 +1,11 @@
-import { createFileRoute } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
-import { api } from '@/lib/api-client'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { LoadingCards } from '@/components/shared/loading'
+import { createFileRoute } from '@tanstack/react-router'
+import { RefreshCw, Users } from 'lucide-react'
 import { EmptyState } from '@/components/shared/empty-state'
-import { Users, RefreshCw } from 'lucide-react'
+import { LoadingCards } from '@/components/shared/loading'
+import { Badge } from '@/components/ui/badge'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { api } from '@/lib/api-client'
 import type { AgentGroup } from '@/types'
 
 export const Route = createFileRoute('/agent-groups')({ component: AgentGroupsPage })
@@ -28,6 +28,7 @@ function AgentGroupsPage() {
           <p className="text-muted-foreground">Multi-agent group management</p>
         </div>
         <button
+          type="button"
           onClick={() => refetch()}
           disabled={isFetching}
           className="rounded-md p-2 hover:bg-muted"

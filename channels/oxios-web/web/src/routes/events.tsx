@@ -1,15 +1,15 @@
-import { createFileRoute } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
-import { api } from '@/lib/api-client'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { createFileRoute } from '@tanstack/react-router'
+import { Bell, RefreshCw } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { EmptyState } from '@/components/shared/empty-state'
+import { LoadingCards } from '@/components/shared/loading'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { LoadingCards } from '@/components/shared/loading'
-import { EmptyState } from '@/components/shared/empty-state'
-import { Bell, RefreshCw } from 'lucide-react'
-import type { OxiosEvent } from '@/types'
-import { useState, useEffect, useRef } from 'react'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { api } from '@/lib/api-client'
 import { SseClient } from '@/lib/sse-client'
+import type { OxiosEvent } from '@/types'
 
 export const Route = createFileRoute('/events')({ component: EventsPage })
 
@@ -18,7 +18,12 @@ function EventsPage() {
   const sseRef = useRef<SseClient | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
 
-  const { data: initial, isLoading, refetch, isFetching } = useQuery({
+  const {
+    data: initial,
+    isLoading,
+    refetch,
+    isFetching,
+  } = useQuery({
     queryKey: ['events'],
     queryFn: () => api.get<{ items: OxiosEvent[] }>('/api/events?limit=50'),
   })
@@ -28,24 +33,21 @@ function EventsPage() {
     if (events.length > 0 && liveEvents.length === 0) {
       setLiveEvents(events.reverse())
     }
-  }, [initial])
+  }, [initial, liveEvents.length])
 
   useEffect(() => {
     const client = new SseClient()
     sseRef.current = client
-    client.connect(
-      '/api/events/stream',
-      (_event, data) => {
-        setLiveEvents((prev) => [...prev.slice(-99), data as OxiosEvent])
-        scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight })
-      },
-    )
+    client.connect('/api/events/stream', (_event, data) => {
+      setLiveEvents((prev) => [...prev.slice(-99), data as OxiosEvent])
+      scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight })
+    })
     return () => client.disconnect()
   }, [])
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight })
-  }, [liveEvents])
+  }, [])
 
   if (isLoading) return <LoadingCards count={4} />
 
@@ -66,7 +68,9 @@ function EventsPage() {
           <CardTitle className="flex items-center gap-2 text-base">
             <Bell className="h-4 w-4" />
             Event Stream
-            <Badge variant="secondary" className="ml-2">{liveEvents.length}</Badge>
+            <Badge variant="secondary" className="ml-2">
+              {liveEvents.length}
+            </Badge>
             <div className="ml-auto h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
           </CardTitle>
         </CardHeader>
@@ -81,11 +85,18 @@ function EventsPage() {
               />
             ) : (
               liveEvents.map((event, i) => (
-                <div key={event.id ?? i} className="flex items-start gap-3 rounded border p-2 text-sm">
-                  <Badge variant="outline" className="shrink-0 text-xs">{event.type}</Badge>
+                <div
+                  key={event.id ?? i}
+                  className="flex items-start gap-3 rounded border p-2 text-sm"
+                >
+                  <Badge variant="outline" className="shrink-0 text-xs">
+                    {event.type}
+                  </Badge>
                   <div className="flex-1 min-w-0">
                     <p className="font-mono text-xs truncate">
-                      {event.data ? JSON.stringify(event.data).slice(0, 120) : event.id?.slice(0, 16)}
+                      {event.data
+                        ? JSON.stringify(event.data).slice(0, 120)
+                        : event.id?.slice(0, 16)}
                     </p>
                   </div>
                   <span className="text-xs text-muted-foreground shrink-0">

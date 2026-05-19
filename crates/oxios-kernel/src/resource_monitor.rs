@@ -235,13 +235,8 @@ mod tests {
         let snap = monitor.snapshot();
 
         assert!(snap.timestamp <= Utc::now());
-        // CPU and memory values should be non-negative
+        // CPU and memory values should be non-negative (floats can be negative)
         assert!(snap.cpu_percent >= 0.0);
-        assert!(snap.memory_used_mb >= 0);
-        assert!(snap.memory_total_mb >= 0);
-        assert!(snap.active_agents >= 0);
-        assert!(snap.pending_tasks >= 0);
-        assert!(snap.total_token_usage >= 0);
         assert!(snap.disk_used_gb >= 0.0);
         assert!(snap.load_avg_1m >= 0.0);
     }

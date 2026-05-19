@@ -1,12 +1,11 @@
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { api } from '@/lib/api-client'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
+import { CheckCircle, RefreshCw, Timer, XCircle } from 'lucide-react'
 import { LoadingCards } from '@/components/shared/loading'
-import { EmptyState } from '@/components/shared/empty-state'
-import { Timer, CheckCircle, XCircle, RefreshCw } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { api } from '@/lib/api-client'
 import type { Approval } from '@/types'
 
 export const Route = createFileRoute('/approvals')({ component: ApprovalsPage })
@@ -61,11 +60,15 @@ function ApprovalsPage() {
           ) : (
             <div className="space-y-3">
               {pending.map((approval) => (
-                <div key={approval.id} className="flex items-center justify-between rounded-lg border p-4">
+                <div
+                  key={approval.id}
+                  className="flex items-center justify-between rounded-lg border p-4"
+                >
                   <div>
                     <p className="font-medium">{approval.description}</p>
                     <p className="text-xs text-muted-foreground mt-1">
-                      Type: {approval.type} • Agent: {approval.agent_id.slice(0, 8)}... • {new Date(approval.created_at).toLocaleString()}
+                      Type: {approval.type} • Agent: {approval.agent_id.slice(0, 8)}... •{' '}
+                      {new Date(approval.created_at).toLocaleString()}
                     </p>
                   </div>
                   <div className="flex gap-2">
@@ -104,10 +107,15 @@ function ApprovalsPage() {
           <CardContent>
             <div className="space-y-2">
               {resolved.map((approval) => (
-                <div key={approval.id} className="flex items-center justify-between rounded-lg border p-3">
+                <div
+                  key={approval.id}
+                  className="flex items-center justify-between rounded-lg border p-3"
+                >
                   <div>
                     <p className="text-sm">{approval.description}</p>
-                    <p className="text-xs text-muted-foreground">{approval.type} • {new Date(approval.created_at).toLocaleString()}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {approval.type} • {new Date(approval.created_at).toLocaleString()}
+                    </p>
                   </div>
                   <Badge variant={approval.status === 'approved' ? 'success' : 'destructive'}>
                     {approval.status}

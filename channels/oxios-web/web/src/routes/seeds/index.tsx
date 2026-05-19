@@ -1,12 +1,12 @@
-import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
-import { api } from '@/lib/api-client'
-import { DataTable } from '@/components/shared/data-table'
-import { LoadingTable } from '@/components/shared/loading'
-import { EmptyState } from '@/components/shared/empty-state'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
+import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { Dna, RefreshCw } from 'lucide-react'
+import { DataTable } from '@/components/shared/data-table'
+import { EmptyState } from '@/components/shared/empty-state'
+import { LoadingTable } from '@/components/shared/loading'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { api } from '@/lib/api-client'
 import type { Seed } from '@/types'
 
 export const Route = createFileRoute('/seeds/')({
@@ -25,7 +25,10 @@ function SeedsListPage() {
 
   const seeds = data?.items ?? []
 
-  const phaseColors: Record<string, 'default' | 'secondary' | 'success' | 'warning' | 'destructive'> = {
+  const phaseColors: Record<
+    string,
+    'default' | 'secondary' | 'success' | 'warning' | 'destructive'
+  > = {
     interview: 'secondary',
     seed: 'default',
     execute: 'success',
@@ -35,11 +38,17 @@ function SeedsListPage() {
 
   const columns = [
     { header: 'Name', accessor: (row: Seed) => <span className="font-medium">{row.name}</span> },
-    { header: 'Phase', accessor: (row: Seed) => (
-      <Badge variant={phaseColors[row.phase] ?? 'outline'}>{row.phase}</Badge>
-    )},
+    {
+      header: 'Phase',
+      accessor: (row: Seed) => (
+        <Badge variant={phaseColors[row.phase] ?? 'outline'}>{row.phase}</Badge>
+      ),
+    },
     { header: 'Created', accessor: (row: Seed) => new Date(row.created_at).toLocaleString() },
-    { header: 'Updated', accessor: (row: Seed) => row.updated_at ? new Date(row.updated_at).toLocaleString() : '—' },
+    {
+      header: 'Updated',
+      accessor: (row: Seed) => (row.updated_at ? new Date(row.updated_at).toLocaleString() : '—'),
+    },
   ]
 
   return (

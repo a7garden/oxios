@@ -1,15 +1,14 @@
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { api } from '@/lib/api-client'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Plus, RefreshCw, Star, Trash2, Users } from 'lucide-react'
+import { useState } from 'react'
+import { EmptyState } from '@/components/shared/empty-state'
+import { LoadingCards } from '@/components/shared/loading'
 import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
-import { Badge } from '@/components/ui/badge'
-import { LoadingCards } from '@/components/shared/loading'
-import { EmptyState } from '@/components/shared/empty-state'
-import { Users, Plus, Trash2, RefreshCw, Star } from 'lucide-react'
-import { useState } from 'react'
+import { api } from '@/lib/api-client'
 import type { Persona } from '@/types'
 
 export const Route = createFileRoute('/personas')({ component: PersonasPage })
@@ -21,7 +20,12 @@ function PersonasPage() {
   const [description, setDescription] = useState('')
   const [systemPrompt, setSystemPrompt] = useState('')
 
-  const { data: personas, isLoading, refetch, isFetching } = useQuery({
+  const {
+    data: personas,
+    isLoading,
+    refetch,
+    isFetching,
+  } = useQuery({
     queryKey: ['personas'],
     queryFn: () => api.get<Persona[]>('/api/personas'),
   })
@@ -75,18 +79,35 @@ function PersonasPage() {
             <CardTitle>Create Persona</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Persona name" />
-            <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Description" />
-            <Textarea value={systemPrompt} onChange={(e) => setSystemPrompt(e.target.value)} placeholder="System prompt..." rows={4} />
+            <Input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Persona name"
+            />
+            <Input
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Description"
+            />
+            <Textarea
+              value={systemPrompt}
+              onChange={(e) => setSystemPrompt(e.target.value)}
+              placeholder="System prompt..."
+              rows={4}
+            />
             <div className="flex gap-2">
               <Button
                 size="sm"
-                onClick={() => createMutation.mutate({ name, description, system_prompt: systemPrompt })}
+                onClick={() =>
+                  createMutation.mutate({ name, description, system_prompt: systemPrompt })
+                }
                 disabled={!name.trim() || createMutation.isPending}
               >
                 Create
               </Button>
-              <Button variant="ghost" size="sm" onClick={() => setShowCreate(false)}>Cancel</Button>
+              <Button variant="ghost" size="sm" onClick={() => setShowCreate(false)}>
+                Cancel
+              </Button>
             </div>
           </CardContent>
         </Card>
@@ -114,11 +135,19 @@ function PersonasPage() {
                 </div>
                 <div className="flex gap-1">
                   {!persona.active && (
-                    <Button variant="ghost" size="icon" onClick={() => activateMutation.mutate(persona.id)}>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => activateMutation.mutate(persona.id)}
+                    >
                       <Star className="h-4 w-4" />
                     </Button>
                   )}
-                  <Button variant="ghost" size="icon" onClick={() => deleteMutation.mutate(persona.id)}>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => deleteMutation.mutate(persona.id)}
+                  >
                     <Trash2 className="h-4 w-4 text-destructive" />
                   </Button>
                 </div>
@@ -126,7 +155,8 @@ function PersonasPage() {
               {persona.system_prompt && (
                 <CardContent>
                   <pre className="rounded bg-muted p-2 text-xs overflow-x-auto max-h-24">
-                    {persona.system_prompt.slice(0, 200)}{persona.system_prompt.length > 200 ? '...' : ''}
+                    {persona.system_prompt.slice(0, 200)}
+                    {persona.system_prompt.length > 200 ? '...' : ''}
                   </pre>
                 </CardContent>
               )}

@@ -1069,7 +1069,7 @@ mod tests {
 
     #[test]
     fn test_budget_manager_task_without_agent_id() {
-        use crate::budget::{BudgetLimit, BudgetManager};
+        use crate::budget::BudgetManager;
 
         let scheduler = Arc::new(Mutex::new(AgentScheduler::new(2, 10_000, 60)));
         let budget_manager = Arc::new(BudgetManager::new());

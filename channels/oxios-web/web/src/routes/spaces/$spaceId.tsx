@@ -1,11 +1,11 @@
-import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
-import { api } from '@/lib/api-client'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
+import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import { ArrowLeft, Boxes } from 'lucide-react'
 import { LoadingCards } from '@/components/shared/loading'
 import { StatusIndicator } from '@/components/shared/status-indicator'
-import { ArrowLeft, Boxes } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { api } from '@/lib/api-client'
 import type { Space } from '@/types'
 
 export const Route = createFileRoute('/spaces/$spaceId')({
@@ -53,7 +53,10 @@ function SpaceDetailPage() {
         <CardContent>
           <div className="grid gap-3 md:grid-cols-2">
             {details.map((d) => (
-              <div key={d.label} className="flex items-center justify-between rounded-lg border p-3">
+              <div
+                key={d.label}
+                className="flex items-center justify-between rounded-lg border p-3"
+              >
                 <span className="text-sm text-muted-foreground">{d.label}</span>
                 <span className="text-sm font-medium">{d.value}</span>
               </div>

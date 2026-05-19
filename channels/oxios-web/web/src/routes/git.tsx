@@ -1,14 +1,14 @@
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { api } from '@/lib/api-client'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Badge } from '@/components/ui/badge'
-import { LoadingCards } from '@/components/shared/loading'
-import { EmptyState } from '@/components/shared/empty-state'
-import { GitBranch, RefreshCw, Tag, RotateCcw, ShieldCheck } from 'lucide-react'
+import { GitBranch, RefreshCw, RotateCcw, ShieldCheck, Tag } from 'lucide-react'
 import { useState } from 'react'
+import { EmptyState } from '@/components/shared/empty-state'
+import { LoadingCards } from '@/components/shared/loading'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { api } from '@/lib/api-client'
 import type { GitCommit } from '@/types'
 
 export const Route = createFileRoute('/git')({ component: GitPage })
@@ -18,7 +18,12 @@ function GitPage() {
   const [tagName, setTagName] = useState('')
   const [restoreHash, setRestoreHash] = useState('')
 
-  const { data: commits, isLoading, refetch, isFetching } = useQuery({
+  const {
+    data: commits,
+    isLoading,
+    refetch,
+    isFetching,
+  } = useQuery({
     queryKey: ['git-log'],
     queryFn: () => api.get<GitCommit[]>('/api/git/log'),
   })
@@ -64,7 +69,12 @@ function GitPage() {
           <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching}>
             <RefreshCw className={`h-4 w-4 mr-1 ${isFetching ? 'animate-spin' : ''}`} /> Refresh
           </Button>
-          <Button variant="outline" size="sm" onClick={() => verifyMutation.mutate()} disabled={verifyMutation.isPending}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => verifyMutation.mutate()}
+            disabled={verifyMutation.isPending}
+          >
             <ShieldCheck className="h-4 w-4 mr-1" /> Verify
           </Button>
         </div>
@@ -96,7 +106,9 @@ function GitPage() {
           {tagList.length > 0 ? (
             <div className="flex gap-2 flex-wrap">
               {tagList.map((t) => (
-                <Badge key={t} variant="outline">{t}</Badge>
+                <Badge key={t} variant="outline">
+                  {t}
+                </Badge>
               ))}
             </div>
           ) : (

@@ -1,11 +1,11 @@
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { api } from '@/lib/api-client'
+import { Clock, RefreshCw, Trash2 } from 'lucide-react'
 import { DataTable } from '@/components/shared/data-table'
-import { LoadingTable } from '@/components/shared/loading'
 import { EmptyState } from '@/components/shared/empty-state'
+import { LoadingTable } from '@/components/shared/loading'
 import { Button } from '@/components/ui/button'
-import { Clock, Trash2, RefreshCw } from 'lucide-react'
+import { api } from '@/lib/api-client'
 import type { Session } from '@/types'
 
 export const Route = createFileRoute('/sessions/')({
@@ -31,21 +31,39 @@ function SessionsListPage() {
   const sessions = data?.items ?? []
 
   const columns = [
-    { header: 'ID', accessor: (row: Session) => <span className="font-mono text-xs">{row.id.slice(0, 12)}...</span> },
-    { header: 'Agent', accessor: (row: Session) => row.agent_id ? row.agent_id.slice(0, 8) + '...' : '—' },
+    {
+      header: 'ID',
+      accessor: (row: Session) => (
+        <span className="font-mono text-xs">{row.id.slice(0, 12)}...</span>
+      ),
+    },
+    {
+      header: 'Agent',
+      accessor: (row: Session) => (row.agent_id ? `${row.agent_id.slice(0, 8)}...` : '—'),
+    },
     { header: 'Messages', accessor: (row: Session) => row.message_count ?? 0 },
     { header: 'Created', accessor: (row: Session) => new Date(row.created_at).toLocaleString() },
-    { header: 'Updated', accessor: (row: Session) => row.updated_at ? new Date(row.updated_at).toLocaleString() : '—' },
-    { header: '', accessor: (row: Session) => (
-      <Button
-        variant="ghost"
-        size="icon"
-        onClick={(e) => { e.stopPropagation(); deleteMutation.mutate(row.id) }}
-        disabled={deleteMutation.isPending}
-      >
-        <Trash2 className="h-4 w-4 text-destructive" />
-      </Button>
-    )},
+    {
+      header: 'Updated',
+      accessor: (row: Session) =>
+        row.updated_at ? new Date(row.updated_at).toLocaleString() : '—',
+    },
+    {
+      header: '',
+      accessor: (row: Session) => (
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={(e) => {
+            e.stopPropagation()
+            deleteMutation.mutate(row.id)
+          }}
+          disabled={deleteMutation.isPending}
+        >
+          <Trash2 className="h-4 w-4 text-destructive" />
+        </Button>
+      ),
+    },
   ]
 
   return (
@@ -71,7 +89,9 @@ function SessionsListPage() {
           columns={columns}
           data={sessions}
           keyExtractor={(row) => row.id}
-          onRowClick={(row) => navigate({ to: '/sessions/$sessionId', params: { sessionId: row.id } })}
+          onRowClick={(row) =>
+            navigate({ to: '/sessions/$sessionId', params: { sessionId: row.id } })
+          }
         />
       )}
     </div>

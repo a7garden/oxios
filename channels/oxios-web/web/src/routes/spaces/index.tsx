@@ -1,13 +1,13 @@
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { api } from '@/lib/api-client'
+import { Archive, Boxes, Play, RefreshCw } from 'lucide-react'
 import { DataTable } from '@/components/shared/data-table'
-import { LoadingTable } from '@/components/shared/loading'
 import { EmptyState } from '@/components/shared/empty-state'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { Boxes, RefreshCw, Archive, Play } from 'lucide-react'
+import { LoadingTable } from '@/components/shared/loading'
 import { StatusIndicator } from '@/components/shared/status-indicator'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { api } from '@/lib/api-client'
 import type { Space } from '@/types'
 
 export const Route = createFileRoute('/spaces/')({
@@ -38,29 +38,35 @@ function SpacesListPage() {
   const spaces = data?.items ?? []
 
   const columns = [
-    { header: 'Name', accessor: (row: Space) => (
-      <div className="flex items-center gap-2">
-        <Boxes className="h-4 w-4 text-muted-foreground" />
-        <span className="font-medium">{row.name}</span>
-        {row.tag && <Badge variant="outline">{row.tag}</Badge>}
-      </div>
-    )},
+    {
+      header: 'Name',
+      accessor: (row: Space) => (
+        <div className="flex items-center gap-2">
+          <Boxes className="h-4 w-4 text-muted-foreground" />
+          <span className="font-medium">{row.name}</span>
+          {row.tag && <Badge variant="outline">{row.tag}</Badge>}
+        </div>
+      ),
+    },
     { header: 'Status', accessor: (row: Space) => <StatusIndicator status={row.status} /> },
     { header: 'Created', accessor: (row: Space) => new Date(row.created_at).toLocaleString() },
-    { header: '', accessor: (row: Space) => (
-      <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
-        {row.status !== 'active' && (
-          <Button variant="ghost" size="icon" onClick={() => activateMutation.mutate(row.id)}>
-            <Play className="h-4 w-4 text-emerald-500" />
-          </Button>
-        )}
-        {row.status !== 'archived' && (
-          <Button variant="ghost" size="icon" onClick={() => archiveMutation.mutate(row.id)}>
-            <Archive className="h-4 w-4 text-amber-500" />
-          </Button>
-        )}
-      </div>
-    )},
+    {
+      header: '',
+      accessor: (row: Space) => (
+        <div role="group" className="flex gap-1" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+          {row.status !== 'active' && (
+            <Button variant="ghost" size="icon" onClick={() => activateMutation.mutate(row.id)}>
+              <Play className="h-4 w-4 text-emerald-500" />
+            </Button>
+          )}
+          {row.status !== 'archived' && (
+            <Button variant="ghost" size="icon" onClick={() => archiveMutation.mutate(row.id)}>
+              <Archive className="h-4 w-4 text-amber-500" />
+            </Button>
+          )}
+        </div>
+      ),
+    },
   ]
 
   return (

@@ -1,11 +1,11 @@
-import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
-import { api } from '@/lib/api-client'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { LoadingCards } from '@/components/shared/loading'
+import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { ArrowLeft, Dna, GitCommit } from 'lucide-react'
+import { LoadingCards } from '@/components/shared/loading'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { api } from '@/lib/api-client'
 import type { Seed } from '@/types'
 
 export const Route = createFileRoute('/seeds/$seedId')({
@@ -60,7 +60,7 @@ function SeedDetailPage() {
           {seed.evolution_log && seed.evolution_log.length > 0 ? (
             <div className="relative space-y-0">
               {seed.evolution_log.map((entry, i) => (
-                <div key={i} className="flex gap-4 pb-6 relative">
+                <div key={`evolution-${i}`} className="flex gap-4 pb-6 relative">
                   <div className="flex flex-col items-center">
                     <div className="h-3 w-3 rounded-full bg-primary mt-1" />
                     {i < seed.evolution_log!.length - 1 && (
@@ -69,7 +69,9 @@ function SeedDetailPage() {
                   </div>
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
-                      <Badge variant="secondary" className="text-xs">{entry.phase}</Badge>
+                      <Badge variant="secondary" className="text-xs">
+                        {entry.phase}
+                      </Badge>
                       <span className="text-xs text-muted-foreground">
                         {new Date(entry.timestamp).toLocaleString()}
                       </span>

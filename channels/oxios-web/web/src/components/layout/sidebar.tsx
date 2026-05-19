@@ -1,15 +1,35 @@
+import { Link, useRouterState } from '@tanstack/react-router'
+import {
+  Activity,
+  Bell,
+  Bot,
+  Boxes,
+  Brain,
+  Calendar,
+  Clock,
+  Cpu,
+  Dna,
+  FolderOpen,
+  GitBranch,
+  LayoutDashboard,
+  MessageSquare,
+  Moon,
+  PanelLeft,
+  PanelLeftClose,
+  Settings,
+  Shield,
+  Sun,
+  Timer,
+  Users,
+  Wallet,
+  Wrench,
+  Zap,
+} from 'lucide-react'
+import { Separator } from '@/components/ui/separator'
+import { Tooltip } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 import { useSidebarStore } from '@/stores/sidebar'
 import { useThemeStore } from '@/stores/theme'
-import {
-  MessageSquare, LayoutDashboard, Bot, Clock, Dna, Boxes, Cpu,
-  Brain, Calendar, Shield, Wallet, Activity, Bell, Timer,
-  GitBranch, Users, Wrench, FolderOpen, Settings, Sun, Moon,
-  PanelLeftClose, PanelLeft, Zap,
-} from 'lucide-react'
-import { Link, useRouterState } from '@tanstack/react-router'
-import { Separator } from '@/components/ui/separator'
-import { Tooltip } from '@/components/ui/tooltip'
 
 interface NavItem {
   label: string
@@ -82,7 +102,7 @@ export function Sidebar() {
             <span className="font-bold text-lg">Oxios</span>
           </div>
         )}
-        <button onClick={toggle} className="rounded-md p-1.5 hover:bg-sidebar-accent">
+        <button type="button" onClick={toggle} className="rounded-md p-1.5 hover:bg-sidebar-accent">
           {collapsed ? <PanelLeft className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
         </button>
       </div>
@@ -98,7 +118,9 @@ export function Sidebar() {
               </p>
             )}
             {group.items.map((item) => {
-              const isActive = currentPath === item.href || (item.href !== '/' && currentPath.startsWith(item.href))
+              const isActive =
+                currentPath === item.href ||
+                (item.href !== '/' && currentPath.startsWith(item.href))
               const link = (
                 <Link
                   key={item.href}
@@ -131,6 +153,7 @@ export function Sidebar() {
       {/* Footer */}
       <div className="p-2 flex items-center gap-1">
         <button
+          type="button"
           onClick={() => setTheme(resolved === 'dark' ? 'light' : 'dark')}
           className="flex items-center gap-3 rounded-lg px-2.5 py-2 text-sm w-full hover:bg-sidebar-accent/50"
         >

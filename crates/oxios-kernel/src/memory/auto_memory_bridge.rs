@@ -803,8 +803,7 @@ mod tests {
         // Should have imported the insight
         assert!(result.import.imported >= 1 || result.import.skipped_duplicates > 0);
 
-        // Should have exported current state
-        assert!(result.export.exported >= 0);
+        // Should have exported current state (usize, always >= 0)
     }
 
     #[test]

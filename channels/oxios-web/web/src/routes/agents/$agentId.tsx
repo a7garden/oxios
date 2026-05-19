@@ -1,12 +1,11 @@
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { api } from '@/lib/api-client'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
+import { ArrowLeft, Bot, RotateCw, Skull } from 'lucide-react'
 import { LoadingCards } from '@/components/shared/loading'
 import { StatusIndicator } from '@/components/shared/status-indicator'
-import { ArrowLeft, Bot, Skull, RotateCw } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { api } from '@/lib/api-client'
 import type { Agent } from '@/types'
 
 export const Route = createFileRoute('/agents/$agentId')({
@@ -49,7 +48,10 @@ function AgentDetailPage() {
     { label: 'Status', value: <StatusIndicator status={agent.status} /> },
     { label: 'Seed ID', value: agent.seed_id ?? '—' },
     { label: 'Space ID', value: agent.space_id ?? '—' },
-    { label: 'Started At', value: agent.started_at ? new Date(agent.started_at).toLocaleString() : '—' },
+    {
+      label: 'Started At',
+      value: agent.started_at ? new Date(agent.started_at).toLocaleString() : '—',
+    },
   ]
 
   return (
@@ -91,7 +93,10 @@ function AgentDetailPage() {
         <CardContent>
           <div className="grid gap-3 md:grid-cols-2">
             {details.map((d) => (
-              <div key={d.label} className="flex items-center justify-between rounded-lg border p-3">
+              <div
+                key={d.label}
+                className="flex items-center justify-between rounded-lg border p-3"
+              >
                 <span className="text-sm text-muted-foreground">{d.label}</span>
                 <span className="text-sm font-medium">{d.value}</span>
               </div>

@@ -1,14 +1,14 @@
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { api } from '@/lib/api-client'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Plus, RefreshCw, Trash2, Zap } from 'lucide-react'
+import { useState } from 'react'
+import { EmptyState } from '@/components/shared/empty-state'
+import { LoadingCards } from '@/components/shared/loading'
 import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
-import { LoadingCards } from '@/components/shared/loading'
-import { EmptyState } from '@/components/shared/empty-state'
-import { Zap, Plus, Trash2, RefreshCw } from 'lucide-react'
-import { useState } from 'react'
+import { api } from '@/lib/api-client'
 import type { Skill } from '@/types'
 
 export const Route = createFileRoute('/skills')({ component: SkillsPage })
@@ -20,7 +20,12 @@ function SkillsPage() {
   const [description, setDescription] = useState('')
   const [content, setContent] = useState('')
 
-  const { data: skills, isLoading, refetch, isFetching } = useQuery({
+  const {
+    data: skills,
+    isLoading,
+    refetch,
+    isFetching,
+  } = useQuery({
     queryKey: ['skills'],
     queryFn: () => api.get<Skill[]>('/api/skills'),
   })
@@ -92,7 +97,9 @@ function SkillsPage() {
               >
                 Create
               </Button>
-              <Button variant="ghost" size="sm" onClick={() => setShowCreate(false)}>Cancel</Button>
+              <Button variant="ghost" size="sm" onClick={() => setShowCreate(false)}>
+                Cancel
+              </Button>
             </div>
           </CardContent>
         </Card>
@@ -126,7 +133,8 @@ function SkillsPage() {
                   <p className="text-sm text-muted-foreground mb-2">{skill.description}</p>
                 )}
                 <pre className="rounded bg-muted p-2 text-xs overflow-x-auto max-h-32">
-                  {skill.content.slice(0, 200)}{skill.content.length > 200 ? '...' : ''}
+                  {skill.content.slice(0, 200)}
+                  {skill.content.length > 200 ? '...' : ''}
                 </pre>
               </CardContent>
             </Card>

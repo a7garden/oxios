@@ -1,10 +1,18 @@
-import { createFileRoute } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
-import { api } from '@/lib/api-client'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { LoadingCards } from '@/components/shared/loading'
+import { createFileRoute } from '@tanstack/react-router'
 import { Activity, RefreshCw } from 'lucide-react'
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts'
+import {
+  Area,
+  AreaChart,
+  CartesianGrid,
+  Tooltip as RechartsTooltip,
+  ResponsiveContainer,
+  XAxis,
+  YAxis,
+} from 'recharts'
+import { LoadingCards } from '@/components/shared/loading'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { api } from '@/lib/api-client'
 import type { ResourceSnapshot } from '@/types'
 
 export const Route = createFileRoute('/resources')({ component: ResourcesPage })
@@ -36,6 +44,7 @@ function ResourcesPage() {
           <p className="text-muted-foreground">System resource monitoring</p>
         </div>
         <button
+          type="button"
           onClick={() => refetch()}
           disabled={isFetching}
           className="rounded-md p-2 hover:bg-muted"
@@ -114,9 +123,30 @@ function ResourcesPage() {
                     fontSize: '12px',
                   }}
                 />
-                <Area type="monotone" dataKey="cpu" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.1} name="CPU %" />
-                <Area type="monotone" dataKey="memory" stroke="#a855f7" fill="#a855f7" fillOpacity={0.1} name="Memory %" />
-                <Area type="monotone" dataKey="disk" stroke="#f59e0b" fill="#f59e0b" fillOpacity={0.1} name="Disk %" />
+                <Area
+                  type="monotone"
+                  dataKey="cpu"
+                  stroke="#3b82f6"
+                  fill="#3b82f6"
+                  fillOpacity={0.1}
+                  name="CPU %"
+                />
+                <Area
+                  type="monotone"
+                  dataKey="memory"
+                  stroke="#a855f7"
+                  fill="#a855f7"
+                  fillOpacity={0.1}
+                  name="Memory %"
+                />
+                <Area
+                  type="monotone"
+                  dataKey="disk"
+                  stroke="#f59e0b"
+                  fill="#f59e0b"
+                  fillOpacity={0.1}
+                  name="Disk %"
+                />
               </AreaChart>
             </ResponsiveContainer>
           ) : (

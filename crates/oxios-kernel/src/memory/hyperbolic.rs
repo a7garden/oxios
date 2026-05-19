@@ -583,10 +583,6 @@ mod tests {
 
         assert_eq!(he.len(), 2);
 
-        // Child should be farther from origin than parent
-        let parent_depth = he.depth("parent");
-        let child_depth = he.depth("child");
-
         // Both should exist
         assert!(he.get("parent").is_some());
         assert!(he.get("child").is_some());

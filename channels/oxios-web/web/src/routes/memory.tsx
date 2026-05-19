@@ -1,12 +1,12 @@
-import { createFileRoute } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
-import { api } from '@/lib/api-client'
+import { createFileRoute } from '@tanstack/react-router'
+import { Brain, RefreshCw, Search } from 'lucide-react'
+import { useState } from 'react'
+import { EmptyState } from '@/components/shared/empty-state'
+import { LoadingCards } from '@/components/shared/loading'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import { LoadingCards } from '@/components/shared/loading'
-import { EmptyState } from '@/components/shared/empty-state'
-import { Brain, Search, RefreshCw } from 'lucide-react'
-import { useState } from 'react'
+import { api } from '@/lib/api-client'
 import type { MemoryEntry } from '@/types'
 
 export const Route = createFileRoute('/memory')({ component: MemoryPage })
@@ -14,9 +14,15 @@ export const Route = createFileRoute('/memory')({ component: MemoryPage })
 function MemoryPage() {
   const [search, setSearch] = useState('')
 
-  const { data: memories, isLoading, refetch, isFetching } = useQuery({
+  const {
+    data: memories,
+    isLoading,
+    refetch,
+    isFetching,
+  } = useQuery({
     queryKey: ['memory', search],
-    queryFn: () => api.get<MemoryEntry[]>(`/api/memory${search ? `?q=${encodeURIComponent(search)}` : ''}`),
+    queryFn: () =>
+      api.get<MemoryEntry[]>(`/api/memory${search ? `?q=${encodeURIComponent(search)}` : ''}`),
   })
 
   if (isLoading) return <LoadingCards count={4} />
@@ -31,6 +37,7 @@ function MemoryPage() {
           <p className="text-muted-foreground">Agent memory store</p>
         </div>
         <button
+          type="button"
           onClick={() => refetch()}
           disabled={isFetching}
           className="rounded-md p-2 hover:bg-muted"
@@ -53,12 +60,14 @@ function MemoryPage() {
         <EmptyState
           icon={<Brain className="h-10 w-10" />}
           title="No memories"
-          description={search ? 'No results for your search.' : 'Memories will be stored as agents work.'}
+          description={
+            search ? 'No results for your search.' : 'Memories will be stored as agents work.'
+          }
         />
       ) : (
         <div className="space-y-3">
-          {items.map((mem, i) => (
-            <Card key={i}>
+          {items.map((mem) => (
+            <Card key={mem.name}>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm flex items-center justify-between">
                   <span className="flex items-center gap-2">

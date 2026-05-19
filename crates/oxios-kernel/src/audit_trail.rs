@@ -902,7 +902,7 @@ mod tests {
     #[test]
     fn test_deterministic_hash() {
         let trail1 = create_test_trail();
-        let trail2 = create_test_trail();
+        let _trail2 = create_test_trail();
 
         let action = AuditAction::AgentSpawn {
             task_type: "test".to_string(),

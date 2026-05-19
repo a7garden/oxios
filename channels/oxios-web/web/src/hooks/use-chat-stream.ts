@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { WsClient } from '@/lib/ws-client'
 import type { ChatMessage, StreamChunk } from '@/types'
 
@@ -12,13 +12,17 @@ export function useChatStream() {
     const client = new WsClient('/api/chat/stream', token, (data) => {
       const chunk = data as StreamChunk
       if (chunk.type === 'token' && chunk.content) {
+        const tokenContent = chunk.content
         setMessages((prev) => {
           const updated = [...prev]
           const last = updated[updated.length - 1]
           if (last?.role === 'assistant') {
-            return [...updated.slice(0, -1), { ...last, content: last.content + chunk.content }]
+            return [...updated.slice(0, -1), { ...last, content: last.content + tokenContent }]
           }
-          return [...updated, { role: 'assistant', content: chunk.content, timestamp: new Date().toISOString() }]
+          return [
+            ...updated,
+            { role: 'assistant' as const, content: tokenContent, timestamp: new Date().toISOString() },
+          ]
         })
       } else if (chunk.type === 'done') {
         setIsStreaming(false)

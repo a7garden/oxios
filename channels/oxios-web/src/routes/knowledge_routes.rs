@@ -1,8 +1,5 @@
 //! Knowledge API route handlers.
 //!
-//! Provides REST endpoints for the files.md-based knowledge editor.
-//! All handlers interact with the workspace's `knowledge/` directory
-//! via filesystem operations (fallback until KnowledgeApi is wired).
 //!
 //! Endpoints:
 //! - GET  /api/knowledge/tree       — file tree listing
@@ -21,6 +18,7 @@ use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::Json;
+use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
 
 use crate::error::AppError;
@@ -756,7 +754,8 @@ fn extract_links_from_line(
 /// POST /api/knowledge/copilot — AI copilot chat.
 ///
 /// Uses the kernel's Oxi engine to answer questions about knowledge files.
-/// TODO: Replace with KnowledgeApi.copilot_chat() when Phase 2 is wired.
+/// Combines current file context + relevant notes + related memories into a prompt,
+/// then calls the AI provider for a response.
 pub(crate) async fn handle_knowledge_copilot(
     state: State<Arc<AppState>>,
     Json(body): Json<KnowledgeCopilotBody>,
@@ -770,15 +769,13 @@ pub(crate) async fn handle_knowledge_copilot(
         });
     }
 
-    let base = knowledge_base_path(&state);
-    let mut context_parts = Vec::new();
-    let mut referenced_notes = Vec::new();
+    let mut context_parts: Vec<String> = Vec::new();
+    let mut referenced_notes: Vec<String> = Vec::new();
 
     // 1. Load context file if provided
     if let Some(ref ctx_path) = body.context_path {
         if !ctx_path.is_empty() {
-            let full_path = base.join(ctx_path.as_str());
-            if let Ok(content) = tokio::fs::read_to_string(&full_path).await {
+            if let Some(content) = state.kernel.knowledge.note_read(ctx_path).ok().flatten() {
                 let snippet: String = content.chars().take(2000).collect();
                 context_parts.push(format!("## Current file: {}\n\n{}", ctx_path, snippet));
                 referenced_notes.push(ctx_path.clone());
@@ -786,29 +783,41 @@ pub(crate) async fn handle_knowledge_copilot(
         }
     }
 
-    // 2. Simple text search to find related files
-    let query_lower = body.question.to_lowercase();
-    if base.exists() {
-        let mut search_results: Vec<(String, String)> = Vec::new();
-        find_relevant_files(&base, &base, &query_lower, 5, &mut search_results).await?;
-
-        for (path, snippet) in &search_results {
-            context_parts.push(format!("## Related: {}\n\n{}", path, snippet));
-            referenced_notes.push(path.clone());
+    // 2. Search for related files via KnowledgeApi
+    if let Ok(hits) = state.kernel.knowledge.search(&body.question, 5) {
+        for hit in hits {
+            if let Some(content) = state.kernel.knowledge.note_read(&hit.path).ok().flatten() {
+                if referenced_notes.contains(&hit.path) {
+                    continue;
+                }
+                let snippet: String = content.chars().take(500).collect();
+                context_parts.push(format!("## Related: {}\n\n{}", hit.path, snippet));
+                referenced_notes.push(hit.path);
+            }
         }
     }
 
-    // 3. Build response (placeholder until oxi engine is integrated)
-    // For now, return a helpful message indicating copilot is not yet wired
+    // 3. Build the AI prompt and call the engine
     let response = if context_parts.is_empty() {
-        "The knowledge copilot is being set up. Please try again once the AI engine is fully connected.\n\nIn the meantime, you can:\n- Create and edit markdown notes\n- Use the sidebar to browse your knowledge base\n- Search for files with ⌘P".to_string()
+        let q: String = body.question.chars().take(50).collect();
+        format!("I could not find relevant notes for \"{}\". Try creating notes with keywords or [[wikilinks]].", q)
     } else {
-        format!(
-            "I can see you have context from {} file(s), but the AI engine is still being wired up (Phase 4). \
-            Your knowledge base is ready for editing.\n\nFiles in context: {}",
-            context_parts.len(),
-            referenced_notes.join(", ")
-        )
+        let system_prompt = format!(
+            "You are a knowledgeable assistant embedded in a markdown note editor.\n\
+             Answer questions about the user's notes using the provided context.\n\
+             Be concise but thorough.\n\
+             Respond in the same language as the user's question.\n\n\
+             ## User's Knowledge Context:\n\n{}",
+            context_parts.join("\n\n")
+        );
+
+        match call_ai_copilot(&state, &system_prompt, &body.question).await {
+            Ok(text) => text,
+            Err(e) => {
+                tracing::warn!(error = %e, "AI copilot call failed");
+                format!("Copilot is connecting. {} files in context.", context_parts.len())
+            }
+        }
     };
 
     Ok(Json(KnowledgeCopilotResponse {
@@ -877,6 +886,71 @@ async fn find_relevant_files(
     }
 
     Ok(())
+}
+
+/// Call the AI engine for copilot chat.
+///
+/// Uses the kernel's Oxi engine to generate a response.
+/// Spawns a blocking task to handle the streaming response collection.
+async fn call_ai_copilot(
+    state: &AppState,
+    system_prompt: &str,
+    question: &str,
+) -> Result<String, AppError> {
+    use oxios_kernel::EngineProvider;
+
+    let config = state.config.read();
+    let model_id = if config.engine.default_model.is_empty() {
+        "anthropic/claude-sonnet-4-20250514".to_string()
+    } else {
+        config.engine.default_model.clone()
+    };
+    drop(config);
+
+    let engine = oxios_kernel::OxiEngineProvider::new(&model_id);
+    let provider_name = model_id.split_once('/').map(|(p, _)| p).unwrap_or("anthropic");
+    let provider = engine.create_provider(provider_name)
+        .map_err(|e| AppError::Internal(format!("Failed to create AI provider: {e}")))?;
+    let model = engine.resolve_model(&model_id)
+        .map_err(|e| AppError::Internal(format!("Failed to resolve model: {e}")))?;
+
+    let mut ctx = oxi_sdk::Context::new();
+    ctx.set_system_prompt(system_prompt);
+    ctx.add_message(oxi_sdk::Message::User(oxi_sdk::UserMessage::new(question)));
+
+    // Collect the stream response
+    // Provider::stream() returns a !Send future, so we must handle it carefully.
+    // Use a separate approach: collect synchronously via block_in_place.
+    // Provider::stream() returns a !Send future.
+    // Use block_in_place to avoid the Send requirement on the handler future.
+    let inner_result = tokio::task::block_in_place(|| {
+        let rt = tokio::runtime::Handle::current();
+        rt.block_on(async {
+            let stream = match provider.stream(&model, &ctx, None).await {
+                Ok(s) => s,
+                Err(e) => return Err(AppError::Internal(format!("Stream error: {e}"))),
+            };
+            let text = collect_stream_text(stream).await;
+            Ok::<String, AppError>(text)
+        })
+    });
+    inner_result
+}
+
+/// Collect text from a provider event stream.
+async fn collect_stream_text(
+    mut stream: std::pin::Pin<Box<dyn futures_util::Stream<Item = oxi_sdk::ProviderEvent> + Send>>,
+) -> String {
+    use futures_util::StreamExt;
+    let mut text = String::new();
+    while let Some(event) = stream.next().await {
+        match event {
+            oxi_sdk::ProviderEvent::TextDelta { delta, .. } => text.push_str(&delta),
+            oxi_sdk::ProviderEvent::Done { .. } => break,
+            _ => {}
+        }
+    }
+    text
 }
 
 #[cfg(test)]

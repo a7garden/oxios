@@ -1,12 +1,12 @@
-import { createFileRoute } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
-import { api } from '@/lib/api-client'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { LoadingCards } from '@/components/shared/loading'
+import { createFileRoute } from '@tanstack/react-router'
+import { FileWarning, KeyRound, RefreshCw, Shield } from 'lucide-react'
 import { EmptyState } from '@/components/shared/empty-state'
-import { Shield, RefreshCw, FileWarning, KeyRound } from 'lucide-react'
-import type { AuditEntry } from '@/types'
+import { LoadingCards } from '@/components/shared/loading'
 import { Badge } from '@/components/ui/badge'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { api } from '@/lib/api-client'
+import type { AuditEntry } from '@/types'
 
 interface PermissionsOverview {
   roles: string[]
@@ -16,7 +16,12 @@ interface PermissionsOverview {
 export const Route = createFileRoute('/security')({ component: SecurityPage })
 
 function SecurityPage() {
-  const { data: audits, isLoading: auditLoading, refetch, isFetching } = useQuery({
+  const {
+    data: audits,
+    isLoading: auditLoading,
+    refetch,
+    isFetching,
+  } = useQuery({
     queryKey: ['audit'],
     queryFn: () => api.get<{ items: AuditEntry[] }>('/api/security/audit'),
   })
@@ -38,6 +43,7 @@ function SecurityPage() {
           <p className="text-muted-foreground">Audit trail and access control</p>
         </div>
         <button
+          type="button"
           onClick={() => refetch()}
           disabled={isFetching}
           className="rounded-md p-2 hover:bg-muted"
@@ -59,15 +65,17 @@ function SecurityPage() {
               <p className="text-sm font-medium mb-1">Roles</p>
               <div className="flex gap-2 flex-wrap">
                 {permissions.roles.map((role) => (
-                  <Badge key={role} variant="outline">{role}</Badge>
+                  <Badge key={role} variant="outline">
+                    {role}
+                  </Badge>
                 ))}
               </div>
             </div>
             <div>
               <p className="text-sm font-medium mb-2">Policies</p>
               <div className="space-y-1">
-                {permissions.policies.map((policy, i) => (
-                  <div key={i} className="flex items-center gap-2 text-sm">
+                {permissions.policies.map((policy) => (
+                  <div key={policy.name} className="flex items-center gap-2 text-sm">
                     <Badge variant={policy.effect === 'allow' ? 'success' : 'destructive'}>
                       {policy.effect}
                     </Badge>
@@ -99,7 +107,10 @@ function SecurityPage() {
           ) : (
             <div className="space-y-2">
               {entries.map((entry) => (
-                <div key={entry.id} className="flex items-center justify-between rounded-lg border p-3">
+                <div
+                  key={entry.id}
+                  className="flex items-center justify-between rounded-lg border p-3"
+                >
                   <div className="flex items-center gap-3">
                     <Shield className="h-4 w-4 text-muted-foreground" />
                     <div>
@@ -108,7 +119,9 @@ function SecurityPage() {
                         <p className="text-xs text-muted-foreground">{entry.resource}</p>
                       )}
                       {entry.agent_id && (
-                        <p className="text-xs text-muted-foreground">Agent: {entry.agent_id.slice(0, 8)}...</p>
+                        <p className="text-xs text-muted-foreground">
+                          Agent: {entry.agent_id.slice(0, 8)}...
+                        </p>
                       )}
                     </div>
                   </div>
@@ -117,7 +130,9 @@ function SecurityPage() {
                       {new Date(entry.timestamp).toLocaleString()}
                     </p>
                     {entry.hash && (
-                      <p className="text-xs font-mono text-muted-foreground">{entry.hash.slice(0, 12)}...</p>
+                      <p className="text-xs font-mono text-muted-foreground">
+                        {entry.hash.slice(0, 12)}...
+                      </p>
                     )}
                   </div>
                 </div>

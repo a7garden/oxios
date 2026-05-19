@@ -221,16 +221,16 @@ mod tests {
 
     #[test]
     fn test_space_emoji() {
-        let mut s = Space::new("", SpaceSource::Manual);
+        let s = Space::new("", SpaceSource::Manual);
         assert_eq!(s.emoji(), "⚪");
 
-        let mut s = Space::new("oxios", SpaceSource::AutoResource);
+        let s = Space::new("oxios", SpaceSource::AutoResource);
         assert_eq!(s.emoji(), "🔧");
 
-        let mut s = Space::new("일상", SpaceSource::AutoTopic);
+        let s = Space::new("일상", SpaceSource::AutoTopic);
         assert_eq!(s.emoji(), "🏠");
 
-        let mut s = Space::new("random", SpaceSource::Manual);
+        let s = Space::new("random", SpaceSource::Manual);
         assert_eq!(s.emoji(), "📦");
     }
 

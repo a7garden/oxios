@@ -1,13 +1,13 @@
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { api } from '@/lib/api-client'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import { Save, Settings } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { LoadingCards } from '@/components/shared/loading'
-import { Settings, Save, RefreshCw } from 'lucide-react'
-import { useState, useEffect } from 'react'
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { api } from '@/lib/api-client'
 import type { OxiosConfig } from '@/types'
 
 export const Route = createFileRoute('/settings')({ component: SettingsPage })
@@ -31,8 +31,18 @@ const sections: SettingsSection[] = [
     label: 'General',
     fields: [
       { key: 'default_model', label: 'Default Model', type: 'text', placeholder: 'gpt-4o' },
-      { key: 'max_concurrent_agents', label: 'Max Concurrent Agents', type: 'number', placeholder: '10' },
-      { key: 'workspace_path', label: 'Workspace Path', type: 'text', placeholder: '~/.oxios/workspace' },
+      {
+        key: 'max_concurrent_agents',
+        label: 'Max Concurrent Agents',
+        type: 'number',
+        placeholder: '10',
+      },
+      {
+        key: 'workspace_path',
+        label: 'Workspace Path',
+        type: 'text',
+        placeholder: '~/.oxios/workspace',
+      },
     ],
   },
   {
@@ -42,7 +52,12 @@ const sections: SettingsSection[] = [
       { key: 'provider', label: 'Provider', type: 'text', placeholder: 'openai' },
       { key: 'model', label: 'Model', type: 'text', placeholder: 'gpt-4o' },
       { key: 'api_key', label: 'API Key', type: 'password', placeholder: 'sk-...' },
-      { key: 'base_url', label: 'Base URL', type: 'text', placeholder: 'https://api.openai.com/v1' },
+      {
+        key: 'base_url',
+        label: 'Base URL',
+        type: 'text',
+        placeholder: 'https://api.openai.com/v1',
+      },
     ],
   },
   {
@@ -58,7 +73,12 @@ const sections: SettingsSection[] = [
     key: 'agents',
     label: 'Agents',
     fields: [
-      { key: 'default_timeout_ms', label: 'Default Timeout (ms)', type: 'number', placeholder: '300000' },
+      {
+        key: 'default_timeout_ms',
+        label: 'Default Timeout (ms)',
+        type: 'number',
+        placeholder: '300000',
+      },
       { key: 'auto_kill_zombies', label: 'Auto Kill Zombies', type: 'text', placeholder: 'true' },
       { key: 'max_retries', label: 'Max Retries', type: 'number', placeholder: '3' },
     ],
@@ -78,7 +98,12 @@ const sections: SettingsSection[] = [
     fields: [
       { key: 'memory_enabled', label: 'Memory Enabled', type: 'text', placeholder: 'true' },
       { key: 'context_window', label: 'Context Window', type: 'number', placeholder: '128000' },
-      { key: 'embedding_model', label: 'Embedding Model', type: 'text', placeholder: 'text-embedding-3-small' },
+      {
+        key: 'embedding_model',
+        label: 'Embedding Model',
+        type: 'text',
+        placeholder: 'text-embedding-3-small',
+      },
     ],
   },
   {
@@ -87,7 +112,12 @@ const sections: SettingsSection[] = [
     fields: [
       { key: 'telemetry_enabled', label: 'Telemetry Enabled', type: 'text', placeholder: 'false' },
       { key: 'log_level', label: 'Log Level', type: 'text', placeholder: 'info' },
-      { key: 'resource_poll_interval_ms', label: 'Resource Poll Interval (ms)', type: 'number', placeholder: '5000' },
+      {
+        key: 'resource_poll_interval_ms',
+        label: 'Resource Poll Interval (ms)',
+        type: 'number',
+        placeholder: '5000',
+      },
     ],
   },
   {
@@ -96,7 +126,12 @@ const sections: SettingsSection[] = [
     fields: [
       { key: 'daemon_mode', label: 'Daemon Mode', type: 'text', placeholder: 'true' },
       { key: 'pid_file', label: 'PID File', type: 'text', placeholder: '~/.oxios/oxios.pid' },
-      { key: 'config_path', label: 'Config Path', type: 'text', placeholder: '~/.oxios/config.toml' },
+      {
+        key: 'config_path',
+        label: 'Config Path',
+        type: 'text',
+        placeholder: '~/.oxios/config.toml',
+      },
     ],
   },
 ]
@@ -120,10 +155,11 @@ function SettingsPage() {
     if (!config) return
     const values: Record<string, Record<string, string>> = {}
     for (const section of sections) {
-      values[section.key] = {}
       const sectionConfig = config[section.key] as Record<string, unknown> | undefined
+      if (!sectionConfig) continue
+      values[section.key] = {}
       for (const field of section.fields) {
-        values[section.key][field.key] = String(sectionConfig?.[field.key] ?? '')
+        values[section.key]![field.key] = String(sectionConfig[field.key] ?? '')
       }
     }
     setFormValues(values)
@@ -169,10 +205,16 @@ function SettingsPage() {
         </div>
       )}
 
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
+      <Tabs>
         <TabsList className="flex-wrap">
           {sections.map((s) => (
-            <TabsTrigger key={s.key} value={s.key}>{s.label}</TabsTrigger>
+            <TabsTrigger
+              key={s.key}
+              data-state={activeTab === s.key ? 'active' : 'inactive'}
+              onClick={() => setActiveTab(s.key)}
+            >
+              {s.label}
+            </TabsTrigger>
           ))}
         </TabsList>
 
@@ -187,10 +229,17 @@ function SettingsPage() {
               <CardContent className="space-y-4">
                 {section.fields.map((field) => (
                   <div key={field.key} className="grid gap-2 md:grid-cols-3 items-center">
-                    <label className="text-sm font-medium">{field.label}</label>
+                    <label htmlFor={field.key} className="text-sm font-medium">{field.label}</label>
                     <div className="md:col-span-2">
                       <Input
-                        type={field.type === 'password' ? 'password' : field.type === 'number' ? 'number' : 'text'}
+                        id={field.key}
+                        type={
+                          field.type === 'password'
+                            ? 'password'
+                            : field.type === 'number'
+                              ? 'number'
+                              : 'text'
+                        }
                         value={formValues[section.key]?.[field.key] ?? ''}
                         onChange={(e) =>
                           setFormValues((prev) => ({

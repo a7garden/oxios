@@ -5092,6 +5092,8 @@ dependencies = [
  "axum 0.8.9",
  "chrono",
  "futures-util",
+ "oxi-ai",
+ "oxi-sdk",
  "oxios-gateway",
  "oxios-kernel",
  "oxios-ouroboros",

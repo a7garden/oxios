@@ -4,7 +4,7 @@ export function LoadingCards({ count = 3 }: { count?: number }) {
   return (
     <div className="grid gap-4">
       {Array.from({ length: count }).map((_, i) => (
-        <div key={i} className="rounded-xl border p-6">
+        <div key={`skeleton-card-${i}`} className="rounded-xl border p-6">
           <Skeleton className="h-4 w-1/3 mb-4" />
           <Skeleton className="h-3 w-2/3 mb-2" />
           <Skeleton className="h-3 w-1/2" />
@@ -21,7 +21,7 @@ export function LoadingTable({ rows = 5 }: { rows?: number }) {
         <Skeleton className="h-4 w-1/4" />
       </div>
       {Array.from({ length: rows }).map((_, i) => (
-        <div key={i} className="flex items-center gap-4 border-b p-4 last:border-0">
+        <div key={`skeleton-row-${i}`} className="flex items-center gap-4 border-b p-4 last:border-0">
           <Skeleton className="h-4 w-1/4" />
           <Skeleton className="h-4 w-1/3" />
           <Skeleton className="h-4 w-1/6" />

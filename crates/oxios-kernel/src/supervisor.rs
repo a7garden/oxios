@@ -340,8 +340,6 @@ mod tests {
 
     /// Helper to create a real BasicSupervisor wired to a real EventBus.
     async fn make_supervisor() -> BasicSupervisor {
-        use std::path::PathBuf;
-
         let event_bus = EventBus::new(64);
         let provider = Arc::new(MockProvider);
 

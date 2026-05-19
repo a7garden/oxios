@@ -1,14 +1,14 @@
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { api } from '@/lib/api-client'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { Input } from '@/components/ui/input'
-import { LoadingCards } from '@/components/shared/loading'
-import { EmptyState } from '@/components/shared/empty-state'
-import { Timer, Plus, Trash2, RefreshCw, Power, PowerOff } from 'lucide-react'
+import { Plus, Power, PowerOff, RefreshCw, Timer, Trash2 } from 'lucide-react'
 import { useState } from 'react'
+import { EmptyState } from '@/components/shared/empty-state'
+import { LoadingCards } from '@/components/shared/loading'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { api } from '@/lib/api-client'
 import type { CronJob } from '@/types'
 
 export const Route = createFileRoute('/cron-jobs')({ component: CronJobsPage })
@@ -76,8 +76,16 @@ function CronJobsPage() {
           </CardHeader>
           <CardContent className="space-y-3">
             <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Job name" />
-            <Input value={schedule} onChange={(e) => setSchedule(e.target.value)} placeholder="Cron schedule (e.g. */5 * * * *)" />
-            <Input value={command} onChange={(e) => setCommand(e.target.value)} placeholder="Command to execute" />
+            <Input
+              value={schedule}
+              onChange={(e) => setSchedule(e.target.value)}
+              placeholder="Cron schedule (e.g. */5 * * * *)"
+            />
+            <Input
+              value={command}
+              onChange={(e) => setCommand(e.target.value)}
+              placeholder="Command to execute"
+            />
             <div className="flex gap-2">
               <Button
                 size="sm"
@@ -86,7 +94,9 @@ function CronJobsPage() {
               >
                 Create
               </Button>
-              <Button variant="ghost" size="sm" onClick={() => setShowCreate(false)}>Cancel</Button>
+              <Button variant="ghost" size="sm" onClick={() => setShowCreate(false)}>
+                Cancel
+              </Button>
             </div>
           </CardContent>
         </Card>
@@ -128,11 +138,7 @@ function CronJobsPage() {
                   >
                     {job.enabled ? <PowerOff className="h-4 w-4" /> : <Power className="h-4 w-4" />}
                   </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => deleteMutation.mutate(job.id)}
-                  >
+                  <Button variant="ghost" size="icon" onClick={() => deleteMutation.mutate(job.id)}>
                     <Trash2 className="h-4 w-4 text-destructive" />
                   </Button>
                 </div>

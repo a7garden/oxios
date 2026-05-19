@@ -14,15 +14,27 @@ interface DataTableProps<T> {
   className?: string
 }
 
-export function DataTable<T>({ columns, data, keyExtractor, onRowClick, className }: DataTableProps<T>) {
+export function DataTable<T>({
+  columns,
+  data,
+  keyExtractor,
+  onRowClick,
+  className,
+}: DataTableProps<T>) {
   return (
     <div className={cn('rounded-xl border', className)}>
       <div className="overflow-x-auto">
         <table className="w-full">
           <thead>
             <tr className="border-b bg-muted/50">
-              {columns.map((col, i) => (
-                <th key={i} className={cn('px-4 py-3 text-left text-sm font-medium text-muted-foreground', col.className)}>
+              {columns.map((col) => (
+                <th
+                  key={col.header}
+                  className={cn(
+                    'px-4 py-3 text-left text-sm font-medium text-muted-foreground',
+                    col.className,
+                  )}
+                >
                   {col.header}
                 </th>
               ))}
@@ -32,12 +44,17 @@ export function DataTable<T>({ columns, data, keyExtractor, onRowClick, classNam
             {data.map((row) => (
               <tr
                 key={keyExtractor(row)}
-                className={cn('border-b last:border-0 transition-colors', onRowClick && 'cursor-pointer hover:bg-muted/50')}
+                className={cn(
+                  'border-b last:border-0 transition-colors',
+                  onRowClick && 'cursor-pointer hover:bg-muted/50',
+                )}
                 onClick={() => onRowClick?.(row)}
               >
-                {columns.map((col, i) => (
-                  <td key={i} className={cn('px-4 py-3 text-sm', col.className)}>
-                    {typeof col.accessor === 'function' ? col.accessor(row) : String(row[col.accessor] ?? '')}
+                {columns.map((col) => (
+                  <td key={String(col.accessor)} className={cn('px-4 py-3 text-sm', col.className)}>
+                    {typeof col.accessor === 'function'
+                      ? col.accessor(row)
+                      : String(row[col.accessor] ?? '')}
                   </td>
                 ))}
               </tr>

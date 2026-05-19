@@ -1,16 +1,21 @@
-import { createFileRoute } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
-import { api } from '@/lib/api-client'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { LoadingCards } from '@/components/shared/loading'
+import { createFileRoute } from '@tanstack/react-router'
+import { RefreshCw, Wallet } from 'lucide-react'
 import { EmptyState } from '@/components/shared/empty-state'
-import { Wallet, RefreshCw } from 'lucide-react'
+import { LoadingCards } from '@/components/shared/loading'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { api } from '@/lib/api-client'
 import type { Budget } from '@/types'
 
 export const Route = createFileRoute('/budget')({ component: BudgetPage })
 
 function BudgetPage() {
-  const { data: budgets, isLoading, refetch, isFetching } = useQuery({
+  const {
+    data: budgets,
+    isLoading,
+    refetch,
+    isFetching,
+  } = useQuery({
     queryKey: ['budgets'],
     queryFn: () => api.get<Budget[]>('/api/budget'),
     refetchInterval: 10000,
@@ -31,6 +36,7 @@ function BudgetPage() {
           <p className="text-muted-foreground">Token and cost budget tracking</p>
         </div>
         <button
+          type="button"
           onClick={() => refetch()}
           disabled={isFetching}
           className="rounded-md p-2 hover:bg-muted"

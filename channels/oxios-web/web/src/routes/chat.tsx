@@ -1,11 +1,11 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { useChatStream } from '@/hooks/use-chat-stream'
-import { Card } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Textarea } from '@/components/ui/textarea'
-import { ScrollArea } from '@/components/ui/scroll-area'
-import { Send, Bot, User, Loader2 } from 'lucide-react'
+import { Bot, Loader2, Send, User } from 'lucide-react'
 import { useState } from 'react'
+import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { Textarea } from '@/components/ui/textarea'
+import { useChatStream } from '@/hooks/use-chat-stream'
 
 export const Route = createFileRoute('/chat')({ component: ChatPage })
 
@@ -35,13 +35,15 @@ function ChatPage() {
           ) : (
             <div className="space-y-4">
               {messages.map((msg, i) => (
-                <div key={i} className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : ''}`}>
+                <div key={`${msg.role}-${i}`} className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : ''}`}>
                   {msg.role === 'assistant' && (
                     <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
                       <Bot className="h-4 w-4" />
                     </div>
                   )}
-                  <div className={`rounded-lg px-4 py-2 max-w-[80%] ${msg.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
+                  <div
+                    className={`rounded-lg px-4 py-2 max-w-[80%] ${msg.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}
+                  >
                     <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
                   </div>
                   {msg.role === 'user' && (
@@ -70,7 +72,12 @@ function ChatPage() {
             <Textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend() } }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault()
+                  handleSend()
+                }
+              }}
               placeholder="Type a message..."
               className="min-h-[44px] max-h-[120px] resize-none"
               rows={1}

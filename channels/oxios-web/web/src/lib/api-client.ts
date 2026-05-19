@@ -47,12 +47,8 @@ export async function apiClient<T>(path: string, options?: RequestOptions): Prom
 }
 
 export const api = {
-  get: <T>(path: string, params?: Record<string, string>) =>
-    apiClient<T>(path, { params }),
-  post: <T>(path: string, body?: unknown) =>
-    apiClient<T>(path, { method: 'POST', body }),
-  put: <T>(path: string, body?: unknown) =>
-    apiClient<T>(path, { method: 'PUT', body }),
-  delete: <T>(path: string) =>
-    apiClient<T>(path, { method: 'DELETE' }),
+  get: <T>(path: string, params?: Record<string, string>) => apiClient<T>(path, { params }),
+  post: <T>(path: string, body?: unknown) => apiClient<T>(path, { method: 'POST', body }),
+  put: <T>(path: string, body?: unknown) => apiClient<T>(path, { method: 'PUT', body }),
+  delete: <T>(path: string) => apiClient<T>(path, { method: 'DELETE' }),
 }

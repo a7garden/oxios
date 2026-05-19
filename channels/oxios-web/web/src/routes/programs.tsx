@@ -1,14 +1,14 @@
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { api } from '@/lib/api-client'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { Input } from '@/components/ui/input'
-import { LoadingCards } from '@/components/shared/loading'
-import { EmptyState } from '@/components/shared/empty-state'
-import { Cpu, RefreshCw, Power, PowerOff, Download } from 'lucide-react'
+import { Cpu, Download, Power, PowerOff, RefreshCw } from 'lucide-react'
 import { useState } from 'react'
+import { EmptyState } from '@/components/shared/empty-state'
+import { LoadingCards } from '@/components/shared/loading'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { api } from '@/lib/api-client'
 import type { Program } from '@/types'
 
 export const Route = createFileRoute('/programs')({ component: ProgramsPage })
@@ -17,7 +17,12 @@ function ProgramsPage() {
   const queryClient = useQueryClient()
   const [installName, setInstallName] = useState('')
 
-  const { data: programs, isLoading, refetch, isFetching } = useQuery({
+  const {
+    data: programs,
+    isLoading,
+    refetch,
+    isFetching,
+  } = useQuery({
     queryKey: ['programs'],
     queryFn: () => api.get<Program[]>('/api/programs'),
   })
@@ -106,13 +111,19 @@ function ProgramsPage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => toggleMutation.mutate({ name: program.name, enabled: !program.enabled })}
+                  onClick={() =>
+                    toggleMutation.mutate({ name: program.name, enabled: !program.enabled })
+                  }
                   disabled={toggleMutation.isPending}
                 >
                   {program.enabled ? (
-                    <><PowerOff className="h-3 w-3 mr-1" /> Disable</>
+                    <>
+                      <PowerOff className="h-3 w-3 mr-1" /> Disable
+                    </>
                   ) : (
-                    <><Power className="h-3 w-3 mr-1" /> Enable</>
+                    <>
+                      <Power className="h-3 w-3 mr-1" /> Enable
+                    </>
                   )}
                 </Button>
               </CardContent>

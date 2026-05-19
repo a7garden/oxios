@@ -1,15 +1,14 @@
-import { createFileRoute } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
-import { api } from '@/lib/api-client'
+import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import { Bot, RefreshCw } from 'lucide-react'
 import { DataTable } from '@/components/shared/data-table'
-import { LoadingTable } from '@/components/shared/loading'
 import { EmptyState } from '@/components/shared/empty-state'
+import { LoadingTable } from '@/components/shared/loading'
+import { StatusIndicator } from '@/components/shared/status-indicator'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { useNavigate } from '@tanstack/react-router'
-import { Bot, Plus, RefreshCw } from 'lucide-react'
+import { api } from '@/lib/api-client'
 import type { Agent } from '@/types'
-import { StatusIndicator } from '@/components/shared/status-indicator'
 
 export const Route = createFileRoute('/agents/')({
   component: AgentsListPage,
@@ -29,15 +28,29 @@ function AgentsListPage() {
   const agents = data?.items ?? []
 
   const columns = [
-    { header: 'Name', accessor: (row: Agent) => (
-      <div className="flex items-center gap-2">
-        <Bot className="h-4 w-4 text-muted-foreground" />
-        <span className="font-medium">{row.name}</span>
-      </div>
-    )},
+    {
+      header: 'Name',
+      accessor: (row: Agent) => (
+        <div className="flex items-center gap-2">
+          <Bot className="h-4 w-4 text-muted-foreground" />
+          <span className="font-medium">{row.name}</span>
+        </div>
+      ),
+    },
     { header: 'Status', accessor: (row: Agent) => <StatusIndicator status={row.status} /> },
-    { header: 'Seed', accessor: (row: Agent) => row.seed_id ? <Badge variant="outline">{row.seed_id.slice(0, 8)}...</Badge> : <span className="text-muted-foreground">—</span> },
-    { header: 'Started', accessor: (row: Agent) => row.started_at ? new Date(row.started_at).toLocaleString() : '—' },
+    {
+      header: 'Seed',
+      accessor: (row: Agent) =>
+        row.seed_id ? (
+          <Badge variant="outline">{row.seed_id.slice(0, 8)}...</Badge>
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        ),
+    },
+    {
+      header: 'Started',
+      accessor: (row: Agent) => (row.started_at ? new Date(row.started_at).toLocaleString() : '—'),
+    },
   ]
 
   return (

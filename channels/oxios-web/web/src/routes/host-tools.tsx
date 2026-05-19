@@ -1,10 +1,9 @@
-import { createFileRoute } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
-import { api } from '@/lib/api-client'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
+import { createFileRoute } from '@tanstack/react-router'
+import { CheckCircle, RefreshCw, Wrench, XCircle } from 'lucide-react'
 import { LoadingCards } from '@/components/shared/loading'
-import { Wrench, RefreshCw, CheckCircle, XCircle } from 'lucide-react'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { api } from '@/lib/api-client'
 
 interface ToolCheck {
   name: string
@@ -35,6 +34,7 @@ function HostToolsPage() {
           <p className="text-muted-foreground">Available host system tools and capabilities</p>
         </div>
         <button
+          type="button"
           onClick={() => refetch()}
           disabled={isFetching}
           className="rounded-md p-2 hover:bg-muted"
@@ -70,7 +70,9 @@ function HostToolsPage() {
               <div className="flex-1 min-w-0">
                 <p className="font-medium text-sm flex items-center gap-2">
                   {tool.name}
-                  {tool.version && <span className="text-xs text-muted-foreground">v{tool.version}</span>}
+                  {tool.version && (
+                    <span className="text-xs text-muted-foreground">v{tool.version}</span>
+                  )}
                 </p>
                 {tool.path && (
                   <p className="text-xs text-muted-foreground font-mono truncate">{tool.path}</p>
