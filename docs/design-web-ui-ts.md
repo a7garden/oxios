@@ -62,29 +62,45 @@ SSE: `/api/events` (이벤트 스트림)
 | 원칙 | 설명 |
 |------|------|
 | **SPA** | Oxios에 Axum 백엔드가 이미 있음. SSR/풀스택 프레임워크 불필요 |
-| **현대적** | 2026년 표준 스택. 레거시 아님 |
+| **최신 버전** | 모든 의존성은 npm에 배포된 최신 안정 버전 사용 |
 | **생태계** | 커뮤니티 크기, npm 패키지 호환성, 채용 시장 |
 | **DX** | 타입 안전성, 빠른 HMR, 직관적인 API |
 | **기존 경험** | React + Mantine 경험 활용, 학습 곡선 최소화 |
+
+### npm에서 확인된 최신 버전 (2026-05-20)
+
+```
+Vite                8.0.13     ← Rolldown 통합, Rust 기반 단일 번들러
+React               19.2.6     ← Compiler, Actions, use()
+@vitejs/plugin-react 6.0.2     ← Oxc 기반, Babel 불필요
+TypeScript          6.0.3      ← import defer, expandable hovers
+TanStack Router     1.170.4    ← 파일 기반 타입 안전 라우팅
+TanStack Query      5.100.11   ← 비동기 상태 관리 표준
+Zustand             5.0.13     ← 클라이언트 상태 관리
+Tailwind CSS        4.3.0      ← CSS-native 설정
+Biome               2.4.15     ← Rust 기반 린트/포맷
+Zod                 4.4.3      ← 스키마 검증
+```
 
 ### 선정 스택
 
 | 영역 | 선택 | 이유 | 대안 검토 |
 |------|------|------|-----------|
-| **프레임워크** | **React 19** | 생태계 #1, 기존 경험, Concurrent Features, React Compiler | Vue 3, Svelte 5, Solid — 생태계/경험 부족 |
-| **빌드 도구** | **Vite 6** | Rolldown 기반, HMR < 100ms, React 플러그인 안정적 | Turbopack (Next.js 종속), Rsbuild (성장 중) |
-| **언어** | **TypeScript 5.x** | 비협상 불가. strict mode | — |
-| **UI 컴포넌트** | **shadcn/ui** | 2026년 React UI 표준. Radix 프리미티브 기반. 복사-붙여넣기 모델로 완전 제어 | Mantine (과거 경험 있으나 shadcn이 더 주류), MUI (무거움), Ant Design (엔터프라이즈) |
-| **스타일링** | **Tailwind CSS v4** | shadcn/ui의 기반. v4에서 CSS-native 설정. 유틸리티 퍼스트 | Panda CSS (타입 안전하지만 생태계 작음), CSS Modules (구식) |
-| **클라이언트 상태** | **Zustand** | 가볍고 단순. 보일러플레이트 최소. 2026년 클라이언트 상태 표준 | Redux Toolkit (과도), Jotai (원자형, 이 프로젝트에 과함) |
+| **프레임워크** | **React 19.2** | 생태계 #1, 기존 경험, Concurrent Features, React Compiler | Vue 3, Svelte 5, Solid — 생태계/경험 부족 |
+| **빌드 도구** | **Vite 8** | Rolldown 통합 (10-30x 빌드 속도). Rust 기반 단일 번들러 | Turbopack (Next.js 종속), Rsbuild (성장 중) |
+| **React 플러그인** | **@vitejs/plugin-react v6** | Oxc 기반 React Refresh. Babel 의존성 제거 | — |
+| **언어** | **TypeScript 6.0** | 비협상 불가. strict mode. `import defer` 지원 | — |
+| **UI 컴포넌트** | **shadcn/ui (CLI v4)** | 2026년 React UI 표준. Radix 프리미티브 기반. 복사-붙여넣기 모델로 완전 제어. Presets/Skills 지원 | Mantine (과거 경험 있으나 shadcn이 더 주류), MUI (무거움), Ant Design (엔터프라이즈) |
+| **스타일링** | **Tailwind CSS v4.3** | shadcn/ui의 기반. v4에서 CSS-native 설정 (`@theme`). 유틸리티 퍼스트 | Panda CSS (타입 안전하지만 생태계 작음), CSS Modules (구식) |
+| **클라이언트 상태** | **Zustand v5** | 가볍고 단순. 보일러플레이트 최소. 2026년 클라이언트 상태 표준 | Redux Toolkit (과도), Jotai (원자형, 이 프로젝트에 과함) |
 | **서버 상태** | **TanStack Query v5** | API 캐싱/동기화/낙관적 업데이트의 업계 표준. WebSocket 연동 | SWR (기능 부족), 수동 fetch |
-| **라우팅** | **TanStack Router** | 파일 기반 + 타입 안전 라우팅. search params까지 타입 안전 | React Router (타입 안전성 부족), wouter (과도 경량) |
-| **폼 처리** | **React Hook Form + Zod** | 표준 조합. 런타임 + 컴파일타임 검증 | Formiz, conform (생태계 작음) |
+| **라우팅** | **TanStack Router v1** | 파일 기반 + 타입 안전 라우팅. search params까지 타입 안전 | React Router (타입 안전성 부족), wouter (과도 경량) |
+| **폼 처리** | **React Hook Form + Zod v4** | 표준 조합. 런타임 + 컴파일타임 검증 | Formiz, conform (생태계 작음) |
 | **아이콘** | **Lucide React** | shadcn/ui 기본 아이콘. Tree-shakable | Heroicons, Phosphor |
 | **차트** | **Recharts** | React-native 차트. 대시보드 메트릭 시각화 | Tremor (shadcn 기반이나 제한적), Nivo (과함) |
 | **테스트** | **Vitest + Testing Library** | Vite 통합, Jest 호환 API | Playwright (E2E 전용) |
-| **패키지 매니저** | **pnpm** | 빠르고 디스크 효율적. 모노레포 친화적 | npm, yarn, bun (안정성 이슈) |
-| **린트/포맷** | **Biome** | Rust 기반 ESLint+Prettier 대체. 매우 빠름 | ESLint + Prettier (느림, 설정 복잡) |
+| **패키지 매니저** | **Bun** | 런타임 + 패키지 매니저 + 빌드 도구 통합. npm보다 빠름. `bun --version` 1.3.14 | pnpm, npm, yarn |
+| **린트/포맷** | **Biome v2** | Rust 기반 ESLint+Prettier 대체. 매우 빠름 | ESLint + Prettier (느림, 설정 복잡) |
 
 ### 왜 Next.js/TanStack Start가 아닌가?
 
@@ -105,7 +121,7 @@ channels/oxios-web/
 │
 └── web/                        # ← 새 TypeScript 프론트엔드
     ├── package.json
-    ├── pnpm-lock.yaml
+    ├── bun.lockb                     # ← Bun 네이티브 잠금 파일
     ├── tsconfig.json
     ├── vite.config.ts
     ├── biome.json
@@ -424,16 +440,30 @@ function SettingsForm() {
 ### 6.1 개발
 
 ```bash
-cd channels/oxios-web/web
-pnpm install
-pnpm dev          # Vite dev server on :5173, proxy /api → :3000
+# 설치
+curl -fsSL https://bun.sh/install | bash
+# 또는 brew install bun
+
+# 개발 서버 (Vite 번들러 사용, Bun 런타임으로 실행)
+bun run dev
+
+# 프로덕션 빌드
+bun run build
+
+# 테스트
+bun test
+
+# lint
+bun run lint
 ```
 
 ### 6.2 프로덕션 빌드
 
 ```bash
-pnpm build        # → web/dist/ (정적 파일)
+bun run build        # → web/dist/ (정적 파일)
 ```
+
+Bun의 빠른 번들링으로 빌드 시간이 크게 단축된다. Vite 8의 Rolldown과 결합하면 기존 Rust 백엔드의 컴파일 시간보다 프론트엔드 빌드가 더 빠를 수 있다.
 
 Axum 서버는 `web/dist/`를 정적 파일로 서빙:
 
@@ -446,14 +476,19 @@ Axum 서버는 `web/dist/`를 정적 파일로 서빙:
 
 ```typescript
 // vite.config.ts
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+import tailwindcss from '@tailwindcss/vite'
+
 export default defineConfig({
+  plugins: [react(), tailwindcss()],
   server: {
     proxy: {
       '/api': 'http://localhost:3000',
       '/health': 'http://localhost:3000',
     },
   },
-});
+})
 ```
 
 ---
@@ -462,7 +497,7 @@ export default defineConfig({
 
 ### Phase 1: 기반 구축
 - [ ] `web/` 디렉토리 생성, Vite + React + TS 프로젝트 초기화
-- [ ] shadcn/ui, Tailwind CSS v4 설정
+- [ ] shadcn/ui (CLI v4), Tailwind CSS v4 설정
 - [ ] TanStack Router + Query 설정
 - [ ] Zustand 스토어 (auth, theme, sidebar)
 - [ ] API 클라이언트, WS 클라이언트
@@ -490,7 +525,7 @@ export default defineConfig({
 ### Phase 5: 정리
 - [ ] Dioxus 프론트엔드 제거 (`frontend/` 디렉토리 삭제)
 - [ ] Axum 정적 파일 서빙 경로 변경
-- [ ] CI 파이프라인에 pnpm build 추가
+- [ ] CI 파이프라인에 `bun run build` 추가
 
 ---
 
@@ -498,32 +533,47 @@ export default defineConfig({
 
 ```json
 {
+  "name": "oxios-web-ui",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "vitest",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "typecheck": "tsc --noEmit"
+  },
   "dependencies": {
-    "react": "^19",
-    "react-dom": "^19",
-    "@tanstack/react-router": "^1.x",
-    "@tanstack/react-query": "^5",
-    "zustand": "^5",
+    "react": "^19.2",
+    "react-dom": "^19.2",
+    "@tanstack/react-router": "^1.170",
+    "@tanstack/react-query": "^5.100",
+    "zustand": "^5.0",
     "react-hook-form": "^7",
     "@hookform/resolvers": "^3",
-    "zod": "^3",
+    "zod": "^4.4",
     "recharts": "^2",
-    "lucide-react": "^0.4xx",
+    "lucide-react": "^0.511",
     "class-variance-authority": "^0.7",
     "clsx": "^2",
-    "tailwind-merge": "^2"
+    "tailwind-merge": "^3"
   },
   "devDependencies": {
-    "typescript": "^5.7",
-    "vite": "^6",
-    "@vitejs/plugin-react": "^4",
-    "tailwindcss": "^4",
-    "@tailwindcss/vite": "^4",
-    "biome": "^2",
+    "typescript": "^6.0",
+    "vite": "^8.0",
+    "@vitejs/plugin-react": "^6.0",
+    "tailwindcss": "^4.3",
+    "@tailwindcss/vite": "^4.3",
+    "@biomejs/biome": "^2.4",
     "vitest": "^3",
     "@testing-library/react": "^16",
-    "@tanstack/router-devtools": "^1.x",
-    "@tanstack/router-plugin": "^1.x"
-  }
+    "@tanstack/router-devtools": "^1.170",
+    "@tanstack/router-plugin": "^1.170"
+  },
+  "trustedDependencies": ["@biomejs/biome"]
 }
 ```
