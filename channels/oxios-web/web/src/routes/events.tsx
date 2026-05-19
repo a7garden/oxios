@@ -31,14 +31,16 @@ function EventsPage() {
   }, [initial])
 
   useEffect(() => {
-    const token = localStorage.getItem('oxios-api-key') || ''
-    const client = new SseClient('/api/events/stream', token, (event) => {
-      setLiveEvents((prev) => [...prev.slice(-99), event as OxiosEvent])
-      scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight })
-    })
+    const client = new SseClient()
     sseRef.current = client
-    client.connect()
-    return () => client.close()
+    client.connect(
+      '/api/events/stream',
+      (_event, data) => {
+        setLiveEvents((prev) => [...prev.slice(-99), data as OxiosEvent])
+        scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight })
+      },
+    )
+    return () => client.disconnect()
   }, [])
 
   useEffect(() => {

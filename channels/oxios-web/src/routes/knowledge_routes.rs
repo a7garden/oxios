@@ -685,6 +685,25 @@ fn extract_links_from_line(
     let line_bytes = line.as_bytes();
 
     while i < line.len() {
+        // Look for [[wikilink]] pattern FIRST (before single-bracket check)
+        if i + 1 < line.len() && line_bytes[i] == b'[' && line_bytes[i + 1] == b'[' {
+            if let Some(end) = line[i + 2..].find("]]") {
+                let link_target = &line[i + 2..i + 2 + end];
+                let target = if link_target.ends_with(".md") {
+                    link_target.to_string()
+                } else {
+                    format!("{}.md", link_target)
+                };
+                edges.push(KnowledgeGraphEdge {
+                    source: source_path.to_string(),
+                    target,
+                    label: link_target.to_string(),
+                });
+                i = i + 2 + end + 2;
+                continue;
+            }
+        }
+
         // Look for [text](path) pattern
         if line_bytes[i] == b'[' {
             // Find closing ]
@@ -726,25 +745,6 @@ fn extract_links_from_line(
                     }
                 }
                 i = i + 1 + bracket_end + 1;
-                continue;
-            }
-        }
-
-        // Look for [[wikilink]] pattern
-        if i + 1 < line.len() && line_bytes[i] == b'[' && line_bytes[i + 1] == b'[' {
-            if let Some(end) = line[i + 2..].find("]]") {
-                let link_target = &line[i + 2..i + 2 + end];
-                let target = if link_target.ends_with(".md") {
-                    link_target.to_string()
-                } else {
-                    format!("{}.md", link_target)
-                };
-                edges.push(KnowledgeGraphEdge {
-                    source: source_path.to_string(),
-                    target,
-                    label: link_target.to_string(),
-                });
-                i = i + 2 + end + 2;
                 continue;
             }
         }
