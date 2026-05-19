@@ -1,0 +1,143 @@
+import { createFileRoute } from '@tanstack/react-router'
+import { useQuery } from '@tanstack/react-query'
+import { api } from '@/lib/api-client'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { LoadingCards } from '@/components/shared/loading'
+import { EmptyState } from '@/components/shared/empty-state'
+import { Calendar, RefreshCw, CheckCircle, Clock, Loader2 } from 'lucide-react'
+import { StatusIndicator } from '@/components/shared/status-indicator'
+
+interface SchedulerStatus {
+  running: boolean
+  total_tasks: number
+  active_tasks: number
+  max_concurrent: number
+  tasks: SchedulerTask[]
+}
+
+interface SchedulerTask {
+  id: string
+  agent_id?: string
+  priority: number
+  status: 'queued' | 'running' | 'completed' | 'failed'
+  created_at: string
+  started_at?: string
+}
+
+export const Route = createFileRoute('/scheduler')({ component: SchedulerPage })
+
+function SchedulerPage() {
+  const { data, isLoading, refetch, isFetching } = useQuery({
+    queryKey: ['scheduler'],
+    queryFn: () => api.get<SchedulerStatus>('/api/scheduler'),
+    refetchInterval: 5000,
+  })
+
+  if (isLoading) return <LoadingCards count={4} />
+
+  const tasks = data?.tasks ?? []
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">Scheduler</h1>
+          <p className="text-muted-foreground">Task scheduling and queue management</p>
+        </div>
+        <button
+          onClick={() => refetch()}
+          disabled={isFetching}
+          className="rounded-md p-2 hover:bg-muted"
+        >
+          <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
+        </button>
+      </div>
+
+      {/* Stats */}
+      <div className="grid gap-4 md:grid-cols-4">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm text-muted-foreground">Status</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <StatusIndicator status={data?.running ? 'running' : 'stopped'} />
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm text-muted-foreground">Total Tasks</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{data?.total_tasks ?? 0}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm text-muted-foreground">Active</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{data?.active_tasks ?? 0}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm text-muted-foreground">Max Concurrent</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{data?.max_concurrent ?? '-'}</div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Task List */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Calendar className="h-4 w-4" /> Task Queue
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {tasks.length === 0 ? (
+            <EmptyState
+              icon={<Calendar className="h-8 w-8" />}
+              title="No tasks"
+              description="The scheduler queue is empty."
+              className="py-6"
+            />
+          ) : (
+            <div className="space-y-2">
+              {tasks.map((task) => (
+                <div key={task.id} className="flex items-center justify-between rounded-lg border p-3">
+                  <div className="flex items-center gap-3">
+                    {task.status === 'running' ? (
+                      <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
+                    ) : task.status === 'completed' ? (
+                      <CheckCircle className="h-4 w-4 text-emerald-500" />
+                    ) : task.status === 'failed' ? (
+                      <Clock className="h-4 w-4 text-red-500" />
+                    ) : (
+                      <Clock className="h-4 w-4 text-amber-500" />
+                    )}
+                    <div>
+                      <p className="font-medium text-sm">{task.id.slice(0, 12)}...</p>
+                      {task.agent_id && (
+                        <p className="text-xs text-muted-foreground">Agent: {task.agent_id.slice(0, 8)}...</p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline">P{task.priority}</Badge>
+                    <Badge variant={task.status === 'running' ? 'success' : task.status === 'failed' ? 'destructive' : 'secondary'}>
+                      {task.status}
+                    </Badge>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  )
+}

@@ -1,9 +1,23 @@
 # Progress
 
 ## Status
-In Progress — Phase 3 partially complete
+In Progress — Phase 2 complete, Phase 3 partially complete
 
 ## Tasks
+
+### Phase 2: KnowledgeApi + Knowledge Tools + KernelHandle Integration
+- [x] Add `oxios-markdown` as dependency to `oxios-kernel/Cargo.toml`
+- [x] Create `kernel_handle/knowledge_api.rs` — 12th KernelHandle API facade
+- [x] Add `knowledge` module to `kernel_handle/mod.rs` (field + constructor)
+- [x] Create `tools/kernel/knowledge_tool.rs` — action-based agent tool
+- [x] Register KnowledgeTool in `tools/kernel/mod.rs`
+- [x] Add `"knowledge"` to `kernel_bridge.rs::tool_names()`
+- [x] Add `KernelDomain { "knowledge" }` case in `registration.rs`
+- [x] Update `src/kernel.rs` — both KernelHandle::new() calls pass KnowledgeApi
+- [x] Update `supervisor.rs` test helper — pass KnowledgeApi
+- [x] `cargo check -p oxios-kernel` passes (0 errors, 0 warnings)
+- [x] `cargo test -p oxios-kernel` passes (541 tests)
+- [x] `cargo check --workspace` passes
 
 ### Phase 3: Web UI Integration — Knowledge API Routes
 - [x] Copy files.md web assets to `channels/oxios-web/static/knowledge/`
@@ -17,22 +31,26 @@ In Progress — Phase 3 partially complete
 - [ ] Verify static knowledge assets are served correctly (needs running server)
 - [ ] Create default knowledge files (Chat.md, Later.md, etc.)
 
-## Files Changed
+## Files Changed (Phase 2)
 
 ### New Files
-- `channels/oxios-web/static/knowledge/` — entire files.md web frontend copied
-- `channels/oxios-web/static/knowledge/oxios-adapter.js` — Oxios API adapter for JS
-- `channels/oxios-web/src/routes/knowledge_routes.rs` — Knowledge REST API handlers
+- `crates/oxios-kernel/src/kernel_handle/knowledge_api.rs` — KnowledgeApi facade (12th API domain)
+- `crates/oxios-kernel/src/tools/kernel/knowledge_tool.rs` — KnowledgeTool agent tool
 
 ### Modified Files
-- `channels/oxios-web/static/knowledge/files.js` — disabled sync protocol, set API_URL to ''
-- `channels/oxios-web/static/knowledge/app.js` — disabled token auth, marked server OK
-- `channels/oxios-web/static/knowledge/index.html` — added oxios-adapter.js, updated title
-- `channels/oxios-web/src/routes/mod.rs` — added knowledge_routes module + routes
-- `channels/oxios-web/src/middleware.rs` — added /knowledge/ to static asset whitelist
+- `crates/oxios-kernel/Cargo.toml` — added `oxios-markdown` dependency
+- `crates/oxios-kernel/src/kernel_handle/mod.rs` — added knowledge module, KnowledgeApi field, updated constructors
+- `crates/oxios-kernel/src/tools/kernel/mod.rs` — added knowledge_tool module + registration
+- `crates/oxios-kernel/src/tools/kernel_bridge.rs` — added "knowledge" to tool_names, updated test
+- `crates/oxios-kernel/src/tools/registration.rs` — added knowledge domain CSpace case
+- `crates/oxios-kernel/src/tools/mod.rs` — exported KnowledgeTool
+- `crates/oxios-kernel/src/lib.rs` — exported KnowledgeApi + KnowledgeTool
+- `crates/oxios-kernel/src/supervisor.rs` — updated test KernelHandle construction
+- `src/kernel.rs` — updated both KernelHandle::new() calls (12 params now)
 
-## Notes
-- The static knowledge assets are served via the existing fallback_service (ServeDir) in plugin.rs, which serves everything under `static/`. The `/knowledge/` prefix maps to `static/knowledge/index.html`.
-- Sync protocol (mtime-based 3-way merge) is disabled; files are saved via simple REST CRUD.
-- Copilot handler returns a placeholder response until the oxi engine is integrated (Phase 4).
-- Search and backlinks use simple file scanning as fallback until KnowledgeApi is wired (Phase 2).
+## Notes (Phase 2)
+- KnowledgeApi does NOT depend on EngineProvider — copilot_chat is Phase 4
+- VirtualFs methods are synchronous; note_write fires memory indexing async (graceful when no tokio rt)
+- BacklinkIndex is wrapped in `RwLock` for thread-safe interior mutability
+- KnowledgeTool creates a fresh KnowledgeApi per invocation (lightweight — just wraps paths)
+- One pre-existing test failure in `oxios-web` (`test_extract_links_wikilink`) — not introduced by this phase
