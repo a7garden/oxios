@@ -16,6 +16,9 @@ pub fn GeneralTab(config: Signal<ConfigSnapshot>) -> Element {
             SectionCard {
                 title: "Kernel",
                 description: Some("Core runtime settings for the Oxios kernel."),
+                on_reset: Some(EventHandler::new(move |_: ()| {
+                    cfg.write().kernel = Default::default();
+                })),
                 div { class: "settings-fields",
                     div { class: "settings-field",
                         div { class: "settings-field-label",
@@ -55,6 +58,9 @@ pub fn GeneralTab(config: Signal<ConfigSnapshot>) -> Element {
             SectionCard {
                 title: "Gateway",
                 description: Some("HTTP gateway binding settings."),
+                on_reset: Some(EventHandler::new(move |_: ()| {
+                    cfg.write().gateway = Default::default();
+                })),
                 div { class: "settings-fields",
                     div { class: "settings-field",
                         div { class: "settings-field-label",
@@ -85,6 +91,9 @@ pub fn GeneralTab(config: Signal<ConfigSnapshot>) -> Element {
             SectionCard {
                 title: "Daemon",
                 description: Some("Daemon mode PID and log settings."),
+                on_reset: Some(EventHandler::new(move |_: ()| {
+                    cfg.write().daemon = Default::default();
+                })),
                 div { class: "settings-fields",
                     div { class: "settings-field",
                         div { class: "settings-field-label",
@@ -120,6 +129,9 @@ pub fn GeneralTab(config: Signal<ConfigSnapshot>) -> Element {
             SectionCard {
                 title: "Version Control",
                 description: Some("Git integration settings."),
+                on_reset: Some(EventHandler::new(move |_: ()| {
+                    cfg.write().git = Default::default();
+                })),
                 div { class: "settings-fields",
                     SettingsToggle {
                         label: "Auto Commit",

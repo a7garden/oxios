@@ -37,6 +37,9 @@ pub fn ExecSecurityTab(config: Signal<ConfigSnapshot>) -> Element {
             SectionCard {
                 title: "Execution",
                 description: Some("How the kernel dispatches commands to the host."),
+                on_reset: Some(EventHandler::new(move |_: ()| {
+                    cfg.write().exec = Default::default();
+                })),
                 div { class: "settings-fields",
                     SettingsSelectGroup {
                         label: "Default Mode",
@@ -86,6 +89,9 @@ pub fn ExecSecurityTab(config: Signal<ConfigSnapshot>) -> Element {
             SectionCard {
                 title: "Security",
                 description: Some("Access control, resource limits, and audit configuration."),
+                on_reset: Some(EventHandler::new(move |_: ()| {
+                    cfg.write().security = Default::default();
+                })),
                 div { class: "settings-fields",
                     SettingsToggle {
                         label: "Auth Enabled",
@@ -131,7 +137,7 @@ pub fn ExecSecurityTab(config: Signal<ConfigSnapshot>) -> Element {
                         value: cfg().security.max_memory_mb as f64,
                         onchange: move |v| cfg.write().security.max_memory_mb = v as u64,
                         min: 128.0,
-                        max: 4096.0,
+                        max: Some(4096.0),
                         step: Some(128.0),
                         unit: Some("MB"),
                         show_max: None,

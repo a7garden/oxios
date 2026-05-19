@@ -4,6 +4,10 @@ pub mod config_types;
 pub mod general_tab;
 pub mod engine_tab;
 pub mod exec_security_tab;
+pub mod agents_tab;
+pub mod memory_context_tab;
+pub mod integrations_tab;
+pub mod monitoring_tab;
 pub mod advanced_tab;
 
 pub use config_types::ConfigSnapshot;
@@ -15,6 +19,10 @@ use crate::components::icons::*;
 use crate::views::settings::general_tab::GeneralTab;
 use crate::views::settings::engine_tab::EngineTab;
 use crate::views::settings::exec_security_tab::ExecSecurityTab;
+use crate::views::settings::agents_tab::AgentsTab;
+use crate::views::settings::memory_context_tab::MemoryContextTab;
+use crate::views::settings::integrations_tab::IntegrationsTab;
+use crate::views::settings::monitoring_tab::MonitoringTab;
 use crate::views::settings::advanced_tab::AdvancedTab;
 
 // ---------------------------------------------------------------------------
@@ -26,7 +34,56 @@ enum SettingsTab {
     General,
     Engine,
     ExecSecurity,
+    Agents,
+    MemoryContext,
+    Integrations,
+    Monitoring,
     Advanced,
+}
+
+/// Check if a specific tab has unsaved changes by comparing section subsets.
+fn is_tab_dirty(tab: SettingsTab, current: &ConfigSnapshot, original: &ConfigSnapshot) -> bool {
+    match tab {
+        SettingsTab::General => {
+            serde_json::to_string(&current.kernel).ok() != serde_json::to_string(&original.kernel).ok()
+                || serde_json::to_string(&current.daemon).ok() != serde_json::to_string(&original.daemon).ok()
+                || serde_json::to_string(&current.gateway).ok() != serde_json::to_string(&original.gateway).ok()
+                || serde_json::to_string(&current.git).ok() != serde_json::to_string(&original.git).ok()
+        }
+        SettingsTab::Engine => {
+            let cur_model = &current.engine.default_model;
+            let orig_model = &original.engine.default_model;
+            cur_model != orig_model
+                // api_key change is tracked in the engine tab
+                || current.engine.api_key.is_some() != original.engine.api_key.is_some()
+        }
+        SettingsTab::ExecSecurity => {
+            serde_json::to_string(&current.exec).ok() != serde_json::to_string(&original.exec).ok()
+                || serde_json::to_string(&current.security).ok() != serde_json::to_string(&original.security).ok()
+        }
+        SettingsTab::Agents => {
+            serde_json::to_string(&current.scheduler).ok() != serde_json::to_string(&original.scheduler).ok()
+                || serde_json::to_string(&current.orchestrator).ok() != serde_json::to_string(&original.orchestrator).ok()
+                || serde_json::to_string(&current.persona).ok() != serde_json::to_string(&original.persona).ok()
+                || serde_json::to_string(&current.budget).ok() != serde_json::to_string(&original.budget).ok()
+        }
+        SettingsTab::MemoryContext => {
+            serde_json::to_string(&current.memory).ok() != serde_json::to_string(&original.memory).ok()
+                || serde_json::to_string(&current.context).ok() != serde_json::to_string(&original.context).ok()
+        }
+        SettingsTab::Integrations => {
+            serde_json::to_string(&current.channels).ok() != serde_json::to_string(&original.channels).ok()
+                || serde_json::to_string(&current.mcp).ok() != serde_json::to_string(&original.mcp).ok()
+                || serde_json::to_string(&current.cron).ok() != serde_json::to_string(&original.cron).ok()
+                || serde_json::to_string(&current.browser).ok() != serde_json::to_string(&original.browser).ok()
+        }
+        SettingsTab::Monitoring => {
+            serde_json::to_string(&current.otel).ok() != serde_json::to_string(&original.otel).ok()
+                || serde_json::to_string(&current.audit).ok() != serde_json::to_string(&original.audit).ok()
+                || serde_json::to_string(&current.resource_monitor).ok() != serde_json::to_string(&original.resource_monitor).ok()
+        }
+        SettingsTab::Advanced => false,
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -62,10 +119,6 @@ pub fn SettingsView() -> Element {
     let is_dirty = serde_json::to_string(&current_cfg).ok()
         != serde_json::to_string(&original_cfg).ok();
 
-    let tab_class = |tab: SettingsTab| -> String {
-        if active_tab() == tab { "tab tab-active".to_string() } else { "tab".to_string() }
-    };
-
     let reload = move |_| {
         is_loaded.set(false);
         config_resource.restart();
@@ -93,7 +146,7 @@ pub fn SettingsView() -> Element {
                 Some(body) => {
                     match api::put_json::<serde_json::Value, _>("/api/config", &body).await {
                         Ok(_) => {
-                            save_message.set(Some((true, "Configuration saved successfully. Restart required for all changes.".to_string())));
+                            save_message.set(Some((true, "Configuration saved. Restart Oxios to apply changes.".to_string())));
                             original_signal.set(cfg_val);
                         }
                         Err(e) => save_message.set(Some((false, format!("Save error: {e}")))),
@@ -132,7 +185,7 @@ pub fn SettingsView() -> Element {
                                 span { "{msg}" }
                             }
                         } else {
-                            div { class: "message-error", "{msg}" }
+                            div { class: "message message-error", "{msg}" }
                         }
                     }
                     button {
@@ -145,40 +198,60 @@ pub fn SettingsView() -> Element {
                 }
             }
 
-            // Tab bar
+            // Tab bar with dirty badges
             div { class: "settings-tabs",
-                button { class: "{tab_class(SettingsTab::General)}",
-                    onclick: move |_| active_tab.set(SettingsTab::General),
-                    IconCpu { size: 16 } " General"
-                }
-                button { class: "{tab_class(SettingsTab::Engine)}",
-                    onclick: move |_| active_tab.set(SettingsTab::Engine),
-                    IconZap { size: 16 } " Engine"
-                }
-                button { class: "{tab_class(SettingsTab::ExecSecurity)}",
-                    onclick: move |_| active_tab.set(SettingsTab::ExecSecurity),
-                    IconShield { size: 16 } " Exec & Security"
-                }
-                button { class: "{tab_class(SettingsTab::Advanced)}",
-                    onclick: move |_| active_tab.set(SettingsTab::Advanced),
-                    IconFile { size: 16 } " Advanced"
-                }
+                {render_tab_button(SettingsTab::General, "General", IconCpu, active_tab, &current_cfg, &original_cfg)}
+                {render_tab_button(SettingsTab::Engine, "Engine", IconZap, active_tab, &current_cfg, &original_cfg)}
+                {render_tab_button(SettingsTab::ExecSecurity, "Exec & Security", IconShield, active_tab, &current_cfg, &original_cfg)}
+                {render_tab_button(SettingsTab::Agents, "Agents", IconAgents, active_tab, &current_cfg, &original_cfg)}
+                {render_tab_button(SettingsTab::MemoryContext, "Memory & Context", IconMemory, active_tab, &current_cfg, &original_cfg)}
+                {render_tab_button(SettingsTab::Integrations, "Integrations", IconLayers, active_tab, &current_cfg, &original_cfg)}
+                {render_tab_button(SettingsTab::Monitoring, "Monitoring", IconActivity, active_tab, &current_cfg, &original_cfg)}
+                {render_tab_button(SettingsTab::Advanced, "Advanced", IconFile, active_tab, &current_cfg, &original_cfg)}
             }
 
             // Tab content
             div { class: "tab-content",
                 div { class: "settings-tab-content",
-                    if active_tab() == SettingsTab::General {
-                        GeneralTab { config: config_signal }
-                    } else if active_tab() == SettingsTab::Engine {
-                        EngineTab { config: config_signal }
-                    } else if active_tab() == SettingsTab::ExecSecurity {
-                        ExecSecurityTab { config: config_signal }
-                    } else {
-                        AdvancedTab { config: config_signal }
+                    {
+                        let tab = active_tab();
+                        match tab {
+                            SettingsTab::General => rsx! { GeneralTab { config: config_signal } },
+                            SettingsTab::Engine => rsx! { EngineTab { config: config_signal } },
+                            SettingsTab::ExecSecurity => rsx! { ExecSecurityTab { config: config_signal } },
+                            SettingsTab::Agents => rsx! { AgentsTab { config: config_signal } },
+                            SettingsTab::MemoryContext => rsx! { MemoryContextTab { config: config_signal } },
+                            SettingsTab::Integrations => rsx! { IntegrationsTab { config: config_signal } },
+                            SettingsTab::Monitoring => rsx! { MonitoringTab { config: config_signal } },
+                            SettingsTab::Advanced => rsx! { AdvancedTab { config: config_signal } },
+                        }
                     }
                 }
             }
+        }
+    }
+}
+
+/// Render a tab button with icon and optional dirty dot badge.
+fn render_tab_button(
+    tab: SettingsTab,
+    label: &str,
+    icon: fn(class: Option<String>, size: Option<u32>) -> Element,
+    mut active_tab: Signal<SettingsTab>,
+    current: &ConfigSnapshot,
+    original: &ConfigSnapshot,
+) -> Element {
+    let is_active = active_tab() == tab;
+    let is_dirty = is_tab_dirty(tab, current, original);
+    let class = if is_active { "tab tab-active" } else { "tab" };
+    let dirty_class = if is_dirty { "tab-dirty" } else { "" };
+
+    rsx! {
+        button {
+            class: "{class} {dirty_class}",
+            onclick: move |_| active_tab.set(tab),
+            {icon(None, Some(16))}
+            " {label}"
         }
     }
 }

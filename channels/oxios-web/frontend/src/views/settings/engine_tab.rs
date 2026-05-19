@@ -15,6 +15,9 @@ pub fn EngineTab(config: Signal<ConfigSnapshot>) -> Element {
             SectionCard {
                 title: "LLM Engine",
                 description: Some("Configure the default model and API credentials."),
+                on_reset: Some(EventHandler::new(move |_: ()| {
+                    cfg.write().engine = Default::default();
+                })),
                 div { class: "settings-fields",
                     div { class: "settings-field",
                         div { class: "settings-field-label",

@@ -2267,6 +2267,50 @@ option {
     font-size: 13px;
 }
 
+/* Section card header with reset */
+.section-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 4px;
+}
+
+.section-reset-btn {
+    font-size: 11px;
+    color: var(--text-3);
+    padding: 2px 8px;
+    opacity: 0.6;
+    transition: opacity 0.15s;
+}
+
+.section-reset-btn:hover {
+    opacity: 1;
+    color: var(--accent);
+}
+
+/* MCP Server Card */
+.mcp-server-card {
+    background: var(--bg-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    margin-bottom: 12px;
+}
+
+.mcp-server-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.mcp-server-card-name {
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--text-0);
+    font-family: var(--font-mono);
+}
+
 /* Dirty dot on tab */
 .tab-dirty::after {
     content: "";
