@@ -13,9 +13,6 @@ pub fn SettingsTagInput(
     let mut input_value = use_signal(String::new);
     let placeholder_str = placeholder.unwrap_or("Add tag...");
 
-    // Store values in a signal so closures can read it without capturing the Vec
-    let _values_signal = use_signal(|| values.clone());
-
     rsx! {
         div { class: "settings-field",
             div { class: "settings-field-label",
