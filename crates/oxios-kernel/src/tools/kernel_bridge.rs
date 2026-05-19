@@ -67,6 +67,7 @@ impl SdkKernelToolProvider for OxiosKernelBridge {
             "resource",
             "mcp",
             "browser",
+            "knowledge",
         ]
     }
 
@@ -164,12 +165,16 @@ mod tests {
             crate::A2aApi::new(Arc::new(crate::a2a::A2AProtocol::new(
                 crate::event_bus::EventBus::new(256),
             ))),
+            crate::KnowledgeApi::new(
+                std::path::PathBuf::from("/tmp/oxios-test/knowledge"),
+                Arc::new(crate::memory::MemoryManager::new(state_store.clone())),
+            ),
         ));
 
         let bridge = OxiosKernelBridge::new(kernel);
 
         let names = bridge.tool_names();
-        // 6 always-on + 12 kernel domain = 18 tools
-        assert_eq!(names.len(), 23, "expected 23 tools, got {:?}", names);
+        // 6 always-on + 17 kernel domain = 23 ... plus knowledge = 24
+        assert_eq!(names.len(), 24, "expected 24 tools, got {:?}", names);
     }
 }

@@ -35,8 +35,8 @@ use oxi_sdk::{
 use crate::capability::{CSpace, ResourceRef, Rights};
 use crate::tools::kernel::*;
 use crate::tools::{
-    A2aDelegateTool, A2aQueryTool, A2aSendTool, ExecTool, MemoryReadTool, MemorySearchTool,
-    MemoryWriteTool,
+    A2aDelegateTool, A2aQueryTool, A2aSendTool, ExecTool, KnowledgeTool, MemoryReadTool,
+    MemorySearchTool, MemoryWriteTool,
 };
 use crate::types::AgentId;
 use crate::KernelHandle;
@@ -147,6 +147,7 @@ pub fn register_tools_from_cspace(
                 "security" => registry.register(SecurityTool::from_kernel(kernel)),
                 "budget" => registry.register(BudgetTool::from_kernel(kernel)),
                 "resource" => registry.register(ResourceTool::from_kernel(kernel)),
+                "knowledge" => registry.register(KnowledgeTool::from_kernel(kernel)),
                 "mcp" => { /* MCP tools are enumerated dynamically per agent */ }
                 _ => {} // Unknown domain — silently skip
             },

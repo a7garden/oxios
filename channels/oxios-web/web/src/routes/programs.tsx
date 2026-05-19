@@ -1,0 +1,125 @@
+import { createFileRoute } from '@tanstack/react-router'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { api } from '@/lib/api-client'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
+import { LoadingCards } from '@/components/shared/loading'
+import { EmptyState } from '@/components/shared/empty-state'
+import { Cpu, RefreshCw, Power, PowerOff, Download } from 'lucide-react'
+import { useState } from 'react'
+import type { Program } from '@/types'
+
+export const Route = createFileRoute('/programs')({ component: ProgramsPage })
+
+function ProgramsPage() {
+  const queryClient = useQueryClient()
+  const [installName, setInstallName] = useState('')
+
+  const { data: programs, isLoading, refetch, isFetching } = useQuery({
+    queryKey: ['programs'],
+    queryFn: () => api.get<Program[]>('/api/programs'),
+  })
+
+  const toggleMutation = useMutation({
+    mutationFn: ({ name, enabled }: { name: string; enabled: boolean }) =>
+      api.put(`/api/programs/${name}`, { enabled }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['programs'] }),
+  })
+
+  const installMutation = useMutation({
+    mutationFn: (name: string) => api.post('/api/programs/install', { name }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['programs'] })
+      setInstallName('')
+    },
+  })
+
+  if (isLoading) return <LoadingCards count={4} />
+
+  const items = programs ?? []
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">Programs</h1>
+          <p className="text-muted-foreground">Manage OS-level programs</p>
+        </div>
+        <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching}>
+          <RefreshCw className={`h-4 w-4 mr-1 ${isFetching ? 'animate-spin' : ''}`} /> Refresh
+        </Button>
+      </div>
+
+      {/* Install */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Install Program</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex gap-2">
+            <Input
+              value={installName}
+              onChange={(e) => setInstallName(e.target.value)}
+              placeholder="Program name..."
+              className="max-w-xs"
+            />
+            <Button
+              onClick={() => installMutation.mutate(installName)}
+              disabled={!installName.trim() || installMutation.isPending}
+              size="sm"
+            >
+              <Download className="h-4 w-4 mr-1" /> Install
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {items.length === 0 ? (
+        <EmptyState
+          icon={<Cpu className="h-10 w-10" />}
+          title="No programs"
+          description="Install programs to extend Oxios capabilities."
+        />
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {items.map((program) => (
+            <Card key={program.name}>
+              <CardHeader className="flex flex-row items-start justify-between pb-2">
+                <div>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Cpu className="h-4 w-4" /> {program.name}
+                  </CardTitle>
+                  {program.version && (
+                    <p className="text-xs text-muted-foreground">v{program.version}</p>
+                  )}
+                </div>
+                <Badge variant={program.enabled ? 'success' : 'secondary'}>
+                  {program.enabled ? 'Enabled' : 'Disabled'}
+                </Badge>
+              </CardHeader>
+              <CardContent>
+                {program.description && (
+                  <p className="text-sm text-muted-foreground mb-3">{program.description}</p>
+                )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => toggleMutation.mutate({ name: program.name, enabled: !program.enabled })}
+                  disabled={toggleMutation.isPending}
+                >
+                  {program.enabled ? (
+                    <><PowerOff className="h-3 w-3 mr-1" /> Disable</>
+                  ) : (
+                    <><Power className="h-3 w-3 mr-1" /> Enable</>
+                  )}
+                </Button>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}

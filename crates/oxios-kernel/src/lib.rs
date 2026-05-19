@@ -157,7 +157,7 @@ pub use program::{
 pub use skill::{Skill, SkillMeta, SkillStore};
 #[cfg(feature = "browser")]
 pub use tools::BrowserTool;
-pub use tools::{ExecTool, ProgramTool};
+pub use tools::{ExecTool, KnowledgeTool, ProgramTool};
 #[cfg(feature = "wasm-sandbox")]
 pub use wasm_sandbox::{ResourceKind, WasmConfig, WasmError, WasmSandbox};
 
@@ -186,8 +186,8 @@ pub use types::{AgentId, AgentInfo, AgentStatus};
 // ─── API Surface ────────────────────────────────────────────────────
 pub use kernel_handle::KernelHandle;
 pub use kernel_handle::{
-    A2aApi, AgentApi, BrowserApi, ExecApi, ExtensionApi, InfraApi, McpApi, PersonaApi, SecurityApi,
-    SpaceApi, StateApi,
+    A2aApi, AgentApi, BrowserApi, ExecApi, ExtensionApi, InfraApi, KnowledgeApi, McpApi,
+    PersonaApi, SecurityApi, SpaceApi, StateApi,
 };
 
 // ─── oxi-sdk re-exports ─────────────────────────────────────────────

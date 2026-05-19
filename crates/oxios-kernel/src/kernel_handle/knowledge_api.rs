@@ -135,11 +135,14 @@ impl KnowledgeApi {
         };
 
         // Fire-and-forget async — note_write is sync but memory is async.
-        // Use try_write to avoid blocking on contention.
         let memory = self.memory.clone();
-        tokio::spawn(async move {
-            let _ = memory.remember(entry).await;
-        });
+        let rt = tokio::runtime::Handle::try_current();
+        if let Ok(handle) = rt {
+            handle.spawn(async move {
+                let _ = memory.remember(entry).await;
+            });
+        }
+        // If no tokio runtime, silently skip memory indexing (tests, CLI).
 
         Ok(())
     }

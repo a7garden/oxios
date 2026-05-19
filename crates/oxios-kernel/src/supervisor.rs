@@ -366,7 +366,7 @@ mod tests {
             crate::kernel_handle::AgentApi::new(
                 Arc::new(crate::supervisor::NoOpSupervisor),
                 Arc::new(crate::budget::BudgetManager::new()),
-                memory_manager,
+                memory_manager.clone(),
                 Some(event_bus.clone()),
             ),
             crate::kernel_handle::SecurityApi::new(
@@ -422,6 +422,10 @@ mod tests {
             crate::kernel_handle::A2aApi::new(Arc::new(crate::a2a::A2AProtocol::new(
                 EventBus::new(64),
             ))),
+            crate::kernel_handle::KnowledgeApi::new(
+                tmp.join("knowledge"),
+                memory_manager.clone(),
+            ),
         ));
 
         let runtime = AgentRuntime::new(provider, "mock/model", kernel_handle);

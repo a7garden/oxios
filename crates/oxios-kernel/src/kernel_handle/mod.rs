@@ -47,7 +47,6 @@ use crate::skill::SkillStore;
 use crate::space::SpaceManager;
 use crate::state_store::StateStore;
 use crate::supervisor::Supervisor;
-use parking_lot::RwLock;
 use serde::Serialize;
 use std::sync::Arc;
 use std::time::Instant;

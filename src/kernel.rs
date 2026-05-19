@@ -106,6 +106,10 @@ impl Kernel {
                     ),
                     self.build_browser_api(),
                     oxios_kernel::A2aApi::new(self.a2a_protocol.clone()),
+                    oxios_kernel::KnowledgeApi::new(
+                        std::path::PathBuf::from(&self.config.kernel.workspace).join("knowledge"),
+                        self.memory_manager.clone(),
+                    ),
                 ))
             })
             .clone()
@@ -434,6 +438,10 @@ impl KernelBuilder {
                 oxios_kernel::ExecApi::new(Arc::new(config.exec.clone()), access_manager.clone()),
                 build_browser_api_value(&config),
                 oxios_kernel::A2aApi::new(a2a_protocol.clone()),
+                oxios_kernel::KnowledgeApi::new(
+                    PathBuf::from(&config.kernel.workspace).join("knowledge"),
+                    memory_manager.clone(),
+                ),
             ));
 
         // Build ToolRetriever for semantic capability discovery.

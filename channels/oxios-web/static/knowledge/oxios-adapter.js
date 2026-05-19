@@ -64,7 +64,7 @@ async function oxiosWriteFile(path, content) {
  */
 async function oxiosDeleteFile(path) {
     try {
-        const response = await fetch(`${OXIONS_API_BASE}/file/${encodeURIComponent(path)}`, {
+        const response = await fetch(`${OXIOS_API_BASE}/file/${encodeURIComponent(path)}`, {
             method: 'DELETE',
             credentials: 'include'
         });

@@ -16,6 +16,7 @@ mod cron_jobs;
 mod events;
 mod git_routes;
 mod infra;
+mod knowledge_routes;
 mod resource_routes;
 mod resources;
 mod space_routes;
@@ -59,6 +60,11 @@ pub(crate) use git_routes::{
 pub(crate) use infra::{
     handle_audit_log, handle_metrics, handle_permissions_get, handle_permissions_put,
     handle_scheduler_stats, handle_scheduler_tasks,
+};
+pub(crate) use knowledge_routes::{
+    handle_knowledge_backlinks, handle_knowledge_copilot, handle_knowledge_file_delete,
+    handle_knowledge_file_get, handle_knowledge_file_put, handle_knowledge_graph,
+    handle_knowledge_search, handle_knowledge_tree,
 };
 pub(crate) use resource_routes::{
     handle_resource_history, handle_resource_overload, handle_resource_snapshot,
@@ -273,6 +279,27 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
             post(handle_budget_reserve),
         )
         .route("/api/budget/{agent_id}/reset", post(handle_budget_reset))
+        // Knowledge
+        .route("/api/knowledge/tree", get(handle_knowledge_tree))
+        .route(
+            "/api/knowledge/file/{*path}",
+            get(handle_knowledge_file_get),
+        )
+        .route(
+            "/api/knowledge/file/{*path}",
+            put(handle_knowledge_file_put),
+        )
+        .route(
+            "/api/knowledge/file/{*path}",
+            delete(handle_knowledge_file_delete),
+        )
+        .route("/api/knowledge/search", post(handle_knowledge_search))
+        .route(
+            "/api/knowledge/backlinks",
+            get(handle_knowledge_backlinks),
+        )
+        .route("/api/knowledge/graph", get(handle_knowledge_graph))
+        .route("/api/knowledge/copilot", post(handle_knowledge_copilot))
         .layer(axum::middleware::from_fn_with_state(
             state.clone(),
             require_auth,
