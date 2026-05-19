@@ -8,7 +8,15 @@ on:
 
 jobs:
   check:
-    runs-on: macos-latest
+    strategy:
+      matrix:
+        include:
+          - os: macos-latest
+            target: aarch64-apple-darwin
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -35,8 +43,22 @@ jobs:
       - name: Test
         working-directory: oxios
         run: cargo test --workspace
+      - name: Test coverage (Linux only)
+        if: matrix.os == 'ubuntu-latest'
+        working-directory: oxios
+        run: |
+          cargo install cargo-llvm-cov
+          cargo llvm-cov --workspace --lcov --output-path lcov.info || true
+      - name: Upload coverage
+        if: matrix.os == 'ubuntu-latest'
+        uses: codecov/codecov-action@v4
+        with:
+          files: oxios/lcov.info
+          fail_ci_if_error: false
       - name: Security audit
         working-directory: oxios
         run: |
           cargo install cargo-audit
-          cargo audit
+          mkdir -p ~/.cargo
+          cp audit.toml ~/.cargo/audit.toml
+          cargo audit --deny warnings

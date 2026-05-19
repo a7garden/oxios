@@ -12,8 +12,8 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::time::Instant;
 
-use crate::{BenchmarkConfig, BenchmarkId, BenchmarkRun, TaskCategory, TaskResult};
 use crate::report::{compute_stats, load_report, print_summary, save_report};
+use crate::{BenchmarkConfig, BenchmarkId, BenchmarkRun, TaskCategory, TaskResult};
 
 #[derive(Debug, Serialize)]
 struct ChatRequest {
@@ -51,9 +51,7 @@ async fn run_task(
         })
         .send()
         .await
-        .unwrap_or_else(|e| {
-            panic!("Failed to send request: {}", e)
-        });
+        .unwrap_or_else(|e| panic!("Failed to send request: {}", e));
 
     let response_text = if resp.status().is_success() {
         let status = resp.status();
@@ -80,10 +78,7 @@ async fn run_task(
 }
 
 /// Run all benchmark tasks
-async fn run_benchmark(
-    base_url: &str,
-    tasks: Vec<crate::TaskDefinition>,
-) -> BenchmarkRun {
+async fn run_benchmark(base_url: &str, tasks: Vec<crate::TaskDefinition>) -> BenchmarkRun {
     let client = Client::new();
     let mut collector = crate::collector::EventCollector::new(&BenchmarkId::new().0);
     let mut task_results = Vec::new();
@@ -95,11 +90,7 @@ async fn run_benchmark(
         let status = if result.passed { "✅" } else { "❌" };
         println!(
             "  {} {} - Score: {:.0}% ({}) [{}ms]",
-            status,
-            result.task_id,
-            result.score,
-            result.evaluation_notes,
-            result.duration_ms
+            status, result.task_id, result.score, result.evaluation_notes, result.duration_ms
         );
         task_results.push(result);
     }

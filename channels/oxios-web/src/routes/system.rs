@@ -12,12 +12,60 @@ use crate::server::AppState;
 // Health
 // ---------------------------------------------------------------------------
 
-/// GET /health — Health check endpoint (no auth required).
+/// GET /health — Liveness check (no auth required).
+///
+/// Always returns 200 OK if the process is alive.
 pub(crate) async fn handle_health(State(_state): State<Arc<AppState>>) -> Json<serde_json::Value> {
     Json(serde_json::json!({
         "status": "ok",
         "version": env!("CARGO_PKG_VERSION"),
     }))
+}
+
+/// GET /health/ready — Readiness check (no auth required).
+///
+/// Checks subsystem health: state store, git repository.
+/// Returns 200 if healthy, 503 if degraded.
+pub(crate) async fn handle_readiness(
+    state: State<Arc<AppState>>,
+) -> Result<Json<serde_json::Value>, (axum::http::StatusCode, Json<serde_json::Value>)> {
+    let mut components = serde_json::Map::new();
+    let mut all_healthy = true;
+
+    // State store: check workspace path exists
+    let ws_path = state.kernel.state.workspace_path();
+    let state_ok = ws_path.exists();
+    components.insert(
+        "state_store".into(),
+        serde_json::json!({"healthy": state_ok}),
+    );
+    all_healthy &= state_ok;
+
+    // Git: verify repository integrity
+    let git_ok = state.kernel.infra.git_verify().unwrap_or(false);
+    components.insert("git".into(), serde_json::json!({"healthy": git_ok}));
+    // Git failure is degraded, not fatal
+
+    // Memory: always healthy (optional subsystem)
+    let (index_size, total) = state.kernel.agents.memory_stats().await;
+    components.insert(
+        "memory".into(),
+        serde_json::json!({"healthy": true, "index_size": index_size, "total_entries": total}),
+    );
+
+    let status = if all_healthy { "healthy" } else { "degraded" };
+    let body = serde_json::json!({
+        "status": status,
+        "version": env!("CARGO_PKG_VERSION"),
+        "uptime_secs": state.start_time.elapsed().as_secs(),
+        "components": components,
+    });
+
+    if all_healthy {
+        Ok(Json(body))
+    } else {
+        Err((axum::http::StatusCode::SERVICE_UNAVAILABLE, Json(body)))
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -268,8 +316,17 @@ pub(crate) async fn handle_config_get(
     let config = state.config.read();
     match serde_json::to_value(&*config) {
         Ok(mut json) => {
+            // Mask API key in response — never expose plaintext
+            if let Some(engine) = json.get_mut("engine") {
+                if let Some(api_key) = engine.get_mut("api_key") {
+                    if api_key.as_str().is_some_and(|k| !k.is_empty()) {
+                        *api_key = serde_json::Value::String("***".to_string());
+                    }
+                }
+            }
             // Add api_key_set flag so the frontend knows if a key is currently set
-            json["engine"]["api_key_set"] = serde_json::Value::Bool(config.engine.api_key.is_some());
+            json["engine"]["api_key_set"] =
+                serde_json::Value::Bool(config.engine.api_key.is_some());
             Ok(Json(json))
         }
         Err(e) => {

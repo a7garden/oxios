@@ -1,0 +1,21 @@
+# Oxios development docker-compose
+#
+# Usage:
+#   docker compose up --build
+#
+# Environment variables can be set in .env:
+#   OXIOS_ANTHROPIC_API_KEY=sk-...
+
+services:
+  oxios:
+    build: .
+    ports:
+      - "4200:4200"
+    volumes:
+      - oxios-data:/home/oxios/.oxios
+    environment:
+      - RUST_LOG=oxios=info
+    restart: unless-stopped
+
+volumes:
+  oxios-data:

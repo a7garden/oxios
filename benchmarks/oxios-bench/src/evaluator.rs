@@ -2,12 +2,15 @@
 //!
 //! Evaluates task completion based on expected outcomes and response content.
 
-use crate::{TaskResult};
+use crate::TaskResult;
 
 /// Default evaluation function that checks for keyword presence
 pub fn keyword_evaluation(response: &str, expected: &[&str]) -> TaskResult {
     let response_lower = response.to_lowercase();
-    let matches: usize = expected.iter().filter(|kw| response_lower.contains(&kw.to_lowercase())).count();
+    let matches: usize = expected
+        .iter()
+        .filter(|kw| response_lower.contains(&kw.to_lowercase()))
+        .count();
     let score = if expected.is_empty() {
         100.0
     } else {
@@ -22,7 +25,12 @@ pub fn keyword_evaluation(response: &str, expected: &[&str]) -> TaskResult {
         score,
         response: response.to_string(),
         expected: expected.iter().map(|s| s.to_string()).collect(),
-        evaluation_notes: format!("{}/{} keywords matched ({:.0}%)", matches, expected.len(), score),
+        evaluation_notes: format!(
+            "{}/{} keywords matched ({:.0}%)",
+            matches,
+            expected.len(),
+            score
+        ),
         duration_ms: 0,
     }
 }
@@ -63,7 +71,10 @@ pub fn math_evaluation(response: &str, expected_answer: &str) -> TaskResult {
 /// Evaluation function for web search tasks
 pub fn web_search_evaluation(response: &str, required_info: &[&str]) -> TaskResult {
     let response_lower = response.to_lowercase();
-    let matches: usize = required_info.iter().filter(|kw| response_lower.contains(&kw.to_lowercase())).count();
+    let matches: usize = required_info
+        .iter()
+        .filter(|kw| response_lower.contains(&kw.to_lowercase()))
+        .count();
     let score = if required_info.is_empty() {
         100.0
     } else {
@@ -78,7 +89,12 @@ pub fn web_search_evaluation(response: &str, required_info: &[&str]) -> TaskResu
         score,
         response: response.to_string(),
         expected: required_info.iter().map(|s| s.to_string()).collect(),
-        evaluation_notes: format!("{}/{} info found ({:.0}%)", matches, required_info.len(), score),
+        evaluation_notes: format!(
+            "{}/{} info found ({:.0}%)",
+            matches,
+            required_info.len(),
+            score
+        ),
         duration_ms: 0,
     }
 }

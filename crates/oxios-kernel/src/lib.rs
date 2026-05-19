@@ -8,70 +8,70 @@
 
 // ─── Lifecycle ──────────────────────────────────────────────────────
 // Agent 생성, 실행, 종료. OS의 init + process management.
+pub mod a2a_circuit_breaker;
 pub mod agent_group;
 pub mod agent_lifecycle;
 pub mod agent_runtime;
-pub mod a2a_circuit_breaker;
 pub mod daemon;
 pub mod supervisor;
 
 // ─── Orchestration ──────────────────────────────────────────────────
 // 작업 조율, 스케줄링, 예산 관리.
-pub mod orchestrator;
-pub mod scheduler;
-pub mod cron;
 pub mod budget;
 pub mod circuit_breaker;
+pub mod cron;
+pub mod orchestrator;
+pub mod scheduler;
 
 // ─── Security ───────────────────────────────────────────────────────
 // 접근 제어, 인증, 권한, 감사.
 pub mod access_manager;
+pub mod audit_trail;
 pub mod auth;
 pub mod capability;
 pub mod credential;
-pub mod audit_trail;
 
 // ─── Communication ──────────────────────────────────────────────────
 // 이벤트, 메시징, 외부 프로토콜.
-pub mod event_bus;
 pub mod a2a;
+pub mod event_bus;
 pub mod mcp;
 
 // ─── Intelligence ───────────────────────────────────────────────────
 // 메모리, 임베딩, 페르소나, 온보딩.
-pub mod memory;
 pub mod embedding;
+pub mod memory;
+pub mod onboarding;
 pub mod persona;
 pub mod persona_manager;
 pub mod persona_store;
-pub mod onboarding;
 
 // ─── Tools & Programs ──────────────────────────────────────────────
 // 에이전트가 사용하는 도구, 프로그램, 스킬.
-pub mod tools;
 pub mod host_tools;
 pub mod program;
 pub mod skill;
+pub mod tools;
 #[cfg(feature = "wasm-sandbox")]
 pub mod wasm_sandbox;
 
 // ─── State & Config ─────────────────────────────────────────────────
 // 영속 상태, 설정, 백업, 리소스 모니터링.
-pub mod state_store;
-pub mod config;
 pub mod backup;
+pub mod config;
 pub mod git_layer;
 pub mod resource_monitor;
 pub mod space;
+pub mod state_store;
 
 // ─── Infrastructure ─────────────────────────────────────────────────
 // 엔진, 에러, 타입, 메트릭, 텔레메트리.
 pub mod engine;
 pub mod error;
-pub mod types;
 pub mod metrics;
 #[cfg(feature = "otel")]
 pub mod telemetry_otel;
+pub mod types;
 #[cfg(feature = "otel")]
 pub use telemetry_otel as telemetry;
 #[cfg(not(feature = "otel"))]
@@ -95,36 +95,37 @@ pub use daemon::{DaemonManager, DaemonStatus};
 pub use supervisor::{BasicSupervisor, Supervisor};
 
 // ─── Orchestration ──────────────────────────────────────────────────
-pub use orchestrator::{AgentRole, OrchestrationResult, Orchestrator, SubTask};
-pub use scheduler::{AgentScheduler, Priority, ScheduledTask, SchedulerStats, TaskStatus};
-pub use cron::{CronJob, CronJobResult, CronJobUpdate, CronScheduler, JobSource};
 pub use budget::{BudgetExceeded, BudgetInfo, BudgetKind, BudgetLimit, BudgetManager};
 pub use circuit_breaker::CircuitBreaker;
+pub use cron::{CronJob, CronJobResult, CronJobUpdate, CronScheduler, JobSource};
+pub use orchestrator::{AgentRole, OrchestrationResult, Orchestrator, SubTask};
+pub use scheduler::{AgentScheduler, Priority, ScheduledTask, SchedulerStats, TaskStatus};
 
 // ─── Security ───────────────────────────────────────────────────────
 pub use access_manager::{
     AccessManager, Action, AgentPermissions, ApprovalStatus, PendingApproval, RbacAuditEntry,
     RbacManager, RbacPolicy, Role, Subject,
 };
+pub use audit_trail::{
+    AgentId as AuditAgentId, AuditAction, AuditEntry, AuditError, AuditTrail, HashDigest,
+};
 pub use auth::{AuthManager, KeyMeta};
 pub use capability::template::CapabilityTemplate;
 pub use capability::{CSpace, Capability, CapabilityId, Issuer, ResourceRef, Rights};
 pub use credential::CredentialStore;
-pub use audit_trail::{
-    AgentId as AuditAgentId, AuditAction, AuditEntry, AuditError, AuditTrail, HashDigest,
-};
 
 // ─── Communication ──────────────────────────────────────────────────
-pub use event_bus::{EventBus, KernelEvent};
 pub use a2a::{
     A2AMessage, A2AProtocol, A2ARequest, A2AResponse, AgentCard, AgentCardRegistry,
     DelegationHandler, TaskPriority, TaskSpec,
 };
+pub use event_bus::{EventBus, KernelEvent};
 pub use mcp::{
     McpBridge, McpCapabilities, McpServer, McpTool, McpToolCallResult as CallToolResult,
 };
 
 // ─── Intelligence ───────────────────────────────────────────────────
+pub use embedding::{EmbeddingProvider, EmbeddingVector, TfIdfEmbeddingProvider};
 pub use memory::auto_memory_bridge::{
     AutoMemoryBridge, ExportResult, GuidancePattern, ImportResult, InsightCategory, MemoryInsight,
     SyncDirection, SyncResult,
@@ -143,32 +144,30 @@ pub use memory::{
     MemoryBudget, MemoryEntry, MemoryGraph, MemoryManager, MemoryType, SemanticHit, TextChunk,
     TextVector,
 };
-pub use embedding::{EmbeddingProvider, EmbeddingVector, TfIdfEmbeddingProvider};
 pub use persona::{default_personas, Persona};
 pub use persona_manager::PersonaManager;
 pub use persona_store::PersonaStore;
 
 // ─── Tools & Programs ──────────────────────────────────────────────
-#[cfg(feature = "browser")]
-pub use tools::BrowserTool;
-pub use tools::{ExecTool, ProgramTool};
 pub use host_tools::{common as host_tools_common, HostToolStatus, HostToolValidator};
 pub use program::{
     ArgumentDef, HostRequirementsCheck, InstallSource, Program, ProgramManager, ProgramMeta,
     ToolDef,
 };
 pub use skill::{Skill, SkillMeta, SkillStore};
+#[cfg(feature = "browser")]
+pub use tools::BrowserTool;
+pub use tools::{ExecTool, ProgramTool};
 #[cfg(feature = "wasm-sandbox")]
 pub use wasm_sandbox::{ResourceKind, WasmConfig, WasmError, WasmSandbox};
 
 // ─── State & Config ─────────────────────────────────────────────────
-pub use state_store::{AgentResponse, Session, SessionId, SessionSummary, StateStore};
-pub use config::{
-    BrowserConfig, ChannelsConfig, CronConfig, DaemonConfig, EngineConfig, ExecConfig, ExecMode, GitConfig,
-    InlineCronJob, McpConfig, McpServerDef, MemoryConfig, OrchestratorConfig, OxiosConfig, PersonaConfig,
-    TelegramChannelConfig,
-};
 pub use backup::{BackupManifest, BackupSection};
+pub use config::{
+    BrowserConfig, ChannelsConfig, CronConfig, DaemonConfig, EngineConfig, ExecConfig, ExecMode,
+    GitConfig, InlineCronJob, LoggingConfig, McpConfig, McpServerDef, MemoryConfig,
+    OrchestratorConfig, OxiosConfig, PersonaConfig, TelegramChannelConfig,
+};
 pub use git_layer::{CommitInfo, GitLayer, LogEntry};
 pub use resource_monitor::{OverloadThreshold, ResourceMonitor, ResourceSnapshot};
 pub use space::{
@@ -176,12 +175,13 @@ pub use space::{
     KnowledgeBridge, KnowledgeFlow, PathMatcher, Space, SpaceId, SpaceManager, SpaceManagerError,
     SpaceSource,
 };
+pub use state_store::{AgentResponse, Session, SessionId, SessionSummary, StateStore};
 
 // ─── Infrastructure ─────────────────────────────────────────────────
 pub use engine::{EngineProvider, OxiEngineProvider, OxiosEngine};
 pub use error::{HttpStatus, KernelError, KernelResult};
-pub use types::{AgentId, AgentInfo, AgentStatus};
 pub use metrics::{get_metrics, register_builtin_metrics, registry};
+pub use types::{AgentId, AgentInfo, AgentStatus};
 
 // ─── API Surface ────────────────────────────────────────────────────
 pub use kernel_handle::KernelHandle;
@@ -199,15 +199,6 @@ pub use kernel_handle::{
 // we can drop direct oxi-ai/oxi-agent dependencies entirely.
 // See ../oxi/docs/proposals/sdk-consumer-requirements.md
 pub use oxi_sdk::{
-    AgentEvent,
-    AgentLoop,
-    InterAgentMessage,
-    KernelToolContext,
-    KernelToolProvider,
-    MessageBus,
-    Model,
-    Oxi,
-    OxiBuilder,
-    Provider,
-    StreamOptions,
+    AgentEvent, AgentLoop, InterAgentMessage, KernelToolContext, KernelToolProvider, MessageBus,
+    Model, Oxi, OxiBuilder, Provider, StreamOptions,
 };

@@ -476,7 +476,12 @@ pub(crate) async fn handle_memory_list(
     let mut entries = Vec::new();
 
     // List all memory categories
-    for category in ["memory/facts", "memory/episodes", "memory/knowledge", "memory/sessions"] {
+    for category in [
+        "memory/facts",
+        "memory/episodes",
+        "memory/knowledge",
+        "memory/sessions",
+    ] {
         if let Ok(names) = state.kernel.state.list_category(category).await {
             let cat = category.split('/').nth(1).unwrap_or("fact");
             for name in names {
@@ -498,8 +503,18 @@ pub(crate) async fn handle_memory_get(
 ) -> Result<impl IntoResponse, AppError> {
     // Memory entries are stored as JSON, not markdown.
     // Try all known memory categories to find the entry.
-    for category in ["memory/facts", "memory/episodes", "memory/knowledge", "memory/sessions"] {
-        if let Ok(Some(entry)) = state.kernel.state.load::<oxios_kernel::memory::MemoryEntry>(category, &name).await {
+    for category in [
+        "memory/facts",
+        "memory/episodes",
+        "memory/knowledge",
+        "memory/sessions",
+    ] {
+        if let Ok(Some(entry)) = state
+            .kernel
+            .state
+            .load::<oxios_kernel::memory::MemoryEntry>(category, &name)
+            .await
+        {
             return Ok(Json(serde_json::json!({
                 "id": entry.id,
                 "name": entry.id,

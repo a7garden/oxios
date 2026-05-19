@@ -75,7 +75,7 @@ pub(crate) use space_routes::{
 };
 pub(crate) use system::{
     handle_agent_kill, handle_agents_list, handle_config_get, handle_config_put, handle_health,
-    handle_status,
+    handle_readiness, handle_status,
 };
 pub(crate) use workspace::{
     handle_memory_create, handle_memory_get, handle_memory_list, handle_memory_search,
@@ -129,7 +129,10 @@ pub fn paginate<T: Clone + serde::Serialize>(
 /// `/health` and static assets are excluded from auth.
 pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
     // Public routes (no auth)
-    let public = Router::new().route("/health", get(handle_health));
+    let public = Router::new()
+        .route("/health", get(handle_health))
+        .route("/health/ready", get(handle_readiness))
+        .route("/metrics", get(handle_metrics));
 
     // Protected API routes (auth middleware applied)
     let api = Router::new()
@@ -257,7 +260,10 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         .route("/api/spaces/{id}/restore", post(handle_space_restore))
         .route("/api/spaces/merge", post(handle_space_merge))
         .route("/api/spaces/knowledge-flow", get(handle_knowledge_flow))
-        .route("/api/spaces/{id}/knowledge-flow", get(handle_knowledge_flow_for))
+        .route(
+            "/api/spaces/{id}/knowledge-flow",
+            get(handle_knowledge_flow_for),
+        )
         // Budget
         .route("/api/budget/{agent_id}", get(handle_budget_get))
         .route("/api/budget/{agent_id}", post(handle_budget_set))

@@ -67,9 +67,11 @@ impl BrowserTool {
                 match &self.init {
                     BrowserInit::Ready(b) => Ok::<_, String>(b.clone()),
                     #[cfg(feature = "browser")]
-                    BrowserInit::Lazy(api) => {
-                        api.browser().await.map(|b| b.clone()).map_err(|e| e.to_string())
-                    }
+                    BrowserInit::Lazy(api) => api
+                        .browser()
+                        .await
+                        .map(Arc::clone)
+                        .map_err(|e| e.to_string()),
                 }
             })
             .await?;
@@ -458,10 +460,24 @@ mod tests {
     #[test]
     fn test_schema_covers_all_actions() {
         let actions = vec![
-            "browse", "goto", "back", "forward", "reload", "post",
-            "click", "type", "press_key", "evaluate", "evaluate_await",
-            "content", "query_all", "wait_for", "load_resources",
-            "screenshot", "run_script", "close",
+            "browse",
+            "goto",
+            "back",
+            "forward",
+            "reload",
+            "post",
+            "click",
+            "type",
+            "press_key",
+            "evaluate",
+            "evaluate_await",
+            "content",
+            "query_all",
+            "wait_for",
+            "load_resources",
+            "screenshot",
+            "run_script",
+            "close",
         ];
         assert!(actions.len() >= 16);
         assert!(actions.contains(&"browse"));

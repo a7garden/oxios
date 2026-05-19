@@ -137,6 +137,14 @@ impl Kernel {
         &self.config
     }
 
+    /// Flush audit trail entries to persistent storage.
+    /// Call during graceful shutdown to ensure no entries are lost.
+    pub fn flush_audit(&self) -> anyhow::Result<()> {
+        self.audit_trail
+            .flush(&self.state_store)
+            .map_err(|e| anyhow::anyhow!("audit flush failed: {}", e))
+    }
+
     /// Execute a prompt with an optional session ID for multi-turn conversations.
     ///
     /// Pass `Some(session_id)` to continue an existing interview;
@@ -146,7 +154,9 @@ impl Kernel {
         prompt: &str,
         session_id: Option<&str>,
     ) -> Result<oxios_kernel::OrchestrationResult> {
-        self.orchestrator.handle_message("cli", prompt, session_id).await
+        self.orchestrator
+            .handle_message("cli", prompt, session_id)
+            .await
     }
 
     /// Register a channel with the gateway.
@@ -482,8 +492,13 @@ impl KernelBuilder {
             }))
             .await;
 
-        let mut orchestrator =
-            Orchestrator::with_config(ouroboros, event_bus.clone(), state_store.clone(), lifecycle, config.orchestrator.clone());
+        let mut orchestrator = Orchestrator::with_config(
+            ouroboros,
+            event_bus.clone(),
+            state_store.clone(),
+            lifecycle,
+            config.orchestrator.clone(),
+        );
         orchestrator.set_git_layer(git_layer.clone());
         orchestrator.set_a2a(a2a_protocol.clone());
         orchestrator.set_space_manager(space_manager.clone());

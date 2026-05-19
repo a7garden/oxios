@@ -113,6 +113,7 @@ struct DelegationConfig {
     /// Maximum delay cap for exponential backoff (milliseconds).
     max_delay_ms: u64,
     /// Timeout per delegation attempt (milliseconds).
+    #[allow(dead_code)]
     timeout_ms: u64,
 }
 
@@ -130,7 +131,7 @@ impl Default for DelegationConfig {
 impl DelegationConfig {
     /// Calculate exponential backoff delay.
     fn backoff_delay(&self, attempt: u32) -> u64 {
-        let delay = self.base_delay_ms * 2_u64.saturating_pow(attempt.min(10) as u32);
+        let delay = self.base_delay_ms * 2_u64.saturating_pow(attempt.min(10));
         delay.min(self.max_delay_ms)
     }
 }
@@ -292,7 +293,9 @@ impl Orchestrator {
             let sessions = self.sessions.read();
             needs_interview = !sessions.contains_key(&session_id);
             existing_history = if !needs_interview {
-                sessions.get(&session_id).map(|s| s.interview.conversation_history.clone())
+                sessions
+                    .get(&session_id)
+                    .map(|s| s.interview.conversation_history.clone())
             } else {
                 None
             };
@@ -311,7 +314,10 @@ impl Orchestrator {
                     let mut context_parts = Vec::new();
                     if let Some(ref history) = existing_history {
                         for exchange in history {
-                            context_parts.push(format!("User: {}\nAgent: {}", exchange.user, exchange.agent));
+                            context_parts.push(format!(
+                                "User: {}\nAgent: {}",
+                                exchange.user, exchange.agent
+                            ));
                         }
                     }
                     context_parts.push(format!("User: {}", user_message));
@@ -354,7 +360,9 @@ impl Orchestrator {
                 let mut sessions = self.sessions.write();
                 if let Some(session) = sessions.get_mut(&session_id) {
                     tracing::debug!(session_id = %session_id, history_len = session.interview.conversation_history.len(), "Adding to existing session history");
-                    session.interview.add_to_history(user_message, &response_text);
+                    session
+                        .interview
+                        .add_to_history(user_message, &response_text);
                 } else {
                     // First non-task message — create a minimal session for history
                     let mut interview = InterviewResult::new();
@@ -395,15 +403,16 @@ impl Orchestrator {
             // Record this exchange in conversation history and store the interview.
             {
                 let mut sessions = self.sessions.write();
-                let session = sessions.entry(session_id.clone()).or_insert_with(|| {
-                    InterviewSession {
-                        id: session_id.clone(),
-                        interview: interview.clone(),
-                        phase: Phase::Interview,
-                        seed_id: None,
-                        agent_id: None,
-                    }
-                });
+                let session =
+                    sessions
+                        .entry(session_id.clone())
+                        .or_insert_with(|| InterviewSession {
+                            id: session_id.clone(),
+                            interview: interview.clone(),
+                            phase: Phase::Interview,
+                            seed_id: None,
+                            agent_id: None,
+                        });
                 // The session already has user's answer recorded via add_exchange above.
                 // Record the questions as the agent's response in history.
                 let questions_text = interview.questions.join("\n");
@@ -762,7 +771,7 @@ impl Orchestrator {
                 );
                 return self.delegate_via_lifecycle(subtasks, parent_seed).await;
             }
-            
+
             // Delegate with retry
             return self.delegate_with_retry(subtasks, parent_seed, a2a).await;
         }
@@ -780,9 +789,12 @@ impl Orchestrator {
     ) -> Result<Vec<SubTask>> {
         let mut attempt = 0;
         let max_retries = self.delegation_config.max_retries;
-        
+
         loop {
-            match self.delegate_via_a2a(subtasks.clone(), parent_seed, a2a).await {
+            match self
+                .delegate_via_a2a(subtasks.clone(), parent_seed, a2a)
+                .await
+            {
                 Ok(results) => {
                     self.a2a_breaker.record_success();
                     return Ok(results);
@@ -790,7 +802,7 @@ impl Orchestrator {
                 Err(e) => {
                     self.a2a_breaker.record_failure();
                     attempt += 1;
-                    
+
                     if attempt >= max_retries {
                         tracing::error!(
                             attempts = attempt,
@@ -800,7 +812,7 @@ impl Orchestrator {
                         );
                         return self.delegate_via_lifecycle(subtasks, parent_seed).await;
                     }
-                    
+
                     // Exponential backoff
                     let delay = self.delegation_config.backoff_delay(attempt);
                     tracing::warn!(
@@ -821,7 +833,10 @@ impl Orchestrator {
         subtasks: Vec<SubTask>,
         parent_seed: &Seed,
     ) -> Result<Vec<SubTask>> {
-        let mut task = subtasks.into_iter().next().unwrap();
+        let mut task = subtasks
+            .into_iter()
+            .next()
+            .expect("execute_single_subtask is only called when subtasks is non-empty");
         let child_seed = Seed {
             id: Uuid::new_v4(),
             goal: task.description.clone(),

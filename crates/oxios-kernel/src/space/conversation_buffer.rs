@@ -144,8 +144,8 @@ impl ConversationBuffer {
 
         let avg_recent =
             recent.iter().map(|t| word_count(&t.user)).sum::<usize>() as f64 / recent.len() as f64;
-        let avg_prev =
-            previous.iter().map(|t| word_count(&t.user)).sum::<usize>() as f64 / previous.len() as f64;
+        let avg_prev = previous.iter().map(|t| word_count(&t.user)).sum::<usize>() as f64
+            / previous.len() as f64;
 
         let ratio = avg_recent / avg_prev.max(1.0);
         !(0.5..=2.0).contains(&ratio)
@@ -249,7 +249,8 @@ fn truncate_response(response: &str, max_len: usize) -> String {
         response.to_string()
     } else {
         // Find the nearest char boundary *before* max_len
-        let end = response.char_indices()
+        let end = response
+            .char_indices()
             .take_while(|(idx, _)| *idx < max_len)
             .last()
             .map(|(idx, c)| idx + c.len_utf8())

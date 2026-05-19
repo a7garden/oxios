@@ -505,7 +505,10 @@ mod tests {
 
         let tool = A2aQueryTool::new(a2a.clone());
         let params = json!({"capability": "code-review"});
-        let result = tool.execute("tc", params, None, &ToolContext::default()).await.unwrap();
+        let result = tool
+            .execute("tc", params, None, &ToolContext::default())
+            .await
+            .unwrap();
         assert!(result.output.contains("reviewer"));
         assert!(result.output.contains("1"));
     }
@@ -516,7 +519,10 @@ mod tests {
 
         let tool = A2aQueryTool::new(a2a.clone());
         let params = json!({"capability": "nonexistent"});
-        let result = tool.execute("tc", params, None, &ToolContext::default()).await.unwrap();
+        let result = tool
+            .execute("tc", params, None, &ToolContext::default())
+            .await
+            .unwrap();
         assert!(result.output.contains("0"));
     }
 
@@ -529,7 +535,10 @@ mod tests {
 
         let tool = A2aQueryTool::new(a2a.clone());
         let params = json!({"capability": "test", "limit": 2});
-        let result = tool.execute("tc", params, None, &ToolContext::default()).await.unwrap();
+        let result = tool
+            .execute("tc", params, None, &ToolContext::default())
+            .await
+            .unwrap();
         assert!(result.output.contains("2"));
     }
 
@@ -540,7 +549,10 @@ mod tests {
 
         let tool = A2aDelegateTool::new(a2a.clone(), agent_id);
         let params = json!({"description": "review code", "capability": "code-review"});
-        let result = tool.execute("tc", params, None, &ToolContext::default()).await.unwrap();
+        let result = tool
+            .execute("tc", params, None, &ToolContext::default())
+            .await
+            .unwrap();
         assert!(result.success);
         assert!(result.output.contains("handle this task yourself"));
     }
@@ -552,7 +564,10 @@ mod tests {
 
         let tool = A2aSendTool::new(a2a.clone(), agent_id);
         let params = json!({"target_agent_id": "not-a-uuid", "message_type": "status_update", "content": "hello"});
-        let result = tool.execute("tc", params, None, &ToolContext::default()).await.unwrap();
+        let result = tool
+            .execute("tc", params, None, &ToolContext::default())
+            .await
+            .unwrap();
         assert!(!result.success);
         assert!(result.output.contains("Invalid target_agent_id"));
     }
@@ -569,7 +584,10 @@ mod tests {
 
         let tool = A2aSendTool::new(a2a.clone(), my_id);
         let params = json!({"target_agent_id": target_id.to_string(), "message_type": "handshake", "content": "hello"});
-        let result = tool.execute("tc", params, None, &ToolContext::default()).await.unwrap();
+        let result = tool
+            .execute("tc", params, None, &ToolContext::default())
+            .await
+            .unwrap();
         assert!(result.success);
 
         // Verify message in queue.

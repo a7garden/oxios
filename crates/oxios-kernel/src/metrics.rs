@@ -265,6 +265,8 @@ pub struct MetricsHandles {
     pub agents_failed: CounterHandle,
     pub orch_duration: HistogramHandle,
     pub messages: CounterHandle,
+    /// LLM circuit breaker state: 0=closed, 1=open, 2=half_open.
+    pub llm_circuit_breaker_state: GaugeHandle,
 }
 
 impl MetricsHandles {
@@ -315,6 +317,11 @@ pub fn get_metrics() -> &'static MetricsHandles {
                 vec![0.1, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0, 60.0],
             ),
             messages: r.counter("oxios_messages_processed_total", "Messages processed", &[]),
+            llm_circuit_breaker_state: r.gauge(
+                "oxios_llm_circuit_breaker_state",
+                "LLM circuit breaker state: 0=closed, 1=open, 2=half_open",
+                0.0,
+            ),
         }
     })
 }

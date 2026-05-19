@@ -602,7 +602,9 @@ impl SpaceManager {
             .join("_archived")
             .join(absorbed_id.to_string());
         if absorbed_dir.exists() {
-            let _ = std::fs::create_dir_all(archived_dir.parent().unwrap());
+            if let Some(parent) = archived_dir.parent() {
+                let _ = std::fs::create_dir_all(parent);
+            }
             let _ = std::fs::rename(&absorbed_dir, &archived_dir);
         }
 
@@ -701,7 +703,9 @@ impl SpaceManager {
         let src = self.root_dir.join(space_id.to_string());
         let dst = self.root_dir.join("_archived").join(space_id.to_string());
         if src.exists() {
-            std::fs::create_dir_all(dst.parent().unwrap())?;
+            if let Some(parent) = dst.parent() {
+                std::fs::create_dir_all(parent)?;
+            }
             std::fs::rename(&src, &dst)?;
         }
 

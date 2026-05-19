@@ -494,13 +494,13 @@ mod tests {
     fn make_tool(allowed_commands: Vec<&str>) -> ExecTool {
         let mut config = ExecConfig::default();
         config.allowed_commands = allowed_commands.into_iter().map(String::from).collect();
-        config.allow_shell_mode = true;  // Enable for tests
+        config.allow_shell_mode = true; // Enable for tests
         ExecTool::new(Arc::new(config), Arc::new(Mutex::new(AccessManager::new())))
     }
 
     fn make_tool_with_config(config: ExecConfig) -> ExecTool {
         let mut cfg = config.clone();
-        cfg.allow_shell_mode = true;  // Enable for tests
+        cfg.allow_shell_mode = true; // Enable for tests
         ExecTool::new(Arc::new(cfg), Arc::new(Mutex::new(AccessManager::new())))
     }
 
@@ -690,7 +690,12 @@ mod tests {
     async fn test_agent_tool_missing_mode() {
         let tool = make_tool(vec![]);
         let result = tool
-            .execute("test-3", json!({ "command": "echo hi" }), None, &ToolContext::default())
+            .execute(
+                "test-3",
+                json!({ "command": "echo hi" }),
+                None,
+                &ToolContext::default(),
+            )
             .await;
         assert!(result.is_err());
         assert!(result
@@ -702,7 +707,12 @@ mod tests {
     async fn test_agent_tool_invalid_mode() {
         let tool = make_tool(vec![]);
         let result = tool
-            .execute("test-4", json!({ "mode": "docker" }), None, &ToolContext::default())
+            .execute(
+                "test-4",
+                json!({ "mode": "docker" }),
+                None,
+                &ToolContext::default(),
+            )
             .await;
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("Invalid mode"));
@@ -712,7 +722,12 @@ mod tests {
     async fn test_agent_tool_shell_missing_command() {
         let tool = make_tool(vec![]);
         let result = tool
-            .execute("test-5", json!({ "mode": "shell" }), None, &ToolContext::default())
+            .execute(
+                "test-5",
+                json!({ "mode": "shell" }),
+                None,
+                &ToolContext::default(),
+            )
             .await;
         assert!(result.is_ok());
         let r = result.unwrap();
@@ -724,7 +739,12 @@ mod tests {
     async fn test_agent_tool_structured_missing_binary() {
         let tool = make_tool(vec![]);
         let result = tool
-            .execute("test-6", json!({ "mode": "structured" }), None, &ToolContext::default())
+            .execute(
+                "test-6",
+                json!({ "mode": "structured" }),
+                None,
+                &ToolContext::default(),
+            )
             .await;
         assert!(result.is_ok());
         let r = result.unwrap();
@@ -843,7 +863,7 @@ mod tests {
     /// Helper: build ExecTool bound to a named agent with specific permissions.
     fn make_agent_tool(agent_name: &str, allowed_tools: &[&str]) -> ExecTool {
         let mut config = ExecConfig::default();
-        config.allow_shell_mode = true;  // Enable for tests
+        config.allow_shell_mode = true; // Enable for tests
         let mut access = AccessManager::new();
         // Create default permissions, then set specific allowed tools.
         {
@@ -920,7 +940,7 @@ mod tests {
         // ExecTool::new() (agent_name=None) should NOT check permissions,
         // but shell mode must still be enabled in config.
         let mut config = ExecConfig::default();
-        config.allow_shell_mode = true;  // Enable shell mode for this test
+        config.allow_shell_mode = true; // Enable shell mode for this test
         let access = AccessManager::new(); // empty — no permissions for anyone
         let tool = ExecTool::new(Arc::new(config), Arc::new(Mutex::new(access)));
         let result = tool.shell_exec("echo unrestricted", 5_000).await;

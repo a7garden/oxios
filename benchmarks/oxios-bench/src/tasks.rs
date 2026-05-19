@@ -3,8 +3,11 @@
 //! Each task is a natural language command with expected outcomes
 //! and an evaluation function.
 
+use crate::evaluator::{
+    keyword_evaluation, knowledge_evaluation, math_evaluation, memory_evaluation,
+    web_search_evaluation,
+};
 use crate::{TaskCategory, TaskDefinition};
-use crate::evaluator::{knowledge_evaluation, math_evaluation, memory_evaluation, web_search_evaluation, keyword_evaluation};
 
 /// Get all predefined tasks
 pub fn all_tasks() -> Vec<TaskDefinition> {

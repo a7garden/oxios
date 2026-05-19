@@ -1,0 +1,12 @@
+# Clippy configuration for Oxios
+#
+# Discourages bare unwrap() in non-test code.
+# Use expect("reason") for invariant guarantees or ? for fallible operations.
+
+[[disallowed-methods]]
+path = "Option::unwrap"
+reason = "use expect(\"invariant description\") for provably-safe cases or ? for fallible operations"
+
+[[disallowed-methods]]
+path = "Result::unwrap"
+reason = "use expect(\"invariant description\") for provably-safe cases or ? for fallible operations"

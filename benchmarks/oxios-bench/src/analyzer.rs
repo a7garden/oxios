@@ -4,7 +4,10 @@
 
 use std::collections::HashMap;
 
-use crate::{AgentSummary, EvaluationSummary, ExecutionTrace, MemorySummary, PhaseSummary, SeedSummary, SpaceSummary, TraceReport};
+use crate::{
+    AgentSummary, EvaluationSummary, ExecutionTrace, MemorySummary, PhaseSummary, SeedSummary,
+    SpaceSummary, TraceReport,
+};
 
 /// Extended trace analyzer with detailed event analysis
 pub struct DetailedAnalyzer;
@@ -44,7 +47,12 @@ impl DetailedAnalyzer {
             .filter_map(|e| {
                 Some(SeedSummary {
                     id: e.payload.get("seed_id")?.as_str()?.to_string(),
-                    goal: e.payload.get("goal").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+                    goal: e
+                        .payload
+                        .get("goal")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .to_string(),
                     created_at: e.timestamp.to_rfc3339(),
                 })
             })
@@ -76,8 +84,18 @@ impl DetailedAnalyzer {
             .filter_map(|e| {
                 Some(MemorySummary {
                     id: e.payload.get("id")?.as_str()?.to_string(),
-                    memory_type: e.payload.get("memory_type").and_then(|v| v.as_str()).unwrap_or("unknown").to_string(),
-                    source: e.payload.get("source").and_then(|v| v.as_str()).unwrap_or("unknown").to_string(),
+                    memory_type: e
+                        .payload
+                        .get("memory_type")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("unknown")
+                        .to_string(),
+                    source: e
+                        .payload
+                        .get("source")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("unknown")
+                        .to_string(),
                 })
             })
             .collect()
@@ -91,9 +109,24 @@ impl DetailedAnalyzer {
             .filter(|e| e.event_type == "PhaseCompleted")
             .filter_map(|e| {
                 Some(PhaseSummary {
-                    phase: e.payload.get("phase").and_then(|v| v.as_str()).unwrap_or("unknown").to_string(),
-                    session_id: e.payload.get("session_id").and_then(|v| v.as_str()).unwrap_or("").to_string(),
-                    result_summary: e.payload.get("result_summary").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+                    phase: e
+                        .payload
+                        .get("phase")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("unknown")
+                        .to_string(),
+                    session_id: e
+                        .payload
+                        .get("session_id")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .to_string(),
+                    result_summary: e
+                        .payload
+                        .get("result_summary")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .to_string(),
                 })
             })
             .collect()
@@ -108,7 +141,11 @@ impl DetailedAnalyzer {
             .filter_map(|e| {
                 Some(EvaluationSummary {
                     seed_id: e.payload.get("seed_id")?.as_str()?.to_string(),
-                    passed: e.payload.get("passed").and_then(|v| v.as_bool()).unwrap_or(false),
+                    passed: e
+                        .payload
+                        .get("passed")
+                        .and_then(|v| v.as_bool())
+                        .unwrap_or(false),
                 })
             })
             .collect()
@@ -133,7 +170,12 @@ impl<'a> EventTimeline<'a> {
     pub fn print(&self) {
         println!("\n=== Event Timeline ({}) ===", self.trace.benchmark_id);
         for (i, event) in self.trace.events.iter().enumerate() {
-            println!("{}. [{}] {}", i + 1, event.timestamp.format("%H:%M:%S%.3f"), event.event_type);
+            println!(
+                "{}. [{}] {}",
+                i + 1,
+                event.timestamp.format("%H:%M:%S%.3f"),
+                event.event_type
+            );
             if let Ok(pretty) = serde_json::to_string_pretty(&event.payload) {
                 for line in pretty.lines().take(3) {
                     println!("   {}", line);

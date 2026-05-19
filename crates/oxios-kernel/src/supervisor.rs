@@ -406,12 +406,9 @@ mod tests {
             ),
             crate::kernel_handle::SpaceApi::new(
                 Arc::new(
-                    crate::space::SpaceManager::new(
-                        state_store_for_space,
-                        EventBus::new(64),
-                    )
-                    .await
-                    .expect("space mgr"),
+                    crate::space::SpaceManager::new(state_store_for_space, EventBus::new(64))
+                        .await
+                        .expect("space mgr"),
                 ),
                 EventBus::new(64),
             ),

@@ -6,20 +6,15 @@ use crate::{BenchmarkRun, BenchmarkStats, TaskResult};
 
 /// Generate a JSON report from a benchmark run
 pub fn generate_json_report(run: &BenchmarkRun) -> String {
-    serde_json::to_string_pretty(run).unwrap_or_else(|e| {
-        format!("{{\"error\": \"failed to generate report: {}\"}}", e)
-    })
+    serde_json::to_string_pretty(run)
+        .unwrap_or_else(|e| format!("{{\"error\": \"failed to generate report: {}\"}}", e))
 }
 
 /// Generate aggregate statistics from a benchmark run
 pub fn compute_stats(run: &BenchmarkRun) -> BenchmarkStats {
     let mut stats = BenchmarkStats::default();
     stats.total_tasks = run.task_results.len();
-    stats.total_duration_ms = run
-        .task_results
-        .iter()
-        .map(|r| r.duration_ms)
-        .sum::<u64>();
+    stats.total_duration_ms = run.task_results.iter().map(|r| r.duration_ms).sum::<u64>();
 
     for result in &run.task_results {
         if result.passed {
@@ -82,7 +77,11 @@ pub fn print_summary(run: &BenchmarkRun) {
 
     println!("--- Task Results ({}) ---", stats.total_tasks);
     for (i, result) in run.task_results.iter().enumerate() {
-        let status = if result.passed { "✅ PASS" } else { "❌ FAIL" };
+        let status = if result.passed {
+            "✅ PASS"
+        } else {
+            "❌ FAIL"
+        };
         println!(
             "  {}. {} [{}] - Score: {:.0}% ({})",
             i + 1,
@@ -96,8 +95,16 @@ pub fn print_summary(run: &BenchmarkRun) {
 
     println!("--- Aggregate ---");
     println!("  Total: {}", stats.total_tasks);
-    println!("  Passed: {} ({:.0}%)", stats.passed, (stats.passed as f64 / stats.total_tasks as f64) * 100.0);
-    println!("  Failed: {} ({:.0}%)", stats.failed, (stats.failed as f64 / stats.total_tasks as f64) * 100.0);
+    println!(
+        "  Passed: {} ({:.0}%)",
+        stats.passed,
+        (stats.passed as f64 / stats.total_tasks as f64) * 100.0
+    );
+    println!(
+        "  Failed: {} ({:.0}%)",
+        stats.failed,
+        (stats.failed as f64 / stats.total_tasks as f64) * 100.0
+    );
     println!("  Average Score: {:.1}%", stats.average_score);
     println!("  Total Duration: {}ms", stats.total_duration_ms);
     println!();
@@ -115,7 +122,10 @@ pub fn print_summary(run: &BenchmarkRun) {
 pub fn print_task_result(result: &TaskResult) {
     let status = if result.passed { "PASS" } else { "FAIL" };
     println!("[{}] {} - {:.0}%", status, result.task_id, result.score);
-    println!("  Response: {}", result.response.chars().take(100).collect::<String>());
+    println!(
+        "  Response: {}",
+        result.response.chars().take(100).collect::<String>()
+    );
     println!("  Notes: {}", result.evaluation_notes);
 }
 

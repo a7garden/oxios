@@ -83,8 +83,7 @@ const MANUAL_MODEL_DISPLAY: &str = "✎ Enter model ID manually...";
 /// Check if the system is fully configured (model + credentials).
 /// Returns `true` when onboarding should be skipped.
 pub fn has_credentials(config: &OxiosConfig) -> bool {
-    let Some(provider) = CredentialStore::provider_from_model(&config.engine.default_model)
-    else {
+    let Some(provider) = CredentialStore::provider_from_model(&config.engine.default_model) else {
         return false;
     };
     CredentialStore::has_credential(provider, config.api_key().as_deref())
@@ -107,10 +106,7 @@ pub fn run_onboarding(oxios_home: &Path, config: &mut OxiosConfig) -> anyhow::Re
         {
             if CredentialStore::has_credential(provider_id, config.api_key().as_deref()) {
                 println!();
-                println!(
-                    "  Already configured as '{}'.",
-                    config.engine.default_model
-                );
+                println!("  Already configured as '{}'.", config.engine.default_model);
 
                 let ans = Select::new(
                     "  What would you like to do?",
@@ -156,13 +152,8 @@ pub fn run_onboarding(oxios_home: &Path, config: &mut OxiosConfig) -> anyhow::Re
         if let Some(provider) = detected {
             println!();
             let keys = oxi_sdk::find_env_keys(provider);
-            let var_name = keys
-                .and_then(|k| k.first().copied())
-                .unwrap_or(provider);
-            println!(
-                "  Detected {} in environment for '{}'.",
-                var_name, provider
-            );
+            let var_name = keys.and_then(|k| k.first().copied()).unwrap_or(provider);
+            println!("  Detected {} in environment for '{}'.", var_name, provider);
             let use_it = Confirm::new("  Use this provider?")
                 .with_default(true)
                 .prompt()?;
@@ -203,9 +194,7 @@ fn finish_with_provider(
                 "  Found existing credentials for '{}' in ~/.oxi/auth.json.",
                 provider
             );
-            let use_it = Confirm::new("  Use them?")
-                .with_default(true)
-                .prompt()?;
+            let use_it = Confirm::new("  Use them?").with_default(true).prompt()?;
             if use_it {
                 skip_key = true;
             }
@@ -311,8 +300,7 @@ fn prompt_model(provider: &str) -> anyhow::Result<String> {
 
     if models.is_empty() {
         // Unknown provider — manual entry
-        let model = Text::new("  Enter model ID:")
-            .prompt()?;
+        let model = Text::new("  Enter model ID:").prompt()?;
         if model.is_empty() {
             anyhow::bail!("Model ID is required.");
         }
@@ -457,18 +445,30 @@ fn write_config(oxios_home: &Path, config: &OxiosConfig) -> anyhow::Result<()> {
 fn print_banner() {
     println!();
     println!("  ╔═══════════════════════════════════════════╗");
-    println!("  ║       {}  ║", style("⬡  Oxios — First-time Setup").bold());
+    println!(
+        "  ║       {}  ║",
+        style("⬡  Oxios — First-time Setup").bold()
+    );
     println!("  ╚═══════════════════════════════════════════╝");
     println!();
     println!("  This wizard will configure your API credentials.");
-    println!("  Use {} arrow keys to navigate, Enter to confirm.", style("↑↓").cyan());
-    println!("  Press {} at any time to cancel.", style("Ctrl+C").yellow());
+    println!(
+        "  Use {} arrow keys to navigate, Enter to confirm.",
+        style("↑↓").cyan()
+    );
+    println!(
+        "  Press {} at any time to cancel.",
+        style("Ctrl+C").yellow()
+    );
 }
 
 fn print_success(oxios_home: &Path, model: &str) {
     println!();
     println!("  ╔═══════════════════════════════════════════╗");
-    println!("  ║             {}               ║", style("Setup Complete!").green().bold());
+    println!(
+        "  ║             {}               ║",
+        style("Setup Complete!").green().bold()
+    );
     println!("  ╚═══════════════════════════════════════════╝");
     println!();
     println!(
@@ -476,16 +476,18 @@ fn print_success(oxios_home: &Path, model: &str) {
         style("Config:").dim(),
         oxios_home.join("config.toml").display()
     );
-    println!(
-        "    {}    {}",
-        style("Model:").dim(),
-        style(model).cyan()
-    );
+    println!("    {}    {}", style("Model:").dim(), style(model).cyan());
     println!();
     println!("  Next steps:");
     println!("    {} → start the daemon", style("oxios start").cyan());
-    println!("    {} → register as system service", style("oxios daemon install").cyan());
-    println!("    {} → open web dashboard", style("open http://127.0.0.1:4200").cyan());
+    println!(
+        "    {} → register as system service",
+        style("oxios daemon install").cyan()
+    );
+    println!(
+        "    {} → open web dashboard",
+        style("open http://127.0.0.1:4200").cyan()
+    );
     println!();
 }
 

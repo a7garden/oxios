@@ -24,23 +24,32 @@ pub struct CredentialStore;
 impl CredentialStore {
     /// Resolve the best available API key for a provider.
     ///
-    /// Priority: config.toml → oxi auth.json → env var
+    /// Priority: OXIOS_<PROVIDER>_API_KEY env → config.toml → oxi auth.json → oxi-ai env fallback
+    /// Environment variables take highest priority for container/K8s deployments.
     pub fn resolve(provider: &str, config_key: Option<&str>) -> Option<(String, CredentialSource)> {
-        // 1. config.toml explicit key
+        // 1. Explicit Oxios env var: OXIOS_<PROVIDER>_API_KEY (highest priority for containers)
+        let env_var = format!("OXIOS_{}_API_KEY", provider.to_uppercase());
+        if let Ok(key) = std::env::var(&env_var) {
+            if !key.is_empty() {
+                return Some((key, CredentialSource::EnvVar));
+            }
+        }
+
+        // 2. config.toml explicit key
         if let Some(key) = config_key {
             if !key.is_empty() {
                 return Some((key.to_string(), CredentialSource::Config));
             }
         }
 
-        // 2. oxi auth store (~/.oxi/auth.json)
+        // 3. oxi auth store (~/.oxi/auth.json)
         if let Ok(Some(token)) = oxi_sdk::load_token(provider) {
             if !token.access_token.is_empty() {
                 return Some((token.access_token, CredentialSource::OxiAuthStore));
             }
         }
 
-        // 3. oxi-ai env var fallback
+        // 4. oxi-ai env var fallback
         if let Some(key) = oxi_sdk::get_env_api_key(provider) {
             return Some((key, CredentialSource::EnvVar));
         }
@@ -96,14 +105,8 @@ mod tests {
             CredentialStore::provider_from_model("openai/gpt-4o"),
             Some("openai")
         );
-        assert_eq!(
-            CredentialStore::provider_from_model("bare-model"),
-            None
-        );
-        assert_eq!(
-            CredentialStore::provider_from_model(""),
-            None
-        );
+        assert_eq!(CredentialStore::provider_from_model("bare-model"), None);
+        assert_eq!(CredentialStore::provider_from_model(""), None);
     }
 
     #[test]

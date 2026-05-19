@@ -103,24 +103,18 @@ mod tests {
             crate::AgentApi::new(
                 Arc::new(crate::supervisor::NoOpSupervisor),
                 Arc::new(crate::budget::BudgetManager::new()),
-                Arc::new(crate::memory::MemoryManager::new(
-                    state_store.clone(),
-                )),
+                Arc::new(crate::memory::MemoryManager::new(state_store.clone())),
                 None,
             ),
             crate::SecurityApi::new(
-                Arc::new(parking_lot::Mutex::new(
-                    crate::auth::AuthManager::new(),
-                )),
+                Arc::new(parking_lot::Mutex::new(crate::auth::AuthManager::new())),
                 Arc::new(crate::audit_trail::AuditTrail::new(100)),
                 Arc::new(parking_lot::Mutex::new(
                     crate::access_manager::AccessManager::new(),
                 )),
                 state_store.clone(),
             ),
-            crate::PersonaApi::new(Arc::new(
-                crate::persona_manager::PersonaManager::new(),
-            )),
+            crate::PersonaApi::new(Arc::new(crate::persona_manager::PersonaManager::new())),
             crate::ExtensionApi::new(
                 Arc::new(crate::program::ProgramManager::new(
                     std::path::PathBuf::from("/tmp/oxios-test/programs"),
@@ -131,10 +125,7 @@ mod tests {
                     ))
                     .unwrap(),
                 ),
-                Arc::new(crate::host_tools::HostToolValidator::new(
-                    vec![],
-                    vec![],
-                )),
+                Arc::new(crate::host_tools::HostToolValidator::new(vec![], vec![])),
             ),
             crate::McpApi::new(Arc::new(crate::mcp::McpBridge::new())),
             crate::InfraApi::new(
@@ -146,10 +137,7 @@ mod tests {
                     .unwrap(),
                 ),
                 Arc::new(crate::scheduler::AgentScheduler::new(5, 60, 300)),
-                Arc::new(crate::cron::CronScheduler::new(
-                    state_store.clone(),
-                    60,
-                )),
+                Arc::new(crate::cron::CronScheduler::new(state_store.clone(), 60)),
                 Arc::new(crate::resource_monitor::ResourceMonitor::new(60, 60)),
                 crate::event_bus::EventBus::new(256),
                 crate::OxiosConfig::default(),

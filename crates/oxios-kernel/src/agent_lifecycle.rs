@@ -167,7 +167,9 @@ impl AgentLifecycleManager {
         let mut access = self.access_manager.lock();
         let perms = access.get_or_create_permissions(agent_name);
         // Grant default tool set to new agents
-        for tool in ["bash", "read", "write", "edit", "grep", "find", "exec", "ls"] {
+        for tool in [
+            "bash", "read", "write", "edit", "grep", "find", "exec", "ls",
+        ] {
             if !perms.allowed_tools.contains(tool) {
                 perms.allow_tool(tool);
             }

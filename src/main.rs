@@ -313,7 +313,10 @@ async fn cmd_pkg(kernel: &Kernel, action: &PkgAction) -> Result<()> {
                 println!("{:30} {:10} {:40}", "NAME", "VERSION", "DESCRIPTION");
                 println!("{}", "─".repeat(82));
                 for p in &programs {
-                    println!("{:30} {:10} {:40}", p.meta.name, p.meta.version, p.meta.description);
+                    println!(
+                        "{:30} {:10} {:40}",
+                        p.meta.name, p.meta.version, p.meta.description
+                    );
                 }
             }
         }
@@ -450,17 +453,33 @@ async fn cmd_status(kernel: &Kernel) -> Result<()> {
     let daemon = DaemonManager::new(&config.daemon.pid_file, &config.daemon.log_dir);
 
     println!();
-    println!("  {} {}", style("⬡ Oxios Agent OS").bold(), style(format!("v{}", env!("CARGO_PKG_VERSION"))).dim());
+    println!(
+        "  {} {}",
+        style("⬡ Oxios Agent OS").bold(),
+        style(format!("v{}", env!("CARGO_PKG_VERSION"))).dim()
+    );
     println!("  {}", "─".repeat(48));
     println!("  {:<16}  {}", "Workspace:", config.kernel.workspace);
-    println!("  {:<16}  {}", "Model:", style(&config.engine.default_model).cyan());
+    println!(
+        "  {:<16}  {}",
+        "Model:",
+        style(&config.engine.default_model).cyan()
+    );
 
     let daemon_status = daemon.status();
     let is_running = matches!(daemon_status, oxios_kernel::DaemonStatus::Running { .. });
     if is_running {
-        println!("  {:<16}  {}", "Daemon:", style(daemon_status.to_string()).green());
+        println!(
+            "  {:<16}  {}",
+            "Daemon:",
+            style(daemon_status.to_string()).green()
+        );
     } else {
-        println!("  {:<16}  {}", "Daemon:", style(daemon_status.to_string()).yellow());
+        println!(
+            "  {:<16}  {}",
+            "Daemon:",
+            style(daemon_status.to_string()).yellow()
+        );
     }
     println!();
 
@@ -518,7 +537,8 @@ async fn cmd_status(kernel: &Kernel) -> Result<()> {
         println!();
         for agent in &agents {
             let status_str = format!("{:?}", agent.status);
-            let styled_status = if matches!(agent.status, oxios_kernel::types::AgentStatus::Running) {
+            let styled_status = if matches!(agent.status, oxios_kernel::types::AgentStatus::Running)
+            {
                 style(&status_str).green()
             } else {
                 style(&status_str).yellow()
@@ -540,7 +560,10 @@ async fn cmd_status(kernel: &Kernel) -> Result<()> {
 
 fn cmd_reset(oxios_home: &Path, skip_confirm: bool, pid_file: &Path) -> Result<()> {
     if !oxios_home.exists() {
-        println!("  {} does not exist — nothing to reset.", oxios_home.display());
+        println!(
+            "  {} does not exist — nothing to reset.",
+            oxios_home.display()
+        );
         return Ok(());
     }
 
@@ -581,10 +604,7 @@ fn cmd_reset(oxios_home: &Path, skip_confirm: bool, pid_file: &Path) -> Result<(
         style("✓").green().bold(),
         oxios_home.display()
     );
-    println!(
-        "  Run {} to set up again.",
-        style("`oxios onboard`").cyan()
-    );
+    println!("  Run {} to set up again.", style("`oxios onboard`").cyan());
     println!();
     Ok(())
 }
@@ -617,39 +637,37 @@ async fn cmd_doctor(kernel: &Kernel, config_path: &Path) -> Result<()> {
     checks += 1;
     let provider = CredentialStore::provider_from_model(&config.engine.default_model);
     match provider {
-        Some(provider) => {
-            match CredentialStore::resolve(provider, config.api_key().as_deref()) {
-                Some((key, source)) => {
-                    let source_str = match source {
-                        oxios_kernel::credential::CredentialSource::Config => "config.toml",
-                        oxios_kernel::credential::CredentialSource::OxiAuthStore => "~/.oxi/auth.json",
-                        oxios_kernel::credential::CredentialSource::EnvVar => "env var",
-                    };
-                    let preview = if key.len() > 8 {
-                        format!("{}...{}", &key[..4], &key[key.len() - 4..])
-                    } else {
-                        "(set)".to_string()
-                    };
-                    println!(
-                        "  {} Credentials found ({}, via {})",
-                        style("✓").green(),
-                        style(preview).cyan(),
-                        style(source_str).dim()
-                    );
-                }
-                None => {
-                    println!(
-                        "  {} No credentials for provider '{}'",
-                        style("✗").red().bold(),
-                        style(provider).cyan()
-                    );
-                    issues.push(format!(
-                        "No API key for '{}'. Run `oxios onboard` to configure.",
-                        provider
-                    ));
-                }
+        Some(provider) => match CredentialStore::resolve(provider, config.api_key().as_deref()) {
+            Some((key, source)) => {
+                let source_str = match source {
+                    oxios_kernel::credential::CredentialSource::Config => "config.toml",
+                    oxios_kernel::credential::CredentialSource::OxiAuthStore => "~/.oxi/auth.json",
+                    oxios_kernel::credential::CredentialSource::EnvVar => "env var",
+                };
+                let preview = if key.len() > 8 {
+                    format!("{}...{}", &key[..4], &key[key.len() - 4..])
+                } else {
+                    "(set)".to_string()
+                };
+                println!(
+                    "  {} Credentials found ({}, via {})",
+                    style("✓").green(),
+                    style(preview).cyan(),
+                    style(source_str).dim()
+                );
             }
-        }
+            None => {
+                println!(
+                    "  {} No credentials for provider '{}'",
+                    style("✗").red().bold(),
+                    style(provider).cyan()
+                );
+                issues.push(format!(
+                    "No API key for '{}'. Run `oxios onboard` to configure.",
+                    provider
+                ));
+            }
+        },
         None => {
             println!("  {} No model configured", style("✗").red().bold());
             issues.push("No model set. Run `oxios onboard` to configure.".to_string());
@@ -723,13 +741,19 @@ async fn cmd_doctor(kernel: &Kernel, config_path: &Path) -> Result<()> {
         std::path::PathBuf::from(format!("{}/.oxi/auth.json", home)).exists()
     };
     let oxi_bin_exists = std::path::PathBuf::from("/usr/local/bin/oxi").exists()
-        || std::path::PathBuf::from(std::env::var("HOME").unwrap_or_default() + "/.cargo/bin/oxi").exists();
+        || std::path::PathBuf::from(std::env::var("HOME").unwrap_or_default() + "/.cargo/bin/oxi")
+            .exists();
     let oxi_installed = oxi_auth_exists || oxi_bin_exists;
     if oxi_installed {
-        println!("  {} oxi CLI available (shared auth store)", style("✓").green());
+        println!(
+            "  {} oxi CLI available (shared auth store)",
+            style("✓").green()
+        );
     } else {
         println!("  {} oxi CLI not detected", style("⚠").yellow().bold());
-        issues.push("Install oxi CLI for shared credential management: `cargo install oxi-cli`".to_string());
+        issues.push(
+            "Install oxi CLI for shared credential management: `cargo install oxi-cli`".to_string(),
+        );
     }
 
     // 8. Gateway port available
@@ -793,9 +817,8 @@ fn cmd_models(provider: Option<&str>) -> Result<()> {
         None => {
             // Try reading from config
             let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
-            let config_path = oxios_kernel::config::expand_home(
-                &format!("{}/.oxios/config.toml", home),
-            );
+            let config_path =
+                oxios_kernel::config::expand_home(&format!("{}/.oxios/config.toml", home));
             if config_path.exists() {
                 let config = oxios_kernel::config::load_config(&config_path)?;
                 if config.engine.default_model.is_empty() {
@@ -807,9 +830,7 @@ fn cmd_models(provider: Option<&str>) -> Result<()> {
                     .map(|s| s.to_string())
                     .unwrap_or_default()
             } else {
-                anyhow::bail!(
-                    "No config found. Run `oxios onboard` or use `--provider <name>`."
-                );
+                anyhow::bail!("No config found. Run `oxios onboard` or use `--provider <name>`.");
             }
         }
     };
@@ -903,20 +924,42 @@ async fn run() -> Result<()> {
     let env_filter = tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
         if cli.verbose {
             tracing_subscriber::EnvFilter::new("debug")
+        } else if let Some(ref level) = config.logging.level {
+            tracing_subscriber::EnvFilter::new(level)
         } else {
             tracing_subscriber::EnvFilter::new("info")
         }
     });
 
-    tracing_subscriber::fmt()
-        .with_env_filter(env_filter)
-        .with_target(true)
-        .with_thread_ids(false)
-        .with_file(false)
-        .with_line_number(false)
-        .compact()
-        .with_writer(non_blocking)
-        .init();
+    match config.logging.format.as_str() {
+        "json" => {
+            tracing_subscriber::fmt()
+                .json()
+                .with_env_filter(env_filter)
+                .with_target(true)
+                .with_writer(non_blocking)
+                .init();
+        }
+        "compact" => {
+            tracing_subscriber::fmt()
+                .compact()
+                .with_env_filter(env_filter)
+                .with_target(true)
+                .with_writer(non_blocking)
+                .init();
+        }
+        _ => {
+            tracing_subscriber::fmt()
+                .with_env_filter(env_filter)
+                .with_target(true)
+                .with_thread_ids(false)
+                .with_file(false)
+                .with_line_number(false)
+                .compact()
+                .with_writer(non_blocking)
+                .init();
+        }
+    }
 
     // ── OpenTelemetry ──
     let _otel_guard = otel::init_otel(&config.otel).await?;
@@ -1002,10 +1045,7 @@ async fn run() -> Result<()> {
                 .with_default(true)
                 .prompt()?;
             if !start_now {
-                println!(
-                    "  Run {} when ready.",
-                    style("`oxios start`").cyan()
-                );
+                println!("  Run {} when ready.", style("`oxios start`").cyan());
                 return Ok(());
             }
             // fall through to kernel assembly → daemon start
@@ -1270,7 +1310,11 @@ async fn run() -> Result<()> {
             let handle = kernel.handle();
             match handle.extensions.get_program(name).await {
                 Some(program) => {
-                    println!("\n  {} {}", style(&program.meta.name).bold(), style(format!("v{}", program.meta.version)).dim());
+                    println!(
+                        "\n  {} {}",
+                        style(&program.meta.name).bold(),
+                        style(format!("v{}", program.meta.version)).dim()
+                    );
                     println!("  {}", "─".repeat(50));
                     if !program.meta.description.is_empty() {
                         println!("  {}", program.meta.description);
@@ -1281,7 +1325,12 @@ async fn run() -> Result<()> {
                     if !program.meta.tools.is_empty() {
                         println!("\n  Tools:");
                         for tool in &program.meta.tools {
-                            println!("    {} {}: {}", style("•").dim(), tool.name, tool.description);
+                            println!(
+                                "    {} {}: {}",
+                                style("•").dim(),
+                                tool.name,
+                                tool.description
+                            );
                         }
                     }
                     if !program.meta.host_requirements.required.is_empty() {
@@ -1345,6 +1394,13 @@ async fn cmd_serve(kernel: &Kernel, config_path: &Path) -> Result<()> {
     // so we cannot use tokio::spawn which may move futures between threads).
     // The gateway polls channels and routes messages to the kernel.
     let gateway = kernel.gateway();
+    let gateway_shutdown = {
+        // Signal the gateway to stop before joining its thread.
+        let gw = Arc::clone(&gateway);
+        move || {
+            gw.signal_shutdown();
+        }
+    };
     let gateway_handle = std::thread::spawn(move || {
         let rt = tokio::runtime::Builder::new_current_thread()
             .enable_all()
@@ -1363,7 +1419,11 @@ async fn cmd_serve(kernel: &Kernel, config_path: &Path) -> Result<()> {
     println!("  {}", "─".repeat(48));
     println!(
         "  Gateway:  {}",
-        style(format!("http://{}:{}", config.gateway.host, config.gateway.port)).cyan()
+        style(format!(
+            "http://{}:{}",
+            config.gateway.host, config.gateway.port
+        ))
+        .cyan()
     );
     println!();
     tracing::info!(
@@ -1376,26 +1436,50 @@ async fn cmd_serve(kernel: &Kernel, config_path: &Path) -> Result<()> {
     tokio::signal::ctrl_c().await.ok();
     tracing::info!("Received shutdown signal, starting graceful shutdown...");
 
+    // Phase 1: Signal gateway to stop accepting new messages
+    gateway_shutdown();
+
+    // Phase 2: Cancel channel tasks
     for task in channel_tasks {
         task.abort();
     }
-    // Gateway is on a native thread — wait for it to finish.
-    let _ = gateway_handle.join();
 
+    // Phase 3: Wait for gateway thread with timeout
+    let gateway_result = gateway_handle.join();
+    match gateway_result {
+        Ok(()) => tracing::info!("Gateway stopped cleanly"),
+        Err(e) => tracing::warn!(error = ?e, "Gateway thread panicked"),
+    }
+
+    // Phase 4: Terminate running agents (parallel)
     let handle = kernel.handle();
     if let Ok(agents) = handle.agents.list().await {
-        for agent in &agents {
-            if let Err(e) = handle.agents.kill(&agent.id.to_string()).await {
-                tracing::warn!(agent = %agent.id, error = %e, "Failed to kill agent");
-            }
-        }
         if !agents.is_empty() {
+            tracing::info!(count = agents.len(), "Terminating agents...");
+            let mut kill_futures = Vec::new();
+            for agent in &agents {
+                let agent_id = agent.id.to_string();
+                let h = handle.clone();
+                kill_futures.push(tokio::spawn(async move {
+                    if let Err(e) = h.agents.kill(&agent_id).await {
+                        tracing::warn!(agent = %agent_id, error = %e, "Failed to kill agent");
+                    }
+                }));
+            }
+            for f in kill_futures {
+                let _ = f.await;
+            }
             tracing::info!(count = agents.len(), "Agents terminated");
         }
     }
 
     if let Err(e) = handle.mcp.shutdown_all().await {
         tracing::warn!(error = %e, "MCP shutdown error");
+    }
+
+    // Flush audit trail to disk before exit
+    if let Err(e) = kernel.flush_audit() {
+        tracing::warn!(error = %e, "Audit trail flush error");
     }
 
     tracing::info!("Oxios shut down gracefully");

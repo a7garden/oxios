@@ -51,10 +51,17 @@ impl EventCollector {
     /// Parse events from an SSE event string
     pub fn parse_sse_event(data: &str) -> Option<KernelEventEnvelope> {
         let event_type = data.lines().find(|l| l.starts_with("event:")).map(|l| {
-            l.strip_prefix("event:").unwrap_or("unknown").trim().to_string()
+            l.strip_prefix("event:")
+                .unwrap_or("unknown")
+                .trim()
+                .to_string()
         })?;
 
-        let json_data = data.lines().find(|l| !l.starts_with("event:") && !l.starts_with("data:")).map(|l| l.trim()).unwrap_or("{}");
+        let json_data = data
+            .lines()
+            .find(|l| !l.starts_with("event:") && !l.starts_with("data:"))
+            .map(|l| l.trim())
+            .unwrap_or("{}");
 
         let payload: serde_json::Value = serde_json::from_str(json_data).ok()?;
 
@@ -100,7 +107,12 @@ impl TraceAnalyzer {
                     if let Some(seed_id) = event.payload.get("seed_id").and_then(|v| v.as_str()) {
                         seeds.push(SeedSummary {
                             id: seed_id.to_string(),
-                            goal: event.payload.get("goal").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+                            goal: event
+                                .payload
+                                .get("goal")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("")
+                                .to_string(),
                             created_at: event.timestamp.to_rfc3339(),
                         });
                     }
@@ -121,21 +133,50 @@ impl TraceAnalyzer {
                     if let Some(id) = event.payload.get("id").and_then(|v| v.as_str()) {
                         memories.push(MemorySummary {
                             id: id.to_string(),
-                            memory_type: event.payload.get("memory_type").and_then(|v| v.as_str()).unwrap_or("unknown").to_string(),
-                            source: event.payload.get("source").and_then(|v| v.as_str()).unwrap_or("unknown").to_string(),
+                            memory_type: event
+                                .payload
+                                .get("memory_type")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("unknown")
+                                .to_string(),
+                            source: event
+                                .payload
+                                .get("source")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("unknown")
+                                .to_string(),
                         });
                     }
                 }
                 "PhaseCompleted" => {
                     phases.push(PhaseSummary {
-                        phase: event.payload.get("phase").and_then(|v| v.as_str()).unwrap_or("unknown").to_string(),
-                        session_id: event.payload.get("session_id").and_then(|v| v.as_str()).unwrap_or("").to_string(),
-                        result_summary: event.payload.get("result_summary").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+                        phase: event
+                            .payload
+                            .get("phase")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("unknown")
+                            .to_string(),
+                        session_id: event
+                            .payload
+                            .get("session_id")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("")
+                            .to_string(),
+                        result_summary: event
+                            .payload
+                            .get("result_summary")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("")
+                            .to_string(),
                     });
                 }
                 "EvaluationComplete" => {
                     if let Some(seed_id) = event.payload.get("seed_id").and_then(|v| v.as_str()) {
-                        let passed = event.payload.get("passed").and_then(|v| v.as_bool()).unwrap_or(false);
+                        let passed = event
+                            .payload
+                            .get("passed")
+                            .and_then(|v| v.as_bool())
+                            .unwrap_or(false);
                         evaluations.push(EvaluationSummary {
                             seed_id: seed_id.to_string(),
                             passed,
@@ -168,7 +209,10 @@ mod tests {
     #[test]
     fn test_event_collector() {
         let mut collector = EventCollector::new("test-123");
-        collector.record_event("AgentCreated", json!({"id": "agent-1", "name": "test-agent"}));
+        collector.record_event(
+            "AgentCreated",
+            json!({"id": "agent-1", "name": "test-agent"}),
+        );
         let trace = collector.build_trace();
         assert_eq!(trace.events.len(), 1);
     }

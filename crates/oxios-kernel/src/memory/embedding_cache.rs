@@ -17,7 +17,6 @@ use lru::LruCache;
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use std::hash::{Hash, Hasher};
-use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 /// Cache entry with TTL tracking.
@@ -168,7 +167,11 @@ impl EmbeddingCache {
         CacheStats {
             hits,
             misses,
-            hit_rate: if total > 0 { hits as f64 / total as f64 } else { 0.0 },
+            hit_rate: if total > 0 {
+                hits as f64 / total as f64
+            } else {
+                0.0
+            },
             size: self.inner.read().len(),
             capacity: self.max_entries,
         }
@@ -189,15 +192,15 @@ mod tests {
     #[test]
     fn test_cache_basic() {
         let cache = EmbeddingCache::new(60, 100);
-        
+
         // Insert
         cache.insert("hello", vec![1.0, 2.0, 3.0]);
-        
+
         // Get
         let result = cache.get("hello");
         assert!(result.is_some());
         assert_eq!(result.unwrap(), vec![1.0, 2.0, 3.0]);
-        
+
         // Stats
         let stats = cache.stats();
         assert_eq!(stats.hits, 1);
@@ -207,10 +210,10 @@ mod tests {
     #[test]
     fn test_cache_miss() {
         let cache = EmbeddingCache::new(60, 100);
-        
+
         let result = cache.get("nonexistent");
         assert!(result.is_none());
-        
+
         let stats = cache.stats();
         assert_eq!(stats.hits, 0);
         assert_eq!(stats.misses, 1);
@@ -218,14 +221,14 @@ mod tests {
 
     #[test]
     fn test_cache_ttl() {
-        let cache = EmbeddingCache::new(1, 100);  // 1 second TTL
-        
+        let cache = EmbeddingCache::new(1, 100); // 1 second TTL
+
         cache.insert("test", vec![1.0]);
         assert!(cache.get("test").is_some());
-        
+
         // Wait for expiration
         thread::sleep(Duration::from_secs(2));
-        
+
         // Should be expired
         assert!(cache.get("test").is_none());
     }
@@ -233,14 +236,14 @@ mod tests {
     #[test]
     fn test_cache_eviction() {
         let cache = EmbeddingCache::new(60, 2);
-        
+
         cache.insert("a", vec![1.0]);
         cache.insert("b", vec![2.0]);
-        cache.insert("c", vec![3.0]);  // Should evict oldest
-        
+        cache.insert("c", vec![3.0]); // Should evict oldest
+
         // a should be evicted
         assert!(cache.get("a").is_none());
-        
+
         // b and c should exist
         assert!(cache.get("b").is_some());
         assert!(cache.get("c").is_some());

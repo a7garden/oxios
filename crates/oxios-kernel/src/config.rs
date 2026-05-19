@@ -107,7 +107,7 @@ fn default_max_recall() -> usize {
 }
 
 fn default_cache_ttl() -> u64 {
-    3600  // 1 hour
+    3600 // 1 hour
 }
 
 fn default_cache_max_entries() -> usize {
@@ -181,6 +181,7 @@ impl Default for TelegramChannelConfig {
 
 /// LLM engine configuration.
 #[derive(Debug, Clone, Deserialize, Serialize)]
+#[allow(clippy::derivable_impls)]
 pub struct EngineConfig {
     /// Default model in "provider/model" format.
     /// Empty string means no model configured — onboarding required.
@@ -193,6 +194,7 @@ pub struct EngineConfig {
     pub api_key: Option<String>,
 }
 
+#[allow(clippy::derivable_impls)]
 impl Default for EngineConfig {
     fn default() -> Self {
         Self {
@@ -290,6 +292,9 @@ pub struct OxiosConfig {
     /// OpenTelemetry tracing configuration.
     #[serde(default)]
     pub otel: OtelConfig,
+    /// Logging configuration.
+    #[serde(default)]
+    pub logging: LoggingConfig,
     /// Channel activation configuration.
     #[serde(default)]
     pub channels: ChannelsConfig,
@@ -370,19 +375,14 @@ impl Default for GatewayConfig {
 ///
 /// - `Structured`: Binary allowlist + metacharacter blocking (recommended)
 /// - `Shell`: Raw bash execution (dangerous, requires `allow_shell_mode=true`)
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum ExecMode {
     /// Structured binary execution with allowlist and metacharacter blocking.
+    #[default]
     Structured,
     /// Shell execution via `bash -c`. DANGEROUS — requires explicit enable.
     Shell,
-}
-
-impl Default for ExecMode {
-    fn default() -> Self {
-        Self::Structured
-    }
 }
 
 /// Exec configuration.
@@ -854,6 +854,30 @@ impl Default for OtelConfig {
             endpoint: default_otel_endpoint(),
             service_name: default_otel_service_name(),
             sampling_ratio: default_otel_sampling_ratio(),
+        }
+    }
+}
+
+/// Logging configuration.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct LoggingConfig {
+    /// Log format: "pretty", "json", or "compact".
+    #[serde(default = "default_log_format")]
+    pub format: String,
+    /// Log level override (e.g. "info", "debug"). Falls back to RUST_LOG env var.
+    #[serde(default)]
+    pub level: Option<String>,
+}
+
+fn default_log_format() -> String {
+    "pretty".into()
+}
+
+impl Default for LoggingConfig {
+    fn default() -> Self {
+        Self {
+            format: default_log_format(),
+            level: None,
         }
     }
 }

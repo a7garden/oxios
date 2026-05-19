@@ -29,7 +29,7 @@ use std::sync::Arc;
 
 use oxi_sdk::{
     EditTool, FindTool, GetSearchResultsTool, GrepTool, LsTool, ReadTool, SearchCache,
-    WebSearchTool, WriteTool, ToolRegistry,
+    ToolRegistry, WebSearchTool, WriteTool,
 };
 
 use crate::capability::{CSpace, ResourceRef, Rights};

@@ -66,10 +66,9 @@ impl BrowserApi {
     pub async fn browser(&self) -> anyhow::Result<&Arc<oxibrowser_core::Browser>> {
         self.inner
             .get_or_try_init(|| async {
-                let config = self
-                    .config
-                    .as_ref()
-                    .ok_or_else(|| anyhow::anyhow!("BrowserApi has no config and was not pre-initialized"))?;
+                let config = self.config.as_ref().ok_or_else(|| {
+                    anyhow::anyhow!("BrowserApi has no config and was not pre-initialized")
+                })?;
                 let browser = oxibrowser_core::Browser::new(config.clone())
                     .await
                     .map_err(|e| anyhow::anyhow!("Failed to initialize browser engine: {}", e))?;

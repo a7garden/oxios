@@ -26,14 +26,15 @@ fn register_compatible_providers(builder: OxiBuilder, _default_provider: &str) -
         let name_owned = name.to_string();
         let url_owned = default_url.to_string();
         builder = builder.provider_factory(name, move || {
-            let api_key = crate::credential::CredentialStore::resolve(&name_owned, None)
-                .map(|(key, _)| key);
+            let api_key =
+                crate::credential::CredentialStore::resolve(&name_owned, None).map(|(key, _)| key);
             let base_url = std::env::var(format!("{}_BASE_URL", name_owned.to_uppercase()))
                 .unwrap_or_else(|_| url_owned.clone());
             let provider = oxi_ai::OpenAiProvider::with_base_url_and_key(&base_url, api_key);
             tracing::info!(
                 "Registered {} provider (OpenAI-compatible, base_url: {})",
-                name_owned, base_url
+                name_owned,
+                base_url
             );
             Ok(Arc::new(provider))
         });

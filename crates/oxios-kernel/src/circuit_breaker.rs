@@ -116,6 +116,9 @@ impl CircuitBreaker {
         self.failure_count.store(0, Ordering::Release);
         self.state.store(STATE_CLOSED, Ordering::Release);
         self.half_open_probe_sent.store(false, Ordering::Release);
+        crate::metrics::get_metrics()
+            .llm_circuit_breaker_state
+            .set(0.0);
     }
 
     /// Record a failed call. Opens the circuit if the failure threshold is exceeded.
@@ -135,6 +138,9 @@ impl CircuitBreaker {
                 threshold = self.threshold,
                 "Circuit breaker OPEN — too many failures"
             );
+            crate::metrics::get_metrics()
+                .llm_circuit_breaker_state
+                .set(1.0);
         }
     }
 

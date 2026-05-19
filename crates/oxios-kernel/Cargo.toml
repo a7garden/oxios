@@ -29,7 +29,7 @@ chrono = { workspace = true }
 cron = "0.16"
 
 regex = { workspace = true }
-gix = { version = "0.70", features = ["tree-editor"] }
+gix = { version = "0.83", features = ["tree-editor"] }
 toml = { workspace = true }
 glob = "0.3"
 tempfile = "3"

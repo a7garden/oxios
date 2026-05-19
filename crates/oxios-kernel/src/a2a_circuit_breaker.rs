@@ -81,9 +81,10 @@ impl A2ACircuitBreaker {
                 // Check if reset timeout has passed
                 let last_failure = self.last_failure_time.load(Ordering::Relaxed);
                 let now = Instant::now().elapsed().as_secs();
-                if now.saturating_sub(last_failure) > self.reset_timeout.as_secs() as u64 {
+                if now.saturating_sub(last_failure) > self.reset_timeout.as_secs() {
                     // Transition to half-open
-                    self.state.store(CircuitState::HalfOpen as u8, Ordering::Relaxed);
+                    self.state
+                        .store(CircuitState::HalfOpen as u8, Ordering::Relaxed);
                     self.success_count.store(0, Ordering::Relaxed);
                     true
                 } else {
@@ -104,7 +105,8 @@ impl A2ACircuitBreaker {
                 let successes = self.success_count.fetch_add(1, Ordering::Relaxed) + 1;
                 if successes >= 2 {
                     // Recovery successful → closed
-                    self.state.store(CircuitState::Closed as u8, Ordering::Relaxed);
+                    self.state
+                        .store(CircuitState::Closed as u8, Ordering::Relaxed);
                     self.failure_count.store(0, Ordering::Relaxed);
                     tracing::info!("A2A circuit breaker CLOSED (recovery successful)");
                 }
@@ -120,13 +122,12 @@ impl A2ACircuitBreaker {
     /// Record a failed request.
     pub fn record_failure(&self) {
         let failures = self.failure_count.fetch_add(1, Ordering::Relaxed) + 1;
-        self.last_failure_time.store(
-            Instant::now().elapsed().as_secs(),
-            Ordering::Relaxed,
-        );
+        self.last_failure_time
+            .store(Instant::now().elapsed().as_secs(), Ordering::Relaxed);
 
         if failures >= self.threshold && self.state() != CircuitState::Open {
-            self.state.store(CircuitState::Open as u8, Ordering::Relaxed);
+            self.state
+                .store(CircuitState::Open as u8, Ordering::Relaxed);
             tracing::warn!(
                 failures,
                 threshold = self.threshold,
@@ -150,14 +151,14 @@ mod tests {
     #[test]
     fn test_opens_after_threshold() {
         let cb = A2ACircuitBreaker::new(3, 10);
-        
+
         cb.record_failure();
         assert_eq!(cb.state(), CircuitState::Closed);
-        
+
         cb.record_failure();
         assert_eq!(cb.state(), CircuitState::Closed);
-        
-        cb.record_failure();  // Now at threshold
+
+        cb.record_failure(); // Now at threshold
         assert_eq!(cb.state(), CircuitState::Open);
         assert!(!cb.is_allowed());
     }
@@ -165,11 +166,11 @@ mod tests {
     #[test]
     fn test_success_resets_failure_count() {
         let cb = A2ACircuitBreaker::new(3, 10);
-        
+
         cb.record_failure();
         cb.record_failure();
-        cb.record_success();  // Should reset
-        
+        cb.record_success(); // Should reset
+
         assert_eq!(cb.failure_count.load(Ordering::Relaxed), 0);
     }
 }

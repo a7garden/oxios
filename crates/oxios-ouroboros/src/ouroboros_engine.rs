@@ -264,10 +264,7 @@ impl OuroborosProtocol for OuroborosEngine {
             };
             result.ready_for_seed = false;
 
-            tracing::info!(
-                is_task = false,
-                "Interview phase complete (chat)"
-            );
+            tracing::info!(is_task = false, "Interview phase complete (chat)");
 
             return Ok(result);
         }
@@ -323,7 +320,10 @@ impl OuroborosProtocol for OuroborosEngine {
                 .map(|(q, a)| format!("Q: {}\nA: {}", q, a))
                 .collect::<Vec<_>>()
                 .join("\n\n");
-            format!("## Original Request\n{}\n\n## Clarification Q&A\n{}", original_message, qa_block)
+            format!(
+                "## Original Request\n{}\n\n## Clarification Q&A\n{}",
+                original_message, qa_block
+            )
         } else {
             format!("## Original Request\n{}", original_message)
         };

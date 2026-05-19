@@ -18,9 +18,9 @@
 //! We call it directly from async context without `spawn_blocking`.
 
 use anyhow::Result;
-use oxi_sdk::{CompactionEvent, SearchCache};
 use oxi_sdk::ToolExecutionMode;
 use oxi_sdk::{AgentEvent, AgentLoop, AgentLoopConfig, SharedState, ToolRegistry};
+use oxi_sdk::{CompactionEvent, SearchCache};
 use oxi_sdk::{CompactionStrategy, Provider};
 use parking_lot::Mutex;
 use std::sync::Arc;
@@ -387,7 +387,12 @@ async fn run_agent_loop(ctx: AgentLoopContext) -> Result<(String, usize, bool)> 
 
     // Program-defined tools
     for program in &programs {
-        let dep_names: Vec<&str> = program.meta.dependencies.iter().map(|s| s.as_str()).collect();
+        let dep_names: Vec<&str> = program
+            .meta
+            .dependencies
+            .iter()
+            .map(|s| s.as_str())
+            .collect();
         let missing = registry.missing(&dep_names);
         if !missing.is_empty() {
             tracing::warn!(
@@ -448,83 +453,79 @@ async fn run_agent_loop(ctx: AgentLoopContext) -> Result<(String, usize, bool)> 
 
     // Run the agent loop. Since oxi-sdk 0.19+, `run()` produces a `Send` future.
     let result = agent_loop
-            .run(prompt, move |event| {
-                let mut s = exec_state_clone.lock();
-                match event {
-                    AgentEvent::ToolExecutionEnd {
-                        is_error: false,
-                        ..
-                    } => {
-                        s.steps_completed += 1;
-                    }
-                    AgentEvent::AgentEnd {
-                        messages,
-                        stop_reason,
-                        ..
-                    } => {
-                        if let Some(oxi_sdk::Message::Assistant(a)) = messages.last() {
-                            s.final_content = a.text_content();
-                        }
-                        s.success = stop_reason.as_deref() == Some("Stop");
-                    }
-                    AgentEvent::Error {
-                        message,
-                        ..
-                    } => {
-                        s.final_content = message.clone();
-                        s.success = false;
-                    }
-                    AgentEvent::Compaction { event } => {
-                        let mm = &memory_for_callback;
-                        if let CompactionEvent::Completed { result, .. } = event {
-                            let entry = MemoryEntry {
-                                id: uuid::Uuid::new_v4().to_string(),
-                                memory_type: MemoryType::Conversation,
-                                content: result.summary.clone(),
-                                source: "compaction".to_string(),
-                                session_id: Some(session_id_for_callback.clone()),
-                                tags: vec![],
-                                importance: 0.5,
-                                created_at: chrono::Utc::now(),
-                                accessed_at: chrono::Utc::now(),
-                                access_count: 0,
-                            };
-                            // Fire-and-forget: spawn async remember from sync callback
-                            let mm = mm.clone();
-                            tokio::spawn(async move {
-                                if let Err(e) = mm.remember(entry).await {
-                                    tracing::warn!(error = %e, "Failed to save compaction summary");
-                                }
-                            });
-                        }
-                    }
-                    _ => {}
+        .run(prompt, move |event| {
+            let mut s = exec_state_clone.lock();
+            match event {
+                AgentEvent::ToolExecutionEnd {
+                    is_error: false, ..
+                } => {
+                    s.steps_completed += 1;
                 }
-            })
-            .await;
+                AgentEvent::AgentEnd {
+                    messages,
+                    stop_reason,
+                    ..
+                } => {
+                    if let Some(oxi_sdk::Message::Assistant(a)) = messages.last() {
+                        s.final_content = a.text_content();
+                    }
+                    s.success = stop_reason.as_deref() == Some("Stop");
+                }
+                AgentEvent::Error { message, .. } => {
+                    s.final_content = message.clone();
+                    s.success = false;
+                }
+                AgentEvent::Compaction { event } => {
+                    let mm = &memory_for_callback;
+                    if let CompactionEvent::Completed { result, .. } = event {
+                        let entry = MemoryEntry {
+                            id: uuid::Uuid::new_v4().to_string(),
+                            memory_type: MemoryType::Conversation,
+                            content: result.summary.clone(),
+                            source: "compaction".to_string(),
+                            session_id: Some(session_id_for_callback.clone()),
+                            tags: vec![],
+                            importance: 0.5,
+                            created_at: chrono::Utc::now(),
+                            accessed_at: chrono::Utc::now(),
+                            access_count: 0,
+                        };
+                        // Fire-and-forget: spawn async remember from sync callback
+                        let mm = mm.clone();
+                        tokio::spawn(async move {
+                            if let Err(e) = mm.remember(entry).await {
+                                tracing::warn!(error = %e, "Failed to save compaction summary");
+                            }
+                        });
+                    }
+                }
+                _ => {}
+            }
+        })
+        .await;
 
-        // Record circuit breaker result after agent execution
-        let circuit = get_llm_circuit_breaker();
-        if result.is_err() {
-            circuit.record_failure();
-        } else {
-            circuit.record_success();
-        }
+    // Record circuit breaker result after agent execution
+    let circuit = get_llm_circuit_breaker();
+    if result.is_err() {
+        circuit.record_failure();
+    } else {
+        circuit.record_success();
+    }
 
-        if let Err(e) = result {
-            tracing::error!(seed_id = %seed_id, error = %e, "AgentLoop failed");
-            let s = exec_state.lock();
-            return Ok((format!("Agent failed: {e}"), s.steps_completed, false));
-        }
-
+    if let Err(e) = result {
+        tracing::error!(seed_id = %seed_id, error = %e, "AgentLoop failed");
         let s = exec_state.lock();
-        tracing::info!(
-            seed_id = %seed_id,
-            steps = s.steps_completed,
-            success = s.success,
-            "AgentLoop completed"
-        );
-        Ok((s.final_content.clone(), s.steps_completed, s.success))
+        return Ok((format!("Agent failed: {e}"), s.steps_completed, false));
+    }
+
+    let s = exec_state.lock();
+    tracing::info!(
+        seed_id = %seed_id,
+        steps = s.steps_completed,
+        success = s.success,
+        "AgentLoop completed"
+    );
+    Ok((s.final_content.clone(), s.steps_completed, s.success))
 }
 
 /// Build a system prompt from the Seed's goal, constraints, persona,

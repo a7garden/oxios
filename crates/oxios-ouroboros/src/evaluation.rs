@@ -85,7 +85,21 @@ impl MechanicalEvalResult {
                     // and check if most of them appear in the output
                     let key_tokens: Vec<&str> = c_lower
                         .split_whitespace()
-                        .filter(|w| w.len() > 3 && !matches!(*w, "must" | "should" | "shall" | "where" | "which" | "that" | "with" | "from" | "this"))
+                        .filter(|w| {
+                            w.len() > 3
+                                && !matches!(
+                                    *w,
+                                    "must"
+                                        | "should"
+                                        | "shall"
+                                        | "where"
+                                        | "which"
+                                        | "that"
+                                        | "with"
+                                        | "from"
+                                        | "this"
+                                )
+                        })
                         .collect();
 
                     if key_tokens.is_empty() {
@@ -94,12 +108,21 @@ impl MechanicalEvalResult {
                         (contains, format!("substring_match={}", contains))
                     } else {
                         // Check how many key tokens appear in the output
-                        let matched = key_tokens.iter()
+                        let matched = key_tokens
+                            .iter()
                             .filter(|t| output_lower.contains(*t))
                             .count();
                         let ratio = matched as f64 / key_tokens.len() as f64;
                         let passed = ratio >= 0.5; // At least half the key tokens match
-                        (passed, format!("keyword_match={}/{} ({:.0}%)", matched, key_tokens.len(), ratio * 100.0))
+                        (
+                            passed,
+                            format!(
+                                "keyword_match={}/{} ({:.0}%)",
+                                matched,
+                                key_tokens.len(),
+                                ratio * 100.0
+                            ),
+                        )
                     }
                 };
             results.push(CriterionResult {

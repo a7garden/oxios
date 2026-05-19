@@ -254,7 +254,9 @@ impl GitLayer {
             return Ok(());
         }
         let repo = self.repo.lock();
-        let head_id = repo.head_id().ok()
+        let head_id = repo
+            .head_id()
+            .ok()
             .map(|id| id.detach())
             .ok_or_else(|| anyhow::anyhow!("No HEAD commit to tag"))?;
         let _sig = self_signature_ref();
@@ -297,9 +299,17 @@ impl GitLayer {
             }
             let commit = repo.find_commit(id)?;
             let decoded = commit.decode()?;
-            let msg = decoded.message.to_string();
-            let timestamp = format!("{:?}", decoded.committer.time);
-            let author = decoded.author.name.to_string();
+            let msg_ref = decoded.message();
+            let msg = if let Some(body) = msg_ref.body {
+                format!("{}\n\n{}", msg_ref.title, body)
+            } else {
+                msg_ref.title.to_string()
+            };
+            let timestamp = decoded.time().map(|t| t.to_string()).unwrap_or_default();
+            let author = decoded
+                .author()
+                .map(|a| a.name.to_string())
+                .unwrap_or_default();
             let hex = id.to_hex().to_string();
             entries.push(LogEntry {
                 hash: hex.clone(),
@@ -428,10 +438,12 @@ impl GitLayer {
 
 /// Create a signature ref for committer/author identity.
 fn self_signature_ref() -> gix::actor::SignatureRef<'static> {
+    static TIME_BUF: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+    let time_str = TIME_BUF.get_or_init(|| gix::date::Time::now_local_or_utc().to_string());
     gix::actor::SignatureRef {
         name: "oxios".into(),
         email: "oxios@oxios".into(),
-        time: gix::date::Time::now_local_or_utc(),
+        time: time_str.as_str(),
     }
 }
 

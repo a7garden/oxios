@@ -6,6 +6,7 @@
 
 use anyhow::Result;
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tokio::time::Duration;
@@ -18,6 +19,8 @@ pub struct Gateway {
     channels: RwLock<HashMap<String, Box<dyn Channel>>>,
     /// Shared orchestrator for the Ouroboros lifecycle.
     orchestrator: Arc<oxios_kernel::Orchestrator>,
+    /// Shutdown signal. When set to true, `run()` exits its event loop.
+    shutdown: Arc<AtomicBool>,
 }
 
 impl Gateway {
@@ -26,7 +29,19 @@ impl Gateway {
         Self {
             channels: RwLock::new(HashMap::new()),
             orchestrator,
+            shutdown: Arc::new(AtomicBool::new(false)),
         }
+    }
+
+    /// Signal the gateway to stop its event loop.
+    pub fn signal_shutdown(&self) {
+        self.shutdown.store(true, Ordering::Release);
+        tracing::info!("Gateway shutdown signal sent");
+    }
+
+    /// Check if shutdown has been signalled.
+    pub fn is_shutdown(&self) -> bool {
+        self.shutdown.load(Ordering::Acquire)
     }
 
     /// Registers a channel with the gateway.
@@ -161,6 +176,9 @@ impl Gateway {
             // Adaptive back-off: busy when messages flow, pause when idle.
             if received_any {
                 tokio::task::yield_now().await;
+            } else if self.shutdown.load(Ordering::Acquire) {
+                tracing::info!("Gateway event loop stopped (shutdown signalled)");
+                break Ok(());
             } else {
                 tokio::time::sleep(Duration::from_millis(50)).await;
             }

@@ -38,10 +38,16 @@ impl MemoryGraph {
         self.incoming.entry(from).or_default();
         self.incoming.entry(to).or_default();
 
-        let neighbors = self.edges.get_mut(&from).unwrap();
+        let neighbors = self
+            .edges
+            .get_mut(&from)
+            .expect("entry(or_default) guarantees existence");
         if !neighbors.contains(&to) {
             neighbors.push(to);
-            self.incoming.get_mut(&to).unwrap().push(from);
+            self.incoming
+                .get_mut(&to)
+                .expect("entry(or_default) guarantees existence")
+                .push(from);
         }
 
         self.node_count = self.edges.len();
