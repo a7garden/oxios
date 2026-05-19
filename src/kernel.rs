@@ -109,6 +109,10 @@ impl Kernel {
                     oxios_kernel::KnowledgeApi::new(
                         std::path::PathBuf::from(&self.config.kernel.workspace).join("knowledge"),
                         self.memory_manager.clone(),
+                        Arc::new(oxios_kernel::OxiEngineProvider::new(
+                            &self.config.engine.default_model,
+                        )),
+                        self.config.engine.default_model.clone(),
                     ),
                 ))
             })
@@ -441,6 +445,10 @@ impl KernelBuilder {
                 oxios_kernel::KnowledgeApi::new(
                     PathBuf::from(&config.kernel.workspace).join("knowledge"),
                     memory_manager.clone(),
+                    Arc::new(oxios_kernel::OxiEngineProvider::new(
+                        &config.engine.default_model,
+                    )),
+                    config.engine.default_model.clone(),
                 ),
             ));
 

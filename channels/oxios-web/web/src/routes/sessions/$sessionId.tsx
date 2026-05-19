@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { ArrowLeft, Clock, MessageSquare } from 'lucide-react'
+import { ErrorState } from '@/components/shared/error-state'
 import { LoadingCards } from '@/components/shared/loading'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -16,17 +17,18 @@ function SessionDetailPage() {
   const { sessionId } = Route.useParams()
   const navigate = useNavigate()
 
-  const { data: session, isLoading: sessionLoading } = useQuery({
+  const { data: session, isLoading: sessionLoading, isError: sessionError, refetch: refetchSession } = useQuery({
     queryKey: ['session', sessionId],
     queryFn: () => api.get<Session>(`/api/sessions/${sessionId}`),
   })
 
-  const { data: messages } = useQuery({
+  const { data: messages, isError: messagesError, refetch: refetchMessages } = useQuery({
     queryKey: ['session-messages', sessionId],
     queryFn: () => api.get<ChatMessage[]>(`/api/sessions/${sessionId}/messages`),
   })
 
   if (sessionLoading) return <LoadingCards count={3} />
+  if (sessionError) return <ErrorState onRetry={() => refetchSession()} />
   if (!session) return <p className="text-muted-foreground">Session not found.</p>
 
   const details = [
@@ -44,7 +46,7 @@ function SessionDetailPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={() => navigate({ to: '/sessions' })}>
+        <Button variant="ghost" size="icon" onClick={() => navigate({ to: '/sessions' })} aria-label="Go back">
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div className="flex-1">
@@ -81,7 +83,9 @@ function SessionDetailPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {messages && messages.length > 0 ? (
+          {messagesError ? (
+            <ErrorState onRetry={() => refetchMessages()} />
+          ) : messages && messages.length > 0 ? (
             <div className="space-y-3">
               {messages.map((msg, i) => (
                 <div
@@ -101,7 +105,7 @@ function SessionDetailPage() {
                 </div>
               ))}
             </div>
-          ) : (
+          ) : messagesError ? null : (
             <p className="text-sm text-muted-foreground">No messages in this session.</p>
           )}
         </CardContent>

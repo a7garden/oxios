@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { ArrowLeft, Bot, RotateCw, Skull } from 'lucide-react'
+import { ErrorState } from '@/components/shared/error-state'
 import { LoadingCards } from '@/components/shared/loading'
 import { StatusIndicator } from '@/components/shared/status-indicator'
 import { Button } from '@/components/ui/button'
@@ -17,7 +18,7 @@ function AgentDetailPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
 
-  const { data: agent, isLoading } = useQuery({
+  const { data: agent, isLoading, isError, refetch } = useQuery({
     queryKey: ['agent', agentId],
     queryFn: () => api.get<Agent>(`/api/agents/${agentId}`),
     refetchInterval: 5000,
@@ -40,6 +41,7 @@ function AgentDetailPage() {
   })
 
   if (isLoading) return <LoadingCards count={3} />
+  if (isError) return <ErrorState onRetry={() => refetch()} />
   if (!agent) return <p className="text-muted-foreground">Agent not found.</p>
 
   const details = [
@@ -57,7 +59,7 @@ function AgentDetailPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={() => navigate({ to: '/agents' })}>
+        <Button variant="ghost" size="icon" onClick={() => navigate({ to: '/agents' })} aria-label="Go back">
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div className="flex-1">

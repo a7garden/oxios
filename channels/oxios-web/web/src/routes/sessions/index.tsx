@@ -3,6 +3,7 @@ import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { Clock, RefreshCw, Trash2 } from 'lucide-react'
 import { DataTable } from '@/components/shared/data-table'
 import { EmptyState } from '@/components/shared/empty-state'
+import { ErrorState } from '@/components/shared/error-state'
 import { LoadingTable } from '@/components/shared/loading'
 import { Button } from '@/components/ui/button'
 import { api } from '@/lib/api-client'
@@ -16,9 +17,10 @@ function SessionsListPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
 
-  const { data, isLoading, refetch, isFetching } = useQuery({
+  const { data, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ['sessions'],
     queryFn: () => api.get<{ items: Session[]; total: number }>('/api/sessions'),
+    refetchInterval: 10000,
   })
 
   const deleteMutation = useMutation({
@@ -27,6 +29,7 @@ function SessionsListPage() {
   })
 
   if (isLoading) return <LoadingTable rows={5} />
+  if (isError) return <ErrorState onRetry={() => refetch()} />
 
   const sessions = data?.items ?? []
 
@@ -58,6 +61,7 @@ function SessionsListPage() {
             e.stopPropagation()
             deleteMutation.mutate(row.id)
           }}
+          aria-label="Delete session"
           disabled={deleteMutation.isPending}
         >
           <Trash2 className="h-4 w-4 text-destructive" />

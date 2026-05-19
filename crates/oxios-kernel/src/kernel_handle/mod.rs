@@ -156,7 +156,14 @@ impl KernelHandle {
         space_manager: Arc<SpaceManager>,
     ) -> Self {
         let knowledge_dir = state_store.base_path.join("knowledge");
-        let knowledge = KnowledgeApi::new(knowledge_dir, memory_manager.clone());
+        let knowledge = KnowledgeApi::new(
+            knowledge_dir,
+            memory_manager.clone(),
+            Arc::new(crate::engine::OxiEngineProvider::new(
+                &config.engine.default_model,
+            )),
+            config.engine.default_model.clone(),
+        );
         Self {
             security: SecurityApi::new(
                 auth_manager.clone(),

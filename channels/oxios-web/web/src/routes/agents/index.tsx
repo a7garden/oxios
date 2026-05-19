@@ -3,6 +3,7 @@ import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { Bot, RefreshCw } from 'lucide-react'
 import { DataTable } from '@/components/shared/data-table'
 import { EmptyState } from '@/components/shared/empty-state'
+import { ErrorState } from '@/components/shared/error-state'
 import { LoadingTable } from '@/components/shared/loading'
 import { StatusIndicator } from '@/components/shared/status-indicator'
 import { Badge } from '@/components/ui/badge'
@@ -17,13 +18,14 @@ export const Route = createFileRoute('/agents/')({
 function AgentsListPage() {
   const navigate = useNavigate()
 
-  const { data, isLoading, refetch, isFetching } = useQuery({
+  const { data, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ['agents'],
     queryFn: () => api.get<{ items: Agent[]; total: number }>('/api/agents'),
     refetchInterval: 5000,
   })
 
   if (isLoading) return <LoadingTable rows={5} />
+  if (isError) return <ErrorState onRetry={() => refetch()} />
 
   const agents = data?.items ?? []
 

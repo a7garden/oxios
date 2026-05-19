@@ -3,6 +3,7 @@ import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { Dna, RefreshCw } from 'lucide-react'
 import { DataTable } from '@/components/shared/data-table'
 import { EmptyState } from '@/components/shared/empty-state'
+import { ErrorState } from '@/components/shared/error-state'
 import { LoadingTable } from '@/components/shared/loading'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -16,12 +17,14 @@ export const Route = createFileRoute('/seeds/')({
 function SeedsListPage() {
   const navigate = useNavigate()
 
-  const { data, isLoading, refetch, isFetching } = useQuery({
+  const { data, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ['seeds'],
     queryFn: () => api.get<{ items: Seed[]; total: number }>('/api/seeds'),
+    refetchInterval: 10000,
   })
 
   if (isLoading) return <LoadingTable rows={5} />
+  if (isError) return <ErrorState onRetry={() => refetch()} />
 
   const seeds = data?.items ?? []
 

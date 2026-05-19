@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
 import { Activity, Bot, Boxes, Clock, Cpu, Zap } from 'lucide-react'
+import { ErrorState } from '@/components/shared/error-state'
 import { LoadingCards } from '@/components/shared/loading'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -12,19 +13,20 @@ export const Route = createFileRoute('/dashboard')({
 })
 
 function DashboardPage() {
-  const { data: status, isLoading: statusLoading } = useQuery({
+  const { data: status, isLoading: statusLoading, isError: statusError, refetch: refetchStatus } = useQuery({
     queryKey: ['status'],
     queryFn: () => api.get<SystemStatus>('/api/status'),
     refetchInterval: 10000,
   })
 
-  const { data: agents } = useQuery({
+  const { data: agents, isError: agentsError, refetch: refetchAgents } = useQuery({
     queryKey: ['agents'],
     queryFn: () => api.get<{ items: Agent[] }>('/api/agents'),
     refetchInterval: 5000,
   })
 
   if (statusLoading) return <LoadingCards count={4} />
+  if (statusError) return <ErrorState onRetry={() => refetchStatus()} />
 
   const stats = [
     {
@@ -85,7 +87,9 @@ function DashboardPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {agents?.items?.length ? (
+          {agentsError ? (
+            <ErrorState onRetry={() => refetchAgents()} />
+          ) : agents?.items?.length ? (
             <div className="space-y-2">
               {agents.items
                 .filter((a) => a.status === 'running')

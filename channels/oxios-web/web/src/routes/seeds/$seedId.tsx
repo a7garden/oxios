@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { ArrowLeft, Dna, GitCommit } from 'lucide-react'
+import { ErrorState } from '@/components/shared/error-state'
 import { LoadingCards } from '@/components/shared/loading'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -16,18 +17,19 @@ function SeedDetailPage() {
   const { seedId } = Route.useParams()
   const navigate = useNavigate()
 
-  const { data: seed, isLoading } = useQuery({
+  const { data: seed, isLoading, isError, refetch } = useQuery({
     queryKey: ['seed', seedId],
     queryFn: () => api.get<Seed>(`/api/seeds/${seedId}`),
   })
 
   if (isLoading) return <LoadingCards count={3} />
+  if (isError) return <ErrorState onRetry={() => refetch()} />
   if (!seed) return <p className="text-muted-foreground">Seed not found.</p>
 
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={() => navigate({ to: '/seeds' })}>
+        <Button variant="ghost" size="icon" onClick={() => navigate({ to: '/seeds' })} aria-label="Go back">
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div className="flex-1">

@@ -1,53 +1,30 @@
 import { useQuery } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
 import { Bell, RefreshCw } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import { EmptyState } from '@/components/shared/empty-state'
 import { LoadingCards } from '@/components/shared/loading'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { api } from '@/lib/api-client'
-import { SseClient } from '@/lib/sse-client'
+import { useEvents } from '@/hooks/use-events'
 import type { OxiosEvent } from '@/types'
 
 export const Route = createFileRoute('/events')({ component: EventsPage })
 
 function EventsPage() {
-  const [liveEvents, setLiveEvents] = useState<OxiosEvent[]>([])
-  const sseRef = useRef<SseClient | null>(null)
+  const { events: liveEvents, isConnected, error: connectionError } = useEvents()
   const scrollRef = useRef<HTMLDivElement>(null)
 
-  const {
-    data: initial,
-    isLoading,
-    refetch,
-    isFetching,
-  } = useQuery({
+  const { isLoading, refetch, isFetching } = useQuery({
     queryKey: ['events'],
     queryFn: () => api.get<{ items: OxiosEvent[] }>('/api/events?limit=50'),
   })
 
   useEffect(() => {
-    const events = initial?.items ?? []
-    if (events.length > 0 && liveEvents.length === 0) {
-      setLiveEvents(events.reverse())
-    }
-  }, [initial, liveEvents.length])
-
-  useEffect(() => {
-    const client = new SseClient()
-    sseRef.current = client
-    client.connect('/api/events/stream', (_event, data) => {
-      setLiveEvents((prev) => [...prev.slice(-99), data as OxiosEvent])
-      scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight })
-    })
-    return () => client.disconnect()
-  }, [])
-
-  useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight })
-  }, [])
+  }, [liveEvents.length])
 
   if (isLoading) return <LoadingCards count={4} />
 
@@ -68,14 +45,32 @@ function EventsPage() {
           <CardTitle className="flex items-center gap-2 text-base">
             <Bell className="h-4 w-4" />
             Event Stream
-            <Badge variant="secondary" className="ml-2">
+            <Badge variant="secondary" className="ml-2" aria-live="polite">
               {liveEvents.length}
             </Badge>
-            <div className="ml-auto h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+            {isConnected && !connectionError && (
+              <div className="ml-auto h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+            )}
+            {connectionError && (
+              <div className="ml-auto flex items-center gap-1.5 text-destructive text-xs">
+                <div className="h-2 w-2 rounded-full bg-destructive" />
+                Connection lost
+              </div>
+            )}
           </CardTitle>
         </CardHeader>
         <CardContent className="flex-1">
-          <div ref={scrollRef} className="h-[500px] overflow-y-auto space-y-1">
+          {connectionError && (
+            <div className="mb-3 rounded border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              Failed to connect to event stream: {connectionError.message}
+            </div>
+          )}
+          <div
+            ref={scrollRef}
+            className="h-[500px] overflow-y-auto space-y-1"
+            role="log"
+            aria-label="Event stream"
+          >
             {liveEvents.length === 0 ? (
               <EmptyState
                 icon={<Bell className="h-8 w-8" />}

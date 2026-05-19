@@ -21,6 +21,8 @@ use crate::KernelHandle;
 pub struct KnowledgeTool {
     knowledge_dir: std::path::PathBuf,
     memory: Arc<MemoryManager>,
+    engine: Arc<dyn crate::engine::EngineProvider>,
+    default_model: String,
 }
 
 impl KnowledgeTool {
@@ -29,6 +31,10 @@ impl KnowledgeTool {
         Self {
             knowledge_dir: kernel.knowledge.root(),
             memory: kernel.agents.memory_manager().clone(),
+            engine: Arc::new(crate::engine::OxiEngineProvider::new(
+                kernel.knowledge.model_id(),
+            )),
+            default_model: kernel.knowledge.model_id().to_string(),
         }
     }
 
@@ -37,12 +43,19 @@ impl KnowledgeTool {
         Self {
             knowledge_dir,
             memory,
+            engine: Arc::new(crate::engine::OxiEngineProvider::new("anthropic/claude-sonnet-4")),
+            default_model: "anthropic/claude-sonnet-4".to_string(),
         }
     }
 
     /// Build a temporary KnowledgeApi for this operation.
     fn make_api(&self) -> KnowledgeApi {
-        KnowledgeApi::new(self.knowledge_dir.clone(), self.memory.clone())
+        KnowledgeApi::new(
+            self.knowledge_dir.clone(),
+            self.memory.clone(),
+            self.engine.clone(),
+            self.default_model.clone(),
+        )
     }
 }
 
