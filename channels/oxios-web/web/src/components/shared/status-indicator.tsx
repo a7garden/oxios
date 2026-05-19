@@ -12,15 +12,18 @@ const statusColors: Record<string, string> = {
   pending: 'bg-amber-500',
   stopped: 'bg-zinc-400',
   archived: 'bg-zinc-400',
-  error: 'bg-red-500',
-  failed: 'bg-red-500',
-  rejected: 'bg-red-500',
+  error: 'bg-destructive',
+  failed: 'bg-destructive',
+  rejected: 'bg-destructive',
 }
 
 export function StatusIndicator({ status, className }: StatusIndicatorProps) {
   return (
     <div className={cn('flex items-center gap-2', className)}>
-      <div className={cn('h-2 w-2 rounded-full', statusColors[status] ?? 'bg-zinc-400')} />
+      <div
+        className={cn('h-2 w-2 rounded-full', statusColors[status] ?? 'bg-zinc-400')}
+        aria-hidden="true"
+      />
       <span className="text-sm capitalize">{status}</span>
     </div>
   )
