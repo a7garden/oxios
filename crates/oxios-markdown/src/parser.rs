@@ -108,7 +108,7 @@ pub fn today_chat_header() -> String {
 pub fn today_journal_path() -> String {
     use chrono::Local;
     let now = Local::now();
-    format!("journal/{}.{} {}.md", now.format("%Y.%m"), now.format("%B"))
+    format!("journal/{}.{}.md", now.format("%Y.%m"), now.format("%B"))
 }
 
 #[cfg(test)]
