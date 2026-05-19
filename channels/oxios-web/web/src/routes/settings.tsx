@@ -159,6 +159,7 @@ function SettingsPage() {
       if (!sectionConfig) continue
       values[section.key] = {} as Record<string, string>
       for (const field of section.fields) {
+        // biome-ignore lint/style/noNonNullAssertion: guaranteed by assignment on prev line
         values[section.key]![field.key] = String(sectionConfig[field.key] ?? '')
       }
     }

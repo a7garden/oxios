@@ -13,6 +13,7 @@ import {
   GitBranch,
   LayoutDashboard,
   MessageSquare,
+  Monitor,
   Moon,
   PanelLeft,
   PanelLeftClose,
@@ -83,7 +84,7 @@ const navGroups: { label: string; items: NavItem[] }[] = [
 
 export function Sidebar() {
   const { collapsed, toggle } = useSidebarStore()
-  const { resolved, setTheme } = useThemeStore()
+  const { theme, resolved, setTheme } = useThemeStore()
   const router = useRouterState()
   const currentPath = router.location.pathname
 
@@ -151,14 +152,25 @@ export function Sidebar() {
 
       <Separator />
       {/* Footer */}
-      <div className="p-2 flex items-center gap-1">
+      <div className="p-2 flex flex-col gap-1">
         <button
           type="button"
-          onClick={() => setTheme(resolved === 'dark' ? 'light' : 'dark')}
+          onClick={() => {
+            const next = theme === 'dark' ? 'light' : theme === 'light' ? 'system' : 'dark'
+            setTheme(next)
+          }}
           className="flex items-center gap-3 rounded-lg px-2.5 py-2 text-sm w-full hover:bg-sidebar-accent/50"
         >
-          {resolved === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-          {!collapsed && <span>{resolved === 'dark' ? 'Light' : 'Dark'} Mode</span>}
+          {theme === 'system' ? (
+            <Monitor className="h-4 w-4" />
+          ) : resolved === 'dark' ? (
+            <Sun className="h-4 w-4" />
+          ) : (
+            <Moon className="h-4 w-4" />
+          )}
+          {!collapsed && (
+            <span>{theme === 'system' ? 'System' : resolved === 'dark' ? 'Light' : 'Dark'}</span>
+          )}
         </button>
         <Link
           to="/settings"
