@@ -157,9 +157,9 @@ function SettingsPage() {
     for (const section of sections) {
       const sectionConfig = config[section.key] as Record<string, unknown> | undefined
       if (!sectionConfig) continue
-      values[section.key] = {}
+      values[section.key] = {} as Record<string, string>
       for (const field of section.fields) {
-        values[section.key][field.key] = String(sectionConfig[field.key] ?? '')
+        values[section.key]![field.key] = String(sectionConfig[field.key] ?? '')
       }
     }
     setFormValues(values)

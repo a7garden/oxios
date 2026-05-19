@@ -67,7 +67,7 @@ function SeedDetailPage() {
                 >
                   <div className="flex flex-col items-center">
                     <div className="h-3 w-3 rounded-full bg-primary mt-1" />
-                    {i < seed.evolution_log?.length - 1 && (
+                    {i < (seed.evolution_log?.length ?? 0) - 1 && (
                       <div className="w-0.5 flex-1 bg-border" />
                     )}
                   </div>
