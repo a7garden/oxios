@@ -35,9 +35,6 @@ async function init() {
     // Oxios: token exchange not needed — auth is handled by Oxios middleware
     // If running inside Oxios web channel, mark server as ready immediately.
     markServerOk();
-            logError('Error exchanging token:', error);
-        }
-    }
 
     const savedDirHandle = await getSavedRootDirHandle();
     const hasSavedLocalDir = savedDirHandle instanceof FileSystemDirectoryHandle;
@@ -534,7 +531,10 @@ function goForward() {
 
 // Returns { json, error }. On success, error is null. On HTTP error,
 // json is null and error is a "<status> <statusText>: <body>" string.
+// Oxios: post() routes through Oxios Knowledge API
 async function post(endpoint, data) {
+    // In Oxios mode, the sync endpoints are no-ops, so this function
+    // is mostly unused. Keeping for compatibility.
     let response;
     try {
         response = await fetch(`${API_URL}/${endpoint}`, {
