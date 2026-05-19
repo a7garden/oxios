@@ -97,6 +97,20 @@ pub fn extract_headings(content: &str) -> Vec<String> {
 /// Minimum similarity score (0-100) for fuzzy name search.
 pub const MIN_SEARCH_SIMILARITY: i32 = 70;
 
+/// 오늘 날짜의 Chat.md 헤더 문자열 (예: "#### 20 May, Tuesday").
+pub fn today_chat_header() -> String {
+    use chrono::Local;
+    let now = Local::now();
+    format!("#### {} {}", now.format("%d %B,"), now.format("%A"))
+}
+
+/// 오늘 날짜의 저널 파일 경로 (예: "journal/2026.05 May.md").
+pub fn today_journal_path() -> String {
+    use chrono::Local;
+    let now = Local::now();
+    format!("journal/{}.{} {}.md", now.format("%Y.%m"), now.format("%B"))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

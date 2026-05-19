@@ -112,6 +112,46 @@ impl VirtualFs {
         Ok(self.root.join(&normalized))
     }
 
+    // ── POSIX Path API (단일 path 문자열) ────────────────────
+
+    /// Read file content by POSIX-style relative path.
+    /// `path` examples: "Rust.md", "brain/Rust.md", "journal/2024.08 August.md"
+    pub fn read_path(&self, path: &str) -> Result<String, FsError> {
+        let (dir, filename) = split_posix_path(path);
+        self.read(dir, filename)
+    }
+
+    /// Write file content by POSIX-style relative path.
+    pub fn write_path(&self, path: &str, content: &str) -> Result<(), FsError> {
+        let (dir, filename) = split_posix_path(path);
+        self.write(dir, filename, content)
+    }
+
+    /// Delete file by POSIX-style relative path.
+    pub fn delete_path(&self, path: &str) -> Result<(), FsError> {
+        let (dir, filename) = split_posix_path(path);
+        self.del(dir, filename)
+    }
+
+    /// Rename/move file by POSIX-style relative paths.
+    pub fn rename_path(&self, old_path: &str, new_path: &str) -> Result<(), FsError> {
+        let (old_dir, old_filename) = split_posix_path(old_path);
+        let (new_dir, new_filename) = split_posix_path(new_path);
+        self.rename(old_dir, old_filename, new_dir, new_filename)
+    }
+
+    /// Check if file exists by POSIX-style relative path.
+    pub fn exists_path(&self, path: &str) -> Result<bool, FsError> {
+        let (dir, filename) = split_posix_path(path);
+        self.exists(dir, filename)
+    }
+
+    /// Get mtime by POSIX-style relative path.
+    pub fn mtime_path(&self, path: &str) -> Result<i64, FsError> {
+        let (dir, filename) = split_posix_path(path);
+        self.mtime(dir, filename)
+    }
+
     // ── Basic I/O ───────────────────────────────────────────
 
     /// Check if a file or directory exists.
@@ -525,6 +565,18 @@ pub fn sort_by_ctime_desc(files: &mut Vec<FileEntry>) {
 /// Extract filenames from a list of file entries.
 pub fn only_filenames(files: &[FileEntry]) -> Vec<String> {
     files.iter().map(|f| f.name.clone()).collect()
+}
+
+/// Split a POSIX-style path like "brain/Rust.md" into (dir, filename).
+/// Root-level files like "Chat.md" become ("/", "Chat.md").
+pub fn split_posix_path(path: &str) -> (&str, &str) {
+    let path = path.trim_start_matches('/');
+    if let Some(slash_pos) = path.rfind('/') {
+        let (dir, file) = path.split_at(slash_pos);
+        (dir, &file[1..])
+    } else {
+        (crate::types::DIR_USER_ROOT, path)
+    }
 }
 
 // ── Internal helpers ────────────────────────────────────────
