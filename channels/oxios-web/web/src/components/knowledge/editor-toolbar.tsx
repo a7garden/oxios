@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowRight, Columns2, X } from 'lucide-react'
+import { ArrowLeft, ArrowRight, X } from 'lucide-react'
 import { useKnowledgeStore } from '@/stores/knowledge'
 import { Button } from '@/components/ui/button'
 
@@ -9,8 +9,6 @@ export function EditorToolbar() {
     historyIndex,
     goBack,
     goForward,
-    infoPanelOpen,
-    toggleInfoPanel,
     splitEditorOpen,
     closeSplit,
   } = useKnowledgeStore()

@@ -12,7 +12,7 @@ export function MarkdownEditor({ filePath, initialContent, onSave, className }: 
   const [content, setContent] = useState(initialContent)
   const [isDirty, setIsDirty] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const saveTimerRef = useRef<ReturnType<typeof setTimeout>>()
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
   // Reset when file changes
   useEffect(() => {

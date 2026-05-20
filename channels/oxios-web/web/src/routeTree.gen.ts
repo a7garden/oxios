@@ -30,6 +30,7 @@ import { Route as WorkspaceIndexRouteImport } from './routes/workspace/index'
 import { Route as SpacesIndexRouteImport } from './routes/spaces/index'
 import { Route as SessionsIndexRouteImport } from './routes/sessions/index'
 import { Route as SeedsIndexRouteImport } from './routes/seeds/index'
+import { Route as KnowledgeIndexRouteImport } from './routes/knowledge/index'
 import { Route as AgentsIndexRouteImport } from './routes/agents/index'
 import { Route as SpacesSpaceIdRouteImport } from './routes/spaces/$spaceId'
 import { Route as SessionsSessionIdRouteImport } from './routes/sessions/$sessionId'
@@ -141,6 +142,11 @@ const SeedsIndexRoute = SeedsIndexRouteImport.update({
   path: '/seeds/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const KnowledgeIndexRoute = KnowledgeIndexRouteImport.update({
+  id: '/knowledge/',
+  path: '/knowledge/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AgentsIndexRoute = AgentsIndexRouteImport.update({
   id: '/agents/',
   path: '/agents/',
@@ -190,6 +196,7 @@ export interface FileRoutesByFullPath {
   '/sessions/$sessionId': typeof SessionsSessionIdRoute
   '/spaces/$spaceId': typeof SpacesSpaceIdRoute
   '/agents/': typeof AgentsIndexRoute
+  '/knowledge/': typeof KnowledgeIndexRoute
   '/seeds/': typeof SeedsIndexRoute
   '/sessions/': typeof SessionsIndexRoute
   '/spaces/': typeof SpacesIndexRoute
@@ -218,6 +225,7 @@ export interface FileRoutesByTo {
   '/sessions/$sessionId': typeof SessionsSessionIdRoute
   '/spaces/$spaceId': typeof SpacesSpaceIdRoute
   '/agents': typeof AgentsIndexRoute
+  '/knowledge': typeof KnowledgeIndexRoute
   '/seeds': typeof SeedsIndexRoute
   '/sessions': typeof SessionsIndexRoute
   '/spaces': typeof SpacesIndexRoute
@@ -247,6 +255,7 @@ export interface FileRoutesById {
   '/sessions/$sessionId': typeof SessionsSessionIdRoute
   '/spaces/$spaceId': typeof SpacesSpaceIdRoute
   '/agents/': typeof AgentsIndexRoute
+  '/knowledge/': typeof KnowledgeIndexRoute
   '/seeds/': typeof SeedsIndexRoute
   '/sessions/': typeof SessionsIndexRoute
   '/spaces/': typeof SpacesIndexRoute
@@ -277,6 +286,7 @@ export interface FileRouteTypes {
     | '/sessions/$sessionId'
     | '/spaces/$spaceId'
     | '/agents/'
+    | '/knowledge/'
     | '/seeds/'
     | '/sessions/'
     | '/spaces/'
@@ -305,6 +315,7 @@ export interface FileRouteTypes {
     | '/sessions/$sessionId'
     | '/spaces/$spaceId'
     | '/agents'
+    | '/knowledge'
     | '/seeds'
     | '/sessions'
     | '/spaces'
@@ -333,6 +344,7 @@ export interface FileRouteTypes {
     | '/sessions/$sessionId'
     | '/spaces/$spaceId'
     | '/agents/'
+    | '/knowledge/'
     | '/seeds/'
     | '/sessions/'
     | '/spaces/'
@@ -362,6 +374,7 @@ export interface RootRouteChildren {
   SessionsSessionIdRoute: typeof SessionsSessionIdRoute
   SpacesSpaceIdRoute: typeof SpacesSpaceIdRoute
   AgentsIndexRoute: typeof AgentsIndexRoute
+  KnowledgeIndexRoute: typeof KnowledgeIndexRoute
   SeedsIndexRoute: typeof SeedsIndexRoute
   SessionsIndexRoute: typeof SessionsIndexRoute
   SpacesIndexRoute: typeof SpacesIndexRoute
@@ -517,6 +530,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SeedsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/knowledge/': {
+      id: '/knowledge/'
+      path: '/knowledge'
+      fullPath: '/knowledge/'
+      preLoaderRoute: typeof KnowledgeIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/agents/': {
       id: '/agents/'
       path: '/agents'
@@ -578,6 +598,7 @@ const rootRouteChildren: RootRouteChildren = {
   SessionsSessionIdRoute: SessionsSessionIdRoute,
   SpacesSpaceIdRoute: SpacesSpaceIdRoute,
   AgentsIndexRoute: AgentsIndexRoute,
+  KnowledgeIndexRoute: KnowledgeIndexRoute,
   SeedsIndexRoute: SeedsIndexRoute,
   SessionsIndexRoute: SessionsIndexRoute,
   SpacesIndexRoute: SpacesIndexRoute,

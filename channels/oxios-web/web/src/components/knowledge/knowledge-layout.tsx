@@ -1,5 +1,3 @@
-import { Outlet } from '@tanstack/react-router'
-import { useEffect } from 'react'
 import { useKnowledgeStore } from '@/stores/knowledge'
 import { KnowledgeSidebar } from './knowledge-sidebar'
 import { EditorPanel } from './editor-panel'
@@ -7,13 +5,12 @@ import { KnowledgeChat } from './knowledge-chat'
 import { InfoPanel } from './info-panel'
 import { SearchModal } from './search-modal'
 import { MoveModal } from './move-modal'
-import { cn } from '@/lib/utils'
 
 export function KnowledgeLayout() {
-  const { mode, sidebarOpen, sidebarWidth, infoPanelOpen, toggleSidebar } = useKnowledgeStore()
+  const { mode, sidebarOpen, infoPanelOpen, toggleSidebar } = useKnowledgeStore()
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
+    <div className="fixed inset-0 z-30 flex overflow-hidden bg-background">
       {/* Thin strip to re-open sidebar */}
       {!sidebarOpen && (
         <button
@@ -25,23 +22,15 @@ export function KnowledgeLayout() {
       )}
 
       {/* Sidebar */}
-      {sidebarOpen && (
-        <KnowledgeSidebar />
-      )}
+      {sidebarOpen && <KnowledgeSidebar />}
 
       {/* Main content */}
       <div className="flex flex-1 min-w-0">
-        {mode === 'chat' ? (
-          <KnowledgeChat />
-        ) : (
-          <EditorPanel />
-        )}
+        {mode === 'chat' ? <KnowledgeChat /> : <EditorPanel />}
       </div>
 
       {/* Info panel (right) */}
-      {infoPanelOpen && (
-        <InfoPanel />
-      )}
+      {infoPanelOpen && <InfoPanel />}
 
       {/* Modals */}
       <SearchModal />

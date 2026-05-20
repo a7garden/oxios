@@ -30,7 +30,6 @@ export function useKnowledgeFile(path: string | null) {
     queryKey: ['knowledge', 'file', path],
     queryFn: () => api.get<string>(`/api/knowledge/file/${path}`),
     enabled: !!path,
-    // Don't cache content as stale — editor manages its own state
     staleTime: 0,
   })
 }

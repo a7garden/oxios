@@ -23,8 +23,8 @@ interface KnowledgeState {
   // Actions
   openFile: (path: string) => void
   openChat: () => void
-  goBack: () => string | null
-  goForward: () => string | null
+  goBack: () => string | null | undefined
+  goForward: () => string | null | undefined
   toggleSidebar: () => void
   setSidebarWidth: (w: number) => void
   toggleInfoPanel: () => void

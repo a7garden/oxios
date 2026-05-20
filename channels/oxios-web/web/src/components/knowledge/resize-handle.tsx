@@ -5,7 +5,7 @@ interface ResizeHandleProps {
   onResize: (width: number) => void
 }
 
-export function ResizeHandle({ width, onResize }: ResizeHandleProps) {
+export function ResizeHandle({ onResize }: ResizeHandleProps) {
   const isDragging = useRef(false)
 
   const handleMouseDown = useCallback(
