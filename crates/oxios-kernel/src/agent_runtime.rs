@@ -249,6 +249,27 @@ impl AgentRuntime {
             Err(e) => tracing::warn!(error = %e, "Failed to recall memories"),
         }
 
+        // Blend relevant knowledge notes into system prompt (KnowledgeLens, RFC-003 Phase 3).
+        match self.kernel_handle.knowledge_lens.recall_for_context(&seed.goal, 5).await {
+            Ok(ctx) if !ctx.notes.is_empty() => {
+                tracing::info!(
+                    notes = ctx.notes.len(),
+                    memories = ctx.memories.len(),
+                    "Recalled knowledge context for seed"
+                );
+                let knowledge_blend = ctx.notes
+                    .iter()
+                    .take(3)
+                    .map(|n| format!("## {}\n\n{}", n.name, n.content))
+                    .collect::<Vec<_>>()
+                    .join("\n\n");
+                system_prompt.push_str("\n\n## Relevant Knowledge\n\n");
+                system_prompt.push_str(&knowledge_blend);
+            }
+            Ok(_) => tracing::debug!("No knowledge recalled"),
+            Err(e) => tracing::warn!(error = %e, "Failed to recall knowledge context"),
+        }
+
         // Clone everything to move into spawn_blocking.
         let config = self.config.clone();
         let provider = Arc::clone(&self.provider);
