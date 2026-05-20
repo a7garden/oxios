@@ -7,6 +7,7 @@ pub mod exec_api;
 pub mod extension_api;
 pub mod infra_api;
 pub mod knowledge_api;
+pub mod knowledge_lens;
 pub mod mcp_api;
 pub mod persona_api;
 pub mod security_api;
@@ -20,6 +21,7 @@ pub use exec_api::ExecApi;
 pub use extension_api::ExtensionApi;
 pub use infra_api::InfraApi;
 pub use knowledge_api::KnowledgeApi;
+pub use knowledge_lens::{CopilotResponse, KnowledgeContext, KnowledgeLens, KnowledgeNote, MemoryNote};
 pub use mcp_api::McpApi;
 pub use persona_api::PersonaApi;
 pub use security_api::SecurityApi;
@@ -90,6 +92,8 @@ pub struct KernelHandle {
     pub a2a: A2aApi,
     /// Knowledge base: markdown notes, backlinks, memory sync.
     pub knowledge: KnowledgeApi,
+    /// Semantic knowledge overlay (HNSW index + agent recall).
+    pub knowledge_lens: Arc<KnowledgeLens>,
 }
 
 impl KernelHandle {
@@ -111,6 +115,7 @@ impl KernelHandle {
         browser: BrowserApi,
         a2a: A2aApi,
         knowledge: KnowledgeApi,
+        knowledge_lens: Arc<KnowledgeLens>,
     ) -> Self {
         Self {
             state,
@@ -125,6 +130,7 @@ impl KernelHandle {
             browser,
             a2a,
             knowledge,
+            knowledge_lens,
         }
     }
 
@@ -156,6 +162,7 @@ impl KernelHandle {
         space_manager: Arc<SpaceManager>,
     ) -> Self {
         let knowledge_dir = state_store.base_path.join("knowledge");
+        let knowledge_lens_dir = knowledge_dir.clone();
         let knowledge = KnowledgeApi::new(
             knowledge_dir,
             memory_manager.clone(),
@@ -163,6 +170,13 @@ impl KernelHandle {
                 &config.engine.default_model,
             )),
             config.engine.default_model.clone(),
+        );
+        let knowledge_lens = Arc::new(
+            KnowledgeLens::new(
+                Arc::new(oxios_markdown::KnowledgeBase::new(knowledge_lens_dir).unwrap()),
+                memory_manager.clone(),
+            )
+            .expect("Failed to create KnowledgeLens"),
         );
         Self {
             security: SecurityApi::new(
@@ -195,6 +209,7 @@ impl KernelHandle {
             browser: BrowserApi::default(),
             a2a: A2aApi::new(Arc::new(A2AProtocol::new(crate::EventBus::new(0)))),
             knowledge,
+            knowledge_lens,
         }
     }
 

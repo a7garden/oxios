@@ -13,6 +13,7 @@ use oxios_kernel::{
     Orchestrator, OxiosConfig, PersonaManager, ProgramManager, ResourceMonitor, SkillStore,
     SpaceManager, Supervisor,
 };
+use oxios_markdown::KnowledgeBase;
 
 use oxios_ouroboros::{OuroborosEngine, OuroborosProtocol, Seed};
 use std::path::PathBuf;
@@ -114,6 +115,13 @@ impl Kernel {
                         )),
                         self.config.engine.default_model.clone(),
                     ),
+                    // KnowledgeLens — semantic overlay (Phase 3, RFC-003)
+                    Arc::new(oxios_kernel::KnowledgeLens::new(
+                        Arc::new(KnowledgeBase::new(
+                            std::path::PathBuf::from(&self.config.kernel.workspace).join("knowledge"),
+                        ).expect("KnowledgeBase init failed")),
+                        self.memory_manager.clone(),
+                    ).expect("KnowledgeLens init failed")),
                 ))
             })
             .clone()
@@ -450,6 +458,13 @@ impl KernelBuilder {
                     )),
                     config.engine.default_model.clone(),
                 ),
+                // KnowledgeLens — semantic overlay (Phase 3, RFC-003)
+                Arc::new(oxios_kernel::KnowledgeLens::new(
+                    Arc::new(KnowledgeBase::new(
+                        PathBuf::from(&config.kernel.workspace).join("knowledge"),
+                    ).expect("KnowledgeBase init failed")),
+                    memory_manager.clone(),
+                ).expect("KnowledgeLens init failed")),
             ));
 
         // Build ToolRetriever for semantic capability discovery.

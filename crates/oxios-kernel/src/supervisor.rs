@@ -426,6 +426,10 @@ mod tests {
                 Arc::new(crate::engine::OxiEngineProvider::new("mock/model")),
                 "mock/model".to_string(),
             ),
+            Arc::new(crate::kernel_handle::KnowledgeLens::new(
+                Arc::new(oxios_markdown::KnowledgeBase::new(tmp.join("knowledge")).unwrap()),
+                memory_manager.clone(),
+            ).unwrap()),
         ));
 
         let runtime = AgentRuntime::new(provider, "mock/model", kernel_handle);

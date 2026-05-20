@@ -186,7 +186,8 @@ pub use types::{AgentId, AgentInfo, AgentStatus};
 // ─── API Surface ────────────────────────────────────────────────────
 pub use kernel_handle::KernelHandle;
 pub use kernel_handle::{
-    A2aApi, AgentApi, BrowserApi, ExecApi, ExtensionApi, InfraApi, KnowledgeApi, McpApi,
+    A2aApi, AgentApi, BrowserApi, CopilotResponse, ExecApi, ExtensionApi, InfraApi,
+    KnowledgeApi, KnowledgeContext, KnowledgeLens, KnowledgeNote, McpApi, MemoryNote,
     PersonaApi, SecurityApi, SpaceApi, StateApi,
 };
 

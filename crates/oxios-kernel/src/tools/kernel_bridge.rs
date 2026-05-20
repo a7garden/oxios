@@ -171,6 +171,12 @@ mod tests {
                 Arc::new(crate::engine::OxiEngineProvider::new("anthropic/claude-sonnet-4")),
                 "anthropic/claude-sonnet-4".to_string(),
             ),
+            Arc::new(crate::kernel_handle::KnowledgeLens::new(
+                Arc::new(oxios_markdown::KnowledgeBase::new(
+                    std::path::PathBuf::from("/tmp/oxios-test/knowledge"),
+                ).unwrap()),
+                Arc::new(crate::memory::MemoryManager::new(state_store.clone())),
+            ).unwrap()),
         ));
 
         let bridge = OxiosKernelBridge::new(kernel);
