@@ -76,7 +76,7 @@ impl OxiAgentTool for KnowledgeTool {
     }
 
     fn description(&self) -> &'static str {
-        "Manage markdown knowledge notes. Actions: read, write, delete, move, tree, search, backlinks. Notes are stored as .md files and indexed for search."
+        "Manage markdown knowledge notes. Actions: read, write, delete, move, tree, search, backlinks, checklist_items, checklist_add, checklist_complete, checklist_remove, chat_append, chat_messages, chat_delete, chat_move, journal_add, journal_emoji, journal_today, habits, habits_last_week, today_report, done_today, config_read, config_write, nightly_cleanup, run_scheduled, markdown_to_html, auto_emoji."
     }
 
     fn parameters_schema(&self) -> Value {
@@ -85,7 +85,17 @@ impl OxiAgentTool for KnowledgeTool {
             "properties": {
                 "action": {
                     "type": "string",
-                    "enum": ["read", "write", "delete", "move", "tree", "search", "backlinks"],
+                    "enum": [
+                    "read", "write", "delete", "move", "tree", "search", "backlinks",
+                    "checklist_items", "checklist_add", "checklist_complete", "checklist_remove",
+                    "chat_append", "chat_messages", "chat_delete", "chat_move",
+                    "journal_add", "journal_emoji", "journal_today",
+                    "habits", "habits_last_week",
+                    "today_report", "done_today",
+                    "config_read", "config_write",
+                    "nightly_cleanup", "run_scheduled",
+                    "markdown_to_html", "auto_emoji"
+                ],
                     "description": "The action to perform"
                 },
                 "path": {
@@ -115,6 +125,58 @@ impl OxiAgentTool for KnowledgeTool {
                 "limit": {
                     "type": "integer",
                     "description": "Max results for search/tree (default: 20)"
+                },
+                "item": {
+                    "type": "string",
+                    "description": "Checklist item text (for checklist_add)"
+                },
+                "checked": {
+                    "type": "boolean",
+                    "description": "Whether the checklist item is checked (for checklist_add, default: false)"
+                },
+                "item_hash": {
+                    "type": "string",
+                    "description": "Hash identifying a checklist or chat item (for checklist_complete, chat_delete, chat_move)"
+                },
+                "item_or_hash": {
+                    "type": "string",
+                    "description": "Checklist item text or hash (for checklist_remove)"
+                },
+                "message": {
+                    "type": "string",
+                    "description": "Chat message text (for chat_append)"
+                },
+                "msg_hash": {
+                    "type": "string",
+                    "description": "Hash identifying a chat message (for chat_delete, chat_move)"
+                },
+                "target_path": {
+                    "type": "string",
+                    "description": "Target note path (for chat_move)"
+                },
+                "record": {
+                    "type": "string",
+                    "description": "Journal record text (for journal_add)"
+                },
+                "emoji": {
+                    "type": "string",
+                    "description": "Emoji string (for journal_emoji)"
+                },
+                "year": {
+                    "type": "integer",
+                    "description": "Year number (for habits action)"
+                },
+                "config": {
+                    "type": "object",
+                    "description": "KnowledgeConfig JSON object (for config_write)"
+                },
+                "md": {
+                    "type": "string",
+                    "description": "Markdown text to convert (for markdown_to_html)"
+                },
+                "text": {
+                    "type": "string",
+                    "description": "Text to find emoji for (for auto_emoji)"
                 }
             },
             "required": ["action"]

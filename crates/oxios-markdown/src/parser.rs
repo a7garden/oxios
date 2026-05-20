@@ -352,16 +352,15 @@ mod tests {
         let chunks = split_text_into_chunks("Hello", 5);
         assert_eq!(chunks, vec!["Hello"]);
 
-        // Split at space
-        let chunks = split_text_into_chunks("Hello world how are you", 11);
+        // Split at space (Go test: basic split with spaces)
+        let chunks = split_text_into_chunks("This is a test to check the splitting of text", 10);
         for chunk in &chunks {
-            assert!(chunk.len() <= 11, "chunk too long: '{}' ({})", chunk, chunk.len());
+            assert!(chunk.len() <= 10, "chunk too long: '{}' ({})", chunk, chunk.len());
         }
-        assert!(chunks.len() > 1);
 
-        // Split at newline
-        let chunks = split_text_into_chunks("Line one\nLine two\nLine three", 9);
-        assert_eq!(chunks.len(), 3);
+        // Split at newline (Go test: max_len=15)
+        let chunks = split_text_into_chunks("Line one\nLine two\nLine three", 15);
+        assert_eq!(chunks, vec!["Line one", "Line two", "Line three"]);
 
         // max_len == 0 returns everything as one chunk
         let chunks = split_text_into_chunks("Hello world", 0);

@@ -579,6 +579,173 @@ impl KnowledgeApi {
         self.note_write("config.json", &json)?;
         Ok(())
     }
+
+    // ═══════════════════════════════════════════════════════════════
+    // Checklist — Later/Done/Shop/Watch/Read task management
+    // ═══════════════════════════════════════════════════════════════
+
+    /// Parse checklist items from a file. Returns (items, is_completed_map).
+    pub fn checklist_items(&self, path: &str) -> Result<(Vec<String>, std::collections::HashMap<String, bool>)> {
+        let content = self.note_read(path)?.unwrap_or_default();
+        Ok(oxios_markdown::checklist::checklist_items(&content))
+    }
+
+    /// Get incomplete checklist items from a file.
+    pub fn checklist_incomplete(&self, path: &str) -> Result<Vec<String>> {
+        let content = self.note_read(path)?.unwrap_or_default();
+        Ok(oxios_markdown::checklist::incomplete_checklist_items(&content))
+    }
+
+    /// Add a checklist item to a file. Returns the updated content.
+    pub fn checklist_add(&self, path: &str, item: &str, checked: bool) -> Result<()> {
+        let content = self.note_read(path)?.unwrap_or_default();
+        let updated = oxios_markdown::checklist::add_checklist_item(&content, item, checked);
+        self.note_write(path, &updated)
+    }
+
+    /// Complete a checklist item by hash. Returns true if found.
+    pub fn checklist_complete(&self, path: &str, item_hash: &str) -> Result<bool> {
+        let content = self.note_read(path)?.unwrap_or_default();
+        let (new_content, found) = oxios_markdown::checklist::complete_checklist_item(&content, item_hash);
+        if !found.is_empty() {
+            self.note_write(path, &new_content)?;
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
+
+    /// Remove a checklist item by text or hash. Returns true if found.
+    pub fn checklist_remove(&self, path: &str, item_or_hash: &str) -> Result<bool> {
+        let content = self.note_read(path)?.unwrap_or_default();
+        let (new_content, removed) = oxios_markdown::checklist::remove_checklist_item(&content, item_or_hash);
+        if !removed.is_empty() {
+            self.note_write(path, &new_content)?;
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
+
+    /// Remove all completed checklist items. Returns (kept_content, removed_content).
+    pub fn checklist_remove_completed(&self, path: &str) -> Result<(String, String)> {
+        let content = self.note_read(path)?.unwrap_or_default();
+        let (kept, removed) = oxios_markdown::checklist::remove_completed_checklist_items(&content);
+        if !removed.is_empty() {
+            self.note_write(path, &kept)?;
+        }
+        Ok((kept, removed))
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // Habits — yearly tracking (write + last week)
+    // ═══════════════════════════════════════════════════════════════
+
+    /// Get last week's habit data.
+    pub fn habits_last_week(&self) -> Result<oxios_markdown::types::Habits> {
+        let fs = self.fs.read();
+        let tz = chrono::Local::now().offset().to_owned();
+        Ok(oxios_markdown::last_week_habits(&fs, tz)?)
+    }
+
+    /// Write habit data for a year.
+    pub fn habits_write(&self, year: i32, habits: &oxios_markdown::types::Habits) -> Result<()> {
+        let fs = self.fs.read();
+        oxios_markdown::write_habits(&fs, year, habits)?;
+        Ok(())
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // Worker — nightly cleanup + scheduled tasks
+    // ═══════════════════════════════════════════════════════════════
+
+    /// Run nightly cleanup: remove completed items from Chat/Later, archive to Done, journal ✅.
+    pub fn run_nightly_cleanup(&self) -> Result<oxios_markdown::worker::NightlyReport> {
+        let fs = self.fs.read();
+        let config = self.config()?;
+        Ok(oxios_markdown::worker::remove_completed_items(&fs, &config)?)
+    }
+
+    /// Move due scheduled tasks to Chat. Modifies config in place.
+    pub fn run_scheduled_tasks(&self) -> Result<Vec<String>> {
+        let fs = self.fs.read();
+        let mut config = self.config()?;
+        let moved = oxios_markdown::worker::move_due_tasks(&fs, &mut config)?;
+        if !moved.is_empty() {
+            self.set_config(&config)?;
+        }
+        Ok(moved)
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // Stats — today's completion report
+    // ═══════════════════════════════════════════════════════════════
+
+    /// Get today's completed tasks report.
+    pub fn today_report(&self) -> Result<oxios_markdown::stats::TodayReport> {
+        let fs = self.fs.read();
+        Ok(oxios_markdown::stats::today_report(&fs)?)
+    }
+
+    /// Get list of files completed today.
+    pub fn done_today(&self) -> Result<Vec<oxios_markdown::FileEntry>> {
+        let fs = self.fs.read();
+        Ok(oxios_markdown::stats::done_today(&fs)?)
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // HTML — Markdown → HTML conversion
+    // ═══════════════════════════════════════════════════════════════
+
+    /// Convert markdown to Telegram-compatible HTML.
+    pub fn markdown_to_html(&self, md: &str) -> String {
+        oxios_markdown::markdown_to_html(md)
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // i18n — emoji auto-mapping
+    // ═══════════════════════════════════════════════════════════════
+
+    /// Find an emoji for a keyword.
+    pub fn auto_emoji(&self, text: &str) -> String {
+        oxios_markdown::i18n::emoji_for(text)
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // Chat — move from chat to target file
+    // ═══════════════════════════════════════════════════════════════
+
+    /// Move a chat message to a target file as a checklist item.
+    pub fn chat_move_to(&self, msg_hash: &str, target_path: &str) -> Result<bool> {
+        let chat_content = self.note_read(oxios_markdown::CHAT_FILENAME)?.unwrap_or_default();
+        let target_content = self.note_read(target_path)?.unwrap_or_default();
+        let (new_chat, new_target) = oxios_markdown::move_from_chat(&chat_content, msg_hash, &target_content);
+        if new_chat != chat_content {
+            self.note_write(oxios_markdown::CHAT_FILENAME, &new_chat)?;
+            self.note_write(target_path, &new_target)?;
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // Text extraction — images, links from markdown
+    // ═══════════════════════════════════════════════════════════════
+
+    /// Extract text, images, and links from markdown content.
+    pub fn extract_text_imgs_links(&self, text: &str) -> oxios_markdown::tgtxt::ExtractResult {
+        oxios_markdown::tgtxt::extract_text_imgs_links(text)
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // World Clock — timezone report
+    // ═══════════════════════════════════════════════════════════════
+
+    /// Generate world clock report for given timezone names.
+    pub fn world_clock(&self, timezone_names: &[&str]) -> Vec<oxios_markdown::plugins::TimezoneEntry> {
+        oxios_markdown::plugins::world_clock_for_names(timezone_names)
+    }
 }
 
 #[cfg(test)]

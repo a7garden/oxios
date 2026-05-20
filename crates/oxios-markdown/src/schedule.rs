@@ -61,6 +61,83 @@ impl<'a> ScheduleManager<'a> {
         self.write_config(&cfg)
     }
 
+    // -----------------------------------------------------------------------
+    // Config-level helpers
+    // -----------------------------------------------------------------------
+
+    /// Create the default config file if it doesn't already exist.
+    pub fn create_default_if_not_exists(&self) -> Result<(), ScheduleError> {
+        if self.fs.exists(DIR_USER_ROOT, self.config_filename)
+            .map_err(|e| ScheduleError::Read(e.to_string()))?
+        {
+            return Ok(());
+        }
+        self.write_config(&KnowledgeConfig::default())
+    }
+
+    /// Check whether a checklist string should be split.
+    ///
+    /// Currently always returns `true` (matches the Go original).
+    /// The `checklist` parameter is kept for future per-list overrides.
+    pub fn should_split_checklist(&self, _checklist: &str) -> bool {
+        // TODO: disallow split for read/watch
+        true
+    }
+
+    // -----------------------------------------------------------------------
+    // Move-to commands
+    // -----------------------------------------------------------------------
+
+    /// Add a move-to command. Silently succeeds if the command already exists.
+    pub fn add_move_to_cmd(&self, cmd: &str) -> Result<(), ScheduleError> {
+        let mut cfg = self.read_config()?;
+        if cfg.move_to_commands.iter().any(|c| c == cmd) {
+            return Ok(());
+        }
+        cfg.move_to_commands.push(cmd.to_string());
+        self.write_config(&cfg)
+    }
+
+    /// Get all move-to commands.
+    pub fn move_to_cmds(&self) -> Result<Vec<String>, ScheduleError> {
+        let cfg = self.read_config()?;
+        Ok(cfg.move_to_commands)
+    }
+
+    /// Delete a move-to command.
+    pub fn del_move_to_cmd(&self, cmd: &str) -> Result<(), ScheduleError> {
+        let mut cfg = self.read_config()?;
+        cfg.move_to_commands.retain(|c| c != cmd);
+        self.write_config(&cfg)
+    }
+
+    // -----------------------------------------------------------------------
+    // Quick commands
+    // -----------------------------------------------------------------------
+
+    /// Add a quick command. Silently succeeds if the command already exists.
+    pub fn add_quick_cmd(&self, cmd: &str) -> Result<(), ScheduleError> {
+        let mut cfg = self.read_config()?;
+        if cfg.quick_commands.iter().any(|c| c == cmd) {
+            return Ok(());
+        }
+        cfg.quick_commands.push(cmd.to_string());
+        self.write_config(&cfg)
+    }
+
+    /// Get all quick commands.
+    pub fn quick_cmds(&self) -> Result<Vec<String>, ScheduleError> {
+        let cfg = self.read_config()?;
+        Ok(cfg.quick_commands)
+    }
+
+    /// Delete a quick command.
+    pub fn del_quick_cmd(&self, cmd: &str) -> Result<(), ScheduleError> {
+        let mut cfg = self.read_config()?;
+        cfg.quick_commands.retain(|c| c != cmd);
+        self.write_config(&cfg)
+    }
+
     fn read_config(&self) -> Result<KnowledgeConfig, ScheduleError> {
         if !self.fs.exists(DIR_USER_ROOT, self.config_filename).map_err(|e| ScheduleError::Read(e.to_string()))? {
             return Ok(KnowledgeConfig::default());
@@ -160,5 +237,113 @@ mod tests {
     #[test]
     fn test_tomorrow() {
         assert!(tomorrow_timestamp() > Utc::now().timestamp());
+    }
+
+    // -----------------------------------------------------------------------
+    // create_default_if_not_exists
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_create_default_if_not_exists_creates() {
+        let (fs, _t) = test_fs();
+        let mgr = ScheduleManager::new(&fs, "config.json");
+        assert!(!fs.exists(DIR_USER_ROOT, "config.json").unwrap());
+        mgr.create_default_if_not_exists().unwrap();
+        assert!(fs.exists(DIR_USER_ROOT, "config.json").unwrap());
+        let cfg: KnowledgeConfig =
+            serde_json::from_str(&fs.read(DIR_USER_ROOT, "config.json").unwrap()).unwrap();
+        assert_eq!(cfg.language, "en");
+        assert!(cfg.schedules.is_empty());
+        assert!(cfg.move_to_commands.is_empty());
+        assert!(cfg.quick_commands.is_empty());
+    }
+
+    #[test]
+    fn test_create_default_if_not_exists_idempotent() {
+        let (fs, _t) = test_fs();
+        let mgr = ScheduleManager::new(&fs, "config.json");
+        mgr.create_default_if_not_exists().unwrap();
+        // Add a schedule so we can verify the file is *not* overwritten.
+        mgr.add("Task.md", 1000, "").unwrap();
+        mgr.create_default_if_not_exists().unwrap();
+        assert_eq!(mgr.schedules().unwrap().len(), 1);
+    }
+
+    // -----------------------------------------------------------------------
+    // should_split_checklist
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_should_split_checklist() {
+        let (fs, _t) = test_fs();
+        let mgr = ScheduleManager::new(&fs, "config.json");
+        assert!(mgr.should_split_checklist("- item1\n- item2"));
+        assert!(mgr.should_split_checklist("anything"));
+    }
+
+    // -----------------------------------------------------------------------
+    // move-to commands
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_add_move_to_cmd() {
+        let (fs, _t) = test_fs();
+        let mgr = ScheduleManager::new(&fs, "config.json");
+        assert!(mgr.move_to_cmds().unwrap().is_empty());
+        mgr.add_move_to_cmd("Archive").unwrap();
+        mgr.add_move_to_cmd("Later").unwrap();
+        assert_eq!(mgr.move_to_cmds().unwrap(), vec!["Archive", "Later"]);
+    }
+
+    #[test]
+    fn test_add_move_to_cmd_duplicate() {
+        let (fs, _t) = test_fs();
+        let mgr = ScheduleManager::new(&fs, "config.json");
+        mgr.add_move_to_cmd("Archive").unwrap();
+        mgr.add_move_to_cmd("Archive").unwrap();
+        assert_eq!(mgr.move_to_cmds().unwrap(), vec!["Archive"]);
+    }
+
+    #[test]
+    fn test_del_move_to_cmd() {
+        let (fs, _t) = test_fs();
+        let mgr = ScheduleManager::new(&fs, "config.json");
+        mgr.add_move_to_cmd("Archive").unwrap();
+        mgr.add_move_to_cmd("Later").unwrap();
+        mgr.del_move_to_cmd("Archive").unwrap();
+        assert_eq!(mgr.move_to_cmds().unwrap(), vec!["Later"]);
+    }
+
+    // -----------------------------------------------------------------------
+    // quick commands
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_add_quick_cmd() {
+        let (fs, _t) = test_fs();
+        let mgr = ScheduleManager::new(&fs, "config.json");
+        assert!(mgr.quick_cmds().unwrap().is_empty());
+        mgr.add_quick_cmd("/done").unwrap();
+        mgr.add_quick_cmd("/shop").unwrap();
+        assert_eq!(mgr.quick_cmds().unwrap(), vec!["/done", "/shop"]);
+    }
+
+    #[test]
+    fn test_add_quick_cmd_duplicate() {
+        let (fs, _t) = test_fs();
+        let mgr = ScheduleManager::new(&fs, "config.json");
+        mgr.add_quick_cmd("/done").unwrap();
+        mgr.add_quick_cmd("/done").unwrap();
+        assert_eq!(mgr.quick_cmds().unwrap(), vec!["/done"]);
+    }
+
+    #[test]
+    fn test_del_quick_cmd() {
+        let (fs, _t) = test_fs();
+        let mgr = ScheduleManager::new(&fs, "config.json");
+        mgr.add_quick_cmd("/done").unwrap();
+        mgr.add_quick_cmd("/shop").unwrap();
+        mgr.del_quick_cmd("/done").unwrap();
+        assert_eq!(mgr.quick_cmds().unwrap(), vec!["/shop"]);
     }
 }

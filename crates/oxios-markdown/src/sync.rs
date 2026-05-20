@@ -254,11 +254,6 @@ impl SyncEngine {
     }
 
     /// Upload a media file (from raw bytes).
-    ///
-    /// TODO: Currently VirtualFs::write takes &str content. Binary media files
-    /// need a `write_bytes` method on VirtualFs. For now this writes bytes as-is
-    /// which works for most file types but is not ideal. A proper `read_bytes` /
-    /// `write_bytes` pair should be added to fs.rs.
     pub fn sync_media_upload(&self, filename: &str, data: &[u8]) -> Result<(), SyncError> {
         let exists = self.fs.exists(DIR_MEDIA, filename)
             .map_err(|e| SyncError::Storage(e.to_string()))?;
@@ -268,10 +263,7 @@ impl SyncEngine {
             return Ok(());
         }
 
-        // TODO: Add size/quota limits check
-        // TODO: Use write_bytes once VirtualFs supports binary writes
-        let content = unsafe { std::str::from_utf8_unchecked(data) };
-        self.fs.write(DIR_MEDIA, filename, content)
+        self.fs.write_bytes(DIR_MEDIA, filename, data)
             .map_err(|e| match e {
                 FsError::QuotaExceeded => SyncError::QuotaExceeded,
                 other => SyncError::Storage(other.to_string()),
@@ -281,14 +273,9 @@ impl SyncEngine {
     }
 
     /// Read a media file as raw bytes.
-    ///
-    /// TODO: Currently VirtualFs::read returns String. A `read_bytes` method
-    /// should be added to VirtualFs for proper binary support. For now we
-    /// read as String and convert to bytes.
     pub fn sync_media_read(&self, filename: &str) -> Result<Vec<u8>, SyncError> {
-        let content = self.fs.read(DIR_MEDIA, filename)
-            .map_err(|e| SyncError::Storage(e.to_string()))?;
-        Ok(content.into_bytes())
+        self.fs.read_bytes(DIR_MEDIA, filename)
+            .map_err(|e| SyncError::Storage(e.to_string()))
     }
 }
 

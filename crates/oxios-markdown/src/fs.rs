@@ -192,6 +192,47 @@ impl VirtualFs {
         Ok(())
     }
 
+    /// Read a file as raw bytes.
+    pub fn read_bytes(&self, dir: &str, filename: &str) -> Result<Vec<u8>, FsError> {
+        let path = self.safe_path(dir, filename)?;
+        Ok(std::fs::read(&path)?)
+    }
+
+    /// Write raw bytes to a file, creating parent directories as needed.
+    /// Respects the configured quota (same logic as `write()`).
+    pub fn write_bytes(&self, dir: &str, filename: &str, data: &[u8]) -> Result<(), FsError> {
+        let path = self.safe_path(dir, filename)?;
+
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+
+        if self.quota_kb > 0 {
+            let new_size = data.len() as i64;
+            let old_size = std::fs::metadata(&path).map(|m| m.len() as i64).unwrap_or(0);
+            let used = self.calculate_used_quota()?;
+            let available = (self.quota_kb * 1024) - used;
+            if (new_size - old_size) > available {
+                return Err(FsError::QuotaExceeded);
+            }
+        }
+
+        std::fs::write(&path, data)?;
+        Ok(())
+    }
+
+    /// Read a file by POSIX path as raw bytes.
+    pub fn read_path_bytes(&self, path: &str) -> Result<Vec<u8>, FsError> {
+        let (dir, filename) = split_posix_path(path);
+        self.read_bytes(dir, filename)
+    }
+
+    /// Write raw bytes to a file by POSIX path.
+    pub fn write_path_bytes(&self, path: &str, data: &[u8]) -> Result<(), FsError> {
+        let (dir, filename) = split_posix_path(path);
+        self.write_bytes(dir, filename, data)
+    }
+
     /// Delete a file.
     pub fn del(&self, dir: &str, filename: &str) -> Result<(), FsError> {
         let path = self.safe_path(dir, filename)?;
@@ -750,5 +791,31 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let fs = VirtualFs::new(dir.path().to_path_buf()).unwrap().with_quota(1); // 1 KB
         assert!(fs.write("/", "big.md", &"x".repeat(2048)).is_err());
+    }
+
+    #[test]
+    fn test_read_write_bytes() {
+        let (fs, _t) = test_fs();
+        let data: &[u8] = &[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A]; // PNG header fragment
+        fs.write_bytes("media", "image.png", data).unwrap();
+        let read_back = fs.read_bytes("media", "image.png").unwrap();
+        assert_eq!(read_back, data);
+    }
+
+    #[test]
+    fn test_write_bytes_quota() {
+        let dir = TempDir::new().unwrap();
+        let fs = VirtualFs::new(dir.path().to_path_buf()).unwrap().with_quota(1); // 1 KB
+        let big = vec![0u8; 2048];
+        assert!(fs.write_bytes("/", "big.bin", &big).is_err());
+    }
+
+    #[test]
+    fn test_path_bytes_roundtrip() {
+        let (fs, _t) = test_fs();
+        let data = b"\x00\x01\x02\xFF binary data";
+        fs.write_path_bytes("sub/file.bin", data).unwrap();
+        let read_back = fs.read_path_bytes("sub/file.bin").unwrap();
+        assert_eq!(read_back, data);
     }
 }

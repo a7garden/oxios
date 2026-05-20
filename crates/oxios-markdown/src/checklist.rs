@@ -469,9 +469,11 @@ mod tests {
 
     #[test]
     fn test_add_header_and_text_existing_header() {
-        let content = "### Notes\nSome notes\n### Other\nOther content\n";
+        let content = "### Notes\nSome notes\n### Other\nOther content";
         let result = add_header_and_text(content, "### Notes", "Extra line");
-        assert!(result.contains("### Notes\nExtra line"));
+        // Go behavior: inserts new content after existing content under the header, before next ### header
+        assert!(result.contains("Some notes\nExtra line"));
+        assert!(result.contains("### Other"));
     }
 
     #[test]
