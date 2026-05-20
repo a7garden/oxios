@@ -1,6 +1,8 @@
-import { ArrowLeft, ArrowRight, X } from 'lucide-react'
+import { useEffect } from 'react'
+import { ArrowLeft, ArrowRight, Columns2, PanelRight, Save, X } from 'lucide-react'
 import { useKnowledgeStore } from '@/stores/knowledge'
 import { Button } from '@/components/ui/button'
+import { Tooltip } from '@/components/ui/tooltip'
 
 export function EditorToolbar() {
   const {
@@ -9,13 +11,32 @@ export function EditorToolbar() {
     historyIndex,
     goBack,
     goForward,
+    infoPanelOpen,
+    toggleInfoPanel,
     splitEditorOpen,
     closeSplit,
+    openSplit,
   } = useKnowledgeStore()
 
   const canGoBack = historyIndex > 0
   const canGoForward = historyIndex < history.length - 1
   const fileName = currentFilePath?.split('/').pop()?.replace(/\.md$/, '') ?? ''
+
+  const handleSave = () => {
+    document.dispatchEvent(new CustomEvent('knowledge:save'))
+  }
+
+  // ⌘S keyboard shortcut for manual save
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+        e.preventDefault()
+        handleSave()
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [])
 
   return (
     <div className="flex items-center gap-1 px-2 py-1 border-b bg-muted/30 min-h-[36px]">
@@ -46,18 +67,63 @@ export function EditorToolbar() {
 
       <div className="flex-1" />
 
-      {/* Split editor toggle */}
+      {/* Save */}
+      {currentFilePath && (
+        <Tooltip content="Save (⌘S)">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7"
+            onClick={handleSave}
+            title="Save"
+          >
+            <Save className="h-4 w-4" />
+          </Button>
+        </Tooltip>
+      )}
+
+      {/* Split editor */}
+      {!splitEditorOpen && currentFilePath && (
+        <Tooltip content="Split view">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7"
+            onClick={() => openSplit(currentFilePath)}
+            title="Open split view"
+          >
+            <Columns2 className="h-4 w-4" />
+          </Button>
+        </Tooltip>
+      )}
+
+      {/* Close split */}
       {splitEditorOpen && (
+        <Tooltip content="Close split (⌘W)">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7"
+            onClick={closeSplit}
+            title="Close split"
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        </Tooltip>
+      )}
+
+      {/* Info panel toggle */}
+      <Tooltip content={infoPanelOpen ? 'Hide info panel' : 'Show info panel'}>
         <Button
           variant="ghost"
           size="icon"
           className="h-7 w-7"
-          onClick={closeSplit}
-          title="Close split (⌘W)"
+          onClick={toggleInfoPanel}
+          title="Toggle info panel"
         >
-          <X className="h-4 w-4" />
+          <PanelRight className="h-4 w-4" />
         </Button>
-      )}
+      </Tooltip>
     </div>
   )
 }

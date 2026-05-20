@@ -177,6 +177,19 @@ export function MarkdownEditor({ filePath, initialContent, onSave, className }: 
     setIsDirty(false)
   }, [isDirty, onSave])
 
+  // Listen for manual save event from toolbar (⌘S / save button)
+  useEffect(() => {
+    const handler = () => {
+      const cm = editorRef.current
+      if (!cm) return
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
+      onSave(cm.getValue())
+      setIsDirty(false)
+    }
+    document.addEventListener('knowledge:save', handler)
+    return () => document.removeEventListener('knowledge:save', handler)
+  }, [onSave])
+
   return (
     <div className={cn('h-full relative', className)} onBlur={handleBlur}>
       {isDirty && (
