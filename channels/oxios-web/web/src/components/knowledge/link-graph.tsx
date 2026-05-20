@@ -1,6 +1,5 @@
 import { useKnowledgeGraph } from '@/hooks/use-knowledge'
 import { useKnowledgeStore } from '@/stores/knowledge'
-import type { KnowledgeGraphNode, KnowledgeGraphEdge } from '@/types/knowledge'
 
 interface LinkGraphProps {
   className?: string

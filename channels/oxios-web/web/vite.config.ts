@@ -11,6 +11,21 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  optimizeDeps: {
+    include: [
+      'codemirror',
+      'codemirror/lib/codemirror',
+      'codemirror/mode/javascript/javascript',
+      'codemirror/mode/python/python',
+      'codemirror/mode/go/go',
+      'codemirror/mode/shell/shell',
+      'codemirror/mode/php/php',
+      'codemirror/mode/markdown/markdown',
+      'codemirror/addon/edit/continuelist',
+      'codemirror/addon/selection/active-line',
+      'codemirror/addon/hint/show-hint',
+    ],
+  },
   server: {
     proxy: {
       '/api': 'http://localhost:3000',

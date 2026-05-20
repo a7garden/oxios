@@ -35,6 +35,9 @@ import { Route as AgentsIndexRouteImport } from './routes/agents/index'
 import { Route as SpacesSpaceIdRouteImport } from './routes/spaces/$spaceId'
 import { Route as SessionsSessionIdRouteImport } from './routes/sessions/$sessionId'
 import { Route as SeedsSeedIdRouteImport } from './routes/seeds/$seedId'
+import { Route as KnowledgeSettingsRouteImport } from './routes/knowledge/settings'
+import { Route as KnowledgeHabitsRouteImport } from './routes/knowledge/habits'
+import { Route as KnowledgeGraphRouteImport } from './routes/knowledge/graph'
 import { Route as AgentsAgentIdRouteImport } from './routes/agents/$agentId'
 
 const SkillsRoute = SkillsRouteImport.update({
@@ -167,6 +170,21 @@ const SeedsSeedIdRoute = SeedsSeedIdRouteImport.update({
   path: '/seeds/$seedId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const KnowledgeSettingsRoute = KnowledgeSettingsRouteImport.update({
+  id: '/knowledge/settings',
+  path: '/knowledge/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const KnowledgeHabitsRoute = KnowledgeHabitsRouteImport.update({
+  id: '/knowledge/habits',
+  path: '/knowledge/habits',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const KnowledgeGraphRoute = KnowledgeGraphRouteImport.update({
+  id: '/knowledge/graph',
+  path: '/knowledge/graph',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AgentsAgentIdRoute = AgentsAgentIdRouteImport.update({
   id: '/agents/$agentId',
   path: '/agents/$agentId',
@@ -192,6 +210,9 @@ export interface FileRoutesByFullPath {
   '/settings': typeof SettingsRoute
   '/skills': typeof SkillsRoute
   '/agents/$agentId': typeof AgentsAgentIdRoute
+  '/knowledge/graph': typeof KnowledgeGraphRoute
+  '/knowledge/habits': typeof KnowledgeHabitsRoute
+  '/knowledge/settings': typeof KnowledgeSettingsRoute
   '/seeds/$seedId': typeof SeedsSeedIdRoute
   '/sessions/$sessionId': typeof SessionsSessionIdRoute
   '/spaces/$spaceId': typeof SpacesSpaceIdRoute
@@ -221,6 +242,9 @@ export interface FileRoutesByTo {
   '/settings': typeof SettingsRoute
   '/skills': typeof SkillsRoute
   '/agents/$agentId': typeof AgentsAgentIdRoute
+  '/knowledge/graph': typeof KnowledgeGraphRoute
+  '/knowledge/habits': typeof KnowledgeHabitsRoute
+  '/knowledge/settings': typeof KnowledgeSettingsRoute
   '/seeds/$seedId': typeof SeedsSeedIdRoute
   '/sessions/$sessionId': typeof SessionsSessionIdRoute
   '/spaces/$spaceId': typeof SpacesSpaceIdRoute
@@ -251,6 +275,9 @@ export interface FileRoutesById {
   '/settings': typeof SettingsRoute
   '/skills': typeof SkillsRoute
   '/agents/$agentId': typeof AgentsAgentIdRoute
+  '/knowledge/graph': typeof KnowledgeGraphRoute
+  '/knowledge/habits': typeof KnowledgeHabitsRoute
+  '/knowledge/settings': typeof KnowledgeSettingsRoute
   '/seeds/$seedId': typeof SeedsSeedIdRoute
   '/sessions/$sessionId': typeof SessionsSessionIdRoute
   '/spaces/$spaceId': typeof SpacesSpaceIdRoute
@@ -282,6 +309,9 @@ export interface FileRouteTypes {
     | '/settings'
     | '/skills'
     | '/agents/$agentId'
+    | '/knowledge/graph'
+    | '/knowledge/habits'
+    | '/knowledge/settings'
     | '/seeds/$seedId'
     | '/sessions/$sessionId'
     | '/spaces/$spaceId'
@@ -311,6 +341,9 @@ export interface FileRouteTypes {
     | '/settings'
     | '/skills'
     | '/agents/$agentId'
+    | '/knowledge/graph'
+    | '/knowledge/habits'
+    | '/knowledge/settings'
     | '/seeds/$seedId'
     | '/sessions/$sessionId'
     | '/spaces/$spaceId'
@@ -340,6 +373,9 @@ export interface FileRouteTypes {
     | '/settings'
     | '/skills'
     | '/agents/$agentId'
+    | '/knowledge/graph'
+    | '/knowledge/habits'
+    | '/knowledge/settings'
     | '/seeds/$seedId'
     | '/sessions/$sessionId'
     | '/spaces/$spaceId'
@@ -370,6 +406,9 @@ export interface RootRouteChildren {
   SettingsRoute: typeof SettingsRoute
   SkillsRoute: typeof SkillsRoute
   AgentsAgentIdRoute: typeof AgentsAgentIdRoute
+  KnowledgeGraphRoute: typeof KnowledgeGraphRoute
+  KnowledgeHabitsRoute: typeof KnowledgeHabitsRoute
+  KnowledgeSettingsRoute: typeof KnowledgeSettingsRoute
   SeedsSeedIdRoute: typeof SeedsSeedIdRoute
   SessionsSessionIdRoute: typeof SessionsSessionIdRoute
   SpacesSpaceIdRoute: typeof SpacesSpaceIdRoute
@@ -565,6 +604,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SeedsSeedIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/knowledge/settings': {
+      id: '/knowledge/settings'
+      path: '/knowledge/settings'
+      fullPath: '/knowledge/settings'
+      preLoaderRoute: typeof KnowledgeSettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/knowledge/habits': {
+      id: '/knowledge/habits'
+      path: '/knowledge/habits'
+      fullPath: '/knowledge/habits'
+      preLoaderRoute: typeof KnowledgeHabitsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/knowledge/graph': {
+      id: '/knowledge/graph'
+      path: '/knowledge/graph'
+      fullPath: '/knowledge/graph'
+      preLoaderRoute: typeof KnowledgeGraphRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/agents/$agentId': {
       id: '/agents/$agentId'
       path: '/agents/$agentId'
@@ -594,6 +654,9 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsRoute: SettingsRoute,
   SkillsRoute: SkillsRoute,
   AgentsAgentIdRoute: AgentsAgentIdRoute,
+  KnowledgeGraphRoute: KnowledgeGraphRoute,
+  KnowledgeHabitsRoute: KnowledgeHabitsRoute,
+  KnowledgeSettingsRoute: KnowledgeSettingsRoute,
   SeedsSeedIdRoute: SeedsSeedIdRoute,
   SessionsSessionIdRoute: SessionsSessionIdRoute,
   SpacesSpaceIdRoute: SpacesSpaceIdRoute,

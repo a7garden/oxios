@@ -5,9 +5,13 @@ import { KnowledgeChat } from './knowledge-chat'
 import { InfoPanel } from './info-panel'
 import { SearchModal } from './search-modal'
 import { MoveModal } from './move-modal'
+import { useKnowledgeShortcuts } from '@/hooks/use-knowledge-shortcuts'
 
 export function KnowledgeLayout() {
   const { mode, sidebarOpen, infoPanelOpen, toggleSidebar } = useKnowledgeStore()
+
+  // Register global keyboard shortcuts
+  useKnowledgeShortcuts()
 
   return (
     <div className="fixed inset-0 z-30 flex overflow-hidden bg-background">

@@ -3,3 +3,4 @@ dist/
 *.local
 .routify/
 src/routeTree.gen.ts
+node_modules/hypermd
