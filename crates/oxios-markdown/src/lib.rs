@@ -48,7 +48,7 @@ pub use types::{
 };
 
 pub use backlinks::{Backlink, BacklinkIndex, LinkGraph, LinkEdge, LinkNode};
-pub use fs::{VirtualFs, split_posix_path};
+pub use fs::VirtualFs;
 pub use fs::split_posix_path;
 pub use fslog::FsLog;
 pub use merge::merge;

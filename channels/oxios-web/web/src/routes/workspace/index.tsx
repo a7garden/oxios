@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
 import { ChevronDown, ChevronRight, File, Folder, FolderOpen, RefreshCw } from 'lucide-react'
 import { useState } from 'react'
+import { ErrorState } from '@/components/shared/error-state'
 import { EmptyState } from '@/components/shared/empty-state'
 import { LoadingCards } from '@/components/shared/loading'
 import { Button } from '@/components/ui/button'
@@ -17,11 +18,13 @@ function WorkspacePage() {
   const {
     data: root,
     isLoading,
+    isError,
     refetch,
     isFetching,
   } = useQuery({
     queryKey: ['workspace'],
     queryFn: () => api.get<FileNode>('/api/workspace'),
+    refetchInterval: 15000,
   })
 
   const toggleExpand = async (node: FileNode) => {
@@ -55,6 +58,7 @@ function WorkspacePage() {
   })
 
   if (isLoading) return <LoadingCards count={4} />
+  if (isError) return <ErrorState onRetry={() => refetch()} />
 
   const renderNode = (node: FileNode, depth: number = 0) => {
     const isExpanded = expandedPaths.has(node.path)

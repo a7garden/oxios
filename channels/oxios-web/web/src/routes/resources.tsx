@@ -15,6 +15,7 @@ function getChartColor(token: string): string {
   return getComputedStyle(document.documentElement).getPropertyValue(token).trim() || '#888'
 }
 
+import { ErrorState } from '@/components/shared/error-state'
 import { LoadingCards } from '@/components/shared/loading'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { api } from '@/lib/api-client'
@@ -23,13 +24,14 @@ import type { ResourceSnapshot } from '@/types'
 export const Route = createFileRoute('/resources')({ component: ResourcesPage })
 
 function ResourcesPage() {
-  const { data, isLoading, refetch, isFetching } = useQuery({
+  const { data, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ['resources'],
     queryFn: () => api.get<ResourceSnapshot[]>('/api/resources'),
     refetchInterval: 5000,
   })
 
   if (isLoading) return <LoadingCards count={4} />
+  if (isError) return <ErrorState onRetry={() => refetch()} />
 
   const snapshots = data ?? []
   const latest = snapshots.length > 0 ? snapshots[snapshots.length - 1] : null
@@ -51,6 +53,7 @@ function ResourcesPage() {
         <button
           type="button"
           onClick={() => refetch()}
+          aria-label="Refresh"
           disabled={isFetching}
           className="rounded-md p-2 hover:bg-muted"
         >

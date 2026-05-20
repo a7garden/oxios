@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
 import { Cpu, Download, Power, PowerOff, RefreshCw } from 'lucide-react'
 import { useState } from 'react'
+import { ErrorState } from '@/components/shared/error-state'
 import { EmptyState } from '@/components/shared/empty-state'
 import { LoadingCards } from '@/components/shared/loading'
 import { Badge } from '@/components/ui/badge'
@@ -20,11 +21,13 @@ function ProgramsPage() {
   const {
     data: programs,
     isLoading,
+    isError,
     refetch,
     isFetching,
   } = useQuery({
     queryKey: ['programs'],
     queryFn: () => api.get<Program[]>('/api/programs'),
+    refetchInterval: 30000,
   })
 
   const toggleMutation = useMutation({
@@ -42,6 +45,7 @@ function ProgramsPage() {
   })
 
   if (isLoading) return <LoadingCards count={4} />
+  if (isError) return <ErrorState onRetry={() => refetch()} />
 
   const items = programs ?? []
 

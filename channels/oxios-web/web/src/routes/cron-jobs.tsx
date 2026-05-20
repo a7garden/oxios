@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
 import { Plus, Power, PowerOff, RefreshCw, Timer, Trash2 } from 'lucide-react'
 import { useState } from 'react'
+import { ErrorState } from '@/components/shared/error-state'
 import { EmptyState } from '@/components/shared/empty-state'
 import { LoadingCards } from '@/components/shared/loading'
 import { Badge } from '@/components/ui/badge'
@@ -20,9 +21,10 @@ function CronJobsPage() {
   const [schedule, setSchedule] = useState('')
   const [command, setCommand] = useState('')
 
-  const { data, isLoading, refetch, isFetching } = useQuery({
+  const { data, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ['cron-jobs'],
     queryFn: () => api.get<CronJob[]>('/api/cron-jobs'),
+    refetchInterval: 10000,
   })
 
   const createMutation = useMutation({
@@ -49,6 +51,7 @@ function CronJobsPage() {
   })
 
   if (isLoading) return <LoadingCards count={4} />
+  if (isError) return <ErrorState onRetry={() => refetch()} />
 
   const jobs = data ?? []
 
@@ -135,10 +138,11 @@ function CronJobsPage() {
                     variant="ghost"
                     size="icon"
                     onClick={() => toggleMutation.mutate({ id: job.id, enabled: !job.enabled })}
+                    aria-label={job.enabled ? 'Disable job' : 'Enable job'}
                   >
                     {job.enabled ? <PowerOff className="h-4 w-4" /> : <Power className="h-4 w-4" />}
                   </Button>
-                  <Button variant="ghost" size="icon" onClick={() => deleteMutation.mutate(job.id)}>
+                  <Button variant="ghost" size="icon" onClick={() => deleteMutation.mutate(job.id)} aria-label="Delete job">
                     <Trash2 className="h-4 w-4 text-destructive" />
                   </Button>
                 </div>

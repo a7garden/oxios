@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
 import { Plus, RefreshCw, Trash2, Zap } from 'lucide-react'
 import { useState } from 'react'
+import { ErrorState } from '@/components/shared/error-state'
 import { EmptyState } from '@/components/shared/empty-state'
 import { LoadingCards } from '@/components/shared/loading'
 import { Button } from '@/components/ui/button'
@@ -23,11 +24,13 @@ function SkillsPage() {
   const {
     data: skills,
     isLoading,
+    isError,
     refetch,
     isFetching,
   } = useQuery({
     queryKey: ['skills'],
     queryFn: () => api.get<Skill[]>('/api/skills'),
+    refetchInterval: 30000,
   })
 
   const createMutation = useMutation({
@@ -47,6 +50,7 @@ function SkillsPage() {
   })
 
   if (isLoading) return <LoadingCards count={4} />
+  if (isError) return <ErrorState onRetry={() => refetch()} />
 
   const items = skills ?? []
 
@@ -123,6 +127,7 @@ function SkillsPage() {
                   variant="ghost"
                   size="icon"
                   onClick={() => deleteMutation.mutate(skill.name)}
+                  aria-label="Delete skill"
                   disabled={deleteMutation.isPending}
                 >
                   <Trash2 className="h-4 w-4 text-destructive" />

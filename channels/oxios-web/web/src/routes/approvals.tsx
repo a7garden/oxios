@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
 import { CheckCircle, RefreshCw, Timer, XCircle } from 'lucide-react'
+import { ErrorState } from '@/components/shared/error-state'
 import { LoadingCards } from '@/components/shared/loading'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -13,7 +14,7 @@ export const Route = createFileRoute('/approvals')({ component: ApprovalsPage })
 function ApprovalsPage() {
   const queryClient = useQueryClient()
 
-  const { data, isLoading, refetch, isFetching } = useQuery({
+  const { data, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ['approvals'],
     queryFn: () => api.get<{ items: Approval[] }>('/api/approvals'),
     refetchInterval: 5000,
@@ -30,6 +31,7 @@ function ApprovalsPage() {
   })
 
   if (isLoading) return <LoadingCards count={4} />
+  if (isError) return <ErrorState onRetry={() => refetch()} />
 
   const items = data?.items ?? []
   const pending = items.filter((a) => a.status === 'pending')

@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { ArrowLeft, Boxes } from 'lucide-react'
+import { ErrorState } from '@/components/shared/error-state'
 import { LoadingCards } from '@/components/shared/loading'
 import { StatusIndicator } from '@/components/shared/status-indicator'
 import { Button } from '@/components/ui/button'
@@ -16,12 +17,13 @@ function SpaceDetailPage() {
   const { spaceId } = Route.useParams()
   const navigate = useNavigate()
 
-  const { data: space, isLoading } = useQuery({
+  const { data: space, isLoading, isError, refetch } = useQuery({
     queryKey: ['space', spaceId],
     queryFn: () => api.get<Space>(`/api/spaces/${spaceId}`),
   })
 
   if (isLoading) return <LoadingCards count={3} />
+  if (isError) return <ErrorState onRetry={() => refetch()} />
   if (!space) return <p className="text-muted-foreground">Space not found.</p>
 
   const details = [
@@ -35,7 +37,7 @@ function SpaceDetailPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={() => navigate({ to: '/spaces' })}>
+        <Button variant="ghost" size="icon" onClick={() => navigate({ to: '/spaces' })} aria-label="Go back">
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div className="flex-1">

@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
 import { RefreshCw, Wallet } from 'lucide-react'
+import { ErrorState } from '@/components/shared/error-state'
 import { EmptyState } from '@/components/shared/empty-state'
 import { LoadingCards } from '@/components/shared/loading'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -13,6 +14,7 @@ function BudgetPage() {
   const {
     data: budgets,
     isLoading,
+    isError,
     refetch,
     isFetching,
   } = useQuery({
@@ -22,6 +24,7 @@ function BudgetPage() {
   })
 
   if (isLoading) return <LoadingCards count={4} />
+  if (isError) return <ErrorState onRetry={() => refetch()} />
 
   const items = budgets ?? []
 
@@ -38,6 +41,7 @@ function BudgetPage() {
         <button
           type="button"
           onClick={() => refetch()}
+          aria-label="Refresh"
           disabled={isFetching}
           className="rounded-md p-2 hover:bg-muted"
         >

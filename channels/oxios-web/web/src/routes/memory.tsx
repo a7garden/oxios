@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
 import { Brain, RefreshCw, Search } from 'lucide-react'
 import { useState } from 'react'
+import { ErrorState } from '@/components/shared/error-state'
 import { EmptyState } from '@/components/shared/empty-state'
 import { LoadingCards } from '@/components/shared/loading'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -17,15 +18,18 @@ function MemoryPage() {
   const {
     data: memories,
     isLoading,
+    isError,
     refetch,
     isFetching,
   } = useQuery({
     queryKey: ['memory', search],
     queryFn: () =>
       api.get<MemoryEntry[]>(`/api/memory${search ? `?q=${encodeURIComponent(search)}` : ''}`),
+    refetchInterval: 15000,
   })
 
   if (isLoading) return <LoadingCards count={4} />
+  if (isError) return <ErrorState onRetry={() => refetch()} />
 
   const items = memories ?? []
 
@@ -39,6 +43,7 @@ function MemoryPage() {
         <button
           type="button"
           onClick={() => refetch()}
+          aria-label="Refresh"
           disabled={isFetching}
           className="rounded-md p-2 hover:bg-muted"
         >

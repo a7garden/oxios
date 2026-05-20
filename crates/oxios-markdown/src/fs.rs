@@ -356,57 +356,6 @@ impl VirtualFs {
         Ok(notes)
     }
 
-    // ── POSIX Path Convenience Methods ───────────────────
-
-    /// Split a POSIX path (e.g. `"brain/Rust.md"`) into `(dir, filename)`.
-    /// Root-level files like `"Chat.md"` become `("/", "Chat.md")`.
-    pub fn split_posix_path(path: &str) -> (&str, &str) {
-        let path = path.trim_start_matches('/');
-        if let Some(slash_pos) = path.find('/') {
-            let (dir, file) = path.split_at(slash_pos);
-            (dir, &file[1..])
-        } else {
-            (DIR_USER_ROOT, path)
-        }
-    }
-
-    /// Read file content by POSIX path (e.g. `"brain/Rust.md"`).
-    pub fn read_path(&self, path: &str) -> Result<String, FsError> {
-        let (dir, filename) = Self::split_posix_path(path);
-        self.read(dir, filename)
-    }
-
-    /// Write content to a file by POSIX path.
-    pub fn write_path(&self, path: &str, content: &str) -> Result<(), FsError> {
-        let (dir, filename) = Self::split_posix_path(path);
-        self.write(dir, filename, content)
-    }
-
-    /// Delete a file by POSIX path.
-    pub fn delete_path(&self, path: &str) -> Result<(), FsError> {
-        let (dir, filename) = Self::split_posix_path(path);
-        self.del(dir, filename)
-    }
-
-    /// Rename/move a file by POSIX paths.
-    pub fn rename_path(&self, old_path: &str, new_path: &str) -> Result<(), FsError> {
-        let (old_dir, old_filename) = Self::split_posix_path(old_path);
-        let (new_dir, new_filename) = Self::split_posix_path(new_path);
-        self.rename(old_dir, old_filename, new_dir, new_filename)
-    }
-
-    /// Check if a file exists by POSIX path.
-    pub fn exists_path(&self, path: &str) -> Result<bool, FsError> {
-        let (dir, filename) = Self::split_posix_path(path);
-        self.exists(dir, filename)
-    }
-
-    /// Get modification time by POSIX path.
-    pub fn mtime_path(&self, path: &str) -> Result<i64, FsError> {
-        let (dir, filename) = Self::split_posix_path(path);
-        self.mtime(dir, filename)
-    }
-
     // ── Private helpers ─────────────────────────────────────
 
     fn walk_dir(

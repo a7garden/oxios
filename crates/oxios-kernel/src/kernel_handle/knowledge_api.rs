@@ -14,7 +14,7 @@ use chrono::Utc;
 use parking_lot::{Mutex, RwLock};
 use serde::{Deserialize, Serialize};
 
-use oxios_markdown::{Backlink, BacklinkIndex, FileEntry, LinkGraph, VirtualFs, split_posix_path};
+use oxios_markdown::{Backlink, BacklinkIndex, FileEntry, LinkGraph, VirtualFs};
 use oxios_markdown::parser::{extract_headings, similar};
 use oxios_markdown::types::DIR_USER_ROOT;
 
@@ -416,7 +416,7 @@ impl KnowledgeApi {
 
                 let mut ctx = oxi_sdk::Context::new();
                 ctx.set_system_prompt(&sp);
-                ctx.add_message(oxi_sdk::Message::User(oxi_sdk::UserMessage::new(&q)));
+                ctx.add_message(oxi_sdk::Message::User(oxi_sdk::UserMessage::new(&*q)));
 
                 let stream = provider.stream(&model, &ctx, None).await
                     .map_err(|e| anyhow::anyhow!("Stream: {e}"))?;

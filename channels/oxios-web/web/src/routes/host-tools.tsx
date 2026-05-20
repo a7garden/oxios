@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
 import { CheckCircle, RefreshCw, Wrench, XCircle } from 'lucide-react'
+import { ErrorState } from '@/components/shared/error-state'
 import { LoadingCards } from '@/components/shared/loading'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { api } from '@/lib/api-client'
@@ -15,12 +16,13 @@ interface ToolCheck {
 export const Route = createFileRoute('/host-tools')({ component: HostToolsPage })
 
 function HostToolsPage() {
-  const { data, isLoading, refetch, isFetching } = useQuery({
+  const { data, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ['host-tools'],
     queryFn: () => api.get<ToolCheck[]>('/api/host-tools'),
   })
 
   if (isLoading) return <LoadingCards count={4} />
+  if (isError) return <ErrorState onRetry={() => refetch()} />
 
   const tools = data ?? []
   const available = tools.filter((t) => t.available).length
@@ -36,6 +38,7 @@ function HostToolsPage() {
         <button
           type="button"
           onClick={() => refetch()}
+          aria-label="Refresh"
           disabled={isFetching}
           className="rounded-md p-2 hover:bg-muted"
         >

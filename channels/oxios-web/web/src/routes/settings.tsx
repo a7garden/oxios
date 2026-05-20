@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
 import { Save, Settings } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import { ErrorState } from '@/components/shared/error-state'
 import { LoadingCards } from '@/components/shared/loading'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -141,7 +142,7 @@ function SettingsPage() {
   const [formValues, setFormValues] = useState<Record<string, Record<string, string>>>({})
   const [activeTab, setActiveTab] = useState('general')
 
-  const { data: config, isLoading } = useQuery({
+  const { data: config, isLoading, isError, refetch } = useQuery({
     queryKey: ['config'],
     queryFn: () => api.get<OxiosConfig>('/api/config'),
   })
@@ -182,6 +183,7 @@ function SettingsPage() {
   }
 
   if (isLoading) return <LoadingCards count={4} />
+  if (isError) return <ErrorState onRetry={() => refetch()} />
 
   return (
     <div className="space-y-6">

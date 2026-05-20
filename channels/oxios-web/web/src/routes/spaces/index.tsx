@@ -3,6 +3,7 @@ import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { Archive, Boxes, Play, RefreshCw } from 'lucide-react'
 import { DataTable } from '@/components/shared/data-table'
 import { EmptyState } from '@/components/shared/empty-state'
+import { ErrorState } from '@/components/shared/error-state'
 import { LoadingTable } from '@/components/shared/loading'
 import { StatusIndicator } from '@/components/shared/status-indicator'
 import { Badge } from '@/components/ui/badge'
@@ -18,9 +19,10 @@ function SpacesListPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
 
-  const { data, isLoading, refetch, isFetching } = useQuery({
+  const { data, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ['spaces'],
     queryFn: () => api.get<{ items: Space[]; total: number }>('/api/spaces'),
+    refetchInterval: 15000,
   })
 
   const activateMutation = useMutation({
@@ -34,6 +36,7 @@ function SpacesListPage() {
   })
 
   if (isLoading) return <LoadingTable rows={5} />
+  if (isError) return <ErrorState onRetry={() => refetch()} />
 
   const spaces = data?.items ?? []
 
@@ -61,12 +64,12 @@ function SpacesListPage() {
           onKeyDown={(e) => e.stopPropagation()}
         >
           {row.status !== 'active' && (
-            <Button variant="ghost" size="icon" onClick={() => activateMutation.mutate(row.id)}>
+            <Button variant="ghost" size="icon" onClick={() => activateMutation.mutate(row.id)} aria-label="Activate space">
               <Play className="h-4 w-4 text-emerald-500" />
             </Button>
           )}
           {row.status !== 'archived' && (
-            <Button variant="ghost" size="icon" onClick={() => archiveMutation.mutate(row.id)}>
+            <Button variant="ghost" size="icon" onClick={() => archiveMutation.mutate(row.id)} aria-label="Archive space">
               <Archive className="h-4 w-4 text-amber-500" />
             </Button>
           )}

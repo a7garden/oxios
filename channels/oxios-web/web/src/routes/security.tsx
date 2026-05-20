@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
 import { FileWarning, KeyRound, RefreshCw, Shield } from 'lucide-react'
+import { ErrorState } from '@/components/shared/error-state'
 import { EmptyState } from '@/components/shared/empty-state'
 import { LoadingCards } from '@/components/shared/loading'
 import { Badge } from '@/components/ui/badge'
@@ -19,19 +20,23 @@ function SecurityPage() {
   const {
     data: audits,
     isLoading: auditLoading,
+    isError: auditError,
     refetch,
     isFetching,
   } = useQuery({
     queryKey: ['audit'],
     queryFn: () => api.get<{ items: AuditEntry[] }>('/api/security/audit'),
+    refetchInterval: 15000,
   })
 
-  const { data: permissions } = useQuery({
+  const { data: permissions, isError: permissionsError, refetch: refetchPermissions } = useQuery({
     queryKey: ['permissions'],
     queryFn: () => api.get<PermissionsOverview>('/api/security/permissions'),
+    refetchInterval: 15000,
   })
 
   if (auditLoading) return <LoadingCards count={4} />
+  if (auditError) return <ErrorState onRetry={() => refetch()} />
 
   const entries = audits?.items ?? []
 
@@ -45,6 +50,7 @@ function SecurityPage() {
         <button
           type="button"
           onClick={() => refetch()}
+          aria-label="Refresh"
           disabled={isFetching}
           className="rounded-md p-2 hover:bg-muted"
         >
@@ -53,7 +59,9 @@ function SecurityPage() {
       </div>
 
       {/* Permissions */}
-      {permissions && (
+      {permissionsError ? (
+        <ErrorState onRetry={() => refetchPermissions()} />
+      ) : permissions ? (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -87,7 +95,7 @@ function SecurityPage() {
             </div>
           </CardContent>
         </Card>
-      )}
+      ) : null}
 
       {/* Audit Trail */}
       <Card>

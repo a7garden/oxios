@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
 import { GitBranch, RefreshCw, RotateCcw, ShieldCheck, Tag } from 'lucide-react'
 import { useState } from 'react'
+import { ErrorState } from '@/components/shared/error-state'
 import { EmptyState } from '@/components/shared/empty-state'
 import { LoadingCards } from '@/components/shared/loading'
 import { Badge } from '@/components/ui/badge'
@@ -21,16 +22,19 @@ function GitPage() {
   const {
     data: commits,
     isLoading,
+    isError,
     refetch,
     isFetching,
   } = useQuery({
     queryKey: ['git-log'],
     queryFn: () => api.get<GitCommit[]>('/api/git/log'),
+    refetchInterval: 15000,
   })
 
   const { data: tags } = useQuery({
     queryKey: ['git-tags'],
     queryFn: () => api.get<string[]>('/api/git/tags'),
+    refetchInterval: 15000,
   })
 
   const tagMutation = useMutation({
@@ -54,6 +58,7 @@ function GitPage() {
   })
 
   if (isLoading) return <LoadingCards count={4} />
+  if (isError) return <ErrorState onRetry={() => refetch()} />
 
   const commitList = commits ?? []
   const tagList = tags ?? []

@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
 import { Bell, RefreshCw } from 'lucide-react'
 import { useEffect, useRef } from 'react'
+import { ErrorState } from '@/components/shared/error-state'
 import { EmptyState } from '@/components/shared/empty-state'
 import { LoadingCards } from '@/components/shared/loading'
 import { Badge } from '@/components/ui/badge'
@@ -17,7 +18,7 @@ function EventsPage() {
   const { events: liveEvents, isConnected, error: connectionError } = useEvents()
   const scrollRef = useRef<HTMLDivElement>(null)
 
-  const { isLoading, refetch, isFetching } = useQuery({
+  const { isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ['events'],
     queryFn: () => api.get<{ items: OxiosEvent[] }>('/api/events?limit=50'),
   })
@@ -27,6 +28,7 @@ function EventsPage() {
   }, [liveEvents.length])
 
   if (isLoading) return <LoadingCards count={4} />
+  if (isError) return <ErrorState onRetry={() => refetch()} />
 
   return (
     <div className="space-y-6">

@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
 import { Plus, RefreshCw, Star, Trash2, Users } from 'lucide-react'
 import { useState } from 'react'
+import { ErrorState } from '@/components/shared/error-state'
 import { EmptyState } from '@/components/shared/empty-state'
 import { LoadingCards } from '@/components/shared/loading'
 import { Button } from '@/components/ui/button'
@@ -23,11 +24,13 @@ function PersonasPage() {
   const {
     data: personas,
     isLoading,
+    isError,
     refetch,
     isFetching,
   } = useQuery({
     queryKey: ['personas'],
     queryFn: () => api.get<Persona[]>('/api/personas'),
+    refetchInterval: 30000,
   })
 
   const createMutation = useMutation({
@@ -53,6 +56,7 @@ function PersonasPage() {
   })
 
   if (isLoading) return <LoadingCards count={4} />
+  if (isError) return <ErrorState onRetry={() => refetch()} />
 
   const items = personas ?? []
 
@@ -139,6 +143,7 @@ function PersonasPage() {
                       variant="ghost"
                       size="icon"
                       onClick={() => activateMutation.mutate(persona.id)}
+                      aria-label="Activate persona"
                     >
                       <Star className="h-4 w-4" />
                     </Button>
@@ -147,6 +152,7 @@ function PersonasPage() {
                     variant="ghost"
                     size="icon"
                     onClick={() => deleteMutation.mutate(persona.id)}
+                    aria-label="Delete persona"
                   >
                     <Trash2 className="h-4 w-4 text-destructive" />
                   </Button>
