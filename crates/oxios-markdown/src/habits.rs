@@ -69,7 +69,7 @@ pub fn habits(fs: &VirtualFs, year: i32) -> Result<Habits, HabitsError> {
 
         let days = parts[0];
         let habit = parts[1];
-        let first_day = chrono::NaiveDate::from_ymd_opt(year, month as u32, 1).unwrap();
+        let first_day = chrono::NaiveDate::from_ymd_opt(year, month.number_from_month(), 1).unwrap();
         let mut day_of_year = first_day.ordinal() as i32;
 
         if habit.contains(MOOD_HABIT) {

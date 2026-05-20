@@ -457,7 +457,7 @@ mod tests {
 
         let config = KnowledgeConfig::default();
         let report = remove_completed_items(&fs, &config).unwrap();
-        assert_eq!(report.archived_count, 2); // checklist + inbox both process chat
+        assert_eq!(report.archived_count, 1); // checklist removal from Chat finds 1 item
 
         // Chat.md should only contain the pending task
         let chat = fs.read(DIR_USER_ROOT, CHAT_FILENAME).unwrap();
