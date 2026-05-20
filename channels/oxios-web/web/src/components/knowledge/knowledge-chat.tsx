@@ -422,14 +422,28 @@ export function KnowledgeChat() {
                         onDragEnter={() => handleDragEnter(msg)}
                         onDragEnd={handleDragEnd}
                       >
-                        {/* Checkbox */}
-                        <span className="mt-0.5 shrink-0 text-muted-foreground">
+                        {/* Checkbox — click to toggle completion */}
+                        <button
+                          type="button"
+                          className="mt-0.5 shrink-0 text-muted-foreground hover:text-foreground transition-colors"
+                          title={msg.done ? 'Mark incomplete' : 'Mark complete'}
+                          disabled={chatDelete.isPending || chatAppend.isPending}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            const oldPrefix = msg.done ? '- [x]' : '- [ ]'
+                            const newPrefix = msg.done ? '- [ ]' : '- [x]'
+                            const rest = msg.raw.replace(oldPrefix, '').trim()
+                            chatDelete.mutateAsync(msgHash(msg.raw)).then(() => {
+                              chatAppend.mutateAsync(`${newPrefix} ${rest}`)
+                            })
+                          }}
+                        >
                           {msg.done ? (
                             <CheckSquare className="h-4 w-4 text-emerald-500" />
                           ) : (
                             <Square className="h-4 w-4" />
                           )}
-                        </span>
+                        </button>
 
                         {/* Timestamp */}
                         {msg.timestamp && (

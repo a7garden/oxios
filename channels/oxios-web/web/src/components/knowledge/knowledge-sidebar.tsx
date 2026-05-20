@@ -1,7 +1,7 @@
 import { useCallback } from 'react'
 import { FilePlus, FolderPlus, Trash2 } from 'lucide-react'
 import { useKnowledgeStore } from '@/stores/knowledge'
-import { useKnowledgeTree, useWriteFile, useDeleteFile } from '@/hooks/use-knowledge'
+import { useKnowledgeTree, useWriteFile, useDeleteFile, useJournalToday } from '@/hooks/use-knowledge'
 import { FileTree } from './file-tree'
 import { ResizeHandle } from './resize-handle'
 import { Button } from '@/components/ui/button'
@@ -28,6 +28,13 @@ export function KnowledgeSidebar() {
     await writeFile.mutateAsync({ path: `${name.trim()}/.keep`, content: '' })
     refetch()
   }, [writeFile, refetch])
+
+  const journalToday = useJournalToday()
+  const handleOpenJournal = useCallback(() => {
+    if (journalToday.data?.path) {
+      openFile(journalToday.data.path)
+    }
+  }, [journalToday.data, openFile])
 
   return (
     <div
@@ -86,6 +93,16 @@ export function KnowledgeSidebar() {
         💬 Chat
       </button>
 
+      {/* Journal button */}
+      <button
+        type="button"
+        onClick={handleOpenJournal}
+        disabled={journalToday.isLoading}
+        className="flex items-center gap-2 px-3 py-2 text-sm w-full text-left hover:bg-accent/50 transition-colors border-b disabled:opacity-50"
+      >
+        📔 Journal
+      </button>
+
       {/* File tree */}
       <div className="flex-1 overflow-y-auto p-1">
         {isLoading ? (
@@ -97,6 +114,13 @@ export function KnowledgeSidebar() {
 
       {/* Resize handle */}
       <ResizeHandle width={sidebarWidth} onResize={setSidebarWidth} />
+
+      {/* Keyboard shortcuts legend */}
+      <div className="p-2 border-t text-[10px] text-muted-foreground space-y-0.5">
+        <div><kbd className="font-mono border rounded px-1">⌘K</kbd> Search</div>
+        <div><kbd className="font-mono border rounded px-1">⌘M</kbd> Move file</div>
+        <div><kbd className="font-mono border rounded px-1">⌘N</kbd> New file</div>
+      </div>
     </div>
   )
 }

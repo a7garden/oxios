@@ -81,7 +81,37 @@ export function MarkdownEditor({ filePath, initialContent, onSave, className }: 
         'Ctrl-Y': insertCheckmark,
       },
       hintOptions: {
-        hint: createLinkHintFn(autocompleteEntries),
+        hint: (cm: any) => {
+          const cursor = cm.getCursor()
+          const line = cm.getLine(cursor.line) ?? ''
+          const pos = cursor.ch
+          // Determine trigger: `[` = link hint, `:` = emoji hint
+          if (pos > 0 && line[pos - 1] === '[') {
+            return createLinkHintFn(autocompleteEntries)(cm)
+          }
+          if (pos > 0 && line[pos - 1] === ':') {
+            // Return emoji hint
+            const word = line.slice(pos, pos + 3).replace(/[^\p{L}\p{N}_]/u, '')
+            const emojis = [
+              '✅', '❌', '⚠️', '🔥', '💡', '⭐', '🌟', '💫',
+              '🎯', '🚀', '📝', '📌', '🔗', '💬', '📊', '🛠️',
+              '🎨', '🎵', '🏆', '📦', '📈', '💰', '🌱', '🌍',
+              '🧠', '💡', '🔍', '✅', '☑️', '❎', '⬜', '🟩',
+            ]
+            const filtered = word
+              ? emojis.filter(e => e.includes(word.slice(1)))
+              : emojis
+            return {
+              list: filtered.map(emoji => ({
+                text: emoji + ' ',
+                displayText: emoji,
+              })),
+              from: { line: cursor.line, ch: pos - 1 },
+              to: { line: cursor.line, ch: pos },
+            }
+          }
+          return null
+        },
         closeCharacters: /[$^]/,
         closeOnUnfocus: false,
         completeSingle: false,
@@ -122,10 +152,13 @@ export function MarkdownEditor({ filePath, initialContent, onSave, className }: 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ;(cm as any).hmdReadLink = readLink
 
-    // Auto-show hints on `[` press
+    // Auto-show hints on `[` (link) or `:` (emoji)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     cm.on('inputRead', (_cm: any, change: any) => {
-      if (change.text.length === 1 && change.text[0] === '[') {
+      if (change.text.length !== 1) return
+      const ch = change.text[0]
+
+      if (ch === '[' || ch === ':') {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         ;(cm as any).showHint({
           completeSingle: false,
