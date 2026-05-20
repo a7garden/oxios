@@ -456,6 +456,129 @@ impl KnowledgeApi {
     pub fn clear_agent_write(&self, path: &str) {
         self.agent_writes.lock().remove(path);
     }
+
+    // ═══════════════════════════════════════════════════════════════
+    // Chat / Inbox — files.md Chat.md message management
+    // ═══════════════════════════════════════════════════════════════
+
+    /// Append a timestamped message to Chat.md.
+    ///
+    /// Creates or updates the daily header ("#### 20 May, Tuesday")
+    /// and appends the message with a timestamp.
+    pub fn chat_append(&self, message: &str) -> Result<()> {
+        let header = oxios_markdown::today_chat_header();
+        let timestamp = chrono::Local::now().format("`15:04`").to_string();
+        let entry = format!("{} {}", timestamp, message);
+
+        let mut content = self.note_read(oxios_markdown::CHAT_FILENAME)?.unwrap_or_default();
+        if !content.contains(&header) {
+            if !content.trim_end().ends_with('\n') { content.push('\n'); }
+            content.push_str(&header);
+            content.push('\n');
+        }
+        content.push_str(&entry);
+        content.push('\n');
+        self.note_write(oxios_markdown::CHAT_FILENAME, &content)?;
+        Ok(())
+    }
+
+    /// Parse Chat.md into structured message blocks.
+    pub fn chat_messages(&self) -> Result<Vec<String>> {
+        let content = self.note_read(oxios_markdown::CHAT_FILENAME)?.unwrap_or_default();
+        Ok(oxios_markdown::read_chat_msgs(&content))
+    }
+
+    /// Delete a specific chat message by its content hash.
+    pub fn chat_delete(&self, msg_hash: &str) -> Result<bool> {
+        let content = self.note_read(oxios_markdown::CHAT_FILENAME)?.unwrap_or_default();
+        match oxios_markdown::delete_chat_msg(&content, msg_hash) {
+            Ok(new_content) => {
+                self.note_write(oxios_markdown::CHAT_FILENAME, &new_content)?;
+                Ok(true)
+            }
+            Err(_) => Ok(false),
+        }
+    }
+
+    /// Rename a specific chat message by its content hash.
+    pub fn chat_rename(&self, msg_hash: &str, new_body: &str) -> Result<bool> {
+        let content = self.note_read(oxios_markdown::CHAT_FILENAME)?.unwrap_or_default();
+        match oxios_markdown::rename_chat_msg(&content, msg_hash, new_body) {
+            Ok(new_content) => {
+                self.note_write(oxios_markdown::CHAT_FILENAME, &new_content)?;
+                Ok(true)
+            }
+            Err(_) => Ok(false),
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // Journal — daily timestamped records
+    // ═══════════════════════════════════════════════════════════════
+
+    /// Add a timestamped record to today's journal entry.
+    pub fn journal_add_record(&self, record: &str) -> Result<()> {
+        let fs = self.fs.read();
+        let tz = chrono::Local::now().offset().to_owned();
+        oxios_markdown::journal_add_record(&fs, record, tz)?;
+        Ok(())
+    }
+
+    /// Add an emoji to today's journal header.
+    pub fn journal_add_emoji(&self, emoji: &str) -> Result<()> {
+        let fs = self.fs.read();
+        let tz = chrono::Local::now().offset().to_owned();
+        oxios_markdown::journal_add_emoji(&fs, emoji, tz)?;
+        Ok(())
+    }
+
+    /// Get today's journal file path (e.g., "journal/2026.05 May.md").
+    pub fn journal_today_path(&self) -> String {
+        let tz = chrono::Local::now().offset().to_owned();
+        oxios_markdown::today_journal_filename(tz)
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // Habits — yearly tracking with emoji visualization
+    // ═══════════════════════════════════════════════════════════════
+
+    /// Read habit tracking data for a given year.
+    ///
+    /// Returns a map of habit name → {day_of_year → status}.
+    pub fn habits(&self, year: i32) -> Result<oxios_markdown::types::Habits> {
+        let fs = self.fs.read();
+        Ok(oxios_markdown::habits(&fs, year)?)
+    }
+
+    /// Get the emoji for a habit's status on a given day.
+    pub fn habit_emoji_for_status(
+        &self,
+        habit_name: &str,
+        day: &chrono::DateTime<chrono::FixedOffset>,
+        status: i32,
+    ) -> &'static str {
+        oxios_markdown::emoji_for_status(habit_name, day, status)
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // Config — knowledge base configuration
+    // ═══════════════════════════════════════════════════════════════
+
+    /// Read the knowledge base config (config.json).
+    pub fn config(&self) -> Result<oxios_markdown::types::KnowledgeConfig> {
+        let fs = self.fs.read();
+        match fs.read_path("config.json") {
+            Ok(content) => Ok(serde_json::from_str(&content).unwrap_or_default()),
+            Err(_) => Ok(oxios_markdown::types::KnowledgeConfig::default()),
+        }
+    }
+
+    /// Write the knowledge base config.
+    pub fn set_config(&self, config: &oxios_markdown::types::KnowledgeConfig) -> Result<()> {
+        let json = serde_json::to_string_pretty(config)?;
+        self.note_write("config.json", &json)?;
+        Ok(())
+    }
 }
 
 #[cfg(test)]

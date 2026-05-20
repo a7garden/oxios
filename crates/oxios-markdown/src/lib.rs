@@ -25,13 +25,18 @@
 #![warn(missing_docs)]
 
 pub mod backlinks;
+pub mod chat;
 pub mod fs;
 #[allow(dead_code)]
 pub mod fslog;
+pub mod habits;
+pub mod journal;
 pub mod merge;
 pub mod parser;
+pub mod schedule;
 #[allow(dead_code)]
 pub mod sync;
+pub mod tokens;
 pub mod types;
 
 // Re-export core types for convenience
@@ -48,10 +53,15 @@ pub use types::{
 };
 
 pub use backlinks::{Backlink, BacklinkIndex, LinkGraph, LinkEdge, LinkNode};
+pub use chat::{read_chat_msgs, find_chat_msg_by_hash, rename_chat_msg, delete_chat_msg, today_header as chat_today_header};
 pub use fs::VirtualFs;
 pub use fs::split_posix_path;
 pub use fslog::FsLog;
+pub use habits::{habits, emoji_for_status, habit_emoji, weekday_emoji};
+pub use journal::{add_record as journal_add_record, add_emoji as journal_add_emoji, today_journal_filename, today_header as journal_today_header};
 pub use merge::merge;
 pub use parser::{similar, levenshtein, extract_markdown_links, extract_headings, norm_new_lines,
     today_chat_header, today_journal_path};
+pub use schedule::ScheduleManager;
 pub use sync::SyncEngine;
+pub use tokens::TokenManager;
