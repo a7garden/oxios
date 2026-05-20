@@ -43,25 +43,6 @@ export function MarkdownEditor({ filePath, initialContent, onSave, className }: 
     textarea.value = initialContent
     containerRef.current.appendChild(textarea)
 
-    // Custom link resolver
-    const resolveURL = (url: string | undefined): string | undefined => {
-      if (!url) return url
-      url = url.replace(/%20/g, ' ')
-      if (url.startsWith('../')) url = url.replace('../', '')
-
-      // External URLs
-      if (/^https?:\/\//i.test(url)) return url
-
-      // .md files → open in editor
-      if (/\.md$/i.test(url)) {
-        // Defer to avoid CM internal state issues
-        setTimeout(() => openFile(url), 0)
-        return url
-      }
-
-      return url
-    }
-
     // Custom link reader (handles wiki-style click)
     const readLink = (text: string, _line: number) => {
       text = text.replace(/\|.*]$/, '').replace(/[\[\]]/g, '')
@@ -107,6 +88,33 @@ export function MarkdownEditor({ filePath, initialContent, onSave, className }: 
         alignWithWord: false,
       },
     } as any)
+
+    // Save original resolver before overriding
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const originalResolveURL = (cm as any).hmdResolveURL?.bind(cm)
+
+    // Custom link resolver — only intercepts .md navigation
+    // Image paths and external URLs pass through to HyperMD's default resolver
+    const resolveURL = (url: string | undefined): string | undefined => {
+      if (!url) return url
+      const decoded = url.replace(/%20/g, ' ')
+      const cleaned = decoded.startsWith('../') ? decoded.replace('../', '') : decoded
+
+      // External URLs — let HyperMD handle
+      if (/^https?:\/\//i.test(url)) return originalResolveURL?.(url) ?? url
+
+      // Image files — let HyperMD fold-image handle
+      if (/\.(png|jpe?g|gif|svg|webp|bmp)$/i.test(url)) return originalResolveURL?.(url) ?? url
+
+      // .md files → open in editor
+      if (/\.md$/i.test(cleaned)) {
+        setTimeout(() => openFile(cleaned), 0)
+        return cleaned
+      }
+
+      // Everything else — pass through
+      return originalResolveURL?.(url) ?? url
+    }
 
     // Override URL resolution and link reading
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

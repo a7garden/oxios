@@ -43,6 +43,10 @@ export async function apiClient<T>(path: string, options?: RequestOptions): Prom
   }
 
   if (res.status === 204) return undefined as T
+  const contentType = res.headers.get('content-type') ?? ''
+  if (contentType.includes('text/plain') || contentType.includes('text/markdown') || contentType.includes('text/x-markdown')) {
+    return res.text() as Promise<T>
+  }
   return res.json() as Promise<T>
 }
 

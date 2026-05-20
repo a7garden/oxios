@@ -1,7 +1,7 @@
 import { useCallback } from 'react'
-import { FilePlus, FolderPlus } from 'lucide-react'
+import { FilePlus, FolderPlus, Trash2 } from 'lucide-react'
 import { useKnowledgeStore } from '@/stores/knowledge'
-import { useKnowledgeTree, useWriteFile } from '@/hooks/use-knowledge'
+import { useKnowledgeTree, useWriteFile, useDeleteFile } from '@/hooks/use-knowledge'
 import { FileTree } from './file-tree'
 import { ResizeHandle } from './resize-handle'
 import { Button } from '@/components/ui/button'
@@ -11,6 +11,7 @@ export function KnowledgeSidebar() {
   const { sidebarWidth, setSidebarWidth, currentFilePath, mode, openFile, openChat } = useKnowledgeStore()
   const { data: entries, isLoading, refetch } = useKnowledgeTree()
   const writeFile = useWriteFile()
+  const deleteFile = useDeleteFile()
 
   const handleNewFile = useCallback(async () => {
     const name = 'New file.md'
@@ -55,6 +56,21 @@ export function KnowledgeSidebar() {
           >
             <FolderPlus className="h-4 w-4" />
           </Button>
+          {currentFilePath && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 text-destructive"
+              onClick={async () => {
+                if (confirm(`Delete ${currentFilePath}?`)) {
+                  await deleteFile.mutateAsync(currentFilePath)
+                }
+              }}
+              title="Delete current file (⌘D)"
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          )}
         </div>
       </div>
 
