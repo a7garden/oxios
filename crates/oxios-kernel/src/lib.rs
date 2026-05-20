@@ -172,7 +172,7 @@ pub use git_layer::{CommitInfo, GitLayer, LogEntry};
 pub use resource_monitor::{OverloadThreshold, ResourceMonitor, ResourceSnapshot};
 pub use space::{
     extract_filesystem_path, match_keywords, ConversationBuffer, ConversationTurn, CrossRefEntry,
-    KnowledgeBridge, KnowledgeFlow, PathMatcher, Space, SpaceId, SpaceManager, SpaceManagerError,
+    SpaceBridge, MemoryFlow, PathMatcher, Space, SpaceId, SpaceManager, SpaceManagerError,
     SpaceSource,
 };
 pub use state_store::{AgentResponse, Session, SessionId, SessionSummary, StateStore};

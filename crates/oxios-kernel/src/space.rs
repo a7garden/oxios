@@ -7,12 +7,12 @@
 
 pub mod conversation_buffer;
 pub mod detection;
-pub mod knowledge_bridge;
+pub mod space_bridge;
 pub mod manager;
 
 pub use conversation_buffer::{ConversationBuffer, ConversationTurn};
 pub use detection::{extract_filesystem_path, match_keywords, PathMatcher};
-pub use knowledge_bridge::{CrossRefEntry, KnowledgeBridge, KnowledgeFlow};
+pub use space_bridge::{CrossRefEntry, SpaceBridge, MemoryFlow};
 pub use manager::{SpaceManager, SpaceManagerError};
 
 use chrono::{DateTime, Utc};
@@ -80,10 +80,10 @@ pub struct Space {
     /// Number of interactions in this Space.
     #[serde(default)]
     pub interaction_count: u64,
-    /// Whether this Space allows cross-Space knowledge access.
+    /// Whether this Space allows cross-Space memory access.
     /// Default: true. Set to false for private Spaces.
     #[serde(default = "default_true")]
-    pub knowledge_visible: bool,
+    pub memory_visible: bool,
 }
 
 fn default_true() -> bool {
@@ -105,7 +105,7 @@ impl Space {
             created_at: now,
             last_active_at: now,
             interaction_count: 0,
-            knowledge_visible: true,
+            memory_visible: true,
         }
     }
 

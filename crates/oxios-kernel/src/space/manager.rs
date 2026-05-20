@@ -16,7 +16,7 @@ use parking_lot::RwLock;
 use tokio::sync::Mutex;
 
 use super::conversation_buffer::{ConversationBuffer, ConversationTurn};
-use super::knowledge_bridge::KnowledgeBridge;
+use super::space_bridge::SpaceBridge;
 use super::{
     detection::{self, PathMatcher, Topic},
     Space, SpaceId, SpaceSource,
@@ -65,8 +65,8 @@ pub struct SpaceManager {
     path_matcher: RwLock<PathMatcher>,
     /// Conversation buffer reference for detection.
     buffer: Arc<Mutex<ConversationBuffer>>,
-    /// Knowledge bridge for cross-Space knowledge flow.
-    knowledge_bridge: Option<Arc<KnowledgeBridge>>,
+    /// Memory bridge for cross-Space memory flow.
+    memory_bridge: Option<Arc<SpaceBridge>>,
     /// Root directory for all Space data.
     root_dir: PathBuf,
     /// Number of turns since last topic check.
@@ -104,7 +104,7 @@ impl SpaceManager {
             event_bus,
             path_matcher: RwLock::new(PathMatcher::default()),
             buffer: Arc::new(Mutex::new(ConversationBuffer::default())),
-            knowledge_bridge: None,
+            memory_bridge: None,
             root_dir,
             turns_since_topic_check: Mutex::new(0),
         };
@@ -116,9 +116,9 @@ impl SpaceManager {
         Ok(this)
     }
 
-    /// Set the knowledge bridge (called after construction).
-    pub fn set_knowledge_bridge(&mut self, bridge: Arc<KnowledgeBridge>) {
-        self.knowledge_bridge = Some(bridge);
+    /// Set the memory bridge (called after construction).
+    pub fn set_memory_bridge(&mut self, bridge: Arc<SpaceBridge>) {
+        self.memory_bridge = Some(bridge);
     }
 
     /// Get the default root directory for Space data.
@@ -194,7 +194,7 @@ impl SpaceManager {
             created_at: Utc::now(),
             last_active_at: Utc::now(),
             interaction_count: 0,
-            knowledge_visible: true,
+            memory_visible: true,
         };
 
         self.add_space(default).await
@@ -503,7 +503,7 @@ impl SpaceManager {
             created_at: Utc::now(),
             last_active_at: Utc::now(),
             interaction_count: 1,
-            knowledge_visible: true,
+            memory_visible: true,
         })
         .await
         .ok(); // Ignore save errors here
@@ -765,9 +765,9 @@ impl SpaceManager {
         Ok(())
     }
 
-    /// Get the knowledge bridge.
-    pub fn knowledge_bridge(&self) -> Option<Arc<KnowledgeBridge>> {
-        self.knowledge_bridge.clone()
+    /// Get the memory bridge.
+    pub fn memory_bridge(&self) -> Option<Arc<SpaceBridge>> {
+        self.memory_bridge.clone()
     }
 
     /// Get the root directory.

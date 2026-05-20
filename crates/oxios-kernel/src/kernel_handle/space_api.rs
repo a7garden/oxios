@@ -24,7 +24,7 @@ pub struct SpaceInfo {
     pub active: bool,
     pub paths: Vec<String>,
     pub interaction_count: u64,
-    pub knowledge_visible: bool,
+    pub memory_visible: bool,
     pub last_active: String,
 }
 
@@ -41,16 +41,16 @@ impl From<&Space> for SpaceInfo {
                 .map(|p| p.to_string_lossy().to_string())
                 .collect(),
             interaction_count: space.interaction_count,
-            knowledge_visible: space.knowledge_visible,
+            memory_visible: space.memory_visible,
             last_active: space.last_active_at.to_rfc3339(),
         }
     }
 }
 
-/// Serialized knowledge flow entry.
+/// Serialized memory flow entry.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[allow(missing_docs)]
-pub struct KnowledgeFlowInfo {
+pub struct MemoryFlowInfo {
     pub from: String,
     pub to: String,
     pub flow_type: String,
@@ -58,7 +58,7 @@ pub struct KnowledgeFlowInfo {
     pub timestamp: String,
 }
 
-impl From<&CrossRefEntry> for KnowledgeFlowInfo {
+impl From<&CrossRefEntry> for MemoryFlowInfo {
     fn from(entry: &CrossRefEntry) -> Self {
         Self {
             from: entry.from.to_string(),
@@ -167,15 +167,15 @@ impl SpaceApi {
             .context("Failed to restore Space")
     }
 
-    /// Get recent knowledge flow entries.
-    pub fn knowledge_flow(&self) -> Vec<KnowledgeFlowInfo> {
+    /// Get recent memory flow entries.
+    pub fn memory_flow(&self) -> Vec<MemoryFlowInfo> {
         self.space_manager
             .knowledge_bridge()
             .map(|bridge| {
                 bridge
                     .recent_references()
                     .iter()
-                    .map(KnowledgeFlowInfo::from)
+                    .map(MemoryFlowInfo::from)
                     .collect()
             })
             .unwrap_or_default()
@@ -186,15 +186,15 @@ impl SpaceApi {
         self.space_manager.default_workspace_dir(space_id)
     }
 
-    /// Get knowledge flow for a specific Space.
-    pub fn knowledge_flow_for(&self, id: &str) -> Option<Vec<KnowledgeFlowInfo>> {
+    /// Get memory flow for a specific Space.
+    pub fn memory_flow_for(&self, id: &str) -> Option<Vec<MemoryFlowInfo>> {
         let space_id = uuid::Uuid::parse_str(id).ok()?;
         Some(
             self.space_manager
                 .knowledge_bridge()?
                 .references_for(space_id)
                 .iter()
-                .map(KnowledgeFlowInfo::from)
+                .map(MemoryFlowInfo::from)
                 .collect(),
         )
     }

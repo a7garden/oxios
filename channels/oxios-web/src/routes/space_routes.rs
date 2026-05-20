@@ -1,4 +1,4 @@
-//! Space management routes — list, activate, archive, merge, knowledge flow.
+//! Space management routes — list, activate, archive, merge, memory flow.
 
 use std::sync::Arc;
 
@@ -138,32 +138,32 @@ pub(crate) async fn handle_space_merge(
 }
 
 // ---------------------------------------------------------------------------
-// Knowledge Flow
+// Memory Flow
 // ---------------------------------------------------------------------------
 
-/// GET /api/spaces/knowledge-flow — Get recent knowledge flow.
-pub(crate) async fn handle_knowledge_flow(
+/// GET /api/spaces/memory-flow — Get recent memory flow.
+pub(crate) async fn handle_memory_flow(
     state: State<Arc<AppState>>,
 ) -> Result<Json<serde_json::Value>, AppError> {
-    let flows = state.kernel.spaces.knowledge_flow();
+    let flows = state.kernel.spaces.memory_flow();
     Ok(Json(serde_json::json!({
         "items": flows,
         "total": flows.len(),
     })))
 }
 
-/// GET /api/spaces/:id/knowledge-flow — Knowledge flow for a specific Space.
-pub(crate) async fn handle_knowledge_flow_for(
+/// GET /api/spaces/:id/memory-flow — Memory flow for a specific Space.
+pub(crate) async fn handle_memory_flow_for(
     state: State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<Json<serde_json::Value>, AppError> {
-    match state.kernel.spaces.knowledge_flow_for(&id) {
+    match state.kernel.spaces.memory_flow_for(&id) {
         Some(flows) => Ok(Json(serde_json::json!({
             "items": flows,
             "total": flows.len(),
         }))),
         None => Err(AppError::NotFound(format!(
-            "Space {id} not found for knowledge flow"
+            "Space {id} not found for memory flow"
         ))),
     }
 }

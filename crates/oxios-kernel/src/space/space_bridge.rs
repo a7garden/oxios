@@ -1,6 +1,6 @@
-//! KnowledgeBridge: manages knowledge flow between Spaces.
+//! SpaceBridge: manages memory flow between Spaces.
 //!
-//! Cross-Space knowledge flow is managed through three types:
+//! Cross-Space memory flow is managed through three types:
 //! - Reference: read-only access to another Space's memory
 //! - Transfer: copy memory entries from one Space to another
 //! - Synthesis: combine knowledge from multiple Spaces (Phase 6)
@@ -22,15 +22,15 @@ pub struct CrossRefEntry {
     pub to: SpaceId,
     /// Memory entry IDs that were accessed.
     pub entry_ids: Vec<String>,
-    /// Type of knowledge flow.
-    pub flow: KnowledgeFlow,
+    /// Type of memory flow.
+    pub flow: MemoryFlow,
     /// When this happened.
     pub timestamp: DateTime<Utc>,
 }
 
 impl CrossRefEntry {
     /// Create a new cross-reference entry.
-    pub fn new(from: SpaceId, to: SpaceId, entry_ids: Vec<String>, flow: KnowledgeFlow) -> Self {
+    pub fn new(from: SpaceId, to: SpaceId, entry_ids: Vec<String>, flow: MemoryFlow) -> Self {
         Self {
             from,
             to,
@@ -41,10 +41,10 @@ impl CrossRefEntry {
     }
 }
 
-/// Type of knowledge flow between Spaces.
+/// Type of memory flow between Spaces.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum KnowledgeFlow {
+pub enum MemoryFlow {
     /// Read-only access to another Space's memory.
     Reference,
     /// Copy entries from one Space to another.
@@ -53,33 +53,33 @@ pub enum KnowledgeFlow {
     Synthesis,
 }
 
-impl std::fmt::Display for KnowledgeFlow {
+impl std::fmt::Display for MemoryFlow {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            KnowledgeFlow::Reference => write!(f, "reference"),
-            KnowledgeFlow::Transfer => write!(f, "transfer"),
-            KnowledgeFlow::Synthesis => write!(f, "synthesis"),
+            MemoryFlow::Reference => write!(f, "reference"),
+            MemoryFlow::Transfer => write!(f, "transfer"),
+            MemoryFlow::Synthesis => write!(f, "synthesis"),
         }
     }
 }
 
-/// Manages knowledge flow between Spaces.
+/// Manages memory flow between Spaces.
 ///
 /// Provides controlled access to cross-Space memory:
-/// - Checks `knowledge_visible` flags
+/// - Checks `memory_visible` flags
 /// - Records all access in audit trail
 /// - Respects privacy settings
-pub struct KnowledgeBridge {
+pub struct SpaceBridge {
     /// Reference to SpaceManager for space lookups.
     space_manager: Arc<super::manager::SpaceManager>,
-    /// Audit trail for knowledge flow logging.
+    /// Audit trail for memory flow logging.
     audit_trail: Option<Arc<AuditTrail>>,
     /// In-memory log of recent cross-references.
     recent_refs: parking_lot::RwLock<Vec<CrossRefEntry>>,
 }
 
-impl KnowledgeBridge {
-    /// Create a new KnowledgeBridge.
+impl SpaceBridge {
+    /// Create a new SpaceBridge.
     pub fn new(
         space_manager: Arc<super::manager::SpaceManager>,
         audit_trail: Option<Arc<AuditTrail>>,
@@ -111,7 +111,7 @@ impl KnowledgeBridge {
         // Check visibility
         let from_space = self.space_manager.get_space(&from_space_id).await?;
         if let Some(space) = from_space {
-            if !space.knowledge_visible {
+            if !space.memory_visible {
                 anyhow::bail!("Space {} is private and cannot be accessed", from_space_id);
             }
         }
@@ -130,7 +130,7 @@ impl KnowledgeBridge {
             from_space_id,
             to_space_id,
             entries.iter().map(|e: &MemoryEntry| e.id.clone()).collect(),
-            KnowledgeFlow::Reference,
+            MemoryFlow::Reference,
         );
         self.record_entry(entry);
 
@@ -158,7 +158,7 @@ impl KnowledgeBridge {
         // Check visibility
         let from_space = self.space_manager.get_space(&from_space_id).await?;
         if let Some(space) = from_space {
-            if !space.knowledge_visible {
+            if !space.memory_visible {
                 tracing::warn!(
                     from = %from_space_id,
                     to = %to_space_id,
@@ -178,7 +178,7 @@ impl KnowledgeBridge {
             from_space_id,
             to_space_id,
             entries.iter().map(|e: &MemoryEntry| e.id.clone()).collect(),
-            KnowledgeFlow::Transfer,
+            MemoryFlow::Transfer,
         );
         self.record_entry(entry);
 
@@ -186,7 +186,7 @@ impl KnowledgeBridge {
             from = %from_space_id,
             to = %to_space_id,
             count,
-            "Knowledge transfer recorded"
+            "Memory transfer recorded"
         );
 
         Ok(count)
@@ -209,7 +209,7 @@ impl KnowledgeBridge {
                 format!("space:{}", entry.to),
                 crate::audit_trail::AuditAction::Other {
                     detail: format!(
-                        "knowledge_{}: {}->{} ({} entries)",
+                        "memory_{}: {}->{} ({} entries)",
                         entry.flow,
                         entry.from,
                         entry.to,
@@ -242,10 +242,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_knowledge_flow_display() {
-        assert_eq!(KnowledgeFlow::Reference.to_string(), "reference");
-        assert_eq!(KnowledgeFlow::Transfer.to_string(), "transfer");
-        assert_eq!(KnowledgeFlow::Synthesis.to_string(), "synthesis");
+    fn test_memory_flow_display() {
+        assert_eq!(MemoryFlow::Reference.to_string(), "reference");
+        assert_eq!(MemoryFlow::Transfer.to_string(), "transfer");
+        assert_eq!(MemoryFlow::Synthesis.to_string(), "synthesis");
     }
 
     #[test]
@@ -254,7 +254,7 @@ mod tests {
             SpaceId::new_v4(),
             SpaceId::new_v4(),
             vec!["mem1".to_string(), "mem2".to_string()],
-            KnowledgeFlow::Transfer,
+            MemoryFlow::Transfer,
         );
         assert_eq!(entry.entry_ids.len(), 2);
         assert!(!entry.timestamp.format("%Y").to_string().is_empty());
