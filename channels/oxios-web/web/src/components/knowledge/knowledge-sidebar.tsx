@@ -7,15 +7,18 @@ import { ResizeHandle } from './resize-handle'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
+/**
+ * Knowledge sidebar — replaces the main AppLayout sidebar when in Knowledge mode.
+ * Renders the file tree, chat/journal buttons, and new file/folder actions.
+ */
 export function KnowledgeSidebar() {
-  const { sidebarWidth, setSidebarWidth, currentFilePath, mode, openFile, openChat } = useKnowledgeStore()
+  const { sidebarWidth, setSidebarWidth, currentFilePath, mode, openFile, openChat, toggleSidebar } = useKnowledgeStore()
   const { data: entries, isLoading, refetch } = useKnowledgeTree()
   const writeFile = useWriteFile()
   const deleteFile = useDeleteFile()
 
   const handleNewFile = useCallback(async () => {
     const name = 'New file.md'
-    // Simple unique name — server will handle full validation
     await writeFile.mutateAsync({ path: name, content: `# New file\n\n` })
     openFile(name)
     refetch()
@@ -24,7 +27,6 @@ export function KnowledgeSidebar() {
   const handleNewFolder = useCallback(async () => {
     const name = prompt('Enter folder name:', 'New Folder')
     if (!name?.trim()) return
-    // Create a placeholder file in the folder to ensure it exists
     await writeFile.mutateAsync({ path: `${name.trim()}/.keep`, content: '' })
     refetch()
   }, [writeFile, refetch])
@@ -38,17 +40,19 @@ export function KnowledgeSidebar() {
 
   return (
     <div
-      className="flex flex-col h-full border-r bg-muted/30 shrink-0"
+      className="flex flex-col h-full border-r bg-sidebar-background text-sidebar-foreground shrink-0"
       style={{ width: sidebarWidth }}
     >
-      {/* Header */}
-      <div className="flex items-center justify-between px-3 py-2 border-b">
-        <span className="text-sm font-medium text-muted-foreground">Notes</span>
-        <div className="flex gap-1">
+      {/* Header — matches main sidebar style */}
+      <div className="flex items-center justify-between px-3 h-14 border-b border-sidebar-border">
+        <div className="flex items-center gap-2">
+          <span className="font-bold text-lg">Notes</span>
+        </div>
+        <div className="flex gap-0.5">
           <Button
             variant="ghost"
             size="icon"
-            className="h-7 w-7"
+            className="h-7 w-7 hover:bg-sidebar-accent/50"
             onClick={handleNewFile}
             title="New file (⌘N)"
           >
@@ -57,7 +61,7 @@ export function KnowledgeSidebar() {
           <Button
             variant="ghost"
             size="icon"
-            className="h-7 w-7"
+            className="h-7 w-7 hover:bg-sidebar-accent/50"
             onClick={handleNewFolder}
             title="New folder (⌘⇧N)"
           >
@@ -67,7 +71,7 @@ export function KnowledgeSidebar() {
             <Button
               variant="ghost"
               size="icon"
-              className="h-7 w-7 text-destructive"
+              className="h-7 w-7 text-destructive hover:bg-sidebar-accent/50"
               onClick={async () => {
                 if (confirm(`Delete ${currentFilePath}?`)) {
                   await deleteFile.mutateAsync(currentFilePath)
@@ -86,8 +90,10 @@ export function KnowledgeSidebar() {
         type="button"
         onClick={() => openChat()}
         className={cn(
-          'flex items-center gap-2 px-3 py-2 text-sm w-full text-left hover:bg-accent/50 transition-colors border-b',
-          mode === 'chat' && 'bg-accent font-medium',
+          'flex items-center gap-2 px-3 py-2 text-sm w-full text-left transition-colors border-b border-sidebar-border',
+          mode === 'chat'
+            ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
+            : 'hover:bg-sidebar-accent/50 text-sidebar-foreground/70',
         )}
       >
         💬 Chat
@@ -98,7 +104,7 @@ export function KnowledgeSidebar() {
         type="button"
         onClick={handleOpenJournal}
         disabled={journalToday.isLoading}
-        className="flex items-center gap-2 px-3 py-2 text-sm w-full text-left hover:bg-accent/50 transition-colors border-b disabled:opacity-50"
+        className="flex items-center gap-2 px-3 py-2 text-sm w-full text-left hover:bg-sidebar-accent/50 transition-colors border-b border-sidebar-border text-sidebar-foreground/70 disabled:opacity-50"
       >
         📔 Journal
       </button>
@@ -106,7 +112,7 @@ export function KnowledgeSidebar() {
       {/* File tree */}
       <div className="flex-1 overflow-y-auto p-1">
         {isLoading ? (
-          <div className="p-3 text-sm text-muted-foreground">Loading...</div>
+          <div className="p-3 text-sm text-sidebar-foreground/50">Loading...</div>
         ) : entries ? (
           <FileTree entries={entries} onFileSelect={openFile} currentPath={currentFilePath} />
         ) : null}
@@ -116,7 +122,7 @@ export function KnowledgeSidebar() {
       <ResizeHandle width={sidebarWidth} onResize={setSidebarWidth} />
 
       {/* Keyboard shortcuts legend */}
-      <div className="p-2 border-t text-[10px] text-muted-foreground space-y-0.5">
+      <div className="p-2 border-t border-sidebar-border text-[10px] text-sidebar-foreground/40 space-y-0.5">
         <div><kbd className="font-mono border rounded px-1">⌘K</kbd> Search</div>
         <div><kbd className="font-mono border rounded px-1">⌘M</kbd> Move file</div>
         <div><kbd className="font-mono border rounded px-1">⌘N</kbd> New file</div>

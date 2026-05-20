@@ -160,7 +160,6 @@ impl KernelHandle {
         space_manager: Arc<SpaceManager>,
     ) -> Self {
         let knowledge_dir = state_store.base_path.join("knowledge");
-        let knowledge_lens_dir = knowledge_dir.clone();
         let knowledge = Arc::new(
             oxios_markdown::KnowledgeBase::new(knowledge_dir)
                 .expect("Failed to create KnowledgeBase"),

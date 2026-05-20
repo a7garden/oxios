@@ -119,7 +119,7 @@ impl KnowledgeLens {
             });
         });
 
-        let mut lens = Self {
+        let lens = Self {
             kb,
             memory,
             agent_writes: Arc::new(RwLock::new(HashSet::new())),

@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
-import { createFileRoute } from '@tanstack/react-router'
-import { Activity, Bot, Boxes, Clock, Cpu, Zap } from 'lucide-react'
+import { createFileRoute, Link } from '@tanstack/react-router'
+import { Activity, Bot, Boxes, Brain, Clock, Cpu, FileText, Zap } from 'lucide-react'
 import { ErrorState } from '@/components/shared/error-state'
 import { LoadingCards } from '@/components/shared/loading'
 import { Badge } from '@/components/ui/badge'
@@ -125,6 +125,49 @@ function DashboardPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Quick Links */}
+      <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+        <Link to="/knowledge/">
+          <Card className="hover:bg-accent/50 transition-colors cursor-pointer group">
+            <CardHeader className="flex flex-row items-center gap-3 pb-2">
+              <Brain className="h-5 w-5 text-violet-500" />
+              <div>
+                <CardTitle className="text-sm font-medium">Knowledge</CardTitle>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Markdown notes, journal, chat
+                </p>
+              </div>
+            </CardHeader>
+          </Card>
+        </Link>
+        <Link to="/sessions/">
+          <Card className="hover:bg-accent/50 transition-colors cursor-pointer group">
+            <CardHeader className="flex flex-row items-center gap-3 pb-2">
+              <Clock className="h-5 w-5 text-blue-500" />
+              <div>
+                <CardTitle className="text-sm font-medium">Sessions</CardTitle>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  View agent session history
+                </p>
+              </div>
+            </CardHeader>
+          </Card>
+        </Link>
+        <Link to="/workspace/">
+          <Card className="hover:bg-accent/50 transition-colors cursor-pointer group">
+            <CardHeader className="flex flex-row items-center gap-3 pb-2">
+              <FileText className="h-5 w-5 text-emerald-500" />
+              <div>
+                <CardTitle className="text-sm font-medium">Workspace</CardTitle>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Browse agent workspace files
+                </p>
+              </div>
+            </CardHeader>
+          </Card>
+        </Link>
+      </div>
 
       {/* Version */}
       <div className="flex items-center gap-2 text-sm text-muted-foreground">

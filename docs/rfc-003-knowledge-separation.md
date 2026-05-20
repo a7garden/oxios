@@ -1,6 +1,6 @@
 # RFC-003: Knowledge Base 독립 분리
 
-> **상태:** 최종안  
+> **상태:** 구현 완료 ✅  
 > **날짜:** 2026-05-20  
 > **이전:** rfc-003-knowledge-separation.md (초안)  
 > **범위:** oxios-markdown, oxios-kernel, oxios-web
