@@ -1,0 +1,15 @@
+// Type declarations for HyperMD modules (side-effect imports)
+declare module 'hypermd/mode/hypermd'
+declare module 'hypermd/fold'
+declare module 'hypermd/fold-link'
+declare module 'hypermd/fold-image'
+declare module 'hypermd/fold-emoji'
+declare module 'hypermd/click'
+declare module 'hypermd/read-link'
+declare module 'hypermd/core'
+declare module 'hypermd/theme/hypermd-light.css'
+
+declare module 'codemirror/addon/edit/continuelist'
+declare module 'codemirror/addon/selection/active-line'
+declare module 'codemirror/addon/hint/show-hint'
+declare module 'codemirror/addon/hint/show-hint.css'

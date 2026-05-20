@@ -3,7 +3,7 @@ import CodeMirror from 'codemirror'
 import '@/lib/hypermd-setup' // side-effect: registers all CM5/HyperMD modules
 import { createLinkHintFn, buildAutocompleteDict } from '@/lib/autocomplete-link'
 import { useKnowledgeStore } from '@/stores/knowledge'
-import { useKnowledgeTree, useWriteFile } from '@/hooks/use-knowledge'
+import { useKnowledgeTree } from '@/hooks/use-knowledge'
 import { cn } from '@/lib/utils'
 
 interface MarkdownEditorProps {
@@ -35,7 +35,7 @@ export function MarkdownEditor({ filePath, initialContent, onSave, className }: 
 
     // Clean up previous instance
     if (editorRef.current) {
-      editorRef.current.toTextArea?.()
+      ;(editorRef.current as any).toTextArea?.()
       editorRef.current = null
     }
 
@@ -81,7 +81,10 @@ export function MarkdownEditor({ filePath, initialContent, onSave, className }: 
       return
     }
 
-    const cm = (window.CodeMirror as unknown as typeof CodeMirror).fromTextArea(textarea, {
+    // CodeMirror is registered globally by hypermd-setup side-effect import
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const CM = (window as any).CodeMirror as typeof CodeMirror
+    const cm = CM.fromTextArea(textarea, {
       mode: { name: 'hypermd', math: false },
       lineNumbers: false,
       dragDrop: false,
@@ -106,12 +109,16 @@ export function MarkdownEditor({ filePath, initialContent, onSave, className }: 
     } as any)
 
     // Override URL resolution and link reading
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ;(cm as any).hmdResolveURL = resolveURL
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ;(cm as any).hmdReadLink = readLink
 
     // Auto-show hints on `[` press
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     cm.on('inputRead', (_cm: any, change: any) => {
       if (change.text.length === 1 && change.text[0] === '[') {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         ;(cm as any).showHint({
           completeSingle: false,
           updateOnCursorActivity: true,
@@ -120,7 +127,8 @@ export function MarkdownEditor({ filePath, initialContent, onSave, className }: 
     })
 
     // Force `# ` on first line
-    cm.on('change', (instance, change) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    cm.on('change', (instance: any, change: any) => {
       if (change.from.line === 0) {
         const line = instance.getLine(0)
         if (line && !line.startsWith('# ')) {

@@ -60,7 +60,7 @@ export function createLinkHintFn(
 ): (cm: CodeMirror.Editor) => CodeMirror.Hints | null {
   return (cm) => {
     const cursor = cm.getCursor()
-    const line = cm.getLine(cursor.line)
+    const line = cm.getLine(cursor.line) ?? ''
     const pos = cursor.ch
 
     // Only trigger after '['
@@ -72,7 +72,7 @@ export function createLinkHintFn(
     // Get the word being typed after '['
     const unicodeWordRegex = /[\p{L}\p{N}_\s:-]/u
     let start = pos
-    while (start < line.length && unicodeWordRegex.test(line[start])) start++
+    while (start < line.length && unicodeWordRegex.test(line[start] ?? '')) start++
 
     const word = line.slice(pos, start).toLowerCase()
     const entries = getEntries()
