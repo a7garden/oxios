@@ -165,11 +165,9 @@ mod tests {
             crate::A2aApi::new(Arc::new(crate::a2a::A2AProtocol::new(
                 crate::event_bus::EventBus::new(256),
             ))),
-            crate::KnowledgeApi::new(
+            Arc::new(oxios_markdown::KnowledgeBase::new(
                 std::path::PathBuf::from("/tmp/oxios-test/knowledge"),
-                Arc::new(crate::engine::OxiEngineProvider::new("anthropic/claude-sonnet-4")),
-                "anthropic/claude-sonnet-4".to_string(),
-            ),
+            ).unwrap()),
             Arc::new(crate::kernel_handle::KnowledgeLens::new(
                 Arc::new(oxios_markdown::KnowledgeBase::new(
                     std::path::PathBuf::from("/tmp/oxios-test/knowledge"),

@@ -11,47 +11,30 @@ use chrono::Datelike;
 use oxi_sdk::{AgentTool as OxiAgentTool, AgentToolResult, ToolContext};
 use serde_json::{json, Value};
 
-use crate::kernel_handle::KnowledgeApi;
 use crate::KernelHandle;
+use oxios_markdown::KnowledgeBase;
 
 /// Tool for reading, writing, and managing markdown knowledge notes.
 ///
 /// Uses action-based dispatch: `read`, `write`, `delete`, `move`, `tree`,
 /// `search`, `backlinks`.
+///
+/// Delegates directly to [`KnowledgeBase`] — no KnowledgeApi needed.
 pub struct KnowledgeTool {
-    knowledge_dir: std::path::PathBuf,
-    engine: Arc<dyn crate::engine::EngineProvider>,
-    default_model: String,
+    kb: Arc<KnowledgeBase>,
 }
 
 impl KnowledgeTool {
-    /// Create from a [`KernelHandle`], extracting the necessary components.
+    /// Create from a [`KernelHandle`], extracting KnowledgeBase directly.
     pub fn from_kernel(kernel: &KernelHandle) -> Self {
         Self {
-            knowledge_dir: kernel.knowledge.root(),
-            engine: Arc::new(crate::engine::OxiEngineProvider::new(
-                kernel.knowledge.model_id(),
-            )),
-            default_model: kernel.knowledge.model_id().to_string(),
+            kb: kernel.knowledge.clone(),
         }
     }
 
-    /// Create with explicit parameters (for testing).
-    pub fn new(knowledge_dir: std::path::PathBuf) -> Self {
-        Self {
-            knowledge_dir,
-            engine: Arc::new(crate::engine::OxiEngineProvider::new("anthropic/claude-sonnet-4")),
-            default_model: "anthropic/claude-sonnet-4".to_string(),
-        }
-    }
-
-    /// Build a temporary KnowledgeApi for this operation.
-    fn make_api(&self) -> KnowledgeApi {
-        KnowledgeApi::new(
-            self.knowledge_dir.clone(),
-            self.engine.clone(),
-            self.default_model.clone(),
-        )
+    /// Create with explicit KnowledgeBase (for testing).
+    pub fn new(kb: Arc<KnowledgeBase>) -> Self {
+        Self { kb }
     }
 }
 
@@ -191,7 +174,7 @@ impl OxiAgentTool for KnowledgeTool {
             return Ok(AgentToolResult::error("action is required"));
         }
 
-        let api = self.make_api();
+        
 
         match action {
             "read" => {
@@ -199,7 +182,7 @@ impl OxiAgentTool for KnowledgeTool {
                 if path.is_empty() {
                     return Ok(AgentToolResult::error("path is required for read"));
                 }
-                match api.note_read(path) {
+                match self.kb.note_read(path) {
                     Ok(Some(content)) => Ok(AgentToolResult::success(&content)),
                     Ok(None) => Ok(AgentToolResult::error(format!("Note '{}' not found", path))),
                     Err(e) => Ok(AgentToolResult::error(format!("Failed to read note: {e}"))),
@@ -214,7 +197,7 @@ impl OxiAgentTool for KnowledgeTool {
                 if content.is_empty() {
                     return Ok(AgentToolResult::error("content is required for write"));
                 }
-                match api.note_write(path, content) {
+                match self.kb.note_write(path, content) {
                     Ok(()) => Ok(AgentToolResult::success(format!(
                         "Note '{}' written successfully",
                         path
@@ -227,7 +210,7 @@ impl OxiAgentTool for KnowledgeTool {
                 if path.is_empty() {
                     return Ok(AgentToolResult::error("path is required for delete"));
                 }
-                match api.note_delete(path) {
+                match self.kb.note_delete(path) {
                     Ok(()) => Ok(AgentToolResult::success(format!("Note '{}' deleted", path))),
                     Err(e) => Ok(AgentToolResult::error(format!("Failed to delete note: {e}"))),
                 }
@@ -250,7 +233,7 @@ impl OxiAgentTool for KnowledgeTool {
                         "old_path and new_path are required for move",
                     ));
                 }
-                match api.note_move(old_path, new_path) {
+                match self.kb.note_move(old_path, new_path) {
                     Ok(()) => Ok(AgentToolResult::success(format!(
                         "Note moved from '{}' to '{}'",
                         old_path, new_path
@@ -261,7 +244,7 @@ impl OxiAgentTool for KnowledgeTool {
             "tree" => {
                 let dir = params["dir"].as_str().unwrap_or("/");
                 let limit = params["limit"].as_u64().unwrap_or(50) as usize;
-                match api.note_tree(dir) {
+                match self.kb.note_tree(dir) {
                     Ok(entries) => {
                         let count = entries.len();
                         let entries: Vec<_> = entries.into_iter().take(limit).collect();
@@ -291,24 +274,19 @@ impl OxiAgentTool for KnowledgeTool {
                     return Ok(AgentToolResult::error("query is required for search"));
                 }
                 let limit = params["limit"].as_u64().unwrap_or(10) as usize;
-                match api.search(query, limit) {
+                match self.kb.search(query, limit) {
                     Ok(hits) => {
                         if hits.is_empty() {
                             return Ok(AgentToolResult::success("No matching notes found"));
                         }
                         let mut output = format!("Found {} matching notes:\n\n", hits.len());
                         for hit in &hits {
-                            let score = hit
-                                .semantic_score
-                                .map(|s| format!("{:.2}", s))
-                                .unwrap_or_else(|| "-".to_string());
                             output.push_str(&format!(
-                                "- {} (path: {}, backlinks: {}, name_sim: {}%, score: {})\n",
+                                "- {} (path: {}, backlinks: {}, name_sim: {}%)\n",
                                 hit.name,
                                 hit.path,
                                 hit.backlink_count,
                                 hit.name_similarity,
-                                score
                             ));
                         }
                         Ok(AgentToolResult::success(&output))
@@ -323,7 +301,7 @@ impl OxiAgentTool for KnowledgeTool {
                 if path.is_empty() {
                     return Ok(AgentToolResult::error("path is required for backlinks"));
                 }
-                let backlinks = api.backlinks_for(path);
+                let backlinks = self.kb.backlinks_for(path);
                 if backlinks.is_empty() {
                     return Ok(AgentToolResult::success(format!(
                         "No backlinks for '{}'",
@@ -346,7 +324,7 @@ impl OxiAgentTool for KnowledgeTool {
                 if path.is_empty() {
                     return Ok(AgentToolResult::error("path is required for checklist_items"));
                 }
-                match api.checklist_items(path) {
+                match self.kb.checklist_items(path) {
                     Ok((items, checked_map)) => {
                         if items.is_empty() {
                             return Ok(AgentToolResult::success("No checklist items found"));
@@ -372,7 +350,7 @@ impl OxiAgentTool for KnowledgeTool {
                 if item.is_empty() {
                     return Ok(AgentToolResult::error("item is required for checklist_add"));
                 }
-                match api.checklist_add(path, item, checked) {
+                match self.kb.checklist_add(path, item, checked) {
                     Ok(()) => Ok(AgentToolResult::success(format!(
                         "Checklist item added to '{}'", path
                     ))),
@@ -389,7 +367,7 @@ impl OxiAgentTool for KnowledgeTool {
                 if item_hash.is_empty() {
                     return Ok(AgentToolResult::error("item_hash is required for checklist_complete"));
                 }
-                match api.checklist_complete(path, item_hash) {
+                match self.kb.checklist_complete(path, item_hash) {
                     Ok(true) => Ok(AgentToolResult::success(format!(
                         "Checklist item completed in '{}'", path
                     ))),
@@ -409,7 +387,7 @@ impl OxiAgentTool for KnowledgeTool {
                 if item_or_hash.is_empty() {
                     return Ok(AgentToolResult::error("item_or_hash is required for checklist_remove"));
                 }
-                match api.checklist_remove(path, item_or_hash) {
+                match self.kb.checklist_remove(path, item_or_hash) {
                     Ok(true) => Ok(AgentToolResult::success(format!(
                         "Checklist item removed from '{}'", path
                     ))),
@@ -427,14 +405,14 @@ impl OxiAgentTool for KnowledgeTool {
                 if message.is_empty() {
                     return Ok(AgentToolResult::error("message is required for chat_append"));
                 }
-                match api.chat_append(message) {
+                match self.kb.chat_append(message) {
                     Ok(()) => Ok(AgentToolResult::success("Message appended to chat")),
                     Err(e) => Ok(AgentToolResult::error(format!("Failed to append chat message: {e}"))),
                 }
             }
 
             "chat_messages" => {
-                match api.chat_messages() {
+                match self.kb.chat_messages() {
                     Ok(messages) => {
                         if messages.is_empty() {
                             return Ok(AgentToolResult::success("No chat messages found"));
@@ -454,7 +432,7 @@ impl OxiAgentTool for KnowledgeTool {
                 if msg_hash.is_empty() {
                     return Ok(AgentToolResult::error("msg_hash is required for chat_delete"));
                 }
-                match api.chat_delete(msg_hash) {
+                match self.kb.chat_delete(msg_hash) {
                     Ok(true) => Ok(AgentToolResult::success(format!(
                         "Chat message '{}' deleted", msg_hash
                     ))),
@@ -474,7 +452,7 @@ impl OxiAgentTool for KnowledgeTool {
                 if target_path.is_empty() {
                     return Ok(AgentToolResult::error("target_path is required for chat_move"));
                 }
-                match api.chat_move_to(msg_hash, target_path) {
+                match self.kb.chat_move_to(msg_hash, target_path) {
                     Ok(true) => Ok(AgentToolResult::success(format!(
                         "Chat message moved to '{}'", target_path
                     ))),
@@ -492,7 +470,7 @@ impl OxiAgentTool for KnowledgeTool {
                 if record.is_empty() {
                     return Ok(AgentToolResult::error("record is required for journal_add"));
                 }
-                match api.journal_add_record(record) {
+                match self.kb.journal_add_record(record) {
                     Ok(()) => Ok(AgentToolResult::success("Journal record added")),
                     Err(e) => Ok(AgentToolResult::error(format!("Failed to add journal record: {e}"))),
                 }
@@ -503,14 +481,14 @@ impl OxiAgentTool for KnowledgeTool {
                 if emoji.is_empty() {
                     return Ok(AgentToolResult::error("emoji is required for journal_emoji"));
                 }
-                match api.journal_add_emoji(emoji) {
+                match self.kb.journal_add_emoji(emoji) {
                     Ok(()) => Ok(AgentToolResult::success(format!("Journal emoji set to '{}'", emoji))),
                     Err(e) => Ok(AgentToolResult::error(format!("Failed to set journal emoji: {e}"))),
                 }
             }
 
             "journal_today" => {
-                let path = api.journal_today_path();
+                let path = self.kb.journal_today_path();
                 Ok(AgentToolResult::success(&path))
             }
 
@@ -520,7 +498,7 @@ impl OxiAgentTool for KnowledgeTool {
                 let year = params["year"].as_i64().unwrap_or_else(|| {
                     chrono::Local::now().year() as i64
                 }) as i32;
-                match api.habits(year) {
+                match self.kb.habits(year) {
                     Ok(habits) => {
                         let json = serde_json::to_string_pretty(&habits)
                             .unwrap_or_else(|_| "{}".to_string());
@@ -531,7 +509,7 @@ impl OxiAgentTool for KnowledgeTool {
             }
 
             "habits_last_week" => {
-                match api.habits_last_week() {
+                match self.kb.habits_last_week() {
                     Ok(habits) => {
                         let json = serde_json::to_string_pretty(&habits)
                             .unwrap_or_else(|_| "{}".to_string());
@@ -544,7 +522,7 @@ impl OxiAgentTool for KnowledgeTool {
             // ── Stats ───────────────────────────────────────────────
 
             "today_report" => {
-                match api.today_report() {
+                match self.kb.today_report() {
                     Ok(report) => {
                         let json = serde_json::to_string_pretty(&report)
                             .unwrap_or_else(|_| "{}".to_string());
@@ -555,7 +533,7 @@ impl OxiAgentTool for KnowledgeTool {
             }
 
             "done_today" => {
-                match api.done_today() {
+                match self.kb.done_today() {
                     Ok(entries) => {
                         if entries.is_empty() {
                             return Ok(AgentToolResult::success("No completed items today"));
@@ -577,7 +555,7 @@ impl OxiAgentTool for KnowledgeTool {
             // ── Config ──────────────────────────────────────────────
 
             "config_read" => {
-                match api.config() {
+                match self.kb.config() {
                     Ok(config) => {
                         let json = serde_json::to_string_pretty(&config)
                             .unwrap_or_else(|_| "{}".to_string());
@@ -591,7 +569,7 @@ impl OxiAgentTool for KnowledgeTool {
                 let config_val = params.get("config").cloned().unwrap_or(json!({}));
                 match serde_json::from_value::<oxios_markdown::types::KnowledgeConfig>(config_val) {
                     Ok(config) => {
-                        match api.set_config(&config) {
+                        match self.kb.set_config(&config) {
                             Ok(()) => Ok(AgentToolResult::success("Config updated successfully")),
                             Err(e) => Ok(AgentToolResult::error(format!("Failed to write config: {e}"))),
                         }
@@ -603,7 +581,7 @@ impl OxiAgentTool for KnowledgeTool {
             // ── Automation ──────────────────────────────────────────
 
             "nightly_cleanup" => {
-                match api.run_nightly_cleanup() {
+                match self.kb.run_nightly_cleanup() {
                     Ok(report) => {
                         let json = serde_json::to_string_pretty(&report)
                             .unwrap_or_else(|_| "{}".to_string());
@@ -614,7 +592,7 @@ impl OxiAgentTool for KnowledgeTool {
             }
 
             "run_scheduled" => {
-                match api.run_scheduled_tasks() {
+                match self.kb.run_scheduled_tasks() {
                     Ok(moved) => {
                         if moved.is_empty() {
                             Ok(AgentToolResult::success("No scheduled tasks due"))
@@ -637,7 +615,7 @@ impl OxiAgentTool for KnowledgeTool {
                 if md.is_empty() {
                     return Ok(AgentToolResult::error("md is required for markdown_to_html"));
                 }
-                let html = api.markdown_to_html(md);
+                let html = self.kb.markdown_to_html(md);
                 Ok(AgentToolResult::success(&html))
             }
 
@@ -646,7 +624,7 @@ impl OxiAgentTool for KnowledgeTool {
                 if text.is_empty() {
                     return Ok(AgentToolResult::error("text is required for auto_emoji"));
                 }
-                let emoji = api.auto_emoji(text);
+                let emoji = self.kb.auto_emoji(text);
                 Ok(AgentToolResult::success(&emoji))
             }
 
@@ -670,7 +648,9 @@ mod tests {
 
     #[test]
     fn test_knowledge_tool_schema() {
-        let tool = KnowledgeTool::new(std::path::PathBuf::from("/tmp/test-kb"));
+        let dir = std::env::temp_dir().join(format!("test-kb-tool-{}", uuid::Uuid::new_v4()));
+        let kb = Arc::new(oxios_markdown::KnowledgeBase::new(dir).unwrap());
+        let tool = KnowledgeTool::new(kb);
         assert_eq!(tool.name(), "knowledge");
         let schema = tool.parameters_schema();
         assert!(schema["required"].is_array());

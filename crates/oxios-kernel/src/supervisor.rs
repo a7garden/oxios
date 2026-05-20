@@ -420,11 +420,7 @@ mod tests {
             crate::kernel_handle::A2aApi::new(Arc::new(crate::a2a::A2AProtocol::new(
                 EventBus::new(64),
             ))),
-            crate::kernel_handle::KnowledgeApi::new(
-                tmp.join("knowledge"),
-                Arc::new(crate::engine::OxiEngineProvider::new("mock/model")),
-                "mock/model".to_string(),
-            ),
+            Arc::new(oxios_markdown::KnowledgeBase::new(tmp.join("knowledge")).unwrap()),
             Arc::new(crate::kernel_handle::KnowledgeLens::new(
                 Arc::new(oxios_markdown::KnowledgeBase::new(tmp.join("knowledge")).unwrap()),
                 memory_manager.clone(),

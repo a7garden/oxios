@@ -107,15 +107,13 @@ impl Kernel {
                     ),
                     self.build_browser_api(),
                     oxios_kernel::A2aApi::new(self.a2a_protocol.clone()),
-                    oxios_kernel::KnowledgeApi::new(
+                    // KnowledgeBase — single source of truth (RFC-003)
+                    Arc::new(KnowledgeBase::new(
                         std::path::PathBuf::from(&self.config.kernel.workspace).join("knowledge"),
-                        Arc::new(oxios_kernel::OxiEngineProvider::new(
-                            &self.config.engine.default_model,
-                        )),
-                        self.config.engine.default_model.clone(),
-                    ),
-                    // KnowledgeLens — semantic overlay (Phase 3, RFC-003)
+                    ).expect("KnowledgeBase init failed")),
+                    // KnowledgeLens — semantic overlay, shares same KnowledgeBase
                     Arc::new(oxios_kernel::KnowledgeLens::new(
+                        // Note: clones the Arc, points to same KnowledgeBase
                         Arc::new(KnowledgeBase::new(
                             std::path::PathBuf::from(&self.config.kernel.workspace).join("knowledge"),
                         ).expect("KnowledgeBase init failed")),
@@ -449,14 +447,11 @@ impl KernelBuilder {
                 oxios_kernel::ExecApi::new(Arc::new(config.exec.clone()), access_manager.clone()),
                 build_browser_api_value(&config),
                 oxios_kernel::A2aApi::new(a2a_protocol.clone()),
-                oxios_kernel::KnowledgeApi::new(
+                // KnowledgeBase — single source of truth (RFC-003)
+                Arc::new(KnowledgeBase::new(
                     PathBuf::from(&config.kernel.workspace).join("knowledge"),
-                    Arc::new(oxios_kernel::OxiEngineProvider::new(
-                        &config.engine.default_model,
-                    )),
-                    config.engine.default_model.clone(),
-                ),
-                // KnowledgeLens — semantic overlay (Phase 3, RFC-003)
+                ).expect("KnowledgeBase init failed")),
+                // KnowledgeLens — semantic overlay, shares same KnowledgeBase
                 Arc::new(oxios_kernel::KnowledgeLens::new(
                     Arc::new(KnowledgeBase::new(
                         PathBuf::from(&config.kernel.workspace).join("knowledge"),

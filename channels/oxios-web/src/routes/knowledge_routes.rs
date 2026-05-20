@@ -112,8 +112,6 @@ pub(crate) struct KnowledgeSearchHit {
     pub name: String,
     /// Content snippet.
     pub snippet: String,
-    /// Semantic similarity score (0.0–1.0).
-    pub semantic_score: Option<f32>,
     /// Number of backlinks.
     pub backlink_count: usize,
     /// Name similarity score (0–100).
@@ -510,7 +508,6 @@ pub(crate) async fn handle_knowledge_search(
             path: h.path,
             name: h.name,
             snippet: h.snippet,
-            semantic_score: h.semantic_score,
             backlink_count: h.backlink_count,
             name_similarity: h.name_similarity,
         })
@@ -587,8 +584,14 @@ pub(crate) async fn handle_knowledge_copilot(
 
     let result = state
         .kernel
-        .knowledge
-        .copilot_chat(&body.question, body.context_path.as_deref())
+        .knowledge_lens
+        .copilot_chat(
+            Arc::new(oxios_kernel::OxiEngineProvider::new("anthropic/claude-sonnet-4")),
+            "anthropic/claude-sonnet-4",
+            &body.question,
+            body.context_path.as_deref(),
+        )
+        .await
         .map_err(|e| AppError::Internal(e.to_string()))?;
 
     Ok(Json(KnowledgeCopilotResponse {
@@ -975,13 +978,11 @@ mod tests {
             path: "brain/Rust.md".into(),
             name: "Rust.md".into(),
             snippet: "...ownership model...".into(),
-            semantic_score: Some(0.87),
             backlink_count: 3,
             name_similarity: 95,
         };
         let json = serde_json::to_value(&hit).unwrap();
         assert_eq!(json["path"], "brain/Rust.md");
-        assert!(json["semantic_score"].as_f64().unwrap() - 0.87 < 0.01);
         assert_eq!(json["backlink_count"], 3);
     }
 

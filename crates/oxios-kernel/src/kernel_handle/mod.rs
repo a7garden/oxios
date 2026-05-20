@@ -6,7 +6,6 @@ pub mod browser_api;
 pub mod exec_api;
 pub mod extension_api;
 pub mod infra_api;
-pub mod knowledge_api;
 pub mod knowledge_lens;
 pub mod mcp_api;
 pub mod persona_api;
@@ -20,7 +19,6 @@ pub use browser_api::BrowserApi;
 pub use exec_api::ExecApi;
 pub use extension_api::ExtensionApi;
 pub use infra_api::InfraApi;
-pub use knowledge_api::KnowledgeApi;
 pub use knowledge_lens::{CopilotResponse, KnowledgeContext, KnowledgeLens, KnowledgeNote, MemoryNote};
 pub use mcp_api::McpApi;
 pub use persona_api::PersonaApi;
@@ -90,8 +88,8 @@ pub struct KernelHandle {
     pub browser: BrowserApi,
     /// Agent-to-agent communication.
     pub a2a: A2aApi,
-    /// Knowledge base: markdown notes, backlinks, memory sync.
-    pub knowledge: KnowledgeApi,
+    /// Knowledge base: markdown notes (direct access, no kernel dependency).
+    pub knowledge: Arc<oxios_markdown::KnowledgeBase>,
     /// Semantic knowledge overlay (HNSW index + agent recall).
     pub knowledge_lens: Arc<KnowledgeLens>,
 }
@@ -114,7 +112,7 @@ impl KernelHandle {
         exec: ExecApi,
         browser: BrowserApi,
         a2a: A2aApi,
-        knowledge: KnowledgeApi,
+        knowledge: Arc<oxios_markdown::KnowledgeBase>,
         knowledge_lens: Arc<KnowledgeLens>,
     ) -> Self {
         Self {
@@ -163,16 +161,13 @@ impl KernelHandle {
     ) -> Self {
         let knowledge_dir = state_store.base_path.join("knowledge");
         let knowledge_lens_dir = knowledge_dir.clone();
-        let knowledge = KnowledgeApi::new(
-            knowledge_dir,
-            Arc::new(crate::engine::OxiEngineProvider::new(
-                &config.engine.default_model,
-            )),
-            config.engine.default_model.clone(),
+        let knowledge = Arc::new(
+            oxios_markdown::KnowledgeBase::new(knowledge_dir)
+                .expect("Failed to create KnowledgeBase"),
         );
         let knowledge_lens = Arc::new(
             KnowledgeLens::new(
-                Arc::new(oxios_markdown::KnowledgeBase::new(knowledge_lens_dir).unwrap()),
+                knowledge.clone(),
                 memory_manager.clone(),
             )
             .expect("Failed to create KnowledgeLens"),
