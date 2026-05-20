@@ -6,9 +6,11 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
-use oxios_gateway::plugin::{ChannelBundle, ChannelContext, ChannelPlugin};
 use std::path::PathBuf;
 use std::sync::Arc;
+
+use oxios_gateway::plugin::{ChannelBundle, ChannelContext, ChannelPlugin};
+use oxios_markdown::KnowledgeBase;
 
 use crate::api_docs;
 use crate::channel::{WebChannel, WebChannelHandle};
@@ -48,9 +50,21 @@ impl ChannelPlugin for WebPlugin {
         let web_channel = WebChannel::new(256);
         let channel_handle = WebChannelHandle::from_channel(&web_channel);
 
+        // Create KnowledgeBase for direct markdown CRUD (no kernel dependency)
+        let knowledge_root = PathBuf::from(&config.kernel.workspace).join("knowledge");
+        let knowledge = match KnowledgeBase::new(knowledge_root) {
+            Ok(kb) => Arc::new(kb),
+            Err(e) => {
+                tracing::warn!(error = %e, "Failed to create KnowledgeBase at workspace, using temp dir");
+                let fallback_dir = std::env::temp_dir().join("oxios-web-knowledge");
+                Arc::new(KnowledgeBase::new(fallback_dir).expect("Failed to create fallback KnowledgeBase"))
+            }
+        };
+
         // Build app state
         let state = Arc::new(AppState {
             base_url: format!("http://{}:{}", host, port),
+            knowledge,
             kernel: ctx.kernel.clone(),
             channel: channel_handle,
             config: ctx.config.clone(),

@@ -1,8 +1,11 @@
-//! Knowledge API route handlers — thin adapters over KnowledgeApi.
+//! Knowledge API route handlers — direct adapters over KnowledgeBase.
 //!
-//! All file I/O, backlink tracking, and AI copilot are delegated to
-//! `state.kernel.knowledge` (KnowledgeApi). This layer only handles
-//! HTTP request parsing and JSON serialization.
+//! Most file I/O, backlink tracking, and app features are delegated to
+//! `state.knowledge` (KnowledgeBase). This layer only handles HTTP request
+//! parsing and JSON serialization.
+//!
+//! AI-powered features (copilot_chat) go through `state.kernel.knowledge`
+//! (KnowledgeLens in Phase 3).
 //!
 //! Endpoints:
 //! - GET  /api/knowledge/tree/{*path} — file tree listing
@@ -526,7 +529,7 @@ pub(crate) async fn handle_knowledge_backlinks(
     state: State<Arc<AppState>>,
     Query(params): Query<KnowledgeBacklinksParams>,
 ) -> Result<Json<Vec<KnowledgeBacklink>>, AppError> {
-    let backlinks = state.kernel.knowledge.backlinks_for(&params.path);
+    let backlinks = state.knowledge.backlinks_for(&params.path);
 
     let result: Vec<KnowledgeBacklink> = backlinks
         .into_iter()
@@ -544,7 +547,7 @@ pub(crate) async fn handle_knowledge_backlinks(
 pub(crate) async fn handle_knowledge_graph(
     state: State<Arc<AppState>>,
 ) -> Result<Json<KnowledgeGraph>, AppError> {
-    let graph = state.kernel.knowledge.link_graph();
+    let graph = state.knowledge.link_graph();
 
     Ok(Json(KnowledgeGraph {
         nodes: graph
@@ -754,7 +757,7 @@ pub(crate) async fn handle_knowledge_journal_emoji(
 pub(crate) async fn handle_knowledge_journal_today(
     state: State<Arc<AppState>>,
 ) -> Result<Json<JournalTodayResponse>, AppError> {
-    let path = state.kernel.knowledge.journal_today_path();
+    let path = state.knowledge.journal_today_path();
     Ok(Json(JournalTodayResponse { path }))
 }
 
@@ -918,7 +921,7 @@ pub(crate) async fn handle_knowledge_convert_html(
     state: State<Arc<AppState>>,
     Json(body): Json<ConvertHtmlBody>,
 ) -> Result<Json<ConvertHtmlResponse>, AppError> {
-    let html = state.kernel.knowledge.markdown_to_html(&body.md);
+    let html = state.knowledge.markdown_to_html(&body.md);
     Ok(Json(ConvertHtmlResponse { html }))
 }
 
@@ -931,7 +934,7 @@ pub(crate) async fn handle_knowledge_emoji(
     state: State<Arc<AppState>>,
     Query(params): Query<EmojiQueryParams>,
 ) -> Result<Json<EmojiResponse>, AppError> {
-    let emoji = state.kernel.knowledge.auto_emoji(&params.text);
+    let emoji = state.knowledge.auto_emoji(&params.text);
     Ok(Json(EmojiResponse { emoji }))
 }
 

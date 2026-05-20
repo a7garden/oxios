@@ -5120,6 +5120,7 @@ dependencies = [
  "oxi-sdk",
  "oxios-gateway",
  "oxios-kernel",
+ "oxios-markdown",
  "oxios-ouroboros",
  "parking_lot",
  "serde",

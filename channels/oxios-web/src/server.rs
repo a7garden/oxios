@@ -12,6 +12,7 @@ use crate::channel::WebChannelHandle;
 use crate::error::AppError;
 use crate::middleware::RateLimiter;
 use oxios_kernel::{config, KernelHandle, OxiosConfig};
+use oxios_markdown::KnowledgeBase;
 
 /// Shared application state for the web dashboard.
 ///
@@ -20,6 +21,8 @@ use oxios_kernel::{config, KernelHandle, OxiosConfig};
 pub struct AppState {
     /// Base URL for API responses.
     pub base_url: String,
+    /// Knowledge base for markdown CRUD (no kernel dependency).
+    pub knowledge: Arc<KnowledgeBase>,
     /// Handle to the kernel subsystem (provides access to all kernel components).
     pub kernel: Arc<KernelHandle>,
     /// Handle to the web channel for message passing.
