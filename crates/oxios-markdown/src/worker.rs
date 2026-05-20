@@ -20,7 +20,7 @@ use crate::types::{
 };
 
 /// Result of a nightly cleanup run.
-#[derive(Debug, Default)]
+#[derive(Debug, Default, serde::Serialize, serde::Deserialize)]
 pub struct NightlyReport {
     /// Number of items archived to Done.md.
     pub archived_count: usize,

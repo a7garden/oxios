@@ -62,9 +62,17 @@ pub(crate) use infra::{
     handle_scheduler_stats, handle_scheduler_tasks,
 };
 pub(crate) use knowledge_routes::{
-    handle_knowledge_backlinks, handle_knowledge_copilot, handle_knowledge_file_delete,
-    handle_knowledge_file_get, handle_knowledge_file_put, handle_knowledge_graph,
-    handle_knowledge_search, handle_knowledge_tree,
+    handle_knowledge_backlinks, handle_knowledge_chat_append, handle_knowledge_chat_delete,
+    handle_knowledge_chat_messages, handle_knowledge_chat_move, handle_knowledge_checklist_add,
+    handle_knowledge_checklist_complete, handle_knowledge_checklist_items,
+    handle_knowledge_checklist_remove, handle_knowledge_config_get,
+    handle_knowledge_config_put, handle_knowledge_convert_html, handle_knowledge_copilot,
+    handle_knowledge_emoji, handle_knowledge_file_delete, handle_knowledge_file_get,
+    handle_knowledge_file_put, handle_knowledge_graph, handle_knowledge_habits,
+    handle_knowledge_habits_last_week, handle_knowledge_journal_add, handle_knowledge_journal_emoji,
+    handle_knowledge_journal_today, handle_knowledge_search, handle_knowledge_stats_done_today,
+    handle_knowledge_stats_today, handle_knowledge_tree, handle_knowledge_worker_nightly,
+    handle_knowledge_worker_scheduled,
 };
 pub(crate) use resource_routes::{
     handle_resource_history, handle_resource_overload, handle_resource_snapshot,
@@ -300,6 +308,92 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         )
         .route("/api/knowledge/graph", get(handle_knowledge_graph))
         .route("/api/knowledge/copilot", post(handle_knowledge_copilot))
+        // Knowledge — Checklist
+        .route(
+            "/api/knowledge/checklist/items",
+            post(handle_knowledge_checklist_items),
+        )
+        .route(
+            "/api/knowledge/checklist/add",
+            post(handle_knowledge_checklist_add),
+        )
+        .route(
+            "/api/knowledge/checklist/complete",
+            post(handle_knowledge_checklist_complete),
+        )
+        .route(
+            "/api/knowledge/checklist/remove",
+            post(handle_knowledge_checklist_remove),
+        )
+        // Knowledge — Chat
+        .route(
+            "/api/knowledge/chat/append",
+            post(handle_knowledge_chat_append),
+        )
+        .route(
+            "/api/knowledge/chat/messages",
+            get(handle_knowledge_chat_messages),
+        )
+        .route(
+            "/api/knowledge/chat/delete",
+            post(handle_knowledge_chat_delete),
+        )
+        .route(
+            "/api/knowledge/chat/move",
+            post(handle_knowledge_chat_move),
+        )
+        // Knowledge — Journal
+        .route(
+            "/api/knowledge/journal/add",
+            post(handle_knowledge_journal_add),
+        )
+        .route(
+            "/api/knowledge/journal/emoji",
+            post(handle_knowledge_journal_emoji),
+        )
+        .route(
+            "/api/knowledge/journal/today",
+            get(handle_knowledge_journal_today),
+        )
+        // Knowledge — Habits
+        .route("/api/knowledge/habits", get(handle_knowledge_habits))
+        .route(
+            "/api/knowledge/habits/last-week",
+            get(handle_knowledge_habits_last_week),
+        )
+        // Knowledge — Stats
+        .route(
+            "/api/knowledge/stats/today",
+            get(handle_knowledge_stats_today),
+        )
+        .route(
+            "/api/knowledge/stats/done-today",
+            get(handle_knowledge_stats_done_today),
+        )
+        // Knowledge — Config
+        .route(
+            "/api/knowledge/config",
+            get(handle_knowledge_config_get),
+        )
+        .route(
+            "/api/knowledge/config",
+            put(handle_knowledge_config_put),
+        )
+        // Knowledge — Worker
+        .route(
+            "/api/knowledge/worker/nightly",
+            post(handle_knowledge_worker_nightly),
+        )
+        .route(
+            "/api/knowledge/worker/scheduled",
+            post(handle_knowledge_worker_scheduled),
+        )
+        // Knowledge — Convert & Emoji
+        .route(
+            "/api/knowledge/convert/html",
+            post(handle_knowledge_convert_html),
+        )
+        .route("/api/knowledge/emoji", get(handle_knowledge_emoji))
         .layer(axum::middleware::from_fn_with_state(
             state.clone(),
             require_auth,

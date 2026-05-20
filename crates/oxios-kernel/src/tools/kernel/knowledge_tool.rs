@@ -7,6 +7,7 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use chrono::Datelike;
 use oxi_sdk::{AgentTool as OxiAgentTool, AgentToolResult, ToolContext};
 use serde_json::{json, Value};
 
@@ -508,7 +509,7 @@ impl OxiAgentTool for KnowledgeTool {
                     return Ok(AgentToolResult::error("emoji is required for journal_emoji"));
                 }
                 match api.journal_add_emoji(emoji) {
-                    Ok(()) => Ok(AgentToolResult::success(format!("Journal emoji set to '{}'”, emoji))),
+                    Ok(()) => Ok(AgentToolResult::success(format!("Journal emoji set to '{}'", emoji))),
                     Err(e) => Ok(AgentToolResult::error(format!("Failed to set journal emoji: {e}"))),
                 }
             }

@@ -13,6 +13,43 @@
 //! - GET  /api/knowledge/backlinks    — get backlinks for a file
 //! - GET  /api/knowledge/graph        — link graph for visualization
 //! - POST /api/knowledge/copilot      — AI copilot chat
+//!
+//! Checklist:
+//! - POST /api/knowledge/checklist/items   — list checklist items
+//! - POST /api/knowledge/checklist/add     — add checklist item
+//! - POST /api/knowledge/checklist/complete — complete checklist item
+//! - POST /api/knowledge/checklist/remove  — remove checklist item
+//!
+//! Chat:
+//! - POST /api/knowledge/chat/append   — append chat message
+//! - GET  /api/knowledge/chat/messages  — list chat messages
+//! - POST /api/knowledge/chat/delete    — delete chat message
+//! - POST /api/knowledge/chat/move      — move chat message to file
+//!
+//! Journal:
+//! - POST /api/knowledge/journal/add   — add journal record
+//! - POST /api/knowledge/journal/emoji — add journal emoji
+//! - GET  /api/knowledge/journal/today — today's journal path
+//!
+//! Habits:
+//! - GET  /api/knowledge/habits         — habit data for a year
+//! - GET  /api/knowledge/habits/last-week — last week's habits
+//!
+//! Stats:
+//! - GET  /api/knowledge/stats/today    — today's completion report
+//! - GET  /api/knowledge/stats/done-today — files completed today
+//!
+//! Config:
+//! - GET  /api/knowledge/config         — read config
+//! - PUT  /api/knowledge/config         — write config
+//!
+//! Worker:
+//! - POST /api/knowledge/worker/nightly   — run nightly cleanup
+//! - POST /api/knowledge/worker/scheduled — run scheduled tasks
+//!
+//! Convert:
+//! - POST /api/knowledge/convert/html   — markdown → HTML
+//! - GET  /api/knowledge/emoji           — auto-emoji lookup
 
 use std::sync::Arc;
 
@@ -20,6 +57,7 @@ use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::Json;
+use chrono::Datelike;
 use serde::{Deserialize, Serialize};
 
 use crate::error::AppError;
@@ -136,6 +174,199 @@ pub(crate) struct KnowledgeCopilotBody {
     pub question: String,
     /// Currently open file path for context.
     pub context_path: Option<String>,
+}
+
+// ---------------------------------------------------------------------------
+// Checklist request / response types
+// ---------------------------------------------------------------------------
+
+/// Checklist items request body.
+#[derive(Debug, Deserialize)]
+pub(crate) struct ChecklistItemsBody {
+    /// File path to read checklist from.
+    pub path: String,
+}
+
+/// Checklist add request body.
+#[derive(Debug, Deserialize)]
+pub(crate) struct ChecklistAddBody {
+    /// File path to add checklist item to.
+    pub path: String,
+    /// Checklist item text.
+    pub item: String,
+    /// Whether the item starts checked.
+    #[serde(default)]
+    pub checked: bool,
+}
+
+/// Checklist complete request body.
+#[derive(Debug, Deserialize)]
+pub(crate) struct ChecklistCompleteBody {
+    /// File path.
+    pub path: String,
+    /// Hash of the item to complete.
+    pub item_hash: String,
+}
+
+/// Checklist remove request body.
+#[derive(Debug, Deserialize)]
+pub(crate) struct ChecklistRemoveBody {
+    /// File path.
+    pub path: String,
+    /// Item text or hash to remove.
+    pub item_or_hash: String,
+}
+
+/// Checklist items response.
+#[derive(Debug, Serialize)]
+pub(crate) struct ChecklistItemsResponse {
+    /// All checklist items.
+    pub items: Vec<String>,
+    /// Incomplete items only.
+    pub incomplete: Vec<String>,
+}
+
+// ---------------------------------------------------------------------------
+// Chat request / response types
+// ---------------------------------------------------------------------------
+
+/// Chat append request body.
+#[derive(Debug, Deserialize)]
+pub(crate) struct ChatAppendBody {
+    /// Message text to append.
+    pub message: String,
+}
+
+/// Chat delete request body.
+#[derive(Debug, Deserialize)]
+pub(crate) struct ChatDeleteBody {
+    /// Hash of the message to delete.
+    pub msg_hash: String,
+}
+
+/// Chat move request body.
+#[derive(Debug, Deserialize)]
+pub(crate) struct ChatMoveBody {
+    /// Hash of the message to move.
+    pub msg_hash: String,
+    /// Target file path.
+    pub target_path: String,
+}
+
+// ---------------------------------------------------------------------------
+// Journal request / response types
+// ---------------------------------------------------------------------------
+
+/// Journal add record request body.
+#[derive(Debug, Deserialize)]
+pub(crate) struct JournalAddRecordBody {
+    /// Record text to add.
+    pub record: String,
+}
+
+/// Journal add emoji request body.
+#[derive(Debug, Deserialize)]
+pub(crate) struct JournalAddEmojiBody {
+    /// Emoji to add.
+    pub emoji: String,
+}
+
+/// Journal today response.
+#[derive(Debug, Serialize)]
+pub(crate) struct JournalTodayResponse {
+    /// Path to today's journal file.
+    pub path: String,
+}
+
+// ---------------------------------------------------------------------------
+// Habits query params
+// ---------------------------------------------------------------------------
+
+/// Habits query parameters.
+#[derive(Debug, Deserialize)]
+pub(crate) struct HabitsParams {
+    /// Year to fetch habits for.
+    #[serde(default = "default_habits_year")]
+    pub year: Option<i32>,
+}
+
+fn default_habits_year() -> Option<i32> {
+    None
+}
+
+// ---------------------------------------------------------------------------
+// Config request body (PUT)
+// ---------------------------------------------------------------------------
+
+/// Config update request body.
+#[derive(Debug, Deserialize)]
+pub(crate) struct KnowledgeConfigBody {
+    /// Language code.
+    #[serde(default)]
+    pub language: Option<String>,
+    /// Timezone.
+    #[serde(default)]
+    pub timezone: Option<String>,
+    /// Move-to commands.
+    #[serde(default)]
+    pub move_to_commands: Option<Vec<String>>,
+    /// Pomodoro duration in minutes.
+    #[serde(default)]
+    pub pomodoro_duration_in_minutes: Option<i64>,
+    /// Scheduled tasks.
+    #[serde(default)]
+    pub schedules: Option<Vec<serde_json::Value>>,
+    /// Quick commands.
+    #[serde(default)]
+    pub quick_commands: Option<Vec<String>>,
+    /// Two emojis enabled.
+    #[serde(default)]
+    pub two_emojis_enabled: Option<bool>,
+    /// Mode.
+    #[serde(default)]
+    pub mode: Option<String>,
+    /// Quick habits enabled.
+    #[serde(default)]
+    pub quick_habits_enabled: Option<bool>,
+    /// Associated channels.
+    #[serde(default)]
+    pub channels: Option<Vec<i64>>,
+}
+
+// ---------------------------------------------------------------------------
+// Convert request / response types
+// ---------------------------------------------------------------------------
+
+/// Markdown to HTML request body.
+#[derive(Debug, Deserialize)]
+pub(crate) struct ConvertHtmlBody {
+    /// Markdown text to convert.
+    pub md: String,
+}
+
+/// Convert HTML response.
+#[derive(Debug, Serialize)]
+pub(crate) struct ConvertHtmlResponse {
+    /// Converted HTML.
+    pub html: String,
+}
+
+// ---------------------------------------------------------------------------
+// Emoji query params
+// ---------------------------------------------------------------------------
+
+/// Emoji query parameters.
+#[derive(Debug, Deserialize)]
+pub(crate) struct EmojiQueryParams {
+    /// Text to find an emoji for.
+    pub text: String,
+}
+
+/// Emoji response.
+#[derive(Debug, Serialize)]
+pub(crate) struct EmojiResponse {
+    /// Found emoji.
+    pub emoji: String,
 }
 
 /// Copilot response.
@@ -361,6 +592,347 @@ pub(crate) async fn handle_knowledge_copilot(
         content: result.content,
         referenced_notes: result.referenced_notes,
     }))
+}
+
+// ---------------------------------------------------------------------------
+// Checklist handlers
+// ---------------------------------------------------------------------------
+
+/// POST /api/knowledge/checklist/items — list checklist items.
+pub(crate) async fn handle_knowledge_checklist_items(
+    state: State<Arc<AppState>>,
+    Json(body): Json<ChecklistItemsBody>,
+) -> Result<Json<ChecklistItemsResponse>, AppError> {
+    let (items, _completed) = state
+        .kernel
+        .knowledge
+        .checklist_items(&body.path)
+        .map_err(|e| AppError::Internal(e.to_string()))?;
+    let incomplete = state
+        .kernel
+        .knowledge
+        .checklist_incomplete(&body.path)
+        .map_err(|e| AppError::Internal(e.to_string()))?;
+
+    Ok(Json(ChecklistItemsResponse { items, incomplete }))
+}
+
+/// POST /api/knowledge/checklist/add — add a checklist item.
+pub(crate) async fn handle_knowledge_checklist_add(
+    state: State<Arc<AppState>>,
+    Json(body): Json<ChecklistAddBody>,
+) -> Result<StatusCode, AppError> {
+    state
+        .kernel
+        .knowledge
+        .checklist_add(&body.path, &body.item, body.checked)
+        .map_err(|e| AppError::Internal(e.to_string()))?;
+
+    Ok(StatusCode::NO_CONTENT)
+}
+
+/// POST /api/knowledge/checklist/complete — complete a checklist item.
+pub(crate) async fn handle_knowledge_checklist_complete(
+    state: State<Arc<AppState>>,
+    Json(body): Json<ChecklistCompleteBody>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    let found = state
+        .kernel
+        .knowledge
+        .checklist_complete(&body.path, &body.item_hash)
+        .map_err(|e| AppError::Internal(e.to_string()))?;
+
+    Ok(Json(serde_json::json!({ "found": found })))
+}
+
+/// POST /api/knowledge/checklist/remove — remove a checklist item.
+pub(crate) async fn handle_knowledge_checklist_remove(
+    state: State<Arc<AppState>>,
+    Json(body): Json<ChecklistRemoveBody>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    let found = state
+        .kernel
+        .knowledge
+        .checklist_remove(&body.path, &body.item_or_hash)
+        .map_err(|e| AppError::Internal(e.to_string()))?;
+
+    Ok(Json(serde_json::json!({ "found": found })))
+}
+
+// ---------------------------------------------------------------------------
+// Chat handlers
+// ---------------------------------------------------------------------------
+
+/// POST /api/knowledge/chat/append — append a chat message.
+pub(crate) async fn handle_knowledge_chat_append(
+    state: State<Arc<AppState>>,
+    Json(body): Json<ChatAppendBody>,
+) -> Result<StatusCode, AppError> {
+    state
+        .kernel
+        .knowledge
+        .chat_append(&body.message)
+        .map_err(|e| AppError::Internal(e.to_string()))?;
+
+    Ok(StatusCode::NO_CONTENT)
+}
+
+/// GET /api/knowledge/chat/messages — list chat messages.
+pub(crate) async fn handle_knowledge_chat_messages(
+    state: State<Arc<AppState>>,
+) -> Result<Json<Vec<String>>, AppError> {
+    let messages = state
+        .kernel
+        .knowledge
+        .chat_messages()
+        .map_err(|e| AppError::Internal(e.to_string()))?;
+
+    Ok(Json(messages))
+}
+
+/// POST /api/knowledge/chat/delete — delete a chat message.
+pub(crate) async fn handle_knowledge_chat_delete(
+    state: State<Arc<AppState>>,
+    Json(body): Json<ChatDeleteBody>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    let deleted = state
+        .kernel
+        .knowledge
+        .chat_delete(&body.msg_hash)
+        .map_err(|e| AppError::Internal(e.to_string()))?;
+
+    Ok(Json(serde_json::json!({ "deleted": deleted })))
+}
+
+/// POST /api/knowledge/chat/move — move a chat message to a file.
+pub(crate) async fn handle_knowledge_chat_move(
+    state: State<Arc<AppState>>,
+    Json(body): Json<ChatMoveBody>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    let moved = state
+        .kernel
+        .knowledge
+        .chat_move_to(&body.msg_hash, &body.target_path)
+        .map_err(|e| AppError::Internal(e.to_string()))?;
+
+    Ok(Json(serde_json::json!({ "moved": moved })))
+}
+
+// ---------------------------------------------------------------------------
+// Journal handlers
+// ---------------------------------------------------------------------------
+
+/// POST /api/knowledge/journal/add — add a journal record.
+pub(crate) async fn handle_knowledge_journal_add(
+    state: State<Arc<AppState>>,
+    Json(body): Json<JournalAddRecordBody>,
+) -> Result<StatusCode, AppError> {
+    state
+        .kernel
+        .knowledge
+        .journal_add_record(&body.record)
+        .map_err(|e| AppError::Internal(e.to_string()))?;
+
+    Ok(StatusCode::NO_CONTENT)
+}
+
+/// POST /api/knowledge/journal/emoji — add a journal emoji.
+pub(crate) async fn handle_knowledge_journal_emoji(
+    state: State<Arc<AppState>>,
+    Json(body): Json<JournalAddEmojiBody>,
+) -> Result<StatusCode, AppError> {
+    state
+        .kernel
+        .knowledge
+        .journal_add_emoji(&body.emoji)
+        .map_err(|e| AppError::Internal(e.to_string()))?;
+
+    Ok(StatusCode::NO_CONTENT)
+}
+
+/// GET /api/knowledge/journal/today — get today's journal path.
+pub(crate) async fn handle_knowledge_journal_today(
+    state: State<Arc<AppState>>,
+) -> Result<Json<JournalTodayResponse>, AppError> {
+    let path = state.kernel.knowledge.journal_today_path();
+    Ok(Json(JournalTodayResponse { path }))
+}
+
+// ---------------------------------------------------------------------------
+// Habits handlers
+// ---------------------------------------------------------------------------
+
+/// GET /api/knowledge/habits — get habits for a year.
+pub(crate) async fn handle_knowledge_habits(
+    state: State<Arc<AppState>>,
+    Query(params): Query<HabitsParams>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    let year = params.year.unwrap_or_else(|| chrono::Local::now().year());
+    let habits = state
+        .kernel
+        .knowledge
+        .habits(year)
+        .map_err(|e| AppError::Internal(e.to_string()))?;
+
+    Ok(Json(serde_json::to_value(habits).unwrap_or_default()))
+}
+
+/// GET /api/knowledge/habits/last-week — get last week's habits.
+pub(crate) async fn handle_knowledge_habits_last_week(
+    state: State<Arc<AppState>>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    let habits = state
+        .kernel
+        .knowledge
+        .habits_last_week()
+        .map_err(|e| AppError::Internal(e.to_string()))?;
+
+    Ok(Json(serde_json::to_value(habits).unwrap_or_default()))
+}
+
+// ---------------------------------------------------------------------------
+// Stats handlers
+// ---------------------------------------------------------------------------
+
+/// GET /api/knowledge/stats/today — today's completion report.
+pub(crate) async fn handle_knowledge_stats_today(
+    state: State<Arc<AppState>>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    let report = state
+        .kernel
+        .knowledge
+        .today_report()
+        .map_err(|e| AppError::Internal(e.to_string()))?;
+
+    Ok(Json(serde_json::to_value(report).unwrap_or_default()))
+}
+
+/// GET /api/knowledge/stats/done-today — files completed today.
+pub(crate) async fn handle_knowledge_stats_done_today(
+    state: State<Arc<AppState>>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    let entries = state
+        .kernel
+        .knowledge
+        .done_today()
+        .map_err(|e| AppError::Internal(e.to_string()))?;
+
+    Ok(Json(serde_json::json!({
+        "items": entries,
+        "count": entries.len(),
+    })))
+}
+
+// ---------------------------------------------------------------------------
+// Config handlers
+// ---------------------------------------------------------------------------
+
+/// GET /api/knowledge/config — read knowledge config.
+pub(crate) async fn handle_knowledge_config_get(
+    state: State<Arc<AppState>>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    let config = state
+        .kernel
+        .knowledge
+        .config()
+        .map_err(|e| AppError::Internal(e.to_string()))?;
+
+    Ok(Json(serde_json::to_value(config).unwrap_or_default()))
+}
+
+/// PUT /api/knowledge/config — update knowledge config.
+pub(crate) async fn handle_knowledge_config_put(
+    state: State<Arc<AppState>>,
+    Json(body): Json<KnowledgeConfigBody>,
+) -> Result<StatusCode, AppError> {
+    let mut config = state
+        .kernel
+        .knowledge
+        .config()
+        .map_err(|e| AppError::Internal(e.to_string()))?;
+
+    // Merge non-null fields
+    if let Some(v) = body.language { config.language = v; }
+    if let Some(v) = body.timezone { config.timezone = v; }
+    if let Some(v) = body.move_to_commands { config.move_to_commands = v; }
+    if let Some(v) = body.pomodoro_duration_in_minutes { config.pomodoro_duration_in_minutes = v; }
+    if let Some(v) = body.schedules {
+        config.schedules = v.into_iter()
+            .filter_map(|v| serde_json::from_value(v).ok())
+            .collect();
+    }
+    if let Some(v) = body.quick_commands { config.quick_commands = v; }
+    if let Some(v) = body.two_emojis_enabled { config.two_emojis_enabled = v; }
+    if let Some(v) = body.mode { config.mode = v; }
+    if let Some(v) = body.quick_habits_enabled { config.quick_habits_enabled = v; }
+    if let Some(v) = body.channels { config.channels = v; }
+
+    state
+        .kernel
+        .knowledge
+        .set_config(&config)
+        .map_err(|e| AppError::Internal(e.to_string()))?;
+
+    Ok(StatusCode::NO_CONTENT)
+}
+
+// ---------------------------------------------------------------------------
+// Worker handlers
+// ---------------------------------------------------------------------------
+
+/// POST /api/knowledge/worker/nightly — run nightly cleanup.
+pub(crate) async fn handle_knowledge_worker_nightly(
+    state: State<Arc<AppState>>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    let report = state
+        .kernel
+        .knowledge
+        .run_nightly_cleanup()
+        .map_err(|e| AppError::Internal(e.to_string()))?;
+
+    Ok(Json(serde_json::to_value(report).unwrap_or_default()))
+}
+
+/// POST /api/knowledge/worker/scheduled — run scheduled tasks.
+pub(crate) async fn handle_knowledge_worker_scheduled(
+    state: State<Arc<AppState>>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    let moved = state
+        .kernel
+        .knowledge
+        .run_scheduled_tasks()
+        .map_err(|e| AppError::Internal(e.to_string()))?;
+
+    Ok(Json(serde_json::json!({
+        "moved": moved,
+        "count": moved.len(),
+    })))
+}
+
+// ---------------------------------------------------------------------------
+// Convert handler
+// ---------------------------------------------------------------------------
+
+/// POST /api/knowledge/convert/html — convert markdown to HTML.
+pub(crate) async fn handle_knowledge_convert_html(
+    state: State<Arc<AppState>>,
+    Json(body): Json<ConvertHtmlBody>,
+) -> Result<Json<ConvertHtmlResponse>, AppError> {
+    let html = state.kernel.knowledge.markdown_to_html(&body.md);
+    Ok(Json(ConvertHtmlResponse { html }))
+}
+
+// ---------------------------------------------------------------------------
+// Emoji handler
+// ---------------------------------------------------------------------------
+
+/// GET /api/knowledge/emoji — find emoji for text.
+pub(crate) async fn handle_knowledge_emoji(
+    state: State<Arc<AppState>>,
+    Query(params): Query<EmojiQueryParams>,
+) -> Result<Json<EmojiResponse>, AppError> {
+    let emoji = state.kernel.knowledge.auto_emoji(&params.text);
+    Ok(Json(EmojiResponse { emoji }))
 }
 
 #[cfg(test)]

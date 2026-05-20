@@ -6,7 +6,7 @@ use crate::fs::{is_checklist_item, display_name, VirtualFs};
 use crate::types::{FileEntry, FsError, DIR_ARCHIVE};
 
 /// A completed item shown in today's report.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct CompletedItem {
     /// The display name (capitalized, no extension).
     pub display_name: String,
@@ -15,7 +15,7 @@ pub struct CompletedItem {
 }
 
 /// Today's completion report.
-#[derive(Debug, Default)]
+#[derive(Debug, Default, serde::Serialize, serde::Deserialize)]
 pub struct TodayReport {
     /// Items completed today.
     pub completed_items: Vec<CompletedItem>,
