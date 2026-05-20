@@ -167,7 +167,6 @@ mod tests {
             ))),
             crate::KnowledgeApi::new(
                 std::path::PathBuf::from("/tmp/oxios-test/knowledge"),
-                Arc::new(crate::memory::MemoryManager::new(state_store.clone())),
                 Arc::new(crate::engine::OxiEngineProvider::new("anthropic/claude-sonnet-4")),
                 "anthropic/claude-sonnet-4".to_string(),
             ),

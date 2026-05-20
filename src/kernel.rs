@@ -109,7 +109,6 @@ impl Kernel {
                     oxios_kernel::A2aApi::new(self.a2a_protocol.clone()),
                     oxios_kernel::KnowledgeApi::new(
                         std::path::PathBuf::from(&self.config.kernel.workspace).join("knowledge"),
-                        self.memory_manager.clone(),
                         Arc::new(oxios_kernel::OxiEngineProvider::new(
                             &self.config.engine.default_model,
                         )),
@@ -452,7 +451,6 @@ impl KernelBuilder {
                 oxios_kernel::A2aApi::new(a2a_protocol.clone()),
                 oxios_kernel::KnowledgeApi::new(
                     PathBuf::from(&config.kernel.workspace).join("knowledge"),
-                    memory_manager.clone(),
                     Arc::new(oxios_kernel::OxiEngineProvider::new(
                         &config.engine.default_model,
                     )),

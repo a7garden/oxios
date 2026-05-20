@@ -165,7 +165,6 @@ impl KernelHandle {
         let knowledge_lens_dir = knowledge_dir.clone();
         let knowledge = KnowledgeApi::new(
             knowledge_dir,
-            memory_manager.clone(),
             Arc::new(crate::engine::OxiEngineProvider::new(
                 &config.engine.default_model,
             )),

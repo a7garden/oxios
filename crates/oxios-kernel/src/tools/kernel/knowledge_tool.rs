@@ -12,7 +12,6 @@ use oxi_sdk::{AgentTool as OxiAgentTool, AgentToolResult, ToolContext};
 use serde_json::{json, Value};
 
 use crate::kernel_handle::KnowledgeApi;
-use crate::memory::MemoryManager;
 use crate::KernelHandle;
 
 /// Tool for reading, writing, and managing markdown knowledge notes.
@@ -21,7 +20,6 @@ use crate::KernelHandle;
 /// `search`, `backlinks`.
 pub struct KnowledgeTool {
     knowledge_dir: std::path::PathBuf,
-    memory: Arc<MemoryManager>,
     engine: Arc<dyn crate::engine::EngineProvider>,
     default_model: String,
 }
@@ -31,7 +29,6 @@ impl KnowledgeTool {
     pub fn from_kernel(kernel: &KernelHandle) -> Self {
         Self {
             knowledge_dir: kernel.knowledge.root(),
-            memory: kernel.agents.memory_manager().clone(),
             engine: Arc::new(crate::engine::OxiEngineProvider::new(
                 kernel.knowledge.model_id(),
             )),
@@ -40,10 +37,9 @@ impl KnowledgeTool {
     }
 
     /// Create with explicit parameters (for testing).
-    pub fn new(knowledge_dir: std::path::PathBuf, memory: Arc<MemoryManager>) -> Self {
+    pub fn new(knowledge_dir: std::path::PathBuf) -> Self {
         Self {
             knowledge_dir,
-            memory,
             engine: Arc::new(crate::engine::OxiEngineProvider::new("anthropic/claude-sonnet-4")),
             default_model: "anthropic/claude-sonnet-4".to_string(),
         }
@@ -53,7 +49,6 @@ impl KnowledgeTool {
     fn make_api(&self) -> KnowledgeApi {
         KnowledgeApi::new(
             self.knowledge_dir.clone(),
-            self.memory.clone(),
             self.engine.clone(),
             self.default_model.clone(),
         )
@@ -675,15 +670,7 @@ mod tests {
 
     #[test]
     fn test_knowledge_tool_schema() {
-        let tool = KnowledgeTool::new(
-            std::path::PathBuf::from("/tmp/test-kb"),
-            Arc::new(MemoryManager::new(
-                Arc::new(
-                    crate::state_store::StateStore::new(std::path::PathBuf::from("/tmp/test-state"))
-                        .unwrap(),
-                ),
-            )),
-        );
+        let tool = KnowledgeTool::new(std::path::PathBuf::from("/tmp/test-kb"));
         assert_eq!(tool.name(), "knowledge");
         let schema = tool.parameters_schema();
         assert!(schema["required"].is_array());

@@ -422,7 +422,6 @@ mod tests {
             ))),
             crate::kernel_handle::KnowledgeApi::new(
                 tmp.join("knowledge"),
-                memory_manager.clone(),
                 Arc::new(crate::engine::OxiEngineProvider::new("mock/model")),
                 "mock/model".to_string(),
             ),
