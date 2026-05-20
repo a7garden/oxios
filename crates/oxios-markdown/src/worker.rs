@@ -6,12 +6,12 @@
 //!
 //! Bot/Telegram dependencies are removed — this module contains pure functions.
 
-use chrono::{Datelike, FixedOffset, Utc};
+use chrono::{Datelike, FixedOffset, TimeZone, Utc};
 use regex::Regex;
 
 use crate::chat::read_chat_msgs;
 use crate::fs::VirtualFs;
-use crate::journal::{add_record as journal_add_record, today_header as journal_today_header};
+use crate::journal::add_record as journal_add_record;
 use crate::parser::norm_new_lines;
 use crate::types::{
     FsError, KnowledgeConfig,
@@ -127,14 +127,7 @@ pub fn remove_completed_inbox_entries(md: &str) -> (String, String) {
     let blocks = read_chat_msgs(md);
 
     let done_re = Regex::new(r"^- \[[xX]\] ").unwrap();
-    let ts_re = Regex::new(
-        &format!(
-            r"^(?:- \[[ xX]\] )?{}`{}\d{{2}}:\d{{2}}`{}` ` ",
-            "", "", ""
-        ),
-    )
-    .unwrap();
-    // Build the regex properly: matches optional checkbox + backtick timestamp
+    // Regex that matches optional checkbox + backtick timestamp prefix
     let ts_re = Regex::new(r"^(?:- \[[ xX]\] )?`\d{2}:\d{2}` ").unwrap();
 
     let mut kept: Vec<String> = Vec::new();
@@ -388,6 +381,8 @@ mod tests {
     use super::*;
     use tempfile::TempDir;
 
+    use chrono::Timelike;
+
     fn test_fs() -> (VirtualFs, TempDir) {
         let dir = TempDir::new().unwrap();
         let fs = VirtualFs::new(dir.path().to_path_buf()).unwrap();
@@ -445,7 +440,7 @@ mod tests {
     #[test]
     fn test_remove_completed_inbox_entries_no_completed() {
         let md = "#### 19 May\n- [ ] `09:00` Pending\n- [ ] `10:00` Also pending";
-        let (kept, removed) = remove_completed_inbox_entries(md);
+        let (_kept, removed) = remove_completed_inbox_entries(md);
         assert!(removed.is_empty());
     }
 

@@ -2,7 +2,7 @@
 //!
 //! Ported from files.md (`server/plugins/world_clock.go`) by Artem Zakirullin.
 
-use chrono::{TimeZone, Utc, FixedOffset};
+use chrono::{TimeZone, Utc};
 use chrono_tz::Tz;
 
 /// A timezone entry in the world clock report.
@@ -131,7 +131,7 @@ fn find_tz(name: &str) -> Option<(&'static str, &'static str)> {
 fn format_time(utc_dt: &chrono::DateTime<Utc>, tz_str: &str) -> String {
     if tz_str == "UTC" {
         utc_dt.format("%d.%m.%Y %H:%M:%S").to_string()
-    } else if let Ok(tz: Tz) = tz_str.parse() {
+    } else if let Ok(tz) = tz_str.parse::<Tz>() {
         let local = utc_dt.with_timezone(&tz);
         local.format("%d.%m.%Y %H:%M:%S").to_string()
     } else {

@@ -8,6 +8,7 @@
 //! `` ` `` → `<code>`, ` ``` ` → `<pre>`, `#` → `<b>`.
 
 use std::collections::HashMap;
+use std::rc::Rc;
 use regex::Regex;
 
 // ---------------------------------------------------------------------------
@@ -97,106 +98,107 @@ fn close_tag(token: &str) -> &'static str {
     CLOSE_TAGS.iter().find(|(k, _)| *k == token).map(|(_, v)| *v).unwrap_or("")
 }
 
+/// Using `Rc<dyn Fn>` so that parsers can be cloned (needed for grammar reuse).
+type Parser = Rc<dyn Fn(&str) -> Vec<ParseResult>>;
+
 /// `open(tag)` — recognises the opening markdown token and, on success,
 /// produces the corresponding HTML open tag.
-fn parse_open(token: &'static str, input: &str) -> Vec<ParseResult> {
-    if input.starts_with(token) {
-        vec![ParseResult {
-            consumed: open_tag(token).to_string(),
-            left: input[token.len()..].to_string(),
-        }]
-    } else {
-        vec![]
-    }
+fn parse_open(token: &'static str) -> Parser {
+    Rc::new(move |input: &str| {
+        if input.starts_with(token) {
+            vec![ParseResult {
+                consumed: open_tag(token).to_string(),
+                left: input[token.len()..].to_string(),
+            }]
+        } else {
+            vec![]
+        }
+    })
 }
 
 /// `close(tag)` — recognises the closing markdown token and, on success,
 /// produces the corresponding HTML close tag.
-fn parse_close(token: &'static str, input: &str) -> Vec<ParseResult> {
-    if input.starts_with(token) {
-        vec![ParseResult {
-            consumed: close_tag(token).to_string(),
-            left: input[token.len()..].to_string(),
-        }]
-    } else {
-        vec![]
-    }
+fn parse_close(token: &'static str) -> Parser {
+    Rc::new(move |input: &str| {
+        if input.starts_with(token) {
+            vec![ParseResult {
+                consumed: close_tag(token).to_string(),
+                left: input[token.len()..].to_string(),
+            }]
+        } else {
+            vec![]
+        }
+    })
 }
 
 /// `not_markdown()` — consumes plain text up to the next `*` or `_` character.
-fn parse_not_markdown(input: &str) -> Vec<ParseResult> {
-    for (i, ch) in input.char_indices() {
-        if ch == '*' || ch == '_' {
-            return vec![ParseResult {
-                consumed: input[..i].to_string(),
-                left: input[i..].to_string(),
-            }];
+fn parse_not_markdown() -> Parser {
+    Rc::new(|input: &str| {
+        for (i, ch) in input.char_indices() {
+            if ch == '*' || ch == '_' {
+                return vec![ParseResult {
+                    consumed: input[..i].to_string(),
+                    left: input[i..].to_string(),
+                }];
+            }
         }
-    }
-    if !input.is_empty() {
-        vec![ParseResult {
-            consumed: input.to_string(),
-            left: String::new(),
-        }]
-    } else {
-        vec![]
-    }
+        if !input.is_empty() {
+            vec![ParseResult {
+                consumed: input.to_string(),
+                left: String::new(),
+            }]
+        } else {
+            vec![]
+        }
+    })
 }
 
 /// `or` — try multiple parsers; concatenate all successful results.
-fn parse_or<F>(parsers: &[F], input: &str) -> Vec<ParseResult>
-where
-    F: Fn(&str) -> Vec<ParseResult>,
-{
-    let mut results = Vec::new();
-    for p in parsers {
-        results.extend(p(input));
-    }
-    results
+fn parse_or(parsers: Vec<Parser>) -> Parser {
+    Rc::new(move |input: &str| {
+        let mut results = Vec::new();
+        for p in &parsers {
+            results.extend(p(input));
+        }
+        results
+    })
 }
 
 /// `and` — apply parsers in sequence; every parser must consume something.
-fn parse_and<F>(parsers: &[F], input: &str) -> Vec<ParseResult>
-where
-    F: Fn(&str) -> Vec<ParseResult>,
-{
-    let mut results = vec![ParseResult {
-        consumed: String::new(),
-        left: input.to_string(),
-    }];
+fn parse_and(parsers: Vec<Parser>) -> Parser {
+    Rc::new(move |input: &str| {
+        let mut results = vec![ParseResult {
+            consumed: String::new(),
+            left: input.to_string(),
+        }];
 
-    for p in parsers {
-        let mut new_results = Vec::new();
-        for r in &results {
-            for parsed in p(&r.left) {
-                if !parsed.consumed.is_empty() {
-                    new_results.push(ParseResult {
-                        consumed: format!("{}{}", r.consumed, parsed.consumed),
-                        left: parsed.left.clone(),
-                    });
+        for p in &parsers {
+            let mut new_results = Vec::new();
+            for r in &results {
+                for parsed in p(&r.left) {
+                    if !parsed.consumed.is_empty() {
+                        new_results.push(ParseResult {
+                            consumed: format!("{}{}", r.consumed, parsed.consumed),
+                            left: parsed.left.clone(),
+                        });
+                    }
                 }
             }
+            if new_results.is_empty() {
+                return vec![];
+            }
+            results = new_results;
         }
-        if new_results.is_empty() {
-            return vec![];
-        }
-        results = new_results;
-    }
-    results
+        results
+    })
 }
 
 /// `some` — apply a parser one or more times (recursive).
-fn parse_some<F>(parser: &F, input: &str) -> Vec<ParseResult>
-where
-    F: Fn(&str) -> Vec<ParseResult>,
-{
-    recursive(input, parser, 0)
+fn parse_some(parser: Parser) -> Parser {
+    Rc::new(move |input: &str| recursive(input, &parser, 0))
 }
 
-fn recursive<F>(input: &str, parser: &F, depth: usize) -> Vec<ParseResult>
-where
-    F: Fn(&str) -> Vec<ParseResult>,
-{
+fn recursive(input: &str, parser: &Parser, depth: usize) -> Vec<ParseResult> {
     let mut results = Vec::new();
     let mut empty = true;
 
@@ -227,130 +229,78 @@ where
 // The markdown parser grammar
 // ---------------------------------------------------------------------------
 
-/// Top-level inline markdown parser. Supports one level of nesting for
-/// bold/italic.
-fn markdown_parse(input: &str) -> Vec<ParseResult> {
+/// Build the top-level inline markdown parser.
+/// Supports one level of nesting for bold/italic.
+fn markdown_parser() -> Parser {
     // text = notMarkdown
-    // italicNoBold = or(and(open("*"), text, close("*")),
-    //                   and(open("_"), text, close("_")))
-    // bold          = or(and(open("**"), some(or(text, italicNoBold)), close("**")),
-    //                   and(open("__"), some(or(text, italicNoBold)), close("__")))
-    // italic        = or(and(open("*"),  some(or(text, bold)),        close("*")),
-    //                   and(open("_"),  some(or(text, bold)),        close("_")))
-    // span          = or(bold, italic, text)
-    // result        = some(span)
+    let text = parse_not_markdown();
 
-    let text = |inp: &str| parse_not_markdown(inp);
+    // italicNoBold = or(
+    //     and(open("*"), text, close("*")),
+    //     and(open("_"), text, close("_")),
+    // )
+    let italic_no_bold = parse_or(vec![
+        parse_and(vec![
+            parse_open("*"),
+            parse_not_markdown(),
+            parse_close("*"),
+        ]),
+        parse_and(vec![
+            parse_open("_"),
+            parse_not_markdown(),
+            parse_close("_"),
+        ]),
+    ]);
 
-    let italic_no_bold = |inp: &str| {
-        parse_or(
-            &[
-                |s: &str| parse_and(&[
-                    |s2: &str| parse_open("**", s2), // wait, this is wrong
-                ], s),
-            ],
-            inp,
-        )
-    };
+    // bold = or(
+    //     and(open("**"), some(or(text, italicNoBold)), close("**")),
+    //     and(open("__"), some(or(text, italicNoBold)), close("__")),
+    // )
+    let bold = parse_or(vec![
+        parse_and(vec![
+            parse_open("**"),
+            parse_some(parse_or(vec![
+                parse_not_markdown(),
+                italic_no_bold.clone(),
+            ])),
+            parse_close("**"),
+        ]),
+        parse_and(vec![
+            parse_open("__"),
+            parse_some(parse_or(vec![
+                parse_not_markdown(),
+                italic_no_bold,
+            ])),
+            parse_close("__"),
+        ]),
+    ]);
 
-    // We need closures that capture nothing, so we can write them directly:
+    // italic = or(
+    //     and(open("*"), some(or(text, bold)), close("*")),
+    //     and(open("_"), some(or(text, bold)), close("_")),
+    // )
+    let italic = parse_or(vec![
+        parse_and(vec![
+            parse_open("*"),
+            parse_some(parse_or(vec![
+                parse_not_markdown(),
+                bold.clone(),
+            ])),
+            parse_close("*"),
+        ]),
+        parse_and(vec![
+            parse_open("_"),
+            parse_some(parse_or(vec![
+                parse_not_markdown(),
+                bold.clone(),
+            ])),
+            parse_close("_"),
+        ]),
+    ]);
 
-    let italic_no_bold_fn = |inp: &str| {
-        parse_or(
-            &[
-                // and(open("*"), text, close("*"))
-                |s: &str| parse_and(&[
-                    |s2: &str| parse_open("*", s2),
-                    |s2: &str| text(s2),
-                    |s2: &str| parse_close("*", s2),
-                ], s),
-                // and(open("_"), text, close("_"))
-                |s: &str| parse_and(&[
-                    |s2: &str| parse_open("_", s2),
-                    |s2: &str| text(s2),
-                    |s2: &str| parse_close("_", s2),
-                ], s),
-            ],
-            inp,
-        )
-    };
-
-    let bold_fn = |inp: &str| {
-        parse_or(
-            &[
-                // and(open("**"), some(or(text, italicNoBold)), close("**"))
-                |s: &str| parse_and(&[
-                    |s2: &str| parse_open("**", s2),
-                    |s2: &str| parse_some(
-                        &|s3: &str| parse_or(&[
-                            |s4: &str| text(s4),
-                            |s4: &str| italic_no_bold_fn(s4),
-                        ], s3),
-                        s2,
-                    ),
-                    |s2: &str| parse_close("**", s2),
-                ], s),
-                // and(open("__"), some(or(text, italicNoBold)), close("__"))
-                |s: &str| parse_and(&[
-                    |s2: &str| parse_open("__", s2),
-                    |s2: &str| parse_some(
-                        &|s3: &str| parse_or(&[
-                            |s4: &str| text(s4),
-                            |s4: &str| italic_no_bold_fn(s4),
-                        ], s3),
-                        s2,
-                    ),
-                    |s2: &str| parse_close("__", s2),
-                ], s),
-            ],
-            inp,
-        )
-    };
-
-    let italic_fn = |inp: &str| {
-        parse_or(
-            &[
-                // and(open("*"), some(or(text, bold)), close("*"))
-                |s: &str| parse_and(&[
-                    |s2: &str| parse_open("*", s2),
-                    |s2: &str| parse_some(
-                        &|s3: &str| parse_or(&[
-                            |s4: &str| text(s4),
-                            |s4: &str| bold_fn(s4),
-                        ], s3),
-                        s2,
-                    ),
-                    |s2: &str| parse_close("*", s2),
-                ], s),
-                // and(open("_"), some(or(text, bold)), close("_"))
-                |s: &str| parse_and(&[
-                    |s2: &str| parse_open("_", s2),
-                    |s2: &str| parse_some(
-                        &|s3: &str| parse_or(&[
-                            |s4: &str| text(s4),
-                            |s4: &str| bold_fn(s4),
-                        ], s3),
-                        s2,
-                    ),
-                    |s2: &str| parse_close("_", s2),
-                ], s),
-            ],
-            inp,
-        )
-    };
-
-    let span_fn = |inp: &str| {
-        parse_or(
-            &[
-                |s: &str| bold_fn(s),
-                |s: &str| italic_fn(s),
-                |s: &str| text(s),
-            ],
-            inp,
-        )
-    };
-
-    parse_some(&span_fn, input)
+    // span = or(bold, italic, text)
+    // result = some(span)
+    parse_some(parse_or(vec![bold, italic, text]))
 }
 
 // ---------------------------------------------------------------------------
@@ -362,7 +312,7 @@ fn markdown_parse(input: &str) -> Vec<ParseResult> {
 /// Handles inline `*`/`_` → `<i>`, `**`/`__` → `<b>`, backtick code blocks,
 /// and `#` headers.
 pub fn markdown_to_html(md: &str) -> String {
-    let mut md_without_code = escape_html(md);
+    let md_without_code = escape_html(md);
 
     // Protect code blocks (```...```) and inline code (`...`)
     let (md_without_code, code_placeholders) =
@@ -375,7 +325,8 @@ pub fn markdown_to_html(md: &str) -> String {
     let segments = re_newlines.split(&md_without_code);
     let processed: Vec<String> = segments
         .map(|segment| {
-            let docs = markdown_parse(segment);
+            let parser = markdown_parser();
+            let docs = parser(segment);
             if !docs.is_empty() {
                 format!("{}{}", docs[0].consumed, docs[0].left)
             } else {
@@ -522,7 +473,8 @@ mod tests {
 
     #[test]
     fn test_parser_not_markdown() {
-        let results = parse_not_markdown("hello*world");
+        let p = parse_not_markdown();
+        let results = p("hello*world");
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].consumed, "hello");
         assert_eq!(results[0].left, "*world");
@@ -530,7 +482,8 @@ mod tests {
 
     #[test]
     fn test_parser_not_markdown_no_special() {
-        let results = parse_not_markdown("hello world");
+        let p = parse_not_markdown();
+        let results = p("hello world");
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].consumed, "hello world");
         assert_eq!(results[0].left, "");
@@ -538,12 +491,14 @@ mod tests {
 
     #[test]
     fn test_parser_open_close() {
-        let results = parse_open("**", "**bold**");
+        let p = parse_open("**");
+        let results = p("**bold**");
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].consumed, "<b>");
         assert_eq!(results[0].left, "bold**");
 
-        let results = parse_close("**", "**rest");
+        let p = parse_close("**");
+        let results = p("**rest");
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].consumed, "</b>");
         assert_eq!(results[0].left, "rest");
@@ -551,14 +506,12 @@ mod tests {
 
     #[test]
     fn test_parser_and() {
-        let results = parse_and(
-            &[
-                |s: &str| parse_open("*", s),
-                |s: &str| parse_not_markdown(s),
-                |s: &str| parse_close("*", s),
-            ],
-            "*hello*",
-        );
+        let p = parse_and(vec![
+            parse_open("*"),
+            parse_not_markdown(),
+            parse_close("*"),
+        ]);
+        let results = p("*hello*");
         assert!(!results.is_empty());
         assert_eq!(results[0].consumed, "<i>hello</i>");
     }

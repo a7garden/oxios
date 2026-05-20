@@ -69,7 +69,7 @@ pub fn format_today_report(report: &TodayReport) -> String {
 
 /// Returns the Unix timestamp (milliseconds) of midnight UTC today.
 fn beginning_of_day_utc() -> i64 {
-    use chrono::{Utc, Timelike};
+    use chrono::Utc;
     let now = Utc::now();
     let midnight = now
         .date_naive()

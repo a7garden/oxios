@@ -32,12 +32,16 @@ pub mod html;
 #[allow(dead_code)]
 pub mod fslog;
 pub mod habits;
+pub mod i18n;
 pub mod journal;
 pub mod merge;
 pub mod parser;
+pub mod plugins;
 pub mod schedule;
+pub mod stats;
 #[allow(dead_code)]
 pub mod sync;
+pub mod tgtxt;
 pub mod tokens;
 pub mod types;
 pub mod worker;
@@ -70,6 +74,11 @@ pub use parser::{similar, levenshtein, extract_markdown_links, extract_headings,
 pub use checklist::{checklist_items, incomplete_checklist_items, add_checklist_item,
     complete_checklist_item, remove_checklist_item, remove_completed_checklist_items,
     checklist_item, add_header_and_text};
+pub use schedule::ScheduleManager;
 pub use worker::{remove_completed_items, remove_completed_checklist, remove_completed_inbox_entries, move_due_tasks, schedule_report, next_exclude_today, NightlyReport};
-pub use sync::SyncEngine;
+pub use sync::{SyncEngine, MediaEntry, MediaSyncResponse};
 pub use tokens::TokenManager;
+pub use stats::{TodayReport, CompletedItem, today_report, done_today, format_today_report};
+pub use i18n::{emoji_for, add_emoji};
+pub use tgtxt::{ExtractResult, extract_text_imgs_links};
+pub use plugins::{TimezoneEntry, world_clock_now, world_clock_for_names, format_report as format_world_clock_report, can_handle as world_clock_can_handle, handle as world_clock_handle};

@@ -5,13 +5,8 @@
 use std::collections::HashMap;
 
 use once_cell::sync::Lazy;
-use serde::Deserialize;
 
 // ── Embedded emoji data ─────────────────────────────────────
-
-/// JSON format: `{ "emoji": ["keyword1", "keyword2", ...] }`
-#[derive(Deserialize)]
-struct EmojiRaw(HashMap<String, Vec<String>>);
 
 static EMOJI_MAP: Lazy<HashMap<String, String>> = Lazy::new(|| {
     let raw: HashMap<String, Vec<String>> =

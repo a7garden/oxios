@@ -199,27 +199,29 @@ impl SyncEngine {
             ..SyncResponse::default()
         })
     }
+}
 
-    // ── Media sync ─────────────────────────────────────────
+// ── Media types and methods ───────────────────────────────
 
-    /// Media file entry.
-    #[derive(Debug, Clone)]
-    pub struct MediaEntry {
-        /// Filename within the media directory.
-        pub filename: String,
-        /// Last modified timestamp (millis since epoch).
-        pub last_modified: i64,
-    }
+/// Media file entry.
+#[derive(Debug, Clone)]
+pub struct MediaEntry {
+    /// Filename within the media directory.
+    pub filename: String,
+    /// Last modified timestamp (millis since epoch).
+    pub last_modified: i64,
+}
 
-    /// Media sync response.
-    #[derive(Debug, Clone)]
-    pub struct MediaSyncResponse {
-        /// Media files modified since the given timestamp.
-        pub files: Vec<MediaEntry>,
-        /// Latest modification timestamp among returned files.
-        pub timestamp: i64,
-    }
+/// Media sync response.
+#[derive(Debug, Clone)]
+pub struct MediaSyncResponse {
+    /// Media files modified since the given timestamp.
+    pub files: Vec<MediaEntry>,
+    /// Latest modification timestamp among returned files.
+    pub timestamp: i64,
+}
 
+impl SyncEngine {
     /// List media files modified since a given timestamp.
     ///
     /// Returns all media files whose mtime > `since_timestamp`,

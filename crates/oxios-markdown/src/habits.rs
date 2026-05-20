@@ -6,13 +6,13 @@
 use std::collections::HashMap;
 use std::str::FromStr;
 
-use chrono::Datelike;
+use chrono::{Datelike, TimeZone};
 use unicode_segmentation::UnicodeSegmentation;
 
 use crate::fs::VirtualFs;
 use crate::parser::norm_new_lines;
 use crate::types::{
-    FsError, Habits,
+    FsError, Habits, YearHabits,
     HABIT_COMPLETED, HABIT_COMPLETED_AT_WEEKEND, HABIT_SKIPPED,
     MOOD_EMOJIS, MOOD_HABIT,
     DIR_HABITS, DIR_INSIGHTS, MD_EXT,
@@ -303,14 +303,14 @@ mod tests {
     #[test]
     fn test_mood_emoji() {
         let day = FixedOffset::east_opt(0).unwrap().with_ymd_and_hms(2024, 1, 1, 12, 0, 0).unwrap();
-        assert_eq!(emoji_for_status(MOOD_HABIT, &day, 0), "\u26AA\uFE0F");
-        assert_eq!(emoji_for_status(MOOD_HABIT, &day, 5), "\u{1F60A}");
+        assert_eq!(emoji_for_status(MOOD_HABIT, &day, 0), HABIT_SKIPPED);
+        assert_eq!(emoji_for_status(MOOD_HABIT, &day, 5), "😊");
     }
 
     #[test]
     fn test_weekday_emoji() {
-        assert_eq!(weekday_emoji("monday"), "\u{1F311}");
-        assert_eq!(weekday_emoji("unknown"), "\u26A1\uFE0F");
+        assert_eq!(weekday_emoji("monday"), "🌑");
+        assert_eq!(weekday_emoji("unknown"), "⚡️");
     }
 
     #[test]

@@ -252,9 +252,9 @@ mod tests {
         assert!(!new_chat.contains("Move me"));
         assert!(new_chat.contains("Stay"));
 
-        // Should be added as checklist item in target
+        // Should be added as checklist item in target (timestamp stripped)
         assert!(new_target.contains("- [ ] Existing item"));
-        assert!(new_target.contains("- [ ] `09:00` Move me"));
+        assert!(new_target.contains("- [ ] Move me"));
     }
 
     #[test]
@@ -270,6 +270,6 @@ mod tests {
         let chat = "#### 19 May\n- [ ] `09:00` Move me";
         let hash = chat_block_hash("- [ ] `09:00` Move me");
         let (_new_chat, new_target) = move_from_chat(chat, &hash, "");
-        assert!(new_target.contains("- [ ] `09:00` Move me"));
+        assert!(new_target.contains("- [ ] Move me"));
     }
 }
