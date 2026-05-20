@@ -343,8 +343,325 @@ impl OxiAgentTool for KnowledgeTool {
                 }
                 Ok(AgentToolResult::success(&output))
             }
+            // ── Checklist ─────────────────────────────────────────
+
+            "checklist_items" => {
+                let path = params["path"].as_str().unwrap_or("");
+                if path.is_empty() {
+                    return Ok(AgentToolResult::error("path is required for checklist_items"));
+                }
+                match api.checklist_items(path) {
+                    Ok((items, checked_map)) => {
+                        if items.is_empty() {
+                            return Ok(AgentToolResult::success("No checklist items found"));
+                        }
+                        let mut output = format!("Checklist items for '{}' ({}):\n\n", path, items.len());
+                        for item in &items {
+                            let status = checked_map.get(item).map(|b| if *b { "✅" } else { "⬜" }).unwrap_or("⬜");
+                            output.push_str(&format!("{} {}\n", status, item));
+                        }
+                        Ok(AgentToolResult::success(&output))
+                    }
+                    Err(e) => Ok(AgentToolResult::error(format!("Failed to get checklist items: {e}"))),
+                }
+            }
+
+            "checklist_add" => {
+                let path = params["path"].as_str().unwrap_or("");
+                let item = params["item"].as_str().unwrap_or("");
+                let checked = params["checked"].as_bool().unwrap_or(false);
+                if path.is_empty() {
+                    return Ok(AgentToolResult::error("path is required for checklist_add"));
+                }
+                if item.is_empty() {
+                    return Ok(AgentToolResult::error("item is required for checklist_add"));
+                }
+                match api.checklist_add(path, item, checked) {
+                    Ok(()) => Ok(AgentToolResult::success(format!(
+                        "Checklist item added to '{}'", path
+                    ))),
+                    Err(e) => Ok(AgentToolResult::error(format!("Failed to add checklist item: {e}"))),
+                }
+            }
+
+            "checklist_complete" => {
+                let path = params["path"].as_str().unwrap_or("");
+                let item_hash = params["item_hash"].as_str().unwrap_or("");
+                if path.is_empty() {
+                    return Ok(AgentToolResult::error("path is required for checklist_complete"));
+                }
+                if item_hash.is_empty() {
+                    return Ok(AgentToolResult::error("item_hash is required for checklist_complete"));
+                }
+                match api.checklist_complete(path, item_hash) {
+                    Ok(true) => Ok(AgentToolResult::success(format!(
+                        "Checklist item completed in '{}'", path
+                    ))),
+                    Ok(false) => Ok(AgentToolResult::error(format!(
+                        "Checklist item '{}' not found in '{}'", item_hash, path
+                    ))),
+                    Err(e) => Ok(AgentToolResult::error(format!("Failed to complete checklist item: {e}"))),
+                }
+            }
+
+            "checklist_remove" => {
+                let path = params["path"].as_str().unwrap_or("");
+                let item_or_hash = params["item_or_hash"].as_str().unwrap_or("");
+                if path.is_empty() {
+                    return Ok(AgentToolResult::error("path is required for checklist_remove"));
+                }
+                if item_or_hash.is_empty() {
+                    return Ok(AgentToolResult::error("item_or_hash is required for checklist_remove"));
+                }
+                match api.checklist_remove(path, item_or_hash) {
+                    Ok(true) => Ok(AgentToolResult::success(format!(
+                        "Checklist item removed from '{}'", path
+                    ))),
+                    Ok(false) => Ok(AgentToolResult::error(format!(
+                        "Checklist item '{}' not found in '{}'", item_or_hash, path
+                    ))),
+                    Err(e) => Ok(AgentToolResult::error(format!("Failed to remove checklist item: {e}"))),
+                }
+            }
+
+            // ── Chat ────────────────────────────────────────────────
+
+            "chat_append" => {
+                let message = params["message"].as_str().unwrap_or("");
+                if message.is_empty() {
+                    return Ok(AgentToolResult::error("message is required for chat_append"));
+                }
+                match api.chat_append(message) {
+                    Ok(()) => Ok(AgentToolResult::success("Message appended to chat")),
+                    Err(e) => Ok(AgentToolResult::error(format!("Failed to append chat message: {e}"))),
+                }
+            }
+
+            "chat_messages" => {
+                match api.chat_messages() {
+                    Ok(messages) => {
+                        if messages.is_empty() {
+                            return Ok(AgentToolResult::success("No chat messages found"));
+                        }
+                        let mut output = format!("Chat messages ({}):\n\n", messages.len());
+                        for (i, msg) in messages.iter().enumerate() {
+                            output.push_str(&format!("{}. {}\n", i + 1, msg));
+                        }
+                        Ok(AgentToolResult::success(&output))
+                    }
+                    Err(e) => Ok(AgentToolResult::error(format!("Failed to get chat messages: {e}"))),
+                }
+            }
+
+            "chat_delete" => {
+                let msg_hash = params["msg_hash"].as_str().unwrap_or("");
+                if msg_hash.is_empty() {
+                    return Ok(AgentToolResult::error("msg_hash is required for chat_delete"));
+                }
+                match api.chat_delete(msg_hash) {
+                    Ok(true) => Ok(AgentToolResult::success(format!(
+                        "Chat message '{}' deleted", msg_hash
+                    ))),
+                    Ok(false) => Ok(AgentToolResult::error(format!(
+                        "Chat message '{}' not found", msg_hash
+                    ))),
+                    Err(e) => Ok(AgentToolResult::error(format!("Failed to delete chat message: {e}"))),
+                }
+            }
+
+            "chat_move" => {
+                let msg_hash = params["msg_hash"].as_str().unwrap_or("");
+                let target_path = params["target_path"].as_str().unwrap_or("");
+                if msg_hash.is_empty() {
+                    return Ok(AgentToolResult::error("msg_hash is required for chat_move"));
+                }
+                if target_path.is_empty() {
+                    return Ok(AgentToolResult::error("target_path is required for chat_move"));
+                }
+                match api.chat_move_to(msg_hash, target_path) {
+                    Ok(true) => Ok(AgentToolResult::success(format!(
+                        "Chat message moved to '{}'", target_path
+                    ))),
+                    Ok(false) => Ok(AgentToolResult::error(format!(
+                        "Chat message '{}' not found", msg_hash
+                    ))),
+                    Err(e) => Ok(AgentToolResult::error(format!("Failed to move chat message: {e}"))),
+                }
+            }
+
+            // ── Journal ─────────────────────────────────────────────
+
+            "journal_add" => {
+                let record = params["record"].as_str().unwrap_or("");
+                if record.is_empty() {
+                    return Ok(AgentToolResult::error("record is required for journal_add"));
+                }
+                match api.journal_add_record(record) {
+                    Ok(()) => Ok(AgentToolResult::success("Journal record added")),
+                    Err(e) => Ok(AgentToolResult::error(format!("Failed to add journal record: {e}"))),
+                }
+            }
+
+            "journal_emoji" => {
+                let emoji = params["emoji"].as_str().unwrap_or("");
+                if emoji.is_empty() {
+                    return Ok(AgentToolResult::error("emoji is required for journal_emoji"));
+                }
+                match api.journal_add_emoji(emoji) {
+                    Ok(()) => Ok(AgentToolResult::success(format!("Journal emoji set to '{}'”, emoji))),
+                    Err(e) => Ok(AgentToolResult::error(format!("Failed to set journal emoji: {e}"))),
+                }
+            }
+
+            "journal_today" => {
+                let path = api.journal_today_path();
+                Ok(AgentToolResult::success(&path))
+            }
+
+            // ── Habits ──────────────────────────────────────────────
+
+            "habits" => {
+                let year = params["year"].as_i64().unwrap_or_else(|| {
+                    chrono::Local::now().year() as i64
+                }) as i32;
+                match api.habits(year) {
+                    Ok(habits) => {
+                        let json = serde_json::to_string_pretty(&habits)
+                            .unwrap_or_else(|_| "{}".to_string());
+                        Ok(AgentToolResult::success(&json))
+                    }
+                    Err(e) => Ok(AgentToolResult::error(format!("Failed to get habits: {e}"))),
+                }
+            }
+
+            "habits_last_week" => {
+                match api.habits_last_week() {
+                    Ok(habits) => {
+                        let json = serde_json::to_string_pretty(&habits)
+                            .unwrap_or_else(|_| "{}".to_string());
+                        Ok(AgentToolResult::success(&json))
+                    }
+                    Err(e) => Ok(AgentToolResult::error(format!("Failed to get last week habits: {e}"))),
+                }
+            }
+
+            // ── Stats ───────────────────────────────────────────────
+
+            "today_report" => {
+                match api.today_report() {
+                    Ok(report) => {
+                        let json = serde_json::to_string_pretty(&report)
+                            .unwrap_or_else(|_| "{}".to_string());
+                        Ok(AgentToolResult::success(&json))
+                    }
+                    Err(e) => Ok(AgentToolResult::error(format!("Failed to get today report: {e}"))),
+                }
+            }
+
+            "done_today" => {
+                match api.done_today() {
+                    Ok(entries) => {
+                        if entries.is_empty() {
+                            return Ok(AgentToolResult::success("No completed items today"));
+                        }
+                        let mut output = format!("Done today ({}):\n\n", entries.len());
+                        for entry in &entries {
+                            let kind = if entry.is_dir { "📁" } else { "📄" };
+                            output.push_str(&format!(
+                                "{} {} ({})\n",
+                                kind, entry.display_name, entry.name
+                            ));
+                        }
+                        Ok(AgentToolResult::success(&output))
+                    }
+                    Err(e) => Ok(AgentToolResult::error(format!("Failed to get done today: {e}"))),
+                }
+            }
+
+            // ── Config ──────────────────────────────────────────────
+
+            "config_read" => {
+                match api.config() {
+                    Ok(config) => {
+                        let json = serde_json::to_string_pretty(&config)
+                            .unwrap_or_else(|_| "{}".to_string());
+                        Ok(AgentToolResult::success(&json))
+                    }
+                    Err(e) => Ok(AgentToolResult::error(format!("Failed to read config: {e}"))),
+                }
+            }
+
+            "config_write" => {
+                let config_val = params.get("config").cloned().unwrap_or(json!({}));
+                match serde_json::from_value::<oxios_markdown::types::KnowledgeConfig>(config_val) {
+                    Ok(config) => {
+                        match api.set_config(&config) {
+                            Ok(()) => Ok(AgentToolResult::success("Config updated successfully")),
+                            Err(e) => Ok(AgentToolResult::error(format!("Failed to write config: {e}"))),
+                        }
+                    }
+                    Err(e) => Ok(AgentToolResult::error(format!("Invalid config object: {e}"))),
+                }
+            }
+
+            // ── Automation ──────────────────────────────────────────
+
+            "nightly_cleanup" => {
+                match api.run_nightly_cleanup() {
+                    Ok(report) => {
+                        let json = serde_json::to_string_pretty(&report)
+                            .unwrap_or_else(|_| "{}".to_string());
+                        Ok(AgentToolResult::success(&json))
+                    }
+                    Err(e) => Ok(AgentToolResult::error(format!("Failed to run nightly cleanup: {e}"))),
+                }
+            }
+
+            "run_scheduled" => {
+                match api.run_scheduled_tasks() {
+                    Ok(moved) => {
+                        if moved.is_empty() {
+                            Ok(AgentToolResult::success("No scheduled tasks due"))
+                        } else {
+                            let mut output = format!("Moved {} scheduled tasks to chat:\n\n", moved.len());
+                            for task in &moved {
+                                output.push_str(&format!("- {}\n", task));
+                            }
+                            Ok(AgentToolResult::success(&output))
+                        }
+                    }
+                    Err(e) => Ok(AgentToolResult::error(format!("Failed to run scheduled tasks: {e}"))),
+                }
+            }
+
+            // ── Utils ───────────────────────────────────────────────
+
+            "markdown_to_html" => {
+                let md = params["md"].as_str().unwrap_or("");
+                if md.is_empty() {
+                    return Ok(AgentToolResult::error("md is required for markdown_to_html"));
+                }
+                let html = api.markdown_to_html(md);
+                Ok(AgentToolResult::success(&html))
+            }
+
+            "auto_emoji" => {
+                let text = params["text"].as_str().unwrap_or("");
+                if text.is_empty() {
+                    return Ok(AgentToolResult::error("text is required for auto_emoji"));
+                }
+                let emoji = api.auto_emoji(text);
+                Ok(AgentToolResult::success(&emoji))
+            }
+
             _ => Ok(AgentToolResult::error(format!(
-                "Unknown action '{}'. Must be one of: read, write, delete, move, tree, search, backlinks",
+                "Unknown action '{}'. Must be one of: read, write, delete, move, tree, search, backlinks, \
+                 checklist_items, checklist_add, checklist_complete, checklist_remove, \
+                 chat_append, chat_messages, chat_delete, chat_move, \
+                 journal_add, journal_emoji, journal_today, \
+                 habits, habits_last_week, today_report, done_today, \
+                 config_read, config_write, nightly_cleanup, run_scheduled, \
+                 markdown_to_html, auto_emoji",
                 action
             ))),
         }
@@ -370,6 +687,6 @@ mod tests {
         let schema = tool.parameters_schema();
         assert!(schema["required"].is_array());
         let actions = schema["properties"]["action"]["enum"].as_array().unwrap();
-        assert_eq!(actions.len(), 7);
+        assert_eq!(actions.len(), 28);
     }
 }

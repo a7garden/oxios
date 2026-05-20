@@ -330,4 +330,31 @@ mod tests {
         assert_eq!(resp.status, STATUS_OK);
         assert!(engine.fs.exists(DIR_USER_ROOT, "new.md").unwrap());
     }
+
+    #[test]
+    fn test_sync_media_upload_and_read() {
+        let (engine, _t) = test_engine();
+        engine.fs.make_dir(DIR_MEDIA).unwrap();
+
+        // Binary data that is NOT valid UTF-8
+        let data: &[u8] = &[0x89, 0x50, 0x4E, 0x47, 0xFF, 0xD8, 0x00];
+
+        engine.sync_media_upload("photo.png", data).unwrap();
+
+        let read_back = engine.sync_media_read("photo.png").unwrap();
+        assert_eq!(read_back, data);
+    }
+
+    #[test]
+    fn test_sync_media_upload_skips_existing() {
+        let (engine, _t) = test_engine();
+        engine.fs.make_dir(DIR_MEDIA).unwrap();
+
+        engine.sync_media_upload("file.bin", b"original").unwrap();
+        // Uploading again should skip (no overwrite)
+        engine.sync_media_upload("file.bin", b"updated").unwrap();
+
+        let content = engine.sync_media_read("file.bin").unwrap();
+        assert_eq!(content, b"original");
+    }
 }
