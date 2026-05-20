@@ -148,13 +148,21 @@ pub struct GuidancePattern {
 
 /// Bridge between Oxios memory and external memory systems.
 ///
-/// Reads/writes MEMORY.md-style files and synchronizes with Oxios's
-/// structured MemoryManager.
+/// Bridges Oxios MemoryManager (agent session memory) and optional
+/// KnowledgeBase (markdown knowledge base) with external MEMORY.md
+/// files. Supports bidirectional sync with Claude Code and similar
+/// external tools.
+///
+/// **RFC-003: KnowledgeBase is the single source of truth for markdown.
+/// MemoryManager stores agent session memory. The bridge can sync from
+/// either source or both.**
 pub struct AutoMemoryBridge {
     /// Directory containing external memory files.
     auto_memory_dir: PathBuf,
-    /// Oxios memory manager.
+    /// Oxios memory manager (agent session memory).
     oxios_memory: std::sync::Arc<MemoryManager>,
+    /// Optional markdown knowledge base (global, not per-Space).
+    knowledge_base: Option<std::sync::Arc<oxios_markdown::KnowledgeBase>>,
 }
 
 impl AutoMemoryBridge {
@@ -167,7 +175,17 @@ impl AutoMemoryBridge {
         Self {
             auto_memory_dir,
             oxios_memory,
+            knowledge_base: None,
         }
+    }
+
+    /// Set the optional markdown knowledge base.
+    ///
+    /// When set, `export_knowledge_to_auto()` can read directly from
+    /// `.md` files instead of relying on MemoryManager entries.
+    pub fn with_knowledge_base(mut self, kb: std::sync::Arc<oxios_markdown::KnowledgeBase>) -> Self {
+        self.knowledge_base = Some(kb);
+        self
     }
 
     /// Import memories from external format into Oxios.
@@ -280,29 +298,72 @@ impl AutoMemoryBridge {
     }
 
     /// Export all knowledge memories from Oxios to external format.
+    ///
+    /// Reads from MemoryManager (primary) or falls back to KnowledgeBase
+    /// `.md` files when `knowledge_base` is set and MemoryManager has no
+    /// `MemoryType::Knowledge` entries.
     async fn export_knowledge_to_auto(&self) -> Result<ExportResult> {
+        // Try MemoryManager first (primary source)
         let entries = self
             .oxios_memory
             .list(MemoryType::Knowledge, 1000)
             .await
             .unwrap_or_default();
 
-        let patterns: Vec<GuidancePattern> = entries
-            .iter()
-            .map(|e| GuidancePattern {
-                id: e.id.clone(),
-                category: e
-                    .tags
-                    .first()
-                    .map(|t| InsightCategory::from_str_loose(t))
-                    .unwrap_or(InsightCategory::General),
-                description: e.content.clone(),
-                confidence: e.importance,
-                usage_count: e.access_count,
-            })
-            .collect();
+        if !entries.is_empty() {
+            let patterns: Vec<GuidancePattern> = entries
+                .iter()
+                .map(|e| GuidancePattern {
+                    id: e.id.clone(),
+                    category: e
+                        .tags
+                        .first()
+                        .map(|t| InsightCategory::from_str_loose(t))
+                        .unwrap_or(InsightCategory::General),
+                    description: e.content.clone(),
+                    confidence: e.importance,
+                    usage_count: e.access_count,
+                })
+                .collect();
+            return self.export_to_auto(&patterns).await;
+        }
 
-        self.export_to_auto(&patterns).await
+        // Fall back to KnowledgeBase .md files (RFC-003)
+        if let Some(kb) = &self.knowledge_base {
+            let entries = kb.index_all()?;
+            if entries > 0 {
+                let kb_root = kb.root();
+                let patterns = kb
+                    .note_tree("/")
+                    .unwrap_or_default()
+                    .into_iter()
+                    .filter(|e| !e.is_dir && e.name.ends_with(".md"))
+                    .map(|e| {
+                        let path = if e.parent_dir == "/" || e.parent_dir.is_empty() {
+                            e.name.clone()
+                        } else {
+                            format!("{}/{}", e.parent_dir, e.name)
+                        };
+                        let content = kb.note_read(&path).ok().flatten().unwrap_or_default();
+                        let headings = kb.extract_headings(&content);
+                        let tag = headings.first().map(|s| s.as_str()).unwrap_or("general");
+                        GuidancePattern {
+                            id: format!("note-{}", path.replace('/', "-").trim_end_matches(".md")),
+                            category: InsightCategory::from_str_loose(tag),
+                            description: content.chars().take(300).collect(),
+                            confidence: 0.6,
+                            usage_count: 0,
+                        }
+                    })
+                    .collect::<Vec<_>>();
+                if !patterns.is_empty() {
+                    return self.export_to_auto(&patterns).await;
+                }
+            }
+        }
+
+        // No entries from either source — export empty result
+        Ok(ExportResult::default())
     }
 }
 
@@ -594,6 +655,9 @@ mod tests {
         let store = Arc::new(crate::state_store::StateStore::new(dir.join("state")).unwrap());
         let memory = Arc::new(MemoryManager::new(store));
         AutoMemoryBridge::new(dir.join("auto"), memory)
+            .with_knowledge_base(Arc::new(
+                oxios_markdown::KnowledgeBase::new(dir.join("kb")).unwrap(),
+            ))
     }
 
     #[test]

@@ -145,7 +145,7 @@ oxios run --json --session "$SID" "follow-up"
 - **KernelBridge** (`tools/kernel_bridge.rs`) — Registers all kernel domain tools into an agent's `ToolRegistry` during agent build.
 - **ExecTool** (`tools/exec_tool.rs`) — Two modes: `shell` (bash -c, RBAC-enforced) and `structured` (binary allowlist + metacharacter blocking).
 - **Kernel tools** (`tools/kernel/`) — Space, Agent, Persona, Cron, Security, Budget, Resource, Knowledge tools. Each wraps a KernelHandle API domain.
-- **KernelHandle** (`kernel_handle/`) — Facade exposing 12 typed APIs: AgentApi, SpaceApi, SecurityApi, PersonaApi, ExecApi, BrowserApi, McpApi, ExtensionApi, InfraApi, A2aApi, StateApi, KnowledgeApi. Internally uses `CredentialStore` (`credential.rs`) for multi-source key resolution.
+- **KernelHandle** (`kernel_handle/`) — Facade exposing 13 typed APIs: AgentApi, SpaceApi, SecurityApi, PersonaApi, ExecApi, BrowserApi, McpApi, ExtensionApi, InfraApi, A2aApi, StateApi, KnowledgeApi, KnowledgeLens. Internally uses `CredentialStore` (`credential.rs`) for multi-source key resolution.
 - **AccessManager** (`access_manager/`) — OWASP-inspired least-privilege. RBAC, path sandboxing, audit logging.
 - **AuditTrail** (`audit_trail.rs`) — Merkle-chain style tamper-evident audit log. Each entry cryptographically linked.
 - **Memory** (`memory/`) — Vector store with hyperbolic embeddings, HNSW indexing, flash attention, reasoning bank, Sona learning engine, RVF store.
@@ -154,7 +154,7 @@ oxios run --json --session "$SID" "follow-up"
 - **Workers** (`workers/`) — Background worker pool for async task processing.
 - **WasmSandbox** (`wasm_sandbox.rs`) — WASM-based sandbox for executing untrusted code.
 - **Onboarding** (`onboarding.rs`) — Interactive setup wizard triggered on first run.
-- **Space** (`space/`) — Directory: `manager.rs` (CRUD), `conversation_buffer.rs`, `knowledge_bridge.rs` (auto-knowledge extraction), `detection.rs` (intent classification).
+- **Space** (`space/`) — Directory: `manager.rs` (CRUD), `conversation_buffer.rs`, `space_bridge.rs` (cross-Space memory transfer), `detection.rs` (intent classification). Note: `knowledge_bridge.rs` was renamed to `space_bridge.rs` (RFC-003).
 - **Telemetry** (`telemetry_otel.rs` / `telemetry_stub.rs`) — OpenTelemetry integration with compile-time feature toggle to stub.
 - **ResourceMonitor** (`resource_monitor.rs`) — System resource tracking for agent budget enforcement.
 - **Kernel** (`src/kernel.rs`) — `Kernel::builder().build().await` assembles all components. `execute_prompt_with_session()` for CLI execution.
@@ -197,7 +197,7 @@ impl AgentTool for MyTool {
 | `docs/ARCHITECTURE.md` | Before modifying kernel structure or adding modules |
 | `docs/channel-plugin-guide.md` | Before adding a new channel (Web, Telegram, etc.) |
 | `docs/channel-registry.md` | Before registering a new channel |
-| `docs/rfc-001-kernel-facade.md` | Before modifying KernelHandle or tool APIs |
+| `docs/rfc-003-knowledge-separation.md` | Before modifying knowledge/memory architecture |
 | `docs/rfc-002-kernel-module-organization.md` | Before reorganizing kernel modules |
 | `docs/refactoring-design.md` | Before large-scale refactoring |
 | `docs/program-development.md` | Before creating or modifying programs |
@@ -246,9 +246,10 @@ The Knowledge UI is a full-screen app-within-app (`fixed inset-0 z-30`) built in
 
 ### Backend
 
-- **Route registration**: `channels/oxios-web/src/routes/knowledge_routes.rs` — all 29 Axum handlers
-- **API facade**: `crates/oxios-kernel/src/kernel_handle/knowledge_api.rs` — wraps `oxios-markdown`
-- **Core crate**: `crates/oxios-markdown/` — VirtualFs, BacklinkIndex, chat, journal, checklist, habits, stats
+- **Route registration**: `channels/oxios-web/src/routes/knowledge_routes.rs` — all Axum handlers
+- **KnowledgeBase** (direct): `crates/oxios-markdown/src/knowledge.rs` — web uses `state.knowledge` (KnowledgeBase) directly, bypassing the kernel. No AI engine dependency at the web layer.
+- **KnowledgeApi** (kernel): `crates/oxios-kernel/src/kernel_handle/knowledge_api.rs` — thin wrapper around VirtualFs + BacklinkIndex + AI copilot. Used by CLI, Telegram, and agent tools.
+- **KnowledgeLens** (`kernel_handle/knowledge_lens.rs`) — Semantic HNSW overlay. Subscribes to KnowledgeBase `on_file_change` callbacks to keep agent memory index in sync.
 
 ### Key Design Decisions
 
@@ -259,7 +260,7 @@ The Knowledge UI is a full-screen app-within-app (`fixed inset-0 z-30`) built in
 | **HyperMD (CM5)** | Matches files.md; heavier than CM6 but simpler migration path |
 | **Bundle splitting** | TanStack Router autoCodeSplitting puts HyperMD (447KB) in its own chunk, loaded only on `/knowledge/` |
 | **No iframes** | All components written in React; no static HTML embedding |
-| **Rust business logic** | All smarts in oxios-markdown; React is purely a UI layer |
+| **Web bypasses kernel for knowledge** | `state.knowledge` (KnowledgeBase) is created directly in plugin.rs. Web channel doesn't need AI engine for basic CRUD.
 
 
 ### Keyboard Shortcuts
@@ -312,3 +313,4 @@ cd channels/oxios-web/web && bun dev
 - **CI oxi checkout**: CI checks out `a7garden/oxi` at `v0.4.4` alongside oxios. If tests fail with oxi-related errors, check that the oxi ref matches.
 - **Feature gates**: Web, CLI, Telegram are feature-gated. Browser is enabled by default (default feature). If a channel doesn't compile, check `cargo build -p oxios --features <feature>`.
 - **Tool registration**: All kernel tools must be registered in `tools/kernel_bridge.rs::register_all_kernel_tools()`. Don't add tools directly to `registration.rs` for kernel operations.
+- **Two knowledge storage systems**: Agent session memory is in MemoryManager (JSON per Space). User's markdown knowledge is in KnowledgeBase (`.md` files, global `~/.oxios/knowledge/`). Don't confuse the two — see `docs/rfc-003-knowledge-separation.md`.
