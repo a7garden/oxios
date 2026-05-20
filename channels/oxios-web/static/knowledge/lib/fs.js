@@ -1,6 +1,105 @@
 // Forbidden chars on Windows / PWA / Unix.
 const FORBIDDEN_FILENAME_CHARS = ['<', '>', ':', '"', '|', '\\', '?', '*', '\x00', '/'];
 
+// Oxios: REST API base path for knowledge operations.
+const OXIOS_KNOWLEDGE_API = '/api/knowledge';
+
+// Oxios: REST API implementations for knowledge file operations.
+// These replace the File System Access API calls when running inside Oxios.
+
+async function oxiosRead(path) {
+    const relPath = path.replace(/^\/+/, ''); // "/brain/Rust.md" -> "brain/Rust.md"
+    const resp = await fetch(`${OXIOS_KNOWLEDGE_API}/file/${encodeURIComponent(relPath)}`, {
+        method: 'GET',
+        credentials: 'include',
+        headers: { 'Accept': 'text/plain' }
+    });
+    if (resp.status === 404) throw new Error('File not found: ' + relPath);
+    if (!resp.ok) throw new Error('Read error: ' + resp.status + ' ' + resp.statusText);
+    return await resp.text();
+}
+
+async function oxiosWrite(path, content) {
+    const relPath = path.replace(/^\/+/, '');
+    const resp = await fetch(`${OXIOS_KNOWLEDGE_API}/file/${encodeURIComponent(relPath)}`, {
+        method: 'PUT',
+        credentials: 'include',
+        headers: { 'Content-Type': 'text/plain' },
+        body: content
+    });
+    if (!resp.ok) {
+        const errText = await resp.text().catch(() => '');
+        throw new Error('Write error: ' + resp.status + ' ' + resp.statusText + ' ' + errText);
+    }
+}
+
+async function oxiosRemove(path) {
+    const relPath = path.replace(/^\/+/, '');
+    const resp = await fetch(`${OXIOS_KNOWLEDGE_API}/file/${encodeURIComponent(relPath)}`, {
+        method: 'DELETE',
+        credentials: 'include'
+    });
+    if (!resp.ok && resp.status !== 404) {
+        const errText = await resp.text().catch(() => '');
+        throw new Error('Delete error: ' + resp.status + ' ' + errText);
+    }
+}
+
+async function oxiosExists(path) {
+    const relPath = path.replace(/^\/+/, '');
+    try {
+        const resp = await fetch(`${OXIOS_KNOWLEDGE_API}/file/${encodeURIComponent(relPath)}`, {
+            method: 'HEAD',
+            credentials: 'include'
+        });
+        return resp.ok;
+    } catch {
+        return false;
+    }
+}
+
+async function oxiosGetTree(dir = '') {
+    let url = `${OXIOS_KNOWLEDGE_API}/tree`;
+    if (dir) url += `?dir=${encodeURIComponent(dir)}`;
+    try {
+        const resp = await fetch(url, {
+            credentials: 'include',
+            headers: { 'Accept': 'application/json' }
+        });
+        if (!resp.ok) return [];
+        return await resp.json();
+    } catch {
+        return [];
+    }
+}
+
+async function oxiosWriteAtEnd(path, content) {
+    const relPath = path.replace(/^\/+/, '');
+    let existing = '';
+    try {
+        const resp = await fetch(`${OXIOS_KNOWLEDGE_API}/file/${encodeURIComponent(relPath)}`, {
+            method: 'GET',
+            credentials: 'include',
+            headers: { 'Accept': 'text/plain' }
+        });
+        if (resp.ok) existing = await resp.text();
+    } catch {
+        // File doesn't exist yet, start empty
+    }
+    const updated = existing + content;
+    await oxiosWrite(relPath, updated);
+}
+
+// Oxios: Flag that is set from app.js. When true, all file operations
+// go through the REST API instead of File System Access API.
+let oxiosMode = false;
+
+// Oxios: Enable Oxios REST API mode. Call this from app.js init().
+function enableOxiosMode() {
+    oxiosMode = true;
+    log('Oxios mode: REST API file operations enabled');
+}
+
 function sanitizeFilename(filename) {
     return FORBIDDEN_FILENAME_CHARS.reduce((result, ch) => result.replaceAll(ch, ''), filename);
 }
@@ -13,6 +112,12 @@ function findForbiddenChar(name) {
 }
 
 async function getFileHandle(path, create = false) {
+    if (oxiosMode) {
+        // In Oxios mode, we don't use File System Access handles.
+        // The REST API is used instead. Return a mock object for compatibility.
+        return { oxiosPath: path };
+    }
+
     let dir, filename;
     if (path.includes('/')) {
         const parts = path.split('/');
@@ -46,13 +151,14 @@ async function getFileHandle(path, create = false) {
 }
 
 async function read(path) {
-    let fileHandle = await getFileHandle(path)
+    if (oxiosMode) return oxiosRead(path);
+    let fileHandle = await getFileHandle(path);
     let file = await fileHandle.getFile();
-
     return await file.text();
 }
 
 async function write(path, content) {
+    if (oxiosMode) return oxiosWrite(path, content);
     let fileHandle = await getFileHandle(path, true);
     const writable = await fileHandle.createWritable();
     await writable.write(content);
@@ -60,6 +166,7 @@ async function write(path, content) {
 }
 
 async function writeAtEnd(path, content) {
+    if (oxiosMode) return oxiosWriteAtEnd(path, content);
     let fileHandle = await getFileHandle(path, true);
     if (fileHandle === null) {
         // TODO fix once Chromium fixes the bug
@@ -78,6 +185,11 @@ async function writeAtEnd(path, content) {
 // TODO save metadata & files
 // Write only if content is different.
 async function writeIfContentIsDifferent(path, content) {
+    if (oxiosMode) {
+        // Oxios: always write through REST API
+        await oxiosWrite(path, content);
+        return Date.now();
+    }
     let fileHandle = await getFileHandle(path, true);
     if (fileHandle === null) {
         // TODO fix once Chromium fixes the bug
@@ -101,6 +213,7 @@ async function writeIfContentIsDifferent(path, content) {
 
 // Works only for files.
 async function exists(path) {
+    if (oxiosMode) return oxiosExists(path);
     try {
         await getFileHandle(path);
         return true;
@@ -113,6 +226,7 @@ async function exists(path) {
 }
 
 async function remove(path) {
+    if (oxiosMode) return oxiosRemove(path);
     let fileHandle = await getFileHandle(path);
     if (fileHandle === null) {
         // TODO fix once Chromium fixes the bug
@@ -126,6 +240,13 @@ async function remove(path) {
 }
 
 async function rename(oldpath, newpath) {
+    if (oxiosMode) {
+        // Oxios: read via REST, write via REST, then delete
+        const content = await oxiosRead(oldpath);
+        await oxiosWrite(newpath, content);
+        await oxiosRemove(oldpath);
+        return;
+    }
     let content = await read(oldpath)
     await write(newpath, content)
     await remove(oldpath)
@@ -147,15 +268,17 @@ async function removeDir(dirPath) {
     const parts = trimPrefix(dirPath, '/').split('/').filter(Boolean);
     const dirName = parts.pop();
 
-    const rootHandle = await getRootDirHandle();
-    let parentHandle = rootHandle;
-    for (const seg of parts) {
-        parentHandle = await parentHandle.getDirectoryHandle(seg);
-    }
-    try {
-        await parentHandle.removeEntry(dirName, { recursive: true });
-    } catch (err) {
-        logError('removeDir: removeEntry failed', dirPath, err);
+    if (!oxiosMode) {
+        const rootHandle = await getRootDirHandle();
+        let parentHandle = rootHandle;
+        for (const seg of parts) {
+            parentHandle = await parentHandle.getDirectoryHandle(seg);
+        }
+        try {
+            await parentHandle.removeEntry(dirName, { recursive: true });
+        } catch (err) {
+            logError('removeDir: removeEntry failed', dirPath, err);
+        }
     }
 
     removeMemDir(dirPath);
@@ -197,17 +320,19 @@ async function moveDir(oldDirPath, newDirPath) {
         return;
     }
 
-    const oldParts = trimPrefix(oldDirPath, '/').split('/').filter(Boolean);
-    const oldDirName = oldParts.pop();
-    const rootHandle = await getRootDirHandle();
-    let oldParentHandle = rootHandle;
-    for (const seg of oldParts) {
-        oldParentHandle = await oldParentHandle.getDirectoryHandle(seg);
-    }
-    try {
-        await oldParentHandle.removeEntry(oldDirName, { recursive: true });
-    } catch (err) {
-        logError('moveDir: removeEntry old dir failed', oldDirPath, err);
+    if (!oxiosMode) {
+        const oldParts = trimPrefix(oldDirPath, '/').split('/').filter(Boolean);
+        const oldDirName = oldParts.pop();
+        const rootHandle = await getRootDirHandle();
+        let oldParentHandle = rootHandle;
+        for (const seg of oldParts) {
+            oldParentHandle = await oldParentHandle.getDirectoryHandle(seg);
+        }
+        try {
+            await oldParentHandle.removeEntry(oldDirName, { recursive: true });
+        } catch (err) {
+            logError('moveDir: removeEntry old dir failed', oldDirPath, err);
+        }
     }
 
     removeMemDir(oldDirPath);
@@ -250,6 +375,11 @@ function removeMemDir(dirPath) {
 }
 
 async function mkdir(path) {
+    if (oxiosMode) {
+        // In Oxios mode, directories are created automatically on write.
+        // No explicit mkdir needed for the REST API.
+        return;
+    }
     try {
         let currentDirHandle = await getRootDirHandle();
         await currentDirHandle.getDirectoryHandle(path, {create: true});
@@ -272,6 +402,19 @@ async function mkdirAll(path) {
 // createDir creates an empty directory on OPFS at the given path and registers
 // it in the in-memory file tree so the sidebar picks it up.
 async function createDir(dirPath) {
+    if (oxiosMode) {
+        // Oxios: directories are created automatically on file write.
+        // Still register in the in-memory file tree.
+        let cur = files;
+        const parts = trimPrefix(dirPath, '/').split('/').filter(Boolean);
+        for (const seg of parts) {
+            const key = seg + '/';
+            if (!cur[key]) cur[key] = {};
+            cur = cur[key];
+        }
+        log(`Dir ${dirPath} created (in-memory).`);
+        return;
+    }
     const parts = trimPrefix(dirPath, '/').split('/').filter(Boolean);
     if (parts.length === 0) return;
 
@@ -290,6 +433,11 @@ async function createDir(dirPath) {
 }
 
 async function writeMediaFile(fileName, file) {
+    if (oxiosMode) {
+        // Phase 1: media upload not implemented for Oxios REST API.
+        log('Oxios: media upload via REST API not implemented yet');
+        return null;
+    }
     try {
         const rootHandle = await getRootDirHandle();
 

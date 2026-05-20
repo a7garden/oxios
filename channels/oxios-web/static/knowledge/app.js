@@ -36,32 +36,15 @@ async function init() {
     // If running inside Oxios web channel, mark server as ready immediately.
     markServerOk();
 
-    const savedDirHandle = await getSavedRootDirHandle();
-    const hasSavedLocalDir = savedDirHandle instanceof FileSystemDirectoryHandle;
-    if (hasSavedLocalDir) {
-        isMemFS = false;
-        document.getElementById('open-folder').style.display = 'none';
-    } else {
-        document.getElementById('open-folder').style.display = 'flex';
-        isMemFS = true;
-    }
+    // Oxios: Enable REST API mode for all file operations.
+    enableOxiosMode();
+    isMemFS = true; // Oxios always uses in-memory file tree with REST API backend
 
-    // Alert if there's no "Allow on every visit" check.
-    if (isChrome() && hasSavedLocalDir) {
-        const permission = await (await getRootDirHandle()).queryPermission({ mode: 'readwrite' });
-        log('PERMISSION', permission);
-        if (permission !== 'granted') {
-            document.getElementById('open-folder').style.display = 'flex';
-            // TODO maybe ask user to check "Allow on every visit" on left part of the sidebar
-            await removeSavedRootDirHandle();
-            alert('Can\'t access folder.\n\nPlease, reopen the folder again and check "Allow on every visit" checkbox');
-        }
-    }
-
-    let rootDirHandle = await getRootDirHandle();
+    // Oxios: Skip local folder picker — files are loaded from REST API
+    document.getElementById('open-folder').style.display = 'none';
 
     let perf = performance.now();
-    files = await loadLocalFiles(rootDirHandle);
+    files = await loadLocalFiles(null); // rootDirHandle is null in Oxios mode
     log(`Files loaded in ${performance.now() - perf}ms`);
 
     initChat();

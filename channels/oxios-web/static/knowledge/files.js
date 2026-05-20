@@ -62,15 +62,60 @@ const SUPPORTED_EXTENSIONS = ['md', 'png', 'jpg', 'jpeg', 'webp', 'gif',];
 const SYSTEM_DIRS = ['media', 'archive', 'journal', 'habits', 'triggers', 'insights'];
 const CONFIG_PATH = '/config.json';
 
+// Oxios: Load file tree from the REST API instead of File System Access API.
+async function loadTreeFromAPI() {
+    let tree = {};
+
+    async function loadDir(entries, dirPath) {
+        let current = tree;
+        if (dirPath && dirPath !== '/') {
+            let parts = dirPath.split('/').filter(Boolean);
+            for (let part of parts) {
+                let key = part + '/';
+                if (!current[key]) current[key] = {};
+                current = current[key];
+            }
+        }
+
+        for (let entry of entries) {
+            if (entry.is_dir) {
+                let key = entry.name + '/';
+                current[key] = {};
+                let subEntries = await oxiosGetTree(entry.name);
+                await loadDir(subEntries, (dirPath || '/') + entry.name + '/');
+            } else {
+                let ext = entry.name.split('.').pop().toLowerCase();
+                let supported = ['md', 'png', 'jpg', 'jpeg', 'webp', 'gif'].includes(ext);
+                let isConfig = entry.name === 'config.json';
+                if (supported || isConfig) {
+                    current[entry.name] = {
+                        isFile: true,
+                        path: (dirPath || '/') + entry.name,
+                        // Content loaded on-demand when file is opened
+                    };
+                }
+            }
+        }
+    }
+
+    let rootEntries = await oxiosGetTree('');
+    await loadDir(rootEntries, '/');
+    return tree;
+}
+
 async function loadLocalFiles(rootDirHandle, slowMode = false) {
     if (isLoadingLocalFiles) {
         return;
     }
     isLoadingLocalFiles = true;
 
-    // TODO should we wait for editor2 as well?
-    // What if "isClean" is changed mid-through? We have awaits.
-    // Better check per/file right before loading?
+    // Oxios: load file tree from REST API
+    if (oxiosMode) {
+        let newFiles = await loadTreeFromAPI();
+        isLoadingLocalFiles = false;
+        return newFiles;
+    }
+
     while (!editor.isClean()) {
         await new Promise(r => setTimeout(r, 50));
     }
@@ -845,7 +890,16 @@ async function openFile(path, saveToHistory = true, el = 'editor-textarea') {
         let filename = toFilename(path);
         const header = toHeader(filename)
         let content = '';
-        if (memFile.handle !== undefined) {
+        if (oxiosMode) {
+            // Oxios: load file content from REST API
+            try {
+                content = await read(path);
+            } catch (err) {
+                logError('openFile: failed to load from API:', err);
+                isMessingWithCurrentEditor = false;
+                return;
+            }
+        } else if (memFile.handle !== undefined) {
             const file = await memFile.handle.getFile();
             content = await file.text();
             content = `${header}\n${content}`;
@@ -1140,27 +1194,23 @@ async function syncCurrentText(switchAwayEditor = false) {
         try {
             // const file = files[dir][filename];
             const file = getMemFile(path);
-            if (file && file.handle) {
-                const freshContent = getCurrentContent();
-                if (!currentEditor.isClean() && contentWasModifiedLocally) {
-                    // Changes from both sides: editor and local fs, need merging
+            const freshContent = getCurrentContent();
+            if (!currentEditor.isClean() && contentWasModifiedLocally) {
+                // Changes from both sides: editor and local fs, need merging
+            }
+            // We need to atomically reset the flag once we captured a snapshot of particular version of the content.
+            currentEditor.markClean();
 
-                }
-                // We need to atomically reset the flag once we captured a snapshot of particular version of the content.
-                // This flag can be changed in the event loop, as a result of user making changes to the text in the middle
-                // of our saving process. The new unsaved changes would be then handled by a subsequent saveCurrentFile() call.
-                // Initially, this flag assignment was erroneously placed at the end of the function, resulting in a race condition.
-                // If we override flag in the end, we would lose any changes that occurred during the 3 await calls.
-                currentEditor.markClean();
-
+            if (oxiosMode) {
+                // Oxios: save via REST API
+                await write(path, freshContent);
+            } else if (file && file.handle) {
                 const writable = await file.handle.createWritable();
                 await writable.write(freshContent);
-                // Buffer is flushed on disk at this moment. It could be interrupted
-                // by the event loop, so we use isSaving guard.
                 await writable.close();
             } else {
                 // When could that happen?
-                if (file.handle) {
+                if (file && file.handle) {
                     logError(`Cannot save ${path}. No file handle found.`);
                 }
             }
