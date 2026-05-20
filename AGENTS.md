@@ -7,7 +7,7 @@
 
 Oxios is an **Agent Operating System** in Rust. It's an OS where AI agents execute real work on behalf of users — fork, exec, wait, kill, just like Unix processes.
 
-**Stack:** Rust 2021, tokio async, serde (JSON+TOML), oxi-sdk + oxi-ai (crates.io). ~56K lines across 184 source files.
+**Stack:** Rust 2021, tokio async, serde (JSON+TOML), oxi-sdk + oxi-ai (crates.io). ~61K lines across 190 source files.
 
 ```
 User → Channel (Web/CLI/Telegram) → Gateway → Kernel (supervisor + scheduler + ouroboros + agent_runtime)
@@ -17,8 +17,11 @@ User → Channel (Web/CLI/Telegram) → Gateway → Kernel (supervisor + schedul
 oxios/                     # Main binary (src/main.rs, src/kernel.rs, src/cmd_run.rs)
 ├── crates/
 │   ├── oxios-kernel/      # Core: supervisor, scheduler, event bus, state store, tools, memory
+│   ├── oxios-markdown/    # Markdown knowledge base: VirtualFs, BacklinkIndex, link graph
 │   ├── oxios-ouroboros/   # Spec-first protocol (interview → seed → execute → evaluate → evolve)
 │   └── oxios-gateway/     # Channel-agnostic message hub
+├── benchmarks/
+│   └── oxios-bench/       # Performance benchmarking suite
 ├── channels/
 │   ├── oxios-web/         # Web dashboard (Axum backend + React frontend)
 │   ├── oxios-cli/         # CLI channel
@@ -33,6 +36,7 @@ oxios/                     # Main binary (src/main.rs, src/kernel.rs, src/cmd_ru
 oxios → oxios-kernel → oxi-sdk (crates.io, NOT path dep)
                     → oxi-ai (provider construction)
                     → oxios-ouroboros
+                    → oxios-markdown (knowledge base)
       → oxios-gateway
       → oxios-web/oxios-cli/oxios-telegram (channel plugins, feature-gated)
 ```
@@ -43,9 +47,9 @@ oxios → oxios-kernel → oxi-sdk (crates.io, NOT path dep)
 | Fact | Value |
 |------|-------|
 | **Language** | Rust 2021 |
-| **Version** | 0.1.2 |
+| **Version** | 0.1.3 |
 | **License** | MIT |
-| **CI** | GitHub Actions (macOS-latest, fmt+clippy+test+audit) |
+| **CI** | GitHub Actions (macOS + Linux, fmt+clippy+test+audit) |
 | **Build** | `cargo build` |
 | **Test** | `cargo test --workspace` |
 
@@ -140,8 +144,8 @@ oxios run --json --session "$SID" "follow-up"
 - **OxiosEngine** (`engine.rs`) — Thin wrapper around `oxi_sdk::Oxi`. Provider/model resolution via `OxiBuilder`. Uses `oxi_ai` for provider construction.
 - **KernelBridge** (`tools/kernel_bridge.rs`) — Registers all kernel domain tools into an agent's `ToolRegistry` during agent build.
 - **ExecTool** (`tools/exec_tool.rs`) — Two modes: `shell` (bash -c, RBAC-enforced) and `structured` (binary allowlist + metacharacter blocking).
-- **Kernel tools** (`tools/kernel/`) — Space, Agent, Persona, Cron, Security, Budget, Resource tools. Each wraps a KernelHandle API domain.
-- **KernelHandle** (`kernel_handle/`) — Facade exposing 12 typed APIs: AgentApi, SpaceApi, SecurityApi, PersonaApi, ExecApi, BrowserApi, McpApi, ExtensionApi, InfraApi, A2aApi, StateApi (+ CredentialApi via `credential.rs`).
+- **Kernel tools** (`tools/kernel/`) — Space, Agent, Persona, Cron, Security, Budget, Resource, Knowledge tools. Each wraps a KernelHandle API domain.
+- **KernelHandle** (`kernel_handle/`) — Facade exposing 12 typed APIs: AgentApi, SpaceApi, SecurityApi, PersonaApi, ExecApi, BrowserApi, McpApi, ExtensionApi, InfraApi, A2aApi, StateApi, KnowledgeApi. Internally uses `CredentialStore` (`credential.rs`) for multi-source key resolution.
 - **AccessManager** (`access_manager/`) — OWASP-inspired least-privilege. RBAC, path sandboxing, audit logging.
 - **AuditTrail** (`audit_trail.rs`) — Merkle-chain style tamper-evident audit log. Each entry cryptographically linked.
 - **Memory** (`memory/`) — Vector store with hyperbolic embeddings, HNSW indexing, flash attention, reasoning bank, Sona learning engine, RVF store.
@@ -158,7 +162,7 @@ oxios run --json --session "$SID" "follow-up"
 - **Capability** (`capability/`) — Template-based capability resolution for agent tool discovery.
 - **A2A** (`a2a.rs`) — Google's agent-to-agent protocol. Horizontal agent communication.
 - **CircuitBreaker** (`circuit_breaker.rs`) — 3-state (Closed→Open→Half-Open) protection against cascading LLM provider failures.
-- **CredentialStore** (`credential.rs`) — Multi-source credential resolution: config.toml → oxi auth.json → env var.
+- **CredentialStore** (`credential.rs`) — Multi-source credential resolution: env var → config.toml → oxi auth.json.
 - **Daemon** (`daemon.rs`) — PID file management, start/stop, system service install (launchd/systemd).
 - **GitLayer** (`git_layer.rs`) — In-process version control via `gix`. Commits, logs, tags, restore.
 - **CronScheduler** (`cron.rs`) — Scheduled job execution with persistent state.
