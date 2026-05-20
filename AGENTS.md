@@ -204,6 +204,104 @@ impl AgentTool for MyTool {
 | `docs/USER-GUIDE.md` | Before changing user-facing features or CLI behavior |
 | `share/default-config.toml` | Before changing configuration options |
 
+## Knowledge UI
+
+The Knowledge UI is a full-screen app-within-app (`fixed inset-0 z-30`) built into the oxios-web dashboard. It provides a files.md-style markdown note-taking experience backed by `oxios-markdown`.
+
+### Architecture
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│  channels/oxios-web/web/src/                                 │
+│                                                              │
+│  routes/knowledge/index.tsx     → /knowledge/                  │
+│    └── components/knowledge/                                  │
+│        ├── knowledge-layout.tsx  ← Zustand store + shortcuts  │
+│        ├── knowledge-sidebar.tsx  ← File tree + chat/journal   │
+│        ├── file-tree.tsx         ← Recursive tree             │
+│        ├── editor-panel.tsx      ← Editor + toolbar           │
+│        ├── markdown-editor.tsx   ← HyperMD (CM5) editor       │
+│        ├── split-editor.tsx      ← Second pane               │
+│        ├── editor-toolbar.tsx     ← Back/forward/split/close  │
+│        ├── knowledge-chat.tsx     ← Quick notes (Chat.md)      │
+│        ├── search-modal.tsx       ← ⌘K global search           │
+│        ├── move-modal.tsx         ← ⌘M file mover              │
+│        ├── info-panel.tsx         ← Backlinks/Copilot/Graph   │
+│        ├── copilot.tsx            ← AI copilot panel           │
+│        ├── link-graph.tsx         ← SVG graph viz             │
+│        ├── habits.tsx             ← Year grid tracker         │
+│        ├── today-stats.tsx        ← Daily completion card     │
+│        └── knowledge-settings.tsx  ← Config editor             │
+│                                                              │
+│  hooks/use-knowledge.ts       ← 29 TanStack Query API hooks   │
+│  hooks/use-knowledge-shortcuts.ts  ← Global ⌘N/D/Enter/⌘W   │
+│  stores/knowledge.ts         ← Zustand (mode, path, history)  │
+│  lib/hypermd-setup.ts        ← CM5 + HyperMD side-effect init │
+│  lib/autocomplete-link.ts    ← `[` link hint function          │
+│  types/knowledge.ts          ← Full TypeScript type surface   │
+│  types/hypermd.d.ts          ← CM5/HyperMD type declarations  │
+└──────────────────────────────────────────────────────────────┘
+
+```
+
+### Backend
+
+- **Route registration**: `channels/oxios-web/src/routes/knowledge_routes.rs` — all 29 Axum handlers
+- **API facade**: `crates/oxios-kernel/src/kernel_handle/knowledge_api.rs` — wraps `oxios-markdown`
+- **Core crate**: `crates/oxios-markdown/` — VirtualFs, BacklinkIndex, chat, journal, checklist, habits, stats
+
+### Key Design Decisions
+
+| Decision | Rationale |
+|----------|-----------|
+| **Fixed overlay** (`z-30`) | Escapes AppLayout sidebar/header/padding for full-screen experience |
+| **State-based SPA** | File navigation via Zustand, not URL routes (graph/habits/settings get their own routes) |
+| **HyperMD (CM5)** | Matches files.md; heavier than CM6 but simpler migration path |
+| **Bundle splitting** | TanStack Router autoCodeSplitting puts HyperMD (447KB) in its own chunk, loaded only on `/knowledge/` |
+| **No iframes** | All components written in React; no static HTML embedding |
+| **Rust business logic** | All smarts in oxios-markdown; React is purely a UI layer |
+
+
+### Keyboard Shortcuts
+
+| Shortcut | Action |
+|----------|--------|
+| `⌘K` / `⌘P` | Open search modal |
+| `⌘M` | Open move file modal |
+| `⌘N` | New file |
+| `⌘⇧N` | New folder |
+| `⌘D` | Delete current file |
+| `⌘S` | Manual save |
+| `⌘W` | Close split editor |
+| `⌘Enter` | Open chat |
+| `⌘B` / `⌘I` | Bold / Italic |
+| `⌘Y` | Insert checkmark |
+| `⌘~` | Toggle sidebar |
+| `Escape` | Close split |
+| `jj` (in chat) | Route to journal |
+| `Enter` (in chat) | Send message |
+
+### Adding a New Component
+
+1. Create in `components/knowledge/`
+2. Import store actions from `@/stores/knowledge`
+3. Use API hooks from `@/hooks/use-knowledge`
+4. For a new API route: add it to `knowledge_routes.rs`, then add a hook in `use-knowledge.ts`, then add types in `types/knowledge.ts`
+5. If the component needs a page route (like `/knowledge/habits`), add a file in `routes/knowledge/`
+
+
+### Testing
+
+```bash
+# Backend must be running (port 3000)
+cargo run --bin oxios -- --foreground
+
+# Frontend dev server
+cd channels/oxios-web/web && bun dev
+
+# Open http://localhost:5173/knowledge/
+```
+
 ## Pitfalls
 
 - **Workspace deps**: If `cargo build` fails with missing `oxi-sdk`, ensure it's in `[workspace.dependencies]` in root `Cargo.toml` AND `[dependencies]` in the crate using it. The project depends on `oxi-sdk` (not separate `oxi-ai`/`oxi-agent`).
