@@ -1,5 +1,6 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { ArrowLeft, ArrowRight, Columns2, PanelRight, Save, X } from 'lucide-react'
+import { useRouterState } from '@tanstack/react-router'
 import { useKnowledgeStore } from '@/stores/knowledge'
 import { Button } from '@/components/ui/button'
 import { Tooltip } from '@/components/ui/tooltip'
@@ -26,9 +27,14 @@ export function EditorToolbar() {
     document.dispatchEvent(new CustomEvent('knowledge:save'))
   }
 
-  // ⌘S keyboard shortcut for manual save
+  // ⌘S keyboard shortcut — only on knowledge routes (B5 fix)
+  const router = useRouterState()
+  const pathnameRef = useRef(router.location.pathname)
+  pathnameRef.current = router.location.pathname
+
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      if (!pathnameRef.current.startsWith('/knowledge')) return
       if ((e.metaKey || e.ctrlKey) && e.key === 's') {
         e.preventDefault()
         handleSave()

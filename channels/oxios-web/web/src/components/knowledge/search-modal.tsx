@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Search, Folder, FileText } from 'lucide-react'
+import { useRouterState } from '@tanstack/react-router'
 import { useKnowledgeStore } from '@/stores/knowledge'
 import { useKnowledgeSearch, useKnowledgeTree } from '@/hooks/use-knowledge'
 import type { KnowledgeSearchHit, KnowledgeTreeEntry } from '@/types/knowledge'
@@ -73,10 +74,14 @@ export function SearchModal({
     return recentFiles
   })()
 
-  // ── Global ⌘K / ⌘P listener (only on knowledge routes) ───────────
+  // ── Global ⌘K / ⌘P listener (M5: pathname via ref) ───────────
+  const router = useRouterState()
+  const pathnameRef = useRef(router.location.pathname)
+  pathnameRef.current = router.location.pathname
+
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (!window.location.pathname.startsWith('/knowledge')) return
+      if (!pathnameRef.current.startsWith('/knowledge')) return
       if ((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'p')) {
         e.preventDefault()
         e.stopPropagation()

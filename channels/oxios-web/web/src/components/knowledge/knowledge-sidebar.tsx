@@ -1,5 +1,6 @@
 import { useCallback } from 'react'
-import { FilePlus, FolderPlus, Trash2, LayoutDashboard } from 'lucide-react'
+import { FilePlus, FolderPlus, Trash2, LayoutDashboard, PanelLeftClose } from 'lucide-react'
+import { Link } from '@tanstack/react-router'
 import { useKnowledgeStore } from '@/stores/knowledge'
 import { useKnowledgeTree, useWriteFile, useDeleteFile, useJournalToday } from '@/hooks/use-knowledge'
 import { FileTree } from './file-tree'
@@ -12,7 +13,7 @@ import { cn } from '@/lib/utils'
  * Renders the file tree, chat/journal buttons, and new file/folder actions.
  */
 export function KnowledgeSidebar() {
-  const { sidebarWidth, setSidebarWidth, currentFilePath, mode, openFile, openChat } = useKnowledgeStore()
+  const { sidebarWidth, setSidebarWidth, currentFilePath, mode, openFile, openChat, toggleSidebar } = useKnowledgeStore()
   const { data: entries, isLoading, refetch } = useKnowledgeTree()
   const writeFile = useWriteFile()
   const deleteFile = useDeleteFile()
@@ -48,7 +49,8 @@ export function KnowledgeSidebar() {
         <div className="flex items-center gap-2">
           <span className="font-bold text-lg">Notes</span>
         </div>
-        <div className="flex gap-0.5">
+        <div className="flex items-center gap-0.5">
+          {/* Primary actions — always visible */}
           <Button
             variant="ghost"
             size="icon"
@@ -58,30 +60,44 @@ export function KnowledgeSidebar() {
           >
             <FilePlus className="h-4 w-4" />
           </Button>
+          {/* Secondary actions — hidden on narrow screens (B4) */}
+          <div className="hidden sm:flex items-center gap-0.5">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 hover:bg-sidebar-accent/50"
+              onClick={handleNewFolder}
+              title="New folder (⌘⇧N)"
+            >
+              <FolderPlus className="h-4 w-4" />
+            </Button>
+            {currentFilePath && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 text-destructive hover:bg-sidebar-accent/50"
+                onClick={async () => {
+                  if (confirm(`Delete ${currentFilePath}?`)) {
+                    await deleteFile.mutateAsync(currentFilePath)
+                  }
+                }}
+                title="Delete current file (⌘D)"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+          {/* Collapse sidebar button */}
           <Button
             variant="ghost"
             size="icon"
             className="h-7 w-7 hover:bg-sidebar-accent/50"
-            onClick={handleNewFolder}
-            title="New folder (⌘⇧N)"
+            onClick={toggleSidebar}
+            aria-label="Collapse sidebar"
+            title="Collapse sidebar"
           >
-            <FolderPlus className="h-4 w-4" />
+            <PanelLeftClose className="h-4 w-4" />
           </Button>
-          {currentFilePath && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7 text-destructive hover:bg-sidebar-accent/50"
-              onClick={async () => {
-                if (confirm(`Delete ${currentFilePath}?`)) {
-                  await deleteFile.mutateAsync(currentFilePath)
-                }
-              }}
-              title="Delete current file (⌘D)"
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
-          )}
         </div>
       </div>
 
@@ -130,13 +146,13 @@ export function KnowledgeSidebar() {
 
       {/* Navigation back to Dashboard */}
       <div className="p-2 border-t border-sidebar-border">
-        <a
-          href="/"
+        <Link
+          to="/"
           className="flex items-center gap-2 rounded-lg px-2.5 py-2 text-sm text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground transition-colors w-full"
         >
           <LayoutDashboard className="h-4 w-4 shrink-0" />
           <span>Dashboard</span>
-        </a>
+        </Link>
       </div>
     </div>
   )

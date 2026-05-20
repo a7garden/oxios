@@ -6,6 +6,14 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
+use axum::{
+    body::Body,
+    extract::Path,
+    response::{IntoResponse, Response},
+    routing::get,
+    Router,
+};
+use rust_embed::Embed;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -17,6 +25,68 @@ use crate::channel::{WebChannel, WebChannelHandle};
 use crate::middleware::RateLimiter;
 use crate::routes;
 use crate::server::AppState;
+
+/// Static web assets — embedded at compile time via rust-embed.
+/// Build with: cd web && npm run build
+#[derive(Embed)]
+#[folder = "web/dist/"]
+struct Assets;
+
+/// SPA fallback handler — serves index.html for all non-file routes.
+/// This enables client-side routing (TanStack Router).
+struct SpaFallback;
+
+impl IntoResponse for SpaFallback {
+    fn into_response(self) -> Response {
+        match Assets::get("index.html") {
+            Some(content) => Response::builder()
+                .status(200)
+                .header("Content-Type", "text/html; charset=utf-8")
+                .body(Body::from(content.data.to_vec()))
+                .unwrap(),
+            None => Response::builder()
+                .status(404)
+                .body(Body::from("index.html not found — run `cd web && npm run build`"))
+                .unwrap(),
+        }
+    }
+}
+
+/// Serve a static file from embedded assets.
+fn serve_file(path: &str) -> Response {
+    let clean_path = path.trim_start_matches('/');
+
+    // Try exact path and assets/ prefix
+    let asset = Assets::get(clean_path)
+        .or_else(|| Assets::get(&format!("assets/{}", clean_path)));
+
+    match asset {
+        Some(content) => {
+            let lookup = if clean_path.starts_with("assets/") { clean_path } else { &format!("assets/{}", clean_path) };
+            let mime = mime_guess::from_path(lookup).first_or_octet_stream().to_string();
+            let body = Body::from(content.data.to_vec());
+            Response::builder()
+                .status(200)
+                .header("Content-Type", mime)
+                .body(body)
+                .unwrap()
+        }
+        None => Response::builder()
+            .status(404)
+            .body(Body::empty())
+            .unwrap(),
+    }
+}
+
+/// Static asset handler — extracts path from URL and serves from embedded assets.
+async fn static_handler(Path(path): axum::extract::Path<String>) -> Response {
+    serve_file(&path)
+}
+
+/// SPA fallback — serves index.html for client-side routing.
+async fn spa_handler() -> impl IntoResponse {
+    SpaFallback
+}
 
 /// Web channel plugin — creates an axum HTTP/WS server.
 pub struct WebPlugin;
@@ -73,7 +143,7 @@ impl ChannelPlugin for WebPlugin {
             rate_limiter: RateLimiter::new(rate_limit),
         });
 
-        // Build API routes
+        // Build API routes (with AppState)
         let api_routes = routes::build_routes(state.clone());
 
         // CORS layer — origins from config
@@ -88,39 +158,26 @@ impl ChannelPlugin for WebPlugin {
             .allow_methods(tower_http::cors::Any)
             .allow_headers(tower_http::cors::Any);
 
-        // Static file serving
-        // 1) web/dist/ — TypeScript SPA frontend (Vite build output)
-        // 2) static/   — Oxios runtime assets (knowledge, default-programs, etc.)
-        let web_dist_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("web/dist");
-        let static_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("static");
-        let spa_index = web_dist_dir.join("index.html");
-
-        // OpenAPI / Swagger UI
+        // OpenAPI / Swagger UI (unit state for type compatibility)
         let openapi = api_docs::build_openapi();
-        let swagger: axum::Router<()> = utoipa_swagger_ui::SwaggerUi::new("/swagger-ui")
-            .url("/api-docs/openapi.json", openapi)
+        let swagger: Router<()> = utoipa_swagger_ui::SwaggerUi::new("/api-docs")
+            .url("/openapi.json", openapi)
             .into();
 
-        // Compose final app
-        //
-        // Serve web/dist/ first (SPA frontend), fall back to static/ (runtime assets).
-        // For SPA routing, non-file paths that don't match any route serve index.html.
-        let app = axum::Router::new()
-            .merge(api_routes)
-            .fallback_service(
-                tower_http::services::ServeDir::new(&web_dist_dir)
-                    .fallback(
-                        tower_http::services::ServeDir::new(&static_dir)
-                            .append_index_html_on_directories(true)
-                            .fallback(
-                                tower_http::services::ServeFile::new(&spa_index),
-                            ),
-                    ),
-            )
-            .layer(cors)
-            .with_state(state);
+        // SPA routes (catch-all for client-side routing)
+        let spa_routes: Router<Arc<AppState>> = Router::new()
+            .route("/{*path}", get(spa_handler))
+            .route("/", get(spa_handler));
 
-        let app = axum::Router::new().merge(swagger).merge(app);
+        // Build main app with state
+        // API routes + SPA routes + CORS + Swagger (nested at /api-docs)
+        // with_state() erases state type to Router<()>
+        let app = Router::new()
+            .merge(api_routes)
+            .merge(spa_routes)
+            .layer(cors)
+            .nest_service("/api-docs", swagger)
+            .with_state(state);
 
         // Bind listener
         let addr = format!("{}:{}", host, port);

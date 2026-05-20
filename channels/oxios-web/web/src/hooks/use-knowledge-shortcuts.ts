@@ -1,10 +1,12 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
+import { useRouterState } from '@tanstack/react-router'
 import { useKnowledgeStore } from '@/stores/knowledge'
 import { useWriteFile, useDeleteFile } from '@/hooks/use-knowledge'
 
 /**
  * Register global keyboard shortcuts for the Knowledge UI.
  * Only active when the current route is within /knowledge.
+ * Uses router state (via ref) instead of window.location for accuracy (M5).
  *
  * Shortcuts:
  * ⌘N        → New file
@@ -21,10 +23,15 @@ export function useKnowledgeShortcuts() {
   const writeFile = useWriteFile()
   const deleteFile = useDeleteFile()
 
+  // Keep a ref to the latest pathname so the event handler is never stale (M5)
+  const router = useRouterState()
+  const pathnameRef = useRef(router.location.pathname)
+  pathnameRef.current = router.location.pathname
+
   useEffect(() => {
     const handler = async (e: KeyboardEvent) => {
       // Only activate when on a knowledge route
-      if (!window.location.pathname.startsWith('/knowledge')) return
+      if (!pathnameRef.current.startsWith('/knowledge')) return
 
       const isMeta = e.metaKey || e.ctrlKey
 

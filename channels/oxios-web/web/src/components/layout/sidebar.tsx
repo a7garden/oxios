@@ -60,7 +60,7 @@ const navGroups: { label: string; items: NavItem[] }[] = [
   {
     label: 'Data',
     items: [
-      { label: 'Knowledge', href: '/knowledge/', icon: <Brain className="h-4 w-4" /> },
+      { label: 'Knowledge', href: '/knowledge', icon: <Brain className="h-4 w-4" /> },
       { label: 'Memory', href: '/memory', icon: <Brain className="h-4 w-4" /> },
       { label: 'Workspace', href: '/workspace', icon: <FolderOpen className="h-4 w-4" /> },
     ],

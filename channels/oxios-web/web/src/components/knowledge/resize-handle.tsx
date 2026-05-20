@@ -34,9 +34,10 @@ export function ResizeHandle({ onResize }: ResizeHandleProps) {
     [onResize],
   )
 
+  // B6: hidden on touch/mobile devices — resize is a desktop interaction
   return (
     <div
-      className="h-1 cursor-col-resize hover:bg-primary/20 active:bg-primary/40 transition-colors"
+      className="h-1 cursor-col-resize hover:bg-primary/20 active:bg-primary/40 transition-colors hidden lg:block"
       onMouseDown={handleMouseDown}
     />
   )

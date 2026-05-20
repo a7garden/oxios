@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { ArrowRightLeft } from 'lucide-react'
+import { useRouterState } from '@tanstack/react-router'
 import { useKnowledgeStore } from '@/stores/knowledge'
 import { useKnowledgeTree, useWriteFile, useDeleteFile, useKnowledgeFile } from '@/hooks/use-knowledge'
 import { cn } from '@/lib/utils'
@@ -26,10 +27,14 @@ export function MoveModal() {
     ? allDirs.filter((d) => d.toLowerCase().includes(query.toLowerCase()))
     : allDirs
 
-  // Global ⌘M listener (only on knowledge routes)
+  // Global ⌘M listener (M5: pathname via ref)
+  const router = useRouterState()
+  const pathnameRef = useRef(router.location.pathname)
+  pathnameRef.current = router.location.pathname
+
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (!window.location.pathname.startsWith('/knowledge')) return
+      if (!pathnameRef.current.startsWith('/knowledge')) return
       if ((e.metaKey || e.ctrlKey) && e.key === 'm') {
         // Don't open if no file is selected
         if (!currentFilePath) return

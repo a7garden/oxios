@@ -57,7 +57,7 @@ export function LinkGraph({ className }: LinkGraphProps) {
             <circle
               cx={pos.x} cy={pos.y}
               r={isActive ? 8 : 5}
-              fill={isActive ? 'hsl(var(--primary))' : 'hsl(var(--muted-foreground))'}
+              fill={isActive ? 'var(--primary)' : 'var(--muted-foreground)'}
               opacity={isActive ? 1 : 0.6}
             />
             <text

@@ -3337,12 +3337,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "http-range-header"
-version = "0.4.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9171a2ea8a68358193d15dd5d70c1c10a2afc3e7e4c5bc92bc9f025cebd7359c"
-
-[[package]]
 name = "httparse"
 version = "1.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5117,6 +5111,7 @@ dependencies = [
  "axum 0.8.9",
  "chrono",
  "futures-util",
+ "mime_guess",
  "oxi-ai",
  "oxi-sdk",
  "oxios-gateway",
@@ -5124,6 +5119,7 @@ dependencies = [
  "oxios-markdown",
  "oxios-ouroboros",
  "parking_lot",
+ "rust-embed",
  "serde",
  "serde_json",
  "tokio",
@@ -6011,6 +6007,7 @@ version = "8.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5bcdef0be6fe7f6fa333b1073c949729274b05f123a0ad7efcb8efd878e5c3b1"
 dependencies = [
+ "mime_guess",
  "sha2",
  "walkdir",
 ]
@@ -7140,11 +7137,6 @@ dependencies = [
  "http",
  "http-body",
  "http-body-util",
- "http-range-header",
- "httpdate",
- "mime",
- "mime_guess",
- "percent-encoding",
  "pin-project-lite",
  "tokio",
  "tokio-util",
