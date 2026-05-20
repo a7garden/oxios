@@ -181,6 +181,11 @@ impl SpaceApi {
             .unwrap_or_default()
     }
 
+    /// Get the workspace directory path for a Space.
+    pub fn workspace_dir(&self, space_id: &uuid::Uuid) -> std::path::PathBuf {
+        self.space_manager.default_workspace_dir(space_id)
+    }
+
     /// Get knowledge flow for a specific Space.
     pub fn knowledge_flow_for(&self, id: &str) -> Option<Vec<KnowledgeFlowInfo>> {
         let space_id = uuid::Uuid::parse_str(id).ok()?;

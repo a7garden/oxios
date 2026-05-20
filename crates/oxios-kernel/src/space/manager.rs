@@ -201,7 +201,7 @@ impl SpaceManager {
     }
 
     /// Get the workspace directory for a Space.
-    fn default_workspace_dir(&self, space_id: &SpaceId) -> PathBuf {
+    pub fn default_workspace_dir(&self, space_id: &SpaceId) -> PathBuf {
         self.root_dir.join(space_id.to_string()).join("workspace")
     }
 

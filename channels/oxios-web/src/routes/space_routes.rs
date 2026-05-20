@@ -64,8 +64,7 @@ pub(crate) async fn handle_space_activate(
 ) -> Result<Json<serde_json::Value>, AppError> {
     state
         .kernel
-        .spaces
-        .activate(&id)
+        .activate_space(&id)
         .await
         .map_err(|e| AppError::Internal(e.to_string()))?;
     Ok(Json(serde_json::json!({ "ok": true, "space_id": id })))

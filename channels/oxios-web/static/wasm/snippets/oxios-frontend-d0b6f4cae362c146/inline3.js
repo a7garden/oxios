@@ -1,1 +1,0 @@
-export function ls_remove(k) { localStorage.removeItem(k); }

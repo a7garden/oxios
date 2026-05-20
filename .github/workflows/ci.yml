@@ -62,3 +62,24 @@ jobs:
           mkdir -p ~/.cargo
           cp audit.toml ~/.cargo/audit.toml
           cargo audit --deny warnings
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - name: Install dependencies
+        working-directory: channels/oxios-web/web
+        run: bun install
+      - name: Typecheck
+        working-directory: channels/oxios-web/web
+        run: bun run typecheck
+      - name: Lint
+        working-directory: channels/oxios-web/web
+        run: bun run lint
+      - name: Build
+        working-directory: channels/oxios-web/web
+        run: bun run build
+      - name: Test
+        working-directory: channels/oxios-web/web
+        run: bunx vitest run

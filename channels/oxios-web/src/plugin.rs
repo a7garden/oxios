@@ -74,8 +74,12 @@ impl ChannelPlugin for WebPlugin {
             .allow_methods(tower_http::cors::Any)
             .allow_headers(tower_http::cors::Any);
 
-        // Static file serving — resolves relative to the oxios-web crate root
+        // Static file serving
+        // 1) web/dist/ — TypeScript SPA frontend (Vite build output)
+        // 2) static/   — Oxios runtime assets (knowledge, default-programs, etc.)
+        let web_dist_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("web/dist");
         let static_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("static");
+        let spa_index = web_dist_dir.join("index.html");
 
         // OpenAPI / Swagger UI
         let openapi = api_docs::build_openapi();
@@ -84,11 +88,20 @@ impl ChannelPlugin for WebPlugin {
             .into();
 
         // Compose final app
+        //
+        // Serve web/dist/ first (SPA frontend), fall back to static/ (runtime assets).
+        // For SPA routing, non-file paths that don't match any route serve index.html.
         let app = axum::Router::new()
             .merge(api_routes)
             .fallback_service(
-                tower_http::services::ServeDir::new(&static_dir)
-                    .append_index_html_on_directories(true),
+                tower_http::services::ServeDir::new(&web_dist_dir)
+                    .fallback(
+                        tower_http::services::ServeDir::new(&static_dir)
+                            .append_index_html_on_directories(true)
+                            .fallback(
+                                tower_http::services::ServeFile::new(&spa_index),
+                            ),
+                    ),
             )
             .layer(cors)
             .with_state(state);

@@ -302,4 +302,23 @@ impl KernelHandle {
     pub fn start_time(&self) -> std::time::Instant {
         self.infra.start_time
     }
+
+    /// Activate a Space and switch the KnowledgeApi to use its knowledge directory.
+    ///
+    /// This combines Space activation with Knowledge base switching in a single call.
+    pub async fn activate_space(&self, id: &str) -> anyhow::Result<()> {
+        let space_id = uuid::Uuid::parse_str(id)
+            .map_err(|e| anyhow::anyhow!("Invalid Space ID: {e}"))?;
+
+        // 1. Activate the Space
+        self.spaces.activate(id).await?;
+
+        // 2. Switch KnowledgeApi to the new Space's knowledge directory
+        let workspace_dir = self.spaces.workspace_dir(&space_id);
+        self.knowledge.switch_space(&workspace_dir)?;
+        self.knowledge.index_all()?;
+
+        tracing::info!(space_id = %space_id, "Space activated with knowledge base");
+        Ok(())
+    }
 }

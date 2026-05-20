@@ -1,51 +1,30 @@
 # Progress
 
-## Track B: KnowledgeApi 재설계 — 완료
+## Status
+In Progress
 
-### 1. VirtualFs POSIX path 메서드 (사전조건)
-Track A에서 이미 추가됨:
-- `read_path`, `write_path`, `delete_path`, `rename_path`, `exists_path`, `mtime_path` (VirtualFs 메서드)
-- `split_posix_path` (자유 함수)
+## Tasks
 
-수정: `lib.rs`에서 중복 export 제거
+### Part 2: Space × Knowledge 통합 — activate_space() 구현 ✅
 
-### 2. BacklinkIndex::clear() 추가 ✅
-- `crates/oxios-markdown/src/backlinks.rs`에 `clear()` 메서드 추가
-- `forward`, `backward`, `details` 필드 모두 초기화
+1. **SpaceManager.default_workspace_dir 공개화** — `fn` → `pub fn`
+2. **SpaceApi.workspace_dir() 추가** — Space의 workspace 디렉토리 경로 반환
+3. **KernelHandle.activate_space() 추가** — Space 활성화 + KnowledgeApi 전환을 단일 호출로 통합
+4. **space_routes.rs 업데이트** — `spaces.activate()` → `kernel.activate_space()` 교체
 
-### 3. KnowledgeApi 재작성 ✅
-- `crates/oxios-kernel/src/kernel_handle/knowledge_api.rs` 완전 재작성
-- 새 구조체: `fs`, `memory`, `backlinks`, `engine`, `default_model`, `agent_writes`
-- POSIX path 기반 I/O: `note_read/write/delete/move` → `read_path/write_path/delete_path/rename_path`
-- `index_to_memory()` helper (fire-and-forget async)
-- `search()` — name-based + semantic via MemoryManager
-- `backlinks_for()`, `link_graph()`
-- `index_all()` — 전체 knowledge base 인덱싱
-- `copilot_chat()` — sync AI-powered copilot (block_in_place)
-- `call_engine()` — AI engine 호출
-- `switch_space()` — space 전환 시 루트 교체
-- `agent_writes` 추적: `mark_agent_write`, `is_agent_write`, `clear_agent_write`
-- 새 타입: `CopilotResponse`, `NoteHit`
-- 모든 기존 테스트 보존 + 신규 테스트 (agent_write, index_all, switch_space, copilot_chat[ignore])
+## Files Changed
 
-### 4. kernel.rs 수정 ✅
-- 2곳의 `KnowledgeApi::new()` 호출에 `EngineProvider` + `default_model` 주입 추가
-  - `Kernel::handle()` 메서드
-  - `KernelBuilder::build()` 메서드
+- `crates/oxios-kernel/src/space/manager.rs` — `default_workspace_dir`을 `pub`로 변경
+- `crates/oxios-kernel/src/kernel_handle/space_api.rs` — `workspace_dir()` 메서드 추가
+- `crates/oxios-kernel/src/kernel_handle/mod.rs` — `activate_space()` 편의 메서드 추가
+- `channels/oxios-web/src/routes/space_routes.rs` — `handle_space_activate`이 `activate_space()` 사용하도록 변경
 
-### 5. KernelHandle::from_subsystems() 업데이트 ✅
-- `crates/oxios-kernel/src/kernel_handle/mod.rs` — KnowledgeApi 생성에 engine/model 추가
+## Verification
 
-### 6. KnowledgeTool 수정 ✅
-- `crates/oxios-kernel/src/tools/kernel/knowledge_tool.rs`
-- `engine` + `default_model` 필드 추가
-- `from_kernel()` — `model_id()` 접근자 사용
-- `make_api()` — 4인자 생성자 사용
-
-### 7. 테스트 코드 수정 ✅
-- `tools/kernel_bridge.rs` — 테스트 KnowledgeApi 생성에 engine/model 추가
-- `supervisor.rs` — 테스트 KnowledgeApi 생성에 engine/model 추가
-
-### 검증 결과
 - `cargo check --workspace` ✅
-- `cargo test --workspace` ✅ (모든 테스트 통과)
+- `cargo test --workspace` ✅ (모든 테스트 통과: 540+ 단위 테스트, 40+ e2e 테스트, 22+ 통합 테스트)
+
+## Notes
+
+- `KnowledgeApi`에는 이미 `switch_space()` 및 `index_all()` 메서드가 구현되어 있어 별도 추가 불필요
+- `activate_space()`는 Space 활성화 → Knowledge 루트 전환 → 백링크 재색인을 원자적으로 수행

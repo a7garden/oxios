@@ -524,9 +524,9 @@ export default defineConfig({
 - [ ] 모바일 반응형
 
 ### Phase 5: 정리
-- [ ] Dioxus 프론트엔드 제거 (`frontend/` 디렉토리 삭제)
-- [ ] Axum 정적 파일 서빙 경로 변경
-- [ ] CI 파이프라인에 `bun run build` 추가
+- [x] Dioxus 프론트엔드 제거 (`frontend/` 디렉토리 삭제 + `static/wasm/` + `static/assets/` + Dioxus index.html/style.css)
+- [x] Axum 정적 파일 서빙 경로 변경 (`web/dist/` 우선, `static/` fallback, SPA index.html 리다이렉트)
+- [x] CI 파이프라인에 `bun run typecheck/lint/build/test` 추가 (frontend job)
 
 ---
 

@@ -1,1 +1,0 @@
-export function ls_get(k) { return localStorage.getItem(k); }
