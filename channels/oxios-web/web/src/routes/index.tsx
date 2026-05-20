@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { api } from '@/lib/api-client'
 import type { Agent, SystemStatus } from '@/types'
 
-export const Route = createFileRoute('/dashboard')({
+export const Route = createFileRoute('/')({
   component: DashboardPage,
 })
 
@@ -128,7 +128,7 @@ function DashboardPage() {
 
       {/* Quick Links */}
       <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-        <Link to="/knowledge/">
+        <Link to="/knowledge">
           <Card className="hover:bg-accent/50 transition-colors cursor-pointer group">
             <CardHeader className="flex flex-row items-center gap-3 pb-2">
               <Brain className="h-5 w-5 text-violet-500" />
@@ -141,7 +141,7 @@ function DashboardPage() {
             </CardHeader>
           </Card>
         </Link>
-        <Link to="/sessions/">
+        <Link to="/sessions">
           <Card className="hover:bg-accent/50 transition-colors cursor-pointer group">
             <CardHeader className="flex flex-row items-center gap-3 pb-2">
               <Clock className="h-5 w-5 text-blue-500" />
@@ -154,7 +154,7 @@ function DashboardPage() {
             </CardHeader>
           </Card>
         </Link>
-        <Link to="/workspace/">
+        <Link to="/workspace">
           <Card className="hover:bg-accent/50 transition-colors cursor-pointer group">
             <CardHeader className="flex flex-row items-center gap-3 pb-2">
               <FileText className="h-5 w-5 text-emerald-500" />

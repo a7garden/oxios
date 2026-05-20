@@ -1,5 +1,5 @@
 import { ArrowLeft, Menu } from 'lucide-react'
-import { Link, useRouterState } from '@tanstack/react-router'
+import { useRouterState } from '@tanstack/react-router'
 import { Separator } from '@/components/ui/separator'
 import { useSidebarStore } from '@/stores/sidebar'
 import { useKnowledgeStore } from '@/stores/knowledge'
@@ -28,13 +28,13 @@ export function Header() {
 
       {isKnowledge ? (
         <>
-          <Link
-            to="/"
+          <a
+            href="/"
             className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
           >
             <ArrowLeft className="h-4 w-4" />
             <span>Dashboard</span>
-          </Link>
+          </a>
           <Separator orientation="vertical" className="h-6" />
           <div className="flex items-center gap-2 text-sm">
             <span className={cn('font-medium', !currentFilePath && 'text-foreground')}>

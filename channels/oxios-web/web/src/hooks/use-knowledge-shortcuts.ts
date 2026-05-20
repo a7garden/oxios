@@ -4,7 +4,7 @@ import { useWriteFile, useDeleteFile } from '@/hooks/use-knowledge'
 
 /**
  * Register global keyboard shortcuts for the Knowledge UI.
- * Call once in KnowledgeLayout.
+ * Only active when the current route is within /knowledge.
  *
  * Shortcuts:
  * ⌘N        → New file
@@ -23,6 +23,9 @@ export function useKnowledgeShortcuts() {
 
   useEffect(() => {
     const handler = async (e: KeyboardEvent) => {
+      // Only activate when on a knowledge route
+      if (!window.location.pathname.startsWith('/knowledge')) return
+
       const isMeta = e.metaKey || e.ctrlKey
 
       // ⌘N — new file

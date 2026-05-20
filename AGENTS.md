@@ -145,7 +145,7 @@ oxios run --json --session "$SID" "follow-up"
 - **KernelBridge** (`tools/kernel_bridge.rs`) — Registers all kernel domain tools into an agent's `ToolRegistry` during agent build.
 - **ExecTool** (`tools/exec_tool.rs`) — Two modes: `shell` (bash -c, RBAC-enforced) and `structured` (binary allowlist + metacharacter blocking).
 - **Kernel tools** (`tools/kernel/`) — Space, Agent, Persona, Cron, Security, Budget, Resource, Knowledge tools. Each wraps a KernelHandle API domain.
-- **KernelHandle** (`kernel_handle/`) — Facade exposing 13 typed APIs: AgentApi, SpaceApi, SecurityApi, PersonaApi, ExecApi, BrowserApi, McpApi, ExtensionApi, InfraApi, A2aApi, StateApi, KnowledgeApi, KnowledgeLens. Internally uses `CredentialStore` (`credential.rs`) for multi-source key resolution.
+- **KernelHandle** (`kernel_handle/`) — Facade exposing 13 typed APIs: AgentApi, SpaceApi, SecurityApi, PersonaApi, ExecApi, BrowserApi, McpApi, ExtensionApi, InfraApi, A2aApi, StateApi, KnowledgeBase, KnowledgeLens. Internally uses `CredentialStore` (`credential.rs`) for multi-source key resolution.
 - **AccessManager** (`access_manager/`) — OWASP-inspired least-privilege. RBAC, path sandboxing, audit logging.
 - **AuditTrail** (`audit_trail.rs`) — Merkle-chain style tamper-evident audit log. Each entry cryptographically linked.
 - **Memory** (`memory/`) — Vector store with hyperbolic embeddings, HNSW indexing, flash attention, reasoning bank, Sona learning engine, RVF store.
@@ -248,7 +248,7 @@ The Knowledge UI is a full-screen app-within-app (`fixed inset-0 z-30`) built in
 
 - **Route registration**: `channels/oxios-web/src/routes/knowledge_routes.rs` — all Axum handlers
 - **KnowledgeBase** (direct): `crates/oxios-markdown/src/knowledge.rs` — web uses `state.knowledge` (KnowledgeBase) directly, bypassing the kernel. No AI engine dependency at the web layer.
-- **KnowledgeApi** (kernel): `crates/oxios-kernel/src/kernel_handle/knowledge_api.rs` — thin wrapper around VirtualFs + BacklinkIndex + AI copilot. Used by CLI, Telegram, and agent tools.
+- **KnowledgeBase** (kernel-free, via oxios-markdown): markdown note management, backlinks, AI copilot. Access via `kernel.knowledge` (Arc). See RFC-003 for architecture.
 - **KnowledgeLens** (`kernel_handle/knowledge_lens.rs`) — Semantic HNSW overlay. Subscribes to KnowledgeBase `on_file_change` callbacks to keep agent memory index in sync.
 
 ### Key Design Decisions

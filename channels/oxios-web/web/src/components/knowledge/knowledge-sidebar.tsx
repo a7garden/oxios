@@ -1,5 +1,5 @@
 import { useCallback } from 'react'
-import { FilePlus, FolderPlus, Trash2 } from 'lucide-react'
+import { FilePlus, FolderPlus, Trash2, LayoutDashboard } from 'lucide-react'
 import { useKnowledgeStore } from '@/stores/knowledge'
 import { useKnowledgeTree, useWriteFile, useDeleteFile, useJournalToday } from '@/hooks/use-knowledge'
 import { FileTree } from './file-tree'
@@ -12,7 +12,7 @@ import { cn } from '@/lib/utils'
  * Renders the file tree, chat/journal buttons, and new file/folder actions.
  */
 export function KnowledgeSidebar() {
-  const { sidebarWidth, setSidebarWidth, currentFilePath, mode, openFile, openChat, toggleSidebar } = useKnowledgeStore()
+  const { sidebarWidth, setSidebarWidth, currentFilePath, mode, openFile, openChat } = useKnowledgeStore()
   const { data: entries, isLoading, refetch } = useKnowledgeTree()
   const writeFile = useWriteFile()
   const deleteFile = useDeleteFile()
@@ -126,6 +126,17 @@ export function KnowledgeSidebar() {
         <div><kbd className="font-mono border rounded px-1">⌘K</kbd> Search</div>
         <div><kbd className="font-mono border rounded px-1">⌘M</kbd> Move file</div>
         <div><kbd className="font-mono border rounded px-1">⌘N</kbd> New file</div>
+      </div>
+
+      {/* Navigation back to Dashboard */}
+      <div className="p-2 border-t border-sidebar-border">
+        <a
+          href="/"
+          className="flex items-center gap-2 rounded-lg px-2.5 py-2 text-sm text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground transition-colors w-full"
+        >
+          <LayoutDashboard className="h-4 w-4 shrink-0" />
+          <span>Dashboard</span>
+        </a>
       </div>
     </div>
   )

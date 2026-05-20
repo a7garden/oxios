@@ -19,7 +19,7 @@ use oxios_markdown::KnowledgeBase;
 /// Uses action-based dispatch: `read`, `write`, `delete`, `move`, `tree`,
 /// `search`, `backlinks`.
 ///
-/// Delegates directly to [`KnowledgeBase`] — no KnowledgeApi needed.
+/// Delegates directly to [`KnowledgeBase`] for all operations.
 pub struct KnowledgeTool {
     kb: Arc<KnowledgeBase>,
 }

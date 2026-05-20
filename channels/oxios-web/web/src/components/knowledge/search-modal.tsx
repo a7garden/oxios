@@ -73,9 +73,10 @@ export function SearchModal({
     return recentFiles
   })()
 
-  // ── Global ⌘K / ⌘P listener ────────────────────────────────
+  // ── Global ⌘K / ⌘P listener (only on knowledge routes) ───────────
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      if (!window.location.pathname.startsWith('/knowledge')) return
       if ((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'p')) {
         e.preventDefault()
         e.stopPropagation()

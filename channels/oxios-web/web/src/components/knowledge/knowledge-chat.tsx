@@ -337,9 +337,8 @@ export function KnowledgeChat() {
   return (
     <div className="flex flex-col flex-1 h-full">
       {/* Header */}
-      <div className="px-4 py-3 border-b shrink-0">
-        <h2 className="text-lg font-semibold">💬 Chat</h2>
-        <p className="text-sm text-muted-foreground">Free your head</p>
+      <div className="px-4 py-2 border-b shrink-0 bg-muted/30">
+        <p className="text-xs text-muted-foreground">Free your head</p>
       </div>
 
       {/* Bulk action bar */}

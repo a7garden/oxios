@@ -8,7 +8,7 @@ export const Route = createFileRoute('/knowledge/habits')({
       <div className="flex flex-col h-full">
         <div className="flex items-center gap-3 px-4 py-3 border-b shrink-0">
           <Link
-            to="/knowledge/"
+            to="/knowledge"
             className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
           >
             <ArrowLeft className="h-4 w-4" />

@@ -15,7 +15,7 @@ export function InfoPanel() {
   const [tab, setTab] = useState<Tab>('backlinks')
 
   return (
-    <div className="w-72 border-l bg-muted/30 flex flex-col shrink-0">
+    <div className="w-72 border-l bg-sidebar-background text-sidebar-foreground flex flex-col shrink-0">
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-2 border-b">
         <span className="text-sm font-medium">Info</span>

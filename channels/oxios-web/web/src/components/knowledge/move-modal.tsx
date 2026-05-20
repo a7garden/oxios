@@ -26,9 +26,10 @@ export function MoveModal() {
     ? allDirs.filter((d) => d.toLowerCase().includes(query.toLowerCase()))
     : allDirs
 
-  // Global ⌘M listener
+  // Global ⌘M listener (only on knowledge routes)
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      if (!window.location.pathname.startsWith('/knowledge')) return
       if ((e.metaKey || e.ctrlKey) && e.key === 'm') {
         // Don't open if no file is selected
         if (!currentFilePath) return

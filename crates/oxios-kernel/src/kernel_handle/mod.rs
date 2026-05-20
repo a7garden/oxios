@@ -64,7 +64,7 @@ use std::time::Instant;
 /// - [`ExecApi`]      — execution config, access management
 /// - [`BrowserApi`]   — browser backend
 /// - [`A2aApi`]       — agent-to-agent communication
-/// - [`KnowledgeApi`] — markdown note management, backlinks, memory sync
+/// - [`KnowledgeBase`] — markdown note management (kernel-free, via oxios-markdown)
 pub struct KernelHandle {
     /// State management: save/load/sessions.
     pub state: StateApi,

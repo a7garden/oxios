@@ -20,12 +20,12 @@ import { Route as MemoryRouteImport } from './routes/memory'
 import { Route as HostToolsRouteImport } from './routes/host-tools'
 import { Route as GitRouteImport } from './routes/git'
 import { Route as EventsRouteImport } from './routes/events'
-import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as CronJobsRouteImport } from './routes/cron-jobs'
 import { Route as ChatRouteImport } from './routes/chat'
 import { Route as BudgetRouteImport } from './routes/budget'
 import { Route as ApprovalsRouteImport } from './routes/approvals'
 import { Route as AgentGroupsRouteImport } from './routes/agent-groups'
+import { Route as IndexRouteImport } from './routes/index'
 import { Route as WorkspaceIndexRouteImport } from './routes/workspace/index'
 import { Route as SpacesIndexRouteImport } from './routes/spaces/index'
 import { Route as SessionsIndexRouteImport } from './routes/sessions/index'
@@ -95,11 +95,6 @@ const EventsRoute = EventsRouteImport.update({
   path: '/events',
   getParentRoute: () => rootRouteImport,
 } as any)
-const DashboardRoute = DashboardRouteImport.update({
-  id: '/dashboard',
-  path: '/dashboard',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const CronJobsRoute = CronJobsRouteImport.update({
   id: '/cron-jobs',
   path: '/cron-jobs',
@@ -123,6 +118,11 @@ const ApprovalsRoute = ApprovalsRouteImport.update({
 const AgentGroupsRoute = AgentGroupsRouteImport.update({
   id: '/agent-groups',
   path: '/agent-groups',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const WorkspaceIndexRoute = WorkspaceIndexRouteImport.update({
@@ -192,12 +192,12 @@ const AgentsAgentIdRoute = AgentsAgentIdRouteImport.update({
 } as any)
 
 export interface FileRoutesByFullPath {
+  '/': typeof IndexRoute
   '/agent-groups': typeof AgentGroupsRoute
   '/approvals': typeof ApprovalsRoute
   '/budget': typeof BudgetRoute
   '/chat': typeof ChatRoute
   '/cron-jobs': typeof CronJobsRoute
-  '/dashboard': typeof DashboardRoute
   '/events': typeof EventsRoute
   '/git': typeof GitRoute
   '/host-tools': typeof HostToolsRoute
@@ -224,12 +224,12 @@ export interface FileRoutesByFullPath {
   '/workspace/': typeof WorkspaceIndexRoute
 }
 export interface FileRoutesByTo {
+  '/': typeof IndexRoute
   '/agent-groups': typeof AgentGroupsRoute
   '/approvals': typeof ApprovalsRoute
   '/budget': typeof BudgetRoute
   '/chat': typeof ChatRoute
   '/cron-jobs': typeof CronJobsRoute
-  '/dashboard': typeof DashboardRoute
   '/events': typeof EventsRoute
   '/git': typeof GitRoute
   '/host-tools': typeof HostToolsRoute
@@ -257,12 +257,12 @@ export interface FileRoutesByTo {
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
+  '/': typeof IndexRoute
   '/agent-groups': typeof AgentGroupsRoute
   '/approvals': typeof ApprovalsRoute
   '/budget': typeof BudgetRoute
   '/chat': typeof ChatRoute
   '/cron-jobs': typeof CronJobsRoute
-  '/dashboard': typeof DashboardRoute
   '/events': typeof EventsRoute
   '/git': typeof GitRoute
   '/host-tools': typeof HostToolsRoute
@@ -291,12 +291,12 @@ export interface FileRoutesById {
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
+    | '/'
     | '/agent-groups'
     | '/approvals'
     | '/budget'
     | '/chat'
     | '/cron-jobs'
-    | '/dashboard'
     | '/events'
     | '/git'
     | '/host-tools'
@@ -323,12 +323,12 @@ export interface FileRouteTypes {
     | '/workspace/'
   fileRoutesByTo: FileRoutesByTo
   to:
+    | '/'
     | '/agent-groups'
     | '/approvals'
     | '/budget'
     | '/chat'
     | '/cron-jobs'
-    | '/dashboard'
     | '/events'
     | '/git'
     | '/host-tools'
@@ -355,12 +355,12 @@ export interface FileRouteTypes {
     | '/workspace'
   id:
     | '__root__'
+    | '/'
     | '/agent-groups'
     | '/approvals'
     | '/budget'
     | '/chat'
     | '/cron-jobs'
-    | '/dashboard'
     | '/events'
     | '/git'
     | '/host-tools'
@@ -388,12 +388,12 @@ export interface FileRouteTypes {
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
+  IndexRoute: typeof IndexRoute
   AgentGroupsRoute: typeof AgentGroupsRoute
   ApprovalsRoute: typeof ApprovalsRoute
   BudgetRoute: typeof BudgetRoute
   ChatRoute: typeof ChatRoute
   CronJobsRoute: typeof CronJobsRoute
-  DashboardRoute: typeof DashboardRoute
   EventsRoute: typeof EventsRoute
   GitRoute: typeof GitRoute
   HostToolsRoute: typeof HostToolsRoute
@@ -499,13 +499,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof EventsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/dashboard': {
-      id: '/dashboard'
-      path: '/dashboard'
-      fullPath: '/dashboard'
-      preLoaderRoute: typeof DashboardRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/cron-jobs': {
       id: '/cron-jobs'
       path: '/cron-jobs'
@@ -539,6 +532,13 @@ declare module '@tanstack/react-router' {
       path: '/agent-groups'
       fullPath: '/agent-groups'
       preLoaderRoute: typeof AgentGroupsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/workspace/': {
@@ -636,12 +636,12 @@ declare module '@tanstack/react-router' {
 }
 
 const rootRouteChildren: RootRouteChildren = {
+  IndexRoute: IndexRoute,
   AgentGroupsRoute: AgentGroupsRoute,
   ApprovalsRoute: ApprovalsRoute,
   BudgetRoute: BudgetRoute,
   ChatRoute: ChatRoute,
   CronJobsRoute: CronJobsRoute,
-  DashboardRoute: DashboardRoute,
   EventsRoute: EventsRoute,
   GitRoute: GitRoute,
   HostToolsRoute: HostToolsRoute,

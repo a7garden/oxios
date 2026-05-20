@@ -399,7 +399,7 @@ fn guess_knowledge_mime(path: &str) -> String {
 }
 
 // ---------------------------------------------------------------------------
-// Handlers — all delegate to KnowledgeApi
+// Handlers — all delegate to state.knowledge (KnowledgeBase)
 // ---------------------------------------------------------------------------
 
 /// GET /api/knowledge/tree — File tree of the knowledge directory.
