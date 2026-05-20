@@ -13,13 +13,22 @@ export const Route = createFileRoute('/dashboard')({
 })
 
 function DashboardPage() {
-  const { data: status, isLoading: statusLoading, isError: statusError, refetch: refetchStatus } = useQuery({
+  const {
+    data: status,
+    isLoading: statusLoading,
+    isError: statusError,
+    refetch: refetchStatus,
+  } = useQuery({
     queryKey: ['status'],
     queryFn: () => api.get<SystemStatus>('/api/status'),
     refetchInterval: 10000,
   })
 
-  const { data: agents, isError: agentsError, refetch: refetchAgents } = useQuery({
+  const {
+    data: agents,
+    isError: agentsError,
+    refetch: refetchAgents,
+  } = useQuery({
     queryKey: ['agents'],
     queryFn: () => api.get<{ items: Agent[] }>('/api/agents'),
     refetchInterval: 5000,

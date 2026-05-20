@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Textarea } from '@/components/ui/textarea'
-import { useToast } from '@/components/ui/sonner'
 import { useChatStream } from '@/hooks/use-chat-stream'
 
 export const Route = createFileRoute('/chat')({ component: ChatPage })
@@ -13,16 +12,13 @@ export const Route = createFileRoute('/chat')({ component: ChatPage })
 function ChatPage() {
   const { messages, isStreaming, sendMessage } = useChatStream()
   const [input, setInput] = useState('')
-  const { toast } = useToast()
+  // Toast: import { useToast } from '@/components/ui/sonner' then const { toast } = useToast()
+  void 0 // reserved for future toast
 
   const handleSend = () => {
     if (!input.trim() || isStreaming) return
-    try {
-      sendMessage(input.trim())
-      setInput('')
-    } catch (err) {
-      toast('Failed to send message', 'destructive')
-    }
+    sendMessage(input.trim())
+    setInput('')
   }
 
   return (
@@ -92,7 +88,12 @@ function ChatPage() {
               className="min-h-[44px] max-h-[120px] resize-none"
               rows={1}
             />
-            <Button onClick={handleSend} disabled={!input.trim() || isStreaming} size="icon" aria-label="Send message">
+            <Button
+              onClick={handleSend}
+              disabled={!input.trim() || isStreaming}
+              size="icon"
+              aria-label="Send message"
+            >
               <Send className="h-4 w-4" />
             </Button>
           </div>

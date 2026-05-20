@@ -26,7 +26,7 @@ export function DataTable<T>({
   return (
     <div className={cn('rounded-xl border', className)}>
       <div className="overflow-x-auto">
-        <table className="w-full" role="table" aria-label={caption}>
+        <table className="w-full" aria-label={caption}>
           {caption && <caption className="sr-only">{caption}</caption>}
           <thead>
             <tr className="border-b bg-muted/50">
@@ -34,7 +34,10 @@ export function DataTable<T>({
                 <th
                   key={col.header}
                   scope="col"
-                  className={cn('px-4 py-3 text-left text-sm font-medium text-muted-foreground', col.className)}
+                  className={cn(
+                    'px-4 py-3 text-left text-sm font-medium text-muted-foreground',
+                    col.className,
+                  )}
                 >
                   {col.header}
                 </th>
@@ -45,15 +48,17 @@ export function DataTable<T>({
             {data.map((row) => (
               <tr
                 key={keyExtractor(row)}
-                className={cn('border-b last:border-0 transition-colors', onRowClick && 'cursor-pointer hover:bg-muted/50')}
+                className={cn(
+                  'border-b last:border-0 transition-colors',
+                  onRowClick && 'cursor-pointer hover:bg-muted/50',
+                )}
                 onClick={() => onRowClick?.(row)}
               >
                 {columns.map((col) => (
-                  <td
-                    key={String(col.accessor)}
-                    className={cn('px-4 py-3 text-sm', col.className)}
-                  >
-                    {typeof col.accessor === 'function' ? col.accessor(row) : String(row[col.accessor] ?? '')}
+                  <td key={String(col.accessor)} className={cn('px-4 py-3 text-sm', col.className)}>
+                    {typeof col.accessor === 'function'
+                      ? col.accessor(row)
+                      : String(row[col.accessor] ?? '')}
                   </td>
                 ))}
               </tr>

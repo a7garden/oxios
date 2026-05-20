@@ -10,6 +10,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
+
 function getChartColor(token: string): string {
   if (typeof window === 'undefined') return '#888'
   return getComputedStyle(document.documentElement).getPropertyValue(token).trim() || '#888'
@@ -73,7 +74,10 @@ function ResourcesPage() {
               <div className="mt-2 h-2 rounded-full bg-muted overflow-hidden">
                 <div
                   className="h-full rounded-full transition-all"
-                  style={{ width: `${latest.cpu_percent}%`, backgroundColor: getChartColor('--chart-1') }}
+                  style={{
+                    width: `${latest.cpu_percent}%`,
+                    backgroundColor: getChartColor('--chart-1'),
+                  }}
                 />
               </div>
             </CardContent>
@@ -87,7 +91,10 @@ function ResourcesPage() {
               <div className="mt-2 h-2 rounded-full bg-muted overflow-hidden">
                 <div
                   className="h-full rounded-full transition-all"
-                  style={{ width: `${latest.memory_percent}%`, backgroundColor: getChartColor('--chart-2') }}
+                  style={{
+                    width: `${latest.memory_percent}%`,
+                    backgroundColor: getChartColor('--chart-2'),
+                  }}
                 />
               </div>
             </CardContent>
@@ -101,7 +108,10 @@ function ResourcesPage() {
               <div className="mt-2 h-2 rounded-full bg-muted overflow-hidden">
                 <div
                   className="h-full rounded-full transition-all"
-                  style={{ width: `${latest.disk_percent}%`, backgroundColor: getChartColor('--chart-3') }}
+                  style={{
+                    width: `${latest.disk_percent}%`,
+                    backgroundColor: getChartColor('--chart-3'),
+                  }}
                 />
               </div>
             </CardContent>

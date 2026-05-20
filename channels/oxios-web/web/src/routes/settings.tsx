@@ -142,7 +142,12 @@ function SettingsPage() {
   const [formValues, setFormValues] = useState<Record<string, Record<string, string>>>({})
   const [activeTab, setActiveTab] = useState('general')
 
-  const { data: config, isLoading, isError, refetch } = useQuery({
+  const {
+    data: config,
+    isLoading,
+    isError,
+    refetch,
+  } = useQuery({
     queryKey: ['config'],
     queryFn: () => api.get<OxiosConfig>('/api/config'),
   })

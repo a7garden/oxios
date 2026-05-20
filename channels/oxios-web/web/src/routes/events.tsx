@@ -2,14 +2,14 @@ import { useQuery } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
 import { Bell, RefreshCw } from 'lucide-react'
 import { useEffect, useRef } from 'react'
-import { ErrorState } from '@/components/shared/error-state'
 import { EmptyState } from '@/components/shared/empty-state'
+import { ErrorState } from '@/components/shared/error-state'
 import { LoadingCards } from '@/components/shared/loading'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { api } from '@/lib/api-client'
 import { useEvents } from '@/hooks/use-events'
+import { api } from '@/lib/api-client'
 import type { OxiosEvent } from '@/types'
 
 export const Route = createFileRoute('/events')({ component: EventsPage })
@@ -23,6 +23,7 @@ function EventsPage() {
     queryFn: () => api.get<{ items: OxiosEvent[] }>('/api/events?limit=50'),
   })
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: liveEvents.length is sufficient dependency for scroll-to-bottom
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight })
   }, [liveEvents.length])

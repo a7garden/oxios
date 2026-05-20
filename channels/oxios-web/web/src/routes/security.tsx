@@ -1,8 +1,8 @@
 import { useQuery } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
 import { FileWarning, KeyRound, RefreshCw, Shield } from 'lucide-react'
-import { ErrorState } from '@/components/shared/error-state'
 import { EmptyState } from '@/components/shared/empty-state'
+import { ErrorState } from '@/components/shared/error-state'
 import { LoadingCards } from '@/components/shared/loading'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -29,7 +29,11 @@ function SecurityPage() {
     refetchInterval: 15000,
   })
 
-  const { data: permissions, isError: permissionsError, refetch: refetchPermissions } = useQuery({
+  const {
+    data: permissions,
+    isError: permissionsError,
+    refetch: refetchPermissions,
+  } = useQuery({
     queryKey: ['permissions'],
     queryFn: () => api.get<PermissionsOverview>('/api/security/permissions'),
     refetchInterval: 15000,

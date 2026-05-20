@@ -18,7 +18,12 @@ function AgentDetailPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
 
-  const { data: agent, isLoading, isError, refetch } = useQuery({
+  const {
+    data: agent,
+    isLoading,
+    isError,
+    refetch,
+  } = useQuery({
     queryKey: ['agent', agentId],
     queryFn: () => api.get<Agent>(`/api/agents/${agentId}`),
     refetchInterval: 5000,
@@ -59,7 +64,12 @@ function AgentDetailPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={() => navigate({ to: '/agents' })} aria-label="Go back">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => navigate({ to: '/agents' })}
+          aria-label="Go back"
+        >
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div className="flex-1">

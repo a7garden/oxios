@@ -2,8 +2,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
 import { Plus, Power, PowerOff, RefreshCw, Timer, Trash2 } from 'lucide-react'
 import { useState } from 'react'
-import { ErrorState } from '@/components/shared/error-state'
 import { EmptyState } from '@/components/shared/empty-state'
+import { ErrorState } from '@/components/shared/error-state'
 import { LoadingCards } from '@/components/shared/loading'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -142,7 +142,12 @@ function CronJobsPage() {
                   >
                     {job.enabled ? <PowerOff className="h-4 w-4" /> : <Power className="h-4 w-4" />}
                   </Button>
-                  <Button variant="ghost" size="icon" onClick={() => deleteMutation.mutate(job.id)} aria-label="Delete job">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => deleteMutation.mutate(job.id)}
+                    aria-label="Delete job"
+                  >
                     <Trash2 className="h-4 w-4 text-destructive" />
                   </Button>
                 </div>

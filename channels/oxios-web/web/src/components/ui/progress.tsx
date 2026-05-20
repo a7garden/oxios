@@ -19,7 +19,10 @@ const Progress = React.forwardRef<HTMLDivElement, ProgressProps>(
       {...props}
     >
       <div
-        className={cn('h-full rounded-full bg-primary transition-all duration-300', indicatorClassName)}
+        className={cn(
+          'h-full rounded-full bg-primary transition-all duration-300',
+          indicatorClassName,
+        )}
         style={{ width: `${Math.min(100, (value / max) * 100)}%` }}
       />
     </div>

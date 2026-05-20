@@ -23,7 +23,18 @@ function DropdownMenu({ trigger, children, align = 'left' }: DropdownMenuProps) 
 
   return (
     <div className="relative" ref={ref}>
-      <div onClick={() => setOpen(!open)}>{trigger}</div>
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        onKeyDown={(e) => {
+          if (e.key === 'Escape') setOpen(false)
+        }}
+        className="inline-flex items-center justify-center"
+        aria-expanded={open}
+        aria-haspopup="menu"
+      >
+        {trigger}
+      </button>
       {open && (
         <div
           className={cn(

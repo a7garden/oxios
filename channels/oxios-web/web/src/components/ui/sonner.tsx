@@ -1,6 +1,6 @@
+import { X } from 'lucide-react'
 import * as React from 'react'
 import { cn } from '@/lib/utils'
-import { X } from 'lucide-react'
 
 type ToastVariant = 'default' | 'success' | 'destructive'
 
@@ -42,8 +42,10 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
             key={t.id}
             className={cn(
               'flex items-center gap-2 rounded-lg border px-4 py-3 text-sm shadow-lg min-w-[280px] max-w-[420px]',
-              t.variant === 'destructive' && 'border-destructive bg-destructive text-destructive-foreground',
-              t.variant === 'success' && 'border-emerald-500/50 bg-emerald-500/15 text-emerald-700 dark:text-emerald-400',
+              t.variant === 'destructive' &&
+                'border-destructive bg-destructive text-destructive-foreground',
+              t.variant === 'success' &&
+                'border-emerald-500/50 bg-emerald-500/15 text-emerald-700 dark:text-emerald-400',
               t.variant === 'default' && 'border-border bg-background text-foreground',
             )}
           >

@@ -17,7 +17,12 @@ function SpaceDetailPage() {
   const { spaceId } = Route.useParams()
   const navigate = useNavigate()
 
-  const { data: space, isLoading, isError, refetch } = useQuery({
+  const {
+    data: space,
+    isLoading,
+    isError,
+    refetch,
+  } = useQuery({
     queryKey: ['space', spaceId],
     queryFn: () => api.get<Space>(`/api/spaces/${spaceId}`),
   })
@@ -37,7 +42,12 @@ function SpaceDetailPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={() => navigate({ to: '/spaces' })} aria-label="Go back">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => navigate({ to: '/spaces' })}
+          aria-label="Go back"
+        >
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div className="flex-1">

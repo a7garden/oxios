@@ -17,7 +17,12 @@ function SeedDetailPage() {
   const { seedId } = Route.useParams()
   const navigate = useNavigate()
 
-  const { data: seed, isLoading, isError, refetch } = useQuery({
+  const {
+    data: seed,
+    isLoading,
+    isError,
+    refetch,
+  } = useQuery({
     queryKey: ['seed', seedId],
     queryFn: () => api.get<Seed>(`/api/seeds/${seedId}`),
   })
@@ -29,7 +34,12 @@ function SeedDetailPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={() => navigate({ to: '/seeds' })} aria-label="Go back">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => navigate({ to: '/seeds' })}
+          aria-label="Go back"
+        >
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div className="flex-1">
