@@ -20,7 +20,7 @@ oxios/                     # Main binary (src/main.rs, src/kernel.rs, src/cmd_ru
 │   ├── oxios-ouroboros/   # Spec-first protocol (interview → seed → execute → evaluate → evolve)
 │   └── oxios-gateway/     # Channel-agnostic message hub
 ├── channels/
-│   ├── oxios-web/         # Web dashboard (Axum backend + Dioxus/WASM frontend)
+│   ├── oxios-web/         # Web dashboard (Axum backend + React frontend)
 │   ├── oxios-cli/         # CLI channel
 │   └── oxios-telegram/    # Telegram channel
 ├── .programs/             # OS-level programs (code-review, debug, deploy, guardian, refactor, program-creator)
