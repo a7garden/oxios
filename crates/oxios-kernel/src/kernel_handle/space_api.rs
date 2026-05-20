@@ -170,7 +170,7 @@ impl SpaceApi {
     /// Get recent memory flow entries.
     pub fn memory_flow(&self) -> Vec<MemoryFlowInfo> {
         self.space_manager
-            .knowledge_bridge()
+            .memory_bridge()
             .map(|bridge| {
                 bridge
                     .recent_references()
@@ -191,7 +191,7 @@ impl SpaceApi {
         let space_id = uuid::Uuid::parse_str(id).ok()?;
         Some(
             self.space_manager
-                .knowledge_bridge()?
+                .memory_bridge()?
                 .references_for(space_id)
                 .iter()
                 .map(MemoryFlowInfo::from)

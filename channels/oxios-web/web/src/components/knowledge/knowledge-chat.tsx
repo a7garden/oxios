@@ -102,11 +102,24 @@ function groupMessages(raws: string[]): DateGroup[] {
 }
 
 // ── Simple hash for msg_hash ─────────────────────────────────
-// Matches the backend's simple content-based identifier.
-// Send the full raw text — backend can derive its own hash.
+// Computes the same MD5(first_line)[..11] hash that the backend uses.
+// Backend: oxios-markdown/src/fs.rs → hash_filename() → MD5 → first 11 hex chars.
 
-function msgHash(raw: string): string {
-  return raw
+export async function msgHash(raw: string): Promise<string> {
+  const stripped = raw.replace(/^- \[[ xX]\] /, '')
+  const firstLine = stripped.split('\n')[0] ?? ''
+  try {
+    // Web Crypto API — MD5 via md5-js fallback
+    const { default: md5 } = await import('md5')
+    return md5(firstLine).slice(0, 11)
+  } catch {
+    // Fallback: simple non-crypto hash (deterministic across runs)
+    let h = 5381
+    for (let i = 0; i < firstLine.length; i++) {
+      h = Math.imul(33, h) ^ firstLine.charCodeAt(i)
+    }
+    return Math.abs(h >>> 0).toString(16).padStart(11, '0').slice(0, 11)
+  }
 }
 
 // ── Checklist targets ─────────────────────────────────────────
@@ -267,7 +280,7 @@ export function KnowledgeChat() {
   const moveToJournal = useCallback(
     async (msg: ParsedMessage) => {
       await journalAdd.mutateAsync(msg.text)
-      await chatDelete.mutateAsync(msgHash(msg.raw))
+      await chatDelete.mutateAsync(await msgHash(msg.raw))
     },
     [journalAdd, chatDelete],
   )
@@ -275,14 +288,14 @@ export function KnowledgeChat() {
   const moveToChecklist = useCallback(
     async (path: string, msg: ParsedMessage) => {
       await checklistAdd.mutateAsync({ path, item: msg.text })
-      await chatDelete.mutateAsync(msgHash(msg.raw))
+      await chatDelete.mutateAsync(await msgHash(msg.raw))
     },
     [checklistAdd, chatDelete],
   )
 
   const deleteMessage = useCallback(
     async (msg: ParsedMessage) => {
-      await chatDelete.mutateAsync(msgHash(msg.raw))
+      await chatDelete.mutateAsync(await msgHash(msg.raw))
     },
     [chatDelete],
   )
@@ -293,7 +306,7 @@ export function KnowledgeChat() {
       const targets = flatMessages.filter((m) => selectedIndices.has(m.index))
       for (const msg of targets) {
         await checklistAdd.mutateAsync({ path, item: msg.text })
-        await chatDelete.mutateAsync(msgHash(msg.raw))
+        await chatDelete.mutateAsync(await msgHash(msg.raw))
       }
       setSelectedIndices(new Set())
     },
@@ -304,7 +317,7 @@ export function KnowledgeChat() {
     const targets = flatMessages.filter((m) => selectedIndices.has(m.index))
     for (const msg of targets) {
       await journalAdd.mutateAsync(msg.text)
-      await chatDelete.mutateAsync(msgHash(msg.raw))
+      await chatDelete.mutateAsync(await msgHash(msg.raw))
     }
     setSelectedIndices(new Set())
   }, [flatMessages, selectedIndices, journalAdd, chatDelete])
@@ -312,7 +325,7 @@ export function KnowledgeChat() {
   const bulkDelete = useCallback(async () => {
     const targets = flatMessages.filter((m) => selectedIndices.has(m.index))
     for (const msg of targets) {
-      await chatDelete.mutateAsync(msgHash(msg.raw))
+      await chatDelete.mutateAsync(await msgHash(msg.raw))
     }
     setSelectedIndices(new Set())
   }, [flatMessages, selectedIndices, chatDelete])
@@ -428,14 +441,14 @@ export function KnowledgeChat() {
                           className="mt-0.5 shrink-0 text-muted-foreground hover:text-foreground transition-colors"
                           title={msg.done ? 'Mark incomplete' : 'Mark complete'}
                           disabled={chatDelete.isPending || chatAppend.isPending}
-                          onClick={(e) => {
+                          onClick={async (e) => {
                             e.stopPropagation()
+                            const hash = await msgHash(msg.raw)
                             const oldPrefix = msg.done ? '- [x]' : '- [ ]'
                             const newPrefix = msg.done ? '- [ ]' : '- [x]'
                             const rest = msg.raw.replace(oldPrefix, '').trim()
-                            chatDelete.mutateAsync(msgHash(msg.raw)).then(() => {
-                              chatAppend.mutateAsync(`${newPrefix} ${rest}`)
-                            })
+                            await chatDelete.mutateAsync(hash)
+                            await chatAppend.mutateAsync(`${newPrefix} ${rest}`)
                           }}
                         >
                           {msg.done ? (

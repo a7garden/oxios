@@ -83,7 +83,7 @@ pub(crate) use resources::{
     handle_programs_list,
 };
 pub(crate) use space_routes::{
-    handle_knowledge_flow, handle_knowledge_flow_for, handle_space_activate, handle_space_archive,
+    handle_memory_flow, handle_memory_flow_for, handle_space_activate, handle_space_archive,
     handle_space_current, handle_space_get, handle_space_merge, handle_space_restore,
     handle_spaces_list,
 };
@@ -273,10 +273,10 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         .route("/api/spaces/{id}/archive", post(handle_space_archive))
         .route("/api/spaces/{id}/restore", post(handle_space_restore))
         .route("/api/spaces/merge", post(handle_space_merge))
-        .route("/api/spaces/knowledge-flow", get(handle_knowledge_flow))
+        .route("/api/spaces/memory-flow", get(handle_memory_flow))
         .route(
-            "/api/spaces/{id}/knowledge-flow",
-            get(handle_knowledge_flow_for),
+            "/api/spaces/{id}/memory-flow",
+            get(handle_memory_flow_for),
         )
         // Budget
         .route("/api/budget/{agent_id}", get(handle_budget_get))

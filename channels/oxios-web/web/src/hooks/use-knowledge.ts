@@ -38,7 +38,7 @@ export function useWriteFile() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: ({ path, content }: { path: string; content: string }) =>
-      api.put(`/api/knowledge/file/${path}`, content),
+      api.put(`/api/knowledge/file/${path}`, content, true), // raw markdown, not JSON
     onSuccess: (_, { path }) => {
       qc.invalidateQueries({ queryKey: ['knowledge', 'tree'] })
       qc.invalidateQueries({ queryKey: ['knowledge', 'file', path] })

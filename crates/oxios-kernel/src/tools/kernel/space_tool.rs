@@ -153,7 +153,7 @@ impl AgentTool for SpaceTool {
                             "active": info.active,
                             "paths": info.paths,
                             "interaction_count": info.interaction_count,
-                            "knowledge_visible": info.knowledge_visible,
+                            "memory_visible": info.memory_visible,
                             "last_active": info.last_active,
                         }))
                         .unwrap_or_default(),

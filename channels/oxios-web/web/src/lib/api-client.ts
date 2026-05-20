@@ -16,6 +16,8 @@ interface RequestOptions {
   body?: unknown
   params?: Record<string, string>
   headers?: Record<string, string>
+  /** Skip JSON encoding — send body as-is (for file PUT with raw markdown) */
+  rawBody?: boolean
 }
 
 export async function apiClient<T>(path: string, options?: RequestOptions): Promise<T> {
@@ -27,14 +29,17 @@ export async function apiClient<T>(path: string, options?: RequestOptions): Prom
   }
 
   const token = localStorage.getItem('oxios-api-key')
+  const isRawBody = options?.rawBody === true
   const res = await fetch(url.toString(), {
     method: options?.method ?? 'GET',
     headers: {
-      'Content-Type': 'application/json',
+      'Content-Type': isRawBody ? 'text/markdown' : 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...options?.headers,
     },
-    body: options?.body ? JSON.stringify(options.body) : undefined,
+    body: isRawBody
+      ? (options.body as string ?? undefined)
+      : (options?.body ? JSON.stringify(options.body) : undefined),
   })
 
   if (!res.ok) {
@@ -53,6 +58,7 @@ export async function apiClient<T>(path: string, options?: RequestOptions): Prom
 export const api = {
   get: <T>(path: string, params?: Record<string, string>) => apiClient<T>(path, { params }),
   post: <T>(path: string, body?: unknown) => apiClient<T>(path, { method: 'POST', body }),
-  put: <T>(path: string, body?: unknown) => apiClient<T>(path, { method: 'PUT', body }),
+  put: <T>(path: string, body?: unknown, rawBody?: boolean) =>
+    apiClient<T>(path, { method: 'PUT', body, rawBody }),
   delete: <T>(path: string) => apiClient<T>(path, { method: 'DELETE' }),
 }

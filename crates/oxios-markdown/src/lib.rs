@@ -32,6 +32,7 @@ pub mod html;
 #[allow(dead_code)]
 pub mod fslog;
 pub mod habits;
+pub mod knowledge;
 pub mod i18n;
 pub mod journal;
 pub mod merge;
@@ -60,6 +61,7 @@ pub use types::{
 };
 
 pub use backlinks::{Backlink, BacklinkIndex, LinkGraph, LinkEdge, LinkNode};
+pub use knowledge::{FileChange, KnowledgeBase, NoteHit};
 pub use chat::{read_chat_msgs, find_chat_msg_by_hash, rename_chat_msg, delete_chat_msg, append_to_chat_msg, move_from_chat, today_header as chat_today_header};
 pub use fs::VirtualFs;
 pub use fs::split_posix_path;

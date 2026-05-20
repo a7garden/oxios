@@ -4,7 +4,7 @@
 //! - Detects which Space a message belongs to (3-layer strategy)
 //! - Creates/manages Spaces (auto + manual)
 //! - Routes messages to the appropriate Space
-//! - Manages knowledge flow via KnowledgeBridge
+//! - Manages memory flow via SpaceBridge
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
