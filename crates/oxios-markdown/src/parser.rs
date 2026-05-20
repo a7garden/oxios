@@ -58,6 +58,162 @@ pub fn truncate(s: &str, max_len: usize) -> String {
     }
 }
 
+/// First character uppercase (Unicode-aware).
+///
+/// ```
+/// use oxios_markdown::parser::ucfirst;
+/// assert_eq!(ucfirst("hello"), "Hello");
+/// assert_eq!(ucfirst(""), "");
+/// assert_eq!(ucfirst("über"), "Über");
+/// ```
+pub fn ucfirst(s: &str) -> String {
+    let mut chars = s.chars();
+    match chars.next() {
+        Some(first) => first.to_uppercase().chain(chars).collect(),
+        None => String::new(),
+    }
+}
+
+/// First character lowercase (Unicode-aware).
+///
+/// ```
+/// use oxios_markdown::parser::lcfirst;
+/// assert_eq!(lcfirst("Hello"), "hello");
+/// assert_eq!(lcfirst(""), "");
+/// ```
+pub fn lcfirst(s: &str) -> String {
+    let mut chars = s.chars();
+    match chars.next() {
+        Some(first) => first.to_lowercase().chain(chars).collect(),
+        None => String::new(),
+    }
+}
+
+/// Unicode-safe substring.
+///
+/// Respects Unicode codepoints but is not grapheme-cluster aware
+/// (combining characters like skin-tone modifiers count as separate codepoints).
+///
+/// ```
+/// use oxios_markdown::parser::substr;
+/// assert_eq!(substr("Hello", 0, 3), "Hel");
+/// assert_eq!(substr("Hello", 3, 10), "lo");
+/// assert_eq!(substr("Hello", 10, 2), "");
+/// ```
+pub fn substr(input: &str, start: usize, length: usize) -> String {
+    let runes: Vec<char> = input.chars().collect();
+    if start >= runes.len() {
+        return String::new();
+    }
+    let end = (start + length).min(runes.len());
+    runes[start..end].iter().collect()
+}
+
+/// Check if text has multiple lines.
+///
+/// ```
+/// use oxios_markdown::parser::is_multiline;
+/// assert!(is_multiline("line one\nline two"));
+/// assert!(!is_multiline("single line"));
+/// ```
+pub fn is_multiline(text: &str) -> bool {
+    let text = norm_new_lines(text);
+    text.lines().count() > 1
+}
+
+/// Split text into chunks of at most `max_len` characters.
+///
+/// Tries to break at the last newline, then the last space within the window.
+/// Trims leading/trailing whitespace from each chunk.
+///
+/// ```
+/// use oxios_markdown::parser::split_text_into_chunks;
+/// let chunks = split_text_into_chunks("Hello world how are you", 11);
+/// assert!(chunks.len() > 1);
+/// for chunk in &chunks {
+///     assert!(chunk.len() <= 11);
+/// }
+/// ```
+pub fn split_text_into_chunks(text: &str, max_len: usize) -> Vec<String> {
+    let text = text.trim();
+
+    if max_len == 0 {
+        return vec![text.to_string()];
+    }
+
+    let mut chunks = Vec::new();
+    let mut runes: Vec<char> = text.chars().collect();
+
+    while runes.len() > max_len {
+        let window = &runes[..max_len];
+
+        // Find the last newline in the window
+        let mut split_index = None;
+        for i in (0..window.len()).rev() {
+            if window[i] == '\n' {
+                split_index = Some(i);
+                break;
+            }
+        }
+
+        // No newline — find the last space
+        if split_index.is_none() {
+            for i in (0..window.len()).rev() {
+                if window[i] == ' ' {
+                    split_index = Some(i);
+                    break;
+                }
+            }
+        }
+
+        // No space either — split at max_len
+        let split_index = split_index.unwrap_or(max_len);
+
+        let chunk: String = runes[..split_index].iter().collect();
+        let chunk = chunk.trim();
+        if !chunk.is_empty() {
+            chunks.push(chunk.to_string());
+        }
+
+        let remainder: String = runes[split_index..].iter().collect();
+        runes = remainder.trim().chars().collect();
+    }
+
+    // Add the remaining runes as the final chunk
+    let remainder: String = runes.iter().collect();
+    let remainder = remainder.trim();
+    if !remainder.is_empty() {
+        chunks.push(remainder.to_string());
+    }
+
+    chunks
+}
+
+/// Known emoji prefixes to strip before re-adding.
+const EMOJI_STRIP_PREFIXES: &[&str] = &[
+    "WRK ", "UA ", "US ", "CY ", "HOB ", "SRB ", "PL ",
+];
+
+/// Add emoji prefix to string, stripping known prefixes first.
+///
+/// If `emoji` is empty the string is returned with prefixes stripped only.
+///
+/// ```
+/// use oxios_markdown::parser::emoji_prefix;
+/// assert_eq!(emoji_prefix("📝", "WRK Task"), "📝 Task");
+/// assert_eq!(emoji_prefix("", "Hello"), "Hello");
+/// ```
+pub fn emoji_prefix(emoji: &str, s: &str) -> String {
+    let mut s = s.to_string();
+    for prefix in EMOJI_STRIP_PREFIXES {
+        s = s.trim_start_matches(prefix).to_string();
+    }
+    if emoji.is_empty() {
+        return s;
+    }
+    format!("{} {}", emoji, s)
+}
+
 /// Check if text contains a markdown image.
 pub fn has_image(msg: &str) -> bool {
     Regex::new(r"!\[.*?\]\(.*?\)").unwrap().is_match(msg)
@@ -154,6 +310,70 @@ mod tests {
         let md = "# Title\n## Section\n### Sub\nsome text";
         let headings = extract_headings(md);
         assert_eq!(headings, vec!["Title", "Section", "Sub"]);
+    }
+
+    #[test]
+    fn test_ucfirst() {
+        assert_eq!(ucfirst("hello"), "Hello");
+        assert_eq!(ucfirst(""), "");
+        assert_eq!(ucfirst("Already"), "Already");
+        assert_eq!(ucfirst("über"), "Über");
+    }
+
+    #[test]
+    fn test_lcfirst() {
+        assert_eq!(lcfirst("Hello"), "hello");
+        assert_eq!(lcfirst(""), "");
+        assert_eq!(lcfirst("lower"), "lower");
+    }
+
+    #[test]
+    fn test_substr() {
+        assert_eq!(substr("Hello", 0, 3), "Hel");
+        assert_eq!(substr("Hello", 2, 3), "llo");
+        assert_eq!(substr("Hello", 3, 10), "lo");
+        assert_eq!(substr("Hello", 10, 2), "");
+        assert_eq!(substr("", 0, 5), "");
+        // Unicode
+        assert_eq!(substr("안녕하세요", 0, 2), "안녕");
+    }
+
+    #[test]
+    fn test_is_multiline() {
+        assert!(is_multiline("line one\nline two"));
+        assert!(!is_multiline("single line"));
+        assert!(is_multiline("a\r\nb"));
+        assert!(!is_multiline(""));
+    }
+
+    #[test]
+    fn test_split_text_into_chunks() {
+        // Exact fit
+        let chunks = split_text_into_chunks("Hello", 5);
+        assert_eq!(chunks, vec!["Hello"]);
+
+        // Split at space
+        let chunks = split_text_into_chunks("Hello world how are you", 11);
+        for chunk in &chunks {
+            assert!(chunk.len() <= 11, "chunk too long: '{}' ({})", chunk, chunk.len());
+        }
+        assert!(chunks.len() > 1);
+
+        // Split at newline
+        let chunks = split_text_into_chunks("Line one\nLine two\nLine three", 9);
+        assert_eq!(chunks.len(), 3);
+
+        // max_len == 0 returns everything as one chunk
+        let chunks = split_text_into_chunks("Hello world", 0);
+        assert_eq!(chunks, vec!["Hello world"]);
+    }
+
+    #[test]
+    fn test_emoji_prefix() {
+        assert_eq!(emoji_prefix("📝", "WRK Task"), "📝 Task");
+        assert_eq!(emoji_prefix("✅", "Task"), "✅ Task");
+        assert_eq!(emoji_prefix("", "Hello"), "Hello");
+        assert_eq!(emoji_prefix("🎉", "UA Celebration"), "🎉 Celebration");
     }
 
     #[test]

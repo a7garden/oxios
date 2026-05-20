@@ -26,7 +26,9 @@
 
 pub mod backlinks;
 pub mod chat;
+pub mod checklist;
 pub mod fs;
+pub mod html;
 #[allow(dead_code)]
 pub mod fslog;
 pub mod habits;
@@ -38,6 +40,7 @@ pub mod schedule;
 pub mod sync;
 pub mod tokens;
 pub mod types;
+pub mod worker;
 
 // Re-export core types for convenience
 pub use types::{
@@ -53,15 +56,20 @@ pub use types::{
 };
 
 pub use backlinks::{Backlink, BacklinkIndex, LinkGraph, LinkEdge, LinkNode};
-pub use chat::{read_chat_msgs, find_chat_msg_by_hash, rename_chat_msg, delete_chat_msg, today_header as chat_today_header};
+pub use chat::{read_chat_msgs, find_chat_msg_by_hash, rename_chat_msg, delete_chat_msg, append_to_chat_msg, move_from_chat, today_header as chat_today_header};
 pub use fs::VirtualFs;
 pub use fs::split_posix_path;
 pub use fslog::FsLog;
-pub use habits::{habits, emoji_for_status, habit_emoji, weekday_emoji};
+pub use habits::{habits, last_week_habits, write_habits, emoji_for_status, habit_emoji, weekday_emoji};
 pub use journal::{add_record as journal_add_record, add_emoji as journal_add_emoji, today_journal_filename, today_header as journal_today_header};
+pub use html::{markdown_to_html, escape_html, strip_html_tags, replace_with_placeholders, restore_from_placeholders};
 pub use merge::merge;
 pub use parser::{similar, levenshtein, extract_markdown_links, extract_headings, norm_new_lines,
-    today_chat_header, today_journal_path};
-pub use schedule::ScheduleManager;
+    today_chat_header, today_journal_path,
+    ucfirst, lcfirst, substr, is_multiline, split_text_into_chunks, emoji_prefix};
+pub use checklist::{checklist_items, incomplete_checklist_items, add_checklist_item,
+    complete_checklist_item, remove_checklist_item, remove_completed_checklist_items,
+    checklist_item, add_header_and_text};
+pub use worker::{remove_completed_items, remove_completed_checklist, remove_completed_inbox_entries, move_due_tasks, schedule_report, next_exclude_today, NightlyReport};
 pub use sync::SyncEngine;
 pub use tokens::TokenManager;

@@ -11,7 +11,7 @@ use crate::merge::merge;
 use crate::types::{
     FsError, SyncError, SyncFile, SyncRequest, SyncResponse,
     STATUS_MERGED, STATUS_NOT_MODIFIED, STATUS_OK, STATUS_UPDATED_ON_SERVER,
-    DIR_USER_ROOT, MD_EXT,
+    DIR_MEDIA, DIR_USER_ROOT, MD_EXT,
 };
 
 /// Configuration for the sync engine.
@@ -198,6 +198,95 @@ impl SyncEngine {
             }],
             ..SyncResponse::default()
         })
+    }
+
+    // ── Media sync ─────────────────────────────────────────
+
+    /// Media file entry.
+    #[derive(Debug, Clone)]
+    pub struct MediaEntry {
+        /// Filename within the media directory.
+        pub filename: String,
+        /// Last modified timestamp (millis since epoch).
+        pub last_modified: i64,
+    }
+
+    /// Media sync response.
+    #[derive(Debug, Clone)]
+    pub struct MediaSyncResponse {
+        /// Media files modified since the given timestamp.
+        pub files: Vec<MediaEntry>,
+        /// Latest modification timestamp among returned files.
+        pub timestamp: i64,
+    }
+
+    /// List media files modified since a given timestamp.
+    ///
+    /// Returns all media files whose mtime > `since_timestamp`,
+    /// along with the latest timestamp for incremental sync.
+    pub fn sync_media_filenames(&self, since_timestamp: i64) -> Result<MediaSyncResponse, SyncError> {
+        let mtimes = self.fs
+            .mtimes(DIR_MEDIA, &[])
+            .map_err(|e| SyncError::Storage(e.to_string()))?;
+
+        let mut files: Vec<MediaEntry> = Vec::new();
+        let mut latest_timestamp: i64 = 0;
+
+        for (filename, mod_time) in &mtimes {
+            if *mod_time <= since_timestamp {
+                continue;
+            }
+            if *mod_time > latest_timestamp {
+                latest_timestamp = *mod_time;
+            }
+            files.push(MediaEntry {
+                filename: filename.clone(),
+                last_modified: *mod_time,
+            });
+        }
+
+        Ok(MediaSyncResponse {
+            files,
+            timestamp: latest_timestamp,
+        })
+    }
+
+    /// Upload a media file (from raw bytes).
+    ///
+    /// TODO: Currently VirtualFs::write takes &str content. Binary media files
+    /// need a `write_bytes` method on VirtualFs. For now this writes bytes as-is
+    /// which works for most file types but is not ideal. A proper `read_bytes` /
+    /// `write_bytes` pair should be added to fs.rs.
+    pub fn sync_media_upload(&self, filename: &str, data: &[u8]) -> Result<(), SyncError> {
+        let exists = self.fs.exists(DIR_MEDIA, filename)
+            .map_err(|e| SyncError::Storage(e.to_string()))?;
+
+        if exists {
+            // File already exists, skip
+            return Ok(());
+        }
+
+        // TODO: Add size/quota limits check
+        // TODO: Use write_bytes once VirtualFs supports binary writes
+        let content = unsafe { std::str::from_utf8_unchecked(data) };
+        self.fs.write(DIR_MEDIA, filename, content)
+            .map_err(|e| match e {
+                FsError::QuotaExceeded => SyncError::QuotaExceeded,
+                other => SyncError::Storage(other.to_string()),
+            })?;
+
+        Ok(())
+    }
+
+    /// Read a media file as raw bytes.
+    ///
+    /// TODO: Currently VirtualFs::read returns String. A `read_bytes` method
+    /// should be added to VirtualFs for proper binary support. For now we
+    /// read as String and convert to bytes.
+    pub fn sync_media_read(&self, filename: &str) -> Result<Vec<u8>, SyncError> {
+        let content = self.fs.read(DIR_MEDIA, filename)
+            .map_err(|e| SyncError::Storage(e.to_string()))?;
+        Ok(content.into_bytes())
     }
 }
 

@@ -84,6 +84,77 @@ pub fn rename_chat_msg(content: &str, msg_hash: &str, new_body: &str) -> Result<
     Ok(new_blocks.join("\n"))
 }
 
+/// Append text to an existing chat message identified by hash.
+///
+/// Returns `(new_content, true)` on success, or `(original_content, false)` if not found.
+/// The appended text becomes a new indented continuation line under the original entry.
+pub fn append_to_chat_msg(
+    content: &str,
+    msg_hash: &str,
+    new_text: &str,
+) -> Result<String, String> {
+    let blocks = read_chat_msgs(content);
+    let header_re = Regex::new(r"^#### ").unwrap();
+
+    let idx = blocks.iter().position(|b| {
+        !header_re.is_match(b) && chat_block_hash(b) == msg_hash
+    });
+
+    let idx = match idx {
+        Some(i) => i,
+        None => return Err(format!("chat block not found for hash {:?}", msg_hash)),
+    };
+
+    let new_text = new_text.trim_end_matches('\n');
+    if new_text.is_empty() {
+        return Ok(content.to_string());
+    }
+
+    let mut new_blocks = blocks;
+    let block = new_blocks[idx].trim_end_matches('\n').to_string();
+    new_blocks[idx] = format!("{}\n{}", block, new_text);
+
+    Ok(new_blocks.join("\n"))
+}
+
+/// Move a chat message to a target file as a checklist item.
+///
+/// Finds the message by hash in `chat_content`, removes it from chat, and
+/// appends it as a `- [ ] ` checklist item to `target_content`.
+/// Returns `(new_chat_content, new_target_content)`.
+pub fn move_from_chat(
+    chat_content: &str,
+    msg_hash: &str,
+    target_content: &str,
+) -> (String, String) {
+    // Find the message
+    let found = find_chat_msg_by_hash(chat_content, msg_hash);
+
+    match found {
+        Some((_idx, block)) => {
+            // Strip the inbox entry prefix to get the body
+            let body = strip_inbox_entry_prefix(&block);
+            let body = body.trim().replace('\n', " ");
+
+            // Remove from chat
+            let new_chat = match delete_chat_msg(chat_content, msg_hash) {
+                Ok(c) => c,
+                Err(_) => chat_content.to_string(),
+            };
+
+            // Add as checklist item to target
+            let new_target = if target_content.is_empty() {
+                format!("- [ ] {}", body)
+            } else {
+                format!("{}\n- [ ] {}", target_content.trim_end(), body)
+            };
+
+            (new_chat, new_target)
+        }
+        None => (chat_content.to_string(), target_content.to_string()),
+    }
+}
+
 /// Delete a chat message by hash.
 pub fn delete_chat_msg(content: &str, msg_hash: &str) -> Result<String, String> {
     let blocks = read_chat_msgs(content);
@@ -145,5 +216,60 @@ mod tests {
         let result = delete_chat_msg(content, &hash).unwrap();
         assert!(!result.contains("Delete me"));
         assert!(result.contains("Keep me"));
+    }
+
+    #[test]
+    fn test_append_to_chat_msg() {
+        let content = "#### 19 May\n- [ ] `09:00` Task one\n- [ ] `10:00` Task two";
+        let hash = chat_block_hash("- [ ] `09:00` Task one");
+        let result = append_to_chat_msg(content, &hash, "added detail").unwrap();
+        assert!(result.contains("Task one\nadded detail"));
+        assert!(result.contains("Task two"));
+    }
+
+    #[test]
+    fn test_append_to_chat_msg_not_found() {
+        let content = "#### 19 May\n- [ ] `09:00` Task";
+        let result = append_to_chat_msg(content, "nonexistent_hash", "text");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_append_to_chat_msg_empty_text() {
+        let content = "#### 19 May\n- [ ] `09:00` Task";
+        let hash = chat_block_hash("- [ ] `09:00` Task");
+        let result = append_to_chat_msg(content, &hash, "").unwrap();
+        assert_eq!(result, content);
+    }
+
+    #[test]
+    fn test_move_from_chat() {
+        let chat = "#### 19 May\n- [ ] `09:00` Move me\n- [ ] `10:00` Stay";
+        let hash = chat_block_hash("- [ ] `09:00` Move me");
+        let (new_chat, new_target) = move_from_chat(chat, &hash, "- [ ] Existing item");
+
+        // Should be removed from chat
+        assert!(!new_chat.contains("Move me"));
+        assert!(new_chat.contains("Stay"));
+
+        // Should be added as checklist item in target
+        assert!(new_target.contains("- [ ] Existing item"));
+        assert!(new_target.contains("- [ ] `09:00` Move me"));
+    }
+
+    #[test]
+    fn test_move_from_chat_not_found() {
+        let chat = "#### 19 May\n- [ ] `09:00` Task";
+        let (new_chat, new_target) = move_from_chat(chat, "nonexistent", "target");
+        assert_eq!(new_chat, chat);
+        assert_eq!(new_target, "target");
+    }
+
+    #[test]
+    fn test_move_from_chat_empty_target() {
+        let chat = "#### 19 May\n- [ ] `09:00` Move me";
+        let hash = chat_block_hash("- [ ] `09:00` Move me");
+        let (_new_chat, new_target) = move_from_chat(chat, &hash, "");
+        assert!(new_target.contains("- [ ] `09:00` Move me"));
     }
 }
