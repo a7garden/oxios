@@ -18,7 +18,6 @@ use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 
-use crate::embedding::EmbeddingProvider;
 use crate::memory::{MemoryEntry, MemoryManager, MemoryType};
 
 /// Knowledge context injected into agent prompts.
@@ -91,6 +90,7 @@ pub struct KnowledgeLens {
     /// Tracks which files were written by agents.
     agent_writes: Arc<RwLock<HashSet<String>>>,
     /// Callback handle for file-change events.
+    #[allow(dead_code)]
     callback_handle: Option<mpsc::Sender<oxios_markdown::knowledge::FileChange>>,
     /// Default model ID for copilot chat.
     model_id: String,

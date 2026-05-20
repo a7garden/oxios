@@ -332,7 +332,6 @@ impl AutoMemoryBridge {
         if let Some(kb) = &self.knowledge_base {
             let entries = kb.index_all()?;
             if entries > 0 {
-                let kb_root = kb.root();
                 let patterns = kb
                     .note_tree("/")
                     .unwrap_or_default()

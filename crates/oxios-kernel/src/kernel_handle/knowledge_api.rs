@@ -10,12 +10,11 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use anyhow::Result;
-use chrono::Utc;
 use parking_lot::{Mutex, RwLock};
 use serde::{Deserialize, Serialize};
 
 use oxios_markdown::{Backlink, BacklinkIndex, FileEntry, LinkGraph, VirtualFs};
-use oxios_markdown::parser::{extract_headings, similar};
+use oxios_markdown::parser::similar;
 use oxios_markdown::types::DIR_USER_ROOT;
 
 use crate::engine::EngineProvider;

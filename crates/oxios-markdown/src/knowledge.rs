@@ -41,7 +41,12 @@ pub enum FileChange {
     /// A file was deleted.
     Deleted(String),
     /// A file was moved or renamed.
-    Moved { old: String, new: String },
+    Moved {
+        /// Original path before the move.
+        old: String,
+        /// New path after the move.
+        new: String,
+    },
 }
 
 /// Knowledge search hit (file-name based).
