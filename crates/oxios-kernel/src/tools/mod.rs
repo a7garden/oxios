@@ -20,8 +20,8 @@ pub mod browser;
 pub use a2a_tools::{A2aDelegateTool, A2aQueryTool, A2aSendTool};
 pub use exec_tool::ExecTool;
 pub use kernel::{
-    BudgetTool, CronTool, KernelAgentTool, KnowledgeTool, PersonaTool, ResourceTool,
-    SecurityTool, SpaceTool,
+    BudgetTool, CronTool, KernelAgentTool, KnowledgeTool, PersonaTool, ResourceTool, SecurityTool,
+    SpaceTool,
 };
 pub use mcp_tool::McpToolWrapper;
 pub use memory_tools::{MemoryReadTool, MemorySearchTool, MemoryWriteTool};

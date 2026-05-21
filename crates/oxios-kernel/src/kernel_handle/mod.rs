@@ -19,7 +19,9 @@ pub use browser_api::BrowserApi;
 pub use exec_api::ExecApi;
 pub use extension_api::ExtensionApi;
 pub use infra_api::InfraApi;
-pub use knowledge_lens::{CopilotResponse, KnowledgeContext, KnowledgeLens, KnowledgeNote, MemoryNote};
+pub use knowledge_lens::{
+    CopilotResponse, KnowledgeContext, KnowledgeLens, KnowledgeNote, MemoryNote,
+};
 pub use mcp_api::McpApi;
 pub use persona_api::PersonaApi;
 pub use security_api::SecurityApi;
@@ -165,11 +167,8 @@ impl KernelHandle {
                 .expect("Failed to create KnowledgeBase"),
         );
         let knowledge_lens = Arc::new(
-            KnowledgeLens::new(
-                knowledge.clone(),
-                memory_manager.clone(),
-            )
-            .expect("Failed to create KnowledgeLens"),
+            KnowledgeLens::new(knowledge.clone(), memory_manager.clone())
+                .expect("Failed to create KnowledgeLens"),
         );
         Self {
             security: SecurityApi::new(
@@ -199,6 +198,7 @@ impl KernelHandle {
             ),
             spaces: SpaceApi::new(space_manager, event_bus),
             exec: ExecApi::new(Arc::new(config.exec.clone()), access_manager),
+            #[allow(clippy::default_trait_access)]
             browser: BrowserApi::default(),
             a2a: A2aApi::new(Arc::new(A2AProtocol::new(crate::EventBus::new(0)))),
             knowledge,

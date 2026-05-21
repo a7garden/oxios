@@ -7,13 +7,13 @@
 
 pub mod conversation_buffer;
 pub mod detection;
-pub mod space_bridge;
 pub mod manager;
+pub mod space_bridge;
 
 pub use conversation_buffer::{ConversationBuffer, ConversationTurn};
 pub use detection::{extract_filesystem_path, match_keywords, PathMatcher};
-pub use space_bridge::{CrossRefEntry, SpaceBridge, MemoryFlow};
 pub use manager::{SpaceManager, SpaceManagerError};
+pub use space_bridge::{CrossRefEntry, MemoryFlow, SpaceBridge};
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};

@@ -267,7 +267,7 @@ pub const MOOD_EMOJIS: &[&str] = &["⚪️", "🤕", "😔", "😐", "🙂", "�
 // ============================================================================
 
 /// A scheduled task.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Schedule {
     /// Target filename.
     pub filename: String,
@@ -280,18 +280,6 @@ pub struct Schedule {
     pub cmd: String,
 }
 
-impl Default for Schedule {
-    fn default() -> Self {
-        Self {
-            filename: String::new(),
-            scheduled_at: 0,
-            cron: String::new(),
-            cmd: String::new(),
-        }
-    }
-}
-
-// ============================================================================
 // Knowledge Config Types
 // ============================================================================
 
@@ -333,10 +321,18 @@ pub struct KnowledgeConfig {
     pub channels: Vec<i64>,
 }
 
-fn default_language() -> String { "en".to_string() }
-fn default_timezone() -> String { "UTC".to_string() }
-fn default_pomodoro_duration() -> i64 { 50 }
-fn default_mode() -> String { "full".to_string() }
+fn default_language() -> String {
+    "en".to_string()
+}
+fn default_timezone() -> String {
+    "UTC".to_string()
+}
+fn default_pomodoro_duration() -> i64 {
+    50
+}
+fn default_mode() -> String {
+    "full".to_string()
+}
 
 impl Default for KnowledgeConfig {
     fn default() -> Self {

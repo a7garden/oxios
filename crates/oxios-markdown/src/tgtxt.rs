@@ -67,36 +67,42 @@ pub fn extract_text_imgs_links(text: &str) -> ExtractResult {
     let mut text = kept_lines.join("\n");
 
     // Phase 2: replace images
-    text = img_re.replace_all(&text, |caps: &regex::Captures| {
-        if let Some(id) = caps.get(1) {
-            images.push(id.as_str().to_string());
-        }
-        "🖼"
-    }).to_string();
+    text = img_re
+        .replace_all(&text, |caps: &regex::Captures| {
+            if let Some(id) = caps.get(1) {
+                images.push(id.as_str().to_string());
+            }
+            "🖼"
+        })
+        .to_string();
 
     // Phase 3: replace inline links
-    text = link_re.replace_all(&text, |caps: &regex::Captures| {
-        if let Some(m) = caps.get(1) {
-            let content = m.as_str();
-            let (link_path, link_label) = split_link_content(content, false);
-            links.insert(link_label.clone(), link_path);
-            format!("`{}`", link_label)
-        } else {
-            caps.get(0).unwrap().as_str().to_string()
-        }
-    }).to_string();
+    text = link_re
+        .replace_all(&text, |caps: &regex::Captures| {
+            if let Some(m) = caps.get(1) {
+                let content = m.as_str();
+                let (link_path, link_label) = split_link_content(content, false);
+                links.insert(link_label.clone(), link_path);
+                format!("`{}`", link_label)
+            } else {
+                caps.get(0).unwrap().as_str().to_string()
+            }
+        })
+        .to_string();
 
     // Phase 4: replace wiki links
-    text = wiki_re.replace_all(&text, |caps: &regex::Captures| {
-        if let Some(m) = caps.get(1) {
-            let content = m.as_str();
-            let (link_path, link_label) = split_link_content(content, true);
-            links.insert(link_label.clone(), link_path);
-            format!("`{}`", link_label)
-        } else {
-            caps.get(0).unwrap().as_str().to_string()
-        }
-    }).to_string();
+    text = wiki_re
+        .replace_all(&text, |caps: &regex::Captures| {
+            if let Some(m) = caps.get(1) {
+                let content = m.as_str();
+                let (link_path, link_label) = split_link_content(content, true);
+                links.insert(link_label.clone(), link_path);
+                format!("`{}`", link_label)
+            } else {
+                caps.get(0).unwrap().as_str().to_string()
+            }
+        })
+        .to_string();
 
     ExtractResult {
         text: text.trim().to_string(),
@@ -112,16 +118,13 @@ fn split_link_content(content: &str, is_wiki: bool) -> (String, String) {
     if is_wiki {
         let parts: Vec<&str> = content.splitn(2, '|').collect();
         let path = format!("{}.md", parts[0]);
-        let label = parts
-            .get(1)
-            .map(|s| (*s).to_string())
-            .unwrap_or_else(|| {
-                std::path::Path::new(&path)
-                    .file_stem()
-                    .and_then(|s| s.to_str())
-                    .unwrap_or("")
-                    .to_string()
-            });
+        let label = parts.get(1).map(|s| (*s).to_string()).unwrap_or_else(|| {
+            std::path::Path::new(&path)
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or("")
+                .to_string()
+        });
         (path, label)
     } else {
         let path = content.to_string();
@@ -167,7 +170,10 @@ mod tests {
         let md = "See [[brain/Rust|The Rust Page]] for details";
         let result = extract_text_imgs_links(md);
         assert!(result.text.contains("`The Rust Page`"));
-        assert_eq!(result.links.get("The Rust Page"), Some(&"brain/Rust.md".to_string()));
+        assert_eq!(
+            result.links.get("The Rust Page"),
+            Some(&"brain/Rust.md".to_string())
+        );
     }
 
     #[test]
@@ -177,7 +183,10 @@ mod tests {
         assert!(result.text.contains("Some text"));
         assert!(result.text.contains("More text"));
         assert!(!result.text.contains("My Note"));
-        assert_eq!(result.links.get("MyNote"), Some(&"notes/MyNote.md".to_string()));
+        assert_eq!(
+            result.links.get("MyNote"),
+            Some(&"notes/MyNote.md".to_string())
+        );
     }
 
     #[test]
@@ -185,7 +194,10 @@ mod tests {
         let md = "Some text\n[[notes/MyNote]]\nMore text";
         let result = extract_text_imgs_links(md);
         assert!(!result.text.contains("[[notes/MyNote]]"));
-        assert_eq!(result.links.get("MyNote"), Some(&"notes/MyNote.md".to_string()));
+        assert_eq!(
+            result.links.get("MyNote"),
+            Some(&"notes/MyNote.md".to_string())
+        );
     }
 
     #[test]

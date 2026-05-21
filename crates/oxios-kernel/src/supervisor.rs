@@ -421,10 +421,13 @@ mod tests {
                 EventBus::new(64),
             ))),
             Arc::new(oxios_markdown::KnowledgeBase::new(tmp.join("knowledge")).unwrap()),
-            Arc::new(crate::kernel_handle::KnowledgeLens::new(
-                Arc::new(oxios_markdown::KnowledgeBase::new(tmp.join("knowledge")).unwrap()),
-                memory_manager.clone(),
-            ).unwrap()),
+            Arc::new(
+                crate::kernel_handle::KnowledgeLens::new(
+                    Arc::new(oxios_markdown::KnowledgeBase::new(tmp.join("knowledge")).unwrap()),
+                    memory_manager.clone(),
+                )
+                .unwrap(),
+            ),
         ));
 
         let runtime = AgentRuntime::new(provider, "mock/model", kernel_handle);

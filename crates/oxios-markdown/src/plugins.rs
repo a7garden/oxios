@@ -20,8 +20,8 @@ pub struct TimezoneEntry {
 const TIMEZONES: &[(&str, &str, &str)] = &[
     ("UTC", "🕰", "UTC"),
     ("MSK", "🔺", "Europe/Moscow"),
-    ("CY",  "🏝", "Asia/Nicosia"),
-    ("ME",  "⛰",  "Europe/Podgorica"),
+    ("CY", "🏝", "Asia/Nicosia"),
+    ("ME", "⛰", "Europe/Podgorica"),
 ];
 
 /// Default timezone names (in order).
@@ -141,15 +141,11 @@ fn format_time(utc_dt: &chrono::DateTime<Utc>, tz_str: &str) -> String {
 }
 
 fn show_timestamp(utc_dt: &chrono::DateTime<Utc>) -> Vec<TimezoneEntry> {
-    show_impl(utc_dt, |dt, tz_str| {
-        format_time(dt, tz_str)
-    })
+    show_impl(utc_dt, format_time)
 }
 
 fn show_time(utc_dt: &chrono::DateTime<Utc>) -> Vec<TimezoneEntry> {
-    show_impl(utc_dt, |dt, tz_str| {
-        format_time(dt, tz_str)
-    })
+    show_impl(utc_dt, format_time)
 }
 
 fn show_impl<F>(utc_dt: &chrono::DateTime<Utc>, formatter: F) -> Vec<TimezoneEntry>
@@ -233,13 +229,11 @@ mod tests {
 
     #[test]
     fn test_format_report() {
-        let entries = vec![
-            TimezoneEntry {
-                name: "UTC".into(),
-                icon: "🕰".into(),
-                current_time: "01.06.2024 12:00:00".into(),
-            },
-        ];
+        let entries = vec![TimezoneEntry {
+            name: "UTC".into(),
+            icon: "🕰".into(),
+            current_time: "01.06.2024 12:00:00".into(),
+        }];
         let report = format_report(&entries);
         assert!(report.contains("🕰"));
         assert!(report.contains("UTC"));

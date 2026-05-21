@@ -65,14 +65,13 @@ pub(crate) use knowledge_routes::{
     handle_knowledge_backlinks, handle_knowledge_chat_append, handle_knowledge_chat_delete,
     handle_knowledge_chat_messages, handle_knowledge_chat_move, handle_knowledge_checklist_add,
     handle_knowledge_checklist_complete, handle_knowledge_checklist_items,
-    handle_knowledge_checklist_remove, handle_knowledge_config_get,
-    handle_knowledge_config_put, handle_knowledge_convert_html, handle_knowledge_copilot,
-    handle_knowledge_emoji, handle_knowledge_file_delete, handle_knowledge_file_get,
-    handle_knowledge_file_put, handle_knowledge_graph, handle_knowledge_habits,
-    handle_knowledge_habits_last_week, handle_knowledge_journal_add, handle_knowledge_journal_emoji,
-    handle_knowledge_journal_today, handle_knowledge_search, handle_knowledge_stats_done_today,
-    handle_knowledge_stats_today, handle_knowledge_tree, handle_knowledge_worker_nightly,
-    handle_knowledge_worker_scheduled,
+    handle_knowledge_checklist_remove, handle_knowledge_config_get, handle_knowledge_config_put,
+    handle_knowledge_convert_html, handle_knowledge_copilot, handle_knowledge_emoji,
+    handle_knowledge_file_delete, handle_knowledge_file_get, handle_knowledge_file_put,
+    handle_knowledge_graph, handle_knowledge_habits, handle_knowledge_habits_last_week,
+    handle_knowledge_journal_add, handle_knowledge_journal_emoji, handle_knowledge_journal_today,
+    handle_knowledge_search, handle_knowledge_stats_done_today, handle_knowledge_stats_today,
+    handle_knowledge_tree, handle_knowledge_worker_nightly, handle_knowledge_worker_scheduled,
 };
 pub(crate) use resource_routes::{
     handle_resource_history, handle_resource_overload, handle_resource_snapshot,
@@ -274,10 +273,7 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         .route("/api/spaces/{id}/restore", post(handle_space_restore))
         .route("/api/spaces/merge", post(handle_space_merge))
         .route("/api/spaces/memory-flow", get(handle_memory_flow))
-        .route(
-            "/api/spaces/{id}/memory-flow",
-            get(handle_memory_flow_for),
-        )
+        .route("/api/spaces/{id}/memory-flow", get(handle_memory_flow_for))
         // Budget
         .route("/api/budget/{agent_id}", get(handle_budget_get))
         .route("/api/budget/{agent_id}", post(handle_budget_set))
@@ -302,10 +298,7 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
             delete(handle_knowledge_file_delete),
         )
         .route("/api/knowledge/search", post(handle_knowledge_search))
-        .route(
-            "/api/knowledge/backlinks",
-            get(handle_knowledge_backlinks),
-        )
+        .route("/api/knowledge/backlinks", get(handle_knowledge_backlinks))
         .route("/api/knowledge/graph", get(handle_knowledge_graph))
         .route("/api/knowledge/copilot", post(handle_knowledge_copilot))
         // Knowledge — Checklist
@@ -338,10 +331,7 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
             "/api/knowledge/chat/delete",
             post(handle_knowledge_chat_delete),
         )
-        .route(
-            "/api/knowledge/chat/move",
-            post(handle_knowledge_chat_move),
-        )
+        .route("/api/knowledge/chat/move", post(handle_knowledge_chat_move))
         // Knowledge — Journal
         .route(
             "/api/knowledge/journal/add",
@@ -371,14 +361,8 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
             get(handle_knowledge_stats_done_today),
         )
         // Knowledge — Config
-        .route(
-            "/api/knowledge/config",
-            get(handle_knowledge_config_get),
-        )
-        .route(
-            "/api/knowledge/config",
-            put(handle_knowledge_config_put),
-        )
+        .route("/api/knowledge/config", get(handle_knowledge_config_get))
+        .route("/api/knowledge/config", put(handle_knowledge_config_put))
         // Knowledge — Worker
         .route(
             "/api/knowledge/worker/nightly",

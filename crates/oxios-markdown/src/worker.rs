@@ -14,9 +14,8 @@ use crate::fs::VirtualFs;
 use crate::journal::add_record as journal_add_record;
 use crate::parser::norm_new_lines;
 use crate::types::{
-    FsError, KnowledgeConfig,
-    DIR_ARCHIVE, DIR_USER_ROOT,
-    CHAT_FILENAME, LATER_FILENAME, DONE_FILENAME,
+    FsError, KnowledgeConfig, CHAT_FILENAME, DIR_ARCHIVE, DIR_USER_ROOT, DONE_FILENAME,
+    LATER_FILENAME,
 };
 
 /// Result of a nightly cleanup run.
@@ -44,7 +43,9 @@ pub fn remove_completed_items(
     // We apply two reducers to Chat.md:
     //   1. checklist removal (from both Chat and Later)
     //   2. inbox entry removal (Chat only)
-    let targets: &[(&str, fn(&str) -> (String, String))] = &[
+    type Reducer = fn(&str) -> (String, String);
+
+    let targets: &[(&str, Reducer)] = &[
         (CHAT_FILENAME, remove_completed_checklist),
         (LATER_FILENAME, remove_completed_checklist),
         (CHAT_FILENAME, remove_completed_inbox_entries),
@@ -86,11 +87,7 @@ pub fn remove_completed_items(
         let tasks = checklist_items(&removed_md);
         for task in &tasks {
             let stripped = strip_chat_timestamp(task);
-            let _ = journal_add_record(
-                fs,
-                &format!("✅ {}", stripped),
-                tz,
-            );
+            let _ = journal_add_record(fs, &format!("✅ {}", stripped), tz);
             report.journal_count += 1;
         }
         report.archived_count += tasks.len();
@@ -263,10 +260,7 @@ pub fn next_exclude_today(cron_expr: &str) -> Option<i64> {
     // Calculate tomorrow at HH:MM UTC
     let now = Utc::now();
     let tomorrow = now.date_naive() + chrono::Duration::days(1);
-    let target = tomorrow
-        .and_hms_opt(hour, minute, 0)?
-        .and_utc()
-        .timestamp();
+    let target = tomorrow.and_hms_opt(hour, minute, 0)?.and_utc().timestamp();
 
     Some(target)
 }
@@ -452,8 +446,12 @@ mod tests {
         fs.create_system_dirs().unwrap();
 
         // Write Chat.md with completed items
-        fs.write(DIR_USER_ROOT, CHAT_FILENAME, "- [x] Completed task\n- [ ] Pending task")
-            .unwrap();
+        fs.write(
+            DIR_USER_ROOT,
+            CHAT_FILENAME,
+            "- [x] Completed task\n- [ ] Pending task",
+        )
+        .unwrap();
 
         let config = KnowledgeConfig::default();
         let report = remove_completed_items(&fs, &config).unwrap();
@@ -474,10 +472,18 @@ mod tests {
         let (fs, _t) = test_fs();
         fs.create_system_dirs().unwrap();
 
-        fs.write(DIR_USER_ROOT, CHAT_FILENAME, "- [x] Chat done\n- [ ] Chat pending")
-            .unwrap();
-        fs.write(DIR_USER_ROOT, LATER_FILENAME, "- [x] Later done\n- [ ] Later pending")
-            .unwrap();
+        fs.write(
+            DIR_USER_ROOT,
+            CHAT_FILENAME,
+            "- [x] Chat done\n- [ ] Chat pending",
+        )
+        .unwrap();
+        fs.write(
+            DIR_USER_ROOT,
+            LATER_FILENAME,
+            "- [x] Later done\n- [ ] Later pending",
+        )
+        .unwrap();
 
         let config = KnowledgeConfig::default();
         let report = remove_completed_items(&fs, &config).unwrap();

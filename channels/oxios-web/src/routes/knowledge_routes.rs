@@ -586,7 +586,9 @@ pub(crate) async fn handle_knowledge_copilot(
         .kernel
         .knowledge_lens
         .copilot_chat(
-            Arc::new(oxios_kernel::OxiEngineProvider::new("anthropic/claude-sonnet-4")),
+            Arc::new(oxios_kernel::OxiEngineProvider::new(
+                "anthropic/claude-sonnet-4",
+            )),
             "anthropic/claude-sonnet-4",
             &body.question,
             body.context_path.as_deref(),
@@ -858,20 +860,39 @@ pub(crate) async fn handle_knowledge_config_put(
         .map_err(|e| AppError::Internal(e.to_string()))?;
 
     // Merge non-null fields
-    if let Some(v) = body.language { config.language = v; }
-    if let Some(v) = body.timezone { config.timezone = v; }
-    if let Some(v) = body.move_to_commands { config.move_to_commands = v; }
-    if let Some(v) = body.pomodoro_duration_in_minutes { config.pomodoro_duration_in_minutes = v; }
+    if let Some(v) = body.language {
+        config.language = v;
+    }
+    if let Some(v) = body.timezone {
+        config.timezone = v;
+    }
+    if let Some(v) = body.move_to_commands {
+        config.move_to_commands = v;
+    }
+    if let Some(v) = body.pomodoro_duration_in_minutes {
+        config.pomodoro_duration_in_minutes = v;
+    }
     if let Some(v) = body.schedules {
-        config.schedules = v.into_iter()
+        config.schedules = v
+            .into_iter()
             .filter_map(|v| serde_json::from_value(v).ok())
             .collect();
     }
-    if let Some(v) = body.quick_commands { config.quick_commands = v; }
-    if let Some(v) = body.two_emojis_enabled { config.two_emojis_enabled = v; }
-    if let Some(v) = body.mode { config.mode = v; }
-    if let Some(v) = body.quick_habits_enabled { config.quick_habits_enabled = v; }
-    if let Some(v) = body.channels { config.channels = v; }
+    if let Some(v) = body.quick_commands {
+        config.quick_commands = v;
+    }
+    if let Some(v) = body.two_emojis_enabled {
+        config.two_emojis_enabled = v;
+    }
+    if let Some(v) = body.mode {
+        config.mode = v;
+    }
+    if let Some(v) = body.quick_habits_enabled {
+        config.quick_habits_enabled = v;
+    }
+    if let Some(v) = body.channels {
+        config.channels = v;
+    }
 
     state
         .kernel

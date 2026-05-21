@@ -172,7 +172,7 @@ pub use git_layer::{CommitInfo, GitLayer, LogEntry};
 pub use resource_monitor::{OverloadThreshold, ResourceMonitor, ResourceSnapshot};
 pub use space::{
     extract_filesystem_path, match_keywords, ConversationBuffer, ConversationTurn, CrossRefEntry,
-    SpaceBridge, MemoryFlow, PathMatcher, Space, SpaceId, SpaceManager, SpaceManagerError,
+    MemoryFlow, PathMatcher, Space, SpaceBridge, SpaceId, SpaceManager, SpaceManagerError,
     SpaceSource,
 };
 pub use state_store::{AgentResponse, Session, SessionId, SessionSummary, StateStore};
@@ -187,8 +187,8 @@ pub use types::{AgentId, AgentInfo, AgentStatus};
 pub use kernel_handle::KernelHandle;
 pub use kernel_handle::{
     A2aApi, AgentApi, BrowserApi, CopilotResponse, ExecApi, ExtensionApi, InfraApi,
-    KnowledgeContext, KnowledgeLens, KnowledgeNote, McpApi, MemoryNote,
-    PersonaApi, SecurityApi, SpaceApi, StateApi,
+    KnowledgeContext, KnowledgeLens, KnowledgeNote, McpApi, MemoryNote, PersonaApi, SecurityApi,
+    SpaceApi, StateApi,
 };
 
 // ─── oxi-sdk re-exports ─────────────────────────────────────────────

@@ -4,6 +4,7 @@
 //! Each knowledge base has its own root directory. All paths are validated
 //! to prevent path traversal attacks.
 
+use std::cmp::Reverse;
 use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
@@ -11,16 +12,20 @@ use std::time::SystemTime;
 
 use md5::{Digest as Md5Digest, Md5};
 
-use crate::types::{
-    FileEntry, FsError,
-    DIR_ARCHIVE, DIR_JOURNAL, DIR_MEDIA, DIR_USER_ROOT,
-};
+use crate::types::{FileEntry, FsError, DIR_ARCHIVE, DIR_JOURNAL, DIR_MEDIA, DIR_USER_ROOT};
 
 /// Forbidden filename characters and their safe replacements.
 const FORBIDDEN_CHARS: &[(&str, &str)] = &[
-    ("<", "＜"), (">", "＞"), (":", "꞉"), ("\"", "″"),
-    ("|", "⼁"), ("\\", "＼"), ("?", "？"), ("*", "﹡"),
-    ("\x00", ""), ("/", "／"),
+    ("<", "＜"),
+    (">", "＞"),
+    (":", "꞉"),
+    ("\"", "″"),
+    ("|", "⼁"),
+    ("\\", "＼"),
+    ("?", "？"),
+    ("*", "﹡"),
+    ("\x00", ""),
+    ("/", "／"),
 ];
 
 /// System directories to exclude from user-facing listings.
@@ -103,7 +108,9 @@ impl VirtualFs {
         let full = self.root.join(&relative);
 
         // Normalize and verify we didn't escape root
-        let stripped = full.strip_prefix(&self.root).map_err(|_| FsError::UnsafePath)?;
+        let stripped = full
+            .strip_prefix(&self.root)
+            .map_err(|_| FsError::UnsafePath)?;
         let (normalized, escaped) = normalize_path(stripped);
         if escaped || normalized.to_string_lossy().contains("..") {
             return Err(FsError::UnsafePath);
@@ -179,7 +186,9 @@ impl VirtualFs {
 
         if self.quota_kb > 0 {
             let new_size = content.len() as i64;
-            let old_size = std::fs::metadata(&path).map(|m| m.len() as i64).unwrap_or(0);
+            let old_size = std::fs::metadata(&path)
+                .map(|m| m.len() as i64)
+                .unwrap_or(0);
             let used = self.calculate_used_quota()?;
             let available = (self.quota_kb * 1024) - used;
             if (new_size - old_size) > available {
@@ -209,7 +218,9 @@ impl VirtualFs {
 
         if self.quota_kb > 0 {
             let new_size = data.len() as i64;
-            let old_size = std::fs::metadata(&path).map(|m| m.len() as i64).unwrap_or(0);
+            let old_size = std::fs::metadata(&path)
+                .map(|m| m.len() as i64)
+                .unwrap_or(0);
             let used = self.calculate_used_quota()?;
             let available = (self.quota_kb * 1024) - used;
             if (new_size - old_size) > available {
@@ -313,7 +324,11 @@ impl VirtualFs {
         for entry in std::fs::read_dir(&user_path)? {
             let entry = entry?;
             let path = entry.path();
-            let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("").to_string();
+            let name = path
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or("")
+                .to_string();
 
             if IGNORED_NAMES.contains(&name.as_str()) {
                 continue;
@@ -326,14 +341,26 @@ impl VirtualFs {
             let display_name = display_name(&name);
             let has_content = !is_dir && meta.len() > 0;
 
-            entries.push(FileEntry::new(name, hash, display_name, ctime, has_content, is_dir, dir.to_string()));
+            entries.push(FileEntry::new(
+                name,
+                hash,
+                display_name,
+                ctime,
+                has_content,
+                is_dir,
+                dir.to_string(),
+            ));
         }
         Ok(entries)
     }
 
     /// List only directories in the root.
     pub fn dirs(&self) -> Result<Vec<FileEntry>, FsError> {
-        Ok(self.files_and_dirs(DIR_USER_ROOT)?.into_iter().filter(|f| f.is_dir).collect())
+        Ok(self
+            .files_and_dirs(DIR_USER_ROOT)?
+            .into_iter()
+            .filter(|f| f.is_dir)
+            .collect())
     }
 
     /// Check if a file has non-whitespace content.
@@ -380,7 +407,8 @@ impl VirtualFs {
         self.collect_md_files(&self.root, &self.root, &mut notes)?;
 
         if !query_lower.is_empty() {
-            let matching: Vec<FileEntry> = notes.iter()
+            let matching: Vec<FileEntry> = notes
+                .iter()
                 .filter(|f| {
                     let top = f.parent_dir.split('/').next().unwrap_or("");
                     top.to_lowercase().starts_with(&query_lower)
@@ -393,7 +421,7 @@ impl VirtualFs {
             }
         }
 
-        notes.sort_by(|a, b| b.ctime.cmp(&a.ctime));
+        notes.sort_by_key(|a| Reverse(a.ctime));
         Ok(notes)
     }
 
@@ -422,14 +450,21 @@ impl VirtualFs {
                 self.walk_dir(root_path, &path, extensions, result)?;
             } else {
                 if !extensions.is_empty() {
-                    let ext = path.extension().and_then(|e| e.to_str()).map(|e| format!(".{}", e));
-                    let ext_match = ext.as_ref().map(|e| extensions.contains(&e.as_str())).unwrap_or(false);
+                    let ext = path
+                        .extension()
+                        .and_then(|e| e.to_str())
+                        .map(|e| format!(".{}", e));
+                    let ext_match = ext
+                        .as_ref()
+                        .map(|e| extensions.contains(&e.as_str()))
+                        .unwrap_or(false);
                     if !ext_match {
                         continue;
                     }
                 }
 
-                let rel = path.strip_prefix(root_path)
+                let rel = path
+                    .strip_prefix(root_path)
                     .map_err(|_| FsError::UnsafePath)?;
                 let display = rel.to_string_lossy();
                 let display_path = if display.starts_with('/') || display.starts_with('\\') {
@@ -445,7 +480,12 @@ impl VirtualFs {
         Ok(())
     }
 
-    fn collect_md_files(&self, root_path: &Path, current_path: &Path, files: &mut Vec<FileEntry>) -> Result<(), FsError> {
+    fn collect_md_files(
+        &self,
+        root_path: &Path,
+        current_path: &Path,
+        files: &mut Vec<FileEntry>,
+    ) -> Result<(), FsError> {
         if !current_path.is_dir() {
             return Ok(());
         }
@@ -455,14 +495,23 @@ impl VirtualFs {
             let filename = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
 
             if path.is_dir() {
-                if filename.starts_with('.') { continue; }
+                if filename.starts_with('.') {
+                    continue;
+                }
                 self.collect_md_files(root_path, &path, files)?;
             } else {
-                if !filename.ends_with(".md") || filename.starts_with('.') { continue; }
+                if !filename.ends_with(".md") || filename.starts_with('.') {
+                    continue;
+                }
 
                 let meta = std::fs::metadata(&path)?;
-                let rel = path.strip_prefix(root_path).map_err(|_| FsError::UnsafePath)?;
-                let parent = rel.parent().map(|p| p.to_string_lossy().to_string()).unwrap_or_default();
+                let rel = path
+                    .strip_prefix(root_path)
+                    .map_err(|_| FsError::UnsafePath)?;
+                let parent = rel
+                    .parent()
+                    .map(|p| p.to_string_lossy().to_string())
+                    .unwrap_or_default();
                 let parent_str = if parent.is_empty() || parent == "." {
                     DIR_USER_ROOT.to_string()
                 } else {
@@ -474,8 +523,13 @@ impl VirtualFs {
                 let display_name = display_name(filename);
 
                 files.push(FileEntry::new(
-                    filename.to_string(), hash, display_name, ctime,
-                    meta.len() > 0, false, parent_str,
+                    filename.to_string(),
+                    hash,
+                    display_name,
+                    ctime,
+                    meta.len() > 0,
+                    false,
+                    parent_str,
                 ));
             }
         }
@@ -507,14 +561,14 @@ impl VirtualFs {
 pub fn hash_filename(filename: &str) -> String {
     let mut hasher = Md5::new();
     hasher.update(filename.as_bytes());
-    hex::encode(&hasher.finalize())[..11].to_string()
+    hex::encode(hasher.finalize())[..11].to_string()
 }
 
 /// Compute short hash (first 5 hex characters).
 pub fn short_hash(filename: &str) -> String {
     let mut hasher = Md5::new();
     hasher.update(filename.as_bytes());
-    hex::encode(&hasher.finalize())[..5].to_string()
+    hex::encode(hasher.finalize())[..5].to_string()
 }
 
 /// Sanitize a filename by replacing forbidden characters.
@@ -540,11 +594,7 @@ pub fn unsanitize_filename(filename: &str) -> String {
 /// Get display name from filename: capitalized, without `.md` extension.
 pub fn display_name(filename: &str) -> String {
     let trimmed = filename.trim();
-    let without_ext = if trimmed.ends_with(".md") {
-        &trimmed[..trimmed.len() - 3]
-    } else {
-        trimmed
-    };
+    let without_ext = trimmed.strip_suffix(".md").unwrap_or(trimmed);
     let mut chars = without_ext.chars();
     match chars.next() {
         None => String::new(),
@@ -555,7 +605,9 @@ pub fn display_name(filename: &str) -> String {
 /// Check if a filename represents a checklist item.
 pub fn is_checklist_item(filename: &str) -> bool {
     let trimmed = filename.trim();
-    if !trimmed.starts_with('-') { return false; }
+    if !trimmed.starts_with('-') {
+        return false;
+    }
     if let Some(pos) = trimmed.rfind('-') {
         pos > 0 && pos < trimmed.len() - 1
     } else {
@@ -565,20 +617,32 @@ pub fn is_checklist_item(filename: &str) -> bool {
 
 /// Filter: exclude checklist files.
 pub fn exclude_checklists(files: &[FileEntry]) -> Vec<FileEntry> {
-    files.iter().filter(|f| {
-        let name = f.name.trim_end_matches(".md");
-        !(name.starts_with('_') && name.ends_with('_'))
-    }).cloned().collect()
+    files
+        .iter()
+        .filter(|f| {
+            let name = f.name.trim_end_matches(".md");
+            !(name.starts_with('_') && name.ends_with('_'))
+        })
+        .cloned()
+        .collect()
 }
 
 /// Filter: exclude system directories.
 pub fn exclude_system_dirs(files: &[FileEntry]) -> Vec<FileEntry> {
-    files.iter().filter(|f| !SYSTEM_DIRS.contains(&f.name.as_str())).cloned().collect()
+    files
+        .iter()
+        .filter(|f| !SYSTEM_DIRS.contains(&f.name.as_str()))
+        .cloned()
+        .collect()
 }
 
 /// Filter: exclude system files.
 pub fn exclude_system_files(files: &[FileEntry]) -> Vec<FileEntry> {
-    files.iter().filter(|f| !SYSTEM_FILES.contains(&f.name.as_str())).cloned().collect()
+    files
+        .iter()
+        .filter(|f| !SYSTEM_FILES.contains(&f.name.as_str()))
+        .cloned()
+        .collect()
 }
 
 /// Filter: only directories.
@@ -593,14 +657,18 @@ pub fn only_files(files: &[FileEntry]) -> Vec<FileEntry> {
 
 /// Filter: only user markdown files (exclude system files, dirs, non-md).
 pub fn only_user_md_files(files: &[FileEntry]) -> Vec<FileEntry> {
-    files.iter().filter(|f| {
-        !f.is_dir && f.name.ends_with(".md") && !SYSTEM_FILES.contains(&f.name.as_str())
-    }).cloned().collect()
+    files
+        .iter()
+        .filter(|f| {
+            !f.is_dir && f.name.ends_with(".md") && !SYSTEM_FILES.contains(&f.name.as_str())
+        })
+        .cloned()
+        .collect()
 }
 
 /// Sort files by ctime descending (newest first).
-pub fn sort_by_ctime_desc(files: &mut Vec<FileEntry>) {
-    files.sort_by(|a, b| b.ctime.cmp(&a.ctime));
+pub fn sort_by_ctime_desc(files: &mut [FileEntry]) {
+    files.sort_by_key(|a| Reverse(a.ctime));
 }
 
 /// Extract filenames from a list of file entries.
@@ -629,7 +697,11 @@ fn normalize_path(path: &Path) -> (PathBuf, bool) {
         match component {
             std::path::Component::Normal(s) => components.push(s),
             std::path::Component::ParentDir => {
-                if components.is_empty() { escaped = true; } else { components.pop(); }
+                if components.is_empty() {
+                    escaped = true;
+                } else {
+                    components.pop();
+                }
             }
             std::path::Component::CurDir => {}
             std::path::Component::RootDir | std::path::Component::Prefix(_) => {}
@@ -639,7 +711,9 @@ fn normalize_path(path: &Path) -> (PathBuf, bool) {
 }
 
 fn mtime_to_ms(time: SystemTime) -> i64 {
-    time.duration_since(SystemTime::UNIX_EPOCH).map(|d| d.as_millis() as i64).unwrap_or(0)
+    time.duration_since(SystemTime::UNIX_EPOCH)
+        .map(|d| d.as_millis() as i64)
+        .unwrap_or(0)
 }
 
 fn dir_size(path: PathBuf) -> std::io::Result<i64> {
@@ -647,8 +721,11 @@ fn dir_size(path: PathBuf) -> std::io::Result<i64> {
     for entry in std::fs::read_dir(path)? {
         let entry = entry?;
         let meta = entry.metadata()?;
-        if meta.is_file() { total += meta.len() as i64; }
-        else if meta.is_dir() { total += dir_size(entry.path())?; }
+        if meta.is_file() {
+            total += meta.len() as i64;
+        } else if meta.is_dir() {
+            total += dir_size(entry.path())?;
+        }
     }
     Ok(total)
 }
@@ -780,8 +857,24 @@ mod tests {
 
     #[test]
     fn test_filter_functions() {
-        let f = FileEntry::new("a.md".into(), "h".into(), "A".into(), 0, true, false, "/".into());
-        let d = FileEntry::new("dir".into(), "h".into(), "Dir".into(), 0, false, true, "/".into());
+        let f = FileEntry::new(
+            "a.md".into(),
+            "h".into(),
+            "A".into(),
+            0,
+            true,
+            false,
+            "/".into(),
+        );
+        let d = FileEntry::new(
+            "dir".into(),
+            "h".into(),
+            "Dir".into(),
+            0,
+            false,
+            true,
+            "/".into(),
+        );
         assert_eq!(only_dirs(&[f.clone(), d.clone()]).len(), 1);
         assert_eq!(only_files(&[f.clone(), d]).len(), 1);
     }
@@ -789,7 +882,9 @@ mod tests {
     #[test]
     fn test_quota_enforcement() {
         let dir = TempDir::new().unwrap();
-        let fs = VirtualFs::new(dir.path().to_path_buf()).unwrap().with_quota(1); // 1 KB
+        let fs = VirtualFs::new(dir.path().to_path_buf())
+            .unwrap()
+            .with_quota(1); // 1 KB
         assert!(fs.write("/", "big.md", &"x".repeat(2048)).is_err());
     }
 
@@ -805,7 +900,9 @@ mod tests {
     #[test]
     fn test_write_bytes_quota() {
         let dir = TempDir::new().unwrap();
-        let fs = VirtualFs::new(dir.path().to_path_buf()).unwrap().with_quota(1); // 1 KB
+        let fs = VirtualFs::new(dir.path().to_path_buf())
+            .unwrap()
+            .with_quota(1); // 1 KB
         let big = vec![0u8; 2048];
         assert!(fs.write_bytes("/", "big.bin", &big).is_err());
     }

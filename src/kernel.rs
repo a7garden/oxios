@@ -108,17 +108,28 @@ impl Kernel {
                     self.build_browser_api(),
                     oxios_kernel::A2aApi::new(self.a2a_protocol.clone()),
                     // KnowledgeBase — single source of truth (RFC-003)
-                    Arc::new(KnowledgeBase::new(
-                        std::path::PathBuf::from(&self.config.kernel.workspace).join("knowledge"),
-                    ).expect("KnowledgeBase init failed")),
+                    Arc::new(
+                        KnowledgeBase::new(
+                            std::path::PathBuf::from(&self.config.kernel.workspace)
+                                .join("knowledge"),
+                        )
+                        .expect("KnowledgeBase init failed"),
+                    ),
                     // KnowledgeLens — semantic overlay, shares same KnowledgeBase
-                    Arc::new(oxios_kernel::KnowledgeLens::new(
-                        // Note: clones the Arc, points to same KnowledgeBase
-                        Arc::new(KnowledgeBase::new(
-                            std::path::PathBuf::from(&self.config.kernel.workspace).join("knowledge"),
-                        ).expect("KnowledgeBase init failed")),
-                        self.memory_manager.clone(),
-                    ).expect("KnowledgeLens init failed")),
+                    Arc::new(
+                        oxios_kernel::KnowledgeLens::new(
+                            // Note: clones the Arc, points to same KnowledgeBase
+                            Arc::new(
+                                KnowledgeBase::new(
+                                    std::path::PathBuf::from(&self.config.kernel.workspace)
+                                        .join("knowledge"),
+                                )
+                                .expect("KnowledgeBase init failed"),
+                            ),
+                            self.memory_manager.clone(),
+                        )
+                        .expect("KnowledgeLens init failed"),
+                    ),
                 ))
             })
             .clone()
@@ -448,16 +459,23 @@ impl KernelBuilder {
                 build_browser_api_value(&config),
                 oxios_kernel::A2aApi::new(a2a_protocol.clone()),
                 // KnowledgeBase — single source of truth (RFC-003)
-                Arc::new(KnowledgeBase::new(
-                    PathBuf::from(&config.kernel.workspace).join("knowledge"),
-                ).expect("KnowledgeBase init failed")),
+                Arc::new(
+                    KnowledgeBase::new(PathBuf::from(&config.kernel.workspace).join("knowledge"))
+                        .expect("KnowledgeBase init failed"),
+                ),
                 // KnowledgeLens — semantic overlay, shares same KnowledgeBase
-                Arc::new(oxios_kernel::KnowledgeLens::new(
-                    Arc::new(KnowledgeBase::new(
-                        PathBuf::from(&config.kernel.workspace).join("knowledge"),
-                    ).expect("KnowledgeBase init failed")),
-                    memory_manager.clone(),
-                ).expect("KnowledgeLens init failed")),
+                Arc::new(
+                    oxios_kernel::KnowledgeLens::new(
+                        Arc::new(
+                            KnowledgeBase::new(
+                                PathBuf::from(&config.kernel.workspace).join("knowledge"),
+                            )
+                            .expect("KnowledgeBase init failed"),
+                        ),
+                        memory_manager.clone(),
+                    )
+                    .expect("KnowledgeLens init failed"),
+                ),
             ));
 
         // Build ToolRetriever for semantic capability discovery.

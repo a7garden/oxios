@@ -165,15 +165,24 @@ mod tests {
             crate::A2aApi::new(Arc::new(crate::a2a::A2AProtocol::new(
                 crate::event_bus::EventBus::new(256),
             ))),
-            Arc::new(oxios_markdown::KnowledgeBase::new(
-                std::path::PathBuf::from("/tmp/oxios-test/knowledge"),
-            ).unwrap()),
-            Arc::new(crate::kernel_handle::KnowledgeLens::new(
-                Arc::new(oxios_markdown::KnowledgeBase::new(
-                    std::path::PathBuf::from("/tmp/oxios-test/knowledge"),
-                ).unwrap()),
-                Arc::new(crate::memory::MemoryManager::new(state_store.clone())),
-            ).unwrap()),
+            Arc::new(
+                oxios_markdown::KnowledgeBase::new(std::path::PathBuf::from(
+                    "/tmp/oxios-test/knowledge",
+                ))
+                .unwrap(),
+            ),
+            Arc::new(
+                crate::kernel_handle::KnowledgeLens::new(
+                    Arc::new(
+                        oxios_markdown::KnowledgeBase::new(std::path::PathBuf::from(
+                            "/tmp/oxios-test/knowledge",
+                        ))
+                        .unwrap(),
+                    ),
+                    Arc::new(crate::memory::MemoryManager::new(state_store.clone())),
+                )
+                .unwrap(),
+            ),
         ));
 
         let bridge = OxiosKernelBridge::new(kernel);

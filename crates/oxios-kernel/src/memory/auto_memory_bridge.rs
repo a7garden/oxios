@@ -183,7 +183,10 @@ impl AutoMemoryBridge {
     ///
     /// When set, `export_knowledge_to_auto()` can read directly from
     /// `.md` files instead of relying on MemoryManager entries.
-    pub fn with_knowledge_base(mut self, kb: std::sync::Arc<oxios_markdown::KnowledgeBase>) -> Self {
+    pub fn with_knowledge_base(
+        mut self,
+        kb: std::sync::Arc<oxios_markdown::KnowledgeBase>,
+    ) -> Self {
         self.knowledge_base = Some(kb);
         self
     }
@@ -653,10 +656,9 @@ mod tests {
     fn make_bridge(dir: &Path) -> AutoMemoryBridge {
         let store = Arc::new(crate::state_store::StateStore::new(dir.join("state")).unwrap());
         let memory = Arc::new(MemoryManager::new(store));
-        AutoMemoryBridge::new(dir.join("auto"), memory)
-            .with_knowledge_base(Arc::new(
-                oxios_markdown::KnowledgeBase::new(dir.join("kb")).unwrap(),
-            ))
+        AutoMemoryBridge::new(dir.join("auto"), memory).with_knowledge_base(Arc::new(
+            oxios_markdown::KnowledgeBase::new(dir.join("kb")).unwrap(),
+        ))
     }
 
     #[test]

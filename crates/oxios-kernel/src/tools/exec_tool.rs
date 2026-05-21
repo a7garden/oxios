@@ -498,7 +498,6 @@ mod tests {
         ExecTool::new(Arc::new(config), Arc::new(Mutex::new(AccessManager::new())))
     }
 
-
     // ─── shell_exec ──────────────────────────────────────────────────
 
     #[tokio::test]

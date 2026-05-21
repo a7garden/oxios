@@ -7,9 +7,9 @@
 //! Supported tags: `*`/`_` → `<i>`, `**`/`__` → `<b>`,
 //! `` ` `` → `<code>`, ` ``` ` → `<pre>`, `#` → `<b>`.
 
+use regex::Regex;
 use std::collections::HashMap;
 use std::rc::Rc;
-use regex::Regex;
 
 // ---------------------------------------------------------------------------
 // Public API — utility functions
@@ -39,22 +39,21 @@ pub fn replace_with_placeholders(
     let mut placeholders = HashMap::new();
     let mut counter: usize = 0;
 
-    let result = re.replace_all(s, |caps: &regex::Captures<'_>| {
-        let full = caps.get(0).unwrap().as_str().to_string();
-        let ph = format!("#{}{}#", placeholder, counter);
-        counter += 1;
-        placeholders.insert(ph.clone(), full);
-        ph
-    }).to_string();
+    let result = re
+        .replace_all(s, |caps: &regex::Captures<'_>| {
+            let full = caps.get(0).unwrap().as_str().to_string();
+            let ph = format!("#{}{}#", placeholder, counter);
+            counter += 1;
+            placeholders.insert(ph.clone(), full);
+            ph
+        })
+        .to_string();
 
     (result, placeholders)
 }
 
 /// Restore placeholders back to their original values.
-pub fn restore_from_placeholders(
-    s: &str,
-    placeholders: &HashMap<String, String>,
-) -> String {
+pub fn restore_from_placeholders(s: &str, placeholders: &HashMap<String, String>) -> String {
     let mut result = s.to_string();
     for (ph, original) in placeholders {
         result = result.replace(ph, original);
@@ -75,27 +74,26 @@ struct ParseResult {
 }
 
 /// The open-tag mapping: markdown token → HTML open tag.
-static OPEN_TAGS: &[(&str, &str)] = &[
-    ("*", "<i>"),
-    ("**", "<b>"),
-    ("_", "<i>"),
-    ("__", "<b>"),
-];
+static OPEN_TAGS: &[(&str, &str)] = &[("*", "<i>"), ("**", "<b>"), ("_", "<i>"), ("__", "<b>")];
 
 /// The close-tag mapping: markdown token → HTML close tag.
-static CLOSE_TAGS: &[(&str, &str)] = &[
-    ("*", "</i>"),
-    ("**", "</b>"),
-    ("_", "</i>"),
-    ("__", "</b>"),
-];
+static CLOSE_TAGS: &[(&str, &str)] =
+    &[("*", "</i>"), ("**", "</b>"), ("_", "</i>"), ("__", "</b>")];
 
 fn open_tag(token: &str) -> &'static str {
-    OPEN_TAGS.iter().find(|(k, _)| *k == token).map(|(_, v)| *v).unwrap_or("")
+    OPEN_TAGS
+        .iter()
+        .find(|(k, _)| *k == token)
+        .map(|(_, v)| *v)
+        .unwrap_or("")
 }
 
 fn close_tag(token: &str) -> &'static str {
-    CLOSE_TAGS.iter().find(|(k, _)| *k == token).map(|(_, v)| *v).unwrap_or("")
+    CLOSE_TAGS
+        .iter()
+        .find(|(k, _)| *k == token)
+        .map(|(_, v)| *v)
+        .unwrap_or("")
 }
 
 /// Using `Rc<dyn Fn>` so that parsers can be cloned (needed for grammar reuse).
@@ -105,10 +103,10 @@ type Parser = Rc<dyn Fn(&str) -> Vec<ParseResult>>;
 /// produces the corresponding HTML open tag.
 fn parse_open(token: &'static str) -> Parser {
     Rc::new(move |input: &str| {
-        if input.starts_with(token) {
+        if let Some(rest) = input.strip_prefix(token) {
             vec![ParseResult {
                 consumed: open_tag(token).to_string(),
-                left: input[token.len()..].to_string(),
+                left: rest.to_string(),
             }]
         } else {
             vec![]
@@ -120,10 +118,10 @@ fn parse_open(token: &'static str) -> Parser {
 /// produces the corresponding HTML close tag.
 fn parse_close(token: &'static str) -> Parser {
     Rc::new(move |input: &str| {
-        if input.starts_with(token) {
+        if let Some(rest) = input.strip_prefix(token) {
             vec![ParseResult {
                 consumed: close_tag(token).to_string(),
-                left: input[token.len()..].to_string(),
+                left: rest.to_string(),
             }]
         } else {
             vec![]
@@ -259,18 +257,12 @@ fn markdown_parser() -> Parser {
     let bold = parse_or(vec![
         parse_and(vec![
             parse_open("**"),
-            parse_some(parse_or(vec![
-                parse_not_markdown(),
-                italic_no_bold.clone(),
-            ])),
+            parse_some(parse_or(vec![parse_not_markdown(), italic_no_bold.clone()])),
             parse_close("**"),
         ]),
         parse_and(vec![
             parse_open("__"),
-            parse_some(parse_or(vec![
-                parse_not_markdown(),
-                italic_no_bold,
-            ])),
+            parse_some(parse_or(vec![parse_not_markdown(), italic_no_bold])),
             parse_close("__"),
         ]),
     ]);
@@ -282,18 +274,12 @@ fn markdown_parser() -> Parser {
     let italic = parse_or(vec![
         parse_and(vec![
             parse_open("*"),
-            parse_some(parse_or(vec![
-                parse_not_markdown(),
-                bold.clone(),
-            ])),
+            parse_some(parse_or(vec![parse_not_markdown(), bold.clone()])),
             parse_close("*"),
         ]),
         parse_and(vec![
             parse_open("_"),
-            parse_some(parse_or(vec![
-                parse_not_markdown(),
-                bold.clone(),
-            ])),
+            parse_some(parse_or(vec![parse_not_markdown(), bold.clone()])),
             parse_close("_"),
         ]),
     ]);
@@ -380,7 +366,10 @@ mod tests {
     fn test_strip_html_tags() {
         assert_eq!(strip_html_tags("<b>hello</b>"), "hello");
         assert_eq!(strip_html_tags("no tags"), "no tags");
-        assert_eq!(strip_html_tags("<b>bold</b> and <i>italic</i>"), "bold and italic");
+        assert_eq!(
+            strip_html_tags("<b>bold</b> and <i>italic</i>"),
+            "bold and italic"
+        );
     }
 
     #[test]

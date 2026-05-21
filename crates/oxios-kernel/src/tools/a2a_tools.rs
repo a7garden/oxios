@@ -476,7 +476,6 @@ mod tests {
         Arc::new(A2AProtocol::new(EventBus::new(256)))
     }
 
-
     async fn register_agent_async(a2a: &A2AProtocol, name: &str, caps: &[&str]) -> AgentId {
         let id = Uuid::new_v4();
         let mut card = crate::a2a::AgentCard::new(id, name, format!("Test agent: {name}"));

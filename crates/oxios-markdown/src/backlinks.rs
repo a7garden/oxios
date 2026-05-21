@@ -84,7 +84,8 @@ impl BacklinkIndex {
                     sources.remove(path);
                 }
             }
-            self.details.retain(|k, _| !k.starts_with(&format!("{}→", path)));
+            self.details
+                .retain(|k, _| !k.starts_with(&format!("{}→", path)));
         }
 
         // Extract and register new links
@@ -94,7 +95,10 @@ impl BacklinkIndex {
         for (line_num, line) in content.lines().enumerate() {
             for (text, target) in extract_markdown_links(line) {
                 targets.insert(target.clone());
-                self.backward.entry(target.clone()).or_default().insert(path.to_string());
+                self.backward
+                    .entry(target.clone())
+                    .or_default()
+                    .insert(path.to_string());
                 self.details.insert(
                     format!("{}→{}", path, target),
                     vec![Backlink {
@@ -110,13 +114,19 @@ impl BacklinkIndex {
         // Deduplicate: extract_markdown_links called twice above; fix by re-extracting from full content once
         // Actually the line-level extraction adds duplicates. Let's simplify:
         // Clear and redo from the full-content extraction.
-        self.backward.values_mut().for_each(|s| { s.remove(path); });
-        self.details.retain(|k, _| !k.starts_with(&format!("{}→", path)));
+        self.backward.values_mut().for_each(|s| {
+            s.remove(path);
+        });
+        self.details
+            .retain(|k, _| !k.starts_with(&format!("{}→", path)));
 
         let mut new_targets = HashSet::new();
         for (text, target) in &links {
             new_targets.insert(target.clone());
-            self.backward.entry(target.clone()).or_default().insert(path.to_string());
+            self.backward
+                .entry(target.clone())
+                .or_default()
+                .insert(path.to_string());
             self.details.insert(
                 format!("{}→{}", path, target),
                 vec![Backlink {
@@ -160,7 +170,12 @@ impl BacklinkIndex {
 
     /// Get all forward links from a file (files this one references).
     pub fn forward_links_for(&self, path: &str) -> Vec<String> {
-        self.forward.get(path).cloned().unwrap_or_default().into_iter().collect()
+        self.forward
+            .get(path)
+            .cloned()
+            .unwrap_or_default()
+            .into_iter()
+            .collect()
     }
 
     /// Get the number of backlinks for a file.
@@ -185,11 +200,19 @@ impl BacklinkIndex {
             }
         }
 
-        let nodes: Vec<LinkNode> = node_set.into_iter().map(|id| {
-            let label = id.trim_end_matches(".md").rsplit('/').next().unwrap_or(&id).to_string();
-            let group = id.split('/').next().unwrap_or("").to_string();
-            LinkNode { id, label, group }
-        }).collect();
+        let nodes: Vec<LinkNode> = node_set
+            .into_iter()
+            .map(|id| {
+                let label = id
+                    .trim_end_matches(".md")
+                    .rsplit('/')
+                    .next()
+                    .unwrap_or(&id)
+                    .to_string();
+                let group = id.split('/').next().unwrap_or("").to_string();
+                LinkNode { id, label, group }
+            })
+            .collect();
 
         LinkGraph { nodes, edges }
     }
@@ -226,7 +249,10 @@ mod tests {
     #[test]
     fn test_index_and_backlinks() {
         let mut idx = BacklinkIndex::new();
-        idx.index_file("brain/Rust.md", "See [Ownership](brain/Ownership.md) and [Go](brain/Go.md)");
+        idx.index_file(
+            "brain/Rust.md",
+            "See [Ownership](brain/Ownership.md) and [Go](brain/Go.md)",
+        );
 
         let bl = idx.backlinks_for("brain/Ownership.md");
         assert_eq!(bl.len(), 1);

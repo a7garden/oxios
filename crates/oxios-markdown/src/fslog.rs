@@ -24,13 +24,19 @@ pub struct FsLog {
 impl FsLog {
     /// Create a new FsLog writing to the given path.
     pub fn new(log_path: std::path::PathBuf) -> Self {
-        Self { log_path, lock: Mutex::new(()) }
+        Self {
+            log_path,
+            lock: Mutex::new(()),
+        }
     }
 
     /// Record a file rename.
     pub fn log_rename(&self, time: i64, old_path: &str, new_path: &str) {
         let _guard = self.lock.lock();
-        let _ = self.append(&format!("{} {} {} {}", time, RENAME_OP,
+        let _ = self.append(&format!(
+            "{} {} {} {}",
+            time,
+            RENAME_OP,
             percent_encoding::utf8_percent_encode(old_path, percent_encoding::NON_ALPHANUMERIC),
             percent_encoding::utf8_percent_encode(new_path, percent_encoding::NON_ALPHANUMERIC),
         ));
@@ -39,8 +45,10 @@ impl FsLog {
     /// Record a file deletion.
     pub fn log_delete(&self, time: i64, path: &str) {
         let _guard = self.lock.lock();
-        let _ = self.append(&format!("{} {} {}",
-            time, DELETE_OP,
+        let _ = self.append(&format!(
+            "{} {} {}",
+            time,
+            DELETE_OP,
             percent_encoding::utf8_percent_encode(path, percent_encoding::NON_ALPHANUMERIC),
         ));
     }
@@ -48,7 +56,11 @@ impl FsLog {
     /// Read rename entries since a given timestamp.
     ///
     /// Returns a map of new_path → old_path.
-    pub fn renames_since(&self, user_prefix: &str, after_timestamp: i64) -> HashMap<String, String> {
+    pub fn renames_since(
+        &self,
+        user_prefix: &str,
+        after_timestamp: i64,
+    ) -> HashMap<String, String> {
         let _guard = self.lock.lock();
         let file = match File::open(&self.log_path) {
             Ok(f) => f,
@@ -58,12 +70,21 @@ impl FsLog {
         let reader = BufReader::new(file);
         let mut result = HashMap::new();
 
-        for line in reader.lines().filter_map(|l| l.ok()) {
+        for line in reader.lines().map_while(Result::ok) {
             let parts: Vec<&str> = line.split_whitespace().collect();
-            if parts.len() != 4 { continue; }
-            let timestamp: i64 = match parts[0].parse() { Ok(t) => t, Err(_) => continue };
-            if parts[1] != RENAME_OP { continue; }
-            if timestamp < after_timestamp { continue; }
+            if parts.len() != 4 {
+                continue;
+            }
+            let timestamp: i64 = match parts[0].parse() {
+                Ok(t) => t,
+                Err(_) => continue,
+            };
+            if parts[1] != RENAME_OP {
+                continue;
+            }
+            if timestamp < after_timestamp {
+                continue;
+            }
 
             let old_path = decode_path(parts[2]);
             let new_path = decode_path(parts[3]);
@@ -72,8 +93,14 @@ impl FsLog {
                 continue;
             }
 
-            let old_rel = old_path.strip_prefix(user_prefix).unwrap_or(&old_path).to_string();
-            let new_rel = new_path.strip_prefix(user_prefix).unwrap_or(&new_path).to_string();
+            let old_rel = old_path
+                .strip_prefix(user_prefix)
+                .unwrap_or(&old_path)
+                .to_string();
+            let new_rel = new_path
+                .strip_prefix(user_prefix)
+                .unwrap_or(&new_path)
+                .to_string();
             result.insert(new_rel, old_rel);
         }
         result
@@ -83,7 +110,10 @@ impl FsLog {
         if let Some(parent) = self.log_path.parent() {
             std::fs::create_dir_all(parent)?;
         }
-        let mut file = OpenOptions::new().create(true).append(true).write(true).open(&self.log_path)?;
+        let mut file = OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&self.log_path)?;
         writeln!(file, "{}", record)?;
         file.sync_all()?;
         Ok(())
@@ -91,7 +121,9 @@ impl FsLog {
 }
 
 fn decode_path(encoded: &str) -> String {
-    percent_encoding::percent_decode_str(encoded).decode_utf8_lossy().to_string()
+    percent_encoding::percent_decode_str(encoded)
+        .decode_utf8_lossy()
+        .to_string()
 }
 
 #[cfg(test)]

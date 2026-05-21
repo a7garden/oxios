@@ -43,7 +43,7 @@ impl TokenManager {
             one_time_tokens: Mutex::new(HashMap::new()),
             blocked_ips: Mutex::new(HashMap::new()),
             tokens_dir,
-            tokens_salt: tokens_salt,
+            tokens_salt,
         }
     }
 
@@ -51,7 +51,13 @@ impl TokenManager {
     pub fn gen_one_time_token(&self, user_id: i64) -> String {
         let token = gen_token();
         let expires_at = now_timestamp() + ONE_TIME_EXPIRATION_SECS;
-        self.one_time_tokens.lock().insert(token.clone(), OneTimeToken { user_id, expires_at });
+        self.one_time_tokens.lock().insert(
+            token.clone(),
+            OneTimeToken {
+                user_id,
+                expires_at,
+            },
+        );
         token
     }
 
@@ -60,7 +66,9 @@ impl TokenManager {
         let user_id = {
             let tokens = self.one_time_tokens.lock();
             let data = tokens.get(one_time_token)?;
-            if now_timestamp() > data.expires_at { return None; }
+            if now_timestamp() > data.expires_at {
+                return None;
+            }
             data.user_id
         };
         self.one_time_tokens.lock().remove(one_time_token);
@@ -98,12 +106,17 @@ impl TokenManager {
 
     /// Block an IP for invalid token attempts.
     pub fn block_ip(&self, ip: &str) {
-        self.blocked_ips.lock().insert(ip.to_string(), now_timestamp() + BAN_DURATION_SECS);
+        self.blocked_ips
+            .lock()
+            .insert(ip.to_string(), now_timestamp() + BAN_DURATION_SECS);
     }
 
     /// Extract IP from a remote address string (strip port).
     pub fn get_ip_from_remote_addr(remote_addr: &str) -> String {
-        remote_addr.rsplit_once(':').map(|(host, _)| host.to_string()).unwrap_or(remote_addr.to_string())
+        remote_addr
+            .rsplit_once(':')
+            .map(|(host, _)| host.to_string())
+            .unwrap_or(remote_addr.to_string())
     }
 
     fn hash_token(&self, token: &str) -> String {
@@ -121,7 +134,10 @@ fn gen_token() -> String {
 }
 
 fn now_timestamp() -> i64 {
-    SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).map(|d| d.as_secs() as i64).unwrap_or(0)
+    SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0)
 }
 
 #[cfg(test)]
@@ -135,7 +151,10 @@ mod tests {
 
     #[test]
     fn test_ip_extraction() {
-        assert_eq!(TokenManager::get_ip_from_remote_addr("1.2.3.4:8080"), "1.2.3.4");
+        assert_eq!(
+            TokenManager::get_ip_from_remote_addr("1.2.3.4:8080"),
+            "1.2.3.4"
+        );
         assert_eq!(TokenManager::get_ip_from_remote_addr("1.2.3.4"), "1.2.3.4");
     }
 

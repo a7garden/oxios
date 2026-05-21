@@ -5,6 +5,7 @@
 //! This avoids the `block_on` panic that occurs when constructing
 //! inside an existing tokio runtime.
 
+#[cfg(feature = "browser")]
 use std::sync::Arc;
 
 /// Browser management system calls.

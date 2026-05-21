@@ -3,7 +3,7 @@
 //! Ported from files.md (`server/schedule/mod.rs`) by Artem Zakirullin.
 //! Manages scheduled tasks stored in the knowledge config.
 
-use chrono::{Datelike, TimeZone, Utc, FixedOffset};
+use chrono::{Datelike, FixedOffset, TimeZone, Utc};
 
 use crate::fs::VirtualFs;
 use crate::types::{KnowledgeConfig, Schedule, DIR_USER_ROOT};
@@ -28,7 +28,10 @@ pub struct ScheduleManager<'a> {
 impl<'a> ScheduleManager<'a> {
     /// Create a new schedule manager.
     pub fn new(fs: &'a VirtualFs, config_filename: &'a str) -> Self {
-        Self { fs, config_filename }
+        Self {
+            fs,
+            config_filename,
+        }
     }
 
     /// Get all schedules.
@@ -67,7 +70,9 @@ impl<'a> ScheduleManager<'a> {
 
     /// Create the default config file if it doesn't already exist.
     pub fn create_default_if_not_exists(&self) -> Result<(), ScheduleError> {
-        if self.fs.exists(DIR_USER_ROOT, self.config_filename)
+        if self
+            .fs
+            .exists(DIR_USER_ROOT, self.config_filename)
             .map_err(|e| ScheduleError::Read(e.to_string()))?
         {
             return Ok(());
@@ -139,17 +144,25 @@ impl<'a> ScheduleManager<'a> {
     }
 
     fn read_config(&self) -> Result<KnowledgeConfig, ScheduleError> {
-        if !self.fs.exists(DIR_USER_ROOT, self.config_filename).map_err(|e| ScheduleError::Read(e.to_string()))? {
+        if !self
+            .fs
+            .exists(DIR_USER_ROOT, self.config_filename)
+            .map_err(|e| ScheduleError::Read(e.to_string()))?
+        {
             return Ok(KnowledgeConfig::default());
         }
-        let content = self.fs.read(DIR_USER_ROOT, self.config_filename)
+        let content = self
+            .fs
+            .read(DIR_USER_ROOT, self.config_filename)
             .map_err(|e| ScheduleError::Read(e.to_string()))?;
         serde_json::from_str(&content).map_err(|e| ScheduleError::Read(e.to_string()))
     }
 
     fn write_config(&self, cfg: &KnowledgeConfig) -> Result<(), ScheduleError> {
-        let json = serde_json::to_string_pretty(cfg).map_err(|e| ScheduleError::Write(e.to_string()))?;
-        self.fs.write(DIR_USER_ROOT, self.config_filename, &json)
+        let json =
+            serde_json::to_string_pretty(cfg).map_err(|e| ScheduleError::Write(e.to_string()))?;
+        self.fs
+            .write(DIR_USER_ROOT, self.config_filename, &json)
             .map_err(|e| ScheduleError::Write(e.to_string()))
     }
 }
@@ -161,14 +174,22 @@ pub fn format_schedule_date(scheduled_at: i64, timezone: FixedOffset) -> String 
     let task_start = beginning_of_day(scheduled_at);
     let diff_days = (task_start - today_start) / 86400;
 
-    let tz_dt = Utc.timestamp_opt(scheduled_at, 0).unwrap().with_timezone(&timezone);
+    let tz_dt = Utc
+        .timestamp_opt(scheduled_at, 0)
+        .unwrap()
+        .with_timezone(&timezone);
 
     match diff_days {
         0 => "Today".to_string(),
         1 => "Tomorrow".to_string(),
         2..=6 => format!("{} {:02}", tz_dt.format("%A"), tz_dt.day()),
         7..=13 => format!("Next {}", tz_dt.format("%A %d")),
-        _ => format!("{} {}, {}", tz_dt.format("%d %B"), tz_dt.weekday(), tz_dt.year()),
+        _ => format!(
+            "{} {}, {}",
+            tz_dt.format("%d %B"),
+            tz_dt.weekday(),
+            tz_dt.year()
+        ),
     }
 }
 
@@ -176,13 +197,20 @@ pub fn format_schedule_date(scheduled_at: i64, timezone: FixedOffset) -> String 
 pub fn beginning_of_day(timestamp: i64) -> i64 {
     let dt = Utc.timestamp_opt(timestamp, 0).unwrap();
     let date = dt.date_naive();
-    date.and_hms_milli_opt(0, 0, 0, 0).unwrap().and_utc().timestamp()
+    date.and_hms_milli_opt(0, 0, 0, 0)
+        .unwrap()
+        .and_utc()
+        .timestamp()
 }
 
 /// Calculate tomorrow's midnight timestamp.
 pub fn tomorrow_timestamp() -> i64 {
     let tomorrow = Utc::now().date_naive() + chrono::Duration::days(1);
-    tomorrow.and_hms_milli_opt(0, 0, 0, 0).unwrap().and_utc().timestamp()
+    tomorrow
+        .and_hms_milli_opt(0, 0, 0, 0)
+        .unwrap()
+        .and_utc()
+        .timestamp()
 }
 
 #[cfg(test)]

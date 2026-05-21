@@ -9,9 +9,8 @@ use once_cell::sync::Lazy;
 // ── Embedded emoji data ─────────────────────────────────────
 
 static EMOJI_MAP: Lazy<HashMap<String, String>> = Lazy::new(|| {
-    let raw: HashMap<String, Vec<String>> =
-        serde_json::from_str(include_str!("data/emojis.json"))
-            .expect("Failed to parse embedded emojis.json");
+    let raw: HashMap<String, Vec<String>> = serde_json::from_str(include_str!("data/emojis.json"))
+        .expect("Failed to parse embedded emojis.json");
 
     let mut map = HashMap::new();
     for (emoji, keywords) in raw {

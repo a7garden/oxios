@@ -16,8 +16,12 @@ const HEADER_RE: &str = r"^(####|##) \d+ \w+, \w+";
 /// When both sides modified the same section, the server version is preferred
 /// first, then client additions are appended.
 pub fn merge(s1: &str, s2: &str) -> String {
-    if s1.is_empty() { return s2.to_string(); }
-    if s2.is_empty() { return s1.to_string(); }
+    if s1.is_empty() {
+        return s2.to_string();
+    }
+    if s2.is_empty() {
+        return s1.to_string();
+    }
 
     let lines1: Vec<&str> = s1.lines().collect();
     let lines2: Vec<&str> = s2.lines().collect();
@@ -40,8 +44,16 @@ pub fn merge(s1: &str, s2: &str) -> String {
 }
 
 /// Backtrack through the LCS table to produce merged lines.
-fn backtrack(lines1: &[&str], lines2: &[&str], lcs: &[Vec<usize>], i: usize, j: usize) -> Vec<String> {
-    if i == 0 && j == 0 { return vec![]; }
+fn backtrack(
+    lines1: &[&str],
+    lines2: &[&str],
+    lcs: &[Vec<usize>],
+    i: usize,
+    j: usize,
+) -> Vec<String> {
+    if i == 0 && j == 0 {
+        return vec![];
+    }
     if i == 0 {
         let mut r = backtrack(lines1, lines2, lcs, 0, j - 1);
         r.push(lines2[j - 1].to_string());

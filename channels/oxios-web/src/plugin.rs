@@ -46,7 +46,9 @@ impl IntoResponse for SpaFallback {
                 .unwrap(),
             None => Response::builder()
                 .status(404)
-                .body(Body::from("index.html not found — run `cd web && npm run build`"))
+                .body(Body::from(
+                    "index.html not found — run `cd web && npm run build`",
+                ))
                 .unwrap(),
         }
     }
@@ -57,13 +59,18 @@ fn serve_file(path: &str) -> Response {
     let clean_path = path.trim_start_matches('/');
 
     // Try exact path and assets/ prefix
-    let asset = Assets::get(clean_path)
-        .or_else(|| Assets::get(&format!("assets/{}", clean_path)));
+    let asset = Assets::get(clean_path).or_else(|| Assets::get(&format!("assets/{}", clean_path)));
 
     match asset {
         Some(content) => {
-            let lookup = if clean_path.starts_with("assets/") { clean_path } else { &format!("assets/{}", clean_path) };
-            let mime = mime_guess::from_path(lookup).first_or_octet_stream().to_string();
+            let lookup = if clean_path.starts_with("assets/") {
+                clean_path
+            } else {
+                &format!("assets/{}", clean_path)
+            };
+            let mime = mime_guess::from_path(lookup)
+                .first_or_octet_stream()
+                .to_string();
             let body = Body::from(content.data.to_vec());
             Response::builder()
                 .status(200)
@@ -71,10 +78,7 @@ fn serve_file(path: &str) -> Response {
                 .body(body)
                 .unwrap()
         }
-        None => Response::builder()
-            .status(404)
-            .body(Body::empty())
-            .unwrap(),
+        None => Response::builder().status(404).body(Body::empty()).unwrap(),
     }
 }
 
@@ -127,7 +131,10 @@ impl ChannelPlugin for WebPlugin {
             Err(e) => {
                 tracing::warn!(error = %e, "Failed to create KnowledgeBase at workspace, using temp dir");
                 let fallback_dir = std::env::temp_dir().join("oxios-web-knowledge");
-                Arc::new(KnowledgeBase::new(fallback_dir).expect("Failed to create fallback KnowledgeBase"))
+                Arc::new(
+                    KnowledgeBase::new(fallback_dir)
+                        .expect("Failed to create fallback KnowledgeBase"),
+                )
             }
         };
 
@@ -165,7 +172,11 @@ impl ChannelPlugin for WebPlugin {
             .into();
 
         // SPA routes (catch-all for client-side routing)
+        // Static assets (/assets/*) served from embedded files, not SPA fallback
         let spa_routes: Router<Arc<AppState>> = Router::new()
+            .route("/assets/{*path}", get(static_handler))
+            .route("/favicon.svg", get(static_handler))
+            .route("/icons.svg", get(static_handler))
             .route("/{*path}", get(spa_handler))
             .route("/", get(spa_handler));
 

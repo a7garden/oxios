@@ -250,14 +250,20 @@ impl AgentRuntime {
         }
 
         // Blend relevant knowledge notes into system prompt (KnowledgeLens, RFC-003 Phase 3).
-        match self.kernel_handle.knowledge_lens.recall_for_context(&seed.goal, 5).await {
+        match self
+            .kernel_handle
+            .knowledge_lens
+            .recall_for_context(&seed.goal, 5)
+            .await
+        {
             Ok(ctx) if !ctx.notes.is_empty() => {
                 tracing::info!(
                     notes = ctx.notes.len(),
                     memories = ctx.memories.len(),
                     "Recalled knowledge context for seed"
                 );
-                let knowledge_blend = ctx.notes
+                let knowledge_blend = ctx
+                    .notes
                     .iter()
                     .take(3)
                     .map(|n| format!("## {}\n\n{}", n.name, n.content))

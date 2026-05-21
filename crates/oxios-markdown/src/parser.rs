@@ -17,30 +17,49 @@ pub fn first_word(s: &str) -> &str {
 
 /// Calculate similarity between two strings (0.0 – 100.0) using Levenshtein distance.
 pub fn similar(a: &str, b: &str) -> f64 {
-    if a.is_empty() || b.is_empty() { return 0.0; }
+    if a.is_empty() || b.is_empty() {
+        return 0.0;
+    }
     let a_lower = a.to_lowercase();
     let b_lower = b.to_lowercase();
-    if a_lower == b_lower { return 100.0; }
+    if a_lower == b_lower {
+        return 100.0;
+    }
     let max_len = a_lower.len().max(b_lower.len());
-    if max_len == 0 { return 100.0; }
+    if max_len == 0 {
+        return 100.0;
+    }
     let distance = levenshtein(&a_lower, &b_lower);
     ((max_len - distance) as f64 / max_len as f64) * 100.0
 }
 
 /// Compute Levenshtein edit distance between two strings.
+#[allow(clippy::needless_range_loop)]
 pub fn levenshtein(a: &str, b: &str) -> usize {
     let len_a = a.len();
     let len_b = b.len();
-    if len_a == 0 { return len_b; }
-    if len_b == 0 { return len_a; }
+    if len_a == 0 {
+        return len_b;
+    }
+    if len_b == 0 {
+        return len_a;
+    }
 
     let mut matrix = vec![vec![0usize; len_b + 1]; len_a + 1];
-    for i in 0..=len_a { matrix[i][0] = i; }
-    for j in 0..=len_b { matrix[0][j] = j; }
+    for i in 0..=len_a {
+        matrix[i][0] = i;
+    }
+    for j in 0..=len_b {
+        matrix[0][j] = j;
+    }
 
     for i in 1..=len_a {
         for j in 1..=len_b {
-            let cost = if a.as_bytes()[i - 1] == b.as_bytes()[j - 1] { 0 } else { 1 };
+            let cost = if a.as_bytes()[i - 1] == b.as_bytes()[j - 1] {
+                0
+            } else {
+                1
+            };
             matrix[i][j] = (matrix[i - 1][j] + 1)
                 .min(matrix[i][j - 1] + 1)
                 .min(matrix[i - 1][j - 1] + cost);
@@ -190,9 +209,7 @@ pub fn split_text_into_chunks(text: &str, max_len: usize) -> Vec<String> {
 }
 
 /// Known emoji prefixes to strip before re-adding.
-const EMOJI_STRIP_PREFIXES: &[&str] = &[
-    "WRK ", "UA ", "US ", "CY ", "HOB ", "SRB ", "PL ",
-];
+const EMOJI_STRIP_PREFIXES: &[&str] = &["WRK ", "UA ", "US ", "CY ", "HOB ", "SRB ", "PL "];
 
 /// Add emoji prefix to string, stripping known prefixes first.
 ///
@@ -221,7 +238,10 @@ pub fn has_image(msg: &str) -> bool {
 
 /// Strip a leading `` `HH:MM` `` timestamp from chat entries.
 pub fn strip_chat_timestamp(s: &str) -> String {
-    Regex::new(r"^`\d{2}:\d{2}` ").unwrap().replace(s, "").to_string()
+    Regex::new(r"^`\d{2}:\d{2}` ")
+        .unwrap()
+        .replace(s, "")
+        .to_string()
 }
 
 /// Extract all markdown links `[text](path)` from content.
@@ -234,7 +254,9 @@ pub fn extract_markdown_links(content: &str) -> Vec<(String, String)> {
             let text = cap.get(1)?.as_str().to_string();
             let path = cap.get(2)?.as_str().to_string();
             // Skip external links and images
-            if path.starts_with("http://") || path.starts_with("https://") { return None; }
+            if path.starts_with("http://") || path.starts_with("https://") {
+                return None;
+            }
             Some((text, path))
         })
         .collect()
@@ -298,7 +320,8 @@ mod tests {
 
     #[test]
     fn test_extract_links() {
-        let md = "See [Rust](brain/Rust.md) and [Go](brain/Go.md) but not [ext](https://example.com)";
+        let md =
+            "See [Rust](brain/Rust.md) and [Go](brain/Go.md) but not [ext](https://example.com)";
         let links = extract_markdown_links(md);
         assert_eq!(links.len(), 2);
         assert_eq!(links[0].0, "Rust");
@@ -355,7 +378,12 @@ mod tests {
         // Split at space (Go test: basic split with spaces)
         let chunks = split_text_into_chunks("This is a test to check the splitting of text", 10);
         for chunk in &chunks {
-            assert!(chunk.len() <= 10, "chunk too long: '{}' ({})", chunk, chunk.len());
+            assert!(
+                chunk.len() <= 10,
+                "chunk too long: '{}' ({})",
+                chunk,
+                chunk.len()
+            );
         }
 
         // Split at newline (Go test: max_len=15)

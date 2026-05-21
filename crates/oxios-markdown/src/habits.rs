@@ -12,10 +12,8 @@ use unicode_segmentation::UnicodeSegmentation;
 use crate::fs::VirtualFs;
 use crate::parser::norm_new_lines;
 use crate::types::{
-    FsError, Habits, YearHabits,
-    HABIT_COMPLETED, HABIT_COMPLETED_AT_WEEKEND, HABIT_SKIPPED,
-    MOOD_EMOJIS, MOOD_HABIT,
-    DIR_HABITS, DIR_INSIGHTS, MD_EXT,
+    FsError, Habits, YearHabits, DIR_HABITS, DIR_INSIGHTS, HABIT_COMPLETED,
+    HABIT_COMPLETED_AT_WEEKEND, HABIT_SKIPPED, MD_EXT, MOOD_EMOJIS, MOOD_HABIT,
 };
 
 /// Habits-specific errors.
@@ -30,7 +28,9 @@ pub enum HabitsError {
 }
 
 impl From<FsError> for HabitsError {
-    fn from(e: FsError) -> Self { HabitsError::Other(e.to_string()) }
+    fn from(e: FsError) -> Self {
+        HabitsError::Other(e.to_string())
+    }
 }
 
 /// Read habits for a given year.
@@ -52,7 +52,9 @@ pub fn habits(fs: &VirtualFs, year: i32) -> Result<Habits, HabitsError> {
 
     for line in normalized.split('\n') {
         let line = line.trim();
-        if line.is_empty() { continue; }
+        if line.is_empty() {
+            continue;
+        }
 
         if line.starts_with("###") {
             let parts: Vec<&str> = line.split(' ').collect();
@@ -65,11 +67,14 @@ pub fn habits(fs: &VirtualFs, year: i32) -> Result<Habits, HabitsError> {
         }
 
         let parts: Vec<&str> = line.splitn(2, ' ').collect();
-        if parts.len() < 2 { continue; }
+        if parts.len() < 2 {
+            continue;
+        }
 
         let days = parts[0];
         let habit = parts[1];
-        let first_day = chrono::NaiveDate::from_ymd_opt(year, month.number_from_month(), 1).unwrap();
+        let first_day =
+            chrono::NaiveDate::from_ymd_opt(year, month.number_from_month(), 1).unwrap();
         let mut day_of_year = first_day.ordinal() as i32;
 
         if habit.contains(MOOD_HABIT) {
@@ -82,8 +87,13 @@ pub fn habits(fs: &VirtualFs, year: i32) -> Result<Habits, HabitsError> {
             continue;
         }
 
-        let marker = format!("{}{}{}", HABIT_SKIPPED, HABIT_COMPLETED_AT_WEEKEND, HABIT_COMPLETED);
-        if !days.contains(marker.chars().next().unwrap().to_string().as_str()) { continue; }
+        let marker = format!(
+            "{}{}{}",
+            HABIT_SKIPPED, HABIT_COMPLETED_AT_WEEKEND, HABIT_COMPLETED
+        );
+        if !days.contains(marker.chars().next().unwrap().to_string().as_str()) {
+            continue;
+        }
 
         let name = habit.trim();
         let year_habits = habits.entry(name.to_string()).or_default();
@@ -96,7 +106,11 @@ pub fn habits(fs: &VirtualFs, year: i32) -> Result<Habits, HabitsError> {
 }
 
 /// Get emoji for a habit status.
-pub fn emoji_for_status(habit_name: &str, day: &chrono::DateTime<chrono::FixedOffset>, status: i32) -> &'static str {
+pub fn emoji_for_status(
+    habit_name: &str,
+    day: &chrono::DateTime<chrono::FixedOffset>,
+    status: i32,
+) -> &'static str {
     if habit_name == MOOD_HABIT {
         return MOOD_EMOJIS.get(status as usize).unwrap_or(&HABIT_SKIPPED);
     }
@@ -115,7 +129,9 @@ pub fn emoji_for_status(habit_name: &str, day: &chrono::DateTime<chrono::FixedOf
 pub fn habit_emoji(fs: &VirtualFs, habit_name: &str) -> String {
     if let Ok(content) = fs.read(DIR_HABITS, &format!("{}{}", habit_name, MD_EXT)) {
         let trimmed = content.trim();
-        if !trimmed.is_empty() { return trimmed.to_string(); }
+        if !trimmed.is_empty() {
+            return trimmed.to_string();
+        }
     }
     weekday_emoji(habit_name).to_string()
 }
@@ -123,9 +139,14 @@ pub fn habit_emoji(fs: &VirtualFs, habit_name: &str) -> String {
 /// Get emoji for a weekday or month name.
 pub fn weekday_emoji(key: &str) -> &'static str {
     match key.to_lowercase().as_str() {
-        "monday" => "🌑", "tuesday" => "🌒", "wednesday" => "🌓",
-        "thursday" => "🌔", "friday" => "🌕", "saturday" => "🌝",
-        "sunday" => "🌛", _ => "⚡️",
+        "monday" => "🌑",
+        "tuesday" => "🌒",
+        "wednesday" => "🌓",
+        "thursday" => "🌔",
+        "friday" => "🌕",
+        "saturday" => "🌝",
+        "sunday" => "🌛",
+        _ => "⚡️",
     }
 }
 
@@ -136,10 +157,7 @@ pub fn weekday_emoji(key: &str) -> &'static str {
 /// plus the default Mood habit.
 ///
 /// Ported from Go `LastWeekHabits`.
-pub fn last_week_habits(
-    fs: &VirtualFs,
-    tz: chrono::FixedOffset,
-) -> Result<Habits, HabitsError> {
+pub fn last_week_habits(fs: &VirtualFs, tz: chrono::FixedOffset) -> Result<Habits, HabitsError> {
     let now = chrono::Utc::now().with_timezone(&tz);
     let year = now.year();
 
@@ -213,9 +231,7 @@ pub fn write_habits(fs: &VirtualFs, year: i32, habits: &Habits) -> Result<(), Ha
                     if let Some(&status) = status_map.get(&year_day) {
                         let dt = chrono::FixedOffset::east_opt(0)
                             .unwrap()
-                            .from_utc_datetime(
-                                &day_of_month.and_hms_opt(12, 0, 0).unwrap(),
-                            );
+                            .from_utc_datetime(&day_of_month.and_hms_opt(12, 0, 0).unwrap());
                         let e = emoji_for_status(habit_name, &dt, status);
                         if e != HABIT_SKIPPED {
                             at_least_one_completion = true;
@@ -250,7 +266,11 @@ pub fn write_habits(fs: &VirtualFs, year: i32, habits: &Habits) -> Result<(), Ha
         // Advance to the 1st of the next month
         day = chrono::NaiveDate::from_ymd_opt(
             if day.month() == 12 { year + 1 } else { year },
-            if day.month() == 12 { 1 } else { day.month() + 1 },
+            if day.month() == 12 {
+                1
+            } else {
+                day.month() + 1
+            },
             1,
         )
         .unwrap();
@@ -283,8 +303,8 @@ fn month_name(month: u32) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::TimeZone;
     use chrono::FixedOffset;
+    use chrono::TimeZone;
     use tempfile::TempDir;
 
     fn test_fs() -> (VirtualFs, TempDir) {
@@ -295,14 +315,23 @@ mod tests {
 
     #[test]
     fn test_emoji_for_status() {
-        let saturday = FixedOffset::east_opt(0).unwrap().with_ymd_and_hms(2024, 1, 6, 12, 0, 0).unwrap();
-        assert_eq!(emoji_for_status("Exercise", &saturday, 1), HABIT_COMPLETED_AT_WEEKEND);
+        let saturday = FixedOffset::east_opt(0)
+            .unwrap()
+            .with_ymd_and_hms(2024, 1, 6, 12, 0, 0)
+            .unwrap();
+        assert_eq!(
+            emoji_for_status("Exercise", &saturday, 1),
+            HABIT_COMPLETED_AT_WEEKEND
+        );
         assert_eq!(emoji_for_status("Exercise", &saturday, 0), HABIT_SKIPPED);
     }
 
     #[test]
     fn test_mood_emoji() {
-        let day = FixedOffset::east_opt(0).unwrap().with_ymd_and_hms(2024, 1, 1, 12, 0, 0).unwrap();
+        let day = FixedOffset::east_opt(0)
+            .unwrap()
+            .with_ymd_and_hms(2024, 1, 1, 12, 0, 0)
+            .unwrap();
         assert_eq!(emoji_for_status(MOOD_HABIT, &day, 0), HABIT_SKIPPED);
         assert_eq!(emoji_for_status(MOOD_HABIT, &day, 5), "😊");
     }

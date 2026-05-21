@@ -174,8 +174,6 @@ impl OxiAgentTool for KnowledgeTool {
             return Ok(AgentToolResult::error("action is required"));
         }
 
-        
-
         match action {
             "read" => {
                 let path = params["path"].as_str().unwrap_or("");

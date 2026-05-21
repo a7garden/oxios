@@ -2,7 +2,7 @@
 //!
 //! Ported from files.md (`server/stats/stats.go`) by Artem Zakirullin.
 
-use crate::fs::{is_checklist_item, display_name, VirtualFs};
+use crate::fs::{display_name, is_checklist_item, VirtualFs};
 use crate::types::{FileEntry, FsError, DIR_ARCHIVE};
 
 /// A completed item shown in today's report.
@@ -71,10 +71,7 @@ pub fn format_today_report(report: &TodayReport) -> String {
 fn beginning_of_day_utc() -> i64 {
     use chrono::Utc;
     let now = Utc::now();
-    let midnight = now
-        .date_naive()
-        .and_hms_opt(0, 0, 0)
-        .unwrap();
+    let midnight = now.date_naive().and_hms_opt(0, 0, 0).unwrap();
     let dt = midnight.and_utc();
     dt.timestamp_millis()
 }

@@ -16,7 +16,9 @@ const IMG_PATTERN: &str = r"!\[.*?\]\(.*?\)";
 /// Add a text record to today's journal entry.
 pub fn add_record(fs: &VirtualFs, record: &str, timezone: FixedOffset) -> Result<(), FsError> {
     let record = record.trim();
-    if record.is_empty() { return Ok(()); }
+    if record.is_empty() {
+        return Ok(());
+    }
 
     let filename = today_journal_filename(timezone);
     let exists = fs.exists(DIR_JOURNAL, &filename)?;
@@ -28,7 +30,9 @@ pub fn add_record(fs: &VirtualFs, record: &str, timezone: FixedOffset) -> Result
         String::new()
     };
 
-    if !md.is_empty() { md.push('\n'); }
+    if !md.is_empty() {
+        md.push('\n');
+    }
     if !md.contains(&today_header(timezone)) {
         md.push_str(&today_header(timezone));
         md.push('\n');
@@ -37,7 +41,10 @@ pub fn add_record(fs: &VirtualFs, record: &str, timezone: FixedOffset) -> Result
     let timestamp = Utc::now().with_timezone(&timezone).format("`15:04`");
     if has_image(record) {
         let re = Regex::new(IMG_PATTERN).unwrap();
-        let img_link = re.find(record).map(|m| m.as_str().to_string()).unwrap_or_default();
+        let img_link = re
+            .find(record)
+            .map(|m| m.as_str().to_string())
+            .unwrap_or_default();
         let rest = record.replace(&img_link, "").trim().to_string();
         md.push_str(&format!("{}\n{} {}\n", img_link, timestamp, rest));
     } else {
@@ -49,7 +56,9 @@ pub fn add_record(fs: &VirtualFs, record: &str, timezone: FixedOffset) -> Result
 
 /// Add an emoji indicator to today's journal header.
 pub fn add_emoji(fs: &VirtualFs, emoji: &str, timezone: FixedOffset) -> Result<(), FsError> {
-    if emoji.is_empty() { return Ok(()); }
+    if emoji.is_empty() {
+        return Ok(());
+    }
 
     let filename = today_journal_filename(timezone);
     if !fs.exists(DIR_JOURNAL, &filename)? {
@@ -74,13 +83,21 @@ pub fn add_emoji(fs: &VirtualFs, emoji: &str, timezone: FixedOffset) -> Result<(
 
 /// Get today's journal filename (e.g., "2026.05 May.md").
 pub fn today_journal_filename(timezone: FixedOffset) -> String {
-    Utc::now().with_timezone(&timezone).format("%Y.%m %B.md").to_string()
+    Utc::now()
+        .with_timezone(&timezone)
+        .format("%Y.%m %B.md")
+        .to_string()
 }
 
 /// Get today's journal header line.
 pub fn today_header(timezone: FixedOffset) -> String {
     let now_tz = Utc::now().with_timezone(&timezone);
-    format!("## {} {}, {}", now_tz.date_naive().day(), now_tz.format("%B"), now_tz.format("%A"))
+    format!(
+        "## {} {}, {}",
+        now_tz.date_naive().day(),
+        now_tz.format("%B"),
+        now_tz.format("%A")
+    )
 }
 
 #[cfg(test)]

@@ -13,6 +13,10 @@ use std::path::PathBuf;
 use anyhow::Result;
 use parking_lot::{Mutex as ParkingMutex, RwLock};
 
+/// Callback type for file change notifications.
+/// Used by [`KnowledgeLens`] to keep the semantic index in sync.
+pub type FileChangeCallback = Box<dyn Fn(&str, FileChange) + Send + Sync>;
+
 use crate::backlinks::{Backlink, BacklinkIndex, LinkGraph};
 use crate::chat::{delete_chat_msg, move_from_chat, read_chat_msgs, rename_chat_msg};
 use crate::checklist::{
@@ -79,8 +83,8 @@ pub struct KnowledgeBase {
     /// Files written by agents (not by the user).
     agent_writes: ParkingMutex<HashSet<String>>,
     /// Callbacks invoked on file changes.
-    /// Used by `KnowledgeLens` to keep semantic index in sync.
-    on_change: RwLock<Vec<Box<dyn Fn(&str, FileChange) + Send + Sync>>>,
+    /// Used by [`KnowledgeLens`] to keep semantic index in sync.
+    on_change: RwLock<Vec<FileChangeCallback>>,
 }
 
 impl std::fmt::Debug for KnowledgeBase {
@@ -158,7 +162,14 @@ impl KnowledgeBase {
             backlinks.index_file(path, content);
         }
 
-        self.notify_change(path, if is_new { FileChange::Created(path.to_string()) } else { FileChange::Updated(path.to_string()) });
+        self.notify_change(
+            path,
+            if is_new {
+                FileChange::Created(path.to_string())
+            } else {
+                FileChange::Updated(path.to_string())
+            },
+        );
         Ok(())
     }
 
@@ -177,14 +188,24 @@ impl KnowledgeBase {
         if let Some(content) = self.note_read(new_path)? {
             self.backlinks.write().index_file(new_path, &content);
         }
-        self.notify_change(old_path, FileChange::Moved { old: old_path.to_string(), new: new_path.to_string() });
+        self.notify_change(
+            old_path,
+            FileChange::Moved {
+                old: old_path.to_string(),
+                new: new_path.to_string(),
+            },
+        );
         Ok(())
     }
 
     /// List notes in a directory.
     pub fn note_tree(&self, dir: &str) -> Result<Vec<FileEntry>> {
         let fs = self.fs.read();
-        let dir = if dir.is_empty() || dir == "/" { DIR_USER_ROOT } else { dir };
+        let dir = if dir.is_empty() || dir == "/" {
+            DIR_USER_ROOT
+        } else {
+            dir
+        };
         Ok(fs.files_and_dirs(dir)?)
     }
 
@@ -400,7 +421,10 @@ impl KnowledgeBase {
     // ── Checklist ────────────────────────────────────────────────
 
     /// Parse checklist items from a file.
-    pub fn checklist_items(&self, path: &str) -> Result<(Vec<String>, std::collections::HashMap<String, bool>)> {
+    pub fn checklist_items(
+        &self,
+        path: &str,
+    ) -> Result<(Vec<String>, std::collections::HashMap<String, bool>)> {
         let content = self.note_read(path)?.unwrap_or_default();
         Ok(checklist_items(&content))
     }
@@ -531,12 +555,8 @@ impl KnowledgeBase {
 
     /// Extract headings from content for tag generation.
     pub fn extract_headings(&self, content: &str) -> Vec<String> {
-        extract_headings(content)
-            .into_iter()
-            .take(5)
-            .collect()
+        extract_headings(content).into_iter().take(5).collect()
     }
-
 }
 
 // ---------------------------------------------------------------------------
@@ -555,7 +575,8 @@ mod tests {
     #[test]
     fn test_note_write_and_read() {
         let kb = make_test_kb();
-        kb.note_write("brain/Rust.md", "# Rust\n\nHello world").unwrap();
+        kb.note_write("brain/Rust.md", "# Rust\n\nHello world")
+            .unwrap();
         let content = kb.note_read("brain/Rust.md").unwrap();
         assert_eq!(content, Some("# Rust\n\nHello world".to_string()));
     }
@@ -644,7 +665,8 @@ mod tests {
     fn test_on_file_change_callback() {
         let kb = make_test_kb();
         let _called = std::sync::atomic::AtomicBool::new(false);
-        let path_clone: std::sync::Arc<std::sync::atomic::AtomicBool> = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let path_clone: std::sync::Arc<std::sync::atomic::AtomicBool> =
+            std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
         let flag = path_clone.clone();
 
         kb.on_file_change(move |path, change| {

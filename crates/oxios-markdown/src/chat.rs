@@ -3,10 +3,10 @@
 //! Ported from files.md (`server/chat/mod.rs`) by Artem Zakirullin.
 //! Handles the Chat.md file: parsing blocks, finding/renaming/deleting entries.
 
-use chrono::Datelike;
-use regex::Regex;
 use crate::fs::hash_filename;
 use crate::parser::norm_new_lines;
+use chrono::Datelike;
+use regex::Regex;
 
 /// Strip the `- [ ]` / `- [x]` prefix and optional `` `HH:MM` `` timestamp.
 pub fn strip_inbox_entry_prefix(block: &str) -> String {
@@ -17,7 +17,7 @@ pub fn strip_inbox_entry_prefix(block: &str) -> String {
 /// Compute a stable hash for a chat block (based on content after stripping marker).
 pub fn chat_block_hash(block: &str) -> String {
     let stripped = Regex::new(r"^- \[[ xX]\] ").unwrap().replace_all(block, "");
-    let first_line = stripped.splitn(2, '\n').next().unwrap_or("");
+    let first_line = stripped.split('\n').next().unwrap_or("");
     hash_filename(first_line)
 }
 
@@ -59,7 +59,9 @@ pub fn find_chat_msg_by_hash(content: &str, msg_hash: &str) -> Option<(usize, St
     let blocks = read_chat_msgs(content);
     let header_re = Regex::new(r"^#### ").unwrap();
     for (i, block) in blocks.iter().enumerate() {
-        if header_re.is_match(block) { continue; }
+        if header_re.is_match(block) {
+            continue;
+        }
         if chat_block_hash(block) == msg_hash {
             return Some((i, block.clone()));
         }
@@ -73,11 +75,15 @@ pub fn rename_chat_msg(content: &str, msg_hash: &str, new_body: &str) -> Result<
     let header_re = Regex::new(r"^#### ").unwrap();
     let prefix_re = Regex::new(r"^- \[[ xX]\] (?:`\d{2}:\d{2}` )?").unwrap();
 
-    let idx = blocks.iter().position(|b| {
-        !header_re.is_match(b) && chat_block_hash(b) == msg_hash
-    }).ok_or_else(|| format!("chat block not found for hash {:?}", msg_hash))?;
+    let idx = blocks
+        .iter()
+        .position(|b| !header_re.is_match(b) && chat_block_hash(b) == msg_hash)
+        .ok_or_else(|| format!("chat block not found for hash {:?}", msg_hash))?;
 
-    let prefix = prefix_re.find(&blocks[idx]).map(|m| m.as_str().to_string()).unwrap_or_default();
+    let prefix = prefix_re
+        .find(&blocks[idx])
+        .map(|m| m.as_str().to_string())
+        .unwrap_or_default();
     let new_body = new_body.trim().replace('\n', " ");
     let mut new_blocks = blocks;
     new_blocks[idx] = format!("{}{}", prefix, new_body);
@@ -88,17 +94,13 @@ pub fn rename_chat_msg(content: &str, msg_hash: &str, new_body: &str) -> Result<
 ///
 /// Returns `(new_content, true)` on success, or `(original_content, false)` if not found.
 /// The appended text becomes a new indented continuation line under the original entry.
-pub fn append_to_chat_msg(
-    content: &str,
-    msg_hash: &str,
-    new_text: &str,
-) -> Result<String, String> {
+pub fn append_to_chat_msg(content: &str, msg_hash: &str, new_text: &str) -> Result<String, String> {
     let blocks = read_chat_msgs(content);
     let header_re = Regex::new(r"^#### ").unwrap();
 
-    let idx = blocks.iter().position(|b| {
-        !header_re.is_match(b) && chat_block_hash(b) == msg_hash
-    });
+    let idx = blocks
+        .iter()
+        .position(|b| !header_re.is_match(b) && chat_block_hash(b) == msg_hash);
 
     let idx = match idx {
         Some(i) => i,
@@ -160,9 +162,10 @@ pub fn delete_chat_msg(content: &str, msg_hash: &str) -> Result<String, String> 
     let blocks = read_chat_msgs(content);
     let header_re = Regex::new(r"^#### ").unwrap();
 
-    let idx = blocks.iter().position(|b| {
-        !header_re.is_match(b) && chat_block_hash(b) == msg_hash
-    }).ok_or_else(|| format!("chat block not found for hash {:?}", msg_hash))?;
+    let idx = blocks
+        .iter()
+        .position(|b| !header_re.is_match(b) && chat_block_hash(b) == msg_hash)
+        .ok_or_else(|| format!("chat block not found for hash {:?}", msg_hash))?;
 
     let mut new_blocks = blocks;
     new_blocks.remove(idx);
@@ -172,7 +175,12 @@ pub fn delete_chat_msg(content: &str, msg_hash: &str) -> Result<String, String> 
 /// Generate today's date header for the chat file.
 pub fn today_header(timezone: &chrono::FixedOffset) -> String {
     let now_tz = chrono::Utc::now().with_timezone(timezone);
-    format!("#### {} {}, {}", now_tz.date_naive().day(), now_tz.format("%B"), now_tz.format("%A"))
+    format!(
+        "#### {} {}, {}",
+        now_tz.date_naive().day(),
+        now_tz.format("%B"),
+        now_tz.format("%A")
+    )
 }
 
 #[cfg(test)]

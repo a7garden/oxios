@@ -81,8 +81,8 @@ pub fn add_checklist_item(md: &str, item: &str, checked: bool) -> String {
     } else {
         // Find the first incomplete item and insert before it
         let mut insert_index = lines.len();
-        for i in 0..lines.len() {
-            let trimmed = lines[i].trim();
+        for (i, line) in lines.iter().enumerate() {
+            let trimmed = line.trim();
             if trimmed.starts_with("- [ ] ") {
                 insert_index = i;
                 break;
@@ -162,13 +162,9 @@ pub fn remove_checklist_item(md: &str, item_or_hash: &str) -> (String, String) {
         }
 
         // Both "- [ ] X" and "- [x] X" have a 6-char prefix before the item text
-        let rest = if let Some(r) = trimmed.strip_prefix("- [ ] ") {
-            Some(r)
-        } else if let Some(r) = trimmed.strip_prefix("- [x] ") {
-            Some(r)
-        } else {
-            None
-        };
+        let rest = trimmed
+            .strip_prefix("- [ ] ")
+            .or_else(|| trimmed.strip_prefix("- [x] "));
 
         if let Some(rest) = rest {
             if hash_filename(rest) == item_or_hash || rest == item_or_hash {
@@ -232,13 +228,9 @@ pub fn checklist_item(md: &str, item_or_hash: &str) -> String {
             continue;
         }
 
-        let rest = if let Some(r) = trimmed.strip_prefix("- [ ] ") {
-            Some(r)
-        } else if let Some(r) = trimmed.strip_prefix("- [x] ") {
-            Some(r)
-        } else {
-            None
-        };
+        let rest = trimmed
+            .strip_prefix("- [ ] ")
+            .or_else(|| trimmed.strip_prefix("- [x] "));
 
         if let Some(rest) = rest {
             if hash_filename(rest) == item_or_hash || rest == item_or_hash {
@@ -290,8 +282,8 @@ pub fn add_header_and_text(content: &str, header: &str, new_content: &str) -> St
     // stopping at the next ### sub-header).
     let mut insert_index = header_index + 1;
 
-    for i in (header_index + 1)..lines.len() {
-        if lines[i].starts_with("###") {
+    for (i, line) in lines.iter().enumerate().skip(header_index + 1) {
+        if line.starts_with("###") {
             insert_index = i;
             break;
         }
@@ -358,7 +350,10 @@ mod tests {
         // New unchecked item should be inserted before existing unchecked
         let lines: Vec<&str> = result.lines().collect();
         let new_pos = lines.iter().position(|l| l.contains("New task")).unwrap();
-        let existing_pos = lines.iter().position(|l| l.contains("Existing task")).unwrap();
+        let existing_pos = lines
+            .iter()
+            .position(|l| l.contains("Existing task"))
+            .unwrap();
         assert!(new_pos < existing_pos);
     }
 

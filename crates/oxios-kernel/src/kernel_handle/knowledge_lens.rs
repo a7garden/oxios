@@ -21,7 +21,7 @@ use tokio::sync::mpsc;
 use crate::memory::{MemoryEntry, MemoryManager, MemoryType};
 
 /// Knowledge context injected into agent prompts.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct KnowledgeContext {
     /// Relevant knowledge notes for the query.
     pub notes: Vec<KnowledgeNote>,
@@ -29,16 +29,6 @@ pub struct KnowledgeContext {
     pub memories: Vec<MemoryNote>,
     /// Number of HNSW index entries used.
     pub index_entries_used: usize,
-}
-
-impl Default for KnowledgeContext {
-    fn default() -> Self {
-        Self {
-            notes: Vec::new(),
-            memories: Vec::new(),
-            index_entries_used: 0,
-        }
-    }
 }
 
 /// A knowledge note extracted from the markdown knowledge base.
@@ -173,13 +163,13 @@ impl KnowledgeLens {
     ///
     /// Combines markdown note search (via KnowledgeBase) with agent memory
     /// search (via MemoryManager). Returns notes ranked by relevance.
-    pub async fn recall_for_context(
-        &self,
-        query: &str,
-        limit: usize,
-    ) -> Result<KnowledgeContext> {
+    pub async fn recall_for_context(&self, query: &str, limit: usize) -> Result<KnowledgeContext> {
         // Search agent memory for relevant entries
-        let mem_entries = self.memory.search(query, None, limit).await.unwrap_or_default();
+        let mem_entries = self
+            .memory
+            .search(query, None, limit)
+            .await
+            .unwrap_or_default();
 
         let memories: Vec<MemoryNote> = mem_entries
             .iter()
@@ -278,7 +268,10 @@ impl KnowledgeLens {
             context_parts.join("\n\n")
         );
 
-        let provider_name = model_id.split_once('/').map(|(p, _)| p).unwrap_or("anthropic");
+        let provider_name = model_id
+            .split_once('/')
+            .map(|(p, _)| p)
+            .unwrap_or("anthropic");
         let provider = engine
             .create_provider(provider_name)
             .map_err(|e| anyhow::anyhow!("Provider: {e}"))?;
@@ -290,7 +283,9 @@ impl KnowledgeLens {
         ctx.set_system_prompt(&system_prompt);
         ctx.add_message(oxi_sdk::Message::User(oxi_sdk::UserMessage::new(question)));
 
-        let stream = provider.stream(&model, &ctx, None).await
+        let stream = provider
+            .stream(&model, &ctx, None)
+            .await
             .map_err(|e| anyhow::anyhow!("Stream: {e}"))?;
 
         let mut text = String::new();

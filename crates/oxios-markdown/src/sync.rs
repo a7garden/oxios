@@ -9,9 +9,8 @@ use crate::fs::VirtualFs;
 use crate::fslog::FsLog;
 use crate::merge::merge;
 use crate::types::{
-    FsError, SyncError, SyncFile, SyncRequest, SyncResponse,
+    FsError, SyncError, SyncFile, SyncRequest, SyncResponse, DIR_MEDIA, DIR_USER_ROOT, MD_EXT,
     STATUS_MERGED, STATUS_NOT_MODIFIED, STATUS_OK, STATUS_UPDATED_ON_SERVER,
-    DIR_MEDIA, DIR_USER_ROOT, MD_EXT,
 };
 
 /// Configuration for the sync engine.
@@ -57,13 +56,19 @@ impl SyncEngine {
     /// 2. Save client modifications (merge on conflict)
     /// 3. Send server files that the client doesn't have
     /// 4. Include rename log entries
-    pub fn sync_filenames(&self, user_id: i64, request: SyncRequest) -> Result<SyncResponse, SyncError> {
+    pub fn sync_filenames(
+        &self,
+        user_id: i64,
+        request: SyncRequest,
+    ) -> Result<SyncResponse, SyncError> {
         let mut files_to_send: Vec<SyncFile> = Vec::new();
         let mut dir_timestamps: HashMap<String, i64> = HashMap::new();
 
         let mut last_sync: i64 = 0;
         for ts in request.timestamps.values() {
-            if *ts > last_sync { last_sync = *ts; }
+            if *ts > last_sync {
+                last_sync = *ts;
+            }
         }
 
         let renames = if last_sync != 0 {
@@ -85,19 +90,19 @@ impl SyncEngine {
             let server_mtime = self.fs.mtime(DIR_USER_ROOT, rel).ok();
             let mut content = client_file.content.clone();
 
-            match server_mtime {
-                None => {} // New file, use client content
-                Some(server_modified) => {
-                    if server_modified > client_file.last_modified {
-                        if let Ok(server_content) = self.fs.read(DIR_USER_ROOT, rel) {
-                            content = merge(&server_content, &client_file.content);
-                        }
+            // If server file is newer, merge with client content
+            if let Some(server_modified) = server_mtime {
+                if server_modified > client_file.last_modified {
+                    if let Ok(server_content) = self.fs.read(DIR_USER_ROOT, rel) {
+                        content = merge(&server_content, &client_file.content);
                     }
                 }
             }
 
             // Skip config file
-            if client_file.path == self.config.config_filename { continue; }
+            if client_file.path == self.config.config_filename {
+                continue;
+            }
 
             match self.fs.write(DIR_USER_ROOT, rel, &content) {
                 Err(FsError::QuotaExceeded) => return Err(SyncError::QuotaExceeded),
@@ -107,7 +112,9 @@ impl SyncEngine {
         }
 
         // Build response with files the client needs
-        let server_timestamps = self.fs.mtimes(DIR_USER_ROOT, &[MD_EXT, ".txt"])
+        let server_timestamps = self
+            .fs
+            .mtimes(DIR_USER_ROOT, &[MD_EXT, ".txt"])
             .map_err(|e| SyncError::Storage(e.to_string()))?;
 
         for (path, server_time) in &server_timestamps {
@@ -143,7 +150,11 @@ impl SyncEngine {
     }
 
     /// Synchronize a single file.
-    pub fn sync_file(&self, _user_id: i64, client_file: SyncFile) -> Result<SyncResponse, SyncError> {
+    pub fn sync_file(
+        &self,
+        _user_id: i64,
+        client_file: SyncFile,
+    ) -> Result<SyncResponse, SyncError> {
         let rel = client_file.path.trim_start_matches('/');
         let server_content = self.fs.read(DIR_USER_ROOT, rel).ok();
         let server_mtime = self.fs.mtime(DIR_USER_ROOT, rel).ok().unwrap_or(0);
@@ -177,7 +188,8 @@ impl SyncEngine {
         }
 
         if should_update {
-            self.fs.write(DIR_USER_ROOT, rel, &content)
+            self.fs
+                .write(DIR_USER_ROOT, rel, &content)
                 .map_err(|e| SyncError::Storage(e.to_string()))?;
             return Ok(SyncResponse {
                 status: STATUS_UPDATED_ON_SERVER.to_string(),
@@ -226,8 +238,12 @@ impl SyncEngine {
     ///
     /// Returns all media files whose mtime > `since_timestamp`,
     /// along with the latest timestamp for incremental sync.
-    pub fn sync_media_filenames(&self, since_timestamp: i64) -> Result<MediaSyncResponse, SyncError> {
-        let mtimes = self.fs
+    pub fn sync_media_filenames(
+        &self,
+        since_timestamp: i64,
+    ) -> Result<MediaSyncResponse, SyncError> {
+        let mtimes = self
+            .fs
             .mtimes(DIR_MEDIA, &[])
             .map_err(|e| SyncError::Storage(e.to_string()))?;
 
@@ -255,7 +271,9 @@ impl SyncEngine {
 
     /// Upload a media file (from raw bytes).
     pub fn sync_media_upload(&self, filename: &str, data: &[u8]) -> Result<(), SyncError> {
-        let exists = self.fs.exists(DIR_MEDIA, filename)
+        let exists = self
+            .fs
+            .exists(DIR_MEDIA, filename)
             .map_err(|e| SyncError::Storage(e.to_string()))?;
 
         if exists {
@@ -263,7 +281,8 @@ impl SyncEngine {
             return Ok(());
         }
 
-        self.fs.write_bytes(DIR_MEDIA, filename, data)
+        self.fs
+            .write_bytes(DIR_MEDIA, filename, data)
             .map_err(|e| match e {
                 FsError::QuotaExceeded => SyncError::QuotaExceeded,
                 other => SyncError::Storage(other.to_string()),
@@ -274,7 +293,8 @@ impl SyncEngine {
 
     /// Read a media file as raw bytes.
     pub fn sync_media_read(&self, filename: &str) -> Result<Vec<u8>, SyncError> {
-        self.fs.read_bytes(DIR_MEDIA, filename)
+        self.fs
+            .read_bytes(DIR_MEDIA, filename)
             .map_err(|e| SyncError::Storage(e.to_string()))
     }
 }
@@ -288,18 +308,29 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let fs = VirtualFs::new(dir.path().to_path_buf()).unwrap();
         let fslog = FsLog::new(dir.path().join("fslog"));
-        let config = SyncConfig { config_filename: "config.json".into(), storage_dir: dir.path().to_string_lossy().to_string() };
+        let config = SyncConfig {
+            config_filename: "config.json".into(),
+            storage_dir: dir.path().to_string_lossy().to_string(),
+        };
         (SyncEngine::new(fs, config, fslog), dir)
     }
 
     #[test]
     fn test_sync_file_new() {
         let (engine, _t) = test_engine();
-        let resp = engine.sync_file(1, SyncFile {
-            status: String::new(), path: "test.md".into(),
-            last_modified: 0, client_last_modified: 0, client_last_synced: 0,
-            content: "hello".into(),
-        }).unwrap();
+        let resp = engine
+            .sync_file(
+                1,
+                SyncFile {
+                    status: String::new(),
+                    path: "test.md".into(),
+                    last_modified: 0,
+                    client_last_modified: 0,
+                    client_last_synced: 0,
+                    content: "hello".into(),
+                },
+            )
+            .unwrap();
         assert_eq!(resp.status, STATUS_UPDATED_ON_SERVER);
     }
 
@@ -307,26 +338,42 @@ mod tests {
     fn test_sync_file_not_modified() {
         let (engine, _t) = test_engine();
         engine.fs.write(DIR_USER_ROOT, "test.md", "hello").unwrap();
-        let resp = engine.sync_file(1, SyncFile {
-            status: String::new(), path: "test.md".into(),
-            last_modified: 0, client_last_modified: 0, client_last_synced: 0,
-            content: "hello".into(),
-        }).unwrap();
+        let resp = engine
+            .sync_file(
+                1,
+                SyncFile {
+                    status: String::new(),
+                    path: "test.md".into(),
+                    last_modified: 0,
+                    client_last_modified: 0,
+                    client_last_synced: 0,
+                    content: "hello".into(),
+                },
+            )
+            .unwrap();
         assert_eq!(resp.status, STATUS_NOT_MODIFIED);
     }
 
     #[test]
     fn test_batch_sync_creates_files() {
         let (engine, _t) = test_engine();
-        let resp = engine.sync_filenames(1, SyncRequest {
-            modified: vec![SyncFile {
-                status: String::new(), path: "new.md".into(),
-                last_modified: 0, client_last_modified: 0, client_last_synced: 0,
-                content: "new content".into(),
-            }],
-            deleted: vec![],
-            timestamps: HashMap::new(),
-        }).unwrap();
+        let resp = engine
+            .sync_filenames(
+                1,
+                SyncRequest {
+                    modified: vec![SyncFile {
+                        status: String::new(),
+                        path: "new.md".into(),
+                        last_modified: 0,
+                        client_last_modified: 0,
+                        client_last_synced: 0,
+                        content: "new content".into(),
+                    }],
+                    deleted: vec![],
+                    timestamps: HashMap::new(),
+                },
+            )
+            .unwrap();
         assert_eq!(resp.status, STATUS_OK);
         assert!(engine.fs.exists(DIR_USER_ROOT, "new.md").unwrap());
     }
