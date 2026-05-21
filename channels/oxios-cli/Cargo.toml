@@ -1,13 +1,13 @@
 [package]
 name = "oxios-cli"
-version = "0.1.3"
+version = "0.2.0"
 edition = "2021"
 description = "Interactive CLI channel for Oxios"
 license = "MIT"
 repository = "https://github.com/a7garden/oxios"
 
 [dependencies]
-oxios-gateway = { version = "0.1.3", path = "../../crates/oxios-gateway" }
+oxios-gateway = { version = "0.2.0", path = "../../crates/oxios-gateway" }
 reedline = "0.38"
 tokio = { workspace = true }
 async-trait = { workspace = true }

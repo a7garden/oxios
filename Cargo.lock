@@ -4904,7 +4904,7 @@ dependencies = [
 
 [[package]]
 name = "oxios"
-version = "0.1.3"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -4960,7 +4960,7 @@ dependencies = [
 
 [[package]]
 name = "oxios-cli"
-version = "0.1.3"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4976,7 +4976,7 @@ dependencies = [
 
 [[package]]
 name = "oxios-gateway"
-version = "0.1.3"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4993,7 +4993,7 @@ dependencies = [
 
 [[package]]
 name = "oxios-kernel"
-version = "0.1.3"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5042,7 +5042,7 @@ dependencies = [
 
 [[package]]
 name = "oxios-markdown"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -5070,7 +5070,7 @@ dependencies = [
 
 [[package]]
 name = "oxios-ouroboros"
-version = "0.1.3"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5088,7 +5088,7 @@ dependencies = [
 
 [[package]]
 name = "oxios-telegram"
-version = "0.1.3"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5104,7 +5104,7 @@ dependencies = [
 
 [[package]]
 name = "oxios-web"
-version = "0.1.3"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "async-trait",
