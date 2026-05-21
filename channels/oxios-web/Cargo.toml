@@ -6,6 +6,7 @@ description = "Web dashboard channel for Oxios"
 license = "MIT"
 repository = "https://github.com/a7garden/oxios"
 exclude = ["frontend/target/*", "static/wasm/*.wasm", "static/assets/*.wasm"]
+include = ["src/**", "web/dist/**", "static/**", "Cargo.toml", "LICENSE", "README.md"]
 
 [dependencies]
 oxios-gateway = { version = "0.2.0", path = "../../crates/oxios-gateway" }
