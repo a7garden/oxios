@@ -1,16 +1,19 @@
-# Analysis Progress
+# Progress
 
-## Task: Analyze oxios-kernel crate module structure and dependencies
+## Status
+In Progress
 
-- [x] Read `lib.rs` — all 38 public modules identified, sectioned into 8 groups
-- [x] Read `Cargo.toml` — 28 required deps, 3 features (otel, wasm-sandbox, browser)
-- [x] Read all 17 target root-level `.rs` files
-- [x] Extract exported types (pub struct/enum/trait/type) per file
-- [x] Extract internal dependencies (`use crate::...`) per file
-- [x] Extract external crate dependencies per file
-- [x] Identify internal state patterns (Arc, Mutex, RwLock, atomics)
-- [x] Build dependency matrix
-- [x] Classify leaf vs hub modules
-- [x] Write report to `/Volumes/MERCURY/PROJECTS/oxios/analysis/root-modules.md`
+## Tasks
 
-**Status: COMPLETE**
+- [x] Cross-crate dependency analysis — analyzed all 9 workspace crates, traced imports, wrote report
+
+## Files Changed
+
+- `analysis/cross-crate-deps.md` — Full cross-crate dependency report
+
+## Notes
+
+- CLI and Telegram channels are well-isolated (gateway-only dependency)
+- Web channel is the most coupled (imports from 4 workspace crates directly)
+- No circular dependencies in the workspace
+- Leaf crates: ouroboros, markdown (no workspace deps)
