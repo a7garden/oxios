@@ -14,7 +14,7 @@ interface MarkdownEditorProps {
 }
 
 export function MarkdownEditor({
-  filePath,
+  filePath: _filePath,
   initialContent,
   onSave,
   className,
