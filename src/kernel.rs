@@ -279,7 +279,119 @@ impl Kernel {
                 let _ = handle.commit_all("guardian: periodic checkpoint");
             }
         });
+
+        // Daily health check: web UI update, self-update check.
+        self.start_daily_health_check();
     }
+
+    /// Start the daily health check loop.
+    ///
+    /// Runs every 24 hours and checks:
+    /// - Web UI: download if missing, update if new version available
+    /// - Binary: check for new version on GitHub (log only, don't auto-replace)
+    fn start_daily_health_check(&self) {
+        let handle = self.handle();
+        tokio::spawn(async move {
+            // Run once immediately on startup (first download)
+            if let Err(e) = daily_health_check(&handle).await {
+                tracing::warn!(error = %e, "Daily health check failed on initial run");
+            }
+
+            // Then every 24 hours
+            let mut interval = tokio::time::interval(std::time::Duration::from_secs(86400));
+            loop {
+                interval.tick().await;
+                if let Err(e) = daily_health_check(&handle).await {
+                    tracing::warn!(error = %e, "Daily health check failed");
+                }
+            }
+        });
+    }
+}
+
+/// Daily health check logic.
+async fn daily_health_check(
+    _handle: &oxios_kernel::KernelHandle,
+) -> anyhow::Result<()> {
+    let home = dirs::home_dir().ok_or_else(|| anyhow::anyhow!("no home dir"))?;
+    let web_dist = home.join(".oxios").join("web").join("dist");
+    let version_file = home.join(".oxios").join("web").join("version");
+
+    // Fetch latest release tag from GitHub
+    let client = reqwest::Client::builder()
+        .user_agent("oxios-health")
+        .build()?;
+
+    let resp: serde_json::Value = client
+        .get("https://api.github.com/repos/a7garden/oxios/releases/latest")
+        .send()
+        .await?
+        .json()
+        .await?;
+
+    let latest_tag = resp["tag_name"]
+        .as_str()
+        .ok_or_else(|| anyhow::anyhow!("no tag_name in response"))?;
+
+    let current_version = std::fs::read_to_string(&version_file)
+        .unwrap_or_default()
+        .trim()
+        .to_string();
+
+    let needs_download = !web_dist.join("index.html").is_file() || current_version != latest_tag;
+
+    if !needs_download {
+        tracing::debug!("Daily health check: web UI up to date ({})", latest_tag);
+        return Ok(());
+    }
+
+    tracing::info!(
+        current = %current_version,
+        latest = %latest_tag,
+        "Updating web UI..."
+    );
+
+    // Download web-dist.zip
+    let url = format!(
+        "https://github.com/a7garden/oxios/releases/download/{}/web-dist.zip",
+        latest_tag
+    );
+    let bytes = client.get(&url).send().await?.bytes().await?;
+
+    // Clear and extract
+    if web_dist.exists() {
+        std::fs::remove_dir_all(&web_dist)?;
+    }
+    std::fs::create_dir_all(&web_dist)?;
+
+    let reader = std::io::Cursor::new(bytes.as_ref());
+    let mut archive = zip::ZipArchive::new(reader)?;
+
+    for i in 0..archive.len() {
+        let mut file = archive.by_index(i)?;
+        let outpath = match file.enclosed_name() {
+            Some(path) => web_dist.join(path),
+            None => continue,
+        };
+        if file.is_dir() {
+            std::fs::create_dir_all(&outpath)?;
+        } else {
+            if let Some(p) = outpath.parent() {
+                std::fs::create_dir_all(p)?;
+            }
+            let mut outfile = std::fs::File::create(&outpath)?;
+            std::io::copy(&mut file, &mut outfile)?;
+        }
+    }
+
+    // Write version file
+    if let Some(parent) = version_file.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    std::fs::write(&version_file, latest_tag)?;
+
+    tracing::info!(version = %latest_tag, "Daily health check: web UI updated");
+    Ok(())
 }
 
 /// Builder for assembling the Oxios kernel.
