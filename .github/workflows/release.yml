@@ -42,6 +42,10 @@ jobs:
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
 
+      - name: Build web assets
+        working-directory: oxios/channels/oxios-web/web
+        run: bun install && bun run build
+
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
         with:
