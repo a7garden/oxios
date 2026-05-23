@@ -12,7 +12,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use axum::{
     body::Body,
-    response::{IntoResponse, Response},
+    response::Response,
     routing::get,
     Router,
 };
@@ -106,7 +106,7 @@ fn serve_file(dist: Option<&std::path::Path>, path: &str) -> Response {
 
     // Try filesystem first
     if let Some(d) = dist {
-        if let Some(data) = fs_read(d, &clean) {
+        if let Some(data) = fs_read(d, clean) {
             let lookup = if clean.starts_with("assets/") {
                 clean.to_string()
             } else {
