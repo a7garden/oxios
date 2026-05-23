@@ -5,6 +5,7 @@
 //! First run without credentials triggers an interactive setup wizard.
 
 mod cmd_run;
+mod cmd_update;
 mod kernel;
 mod otel;
 
@@ -179,6 +180,35 @@ enum Command {
         /// Port override (default: from config).
         #[arg(short, long)]
         port: Option<u16>,
+    },
+
+    /// Update oxios binary and/or web UI from GitHub Releases.
+    Update {
+        /// Update web UI only (binary unchanged).
+        #[arg(long)]
+        web_only: bool,
+
+        /// Update binary only (web UI unchanged).
+        #[arg(long)]
+        binary_only: bool,
+
+        /// Target version (default: latest).
+        #[arg(long)]
+        version: Option<String>,
+
+        /// Dry run — show what would be updated without applying.
+        #[arg(long)]
+        dry_run: bool,
+
+        /// Skip confirmation prompt.
+        #[arg(short = 'y')]
+        yes: bool,
+    },
+
+    /// Show changelog or release notes for a version.
+    Changelog {
+        /// Version to show (default: latest).
+        version: Option<String>,
     },
 
     /// Generate shell completion script.
@@ -1066,6 +1096,18 @@ async fn run() -> Result<()> {
         Some(Command::Web { port }) => {
             return cmd_web(&config, *port);
         }
+        Some(Command::Update {
+            web_only,
+            binary_only,
+            version,
+            dry_run,
+            yes,
+        }) => {
+            return cmd_update::run_update(*web_only, *binary_only, version.as_deref(), *dry_run, *yes).await;
+        }
+        Some(Command::Changelog { version }) => {
+            return cmd_update::run_changelog(version.as_deref()).await;
+        }
         Some(Command::Completion { shell }) => {
             let mut cmd = Cli::command();
             let name = cmd.get_name().to_string();
@@ -1425,7 +1467,9 @@ async fn run() -> Result<()> {
         | Some(Command::Reset { .. })
         | Some(Command::Models { .. })
         | Some(Command::Web { .. })
-        | Some(Command::Completion { .. }) => unreachable!(),
+        | Some(Command::Completion { .. })
+        | Some(Command::Update { .. })
+        | Some(Command::Changelog { .. }) => unreachable!(),
     }
 }
 

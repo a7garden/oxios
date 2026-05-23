@@ -42,10 +42,6 @@ jobs:
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
 
-      - name: Build web assets
-        working-directory: oxios/channels/oxios-web/web
-        run: bun install && bun run build
-
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
         with:
@@ -97,3 +93,39 @@ jobs:
             oxios/target/oxios-${{ matrix.name }}
             oxios/target/oxios-${{ matrix.name }}.sha256
           generate_release_notes: true
+
+      # ── Separate job: upload web dist as release assets ──────────────────────
+
+  web-assets:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout oxios
+        uses: actions/checkout@v4
+        with:
+          path: oxios
+          sparse-checkout: |
+            channels/oxios-web/web/dist
+          sparse-checkout-cone-mode: false
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Build web assets
+        working-directory: oxios/channels/oxios-web/web
+        run: bun install && bun run build
+
+      - name: Get version
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Package web dist
+        run: |
+          cd oxios/channels/oxios-web/web/dist
+          zip -r ../../../../../web-dist.zip .
+
+      - name: Upload to Release
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: oxios/channels/oxios-web/web/web-dist.zip
