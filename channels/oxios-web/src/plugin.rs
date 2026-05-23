@@ -10,12 +10,7 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
-use axum::{
-    body::Body,
-    response::Response,
-    routing::get,
-    Router,
-};
+use axum::{body::Body, response::Response, routing::get, Router};
 use rust_embed::Embed;
 use std::path::PathBuf;
 use std::sync::Arc;
