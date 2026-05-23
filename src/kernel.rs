@@ -286,22 +286,36 @@ impl Kernel {
 
     /// Start the daily health check loop.
     ///
-    /// Runs every 24 hours and checks:
-    /// - Web UI: download if missing, update if new version available
-    /// - Binary: check for new version on GitHub (log only, don't auto-replace)
+    /// Runs at 03:00 AM every day (user's local time) via cron expression.
+    /// First tick is calculated to land on the next 3 AM, then every 24h after.
     fn start_daily_health_check(&self) {
-        let handle = self.handle();
         tokio::spawn(async move {
-            // Run once immediately on startup (first download)
-            if let Err(e) = daily_health_check(&handle).await {
-                tracing::warn!(error = %e, "Daily health check failed on initial run");
+            let now = chrono::Local::now();
+            let mut next = now.date_naive()
+                .and_hms_opt(3, 0, 0)
+                .unwrap()
+                .and_local_timezone(chrono::Local)
+                .unwrap();
+            if next <= now {
+                next += chrono::Duration::days(1);
             }
 
-            // Then every 24 hours
+            let delay_secs = (next - now).num_seconds().max(0) as u64;
+            tracing::info!(
+                next_check = %next.format("%Y-%m-%d %H:%M"),
+                "Daily health check scheduled at 03:00"
+            );
+
+            tokio::time::sleep(std::time::Duration::from_secs(delay_secs)).await;
+
+            if let Err(e) = daily_health_check().await {
+                tracing::warn!(error = %e, "Daily health check failed");
+            }
+
             let mut interval = tokio::time::interval(std::time::Duration::from_secs(86400));
             loop {
                 interval.tick().await;
-                if let Err(e) = daily_health_check(&handle).await {
+                if let Err(e) = daily_health_check().await {
                     tracing::warn!(error = %e, "Daily health check failed");
                 }
             }
@@ -310,9 +324,7 @@ impl Kernel {
 }
 
 /// Daily health check logic.
-async fn daily_health_check(
-    _handle: &oxios_kernel::KernelHandle,
-) -> anyhow::Result<()> {
+async fn daily_health_check() -> anyhow::Result<()> {
     let home = dirs::home_dir().ok_or_else(|| anyhow::anyhow!("no home dir"))?;
     let web_dist = home.join(".oxios").join("web").join("dist");
     let version_file = home.join(".oxios").join("web").join("version");
