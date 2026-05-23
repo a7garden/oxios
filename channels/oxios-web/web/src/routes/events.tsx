@@ -1,39 +1,25 @@
-import { useQuery } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
 import { Bell, RefreshCw } from 'lucide-react'
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { EmptyState } from '@/components/shared/empty-state'
-import { ErrorState } from '@/components/shared/error-state'
-import { LoadingCards } from '@/components/shared/loading'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useEvents } from '@/hooks/use-events'
+import type { OxiosEvent } from '@/types'
 
 export const Route = createFileRoute('/events')({ component: EventsPage })
 
 function EventsPage() {
-  const { events: liveEvents, isConnected, error: connectionError } = useEvents()
+  const { events: liveEvents, isConnected, error: connectionError, reconnect } = useEvents()
   const scrollRef = useRef<HTMLDivElement>(null)
-
-  const {
-    isLoading,
-    isError,
-    refetch,
-    isFetching,
-  } = useQuery({
-    queryKey: ['events'],
-    // /api/events is SSE stream, not REST. Live events come from useEvents() hook.
-    queryFn: async () => null,
-  })
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [_r, setRefreshKey] = useState(0)
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: liveEvents.length is sufficient dependency for scroll-to-bottom
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight })
   }, [liveEvents.length])
-
-  if (isLoading) return <LoadingCards count={4} />
-  if (isError) return <ErrorState onRetry={() => refetch()} />
 
   return (
     <div className="space-y-6">
@@ -42,8 +28,8 @@ function EventsPage() {
           <h1 className="text-2xl font-bold">Events</h1>
           <p className="text-muted-foreground">Live event stream</p>
         </div>
-        <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching}>
-          <RefreshCw className={`h-4 w-4 mr-1 ${isFetching ? 'animate-spin' : ''}`} /> Refresh
+        <Button variant="outline" size="sm" onClick={() => { reconnect?.(); setRefreshKey((k) => k + 1) }}>
+          <RefreshCw className="h-4 w-4 mr-1" /> Refresh
         </Button>
       </div>
 
@@ -86,9 +72,9 @@ function EventsPage() {
                 className="py-8"
               />
             ) : (
-              liveEvents.map((event, i) => (
+              liveEvents.map((event: OxiosEvent, i: number) => (
                 <div
-                  key={event.id ?? i}
+                  key={event.id ?? `evt-${i}`}
                   className="flex items-start gap-3 rounded border p-2 text-sm"
                 >
                   <Badge variant="outline" className="shrink-0 text-xs">

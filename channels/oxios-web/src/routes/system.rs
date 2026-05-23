@@ -120,6 +120,8 @@ pub(crate) struct ComponentHealth {
     pub memory: MemoryHealth,
     /// Agent subsystem health.
     pub agents: AgentHealth,
+    /// Active spaces count.
+    pub spaces_active: usize,
 }
 
 /// Response body for the status endpoint.
@@ -208,6 +210,7 @@ pub(crate) async fn handle_status(state: State<Arc<AppState>>) -> Json<StatusRes
         },
         memory: memory_health,
         agents: agent_health,
+        spaces_active: state.kernel.spaces.list_spaces().len(),
     });
 
     Json(StatusResponse {
@@ -278,7 +281,7 @@ pub(crate) async fn handle_agents_list(
                 .map(|a| AgentSummary {
                     id: a.id.to_string(),
                     name: a.name,
-                    status: format!("{:?}", a.status),
+                    status: a.status.to_string(),
                     created_at: a.created_at.to_rfc3339(),
                     seed_id: a.seed_id.map(|s| s.to_string()),
                 })

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { SseClient } from '@/lib/sse-client'
 import type { OxiosEvent } from '@/types'
 
@@ -8,10 +8,14 @@ export function useEvents() {
   const [error, setError] = useState<Error | null>(null)
   const clientRef = useRef<SseClient | null>(null)
 
-  useEffect(() => {
+  const connect = useCallback(() => {
+    // Disconnect previous
+    clientRef.current?.disconnect()
+
     const client = new SseClient()
     clientRef.current = client
     setIsConnected(true)
+    setError(null)
 
     client.connect(
       '/api/events',
@@ -24,12 +28,20 @@ export function useEvents() {
         setIsConnected(false)
       },
     )
-
-    return () => {
-      client.disconnect()
-      setIsConnected(false)
-    }
   }, [])
 
-  return { events, isConnected, error }
+  useEffect(() => {
+    connect()
+    return () => {
+      clientRef.current?.disconnect()
+      setIsConnected(false)
+    }
+  }, [connect])
+
+  const reconnect = useCallback(() => {
+    setEvents([])
+    connect()
+  }, [connect])
+
+  return { events, isConnected, error, reconnect }
 }

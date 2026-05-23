@@ -9,6 +9,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { api } from '@/lib/api-client'
 
+interface MemoryItem {
+  name: string
+  category?: string
+  snippet?: string
+  content?: string
+}
+
 export const Route = createFileRoute('/memory')({ component: MemoryPage })
 
 function MemoryPage() {
@@ -22,10 +29,15 @@ function MemoryPage() {
     isFetching,
   } = useQuery({
     queryKey: ['memory', search],
-    queryFn: async () => {
+    queryFn: async (): Promise<MemoryItem[]> => {
+      if (search.trim()) {
+        // Use search endpoint when query is provided
+        const res = await api.post<{ entries: { id: string; type: string; content: string; tags: string[]; importance: number; created_at: string }[]; count: number }>('/api/memory/search', { query: search })
+        return (res.entries ?? []).map((e) => ({ name: e.id ?? e.type, snippet: e.content?.slice(0, 200) ?? '', category: e.type }))
+      }
+      // Default: list all memory entries
       const res = await api.get<{ items: { name: string; category: string }[] }>('/api/memory')
-      // List endpoint returns name + category only — show category as content
-      return (res.items ?? []).map((m) => ({ name: m.name, content: m.category, updated_at: '' }))
+      return (res.items ?? []).map((m) => ({ name: m.name, category: m.category }))
     },
     refetchInterval: 15000,
   })
@@ -76,21 +88,14 @@ function MemoryPage() {
           {items.map((mem) => (
             <Card key={mem.name}>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm flex items-center justify-between">
-                  <span className="flex items-center gap-2">
-                    <Brain className="h-3 w-3" /> {mem.name}
-                  </span>
-                  {mem.updated_at && (
-                    <span className="text-xs text-muted-foreground font-normal">
-                      {new Date(mem.updated_at).toLocaleString()}
-                    </span>
-                  )}
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <Brain className="h-3 w-3" /> {mem.name}
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <pre className="rounded bg-muted p-3 text-xs overflow-x-auto whitespace-pre-wrap">
-                  {mem.content}
-                </pre>
+                <p className="text-xs text-muted-foreground">
+                  {mem.snippet ?? mem.category ?? '—'}
+                </p>
               </CardContent>
             </Card>
           ))}

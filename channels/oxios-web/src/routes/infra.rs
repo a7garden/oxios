@@ -73,8 +73,8 @@ pub(crate) async fn handle_scheduler_tasks(
         .map(|t| TaskSummary {
             id: t.id.to_string(),
             description: t.description,
-            priority: format!("{:?}", t.priority),
-            status: format!("{:?}", t.status),
+            priority: format!("{:?}", t.priority).to_lowercase(),
+            status: format!("{:?}", t.status).to_lowercase(),
             created_at: t.created_at.to_rfc3339(),
             error: t.error,
         })
@@ -88,8 +88,8 @@ pub(crate) async fn handle_scheduler_tasks(
         .map(|t| TaskSummary {
             id: t.id.to_string(),
             description: t.description,
-            priority: format!("{:?}", t.priority),
-            status: format!("{:?}", t.status),
+            priority: format!("{:?}", t.priority).to_lowercase(),
+            status: format!("{:?}", t.status).to_lowercase(),
             created_at: t.created_at.to_rfc3339(),
             error: t.error,
         })
@@ -434,4 +434,40 @@ pub(crate) async fn handle_mcp_tool_call(
         "content": content,
         "is_error": result.is_error,
     })))
+}
+
+// ---------------------------------------------------------------------------
+// Security / Permissions overview
+// ---------------------------------------------------------------------------
+
+/// GET /api/security/permissions — List roles and policies.
+pub(crate) async fn handle_security_permissions(
+    state: State<Arc<AppState>>,
+) -> Json<serde_json::Value> {
+    use oxios_kernel::access_manager::Role;
+    let roles: Vec<String> = [
+        format!("{:?}", Role::User).to_lowercase(),
+        format!("{:?}", Role::Superuser).to_lowercase(),
+        format!("{:?}", Role::Admin).to_lowercase(),
+    ].into_iter().map(|r| r.to_lowercase()).collect();
+
+    // Build policy summaries from each role's default policy
+    let mut policies = Vec::new();
+    for role in [Role::User, Role::Superuser, Role::Admin] {
+        let policy = role.default_policy();
+        // Serialize the policy to get its allowed actions
+        let val = serde_json::to_value(&policy).unwrap_or_default();
+        policies.push(serde_json::json!({
+            "name": format!("{}-default", format!("{:?}", role).to_lowercase()),
+            "effect": "allow",
+            "resources": val.get("allowed_actions").and_then(|v| v.as_array())
+                .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect::<Vec<_>>())
+                .unwrap_or_default(),
+        }));
+    }
+
+    Json(serde_json::json!({
+        "roles": roles,
+        "policies": policies,
+    }))
 }

@@ -1,9 +1,10 @@
 import { useQuery } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
-import { FileWarning, RefreshCw, Shield } from 'lucide-react'
+import { FileWarning, KeyRound, RefreshCw, Shield } from 'lucide-react'
 import { EmptyState } from '@/components/shared/empty-state'
 import { ErrorState } from '@/components/shared/error-state'
 import { LoadingCards } from '@/components/shared/loading'
+import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { api } from '@/lib/api-client'
 
@@ -19,10 +20,19 @@ function SecurityPage() {
   } = useQuery({
     queryKey: ['audit'],
     queryFn: async () => {
-      // Backend uses /api/audit, not /api/security/audit
       const res = await api.get<{ items: { timestamp: string; agent_name: string; action: string; resource: string; allowed: boolean; reason: string | null }[] }>('/api/audit')
       return res
     },
+    refetchInterval: 15000,
+  })
+
+  const {
+    data: permissions,
+    isError: permissionsError,
+    refetch: refetchPermissions,
+  } = useQuery({
+    queryKey: ['permissions'],
+    queryFn: () => api.get<{ roles: string[]; policies: { name: string; effect: string; resources: string[] }[] }>('/api/security/permissions'),
     refetchInterval: 15000,
   })
 
@@ -52,6 +62,47 @@ function SecurityPage() {
           <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
         </button>
       </div>
+
+      {/* Permissions */}
+      {permissionsError ? (
+        <ErrorState onRetry={() => refetchPermissions()} />
+      ) : permissions ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <KeyRound className="h-4 w-4" /> Roles & Policies
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div>
+              <p className="text-sm font-medium mb-1">Roles</p>
+              <div className="flex gap-2 flex-wrap">
+                {permissions.roles.map((role) => (
+                  <Badge key={role} variant="outline">
+                    {role}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+            <div>
+              <p className="text-sm font-medium mb-2">Policies</p>
+              <div className="space-y-1">
+                {permissions.policies.map((policy) => (
+                  <div key={policy.name} className="flex items-center gap-2 text-sm">
+                    <Badge variant={policy.effect === 'allow' ? 'success' : 'destructive'}>
+                      {policy.effect}
+                    </Badge>
+                    <span>{policy.name}</span>
+                    {policy.resources.length > 0 && (
+                      <span className="text-muted-foreground">({policy.resources.join(', ')})</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
 
       {/* Audit Trail */}
       <Card>

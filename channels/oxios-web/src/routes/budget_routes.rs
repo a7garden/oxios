@@ -1,8 +1,10 @@
 //! Budget management API routes.
 
 use crate::error::AppError;
+use crate::routes::paginate;
+use crate::routes::PageParams;
 use crate::server::AppState;
-use axum::extract::{Path, State};
+use axum::extract::{Path, Query, State};
 use axum::Json;
 use oxios_kernel::budget::BudgetLimit;
 use oxios_kernel::types::AgentId;
@@ -24,6 +26,39 @@ pub struct ReserveRequest {
 
 fn parse_agent_id(id: &str) -> Result<AgentId, AppError> {
     AgentId::parse_str(id).map_err(|e| AppError::Internal(format!("Invalid agent ID: {e}")))
+}
+
+/// GET /api/budget — List all agent budgets.
+pub(crate) async fn handle_budget_list(
+    state: State<Arc<AppState>>,
+    Query(params): Query<PageParams>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    let agents = state
+        .kernel
+        .agents
+        .list()
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))?;
+    let items: Vec<serde_json::Value> = agents
+        .iter()
+        .filter_map(|a| {
+            let info = state.kernel.agents.check_budget(&a.id);
+            // Only include agents that have budget limits configured
+            if info.tokens_remaining > 0 || info.calls_remaining > 0 {
+                Some(serde_json::json!({
+                    "agent_id": a.id.to_string(),
+                    "name": a.name,
+                    "tokens_remaining": info.tokens_remaining,
+                    "calls_remaining": info.calls_remaining,
+                    "window_remaining_secs": info.window_remaining_secs,
+                    "is_exhausted": info.is_exhausted,
+                }))
+            } else {
+                None
+            }
+        })
+        .collect();
+    Ok(Json(paginate(&items, &params)))
 }
 
 /// GET /api/budget/{agent_id}

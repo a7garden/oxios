@@ -260,5 +260,6 @@ export interface SystemStatus {
     event_bus?: { healthy: boolean; detail?: string }
     memory?: { enabled: boolean; index_size: number; total_entries: number }
     agents?: { active_count: number; total_forked: number; total_completed: number; total_failed: number }
+    spaces_active?: number
   }
 }

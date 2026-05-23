@@ -125,7 +125,13 @@ pub(crate) async fn handle_events(
 /// Returns only the event type and non-sensitive metadata.
 pub(crate) fn sanitize_event(event: &oxios_kernel::event_bus::KernelEvent) -> serde_json::Value {
     use oxios_kernel::event_bus::KernelEvent;
-    match event {
+    let now = chrono::Utc::now().to_rfc3339();
+    let id = uuid::Uuid::new_v4().to_string();
+    let mut base = serde_json::json!({
+        "id": id,
+        "timestamp": now,
+    });
+    let payload = match event {
         KernelEvent::AgentCreated { id, name } => serde_json::json!({
             "type": "agent_created",
             "agent_id": id.to_string(),
@@ -267,12 +273,20 @@ pub(crate) fn sanitize_event(event: &oxios_kernel::event_bus::KernelEvent) -> se
             "to_space": to_space.to_string(),
             "entries": entries,
             "flow": format!("{:?}", flow),
-        }),
+        })
+    };
+    // Merge payload into base
+    if let serde_json::Value::Object(mut map) = base {
+        if let serde_json::Value::Object(payload_map) = payload {
+            for (k, v) in payload_map {
+                map.insert(k, v);
+            }
+        }
+        serde_json::Value::Object(map)
+    } else {
+        payload
     }
 }
-
-// ---------------------------------------------------------------------------
-// Approvals (HitL)
 // ---------------------------------------------------------------------------
 
 /// Approval request for the API response.

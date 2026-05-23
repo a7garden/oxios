@@ -42,7 +42,7 @@ pub(crate) use audit_routes::{
     handle_audit_verify,
 };
 pub(crate) use budget_routes::{
-    handle_budget_get, handle_budget_remove, handle_budget_reserve, handle_budget_reset,
+    handle_budget_get, handle_budget_list, handle_budget_remove, handle_budget_reserve, handle_budget_reset,
     handle_budget_set,
 };
 pub(crate) use chat::{handle_chat, handle_chat_stream};
@@ -59,6 +59,7 @@ pub(crate) use git_routes::{
 };
 pub(crate) use infra::{
     handle_audit_log, handle_metrics, handle_permissions_get, handle_permissions_put,
+    handle_security_permissions,
     handle_scheduler_stats, handle_scheduler_tasks,
 };
 pub(crate) use knowledge_routes::{
@@ -195,6 +196,7 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         .route("/api/audit/flush", post(handle_audit_flush))
         // Permissions
         .route("/api/audit", get(handle_audit_log))
+        .route("/api/security/permissions", get(handle_security_permissions))
         .route("/api/permissions/{agent}", get(handle_permissions_get))
         .route("/api/permissions/{agent}", put(handle_permissions_put))
         // Prometheus metrics
@@ -275,6 +277,7 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         .route("/api/spaces/memory-flow", get(handle_memory_flow))
         .route("/api/spaces/{id}/memory-flow", get(handle_memory_flow_for))
         // Budget
+        .route("/api/budget", get(handle_budget_list))
         .route("/api/budget/{agent_id}", get(handle_budget_get))
         .route("/api/budget/{agent_id}", post(handle_budget_set))
         .route("/api/budget/{agent_id}", delete(handle_budget_remove))

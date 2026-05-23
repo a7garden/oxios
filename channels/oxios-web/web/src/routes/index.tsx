@@ -51,8 +51,8 @@ function DashboardPage() {
       color: 'text-blue-500',
     },
     {
-      label: 'Memory Entries',
-      value: status?.components?.memory?.total_entries ?? 0,
+      label: 'Active Spaces',
+      value: status?.components?.spaces_active ?? 0,
       icon: <Boxes className="h-4 w-4" />,
       color: 'text-purple-500',
     },
