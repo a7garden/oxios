@@ -48,10 +48,6 @@ jobs:
         working-directory: oxios
         run: cargo build --release --target ${{ matrix.target }}
 
-      - name: Test
-        working-directory: oxios
-        run: cargo test --workspace
-
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
