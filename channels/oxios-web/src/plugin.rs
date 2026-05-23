@@ -6,13 +6,14 @@
 //!
 //! **Auto-update**: The web UI can be updated by placing a new build in
 //! `~/.oxios/web/dist/` (checked first) or `<workspace>/web/dist/` (fallback).
+//! If neither exists, the web UI is automatically downloaded from GitHub Releases.
 //! The server reads from filesystem on every request — no restart needed.
 
 use anyhow::Result;
 use async_trait::async_trait;
 use axum::{body::Body, response::Response, routing::get, Router};
 use rust_embed::Embed;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use oxios_gateway::plugin::{ChannelBundle, ChannelContext, ChannelPlugin};
@@ -24,6 +25,8 @@ use crate::middleware::RateLimiter;
 use crate::routes;
 use crate::server::AppState;
 
+const GITHUB_REPO: &str = "a7garden/oxios";
+
 /// Static web assets — embedded at compile time via rust-embed.
 /// This is the fallback when no external web/dist/ is found.
 /// Build with: cd web && npm run build
@@ -32,35 +35,151 @@ use crate::server::AppState;
 struct EmbeddedAssets;
 
 // ---------------------------------------------------------------------------
-// Web dist path resolution
+// Web dist auto-download from GitHub Releases
 // ---------------------------------------------------------------------------
 
-/// Returns the active web dist directory, checked in order:
-/// 1. `~/.oxios/web/dist/` — user-provided or updated builds (highest priority)
-/// 2. `<workspace>/web/dist/` — development / bundled builds
-///
-/// Returns `None` if neither exists.
-fn web_dist_path(workspace: &std::path::Path) -> Option<std::path::PathBuf> {
-    // 1. ~/.oxios/web/dist/ (user updates)
-    let user_dist = dirs::home_dir()
-        .map(|h| h.join(".oxios").join("web").join("dist"))
-        .filter(|p| p.exists() && p.join("index.html").is_file());
+/// Returns `~/.oxios/web/dist/` path.
+fn user_web_dist_dir() -> Option<PathBuf> {
+    dirs::home_dir().map(|h| h.join(".oxios").join("web").join("dist"))
+}
 
-    if let Some(ref dist) = user_dist {
-        tracing::info!(
-            path = ?dist,
-            "Serving web UI from user override (~/.oxios/web/dist/)"
+/// Returns `~/.oxios/web/version` path.
+fn user_web_version_file() -> Option<PathBuf> {
+    dirs::home_dir().map(|h| h.join(".oxios").join("web").join("version"))
+}
+
+
+/// Fetches the latest release tag from GitHub API.
+async fn fetch_latest_release_tag() -> Result<String> {
+    let url = format!("https://api.github.com/repos/{}/releases/latest", GITHUB_REPO);
+    let client = reqwest::Client::builder()
+        .user_agent("oxios-web")
+        .build()?;
+    let resp: serde_json::Value = client.get(&url).send().await?.json().await?;
+    let tag = resp["tag_name"]
+        .as_str()
+        .ok_or_else(|| anyhow::anyhow!("tag_name not found in GitHub response"))?;
+    Ok(tag.to_string())
+}
+
+/// Downloads `web-dist.zip` from a GitHub release and extracts to `~/.oxios/web/dist/`.
+async fn download_and_extract_web_dist(version_tag: &str) -> Result<PathBuf> {
+    let dist_dir = user_web_dist_dir()
+        .ok_or_else(|| anyhow::anyhow!("cannot determine home directory"))?;
+    let version_file = user_web_version_file()
+        .ok_or_else(|| anyhow::anyhow!("cannot determine home directory"))?;
+
+    // Download zip
+    let url = format!(
+        "https://github.com/{}/releases/download/{}/web-dist.zip",
+        GITHUB_REPO, version_tag
+    );
+    tracing::info!(url = %url, "Downloading web UI from GitHub Releases");
+
+    let client = reqwest::Client::builder()
+        .user_agent("oxios-web")
+        .build()?;
+    let resp = client.get(&url).send().await?;
+
+    if !resp.status().is_success() {
+        anyhow::bail!(
+            "Failed to download web-dist.zip: HTTP {}",
+            resp.status()
         );
-        return user_dist;
+    }
+
+    let bytes = resp.bytes().await?;
+
+    // Extract zip
+    let reader = std::io::Cursor::new(bytes.as_ref());
+    let mut archive = zip::ZipArchive::new(reader)?;
+
+    // Clear old dist
+    if dist_dir.exists() {
+        std::fs::remove_dir_all(&dist_dir)?;
+    }
+    std::fs::create_dir_all(&dist_dir)?;
+
+    for i in 0..archive.len() {
+        let mut file = archive.by_index(i)?;
+        let outpath = match file.enclosed_name() {
+            Some(path) => dist_dir.join(path),
+            None => continue,
+        };
+        if file.is_dir() {
+            std::fs::create_dir_all(&outpath)?;
+        } else {
+            if let Some(p) = outpath.parent() {
+                if !p.exists() {
+                    std::fs::create_dir_all(p)?;
+                }
+            }
+            let mut outfile = std::fs::File::create(&outpath)?;
+            std::io::copy(&mut file, &mut outfile)?;
+        }
+    }
+
+    // Write version file
+    if let Some(parent) = version_file.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    std::fs::write(&version_file, version_tag)?;
+
+    tracing::info!(
+        path = ?dist_dir,
+        version = %version_tag,
+        "Web UI downloaded and extracted"
+    );
+
+    Ok(dist_dir)
+}
+
+/// Ensures web dist is available. Downloads from GitHub if not present.
+/// Returns the dist directory path if available from filesystem.
+async fn ensure_web_dist(workspace: &Path) -> Option<PathBuf> {
+    // 1. ~/.oxios/web/dist/ (user override — always wins)
+    if let Some(ref dist) = user_web_dist_dir() {
+        if dist.join("index.html").is_file() {
+            // Check if there's a version file — if so, it was auto-downloaded
+            // and we should check for updates
+            let version_file = user_web_version_file().unwrap();
+            let current_version = std::fs::read_to_string(&version_file).ok();
+
+            // Try to fetch latest tag (non-blocking, best-effort)
+            match fetch_latest_release_tag().await {
+                Ok(latest_tag) => {
+                    let current = current_version.as_deref().unwrap_or("");
+                    if current != latest_tag {
+                        tracing::info!(
+                            current = %current,
+                            latest = %latest_tag,
+                            "New web UI version available, downloading..."
+                        );
+                        match download_and_extract_web_dist(&latest_tag).await {
+                            Ok(p) => {
+                                tracing::info!(path = ?p, "Web UI updated");
+                                return Some(p);
+                            }
+                            Err(e) => {
+                                tracing::warn!(error = %e, "Failed to download update, using existing");
+                            }
+                        }
+                    }
+                }
+                Err(e) => {
+                    tracing::debug!(error = %e, "Could not check for web UI updates");
+                }
+            }
+
+            tracing::info!(path = ?dist, "Serving web UI from ~/.oxios/web/dist/");
+            return Some(dist.clone());
+        }
     }
 
     // 2. workspace/web/dist/ (bundled / dev)
     let workspace_dist = workspace.join("web").join("dist");
     if workspace_dist.join("index.html").is_file() {
-        tracing::info!(
-            path = ?workspace_dist,
-            "Serving web UI from workspace (web/dist/)"
-        );
+        tracing::info!(path = ?workspace_dist, "Serving web UI from workspace (web/dist/)");
         return Some(workspace_dist);
     }
 
@@ -68,6 +187,16 @@ fn web_dist_path(workspace: &std::path::Path) -> Option<std::path::PathBuf> {
     if EmbeddedAssets::get("index.html").is_some() {
         tracing::info!("Serving web UI from embedded assets (binary built with --features web)");
         return None;
+    }
+
+    // 4. Auto-download from GitHub Releases
+    tracing::info!("No web UI found locally, downloading from GitHub Releases...");
+    match fetch_latest_release_tag().await {
+        Ok(tag) => match download_and_extract_web_dist(&tag).await {
+            Ok(p) => return Some(p),
+            Err(e) => tracing::warn!(error = %e, "Failed to auto-download web UI"),
+        },
+        Err(e) => tracing::warn!(error = %e, "Could not fetch latest release info"),
     }
 
     None
@@ -225,8 +354,8 @@ impl ChannelPlugin for WebPlugin {
         let rate_limit = config.security.rate_limit_per_minute;
         let workspace = PathBuf::from(&config.kernel.workspace);
 
-        // Resolve web dist path (filesystem override or embedded fallback)
-        let web_dist = web_dist_path(&workspace);
+        // Resolve web dist path (auto-download if needed)
+        let web_dist = ensure_web_dist(&workspace).await;
 
         // Create web channel
         let web_channel = WebChannel::new(256);

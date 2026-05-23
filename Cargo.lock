@@ -5326,6 +5326,7 @@ dependencies = [
  "oxios-markdown",
  "oxios-ouroboros",
  "parking_lot",
+ "reqwest",
  "rust-embed",
  "serde",
  "serde_json",
@@ -5338,6 +5339,7 @@ dependencies = [
  "utoipa",
  "utoipa-swagger-ui",
  "uuid",
+ "zip 2.4.2",
 ]
 
 [[package]]
