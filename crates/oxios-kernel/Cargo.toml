@@ -1,6 +1,6 @@
 [package]
 name = "oxios-kernel"
-version = "0.3.0"
+version = "0.4.0"
 edition = "2021"
 description = "Oxios kernel: supervisor, event bus, state store"
 license = "MIT"
@@ -13,8 +13,8 @@ wasm-sandbox = ["dep:wasmtime", "dep:wasmtime-wasi"]
 browser = []
 
 [dependencies]
-oxios-ouroboros = { version = "0.3.0", path = "../oxios-ouroboros" }
-oxios-markdown = { version = "0.3.0", path = "../oxios-markdown" }
+oxios-ouroboros = { version = "0.4.0", path = "../oxios-ouroboros" }
+oxios-markdown = { version = "0.4.0", path = "../oxios-markdown" }
 oxios-mcp = { version = "0.1.0", path = "../oxios-mcp" }
 oxi-sdk = { workspace = true }
 oxi-ai = { workspace = true }
@@ -69,6 +69,6 @@ opentelemetry-stdout = { version = "0.27", optional = true }
 
 [dev-dependencies]
 tempfile = "3"
-oxios-ouroboros = { version = "0.3.0", path = "../oxios-ouroboros" }
+oxios-ouroboros = { version = "0.4.0", path = "../oxios-ouroboros" }
 oxios-gateway = { path = "../oxios-gateway" }
 async-trait = { workspace = true }
