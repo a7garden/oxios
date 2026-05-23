@@ -243,7 +243,6 @@ pub async fn run_update(
                 std::io::stdout().flush().ok();
                 let cs_bytes = download_file(&client, cs_url, 256).await?;
                 String::from_utf8_lossy(&cs_bytes)
-                    .trim()
                     .split_whitespace()
                     .next()
                     .unwrap_or("")
