@@ -688,7 +688,6 @@ fn test_resource_snapshot() {
 
     assert!(snap.cpu_percent >= 0.0);
     assert!(snap.memory_total_mb > 0);
-    assert!(snap.memory_used_mb >= u64::MIN);
     assert!(snap.load_avg_1m >= 0.0);
     assert!(snap.disk_used_gb >= 0.0);
 }

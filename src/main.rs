@@ -944,7 +944,7 @@ fn cmd_web(config: &OxiosConfig, port_override: Option<u16>) -> Result<()> {
         let mut attempts = 0;
         loop {
             std::thread::sleep(std::time::Duration::from_millis(300));
-            if TcpStream::connect(&format!("127.0.0.1:{}", port)).is_ok() {
+            if TcpStream::connect(format!("127.0.0.1:{}", port)).is_ok() {
                 break;
             }
             attempts += 1;
