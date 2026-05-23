@@ -206,6 +206,7 @@ async fn spa_handler(axum::extract::State(state): axum::extract::State<Arc<AppSt
 pub struct WebPlugin;
 
 impl WebPlugin {
+    /// Create a new web plugin instance.
     pub fn new() -> Self {
         Self
     }
