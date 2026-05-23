@@ -244,6 +244,7 @@ fn print_and_verify(
 }
 
 #[tokio::test]
+#[ignore] // requires real LLM API key; run with --ignored flag locally
 async fn test_interview_scenarios() {
     let engine = make_engine().await;
     let scenarios = scenarios();
