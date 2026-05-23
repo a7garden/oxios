@@ -30,7 +30,14 @@ export interface SessionDetail {
   id: string
   user_id: string
   user_messages: string[]
-  agent_responses: { content: string; session_id: string; seed_id: string; phase_reached: string; evaluation_passed: boolean; timestamp: string }[]
+  agent_responses: {
+    content: string
+    session_id: string
+    seed_id: string
+    phase_reached: string
+    evaluation_passed: boolean
+    timestamp: string
+  }[]
   active_seed_id?: string
   active_persona_id?: string
   created_at: string
@@ -264,7 +271,12 @@ export interface SystemStatus {
     state_store?: { healthy: boolean; detail?: string }
     event_bus?: { healthy: boolean; detail?: string }
     memory?: { enabled: boolean; index_size: number; total_entries: number }
-    agents?: { active_count: number; total_forked: number; total_completed: number; total_failed: number }
+    agents?: {
+      active_count: number
+      total_forked: number
+      total_completed: number
+      total_failed: number
+    }
     spaces_active?: number
   }
 }

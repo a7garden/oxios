@@ -49,7 +49,9 @@ function SpacesListPage() {
           {row.tags && row.tags.length > 0 && (
             <div className="flex gap-1">
               {row.tags.map((t) => (
-                <Badge key={t} variant="outline">{t}</Badge>
+                <Badge key={t} variant="outline">
+                  {t}
+                </Badge>
               ))}
             </div>
           )}

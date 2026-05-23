@@ -20,7 +20,16 @@ function SecurityPage() {
   } = useQuery({
     queryKey: ['audit'],
     queryFn: async () => {
-      const res = await api.get<{ items: { timestamp: string; agent_name: string; action: string; resource: string; allowed: boolean; reason: string | null }[] }>('/api/audit')
+      const res = await api.get<{
+        items: {
+          timestamp: string
+          agent_name: string
+          action: string
+          resource: string
+          allowed: boolean
+          reason: string | null
+        }[]
+      }>('/api/audit')
       return res
     },
     refetchInterval: 15000,
@@ -32,7 +41,11 @@ function SecurityPage() {
     refetch: refetchPermissions,
   } = useQuery({
     queryKey: ['permissions'],
-    queryFn: () => api.get<{ roles: string[]; policies: { name: string; effect: string; resources: string[] }[] }>('/api/security/permissions'),
+    queryFn: () =>
+      api.get<{
+        roles: string[]
+        policies: { name: string; effect: string; resources: string[] }[]
+      }>('/api/security/permissions'),
     refetchInterval: 15000,
   })
 

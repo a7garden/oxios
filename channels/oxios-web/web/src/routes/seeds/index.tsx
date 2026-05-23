@@ -32,11 +32,12 @@ function SeedsListPage() {
     { header: 'Goal', accessor: (row: Seed) => <span className="font-medium">{row.goal}</span> },
     {
       header: 'Constraints',
-      accessor: (row: Seed) => (
-        <Badge variant="outline">{row.constraints_count}</Badge>
-      ),
+      accessor: (row: Seed) => <Badge variant="outline">{row.constraints_count}</Badge>,
     },
-    { header: 'Created', accessor: (row: Seed) => row.created_at ? new Date(row.created_at).toLocaleString() : '—' },
+    {
+      header: 'Created',
+      accessor: (row: Seed) => (row.created_at ? new Date(row.created_at).toLocaleString() : '—'),
+    },
   ]
 
   return (

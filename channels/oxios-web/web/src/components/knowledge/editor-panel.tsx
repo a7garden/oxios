@@ -1,5 +1,5 @@
-import { useKnowledgeStore } from '@/stores/knowledge'
 import { useKnowledgeFile, useWriteFile } from '@/hooks/use-knowledge'
+import { useKnowledgeStore } from '@/stores/knowledge'
 import { EditorToolbar } from './editor-toolbar'
 import { MarkdownEditor } from './markdown-editor'
 import { SplitEditor } from './split-editor'
@@ -35,9 +35,7 @@ export function EditorPanel() {
       </div>
 
       {/* Split editor */}
-      {splitEditorOpen && splitFilePath && (
-        <SplitEditor filePath={splitFilePath} />
-      )}
+      {splitEditorOpen && splitFilePath && <SplitEditor filePath={splitFilePath} />}
     </div>
   )
 }

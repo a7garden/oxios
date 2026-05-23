@@ -31,9 +31,19 @@ const sections: SettingsSection[] = [
     key: 'kernel',
     label: 'Kernel',
     fields: [
-      { key: 'workspace', label: 'Workspace Path', type: 'text', placeholder: '~/.oxios/workspace' },
+      {
+        key: 'workspace',
+        label: 'Workspace Path',
+        type: 'text',
+        placeholder: '~/.oxios/workspace',
+      },
       { key: 'max_agents', label: 'Max Concurrent Agents', type: 'number', placeholder: '16' },
-      { key: 'event_bus_capacity', label: 'Event Bus Capacity', type: 'number', placeholder: '256' },
+      {
+        key: 'event_bus_capacity',
+        label: 'Event Bus Capacity',
+        type: 'number',
+        placeholder: '256',
+      },
     ],
   },
   {
@@ -49,7 +59,12 @@ const sections: SettingsSection[] = [
     label: 'Security',
     fields: [
       { key: 'network_access', label: 'Network Access', type: 'text', placeholder: 'false' },
-      { key: 'max_execution_time_secs', label: 'Max Execution Time (s)', type: 'number', placeholder: '300' },
+      {
+        key: 'max_execution_time_secs',
+        label: 'Max Execution Time (s)',
+        type: 'number',
+        placeholder: '300',
+      },
       { key: 'max_memory_mb', label: 'Max Memory (MB)', type: 'number', placeholder: '512' },
     ],
   },
@@ -59,7 +74,12 @@ const sections: SettingsSection[] = [
     fields: [
       { key: 'max_concurrent', label: 'Max Concurrent Tasks', type: 'number', placeholder: '10' },
       { key: 'rate_limit_per_minute', label: 'Rate Limit/min', type: 'number', placeholder: '60' },
-      { key: 'zombie_timeout_secs', label: 'Zombie Timeout (s)', type: 'number', placeholder: '600' },
+      {
+        key: 'zombie_timeout_secs',
+        label: 'Zombie Timeout (s)',
+        type: 'number',
+        placeholder: '600',
+      },
     ],
   },
   {
@@ -67,7 +87,12 @@ const sections: SettingsSection[] = [
     label: 'Memory',
     fields: [
       { key: 'enabled', label: 'Enabled', type: 'text', placeholder: 'true' },
-      { key: 'embedding_model', label: 'Embedding Model', type: 'text', placeholder: 'text-embedding-3-small' },
+      {
+        key: 'embedding_model',
+        label: 'Embedding Model',
+        type: 'text',
+        placeholder: 'text-embedding-3-small',
+      },
       { key: 'context_window', label: 'Context Window', type: 'number', placeholder: '128000' },
     ],
   },

@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react'
-import { useKnowledgeConfig, useKnowledgeConfigUpdate } from '@/hooks/use-knowledge'
+import { Save } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Save } from 'lucide-react'
+import { useKnowledgeConfig, useKnowledgeConfigUpdate } from '@/hooks/use-knowledge'
 import type { KnowledgeConfig } from '@/types/knowledge'
 
 export function KnowledgeSettings() {
@@ -23,7 +23,7 @@ export function KnowledgeSettings() {
   }
 
   const update = (key: keyof KnowledgeConfig, value: unknown) => {
-    setForm(prev => ({ ...prev, [key]: value }))
+    setForm((prev) => ({ ...prev, [key]: value }))
   }
 
   return (
@@ -31,7 +31,9 @@ export function KnowledgeSettings() {
       <h2 className="text-lg font-semibold">⚙️ Knowledge Settings</h2>
 
       <Card>
-        <CardHeader><CardTitle className="text-sm">General</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle className="text-sm">General</CardTitle>
+        </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-3 items-center gap-4">
             <label className="text-sm text-muted-foreground">Language</label>
@@ -71,7 +73,9 @@ export function KnowledgeSettings() {
       </Card>
 
       <Card>
-        <CardHeader><CardTitle className="text-sm">Features</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle className="text-sm">Features</CardTitle>
+        </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between">
             <label className="text-sm">Two emojis enabled</label>

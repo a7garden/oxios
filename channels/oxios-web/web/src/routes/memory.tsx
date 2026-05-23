@@ -32,8 +32,22 @@ function MemoryPage() {
     queryFn: async (): Promise<MemoryItem[]> => {
       if (search.trim()) {
         // Use search endpoint when query is provided
-        const res = await api.post<{ entries: { id: string; type: string; content: string; tags: string[]; importance: number; created_at: string }[]; count: number }>('/api/memory/search', { query: search })
-        return (res.entries ?? []).map((e) => ({ name: e.id ?? e.type, snippet: e.content?.slice(0, 200) ?? '', category: e.type }))
+        const res = await api.post<{
+          entries: {
+            id: string
+            type: string
+            content: string
+            tags: string[]
+            importance: number
+            created_at: string
+          }[]
+          count: number
+        }>('/api/memory/search', { query: search })
+        return (res.entries ?? []).map((e) => ({
+          name: e.id ?? e.type,
+          snippet: e.content?.slice(0, 200) ?? '',
+          category: e.type,
+        }))
       }
       // Default: list all memory entries
       const res = await api.get<{ items: { name: string; category: string }[] }>('/api/memory')

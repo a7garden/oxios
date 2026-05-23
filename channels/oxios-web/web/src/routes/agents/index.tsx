@@ -39,7 +39,10 @@ function AgentsListPage() {
         </div>
       ),
     },
-    { header: 'Status', accessor: (row: Agent) => <StatusIndicator status={row.status?.toLowerCase() ?? 'unknown'} /> },
+    {
+      header: 'Status',
+      accessor: (row: Agent) => <StatusIndicator status={row.status?.toLowerCase() ?? 'unknown'} />,
+    },
     {
       header: 'Seed',
       accessor: (row: Agent) =>

@@ -1,9 +1,14 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
-import { ArrowRightLeft } from 'lucide-react'
 import { useRouterState } from '@tanstack/react-router'
-import { useKnowledgeStore } from '@/stores/knowledge'
-import { useKnowledgeTree, useWriteFile, useDeleteFile, useKnowledgeFile } from '@/hooks/use-knowledge'
+import { ArrowRightLeft } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import {
+  useDeleteFile,
+  useKnowledgeFile,
+  useKnowledgeTree,
+  useWriteFile,
+} from '@/hooks/use-knowledge'
 import { cn } from '@/lib/utils'
+import { useKnowledgeStore } from '@/stores/knowledge'
 import type { KnowledgeTreeEntry } from '@/types/knowledge'
 
 export function MoveModal() {
@@ -57,7 +62,7 @@ export function MoveModal() {
   // Reset focusedIndex when filtered list changes
   useEffect(() => {
     setFocusedIndex(0)
-  }, [filteredDirs.length])
+  }, [])
 
   const close = useCallback(() => setOpen(false), [])
 
@@ -128,12 +133,11 @@ export function MoveModal() {
         </div>
 
         {/* Directory list */}
-        <ul className="max-h-80 overflow-y-auto" role="listbox">
+        <ul className="max-h-80 overflow-y-auto">
           {filteredDirs.length > 0 ? (
             filteredDirs.map((dir, i) => (
               <li
                 key={dir}
-                role="option"
                 aria-selected={i === focusedIndex}
                 className={cn(
                   'px-4 py-2.5 text-sm cursor-pointer transition-colors',
@@ -142,7 +146,7 @@ export function MoveModal() {
                 onClick={() => handleMove(dir)}
                 onMouseEnter={() => setFocusedIndex(i)}
               >
-                {dir === '/' ? '/' : dir + '/'}
+                {dir === '/' ? '/' : `${dir}/`}
               </li>
             ))
           ) : (

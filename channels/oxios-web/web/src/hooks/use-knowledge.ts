@@ -1,19 +1,19 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api-client'
 import type {
-  KnowledgeTreeEntry,
-  KnowledgeSearchResult,
-  KnowledgeBacklink,
-  KnowledgeGraph,
-  KnowledgeCopilotResponse,
   ChecklistItemsResponse,
-  JournalTodayResponse,
-  KnowledgeConfig,
   ConvertHtmlResponse,
   EmojiResponse,
   HabitsData,
-  TodayReport,
+  JournalTodayResponse,
+  KnowledgeBacklink,
+  KnowledgeConfig,
+  KnowledgeCopilotResponse,
+  KnowledgeGraph,
+  KnowledgeSearchResult,
+  KnowledgeTreeEntry,
   NightlyReport,
+  TodayReport,
 } from '@/types/knowledge'
 
 // ── File I/O ──────────────────────────────────────────────────
@@ -71,7 +71,8 @@ export function useKnowledgeSearch() {
 export function useKnowledgeBacklinks(path: string | null) {
   return useQuery({
     queryKey: ['knowledge', 'backlinks', path],
-    queryFn: () => api.get<KnowledgeBacklink[]>('/api/knowledge/backlinks', path ? { path } : undefined),
+    queryFn: () =>
+      api.get<KnowledgeBacklink[]>('/api/knowledge/backlinks', path ? { path } : undefined),
     enabled: !!path,
   })
 }
@@ -107,8 +108,7 @@ export function useChatMessages() {
 export function useChatAppend() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (message: string) =>
-      api.post('/api/knowledge/chat/append', { message }),
+    mutationFn: (message: string) => api.post('/api/knowledge/chat/append', { message }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['knowledge', 'chat', 'messages'] })
     },
@@ -118,8 +118,7 @@ export function useChatAppend() {
 export function useChatDelete() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (msgHash: string) =>
-      api.post('/api/knowledge/chat/delete', { msg_hash: msgHash }),
+    mutationFn: (msgHash: string) => api.post('/api/knowledge/chat/delete', { msg_hash: msgHash }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['knowledge', 'chat', 'messages'] })
     },
@@ -151,8 +150,15 @@ export function useChecklistItems(path: string | null) {
 export function useChecklistAdd() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ path, item, checked = false }: { path: string; item: string; checked?: boolean }) =>
-      api.post('/api/knowledge/checklist/add', { path, item, checked }),
+    mutationFn: ({
+      path,
+      item,
+      checked = false,
+    }: {
+      path: string
+      item: string
+      checked?: boolean
+    }) => api.post('/api/knowledge/checklist/add', { path, item, checked }),
     onSuccess: (_, { path }) => {
       qc.invalidateQueries({ queryKey: ['knowledge', 'checklist', path] })
       qc.invalidateQueries({ queryKey: ['knowledge', 'tree'] })
@@ -194,8 +200,7 @@ export function useJournalToday() {
 export function useJournalAdd() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (record: string) =>
-      api.post('/api/knowledge/journal/add', { record }),
+    mutationFn: (record: string) => api.post('/api/knowledge/journal/add', { record }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['knowledge', 'tree'] })
     },
@@ -204,8 +209,7 @@ export function useJournalAdd() {
 
 export function useJournalAddEmoji() {
   return useMutation({
-    mutationFn: (emoji: string) =>
-      api.post('/api/knowledge/journal/emoji', { emoji }),
+    mutationFn: (emoji: string) => api.post('/api/knowledge/journal/emoji', { emoji }),
   })
 }
 
@@ -214,7 +218,8 @@ export function useJournalAddEmoji() {
 export function useKnowledgeHabits(year?: number) {
   return useQuery({
     queryKey: ['knowledge', 'habits', year],
-    queryFn: () => api.get<HabitsData>('/api/knowledge/habits', year ? { year: String(year) } : undefined),
+    queryFn: () =>
+      api.get<HabitsData>('/api/knowledge/habits', year ? { year: String(year) } : undefined),
   })
 }
 
@@ -253,8 +258,7 @@ export function useKnowledgeConfig() {
 export function useKnowledgeConfigUpdate() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (config: Partial<KnowledgeConfig>) =>
-      api.put('/api/knowledge/config', config),
+    mutationFn: (config: Partial<KnowledgeConfig>) => api.put('/api/knowledge/config', config),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['knowledge', 'config'] })
     },
@@ -271,7 +275,8 @@ export function useNightlyCleanup() {
 
 export function useScheduledTasks() {
   return useMutation({
-    mutationFn: () => api.post<{ moved: string[]; count: number }>('/api/knowledge/worker/scheduled'),
+    mutationFn: () =>
+      api.post<{ moved: string[]; count: number }>('/api/knowledge/worker/scheduled'),
   })
 }
 

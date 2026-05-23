@@ -57,9 +57,7 @@ function SeedDetailPage() {
           </h1>
           <p className="text-muted-foreground font-mono text-xs">{seed.id}</p>
         </div>
-        {seed.generation != null && (
-          <Badge variant="default">Gen {seed.generation}</Badge>
-        )}
+        {seed.generation != null && <Badge variant="default">Gen {seed.generation}</Badge>}
       </div>
 
       <Card>

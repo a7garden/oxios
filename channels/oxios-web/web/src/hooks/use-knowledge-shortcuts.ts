@@ -1,7 +1,7 @@
-import { useEffect, useRef } from 'react'
 import { useRouterState } from '@tanstack/react-router'
+import { useEffect, useRef } from 'react'
+import { useDeleteFile, useWriteFile } from '@/hooks/use-knowledge'
 import { useKnowledgeStore } from '@/stores/knowledge'
-import { useWriteFile, useDeleteFile } from '@/hooks/use-knowledge'
 
 /**
  * Register global keyboard shortcuts for the Knowledge UI.
@@ -42,7 +42,9 @@ export function useKnowledgeShortcuts() {
         try {
           await writeFile.mutateAsync({ path: 'New file.md', content: '# New file\n\n' })
           store.openFile('New file.md')
-        } catch { /* ignore */ }
+        } catch {
+          /* ignore */
+        }
         return
       }
 
@@ -54,7 +56,9 @@ export function useKnowledgeShortcuts() {
         if (name?.trim()) {
           try {
             await writeFile.mutateAsync({ path: `${name.trim()}/.keep`, content: '' })
-          } catch { /* ignore */ }
+          } catch {
+            /* ignore */
+          }
         }
         return
       }
@@ -67,7 +71,9 @@ export function useKnowledgeShortcuts() {
           if (confirm(`Delete ${store.currentFilePath}?`)) {
             try {
               await deleteFile.mutateAsync(store.currentFilePath)
-            } catch { /* ignore */ }
+            } catch {
+              /* ignore */
+            }
           }
         }
         return

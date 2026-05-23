@@ -1,15 +1,17 @@
-import { useState, useCallback } from 'react'
-import { Bot, Send, ExternalLink } from 'lucide-react'
+import { Bot, ExternalLink, Send } from 'lucide-react'
+import { useCallback, useState } from 'react'
+import { Button } from '@/components/ui/button'
 import { useKnowledgeCopilot } from '@/hooks/use-knowledge'
 import { useKnowledgeStore } from '@/stores/knowledge'
-import { Button } from '@/components/ui/button'
 
 export function Copilot() {
   const currentFilePath = useKnowledgeStore((s) => s.currentFilePath)
   const openFile = useKnowledgeStore((s) => s.openFile)
   const copilot = useKnowledgeCopilot()
   const [question, setQuestion] = useState('')
-  const [response, setResponse] = useState<{ content: string; referenced_notes: string[] } | null>(null)
+  const [response, setResponse] = useState<{ content: string; referenced_notes: string[] } | null>(
+    null,
+  )
 
   const handleAsk = useCallback(async () => {
     if (!question.trim()) return
@@ -48,11 +50,7 @@ export function Copilot() {
             className="flex-1 resize-none rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
             rows={2}
           />
-          <Button
-            onClick={handleAsk}
-            disabled={!question.trim() || copilot.isPending}
-            size="icon"
-          >
+          <Button onClick={handleAsk} disabled={!question.trim() || copilot.isPending} size="icon">
             <Send className="h-4 w-4" />
           </Button>
         </div>
@@ -63,15 +61,15 @@ export function Copilot() {
         {copilot.isPending && (
           <div className="text-sm text-muted-foreground animate-pulse">Thinking...</div>
         )}
-        {copilot.isError && (
-          <div className="text-sm text-destructive">Failed to get response</div>
-        )}
+        {copilot.isError && <div className="text-sm text-destructive">Failed to get response</div>}
         {response && (
           <div className="space-y-3">
             <div className="text-sm whitespace-pre-wrap">{response.content}</div>
             {response.referenced_notes.length > 0 && (
               <div className="space-y-1">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Referenced Notes</p>
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                  Referenced Notes
+                </p>
                 {response.referenced_notes.map((note) => (
                   <button
                     key={note}

@@ -47,7 +47,9 @@ function WorkspacePage() {
       const result: Record<string, TreeEntry[]> = {}
       for (const dir of expandedArr) {
         try {
-          const res = await api.get<TreeEntry[]>(`/api/workspace/tree?dir=${encodeURIComponent(dir)}`)
+          const res = await api.get<TreeEntry[]>(
+            `/api/workspace/tree?dir=${encodeURIComponent(dir)}`,
+          )
           result[dir] = Array.isArray(res) ? res : []
         } catch {
           result[dir] = []
@@ -101,7 +103,9 @@ function WorkspacePage() {
             </span>
           )}
         </div>
-        {isExpanded && entry.is_dir && (childrenMap?.[entry.name] ?? []).map((child) => renderEntry(child, depth + 1))}
+        {isExpanded &&
+          entry.is_dir &&
+          (childrenMap?.[entry.name] ?? []).map((child) => renderEntry(child, depth + 1))}
       </div>
     )
   }
@@ -133,9 +137,7 @@ function WorkspacePage() {
               className="py-6"
             />
           ) : (
-            <div className="space-y-0">
-              {entries.map((entry) => renderEntry(entry))}
-            </div>
+            <div className="space-y-0">{entries.map((entry) => renderEntry(entry))}</div>
           )}
         </CardContent>
       </Card>

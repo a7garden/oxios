@@ -3,8 +3,8 @@ import type { KnowledgeTreeEntry } from '@/types/knowledge'
 
 /** A file entry with computed autocomplete key. */
 interface FileEntry {
-  key: string       // filename without .md
-  filePath: string  // full path for insertion
+  key: string // filename without .md
+  filePath: string // full path for insertion
 }
 
 /**

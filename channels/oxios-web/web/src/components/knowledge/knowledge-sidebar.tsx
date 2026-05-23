@@ -1,19 +1,32 @@
-import { useCallback } from 'react'
-import { FilePlus, FolderPlus, Trash2, LayoutDashboard, PanelLeftClose } from 'lucide-react'
 import { Link } from '@tanstack/react-router'
+import { FilePlus, FolderPlus, LayoutDashboard, PanelLeftClose, Trash2 } from 'lucide-react'
+import { useCallback } from 'react'
+import { Button } from '@/components/ui/button'
+import {
+  useDeleteFile,
+  useJournalToday,
+  useKnowledgeTree,
+  useWriteFile,
+} from '@/hooks/use-knowledge'
+import { cn } from '@/lib/utils'
 import { useKnowledgeStore } from '@/stores/knowledge'
-import { useKnowledgeTree, useWriteFile, useDeleteFile, useJournalToday } from '@/hooks/use-knowledge'
 import { FileTree } from './file-tree'
 import { ResizeHandle } from './resize-handle'
-import { Button } from '@/components/ui/button'
-import { cn } from '@/lib/utils'
 
 /**
  * Knowledge sidebar — replaces the main AppLayout sidebar when in Knowledge mode.
  * Renders the file tree, chat/journal buttons, and new file/folder actions.
  */
 export function KnowledgeSidebar() {
-  const { sidebarWidth, setSidebarWidth, currentFilePath, mode, openFile, openChat, toggleSidebar } = useKnowledgeStore()
+  const {
+    sidebarWidth,
+    setSidebarWidth,
+    currentFilePath,
+    mode,
+    openFile,
+    openChat,
+    toggleSidebar,
+  } = useKnowledgeStore()
   const { data: entries, isLoading, refetch } = useKnowledgeTree()
   const writeFile = useWriteFile()
   const deleteFile = useDeleteFile()
@@ -139,9 +152,15 @@ export function KnowledgeSidebar() {
 
       {/* Keyboard shortcuts legend */}
       <div className="p-2 border-t border-sidebar-border text-[10px] text-sidebar-foreground/40 space-y-0.5">
-        <div><kbd className="font-mono border rounded px-1">⌘K</kbd> Search</div>
-        <div><kbd className="font-mono border rounded px-1">⌘M</kbd> Move file</div>
-        <div><kbd className="font-mono border rounded px-1">⌘N</kbd> New file</div>
+        <div>
+          <kbd className="font-mono border rounded px-1">⌘K</kbd> Search
+        </div>
+        <div>
+          <kbd className="font-mono border rounded px-1">⌘M</kbd> Move file
+        </div>
+        <div>
+          <kbd className="font-mono border rounded px-1">⌘N</kbd> New file
+        </div>
       </div>
 
       {/* Navigation back to Dashboard */}

@@ -1,10 +1,10 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
-import { Search, Folder, FileText } from 'lucide-react'
 import { useRouterState } from '@tanstack/react-router'
-import { useKnowledgeStore } from '@/stores/knowledge'
+import { FileText, Folder, Search } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useKnowledgeSearch, useKnowledgeTree } from '@/hooks/use-knowledge'
-import type { KnowledgeSearchHit, KnowledgeTreeEntry } from '@/types/knowledge'
 import { cn } from '@/lib/utils'
+import { useKnowledgeStore } from '@/stores/knowledge'
+import type { KnowledgeSearchHit, KnowledgeTreeEntry } from '@/types/knowledge'
 
 interface SearchModalProps {
   /** When opened externally (e.g. from chat message action) */
@@ -138,7 +138,7 @@ export function SearchModal({
     }, 150)
     return () => clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query, open])
+  }, [query, open, searchMutation.mutate])
 
   // ── Close handler ───────────────────────────────────────────
   const close = useCallback(() => {
@@ -226,11 +226,7 @@ export function SearchModal({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={
-              isMoveMode
-                ? 'Search or select a destination...'
-                : 'Search files...'
-            }
+            placeholder={isMoveMode ? 'Search or select a destination...' : 'Search files...'}
             className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
           />
           <kbd className="text-[10px] text-muted-foreground border rounded px-1.5 py-0.5 font-mono">
@@ -246,9 +242,7 @@ export function SearchModal({
                 key={item.path + (item.isDir ? '-dir' : '-file')}
                 className={cn(
                   'flex items-center gap-2.5 px-3 py-2 text-sm cursor-pointer rounded-md transition-colors',
-                  i === focusedIndex
-                    ? 'bg-accent text-accent-foreground'
-                    : 'hover:bg-accent/50',
+                  i === focusedIndex ? 'bg-accent text-accent-foreground' : 'hover:bg-accent/50',
                 )}
                 onClick={() => handleSelect(item)}
                 onMouseEnter={() => setFocusedIndex(i)}
@@ -258,18 +252,14 @@ export function SearchModal({
                 ) : (
                   <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
                 )}
-                <span className="font-medium truncate">
-                  {item.name.replace(/\.md$/, '')}
-                </span>
+                <span className="font-medium truncate">{item.name.replace(/\.md$/, '')}</span>
                 {item.path.includes('/') && (
                   <span className="ml-auto text-xs text-muted-foreground shrink-0">
                     {item.path.replace(/\/[^/]+$/, '')}
                   </span>
                 )}
                 {item.isDir && (
-                  <span className="ml-auto text-xs text-muted-foreground shrink-0">
-                    dir
-                  </span>
+                  <span className="ml-auto text-xs text-muted-foreground shrink-0">dir</span>
                 )}
               </li>
             ))
@@ -279,9 +269,7 @@ export function SearchModal({
             </li>
           ) : (
             <li className="px-4 py-6 text-sm text-muted-foreground text-center">
-              {isMoveMode
-                ? 'Select a file or directory'
-                : 'Type to search files'}
+              {isMoveMode ? 'Select a file or directory' : 'Type to search files'}
             </li>
           )}
         </ul>

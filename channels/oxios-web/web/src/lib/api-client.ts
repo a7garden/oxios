@@ -38,8 +38,10 @@ export async function apiClient<T>(path: string, options?: RequestOptions): Prom
       ...options?.headers,
     },
     body: isRawBody
-      ? (options.body as string ?? undefined)
-      : (options?.body ? JSON.stringify(options.body) : undefined),
+      ? ((options.body as string) ?? undefined)
+      : options?.body
+        ? JSON.stringify(options.body)
+        : undefined,
   })
 
   if (!res.ok) {
@@ -49,7 +51,11 @@ export async function apiClient<T>(path: string, options?: RequestOptions): Prom
 
   if (res.status === 204) return undefined as T
   const contentType = res.headers.get('content-type') ?? ''
-  if (contentType.includes('text/') || contentType.includes('application/json') || contentType.includes('application/toml')) {
+  if (
+    contentType.includes('text/') ||
+    contentType.includes('application/json') ||
+    contentType.includes('application/toml')
+  ) {
     return res.text() as Promise<T>
   }
   return res.json() as Promise<T>

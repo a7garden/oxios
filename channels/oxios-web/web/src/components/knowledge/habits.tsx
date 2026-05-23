@@ -1,6 +1,6 @@
-import { useKnowledgeHabits } from '@/hooks/use-knowledge'
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
+import { useKnowledgeHabits } from '@/hooks/use-knowledge'
 
 export function Habits() {
   const currentYear = new Date().getFullYear()
@@ -19,18 +19,14 @@ export function Habits() {
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">💪 Habits</h2>
         <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setYear(y => y - 1)}
-          >
+          <Button variant="outline" size="sm" onClick={() => setYear((y) => y - 1)}>
             ← {year - 1}
           </Button>
           <span className="text-sm font-medium w-16 text-center">{year}</span>
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setYear(y => Math.min(y + 1, currentYear))}
+            onClick={() => setYear((y) => Math.min(y + 1, currentYear))}
             disabled={year >= currentYear}
           >
             {year + 1} →

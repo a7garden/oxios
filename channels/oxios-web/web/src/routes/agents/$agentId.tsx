@@ -48,7 +48,10 @@ function AgentDetailPage() {
   const details = [
     { label: 'ID', value: agent.id },
     { label: 'Name', value: agent.name },
-    { label: 'Status', value: <StatusIndicator status={agent.status?.toLowerCase() ?? 'unknown'} /> },
+    {
+      label: 'Status',
+      value: <StatusIndicator status={agent.status?.toLowerCase() ?? 'unknown'} />,
+    },
     { label: 'Seed ID', value: agent.seed_id ?? '—' },
     {
       label: 'Created At',

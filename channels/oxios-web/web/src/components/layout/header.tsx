@@ -1,9 +1,9 @@
-import { ArrowLeft, Menu } from 'lucide-react'
 import { Link, useRouterState } from '@tanstack/react-router'
+import { ArrowLeft, Menu } from 'lucide-react'
 import { Separator } from '@/components/ui/separator'
-import { useSidebarStore } from '@/stores/sidebar'
-import { useKnowledgeStore } from '@/stores/knowledge'
 import { cn } from '@/lib/utils'
+import { useKnowledgeStore } from '@/stores/knowledge'
+import { useSidebarStore } from '@/stores/sidebar'
 
 export function Header() {
   const { setMobileOpen } = useSidebarStore()
@@ -32,7 +32,9 @@ export function Header() {
         <Menu className="h-5 w-5" />
       </button>
 
-      {isKnowledge ? <KnowledgeBreadcrumb /> : (
+      {isKnowledge ? (
+        <KnowledgeBreadcrumb />
+      ) : (
         <Separator orientation="vertical" className="hidden lg:block h-6" />
       )}
 
@@ -65,9 +67,7 @@ function KnowledgeBreadcrumb() {
       </Link>
       <Separator orientation="vertical" className="h-6" />
       <div className="flex items-center gap-2 text-sm">
-        <span className={cn('font-medium', !currentFilePath && 'text-foreground')}>
-          Knowledge
-        </span>
+        <span className={cn('font-medium', !currentFilePath && 'text-foreground')}>Knowledge</span>
         {currentFilePath && (
           <>
             <span className="text-muted-foreground">/</span>

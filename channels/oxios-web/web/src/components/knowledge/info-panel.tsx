@@ -1,11 +1,11 @@
-import { useState } from 'react'
 import { PanelRightClose } from 'lucide-react'
-import { useKnowledgeStore } from '@/stores/knowledge'
+import { useState } from 'react'
+import { Button } from '@/components/ui/button'
 import { useKnowledgeBacklinks } from '@/hooks/use-knowledge'
+import { cn } from '@/lib/utils'
+import { useKnowledgeStore } from '@/stores/knowledge'
 import { Copilot } from './copilot'
 import { LinkGraph } from './link-graph'
-import { Button } from '@/components/ui/button'
-import { cn } from '@/lib/utils'
 
 type Tab = 'backlinks' | 'copilot' | 'graph'
 

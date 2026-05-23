@@ -34,7 +34,13 @@ function SchedulerPage() {
     queryFn: async () => {
       // Backend has separate /api/scheduler/stats + /api/scheduler/tasks
       const [stats, tasksRes] = await Promise.all([
-        api.get<{ queued: number; running: number; max_concurrent: number; rate_limit_per_minute: number; rate_remaining: number }>('/api/scheduler/stats'),
+        api.get<{
+          queued: number
+          running: number
+          max_concurrent: number
+          rate_limit_per_minute: number
+          rate_remaining: number
+        }>('/api/scheduler/stats'),
         api.get<{ queued: SchedulerTask[]; running: SchedulerTask[] }>('/api/scheduler/tasks'),
       ])
       return {
@@ -140,10 +146,10 @@ function SchedulerPage() {
                       <Clock className="h-4 w-4 text-amber-500" />
                     )}
                     <div>
-                      <p className="font-medium text-sm">{task.description ?? task.id.slice(0, 12)}...</p>
-                      {task.error && (
-                        <p className="text-xs text-destructive">{task.error}</p>
-                      )}
+                      <p className="font-medium text-sm">
+                        {task.description ?? task.id.slice(0, 12)}...
+                      </p>
+                      {task.error && <p className="text-xs text-destructive">{task.error}</p>}
                     </div>
                   </div>
                   <div className="flex items-center gap-2">

@@ -1,29 +1,23 @@
 import {
-  useState,
-  useRef,
-  useEffect,
-  useCallback,
-  useMemo,
-} from 'react'
-import {
-  Send,
   BookOpen,
-  ShoppingCart,
-  Tv,
-  Newspaper,
-  Clock,
   CheckSquare,
+  Clock,
+  Newspaper,
+  Send,
+  ShoppingCart,
   Square,
   Trash2,
+  Tv,
 } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Button } from '@/components/ui/button'
 import {
-  useChatMessages,
   useChatAppend,
   useChatDelete,
-  useJournalAdd,
+  useChatMessages,
   useChecklistAdd,
+  useJournalAdd,
 } from '@/hooks/use-knowledge'
-import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
 // ── Types ─────────────────────────────────────────────────────
@@ -118,7 +112,10 @@ export async function msgHash(raw: string): Promise<string> {
     for (let i = 0; i < firstLine.length; i++) {
       h = Math.imul(33, h) ^ firstLine.charCodeAt(i)
     }
-    return Math.abs(h >>> 0).toString(16).padStart(11, '0').slice(0, 11)
+    return Math.abs(h >>> 0)
+      .toString(16)
+      .padStart(11, '0')
+      .slice(0, 11)
   }
 }
 
@@ -164,7 +161,7 @@ export function KnowledgeChat() {
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [rawMessages])
+  }, [])
 
   // ── Auto-resize textarea ──────────────────────────────────
 
@@ -173,7 +170,7 @@ export function KnowledgeChat() {
     if (!el) return
     el.style.height = 'auto'
     el.style.height = `${Math.min(el.scrollHeight, 160)}px`
-  }, [input])
+  }, [])
 
   // ── Send / shortcuts ──────────────────────────────────────
 
@@ -252,14 +249,11 @@ export function KnowledgeChat() {
 
   // ── Drag selection ────────────────────────────────────────
 
-  const handleDragStart = useCallback(
-    (msg: ParsedMessage) => {
-      isDragging.current = true
-      dragStart.current = msg.index
-      setSelectedIndices(new Set([msg.index]))
-    },
-    [],
-  )
+  const handleDragStart = useCallback((msg: ParsedMessage) => {
+    isDragging.current = true
+    dragStart.current = msg.index
+    setSelectedIndices(new Set([msg.index]))
+  }, [])
 
   const handleDragEnter = useCallback((msg: ParsedMessage) => {
     if (!isDragging.current || dragStart.current === null) return
@@ -382,14 +376,9 @@ export function KnowledgeChat() {
       )}
 
       {/* Messages area */}
-      <div
-        className="flex-1 overflow-y-auto p-4 select-none"
-        onClick={handleBackgroundClick}
-      >
+      <div className="flex-1 overflow-y-auto p-4 select-none" onClick={handleBackgroundClick}>
         {isLoading ? (
-          <div className="text-center text-muted-foreground py-12">
-            Loading…
-          </div>
+          <div className="text-center text-muted-foreground py-12">Loading…</div>
         ) : groups.length === 0 ? (
           <div className="text-center text-muted-foreground py-12">
             <p className="text-2xl mb-2">🌱</p>
@@ -413,9 +402,7 @@ export function KnowledgeChat() {
                     const isHovered = hoveredIndex === msg.index
                     const isSelected = selectedIndices.has(msg.index)
                     const isPending =
-                      chatDelete.isPending ||
-                      checklistAdd.isPending ||
-                      journalAdd.isPending
+                      chatDelete.isPending || checklistAdd.isPending || journalAdd.isPending
 
                     return (
                       <div

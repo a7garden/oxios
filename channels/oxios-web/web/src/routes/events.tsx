@@ -28,7 +28,14 @@ function EventsPage() {
           <h1 className="text-2xl font-bold">Events</h1>
           <p className="text-muted-foreground">Live event stream</p>
         </div>
-        <Button variant="outline" size="sm" onClick={() => { reconnect?.(); setRefreshKey((k) => k + 1) }}>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            reconnect?.()
+            setRefreshKey((k) => k + 1)
+          }}
+        >
           <RefreshCw className="h-4 w-4 mr-1" /> Refresh
         </Button>
       </div>

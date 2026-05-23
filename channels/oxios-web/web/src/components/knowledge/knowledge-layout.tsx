@@ -1,6 +1,6 @@
 import { useKnowledgeStore } from '@/stores/knowledge'
-import { KnowledgeChat } from './knowledge-chat'
 import { EditorPanel } from './editor-panel'
+import { KnowledgeChat } from './knowledge-chat'
 
 /**
  * KnowledgeLayout renders inline within the AppLayout outlet.

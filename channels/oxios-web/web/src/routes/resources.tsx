@@ -29,7 +29,9 @@ function ResourcesPage() {
     queryKey: ['resources'],
     queryFn: async () => {
       // /api/resources returns a single snapshot; /api/resources/history returns array
-      const res = await api.get<{ snapshots: ResourceSnapshot[]; count: number }>('/api/resources/history?last_n=30')
+      const res = await api.get<{ snapshots: ResourceSnapshot[]; count: number }>(
+        '/api/resources/history?last_n=30',
+      )
       return res.snapshots ?? []
     },
     refetchInterval: 5000,

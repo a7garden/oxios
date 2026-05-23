@@ -1,9 +1,9 @@
-import { useEffect, useRef } from 'react'
-import { ArrowLeft, ArrowRight, Columns2, PanelRight, Save, X } from 'lucide-react'
 import { useRouterState } from '@tanstack/react-router'
-import { useKnowledgeStore } from '@/stores/knowledge'
+import { ArrowLeft, ArrowRight, Columns2, PanelRight, Save, X } from 'lucide-react'
+import { useEffect, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Tooltip } from '@/components/ui/tooltip'
+import { useKnowledgeStore } from '@/stores/knowledge'
 
 export function EditorToolbar() {
   const {
@@ -42,7 +42,7 @@ export function EditorToolbar() {
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [])
+  }, [handleSave])
 
   return (
     <div className="flex items-center gap-1 px-2 py-1 border-b bg-muted/30 min-h-[36px]">
@@ -67,22 +67,14 @@ export function EditorToolbar() {
         <ArrowRight className="h-4 w-4" />
       </Button>
 
-      <span className="text-sm font-medium truncate mx-2">
-        {fileName || 'Knowledge'}
-      </span>
+      <span className="text-sm font-medium truncate mx-2">{fileName || 'Knowledge'}</span>
 
       <div className="flex-1" />
 
       {/* Save */}
       {currentFilePath && (
         <Tooltip content="Save (⌘S)">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7"
-            onClick={handleSave}
-            title="Save"
-          >
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleSave} title="Save">
             <Save className="h-4 w-4" />
           </Button>
         </Tooltip>

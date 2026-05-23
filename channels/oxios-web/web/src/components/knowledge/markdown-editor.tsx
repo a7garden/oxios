@@ -1,10 +1,10 @@
-import { useEffect, useRef, useState, useCallback } from 'react'
-import CodeMirror from 'codemirror'
+import type CodeMirror from 'codemirror'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import '@/lib/hypermd-setup' // side-effect: registers all CM5/HyperMD modules
-import { createLinkHintFn, buildAutocompleteDict } from '@/lib/autocomplete-link'
-import { useKnowledgeStore } from '@/stores/knowledge'
 import { useKnowledgeTree } from '@/hooks/use-knowledge'
+import { buildAutocompleteDict, createLinkHintFn } from '@/lib/autocomplete-link'
 import { cn } from '@/lib/utils'
+import { useKnowledgeStore } from '@/stores/knowledge'
 
 interface MarkdownEditorProps {
   filePath: string
@@ -13,7 +13,12 @@ interface MarkdownEditorProps {
   className?: string
 }
 
-export function MarkdownEditor({ filePath, initialContent, onSave, className }: MarkdownEditorProps) {
+export function MarkdownEditor({
+  filePath,
+  initialContent,
+  onSave,
+  className,
+}: MarkdownEditorProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const editorRef = useRef<CodeMirror.Editor | null>(null)
   const [isDirty, setIsDirty] = useState(false)
@@ -45,7 +50,7 @@ export function MarkdownEditor({ filePath, initialContent, onSave, className }: 
 
     // Custom link reader (handles wiki-style click)
     const readLink = (text: string, _line: number) => {
-      text = text.replace(/\|.*]$/, '').replace(/[\[\]]/g, '')
+      text = text.replace(/\|.*]$/, '').replace(/[[\]]/g, '')
 
       // Action links
       if (text === 'cmd:openDir' || text === 'cmd:openChat') return undefined
@@ -57,7 +62,7 @@ export function MarkdownEditor({ filePath, initialContent, onSave, className }: 
       }
 
       // Internal .md links
-      const path = text.endsWith('.md') ? text : text + '.md'
+      const path = text.endsWith('.md') ? text : `${text}.md`
       setTimeout(() => openFile(path), 0)
       return
     }
@@ -93,17 +98,43 @@ export function MarkdownEditor({ filePath, initialContent, onSave, className }: 
             // Return emoji hint
             const word = line.slice(pos, pos + 3).replace(/[^\p{L}\p{N}_]/u, '')
             const emojis = [
-              '✅', '❌', '⚠️', '🔥', '💡', '⭐', '🌟', '💫',
-              '🎯', '🚀', '📝', '📌', '🔗', '💬', '📊', '🛠️',
-              '🎨', '🎵', '🏆', '📦', '📈', '💰', '🌱', '🌍',
-              '🧠', '💡', '🔍', '✅', '☑️', '❎', '⬜', '🟩',
+              '✅',
+              '❌',
+              '⚠️',
+              '🔥',
+              '💡',
+              '⭐',
+              '🌟',
+              '💫',
+              '🎯',
+              '🚀',
+              '📝',
+              '📌',
+              '🔗',
+              '💬',
+              '📊',
+              '🛠️',
+              '🎨',
+              '🎵',
+              '🏆',
+              '📦',
+              '📈',
+              '💰',
+              '🌱',
+              '🌍',
+              '🧠',
+              '💡',
+              '🔍',
+              '✅',
+              '☑️',
+              '❎',
+              '⬜',
+              '🟩',
             ]
-            const filtered = word
-              ? emojis.filter(e => e.includes(word.slice(1)))
-              : emojis
+            const filtered = word ? emojis.filter((e) => e.includes(word.slice(1))) : emojis
             return {
-              list: filtered.map(emoji => ({
-                text: emoji + ' ',
+              list: filtered.map((emoji) => ({
+                text: `${emoji} `,
                 displayText: emoji,
               })),
               from: { line: cursor.line, ch: pos - 1 },
@@ -174,7 +205,7 @@ export function MarkdownEditor({ filePath, initialContent, onSave, className }: 
         const line = instance.getLine(0)
         if (line && !line.startsWith('# ')) {
           const content = line.replace(/^#*\s*/, '')
-          instance.replaceRange('# ' + content, { line: 0, ch: 0 }, { line: 0, ch: line.length })
+          instance.replaceRange(`# ${content}`, { line: 0, ch: 0 }, { line: 0, ch: line.length })
         }
       }
     })
@@ -201,7 +232,7 @@ export function MarkdownEditor({ filePath, initialContent, onSave, className }: 
       cm.toTextArea()
       editorRef.current = null
     }
-  }, [filePath]) // Re-create on file change
+  }, [initialContent, openFile, onSave, autocompleteEntries]) // Re-create on file change
 
   // Update content when initialContent changes (file loaded from API)
   useEffect(() => {

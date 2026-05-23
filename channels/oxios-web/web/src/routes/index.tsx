@@ -150,9 +150,7 @@ function DashboardPage() {
               <Clock className="h-5 w-5 text-blue-500" />
               <div>
                 <CardTitle className="text-sm font-medium">Sessions</CardTitle>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  View agent session history
-                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">View agent session history</p>
               </div>
             </CardHeader>
           </Card>
@@ -163,9 +161,7 @@ function DashboardPage() {
               <FileText className="h-5 w-5 text-emerald-500" />
               <div>
                 <CardTitle className="text-sm font-medium">Workspace</CardTitle>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Browse agent workspace files
-                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">Browse agent workspace files</p>
               </div>
             </CardHeader>
           </Card>

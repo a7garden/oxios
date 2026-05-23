@@ -1,15 +1,15 @@
 import { Outlet, useRouterState } from '@tanstack/react-router'
 import { Menu } from 'lucide-react'
+import { InfoPanel } from '@/components/knowledge/info-panel'
+import { KnowledgeSidebar } from '@/components/knowledge/knowledge-sidebar'
+import { MoveModal } from '@/components/knowledge/move-modal'
+import { SearchModal } from '@/components/knowledge/search-modal'
+import { useKnowledgeShortcuts } from '@/hooks/use-knowledge-shortcuts'
 import { cn } from '@/lib/utils'
-import { useSidebarStore } from '@/stores/sidebar'
 import { useKnowledgeStore } from '@/stores/knowledge'
+import { useSidebarStore } from '@/stores/sidebar'
 import { Header } from './header'
 import { Sidebar } from './sidebar'
-import { KnowledgeSidebar } from '@/components/knowledge/knowledge-sidebar'
-import { InfoPanel } from '@/components/knowledge/info-panel'
-import { SearchModal } from '@/components/knowledge/search-modal'
-import { MoveModal } from '@/components/knowledge/move-modal'
-import { useKnowledgeShortcuts } from '@/hooks/use-knowledge-shortcuts'
 
 /**
  * Unified AppLayout that seamlessly switches between Dashboard and Knowledge modes.
@@ -49,10 +49,9 @@ export function AppLayout() {
             />
           )}
           {sidebarOpen ? (
-            <div className={cn(
-              'flex shrink-0',
-              'fixed inset-y-0 left-0 z-50 lg:relative lg:z-auto',
-            )}>
+            <div
+              className={cn('flex shrink-0', 'fixed inset-y-0 left-0 z-50 lg:relative lg:z-auto')}
+            >
               <KnowledgeSidebar />
             </div>
           ) : (
@@ -67,7 +66,9 @@ export function AppLayout() {
               aria-label="Open sidebar"
             >
               <Menu className="h-5 w-5 text-muted-foreground lg:hidden" />
-              <span className="hidden lg:block text-muted-foreground text-xs rotate-90 whitespace-nowrap">Notes</span>
+              <span className="hidden lg:block text-muted-foreground text-xs rotate-90 whitespace-nowrap">
+                Notes
+              </span>
             </button>
           )}
         </>

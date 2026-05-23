@@ -29,7 +29,17 @@ function PersonasPage() {
   } = useQuery({
     queryKey: ['personas'],
     queryFn: async () => {
-      const res = await api.get<{ id: string; name: string; role: string; description: string; enabled: boolean; personality_traits: string[] }[]>('/api/personas')
+      const res =
+        await api.get<
+          {
+            id: string
+            name: string
+            role: string
+            description: string
+            enabled: boolean
+            personality_traits: string[]
+          }[]
+        >('/api/personas')
       // Backend returns raw array
       return Array.isArray(res) ? res : []
     },

@@ -1,8 +1,8 @@
-import { useState } from 'react'
 import { ChevronRight, File, Folder, FolderOpen } from 'lucide-react'
+import { useState } from 'react'
 import { useKnowledgeTree } from '@/hooks/use-knowledge'
-import type { KnowledgeTreeEntry } from '@/types/knowledge'
 import { cn } from '@/lib/utils'
+import type { KnowledgeTreeEntry } from '@/types/knowledge'
 
 interface FileTreeProps {
   entries: KnowledgeTreeEntry[]
@@ -49,7 +49,9 @@ function FileTreeItem({ entry, parentPath, onFileSelect, currentPath }: FileTree
           onClick={() => setExpanded(!expanded)}
           className="flex items-center gap-1.5 w-full px-2 py-1 text-sm rounded hover:bg-accent/50 transition-colors text-left"
         >
-          <ChevronRight className={cn('h-3 w-3 shrink-0 transition-transform', expanded && 'rotate-90')} />
+          <ChevronRight
+            className={cn('h-3 w-3 shrink-0 transition-transform', expanded && 'rotate-90')}
+          />
           {expanded ? (
             <FolderOpen className="h-4 w-4 shrink-0 text-muted-foreground" />
           ) : (
@@ -57,7 +59,9 @@ function FileTreeItem({ entry, parentPath, onFileSelect, currentPath }: FileTree
           )}
           <span className="truncate">{entry.name}</span>
         </button>
-        {expanded && <SubDirectory dir={fullPath} onFileSelect={onFileSelect} currentPath={currentPath} />}
+        {expanded && (
+          <SubDirectory dir={fullPath} onFileSelect={onFileSelect} currentPath={currentPath} />
+        )}
       </li>
     )
   }
@@ -84,13 +88,26 @@ function FileTreeItem({ entry, parentPath, onFileSelect, currentPath }: FileTree
   )
 }
 
-function SubDirectory({ dir, onFileSelect, currentPath }: { dir: string; onFileSelect: (path: string) => void; currentPath: string | null }) {
+function SubDirectory({
+  dir,
+  onFileSelect,
+  currentPath,
+}: {
+  dir: string
+  onFileSelect: (path: string) => void
+  currentPath: string | null
+}) {
   const { data: entries, isLoading } = useKnowledgeTree(dir)
   if (isLoading) return <div className="pl-4 text-xs text-muted-foreground">...</div>
   if (!entries || entries.length === 0) return null
   return (
     <div className="pl-3">
-      <FileTree entries={entries} onFileSelect={onFileSelect} currentPath={currentPath} parentPath={dir} />
+      <FileTree
+        entries={entries}
+        onFileSelect={onFileSelect}
+        currentPath={currentPath}
+        parentPath={dir}
+      />
     </div>
   )
 }

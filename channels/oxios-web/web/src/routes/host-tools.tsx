@@ -23,17 +23,21 @@ function HostToolsPage() {
       // Backend returns { all_required_present, missing_required, optional_available: { name: bool } }
       const optional = res.optional_available as Record<string, boolean> | undefined
       if (optional && typeof optional === 'object') {
-        return Object.entries(optional).map(([name, available]): ToolCheck => ({
-          name,
-          available,
-        }))
+        return Object.entries(optional).map(
+          ([name, available]): ToolCheck => ({
+            name,
+            available,
+          }),
+        )
       }
       // Fallback: treat the whole response as a flat map
       if (typeof res === 'object' && res !== null && !Array.isArray(res)) {
-        return Object.entries(res as Record<string, boolean>).map(([name, available]): ToolCheck => ({
-          name,
-          available,
-        }))
+        return Object.entries(res as Record<string, boolean>).map(
+          ([name, available]): ToolCheck => ({
+            name,
+            available,
+          }),
+        )
       }
       // Already an array
       return []

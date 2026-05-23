@@ -11,7 +11,8 @@ export function LinkGraph({ className }: LinkGraphProps) {
   const currentFilePath = useKnowledgeStore((s) => s.currentFilePath)
 
   if (isLoading) return <div className="text-xs text-muted-foreground p-2">Loading graph...</div>
-  if (!graph || graph.nodes.length === 0) return <div className="text-xs text-muted-foreground p-2">No links found</div>
+  if (!graph || graph.nodes.length === 0)
+    return <div className="text-xs text-muted-foreground p-2">No links found</div>
 
   // Simple layout: arrange nodes in a circle
   const nodes = graph.nodes
@@ -39,8 +40,10 @@ export function LinkGraph({ className }: LinkGraphProps) {
         return (
           <line
             key={`edge-${i}`}
-            x1={from.x} y1={from.y}
-            x2={to.x} y2={to.y}
+            x1={from.x}
+            y1={from.y}
+            x2={to.x}
+            y2={to.y}
             stroke="currentColor"
             strokeWidth={1}
             opacity={0.3}
@@ -55,17 +58,19 @@ export function LinkGraph({ className }: LinkGraphProps) {
         return (
           <g key={node.id} onClick={() => openFile(node.id)} style={{ cursor: 'pointer' }}>
             <circle
-              cx={pos.x} cy={pos.y}
+              cx={pos.x}
+              cy={pos.y}
               r={isActive ? 8 : 5}
               fill={isActive ? 'var(--primary)' : 'var(--muted-foreground)'}
               opacity={isActive ? 1 : 0.6}
             />
             <text
-              x={pos.x} y={pos.y + 14}
+              x={pos.x}
+              y={pos.y + 14}
               textAnchor="middle"
               className="text-[7px] fill-muted-foreground"
             >
-              {node.label.length > 12 ? node.label.slice(0, 12) + '…' : node.label}
+              {node.label.length > 12 ? `${node.label.slice(0, 12)}…` : node.label}
             </text>
           </g>
         )

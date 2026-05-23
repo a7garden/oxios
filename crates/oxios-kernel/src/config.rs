@@ -487,14 +487,10 @@ impl Default for SchedulerConfig {
 }
 
 /// Orchestrator configuration (Ouroboros protocol execution).
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct OrchestratorConfig {}
 
-impl Default for OrchestratorConfig {
-    fn default() -> Self {
-        Self {}
-    }
-}
+// (removed manual impl Default — now derived)
 
 /// Context manager configuration (inspired by AIOS).
 #[derive(Debug, Clone, Deserialize, Serialize)]

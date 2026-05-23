@@ -1,6 +1,6 @@
-import { useKnowledgeStatsToday, useKnowledgeDoneToday } from '@/hooks/use-knowledge'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Activity } from 'lucide-react'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { useKnowledgeDoneToday, useKnowledgeStatsToday } from '@/hooks/use-knowledge'
 
 export function TodayStats() {
   const { data: report, isLoading: reportLoading } = useKnowledgeStatsToday()

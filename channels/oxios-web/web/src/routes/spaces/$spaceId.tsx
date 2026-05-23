@@ -37,8 +37,12 @@ function SpaceDetailPage() {
     { label: 'Tags', value: space.tags && space.tags.length > 0 ? space.tags.join(', ') : '—' },
     { label: 'Active', value: space.active !== false ? 'Yes' : 'No' },
     { label: 'Created', value: new Date(space.created_at).toLocaleString() },
-    ...(space.last_active_at ? [{ label: 'Last Active', value: new Date(space.last_active_at).toLocaleString() }] : []),
-    ...(space.interaction_count != null ? [{ label: 'Interactions', value: String(space.interaction_count) }] : []),
+    ...(space.last_active_at
+      ? [{ label: 'Last Active', value: new Date(space.last_active_at).toLocaleString() }]
+      : []),
+    ...(space.interaction_count != null
+      ? [{ label: 'Interactions', value: String(space.interaction_count) }]
+      : []),
   ]
 
   return (
@@ -87,7 +91,9 @@ function SpaceDetailPage() {
           <CardContent>
             <ul className="space-y-1">
               {space.paths.map((p) => (
-                <li key={p} className="text-sm font-mono text-muted-foreground">{p}</li>
+                <li key={p} className="text-sm font-mono text-muted-foreground">
+                  {p}
+                </li>
               ))}
             </ul>
           </CardContent>
