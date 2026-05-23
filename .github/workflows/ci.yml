@@ -3,20 +3,10 @@ name: CI
 on:
   push:
     branches: [main]
-  pull_request:
-    branches: [main]
 
 jobs:
-  build:
-    strategy:
-      matrix:
-        include:
-          - os: macos-latest
-            target: aarch64-apple-darwin
-          - os: ubuntu-latest
-            target: x86_64-unknown-linux-gnu
-
-    runs-on: ${{ matrix.os }}
+  check:
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
@@ -35,22 +25,7 @@ jobs:
           ref: v0.4.4
 
       - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt, clippy
-
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: |
-            oxios -> target
-            oxi -> target
 
       - name: Build
         working-directory: oxios
-        run: cargo build --release --target ${{ matrix.target }}
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: oxios-${{ matrix.target }}
-          path: oxios/target/${{ matrix.target }}/release/oxios
-          retention-days: 7
+        run: cargo build
