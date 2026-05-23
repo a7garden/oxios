@@ -36,6 +36,8 @@ pub struct AppState {
     /// Rate limiter for API endpoints.
     #[allow(dead_code)]
     pub rate_limiter: RateLimiter,
+    /// Override web dist directory for auto-update UI. `None` = embedded only.
+    pub web_dist: Option<PathBuf>,
 }
 
 impl std::fmt::Debug for AppState {
