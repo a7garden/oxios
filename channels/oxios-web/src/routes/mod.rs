@@ -42,8 +42,8 @@ pub(crate) use audit_routes::{
     handle_audit_verify,
 };
 pub(crate) use budget_routes::{
-    handle_budget_get, handle_budget_list, handle_budget_remove, handle_budget_reserve, handle_budget_reset,
-    handle_budget_set,
+    handle_budget_get, handle_budget_list, handle_budget_remove, handle_budget_reserve,
+    handle_budget_reset, handle_budget_set,
 };
 pub(crate) use chat::{handle_chat, handle_chat_stream};
 pub(crate) use cron_jobs::{
@@ -59,8 +59,7 @@ pub(crate) use git_routes::{
 };
 pub(crate) use infra::{
     handle_audit_log, handle_metrics, handle_permissions_get, handle_permissions_put,
-    handle_security_permissions,
-    handle_scheduler_stats, handle_scheduler_tasks,
+    handle_scheduler_stats, handle_scheduler_tasks, handle_security_permissions,
 };
 pub(crate) use knowledge_routes::{
     handle_knowledge_backlinks, handle_knowledge_chat_append, handle_knowledge_chat_delete,
@@ -196,7 +195,10 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         .route("/api/audit/flush", post(handle_audit_flush))
         // Permissions
         .route("/api/audit", get(handle_audit_log))
-        .route("/api/security/permissions", get(handle_security_permissions))
+        .route(
+            "/api/security/permissions",
+            get(handle_security_permissions),
+        )
         .route("/api/permissions/{agent}", get(handle_permissions_get))
         .route("/api/permissions/{agent}", put(handle_permissions_put))
         // Prometheus metrics

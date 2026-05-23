@@ -4,9 +4,9 @@
 //! functions between MCP-native types and Oxios kernel types (`ToolDef`).
 
 pub use oxios_mcp::{
-    McpBridge, McpCapabilities, McpClient, McpContentBlock, McpError, McpRequest, McpResponse,
-    McpServer, McpServerConfig, McpTool, McpToolCallResult, McpToolsResult, MappedResource,
-    ClientInfo, InitializeParams, InitializeResult, ServerInfo,
+    ClientInfo, InitializeParams, InitializeResult, MappedResource, McpBridge, McpCapabilities,
+    McpClient, McpContentBlock, McpError, McpRequest, McpResponse, McpServer, McpServerConfig,
+    McpTool, McpToolCallResult, McpToolsResult, ServerInfo,
 };
 
 use crate::program::{ArgumentDef, ToolDef};
@@ -36,8 +36,8 @@ pub fn mcp_tool_to_tool_def(tool: &McpTool) -> ToolDef {
                     .and_then(|d| d.as_str())
                     .unwrap_or("No description")
                     .to_string();
-                let required = required_list.iter().any(|r| *r == name)
-                    && schema.get("default").is_none();
+                let required =
+                    required_list.iter().any(|r| *r == name) && schema.get("default").is_none();
 
                 ArgumentDef {
                     name: name.clone(),
@@ -76,7 +76,10 @@ pub async fn cached_tool_defs(bridge: &McpBridge, server_name: &str) -> Option<V
 }
 
 /// Refresh and return MCP tools as Oxios `ToolDef`s for a specific server.
-pub async fn refresh_tool_defs(bridge: &McpBridge, server_name: &str) -> anyhow::Result<Vec<ToolDef>> {
+pub async fn refresh_tool_defs(
+    bridge: &McpBridge,
+    server_name: &str,
+) -> anyhow::Result<Vec<ToolDef>> {
     let tools = bridge.refresh_tools(server_name).await?;
     Ok(tools.iter().map(mcp_tool_to_tool_def).collect())
 }

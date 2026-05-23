@@ -449,7 +449,10 @@ pub(crate) async fn handle_security_permissions(
         format!("{:?}", Role::User).to_lowercase(),
         format!("{:?}", Role::Superuser).to_lowercase(),
         format!("{:?}", Role::Admin).to_lowercase(),
-    ].into_iter().map(|r| r.to_lowercase()).collect();
+    ]
+    .into_iter()
+    .map(|r| r.to_lowercase())
+    .collect();
 
     // Build policy summaries from each role's default policy
     let mut policies = Vec::new();

@@ -929,19 +929,14 @@ fn cmd_web(config: &OxiosConfig, port_override: Option<u16>) -> Result<()> {
 
     // Ensure daemon is running
     let daemon = DaemonManager::new(&config.daemon.pid_file, &config.daemon.log_dir);
-    let was_running = matches!(
-        daemon.status(),
-        oxios_kernel::DaemonStatus::Running { .. }
-    );
+    let was_running = matches!(daemon.status(), oxios_kernel::DaemonStatus::Running { .. });
 
     if !was_running {
-        println!(
-            "  {} Daemon not running — starting...",
-            style("⠋").cyan()
-        );
-        let config_path = oxios_kernel::config::expand_home(
-            &format!("{}/.oxios/config.toml", std::env::var("HOME").unwrap_or_default())
-        );
+        println!("  {} Daemon not running — starting...", style("⠋").cyan());
+        let config_path = oxios_kernel::config::expand_home(&format!(
+            "{}/.oxios/config.toml",
+            std::env::var("HOME").unwrap_or_default()
+        ));
         daemon.start(&config_path)?;
 
         // Give the server a moment to bind the port
@@ -967,8 +962,7 @@ fn cmd_web(config: &OxiosConfig, port_override: Option<u16>) -> Result<()> {
     let url = format!("http://127.0.0.1:{}", port);
     println!("  {} Opening {}", style("↗").green(), style(&url).cyan());
 
-    webbrowser::open(&url)
-        .map_err(|e| anyhow::anyhow!("failed to open browser: {}", e))?;
+    webbrowser::open(&url).map_err(|e| anyhow::anyhow!("failed to open browser: {}", e))?;
 
     Ok(())
 }
@@ -1103,7 +1097,14 @@ async fn run() -> Result<()> {
             dry_run,
             yes,
         }) => {
-            return cmd_update::run_update(*web_only, *binary_only, version.as_deref(), *dry_run, *yes).await;
+            return cmd_update::run_update(
+                *web_only,
+                *binary_only,
+                version.as_deref(),
+                *dry_run,
+                *yes,
+            )
+            .await;
         }
         Some(Command::Changelog { version }) => {
             return cmd_update::run_changelog(version.as_deref()).await;

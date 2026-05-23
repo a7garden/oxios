@@ -12,13 +12,13 @@
 
 #![warn(missing_docs)]
 
+pub mod degraded;
 pub mod eval_cache;
 pub mod evaluation;
 pub mod interview;
 pub mod ouroboros_engine;
 pub mod protocol;
 pub mod seed;
-pub mod degraded;
 // pub mod lateral; // Removed: evolve() is not called by any caller
 // pub mod regression; // Removed: evolve() is not called by any caller
 

@@ -4,8 +4,8 @@
 //! these fallbacks produce context-aware defaults instead of generic
 //! placeholders. They preserve user intent from the available context.
 
-use crate::{EvaluationResult, InterviewResult, Seed};
 use crate::AmbiguityScore;
+use crate::{EvaluationResult, InterviewResult, Seed};
 
 /// Produce a degraded interview result when LLM parsing fails.
 ///
@@ -30,7 +30,11 @@ pub fn degraded_interview(user_input: &str) -> InterviewResult {
     } else {
         result.chat_response = "Hello! How can I help you today?".to_string();
     }
-    result.update_ambiguity(AmbiguityScore::new(goal_clarity, constraint_clarity, success_clarity));
+    result.update_ambiguity(AmbiguityScore::new(
+        goal_clarity,
+        constraint_clarity,
+        success_clarity,
+    ));
 
     result
 }
@@ -56,11 +60,7 @@ pub fn degraded_seed(interview: &InterviewResult) -> Seed {
 /// Produce a degraded evaluation when LLM evaluation fails.
 ///
 /// Uses keyword matching between acceptance criteria and output.
-pub fn degraded_evaluation(
-    seed: &Seed,
-    output: &str,
-    mechanical_pass: bool,
-) -> EvaluationResult {
+pub fn degraded_evaluation(seed: &Seed, output: &str, mechanical_pass: bool) -> EvaluationResult {
     let output_lower = output.to_lowercase();
     let mut matched = 0;
 
@@ -70,7 +70,9 @@ pub fn degraded_evaluation(
             .split_whitespace()
             .filter(|w| w.len() > 3 && !matches!(*w, "the" | "must" | "should" | "shall"))
             .collect();
-        let keyword_match = keywords.iter().any(|kw| output_lower.contains(&kw.to_lowercase()));
+        let keyword_match = keywords
+            .iter()
+            .any(|kw| output_lower.contains(&kw.to_lowercase()));
         if keyword_match {
             matched += 1;
         }
@@ -89,7 +91,11 @@ pub fn degraded_evaluation(
     } else {
         vec![
             "Evaluation parsing failed; using keyword fallback.".to_string(),
-            format!("Keywords matched: {}/{} criteria", matched, seed.acceptance_criteria.len()),
+            format!(
+                "Keywords matched: {}/{} criteria",
+                matched,
+                seed.acceptance_criteria.len()
+            ),
         ]
     };
 
@@ -109,9 +115,29 @@ pub fn degraded_evaluation(
 /// Check if the message contains action verbs indicating a task.
 fn contains_action_verb(text: &str) -> bool {
     let verbs = [
-        "create", "make", "build", "fix", "find", "deploy", "analyze", "review",
-        "write", "read", "run", "execute", "delete", "update", "move", "copy",
-        "implement", "refactor", "debug", "test", "install", "configure", "setup",
+        "create",
+        "make",
+        "build",
+        "fix",
+        "find",
+        "deploy",
+        "analyze",
+        "review",
+        "write",
+        "read",
+        "run",
+        "execute",
+        "delete",
+        "update",
+        "move",
+        "copy",
+        "implement",
+        "refactor",
+        "debug",
+        "test",
+        "install",
+        "configure",
+        "setup",
     ];
     let lower = text.to_lowercase();
     verbs.iter().any(|v| lower.contains(v))
@@ -129,14 +155,22 @@ fn contains_specifics(text: &str) -> bool {
     }
     // Contains specific language/framework names
     let specifics = [
-        "rust", "python", "typescript", "javascript", "go", "java", "tokio",
-        "react", "axum", "cargo", "npm", "docker",
+        "rust",
+        "python",
+        "typescript",
+        "javascript",
+        "go",
+        "java",
+        "tokio",
+        "react",
+        "axum",
+        "cargo",
+        "npm",
+        "docker",
     ];
     let lower = text.to_lowercase();
     specifics.iter().any(|s| lower.contains(s))
 }
-
-
 
 #[cfg(test)]
 mod tests {

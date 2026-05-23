@@ -308,7 +308,10 @@ async fn test_orchestrator_evolution_loop() -> Result<()> {
     // Should still reach Execute (evolve→re-execute).
     // Note: current pipeline stops at Execute; evaluate is not a separate phase.
     assert_eq!(result.phase_reached, Phase::Execute);
-    assert!(result.evaluation_passed, "Execution should succeed after evolution");
+    assert!(
+        result.evaluation_passed,
+        "Execution should succeed after evolution"
+    );
 
     println!("Evolution loop: {:?}", result.phase_reached);
 

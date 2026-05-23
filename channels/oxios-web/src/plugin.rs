@@ -132,7 +132,8 @@ fn serve_file(dist: Option<&std::path::Path>, path: &str) -> Response {
     }
 
     // Fall back to embedded assets
-    let asset = EmbeddedAssets::get(clean).or_else(|| EmbeddedAssets::get(&format!("assets/{}", clean)));
+    let asset =
+        EmbeddedAssets::get(clean).or_else(|| EmbeddedAssets::get(&format!("assets/{}", clean)));
 
     match asset {
         Some(content) => {
@@ -150,10 +151,7 @@ fn serve_file(dist: Option<&std::path::Path>, path: &str) -> Response {
                 .body(Body::from(content.data.to_vec()))
                 .unwrap()
         }
-        None => Response::builder()
-            .status(404)
-            .body(Body::empty())
-            .unwrap(),
+        None => Response::builder().status(404).body(Body::empty()).unwrap(),
     }
 }
 
@@ -162,7 +160,10 @@ fn serve_file(dist: Option<&std::path::Path>, path: &str) -> Response {
 // ---------------------------------------------------------------------------
 
 /// Static asset handler.
-async fn static_handler(path: axum::extract::Path<String>, state: axum::extract::State<Arc<AppState>>) -> Response {
+async fn static_handler(
+    path: axum::extract::Path<String>,
+    state: axum::extract::State<Arc<AppState>>,
+) -> Response {
     let dist = state.web_dist.clone();
     serve_file(dist.as_deref(), &path)
 }

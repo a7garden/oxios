@@ -499,11 +499,7 @@ impl OuroborosProtocol for OuroborosEngine {
             }
             Err(e) => {
                 tracing::warn!(error = %e, "Evaluation JSON parse failed after retry, using degraded fallback");
-                crate::degraded::degraded_evaluation(
-                    seed,
-                    &execution.output,
-                    mechanical.all_passed,
-                )
+                crate::degraded::degraded_evaluation(seed, &execution.output, mechanical.all_passed)
             }
         };
 

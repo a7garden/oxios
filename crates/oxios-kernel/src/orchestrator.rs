@@ -468,14 +468,21 @@ impl Orchestrator {
         // "simple" + low ambiguity → create a lightweight Seed from the user
         // message directly (no LLM call) and skip formal evaluation.
         // "complex" (or ambiguous simple) → generate a full Seed via LLM.
-        let is_simple = interview.complexity == "simple"
-            && interview.ambiguity.ambiguity() <= 0.3;
+        let is_simple = interview.complexity == "simple" && interview.ambiguity.ambiguity() <= 0.3;
 
         let seed = if is_simple {
-            tracing::info!(phase = "seed", method = "from_message", "Simple task — ad-hoc seed");
+            tracing::info!(
+                phase = "seed",
+                method = "from_message",
+                "Simple task — ad-hoc seed"
+            );
             Seed::from_message(&interview.original_message)
         } else {
-            tracing::info!(phase = "seed", method = "llm", "Complex task — LLM-generated seed");
+            tracing::info!(
+                phase = "seed",
+                method = "llm",
+                "Complex task — LLM-generated seed"
+            );
             self.ouroboros.generate_seed(&interview).await?
         };
 

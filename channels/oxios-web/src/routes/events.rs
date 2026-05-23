@@ -273,7 +273,7 @@ pub(crate) fn sanitize_event(event: &oxios_kernel::event_bus::KernelEvent) -> se
             "to_space": to_space.to_string(),
             "entries": entries,
             "flow": format!("{:?}", flow),
-        })
+        }),
     };
     // Merge payload into base
     if let serde_json::Value::Object(mut map) = base {

@@ -29,11 +29,21 @@ pub async fn run_update(
     let update_web = !binary_only;
 
     println!();
-    println!("  {} {}", style("⬡ Oxios Updater").bold(), style(format!("v{}", current)).dim());
+    println!(
+        "  {} {}",
+        style("⬡ Oxios Updater").bold(),
+        style(format!("v{}", current)).dim()
+    );
     println!("  {}", "─".repeat(52));
     println!("  Current version:  {}", current);
-    println!("  Update binary:    {}", if update_binary { "yes" } else { "no" });
-    println!("  Update web UI:   {}", if update_web { "yes" } else { "no" });
+    println!(
+        "  Update binary:    {}",
+        if update_binary { "yes" } else { "no" }
+    );
+    println!(
+        "  Update web UI:   {}",
+        if update_web { "yes" } else { "no" }
+    );
     if let Some(v) = version {
         println!("  Target version:  {}", v);
     } else {
@@ -51,7 +61,10 @@ pub async fn run_update(
             "https://api.github.com/repos/{}/{}/releases/tags/{}",
             owner, repo, t
         ),
-        None => format!("https://api.github.com/repos/{}/{}/releases/latest", owner, repo),
+        None => format!(
+            "https://api.github.com/repos/{}/{}/releases/latest",
+            owner, repo
+        ),
     };
 
     println!("  Fetching release info from GitHub...");
@@ -83,11 +96,19 @@ pub async fn run_update(
     let html_url = release["html_url"].as_str().unwrap_or("");
     let body = release["body"].as_str().unwrap_or("No release notes.");
 
-    println!("  Latest release:  {} ({})", style(tag_name).green().bold(), html_url);
+    println!(
+        "  Latest release:  {} ({})",
+        style(tag_name).green().bold(),
+        html_url
+    );
     println!();
 
     if tag_name == current && !dry_run && !yes {
-        println!("  {} Already on latest version ({}).", style("✓").green(), current);
+        println!(
+            "  {} Already on latest version ({}).",
+            style("✓").green(),
+            current
+        );
         println!("  Use `--version X.Y.Z` to force a specific version.");
         return Ok(());
     }
@@ -107,8 +128,12 @@ pub async fn run_update(
         .collect();
 
     let web_asset = assets.iter().find(|(name, _, _)| name == "web-dist.zip");
-    let binary_asset = assets.iter().find(|(name, _, _)| name == "oxios-macos-arm64");
-    let checksum_asset = assets.iter().find(|(name, _, _)| name == "oxios-macos-arm64.sha256");
+    let binary_asset = assets
+        .iter()
+        .find(|(name, _, _)| name == "oxios-macos-arm64");
+    let checksum_asset = assets
+        .iter()
+        .find(|(name, _, _)| name == "oxios-macos-arm64.sha256");
 
     println!("  Available assets:");
     for (name, _, size) in &assets {
@@ -132,7 +157,10 @@ pub async fn run_update(
                 println!("  Would download: {} ({})", name, format_size(*size));
                 println!("  Would install to: ~/.cargo/bin/oxios");
             } else {
-                println!("  {} oxios-macos-arm64 not found in release.", style("✗").red());
+                println!(
+                    "  {} oxios-macos-arm64 not found in release.",
+                    style("✗").red()
+                );
             }
         }
         return Ok(());
@@ -176,8 +204,7 @@ pub async fn run_update(
             std::io::stdout().flush().ok();
 
             let cursor = std::io::Cursor::new(bytes);
-            let mut archive = zip::ZipArchive::new(cursor)
-                .context("invalid zip file")?;
+            let mut archive = zip::ZipArchive::new(cursor).context("invalid zip file")?;
 
             for i in 0..archive.len() {
                 let mut file = archive.by_index(i)?;
@@ -194,9 +221,17 @@ pub async fn run_update(
                 }
             }
             println!("done.");
-            println!("  {} Web UI updated to {} in {:?}.", style("✓").green(), tag_name, dest_dir);
+            println!(
+                "  {} Web UI updated to {} in {:?}.",
+                style("✓").green(),
+                tag_name,
+                dest_dir
+            );
         } else {
-            println!("  {} web-dist.zip not found — skipping.", style("⚠").yellow());
+            println!(
+                "  {} web-dist.zip not found — skipping.",
+                style("⚠").yellow()
+            );
         }
     }
 
@@ -229,7 +264,8 @@ pub async fn run_update(
                 if actual != expected_checksum {
                     anyhow::bail!(
                         "Checksum mismatch!\n  Expected: {}\n  Actual:   {}",
-                        expected_checksum, actual
+                        expected_checksum,
+                        actual
                     );
                 }
                 println!("  {} Checksum verified.", style("✓").green());
@@ -250,12 +286,23 @@ pub async fn run_update(
                 std::fs::set_permissions(&dest, perms)?;
             }
 
-            println!("  {} Binary updated to {} at {:?}", style("✓").green(), tag_name, dest);
+            println!(
+                "  {} Binary updated to {} at {:?}",
+                style("✓").green(),
+                tag_name,
+                dest
+            );
             println!();
-            println!("  {} Run `{}` to restart with the new binary.",
-                style("ℹ").cyan(), style("oxios restart").bold());
+            println!(
+                "  {} Run `{}` to restart with the new binary.",
+                style("ℹ").cyan(),
+                style("oxios restart").bold()
+            );
         } else {
-            println!("  {} oxios-macos-arm64 not found — skipping.", style("⚠").yellow());
+            println!(
+                "  {} oxios-macos-arm64 not found — skipping.",
+                style("⚠").yellow()
+            );
         }
     }
 
@@ -272,7 +319,10 @@ pub async fn run_changelog(version: Option<&str>) -> Result<()> {
             "https://api.github.com/repos/{}/{}/releases/tags/v{}",
             owner, repo, v
         ),
-        None => format!("https://api.github.com/repos/{}/{}/releases/latest", owner, repo),
+        None => format!(
+            "https://api.github.com/repos/{}/{}/releases/latest",
+            owner, repo
+        ),
     };
 
     let client = reqwest::Client::builder()
@@ -291,12 +341,20 @@ pub async fn run_changelog(version: Option<&str>) -> Result<()> {
     }
 
     let release: serde_json::Value = resp.json().await.context("failed to parse release JSON")?;
-    let tag = release["tag_name"].as_str().unwrap_or("?").trim_start_matches('v');
+    let tag = release["tag_name"]
+        .as_str()
+        .unwrap_or("?")
+        .trim_start_matches('v');
     let body = release["body"].as_str().unwrap_or("(no release notes)");
     let date = release["published_at"].as_str().unwrap_or("?");
 
     println!();
-    println!("  {} v{}  ({})", style("⬡ Oxios").bold(), style(tag).green().bold(), date);
+    println!(
+        "  {} v{}  ({})",
+        style("⬡ Oxios").bold(),
+        style(tag).green().bold(),
+        date
+    );
     println!("  {}", "─".repeat(55));
     println!();
     println!("{}", body);
@@ -315,7 +373,11 @@ fn dest_binary_path() -> Result<PathBuf> {
     Ok(home.join(".cargo").join("bin").join("oxios"))
 }
 
-async fn download_file(client: &reqwest::Client, url: &str, _expected_size: u64) -> Result<Vec<u8>> {
+async fn download_file(
+    client: &reqwest::Client,
+    url: &str,
+    _expected_size: u64,
+) -> Result<Vec<u8>> {
     let resp = client
         .get(url)
         .send()
@@ -326,10 +388,7 @@ async fn download_file(client: &reqwest::Client, url: &str, _expected_size: u64)
         anyhow::bail!("Download failed: {}", resp.status());
     }
 
-    let bytes = resp
-        .bytes()
-        .await
-        .context("failed to read response body")?;
+    let bytes = resp.bytes().await.context("failed to read response body")?;
 
     Ok(bytes.to_vec())
 }

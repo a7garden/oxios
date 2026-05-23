@@ -95,9 +95,8 @@ mod tests {
         let base = tmp.path().to_path_buf();
 
         // Build a minimal KernelHandle for testing
-        let state_store = Arc::new(
-            crate::state_store::StateStore::new(base.join("workspace")).unwrap(),
-        );
+        let state_store =
+            Arc::new(crate::state_store::StateStore::new(base.join("workspace")).unwrap());
 
         let kernel = Arc::new(crate::KernelHandle::new(
             crate::StateApi::new(state_store.clone()),
@@ -117,20 +116,13 @@ mod tests {
             ),
             crate::PersonaApi::new(Arc::new(crate::persona_manager::PersonaManager::new())),
             crate::ExtensionApi::new(
-                Arc::new(crate::program::ProgramManager::new(
-                    base.join("programs"),
-                )),
-                Arc::new(
-                    crate::skill::SkillStore::new(base.join("skills"))
-                        .unwrap(),
-                ),
+                Arc::new(crate::program::ProgramManager::new(base.join("programs"))),
+                Arc::new(crate::skill::SkillStore::new(base.join("skills")).unwrap()),
                 Arc::new(crate::host_tools::HostToolValidator::new(vec![], vec![])),
             ),
             crate::McpApi::new(Arc::new(crate::mcp::McpBridge::new())),
             crate::InfraApi::new(
-                Arc::new(
-                    crate::git_layer::GitLayer::new(base.join("git"), false).unwrap(),
-                ),
+                Arc::new(crate::git_layer::GitLayer::new(base.join("git"), false).unwrap()),
                 Arc::new(crate::scheduler::AgentScheduler::new(5, 60, 300)),
                 Arc::new(crate::cron::CronScheduler::new(state_store.clone(), 60)),
                 Arc::new(crate::resource_monitor::ResourceMonitor::new(60, 60)),
@@ -159,15 +151,11 @@ mod tests {
             crate::A2aApi::new(Arc::new(crate::a2a::A2AProtocol::new(
                 crate::event_bus::EventBus::new(256),
             ))),
-            Arc::new(
-                oxios_markdown::KnowledgeBase::new(base.join("knowledge"))
-                    .unwrap(),
-            ),
+            Arc::new(oxios_markdown::KnowledgeBase::new(base.join("knowledge")).unwrap()),
             Arc::new(
                 crate::kernel_handle::KnowledgeLens::new(
                     Arc::new(
-                        oxios_markdown::KnowledgeBase::new(base.join("knowledge_lens"))
-                            .unwrap(),
+                        oxios_markdown::KnowledgeBase::new(base.join("knowledge_lens")).unwrap(),
                     ),
                     Arc::new(crate::memory::MemoryManager::new(state_store.clone())),
                 )

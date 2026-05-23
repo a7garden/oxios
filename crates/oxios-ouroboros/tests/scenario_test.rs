@@ -12,8 +12,12 @@ use oxios_ouroboros::{OuroborosEngine, OuroborosProtocol};
 
 /// auth.json에서 zai API 키 읽기.
 fn load_zai_key() -> Option<String> {
-    let path = std::env::var("OXI_AUTH_PATH")
-        .unwrap_or_else(|_| format!("{}/.oxi/auth.json", std::env::var("HOME").unwrap_or_default()));
+    let path = std::env::var("OXI_AUTH_PATH").unwrap_or_else(|_| {
+        format!(
+            "{}/.oxi/auth.json",
+            std::env::var("HOME").unwrap_or_default()
+        )
+    });
     let content = std::fs::read_to_string(&path).ok()?;
     let json: serde_json::Value = serde_json::from_str(&content).ok()?;
     json.get("zai")?
@@ -37,8 +41,12 @@ async fn make_engine() -> Arc<dyn OuroborosProtocol> {
     });
 
     let oxi = builder.build();
-    let model = oxi.resolve_model("zai/glm-5-turbo").expect("model not found");
-    let provider = oxi.create_provider("zai").expect("provider creation failed");
+    let model = oxi
+        .resolve_model("zai/glm-5-turbo")
+        .expect("model not found");
+    let provider = oxi
+        .create_provider("zai")
+        .expect("provider creation failed");
     Arc::new(OuroborosEngine::new(provider, model))
 }
 
@@ -71,7 +79,6 @@ fn scenarios() -> Vec<Scenario> {
             expected_ready: Some(true),
             expected_has_questions: Some(false),
         },
-
         // ── Category 2: 모호한 작업 요청 ──
         Scenario {
             name: "모호한 수정",
@@ -101,7 +108,6 @@ fn scenarios() -> Vec<Scenario> {
             expected_ready: Some(false),
             expected_has_questions: Some(true),
         },
-
         // ── Category 3: 대화/비작업 ──
         Scenario {
             name: "인사",
@@ -124,27 +130,30 @@ fn scenarios() -> Vec<Scenario> {
             expected_ready: None,
             expected_has_questions: None,
         },
-
         // ── Category 4: 경계 케이스 ──
         Scenario {
             name: "부분 구체성 (파일+모호한 수정)",
             message: "로그인 페이지 수정해줘",
             expected_is_task: Some(true),
-            expected_ready: None,  // 애매함 — 어떻게 나올지 보기
+            expected_ready: None, // 애매함 — 어떻게 나올지 보기
             expected_has_questions: None,
         },
         Scenario {
             name: "구체적 설명+모호한 요청",
             message: "dashboard.tsx에 Chart 컴포넌트가 데이터를 못 불러오는 것 같아. 확인해줘",
             expected_is_task: Some(true),
-            expected_ready: None,  // 파일은 있는데 "확인"이 모호
+            expected_ready: None, // 파일은 있는데 "확인"이 모호
             expected_has_questions: None,
         },
     ]
 }
 
 /// 결과 예쁘게 출력 + 검증
-fn print_and_verify(name: &str, s: &Scenario, result: &oxios_ouroboros::InterviewResult) -> (usize, usize) {
+fn print_and_verify(
+    name: &str,
+    s: &Scenario,
+    result: &oxios_ouroboros::InterviewResult,
+) -> (usize, usize) {
     let mut pass = 0;
     let mut fail = 0;
 
@@ -161,32 +170,59 @@ fn print_and_verify(name: &str, s: &Scenario, result: &oxios_ouroboros::Intervie
     print!("   분류: {}", is_task_str);
     if let Some(exp) = s.expected_is_task {
         let ok = result.is_task == exp;
-        print!(" {} (expected: {})", if ok { "✅" } else { "❌" }, if exp { "TASK" } else { "CHAT" });
-        if ok { pass += 1; } else { fail += 1; }
+        print!(
+            " {} (expected: {})",
+            if ok { "✅" } else { "❌" },
+            if exp { "TASK" } else { "CHAT" }
+        );
+        if ok {
+            pass += 1;
+        } else {
+            fail += 1;
+        }
     }
     println!();
 
     // Ambiguity
-    println!("   Ambiguity: {:.3}  ready={}  (goal={:.2} constraint={:.2} criteria={:.2})",
-        ambiguity, ready,
+    println!(
+        "   Ambiguity: {:.3}  ready={}  (goal={:.2} constraint={:.2} criteria={:.2})",
+        ambiguity,
+        ready,
         result.ambiguity.goal_clarity,
         result.ambiguity.constraint_clarity,
-        result.ambiguity.success_criteria);
+        result.ambiguity.success_criteria
+    );
 
     if let Some(exp_ready) = s.expected_ready {
         let ok = ready == exp_ready;
-        println!("   {} ready: actual={}, expected={}",
-            if ok { "✅" } else { "❌" }, ready, exp_ready);
-        if ok { pass += 1; } else { fail += 1; }
+        println!(
+            "   {} ready: actual={}, expected={}",
+            if ok { "✅" } else { "❌" },
+            ready,
+            exp_ready
+        );
+        if ok {
+            pass += 1;
+        } else {
+            fail += 1;
+        }
     }
 
     // Questions
     if let Some(exp_q) = s.expected_has_questions {
         let has_q = n_questions > 0;
         let ok = has_q == exp_q;
-        println!("   {} has_questions: actual={}, expected={}",
-            if ok { "✅" } else { "❌" }, has_q, exp_q);
-        if ok { pass += 1; } else { fail += 1; }
+        println!(
+            "   {} has_questions: actual={}, expected={}",
+            if ok { "✅" } else { "❌" },
+            has_q,
+            exp_q
+        );
+        if ok {
+            pass += 1;
+        } else {
+            fail += 1;
+        }
     }
 
     if n_questions > 0 {
