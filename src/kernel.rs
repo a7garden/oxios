@@ -515,6 +515,7 @@ impl KernelBuilder {
                         generation: 0,
                         parent_seed_id: None,
                         cspace_hint: None,
+                        original_request: String::new(),
                     };
                     match lc
                         .spawn_and_run(&seed, oxios_kernel::scheduler::Priority::Normal)

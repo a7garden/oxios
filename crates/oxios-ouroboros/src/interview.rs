@@ -32,6 +32,11 @@ pub struct InterviewResult {
     /// Each exchange is a user message + agent response (questions or chat).
     #[serde(default)]
     pub conversation_history: Vec<Exchange>,
+    /// Task complexity: "simple" for clear single-action requests,
+    /// "complex" for ambiguous or multi-step tasks.
+    /// Defaults to "complex" (safe default).
+    #[serde(default = "default_complexity")]
+    pub complexity: String,
 }
 
 /// A single exchange in the conversation history.
@@ -47,6 +52,10 @@ fn default_is_task() -> bool {
     true
 }
 
+fn default_complexity() -> String {
+    "complex".to_string()
+}
+
 impl InterviewResult {
     /// Creates a new empty interview result with maximum ambiguity.
     pub fn new() -> Self {
@@ -59,6 +68,7 @@ impl InterviewResult {
             is_task: true,
             chat_response: String::new(),
             conversation_history: Vec::new(),
+            complexity: default_complexity(),
         }
     }
 

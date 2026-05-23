@@ -93,6 +93,7 @@ impl OuroborosProtocol for MockOuroboros {
             generation: 0,
             parent_seed_id: None,
             cspace_hint: None,
+            original_request: String::new(),
         })
     }
 
@@ -138,6 +139,7 @@ impl OuroborosProtocol for MockOuroboros {
             generation: seed.generation + 1,
             parent_seed_id: Some(seed.id),
             cspace_hint: None,
+            original_request: String::new(),
         }))
     }
 }

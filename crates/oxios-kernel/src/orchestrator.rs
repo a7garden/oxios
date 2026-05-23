@@ -1,12 +1,11 @@
-//! Orchestrator: coordinates the full Ouroboros lifecycle for user messages.
+//! Orchestrator: coordinates the Ouroboros lifecycle for user messages.
 //!
-//! The orchestrator is the "brain" that runs the Ouroboros protocol
-//! end-to-end. Given a user message:
+//! The orchestrator is the "brain" that runs the Ouroboros protocol.
+//! Given a user message:
 //! 1. Conduct the interview (ask clarifying questions if needed)
-//! 2. Generate a seed when ambiguity is low enough
-//! 3. Fork and execute an agent via the supervisor
-//! 4. Evaluate the result
-//! 5. Evolve and re-execute if evaluation fails
+//! 2. Generate a seed (via LLM for complex tasks, or ad-hoc for simple tasks)
+//! 3. Execute the agent via the supervisor
+//! 4. Return the result to the user
 //!
 //! The orchestrator does NOT know about channels or HTTP — it only
 //! coordinates Ouroboros + Supervisor + EventBus + StateStore + Scheduler + AccessManager.
@@ -16,7 +15,7 @@ use std::time::Duration;
 
 use anyhow::{Context, Result};
 use chrono;
-use oxios_ouroboros::{EvaluationResult, InterviewResult, OuroborosProtocol, Phase, Seed};
+use oxios_ouroboros::{ExecutionResult, InterviewResult, OuroborosProtocol, Phase, Seed};
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -96,8 +95,6 @@ pub struct Orchestrator {
     /// Conversation buffer for topic shift detection.
     conversation_buffer: RwLock<ConversationBuffer>,
     /// Orchestrator configuration (Ouroboros protocol settings).
-    config: crate::config::OrchestratorConfig,
-    /// Delegation configuration for A2A retries.
     delegation_config: DelegationConfig,
     /// A2A circuit breaker for delegation reliability.
     a2a_breaker: Arc<crate::a2a_circuit_breaker::A2ACircuitBreaker>,
@@ -153,13 +150,13 @@ impl Orchestrator {
         )
     }
 
-    /// Creates a new orchestrator with custom config.
+    /// Creates a new orchestrator with custom config (kept for API compat).
     pub fn with_config(
         ouroboros: Arc<dyn OuroborosProtocol>,
         event_bus: EventBus,
         state_store: Arc<StateStore>,
         lifecycle: AgentLifecycleManager,
-        config: crate::config::OrchestratorConfig,
+        _config: crate::config::OrchestratorConfig,
     ) -> Self {
         Self {
             ouroboros,
@@ -171,7 +168,6 @@ impl Orchestrator {
             a2a: None,
             space_manager: RwLock::new(None),
             conversation_buffer: RwLock::new(ConversationBuffer::default()),
-            config,
             delegation_config: DelegationConfig::default(),
             a2a_breaker: Arc::new(crate::a2a_circuit_breaker::A2ACircuitBreaker::new(5, 30)),
         }
@@ -459,17 +455,29 @@ impl Orchestrator {
         // but we record it for completeness.
         {
             let mut buffer = self.conversation_buffer.write();
-            buffer.push_agent("[interview: questions]", &space_id);
+            buffer.push_agent("[interview: ready]", &space_id);
         }
 
-        // Interview complete and ready. Proceed to seed generation.
-        self.publish_phase_completed(&session_id, Phase::Interview, "ready for seed")
+        // Interview complete and ready.
+        self.publish_phase_completed(&session_id, Phase::Interview, "ready")
             .await;
         self.publish_phase_started(&session_id, Phase::Seed).await;
 
-        // Phase 2: Generate seed
-        tracing::info!(phase = "seed", "Starting seed generation");
-        let seed = self.ouroboros.generate_seed(&interview).await?;
+        // ── Complexity-based routing ──
+        //
+        // "simple" + low ambiguity → create a lightweight Seed from the user
+        // message directly (no LLM call) and skip formal evaluation.
+        // "complex" (or ambiguous simple) → generate a full Seed via LLM.
+        let is_simple = interview.complexity == "simple"
+            && interview.ambiguity.ambiguity() <= 0.3;
+
+        let seed = if is_simple {
+            tracing::info!(phase = "seed", method = "from_message", "Simple task — ad-hoc seed");
+            Seed::from_message(&interview.original_message)
+        } else {
+            tracing::info!(phase = "seed", method = "llm", "Complex task — LLM-generated seed");
+            self.ouroboros.generate_seed(&interview).await?
+        };
 
         // Save seed to state store.
         self.save_seed(&seed).await?;
@@ -539,7 +547,7 @@ impl Orchestrator {
             buffer.push_agent("[multi-agent: complete]", &space_id);
         }
 
-        // Phase 3: Fork and execute agent via lifecycle manager
+        // Execute agent via lifecycle manager.
         tracing::info!(phase = "execute", "Starting execution phase");
         let exec_result = self
             .lifecycle
@@ -549,108 +557,8 @@ impl Orchestrator {
         // Periodically reap zombie tasks.
         self.lifecycle.reap_zombies();
 
-        // Phase 4: Evaluate
         self.publish_phase_completed(&session_id, Phase::Execute, "completed")
             .await;
-        self.publish_phase_started(&session_id, Phase::Evaluate)
-            .await;
-
-        tracing::info!(phase = "evaluate", "Starting evaluation phase");
-        let evaluation = self.ouroboros.evaluate(&seed, &exec_result).await?;
-
-        self.publish_phase_completed(
-            &session_id,
-            Phase::Evaluate,
-            &format!("score={:.2}", evaluation.score),
-        )
-        .await;
-
-        self.event_bus.publish(KernelEvent::EvaluationComplete {
-            seed_id: seed.id,
-            passed: evaluation.all_passed(),
-        })?;
-
-        // Save evaluation to state store for lineage tracking.
-        self.save_evaluation(&seed, &evaluation).await?;
-
-        // Phase 5: Evolve if needed
-        let mut current_seed = Some(seed);
-        let mut current_evaluation = evaluation;
-        let mut iterations = 0;
-
-        while !current_evaluation.all_passed()
-            && current_evaluation.score < self.config.min_evaluation_score
-            && iterations < self.config.max_evolution_iterations
-        {
-            iterations += 1;
-            self.publish_phase_started(&session_id, Phase::Evolve).await;
-
-            tracing::info!(
-                phase = "evolve",
-                iteration = iterations,
-                max_iterations = self.config.max_evolution_iterations,
-                "Starting evolve phase"
-            );
-            let evolve_result = self
-                .ouroboros
-                .evolve(
-                    current_seed.as_ref().expect("seed exists"),
-                    &current_evaluation,
-                )
-                .await?;
-
-            if let Some(evolved) = evolve_result {
-                current_seed = Some(evolved.clone());
-
-                // Save evolved seed.
-                self.save_seed(&evolved).await?;
-                self.event_bus.publish(KernelEvent::SeedCreated {
-                    seed_id: evolved.id,
-                })?;
-
-                self.publish_phase_completed(&session_id, Phase::Evolve, "evolved")
-                    .await;
-                self.publish_phase_started(&session_id, Phase::Execute)
-                    .await;
-
-                tracing::info!(
-                    phase = "re-execute",
-                    iteration = iterations,
-                    "Re-executing with evolved seed"
-                );
-                let new_exec = self
-                    .lifecycle
-                    .spawn_and_run(&evolved, Priority::High)
-                    .await?;
-
-                self.publish_phase_completed(&session_id, Phase::Execute, "completed")
-                    .await;
-                self.publish_phase_started(&session_id, Phase::Evaluate)
-                    .await;
-
-                tracing::info!(
-                    phase = "re-evaluate",
-                    iteration = iterations,
-                    "Re-evaluating evolved result"
-                );
-                let new_eval = self.ouroboros.evaluate(&evolved, &new_exec).await?;
-                current_evaluation = new_eval;
-
-                self.publish_phase_completed(
-                    &session_id,
-                    Phase::Evaluate,
-                    &format!("score={:.2}", current_evaluation.score),
-                )
-                .await;
-                // Save evolved seed evaluation for lineage tracking.
-                self.save_evaluation(&evolved, &current_evaluation).await?;
-            } else {
-                // No evolution possible.
-                self.publish_phase_completed(&session_id, Phase::Evolve, "no evolution")
-                    .await;
-                break;
-            }
-        }
 
         // Clean up the session.
         {
@@ -658,13 +566,10 @@ impl Orchestrator {
             sessions.remove(&session_id);
         }
 
-        let final_seed = current_seed.expect("at least one seed exists");
-        let passed = current_evaluation.all_passed() || current_evaluation.score >= 0.7;
+        let passed = exec_result.success;
 
         tracing::info!(
             session_id = %session_id,
-            iterations,
-            score = current_evaluation.score,
             passed,
             "Orchestration complete"
         );
@@ -683,19 +588,19 @@ impl Orchestrator {
         // Record agent response in conversation buffer (for topic shift detection)
         {
             let mut buffer = self.conversation_buffer.write();
-            buffer.push_agent(&final_seed.goal, &space_id);
+            buffer.push_agent(&seed.goal, &space_id);
         }
 
         Ok(OrchestrationResult {
             session_id: Some(session_id),
             space_id: Some(space_id),
             space_tag: Some(space_tag.clone()),
-            response: format_result(&final_seed, &current_evaluation),
-            seed_id: Some(final_seed.id),
+            response: format_execution_result(&seed, &exec_result),
+            seed_id: Some(seed.id),
             agent_id: None,
-            phase_reached: Phase::Evaluate,
+            phase_reached: Phase::Execute,
             evaluation_passed: passed,
-            output: Some(current_evaluation.notes.join("; ")),
+            output: Some(exec_result.output.clone()),
         })
     }
 
@@ -714,19 +619,6 @@ impl Orchestrator {
     }
 
     /// Save an evaluation result to the state store.
-    async fn save_evaluation(&self, seed: &Seed, evaluation: &EvaluationResult) -> Result<()> {
-        let key = format!("{}-eval", seed.id);
-
-        self.state_store
-            .save_json("evals", &key, evaluation)
-            .await
-            .context("failed to save evaluation to state store")?;
-
-        self.git_commit(&format!("evals/{}.json", key), "ourobors: save eval");
-
-        Ok(())
-    }
-
     /// Publish a PhaseStarted event.
     async fn publish_phase_started(&self, session_id: &str, phase: Phase) {
         let _ = self.event_bus.publish(KernelEvent::PhaseStarted {
@@ -847,6 +739,7 @@ impl Orchestrator {
             generation: parent_seed.generation + 1,
             parent_seed_id: Some(parent_seed.id),
             cspace_hint: None,
+            original_request: parent_seed.original_request.clone(),
         };
         match self
             .lifecycle
@@ -1154,26 +1047,28 @@ fn format_questions(questions: &[String]) -> String {
 }
 
 /// Format the final result for display.
-fn format_result(seed: &Seed, evaluation: &EvaluationResult) -> String {
-    let passed = evaluation.all_passed();
-
+/// Format execution result for display to the user.
+fn format_execution_result(seed: &Seed, exec: &ExecutionResult) -> String {
     let mut lines = Vec::new();
-    lines.push(format!("Task '{}' completed.", seed.goal));
 
-    if passed {
-        lines.push("✅ Evaluation passed.".to_string());
+    if exec.success {
+        lines.push(format!("✅ '{}'", seed.goal));
     } else {
         lines.push(format!(
-            "⚠️ Evaluation score: {:.0}%",
-            evaluation.score * 100.0
+            "⚠️ '{}'을(를) 시도했지만 완전히 성공하지 못했습니다.",
+            seed.goal
         ));
     }
 
-    if !evaluation.notes.is_empty() {
-        lines.push("\nNotes:".to_string());
-        for note in &evaluation.notes {
-            lines.push(format!("- {}", note));
-        }
+    // Show a truncated preview of the output if present.
+    if !exec.output.is_empty() {
+        let preview = if exec.output.len() > 500 {
+            format!("{}...", &exec.output[..500])
+        } else {
+            exec.output.clone()
+        };
+        lines.push(String::new());
+        lines.push(preview);
     }
 
     lines.join("\n")
@@ -1252,6 +1147,7 @@ async fn run_via_lifecycle(
         generation: parent_seed.generation + 1,
         parent_seed_id: Some(parent_seed.id),
         cspace_hint: None,
+        original_request: parent_seed.original_request.clone(),
     };
     match lifecycle.spawn_and_run(&child_seed, Priority::Normal).await {
         Ok(result) => (result.output, result.success),

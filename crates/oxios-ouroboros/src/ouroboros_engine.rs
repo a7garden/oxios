@@ -40,6 +40,16 @@ struct InterviewResponse {
     questions: Vec<String>,
     /// Ambiguity scores along each dimension (0.0–1.0 clarity).
     scores: Option<AmbiguityScores>,
+    /// Task complexity: "simple" for clear single-action requests,
+    /// "complex" for ambiguous or multi-step tasks.
+    /// Defaults to "complex" (safe default — extra LLM call is cheaper
+    /// than misrouting an ambiguous request).
+    #[serde(default = "default_complexity")]
+    complexity: String,
+}
+
+fn default_complexity() -> String {
+    "complex".to_string()
 }
 
 fn default_true() -> bool {
@@ -226,27 +236,35 @@ impl OuroborosProtocol for OuroborosEngine {
             "The user said:\n\"{}\"\n\n\
              Analyze this message and produce a JSON object with:\n\
              - \"is_task\": true if the message requests a concrete action (create, read, write, run, find, fix, analyze, deploy, etc.) or describes something to build/execute. false for greetings, small talk, questions, gratitude, opinions, or conversational messages.\n\
-             - \"chat_response\": (only when is_task=false) A natural, friendly response in the user's language. Be warm, concise, and helpful. Skip this field when is_task=true.\n\
+             - \"chat_response\": (only when is_task=false) A natural, friendly response. Be warm, concise, and helpful. Skip this field when is_task=true.\n\
+             - \"complexity\": (only when is_task=true) \"simple\" for clear single-action requests that need no clarification (check weather, set alarm, search, calculate, simple file read/write, echo). \"complex\" for ambiguous or multi-step tasks (modify code, write blog post, deploy, analyze). Default to \"complex\" when unsure.\n\
              - \"questions\": (only when is_task=true) Up to 3 Socratic clarifying questions. Empty array when is_task=false.\n\
              - \"scores\": (only when is_task=true) {{ \"goal_clarity\": 0.0-1.0, \"constraint_clarity\": 0.0-1.0, \"success_criteria\": 0.0-1.0 }}. Skip this field when is_task=false.\n\n\
              IMPORTANT SCORING (when is_task=true):\n\
-             - Score GOAL_CLARITY 0.9+ if the user states ANY concrete action\n\
-             - Score CONSTRAINT_CLARITY 0.8+ if the request includes ANY specifics (filename, content, path, language)\n\
-             - Score SUCCESS_CRITERIA 0.7+ if you can infer what 'done' looks like\n\
-             - Be GENEROUS with clarity scores. When in doubt, score higher.",
+             - Score GOAL_CLARITY 0.9+ ONLY if the request is immediately executable with no ambiguity\n\
+             - Score CONSTRAINT_CLARITY 0.8+ ONLY if specific filenames, paths, or content are provided\n\
+             - Score SUCCESS_CRITERIA 0.7+ ONLY if 'done' is clearly defined\n\
+             - Be HONEST with clarity scores. When in doubt, score LOWER.",
             user_input
         );
 
         let raw = self.llm_complete(system_prompt, &user_message).await?;
         let parsed: InterviewResponse = Self::parse_json(&raw).unwrap_or_else(|e| {
-            tracing::warn!(error = %e, "Failed to parse interview LLM response, using defaults");
+            tracing::warn!(error = %e, "Failed to parse interview LLM response, using degraded fallback");
+            // Use context-aware fallback instead of generic defaults
+            let degraded = crate::degraded::degraded_interview(user_input);
             InterviewResponse {
-                is_task: true,
-                chat_response: String::new(),
-                questions: vec!["Could you describe the goal in more detail?".into()],
+                is_task: degraded.is_task,
+                complexity: default_complexity(),
+                chat_response: degraded.chat_response,
+                questions: if !degraded.questions.is_empty() {
+                    degraded.questions
+                } else {
+                    vec!["Could you describe the goal in more detail?".into()]
+                },
                 scores: Some(AmbiguityScores {
-                    goal_clarity: 0.3,
-                    constraint_clarity: 0.2,
+                    goal_clarity: 0.4,
+                    constraint_clarity: 0.3,
                     success_criteria: 0.2,
                 }),
             }
@@ -263,6 +281,7 @@ impl OuroborosProtocol for OuroborosEngine {
                 parsed.chat_response
             };
             result.ready_for_seed = false;
+            result.complexity = "n/a".to_string(); // chat, not a task
 
             tracing::info!(is_task = false, "Interview phase complete (chat)");
 
@@ -286,6 +305,7 @@ impl OuroborosProtocol for OuroborosEngine {
 
         let mut result = InterviewResult::new();
         result.original_message = user_input.to_string();
+        result.complexity = parsed.complexity.clone();
         for q in &parsed.questions {
             result.add_exchange(q, "");
         }
@@ -294,6 +314,7 @@ impl OuroborosProtocol for OuroborosEngine {
         tracing::info!(
             ambiguity = ambiguity_value,
             ready = result.ready_for_seed,
+            complexity = %parsed.complexity,
             questions = parsed.questions.len(),
             "Interview phase complete (task)"
         );
@@ -344,10 +365,16 @@ impl OuroborosProtocol for OuroborosEngine {
 
         let raw = self.llm_complete(system_prompt, &user_message).await?;
         let parsed: SeedResponse = Self::parse_json(&raw).unwrap_or_else(|e| {
-            tracing::warn!(error = %e, "Failed to parse seed LLM response, using defaults");
+            tracing::warn!(error = %e, "Failed to parse seed LLM response, using degraded fallback");
+            // Preserve user intent instead of generic "Task from user input"
+            let goal = if !interview.original_message.is_empty() {
+                interview.original_message.clone()
+            } else {
+                "Task from user input".to_string()
+            };
             SeedResponse {
-                goal: "Task from user input".into(),
-                constraints: vec![],
+                goal,
+                constraints: vec!["Requires human clarification: Seed generation failed, spec may be incomplete".into()],
                 acceptance_criteria: vec!["Task completes without errors".into()],
                 ontology: vec![],
             }
@@ -363,6 +390,7 @@ impl OuroborosProtocol for OuroborosEngine {
             generation: 0,
             parent_seed_id: None,
             cspace_hint: None,
+            original_request: interview.original_message.clone(),
         };
 
         tracing::info!(seed_id = %seed.id, goal = %seed.goal, "Seed generated");
@@ -448,31 +476,30 @@ impl OuroborosProtocol for OuroborosEngine {
             mechanical.all_passed,
         );
 
-        let parsed = match self
+        let result = match self
             .llm_json::<EvaluationResponse>(system_prompt, &user_message)
             .await
         {
-            Ok(p) => p,
+            Ok(parsed) => {
+                let r = EvaluationResult {
+                    mechanical_pass: parsed.mechanical_pass,
+                    semantic_pass: Some(parsed.semantic_pass),
+                    consensus_pass: None,
+                    score: parsed.score,
+                    notes: parsed.notes,
+                };
+                self.eval_cache.put(seed, execution, r.clone());
+                r
+            }
             Err(e) => {
-                tracing::warn!(error = %e, "Evaluation JSON parse failed after retry, using mechanical-only");
-                EvaluationResponse {
-                    mechanical_pass: mechanical.all_passed,
-                    semantic_pass: mechanical.all_passed,
-                    score: if mechanical.all_passed { 0.7 } else { 0.3 },
-                    notes: vec![format!("Evaluation parsing failed: {}", e)],
-                }
+                tracing::warn!(error = %e, "Evaluation JSON parse failed after retry, using degraded fallback");
+                crate::degraded::degraded_evaluation(
+                    seed,
+                    &execution.output,
+                    mechanical.all_passed,
+                )
             }
         };
-
-        let result = EvaluationResult {
-            mechanical_pass: parsed.mechanical_pass,
-            semantic_pass: Some(parsed.semantic_pass),
-            consensus_pass: None,
-            score: parsed.score,
-            notes: parsed.notes,
-        };
-
-        self.eval_cache.put(seed, execution, result.clone());
 
         tracing::info!(
             seed_id = %seed.id,
@@ -547,6 +574,7 @@ impl OuroborosProtocol for OuroborosEngine {
             generation: evolved.generation,
             parent_seed_id: evolved.parent_seed_id,
             cspace_hint: evolved.cspace_hint,
+            original_request: seed.original_request.clone(),
         };
 
         tracing::info!(
@@ -564,65 +592,128 @@ impl OuroborosProtocol for OuroborosEngine {
 // ---------------------------------------------------------------------------
 
 const INTERVIEW_SYSTEM_PROMPT: &str = "\
-You are a Socratic interviewer for an AI agent operating system. \
-Your job is to analyze the user's request and determine how ambiguous it is.
+You are the Interview phase of the Ouroboros protocol. \
+Your job: determine whether the user's message is a task or conversation, \
+and if it's a task, assess ambiguity along three dimensions.
 
-You must assess three dimensions:
-1. **Goal clarity** — Is it clear what the user wants to achieve?
-2. **Constraint clarity** — Are the boundaries and limitations well-defined?
-3. **Success criteria clarity** — Is it clear how to know when the task is done?
+## Critical Boundaries
+- NEVER propose solutions. You ask, you do not implement.
+- NEVER say \"I will...\" or \"Let me...\" — you are an interviewer, not an executor.
+- NEVER skip scoring. Every task gets ambiguity scores.
 
-Ask probing questions that help clarify the user's intent. \
-Focus on what the user is assuming but not stating explicitly. \
-Be concise — each question should target a specific ambiguity.
+## Scoring Policy
+Be HONEST, not generous:
+- Score GOAL_CLARITY below 0.5 if the user's intent is genuinely ambiguous
+- Score CONSTRAINT_CLARITY below 0.5 if no specifics are mentioned
+- Score SUCCESS_CRITERIA below 0.5 if \"done\" is undefined
+- Reserve 0.9+ for requests that are immediately executable as-is
+- When in doubt, score LOWER — it is cheaper to ask than to guess wrong
+
+## Conversation Detection
+- Greetings, thanks, opinions, questions about capabilities → is_task: false
+- Any verb implying action (create, fix, find, deploy, analyze, review) → is_task: true
+- When uncertain, default to is_task: true
+
+## Question Quality
+Bad: \"Could you tell me more about your requirements?\"
+Good: \"You said 'optimize the API' — optimize for latency, throughput, or cost?\"
+
+Questions must target a SPECIFIC ambiguity, not invite a general brain dump.
+Maximum 3 questions. Each must be answerable in one sentence.
 
 Always respond with valid JSON in the exact format requested. \
 Do not include any text outside the JSON object.";
 
 const SEED_SYSTEM_PROMPT: &str = "\
-You are a Seed Architect for an AI agent operating system. \
-Your job is to crystallize interview answers into an immutable specification called a Seed.
+You are the Seed Architect of the Ouroboros protocol. \
+Your job: crystallize interview results into an immutable specification.
 
-A Seed must be:
-- **Complete** — Contains everything the agent needs to execute
-- **Specific** — No room for misinterpretation
-- **Measurable** — Acceptance criteria can be objectively verified
+## Core Principle
+A Seed is a CONTRACT — it will be executed by an autonomous agent without \
+further human input. If the Seed is ambiguous, the execution WILL go wrong.
 
-The Seed you produce will be executed by an autonomous agent with tools \
-for reading, writing, editing files, and running shell commands.
+## Mandatory Properties
+- COMPLETE: Contains EVERYTHING the agent needs. No assumed context.
+- SPECIFIC: Exact filenames, paths, languages, frameworks — never \"a file\" \
+  or \"the system\".
+- MEASURABLE: Each acceptance criterion can be verified by running a command \
+  or checking file content. No subjective criteria like \"clean code\".
+
+## Scope Guard
+Do NOT expand beyond the user's request:
+- If they asked for a single function, do not spec a module
+- If they specified a language, do not suggest alternatives
+- If they named a file, use THAT filename, not a \"better\" one
+
+If the interview was insufficient to produce a complete Seed, include the \
+constraint: \"Requires human clarification: [what's missing]\"
 
 Always respond with valid JSON in the exact format requested. \
 Do not include any text outside the JSON object.";
 
 const EVALUATE_SYSTEM_PROMPT: &str = "\
-You are an Evaluator for an AI agent operating system. \
-Your job is to verify whether an agent's execution output satisfies the specification.\n\
-Evaluate in two stages:\n\
-1. **Mechanical** — Does the output mention or demonstrate each acceptance criterion?\n\
-2. **Semantic** — Does the output actually solve the user's intent?\n\
-\n\
-SCORING GUIDELINES:\n\
-- If the agent reports creating a file and shows its content matching the requirement, that is EVIDENCE of success.\n\
-- If the agent ran commands and reported their output, trust the reported output unless contradictory.\n\
-- Score 0.8+ if the task was clearly accomplished even if minor details differ.\n\
-- Score 0.5-0.7 if partially accomplished with some issues.\n\
-- Score below 0.5 only if the task clearly failed or produced nothing useful.\n\
-- Be GENEROUS — if the output plausibly shows the task was done, mark it as passed.\n\n\
+You are the Evaluator of the Ouroboros protocol. \
+Your job: determine whether execution output satisfies the Seed specification.
+
+## Two-Stage Evaluation
+
+Stage 1 — Mechanical: Does the output explicitly address each acceptance criterion?
+- If the agent claims to have created a file, look for the file content or path
+- If the agent claims to have run a command, look for command output
+- Absence of evidence = evidence of absence
+
+Stage 2 — Semantic: Does the output actually solve the user's intent?
+- The agent may check every box but still miss the point
+- Look for the gap between \"technically correct\" and \"genuinely useful\"
+
+## Scoring Policy
+- 0.9–1.0: All criteria met, output is complete and correct
+- 0.7–0.8: Core goal achieved, minor issues or missing optional elements
+- 0.5–0.6: Partially done, significant gaps
+- Below 0.5: Fundamentally failed or produced nothing useful
+
+## Anti-Patterns (score penalty)
+- Agent claims completion without showing evidence → cap at 0.5
+- Agent solved a different problem than specified → cap at 0.4
+- Agent made changes not in the Seed scope → flag as scope violation
+- Agent output is generic/boilerplate that could apply to anything → cap at 0.3
+
+## Evidence Requirement
+Do NOT give credit for claims. Give credit for DEMONSTRATED results:
+- \"I created the file\" → Show me the file content
+- \"Tests pass\" → Show me the test output
+- \"The bug is fixed\" → Show me before/after behavior
+
 Always respond with valid JSON in the exact format requested. \
 Do not include any text outside the JSON object.";
 
 const EVOLVE_SYSTEM_PROMPT: &str = "\
-You are a Seed Evolver for an AI agent operating system. \
-Your job is to improve a Seed specification based on evaluation feedback.
+You are the Evolve phase of the Ouroboros protocol. \
+Your job: improve a Seed based on evaluation failure analysis.
 
-When evolving:
-- Keep what worked, change what didn't
-- Add new constraints to prevent known failure modes
-- Tighten acceptance criteria if they were too loose
-- Broaden acceptance criteria if they were too strict
-- Preserve the original intent
+## Before You Evolve
+1. Read the evaluation notes carefully — WHAT failed and WHY
+2. Distinguish between:
+   - SPEC issues (Seed was ambiguous or incomplete) → Fix the Seed
+   - EXECUTION issues (Agent misunderstood or went off-track) → Add constraints/guards
+   - IMPOSSIBLE issues (Goal is infeasible as stated) → Flag for human review
 
-The evolved Seed will be re-executed by an autonomous agent.
+## Evolution Rules
+- Preserve what WORKED — do not change passing acceptance criteria
+- Add constraints that prevent known failure modes
+- Tighten criteria that were too vague
+- If the goal itself was wrong, flag it rather than silently changing it
+
+## Scope Guard
+Evolution narrows scope, never expands it:
+- Do NOT add new features the user didn't request
+- Do NOT change the goal to something \"better\"
+- Do NOT add acceptance criteria for problems the user didn't mention
+
+## Stagnation Detection
+If this is generation 3+ and the same issues persist:
+- The Seed may be fundamentally flawed — suggest restarting the interview
+- Consider whether the task needs to be decomposed into smaller Seeds
 
 Always respond with valid JSON in the exact format requested. \
 Do not include any text outside the JSON object.";

@@ -446,6 +446,7 @@ mod tests {
             generation: 0,
             parent_seed_id: None,
             cspace_hint: None,
+            original_request: String::new(),
         }
     }
 

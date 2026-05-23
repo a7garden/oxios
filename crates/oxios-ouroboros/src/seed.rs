@@ -46,6 +46,15 @@ pub struct Seed {
     /// default "worker" template.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cspace_hint: Option<String>,
+
+    /// The user's original message, preserved verbatim.
+    ///
+    /// For complex tasks this differs from `goal` (which is the LLM's
+    /// crystallized version). For simple tasks, goal == original_request.
+    /// The agent runtime injects this into the system prompt so the agent
+    /// sees the user's exact wording, including language-specific nuance.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub original_request: String,
 }
 
 impl Seed {
@@ -63,10 +72,47 @@ impl Seed {
     /// assert_eq!(seed.generation, 0);
     /// assert!(seed.parent_seed_id.is_none());
     /// ```
+    /// Creates a new seed with the given goal and auto-generated ID.
+    ///
+    /// Generation is set to 0 and parent_seed_id is None.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use oxios_ouroboros::Seed;
+    ///
+    /// let seed = Seed::new("Build a web server");
+    /// assert!(!seed.goal.is_empty());
+    /// assert_eq!(seed.generation, 0);
+    /// assert!(seed.parent_seed_id.is_none());
+    /// ```
     pub fn new(goal: impl Into<String>) -> Self {
+        let goal = goal.into();
         Self {
             id: uuid::Uuid::new_v4(),
-            goal: goal.into(),
+            goal: goal.clone(),
+            original_request: goal,
+            constraints: Vec::new(),
+            acceptance_criteria: Vec::new(),
+            ontology: Vec::new(),
+            created_at: Utc::now(),
+            generation: 0,
+            parent_seed_id: None,
+            cspace_hint: None,
+        }
+    }
+
+    /// Creates a lightweight seed directly from a user message.
+    ///
+    /// Used for simple, unambiguous tasks where the user's exact wording
+    /// is sufficient as-is — no Seed-generation LLM call needed.
+    /// The message becomes both `goal` and `original_request` verbatim.
+    pub fn from_message(message: impl Into<String>) -> Self {
+        let msg = message.into();
+        Self {
+            id: uuid::Uuid::new_v4(),
+            goal: msg.clone(),
+            original_request: msg,
             constraints: Vec::new(),
             acceptance_criteria: Vec::new(),
             ontology: Vec::new(),
@@ -85,6 +131,7 @@ impl Seed {
         Self {
             id: uuid::Uuid::new_v4(),
             goal: parent.goal.clone(),
+            original_request: parent.original_request.clone(),
             constraints: parent.constraints.clone(),
             acceptance_criteria: parent.acceptance_criteria.clone(),
             ontology: parent.ontology.clone(),

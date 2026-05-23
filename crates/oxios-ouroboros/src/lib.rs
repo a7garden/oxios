@@ -18,6 +18,9 @@ pub mod interview;
 pub mod ouroboros_engine;
 pub mod protocol;
 pub mod seed;
+pub mod degraded;
+pub mod lateral;
+// pub mod regression; // Removed: evolve-only feature
 
 pub use evaluation::EvaluationResult;
 pub use interview::InterviewResult;

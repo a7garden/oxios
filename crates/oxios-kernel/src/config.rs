@@ -487,43 +487,12 @@ impl Default for SchedulerConfig {
 }
 
 /// Orchestrator configuration (Ouroboros protocol execution).
-///
-/// Controls how the orchestrator runs the Ouroboros protocol:
-/// - Evolution iterations: How many times to retry failed tasks
-/// - Evaluation thresholds: Score cutoffs for pass/fail
-///
-/// # Example
-///
-/// ```toml
-/// [orchestrator]
-/// max_evolution_iterations = 3
-/// min_evaluation_score = 0.8
-/// ```
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct OrchestratorConfig {
-    /// Maximum Ouroboros evolution iterations before giving up.
-    #[serde(default = "default_max_evolution_iterations")]
-    pub max_evolution_iterations: usize,
-    /// Minimum evaluation score for task to be considered passed.
-    /// Below this, evolution will retry if iterations remain.
-    #[serde(default = "default_min_evaluation_score")]
-    pub min_evaluation_score: f64,
-}
-
-fn default_max_evolution_iterations() -> usize {
-    3
-}
-
-fn default_min_evaluation_score() -> f64 {
-    0.8
-}
+pub struct OrchestratorConfig {}
 
 impl Default for OrchestratorConfig {
     fn default() -> Self {
-        Self {
-            max_evolution_iterations: default_max_evolution_iterations(),
-            min_evaluation_score: default_min_evaluation_score(),
-        }
+        Self {}
     }
 }
 
