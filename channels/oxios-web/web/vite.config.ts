@@ -28,8 +28,8 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      '/api': 'http://localhost:3000',
-      '/health': 'http://localhost:3000',
+      '/api': 'http://localhost:4200',
+      '/health': 'http://localhost:4200',
     },
   },
 })
