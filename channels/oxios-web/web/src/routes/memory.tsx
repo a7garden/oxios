@@ -33,7 +33,7 @@ function MemoryPage() {
       if (search.trim()) {
         // Use search endpoint when query is provided
         const res = await api.post<{
-          entries: {
+          entries?: {
             id: string
             type: string
             content: string
@@ -43,15 +43,17 @@ function MemoryPage() {
           }[]
           count: number
         }>('/api/memory/search', { query: search })
-        return (res.entries ?? []).map((e) => ({
+        const entries = Array.isArray(res?.entries) ? res.entries : []
+        return entries.map((e) => ({
           name: e.id ?? e.type,
           snippet: e.content?.slice(0, 200) ?? '',
           category: e.type,
         }))
       }
       // Default: list all memory entries
-      const res = await api.get<{ items: { name: string; category: string }[] }>('/api/memory')
-      return (res.items ?? []).map((m) => ({ name: m.name, category: m.category }))
+      const res = await api.get<{ items?: { name: string; category: string }[] }>('/api/memory')
+      const items = Array.isArray(res?.items) ? res.items : []
+      return items.map((m) => ({ name: m.name, category: m.category }))
     },
     refetchInterval: 15000,
   })

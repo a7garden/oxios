@@ -3,14 +3,37 @@
 //
 // IMPORTANT: Vite 8 uses Rolldown which can't resolve hypermd/* deep imports
 // during production build. We use a single bundled entry point instead.
+//
+// Vite 8 (Rolldown) may fail to create a proper default export from
+// codemirror's CJS `module.exports = factory()`. We import both ways
+// and fall back to `window.CodeMirror` set by codemirror's own IIFE.
 
 import 'codemirror/lib/codemirror.css'
-import CodeMirror from 'codemirror'
+import CodeMirrorDefault from 'codemirror'
+import * as CodeMirrorNS from 'codemirror'
 
-// Ensure CodeMirror is available globally — Vite 8 (Rolldown) tree-shakes
-// the side-effect assignment inside codemirror's main entry.
+// Resolve the actual CodeMirror constructor from whichever import strategy worked
+const _resolveCodeMirror = (): any => {
+  if (typeof window !== 'undefined' && (window as any).CodeMirror) {
+    return (window as any).CodeMirror
+  }
+  if (CodeMirrorDefault && typeof CodeMirrorDefault.fromTextArea === 'function') {
+    return CodeMirrorDefault
+  }
+  if ((CodeMirrorNS as any).default && typeof (CodeMirrorNS as any).default.fromTextArea === 'function') {
+    return (CodeMirrorNS as any).default
+  }
+  // Namespace itself might be the constructor
+  if (typeof (CodeMirrorNS as any).fromTextArea === 'function') {
+    return CodeMirrorNS
+  }
+  return undefined
+}
+
+const CodeMirror = _resolveCodeMirror()
+
 if (typeof window !== 'undefined') {
-  ;(window as any).CodeMirror = (window as any).CodeMirror ?? CodeMirror
+  ;(window as any).CodeMirror = CodeMirror
 }
 
 // Import HyperMD as a single bundle (includes fold, click, read-link, etc.)

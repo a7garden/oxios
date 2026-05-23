@@ -70,6 +70,10 @@ export function MarkdownEditor({
     // CodeMirror is registered globally by hypermd-setup side-effect import
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const CM = (window as any).CodeMirror as typeof CodeMirror
+    if (!CM) {
+      console.error('[Knowledge] CodeMirror not available — hypermd-setup may have failed to load')
+      return
+    }
     const cm = CM.fromTextArea(textarea, {
       mode: { name: 'hypermd', math: false },
       lineNumbers: false,

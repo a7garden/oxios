@@ -182,13 +182,23 @@ pub(crate) async fn handle_chat_stream(
 pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState>) {
     let (mut ws_tx, mut ws_rx) = socket.split();
 
-    // Subscribe to outgoing messages
-    let mut outgoing_rx = state.kernel.infra.subscribe();
+    // Subscribe to outgoing messages from the web channel (not kernel event bus).
+    // WebChannel::send() broadcasts OutgoingMessage here; the kernel event bus
+    // carries KernelEvents which are a different type entirely.
+    let mut outgoing_rx = state.channel.subscribe();
 
     // Forward outgoing messages to the WebSocket
+    // Convert OutgoingMessage → StreamChunk format expected by frontend:
+    //   { type: "token", content: "..." }   (partial or full response)
+    //   { type: "done" }                    (response complete)
     let recv_task = tokio::spawn(async move {
         while let Ok(msg) = outgoing_rx.recv().await {
-            let json = match serde_json::to_string(&msg) {
+            // Send the response content as a "token" chunk
+            let token_chunk = serde_json::json!({
+                "type": "token",
+                "content": msg.content,
+            });
+            let json = match serde_json::to_string(&token_chunk) {
                 Ok(j) => j,
                 Err(e) => {
                     tracing::error!(error = %e, "Failed to serialize outgoing message");
@@ -196,6 +206,16 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
                 }
             };
             if ws_tx.send(Message::Text(json.into())).await.is_err() {
+                break;
+            }
+
+            // Send "done" to signal completion
+            let done_chunk = serde_json::json!({ "type": "done" });
+            let done_json = match serde_json::to_string(&done_chunk) {
+                Ok(j) => j,
+                Err(_) => break,
+            };
+            if ws_tx.send(Message::Text(done_json.into())).await.is_err() {
                 break;
             }
         }
@@ -207,10 +227,18 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
         while let Some(Ok(msg)) = FuturesStreamExt::next(&mut ws_rx).await {
             match msg {
                 Message::Text(text) => {
+                    // Frontend sends JSON: { type: "message", content: "..." }
+                    // Extract the actual content string.
+                    let content = serde_json::from_str::<serde_json::Value>(&text)
+                        .ok()
+                        .and_then(|v| v.get("content").cloned())
+                        .and_then(|v| v.as_str().map(|s| s.to_string()))
+                        .unwrap_or_else(|| text.to_string());
+
                     let incoming = oxios_gateway::message::IncomingMessage::new(
                         "web",
                         "session", // TODO: derive from token when user system exists
-                        text.to_string(),
+                        content,
                     );
                     if send_tx.send(incoming).await.is_err() {
                         break;
