@@ -5,7 +5,13 @@
 // during production build. We use a single bundled entry point instead.
 
 import 'codemirror/lib/codemirror.css'
-import 'codemirror'
+import CodeMirror from 'codemirror'
+
+// Ensure CodeMirror is available globally — Vite 8 (Rolldown) tree-shakes
+// the side-effect assignment inside codemirror's main entry.
+if (typeof window !== 'undefined') {
+  ;(window as any).CodeMirror = (window as any).CodeMirror ?? CodeMirror
+}
 
 // Import HyperMD as a single bundle (includes fold, click, read-link, etc.)
 import 'hypermd/everything'

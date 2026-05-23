@@ -36,7 +36,7 @@ use oxios_gateway::plugin::{ChannelContext, ChannelPlugin};
     name = "oxios",
     version,
     about = "Oxios Agent OS — Agent Operating System",
-    after_help = "Examples:\n  oxios start                  Start the daemon\n  oxios onboard                Run the setup wizard\n  oxios run \"review this code\"  Execute a single prompt\n  oxios chat                   Start interactive chat\n  oxios status                 Show system status\n  oxios doctor                 Diagnose issues\n  oxios help                   Show all commands"
+    after_help = "Examples:\n  oxios start                  Start the daemon\n  oxios web                    Open web dashboard in browser\n  oxios run \"review this code\"  Execute a single prompt\n  oxios chat                   Start interactive chat\n  oxios status                 Show system status\n  oxios doctor                 Diagnose issues\n  oxios help                   Show all commands"
 )]
 struct Cli {
     /// Run in foreground (do not daemonize).
@@ -173,6 +173,13 @@ enum Command {
 
     /// Show program skill file and usage.
     Program { name: String },
+
+    /// Open the web dashboard in your browser.
+    Web {
+        /// Port override (default: from config).
+        #[arg(short, long)]
+        port: Option<u16>,
+    },
 
     /// Generate shell completion script.
     Completion { shell: Shell },
@@ -885,6 +892,57 @@ fn cmd_models(provider: Option<&str>) -> Result<()> {
     Ok(())
 }
 
+// ─── Web command ────────────────────────────────────────────────────────────
+
+fn cmd_web(config: &OxiosConfig, port_override: Option<u16>) -> Result<()> {
+    let port = port_override.unwrap_or(config.gateway.port);
+
+    // Ensure daemon is running
+    let daemon = DaemonManager::new(&config.daemon.pid_file, &config.daemon.log_dir);
+    let was_running = matches!(
+        daemon.status(),
+        oxios_kernel::DaemonStatus::Running { .. }
+    );
+
+    if !was_running {
+        println!(
+            "  {} Daemon not running — starting...",
+            style("⠋").cyan()
+        );
+        let config_path = oxios_kernel::config::expand_home(
+            &format!("{}/.oxios/config.toml", std::env::var("HOME").unwrap_or_default())
+        );
+        daemon.start(&config_path)?;
+
+        // Give the server a moment to bind the port
+        let url = format!("http://127.0.0.1:{}", port);
+        let mut attempts = 0;
+        loop {
+            std::thread::sleep(std::time::Duration::from_millis(300));
+            if TcpStream::connect(&format!("127.0.0.1:{}", port)).is_ok() {
+                break;
+            }
+            attempts += 1;
+            if attempts >= 20 {
+                println!(
+                    "  {} Server didn't start in time. Open manually: {}",
+                    style("⚠").yellow(),
+                    style(&url).cyan()
+                );
+                return Ok(());
+            }
+        }
+    }
+
+    let url = format!("http://127.0.0.1:{}", port);
+    println!("  {} Opening {}", style("↗").green(), style(&url).cyan());
+
+    webbrowser::open(&url)
+        .map_err(|e| anyhow::anyhow!("failed to open browser: {}", e))?;
+
+    Ok(())
+}
+
 // ─── Entry point ─────────────────────────────────────────────────────────────
 
 #[tokio::main]
@@ -1004,6 +1062,9 @@ async fn run() -> Result<()> {
         }
         Some(Command::Models { provider }) => {
             return cmd_models(provider.as_deref());
+        }
+        Some(Command::Web { port }) => {
+            return cmd_web(&config, *port);
         }
         Some(Command::Completion { shell }) => {
             let mut cmd = Cli::command();
@@ -1363,6 +1424,7 @@ async fn run() -> Result<()> {
         | Some(Command::Onboard)
         | Some(Command::Reset { .. })
         | Some(Command::Models { .. })
+        | Some(Command::Web { .. })
         | Some(Command::Completion { .. }) => unreachable!(),
     }
 }

@@ -1,20 +1,16 @@
-# Progress
+# Analysis Progress
 
-## Status
-In Progress
+## Task: Analyze oxios-kernel crate module structure and dependencies
 
-## Tasks
-- [x] Rewrite MarkdownEditor with HyperMD for oxios-web Knowledge UI
-- [x] Update editor-toolbar with split/info/save buttons + ⌘S shortcut
+- [x] Read `lib.rs` — all 38 public modules identified, sectioned into 8 groups
+- [x] Read `Cargo.toml` — 28 required deps, 3 features (otel, wasm-sandbox, browser)
+- [x] Read all 17 target root-level `.rs` files
+- [x] Extract exported types (pub struct/enum/trait/type) per file
+- [x] Extract internal dependencies (`use crate::...`) per file
+- [x] Extract external crate dependencies per file
+- [x] Identify internal state patterns (Arc, Mutex, RwLock, atomics)
+- [x] Build dependency matrix
+- [x] Classify leaf vs hub modules
+- [x] Write report to `/Volumes/MERCURY/PROJECTS/oxios/analysis/root-modules.md`
 
-## Files Changed
-- `channels/oxios-web/web/src/components/knowledge/markdown-editor.tsx` — Replaced plain textarea with HyperMD/CodeMirror 5 editor; added `knowledge:save` custom event listener for manual save
-- `channels/oxios-web/web/src/components/knowledge/editor-toolbar.tsx` — Added Save (⌘S), Split view (Columns2), Close split (X), and Info panel toggle (PanelRight) buttons with Tooltip wrappers
-
-## Notes
-- Replaced the previous `<textarea>`-based editor with a full HyperMD CodeMirror 5 instance
-- Key changes: uses `@/lib/hypermd-setup` side-effect import for CM5 module registration, `window.CodeMirror.fromTextArea()` for editor creation, custom `hmdResolveURL`/`hmdReadLink` for wiki-link navigation, `[`-triggered autocomplete via `createLinkHintFn`, auto-save with 1s debounce, first-line `# ` enforcement, formatting shortcuts (Cmd/Ctrl+B/I/Y)
-- Toolbar now has: back/forward nav, file name, Save button (⌘S shortcut), Split view toggle (Columns2/X), Info panel toggle (PanelRight)
-- Save dispatches a `knowledge:save` custom DOM event; MarkdownEditor listens for it and flushes content immediately
-- Verified `Tooltip` component API: `content` prop + `children` wrapper (no Provider/Root needed)
-- No new tsc errors introduced; pre-existing codemirror type errors unchanged
+**Status: COMPLETE**
