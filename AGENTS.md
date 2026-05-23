@@ -7,7 +7,7 @@
 
 Oxios is an **Agent Operating System** in Rust. It's an OS where AI agents execute real work on behalf of users — fork, exec, wait, kill, just like Unix processes.
 
-**Stack:** Rust 2021, tokio async, serde (JSON+TOML), oxi-sdk + oxi-ai (crates.io). ~61K lines across 190 source files.
+**Stack:** Rust 2021, tokio async, serde (JSON+TOML), oxi-sdk + oxi-ai (crates.io). ~63K lines across 193 source files.
 
 ```
 User → Channel (Web/CLI/Telegram) → Gateway → Kernel (supervisor + scheduler + ouroboros + agent_runtime)
@@ -19,7 +19,8 @@ oxios/                     # Main binary (src/main.rs, src/kernel.rs, src/cmd_ru
 │   ├── oxios-kernel/      # Core: supervisor, scheduler, event bus, state store, tools, memory
 │   ├── oxios-markdown/    # Markdown knowledge base: VirtualFs, BacklinkIndex, link graph
 │   ├── oxios-ouroboros/   # Spec-first protocol (interview → seed → execute → evaluate → evolve)
-│   └── oxios-gateway/     # Channel-agnostic message hub
+│   ├── oxios-gateway/     # Channel-agnostic message hub
+│   └── oxios-mcp/         # MCP client library (JSON-RPC 2.0 over stdio)
 ├── benchmarks/
 │   └── oxios-bench/       # Performance benchmarking suite
 ├── channels/
@@ -37,6 +38,7 @@ oxios → oxios-kernel → oxi-sdk (crates.io, NOT path dep)
                     → oxi-ai (provider construction)
                     → oxios-ouroboros
                     → oxios-markdown (knowledge base)
+                    → oxios-mcp (MCP client)
       → oxios-gateway
       → oxios-web/oxios-cli/oxios-telegram (channel plugins, feature-gated)
 ```
@@ -47,7 +49,7 @@ oxios → oxios-kernel → oxi-sdk (crates.io, NOT path dep)
 | Fact | Value |
 |------|-------|
 | **Language** | Rust 2021 |
-| **Version** | 0.1.3 |
+| **Version** | 0.2.0 |
 | **License** | MIT |
 | **CI** | GitHub Actions (macOS + Linux, fmt+clippy+test+audit) |
 | **Build** | `cargo build` |
@@ -149,7 +151,7 @@ oxios run --json --session "$SID" "follow-up"
 - **AccessManager** (`access_manager/`) — OWASP-inspired least-privilege. RBAC, path sandboxing, audit logging.
 - **AuditTrail** (`audit_trail.rs`) — Merkle-chain style tamper-evident audit log. Each entry cryptographically linked.
 - **Memory** (`memory/`) — Vector store with hyperbolic embeddings, HNSW indexing, flash attention, reasoning bank, Sona learning engine, RVF store.
-- **MCP** (`mcp/`) — Model Context Protocol client, protocol handler, and server integration. Wrapped by `McpApi` in kernel_handle.
+- **MCP** (`mcp/`) — Model Context Protocol client. Web uses `oxios-mcp` (crates.io); kernel uses `crates/oxios-mcp` via `mcp/mod.rs` integration layer.
 - **Auth** (`auth.rs`) — Authentication manager. Used by KernelHandle for identity verification.
 - **Workers** (`workers/`) — Background worker pool for async task processing.
 - **WasmSandbox** (`wasm_sandbox.rs`) — WASM-based sandbox for executing untrusted code.
@@ -198,7 +200,12 @@ impl AgentTool for MyTool {
 | `docs/channel-plugin-guide.md` | Before adding a new channel (Web, Telegram, etc.) |
 | `docs/channel-registry.md` | Before registering a new channel |
 | `docs/rfc-003-knowledge-separation.md` | Before modifying knowledge/memory architecture |
-| `docs/rfc-002-kernel-module-organization.md` | Before reorganizing kernel modules |
+| `docs/rfc-004-knowledge-system.md` | Before modifying knowledge system |
+| `docs/rfc-005-knowledge-integration.md` | Before integrating knowledge with AI engine |
+| `docs/rfc-006-js-space-integration.md` | Before modifying JS/Space integration |
+| `docs/rfc-007-remaining-port.md` | Before porting remaining features |
+| `docs/refactoring-design.md` | Before large-scale refactoring |
+| `docs/program-development.md` | Before creating or modifying programs |
 | `docs/refactoring-design.md` | Before large-scale refactoring |
 | `docs/program-development.md` | Before creating or modifying programs |
 | `docs/USER-GUIDE.md` | Before changing user-facing features or CLI behavior |
