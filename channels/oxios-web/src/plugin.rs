@@ -123,7 +123,7 @@ fn serve_file(dist: Option<&std::path::Path>, path: &str) -> Response {
         if let Some(data) = fs_read(d, &format!("assets/{}", clean)) {
             return Response::builder()
                 .status(200)
-                .header("Content-Type", mime_type(&clean))
+                .header("Content-Type", mime_type(clean))
                 .header("Cache-Control", "no-cache")
                 .body(Body::from(data))
                 .unwrap();
@@ -141,7 +141,7 @@ fn serve_file(dist: Option<&std::path::Path>, path: &str) -> Response {
             } else {
                 format!("assets/{}", clean)
             };
-            let mime = mime_guess::from_path(&lookup)
+            let mime = mime_guess::from_path(lookup.as_str())
                 .first_or_octet_stream()
                 .to_string();
             Response::builder()
