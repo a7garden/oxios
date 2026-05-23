@@ -127,7 +127,7 @@ pub(crate) fn sanitize_event(event: &oxios_kernel::event_bus::KernelEvent) -> se
     use oxios_kernel::event_bus::KernelEvent;
     let now = chrono::Utc::now().to_rfc3339();
     let id = uuid::Uuid::new_v4().to_string();
-    let mut base = serde_json::json!({
+    let base = serde_json::json!({
         "id": id,
         "timestamp": now,
     });

@@ -12,7 +12,6 @@ use anyhow::Result;
 use async_trait::async_trait;
 use axum::{
     body::Body,
-    extract::Path,
     response::{IntoResponse, Response},
     routing::get,
     Router,
@@ -52,9 +51,9 @@ fn web_dist_path(workspace: &std::path::Path) -> Option<std::path::PathBuf> {
         .map(|h| h.join(".oxios").join("web").join("dist"))
         .filter(|p| p.exists() && p.join("index.html").is_file());
 
-    if user_dist.is_some() {
+    if let Some(ref dist) = user_dist {
         tracing::info!(
-            path = ?user_dist.as_ref().unwrap(),
+            path = ?dist,
             "Serving web UI from user override (~/.oxios/web/dist/)"
         );
         return user_dist;

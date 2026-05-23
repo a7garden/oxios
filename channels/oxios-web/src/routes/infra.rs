@@ -442,7 +442,7 @@ pub(crate) async fn handle_mcp_tool_call(
 
 /// GET /api/security/permissions — List roles and policies.
 pub(crate) async fn handle_security_permissions(
-    state: State<Arc<AppState>>,
+    _state: State<Arc<AppState>>,
 ) -> Json<serde_json::Value> {
     use oxios_kernel::access_manager::Role;
     let roles: Vec<String> = [
