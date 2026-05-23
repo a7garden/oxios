@@ -38,6 +38,9 @@ pub fn degraded_interview(user_input: &str) -> InterviewResult {
 /// Produce a degraded seed when LLM generation fails.
 ///
 /// Uses the interview context to preserve as much user intent as possible.
+///
+/// TODO: Connect to `generate_seed()` fallback when full integration is done.
+#[allow(dead_code)]
 pub fn degraded_seed(interview: &InterviewResult) -> Seed {
     let goal = if !interview.original_message.is_empty() {
         interview.original_message.clone()

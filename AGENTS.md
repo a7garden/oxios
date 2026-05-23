@@ -7,7 +7,7 @@
 
 Oxios is an **Agent Operating System** in Rust. It's an OS where AI agents execute real work on behalf of users — fork, exec, wait, kill, just like Unix processes.
 
-**Stack:** Rust 2021, tokio async, serde (JSON+TOML), oxi-sdk + oxi-ai (crates.io). ~63K lines across 193 source files.
+**Stack:** Rust 2021, tokio async, serde (JSON+TOML), oxi-sdk + oxi-ai (crates.io). ~64.4K lines across 304 source files (193 Rust + 111 TypeScript/TSX).
 
 ```
 User → Channel (Web/CLI/Telegram) → Gateway → Kernel (supervisor + scheduler + ouroboros + agent_runtime)
@@ -34,13 +34,13 @@ oxios/                     # Main binary (src/main.rs, src/kernel.rs, src/cmd_ru
 
 **Dependency graph:**
 ```
-oxios → oxios-kernel → oxi-sdk (crates.io, NOT path dep)
-                    → oxi-ai (provider construction)
-                    → oxios-ouroboros
-                    → oxios-markdown (knowledge base)
-                    → oxios-mcp (MCP client)
-      → oxios-gateway
-      → oxios-web/oxios-cli/oxios-telegram (channel plugins, feature-gated)
+oxios → oxios-kernel → oxios-ouroboros
+      → oxios-markdown (knowledge base)
+      → oxios-mcp (MCP client)
+      → oxi-sdk (crates.io, NOT path dep)
+      → oxi-ai (provider construction)
+    → oxios-gateway
+    → oxios-web/oxios-cli/oxios-telegram (channel plugins, feature-gated)
 ```
 
 
@@ -48,11 +48,11 @@ oxios → oxios-kernel → oxi-sdk (crates.io, NOT path dep)
 
 | Fact | Value |
 |------|-------|
-| **Language** | Rust 2021 |
+| **Language** | Rust 2021 + TypeScript 5 (frontend) |
 | **Version** | 0.2.0 |
 | **License** | MIT |
-| **CI** | GitHub Actions (macOS + Linux, fmt+clippy+test+audit) |
-| **Build** | `cargo build` |
+| **CI** | GitHub Actions (macOS + Linux, fmt+clippy+test+audit+frontend) |
+| **Build** | `cargo build && cd channels/oxios-web/web && bun run build` |
 | **Test** | `cargo test --workspace` |
 
 ## Why
@@ -69,11 +69,26 @@ oxios → oxios-kernel → oxi-sdk (crates.io, NOT path dep)
 ## How
 
 ```bash
-cargo build                # Build everything
-cargo test --workspace     # Run all tests (must pass at every commit)
-cargo run                  # Run oxios daemon (background by default)
-cargo run -- --foreground  # Run in foreground (for debugging)
-cargo run -- run --json "prompt"   # Single-shot execution with JSON output
+# Frontend build (required for CI/web channel)
+cd channels/oxios-web/web && bun install && bun run build
+
+# Build everything (Rust only)
+cargo build
+
+# Run all tests (must pass at every commit)
+cargo test --workspace
+
+# Run oxios daemon (background by default)
+cargo run
+
+# Run in foreground (for debugging)
+cargo run -- --foreground
+
+# Single-shot execution with JSON output
+cargo run -- run --json "prompt"
+
+# Frontend dev server (requires backend on port 3000)
+cd channels/oxios-web/web && bun dev
 ```
 
 ## Daemon & CLI
@@ -147,7 +162,7 @@ oxios run --json --session "$SID" "follow-up"
 - **KernelBridge** (`tools/kernel_bridge.rs`) — Registers all kernel domain tools into an agent's `ToolRegistry` during agent build.
 - **ExecTool** (`tools/exec_tool.rs`) — Two modes: `shell` (bash -c, RBAC-enforced) and `structured` (binary allowlist + metacharacter blocking).
 - **Kernel tools** (`tools/kernel/`) — Space, Agent, Persona, Cron, Security, Budget, Resource, Knowledge tools. Each wraps a KernelHandle API domain.
-- **KernelHandle** (`kernel_handle/`) — Facade exposing 13 typed APIs: AgentApi, SpaceApi, SecurityApi, PersonaApi, ExecApi, BrowserApi, McpApi, ExtensionApi, InfraApi, A2aApi, StateApi, KnowledgeBase, KnowledgeLens. Internally uses `CredentialStore` (`credential.rs`) for multi-source key resolution.
+- **KernelHandle** (`kernel_handle/`) — Facade exposing 13 typed APIs: AgentApi, SpaceApi, SecurityApi, PersonaApi, ExecApi, BrowserApi, McpApi, ExtensionApi, InfraApi, A2aApi, StateApi, KnowledgeBase, KnowledgeLens. Internally uses `CredentialStore` (`credential.rs`) for multi-source key resolution. Each API lives in its own file (`*_api.rs`).
 - **AccessManager** (`access_manager/`) — OWASP-inspired least-privilege. RBAC, path sandboxing, audit logging.
 - **AuditTrail** (`audit_trail.rs`) — Merkle-chain style tamper-evident audit log. Each entry cryptographically linked.
 - **Memory** (`memory/`) — Vector store with hyperbolic embeddings, HNSW indexing, flash attention, reasoning bank, Sona learning engine, RVF store.
@@ -308,6 +323,7 @@ cargo run --bin oxios -- --foreground
 cd channels/oxios-web/web && bun dev
 
 # Open http://localhost:5173/knowledge/
+# Or directly http://localhost:3000/knowledge/ (proxied)
 ```
 
 ## Pitfalls

@@ -397,6 +397,9 @@ impl OuroborosProtocol for OuroborosEngine {
         Ok(seed)
     }
 
+    /// TODO: Not called by any caller. Orchestrator delegates execution directly
+    /// to AgentRuntime via Supervisor. Connect when Ouroboros full lifecycle is wired.
+    #[allow(dead_code)]
     async fn execute(&self, seed: &Seed) -> Result<ExecutionResult> {
         self.set_phase(Phase::Execute);
         // Execution is delegated to the kernel's AgentRuntime via the Supervisor.
@@ -412,6 +415,9 @@ impl OuroborosProtocol for OuroborosEngine {
         })
     }
 
+    /// TODO: Not called by any caller. Evaluation is done inline within the
+    /// orchestrator's simple flow. Connect when multi-stage evaluation is needed.
+    #[allow(dead_code)]
     async fn evaluate(&self, seed: &Seed, execution: &ExecutionResult) -> Result<EvaluationResult> {
         self.set_phase(Phase::Evaluate);
 
@@ -512,6 +518,10 @@ impl OuroborosProtocol for OuroborosEngine {
         Ok(result)
     }
 
+    /// TODO: Not called by any caller. The evolution loop (evaluate → evolve → re-execute)
+    /// is not yet wired in the orchestrator. Connect when Ouroboros full lifecycle is enabled.
+    /// When connected, also re-enable `lateral.rs` and `regression.rs` modules.
+    #[allow(dead_code)]
     async fn evolve(&self, seed: &Seed, evaluation: &EvaluationResult) -> Result<Option<Seed>> {
         self.set_phase(Phase::Evolve);
 

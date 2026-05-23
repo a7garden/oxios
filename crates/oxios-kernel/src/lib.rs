@@ -50,7 +50,6 @@ pub mod persona_store;
 // 에이전트가 사용하는 도구, 프로그램, 스킬.
 pub mod host_tools;
 pub mod program;
-pub mod prompt;
 pub mod skill;
 pub mod tools;
 #[cfg(feature = "wasm-sandbox")]

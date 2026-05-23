@@ -1,131 +1,102 @@
 ---
-name: refactor
-description: Guidelines and patterns for refactoring code safely and effectively
+name: oxios-refactor
+description: Safe refactoring with behavior preservation
+version: 1.0.0
+args:
+  target:
+    description: File or directory to refactor
+    required: true
+    type: string
+  goal:
+    description: Refactoring goal
+    required: true
+    type: string
+    options: [readability, performance, maintainability]
 ---
 
-# Refactoring Skill
+# Oxios Refactor — Skill Document
 
-## Overview
+You are a senior software architect specializing in safe, incremental refactoring that preserves behavior.
 
-Refactoring improves code structure without changing its behavior. Do it incrementally, with tests, and for a clear reason. Never refactor while also adding features — each should be a separate change.
+## Core Principle
+> "Make the change easy, then make the easy change." — Kent Beck
 
-## When to Refactor
+Never refactor blind. Always understand before touching.
 
-### Signs Code Needs Refactoring
-- The same logic is duplicated in multiple places
-- A function is doing too many things (low cohesion)
-- Classes/modules are too tightly coupled
-- Names are confusing or misleading
-- Dead code exists (unused functions, imports, etc.)
-- Tests are hard to write or maintain
+## Workflow
 
-### When NOT to Refactor
-- When there's no test coverage
-- In the middle of a critical deadline
-- If the "current" code is working well enough
-- Instead of understanding why it's written that way first
+### Phase 1: Understanding
+1. Read the target code thoroughly
+2. Identify the public API surface (what's used externally?)
+3. Trace all call sites to understand usage patterns
+4. Document the current behavior with examples
 
-## The Refactoring Process
+### Phase 2: Planning
+1. Define the refactoring goal clearly
+2. Break into minimal steps (smallest change that improves something)
+3. Identify risks: what could break? What's the rollback plan?
+4. Plan test strategy: which existing tests cover this code?
 
-### 1. Understand Before Changing
-- Read the existing code thoroughly
-- Talk to the original author if possible
-- Run existing tests to establish a baseline
-- Identify all callers and side effects
+### Phase 3: Safe Refactoring Steps
+Use this order (Martin Fowler's categories):
 
-### 2. Make a Plan
-- Break large refactors into small steps
-- Each step should be independently testable
-- Keep refactoring and behavior changes separate
+**Preparatory (make change easy)**
+- Rename variables to clarify intent
+- Extract helper functions
+- Simplify boolean expressions
 
-### 3. Do It Incrementally
-- Change one thing at a time
-- Run tests after each small change
-- Commit between steps
+**Composing (structure improvement)**
+- Extract functions
+- Inline functions
+- Move functions between contexts
+- Split functions
+- Replace temp with query
 
-### 4. Verify
-- All existing tests still pass
-- New tests cover the refactored code
-- Performance hasn't degraded
-- No new linting warnings
+**Encapsulating (data handling)**
+- Encapsulate field
+- Replace data value with object
+- Replace magic numbers with named constants
 
-## Common Refactoring Patterns
+### Phase 4: Verification
+1. Run all tests — must pass before and after
+2. If tests fail, revert and re-plan
+3. Check that the behavior is identical
+4. Verify performance hasn't regressed
 
-### Extract Method
-**Before:**
-```rust
-fn process_order(order: &Order) {
-    // 50 lines of validation, calculation, and saving
-}
+### Phase 5: Commit
+Write a descriptive commit message:
+```
+refactor(scope): descriptive change
+
+Before: [what was confusing/complex]
+After: [what changed and why]
+
+Tests: [which tests verify this]
 ```
 
-**After:**
-```rust
-fn process_order(order: &Order) -> Result<()> {
-    validate_order(order)?;
-    let total = calculate_total(order)?;
-    save_order(order, total)?;
-    send_confirmation(order)?;
-    Ok(())
-}
+## Output Format
+```markdown
+## Refactoring Plan
+**Target:** [file/component]
+**Goal:** [readability|performance|maintainability]
+**Steps:** [numbered list]
+
+## Risk Assessment
+- Risk 1: [description] — Mitigation: [approach]
+- Risk 2: [description] — Mitigation: [approach]
+
+## Changes Made
+| Step | Change | Reason |
+|------|--------|--------|
+
+## Verification
+- Tests: [passed/failed with count]
+- Behavior preserved: [yes/no with evidence]
+- Performance: [improved/degraded/no change]
 ```
 
-### Replace Conditional with Polymorphism
-**Before:**
-```rust
-fn calculate_area(shape: &Shape) -> f64 {
-    match shape {
-        Shape::Circle(r) => std::f64::consts::PI * r * r,
-        Shape::Rectangle(w, h) => w * h,
-        Shape::Triangle(b, h) => 0.5 * b * h,
-    }
-}
-```
-
-**After:**
-```rust
-trait Area {
-    fn area(&self) -> f64;
-}
-
-struct Circle { radius: f64 }
-impl Area for Circle {
-    fn area(&self) -> f64 { std::f64::consts::PI * self.radius * self.radius }
-}
-```
-
-### Introduce Parameter Object
-**Before:**
-```rust
-fn create_user(name: String, email: String, age: u32, city: String, country: String) {
-    // ...
-}
-```
-
-**After:**
-```rust
-struct UserProfile {
-    name: String,
-    email: String,
-    age: u32,
-    location: Location,
-}
-
-struct Location { city: String, country: String }
-```
-
-### Rename
-When renaming, update all references:
-- Variables and functions
-- Types and traits
-- Files (if the type name is the filename)
-- Tests (if relevant)
-
-## Safety Checklist
-
-- [ ] All existing tests pass
-- [ ] New behavior has test coverage
-- [ ] No temporary debugging code left behind
-- [ ] Commit message explains WHY, not just WHAT
-- [ ] No merge conflicts introduced
-- [ ] Documentation updated if public API changed
+## Constraints
+- One refactoring goal at a time
+- Maximum 10 files per refactoring session
+- Always run tests before committing
+- Document why, not just what

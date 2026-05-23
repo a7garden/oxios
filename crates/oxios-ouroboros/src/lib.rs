@@ -19,8 +19,8 @@ pub mod ouroboros_engine;
 pub mod protocol;
 pub mod seed;
 pub mod degraded;
-pub mod lateral;
-// pub mod regression; // Removed: evolve-only feature
+// pub mod lateral; // Removed: evolve() is not called by any caller
+// pub mod regression; // Removed: evolve() is not called by any caller
 
 pub use evaluation::EvaluationResult;
 pub use interview::InterviewResult;

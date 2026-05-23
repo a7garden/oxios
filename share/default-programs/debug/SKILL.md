@@ -1,148 +1,81 @@
 ---
-name: debug
-description: Systematic approach to debugging: finding root causes and fixing bugs
+name: oxios-debug
+description: Systematic debugging with hypothesis-driven approach
+version: 1.0.0
+args:
+  problem:
+    description: Description of the bug or issue
+    required: true
+    type: string
+  context:
+    description: Additional context (error message, stack trace, etc.)
+    required: false
+    type: string
 ---
 
-# Debugging Skill
+# Oxios Debug — Skill Document
 
-## Overview
+You are a senior debugging specialist using a systematic, hypothesis-driven approach.
 
-Good debugging is systematic, not magical. When something breaks, resist the urge to guess — follow a process. Most bugs are simpler than they appear.
+## Workflow
 
-## The Debugging Process
+### Phase 1: Problem Characterization
+1. Parse the error message, stack trace, or symptom description
+2. Identify: What worked? What broke? When did it start?
+3. Determine the scope: Is it reproducible? Intermittent? Heisenbug?
 
-### 1. Gather Information
+### Phase 2: Hypothesis Formation
+Based on symptoms, generate ranked hypotheses:
+1. Most likely cause
+2. Second most likely
+3. Edge cases to consider
 
-Before making any changes, collect facts:
+### Phase 3: Investigation
+For each hypothesis:
+1. Design a test to isolate the cause
+2. Run the test with minimal changes
+3. Interpret results — confirm or refute hypothesis
+4. If refuted, move to next hypothesis
+5. If confirmed, trace the root cause
 
-- **What happened?** (actual behavior)
-- **What should have happened?** (expected behavior)
-- **When did it start?** (recent changes?)
-- **How can it be reproduced?** (steps to repeat)
-- **What environment?** (OS, versions, config)
+### Phase 4: Root Cause Analysis
+Use "5 Whys" technique:
+- Why did the bug occur?
+- Why did the contributing factors exist?
+- Continue until reaching the systemic root cause
 
-### 2. Isolate the Problem
+### Phase 5: Fix & Verify
+1. Implement the minimal fix
+2. Write a test that reproduces the bug
+3. Run the test — should fail before fix, pass after
+4. Verify the original scenario works
 
-Reduce the search space:
+## Output Format
+```markdown
+## Problem Summary
+[concise description]
 
-- Can you reproduce it in isolation?
-- Can you narrow down where it occurs?
-- Can you identify which inputs trigger it?
-- Is it consistent or intermittent?
+## Hypotheses (ranked by likelihood)
+1. [Hypothesis A] — [reasoning]
+2. [Hypothesis B] — [reasoning]
+3. [Hypothesis C] — [reasoning]
 
-### 3. Form a Hypothesis
+## Investigation Log
+| Step | Action | Result | Interpretation |
+|------|--------|--------|----------------|
 
-Based on the facts:
+## Root Cause
+[the actual root cause, with evidence]
 
-- What's the most likely cause?
-- What evidence supports or refutes this theory?
-- Can you design a test to verify?
+## Fix
+[the specific code change]
 
-### 4. Test and Fix
-
-- Make one change at a time
-- Verify each fix works
-- Ensure no regressions are introduced
-
-### 5. Understand the Root Cause
-
-Fix the symptom or fix the cause?
-
-- **Symptom fix:** Makes the error go away but doesn't prevent recurrence
-- **Root cause fix:** Addresses why the bug occurred in the first place
-
-Always prefer root cause fixes when possible.
-
-## Debugging Techniques
-
-### Print Debugging
-Quick but messy. Use sparingly.
-
-```rust
-println!("DEBUG: x = {:?}, y = {:?}", x, y);
+## Verification
+[test results confirming the fix]
 ```
 
-For production, use structured logging instead.
-
-### Using the Debugger
-Rust supports GDB/LLDB. Basic workflow:
-
-```bash
-# Compile with debug symbols
-RUSTFLAGS="-C debuginfo=2" cargo build
-
-# Run in debugger
-lldb ./target/debug/my_program
-(lldb) breakpoint set --name main
-(lldb) run
-```
-
-### Binary Search
-When narrowing down problems:
-- Halve the input or codebase
-- Check which half still exhibits the issue
-- Repeat until isolated
-
-### Rubber Duck Debugging
-Explain the problem out loud (or to a rubber duck). The act of articulating often reveals the issue.
-
-### Version Control Bisect
-When a regression is suspected:
-
-```bash
-git bisect start
-git bisect bad  # current version is broken
-git bisect good v1.0.0  # last known good version
-# git will guide you through testing
-```
-
-## Common Bug Patterns
-
-### Off-by-One Errors
-Check loop boundaries and array indices carefully.
-
-### Null/None Handling
-Assume optional values can be `None`. Handle gracefully.
-
-### Concurrency Issues
-- Race conditions
-- Deadlocks (A waiting for B, B waiting for A)
-- Use `Mutex` or `RwLock` for shared state
-- Check ordering of lock acquisition
-
-### Async Bugs
-- Forgetting to `.await`
-- Blocking in async code
-- Tasks not spawned properly
-
-### Type Mismatches
-- Comparing incompatible types
-- Integer overflow
-- Floating point precision
-
-### Resource Leaks
-- Files not closed
-- Connections not released
-- Memory not freed (in non-GC languages)
-
-## When Stuck
-
-1. **Sleep on it.** Take a break, the answer often comes after.
-
-2. **Search.** Someone has likely encountered this before.
-
-3. **Ask for help.** Articulate the problem clearly.
-
-4. **Simplify.** Create a minimal reproduction case.
-
-5. **Look at similar code.** Patterns often reveal solutions.
-
-## Debugging Checklist
-
-- [ ] Can you reproduce the issue consistently?
-- [ ] Isolate where in the code the problem occurs
-- [ ] Form a hypothesis about the root cause
-- [ ] Verify your hypothesis with a test
-- [ ] Fix the root cause (not just the symptom)
-- [ ] Ensure all tests pass afterward
-- [ ] Document what you learned
+## Constraints
+- Fix the root cause, not symptoms
+- Minimize the blast radius
+- Always write a regression test
+- Document what you learned

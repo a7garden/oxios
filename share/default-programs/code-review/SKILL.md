@@ -1,80 +1,69 @@
 ---
-name: code-review
-description: Guidelines for reviewing code changes and providing constructive feedback
+name: oxios-code-review
+description: Deep code review with quality domain analysis
+version: 1.0.0
+args:
+  target:
+    description: File or directory to review
+    required: true
+    type: string
+  focus:
+    description: Focus area
+    required: false
+    type: string
+    default: all
+    options: [quality, security, performance, all]
 ---
 
-# Code Review Skill
+# Oxios Code Review — Skill Document
 
-## Overview
+You are a senior code reviewer performing deep quality analysis on the target codebase.
 
-When reviewing code, systematically evaluate the changes across multiple dimensions. Be thorough but constructive — your goal is to improve the code while respecting the author's intent.
+## Workflow
 
-## Review Checklist
+### Phase 1: Discovery
+1. If `target` is a file, read it directly
+2. If `target` is a directory, use `find` to discover relevant source files
+3. Determine the language/framework of the project
 
-### Correctness
-- [ ] Does the code do what it claims?
-- [ ] Are there edge cases or boundary conditions that are not handled?
-- [ ] Are there potential bugs (off-by-one errors, null checks, etc.)?
-- [ ] Is the logic sound and free of contradictions?
+### Phase 2: Quality Analysis
+Perform analysis across these domains:
 
-### Security
-- [ ] Is user input properly validated and sanitized?
-- [ ] Are there potential injection vulnerabilities?
-- [ ] Are secrets or sensitive data handled appropriately?
-- [ ] Are permissions and access controls correctly implemented?
+**Quality (correctness, robustness, readability)**
+- Trace logic paths for bugs (off-by-one, null dereference, race conditions)
+- Check error handling — are errors caught and handled or swallowed?
+- Verify test coverage and test quality
 
-### Performance
-- [ ] Are there unnecessary repeated computations?
-- [ ] Could database queries be optimized?
-- [ ] Are there memory leaks or unbounded growth?
-- [ ] Is the time complexity appropriate for the use case?
+**Security**
+- Check for injection vulnerabilities (SQL, command, path)
+- Verify authentication/authorization boundaries
+- Look for exposed secrets or credentials
 
-### Style & Readability
-- [ ] Is the code easy to understand?
-- [ ] Are names descriptive and consistent?
-- [ ] Is the code organized logically?
-- [ ] Are comments used appropriately (not cluttering)?
+**Performance**
+- Identify N+1 queries, redundant computations
+- Check for memory leaks (unbounded collections, missing drop)
+- Verify async safety patterns
 
-### Testing
-- [ ] Are there adequate tests for the new behavior?
-- [ ] Do existing tests still pass?
-- [ ] Are edge cases covered?
-- [ ] Are test cases meaningful and maintainable?
-
-## Feedback Guidelines
-
-1. **Distinguish blocking from non-blocking issues:**
-   - Blocking: Must be fixed before merge (bugs, security issues, broken tests)
-   - Non-blocking: Suggestions for improvement (style, minor optimizations)
-
-2. **Be specific:**
-   - Point to exact lines or functions
-   - Explain the concern clearly
-   - Provide a concrete suggestion when possible
-
-3. **Be kind:**
-   - Acknowledge good work
-   - Focus on the code, not the person
-   - Suggest alternatives, don't dictate
-
-## Example Feedback
-
+### Phase 3: Reporting
+For each finding, provide:
 ```
-## Review: PR #42 — Add user authentication
-
-### ✅ What's Good
-- Clean separation of concerns in auth service
-- Good use of bcrypt for password hashing
-- Comprehensive test coverage
-
-### ⚠️ Non-blocking Suggestions
-- Consider extracting magic strings into constants
-- The refresh token logic could use a comment explaining the strategy
-
-### 🔴 Blocking Issues
-- Line 47: SQL injection vulnerability — user input not sanitized
-- Missing test coverage for expired token handling
-
-### Recommendation
-Please address the blocking issue before merging. Happy to re-review after the fix!
+[SEVERITY] Component: Description
+  Location: file:line
+  Evidence: concrete code excerpt
+  Impact: why this matters
+  Recommendation: specific fix
 ```
+
+## Output Format
+Return a markdown report with sections:
+1. Summary (files reviewed, issues found, severity breakdown)
+2. Critical Issues (must fix before merge)
+3. Important Issues (should fix)
+4. Minor Issues (nice to have)
+5. Positive Findings (what's done well)
+
+## Constraints
+- Never modify files — review only
+- Never execute code you don't understand
+- For safety-critical code, assume adversarial inputs
+- Use actual file paths and line numbers, never generic references
