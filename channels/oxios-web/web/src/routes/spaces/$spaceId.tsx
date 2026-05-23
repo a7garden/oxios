@@ -3,7 +3,6 @@ import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { ArrowLeft, Boxes } from 'lucide-react'
 import { ErrorState } from '@/components/shared/error-state'
 import { LoadingCards } from '@/components/shared/loading'
-import { StatusIndicator } from '@/components/shared/status-indicator'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { api } from '@/lib/api-client'
@@ -34,9 +33,12 @@ function SpaceDetailPage() {
   const details = [
     { label: 'ID', value: space.id },
     { label: 'Name', value: space.name },
-    { label: 'Tag', value: space.tag ?? '—' },
-    { label: 'Status', value: <StatusIndicator status={space.status} /> },
+    { label: 'Source', value: space.source ?? '—' },
+    { label: 'Tags', value: space.tags && space.tags.length > 0 ? space.tags.join(', ') : '—' },
+    { label: 'Active', value: space.active !== false ? 'Yes' : 'No' },
     { label: 'Created', value: new Date(space.created_at).toLocaleString() },
+    ...(space.last_active_at ? [{ label: 'Last Active', value: new Date(space.last_active_at).toLocaleString() }] : []),
+    ...(space.interaction_count != null ? [{ label: 'Interactions', value: String(space.interaction_count) }] : []),
   ]
 
   return (
@@ -77,15 +79,17 @@ function SpaceDetailPage() {
         </CardContent>
       </Card>
 
-      {space.metadata && Object.keys(space.metadata).length > 0 && (
+      {space.paths && space.paths.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle>Metadata</CardTitle>
+            <CardTitle>Paths</CardTitle>
           </CardHeader>
           <CardContent>
-            <pre className="rounded-lg bg-muted p-4 text-xs overflow-x-auto">
-              {JSON.stringify(space.metadata, null, 2)}
-            </pre>
+            <ul className="space-y-1">
+              {space.paths.map((p) => (
+                <li key={p} className="text-sm font-mono text-muted-foreground">{p}</li>
+              ))}
+            </ul>
           </CardContent>
         </Card>
       )}

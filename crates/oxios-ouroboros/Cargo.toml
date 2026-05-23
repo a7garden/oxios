@@ -24,3 +24,6 @@ anyhow = { workspace = true }
 thiserror = { workspace = true }
 chrono = { workspace = true }
 parking_lot = { workspace = true }
+
+[dev-dependencies]
+oxi-ai = { workspace = true }

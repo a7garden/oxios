@@ -57,9 +57,14 @@ export interface EvolutionEntry {
 export interface Space {
   id: string
   name: string
-  tag?: string
-  status: 'active' | 'archived'
+  source?: string
+  paths?: string[]
+  tags?: string[]
+  active?: boolean
   created_at: string
+  last_active_at?: string
+  interaction_count?: number
+  memory_visible?: boolean
   metadata?: Record<string, unknown>
 }
 

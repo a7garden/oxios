@@ -9,7 +9,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { api } from '@/lib/api-client'
-import type { OxiosConfig } from '@/types'
 
 export const Route = createFileRoute('/settings')({ component: SettingsPage })
 
@@ -22,117 +21,79 @@ interface SettingsSection {
 interface SettingsField {
   key: string
   label: string
-  type: 'text' | 'number' | 'password'
+  type: 'text' | 'number' | 'password' | 'checkbox'
   placeholder?: string
 }
 
+// Sections mapped to actual backend OxiosConfig fields
 const sections: SettingsSection[] = [
   {
-    key: 'general',
-    label: 'General',
+    key: 'kernel',
+    label: 'Kernel',
     fields: [
-      { key: 'default_model', label: 'Default Model', type: 'text', placeholder: 'gpt-4o' },
-      {
-        key: 'max_concurrent_agents',
-        label: 'Max Concurrent Agents',
-        type: 'number',
-        placeholder: '10',
-      },
-      {
-        key: 'workspace_path',
-        label: 'Workspace Path',
-        type: 'text',
-        placeholder: '~/.oxios/workspace',
-      },
+      { key: 'workspace', label: 'Workspace Path', type: 'text', placeholder: '~/.oxios/workspace' },
+      { key: 'max_agents', label: 'Max Concurrent Agents', type: 'number', placeholder: '16' },
+      { key: 'event_bus_capacity', label: 'Event Bus Capacity', type: 'number', placeholder: '256' },
     ],
   },
   {
     key: 'engine',
     label: 'Engine',
     fields: [
-      { key: 'provider', label: 'Provider', type: 'text', placeholder: 'openai' },
-      { key: 'model', label: 'Model', type: 'text', placeholder: 'gpt-4o' },
-      { key: 'api_key', label: 'API Key', type: 'password', placeholder: 'sk-...' },
-      {
-        key: 'base_url',
-        label: 'Base URL',
-        type: 'text',
-        placeholder: 'https://api.openai.com/v1',
-      },
+      { key: 'default_model', label: 'Default Model', type: 'text', placeholder: 'openai/gpt-4o' },
+      { key: 'api_key', label: 'API Key Override', type: 'password', placeholder: 'sk-...' },
     ],
   },
   {
-    key: 'exec_security',
-    label: 'Exec & Security',
+    key: 'security',
+    label: 'Security',
     fields: [
-      { key: 'shell_allowed', label: 'Shell Allowed', type: 'text', placeholder: 'true' },
-      { key: 'sandbox_enabled', label: 'Sandbox Enabled', type: 'text', placeholder: 'false' },
-      { key: 'audit_enabled', label: 'Audit Enabled', type: 'text', placeholder: 'true' },
+      { key: 'network_access', label: 'Network Access', type: 'text', placeholder: 'false' },
+      { key: 'max_execution_time_secs', label: 'Max Execution Time (s)', type: 'number', placeholder: '300' },
+      { key: 'max_memory_mb', label: 'Max Memory (MB)', type: 'number', placeholder: '512' },
     ],
   },
   {
-    key: 'agents',
-    label: 'Agents',
+    key: 'scheduler',
+    label: 'Scheduler',
     fields: [
-      {
-        key: 'default_timeout_ms',
-        label: 'Default Timeout (ms)',
-        type: 'number',
-        placeholder: '300000',
-      },
-      { key: 'auto_kill_zombies', label: 'Auto Kill Zombies', type: 'text', placeholder: 'true' },
-      { key: 'max_retries', label: 'Max Retries', type: 'number', placeholder: '3' },
+      { key: 'max_concurrent', label: 'Max Concurrent Tasks', type: 'number', placeholder: '10' },
+      { key: 'rate_limit_per_minute', label: 'Rate Limit/min', type: 'number', placeholder: '60' },
+      { key: 'zombie_timeout_secs', label: 'Zombie Timeout (s)', type: 'number', placeholder: '600' },
     ],
   },
   {
-    key: 'integrations',
-    label: 'Integrations',
+    key: 'memory',
+    label: 'Memory',
     fields: [
-      { key: 'mcp_enabled', label: 'MCP Enabled', type: 'text', placeholder: 'true' },
-      { key: 'a2a_enabled', label: 'A2A Enabled', type: 'text', placeholder: 'true' },
-      { key: 'browser_enabled', label: 'Browser Enabled', type: 'text', placeholder: 'true' },
-    ],
-  },
-  {
-    key: 'memory_context',
-    label: 'Memory & Context',
-    fields: [
-      { key: 'memory_enabled', label: 'Memory Enabled', type: 'text', placeholder: 'true' },
+      { key: 'enabled', label: 'Enabled', type: 'text', placeholder: 'true' },
+      { key: 'embedding_model', label: 'Embedding Model', type: 'text', placeholder: 'text-embedding-3-small' },
       { key: 'context_window', label: 'Context Window', type: 'number', placeholder: '128000' },
-      {
-        key: 'embedding_model',
-        label: 'Embedding Model',
-        type: 'text',
-        placeholder: 'text-embedding-3-small',
-      },
     ],
   },
   {
-    key: 'monitoring',
+    key: 'resource_monitor',
     label: 'Monitoring',
     fields: [
-      { key: 'telemetry_enabled', label: 'Telemetry Enabled', type: 'text', placeholder: 'false' },
-      { key: 'log_level', label: 'Log Level', type: 'text', placeholder: 'info' },
-      {
-        key: 'resource_poll_interval_ms',
-        label: 'Resource Poll Interval (ms)',
-        type: 'number',
-        placeholder: '5000',
-      },
+      { key: 'interval_secs', label: 'Poll Interval (s)', type: 'number', placeholder: '5' },
+      { key: 'history_max', label: 'Max History', type: 'number', placeholder: '100' },
+      { key: 'cpu_threshold', label: 'CPU Threshold (%)', type: 'number', placeholder: '80' },
     ],
   },
   {
-    key: 'advanced',
-    label: 'Advanced',
+    key: 'daemon',
+    label: 'Daemon',
     fields: [
-      { key: 'daemon_mode', label: 'Daemon Mode', type: 'text', placeholder: 'true' },
       { key: 'pid_file', label: 'PID File', type: 'text', placeholder: '~/.oxios/oxios.pid' },
-      {
-        key: 'config_path',
-        label: 'Config Path',
-        type: 'text',
-        placeholder: '~/.oxios/config.toml',
-      },
+      { key: 'log_dir', label: 'Log Directory', type: 'text', placeholder: '~/.oxios/logs' },
+    ],
+  },
+  {
+    key: 'gateway',
+    label: 'Gateway',
+    fields: [
+      { key: 'host', label: 'Host', type: 'text', placeholder: '127.0.0.1' },
+      { key: 'port', label: 'Port', type: 'number', placeholder: '3000' },
     ],
   },
 ]
@@ -140,7 +101,7 @@ const sections: SettingsSection[] = [
 function SettingsPage() {
   const queryClient = useQueryClient()
   const [formValues, setFormValues] = useState<Record<string, Record<string, string>>>({})
-  const [activeTab, setActiveTab] = useState('general')
+  const [activeTab, setActiveTab] = useState('kernel')
 
   const {
     data: config,
@@ -149,11 +110,11 @@ function SettingsPage() {
     refetch,
   } = useQuery({
     queryKey: ['config'],
-    queryFn: () => api.get<OxiosConfig>('/api/config'),
+    queryFn: () => api.get<Record<string, unknown>>('/api/config'),
   })
 
   const saveMutation = useMutation({
-    mutationFn: (updated: OxiosConfig) => api.put('/api/config', updated),
+    mutationFn: (updated: Record<string, unknown>) => api.put('/api/config', updated),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['config'] }),
   })
 
@@ -163,9 +124,8 @@ function SettingsPage() {
     for (const section of sections) {
       const sectionConfig = config[section.key] as Record<string, unknown> | undefined
       if (!sectionConfig) continue
-      values[section.key] = {} as Record<string, string>
+      values[section.key] = {}
       for (const field of section.fields) {
-        // biome-ignore lint/style/noNonNullAssertion: guaranteed by assignment on prev line
         values[section.key]![field.key] = String(sectionConfig[field.key] ?? '')
       }
     }
@@ -184,7 +144,7 @@ function SettingsPage() {
       }
       updated[section.key] = sectionValues
     }
-    saveMutation.mutate(updated as OxiosConfig)
+    saveMutation.mutate(updated)
   }
 
   if (isLoading) return <LoadingCards count={4} />
@@ -237,12 +197,12 @@ function SettingsPage() {
               <CardContent className="space-y-4">
                 {section.fields.map((field) => (
                   <div key={field.key} className="grid gap-2 md:grid-cols-3 items-center">
-                    <label htmlFor={field.key} className="text-sm font-medium">
+                    <label htmlFor={`${section.key}-${field.key}`} className="text-sm font-medium">
                       {field.label}
                     </label>
                     <div className="md:col-span-2">
                       <Input
-                        id={field.key}
+                        id={`${section.key}-${field.key}`}
                         type={
                           field.type === 'password'
                             ? 'password'

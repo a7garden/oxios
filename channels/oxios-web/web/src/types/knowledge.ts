@@ -10,7 +10,6 @@ export interface KnowledgeSearchHit {
   path: string
   name: string
   snippet: string
-  semantic_score: number | null
   backlink_count: number
   name_similarity: number
 }

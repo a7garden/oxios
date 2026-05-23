@@ -5,7 +5,6 @@ import { DataTable } from '@/components/shared/data-table'
 import { EmptyState } from '@/components/shared/empty-state'
 import { ErrorState } from '@/components/shared/error-state'
 import { LoadingTable } from '@/components/shared/loading'
-import { StatusIndicator } from '@/components/shared/status-indicator'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { api } from '@/lib/api-client'
@@ -47,11 +46,24 @@ function SpacesListPage() {
         <div className="flex items-center gap-2">
           <Boxes className="h-4 w-4 text-muted-foreground" />
           <span className="font-medium">{row.name}</span>
-          {row.tag && <Badge variant="outline">{row.tag}</Badge>}
+          {row.tags && row.tags.length > 0 && (
+            <div className="flex gap-1">
+              {row.tags.map((t) => (
+                <Badge key={t} variant="outline">{t}</Badge>
+              ))}
+            </div>
+          )}
         </div>
       ),
     },
-    { header: 'Status', accessor: (row: Space) => <StatusIndicator status={row.status} /> },
+    {
+      header: 'Status',
+      accessor: (row: Space) => (
+        <Badge variant={row.active !== false ? 'success' : 'secondary'}>
+          {row.active !== false ? 'Active' : 'Archived'}
+        </Badge>
+      ),
+    },
     { header: 'Created', accessor: (row: Space) => new Date(row.created_at).toLocaleString() },
     {
       header: '',
@@ -63,7 +75,7 @@ function SpacesListPage() {
           onClick={(e) => e.stopPropagation()}
           onKeyDown={(e) => e.stopPropagation()}
         >
-          {row.status !== 'active' && (
+          {!row.active && (
             <Button
               variant="ghost"
               size="icon"
@@ -73,7 +85,7 @@ function SpacesListPage() {
               <Play className="h-4 w-4 text-emerald-500" />
             </Button>
           )}
-          {row.status !== 'archived' && (
+          {row.active !== false && (
             <Button
               variant="ghost"
               size="icon"
