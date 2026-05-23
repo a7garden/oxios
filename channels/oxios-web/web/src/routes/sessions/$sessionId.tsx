@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { api } from '@/lib/api-client'
-import type { ChatMessage, Session } from '@/types'
+import type { SessionDetail } from '@/types'
 
 export const Route = createFileRoute('/sessions/$sessionId')({
   component: SessionDetailPage,
@@ -19,32 +19,35 @@ function SessionDetailPage() {
 
   const {
     data: session,
-    isLoading: sessionLoading,
-    isError: sessionError,
-    refetch: refetchSession,
+    isLoading,
+    isError,
+    refetch,
   } = useQuery({
     queryKey: ['session', sessionId],
-    queryFn: () => api.get<Session>(`/api/sessions/${sessionId}`),
+    queryFn: () => api.get<SessionDetail>(`/api/sessions/${sessionId}`),
   })
 
-  const {
-    data: messages,
-    isError: messagesError,
-    refetch: refetchMessages,
-  } = useQuery({
-    queryKey: ['session-messages', sessionId],
-    queryFn: () => api.get<ChatMessage[]>(`/api/sessions/${sessionId}/messages`),
-  })
-
-  if (sessionLoading) return <LoadingCards count={3} />
-  if (sessionError) return <ErrorState onRetry={() => refetchSession()} />
+  if (isLoading) return <LoadingCards count={3} />
+  if (isError) return <ErrorState onRetry={() => refetch()} />
   if (!session) return <p className="text-muted-foreground">Session not found.</p>
+
+  // Build interleaved messages from user_messages and agent_responses
+  const messages: { role: 'user' | 'assistant'; content: string }[] = []
+  const userMsgs: string[] = session.user_messages ?? []
+  const agentMsgs: { content: string }[] = session.agent_responses ?? []
+  const maxLen = Math.max(userMsgs.length, agentMsgs.length)
+  for (let i = 0; i < maxLen; i++) {
+    const userMsg = userMsgs[i]
+    const agentMsg = agentMsgs[i]
+    if (userMsg != null) messages.push({ role: 'user', content: String(userMsg) })
+    if (agentMsg) messages.push({ role: 'assistant', content: agentMsg.content ?? '' })
+  }
 
   const details = [
     { label: 'ID', value: session.id },
-    { label: 'Agent ID', value: session.agent_id ?? '—' },
-    { label: 'Space ID', value: session.space_id ?? '—' },
-    { label: 'Messages', value: session.message_count ?? 0 },
+    { label: 'User ID', value: session.user_id ?? '—' },
+    { label: 'Seed ID', value: session.active_seed_id ?? '—' },
+    { label: 'Messages', value: messages.length },
     { label: 'Created', value: new Date(session.created_at).toLocaleString() },
     {
       label: 'Updated',
@@ -97,9 +100,7 @@ function SessionDetailPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {messagesError ? (
-            <ErrorState onRetry={() => refetchMessages()} />
-          ) : messages && messages.length > 0 ? (
+          {messages.length > 0 ? (
             <div className="space-y-3">
               {messages.map((msg, i) => (
                 <div
@@ -119,7 +120,7 @@ function SessionDetailPage() {
                 </div>
               ))}
             </div>
-          ) : messagesError ? null : (
+          ) : (
             <p className="text-sm text-muted-foreground">No messages in this session.</p>
           )}
         </CardContent>

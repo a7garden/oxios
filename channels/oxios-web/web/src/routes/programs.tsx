@@ -35,12 +35,12 @@ function ProgramsPage() {
 
   const toggleMutation = useMutation({
     mutationFn: ({ name, enabled }: { name: string; enabled: boolean }) =>
-      api.put(`/api/programs/${name}`, { enabled }),
+      api.post(`/api/programs/${name}/${enabled ? 'enable' : 'disable'}`),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['programs'] }),
   })
 
   const installMutation = useMutation({
-    mutationFn: (name: string) => api.post('/api/programs/install', { name }),
+    mutationFn: (path: string) => api.post('/api/programs', { path }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['programs'] })
       setInstallName('')

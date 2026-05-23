@@ -2,11 +2,9 @@
 export interface Agent {
   id: string
   name: string
-  status: 'running' | 'idle' | 'stopped' | 'error'
+  status: string // Backend sends Debug format: "Running", "Idle", "Stopped", "Starting", "Error"
+  created_at?: string
   seed_id?: string
-  space_id?: string
-  started_at?: string
-  metadata?: Record<string, unknown>
 }
 
 export interface AgentListResponse {
@@ -19,23 +17,33 @@ export interface AgentListResponse {
 // Session
 export interface Session {
   id: string
-  agent_id?: string
-  space_id?: string
+  user_id?: string
+  active_seed_id?: string
   created_at: string
   updated_at?: string
   message_count?: number
   metadata?: Record<string, unknown>
 }
 
+// Session detail (from GET /api/sessions/:id)
+export interface SessionDetail {
+  id: string
+  user_id: string
+  user_messages: string[]
+  agent_responses: { content: string; session_id: string; seed_id: string; phase_reached: string; evaluation_passed: boolean; timestamp: string }[]
+  active_seed_id?: string
+  active_persona_id?: string
+  created_at: string
+  updated_at: string
+  metadata?: Record<string, unknown>
+}
+
 // Seed
 export interface Seed {
   id: string
-  name: string
-  spec: Record<string, unknown>
-  phase: 'interview' | 'seed' | 'execute' | 'evaluate' | 'evolve'
+  goal: string
+  constraints_count: number
   created_at: string
-  updated_at?: string
-  evolution_log?: EvolutionEntry[]
 }
 
 export interface EvolutionEntry {
@@ -61,7 +69,9 @@ export interface Program {
   enabled: boolean
   version?: string
   description?: string
-  host_requirements?: string[]
+  author?: string
+  tools_count?: number
+  has_skill_content?: boolean
 }
 
 // Skill
@@ -74,7 +84,8 @@ export interface Skill {
 // Memory
 export interface MemoryEntry {
   name: string
-  content: string
+  category?: string
+  content?: string
   created_at?: string
   updated_at?: string
 }
@@ -131,24 +142,27 @@ export interface StreamChunk {
   error?: string
 }
 
-// Event
+// Event (SSE)
 export interface OxiosEvent {
-  id: string
+  id?: string
   type: string
   agent_id?: string
   session_id?: string
-  timestamp: string
+  timestamp?: string
   data?: Record<string, unknown>
+  // SSE events may also carry ad-hoc fields
+  [key: string]: unknown
 }
 
 // Approval
 export interface Approval {
   id: string
-  agent_id: string
-  type: string
-  description: string
+  subject: string
+  action: string
+  resource: string
+  reason: string
   created_at: string
-  status: 'pending' | 'approved' | 'rejected'
+  status: string
 }
 
 // Cron Job
@@ -156,7 +170,7 @@ export interface CronJob {
   id: string
   name: string
   schedule: string
-  command: string
+  command?: string
   enabled: boolean
   last_run?: string
   next_run?: string
@@ -181,10 +195,13 @@ export interface ResourceSnapshot {
 
 // Audit
 export interface AuditEntry {
-  id: string
+  id?: string
   agent_id?: string
+  agent_name?: string
   action: string
   resource?: string
+  allowed?: boolean
+  reason?: string | null
   timestamp: string
   details?: Record<string, unknown>
   hash?: string
@@ -202,9 +219,10 @@ export interface GitCommit {
 export interface Persona {
   id: string
   name: string
+  role?: string
   description?: string
-  system_prompt?: string
-  active: boolean
+  enabled: boolean
+  personality_traits?: string[]
 }
 
 // Agent Group
@@ -215,14 +233,11 @@ export interface AgentGroup {
   strategy?: string
 }
 
-// Workspace
-export interface FileNode {
+// Workspace — matches backend TreeEntry from /api/workspace/tree
+export interface TreeEntry {
   name: string
-  path: string
-  type: 'file' | 'directory'
-  children?: FileNode[]
-  size?: number
-  modified?: string
+  is_dir: boolean
+  size: number
 }
 
 // Paginated response
@@ -233,12 +248,17 @@ export interface PaginatedResponse<T> {
   limit: number
 }
 
-// Status
+// Status — matches backend StatusResponse
 export interface SystemStatus {
+  service: string
+  status: string
   version: string
-  uptime_ms: number
-  agents_running: number
-  agents_total: number
-  spaces_active: number
-  memory_usage_mb?: number
+  channels: string[]
+  uptime: string // formatted "1h 30m 5s"
+  components?: {
+    state_store?: { healthy: boolean; detail?: string }
+    event_bus?: { healthy: boolean; detail?: string }
+    memory?: { enabled: boolean; index_size: number; total_entries: number }
+    agents?: { active_count: number; total_forked: number; total_completed: number; total_failed: number }
+  }
 }

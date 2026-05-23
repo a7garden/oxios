@@ -14,7 +14,7 @@ export function useEvents() {
     setIsConnected(true)
 
     client.connect(
-      '/api/events/stream',
+      '/api/events',
       (_event, data) => {
         const oxiosEvent = data as OxiosEvent
         setEvents((prev) => [oxiosEvent, ...prev].slice(0, 100))

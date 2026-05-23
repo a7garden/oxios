@@ -17,7 +17,7 @@ function ApprovalsPage() {
   const { data, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ['approvals'],
     queryFn: async () => {
-      // Backend returns raw array, not { items } wrapper
+      // Backend returns raw array
       const res = await api.get<Approval[]>('/api/approvals')
       return { items: Array.isArray(res) ? res : [] }
     },
@@ -71,9 +71,9 @@ function ApprovalsPage() {
                   className="flex items-center justify-between rounded-lg border p-4"
                 >
                   <div>
-                    <p className="font-medium">{approval.description}</p>
+                    <p className="font-medium">{approval.reason || approval.action}</p>
                     <p className="text-xs text-muted-foreground mt-1">
-                      Type: {approval.type} • Agent: {approval.agent_id.slice(0, 8)}... •{' '}
+                      {approval.action} • {approval.subject} • {approval.resource} •{' '}
                       {new Date(approval.created_at).toLocaleString()}
                     </p>
                   </div>
@@ -118,9 +118,9 @@ function ApprovalsPage() {
                   className="flex items-center justify-between rounded-lg border p-3"
                 >
                   <div>
-                    <p className="text-sm">{approval.description}</p>
+                    <p className="text-sm">{approval.reason || approval.action}</p>
                     <p className="text-xs text-muted-foreground">
-                      {approval.type} • {new Date(approval.created_at).toLocaleString()}
+                      {approval.action} • {new Date(approval.created_at).toLocaleString()}
                     </p>
                   </div>
                   <Badge variant={approval.status === 'approved' ? 'success' : 'destructive'}>

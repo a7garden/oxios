@@ -42,7 +42,7 @@ function SessionsListPage() {
     },
     {
       header: 'Agent',
-      accessor: (row: Session) => (row.agent_id ? `${row.agent_id.slice(0, 8)}...` : '—'),
+      accessor: (row: Session) => (row.user_id ? `${row.user_id.slice(0, 8)}...` : '—'),
     },
     { header: 'Messages', accessor: (row: Session) => row.message_count ?? 0 },
     { header: 'Created', accessor: (row: Session) => new Date(row.created_at).toLocaleString() },

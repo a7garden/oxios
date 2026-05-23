@@ -102,7 +102,7 @@ function EventsPage() {
                     </p>
                   </div>
                   <span className="text-xs text-muted-foreground shrink-0">
-                    {new Date(event.timestamp).toLocaleTimeString()}
+                    {event.timestamp ? new Date(event.timestamp).toLocaleTimeString() : '—'}
                   </span>
                 </div>
               ))

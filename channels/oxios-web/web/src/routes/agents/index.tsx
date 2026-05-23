@@ -39,7 +39,7 @@ function AgentsListPage() {
         </div>
       ),
     },
-    { header: 'Status', accessor: (row: Agent) => <StatusIndicator status={row.status} /> },
+    { header: 'Status', accessor: (row: Agent) => <StatusIndicator status={row.status?.toLowerCase() ?? 'unknown'} /> },
     {
       header: 'Seed',
       accessor: (row: Agent) =>
@@ -50,8 +50,8 @@ function AgentsListPage() {
         ),
     },
     {
-      header: 'Started',
-      accessor: (row: Agent) => (row.started_at ? new Date(row.started_at).toLocaleString() : '—'),
+      header: 'Created',
+      accessor: (row: Agent) => (row.created_at ? new Date(row.created_at).toLocaleString() : '—'),
     },
   ]
 

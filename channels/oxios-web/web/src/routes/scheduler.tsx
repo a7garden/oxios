@@ -19,11 +19,11 @@ interface SchedulerStatus {
 
 interface SchedulerTask {
   id: string
-  agent_id?: string
-  priority: number
-  status: 'queued' | 'running' | 'completed' | 'failed'
-  created_at: string
-  started_at?: string
+  description?: string
+  priority?: string // "High", "Medium", "Low"
+  status: string // "Queued", "Running", etc.
+  created_at?: string
+  error?: string | null
 }
 
 export const Route = createFileRoute('/scheduler')({ component: SchedulerPage })
@@ -83,7 +83,7 @@ function SchedulerPage() {
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-muted-foreground">Total Tasks</CardTitle>
+            <CardTitle className="text-sm text-muted-foreground">Queued</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{data?.total_tasks ?? 0}</div>
@@ -130,31 +130,29 @@ function SchedulerPage() {
                   className="flex items-center justify-between rounded-lg border p-3"
                 >
                   <div className="flex items-center gap-3">
-                    {task.status === 'running' ? (
+                    {task.status === 'Running' || task.status === 'running' ? (
                       <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
-                    ) : task.status === 'completed' ? (
+                    ) : task.status === 'Completed' || task.status === 'completed' ? (
                       <CheckCircle className="h-4 w-4 text-emerald-500" />
-                    ) : task.status === 'failed' ? (
+                    ) : task.status === 'Failed' || task.status === 'failed' ? (
                       <Clock className="h-4 w-4 text-red-500" />
                     ) : (
                       <Clock className="h-4 w-4 text-amber-500" />
                     )}
                     <div>
-                      <p className="font-medium text-sm">{task.id.slice(0, 12)}...</p>
-                      {task.agent_id && (
-                        <p className="text-xs text-muted-foreground">
-                          Agent: {task.agent_id.slice(0, 8)}...
-                        </p>
+                      <p className="font-medium text-sm">{task.description ?? task.id.slice(0, 12)}...</p>
+                      {task.error && (
+                        <p className="text-xs text-destructive">{task.error}</p>
                       )}
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Badge variant="outline">P{task.priority}</Badge>
+                    <Badge variant="outline">{task.priority ?? '?'}</Badge>
                     <Badge
                       variant={
-                        task.status === 'running'
+                        task.status === 'Running' || task.status === 'running'
                           ? 'success'
-                          : task.status === 'failed'
+                          : task.status === 'Failed' || task.status === 'failed'
                             ? 'destructive'
                             : 'secondary'
                       }

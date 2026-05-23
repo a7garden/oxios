@@ -40,25 +40,25 @@ function DashboardPage() {
   const stats = [
     {
       label: 'Running Agents',
-      value: status?.agents_running ?? 0,
+      value: status?.components?.agents?.active_count ?? 0,
       icon: <Bot className="h-4 w-4" />,
       color: 'text-emerald-500',
     },
     {
       label: 'Total Agents',
-      value: status?.agents_total ?? 0,
+      value: status?.components?.agents?.total_forked ?? 0,
       icon: <Cpu className="h-4 w-4" />,
       color: 'text-blue-500',
     },
     {
-      label: 'Active Spaces',
-      value: status?.spaces_active ?? 0,
+      label: 'Memory Entries',
+      value: status?.components?.memory?.total_entries ?? 0,
       icon: <Boxes className="h-4 w-4" />,
       color: 'text-purple-500',
     },
     {
       label: 'Uptime',
-      value: status?.uptime_ms ? `${Math.floor(status.uptime_ms / 3600000)}h` : '-',
+      value: status?.uptime ?? '-',
       icon: <Clock className="h-4 w-4" />,
       color: 'text-amber-500',
     },
@@ -101,7 +101,7 @@ function DashboardPage() {
           ) : agents?.items?.length ? (
             <div className="space-y-2">
               {agents.items
-                .filter((a) => a.status === 'running')
+                .filter((a) => a.status?.toLowerCase() === 'running')
                 .map((agent) => (
                   <div
                     key={agent.id}
@@ -119,6 +119,9 @@ function DashboardPage() {
                     <Badge variant="success">Running</Badge>
                   </div>
                 ))}
+              {agents.items.filter((a) => a.status?.toLowerCase() === 'running').length === 0 && (
+                <p className="text-sm text-muted-foreground">No active agents</p>
+              )}
             </div>
           ) : (
             <p className="text-sm text-muted-foreground">No active agents</p>

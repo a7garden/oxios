@@ -28,30 +28,15 @@ function SeedsListPage() {
 
   const seeds = data?.items ?? []
 
-  const phaseColors: Record<
-    string,
-    'default' | 'secondary' | 'success' | 'warning' | 'destructive'
-  > = {
-    interview: 'secondary',
-    seed: 'default',
-    execute: 'success',
-    evaluate: 'warning',
-    evolve: 'default',
-  }
-
   const columns = [
-    { header: 'Name', accessor: (row: Seed) => <span className="font-medium">{row.name}</span> },
+    { header: 'Goal', accessor: (row: Seed) => <span className="font-medium">{row.goal}</span> },
     {
-      header: 'Phase',
+      header: 'Constraints',
       accessor: (row: Seed) => (
-        <Badge variant={phaseColors[row.phase] ?? 'outline'}>{row.phase}</Badge>
+        <Badge variant="outline">{row.constraints_count}</Badge>
       ),
     },
-    { header: 'Created', accessor: (row: Seed) => new Date(row.created_at).toLocaleString() },
-    {
-      header: 'Updated',
-      accessor: (row: Seed) => (row.updated_at ? new Date(row.updated_at).toLocaleString() : '—'),
-    },
+    { header: 'Created', accessor: (row: Seed) => row.created_at ? new Date(row.created_at).toLocaleString() : '—' },
   ]
 
   return (

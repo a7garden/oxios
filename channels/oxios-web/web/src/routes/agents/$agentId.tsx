@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { ArrowLeft, Bot, RotateCw, Skull } from 'lucide-react'
+import { ArrowLeft, Bot, Skull } from 'lucide-react'
 import { ErrorState } from '@/components/shared/error-state'
 import { LoadingCards } from '@/components/shared/loading'
 import { StatusIndicator } from '@/components/shared/status-indicator'
@@ -18,6 +18,7 @@ function AgentDetailPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
 
+  // No GET /api/agents/:id endpoint — fetch from list and filter
   const {
     data: agent,
     isLoading,
@@ -25,20 +26,15 @@ function AgentDetailPage() {
     refetch,
   } = useQuery({
     queryKey: ['agent', agentId],
-    queryFn: () => api.get<Agent>(`/api/agents/${agentId}`),
+    queryFn: async () => {
+      const res = await api.get<{ items: Agent[] }>('/api/agents')
+      return res.items?.find((a) => a.id === agentId)
+    },
     refetchInterval: 5000,
   })
 
   const killMutation = useMutation({
     mutationFn: () => api.post(`/api/agents/${agentId}/kill`),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['agent', agentId] })
-      queryClient.invalidateQueries({ queryKey: ['agents'] })
-    },
-  })
-
-  const restartMutation = useMutation({
-    mutationFn: () => api.post(`/api/agents/${agentId}/restart`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['agent', agentId] })
       queryClient.invalidateQueries({ queryKey: ['agents'] })
@@ -52,12 +48,11 @@ function AgentDetailPage() {
   const details = [
     { label: 'ID', value: agent.id },
     { label: 'Name', value: agent.name },
-    { label: 'Status', value: <StatusIndicator status={agent.status} /> },
+    { label: 'Status', value: <StatusIndicator status={agent.status?.toLowerCase() ?? 'unknown'} /> },
     { label: 'Seed ID', value: agent.seed_id ?? '—' },
-    { label: 'Space ID', value: agent.space_id ?? '—' },
     {
-      label: 'Started At',
-      value: agent.started_at ? new Date(agent.started_at).toLocaleString() : '—',
+      label: 'Created At',
+      value: agent.created_at ? new Date(agent.created_at).toLocaleString() : '—',
     },
   ]
 
@@ -80,18 +75,10 @@ function AgentDetailPage() {
         </div>
         <div className="flex gap-2">
           <Button
-            variant="outline"
-            size="sm"
-            onClick={() => restartMutation.mutate()}
-            disabled={restartMutation.isPending || agent.status !== 'running'}
-          >
-            <RotateCw className="h-4 w-4 mr-1" /> Restart
-          </Button>
-          <Button
             variant="destructive"
             size="sm"
             onClick={() => killMutation.mutate()}
-            disabled={killMutation.isPending || agent.status === 'stopped'}
+            disabled={killMutation.isPending || agent.status?.toLowerCase() === 'stopped'}
           >
             <Skull className="h-4 w-4 mr-1" /> Kill
           </Button>
@@ -116,19 +103,6 @@ function AgentDetailPage() {
           </div>
         </CardContent>
       </Card>
-
-      {agent.metadata && Object.keys(agent.metadata).length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Metadata</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <pre className="rounded-lg bg-muted p-4 text-xs overflow-x-auto">
-              {JSON.stringify(agent.metadata, null, 2)}
-            </pre>
-          </CardContent>
-        </Card>
-      )}
     </div>
   )
 }

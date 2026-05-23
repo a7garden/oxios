@@ -8,7 +8,7 @@ import { LoadingCards } from '@/components/shared/loading'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { api } from '@/lib/api-client'
-import type { FileNode } from '@/types'
+import type { TreeEntry } from '@/types'
 
 export const Route = createFileRoute('/workspace/')({ component: WorkspacePage })
 
@@ -16,72 +16,70 @@ function WorkspacePage() {
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set())
 
   const {
-    data: root,
+    data: entries,
     isLoading,
     isError,
     refetch,
     isFetching,
   } = useQuery({
     queryKey: ['workspace'],
-    queryFn: () => api.get<FileNode>('/api/workspace'),
+    queryFn: async () => {
+      const res = await api.get<TreeEntry[]>('/api/workspace/tree')
+      return Array.isArray(res) ? res : []
+    },
     refetchInterval: 15000,
   })
 
-  const toggleExpand = async (node: FileNode) => {
-    if (node.type !== 'directory') return
+  const toggleExpand = (name: string) => {
     setExpandedPaths((prev) => {
       const next = new Set(prev)
-      if (next.has(node.path)) {
-        next.delete(node.path)
-      } else {
-        next.add(node.path)
-      }
+      if (next.has(name)) next.delete(name)
+      else next.add(name)
       return next
     })
   }
 
-  const { data: children } = useQuery({
-    queryKey: ['workspace-children', [...expandedPaths]],
+  // Fetch children for expanded directories
+  const expandedArr = [...expandedPaths]
+  const { data: childrenMap } = useQuery({
+    queryKey: ['workspace-children', expandedArr],
     queryFn: async () => {
-      const result: Record<string, FileNode[]> = {}
-      for (const path of expandedPaths) {
+      const result: Record<string, TreeEntry[]> = {}
+      for (const dir of expandedArr) {
         try {
-          const dir = await api.get<FileNode[]>(`/api/workspace/${encodeURIComponent(path)}`)
-          result[path] = dir
+          const res = await api.get<TreeEntry[]>(`/api/workspace/tree?dir=${encodeURIComponent(dir)}`)
+          result[dir] = Array.isArray(res) ? res : []
         } catch {
-          result[path] = []
+          result[dir] = []
         }
       }
       return result
     },
-    enabled: expandedPaths.size > 0,
+    enabled: expandedArr.length > 0,
   })
 
   if (isLoading) return <LoadingCards count={4} />
   if (isError) return <ErrorState onRetry={() => refetch()} />
 
-  const renderNode = (node: FileNode, depth: number = 0) => {
-    const isExpanded = expandedPaths.has(node.path)
-    const nodeChildren = isExpanded
-      ? (children?.[node.path] ?? node.children ?? [])
-      : (node.children ?? [])
+  const renderEntry = (entry: TreeEntry, depth: number = 0) => {
+    const isExpanded = expandedPaths.has(entry.name)
 
     return (
-      <div key={node.path}>
+      <div key={entry.name}>
         <div
           role="treeitem"
           tabIndex={0}
           className="flex items-center gap-2 py-1.5 px-2 hover:bg-muted/50 rounded cursor-pointer text-sm"
           style={{ paddingLeft: `${depth * 16 + 8}px` }}
-          onClick={() => node.type === 'directory' && toggleExpand(node)}
+          onClick={() => entry.is_dir && toggleExpand(entry.name)}
           onKeyDown={(e) => {
             if (e.key === 'Enter' || e.key === ' ') {
               e.preventDefault()
-              node.type === 'directory' && toggleExpand(node)
+              entry.is_dir && toggleExpand(entry.name)
             }
           }}
         >
-          {node.type === 'directory' ? (
+          {entry.is_dir ? (
             <>
               {isExpanded ? (
                 <ChevronDown className="h-4 w-4 shrink-0" />
@@ -96,19 +94,14 @@ function WorkspacePage() {
               <File className="h-4 w-4 text-muted-foreground shrink-0" />
             </>
           )}
-          <span className="truncate">{node.name}</span>
-          {node.size != null && (
+          <span className="truncate">{entry.name}</span>
+          {!entry.is_dir && entry.size > 0 && (
             <span className="ml-auto text-xs text-muted-foreground">
-              {node.size > 1024 ? `${(node.size / 1024).toFixed(1)}KB` : `${node.size}B`}
-            </span>
-          )}
-          {node.modified && (
-            <span className="text-xs text-muted-foreground shrink-0">
-              {new Date(node.modified).toLocaleDateString()}
+              {entry.size > 1024 ? `${(entry.size / 1024).toFixed(1)}KB` : `${entry.size}B`}
             </span>
           )}
         </div>
-        {isExpanded && nodeChildren.map((child) => renderNode(child, depth + 1))}
+        {isExpanded && entry.is_dir && (childrenMap?.[entry.name] ?? []).map((child) => renderEntry(child, depth + 1))}
       </div>
     )
   }
@@ -132,7 +125,7 @@ function WorkspacePage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {!root ? (
+          {!entries || entries.length === 0 ? (
             <EmptyState
               icon={<FolderOpen className="h-8 w-8" />}
               title="No workspace"
@@ -141,10 +134,7 @@ function WorkspacePage() {
             />
           ) : (
             <div className="space-y-0">
-              {renderNode(root)}
-              {root.children?.length === 0 && (
-                <p className="text-sm text-muted-foreground p-4">Empty workspace.</p>
-              )}
+              {entries.map((entry) => renderEntry(entry))}
             </div>
           )}
         </CardContent>
