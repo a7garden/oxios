@@ -26,7 +26,10 @@ function ProgramsPage() {
     isFetching,
   } = useQuery({
     queryKey: ['programs'],
-    queryFn: () => api.get<Program[]>('/api/programs'),
+    queryFn: async () => {
+      const res = await api.get<{ items: Program[] }>('/api/programs')
+      return res.items ?? []
+    },
     refetchInterval: 30000,
   })
 
@@ -47,7 +50,7 @@ function ProgramsPage() {
   if (isLoading) return <LoadingCards count={4} />
   if (isError) return <ErrorState onRetry={() => refetch()} />
 
-  const items = programs ?? []
+  const items = (programs ?? []) as Program[]
 
   return (
     <div className="space-y-6">

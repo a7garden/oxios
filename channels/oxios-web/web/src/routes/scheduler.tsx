@@ -31,7 +31,20 @@ export const Route = createFileRoute('/scheduler')({ component: SchedulerPage })
 function SchedulerPage() {
   const { data, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ['scheduler'],
-    queryFn: () => api.get<SchedulerStatus>('/api/scheduler'),
+    queryFn: async () => {
+      // Backend has separate /api/scheduler/stats + /api/scheduler/tasks
+      const [stats, tasksRes] = await Promise.all([
+        api.get<{ queued: number; running: number; max_concurrent: number; rate_limit_per_minute: number; rate_remaining: number }>('/api/scheduler/stats'),
+        api.get<{ queued: SchedulerTask[]; running: SchedulerTask[] }>('/api/scheduler/tasks'),
+      ])
+      return {
+        running: stats.running > 0,
+        total_tasks: stats.queued,
+        active_tasks: stats.running,
+        max_concurrent: stats.max_concurrent,
+        tasks: [...(tasksRes.queued ?? []), ...(tasksRes.running ?? [])],
+      } as SchedulerStatus
+    },
     refetchInterval: 5000,
   })
 

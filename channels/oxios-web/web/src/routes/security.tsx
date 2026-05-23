@@ -1,18 +1,11 @@
 import { useQuery } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
-import { FileWarning, KeyRound, RefreshCw, Shield } from 'lucide-react'
+import { FileWarning, RefreshCw, Shield } from 'lucide-react'
 import { EmptyState } from '@/components/shared/empty-state'
 import { ErrorState } from '@/components/shared/error-state'
 import { LoadingCards } from '@/components/shared/loading'
-import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { api } from '@/lib/api-client'
-import type { AuditEntry } from '@/types'
-
-interface PermissionsOverview {
-  roles: string[]
-  policies: { name: string; effect: 'allow' | 'deny'; resources: string[] }[]
-}
 
 export const Route = createFileRoute('/security')({ component: SecurityPage })
 
@@ -25,24 +18,22 @@ function SecurityPage() {
     isFetching,
   } = useQuery({
     queryKey: ['audit'],
-    queryFn: () => api.get<{ items: AuditEntry[] }>('/api/security/audit'),
-    refetchInterval: 15000,
-  })
-
-  const {
-    data: permissions,
-    isError: permissionsError,
-    refetch: refetchPermissions,
-  } = useQuery({
-    queryKey: ['permissions'],
-    queryFn: () => api.get<PermissionsOverview>('/api/security/permissions'),
+    queryFn: async () => {
+      // Backend uses /api/audit, not /api/security/audit
+      const res = await api.get<{ items: { timestamp: string; agent_name: string; action: string; resource: string; allowed: boolean; reason: string | null }[] }>('/api/audit')
+      return res
+    },
     refetchInterval: 15000,
   })
 
   if (auditLoading) return <LoadingCards count={4} />
   if (auditError) return <ErrorState onRetry={() => refetch()} />
 
-  const entries = audits?.items ?? []
+  const entries = (audits?.items ?? []).map((e) => ({
+    ...e,
+    id: `${e.timestamp}-${e.agent_name}`,
+    agent_id: e.agent_name,
+  }))
 
   return (
     <div className="space-y-6">
@@ -61,45 +52,6 @@ function SecurityPage() {
           <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
         </button>
       </div>
-
-      {/* Permissions */}
-      {permissionsError ? (
-        <ErrorState onRetry={() => refetchPermissions()} />
-      ) : permissions ? (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <KeyRound className="h-4 w-4" /> Roles & Policies
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div>
-              <p className="text-sm font-medium mb-1">Roles</p>
-              <div className="flex gap-2 flex-wrap">
-                {permissions.roles.map((role) => (
-                  <Badge key={role} variant="outline">
-                    {role}
-                  </Badge>
-                ))}
-              </div>
-            </div>
-            <div>
-              <p className="text-sm font-medium mb-2">Policies</p>
-              <div className="space-y-1">
-                {permissions.policies.map((policy) => (
-                  <div key={policy.name} className="flex items-center gap-2 text-sm">
-                    <Badge variant={policy.effect === 'allow' ? 'success' : 'destructive'}>
-                      {policy.effect}
-                    </Badge>
-                    <span>{policy.name}</span>
-                    <span className="text-muted-foreground">({policy.resources.join(', ')})</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      ) : null}
 
       {/* Audit Trail */}
       <Card>
@@ -141,11 +93,6 @@ function SecurityPage() {
                     <p className="text-xs text-muted-foreground">
                       {new Date(entry.timestamp).toLocaleString()}
                     </p>
-                    {entry.hash && (
-                      <p className="text-xs font-mono text-muted-foreground">
-                        {entry.hash.slice(0, 12)}...
-                      </p>
-                    )}
                   </div>
                 </div>
               ))}

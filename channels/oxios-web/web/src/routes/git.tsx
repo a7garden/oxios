@@ -27,13 +27,19 @@ function GitPage() {
     isFetching,
   } = useQuery({
     queryKey: ['git-log'],
-    queryFn: () => api.get<GitCommit[]>('/api/git/log'),
+    queryFn: async () => {
+      const res = await api.get<{ entries: GitCommit[] }>('/api/git/log')
+      return res.entries ?? []
+    },
     refetchInterval: 15000,
   })
 
   const { data: tags } = useQuery({
     queryKey: ['git-tags'],
-    queryFn: () => api.get<string[]>('/api/git/tags'),
+    queryFn: async () => {
+      const res = await api.get<{ tags: string[] }>('/api/git/tags')
+      return res.tags ?? []
+    },
     refetchInterval: 15000,
   })
 

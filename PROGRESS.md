@@ -5,36 +5,29 @@ In Progress
 
 ## Tasks
 
-- [x] Cross-crate dependency analysis — analyzed all 9 workspace crates, traced imports, wrote report
-- [x] Kernel directory module analysis — analyzed all 9 subdirectories under `crates/oxios-kernel/src/`, 72 .rs files, ~24K LOC
+### ✅ Completed: Full Static API Analysis
+- Analyzed all 31 frontend route files, hooks, types, and layout components
+- Compared every API call against backend handler return shapes
+- Wrote comprehensive report to `/tmp/static-analysis-report.md`
+
+### Findings Summary (30 issues total)
+- 🔴 CRITICAL: 7 — runtime crashes (missing endpoints, shape mismatches on core pages)
+- 🟠 HIGH: 10 — wrong/empty data displays
+- 🟡 MEDIUM: 8 — partial data loss, minor display issues
+- 🔵 LOW: 5 — code quality
+
+### Key Critical Issues
+1. **Dashboard** (`/`) — `agents_running`, `agents_total`, `spaces_active`, `uptime_ms` all missing from backend response
+2. **Agent Detail** (`/agents/:id`) — No `GET /api/agents/:id` endpoint; restart endpoint doesn't exist
+3. **Workspace** (`/workspace`) — Wrong URL (`/api/workspace` vs `/api/workspace/tree`); expects tree structure, gets flat array
+4. **Sessions** — Frontend expects `agent_id`, backend returns `user_id`; messages endpoint doesn't exist
+5. **Seeds** — Frontend expects `name`/`phase`, backend returns `goal`/`constraints_count`
+6. **Programs** — Toggle uses wrong endpoint; install uses wrong URL and body
+7. **Events SSE** — Connects to `/api/events/stream`, backend serves at `/api/events`
 
 ## Files Changed
-
-- `analysis/cross-crate-deps.md` — Full cross-crate dependency report
-- `analysis/dir-modules.md` — Detailed kernel directory module analysis with extraction candidates
+- `/tmp/static-analysis-report.md` — Full analysis report (written)
 
 ## Notes
-
-- CLI and Telegram channels are well-isolated (gateway-only dependency)
-- Web channel is the most coupled (imports from 4 workspace crates directly)
-- No circular dependencies in the workspace
-- Leaf crates: ouroboros, markdown (no workspace deps)
-- 5 modules are strong extraction candidates: workers (0 deps), access_manager (1 dep), program (1 dep), mcp (1 dep), capability (2 deps)
-- memory/ is the largest module (6.8K LOC) with clean internal architecture — extractable with trait abstraction
-- tools/ and kernel_handle/ are not extractable by design (facade and hands of the kernel)
-
-## Frontend-Backend API Type Mismatch Audit (2026-05-23)
-
-- [x] Audited all 13 frontend routes against their backend handlers
-- [x] Report written to `/tmp/api-mismatch-report.md`
-
-### Summary of findings:
-- **12 of 13 routes have mismatches** (only agent-groups is clean)
-- **6 routes**: frontend expects raw array but backend returns paginated `{ items, total, page, limit }`
-- **4 routes**: backend wraps array in object (`{ jobs }`, `{ entries }`, `{ tags }`) but frontend expects raw array
-- **1 route**: frontend expects `{ items }` wrapper but backend returns raw array (approvals)
-- **2 missing endpoints**: `GET /api/budget` (list all) and `GET /api/scheduler` (combined)
-- **2 wrong URLs**: `/api/security/audit` should be `/api/audit`, `/api/security/permissions` doesn't exist
-- **1 protocol mismatch**: `/api/events` is SSE but frontend tries REST GET
-- **1 single-vs-array**: `/api/resources` returns single snapshot but frontend expects array for chart
-- **Multiple field name mismatches**: `active`/`enabled` (personas), `command`/`goal` (cron create), `agent_id`/`subject` (approvals)
+- Previously fixed routes (host-tools, programs, personas, skills, budget, cron-jobs, resources, git, memory, security, scheduler, events, approvals) had array-vs-object wrapping fixes
+- This audit covers ALL remaining mismatches including missing endpoints, wrong field names, wrong URLs, and type shape differences

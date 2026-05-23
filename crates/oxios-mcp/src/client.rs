@@ -14,7 +14,7 @@ use tokio::process::{Child, ChildStdin, ChildStdout, Command};
 use tokio::sync::RwLock;
 use tokio::time::{timeout, Duration};
 
-use super::protocol::*;
+use crate::protocol::*;
 
 // ---------------------------------------------------------------------------
 // McpClient — manages a single MCP server process lifecycle

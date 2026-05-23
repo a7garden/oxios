@@ -16,7 +16,11 @@ function ApprovalsPage() {
 
   const { data, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ['approvals'],
-    queryFn: () => api.get<{ items: Approval[] }>('/api/approvals'),
+    queryFn: async () => {
+      // Backend returns raw array, not { items } wrapper
+      const res = await api.get<Approval[]>('/api/approvals')
+      return { items: Array.isArray(res) ? res : [] }
+    },
     refetchInterval: 5000,
   })
 

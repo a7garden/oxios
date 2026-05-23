@@ -3,13 +3,15 @@
 //! This module defines the wire types for MCP communication (JSON-RPC requests,
 //! responses, errors) and the domain-specific types for tools, capabilities,
 //! and initialization negotiation.
+//!
+//! This module is fully independent of the Oxios kernel. It defines MCP-native
+//! types only. Conversion to Oxios-specific types (like `ToolDef`) is handled
+//! by the kernel's adapter layer.
 
 use std::collections::HashMap;
 
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
-
-use crate::program::ToolDef;
 
 // ---------------------------------------------------------------------------
 // Unique ID generator for JSON-RPC requests
@@ -298,55 +300,19 @@ pub struct McpTool {
 }
 
 impl McpTool {
-    /// Convert an MCP tool to an oxios ToolDef.
-    ///
-    /// Parses the `input_schema` as a JSON Schema object, extracting
-    /// properties from the top-level `"properties"` key (not from the
-    /// root object, which contains `type`, `properties`, `required`, etc.).
-    pub fn to_tool_def(&self) -> ToolDef {
-        let arguments = if let Some(properties) = self
-            .input_schema
-            .get("properties")
-            .and_then(|p| p.as_object())
-        {
-            let required_list: Vec<&str> = self
-                .input_schema
-                .get("required")
-                .and_then(|r| r.as_array())
-                .map(|arr| arr.iter().filter_map(|v| v.as_str()).collect())
-                .unwrap_or_default();
+    /// Get the tool name.
+    pub fn name(&self) -> &str {
+        &self.name
+    }
 
-            properties
-                .iter()
-                .map(|(name, schema)| {
-                    let description = schema
-                        .get("description")
-                        .and_then(|d| d.as_str())
-                        .unwrap_or("No description")
-                        .to_string();
-                    let required =
-                        required_list.iter().any(|r| *r == name) && schema.get("default").is_none();
+    /// Get the tool description.
+    pub fn description(&self) -> &str {
+        &self.description
+    }
 
-                    crate::program::ArgumentDef {
-                        name: name.clone(),
-                        description,
-                        required,
-                        default: schema
-                            .get("default")
-                            .and_then(|d| d.as_str().map(String::from)),
-                    }
-                })
-                .collect()
-        } else {
-            Vec::new()
-        };
-
-        ToolDef {
-            name: self.name.clone(),
-            description: self.description.clone(),
-            arguments,
-            command: String::new(), // MCP tools don't use command-based execution
-        }
+    /// Get the tool input JSON Schema.
+    pub fn input_schema(&self) -> &serde_json::Value {
+        &self.input_schema
     }
 }
 

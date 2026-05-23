@@ -9,8 +9,6 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useEvents } from '@/hooks/use-events'
-import { api } from '@/lib/api-client'
-import type { OxiosEvent } from '@/types'
 
 export const Route = createFileRoute('/events')({ component: EventsPage })
 
@@ -18,9 +16,15 @@ function EventsPage() {
   const { events: liveEvents, isConnected, error: connectionError } = useEvents()
   const scrollRef = useRef<HTMLDivElement>(null)
 
-  const { isLoading, isError, refetch, isFetching } = useQuery({
+  const {
+    isLoading,
+    isError,
+    refetch,
+    isFetching,
+  } = useQuery({
     queryKey: ['events'],
-    queryFn: () => api.get<{ items: OxiosEvent[] }>('/api/events?limit=50'),
+    // /api/events is SSE stream, not REST. Live events come from useEvents() hook.
+    queryFn: async () => null,
   })
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: liveEvents.length is sufficient dependency for scroll-to-bottom

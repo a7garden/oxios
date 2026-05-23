@@ -5,7 +5,6 @@ import { EmptyState } from '@/components/shared/empty-state'
 import { ErrorState } from '@/components/shared/error-state'
 import { LoadingCards } from '@/components/shared/loading'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { api } from '@/lib/api-client'
 import type { Budget } from '@/types'
 
 export const Route = createFileRoute('/budget')({ component: BudgetPage })
@@ -19,7 +18,11 @@ function BudgetPage() {
     isFetching,
   } = useQuery({
     queryKey: ['budgets'],
-    queryFn: () => api.get<Budget[]>('/api/budget'),
+    queryFn: async (): Promise<Budget[]> => {
+      // Backend only has GET /api/budget/{agent_id} — no list endpoint.
+      // Return empty array until backend adds a list endpoint.
+      return []
+    },
     refetchInterval: 10000,
   })
 

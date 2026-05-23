@@ -29,7 +29,11 @@ function SkillsPage() {
     isFetching,
   } = useQuery({
     queryKey: ['skills'],
-    queryFn: () => api.get<Skill[]>('/api/skills'),
+    queryFn: async () => {
+      const res = await api.get<{ items: { name: string; description: string }[] }>('/api/skills')
+      // List endpoint returns no content — must use GET /api/skills/:name for full details
+      return (res.items ?? []).map((s) => ({ ...s, content: '' }))
+    },
     refetchInterval: 30000,
   })
 

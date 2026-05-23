@@ -27,7 +27,11 @@ export const Route = createFileRoute('/resources')({ component: ResourcesPage })
 function ResourcesPage() {
   const { data, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ['resources'],
-    queryFn: () => api.get<ResourceSnapshot[]>('/api/resources'),
+    queryFn: async () => {
+      // /api/resources returns a single snapshot; /api/resources/history returns array
+      const res = await api.get<{ snapshots: ResourceSnapshot[]; count: number }>('/api/resources/history?last_n=30')
+      return res.snapshots ?? []
+    },
     refetchInterval: 5000,
   })
 

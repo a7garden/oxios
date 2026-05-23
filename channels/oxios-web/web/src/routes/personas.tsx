@@ -10,7 +10,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { api } from '@/lib/api-client'
-import type { Persona } from '@/types'
 
 export const Route = createFileRoute('/personas')({ component: PersonasPage })
 
@@ -29,7 +28,11 @@ function PersonasPage() {
     isFetching,
   } = useQuery({
     queryKey: ['personas'],
-    queryFn: () => api.get<Persona[]>('/api/personas'),
+    queryFn: async () => {
+      const res = await api.get<{ id: string; name: string; role: string; description: string; enabled: boolean; personality_traits: string[] }[]>('/api/personas')
+      // Backend returns raw array
+      return Array.isArray(res) ? res : []
+    },
     refetchInterval: 30000,
   })
 
@@ -131,14 +134,14 @@ function PersonasPage() {
                 <div>
                   <CardTitle className="text-base flex items-center gap-2">
                     <Users className="h-4 w-4" /> {persona.name}
-                    {persona.active && <Star className="h-3 w-3 text-amber-500 fill-amber-500" />}
+                    {persona.enabled && <Star className="h-3 w-3 text-amber-500 fill-amber-500" />}
                   </CardTitle>
                   {persona.description && (
                     <p className="text-xs text-muted-foreground mt-1">{persona.description}</p>
                   )}
                 </div>
                 <div className="flex gap-1">
-                  {!persona.active && (
+                  {!persona.enabled && (
                     <Button
                       variant="ghost"
                       size="icon"
@@ -158,12 +161,9 @@ function PersonasPage() {
                   </Button>
                 </div>
               </CardHeader>
-              {persona.system_prompt && (
+              {persona.role && (
                 <CardContent>
-                  <pre className="rounded bg-muted p-2 text-xs overflow-x-auto max-h-24">
-                    {persona.system_prompt.slice(0, 200)}
-                    {persona.system_prompt.length > 200 ? '...' : ''}
-                  </pre>
+                  <p className="text-xs text-muted-foreground">Role: {persona.role}</p>
                 </CardContent>
               )}
             </Card>

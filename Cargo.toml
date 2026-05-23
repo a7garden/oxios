@@ -9,6 +9,7 @@ repository = "https://github.com/a7garden/oxios"
 [workspace]
 resolver = "2"
 members = [
+    "crates/oxios-mcp",
     "crates/oxios-kernel",
     "crates/oxios-markdown",
     "crates/oxios-ouroboros",

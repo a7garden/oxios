@@ -5111,6 +5111,7 @@ dependencies = [
  "oxibrowser-core",
  "oxios-gateway",
  "oxios-markdown",
+ "oxios-mcp",
  "oxios-ouroboros",
  "parking_lot",
  "regex",
@@ -5157,6 +5158,18 @@ dependencies = [
  "unicode-segmentation",
  "uuid",
  "walkdir",
+]
+
+[[package]]
+name = "oxios-mcp"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "parking_lot",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]

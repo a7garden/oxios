@@ -1,6 +1,6 @@
 //! MCP API — external tool server bridge.
 
-use crate::mcp::{McpBridge, McpServer, McpToolCallResult};
+use crate::mcp::{self, McpBridge, McpServer, McpToolCallResult};
 use crate::program::ToolDef;
 use std::sync::Arc;
 
@@ -43,14 +43,14 @@ impl McpApi {
         }
     }
 
-    /// List all MCP tools.
+    /// List all MCP tools as ToolDefs.
     pub async fn list_tools(&self) -> anyhow::Result<Vec<ToolDef>> {
-        self.mcp_bridge.list_tools().await
+        mcp::list_tool_defs(&self.mcp_bridge).await
     }
 
-    /// Get cached tools for a server.
+    /// Get cached tools for a server as ToolDefs.
     pub async fn cached_tools(&self, server_name: &str) -> Option<Vec<ToolDef>> {
-        self.mcp_bridge.cached_tools(server_name).await
+        mcp::cached_tool_defs(&self.mcp_bridge, server_name).await
     }
 
     /// Call an MCP tool.

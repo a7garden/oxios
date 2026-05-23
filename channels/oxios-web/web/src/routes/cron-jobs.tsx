@@ -23,7 +23,10 @@ function CronJobsPage() {
 
   const { data, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ['cron-jobs'],
-    queryFn: () => api.get<CronJob[]>('/api/cron-jobs'),
+    queryFn: async () => {
+      const res = await api.get<{ jobs: CronJob[] }>('/api/cron-jobs')
+      return res.jobs ?? []
+    },
     refetchInterval: 10000,
   })
 

@@ -8,7 +8,6 @@ import { LoadingCards } from '@/components/shared/loading'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { api } from '@/lib/api-client'
-import type { MemoryEntry } from '@/types'
 
 export const Route = createFileRoute('/memory')({ component: MemoryPage })
 
@@ -23,8 +22,11 @@ function MemoryPage() {
     isFetching,
   } = useQuery({
     queryKey: ['memory', search],
-    queryFn: () =>
-      api.get<MemoryEntry[]>(`/api/memory${search ? `?q=${encodeURIComponent(search)}` : ''}`),
+    queryFn: async () => {
+      const res = await api.get<{ items: { name: string; category: string }[] }>('/api/memory')
+      // List endpoint returns name + category only — show category as content
+      return (res.items ?? []).map((m) => ({ name: m.name, content: m.category, updated_at: '' }))
+    },
     refetchInterval: 15000,
   })
 
