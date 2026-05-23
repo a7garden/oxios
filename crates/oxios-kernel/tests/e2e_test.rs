@@ -254,10 +254,10 @@ async fn test_orchestrator_handles_message() -> Result<()> {
     // Response should not be empty.
     assert!(!result.response.is_empty(), "Response should not be empty");
 
-    // Should reach at least Evaluate phase.
+    // Should reach at least Execute phase (current pipeline: Interview → Seed → Execute).
     assert!(
-        result.phase_reached == Phase::Evaluate,
-        "Expected Evaluate phase, got {:?}",
+        result.phase_reached == Phase::Execute,
+        "Expected Execute phase, got {:?}",
         result.phase_reached
     );
 
@@ -305,9 +305,10 @@ async fn test_orchestrator_evolution_loop() -> Result<()> {
         .handle_message("test-user", "Something that needs evolution", None)
         .await?;
 
-    // Should still reach Evaluate (evolve→re-execute→re-evaluate).
-    assert_eq!(result.phase_reached, Phase::Evaluate);
-    assert!(result.evaluation_passed, "Second evaluation should pass");
+    // Should still reach Execute (evolve→re-execute).
+    // Note: current pipeline stops at Execute; evaluate is not a separate phase.
+    assert_eq!(result.phase_reached, Phase::Execute);
+    assert!(result.evaluation_passed, "Execution should succeed after evolution");
 
     println!("Evolution loop: {:?}", result.phase_reached);
 
@@ -456,15 +457,15 @@ async fn test_phase_events_published() -> Result<()> {
         }
     }
 
-    // Should have at least 4 phase started events (Interview, Seed, Execute, Evaluate).
+    // Should have at least 3 phase started events (Interview, Seed, Execute).
     assert!(
-        phase_started >= 4,
-        "Expected ≥4 PhaseStarted events, got {}",
+        phase_started >= 3,
+        "Expected ≥3 PhaseStarted events, got {}",
         phase_started
     );
     assert!(
-        phase_completed >= 4,
-        "Expected ≥4 PhaseCompleted events, got {}",
+        phase_completed >= 3,
+        "Expected ≥3 PhaseCompleted events, got {}",
         phase_completed
     );
 
