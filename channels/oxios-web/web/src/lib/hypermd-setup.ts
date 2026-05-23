@@ -57,3 +57,28 @@ import 'codemirror/mode/markdown/markdown'
 // Re-export CodeMirror type for convenience
 export type CodeMirrorEditor = import('codemirror').Editor
 export type CodeMirrorEditorConfiguration = import('codemirror').EditorConfiguration
+
+/**
+ * Create a HyperMD WYSIWYG editor from a textarea element.
+ *
+ * Uses `HyperMD.fromTextArea` from the core module, which automatically
+ * merges `suggestedEditorConfig` (theme, hmdFold, lineWrapping, etc.)
+ * with the user-provided config. This is what makes the editor render
+ * markdown live — headers fold, links render, images display inline, etc.
+ */
+export function createHyperMDEditor(
+  textarea: HTMLTextAreaElement,
+  userConfig?: Record<string, unknown>,
+): CodeMirror.Editor {
+  // HyperMD.fromTextArea is available on window after the `hypermd/everything` import.
+  const HMD = (window as any).HyperMD
+  if (HMD?.fromTextArea) {
+    return HMD.fromTextArea(textarea, userConfig) as CodeMirror.Editor
+  }
+
+  // Fallback: manual merge of suggestedEditorConfig (shouldn't normally happen)
+  const suggested = HMD?.suggestedEditorConfig ?? {}
+  const finalConfig = { ...suggested, ...userConfig }
+  const CM = (window as any).CodeMirror as typeof CodeMirror
+  return CM.fromTextArea(textarea, finalConfig) as CodeMirror.Editor
+}

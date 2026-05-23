@@ -8,6 +8,9 @@ export class WsClient {
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null
   private reconnectAttempts = 0
   private maxReconnectAttempts = 10
+  /** Queue for messages sent before the socket is open. */
+  private pendingQueue: string[] = []
+  private _disposed = false
 
   constructor(path: string, token: string, onMessage: WsMessageHandler) {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
@@ -17,11 +20,17 @@ export class WsClient {
   }
 
   connect() {
+    if (this._disposed) return
     const separator = this.url.includes('?') ? '&' : '?'
     this.ws = new WebSocket(`${this.url}${separator}token=${this.token}`)
 
     this.ws.onopen = () => {
       this.reconnectAttempts = 0
+      // Flush any messages queued while the socket was connecting.
+      while (this.pendingQueue.length > 0) {
+        const msg = this.pendingQueue.shift()!
+        this.ws!.send(msg)
+      }
     }
 
     this.ws.onmessage = (event) => {
@@ -43,21 +52,34 @@ export class WsClient {
   }
 
   send(data: unknown) {
+    const serialized = JSON.stringify(data)
     if (this.ws?.readyState === WebSocket.OPEN) {
-      this.ws.send(JSON.stringify(data))
+      this.ws.send(serialized)
+    } else {
+      // Socket not open yet — queue for delivery on connect.
+      this.pendingQueue.push(serialized)
     }
   }
 
   close() {
+    this._disposed = true
+    this.pendingQueue = []
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer)
       this.reconnectTimer = null
     }
-    this.ws?.close()
-    this.ws = null
+    if (this.ws) {
+      // Detach handlers to prevent close() from triggering reconnect.
+      const ws = this.ws
+      this.ws = null
+      ws.onclose = null
+      ws.onerror = null
+      ws.close()
+    }
   }
 
   private scheduleReconnect() {
+    if (this._disposed) return
     if (this.reconnectAttempts >= this.maxReconnectAttempts) return
     const delay = Math.min(1000 * 2 ** this.reconnectAttempts, 30000)
     this.reconnectTimer = setTimeout(() => {

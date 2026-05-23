@@ -28,7 +28,10 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      '/api': 'http://localhost:4200',
+      '/api': {
+        target: 'http://localhost:4200',
+        ws: true,
+      },
       '/health': 'http://localhost:4200',
     },
   },

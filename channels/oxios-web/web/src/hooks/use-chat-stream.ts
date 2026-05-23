@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { WsClient } from '@/lib/ws-client'
 import type { ChatMessage, StreamChunk } from '@/types'
 
@@ -7,7 +7,9 @@ export function useChatStream() {
   const [isStreaming, setIsStreaming] = useState(false)
   const wsRef = useRef<WsClient | null>(null)
 
-  const connect = useCallback(() => {
+  const ensureConnected = useCallback(() => {
+    if (wsRef.current) return
+
     const token = localStorage.getItem('oxios-api-key') || ''
     const client = new WsClient('/api/chat/stream', token, (data) => {
       const chunk = data as StreamChunk
@@ -36,7 +38,14 @@ export function useChatStream() {
     })
     wsRef.current = client
     client.connect()
-    return client
+  }, [])
+
+  // Cleanup only — no eager connect.
+  useEffect(() => {
+    return () => {
+      wsRef.current?.close()
+      wsRef.current = null
+    }
   }, [])
 
   const sendMessage = useCallback(
@@ -49,10 +58,10 @@ export function useChatStream() {
       setMessages((prev) => [...prev, userMsg])
       setIsStreaming(true)
 
-      if (!wsRef.current) connect()
+      ensureConnected()
       wsRef.current?.send({ type: 'message', content })
     },
-    [connect],
+    [ensureConnected],
   )
 
   const disconnect = useCallback(() => {

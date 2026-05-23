@@ -1,6 +1,7 @@
 import type CodeMirror from 'codemirror'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import '@/lib/hypermd-setup' // side-effect: registers all CM5/HyperMD modules
+import { createHyperMDEditor } from '@/lib/hypermd-setup'
 import { useKnowledgeTree } from '@/hooks/use-knowledge'
 import { buildAutocompleteDict, createLinkHintFn } from '@/lib/autocomplete-link'
 import { cn } from '@/lib/utils'
@@ -67,20 +68,17 @@ export function MarkdownEditor({
       return
     }
 
-    // CodeMirror is registered globally by hypermd-setup side-effect import
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const CM = (window as any).CodeMirror as typeof CodeMirror
-    if (!CM) {
-      console.error('[Knowledge] CodeMirror not available — hypermd-setup may have failed to load')
-      return
-    }
-    const cm = CM.fromTextArea(textarea, {
+    const cm = createHyperMDEditor(textarea, {
+      // Override suggestedEditorConfig defaults that don't suit our UI
       mode: { name: 'hypermd', math: false },
       lineNumbers: false,
+      lineWrapping: true,
       dragDrop: false,
       viewportMargin: 10,
       hmdClick: true,
       styleActiveLine: true,
+      foldGutter: false,
+      autoCloseBrackets: false,
       extraKeys: {
         'Cmd-B': toggleBold,
         'Ctrl-B': toggleBold,
@@ -233,7 +231,7 @@ export function MarkdownEditor({
 
     return () => {
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
-      cm.toTextArea()
+      ;(cm as any).toTextArea()
       editorRef.current = null
     }
   }, [initialContent, openFile, onSave, autocompleteEntries]) // Re-create on file change
