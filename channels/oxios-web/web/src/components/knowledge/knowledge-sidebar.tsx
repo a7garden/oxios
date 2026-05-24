@@ -54,7 +54,7 @@ export function KnowledgeSidebar() {
 
   return (
     <div
-      className="flex flex-col h-full border-r bg-sidebar-background text-sidebar-foreground shrink-0"
+      className="flex flex-col h-full border-r bg-sidebar text-sidebar-foreground shrink-0"
       style={{ width: sidebarWidth }}
     >
       {/* Header — matches main sidebar style */}

@@ -101,7 +101,7 @@ export function AppLayout() {
               }}
             />
           )}
-          <div className={cn('hidden lg:flex', mobileOpen && 'fixed inset-y-0 left-0 z-50 flex')}>
+          <div className={cn('hidden lg:flex', mobileOpen && 'fixed inset-y-0 left-0 z-50 flex w-60 bg-sidebar')}>
             <Sidebar />
           </div>
         </>
