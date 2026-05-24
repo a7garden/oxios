@@ -8,6 +8,7 @@ use std::sync::Arc;
 use tokio_stream::wrappers::BroadcastStream;
 use tokio_stream::StreamExt as TokioStreamExt;
 
+use crate::error::AppError;
 use crate::routes::{paginate, PageParams};
 use crate::server::AppState;
 
@@ -92,6 +93,38 @@ pub(crate) async fn handle_session_delete(
         Ok(false) => Err(StatusCode::NOT_FOUND),
         Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
     }
+}
+
+/// POST /api/sessions/prune — Prune sessions based on config.
+///
+/// Removes sessions that exceed TTL or exceed the maximum count.
+pub(crate) async fn handle_sessions_prune(
+    State(state): State<Arc<AppState>>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    use oxios_kernel::state_store::PruneConfig;
+    let prune_config = {
+        let cfg = state.config.read();
+        PruneConfig {
+            max_sessions: cfg.session.max_sessions,
+            ttl_hours: cfg.session.ttl_hours,
+        }
+    }; // cfg guard dropped here
+
+    let pruned = state
+        .kernel
+        .state
+        .prune_sessions(&prune_config)
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))?;
+
+    Ok(Json(serde_json::json!({
+        "status": "pruned",
+        "count": pruned,
+        "config": {
+            "max_sessions": prune_config.max_sessions,
+            "ttl_hours": prune_config.ttl_hours,
+        },
+    })))
 }
 
 // ---------------------------------------------------------------------------

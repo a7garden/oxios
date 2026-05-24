@@ -52,7 +52,7 @@ pub(crate) use cron_jobs::{
 };
 pub(crate) use events::{
     handle_approval_approve, handle_approval_reject, handle_approvals_list, handle_events,
-    handle_session_delete, handle_session_get, handle_sessions_list,
+    handle_session_delete, handle_session_get, handle_sessions_list, handle_sessions_prune,
 };
 pub(crate) use git_routes::{
     handle_git_log, handle_git_restore, handle_git_tags, handle_git_verify,
@@ -250,6 +250,7 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         )
         // Sessions
         .route("/api/sessions", get(handle_sessions_list))
+        .route("/api/sessions/prune", post(handle_sessions_prune))
         .route("/api/sessions/{id}", get(handle_session_get))
         .route("/api/sessions/{id}", delete(handle_session_delete))
         // Cron Jobs
