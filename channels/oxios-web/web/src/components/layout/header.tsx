@@ -4,6 +4,7 @@ import { Separator } from '@/components/ui/separator'
 import { cn } from '@/lib/utils'
 import { useKnowledgeStore } from '@/stores/knowledge'
 import { useSidebarStore } from '@/stores/sidebar'
+import { NotificationBell } from './notification-bell'
 
 export function Header() {
   const { setMobileOpen } = useSidebarStore()
@@ -39,6 +40,10 @@ export function Header() {
       )}
 
       <div className="flex-1" />
+
+      {/* Global notification bell */}
+      <NotificationBell />
+
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
         <div className="h-2 w-2 rounded-full bg-emerald-500" aria-hidden="true" />
         <span>Oxios Agent OS</span>

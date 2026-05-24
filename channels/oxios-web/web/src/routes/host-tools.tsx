@@ -1,7 +1,8 @@
 import { useQuery } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
-import { CheckCircle, RefreshCw, Wrench, XCircle } from 'lucide-react'
+import { CheckCircle, Wrench, XCircle } from 'lucide-react'
 import { ErrorState } from '@/components/shared/error-state'
+import { RefreshButton } from '@/components/shared/refresh-button'
 import { LoadingCards } from '@/components/shared/loading'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { api } from '@/lib/api-client'
@@ -58,15 +59,7 @@ function HostToolsPage() {
           <h1 className="text-2xl font-bold">Host Tools</h1>
           <p className="text-muted-foreground">Available host system tools and capabilities</p>
         </div>
-        <button
-          type="button"
-          onClick={() => refetch()}
-          aria-label="Refresh"
-          disabled={isFetching}
-          className="rounded-md p-2 hover:bg-muted"
-        >
-          <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
-        </button>
+        <RefreshButton onClick={() => refetch()} isFetching={isFetching} />
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">

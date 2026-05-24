@@ -1,10 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
-import { Cpu, Download, Power, PowerOff, RefreshCw } from 'lucide-react'
+import { Cpu, Download, Power, PowerOff } from 'lucide-react'
 import { useState } from 'react'
 import { EmptyState } from '@/components/shared/empty-state'
 import { ErrorState } from '@/components/shared/error-state'
 import { LoadingCards } from '@/components/shared/loading'
+import { RefreshButton } from '@/components/shared/refresh-button'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -59,9 +60,7 @@ function ProgramsPage() {
           <h1 className="text-2xl font-bold">Programs</h1>
           <p className="text-muted-foreground">Manage OS-level programs</p>
         </div>
-        <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching}>
-          <RefreshCw className={`h-4 w-4 mr-1 ${isFetching ? 'animate-spin' : ''}`} /> Refresh
-        </Button>
+        <RefreshButton onClick={() => refetch()} isFetching={isFetching} />
       </div>
 
       {/* Install */}

@@ -86,6 +86,9 @@ impl Gateway {
                 if let Some(ref sid) = orchestration.session_id {
                     response_metadata.insert("session_id".to_owned(), sid.clone());
                 }
+                if let Some(ref vid) = orchestration.space_id {
+                    response_metadata.insert("space_id".to_owned(), vid.to_string());
+                }
                 response_metadata
                     .insert("phase".to_owned(), orchestration.phase_reached.to_string());
                 response_metadata.insert(

@@ -1,5 +1,5 @@
 import { Link } from '@tanstack/react-router'
-import { FilePlus, FolderPlus, LayoutDashboard, PanelLeftClose, Trash2 } from 'lucide-react'
+import { BookOpen, FilePlus, FolderPlus, LayoutDashboard, MessageSquare, PanelLeftClose, Trash2 } from 'lucide-react'
 import { useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import {
@@ -119,13 +119,14 @@ export function KnowledgeSidebar() {
         type="button"
         onClick={() => openChat()}
         className={cn(
-          'flex items-center gap-2 px-3 py-2 text-sm w-full text-left transition-colors border-b border-sidebar-border',
+          'flex items-center gap-2.5 px-4 py-2.5 text-sm w-full text-left transition-colors border-b border-sidebar-border',
           mode === 'chat'
             ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
             : 'hover:bg-sidebar-accent/50 text-sidebar-foreground/70',
         )}
       >
-        💬 Chat
+        <MessageSquare className="h-4 w-4" />
+        Chat
       </button>
 
       {/* Journal button */}
@@ -133,13 +134,14 @@ export function KnowledgeSidebar() {
         type="button"
         onClick={handleOpenJournal}
         disabled={journalToday.isLoading}
-        className="flex items-center gap-2 px-3 py-2 text-sm w-full text-left hover:bg-sidebar-accent/50 transition-colors border-b border-sidebar-border text-sidebar-foreground/70 disabled:opacity-50"
+        className="flex items-center gap-2.5 px-4 py-2.5 text-sm w-full text-left hover:bg-sidebar-accent/50 transition-colors border-b border-sidebar-border text-sidebar-foreground/70 disabled:opacity-50"
       >
-        📔 Journal
+        <BookOpen className="h-4 w-4" />
+        Journal
       </button>
 
       {/* File tree */}
-      <div className="flex-1 overflow-y-auto p-1">
+      <div className="flex-1 overflow-y-auto px-2 py-2">
         {isLoading ? (
           <div className="p-3 text-sm text-sidebar-foreground/50">Loading...</div>
         ) : entries ? (
@@ -151,20 +153,23 @@ export function KnowledgeSidebar() {
       <ResizeHandle width={sidebarWidth} onResize={setSidebarWidth} />
 
       {/* Keyboard shortcuts legend */}
-      <div className="p-2 border-t border-sidebar-border text-[10px] text-sidebar-foreground/40 space-y-0.5">
-        <div>
-          <kbd className="font-mono border rounded px-1">⌘K</kbd> Search
+      <div className="px-4 py-3 border-t border-sidebar-border text-[11px] text-sidebar-foreground/40 space-y-1">
+        <div className="flex items-center gap-2">
+          <kbd className="font-mono border rounded px-1.5 py-0.5">⌘K</kbd>
+          <span>Search</span>
         </div>
-        <div>
-          <kbd className="font-mono border rounded px-1">⌘M</kbd> Move file
+        <div className="flex items-center gap-2">
+          <kbd className="font-mono border rounded px-1.5 py-0.5">⌘M</kbd>
+          <span>Move file</span>
         </div>
-        <div>
-          <kbd className="font-mono border rounded px-1">⌘N</kbd> New file
+        <div className="flex items-center gap-2">
+          <kbd className="font-mono border rounded px-1.5 py-0.5">⌘N</kbd>
+          <span>New file</span>
         </div>
       </div>
 
       {/* Navigation back to Dashboard */}
-      <div className="p-2 border-t border-sidebar-border">
+      <div className="px-2 py-3 border-t border-sidebar-border">
         <Link
           to="/"
           className="flex items-center gap-2 rounded-lg px-2.5 py-2 text-sm text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground transition-colors w-full"

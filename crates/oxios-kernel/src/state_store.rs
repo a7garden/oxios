@@ -382,6 +382,7 @@ impl StateStore {
                         user_id: session.user_id.clone(),
                         message_count: session.user_messages.len(),
                         active_seed_id: session.active_seed_id.clone(),
+                        space_id: session.metadata.get("space_id").and_then(|v| v.as_str()).map(String::from),
                         created_at: session.created_at,
                         updated_at: session.updated_at,
                     });
@@ -450,6 +451,9 @@ pub struct SessionSummary {
     /// Active seed ID if any.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub active_seed_id: Option<String>,
+    /// Space ID this session belongs to (from metadata).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub space_id: Option<String>,
     /// When the session was created.
     pub created_at: DateTime<Utc>,
     /// When the session was last updated.

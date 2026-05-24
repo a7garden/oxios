@@ -1,3 +1,4 @@
+import { BarChart3, Dumbbell } from 'lucide-react'
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { useKnowledgeHabits } from '@/hooks/use-knowledge'
@@ -17,7 +18,10 @@ export function Habits() {
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">💪 Habits</h2>
+        <h2 className="text-lg font-semibold flex items-center gap-2">
+          <Dumbbell className="h-5 w-5" />
+          Habits
+        </h2>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={() => setYear((y) => y - 1)}>
             ← {year - 1}
@@ -47,7 +51,7 @@ export function Habits() {
         </div>
       ) : (
         <div className="text-center py-12">
-          <p className="text-2xl mb-2">📊</p>
+          <BarChart3 className="h-8 w-8 text-muted-foreground" />
           <p className="text-muted-foreground">No habit data for {year}</p>
           <p className="text-xs text-muted-foreground mt-1">
             Track habits in your journal to see them here

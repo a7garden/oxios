@@ -5,6 +5,7 @@ import { KnowledgeSidebar } from '@/components/knowledge/knowledge-sidebar'
 import { MoveModal } from '@/components/knowledge/move-modal'
 import { SearchModal } from '@/components/knowledge/search-modal'
 import { useKnowledgeShortcuts } from '@/hooks/use-knowledge-shortcuts'
+import { useGlobalEvents, useApprovalWatcher } from '@/hooks/use-global-events'
 import { cn } from '@/lib/utils'
 import { useKnowledgeStore } from '@/stores/knowledge'
 import { useSidebarStore } from '@/stores/sidebar'
@@ -31,6 +32,10 @@ export function AppLayout() {
   // Always call the hook — it guards internally via pathnameRef
   useKnowledgeShortcuts()
 
+  // Global event → notification pipeline
+  useGlobalEvents()
+  useApprovalWatcher()
+
   return (
     <div className="flex h-screen overflow-hidden">
       {/* ── Sidebar area ── */}
@@ -50,7 +55,11 @@ export function AppLayout() {
           )}
           {sidebarOpen ? (
             <div
-              className={cn('flex shrink-0', 'fixed inset-y-0 left-0 z-50 lg:relative lg:z-auto')}
+              className={cn(
+                'flex shrink-0',
+                // Mobile: fixed full-width overlay
+                'fixed inset-y-0 left-0 z-50 w-80 max-w-[85vw] lg:relative lg:z-auto lg:max-w-none',
+              )}
             >
               <KnowledgeSidebar />
             </div>

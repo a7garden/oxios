@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Textarea } from '@/components/ui/textarea'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import { useChatStore } from '@/stores/chat'
 import type { Space, Session } from '@/types'
 
@@ -72,7 +74,7 @@ function ChatPage() {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => loadSession(activeSessionId ?? '')}
+              onClick={() => { if (activeSessionId) loadSession(activeSessionId) }}
             >
               <RefreshCw className="h-3 w-3 mr-1" /> 새로고침
             </Button>
@@ -111,9 +113,15 @@ function ChatPage() {
                       </div>
                     )}
                     <div
-                      className={`rounded-lg px-4 py-2 max-w-[80%] whitespace-pre-wrap ${msg.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}
+                      className={`rounded-lg px-4 py-2 max-w-[80%] ${msg.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}
                     >
-                      <p className="text-sm">{msg.content}</p>
+                      {msg.role === 'user' ? (
+                        <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                      ) : (
+                        <div className="text-sm prose prose-sm dark:prose-invert max-w-none [&>p:first-child]:mt-0 [&>p:last-child]:mb-0">
+                          <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
+                        </div>
+                      )}
                     </div>
                     {msg.role === 'user' && (
                       <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted">

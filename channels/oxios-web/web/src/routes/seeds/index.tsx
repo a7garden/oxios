@@ -1,12 +1,12 @@
 import { useQuery } from '@tanstack/react-query'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { Dna, RefreshCw } from 'lucide-react'
+import { Dna } from 'lucide-react'
 import { DataTable } from '@/components/shared/data-table'
 import { EmptyState } from '@/components/shared/empty-state'
 import { ErrorState } from '@/components/shared/error-state'
 import { LoadingTable } from '@/components/shared/loading'
+import { RefreshButton } from '@/components/shared/refresh-button'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
 import { api } from '@/lib/api-client'
 import type { Seed } from '@/types'
 
@@ -47,9 +47,7 @@ function SeedsListPage() {
           <h1 className="text-2xl font-bold">Seeds</h1>
           <p className="text-muted-foreground">{data?.total ?? 0} seed(s)</p>
         </div>
-        <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching}>
-          <RefreshCw className={`h-4 w-4 mr-1 ${isFetching ? 'animate-spin' : ''}`} /> Refresh
-        </Button>
+        <RefreshButton onClick={() => refetch()} isFetching={isFetching} />
       </div>
 
       {seeds.length === 0 ? (

@@ -1,11 +1,14 @@
 import { useQuery } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
-import { FileWarning, KeyRound, RefreshCw, Shield } from 'lucide-react'
+import { FileWarning, KeyRound, Shield } from 'lucide-react'
+import { useState } from 'react'
 import { EmptyState } from '@/components/shared/empty-state'
 import { ErrorState } from '@/components/shared/error-state'
 import { LoadingCards } from '@/components/shared/loading'
+import { RefreshButton } from '@/components/shared/refresh-button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
 import { api } from '@/lib/api-client'
 
 export const Route = createFileRoute('/security')({ component: SecurityPage })
@@ -52,11 +55,20 @@ function SecurityPage() {
   if (auditLoading) return <LoadingCards count={4} />
   if (auditError) return <ErrorState onRetry={() => refetch()} />
 
+  const [auditPage, setAuditPage] = useState(1)
+  const AUDIT_PAGE_SIZE = 20
+
   const entries = (audits?.items ?? []).map((e) => ({
     ...e,
     id: `${e.timestamp}-${e.agent_name}`,
     agent_id: e.agent_name,
   }))
+
+  const totalPages = Math.ceil(entries.length / AUDIT_PAGE_SIZE)
+  const pagedEntries = entries.slice(
+    (auditPage - 1) * AUDIT_PAGE_SIZE,
+    auditPage * AUDIT_PAGE_SIZE,
+  )
 
   return (
     <div className="space-y-6">
@@ -65,15 +77,7 @@ function SecurityPage() {
           <h1 className="text-2xl font-bold">Security</h1>
           <p className="text-muted-foreground">Audit trail and access control</p>
         </div>
-        <button
-          type="button"
-          onClick={() => refetch()}
-          aria-label="Refresh"
-          disabled={isFetching}
-          className="rounded-md p-2 hover:bg-muted"
-        >
-          <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
-        </button>
+        <RefreshButton onClick={() => refetch()} isFetching={isFetching} />
       </div>
 
       {/* Permissions */}
@@ -125,7 +129,7 @@ function SecurityPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {entries.length === 0 ? (
+          {pagedEntries.length === 0 ? (
             <EmptyState
               icon={<Shield className="h-8 w-8" />}
               title="No audit entries"
@@ -134,7 +138,7 @@ function SecurityPage() {
             />
           ) : (
             <div className="space-y-2">
-              {entries.map((entry) => (
+              {pagedEntries.map((entry) => (
                 <div
                   key={entry.id}
                   className="flex items-center justify-between rounded-lg border p-3"
@@ -160,6 +164,33 @@ function SecurityPage() {
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between pt-3 border-t mt-3">
+              <p className="text-xs text-muted-foreground">
+                Showing {(auditPage - 1) * AUDIT_PAGE_SIZE + 1}–
+                {Math.min(auditPage * AUDIT_PAGE_SIZE, entries.length)} of {entries.length}
+              </p>
+              <div className="flex gap-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={auditPage <= 1}
+                  onClick={() => setAuditPage((p) => Math.max(1, p - 1))}
+                >
+                  Previous
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={auditPage >= totalPages}
+                  onClick={() => setAuditPage((p) => Math.min(totalPages, p + 1))}
+                >
+                  Next
+                </Button>
+              </div>
             </div>
           )}
         </CardContent>

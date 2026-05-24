@@ -47,7 +47,7 @@ function FileTreeItem({ entry, parentPath, onFileSelect, currentPath }: FileTree
         <button
           type="button"
           onClick={() => setExpanded(!expanded)}
-          className="flex items-center gap-1.5 w-full px-2 py-1 text-sm rounded hover:bg-accent/50 transition-colors text-left"
+          className="flex items-center gap-1.5 w-full px-2.5 py-1.5 text-sm rounded hover:bg-accent/50 transition-colors text-left"
         >
           <ChevronRight
             className={cn('h-3 w-3 shrink-0 transition-transform', expanded && 'rotate-90')}
@@ -76,7 +76,7 @@ function FileTreeItem({ entry, parentPath, onFileSelect, currentPath }: FileTree
         type="button"
         onClick={() => onFileSelect(fullPath)}
         className={cn(
-          'flex items-center gap-1.5 w-full px-2 py-1 text-sm rounded transition-colors text-left',
+          'flex items-center gap-1.5 w-full px-2.5 py-1.5 text-sm rounded transition-colors text-left',
           isActive ? 'bg-accent font-medium' : 'hover:bg-accent/50',
         )}
       >
@@ -101,7 +101,7 @@ function SubDirectory({
   if (isLoading) return <div className="pl-4 text-xs text-muted-foreground">...</div>
   if (!entries || entries.length === 0) return null
   return (
-    <div className="pl-3">
+    <div className="pl-4">
       <FileTree
         entries={entries}
         onFileSelect={onFileSelect}

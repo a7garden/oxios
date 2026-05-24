@@ -1,6 +1,17 @@
 import { useQuery } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { Activity, Bot, Boxes, Brain, Clock, Cpu, FileText, Zap } from 'lucide-react'
+import {
+  Activity,
+  Bot,
+  Brain,
+  Calendar,
+  Clock,
+  Cpu,
+  LayoutDashboard,
+  MessageSquare,
+  NotebookPen,
+  Shield,
+} from 'lucide-react'
 import { ErrorState } from '@/components/shared/error-state'
 import { LoadingCards } from '@/components/shared/loading'
 import { Badge } from '@/components/ui/badge'
@@ -37,6 +48,8 @@ function DashboardPage() {
   if (statusLoading) return <LoadingCards count={4} />
   if (statusError) return <ErrorState onRetry={() => refetchStatus()} />
 
+  const runningAgents = agents?.items?.filter((a) => a.status?.toLowerCase() === 'running') ?? []
+
   const stats = [
     {
       label: 'Running Agents',
@@ -53,7 +66,7 @@ function DashboardPage() {
     {
       label: 'Active Spaces',
       value: status?.components?.spaces_active ?? 0,
-      icon: <Boxes className="h-4 w-4" />,
+      icon: <LayoutDashboard className="h-4 w-4" />,
       color: 'text-purple-500',
     },
     {
@@ -62,6 +75,17 @@ function DashboardPage() {
       icon: <Clock className="h-4 w-4" />,
       color: 'text-amber-500',
     },
+  ]
+
+  const quickLinks = [
+    { label: 'Chat', href: '/chat', icon: <MessageSquare className="h-5 w-5 text-blue-500" />, desc: 'Start a conversation' },
+    { label: 'Knowledge', href: '/knowledge', icon: <NotebookPen className="h-5 w-5 text-violet-500" />, desc: 'Markdown notes & journal' },
+    { label: 'Agents', href: '/agents', icon: <Bot className="h-5 w-5 text-emerald-500" />, desc: 'Manage running agents' },
+    { label: 'Sessions', href: '/sessions', icon: <Clock className="h-5 w-5 text-blue-500" />, desc: 'View session history' },
+    { label: 'Resources', href: '/resources', icon: <Activity className="h-5 w-5 text-amber-500" />, desc: 'System resource usage' },
+    { label: 'Memory', href: '/memory', icon: <Brain className="h-5 w-5 text-purple-500" />, desc: 'Agent memory store' },
+    { label: 'Security', href: '/security', icon: <Shield className="h-5 w-5 text-red-500" />, desc: 'Audit trail & access control' },
+    { label: 'Scheduler', href: '/scheduler', icon: <Calendar className="h-5 w-5 text-teal-500" />, desc: 'Task queue management' },
   ]
 
   return (
@@ -88,91 +112,119 @@ function DashboardPage() {
         ))}
       </div>
 
-      {/* Active Agents */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Activity className="h-4 w-4" /> Active Agents
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {agentsError ? (
-            <ErrorState onRetry={() => refetchAgents()} />
-          ) : agents?.items?.length ? (
-            <div className="space-y-2">
-              {agents.items
-                .filter((a) => a.status?.toLowerCase() === 'running')
-                .map((agent) => (
-                  <div
+      {/* Two-column: Active Agents + System Health */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        {/* Active Agents */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Activity className="h-4 w-4" /> Active Agents
+              {runningAgents.length > 0 && (
+                <Badge variant="success" className="ml-1">{runningAgents.length}</Badge>
+              )}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {agentsError ? (
+              <ErrorState onRetry={() => refetchAgents()} />
+            ) : runningAgents.length > 0 ? (
+              <div className="space-y-2">
+                {runningAgents.map((agent) => (
+                  <Link
                     key={agent.id}
-                    className="flex items-center justify-between rounded-lg border p-3"
+                    to="/agents/$agentId"
+                    params={{ agentId: agent.id }}
+                    className="flex items-center justify-between rounded-lg border p-3 hover:bg-accent/50 transition-colors"
                   >
                     <div className="flex items-center gap-3">
                       <Bot className="h-4 w-4 text-muted-foreground" />
                       <div>
-                        <p className="font-medium">{agent.name}</p>
+                        <p className="font-medium text-sm">{agent.name}</p>
                         <p className="text-xs text-muted-foreground">
                           ID: {agent.id.slice(0, 8)}...
                         </p>
                       </div>
                     </div>
                     <Badge variant="success">Running</Badge>
-                  </div>
+                  </Link>
                 ))}
-              {agents.items.filter((a) => a.status?.toLowerCase() === 'running').length === 0 && (
-                <p className="text-sm text-muted-foreground">No active agents</p>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground py-2">No active agents</p>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* System Health Summary */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Shield className="h-4 w-4" /> System Health
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {status?.components?.state_store && (
+                <HealthRow
+                  label="State Store"
+                  healthy={status.components.state_store.healthy}
+                  detail={status.components.state_store.detail}
+                />
               )}
+              {status?.components?.event_bus && (
+                <HealthRow
+                  label="Event Bus"
+                  healthy={status.components.event_bus.healthy}
+                  detail={status.components.event_bus.detail}
+                />
+              )}
+              {status?.components?.memory && (
+                <HealthRow
+                  label="Memory"
+                  healthy={status.components.memory.enabled}
+                  detail={`${status.components.memory.index_size} entries indexed`}
+                />
+              )}
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Version</span>
+                <span className="font-mono">{status?.version ?? 'unknown'}</span>
+              </div>
             </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">No active agents</p>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Quick Links */}
-      <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-        <Link to="/knowledge">
-          <Card className="hover:bg-accent/50 transition-colors cursor-pointer group">
-            <CardHeader className="flex flex-row items-center gap-3 pb-2">
-              <Brain className="h-5 w-5 text-violet-500" />
-              <div>
-                <CardTitle className="text-sm font-medium">Knowledge</CardTitle>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Markdown notes, journal, chat
-                </p>
-              </div>
-            </CardHeader>
-          </Card>
-        </Link>
-        <Link to="/sessions">
-          <Card className="hover:bg-accent/50 transition-colors cursor-pointer group">
-            <CardHeader className="flex flex-row items-center gap-3 pb-2">
-              <Clock className="h-5 w-5 text-blue-500" />
-              <div>
-                <CardTitle className="text-sm font-medium">Sessions</CardTitle>
-                <p className="text-xs text-muted-foreground mt-0.5">View agent session history</p>
-              </div>
-            </CardHeader>
-          </Card>
-        </Link>
-        <Link to="/workspace">
-          <Card className="hover:bg-accent/50 transition-colors cursor-pointer group">
-            <CardHeader className="flex flex-row items-center gap-3 pb-2">
-              <FileText className="h-5 w-5 text-emerald-500" />
-              <div>
-                <CardTitle className="text-sm font-medium">Workspace</CardTitle>
-                <p className="text-xs text-muted-foreground mt-0.5">Browse agent workspace files</p>
-              </div>
-            </CardHeader>
-          </Card>
-        </Link>
+          </CardContent>
+        </Card>
       </div>
 
-      {/* Version */}
-      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-        <Zap className="h-4 w-4" />
-        <span>Version {status?.version ?? 'unknown'}</span>
+      {/* Quick Links — 2x4 grid */}
+      <div>
+        <h2 className="text-lg font-semibold mb-3">Quick Links</h2>
+        <div className="grid gap-3 grid-cols-2 md:grid-cols-4">
+          {quickLinks.map((link) => (
+            <Link key={link.href} to={link.href}>
+              <Card className="hover:bg-accent/50 transition-colors cursor-pointer group h-full">
+                <CardHeader className="flex flex-row items-center gap-3 pb-2">
+                  {link.icon}
+                  <div>
+                    <CardTitle className="text-sm font-medium">{link.label}</CardTitle>
+                    <p className="text-xs text-muted-foreground mt-0.5">{link.desc}</p>
+                  </div>
+                </CardHeader>
+              </Card>
+            </Link>
+          ))}
+        </div>
       </div>
+    </div>
+  )
+}
+
+function HealthRow({ label, healthy, detail }: { label: string; healthy: boolean; detail?: string | null }) {
+  return (
+    <div className="flex items-center justify-between text-sm">
+      <div className="flex items-center gap-2">
+        <div className={`h-2 w-2 rounded-full ${healthy ? 'bg-emerald-500' : 'bg-red-500'}`} />
+        <span>{label}</span>
+      </div>
+      <span className="text-xs text-muted-foreground">{detail ?? (healthy ? 'Healthy' : 'Unhealthy')}</span>
     </div>
   )
 }

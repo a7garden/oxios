@@ -1,9 +1,10 @@
 import { useQuery } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
-import { RefreshCw, Users } from 'lucide-react'
+import { Users } from 'lucide-react'
 import { EmptyState } from '@/components/shared/empty-state'
 import { ErrorState } from '@/components/shared/error-state'
 import { LoadingCards } from '@/components/shared/loading'
+import { RefreshButton } from '@/components/shared/refresh-button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { api } from '@/lib/api-client'
@@ -30,15 +31,7 @@ function AgentGroupsPage() {
           <h1 className="text-2xl font-bold">Agent Groups</h1>
           <p className="text-muted-foreground">Multi-agent group management</p>
         </div>
-        <button
-          type="button"
-          onClick={() => refetch()}
-          aria-label="Refresh"
-          disabled={isFetching}
-          className="rounded-md p-2 hover:bg-muted"
-        >
-          <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
-        </button>
+        <RefreshButton onClick={() => refetch()} isFetching={isFetching} />
       </div>
 
       {groups.length === 0 ? (

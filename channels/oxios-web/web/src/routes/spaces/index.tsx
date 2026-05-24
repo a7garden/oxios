@@ -1,10 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { Archive, Boxes, Play, RefreshCw } from 'lucide-react'
+import { Archive, Boxes, Play } from 'lucide-react'
 import { DataTable } from '@/components/shared/data-table'
 import { EmptyState } from '@/components/shared/empty-state'
 import { ErrorState } from '@/components/shared/error-state'
 import { LoadingTable } from '@/components/shared/loading'
+import { RefreshButton } from '@/components/shared/refresh-button'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { api } from '@/lib/api-client'
@@ -109,9 +110,7 @@ function SpacesListPage() {
           <h1 className="text-2xl font-bold">Spaces</h1>
           <p className="text-muted-foreground">{data?.total ?? 0} space(s)</p>
         </div>
-        <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching}>
-          <RefreshCw className={`h-4 w-4 mr-1 ${isFetching ? 'animate-spin' : ''}`} /> Refresh
-        </Button>
+        <RefreshButton onClick={() => refetch()} isFetching={isFetching} />
       </div>
 
       {spaces.length === 0 ? (

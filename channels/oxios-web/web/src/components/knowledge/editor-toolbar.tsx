@@ -45,7 +45,7 @@ export function EditorToolbar() {
   }, [handleSave])
 
   return (
-    <div className="flex items-center gap-1 px-2 py-1 border-b bg-muted/30 min-h-[36px]">
+    <div className="flex items-center gap-1 px-3 py-1.5 border-b bg-muted/30 min-h-[40px]">
       <Button
         variant="ghost"
         size="icon"
@@ -67,7 +67,7 @@ export function EditorToolbar() {
         <ArrowRight className="h-4 w-4" />
       </Button>
 
-      <span className="text-sm font-medium truncate mx-2">{fileName || 'Knowledge'}</span>
+      <span className="text-sm font-medium truncate mx-3">{fileName || 'Knowledge'}</span>
 
       <div className="flex-1" />
 

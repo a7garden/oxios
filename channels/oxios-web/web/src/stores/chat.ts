@@ -25,6 +25,8 @@ interface ChatRuntimeState {
   isStreaming: boolean
   /** WebSocket connection state. */
   connected: boolean
+  /** Queue of messages waiting for WS connection. */
+  _sendQueue: string[]
   /** The session ID from the last "done" chunk. */
   _lastDoneSessionId: string | null
   /** The space ID from the last "done" chunk. */
@@ -91,6 +93,7 @@ export const useChatStore = create<ChatStore>()(
       messages: [],
       isStreaming: false,
       connected: false,
+      _sendQueue: [],
       _lastDoneSessionId: null,
       _lastDoneSpaceId: null,
 
@@ -106,6 +109,14 @@ export const useChatStore = create<ChatStore>()(
 
         ws.onopen = () => {
           set({ connected: true })
+          // Flush any messages queued while connecting
+          const queue = get()._sendQueue
+          if (queue.length > 0) {
+            set({ _sendQueue: [] })
+            for (const msg of queue) {
+              get().sendMessage(msg)
+            }
+          }
         }
 
         ws.onmessage = (event) => {
@@ -146,8 +157,12 @@ export const useChatStore = create<ChatStore>()(
         // Ensure WS is connected first
         if (!connected) {
           connect()
-          // Wait a tick for onopen to fire
-          setTimeout(() => get().sendMessage(content), 100)
+          // Queue the message; WS onopen will flush it via _flushQueue.
+          // Avoid infinite retry by queuing once.
+          const q = get()._sendQueue
+          if (!q.includes(content)) {
+            set({ _sendQueue: [...q, content] })
+          }
           return
         }
 
@@ -171,10 +186,12 @@ export const useChatStore = create<ChatStore>()(
       },
 
       async loadSession(sessionId: string) {
+        if (!sessionId) return
         try {
           const res = await fetch(`/api/sessions/${encodeURIComponent(sessionId)}`, {
             headers: {
               Authorization: `Bearer ${getToken()}`,
+              'Content-Type': 'application/json',
             },
           })
           if (!res.ok) return

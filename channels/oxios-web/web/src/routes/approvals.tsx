@@ -1,8 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
-import { CheckCircle, RefreshCw, Timer, XCircle } from 'lucide-react'
+import { CheckCircle, Timer, XCircle } from 'lucide-react'
 import { ErrorState } from '@/components/shared/error-state'
 import { LoadingCards } from '@/components/shared/loading'
+import { RefreshButton } from '@/components/shared/refresh-button'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -48,9 +49,7 @@ function ApprovalsPage() {
           <h1 className="text-2xl font-bold">Approvals</h1>
           <p className="text-muted-foreground">Human-in-the-loop approval queue</p>
         </div>
-        <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching}>
-          <RefreshCw className={`h-4 w-4 mr-1 ${isFetching ? 'animate-spin' : ''}`} /> Refresh
-        </Button>
+        <RefreshButton onClick={() => refetch()} isFetching={isFetching} />
       </div>
 
       {/* Pending */}

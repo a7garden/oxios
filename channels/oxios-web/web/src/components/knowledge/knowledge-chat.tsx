@@ -2,6 +2,7 @@ import {
   BookOpen,
   CheckSquare,
   Clock,
+  MessageSquare,
   Newspaper,
   Send,
   ShoppingCart,
@@ -337,14 +338,14 @@ export function KnowledgeChat() {
 
       {/* Bulk action bar */}
       {hasSelection && (
-        <div className="px-4 py-2 border-b bg-muted/50 flex items-center gap-2 shrink-0">
-          <span className="text-xs text-muted-foreground mr-1">
+        <div className="px-4 py-2 border-b bg-muted/50 flex items-center gap-1.5 shrink-0 overflow-x-auto">
+          <span className="text-xs text-muted-foreground shrink-0 mr-1">
             {selectedIndices.size} selected
           </span>
           <Button
             variant="ghost"
             size="sm"
-            className="h-7 px-2 text-xs"
+            className="h-7 px-2 text-xs shrink-0"
             onClick={bulkMoveToJournal}
           >
             <BookOpen className="h-3 w-3 mr-1" />
@@ -355,18 +356,18 @@ export function KnowledgeChat() {
               key={t.path}
               variant="ghost"
               size="sm"
-              className="h-7 px-2 text-xs"
+              className="h-7 px-2 text-xs shrink-0"
               onClick={() => bulkMoveToChecklist(t.path)}
             >
               <t.icon className="h-3 w-3 mr-1" />
               {t.label}
             </Button>
           ))}
-          <div className="flex-1" />
+          <div className="flex-1 min-w-4" />
           <Button
             variant="ghost"
             size="sm"
-            className="h-7 px-2 text-xs text-destructive"
+            className="h-7 px-2 text-xs text-destructive shrink-0"
             onClick={bulkDelete}
           >
             <Trash2 className="h-3 w-3 mr-1" />
@@ -380,10 +381,10 @@ export function KnowledgeChat() {
         {isLoading ? (
           <div className="text-center text-muted-foreground py-12">Loading…</div>
         ) : groups.length === 0 ? (
-          <div className="text-center text-muted-foreground py-12">
-            <p className="text-2xl mb-2">🌱</p>
-            <p className="font-medium">Free your head</p>
-            <p className="text-sm">Drop whatever's on your mind here</p>
+          <div className="flex flex-col items-center text-muted-foreground py-16">
+            <MessageSquare className="h-10 w-10 opacity-20 mb-4" />
+            <p className="font-medium text-foreground">Free your head</p>
+            <p className="text-sm mt-1">Drop whatever's on your mind here</p>
           </div>
         ) : (
           <div className="space-y-6">
@@ -461,8 +462,8 @@ export function KnowledgeChat() {
                           {msg.text}
                         </span>
 
-                        {/* Hover actions */}
-                        {isHovered && !hasSelection && !isPending && (
+                        {/* Hover/touch actions */}
+                        {((isHovered && !hasSelection) || (isSelected && !isHovered)) && !isPending && (
                           <div className="flex items-center gap-0.5 shrink-0">
                             {/* To Journal */}
                             <Button

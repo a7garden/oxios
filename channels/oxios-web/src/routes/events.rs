@@ -39,7 +39,7 @@ pub(crate) async fn handle_sessions_list(
                 .map(|s| SessionListItem {
                     id: s.id,
                     user_id: s.user_id,
-                    space_id: None, // TODO: extract from Session metadata when available
+                    space_id: s.space_id,
                     message_count: s.message_count,
                     active_seed_id: s.active_seed_id,
                     created_at: s.created_at.to_rfc3339(),

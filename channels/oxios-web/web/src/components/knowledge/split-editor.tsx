@@ -11,7 +11,7 @@ export function SplitEditor({ filePath }: SplitEditorProps) {
 
   return (
     <div className="w-1/2 border-l flex flex-col">
-      <div className="px-3 py-1.5 text-sm font-medium border-b bg-muted/30 truncate">
+      <div className="px-4 py-2 text-sm font-medium border-b bg-muted/30 truncate">
         {filePath.split('/').pop()?.replace(/\.md$/, '')}
       </div>
       <div className="flex-1 overflow-hidden">

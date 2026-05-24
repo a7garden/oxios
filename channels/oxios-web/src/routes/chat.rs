@@ -31,6 +31,9 @@ pub(crate) struct ChatRequest {
     /// Optional session ID for multi-turn conversations.
     #[serde(default)]
     session_id: String,
+    /// Optional space ID for context partitioning.
+    #[serde(default)]
+    space_id: String,
 }
 
 pub(crate) fn default_user() -> String {
@@ -49,6 +52,9 @@ pub(crate) struct ChatResponse {
     /// Session ID for multi-turn conversations.
     #[serde(skip_serializing_if = "Option::is_none")]
     session_id: Option<String>,
+    /// Space ID for context partitioning.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    space_id: Option<String>,
     /// Phase reached during orchestration.
     #[serde(skip_serializing_if = "Option::is_none")]
     phase: Option<String>,
@@ -79,6 +85,12 @@ pub(crate) async fn handle_chat(
             .insert("session_id".to_owned(), body.session_id.clone());
     }
 
+    // Include space_id from request if provided (for context partitioning).
+    if !body.space_id.is_empty() {
+        msg.metadata
+            .insert("space_id".to_owned(), body.space_id.clone());
+    }
+
     let msg_id = msg.id.to_string();
     let content_echo = body.content.clone();
 
@@ -101,7 +113,7 @@ pub(crate) async fn handle_chat(
                         session.add_user_message(&content_echo);
                         session.add_agent_response(oxios_kernel::state_store::AgentResponse {
                             content: response.content.clone(),
-                            session_id: Some(session_id.0),
+                            session_id: Some(session_id.0.clone()),
                             seed_id: response.metadata.get("seed_id").cloned(),
                             phase_reached: response.metadata.get("phase").cloned(),
                             evaluation_passed: response
@@ -110,6 +122,10 @@ pub(crate) async fn handle_chat(
                                 .and_then(|v| v.parse().ok()),
                             timestamp: chrono::Utc::now(),
                         });
+                        // Attach space_id to session metadata if provided by orchestrator
+                        if let Some(vid) = response.metadata.get("space_id") {
+                            session.set_metadata("space_id", serde_json::json!(vid));
+                        }
                         if let Err(e) = state.kernel.state.save_session(&session).await {
                             tracing::warn!(error = %e, "Failed to persist session");
                         }
@@ -123,7 +139,7 @@ pub(crate) async fn handle_chat(
                         session.add_user_message(&content_echo);
                         session.add_agent_response(oxios_kernel::state_store::AgentResponse {
                             content: response.content.clone(),
-                            session_id: Some(session_id.0),
+                            session_id: Some(session_id.0.clone()),
                             seed_id: response.metadata.get("seed_id").cloned(),
                             phase_reached: response.metadata.get("phase").cloned(),
                             evaluation_passed: response
@@ -132,6 +148,10 @@ pub(crate) async fn handle_chat(
                                 .and_then(|v| v.parse().ok()),
                             timestamp: chrono::Utc::now(),
                         });
+                        // Attach space_id to session metadata if provided by orchestrator
+                        if let Some(vid) = response.metadata.get("space_id") {
+                            session.set_metadata("space_id", serde_json::json!(vid));
+                        }
                         if let Err(e) = state.kernel.state.save_session(&session).await {
                             tracing::warn!(error = %e, "Failed to create session");
                         }
@@ -145,6 +165,7 @@ pub(crate) async fn handle_chat(
                 echo: content_echo,
                 reply: response.content,
                 session_id: response.metadata.get("session_id").cloned(),
+                space_id: response.metadata.get("space_id").cloned(),
                 phase: response.metadata.get("phase").cloned(),
             }))
         }
@@ -202,10 +223,10 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
     // Track the last user message for session persistence.
     // The send_task sets this before forwarding to gateway;
     // the recv_task reads it when the response arrives.
-    let pending_user_msg: Arc<tokio::sync::Mutex<Option<PendingMessage>>> =
+    // Keyed by message ID so only the matching response triggers persistence.
+    let pending_user_msg: Arc<tokio::sync::Mutex<Option<(uuid::Uuid, PendingMessage)>>> =
         Arc::new(tokio::sync::Mutex::new(None));
 
-    let _pending_for_recv = pending_user_msg.clone();
     let pending_for_send = pending_user_msg.clone();
 
     // ── Forward gateway responses → WebSocket client ──
@@ -215,6 +236,7 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
     // the session to disk (same as the POST handler).
     let recv_task = tokio::spawn(async move {
         while let Ok(msg) = outgoing_rx.recv().await {
+            let msg_id = msg.id;
             let session_id = msg.metadata.get("session_id").cloned();
             let space_id = msg.metadata.get("space_id").cloned();
             let phase = msg.metadata.get("phase").cloned();
@@ -255,20 +277,30 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
             }
 
             // ── Persist session to disk ──
-            // Uses the same logic as the POST /api/chat handler.
+            // Only persist if this response matches the pending user message
+            // (correlated by message ID) to avoid cross-tab contamination.
             if let Some(ref sid) = session_id {
-                let user_msg = pending_user_msg.lock().await.take();
-                if let Some(pm) = user_msg {
-                    persist_session(
-                        &state_store,
-                        sid,
-                        pm.content.as_str(),
-                        pm.user_id.as_str(),
-                        &msg.content,
-                        space_id.as_deref(),
-                        &msg.metadata,
-                    )
-                    .await;
+                let pending = pending_user_msg.lock().await;
+                if let Some((ref pending_id, _)) = *pending {
+                    if *pending_id == msg_id {
+                        drop(pending); // release lock before async I/O
+                        let pm = {
+                            let mut guard = pending_user_msg.lock().await;
+                            guard.take()
+                        };
+                        if let Some((_, pm)) = pm {
+                            persist_session(
+                                &state_store,
+                                sid,
+                                pm.content.as_str(),
+                                pm.user_id.as_str(),
+                                &msg.content,
+                                space_id.as_deref(),
+                                &msg.metadata,
+                            )
+                            .await;
+                        }
+                    }
                 }
             }
         }
@@ -309,22 +341,22 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
                         continue;
                     }
 
-                    // Save user message for session persistence in recv_task.
-                    {
-                        let mut pending = pending_for_send.lock().await;
-                        *pending = Some(PendingMessage {
-                            content: content.clone(),
-                            user_id: "web-user".to_string(),
-                        });
-                    }
-
-                    let mut incoming = IncomingMessage::new("web", "web-user", content);
+                    let mut incoming = IncomingMessage::new("web", "web-user", content.clone());
 
                     if let Some(ref sid) = incoming_session_id {
                         incoming.metadata.insert("session_id".into(), sid.clone());
                     }
                     if let Some(ref vid) = incoming_space_id {
                         incoming.metadata.insert("space_id".into(), vid.clone());
+                    }
+
+                    // Save user message + its ID for correlated session persistence.
+                    {
+                        let mut pending = pending_for_send.lock().await;
+                        *pending = Some((incoming.id, PendingMessage {
+                            content,
+                            user_id: "web-user".to_string(),
+                        }));
                     }
 
                     if incoming_tx.send(incoming).await.is_err() {

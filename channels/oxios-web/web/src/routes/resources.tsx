@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
-import { Activity, RefreshCw } from 'lucide-react'
+import { Activity } from 'lucide-react'
 import {
   Area,
   AreaChart,
@@ -17,6 +17,7 @@ function getChartColor(token: string): string {
 }
 
 import { ErrorState } from '@/components/shared/error-state'
+import { RefreshButton } from '@/components/shared/refresh-button'
 import { LoadingCards } from '@/components/shared/loading'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { api } from '@/lib/api-client'
@@ -57,15 +58,7 @@ function ResourcesPage() {
           <h1 className="text-2xl font-bold">Resources</h1>
           <p className="text-muted-foreground">System resource monitoring</p>
         </div>
-        <button
-          type="button"
-          onClick={() => refetch()}
-          aria-label="Refresh"
-          disabled={isFetching}
-          className="rounded-md p-2 hover:bg-muted"
-        >
-          <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
-        </button>
+        <RefreshButton onClick={() => refetch()} isFetching={isFetching} />
       </div>
 
       {/* Current Stats */}

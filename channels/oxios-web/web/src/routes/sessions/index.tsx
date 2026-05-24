@@ -1,10 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { Clock, RefreshCw, Trash2 } from 'lucide-react'
+import { Clock, Trash2 } from 'lucide-react'
 import { DataTable } from '@/components/shared/data-table'
 import { EmptyState } from '@/components/shared/empty-state'
 import { ErrorState } from '@/components/shared/error-state'
 import { LoadingTable } from '@/components/shared/loading'
+import { RefreshButton } from '@/components/shared/refresh-button'
 import { Button } from '@/components/ui/button'
 import { api } from '@/lib/api-client'
 import type { Session } from '@/types'
@@ -77,9 +78,7 @@ function SessionsListPage() {
           <h1 className="text-2xl font-bold">Sessions</h1>
           <p className="text-muted-foreground">{data?.total ?? 0} session(s)</p>
         </div>
-        <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching}>
-          <RefreshCw className={`h-4 w-4 mr-1 ${isFetching ? 'animate-spin' : ''}`} /> Refresh
-        </Button>
+        <RefreshButton onClick={() => refetch()} isFetching={isFetching} />
       </div>
 
       {sessions.length === 0 ? (

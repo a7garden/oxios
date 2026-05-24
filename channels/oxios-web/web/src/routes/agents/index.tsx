@@ -1,13 +1,13 @@
 import { useQuery } from '@tanstack/react-query'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { Bot, RefreshCw } from 'lucide-react'
+import { Bot } from 'lucide-react'
 import { DataTable } from '@/components/shared/data-table'
 import { EmptyState } from '@/components/shared/empty-state'
 import { ErrorState } from '@/components/shared/error-state'
 import { LoadingTable } from '@/components/shared/loading'
+import { RefreshButton } from '@/components/shared/refresh-button'
 import { StatusIndicator } from '@/components/shared/status-indicator'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
 import { api } from '@/lib/api-client'
 import type { Agent } from '@/types'
 
@@ -66,9 +66,7 @@ function AgentsListPage() {
           <p className="text-muted-foreground">{data?.total ?? 0} agent(s) registered</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching}>
-            <RefreshCw className={`h-4 w-4 mr-1 ${isFetching ? 'animate-spin' : ''}`} /> Refresh
-          </Button>
+          <RefreshButton onClick={() => refetch()} isFetching={isFetching} />
         </div>
       </div>
 
