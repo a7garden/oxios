@@ -175,7 +175,7 @@ pub use space::{
     MemoryFlow, PathMatcher, Space, SpaceBridge, SpaceId, SpaceManager, SpaceManagerError,
     SpaceSource,
 };
-pub use state_store::{AgentResponse, Session, SessionId, SessionSummary, StateStore};
+pub use state_store::{AgentResponse, PruneConfig, Session, SessionId, SessionSummary, StateStore};
 
 // ─── Infrastructure ─────────────────────────────────────────────────
 pub use engine::{EngineProvider, OxiEngineProvider, OxiosEngine};

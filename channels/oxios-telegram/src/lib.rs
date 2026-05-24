@@ -4,24 +4,108 @@ pub use plugin::TelegramPlugin;
 
 use anyhow::Result;
 use async_trait::async_trait;
+use chrono::{DateTime, Utc};
 use oxios_gateway::channel::Channel;
 use oxios_gateway::message::{IncomingMessage, OutgoingMessage};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
+/// Per-chat session state for Telegram.
+#[derive(Debug, Clone)]
+struct ChatSession {
+    /// Current session ID used for multi-turn conversations.
+    session_id: String,
+    /// When the session was created.
+    created_at: DateTime<Utc>,
+    /// When the last message was sent/received in this session.
+    last_active_at: DateTime<Utc>,
+    /// Number of messages exchanged in this session.
+    message_count: usize,
+}
+
+impl ChatSession {
+    fn new() -> Self {
+        let now = Utc::now();
+        Self {
+            session_id: uuid::Uuid::new_v4().to_string(),
+            created_at: now,
+            last_active_at: now,
+            message_count: 0,
+        }
+    }
+
+    /// Check if this session should be rotated based on configuration.
+    fn should_rotate(&self, rotation_hours: u64, max_messages: usize) -> bool {
+        // Time-based rotation
+        if rotation_hours > 0 {
+            let elapsed = Utc::now() - self.last_active_at;
+            if elapsed > chrono::Duration::hours(rotation_hours as i64) {
+                return true;
+            }
+        }
+        // Message-count based rotation
+        if max_messages > 0 && self.message_count >= max_messages {
+            return true;
+        }
+        false
+    }
+
+    /// Touch the session (update last_active_at and increment message count).
+    fn touch(&mut self) {
+        self.last_active_at = Utc::now();
+        self.message_count += 1;
+    }
+
+    /// Rotate to a new session, returning the old session ID.
+    fn rotate(&mut self) -> String {
+        let old_id = self.session_id.clone();
+        let now = Utc::now();
+        self.session_id = uuid::Uuid::new_v4().to_string();
+        self.created_at = now;
+        self.last_active_at = now;
+        self.message_count = 0;
+        old_id
+    }
+}
+
+/// Telegram session configuration.
+#[derive(Debug, Clone)]
+pub struct TelegramSessionSettings {
+    /// Automatically rotate sessions after this many hours of inactivity.
+    pub rotation_hours: u64,
+    /// Rotate after this many messages (0 = unlimited).
+    pub max_messages_per_session: usize,
+}
+
+impl Default for TelegramSessionSettings {
+    fn default() -> Self {
+        Self {
+            rotation_hours: 2,
+            max_messages_per_session: 0,
+        }
+    }
+}
+
 /// Telegram channel adapter.
 ///
 /// Uses long polling (getUpdates) to receive messages
 /// and the Bot API to send responses.
+///
+/// Session management:
+/// - Each `chat_id` gets its own session tracked in memory.
+/// - Sessions auto-rotate after a configurable period of inactivity.
+/// - Users can force a new session with the `/new` command.
 pub struct TelegramChannel {
     bot_token: String,
     api_base: String,
     allowed_users: Vec<i64>,
     client: reqwest::Client,
     offset: Arc<RwLock<i64>>,
-    /// Maps chat_id → session metadata
-    sessions: Arc<RwLock<HashMap<i64, String>>>,
+    /// Maps chat_id → per-chat session state
+    chat_sessions: Arc<RwLock<HashMap<i64, ChatSession>>>,
+    /// Session rotation settings
+    session_settings: TelegramSessionSettings,
 }
 
 impl TelegramChannel {
@@ -37,13 +121,20 @@ impl TelegramChannel {
             allowed_users,
             client: reqwest::Client::new(),
             offset: Arc::new(RwLock::new(0)),
-            sessions: Arc::new(RwLock::new(HashMap::new())),
+            chat_sessions: Arc::new(RwLock::new(HashMap::new())),
+            session_settings: TelegramSessionSettings::default(),
         }
     }
 
     /// Override API base URL (for local Bot API servers).
     pub fn with_api_base(mut self, base: String) -> Self {
         self.api_base = base;
+        self
+    }
+
+    /// Set session management settings.
+    pub fn with_session_settings(mut self, settings: TelegramSessionSettings) -> Self {
+        self.session_settings = settings;
         self
     }
 
@@ -54,6 +145,42 @@ impl TelegramChannel {
     /// Check if user is allowed.
     fn is_user_allowed(&self, user_id: i64) -> bool {
         self.allowed_users.is_empty() || self.allowed_users.contains(&user_id)
+    }
+
+    /// Get or create a session for a chat, auto-rotating if needed.
+    async fn get_or_create_session(&self, chat_id: i64) -> String {
+        let mut sessions = self.chat_sessions.write().await;
+        let session = sessions.entry(chat_id).or_insert_with(ChatSession::new);
+
+        // Check if rotation is needed
+        if session.should_rotate(
+            self.session_settings.rotation_hours,
+            self.session_settings.max_messages_per_session,
+        ) {
+            session.rotate();
+            tracing::info!(
+                chat_id = chat_id,
+                new_session = %session.session_id,
+                "Telegram session auto-rotated"
+            );
+        }
+
+        session.touch();
+        session.session_id.clone()
+    }
+
+    /// Force-rotate a chat's session (used for /new command).
+    async fn force_new_session(&self, chat_id: i64) -> String {
+        let mut sessions = self.chat_sessions.write().await;
+        let session = sessions.entry(chat_id).or_insert_with(ChatSession::new);
+        let old_id = session.rotate();
+        tracing::info!(
+            chat_id = chat_id,
+            old_session = %old_id,
+            new_session = %session.session_id,
+            "Telegram session force-rotated via /new command"
+        );
+        session.session_id.clone()
     }
 
     /// Poll for updates using getUpdates (long polling).
@@ -185,11 +312,6 @@ impl Channel for TelegramChannel {
                         continue;
                     }
 
-                    // Skip /command messages (let other bots handle)
-                    if text.starts_with('/') {
-                        continue;
-                    }
-
                     // Check user permission
                     if let Some(uid) = user_id {
                         if !self.is_user_allowed(uid) {
@@ -207,17 +329,56 @@ impl Channel for TelegramChannel {
                         }
                     }
 
-                    // Build incoming message
                     if let Some(cid) = chat_id {
                         let user_id_str = user_id
                             .map(|id| id.to_string())
                             .unwrap_or_else(|| "unknown".to_string());
+
+                        // Handle /new command — start a new session
+                        if text.trim() == "/new" || text.trim() == "/new@me" {
+                            let new_session_id = self.force_new_session(cid).await;
+                            let _ = self
+                                .send_text(
+                                    cid,
+                                    &format!("🔄 새 세션을 시작합니다.\\n`{}`", &new_session_id[..8]),
+                                    Some(message_id),
+                                )
+                                .await;
+                            continue;
+                        }
+
+                        // Handle /session command — show current session info
+                        if text.trim() == "/session" || text.trim() == "/session@me" {
+                            let sessions = self.chat_sessions.read().await;
+                            if let Some(session) = sessions.get(&cid) {
+                                let info = format!(
+                                    "📋 현재 세션\\n• ID: `{}`\\n• 메시지: {}개\\n• 시작: {}\\n• 마지막 활동: {}",
+                                    &session.session_id[..8],
+                                    session.message_count,
+                                    session.created_at.format("%m/%d %H:%M"),
+                                    session.last_active_at.format("%m/%d %H:%M"),
+                                );
+                                let _ = self.send_text(cid, &info, Some(message_id)).await;
+                            } else {
+                                let _ = self
+                                    .send_text(cid, "📋 활성 세션이 없습니다.", Some(message_id))
+                                    .await;
+                            }
+                            continue;
+                        }
+
+                        // Skip other /command messages (let other bots handle)
+                        if text.starts_with('/') {
+                            continue;
+                        }
+
+                        // Get or auto-rotate session
+                        let session_id = self.get_or_create_session(cid).await;
+
                         let mut metadata = HashMap::new();
                         metadata.insert("chat_id".to_string(), cid.to_string());
                         metadata.insert("message_id".to_string(), message_id.to_string());
-
-                        // Store session mapping
-                        self.sessions.write().await.insert(cid, user_id_str.clone());
+                        metadata.insert("session_id".to_string(), session_id);
 
                         let incoming = IncomingMessage {
                             channel: "telegram".to_string(),
@@ -287,5 +448,48 @@ mod tests {
             channel.api_url("getMe"),
             "https://api.telegram.org/bot123:ABC/getMe"
         );
+    }
+
+    #[test]
+    fn test_chat_session_rotation_by_time() {
+        let mut session = ChatSession::new();
+        assert!(!session.should_rotate(2, 0)); // Just created, should not rotate
+
+        // Simulate 3 hours of inactivity
+        session.last_active_at = Utc::now() - chrono::Duration::hours(3);
+        assert!(session.should_rotate(2, 0)); // Should rotate
+        assert!(!session.should_rotate(0, 0)); // Disabled, should not rotate
+    }
+
+    #[test]
+    fn test_chat_session_rotation_by_message_count() {
+        let mut session = ChatSession::new();
+        session.message_count = 50;
+        assert!(session.should_rotate(0, 50)); // At limit
+        assert!(session.should_rotate(0, 49)); // Over limit
+        assert!(!session.should_rotate(0, 51)); // Under limit
+        assert!(!session.should_rotate(0, 0)); // Disabled
+    }
+
+    #[test]
+    fn test_chat_session_rotate_resets_state() {
+        let mut session = ChatSession::new();
+        let original_id = session.session_id.clone();
+        session.message_count = 100;
+
+        let old_id = session.rotate();
+        assert_eq!(old_id, original_id);
+        assert_ne!(session.session_id, original_id);
+        assert_eq!(session.message_count, 0);
+    }
+
+    #[test]
+    fn test_chat_session_touch() {
+        let mut session = ChatSession::new();
+        assert_eq!(session.message_count, 0);
+        session.touch();
+        assert_eq!(session.message_count, 1);
+        session.touch();
+        assert_eq!(session.message_count, 2);
     }
 }

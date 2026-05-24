@@ -81,3 +81,24 @@ sampling_ratio = 1.0
 
 [channels]
 enabled = ["web"]
+
+# Telegram channel settings (when enabled)
+# [channels.telegram]
+# Allowed Telegram user IDs (empty = allow all)
+# allowed_users = []
+# [channels.telegram.session]
+# Auto-rotate session after N hours of inactivity (0 = disabled)
+# rotation_hours = 2
+# Max messages per session before auto-rotate (0 = unlimited)
+# max_messages = 0
+
+# Session management (applies to all channels)
+[session]
+# Maximum number of sessions to retain. Oldest are pruned first.
+# Set to 0 for unlimited.
+max_sessions = 100
+# Session TTL in hours. Sessions older than this are auto-deleted.
+# Set to 0 for unlimited (no TTL-based pruning).
+ttl_hours = 168
+# Enable automatic pruning on every session save.
+auto_prune = true

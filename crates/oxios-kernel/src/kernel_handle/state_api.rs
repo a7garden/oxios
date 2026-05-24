@@ -1,6 +1,6 @@
 //! State API — data persistence, session management.
 
-use crate::state_store::{Session, SessionId, SessionSummary, StateStore};
+use crate::state_store::{PruneConfig, Session, SessionId, SessionSummary, StateStore};
 use serde::{de::DeserializeOwned, Serialize};
 use std::sync::Arc;
 
@@ -108,5 +108,12 @@ impl StateApi {
     /// Access the underlying StateStore (for backup/restore).
     pub fn store(&self) -> &Arc<StateStore> {
         &self.state_store
+    }
+
+    /// Prune sessions based on configuration.
+    ///
+    /// Removes sessions that exceed TTL or exceed the maximum count.
+    pub async fn prune_sessions(&self, config: &PruneConfig) -> anyhow::Result<usize> {
+        self.state_store.prune_sessions(config).await
     }
 }

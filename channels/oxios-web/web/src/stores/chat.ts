@@ -200,7 +200,7 @@ export const useChatStore = create<ChatStore>()(
 
           // Reconstruct messages from session history
           const messages: ChatMessage[] = []
-          const userMsgs: string[] = data.user_messages ?? []
+          const userMsgs: { content: string }[] = data.user_messages ?? []
           const agentMsgs: { content: string }[] = data.agent_responses ?? []
           const maxLen = Math.max(userMsgs.length, agentMsgs.length)
           for (let i = 0; i < maxLen; i++) {
@@ -209,7 +209,7 @@ export const useChatStore = create<ChatStore>()(
             if (userMsg != null) {
               messages.push({
                 role: 'user',
-                content: String(userMsg),
+                content: userMsg.content,
                 timestamp: data.created_at,
               })
             }

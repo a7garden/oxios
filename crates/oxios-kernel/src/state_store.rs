@@ -365,6 +365,24 @@ impl StateStore {
         self.save_json("sessions", &session.id.0, session).await
     }
 
+    /// Saves a session and then runs pruning if auto_prune is enabled.
+    pub async fn save_session_with_prune(
+        &self,
+        session: &Session,
+        prune_config: &PruneConfig,
+    ) -> Result<()> {
+        self.save_session(session).await?;
+        // Prune in the background — don't block the response
+        let store = self.clone();
+        let config = prune_config.clone();
+        tokio::spawn(async move {
+            if let Err(e) = store.prune_sessions(&config).await {
+                tracing::warn!(error = %e, "Background session pruning failed");
+            }
+        });
+        Ok(())
+    }
+
     /// Loads a session by ID.
     pub async fn load_session(&self, session_id: &SessionId) -> Result<Option<Session>> {
         self.load_json("sessions", &session_id.0).await
@@ -437,6 +455,53 @@ impl StateStore {
     pub async fn update_session(&self, session: &Session) -> Result<()> {
         self.save_session(session).await
     }
+
+    /// Prune sessions based on configuration.
+    ///
+    /// Removes sessions that exceed TTL or exceed the maximum count.
+    /// Returns the number of sessions pruned.
+    pub async fn prune_sessions(&self, config: &PruneConfig) -> Result<usize> {
+        let mut sessions = self.list_sessions().await?;
+        let mut pruned = 0;
+
+        // TTL-based pruning: remove sessions older than ttl_hours
+        if config.ttl_hours > 0 {
+            let cutoff = Utc::now() - chrono::Duration::hours(config.ttl_hours as i64);
+            let to_prune_ttl: Vec<String> = sessions
+                .iter()
+                .filter(|s| s.updated_at < cutoff)
+                .map(|s| s.id.clone())
+                .collect();
+
+            for id in &to_prune_ttl {
+                let sid = SessionId(id.clone());
+                if self.delete_session(&sid).await.is_ok() {
+                    pruned += 1;
+                }
+            }
+
+            // Remove pruned sessions from the list for count-based pruning
+            sessions.retain(|s| !to_prune_ttl.contains(&s.id));
+        }
+
+        // Count-based pruning: keep only the most recent `max_sessions`
+        if config.max_sessions > 0 && sessions.len() > config.max_sessions {
+            // sessions are already sorted by updated_at descending
+            let excess = sessions.len() - config.max_sessions;
+            for session in sessions.into_iter().rev().take(excess) {
+                let sid = SessionId(session.id);
+                if self.delete_session(&sid).await.is_ok() {
+                    pruned += 1;
+                }
+            }
+        }
+
+        if pruned > 0 {
+            tracing::info!(pruned = pruned, "Session pruning completed");
+        }
+
+        Ok(pruned)
+    }
 }
 
 /// Summary of a session for listing (without full message history).
@@ -458,6 +523,24 @@ pub struct SessionSummary {
     pub created_at: DateTime<Utc>,
     /// When the session was last updated.
     pub updated_at: DateTime<Utc>,
+}
+
+/// Configuration for session pruning.
+#[derive(Debug, Clone)]
+pub struct PruneConfig {
+    /// Maximum number of sessions to keep. 0 = unlimited.
+    pub max_sessions: usize,
+    /// TTL in hours. Sessions older than this are pruned. 0 = no TTL.
+    pub ttl_hours: u64,
+}
+
+impl Default for PruneConfig {
+    fn default() -> Self {
+        Self {
+            max_sessions: 100,
+            ttl_hours: 168, // 7 days
+        }
+    }
 }
 
 #[cfg(test)]
@@ -544,5 +627,63 @@ mod tests {
         let session = store.get_or_create_session("user-456", None).await.unwrap();
         assert_eq!(session.user_id, "user-456");
         assert!(session.user_messages.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_prune_sessions_by_count() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let store = StateStore::new(temp_dir.path().to_path_buf()).unwrap();
+
+        // Create 5 sessions
+        for i in 0..5 {
+            let mut session = Session::new(&format!("user-{}", i));
+            session.add_user_message(&format!("Message {}", i));
+            store.save_session(&session).await.unwrap();
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+        }
+
+        // Prune to max 3
+        let config = PruneConfig {
+            max_sessions: 3,
+            ttl_hours: 0,
+        };
+        let pruned = store.prune_sessions(&config).await.unwrap();
+        assert_eq!(pruned, 2);
+
+        let remaining = store.list_sessions().await.unwrap();
+        assert_eq!(remaining.len(), 3);
+        // Oldest sessions (user-0, user-1) should be pruned
+        let remaining_ids: Vec<&str> = remaining.iter().map(|s| s.user_id.as_str()).collect();
+        assert!(remaining_ids.contains(&"user-2"));
+        assert!(remaining_ids.contains(&"user-3"));
+        assert!(remaining_ids.contains(&"user-4"));
+    }
+
+    #[tokio::test]
+    async fn test_prune_sessions_by_ttl() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let store = StateStore::new(temp_dir.path().to_path_buf()).unwrap();
+
+        // Create a session and manually set updated_at to the past
+        let mut old_session = Session::new("old-user");
+        old_session.updated_at = Utc::now() - chrono::Duration::hours(48);
+        store.save_session(&old_session).await.unwrap();
+
+        // Create a recent session
+        let mut recent_session = Session::new("recent-user");
+        recent_session.add_user_message("Hello");
+        store.save_session(&recent_session).await.unwrap();
+
+        // Prune with 24-hour TTL
+        let config = PruneConfig {
+            max_sessions: 0,
+            ttl_hours: 24,
+        };
+        let pruned = store.prune_sessions(&config).await.unwrap();
+        assert_eq!(pruned, 1);
+
+        let remaining = store.list_sessions().await.unwrap();
+        assert_eq!(remaining.len(), 1);
+        assert_eq!(remaining[0].user_id, "recent-user");
     }
 }

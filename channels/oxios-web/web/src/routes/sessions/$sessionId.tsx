@@ -33,13 +33,13 @@ function SessionDetailPage() {
 
   // Build interleaved messages from user_messages and agent_responses
   const messages: { role: 'user' | 'assistant'; content: string }[] = []
-  const userMsgs: string[] = session.user_messages ?? []
+  const userMsgs: { content: string }[] = session.user_messages ?? []
   const agentMsgs: { content: string }[] = session.agent_responses ?? []
   const maxLen = Math.max(userMsgs.length, agentMsgs.length)
   for (let i = 0; i < maxLen; i++) {
     const userMsg = userMsgs[i]
     const agentMsg = agentMsgs[i]
-    if (userMsg != null) messages.push({ role: 'user', content: String(userMsg) })
+    if (userMsg != null) messages.push({ role: 'user', content: userMsg.content })
     if (agentMsg) messages.push({ role: 'assistant', content: agentMsg.content ?? '' })
   }
 

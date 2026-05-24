@@ -158,6 +158,22 @@ pub(crate) async fn handle_chat(
                     }
                     Err(e) => tracing::warn!(error = %e, "Failed to load/create session"),
                 }
+
+                // Auto-prune sessions if configured
+                let cfg = state.config.read();
+                if cfg.session.auto_prune {
+                    let prune_config = oxios_kernel::state_store::PruneConfig {
+                        max_sessions: cfg.session.max_sessions,
+                        ttl_hours: cfg.session.ttl_hours,
+                    };
+                    drop(cfg); // release read lock before async
+                    let kernel = state.kernel.clone();
+                    tokio::spawn(async move {
+                        if let Err(e) = kernel.state.prune_sessions(&prune_config).await {
+                            tracing::warn!(error = %e, "Session auto-prune failed");
+                        }
+                    });
+                }
             }
 
             Ok(Json(ChatResponse {
@@ -220,6 +236,19 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
     let incoming_tx = state.channel.incoming_tx.clone();
     let state_store = state.kernel.state.store().clone();
 
+    // Read session prune config
+    let prune_config = {
+        let cfg = state.config.read();
+        if cfg.session.auto_prune {
+            Some(oxios_kernel::state_store::PruneConfig {
+                max_sessions: cfg.session.max_sessions,
+                ttl_hours: cfg.session.ttl_hours,
+            })
+        } else {
+            None
+        }
+    };
+
     // Track the last user message for session persistence.
     // The send_task sets this before forwarding to gateway;
     // the recv_task reads it when the response arrives.
@@ -242,43 +271,9 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
             let phase = msg.metadata.get("phase").cloned();
             let evaluation_passed = msg.metadata.get("evaluation_passed").cloned();
 
-            // Send the response content as a "token" chunk with metadata
-            let token_chunk = serde_json::json!({
-                "type": "token",
-                "content": msg.content,
-                "session_id": session_id,
-                "space_id": space_id,
-            });
-            let json = match serde_json::to_string(&token_chunk) {
-                Ok(j) => j,
-                Err(e) => {
-                    tracing::error!(error = %e, "Failed to serialize outgoing message");
-                    continue;
-                }
-            };
-            if ws_tx.send(Message::Text(json.into())).await.is_err() {
-                break;
-            }
-
-            // Send "done" chunk with final metadata
-            let done_chunk = serde_json::json!({
-                "type": "done",
-                "session_id": session_id,
-                "space_id": space_id,
-                "phase": phase,
-                "evaluation_passed": evaluation_passed,
-            });
-            let done_json = match serde_json::to_string(&done_chunk) {
-                Ok(j) => j,
-                Err(_) => break,
-            };
-            if ws_tx.send(Message::Text(done_json.into())).await.is_err() {
-                break;
-            }
-
-            // ── Persist session to disk ──
-            // Only persist if this response matches the pending user message
-            // (correlated by message ID) to avoid cross-tab contamination.
+            // ── Persist session to disk FIRST ──
+            // Always persist, even if WS send fails later. This ensures
+            // the exchange is durable even if the connection drops mid-stream.
             if let Some(ref sid) = session_id {
                 let pending = pending_user_msg.lock().await;
                 if let Some((ref pending_id, _)) = *pending {
@@ -297,11 +292,47 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
                                 &msg.content,
                                 space_id.as_deref(),
                                 &msg.metadata,
+                                prune_config.clone(),
                             )
                             .await;
                         }
                     }
                 }
+            }
+
+            // ── Forward to WebSocket client ──
+            // Send token chunk with metadata
+            let token_chunk = serde_json::json!({
+                "type": "token",
+                "content": msg.content,
+                "session_id": session_id,
+                "space_id": space_id,
+            });
+            let json = match serde_json::to_string(&token_chunk) {
+                Ok(j) => j,
+                Err(e) => {
+                    tracing::error!(error = %e, "Failed to serialize outgoing message");
+                    continue;
+                }
+            };
+            if ws_tx.send(Message::Text(json.into())).await.is_err() {
+                break; // WS closed — session was already persisted above
+            }
+
+            // Send done chunk with final metadata
+            let done_chunk = serde_json::json!({
+                "type": "done",
+                "session_id": session_id,
+                "space_id": space_id,
+                "phase": phase,
+                "evaluation_passed": evaluation_passed,
+            });
+            let done_json = match serde_json::to_string(&done_chunk) {
+                Ok(j) => j,
+                Err(_) => break,
+            };
+            if ws_tx.send(Message::Text(done_json.into())).await.is_err() {
+                break; // WS closed — session was already persisted above
             }
         }
     });
@@ -394,6 +425,7 @@ async fn persist_session(
     agent_content: &str,
     space_id: Option<&str>,
     metadata: &std::collections::HashMap<String, String>,
+    prune_config: Option<oxios_kernel::state_store::PruneConfig>,
 ) {
     let sid = oxios_kernel::state_store::SessionId(session_id.to_string());
     match state_store.load_session(&sid).await {
@@ -448,5 +480,15 @@ async fn persist_session(
         Err(e) => {
             tracing::warn!(error = %e, "WS: failed to load/create session");
         }
+    }
+
+    // Auto-prune in background after session save
+    if let Some(config) = prune_config {
+        let store = state_store.clone();
+        tokio::spawn(async move {
+            if let Err(e) = store.prune_sessions(&config).await {
+                tracing::warn!(error = %e, "WS: session auto-prune failed");
+            }
+        });
     }
 }

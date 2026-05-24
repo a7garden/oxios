@@ -1,4 +1,5 @@
 import { Outlet, useRouterState } from '@tanstack/react-router'
+import React from 'react'
 import { Menu } from 'lucide-react'
 import { InfoPanel } from '@/components/knowledge/info-panel'
 import { KnowledgeSidebar } from '@/components/knowledge/knowledge-sidebar'
@@ -6,6 +7,7 @@ import { MoveModal } from '@/components/knowledge/move-modal'
 import { SearchModal } from '@/components/knowledge/search-modal'
 import { useKnowledgeShortcuts } from '@/hooks/use-knowledge-shortcuts'
 import { useGlobalEvents, useApprovalWatcher } from '@/hooks/use-global-events'
+import { useEventStore } from '@/stores/events'
 import { cn } from '@/lib/utils'
 import { useKnowledgeStore } from '@/stores/knowledge'
 import { useSidebarStore } from '@/stores/sidebar'
@@ -35,6 +37,11 @@ export function AppLayout() {
   // Global event → notification pipeline
   useGlobalEvents()
   useApprovalWatcher()
+
+  // Bootstrap singleton SSE connection on first mount
+  const connectEvents = useEventStore((s) => s.connect)
+  // biome-ignore lint/correctness/useExhaustiveDependencies: connect is stable
+  React.useState(() => { connectEvents() })
 
   return (
     <div className="flex h-screen overflow-hidden">

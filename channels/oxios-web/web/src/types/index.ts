@@ -31,7 +31,7 @@ export interface SessionDetail {
   id: string
   user_id: string
   space_id?: string
-  user_messages: string[]
+  user_messages: { content: string; timestamp: string }[]
   agent_responses: {
     content: string
     session_id: string

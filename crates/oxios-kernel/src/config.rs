@@ -164,6 +164,9 @@ pub struct TelegramChannelConfig {
     /// List of allowed Telegram user IDs (empty = allow all).
     #[serde(default)]
     pub allowed_users: Vec<i64>,
+    /// Telegram session management settings.
+    #[serde(default)]
+    pub session: TelegramSessionConfig,
 }
 
 fn default_telegram_token_env() -> String {
@@ -175,6 +178,7 @@ impl Default for TelegramChannelConfig {
         Self {
             bot_token_env: default_telegram_token_env(),
             allowed_users: Vec::new(),
+            session: TelegramSessionConfig::default(),
         }
     }
 }
@@ -232,6 +236,75 @@ impl Default for DaemonConfig {
         Self {
             pid_file: default_pid_file(),
             log_dir: default_daemon_log_dir(),
+        }
+    }
+}
+
+/// Session management configuration.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct SessionConfig {
+    /// Maximum number of sessions to retain.
+    /// When exceeded, oldest sessions (by `updated_at`) are pruned.
+    /// Set to 0 for unlimited.
+    #[serde(default = "default_max_sessions")]
+    pub max_sessions: usize,
+
+    /// Time-to-live for sessions in hours.
+    /// Sessions older than this are automatically pruned.
+    /// Set to 0 for unlimited (no TTL-based pruning).
+    #[serde(default = "default_session_ttl_hours")]
+    pub ttl_hours: u64,
+
+    /// Enable automatic session pruning on every session save.
+    #[serde(default = "default_true")]
+    pub auto_prune: bool,
+}
+
+fn default_max_sessions() -> usize {
+    100
+}
+
+fn default_session_ttl_hours() -> u64 {
+    168 // 7 days
+}
+
+impl Default for SessionConfig {
+    fn default() -> Self {
+        Self {
+            max_sessions: default_max_sessions(),
+            ttl_hours: default_session_ttl_hours(),
+            auto_prune: true,
+        }
+    }
+}
+
+/// Telegram session management configuration.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct TelegramSessionConfig {
+    /// Automatically rotate to a new session after this many hours of inactivity.
+    /// Set to 0 to disable time-based rotation.
+    #[serde(default = "default_telegram_session_rotation_hours")]
+    pub rotation_hours: u64,
+
+    /// Maximum number of messages per session before auto-rotating.
+    /// Set to 0 for unlimited.
+    #[serde(default = "default_telegram_session_max_messages")]
+    pub max_messages: usize,
+}
+
+fn default_telegram_session_rotation_hours() -> u64 {
+    2 // 2 hours
+}
+
+fn default_telegram_session_max_messages() -> usize {
+    0 // unlimited by default
+}
+
+impl Default for TelegramSessionConfig {
+    fn default() -> Self {
+        Self {
+            rotation_hours: default_telegram_session_rotation_hours(),
+            max_messages: default_telegram_session_max_messages(),
         }
     }
 }
@@ -301,6 +374,9 @@ pub struct OxiosConfig {
     /// Headless browser configuration.
     #[serde(default)]
     pub browser: BrowserConfig,
+    /// Session management configuration.
+    #[serde(default)]
+    pub session: SessionConfig,
 }
 
 /// Kernel configuration.
@@ -974,6 +1050,11 @@ impl OxiosConfig {
         // Budget validation
         if self.budget.default_window_secs == 0 {
             warnings.push("budget.default_window_secs is 0 — no time window".into());
+        }
+
+        // Session validation
+        if self.session.ttl_hours > 0 && self.session.ttl_hours < 1 {
+            warnings.push("session.ttl_hours is less than 1 hour — sessions may expire quickly".into());
         }
 
         // Exec validation

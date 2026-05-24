@@ -8,7 +8,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use oxios_gateway::plugin::{ChannelBundle, ChannelContext, ChannelPlugin};
 
-use crate::TelegramChannel;
+use crate::{TelegramChannel, TelegramSessionSettings};
 
 /// Telegram channel plugin — creates a Telegram Bot channel.
 pub struct TelegramPlugin;
@@ -36,9 +36,22 @@ impl ChannelPlugin for TelegramPlugin {
         })?;
         let allowed = config.channels.telegram.allowed_users.clone();
 
-        let channel = TelegramChannel::new(token, allowed);
+        let session_settings = TelegramSessionSettings {
+            rotation_hours: config.channels.telegram.session.rotation_hours,
+            max_messages_per_session: config.channels.telegram.session.max_messages,
+        };
 
-        tracing::info!("Telegram channel created");
+        let rotation_hours = session_settings.rotation_hours;
+        let max_messages = session_settings.max_messages_per_session;
+
+        let channel = TelegramChannel::new(token, allowed)
+            .with_session_settings(session_settings);
+
+        tracing::info!(
+            rotation_hours = rotation_hours,
+            max_messages = max_messages,
+            "Telegram channel created with session management"
+        );
 
         Ok(ChannelBundle {
             channel: Box::new(channel),
