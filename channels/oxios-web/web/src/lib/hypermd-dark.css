@@ -1,0 +1,216 @@
+/* Dark mode overrides for HyperMD editor.
+ * Scoped under `.dark` class (toggled by useThemeStore on <html>).
+ * The editor keeps `theme: "hypermd-light"` — we override its
+ * hardcoded colors with dark-friendly values.
+ */
+
+/* ── Base editor surface ──────────────────────────────────── */
+.dark .cm-s-hypermd-light {
+  background: var(--background);
+  color: hsl(var(--foreground));
+}
+
+/* ── Gutters ──────────────────────────────────────────────── */
+.dark .cm-s-hypermd-light .CodeMirror-gutters {
+  background: var(--background);
+  border-right-color: hsl(var(--border));
+}
+
+/* ── Active line ──────────────────────────────────────────── */
+.dark .cm-s-hypermd-light .CodeMirror-activeline-background {
+  background: hsl(var(--muted));
+}
+
+/* ── Selection ────────────────────────────────────────────── */
+.dark .cm-s-hypermd-light .CodeMirror-selected,
+.dark .cm-s-hypermd-light.CodeMirror-focused .CodeMirror-selected {
+  background: hsl(var(--accent) / 0.3);
+}
+
+/* ── Cursor ───────────────────────────────────────────────── */
+.dark .cm-s-hypermd-light .CodeMirror-cursor {
+  border-left-color: hsl(var(--foreground));
+}
+
+/* ── Text tokens ──────────────────────────────────────────── */
+.dark .cm-s-hypermd-light span.cm-quote {
+  color: hsl(var(--muted-foreground));
+}
+
+.dark .cm-s-hypermd-light span.cm-keyword {
+  color: #c678dd;
+}
+
+.dark .cm-s-hypermd-light span.cm-atom {
+  color: #d19a66;
+}
+
+.dark .cm-s-hypermd-light span.cm-number {
+  color: #d19a66;
+}
+
+.dark .cm-s-hypermd-light span.cm-def {
+  color: #61afef;
+}
+
+.dark .cm-s-hypermd-light span.cm-variable {
+  color: hsl(var(--foreground));
+}
+
+.dark .cm-s-hypermd-light span.cm-variable-2,
+.dark .cm-s-hypermd-light span.cm-variable-3 {
+  color: #e5c07b;
+}
+
+.dark .cm-s-hypermd-light span.cm-property,
+.dark .cm-s-hypermd-light span.cm-operator {
+  color: hsl(var(--foreground));
+}
+
+.dark .cm-s-hypermd-light span.cm-comment {
+  color: #5c6370;
+}
+
+.dark .cm-s-hypermd-light span.cm-string {
+  color: #98c379;
+}
+
+.dark .cm-s-hypermd-light span.cm-string-2 {
+  color: #e5c07b;
+}
+
+.dark .cm-s-hypermd-light span.cm-meta {
+  color: #e06c75;
+}
+
+/* ── Links ────────────────────────────────────────────────── */
+.dark .cm-s-hypermd-light span.cm-url {
+  color: hsl(var(--muted-foreground));
+}
+
+.dark .cm-s-hypermd-light span.cm-link {
+  color: #6cb4e5;
+}
+
+/* ── Inline code ──────────────────────────────────────────── */
+.dark .cm-s-hypermd-light span.cm-inline-code:not(.cm-formatting):not(.cm-hmd-indented-code) {
+  background-color: hsl(var(--muted));
+  color: hsl(var(--foreground));
+  border-color: hsl(var(--border));
+}
+
+/* ── Code blocks ──────────────────────────────────────────── */
+.dark .cm-s-hypermd-light pre.HyperMD-codeblock {
+  color: hsl(var(--foreground));
+}
+
+.dark .cm-s-hypermd-light div.HyperMD-codeblock-bg {
+  background-color: hsl(var(--muted));
+  border-left-color: hsl(var(--border));
+  border-right-color: hsl(var(--border));
+}
+
+.dark .cm-s-hypermd-light div.HyperMD-codeblock-begin-bg,
+.dark .cm-s-hypermd-light div.HyperMD-codeblock-end-bg {
+  background-color: hsl(var(--muted));
+  border-color: hsl(var(--border));
+}
+
+/* ── Headers ──────────────────────────────────────────────── */
+.dark .cm-s-hypermd-light pre.HyperMD-header:after {
+  background: hsl(var(--border));
+}
+
+/* ── Horizontal rules ─────────────────────────────────────── */
+.dark .cm-s-hypermd-light pre.HyperMD-hr {
+  background-color: transparent;
+}
+
+.dark .cm-s-hypermd-light div.HyperMD-hr-bg {
+  background: hsl(var(--border));
+}
+
+/* ── Quotes ───────────────────────────────────────────────── */
+.dark .cm-s-hypermd-light pre.HyperMD-quote:before {
+  background: hsl(var(--primary)) !important;
+}
+
+/* ── Lists ────────────────────────────────────────────────── */
+.dark .cm-s-hypermd-light span.cm-formatting-list {
+  color: hsl(var(--muted-foreground));
+}
+
+.dark .cm-s-hypermd-light span.cm-hmd-list-indent {
+  border-right-color: hsl(var(--border));
+}
+
+/* ── Tasks ────────────────────────────────────────────────── */
+.dark .cm-s-hypermd-light span.cm-formatting-task {
+  color: hsl(var(--muted-foreground));
+}
+
+/* ── Math ─────────────────────────────────────────────────── */
+.dark .cm-s-hypermd-light span.cm-math,
+.dark .cm-s-hypermd-light span.hmd-fold-math-placeholder {
+  background: hsl(var(--accent) / 0.15);
+}
+
+/* ── Fold stubs (code/html collapsed markers) ─────────────── */
+.dark .cm-s-hypermd-light .hmd-fold-html-stub,
+.dark .cm-s-hypermd-light .hmd-fold-code-stub {
+  color: hsl(var(--muted-foreground));
+  background: hsl(var(--muted));
+  border-color: hsl(var(--border));
+}
+
+.dark .cm-s-hypermd-light .hmd-fold-html-stub:hover,
+.dark .cm-s-hypermd-light .hmd-fold-code-stub:hover,
+.dark .cm-s-hypermd-light .hmd-fold-html-stub.highlight,
+.dark .cm-s-hypermd-light .highlight.hmd-fold-code-stub {
+  color: hsl(var(--foreground));
+  background: hsl(var(--accent));
+  border-color: hsl(var(--accent));
+}
+
+/* ── Hover tooltips ───────────────────────────────────────── */
+.dark .cm-s-hypermd-light.CodeMirror div.HyperMD-hover > .HyperMD-hover-content {
+  background-color: hsl(var(--popover));
+  color: hsl(var(--popover-foreground));
+  border: 1px solid hsl(var(--border));
+}
+
+/* ── Link icons ───────────────────────────────────────────── */
+.dark .cm-s-hypermd-light span.hmd-link-icon:after {
+  color: #6cb4e5;
+  text-shadow: none;
+}
+
+/* ── Footnotes ────────────────────────────────────────────── */
+.dark .cm-s-hypermd-light span.cm-hmd-footref {
+  background-color: hsl(var(--muted));
+  color: hsl(var(--muted-foreground));
+}
+
+/* ── Hidden tokens on inactive lines ──────────────────────── */
+.dark .CodeMirror span.hmd-hidden-token.cm-formatting-em,
+.dark .CodeMirror span.hmd-hidden-token.cm-formatting-strong,
+.dark .CodeMirror span.hmd-hidden-token.cm-formatting-strikethrough,
+.dark .CodeMirror span.hmd-hidden-token.cm-formatting-code,
+.dark .CodeMirror span.hmd-hidden-token.cm-formatting-link {
+  color: transparent;
+}
+
+/* ── Escape chars ─────────────────────────────────────────── */
+.dark .cm-s-hypermd-light span.cm-hmd-escape-backslash {
+  color: hsl(var(--muted-foreground));
+}
+
+.dark .cm-s-hypermd-light span.cm-hmd-escape-char {
+  color: hsl(var(--muted-foreground));
+}
+
+/* ── Scrollbar (webkit) ───────────────────────────────────── */
+.dark .hypermd-container .CodeMirror-vscrollbar,
+.dark .hypermd-container .CodeMirror-hscrollbar {
+  scrollbar-color: hsl(var(--border)) transparent;
+}

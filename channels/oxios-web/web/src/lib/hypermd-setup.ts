@@ -1,12 +1,9 @@
 // HyperMD setup — import all needed CM5/HyperMD modules.
-// This file MUST be imported before calling HyperMD.fromTextArea().
+// This file MUST be imported before creating an editor.
 //
-// IMPORTANT: Vite 8 uses Rolldown which can't resolve hypermd/* deep imports
-// during production build. We use a single bundled entry point instead.
-//
-// Vite 8 (Rolldown) may fail to create a proper default export from
-// codemirror's CJS `module.exports = factory()`. We import both ways
-// and fall back to `window.CodeMirror` set by codemirror's own IIFE.
+// Vite 8 (Rolldown) processes HyperMD's UMD as CJS, so `window.HyperMD`
+// is never populated. We therefore hardcode the essential suggestedEditorConfig
+// that `HyperMD.fromTextArea` would normally merge in.
 
 import 'codemirror/lib/codemirror.css'
 import CodeMirrorDefault from 'codemirror'
@@ -36,11 +33,12 @@ if (typeof window !== 'undefined') {
   ;(window as any).CodeMirror = CodeMirror
 }
 
-// Import HyperMD as a single bundle (includes fold, click, read-link, etc.)
+// Import HyperMD as a single bundle (registers all addons & CodeMirror options)
 import 'hypermd/everything'
 import 'hypermd/theme/hypermd-light.css'
+import './hypermd-dark.css'
 
-// CodeMirror addons (these resolve fine)
+// CodeMirror addons
 import 'codemirror/addon/edit/continuelist'
 import 'codemirror/addon/selection/active-line'
 import 'codemirror/addon/hint/show-hint'
@@ -61,24 +59,47 @@ export type CodeMirrorEditorConfiguration = import('codemirror').EditorConfigura
 /**
  * Create a HyperMD WYSIWYG editor from a textarea element.
  *
- * Uses `HyperMD.fromTextArea` from the core module, which automatically
- * merges `suggestedEditorConfig` (theme, hmdFold, lineWrapping, etc.)
- * with the user-provided config. This is what makes the editor render
- * markdown live — headers fold, links render, images display inline, etc.
+ * Replicates what `HyperMD.fromTextArea` does internally: merges the
+ * suggestedEditorConfig with user overrides, then calls
+ * `CodeMirror.fromTextArea`. The suggested config is hardcoded here
+ * because Vite/Rolldown processes HyperMD's UMD as CJS, meaning
+ * `window.HyperMD` (and its `suggestedEditorConfig`) is never populated.
+ *
+ * Key WYSIWYG enablers from suggestedEditorConfig:
+ *  - theme: "hypermd-light"    → WYSIWYG CSS styles
+ *  - lineWrapping: true         → soft line wrap for prose
+ *  - hmdFold: { code, emoji, image, link, math } → fold markers into rendered views
+ *  - hmdHideToken: true         → hide `**`, `#`, `[]` on non-active lines
+ *  - hmdTableAlign: true        → visual table alignment
+ *  - hmdClick / hmdHover        → clickable links, hover previews
  */
 export function createHyperMDEditor(
   textarea: HTMLTextAreaElement,
   userConfig?: Record<string, unknown>,
 ): CodeMirror.Editor {
-  // HyperMD.fromTextArea is available on window after the `hypermd/everything` import.
-  const HMD = (window as any).HyperMD
-  if (HMD?.fromTextArea) {
-    return HMD.fromTextArea(textarea, userConfig) as CodeMirror.Editor
+  // These are the WYSIWYG defaults that `HyperMD.fromTextArea` normally merges.
+  // See: hypermd/core/quick.js + each addon's registerFolder / suggestedOption.
+  const suggestedConfig = {
+    theme: 'hypermd-light',
+    lineWrapping: true,
+    mode: 'text/x-hypermd',
+    tabSize: 4,
+    hmdFold: {
+      code: true,
+      emoji: true,
+      image: true,
+      link: true,
+      math: false, // no KaTeX loaded
+      html: false,
+    },
+    hmdHideToken: { enabled: true },
+    hmdClick: { enabled: true },
+    hmdHover: { enabled: true },
+    hmdTableAlign: { enabled: true },
+    hmdCursorDebounce: { enabled: true },
   }
 
-  // Fallback: manual merge of suggestedEditorConfig (shouldn't normally happen)
-  const suggested = HMD?.suggestedEditorConfig ?? {}
-  const finalConfig = { ...suggested, ...userConfig }
-  const CM = (window as any).CodeMirror as typeof CodeMirror
+  const finalConfig = { ...suggestedConfig, ...userConfig }
+  const CM = (window as any).CodeMirror as typeof import('codemirror')
   return CM.fromTextArea(textarea, finalConfig) as CodeMirror.Editor
 }

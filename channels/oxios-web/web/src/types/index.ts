@@ -18,6 +18,7 @@ export interface AgentListResponse {
 export interface Session {
   id: string
   user_id?: string
+  space_id?: string
   active_seed_id?: string
   created_at: string
   updated_at?: string
@@ -29,6 +30,7 @@ export interface Session {
 export interface SessionDetail {
   id: string
   user_id: string
+  space_id?: string
   user_messages: string[]
   agent_responses: {
     content: string
@@ -152,6 +154,14 @@ export interface StreamChunk {
   tool_args?: Record<string, unknown>
   tool_result?: unknown
   error?: string
+  /** Session ID returned by the backend (present on 'done' and 'token' chunks). */
+  session_id?: string
+  /** Space ID returned by the backend. */
+  space_id?: string
+  /** Phase reached (present on 'done' chunk). */
+  phase?: string
+  /** Whether evaluation passed (present on 'done' chunk). */
+  evaluation_passed?: string
 }
 
 // Event (SSE)

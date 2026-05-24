@@ -29,25 +29,30 @@ export function MarkdownEditor({
   const { data: treeEntries } = useKnowledgeTree()
   const currentFilePath = useKnowledgeStore((s) => s.currentFilePath)
 
+  // Stabilize onSave via ref so the editor effect doesn't re-run on every parent render
+  const onSaveRef = useRef(onSave)
+  onSaveRef.current = onSave
+
   // Build autocomplete entries from tree
   const autocompleteEntries = useCallback(() => {
     if (!treeEntries) return []
     return buildAutocompleteDict(treeEntries, undefined, currentFilePath ?? undefined)
   }, [treeEntries, currentFilePath])
 
-  // Create editor instance
+  // Create editor instance — only re-creates when file changes (initialContent)
+  // or when autocomplete entries change (treeEntries, currentFilePath).
+  // onSave is accessed via ref to avoid re-creating the editor on every parent render.
   useEffect(() => {
-    if (!containerRef.current) return
+    const container = containerRef.current
+    if (!container) return
 
-    // Clean up previous instance
-    if (editorRef.current) {
-      ;(editorRef.current as any).toTextArea?.()
-      editorRef.current = null
-    }
+    // Nuke everything in the container — removes old CM wrappers and any orphan textareas
+    container.innerHTML = ''
+    editorRef.current = null
 
     const textarea = document.createElement('textarea')
     textarea.value = initialContent
-    containerRef.current.appendChild(textarea)
+    container.appendChild(textarea)
 
     // Custom link reader (handles wiki-style click)
     const readLink = (text: string, _line: number) => {
@@ -69,13 +74,11 @@ export function MarkdownEditor({
     }
 
     const cm = createHyperMDEditor(textarea, {
-      // Override suggestedEditorConfig defaults that don't suit our UI
+      // Our overrides — everything else comes from suggestedEditorConfig
       mode: { name: 'hypermd', math: false },
       lineNumbers: false,
-      lineWrapping: true,
       dragDrop: false,
       viewportMargin: 10,
-      hmdClick: true,
       styleActiveLine: true,
       foldGutter: false,
       autoCloseBrackets: false,
@@ -212,7 +215,7 @@ export function MarkdownEditor({
       }
     })
 
-    // Change handler for auto-save
+    // Change handler for auto-save (uses ref to avoid stale closure)
     cm.on('change', () => {
       if (isSettingContent.current) return
       setIsDirty(true)
@@ -220,7 +223,7 @@ export function MarkdownEditor({
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
       saveTimerRef.current = setTimeout(() => {
         const content = cm.getValue()
-        onSave(content)
+        onSaveRef.current(content)
         setIsDirty(false)
       }, 1000)
     })
@@ -231,10 +234,12 @@ export function MarkdownEditor({
 
     return () => {
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
-      ;(cm as any).toTextArea()
+      // Destroy CM instance properly (getWrapperElement removes from DOM)
+      const wrapper = cm.getWrapperElement()
+      wrapper?.parentNode?.removeChild(wrapper)
       editorRef.current = null
     }
-  }, [initialContent, openFile, onSave, autocompleteEntries]) // Re-create on file change
+  }, [initialContent, openFile, autocompleteEntries]) // Re-create on file change
 
   // Update content when initialContent changes (file loaded from API)
   useEffect(() => {
@@ -255,9 +260,9 @@ export function MarkdownEditor({
     const cm = editorRef.current
     if (!cm || !isDirty) return
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
-    onSave(cm.getValue())
+    onSaveRef.current(cm.getValue())
     setIsDirty(false)
-  }, [isDirty, onSave])
+  }, [isDirty])
 
   // Listen for manual save event from toolbar (⌘S / save button)
   useEffect(() => {
@@ -265,12 +270,12 @@ export function MarkdownEditor({
       const cm = editorRef.current
       if (!cm) return
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
-      onSave(cm.getValue())
+      onSaveRef.current(cm.getValue())
       setIsDirty(false)
     }
     document.addEventListener('knowledge:save', handler)
     return () => document.removeEventListener('knowledge:save', handler)
-  }, [onSave])
+  }, [])
 
   return (
     <div className={cn('h-full relative', className)} onBlur={handleBlur}>

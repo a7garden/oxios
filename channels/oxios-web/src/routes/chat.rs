@@ -179,6 +179,14 @@ pub(crate) async fn handle_chat_stream(
 }
 
 /// Handles a WebSocket connection for chat streaming.
+///
+/// Protocol:
+/// - **Incoming** (frontend → backend):
+///   `{ type: "message", content: "...", session_id?: "...", space_id?: "..." }`
+/// - **Outgoing token** (backend → frontend):
+///   `{ type: "token", content: "...", session_id?, space_id? }`
+/// - **Outgoing done** (backend → frontend):
+///   `{ type: "done", session_id?, space_id?, phase?, evaluation_passed? }`
 pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState>) {
     let (mut ws_tx, mut ws_rx) = socket.split();
 
@@ -187,16 +195,37 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
     // carries KernelEvents which are a different type entirely.
     let mut outgoing_rx = state.channel.subscribe();
 
-    // Forward outgoing messages to the WebSocket
-    // Convert OutgoingMessage → StreamChunk format expected by frontend:
-    //   { type: "token", content: "..." }   (partial or full response)
-    //   { type: "done" }                    (response complete)
+    // Clone handles for the spawned tasks.
+    let incoming_tx = state.channel.incoming_tx.clone();
+    let state_store = state.kernel.state.store().clone();
+
+    // Track the last user message for session persistence.
+    // The send_task sets this before forwarding to gateway;
+    // the recv_task reads it when the response arrives.
+    let pending_user_msg: Arc<tokio::sync::Mutex<Option<PendingMessage>>> =
+        Arc::new(tokio::sync::Mutex::new(None));
+
+    let _pending_for_recv = pending_user_msg.clone();
+    let pending_for_send = pending_user_msg.clone();
+
+    // ── Forward gateway responses → WebSocket client ──
+    //
+    // Each chunk carries session_id + space_id so the frontend can
+    // maintain multi-turn context. After the "done" chunk we persist
+    // the session to disk (same as the POST handler).
     let recv_task = tokio::spawn(async move {
         while let Ok(msg) = outgoing_rx.recv().await {
-            // Send the response content as a "token" chunk
+            let session_id = msg.metadata.get("session_id").cloned();
+            let space_id = msg.metadata.get("space_id").cloned();
+            let phase = msg.metadata.get("phase").cloned();
+            let evaluation_passed = msg.metadata.get("evaluation_passed").cloned();
+
+            // Send the response content as a "token" chunk with metadata
             let token_chunk = serde_json::json!({
                 "type": "token",
                 "content": msg.content,
+                "session_id": session_id,
+                "space_id": space_id,
             });
             let json = match serde_json::to_string(&token_chunk) {
                 Ok(j) => j,
@@ -209,8 +238,14 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
                 break;
             }
 
-            // Send "done" to signal completion
-            let done_chunk = serde_json::json!({ "type": "done" });
+            // Send "done" chunk with final metadata
+            let done_chunk = serde_json::json!({
+                "type": "done",
+                "session_id": session_id,
+                "space_id": space_id,
+                "phase": phase,
+                "evaluation_passed": evaluation_passed,
+            });
             let done_json = match serde_json::to_string(&done_chunk) {
                 Ok(j) => j,
                 Err(_) => break,
@@ -218,29 +253,81 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
             if ws_tx.send(Message::Text(done_json.into())).await.is_err() {
                 break;
             }
+
+            // ── Persist session to disk ──
+            // Uses the same logic as the POST /api/chat handler.
+            if let Some(ref sid) = session_id {
+                let user_msg = pending_user_msg.lock().await.take();
+                if let Some(pm) = user_msg {
+                    persist_session(
+                        &state_store,
+                        sid,
+                        pm.content.as_str(),
+                        pm.user_id.as_str(),
+                        &msg.content,
+                        space_id.as_deref(),
+                        &msg.metadata,
+                    )
+                    .await;
+                }
+            }
         }
     });
 
-    // Receive messages from the WebSocket and push to gateway
-    let send_tx = state.channel.incoming_tx.clone();
+    // ── Receive from WebSocket client → gateway ──
+    //
+    // Frontend sends JSON:
+    //   `{ type: "message", content: "...", session_id?, space_id? }`
     let send_task = tokio::spawn(async move {
         while let Some(Ok(msg)) = FuturesStreamExt::next(&mut ws_rx).await {
             match msg {
                 Message::Text(text) => {
-                    // Frontend sends JSON: { type: "message", content: "..." }
-                    // Extract the actual content string.
-                    let content = serde_json::from_str::<serde_json::Value>(&text)
-                        .ok()
-                        .and_then(|v| v.get("content").cloned())
-                        .and_then(|v| v.as_str().map(|s| s.to_string()))
-                        .unwrap_or_else(|| text.to_string());
+                    let parsed: serde_json::Value = match serde_json::from_str(&text) {
+                        Ok(v) => v,
+                        Err(_) => continue,
+                    };
 
-                    let incoming = oxios_gateway::message::IncomingMessage::new(
-                        "web",
-                        "session", // TODO: derive from token when user system exists
-                        content,
-                    );
-                    if send_tx.send(incoming).await.is_err() {
+                    let content = parsed
+                        .get("content")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .to_string();
+
+                    let incoming_session_id = parsed
+                        .get("session_id")
+                        .and_then(|v| v.as_str())
+                        .filter(|s| !s.is_empty())
+                        .map(String::from);
+
+                    let incoming_space_id = parsed
+                        .get("space_id")
+                        .and_then(|v| v.as_str())
+                        .filter(|s| !s.is_empty())
+                        .map(String::from);
+
+                    if content.is_empty() {
+                        continue;
+                    }
+
+                    // Save user message for session persistence in recv_task.
+                    {
+                        let mut pending = pending_for_send.lock().await;
+                        *pending = Some(PendingMessage {
+                            content: content.clone(),
+                            user_id: "web-user".to_string(),
+                        });
+                    }
+
+                    let mut incoming = IncomingMessage::new("web", "web-user", content);
+
+                    if let Some(ref sid) = incoming_session_id {
+                        incoming.metadata.insert("session_id".into(), sid.clone());
+                    }
+                    if let Some(ref vid) = incoming_space_id {
+                        incoming.metadata.insert("space_id".into(), vid.clone());
+                    }
+
+                    if incoming_tx.send(incoming).await.is_err() {
                         break;
                     }
                 }
@@ -252,7 +339,82 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
 
     // Wait for either side to finish
     tokio::select! {
-        _ = recv_task => {},
-        _ = send_task => {},
+        _ = recv_task => {}
+        _ = send_task => {}
+    }
+}
+
+/// User message awaiting a gateway response for session persistence.
+struct PendingMessage {
+    content: String,
+    user_id: String,
+}
+
+/// Persist a chat exchange (user message + agent response) to the session store.
+///
+/// Mirrors the logic in the POST `/api/chat` handler so that WebSocket-based
+/// conversations are also durable across tab switches and browser restarts.
+async fn persist_session(
+    state_store: &oxios_kernel::state_store::StateStore,
+    session_id: &str,
+    user_content: &str,
+    user_id: &str,
+    agent_content: &str,
+    space_id: Option<&str>,
+    metadata: &std::collections::HashMap<String, String>,
+) {
+    let sid = oxios_kernel::state_store::SessionId(session_id.to_string());
+    match state_store.load_session(&sid).await {
+        Ok(Some(mut session)) => {
+            session.add_user_message(user_content);
+            session.add_agent_response(oxios_kernel::state_store::AgentResponse {
+                content: agent_content.to_string(),
+                session_id: Some(sid.0.clone()),
+                seed_id: metadata.get("seed_id").cloned(),
+                phase_reached: metadata.get("phase").cloned(),
+                evaluation_passed: metadata
+                    .get("evaluation_passed")
+                    .and_then(|v| v.parse().ok()),
+                timestamp: chrono::Utc::now(),
+            });
+            // Attach space_id to session metadata if provided
+            if let Some(vid) = space_id {
+                session.set_metadata(
+                    "space_id",
+                    serde_json::json!(vid),
+                );
+            }
+            if let Err(e) = state_store.save_session(&session).await {
+                tracing::warn!(error = %e, "WS: failed to persist session");
+            }
+        }
+        Ok(None) => {
+            let mut session = oxios_kernel::state_store::Session::new(user_id);
+            session.id = oxios_kernel::state_store::SessionId(session_id.to_string());
+            session.add_user_message(user_content);
+            session.add_agent_response(oxios_kernel::state_store::AgentResponse {
+                content: agent_content.to_string(),
+                session_id: Some(sid.0.clone()),
+                seed_id: metadata.get("seed_id").cloned(),
+                phase_reached: metadata.get("phase").cloned(),
+                evaluation_passed: metadata
+                    .get("evaluation_passed")
+                    .and_then(|v| v.parse().ok()),
+                timestamp: chrono::Utc::now(),
+            });
+            // Attach space_id to session metadata
+            if let Some(vid) = space_id {
+                session.set_metadata(
+                    "space_id",
+                    serde_json::json!(vid),
+                );
+            }
+            if let Err(e) = state_store.save_session(&session).await {
+                tracing::warn!(error = %e, "WS: failed to create session");
+            }
+        }
+        Err(e) => {
+            tracing::warn!(error = %e, "WS: failed to load/create session");
+        }
     }
 }

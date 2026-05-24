@@ -20,6 +20,7 @@ use crate::server::AppState;
 pub(crate) struct SessionListItem {
     id: String,
     user_id: String,
+    space_id: Option<String>,
     message_count: usize,
     active_seed_id: Option<String>,
     created_at: String,
@@ -38,6 +39,7 @@ pub(crate) async fn handle_sessions_list(
                 .map(|s| SessionListItem {
                     id: s.id,
                     user_id: s.user_id,
+                    space_id: None, // TODO: extract from Session metadata when available
                     message_count: s.message_count,
                     active_seed_id: s.active_seed_id,
                     created_at: s.created_at.to_rfc3339(),
@@ -61,6 +63,7 @@ pub(crate) async fn handle_session_get(
         Ok(Some(session)) => Ok(Json(serde_json::json!({
             "id": session.id.0,
             "user_id": session.user_id,
+            "space_id": session.metadata.get("space_id").and_then(|v| v.as_str()).map(String::from),
             "user_messages": session.user_messages,
             "agent_responses": session.agent_responses,
             "active_seed_id": session.active_seed_id,
