@@ -24,7 +24,6 @@ import { Route as CronJobsRouteImport } from './routes/cron-jobs'
 import { Route as ChatRouteImport } from './routes/chat'
 import { Route as BudgetRouteImport } from './routes/budget'
 import { Route as ApprovalsRouteImport } from './routes/approvals'
-import { Route as AgentGroupsRouteImport } from './routes/agent-groups'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as WorkspaceIndexRouteImport } from './routes/workspace/index'
 import { Route as SpacesIndexRouteImport } from './routes/spaces/index'
@@ -115,11 +114,6 @@ const ApprovalsRoute = ApprovalsRouteImport.update({
   path: '/approvals',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AgentGroupsRoute = AgentGroupsRouteImport.update({
-  id: '/agent-groups',
-  path: '/agent-groups',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -193,7 +187,6 @@ const AgentsAgentIdRoute = AgentsAgentIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/agent-groups': typeof AgentGroupsRoute
   '/approvals': typeof ApprovalsRoute
   '/budget': typeof BudgetRoute
   '/chat': typeof ChatRoute
@@ -225,7 +218,6 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/agent-groups': typeof AgentGroupsRoute
   '/approvals': typeof ApprovalsRoute
   '/budget': typeof BudgetRoute
   '/chat': typeof ChatRoute
@@ -258,7 +250,6 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/agent-groups': typeof AgentGroupsRoute
   '/approvals': typeof ApprovalsRoute
   '/budget': typeof BudgetRoute
   '/chat': typeof ChatRoute
@@ -292,7 +283,6 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
-    | '/agent-groups'
     | '/approvals'
     | '/budget'
     | '/chat'
@@ -324,7 +314,6 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
-    | '/agent-groups'
     | '/approvals'
     | '/budget'
     | '/chat'
@@ -356,7 +345,6 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
-    | '/agent-groups'
     | '/approvals'
     | '/budget'
     | '/chat'
@@ -389,7 +377,6 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  AgentGroupsRoute: typeof AgentGroupsRoute
   ApprovalsRoute: typeof ApprovalsRoute
   BudgetRoute: typeof BudgetRoute
   ChatRoute: typeof ChatRoute
@@ -527,13 +514,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApprovalsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/agent-groups': {
-      id: '/agent-groups'
-      path: '/agent-groups'
-      fullPath: '/agent-groups'
-      preLoaderRoute: typeof AgentGroupsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/': {
       id: '/'
       path: '/'
@@ -637,7 +617,6 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  AgentGroupsRoute: AgentGroupsRoute,
   ApprovalsRoute: ApprovalsRoute,
   BudgetRoute: BudgetRoute,
   ChatRoute: ChatRoute,

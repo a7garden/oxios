@@ -1,40 +1,45 @@
 # Progress
 
 ## Status
-In Progress
+Completed
 
 ## Tasks
-
-### Phase: Exhaustive Frontend-Backend Static Analysis
-- [x] Read all 29 knowledge hooks in `use-knowledge.ts`
-- [x] Compare each hook against `knowledge_routes.rs` backend handlers
-- [x] Read knowledge types in `types/knowledge.ts`
-- [x] Analyze chat WebSocket stream (`use-chat-stream.ts` + `chat.rs`)
-- [x] Analyze settings page (`settings.tsx` + `system.rs` config handlers)
-- [x] Check sidebar/header/app-layout for API calls
-- [x] Verify seed detail page (`$seedId.tsx` + `workspace.rs`)
-- [x] Verify space detail page (`$spaceId.tsx` + `space_routes.rs` + `space.rs`)
-- [x] Check all 6 knowledge components (copilot, graph, habits, chat, sidebar, info-panel)
-- [x] Review WS client (`ws-client.ts`) and SSE client (`sse-client.ts`)
-- [x] Verify backend config struct (`config.rs` OxiosConfig) against frontend settings
-- [x] Write final report to `/tmp/final-static-analysis.md`
-
-## Findings Summary (5 total)
-
-| ID | Severity | Area | Issue |
-|----|----------|------|-------|
-| K1 | 🟡 Minor | Knowledge Search | `semantic_score` field doesn't exist in backend |
-| K2 | 🟠 Wrong data | Knowledge File | Non-markdown files parsed as JSON instead of text |
-| C1 | 🟠 Wrong data | Chat Stream | WS sends `OutgoingMessage`, frontend expects `StreamChunk` |
-| S1 | 🟠 Wrong data | Settings | Section/field names don't match `OxiosConfig` schema |
-| SP1 | 🟠 Wrong data | Space Detail | `tag`/`status` fields don't match backend `tags`/`active` |
+- [x] Research latest AI agent memory architectures (2024-2026)
+  - Claude Code Auto Dream: 4-stage consolidation
+  - Hipocampus: 3-tier Hot/Warm/Cold, compaction tree, ROOT.md
+  - MemGPT/Letta: Core/Archival/Recall hierarchy
+  - Zep: Temporal knowledge graphs
+  - Ebbinghaus forgetting curves
+  - SOAR/ACT-R cognitive architectures
+- [x] Read ALL current memory-related files in codebase
+  - memory/mod.rs, store.rs, graph.rs, embedding_cache.rs
+  - auto_memory_bridge.rs, migrate.rs, budget.rs, chunking.rs
+  - hnsw.rs, hyperbolic.rs, flash_attention.rs
+  - sona.rs, rvf_store.rs, reasoning_bank.rs
+  - config.rs (MemoryConfig), state_store.rs
+  - conversation_buffer.rs, space_bridge.rs
+  - knowledge_lens.rs, knowledge.rs
+  - rfc-003, rfc-004, rfc-005
+- [x] Write comprehensive design document (RFC-008)
 
 ## Files Changed
-- `/tmp/final-static-analysis.md` — Full analysis report
+- docs/rfc-008-memory-consolidation.md (NEW - 50KB comprehensive design document)
 
 ## Notes
-- No 🔴 crash-level issues found
-- 29 knowledge hooks verified — all match backend except K1 (cosmetic) and K2 (edge case)
-- Sidebar/Header/Layout make zero API calls (Zustand only) — clean
-- Settings page is essentially non-functional against real backend config schema
-- WS streaming is a placeholder — REST chat works fine
+### Research Findings Summary
+- **Claude Code Auto Dream**: 4-stage process (Orient → Gather Signal → Consolidate → Prune & Index), triggered every 24h + 5 sessions. Key innovation: background memory consolidation during idle time.
+- **Hipocampus**: ROOT.md is the key insight - a ~3K token always-loaded topic index that gives agents O(1) awareness of what they know. 5-level compaction tree (Raw→Daily→Weekly→Monthly→Root) with temporal drill-down. 21.6x better than no memory on MemAware benchmark.
+- **MemGPT/Letta**: Memory hierarchy (Core/Archival/Recall), sleep-time compute for async consolidation, memory blocks as structured context units.
+- **Zep**: Temporal knowledge graphs that track state changes over time, outperforming MemGPT on Deep Memory Retrieval benchmark.
+- **Ebbinghaus**: R = e^(-t/S) forgetting curve, basis for importance decay.
+- **SOAR/ACT-R**: Episodic/Semantic/Procedural memory type separation, activation-based retrieval.
+
+### Design Decisions
+1. 3-tier model (Hot/Warm/Cold) based on Hipocampus + MemGPT
+2. ROOT index (~3K tokens) always in context — Hipocampus inspiration
+3. 5-level compaction tree (Raw→Daily→Weekly→Monthly→Root) — Hipocampus
+4. Dream process (4 phases) — Claude Code Auto Dream
+5. Ebbinghaus-inspired decay with per-type rates — cognitive science
+6. 8 memory types (expanded from 5) based on SOAR/ACT-R
+7. Proactive recall via 3-step selective recall — Hipocampus
+8. Backward-compatible serde migration — existing JSON files work unchanged

@@ -247,14 +247,6 @@ export interface Persona {
   personality_traits?: string[]
 }
 
-// Agent Group
-export interface AgentGroup {
-  id: string
-  name: string
-  agents: string[]
-  strategy?: string
-}
-
 // Workspace — matches backend TreeEntry from /api/workspace/tree
 export interface TreeEntry {
   name: string

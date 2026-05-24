@@ -22,7 +22,6 @@ import {
   Sun,
   Timer,
   Theater,
-  UsersRound,
   Wallet,
   Wrench,
   Zap,
@@ -58,7 +57,6 @@ const navGroups: { label: string; items: NavItem[] }[] = [
     items: [
       { label: 'Agents', href: '/agents', icon: <Bot className="h-4 w-4" /> },
       { label: 'Seeds', href: '/seeds', icon: <Dna className="h-4 w-4" /> },
-      { label: 'Groups', href: '/agent-groups', icon: <UsersRound className="h-4 w-4" /> },
       { label: 'Personas', href: '/personas', icon: <Theater className="h-4 w-4" /> },
       { label: 'Programs', href: '/programs', icon: <Cpu className="h-4 w-4" /> },
       { label: 'Skills', href: '/skills', icon: <Zap className="h-4 w-4" /> },
