@@ -486,6 +486,57 @@ impl KernelBuilder {
         self
     }
 
+    /// Create the appropriate embedding provider based on config.
+    ///
+    /// - `"tfidf"` → TfIdfEmbeddingProvider (default, zero-dependency)
+    /// - `"mlx"` → MlxEmbeddingProvider (Apple Silicon, requires `embedding-mlx` feature)
+    fn create_embedding_provider(config: &OxiosConfig) -> Arc<dyn oxios_kernel::EmbeddingProvider> {
+        let emb_config = &config.memory.embedding;
+
+        match emb_config.provider.as_str() {
+            "mlx" => {
+                #[cfg(feature = "embedding-mlx")]
+                {
+                    use oxios_kernel::{EmbeddingDimension, MlxEmbeddingProvider};
+
+                    let model_dir = oxios_kernel::embedding::mlx::MlxModelLoader
+                        ::model_dir_for_workspace(
+                            Path::new(&config.kernel.workspace)
+                        );
+                    let dim = match emb_config.dimension {
+                        128 => EmbeddingDimension::Dim128,
+                        512 => EmbeddingDimension::Dim512,
+                        768 => EmbeddingDimension::Dim768,
+                        _ => EmbeddingDimension::Dim256,
+                    };
+                    tracing::info!(
+                        dir = %model_dir.display(),
+                        dim = emb_config.dimension,
+                        "Using MLX EmbeddingGemma provider"
+                    );
+                    Arc::new(MlxEmbeddingProvider::new(
+                        model_dir,
+                        dim,
+                        emb_config.model_ttl_secs,
+                    ))
+                }
+
+                #[cfg(not(feature = "embedding-mlx"))]
+                {
+                    tracing::warn!(
+                        "MLX embedding requested but embedding-mlx feature not enabled. \
+                         Falling back to TF-IDF."
+                    );
+                    Arc::new(TfIdfEmbeddingProvider)
+                }
+            }
+            _ => {
+                tracing::debug!("Using TF-IDF embedding provider");
+                Arc::new(TfIdfEmbeddingProvider)
+            }
+        }
+    }
+
     /// Assemble all kernel components and wire them together.
     pub async fn build(self) -> Result<Kernel> {
         let config_path = self.config_path;
@@ -571,8 +622,11 @@ impl KernelBuilder {
             match MemoryDatabase::open(&db_path, sqlite_config.embedding_dim) {
                 Ok(db) => {
                     let db = Arc::new(db);
+
+                    // Select embedding provider based on config
                     let embedding: Arc<dyn oxios_kernel::EmbeddingProvider> =
-                        Arc::new(TfIdfEmbeddingProvider);
+                        Self::create_embedding_provider(&config);
+
                     let sqlite_store = SqliteMemoryStore::new(db, embedding);
 
                     // Run JSON → SQLite migration (one-time, best effort)

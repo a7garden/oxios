@@ -102,6 +102,9 @@ pub struct MemoryConfig {
     /// SQLite memory storage configuration (RFC-012).
     #[serde(default)]
     pub sqlite: SqliteMemoryConfig,
+    /// Embedding provider configuration (RFC-012).
+    #[serde(default)]
+    pub embedding: EmbeddingConfig,
 }
 
 fn default_true() -> bool {
@@ -133,6 +136,7 @@ impl Default for MemoryConfig {
             cache_max_entries: 10000,
             consolidation: ConsolidationConfig::default(),
             sqlite: SqliteMemoryConfig::default(),
+            embedding: EmbeddingConfig::default(),
         }
     }
 }
@@ -176,6 +180,49 @@ impl Default for SqliteMemoryConfig {
             path: String::new(),
             embedding_dim: 256,
             wal_mode: true,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// EmbeddingConfig (RFC-012: Embedding Provider)
+// ---------------------------------------------------------------------------
+
+/// Embedding provider configuration (RFC-012).
+///
+/// Controls which embedding model is used for semantic search.
+/// When `embedding-mlx` feature is enabled and `provider = "mlx"`,
+/// uses EmbeddingGemma-300m via MLX on Apple Silicon.
+/// Otherwise falls back to TF-IDF.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EmbeddingConfig {
+    /// Embedding provider: "tfidf" (default) or "mlx" (Apple Silicon).
+    #[serde(default = "default_embedding_provider")]
+    pub provider: String,
+    /// Matryoshka dimension: 128, 256, 512, or 768.
+    /// Only used when provider = "mlx".
+    #[serde(default = "default_embedding_dim")]
+    pub dimension: usize,
+    /// Model TTL in seconds. Unloaded after this duration of inactivity.
+    /// Only used when provider = "mlx".
+    #[serde(default = "default_model_ttl")]
+    pub model_ttl_secs: u64,
+}
+
+fn default_embedding_provider() -> String {
+    "tfidf".to_string()
+}
+
+fn default_model_ttl() -> u64 {
+    300 // 5 minutes
+}
+
+impl Default for EmbeddingConfig {
+    fn default() -> Self {
+        Self {
+            provider: default_embedding_provider(),
+            dimension: default_embedding_dim(),
+            model_ttl_secs: default_model_ttl(),
         }
     }
 }
