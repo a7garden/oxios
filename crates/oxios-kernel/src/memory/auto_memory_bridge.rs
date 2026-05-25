@@ -448,17 +448,32 @@ impl AutoMemoryBridge {
                     chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0)
                 ),
                 memory_type: MemoryType::Knowledge,
+                tier: super::MemoryTier::Warm,
                 content: match &insight.detail {
                     Some(d) => format!("{}\n\n{}", insight.summary, d),
                     None => insight.summary.clone(),
                 },
+                content_hash: 0,
                 source: insight.source.clone(),
                 session_id: None,
+                space_id: None,
                 tags: vec![insight.category.to_tag().to_string()],
                 importance: insight.confidence,
+                pinned: false,
+                protection: super::ProtectionLevel::None,
+                auto_classified: false,
+                session_appearances: 0,
+                user_corrected: false,
+                seen_in_sessions: vec![],
                 created_at: Utc::now(),
                 accessed_at: Utc::now(),
+                modified_at: Utc::now(),
                 access_count: 0,
+                decay_score: 1.0,
+                compaction_level: 0,
+                compacted_from: vec![],
+                related_ids: vec![],
+                contradicts: None,
             };
 
             match self.oxios_memory.remember(entry).await {
