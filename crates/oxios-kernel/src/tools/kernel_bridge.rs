@@ -60,7 +60,6 @@ impl SdkKernelToolProvider for OxiosKernelBridge {
             "a2a_send",
             "a2a_query",
             "persona",
-            "program",
             "cron",
             "security",
             "budget",
@@ -122,8 +121,6 @@ mod tests {
                         base.join("share/skills"),
                     ),
                 ),
-                Arc::new(crate::program::ProgramManager::new(base.join("programs"))),
-                Arc::new(crate::host_tools::HostToolValidator::new(vec![], vec![])),
             ),
             crate::McpApi::new(Arc::new(crate::mcp::McpBridge::new())),
             crate::InfraApi::new(

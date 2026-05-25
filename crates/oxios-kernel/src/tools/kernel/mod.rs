@@ -76,9 +76,6 @@ pub fn register_all_kernel_tools(registry: &ToolRegistry, kernel: &KernelHandle,
         serde_json::json!({"type": "object", "properties": {}}),
     ));
 
-    // ProgramTool (takes &KernelHandle)
-    registry.register(crate::tools::ProgramTool::from_kernel(kernel));
-
     // KnowledgeTool (markdown note management)
     registry.register(KnowledgeTool::from_kernel(kernel));
 

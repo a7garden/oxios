@@ -43,7 +43,7 @@ pub fn content_hash(content: &str) -> u64 {
 ///
 /// Tokenizes text into terms, computes normalized term frequency,
 /// and supports cosine similarity comparison. No external embedding
-/// model needed — works for any language including Korean.
+/// model needed — language-agnostic.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TextVector {
     /// Term frequencies (normalized).
@@ -73,7 +73,7 @@ impl TextVector {
 
     /// Tokenize text into terms (language-agnostic).
     /// Splits on whitespace and punctuation, lowercases.
-    /// Preserves Korean Hangul syllables (U+AC00–U+D7A3) within tokens.
+    /// Preserves non-ASCII alphanumeric runs (CJK, Hangul, etc.) within tokens.
     pub fn tokenize(text: &str) -> Vec<String> {
         text.to_lowercase()
             .split(|c: char| !c.is_alphanumeric() && !('\u{AC00}'..='\u{D7A3}').contains(&c))
@@ -115,12 +115,10 @@ impl TextVector {
 // Types
 // ---------------------------------------------------------------------------
 
-/// Memory entry type — expanded from 5 to 9 types.
-/// Existing Knowledge is preserved for backward compatibility.
+/// Memory entry type — 9 types derived from the SOAR/ACT-R cognitive model.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum MemoryType {
-    // Existing types (unchanged — backward compat)
     /// Conversation compaction summary (auto-generated).
     Conversation,
     /// Session-end summary (auto-generated).
@@ -129,14 +127,11 @@ pub enum MemoryType {
     Fact,
     /// An event or experience (e.g., "deployed v0.2.0").
     Episode,
-    /// Static knowledge (user/program-provided, knowledge-base synced).
-    /// Preserved from knowledge_lens.rs. **Do not remove.**
+    /// Static knowledge (knowledge-base synced, user/program-provided).
     Knowledge,
-
-    // New types (from SOAR/ACT-R cognitive model)
     /// A learned procedure or pattern (e.g., "run cargo test before commit").
     Skill,
-    /// A user preference (e.g., "use Korean for user-facing messages").
+    /// A user preference (e.g., "always use dark mode").
     Preference,
     /// A recorded decision with rationale (e.g., "chose HNSW over FAISS").
     Decision,
@@ -331,9 +326,7 @@ impl Default for ProtectionLevel {
     }
 }
 
-/// A single memory entry — extended with lifecycle + auto-protection metadata.
-/// All new fields use `#[serde(default)]` for backward compatibility with
-/// existing stored JSON.
+/// A single memory entry with lifecycle and auto-protection metadata.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MemoryEntry {
     // ── Identity ──────────────────────────────────────
@@ -767,13 +760,13 @@ mod tests {
     }
 
     #[test]
-    fn test_text_vector_korean() {
+    fn test_text_vector_multilingual() {
         let v1 = TextVector::from_text("main.rs 파일의 null pointer 에러 수정");
         let v2 = TextVector::from_text("null pointer 오류를 수정했습니다");
         let v3 = TextVector::from_text("문서 업데이트 배포 가이드");
 
-        assert!(v1.cosine_similarity(&v2) > 0.1, "Korean+code similarity");
-        assert!(v1.cosine_similarity(&v3) < 0.1, "Korean different topics");
+        assert!(v1.cosine_similarity(&v2) > 0.1, "Mixed script similarity");
+        assert!(v1.cosine_similarity(&v3) < 0.1, "Different topics");
     }
 
     #[test]
@@ -796,10 +789,10 @@ mod tests {
     }
 
     #[test]
-    fn test_tokenize_korean() {
+    fn test_tokenize_multilingual() {
         let terms = TextVector::tokenize("main.rs 파일의 버그를 수정");
         // Should contain at least some meaningful tokens
-        assert!(!terms.is_empty(), "Korean text should produce tokens");
+        assert!(!terms.is_empty(), "Non-ASCII text should produce tokens");
     }
 
     #[tokio::test]

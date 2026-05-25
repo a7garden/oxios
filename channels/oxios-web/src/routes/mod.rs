@@ -4,7 +4,7 @@
 //! - **chat**: Chat and WebSocket streaming
 //! - **system**: Health, status, agents, config
 //! - **workspace**: File tree, seeds, skills, memory
-//! - **resources**: Programs, host-tools, system resources
+//! - **resource_routes**: System resources
 //! - **infra**: Scheduler, audit, permissions, MCP
 //! - **events**: Sessions, SSE events, approvals
 
@@ -18,7 +18,6 @@ mod git_routes;
 mod infra;
 mod knowledge_routes;
 mod resource_routes;
-mod resources;
 mod space_routes;
 mod system;
 mod workspace;
@@ -76,12 +75,8 @@ pub(crate) use knowledge_routes::{
 pub(crate) use resource_routes::{
     handle_resource_history, handle_resource_overload, handle_resource_snapshot,
 };
-pub(crate) use resources::{
-    handle_host_tools_check, handle_program_disable, handle_program_enable, handle_program_get,
-    handle_program_host_requirements, handle_program_install, handle_program_uninstall,
-    handle_programs_list,
-};
 pub(crate) use space_routes::{
+
     handle_memory_flow, handle_memory_flow_for, handle_space_activate, handle_space_archive,
     handle_space_current, handle_space_get, handle_space_merge, handle_space_restore,
     handle_spaces_list,
@@ -207,19 +202,6 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         .route("/api/permissions/{agent}", put(handle_permissions_put))
         // Prometheus metrics
         .route("/api/metrics", get(handle_metrics))
-        // Programs
-        .route("/api/programs", get(handle_programs_list))
-        .route("/api/programs", post(handle_program_install))
-        .route("/api/programs/{name}", get(handle_program_get))
-        .route("/api/programs/{name}", delete(handle_program_uninstall))
-        .route("/api/programs/{name}/enable", post(handle_program_enable))
-        .route("/api/programs/{name}/disable", post(handle_program_disable))
-        .route(
-            "/api/programs/{name}/host-requirements",
-            get(handle_program_host_requirements),
-        )
-        // Host tools
-        .route("/api/host-tools", get(handle_host_tools_check))
         // Resources
         .route("/api/resources", get(handle_resource_snapshot))
         .route("/api/resources/history", get(handle_resource_history))
