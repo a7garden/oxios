@@ -211,6 +211,7 @@ impl AgentTool for MyTool {
 | `docs/ARCHITECTURE.md` | Before modifying kernel structure or adding modules |
 | `docs/rfc-008-memory-consolidation.md` | Before modifying memory system (tiered memory, Dream, decay, compaction) |
 | `docs/rfc-009-skill-unification.md` | Before modifying skill system (unified SKILL.md frontmatter, requirements) |
+| `docs/rfc-010-clawhub-marketplace.md` | Before working on marketplace feature |
 | `docs/channel-plugin-guide.md` | Before adding a new channel (Web, Telegram, etc.) |
 | `docs/channel-registry.md` | Before registering a new channel |
 | `docs/rfc-003-knowledge-separation.md` | Before modifying knowledge/memory architecture |

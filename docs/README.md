@@ -33,8 +33,6 @@ These documents describe internal design decisions and are primarily for contrib
 
 | Document | Description |
 |----------|-------------|
-| [RFC-001: Kernel Facade](rfc-001-kernel-facade.md) | KernelHandle facade pattern design |
-| [RFC-002: Kernel Module Organization](rfc-002-kernel-module-organization.md) | Module reorganization plan |
 | [RFC-003: CLI UX Improvements](rfc-003-cli-ux-improvements.md) | CLI user experience improvements |
 | [RFC-003: Web Dashboard Audit](rfc-003-web-dashboard-audit.md) | Web dashboard audit findings |
 | [RFC-003: Knowledge Separation](rfc-003-knowledge-separation.md) | Knowledge vs memory architecture separation |
@@ -44,15 +42,17 @@ These documents describe internal design decisions and are primarily for contrib
 | [RFC-007: Remaining Port](rfc-007-remaining-port.md) | Remaining feature porting |
 | [RFC-008: Memory Consolidation](rfc-008-memory-consolidation.md) | Tiered memory with Dream-time compaction |
 | [RFC-009: Skill Unification](rfc-009-skill-unification.md) | Unified Skill model (Programs + Skills merged) |
+| [RFC-010: Clawhub Marketplace](rfc-010-clawhub-marketplace.md) | Marketplace for sharing skills and agents |
 | [Refactoring Design](refactoring-design.md) | Large-scale refactoring plan |
 | [Remaining Items](remaining-items-design.md) | Outstanding design items |
 
 ## Archive
 
 Historical design documents are in the [`archive/`](archive/) directory. This includes:
+- Old RFCs (RFC-001, RFC-002) — superseded by current architecture
 - Analysis results (clippy reports, security audits, kernel analysis)
-- Old design documents (superseded by RFCs)
 - Previous architecture iterations
+- Work-in-progress designs in `designs/`
 
 For recursive-improvement-loop artifacts, see `archive/designs/loop*.md`.
 

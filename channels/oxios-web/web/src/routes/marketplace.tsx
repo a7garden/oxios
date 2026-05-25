@@ -28,10 +28,11 @@ function MarketplacePage() {
   } = useQuery({
     queryKey: ['marketplace', 'search', deferredQuery],
     queryFn: async () => {
-      const res = await api.get<{ results: ClawHubSearchResult[] }>('/api/marketplace/search', {
+      // Backend returns flat array Vec<ClawHubSearchResult>
+      const res = await api.get<ClawHubSearchResult[]>('/api/marketplace/search', {
         q: deferredQuery,
       })
-      return res.results ?? []
+      return res ?? []
     },
     enabled: deferredQuery.trim().length > 0,
     refetchOnWindowFocus: false,

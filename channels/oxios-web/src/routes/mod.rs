@@ -146,7 +146,15 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
     let public = Router::new()
         .route("/health", get(handle_health))
         .route("/health/ready", get(handle_readiness))
-        .route("/metrics", get(handle_metrics));
+        .route("/metrics", get(handle_metrics))
+        // Marketplace (ClawHub) — public, no auth required
+        .route("/api/marketplace/search", get(handle_marketplace_search))
+        .route("/api/marketplace/updates", get(handle_marketplace_updates))
+        .route("/api/marketplace/skills/{slug}", get(handle_marketplace_skill_detail))
+        .route(
+            "/api/marketplace/skills/{slug}/install",
+            post(handle_marketplace_install),
+        );
 
     // Protected API routes (auth middleware applied)
     let api = Router::new()
@@ -375,20 +383,6 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
             post(handle_knowledge_convert_html),
         )
         .route("/api/knowledge/emoji", get(handle_knowledge_emoji))
-        // Marketplace (ClawHub)
-        .route("/api/marketplace/search", get(handle_marketplace_search))
-        .route(
-            "/api/marketplace/skills/{slug}",
-            get(handle_marketplace_skill_detail),
-        )
-        .route(
-            "/api/marketplace/skills/{slug}/install",
-            post(handle_marketplace_install),
-        )
-        .route(
-            "/api/marketplace/updates",
-            get(handle_marketplace_updates),
-        )
         .layer(axum::middleware::from_fn_with_state(
             state.clone(),
             require_auth,
