@@ -442,6 +442,10 @@ pub struct MemoryManager {
     git_layer: Option<Arc<GitLayer>>,
     /// Optional HNSW index for fast ANN search.
     hnsw_index: RwLock<Option<Arc<HnswMemoryIndex>>>,
+    /// Optional SQLite-backed store (RFC-012). When present, remember/search
+    /// operations delegate here instead of StateStore.
+    #[cfg(feature = "sqlite-memory")]
+    sqlite_store: Option<Arc<crate::memory::sqlite_store::SqliteMemoryStore>>,
 }
 
 impl std::fmt::Debug for MemoryManager {
@@ -463,12 +467,24 @@ impl MemoryManager {
             embedding: Arc::new(TfIdfEmbeddingProvider),
             git_layer: None,
             hnsw_index: RwLock::new(None),
+            #[cfg(feature = "sqlite-memory")]
+            sqlite_store: None,
         }
     }
 
     /// Attach a git layer for version-controlled saves.
     pub fn set_git_layer(&mut self, gl: Arc<GitLayer>) {
         self.git_layer = Some(gl);
+    }
+
+    /// Attach a SQLite-backed memory store (RFC-012).
+    ///
+    /// When present, `remember()`, `search()`, `recall()`, and other
+    /// operations will delegate to the SQLite store instead of the
+    /// file-based StateStore.
+    #[cfg(feature = "sqlite-memory")]
+    pub fn set_sqlite_store(&mut self, store: Arc<crate::memory::sqlite_store::SqliteMemoryStore>) {
+        self.sqlite_store = Some(store);
     }
 
     /// Create a Space-scoped MemoryManager.
@@ -670,6 +686,8 @@ mod root_index;
 #[cfg(feature = "sqlite-memory")]
 pub mod search;
 pub mod sona;
+#[cfg(feature = "sqlite-memory")]
+pub mod sqlite_store;
 pub(crate) mod store;
 
 pub use auto_classify::AutoClassifier;

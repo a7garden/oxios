@@ -4,9 +4,9 @@
 //! It runs both vector (semantic) and keyword (BM25) search in parallel
 //! and fuses results using RRF for optimal recall.
 
-mod bm25;
+pub(super) mod bm25;
 mod rrf;
-mod vector;
+pub(super) mod vector;
 
 use anyhow::Result;
 
@@ -151,7 +151,7 @@ pub fn load_memory_by_id(db: &MemoryDatabase, id: &str) -> Result<Option<MemoryE
 ///  6: source, 7: session_id, 8: space_id, 9: tags, 10: access_count, 11: pinned,
 /// 12: auto_classified, 13: session_appearances, 14: decay_score, 15: content_hash,
 /// 16: created_at, 17: updated_at, 18: accessed_at
-fn row_to_memory_entry(row: &rusqlite::Row<'_>) -> MemoryEntry {
+pub fn row_to_memory_entry(row: &rusqlite::Row<'_>) -> MemoryEntry {
     use chrono::Utc;
 
     let memory_type_str: String = row.get_unwrap(1);

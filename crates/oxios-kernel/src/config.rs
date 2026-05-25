@@ -99,6 +99,9 @@ pub struct MemoryConfig {
     /// Consolidation configuration (RFC-008).
     #[serde(default)]
     pub consolidation: ConsolidationConfig,
+    /// SQLite memory storage configuration (RFC-012).
+    #[serde(default)]
+    pub sqlite: SqliteMemoryConfig,
 }
 
 fn default_true() -> bool {
@@ -129,6 +132,50 @@ impl Default for MemoryConfig {
             cache_ttl_secs: 3600,
             cache_max_entries: 10000,
             consolidation: ConsolidationConfig::default(),
+            sqlite: SqliteMemoryConfig::default(),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SqliteMemoryConfig (RFC-012: SQLite Memory Storage)
+// ---------------------------------------------------------------------------
+
+/// SQLite-backed memory storage configuration (RFC-012).
+///
+/// When enabled, memories are stored in a single `memory.db` file with
+/// FTS5 BM25 + sqlite-vec KNN search. Falls back to the existing JSON
+/// + TF-IDF approach when disabled.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SqliteMemoryConfig {
+    /// Enable SQLite-backed memory storage.
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+    /// Path to the SQLite database file.
+    /// Empty string means default: `~/.oxios/workspace/memory.db`
+    #[serde(default)]
+    pub path: String,
+    /// Embedding vector dimension.
+    /// Controls the `vec0` virtual table dimension.
+    /// Common values: 128 (fast), 256 (balanced), 768 (full Gemma).
+    #[serde(default = "default_embedding_dim")]
+    pub embedding_dim: usize,
+    /// Enable WAL mode for concurrent reads.
+    #[serde(default = "default_true")]
+    pub wal_mode: bool,
+}
+
+fn default_embedding_dim() -> usize {
+    256
+}
+
+impl Default for SqliteMemoryConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            path: String::new(),
+            embedding_dim: 256,
+            wal_mode: true,
         }
     }
 }

@@ -10,8 +10,10 @@ use oxios_kernel::{
     access_manager::AccessManager, auth::AuthManager, config::load_config, A2AProtocol,
     AgentRuntime, AgentScheduler, AuditTrail, BasicSupervisor, BudgetManager, ClawHubClient,
     ClawHubInstaller, CronScheduler, EngineProvider, EventBus, GitLayer,
-    McpBridge, McpServer, MarketplaceApi, MemoryManager, Orchestrator,
-    OxiosConfig, PersonaManager, ResourceMonitor, SkillManager, SpaceManager, Supervisor,
+    McpBridge, McpServer, MarketplaceApi, MemoryManager,
+    Orchestrator, OxiosConfig, PersonaManager, ResourceMonitor,
+    SkillManager, SpaceManager, Supervisor,
+    TfIdfEmbeddingProvider,
 };
 use oxios_markdown::knowledge::FileChange;
 use oxios_markdown::KnowledgeBase;
@@ -552,6 +554,49 @@ impl KernelBuilder {
 
         let mut memory_manager = MemoryManager::new(state_store.clone());
         memory_manager.set_git_layer(git_layer.clone());
+
+        // ── RFC-012: SQLite memory backend ──
+        // When enabled, initialize the SQLite database and attach it to the memory manager.
+        #[cfg(feature = "sqlite-memory")]
+        if config.memory.sqlite.enabled {
+            use oxios_kernel::{MemoryDatabase, SqliteMemoryStore};
+
+            let sqlite_config = &config.memory.sqlite;
+            let db_path = if sqlite_config.path.is_empty() {
+                PathBuf::from(&config.kernel.workspace).join("memory.db")
+            } else {
+                oxios_kernel::config::expand_home(&sqlite_config.path)
+            };
+
+            match MemoryDatabase::open(&db_path, sqlite_config.embedding_dim) {
+                Ok(db) => {
+                    let db = Arc::new(db);
+                    let embedding: Arc<dyn oxios_kernel::EmbeddingProvider> =
+                        Arc::new(TfIdfEmbeddingProvider);
+                    let sqlite_store = SqliteMemoryStore::new(db, embedding);
+
+                    // Run JSON → SQLite migration (one-time, best effort)
+                    let workspace_dir = PathBuf::from(&config.kernel.workspace);
+                    if let Err(e) = sqlite_store.migrate_if_needed(&workspace_dir) {
+                        tracing::warn!(error = %e, "Memory migration failed (non-fatal)");
+                    }
+
+                    memory_manager.set_sqlite_store(Arc::new(sqlite_store));
+                    tracing::info!(
+                        path = %db_path.display(),
+                        dim = sqlite_config.embedding_dim,
+                        "SQLite memory backend initialized"
+                    );
+                }
+                Err(e) => {
+                    tracing::warn!(
+                        error = %e,
+                        "Failed to open SQLite memory database, falling back to JSON"
+                    );
+                }
+            }
+        }
+
         let memory_manager = Arc::new(memory_manager);
 
         // ── RFC-008: Dream process for background memory consolidation ──

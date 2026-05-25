@@ -152,6 +152,8 @@ pub use memory::database::{bytes_to_f32_slice, f32_slice_to_bytes, MemoryDatabas
 #[cfg(feature = "sqlite-memory")]
 pub use memory::search::{Bm25Hit, RankedMemory, VectorHit, reciprocal_rank_fusion};
 #[cfg(feature = "sqlite-memory")]
+pub use memory::sqlite_store::SqliteMemoryStore;
+#[cfg(feature = "sqlite-memory")]
 pub use memory::cache::{self as sqlite_cache};
 #[cfg(feature = "sqlite-memory")]
 pub use memory::migration::{self as sqlite_migration, MigrationReport};
@@ -182,7 +184,7 @@ pub use backup::{BackupManifest, BackupSection};
 pub use config::{
     BrowserConfig, ChannelsConfig, CronConfig, DaemonConfig, EngineConfig, ExecConfig, ExecMode,
     GitConfig, InlineCronJob, LoggingConfig, MarketplaceConfig, McpConfig, McpServerDef,
-    MemoryConfig, OrchestratorConfig, OxiosConfig, PersonaConfig, TelegramChannelConfig,
+    MemoryConfig, OrchestratorConfig, OxiosConfig, PersonaConfig, SqliteMemoryConfig,
 };
 pub use git_layer::{CommitInfo, GitLayer, LogEntry};
 pub use resource_monitor::{OverloadThreshold, ResourceMonitor, ResourceSnapshot};

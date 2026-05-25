@@ -13,7 +13,7 @@
 use std::path::Path;
 
 use anyhow::{Context, Result};
-use parking_lot::ReentrantMutex;
+use parking_lot::Mutex;
 use rusqlite::Connection;
 
 /// Schema DDL for the memory database.
@@ -130,7 +130,7 @@ CREATE VIRTUAL TABLE IF NOT EXISTS memory_vectors USING vec0(
 /// All memory data lives in a single `.db` file with ACID guarantees.
 /// Thread-safe via `Mutex<Connection>` (SQLite supports serialised access).
 pub struct MemoryDatabase {
-    conn: ReentrantMutex<Connection>,
+    conn: Mutex<Connection>,
     /// Embedding vector dimension (default 768 for EmbeddingGemma).
     embedding_dim: usize,
 }
@@ -180,7 +180,7 @@ impl MemoryDatabase {
             );
 
         Ok(Self {
-            conn: ReentrantMutex::new(conn),
+            conn: Mutex::new(conn),
             embedding_dim,
         })
     }
@@ -196,7 +196,7 @@ impl MemoryDatabase {
         conn.execute_batch(&VEC_SCHEMA_TEMPLATE.replace("{DIM}", &embedding_dim.to_string()))?;
 
         Ok(Self {
-            conn: ReentrantMutex::new(conn),
+            conn: Mutex::new(conn),
             embedding_dim,
         })
     }
@@ -221,9 +221,10 @@ impl MemoryDatabase {
 
     /// Get a locked connection reference.
     ///
-    /// Returns a `ReentrantMutexGuard<Connection>` for executing queries.
-    /// Reentrant: the same thread can lock multiple times without deadlocking.
-    pub fn conn(&self) -> parking_lot::ReentrantMutexGuard<'_, Connection> {
+    /// Returns a `MutexGuard<Connection>` for executing queries.
+    /// `parking_lot::Mutex` is `Send` and safe to use in async contexts.
+    /// IMPORTANT: Always drop the guard before any `.await` point.
+    pub fn conn(&self) -> parking_lot::MutexGuard<'_, Connection> {
         self.conn.lock()
     }
 

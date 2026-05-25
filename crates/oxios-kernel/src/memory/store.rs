@@ -136,9 +136,17 @@ impl MemoryManager {
 
     /// Store a memory entry. Returns the entry ID.
     ///
-    /// Also computes and stores the entry's text vector in the in-memory
+    /// When SQLite backend is enabled, delegates to `SqliteMemoryStore`.
+    /// Otherwise computes and stores the entry's text vector in the in-memory
     /// index for future semantic search.
     pub async fn remember(&self, entry: MemoryEntry) -> Result<String> {
+        // ── SQLite fast path (RFC-012) ──
+        #[cfg(feature = "sqlite-memory")]
+        if let Some(ref sqlite) = self.sqlite_store {
+            return sqlite.remember(&entry).await;
+        }
+
+        // ── Legacy JSON path ──
         let id = entry.id.clone();
         let vector = self.embedding.embed(&entry.content).await?;
         let category = entry.memory_type.category();
@@ -171,11 +179,19 @@ impl MemoryManager {
 
     /// Retrieve a single memory by ID.
     pub async fn get(&self, id: &str, memory_type: MemoryType) -> Result<Option<MemoryEntry>> {
+        #[cfg(feature = "sqlite-memory")]
+        if let Some(ref sqlite) = self.sqlite_store {
+            return sqlite.get(id, memory_type);
+        }
         self.state_store.load_json(memory_type.category(), id).await
     }
 
     /// Delete a memory entry.
     pub async fn forget(&self, id: &str, memory_type: MemoryType) -> Result<bool> {
+        #[cfg(feature = "sqlite-memory")]
+        if let Some(ref sqlite) = self.sqlite_store {
+            return sqlite.forget(id, memory_type);
+        }
         let result = self
             .state_store
             .delete_file(memory_type.category(), id)
@@ -196,6 +212,10 @@ impl MemoryManager {
 
     /// List memories of a given type, most recent first.
     pub async fn list(&self, memory_type: MemoryType, limit: usize) -> Result<Vec<MemoryEntry>> {
+        #[cfg(feature = "sqlite-memory")]
+        if let Some(ref sqlite) = self.sqlite_store {
+            return sqlite.list(memory_type, limit);
+        }
         let category = memory_type.category();
         let names = self.state_store.list_category(category).await?;
         let mut entries = Vec::new();
@@ -224,6 +244,10 @@ impl MemoryManager {
         memory_type: Option<MemoryType>,
         limit: usize,
     ) -> Result<Vec<MemoryEntry>> {
+        #[cfg(feature = "sqlite-memory")]
+        if let Some(ref sqlite) = self.sqlite_store {
+            return sqlite.search(query, memory_type, limit).await;
+        }
         let query_vector = self.embedding.embed(query).await?;
 
         // Scope the read lock: compute scores, then drop before any await.
@@ -324,6 +348,10 @@ impl MemoryManager {
     /// Combines recent conversation summaries, session summaries,
     /// and keyword-matched facts/episodes.
     pub async fn recall(&self, query: &str) -> Result<Vec<MemoryEntry>> {
+        #[cfg(feature = "sqlite-memory")]
+        if let Some(ref sqlite) = self.sqlite_store {
+            return sqlite.recall(query, self.max_recall).await;
+        }
         let limit = self.max_recall;
 
         // 1. Recent conversation summaries (always include)
@@ -475,6 +503,10 @@ impl MemoryManager {
     ///
     /// Returns the entry ID if stored, or `None` if duplicate.
     pub async fn remember_unique(&self, entry: MemoryEntry) -> Result<Option<String>> {
+        #[cfg(feature = "sqlite-memory")]
+        if let Some(ref sqlite) = self.sqlite_store {
+            return sqlite.remember_unique(&entry).await;
+        }
         if self.is_duplicate(&entry.content).await {
             tracing::debug!(id = %entry.id, "Skipping duplicate memory");
             return Ok(None);
