@@ -9,9 +9,8 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
-use serde::Deserialize;
 
-use oxios_kernel::{MarketplaceApi, ClawHubSearchResult, ClawHubSkillDetail};
+use oxios_kernel::{ClawHubSearchResult, ClawHubSkillDetail};
 
 use crate::error::AppError;
 use crate::server::AppState;
@@ -19,7 +18,7 @@ use crate::server::AppState;
 // ─── Query types ─────────────────────────────────────────────────────────────
 
 /// Query params for marketplace search.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, serde::Deserialize)]
 pub struct SearchQuery {
     /// Search query string.
     pub q: String,
@@ -33,7 +32,7 @@ fn default_limit() -> usize {
 }
 
 /// Request body for installing a skill.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, serde::Deserialize)]
 pub struct InstallBody {
     /// Specific version to install (None = latest).
     pub version: Option<String>,
@@ -42,7 +41,7 @@ pub struct InstallBody {
 // ─── Handlers ─────────────────────────────────────────────────────────────────
 
 /// GET /api/marketplace/search — Search ClawHub for skills.
-pub(crate) async fn handle_marketplace_search(
+pub async fn handle_marketplace_search(
     state: State<Arc<AppState>>,
     Query(query): Query<SearchQuery>,
 ) -> Result<Json<Vec<ClawHubSearchResult>>, AppError> {
@@ -56,7 +55,7 @@ pub(crate) async fn handle_marketplace_search(
 }
 
 /// GET /api/marketplace/skills/{slug} — Get skill detail from ClawHub.
-pub(crate) async fn handle_marketplace_skill_detail(
+pub async fn handle_marketplace_skill_detail(
     state: State<Arc<AppState>>,
     Path(slug): Path<String>,
 ) -> Result<Json<ClawHubSkillDetail>, AppError> {
@@ -70,7 +69,7 @@ pub(crate) async fn handle_marketplace_skill_detail(
 }
 
 /// POST /api/marketplace/skills/{slug}/install — Install a skill from ClawHub.
-pub(crate) async fn handle_marketplace_install(
+pub async fn handle_marketplace_install(
     state: State<Arc<AppState>>,
     Path(slug): Path<String>,
     Json(body): Json<InstallBody>,
@@ -92,7 +91,7 @@ pub(crate) async fn handle_marketplace_install(
 }
 
 /// GET /api/marketplace/updates — Check for updates to installed ClawHub skills.
-pub(crate) async fn handle_marketplace_updates(
+pub async fn handle_marketplace_updates(
     state: State<Arc<AppState>>,
 ) -> Result<Json<Vec<serde_json::Value>>, AppError> {
     let updates = state

@@ -1,7 +1,7 @@
 # Progress
 
 ## Status
-In Progress — RFC-010 Phase 1 complete
+In Progress — RFC-010 Phase 2 kernel integration complete, oxios-web handler error
 
 ## Tasks
 
@@ -18,10 +18,26 @@ In Progress — RFC-010 Phase 1 complete
   - [x] `kernel_bridge.rs` — fixed duplicate MarketplaceApi call
   - [x] Unit tests (7 passing)
 
-- [ ] Phase 2: Kernel integration (MarketplaceApi → KernelHandle)
+- [x] Phase 2: Kernel integration (MarketplaceApi → KernelHandle)
+  - [x] `crates/oxios-kernel/src/kernel_handle/marketplace_api.rs` — new MarketplaceApi facade
+  - [x] `crates/oxios-kernel/src/kernel_handle/mod.rs` — MarketplaceApi field + accessor
+  - [x] `crates/oxios-kernel/src/tools/kernel/marketplace_tool.rs` — AgentTool for agents
+  - [x] `crates/oxios-kernel/src/tools/kernel/mod.rs` — registered MarketplaceTool in bridge
+  - [x] `crates/oxios-kernel/src/tools/kernel_bridge.rs` — added marketplace to tool_names
+  - [x] `crates/oxios-kernel/src/config.rs` — added MarketplaceConfig
+  - [x] `crates/oxios-kernel/src/lib.rs` — re-exports for MarketplaceApi + MarketplaceConfig
+  - [x] `crates/oxios-kernel/src/clawhub/client.rs` — added `pub fn base_url()` method
+  - [x] `src/kernel.rs` — wired MarketplaceApi with workspace_dir + skills_dir
+  - [x] `channels/oxios-web/src/routes/marketplace.rs` — HTTP handlers (needs trait fix)
+  - ⚠️ oxios-web: Handler trait error — handlers exist but fail axum Handler bound
+  - [x] `cargo check -p oxios-kernel` passes
 - [ ] Phase 3: Backend API endpoints (`/api/marketplace/*`)
 - [ ] Phase 4: Web UI — marketplace tab
-- [ ] Phase 5: CLI commands (`oxios marketplace *`)
+- [x] Phase 5: CLI commands (`oxios marketplace *`)
+  - ✅ CLI commands fully implemented in `src/main.rs`
+  - ✅ MarketplaceApi wired into KernelHandle
+  - ✅ All subcommands: search, install, update, updates
+  - ✅ Unit tests passing (7/7)
 
 ## Files Changed
 
