@@ -7,10 +7,11 @@ license = "MIT"
 repository = "https://github.com/a7garden/oxios"
 
 [features]
-default = ["browser"]
+default = ["browser", "sqlite-memory"]
 otel = ["tracing-opentelemetry", "opentelemetry", "opentelemetry_sdk", "opentelemetry-otlp", "opentelemetry-stdout"]
 wasm-sandbox = ["dep:wasmtime", "dep:wasmtime-wasi"]
 browser = []
+sqlite-memory = ["dep:rusqlite", "dep:sqlite-vec"]
 
 [dependencies]
 oxios-ouroboros = { version = "0.4.0", path = "../oxios-ouroboros" }
@@ -60,8 +61,12 @@ lru = "0.10"
 inquire = "0.9"
 console = "0.15"
 
-# Vector search (HNSW)
+# Vector search (HNSW, legacy)
 usearch = "2.25"
+
+# SQLite-based memory storage (RFC-012)
+rusqlite = { version = "0.34", features = ["bundled"], optional = true }
+sqlite-vec = { version = "0.1", optional = true }
 
 # Headless browser (built-in)
 oxibrowser-core = "0.9.1"

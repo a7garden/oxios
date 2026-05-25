@@ -649,18 +649,26 @@ pub mod auto_classify;
 mod auto_protect;
 pub mod auto_memory_bridge;
 mod budget;
+#[cfg(feature = "sqlite-memory")]
+pub mod cache;
 mod chunking;
 mod compaction;
 mod decay;
+#[cfg(feature = "sqlite-memory")]
+pub mod database;
 pub mod dream;
 pub mod embedding_cache;
 pub mod flash_attention;
 mod graph;
 mod hnsw;
 pub mod hyperbolic;
+#[cfg(feature = "sqlite-memory")]
+pub mod migration;
 pub mod normalizer;
 mod proactive;
 mod root_index;
+#[cfg(feature = "sqlite-memory")]
+pub mod search;
 pub mod sona;
 pub(crate) mod store;
 
