@@ -1,10 +1,15 @@
-//! Skill system: markdown-based instructions for agents.
+//! Skill system — unified manager for skills and programs.
 //!
-//! Skills are markdown files with YAML frontmatter that define
-//! reusable instruction templates. Agents read skills to understand
-//! expected behaviors and patterns.
+//! RFC-009 Phase 3: `SkillManager` replaces the separate `ProgramManager` +
+//! `SkillStore` pair. It wraps both subsystems behind a single facade so that
+//! the rest of the kernel only depends on `SkillManager`.
 //!
-//! Skill files are structured as:
+//! ## Skill files
+//!
+//! Skills are markdown files with YAML frontmatter that define reusable
+//! instruction templates. Agents read skills to understand expected
+//! behaviors and patterns.
+//!
 //! ```markdown
 //! ---
 //! name: skill-name
@@ -19,6 +24,7 @@
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+use std::sync::Arc;
 use tokio::fs;
 
 /// Metadata extracted from SKILL.md frontmatter.
@@ -245,6 +251,144 @@ impl SkillStore {
     /// Get the path to the skills directory.
     pub fn path(&self) -> &PathBuf {
         &self.skills_dir
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// SkillManager — unified facade (RFC-009 Phase 3)
+// ─────────────────────────────────────────────────────────────────────
+
+/// Unified skill manager that owns both the program manager and skill store.
+///
+/// This is the single entry point for all skill/program operations in the
+/// kernel. It replaces the previous `Arc<ProgramManager> + Arc<SkillStore>`
+/// pair used throughout the codebase.
+#[derive(Clone)]
+pub struct SkillManager {
+    /// Underlying program manager (kept for backward compatibility during migration).
+    program_manager: Arc<crate::program::ProgramManager>,
+    /// Underlying skill store.
+    skill_store: Arc<SkillStore>,
+}
+
+impl std::fmt::Debug for SkillManager {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SkillManager")
+            .field("programs_dir", &self.program_manager.programs_dir())
+            .field("skills_dir", &self.skill_store.path())
+            .finish()
+    }
+}
+
+impl SkillManager {
+    /// Create a new `SkillManager` from the given program and skill directories.
+    pub fn new(programs_dir: PathBuf, skills_dir: PathBuf) -> Result<Self> {
+        let program_manager = Arc::new(crate::program::ProgramManager::new(programs_dir));
+        let skill_store = Arc::new(SkillStore::new(skills_dir)?);
+        Ok(Self {
+            program_manager,
+            skill_store,
+        })
+    }
+
+    /// Create from pre-built subsystems (for tests or custom wiring).
+    pub fn from_parts(
+        program_manager: Arc<crate::program::ProgramManager>,
+        skill_store: Arc<SkillStore>,
+    ) -> Self {
+        Self {
+            program_manager,
+            skill_store,
+        }
+    }
+
+    // ── Program delegation ──────────────────────────────────────────
+
+    /// Access the underlying program manager.
+    ///
+    /// Prefer the typed methods below. This accessor exists for the
+    /// migration period where `agent_runtime` still directly queries
+    /// `ProgramManager` for tool registration.
+    pub fn program_manager(&self) -> &Arc<crate::program::ProgramManager> {
+        &self.program_manager
+    }
+
+    /// List installed programs.
+    pub async fn list_programs(&self) -> Vec<crate::program::Program> {
+        self.program_manager.list_programs().await
+    }
+
+    /// List enabled programs.
+    pub async fn list_enabled_programs(&self) -> Vec<crate::program::Program> {
+        self.program_manager.list_enabled().await
+    }
+
+    /// Get a program by name.
+    pub async fn get_program(&self, name: &str) -> Option<crate::program::Program> {
+        self.program_manager.get_program(name).await
+    }
+
+    /// Install a program from a source.
+    pub async fn install_program(
+        &self,
+        source: crate::program::InstallSource,
+    ) -> Result<crate::program::Program> {
+        self.program_manager.install_from(source).await
+    }
+
+    /// Uninstall a program.
+    pub async fn uninstall_program(&self, name: &str) -> Result<()> {
+        self.program_manager.uninstall(name).await
+    }
+
+    /// Enable a program.
+    pub async fn enable_program(&self, name: &str) -> Result<()> {
+        self.program_manager.set_enabled(name, true).await
+    }
+
+    /// Disable a program.
+    pub async fn disable_program(&self, name: &str) -> Result<()> {
+        self.program_manager.set_enabled(name, false).await
+    }
+
+    /// Check host requirements for a program.
+    pub async fn check_host_requirements(
+        &self,
+        name: &str,
+    ) -> Result<crate::program::HostRequirementsCheck> {
+        self.program_manager.check_host_requirements(name).await
+    }
+
+    // ── Skill delegation ────────────────────────────────────────────
+
+    /// List all skills.
+    pub async fn list_skills(&self) -> Result<Vec<SkillMeta>> {
+        self.skill_store.list_skills().await
+    }
+
+    /// Load skill by name.
+    pub async fn load_skill(&self, name: &str) -> Result<Option<Skill>> {
+        self.skill_store.load_skill(name).await
+    }
+
+    /// Create a new skill.
+    pub async fn create_skill(
+        &self,
+        name: &str,
+        description: &str,
+        content: &str,
+    ) -> Result<()> {
+        self.skill_store.create_skill(name, description, content).await
+    }
+
+    /// Delete a skill.
+    pub async fn delete_skill(&self, name: &str) -> Result<()> {
+        self.skill_store.delete_skill(name).await
+    }
+
+    /// Access the underlying skill store.
+    pub fn skill_store(&self) -> &Arc<SkillStore> {
+        &self.skill_store
     }
 }
 

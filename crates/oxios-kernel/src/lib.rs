@@ -154,7 +154,7 @@ pub use program::{
     ArgumentDef, HostRequirementsCheck, InstallSource, Program, ProgramManager, ProgramMeta,
     ToolDef,
 };
-pub use skill::{Skill, SkillMeta, SkillStore};
+pub use skill::{Skill, SkillManager, SkillMeta, SkillStore};
 #[cfg(feature = "browser")]
 pub use tools::BrowserTool;
 pub use tools::{ExecTool, KnowledgeTool, ProgramTool};

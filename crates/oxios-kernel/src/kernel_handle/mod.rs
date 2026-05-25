@@ -42,10 +42,9 @@ use crate::host_tools::HostToolValidator;
 use crate::mcp::McpBridge;
 use crate::memory::MemoryManager;
 use crate::persona_manager::PersonaManager;
-use crate::program::ProgramManager;
 use crate::resource_monitor::ResourceMonitor;
 use crate::scheduler::AgentScheduler;
-use crate::skill::SkillStore;
+use crate::skill::SkillManager;
 use crate::space::SpaceManager;
 use crate::state_store::StateStore;
 use crate::supervisor::Supervisor;
@@ -150,8 +149,8 @@ impl KernelHandle {
         budget_manager: Arc<BudgetManager>,
         resource_monitor: Arc<ResourceMonitor>,
         cron_scheduler: Arc<CronScheduler>,
-        program_manager: Arc<ProgramManager>,
-        skill_store: Arc<SkillStore>,
+        program_manager: Arc<crate::program::ProgramManager>,
+        skill_store: Arc<crate::skill::SkillStore>,
         persona_manager: Arc<PersonaManager>,
         mcp_bridge: Arc<McpBridge>,
         auth_manager: Arc<parking_lot::Mutex<AuthManager>>,
@@ -185,7 +184,10 @@ impl KernelHandle {
                 Some(event_bus.clone()),
             ),
             persona: PersonaApi::new(persona_manager),
-            extensions: ExtensionApi::new(program_manager, skill_store, host_tool_validator),
+            extensions: ExtensionApi::new(
+                Arc::new(SkillManager::from_parts(program_manager, skill_store)),
+                host_tool_validator,
+            ),
             mcp: McpApi::new(mcp_bridge),
             infra: InfraApi::new(
                 git_layer,

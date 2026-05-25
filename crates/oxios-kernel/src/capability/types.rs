@@ -177,9 +177,9 @@ pub enum ResourceRef {
         /// Domain name within the kernel.
         domain: String,
     },
-    /// An installed program.
-    Program {
-        /// Program name as registered in the program store.
+    /// An installed skill (unified programs + skills per RFC-009).
+    Skill {
+        /// Skill name as registered in the skill manager.
         name: String,
     },
     /// A workspace space.
@@ -212,7 +212,7 @@ impl fmt::Display for ResourceRef {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             ResourceRef::KernelDomain { domain } => write!(f, "kernel:{}", domain),
-            ResourceRef::Program { name } => write!(f, "program:{}", name),
+            ResourceRef::Skill { name } => write!(f, "skill:{}", name),
             ResourceRef::Space { id } => write!(f, "space:{}", id),
             ResourceRef::Agent { id } => write!(f, "agent:{}", id),
             ResourceRef::Exec { mode } => write!(f, "exec:{}", mode),

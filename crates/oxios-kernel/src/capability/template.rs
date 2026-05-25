@@ -32,7 +32,7 @@ use super::types::{CSpace, Capability, CapabilityId, Issuer, ResourceRef, Rights
 /// Builder for constructing preset capability spaces.
 ///
 /// Use the associated constructors (`worker`, `standard`, `operator`,
-/// `supervisor`, `with_programs`) to start from a template, then call
+/// `supervisor`, `with_skills`) to start from a template, then call
 /// [`build`] or [`build_for`] to produce a [`CSpace`].
 #[derive(Debug, Clone)]
 pub struct CapabilityTemplate {
@@ -157,16 +157,16 @@ impl CapabilityTemplate {
         t
     }
 
-    /// **With programs** — worker + specific named programs.
+    /// **With skills** — worker + specific named skills.
     ///
     /// Creates a worker-level agent with EXECUTE rights on the listed
-    /// programs only. This is the recommended template for agents that
+    /// skills only. This is the recommended template for agents that
     /// should have access to a known set of tools.
-    pub fn with_programs(names: &[&str]) -> Self {
+    pub fn with_skills(names: &[&str]) -> Self {
         let mut t = Self::worker();
         for name in names {
             t.caps.push((
-                ResourceRef::Program {
+                ResourceRef::Skill {
                     name: (*name).into(),
                 },
                 Rights::EXECUTE | Rights::READ,
@@ -273,15 +273,15 @@ mod tests {
     }
 
     #[test]
-    fn with_programs_scoped() {
-        let cs = CapabilityTemplate::with_programs(&["git", "gh"]).build();
+    fn with_skills_scoped() {
+        let cs = CapabilityTemplate::with_skills(&["git", "gh"]).build();
         assert!(cs.can(
-            &ResourceRef::Program { name: "git".into() },
+            &ResourceRef::Skill { name: "git".into() },
             Rights::EXECUTE
         ));
-        assert!(cs.can(&ResourceRef::Program { name: "gh".into() }, Rights::EXECUTE));
+        assert!(cs.can(&ResourceRef::Skill { name: "gh".into() }, Rights::EXECUTE));
         assert!(!cs.can(
-            &ResourceRef::Program {
+            &ResourceRef::Skill {
                 name: "curl".into()
             },
             Rights::EXECUTE

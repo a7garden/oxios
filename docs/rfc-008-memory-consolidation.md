@@ -1,9 +1,13 @@
 # RFC-008: Memory Consolidation — Tiered Memory with Dream-Time Compaction
 
-> **상태:** 초안  
-> **날짜:** 2026-05-25  
-> **이전:** rfc-003 (Knowledge Separation), rfc-004 (Knowledge System), rfc-005 (Knowledge Integration)  
+> **상태:** 초안 v2 (리뷰 피드백 반영)
+> **날짜:** 2026-05-25
+> **이전:** rfc-003 (Knowledge Separation), rfc-004 (Knowledge System), rfc-005 (Knowledge Integration)
 > **범위:** `crates/oxios-kernel/src/memory/`, `crates/oxios-kernel/src/config.rs`, `src/kernel.rs`
+>
+> **v2 변경사항:** 타입별 초기 tier 차등 지정, Knowledge 타입 유지, Dream 체크포인트/원자성,
+> LLM 호출 전략 명시, session_appearances 추적 구체화, 한국어 분류 패턴,
+> Space 범위 결정, 보호 등급 강등 로직, Hot overflow 즉시 대응
 
 ---
 
@@ -15,9 +19,10 @@
 |------|------|
 | **Zero Maintenance** | 사용자가 pin, 타입 지정, 중요도 설정을 할 필요 없다. 시스템이 행동 패턴에서 자동 추론한다. |
 | **Automatic Protection** | 반복해서 참조된 정보, 여러 세션에 걸쳐 나타난 패턴, 사용자가 정정한 내용은 자동으로 보호된다. |
-| **Optional Override** | 기본은 전자동. 사용자가 원하면 수동 편집도 가능하지만, 안 해도 된다. |
+| **Tool-Only Override** | 기본은 전자동. 수동 override는 **에이전트 도구(memory_pin 등)로만** 노출하고, 웹 UI나 CLI에서는 숨긴다. 사용자가 "기억해"라고 말하면 에이전트가 도구를 호출하는 방식. 인지 부하 최소화. |
 | **Progressive Importance** | 중요도는 고정값이 아니라 점진적으로 쌓인다. 한 번 언급 = 낮음, 세 번 반복 = 높음, 직접 "기억해" = 보호. |
 | **Graceful Forgetting** | 잊어버리는 것도 자연스럽게. 90일 동안 한 번도 참조 안 된 건 조용히 사라진다. 사용자가 눈치채지 못하게. |
+| **Space-Scoped Memory** | 메모리는 Space 단위로 격리된다. 단 UserProfile과 Preference는 예외적으로 글로벌 ~/.oxios/memory/에 저장하여 Space 간 공유. |
 
 **사용자 경험:**
 ```
@@ -111,7 +116,7 @@ Hipocampus의 ROOT.md 개념처럼, 에이전트가 "내가 무엇을 알고 있
 │  ├── 3. HNSW vector search (semantic)                           │
 │  └── 4. Keyword fallback (BM25-style)                           │
 │                                                                   │
-│  remember(entry) → Tier 1 (Hot)  ← 자동 호출                    │
+│  remember(entry) → initial tier by type ← 자동 호출              │
 │  forget(id)      → Tier downshift or deletion  ← Dream이 자동   │
 │  consolidate()   → Dream process  ← 백그라운드 자동              │
 └───────────────────────────┬─────────────────────────────────────┘
@@ -168,21 +173,22 @@ Hipocampus의 ROOT.md 개념처럼, 에이전트가 "내가 무엇을 알고 있
                     ┌─────────── 새 메모리 생성 ───────────┐
                     │  (사용자 모름, 시스템이 자동 생성)      │
                     ▼                                        │
-            ┌───────────────┐                               │
-            │  Tier 1: Hot  │ ◄─── remember() 자동 호출     │
-            │  (always in   │                                │
-            │   context)    │ ──── access() → 통계 자동 업데이트│
-            └───────┬───────┘                                │
-                    │                                        │
-          capacity? │ over budget (Dream이 자동 처리)         │
-                    ▼                                        │
-            ┌───────────────┐                               │
-            │  Tier 2: Warm │ ◄─── shift_down() 자동        │
-            │  (on-demand)  │                                │
-            └───────┬───────┘                                │
-                    │                                        │
-          decay?    │ importance < threshold (Dream이 자동)   │
-                    ▼                                        │
+            ┌───────────────────────────────────┐           │
+            │  초기 tier = MemoryType별 차등     │           │
+            │  Fact/Decision/Preference/Profile  │── Hot     │
+            │  Knowledge/Skill                   │── Warm    │
+            │  Session/Conversation/Episode       │── Warm    │
+            └───────┬───────────────┬────────────┘           │
+                    │               │                        │
+            ┌───────▼───────┐ ┌─────▼─────────┐             │
+            │  Tier 1: Hot  │ │ Tier 2: Warm  │             │
+            │  (always in   │ │ (on-demand)   │             │
+            │   context)    │ │               │             │
+            └───────┬───────┘ └───────┬───────┘             │
+                    │                 │                      │
+         capacity?  │  decay?         │                      │
+         + overflow │  Dream이 자동    │                      │
+                    ▼                 ▼                      │
             ┌───────────────┐                               │
             │  Tier 3: Cold │ ◄─── archive() 자동           │
             │  (compressed) │                                │
@@ -261,12 +267,14 @@ pub enum ProtectionLevel {
 }
 ```
 
-### 3.2 자동 승격 규칙 (Auto-Promotion Rules)
+### 3.2 자동 승격 및 강등 규칙 (Auto-Promotion and Demotion Rules)
 
-Dream 프로세스의 Phase 2에서 자동으로 평가:
+Dream 프로세스의 Phase 2에서 자동으로 평가. **보호 등급은 올라가기만 하는 것이 아니라,
+최근 접근 패턴에 따라 강등도 가능하다.**
 
 ```rust
 /// 자동 보호 결정 로직. Dream이 매 실행마다 호출.
+/// 승격과 강등 모두 처리.
 fn compute_protection(entry: &MemoryEntry, stats: &AccessStats) -> ProtectionLevel {
     // 1. 타입 기반 기본 보호
     match entry.memory_type {
@@ -279,9 +287,8 @@ fn compute_protection(entry: &MemoryEntry, stats: &AccessStats) -> ProtectionLev
 
     // 3. 접근 패턴 기반 자동 승격
     let access_count = entry.access_count;
-    let session_span = stats.sessions_with_access(&entry.id);
-    let days_since_creation = stats.days_since(entry.created_at);
-    let has_user_correction = stats.was_corrected(&entry.id);
+    let session_span = entry.session_appearances;
+    let has_user_correction = entry.user_corrected;
 
     // 사용자가 정정한 내용은 높은 보호
     // (사용자가 "아니야, 그게 아니라 이거야"라고 한 경우)
@@ -307,7 +314,45 @@ fn compute_protection(entry: &MemoryEntry, stats: &AccessStats) -> ProtectionLev
     // 나머지 = None (정상 감쇠 + 삭제 가능)
     ProtectionLevel::None
 }
+
+/// 보호 등급 강등 평가. Dream Phase 2에서 승격 계산 후 실행.
+/// 한 번 승격된 등급이 최근 비활성으로 인해 과한 보호인지 판단.
+fn should_demote_protection(entry: &MemoryEntry, current: ProtectionLevel) -> Option<ProtectionLevel> {
+    // Permanent와 명시적 pin은 강등 대상이 아님
+    if entry.pinned || current == ProtectionLevel::Permanent {
+        return None;
+    }
+
+    // 강등 조건: 승격 사유가 더 이상 유효하지 않음
+    // 기준: 최근 retention_days / 3 동안 접근 기록 없음
+    let stale_days = 30; // 약 retention_days(90)의 1/3
+    let days_since_access = (Utc::now() - entry.accessed_at).num_days() as u32;
+
+    // High → Medium: 30일+ 미접근 + 현재 승격 조건 불충족
+    if current == ProtectionLevel::High
+        && days_since_access > stale_days
+        && entry.access_count < 3  // 더 이상 High 기준 미달
+    {
+        return Some(ProtectionLevel::Medium);
+    }
+
+    // Medium → Low: 60일+ 미접근
+    if current == ProtectionLevel::Medium && days_since_access > stale_days * 2 {
+        return Some(ProtectionLevel::Low);
+    }
+
+    // Low → None: 90일+ 미접근 (retention_days와 동일)
+    if current == ProtectionLevel::Low && days_since_access > stale_days * 3 {
+        return Some(ProtectionLevel::None);
+    }
+
+    None
+}
 ```
+
+**강등의 안전망:** 강등은 한 단계씩만 발생한다 (High → Medium, Medium → Low).
+한 번의 Dream에서 두 단계 이상 강등되지 않는다.
+강등 후 다음 Dream에서 다시 활성 접근이 감지되면 즉시 재승격된다.
 
 ### 3.3 보호 등급별 효과
 
@@ -349,52 +394,64 @@ Where:
 
 ### 4.2 분류 규칙
 
+**한국어/영어 이중 패턴 매칭.** Oxios는 사용자 메시지가 한국어이므로,
+모든 패턴 감지기는 한국어 패턴을 최우선으로, 영어를 보조로 사용한다.
+
 ```rust
 /// 내용 기반 자동 타입 분류.
 /// 명시적 타입이 지정되지 않은 경우에만 사용.
 fn infer_memory_type(content: &str, context: &str) -> MemoryType {
     let content_lower = content.to_lowercase();
 
-    // 1. 사용자 정반 (correction) 감지
-    // "아니야", "그게 아니라", "actually", "no, it's"
+    // 1. 사용자 정정 (correction) 감지
     if is_correction(&content_lower) {
         return MemoryType::Fact;
     }
+    // 한국어: "아니야", "그게 아니라", "아니라", "잘못됐어", "수정해"
+    // 영어: "actually", "no, it's", "that's wrong", "correction"
 
     // 2. 선호도/취향 감지
-    // "나는 ~ 좋아해", "항상 ~로 해", "prefer", "always use"
     if is_preference_statement(&content_lower) {
         return MemoryType::Preference;
     }
+    // 한국어: "나는 ~ 좋아해", "항상 ~로 해", "~로 해줘", "~선호해", "싫어"
+    // 영어: "i prefer", "always use", "i like", "don't", "never use"
 
     // 3. 결정 감지
-    // "~하기로 했어", "선택했어", "decided", "chose", "let's go with"
     if is_decision_statement(&content_lower) {
         return MemoryType::Decision;
     }
+    // 한국어: "~하기로 했어", "선택했어", "~로 가자", "~로 결정"
+    // 영어: "decided", "chose", "let's go with", "we'll use"
 
     // 4. 절차/패턴 감지
-    // "항상 ~ 한다", "每次", "always run", "before commit"
     if is_skill_statement(&content_lower) {
         return MemoryType::Skill;
     }
+    // 한국어: "항상 ~ 한다", "~하기 전에", "매번 ~", "~해야 해"
+    // 영어: "always run", "before commit", "every time", "make sure to"
 
     // 5. 프로필 정보 감지
-    // 사용자 이름, 역할, 소속, 전문 분야
     if is_profile_information(&content_lower, context) {
         return MemoryType::UserProfile;
     }
+    // 한국어: "나는 ~야", "내 이름은", "나 ~ 소속", "~ 개발자"
+    // 영어: "my name is", "i work at", "i'm a", "i am a"
 
     // 6. 이벤트/경험 감지
-    // 날짜 + 동작 조합, "~했음", "deployed", "released"
     if is_episode(&content_lower) {
         return MemoryType::Episode;
     }
+    // 한국어: "~했어", "배포했음", "출시했어", 날짜+동작 조합
+    // 영어: "deployed", "released", "launched", 날짜+동작 조합
 
     // 7. 기본값: Fact
     MemoryType::Fact
 }
 ```
+
+**분류기 구현 전략:** 초기에는 단순 문자열 포함 검사(`str::contains`).
+Dream이 데이터를 충분히 축적하면 LLM 기반 분류로 전환 (§10.6 참조).
 
 ### 4.3 분류 힌트 (Classifier Hints)
 
@@ -453,21 +510,25 @@ impl MemoryTier {
 ### 5.2 MemoryType (확장)
 
 ```rust
-/// Memory entry type — expanded from 5 to 8 types.
+/// Memory entry type — expanded from 5 to 9 types.
+/// 기존 Knowledge를 유지하면서 새 타입을 추가한다.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum MemoryType {
-    // Existing types
+    // Existing types (unchanged — 기존 코드/데이터 호환)
     /// Conversation compaction summary (auto-generated).
     Conversation,
     /// Session-end summary (auto-generated).
     Session,
-
-    // New types (from SOAR/ACT-R cognitive model)
     /// A factual statement (e.g., "API uses port 3000").
     Fact,
     /// An event or experience (e.g., "deployed v0.2.0 on 2026-05-20").
     Episode,
+    /// Static knowledge (user/program-provided, knowledge-base synced).
+    /// 기존 knowledge_lens.rs에서 사용. **삭제하지 않음.**
+    Knowledge,
+
+    // New types (from SOAR/ACT-R cognitive model)
     /// A learned procedure or pattern (e.g., "run cargo test before commit").
     Skill,
     /// A user preference (e.g., "use Korean for user-facing messages").
@@ -485,6 +546,7 @@ impl MemoryType {
             MemoryType::UserProfile => 0.95,
             MemoryType::Preference => 0.90,
             MemoryType::Decision => 0.80,
+            MemoryType::Knowledge => 0.75,  // 기존: knowledge-base 동기화 데이터
             MemoryType::Skill => 0.75,
             MemoryType::Fact => 0.60,
             MemoryType::Episode => 0.50,
@@ -499,6 +561,7 @@ impl MemoryType {
             MemoryType::UserProfile => 0.001,
             MemoryType::Preference => 0.002,
             MemoryType::Decision => 0.005,
+            MemoryType::Knowledge => 0.006,  // 지식은 느리게 감쇠
             MemoryType::Skill => 0.008,
             MemoryType::Fact => 0.015,
             MemoryType::Episode => 0.025,
@@ -507,8 +570,34 @@ impl MemoryType {
         }
     }
 
+    /// Initial tier for new entries of this type.
+    /// 모든 새 메모리를 Hot에 넣으면 오버플로우가 발생하므로
+    /// 타입별로 차등 지정.
+    pub fn initial_tier(&self) -> MemoryTier {
+        match self {
+            // Hot: 즉시 컨텍스트에 필요한 것
+            MemoryType::UserProfile
+            | MemoryType::Preference
+            | MemoryType::Decision
+            | MemoryType::Fact => MemoryTier::Hot,
+
+            // Warm: 검색으로 필요시 접근
+            MemoryType::Knowledge
+            | MemoryType::Skill
+            | MemoryType::Episode
+            | MemoryType::Session
+            | MemoryType::Conversation => MemoryTier::Warm,
+        }
+    }
+
     /// Whether this type is automatically protected from deletion.
     pub fn is_auto_protected(&self) -> bool {
+        matches!(self, MemoryType::UserProfile | MemoryType::Preference)
+    }
+
+    /// Whether this type is stored globally (cross-Space).
+    /// UserProfile과 Preference는 모든 Space에서 공유.
+    pub fn is_global(&self) -> bool {
         matches!(self, MemoryType::UserProfile | MemoryType::Preference)
     }
 
@@ -519,6 +608,7 @@ impl MemoryType {
             MemoryType::Session => "memory/sessions",
             MemoryType::Fact => "memory/facts",
             MemoryType::Episode => "memory/episodes",
+            MemoryType::Knowledge => "memory/knowledge",
             MemoryType::Skill => "memory/skills",
             MemoryType::Preference => "memory/preferences",
             MemoryType::Decision => "memory/decisions",
@@ -579,11 +669,17 @@ pub struct MemoryEntry {
     #[serde(default)]
     pub auto_classified: bool,
     /// Number of distinct sessions this entry was accessed in.
+    /// 접근 시점의 session_id를 access_log에 기록하여 중복 없이 카운트.
+    /// (별도 추적 구조체 `AccessLog` 사용 — §6.2 참조)
     #[serde(default)]
     pub session_appearances: u32,
     /// Whether the user has corrected/contradicted this entry's topic.
     #[serde(default)]
     pub user_corrected: bool,
+    /// Session IDs that have accessed this entry (for dedup of session_appearances).
+    /// 최대 100개 유지. 초과 시 가장 오래된 것부터 삭제.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub seen_in_sessions: Vec<String>,
 
     // ── Lifecycle ─────────────────────────────────────
     /// Creation timestamp.
@@ -669,21 +765,31 @@ pub struct TopicEntry {
 /// Report from a dream (consolidation) run.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DreamReport {
+    pub dream_id: String,
+    pub space_id: String,
     pub started_at: DateTime<Utc>,
     pub completed_at: DateTime<Utc>,
+    /// Whether this was resumed from a checkpoint.
+    pub resumed_from_checkpoint: bool,
     pub entries_before: usize,
     pub entries_after: usize,
     pub compacted: usize,
     pub promoted: usize,
     pub demoted: usize,
+    pub protection_promoted: usize,
+    pub protection_demoted: usize,
     pub deleted: usize,
     pub contradictions_resolved: usize,
     pub duplicates_merged: usize,
-    pub auto_protected: usize,       // NEW: 자동 보호된 항목 수
-    pub auto_classified: usize,      // NEW: 자동 분류된 항목 수
-    pub type_promotions: usize,      // NEW: 타입 승격 수 (Fact→Decision 등)
+    pub auto_protected: usize,
+    pub auto_classified: usize,
+    pub type_promotions: usize,
     pub root_updated: bool,
+    pub used_llm: bool,
     pub duration_ms: u64,
+    /// Error if Dream failed (None = success).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
 }
 ```
 
@@ -756,6 +862,22 @@ pub struct ConsolidationConfig {
     #[serde(default = "default_true")]
     pub llm_compaction: bool,
 
+    // ── Dream LLM ──────────────────────────────────────
+    /// Optional model for Dream LLM operations (None = rule-based fallback).
+    #[serde(default)]
+    pub dream_model: Option<String>,
+
+    // ── Protection Demotion ────────────────────────────
+    /// Enable protection level demotion for stale entries.
+    #[serde(default = "default_true")]
+    pub protection_demotion_enabled: bool,
+    /// Days without access before considering demotion.
+    #[serde(default = "default_demotion_stale_days")]
+    pub protection_demotion_stale_days: u32,
+    /// Maximum demotion steps per Dream cycle (1 = one level at a time).
+    #[serde(default = "default_demotion_max_step")]
+    pub protection_demotion_max_step: u32,
+
     // ── Proactive Recall ──────────────────────────────
     #[serde(default = "default_true")]
     pub proactive_recall: bool,
@@ -784,6 +906,8 @@ fn default_type_promotion_repetitions() -> u32 { 3 }
 fn default_compaction_threshold() -> usize { 200 }
 fn default_proactive_limit() -> usize { 5 }
 fn default_proactive_threshold() -> f32 { 0.6 }
+fn default_demotion_stale_days() -> u32 { 30 }
+fn default_demotion_max_step() -> u32 { 1 }
 ```
 
 ---
@@ -814,23 +938,77 @@ pub enum CreationSource {
 ```
 
 모든 메모리는 자동으로 초기화된다 (사용자 개입 없음):
-- `tier = MemoryTier::Hot` — 모든 새 메모리는 Hot에서 시작
-- `memory_type = infer_memory_type(content, context)` — 자동 분류
+- `tier = memory_type.initial_tier()` — **타입별 차등 초기 tier** (§5.2 `initial_tier()` 참조)
+- `memory_type = infer_memory_type(content, context)` — 자동 분류 (한국어/영어 이중 패턴)
 - `importance = memory_type.base_importance()` — 타입별 기본값
 - `protection = ProtectionLevel::None` — 초기에는 보호 없음
 - `decay_score = 1.0` — 최대 신선도
 - `auto_classified = true` — 자동 분류 마크
 - `content_hash = content_hash(&content)` — 중복 감지용
 - `tags = extract_tags(&content)` — 자동 태그 추출
+- `seen_in_sessions = vec![current_session_id]` — 생성 세션 기록
 - `created_at = accessed_at = modified_at = Utc::now()`
 
-### 6.2 접근 (Access) — 자동 추적
+**Hot overflow 즉시 대응:** 새 메모리 생성 시 Hot이 `hot_max_entries`를 초과하면
+Dream을 기다리지 않고 즉시 강등 로직을 실행한다:
+```rust
+/// remember() 호출 후 Hot overflow 시 즉시 실행.
+/// 보호 등급이 가장 낮고 decay_score가 가장 낮은 항목부터 Warm으로 강등.
+async fn immediate_hot_overflow(&self) -> Result<usize> {
+    let hot_entries = self.list_by_tier(MemoryTier::Hot, self.config.hot_max_entries * 2).await?;
+    if hot_entries.len() <= self.config.hot_max_entries {
+        return Ok(0);
+    }
+    let overflow = hot_entries.len() - self.config.hot_max_entries;
+    let mut candidates: Vec<_> = hot_entries.into_iter()
+        .filter(|e| e.protection < ProtectionLevel::High && !e.pinned)
+        .collect();
+    candidates.sort_by(|a, b| {
+        // 보호 등급 낮은 것 우선, 같으면 decay_score 낮은 것 우선
+        a.protection.cmp(&b.protection)
+            .then(a.decay_score.partial_cmp(&b.decay_score).unwrap_or(Ordering::Equal))
+    });
+    let mut demoted = 0;
+    for entry in candidates.into_iter().take(overflow) {
+        self.shift_tier(&entry.id, MemoryTier::Hot, MemoryTier::Warm).await?;
+        demoted += 1;
+    }
+    Ok(demoted)
+}
+```
+
+### 6.2 접근 (Access) — 자동 추적 (AccessLog)
 
 메모리가 recall 또는 search에 의해 접근되면 (자동):
 - `access_count += 1`
 - `accessed_at = Utc::now()`
-- `session_appearances += 1` (새 세션인 경우만)
+- `session_appearances` 업데이트: `seen_in_sessions`에 현재 세션 ID가 없으면 추가하고 카운트 증가
 - `decay_score = f32::max(decay_score, recompute_decay(entry))` — 접근 시 감쇠 부분 복구
+
+```rust
+/// 접근 기록 업데이트. recall/search에서 자동 호출.
+fn record_access(entry: &mut MemoryEntry, current_session_id: &str) {
+    entry.access_count += 1;
+    entry.accessed_at = Utc::now();
+
+    // session_appearances 중복 방지: seen_in_sessions로 추적
+    if !entry.seen_in_sessions.contains(&current_session_id.to_string()) {
+        entry.session_appearances += 1;
+        entry.seen_in_sessions.push(current_session_id.to_string());
+        // seen_in_sessions 크기 제한 (최대 100)
+        if entry.seen_in_sessions.len() > 100 {
+            entry.seen_in_sessions.remove(0);
+        }
+    }
+
+    // 감쇠 부분 복구 (접근 시 decay_score를 최소 절반으로 복구)
+    let boosted = 0.5 + 0.5 * entry.decay_score;
+    entry.decay_score = entry.decay_score.max(boosted);
+}
+```
+
+**참고:** `session_id` 필드는 메모리 생성 시의 세션을 의미하고,
+`seen_in_sessions`는 접근한 모든 세션을 추적한다. 둘은 다른 목적.
 
 ### 6.3 감쇠 (Decay) — 자동 계산
 
@@ -1072,6 +1250,8 @@ auto_summarize = true
 dream_enabled = true
 dream_interval_hours = 24
 dream_min_sessions = 5
+# Dream에서 사용할 LLM 모델 (없으면 rule-based fallback)
+# dream_model = "gpt-4o-mini"
 
 # Tier 예산
 hot_max_entries = 50
@@ -1101,6 +1281,11 @@ type_promotion_repetitions = 3     # 3회 반복 → 타입 승격
 compaction_line_threshold = 200
 llm_compaction = true
 
+# Protection Demotion (보호 등급 강등)
+protection_demotion_enabled = true       # 강등 로직 활성화
+protection_demotion_stale_days = 30      # High→Medium 강등 기준일
+protection_demotion_max_step = 1         # 한 Dream에서 최대 강등 단계
+
 # Proactive Recall
 proactive_recall = true
 proactive_recall_limit = 5
@@ -1115,10 +1300,82 @@ proactive_recall_threshold = 0.6
 
 Dream은 다음 조건이 **모두** 충족될 때 자동 실행된다:
 1. `dream_enabled = true` (기본값)
-2. 마지막 dream 이후 24시간 경과
+2. 마지막 dream 이후 24시간 경과 **또는** 세션 종료 시(즉시 모드)
 3. 마지막 dream 이후 5세션 누적
 4. 백그라운드 실행 (활성 세션 차단 없음)
-5. Lock file로 동시 실행 방지
+5. Lock file(`~/.oxios/workspace/spaces/{space-id}/memory/.dream.lock`)로 동시 실행 방지
+6. Space-scoped: 각 Space의 MemoryManager가 독립적으로 Dream 실행
+7. LLM 호출은 글로벌 provider 공유 but per-space 직렬화 (lock file)
+
+**즉시 Dream 모드:** 세션 종료 시 `summarize_session()` 직후에 lightweight Dream을
+실행하여 Hot overflow를 즉시 해소. 전체 Dream이 아닌 tier 리밸런싱만 수행.
+
+### 10.1.1 Dream의 LLM 사용 전략
+
+Dream은 **선택적으로** LLM을 사용한다. LLM 없이도 기본 기능이 작동한다.
+
+| Phase | LLM 필요? | 대안 (LLM 없을 시) |
+|-------|----------|-------------------|
+| Phase 1: Orient | ❌ | — |
+| Phase 2: Gather Signal | ❌ | rule-based 패턴 매칭 (접근 횟수, 키워드 빈도) |
+| Phase 3: Consolidate | ⚠️ 선택 | 압축: rule-based (첫/마지막 문장 보존). 모순 해결: 타임스탬프 비교 (최신 우선) |
+| Phase 4: Prune & Index | ❌ | — |
+
+**LLM 호출 경로:** 기존 `OxiBuilder`로 생성한 provider를 통해 실행.
+Dream 전용 경량 모델 설정 지원 (`dream_model = "gpt-4o-mini"` 등).
+지정하지 않으면 agent_runtime의 provider를 그대로 사용.
+
+```rust
+/// Dream 전용 LLM 호출.
+/// provider가 없으면 rule-based fallback.
+async fn dream_llm_summarize(&self, entries: &[MemoryEntry]) -> Result<String> {
+    if let Some(ref provider) = self.dream_provider {
+        // LLM 호출: entries의 내용을 요약
+        provider.summarize(entries).await
+    } else {
+        // Rule-based fallback: 각 엔트리의 첫 문장 결합
+        let summary: Vec<&str> = entries.iter()
+            .filter_map(|e| e.content.lines().next())
+            .take(10)
+            .collect();
+        Ok(summary.join("\n"))
+    }
+}
+```
+
+### 10.1.2 Dream 체크포인트와 원자성
+
+Dream은 4-phase로 구성되며, 각 phase 완료 시 체크포인트를 저장한다.
+실패 시 마지막 체크포인트부터 재시작한다.
+
+```rust
+/// Dream 실행 상태 (체크포인트)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DreamCheckpoint {
+    pub dream_id: String,
+    pub space_id: String,
+    pub started_at: DateTime<Utc>,
+    /// 완료된 마지막 phase (0 = 미시작)
+    pub completed_phase: u8,
+    /// Phase 2의 결과 (재계산 불필요 시 캐시)
+    pub cached_signals: Option<Vec<MemorySignal>>,
+    /// Phase 3의 결과
+    pub cached_plan: Option<ConsolidationPlan>,
+}
+
+impl DreamCheckpoint {
+    fn path(space_dir: &Path) -> PathBuf {
+        space_dir.join("memory/.dream_checkpoint.json")
+    }
+}
+```
+
+**원자성 보장:**
+- Phase 3(Consolidate)의 각 변경사항은 개별적으로 적용 + 저장.
+- Phase 4(Prune)는 배치로 적용. 실패 시 이미 적용된 Phase 3 결과는 유지.
+- 체크포인트는 `DreamCheckpoint`를 JSON으로 저장.
+- Dream 시작 시 기존 체크포인트가 있으면 해당 phase부터 재개.
+- 체크포인트가 1시간 이상 된 것이면 무시하고 처음부터 시작 (stale 방지).
 
 ### 10.2 Phase 1: Orient (지도 구축)
 
@@ -1285,6 +1542,36 @@ async fn dream_prune_and_index(&self, plan: &ConsolidationPlan) -> Result<()> {
 
 ### 11.1 3-Step Selective Recall
 
+호출 시점: **세션 첫 메시지**와 **대화 주제 전환 감지 시**에만 실행.
+매 사용자 메시지마다 실행하지 않는다 (컨텍스트 과팽창 방지).
+
+```rust
+/// Proactive recall 호출 시점 판단.
+struct RecallTiming {
+    last_recall_topic: Option<String>,
+    message_count_since_recall: usize,
+}
+
+impl RecallTiming {
+    /// 세션 첫 메시지이거나, 주제가 전환되었거나,
+    /// 마지막 recall 이후 10메시지 경과 시 true.
+    fn should_recall(&mut self, query: &str) -> bool {
+        let topic_changed = self.last_recall_topic.as_ref()
+            .map_or(true, |prev| !topics_similar(prev, query));
+        let should = self.message_count_since_recall == 0  // 세션 첫 메시지
+            || (topic_changed && self.message_count_since_recall >= 3)  // 주제 전환
+            || self.message_count_since_recall >= 10;  // 주기적 재확인
+        if should {
+            self.last_recall_topic = Some(query.to_string());
+            self.message_count_since_recall = 0;
+        } else {
+            self.message_count_since_recall += 1;
+        }
+        should
+    }
+}
+```
+
 ```
 Step 1: ROOT.md Triage (O(1))
   ├── Topic index에서 직접 매칭
@@ -1361,6 +1648,16 @@ impl MemoryManager {
 
 ## 12. 마이그레이션 계획 (Migration Plan)
 
+### 12.0 전제 조건
+
+**`MemoryType::Knowledge`를 유지한다.** 기존 코드에서 사용 중이며, 제거하면
+`knowledge_lens.rs`, `memory_tools.rs`, `agent_runtime.rs`, `auto_memory_bridge.rs`가
+모두 깨진다. 대신 새 타입(Skill, Preference, Decision, UserProfile)을 추가만 한다.
+
+기존 `Knowledge`와 새 `Skill`의 구분:
+- `Knowledge`: knowledge-base에서 동기화된 정적 지식 (RFC-003)
+- `Skill`: 사용자/에이전트의 반복 패턴에서 추출한 절차적 지식
+
 ### 12.1 Phase 1: Data Model Extension (비파괴적)
 
 **신규 파일:**
@@ -1379,17 +1676,23 @@ impl MemoryManager {
 |------|------|
 | `memory/mod.rs` | `MemoryTier`, `ProtectionLevel`, `MemoryType` 확장, `MemoryEntry` 확장 |
 | `memory/store.rs` | tier-aware operations, protection-aware operations |
-| `config.rs` | `ConsolidationConfig` 추가 |
-| `agent_runtime.rs` | `build_full_context()` 사용 |
-| `kernel.rs` | Dream process 스폰 |
+| `config.rs` | `ConsolidationConfig` 추가 (기존 `MemoryConfig` 내부에 중첩) |
+| `agent_runtime.rs` | `build_full_context()` 사용, `record_access()` 호출 |
+| `kernel.rs` | Dream process 스폰, 글로벌 UserProfile/Preference MemoryManager 생성 |
+| `tools/memory_tools.rs` | 새 타입(Skill, Preference, Decision, UserProfile) 파싱 추가 |
+| `kernel_handle/knowledge_lens.rs` | `MemoryType::Knowledge` 유지 확인 |
+| `memory/migrate.rs` | 기존 엔트리에 새 필드 초기값 backfill 스크립트 |
 
 **기존 데이터 호환:** 모든 새 필드는 `#[serde(default)]`로 기존 JSON과 자동 호환.
+**첫 Dream 실행:** 기존 엔트리의 `content_hash`와 `seen_in_sessions`가 비어 있으므로,
+Dream Phase 1에서 전체 backfill을 수행한다.
 
-### 12.2 Phase 2-4: 순차 구현
+### 12.2 Phase 2-5: 순차 구현
 
-1. Phase 2: `DecayEngine` + `AutoProtector` + `AutoClassifier`
-2. Phase 3: `DreamProcess` (Phase 1-4) → 백그라운드 스폰
+1. Phase 2: `DecayEngine` + `AutoProtector` + `AutoClassifier` (rule-based)
+2. Phase 3: `DreamProcess` (Phase 1-4) → 백그라운드 스폰 + 체크포인트
 3. Phase 4: `RootIndex` + `ProactiveRecall` → 컨텍스트 주입
+4. Phase 5: LLM 기반 분류/압축 (선택적, dream_model 설정 시 활성화)
 
 ---
 
@@ -1398,16 +1701,21 @@ impl MemoryManager {
 ### 13.1 데이터 파일
 
 ```
-~/.oxios/workspace/spaces/{space-id}/memory/
+~/.oxios/memory/                          # 글로벌 메모리 (UserProfile, Preference)
+├── profiles/
+└── preferences/
+
+~/.oxios/workspace/spaces/{space-id}/memory/  # Space-scoped 메모리
 ├── root_index.json                    # ROOT 인덱스 (자동 관리)
+├── .dream.lock                        # Dream 락 파일
+├── .dream_checkpoint.json             # Dream 체크포인트
 ├── conversations/                     # 기존
 ├── sessions/                          # 기존
 ├── facts/                             # 기존
 ├── episodes/                          # 기존
+├── knowledge/                         # 기존 (knowledge_lens.rs에서 사용)
 ├── skills/                            # 신규
-├── preferences/                       # 신규
 ├── decisions/                         # 신규
-├── profiles/                          # 신규
 ├── compaction/                        # 압축 트리 (자동 관리)
 │   ├── daily/
 │   ├── weekly/
@@ -1422,12 +1730,14 @@ impl MemoryManager {
 | 기준 | 측정 |
 |------|------|
 | 사용자가 설정 없이 기본 작동 | 모든 config에 합리적 기본값 |
-| Hot tier 항상 ~3K 토큰 이내 | `build_hot_context().len()` |
+| Hot tier 항상 ~3K 토큰 이내 | 토큰 추정기로 계산 (4chars ≈ 1token). `build_hot_context()` 길이 < 12K chars |
 | Dream 24시간 주기 자동 실행 | `dream_reports/` 파일 확인 |
 | 반복 참조된 메모리 자동 보호 | ProtectionLevel > None인 항목 존재 |
-| 안 쓰는 메모리 조용히 삭제 | 90일+ 미접근 + None 보호 = 0개 |
+| 안 쓰는 메모리 조용히 삭제 | 90일+ 미접근 + None 보호 항목 수가 감소 추세 |
 | 기존 데이터 호환 | serde default로 기존 JSON 로드 |
-| 기존 테스트 모두 통과 | `cargo test --workspace` |
+| 기존 테스트 모두 통과 | `cargo test --workspace` (Knowledge 타입 유지로 기존 코드 영향 없음) |
+| Dream 실패 시 안전 복구 | 체크포인트에서 재시작, 부분 적용된 상태에서 무결성 유지 |
+| 즉시 Hot overflow 대응 | 세션 종료 시 Hot 초과 항목이 즉시 Warm으로 강등 |
 
 ---
 
@@ -1436,18 +1746,27 @@ impl MemoryManager {
 ### 15.1 잘못된 자동 보호 (False Positive)
 시스템이 중요하지 않은 걸 보호할 수 있음.
 
-**완화:** False positive(안 중요한데 보호)는 false negative(중요한데 삭제)보다 훨씬 안전. 보호 등급은 점진적으로 올라가고 (None → Low → Medium → High), 용량 초과 시 가장 낮은 보호 등급부터 강등.
+**완화:** False positive(안 중요한데 보호)는 false negative(중요한데 삭제)보다 훨씬 안전. 보호 등급은 점진적으로 올라가고 (None → Low → Medium → High), 용량 초과 시 가장 낮은 보호 등급부터 강등. **v2 추가:** 30/60/90일 비활성 시 강등 로직(`should_demote_protection`)으로 과보호 자동 교정.
 
 ### 15.2 잘못된 자동 분류
 내용 분석이 틀릴 수 있음 (Fact를 Decision으로 분류 등).
 
-**완화:** 분류 오류는 중요도에만 영향. 잘못 높이면 보호가 더 되고(문제없음), 잘못 낮추면 보호가 덜 되지만 감쇠로 자연스럽게 처리됨. 타입 승격은 3회 반복 기준이므로 오타 한 번으로는 안 됨.
+**완화:** 분류 오류는 중요도에만 영향. 잘못 높이면 보호가 더 되고(문제없음), 잘못 낮추면 보호가 덜 되지만 감쇠로 자연스럽게 처리됨. 타입 승격은 3회 반복 기준이므로 오타 한 번으로는 안 됨. **v2 추가:** 한국어 패턴을 최우선으로 매칭하여 한국어 사용자의 분류 정확도 향상.
 
 ### 15.3 Dream이 중요한 메모리를 삭제
 **완화:** 5단계 삭제 조건 모두 만족해야. `ProtectionLevel >= Medium`이면 삭제 불가. `UserProfile`/`Preference`는 영구 보호.
 
 ### 15.4 ROOT 인덱스 품질
 **완화:** 초기에는 간단한 키워드 추출로 빌드. 점진적으로 LLM 압축 품질 개선.
+
+### 15.5 Dream 실패 시 데이터 무결성
+**완화(v2 추가):** 체크포인트 기반 재시작. Phase 3의 개별 변경은 즉시 저장. Phase 4 실패 시 이미 적용된 Phase 3 결과는 유지 (롤백하지 않음). Stale 체크포인트(1시간+)는 무시하고 처음부터 시작.
+
+### 15.6 Hot Tier 오버플로우
+**완화(v2 추가):** 타입별 차등 초기 tier(Conversation/Session/Episode는 Warm 시작) + remember() 후 즉시 overflow 체크 + 세션 종료 시 lightweight Dream.
+
+### 15.7 Space 간 메모리 격리
+**완화(v2 추가):** Space-scoped 메모리는 Space 디렉토리 하위에 저장. UserProfile/Preference만 글로벌(`~/.oxios/memory/`)에 저장하여 Space 간 공유. 글로벌 MemoryManager는 kernel.rs에서 singleton으로 생성.
 
 ---
 
