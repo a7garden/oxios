@@ -652,7 +652,7 @@ mod budget;
 mod chunking;
 mod compaction;
 mod decay;
-mod dream;
+pub mod dream;
 pub mod embedding_cache;
 pub mod flash_attention;
 mod graph;
