@@ -359,10 +359,8 @@ async fn run_agent_loop(ctx: AgentLoopContext) -> Result<(String, usize, bool)> 
         "Tools registered from CSpace"
     );
 
-    // ── Program tools: temporarily disabled during RFC-009 migration ──
-    // TODO: Re-enable program tool registration via SkillManager
-    // after Phase 3 migration completes. The old ProgramManager is
-    // being replaced by the unified SkillManager.
+    // ── Skill tools ──
+    // Skills are surfaced through the CSpace tool set + semantic retrieval.
     let _ = kernel_handle.extensions.skill_manager();
 
     let tools = Arc::new(registry);

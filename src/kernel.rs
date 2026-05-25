@@ -9,9 +9,9 @@ use oxios_gateway::Gateway;
 use oxios_kernel::{
     access_manager::AccessManager, auth::AuthManager, config::load_config, A2AProtocol,
     AgentRuntime, AgentScheduler, AuditTrail, BasicSupervisor, BudgetManager, CronScheduler,
-    EngineProvider, EventBus, GitLayer, HostToolValidator, McpBridge, McpServer, MemoryManager,
-    Orchestrator, OxiosConfig, PersonaManager, ProgramManager, ResourceMonitor, SkillManager,
-    SpaceManager, Supervisor,
+    EngineProvider, EventBus, GitLayer, McpBridge, McpServer, MemoryManager,
+    Orchestrator, OxiosConfig, PersonaManager, ResourceMonitor, SkillManager,
+    SpaceManager, Supervisor, DreamProcess,
 };
 use oxios_markdown::KnowledgeBase;
 
@@ -30,12 +30,10 @@ pub struct Kernel {
     event_bus: EventBus,
     state_store: Arc<oxios_kernel::state_store::StateStore>,
     config: OxiosConfig,
-    skill_manager: SkillManager,
+    skill_manager: Arc<SkillManager>,
     supervisor: Arc<dyn Supervisor>,
     scheduler: Arc<AgentScheduler>,
     access_manager: Arc<parking_lot::Mutex<AccessManager>>,
-    program_manager: Arc<ProgramManager>,
-    host_tool_validator: HostToolValidator,
     persona_manager: PersonaManager,
     mcp_bridge: Arc<McpBridge>,
     #[allow(dead_code)]
@@ -87,8 +85,6 @@ impl Kernel {
                     oxios_kernel::PersonaApi::new(Arc::new(self.persona_manager.clone())),
                     oxios_kernel::ExtensionApi::new(
                         Arc::new(self.skill_manager.clone()),
-                        self.program_manager.clone(),
-                        Arc::new(self.host_tool_validator.clone()),
                     ),
                     oxios_kernel::McpApi::new(self.mcp_bridge.clone()),
                     oxios_kernel::InfraApi::new(
@@ -201,24 +197,6 @@ impl Kernel {
         let defaults_dir = share_dir.join("default-skills");
         self.skill_manager.init().await?;
         let _ = defaults_dir; // TODO: wire bundled defaults dir
-        Ok(())
-    }
-
-    /// Initialize default programs from the share directory.
-    pub async fn init_default_programs(&self, share_dir: &std::path::Path) -> Result<()> {
-        let programs_dir = share_dir.join("default-programs");
-        if programs_dir.exists() {
-            for entry in std::fs::read_dir(&programs_dir)? {
-                let entry = entry?;
-                let name = entry.file_name().to_str().unwrap_or("").to_string();
-                if entry.path().is_dir() && self.program_manager.get_program(&name).await.is_none()
-                {
-                    if let Err(e) = self.program_manager.install(&entry.path()).await {
-                        tracing::warn!(error = %e, program = ?entry.file_name(), "Failed to install default program");
-                    }
-                }
-            }
-        }
         Ok(())
     }
 
@@ -478,25 +456,8 @@ impl KernelBuilder {
         let skills_dir = PathBuf::from(&config.kernel.workspace).join("skills");
         let bundled_dir = PathBuf::from(&config.kernel.workspace).join("share/skills");
         let skill_manager = SkillManager::new(skills_dir, bundled_dir);
-        let programs_dir = PathBuf::from(&config.kernel.workspace).join("programs");
-        let program_manager = Arc::new(ProgramManager::new(programs_dir));
-        program_manager.init().await?;
 
-        let mcp_bridge = init_mcp_bridge(&config).await?;
-        for program in program_manager.list_enabled().await {
-            for server_config in &program.meta.mcp_servers {
-                if server_config.enabled {
-                    mcp_bridge.register_server(McpServer {
-                        name: server_config.name.clone(),
-                        command: server_config.command.clone(),
-                        args: server_config.args.clone(),
-                        env: server_config.env.clone(),
-                        enabled: server_config.enabled,
-                    });
-                }
-            }
-        }
-        let mcp_bridge = Arc::new(mcp_bridge);
+        let mcp_bridge = Arc::new(init_mcp_bridge(&config).await?);
 
         // ── Pre-create all kernel service objects ──
         // These are needed before KernelHandle creation (for AgentRuntime).
@@ -506,12 +467,23 @@ impl KernelBuilder {
         memory_manager.set_git_layer(git_layer.clone());
         let memory_manager = Arc::new(memory_manager);
 
-        let budget_manager = Arc::new(BudgetManager::new());
+        // ── RFC-008: Dream process for background memory consolidation ──
+        {
+            let consolidation = &config.memory.consolidation;
+            if consolidation.dream_enabled {
+                let dream_config = oxios_kernel::memory::dream::DreamConfig::from_consolidation(consolidation);
+                let space_dir = PathBuf::from(&config.kernel.workspace);
+                let dream = Arc::new(oxios_kernel::DreamProcess::new(
+                    memory_manager.clone(),
+                    dream_config,
+                    space_dir,
+                ));
+                dream.spawn_dream_task();
+                tracing::info!("Dream process spawned for background memory consolidation");
+            }
+        }
 
-        let host_tool_validator = HostToolValidator::new(
-            config.exec.required_host_tools.clone(),
-            config.exec.optional_host_tools.clone(),
-        );
+        let budget_manager = Arc::new(BudgetManager::new());
 
         let auth_manager = AuthManager::new();
         // API key auth is now via engine.api_key or ~/.oxi/auth.json
@@ -567,8 +539,6 @@ impl KernelBuilder {
                 oxios_kernel::PersonaApi::new(Arc::new(persona_manager.clone())),
                 oxios_kernel::ExtensionApi::new(
                     Arc::new(skill_manager.clone()),
-                    program_manager.clone(),
-                    Arc::new(host_tool_validator.clone()),
                 ),
                 oxios_kernel::McpApi::new(mcp_bridge.clone()),
                 oxios_kernel::InfraApi::new(
@@ -605,7 +575,7 @@ impl KernelBuilder {
             ));
 
         // Build ToolRetriever for semantic capability discovery.
-        let tool_retriever = build_tool_retriever(&program_manager).await;
+        let tool_retriever = build_tool_retriever(&skill_manager).await;
 
         let agent_runtime = AgentRuntime::new(provider, model_id, kernel_handle)
             .with_persona_manager(Arc::new(persona_manager.clone()))
@@ -685,8 +655,6 @@ impl KernelBuilder {
             supervisor,
             scheduler,
             access_manager,
-            program_manager,
-            host_tool_validator,
             persona_manager,
             mcp_bridge,
             memory_manager,
@@ -744,9 +712,9 @@ async fn init_mcp_bridge(config: &OxiosConfig) -> Result<McpBridge> {
     Ok(bridge)
 }
 
-/// Build a ToolRetriever with all OS tools and installed programs indexed.
+/// Build a ToolRetriever with all OS tools and installed skills indexed.
 async fn build_tool_retriever(
-    pm: &Arc<ProgramManager>,
+    sm: &SkillManager,
 ) -> oxios_kernel::tools::retrieval::ToolRetriever {
     use oxios_kernel::embedding::TfIdfEmbeddingProvider;
     use oxios_kernel::tools::retrieval::ToolEntry;
@@ -790,32 +758,19 @@ async fn build_tool_retriever(
             .await;
     }
 
-    // Index installed programs.
-    let programs = pm.list_enabled().await;
-    for program in &programs {
-        let desc = program.meta.description.clone();
+    // Index installed skills.
+    let skills = sm.list_skills().await;
+    for entry in &skills {
+        let desc = entry.skill.description.clone();
         retriever
             .index_tool(ToolEntry {
-                name: format!("program:{}", program.meta.name),
-                category: "program".to_string(),
+                name: format!("skill:{}", entry.skill.name),
+                category: "skill".to_string(),
                 description: desc,
-                skill_path: Some(format!("programs/{}/SKILL.md", program.meta.name)),
-                command: Some(program.meta.name.clone()),
+                skill_path: Some(format!("skills/{}/SKILL.md", entry.skill.name)),
+                command: None,
             })
             .await;
-
-        // Index individual program tools.
-        for tool_def in &program.meta.tools {
-            retriever
-                .index_tool(ToolEntry {
-                    name: format!("{}:{}", program.meta.name, tool_def.name),
-                    category: "program-tool".to_string(),
-                    description: tool_def.description.clone(),
-                    skill_path: Some(format!("programs/{}/SKILL.md", program.meta.name)),
-                    command: Some(tool_def.command.clone()),
-                })
-                .await;
-        }
     }
 
     tracing::info!(count = retriever.len(), "ToolRetriever indexed");

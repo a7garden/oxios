@@ -1,7 +1,7 @@
 //! MCP API — external tool server bridge.
 
 use crate::mcp::{self, McpBridge, McpServer, McpToolCallResult};
-use crate::program::ToolDef;
+use crate::tools::tool_types::ToolDef;
 use std::sync::Arc;
 
 /// MCP system calls.

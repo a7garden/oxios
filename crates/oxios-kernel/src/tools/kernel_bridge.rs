@@ -168,7 +168,7 @@ mod tests {
         let bridge = OxiosKernelBridge::new(kernel);
 
         let names = bridge.tool_names();
-        // 6 always-on + 17 kernel domain = 23 ... plus knowledge = 24
-        assert_eq!(names.len(), 24, "expected 24 tools, got {:?}", names);
+        // 6 always-on + 16 kernel domain = 22 ... plus knowledge = 23
+        assert_eq!(names.len(), 23, "expected 23 tools, got {:?}", names);
     }
 }

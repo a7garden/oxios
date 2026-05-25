@@ -952,7 +952,7 @@ impl MemoryManager {
     /// Build full context: hot context + proactive recall blended into system prompt.
     pub async fn build_full_context(
         &self,
-        query: &str,
+        _query: &str,
         system_prompt: &str,
         token_budget: usize,
     ) -> Result<String> {

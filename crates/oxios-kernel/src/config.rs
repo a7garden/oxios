@@ -626,12 +626,6 @@ pub struct ExecConfig {
     /// Maximum allowed timeout for an exec call in seconds.
     #[serde(default = "default_exec_max_timeout")]
     pub max_timeout_secs: u64,
-    /// Host tools that MUST be present (checked on startup).
-    #[serde(default)]
-    pub required_host_tools: Vec<String>,
-    /// Host tools that are optional (checked lazily when needed).
-    #[serde(default)]
-    pub optional_host_tools: Vec<String>,
 }
 
 fn default_false() -> bool {
@@ -664,8 +658,6 @@ impl Default for ExecConfig {
             allowed_commands: Vec::new(),
             default_timeout_secs: default_exec_timeout(),
             max_timeout_secs: default_exec_max_timeout(),
-            required_host_tools: Vec::new(),
-            optional_host_tools: Vec::new(),
         }
     }
 }

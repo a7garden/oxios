@@ -38,7 +38,6 @@ use crate::cron::CronScheduler;
 use crate::event_bus::EventBus;
 use crate::git_layer::CommitInfo;
 use crate::git_layer::GitLayer;
-use crate::host_tools::HostToolValidator;
 use crate::mcp::McpBridge;
 use crate::memory::MemoryManager;
 use crate::persona_manager::PersonaManager;
@@ -149,13 +148,11 @@ impl KernelHandle {
         budget_manager: Arc<BudgetManager>,
         resource_monitor: Arc<ResourceMonitor>,
         cron_scheduler: Arc<CronScheduler>,
-        program_manager: Arc<crate::program::ProgramManager>,
-        skill_store: Arc<crate::skill::SkillStore>,
+        skill_manager: Arc<SkillManager>,
         persona_manager: Arc<PersonaManager>,
         mcp_bridge: Arc<McpBridge>,
         auth_manager: Arc<parking_lot::Mutex<AuthManager>>,
         access_manager: Arc<parking_lot::Mutex<AccessManager>>,
-        host_tool_validator: Arc<HostToolValidator>,
         config: OxiosConfig,
         start_time: Instant,
         space_manager: Arc<SpaceManager>,
@@ -184,14 +181,7 @@ impl KernelHandle {
                 Some(event_bus.clone()),
             ),
             persona: PersonaApi::new(persona_manager),
-            extensions: ExtensionApi::new(
-                Arc::new(SkillManager::new(
-                    skill_store.path().clone(),
-                    skill_store.path().clone().join("../share/skills"),
-                )),
-                program_manager,
-                host_tool_validator,
-            ),
+            extensions: ExtensionApi::new(skill_manager),
             mcp: McpApi::new(mcp_bridge),
             infra: InfraApi::new(
                 git_layer,

@@ -387,8 +387,6 @@ mod tests {
                         tmp.join("share/skills"),
                     ),
                 ),
-                Arc::new(crate::program::ProgramManager::new(tmp.join("programs"))),
-                Arc::new(crate::host_tools::HostToolValidator::new(vec![], vec![])),
             ),
             crate::kernel_handle::McpApi::new(Arc::new(crate::mcp::McpBridge::new())),
             crate::kernel_handle::InfraApi::new(

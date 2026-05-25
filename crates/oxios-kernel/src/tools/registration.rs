@@ -89,7 +89,7 @@ pub fn register_always_on(registry: &ToolRegistry, search_cache: Arc<SearchCache
 /// | `KernelDomain { "agent" }` | any | `KernelAgentTool` |
 /// | `KernelDomain { "a2a" }` | any | `A2aDelegateTool`, `A2aSendTool`, `A2aQueryTool` |
 /// | `KernelDomain { "persona" }` | any | `PersonaTool` |
-/// | `KernelDomain { "program" }` | any | `ProgramTool` |
+/// | `KernelDomain { "program" }` | any | *(deprecated — skills via CSpace)* |
 /// | `KernelDomain { "cron" }` | any | `CronTool` |
 /// | `KernelDomain { "security" }` | any | `SecurityTool` |
 /// | `KernelDomain { "budget" }` | any | `BudgetTool` |
@@ -141,7 +141,7 @@ pub fn register_tools_from_cspace(
                     registry.register(A2aQueryTool::from_kernel(kernel));
                 }
                 "persona" => registry.register(PersonaTool::from_kernel(kernel)),
-                "program" => { /* ProgramTools are registered individually by agent_runtime, not via CSpace */
+                "program" => { /* Skills are surfaced through CSpace + semantic retrieval, not individual tools */
                 }
                 "cron" => registry.register(CronTool::from_kernel(kernel)),
                 "security" => registry.register(SecurityTool::from_kernel(kernel)),

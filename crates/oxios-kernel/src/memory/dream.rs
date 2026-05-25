@@ -445,7 +445,7 @@ impl DreamProcess {
 
         let result = async {
             // Phase 1: Orient
-            let state = if start_phase < 1 {
+            let _state = if start_phase < 1 {
                 self.dream_orient().await?
             } else {
                 // Skip — use cached state (in a full impl, we'd cache this)

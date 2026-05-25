@@ -172,9 +172,6 @@ enum Command {
         lines: usize,
     },
 
-    /// Show program skill file and usage.
-    Program { name: String },
-
     /// Open the web dashboard in your browser.
     Web {
         /// Port override (default: from config).
@@ -270,7 +267,6 @@ const WORKSPACE_SUBDIRS: &[&str] = &[
     "workspace/seeds",
     "workspace/sessions",
     "workspace/skills",
-    "workspace/programs",
 ];
 
 const DEFAULT_CONFIG: &str = include_str!("../share/default-config.toml");
@@ -318,57 +314,39 @@ fn tail_file(path: &Path, lines: usize) -> Result<String> {
 async fn cmd_pkg(kernel: &Kernel, action: &PkgAction) -> Result<()> {
     let handle = kernel.handle();
     match action {
-        PkgAction::Install { source, branch } => {
-            let source = source.clone();
-            let branch = branch.clone();
-            let install_source = if source.ends_with(".git") || source.starts_with("git@") {
-                oxios_kernel::InstallSource::Git {
-                    url: source,
-                    branch,
-                }
-            } else if source.starts_with("http://") || source.starts_with("https://") {
-                oxios_kernel::InstallSource::Tarball { url: source }
-            } else {
-                oxios_kernel::InstallSource::Local(PathBuf::from(&source))
-            };
-            let program = handle.extensions.install_program(install_source).await?;
-            println!(
-                "  {} '{}'",
-                style("Installed").green().bold(),
-                style(format!("{} v{}", program.meta.name, program.meta.version)).bold(),
-            );
+        PkgAction::Install { source, branch: _ } => {
+            // TODO: Implement skill install from source (git/local/tarball)
+            println!("  {} Skill install from '{}' not yet implemented.", style("⚠").yellow(), source);
         }
         PkgAction::Uninstall { name } => {
-            handle.extensions.uninstall_program(name).await?;
+            handle.extensions.delete_skill(name).await?;
             println!("  {} '{}'", style("Uninstalled").green(), name);
         }
         PkgAction::List => {
-            let programs = handle.extensions.list_programs().await;
-            if programs.is_empty() {
-                println!("  No programs installed.");
+            let skills = handle.extensions.list_skills_entries().await;
+            if skills.is_empty() {
+                println!("  No skills installed.");
             } else {
-                println!("{:30} {:10} {:40}", "NAME", "VERSION", "DESCRIPTION");
+                println!("{:30} {:10} {:40}", "NAME", "STATUS", "DESCRIPTION");
                 println!("{}", "─".repeat(82));
-                for p in &programs {
+                for s in &skills {
                     println!(
                         "{:30} {:10} {:40}",
-                        p.meta.name, p.meta.version, p.meta.description
+                        s.meta.name,
+                        format!("{:?}", s.eligibility),
+                        s.meta.description.chars().take(40).collect::<String>()
                     );
                 }
             }
         }
         PkgAction::Search => {
-            let programs = handle.extensions.list_programs().await;
-            if programs.is_empty() {
-                println!("  No programs installed.");
+            let skills = handle.extensions.list_skills_entries().await;
+            if skills.is_empty() {
+                println!("  No skills installed.");
             } else {
-                for p in &programs {
-                    println!("{} ({})", style(&p.meta.name).bold(), p.meta.version);
-                    println!("  {}", p.meta.description);
-                    if !p.meta.tools.is_empty() {
-                        let tools: Vec<_> = p.meta.tools.iter().map(|t| t.name.clone()).collect();
-                        println!("  Tools: {}", tools.join(", "));
-                    }
+                for s in &skills {
+                    println!("{}", style(&s.meta.name).bold());
+                    println!("  {}", s.meta.description);
                     println!();
                 }
             }
@@ -463,22 +441,6 @@ fn set_config_value(config: &mut OxiosConfig, key: &str, value: &str) -> Option<
         }
         ["exec", "max_timeout_secs"] => {
             config.exec.max_timeout_secs = value.parse().ok()?;
-            Some(())
-        }
-        ["exec", "required_host_tools"] => {
-            config.exec.required_host_tools = value
-                .split(',')
-                .map(|s| s.trim().to_string())
-                .filter(|s| !s.is_empty())
-                .collect();
-            Some(())
-        }
-        ["exec", "optional_host_tools"] => {
-            config.exec.optional_host_tools = value
-                .split(',')
-                .map(|s| s.trim().to_string())
-                .filter(|s| !s.is_empty())
-                .collect();
             Some(())
         }
         _ => None,
@@ -1133,7 +1095,6 @@ async fn run() -> Result<()> {
             | Some(Command::Audit)
             | Some(Command::Budget { .. })
             | Some(Command::Git { .. })
-            | Some(Command::Program { .. })
             | Some(Command::Pkg { .. })
     );
 
@@ -1410,55 +1371,6 @@ async fn run() -> Result<()> {
             }
         }
 
-        Some(Command::Program { name }) => {
-            let handle = kernel.handle();
-            match handle.extensions.get_program(name).await {
-                Some(program) => {
-                    println!(
-                        "\n  {} {}",
-                        style(&program.meta.name).bold(),
-                        style(format!("v{}", program.meta.version)).dim()
-                    );
-                    println!("  {}", "─".repeat(50));
-                    if !program.meta.description.is_empty() {
-                        println!("  {}", program.meta.description);
-                    }
-                    if !program.skill_content.is_empty() {
-                        println!("\n  SKILL.md:\n{}", program.skill_content);
-                    }
-                    if !program.meta.tools.is_empty() {
-                        println!("\n  Tools:");
-                        for tool in &program.meta.tools {
-                            println!(
-                                "    {} {}: {}",
-                                style("•").dim(),
-                                tool.name,
-                                tool.description
-                            );
-                        }
-                    }
-                    if !program.meta.host_requirements.required.is_empty() {
-                        println!(
-                            "\n  Required host tools: {}",
-                            program.meta.host_requirements.required.join(", ")
-                        );
-                    }
-                    if !program.meta.host_requirements.optional.is_empty() {
-                        println!(
-                            "  Optional host tools:   {}",
-                            program.meta.host_requirements.optional.join(", ")
-                        );
-                    }
-                    println!();
-                    Ok(())
-                }
-                None => Err(anyhow::anyhow!(
-                    "program '{}' not found. Install with `oxios pkg install`",
-                    name
-                )),
-            }
-        }
-
         // Handled before kernel assembly above — unreachable here
         Some(Command::Stop)
         | Some(Command::Daemon { .. })
@@ -1486,9 +1398,6 @@ async fn cmd_serve(kernel: &Kernel, config_path: &Path) -> Result<()> {
     let share_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("share");
     if let Err(e) = kernel.init_default_skills(&share_dir).await {
         tracing::warn!(error = %e, "Failed to initialize default skills");
-    }
-    if let Err(e) = kernel.init_default_programs(&share_dir).await {
-        tracing::warn!(error = %e, "Failed to initialize default programs");
     }
 
     // Activate channels

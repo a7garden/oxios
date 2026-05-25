@@ -9,7 +9,7 @@ pub use oxios_mcp::{
     McpTool, McpToolCallResult, McpToolsResult, ServerInfo,
 };
 
-use crate::program::{ArgumentDef, ToolDef};
+use crate::tools::tool_types::{ArgumentDef, ToolDef};
 
 /// Convert an MCP tool to an Oxios `ToolDef`.
 ///

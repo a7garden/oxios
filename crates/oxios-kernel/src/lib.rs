@@ -46,10 +46,8 @@ pub mod persona;
 pub mod persona_manager;
 pub mod persona_store;
 
-// ─── Tools & Programs ──────────────────────────────────────────────
-// 에이전트가 사용하는 도구, 프로그램, 스킬.
-pub mod host_tools;
-pub mod program;
+// ─── Tools & Skills ───────────────────────────────────────────────
+// 에이전트가 사용하는 도구, 스킬.
 pub mod skill;
 pub mod tools;
 #[cfg(feature = "wasm-sandbox")]
@@ -139,29 +137,27 @@ pub use memory::hyperbolic::{
     mobius_scalar_mul, HyperbolicConfig, HyperbolicEmbedding,
 };
 pub use memory::{
-    chunk_fixed, chunk_paragraphs, content_hash, cosine_similarity_f32, l2_normalize_f32,
-    l2_normalize_f64, ChunkConfig, CurationCandidate, CurationReport, HnswIndex, HnswMemoryIndex,
-    MemoryBudget, MemoryEntry, MemoryGraph, MemoryManager, MemoryType, SemanticHit, TextChunk,
-    TextVector,
+    AutoClassifier, chunk_fixed, chunk_paragraphs, content_hash, cosine_similarity_f32,
+    l2_normalize_f32, l2_normalize_f64, ChunkConfig, CompactionTree, CurationCandidate,
+    CurationReport, DecayEngine, DreamCheckpoint, DreamProcess, DreamReport, HnswIndex,
+    HnswMemoryIndex, HistoricalPeriod, MemoryBudget, MemoryEntry, MemoryGraph, MemoryManager,
+    MemoryTier, MemoryType, ProtectionLevel, ProactiveRecall, RootEntry, RootIndex,
+    SemanticHit, TextChunk, TextVector, TopicEntry,
 };
 pub use persona::{default_personas, Persona};
 pub use persona_manager::PersonaManager;
 pub use persona_store::PersonaStore;
 
-// ─── Tools & Programs ──────────────────────────────────────────────
-pub use host_tools::{common as host_tools_common, HostToolStatus, HostToolValidator};
-pub use program::{
-    ArgumentDef, HostRequirementsCheck, InstallSource, Program, ProgramManager, ProgramMeta,
-    ToolDef,
-};
+// ─── Tools & Skills ────────────────────────────────────────────────
 pub use skill::{
     InstallKind, Requirements, RequirementsCheck, Skill, SkillConfig, SkillEntry,
     SkillInstallSpec, SkillInvocationPolicy, SkillManager, SkillMeta, SkillMetadata, SkillRef,
-    SkillSnapshot, SkillSource, SkillState, SkillStatus, SkillStore,
+    SkillSnapshot, SkillSource, SkillState, SkillStatus,
 };
+pub use tools::tool_types::{ArgumentDef, ToolDef};
 #[cfg(feature = "browser")]
 pub use tools::BrowserTool;
-pub use tools::{ExecTool, KnowledgeTool, ProgramTool};
+pub use tools::{ExecTool, KnowledgeTool};
 #[cfg(feature = "wasm-sandbox")]
 pub use wasm_sandbox::{ResourceKind, WasmConfig, WasmError, WasmSandbox};
 
