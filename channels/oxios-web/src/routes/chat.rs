@@ -159,9 +159,9 @@ pub(crate) async fn handle_chat(
                     Err(e) => tracing::warn!(error = %e, "Failed to load/create session"),
                 }
 
-                // Auto-prune sessions if configured
+                // Auto-prune sessions if configured (throttled to once per hour)
                 let cfg = state.config.read();
-                if cfg.session.auto_prune {
+                if cfg.session.auto_prune && state.kernel.state.should_auto_prune() {
                     let prune_config = oxios_kernel::state_store::PruneConfig {
                         max_sessions: cfg.session.max_sessions,
                         ttl_hours: cfg.session.ttl_hours,
@@ -482,13 +482,24 @@ async fn persist_session(
         }
     }
 
-    // Auto-prune in background after session save
+    // Auto-prune in background after session save (throttled)
     if let Some(config) = prune_config {
-        let store = state_store.clone();
-        tokio::spawn(async move {
-            if let Err(e) = store.prune_sessions(&config).await {
-                tracing::warn!(error = %e, "WS: session auto-prune failed");
-            }
-        });
+        // Only prune if at least 1 hour has passed since the last prune.
+        // Uses a process-global throttle to avoid spawning on every message.
+        static LAST_PRUNE: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+        let now_secs = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+        let last = LAST_PRUNE.load(std::sync::atomic::Ordering::Relaxed);
+        if now_secs.saturating_sub(last) >= 3600 {
+            LAST_PRUNE.store(now_secs, std::sync::atomic::Ordering::Relaxed);
+            let store = state_store.clone();
+            tokio::spawn(async move {
+                if let Err(e) = store.prune_sessions(&config).await {
+                    tracing::warn!(error = %e, "WS: session auto-prune failed");
+                }
+            });
+        }
     }
 }

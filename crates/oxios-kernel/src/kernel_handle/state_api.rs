@@ -1,6 +1,6 @@
 //! State API — data persistence, session management.
 
-use crate::state_store::{PruneConfig, Session, SessionId, SessionSummary, StateStore};
+use crate::state_store::{PruneConfig, PruneThrottle, Session, SessionId, SessionSummary, StateStore};
 use serde::{de::DeserializeOwned, Serialize};
 use std::sync::Arc;
 
@@ -9,12 +9,17 @@ use std::sync::Arc;
 /// All data persistence: file (JSON/Markdown) storage, session management.
 pub struct StateApi {
     pub(crate) state_store: Arc<StateStore>,
+    /// Throttle for auto-prune to avoid excessive disk scans.
+    pub prune_throttle: PruneThrottle,
 }
 
 impl StateApi {
     /// Create a new StateApi.
     pub fn new(state_store: Arc<StateStore>) -> Self {
-        Self { state_store }
+        Self {
+            state_store,
+            prune_throttle: PruneThrottle::new(3600), // 1 hour cooldown
+        }
     }
     /// Save JSON data.
     pub async fn save<T: Serialize>(
@@ -115,5 +120,10 @@ impl StateApi {
     /// Removes sessions that exceed TTL or exceed the maximum count.
     pub async fn prune_sessions(&self, config: &PruneConfig) -> anyhow::Result<usize> {
         self.state_store.prune_sessions(config).await
+    }
+
+    /// Check if auto-prune should run (respects cooldown throttle).
+    pub fn should_auto_prune(&self) -> bool {
+        self.prune_throttle.should_prune()
     }
 }

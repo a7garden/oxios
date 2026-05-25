@@ -1053,8 +1053,8 @@ impl OxiosConfig {
         }
 
         // Session validation
-        if self.session.ttl_hours > 0 && self.session.ttl_hours < 1 {
-            warnings.push("session.ttl_hours is less than 1 hour — sessions may expire quickly".into());
+        if self.session.max_sessions == 0 && self.session.ttl_hours == 0 && self.session.auto_prune {
+            warnings.push("session: auto_prune is enabled but both max_sessions and ttl_hours are 0 — nothing will be pruned".into());
         }
 
         // Exec validation

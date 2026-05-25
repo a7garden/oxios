@@ -52,11 +52,11 @@ function SecurityPage() {
     refetchInterval: 15000,
   })
 
-  if (auditLoading) return <LoadingCards count={4} />
-  if (auditError) return <ErrorState onRetry={() => refetch()} />
-
   const [auditPage, setAuditPage] = useState(1)
   const AUDIT_PAGE_SIZE = 20
+
+  if (auditLoading) return <LoadingCards count={4} />
+  if (auditError) return <ErrorState onRetry={() => refetch()} />
 
   const entries = (audits?.items ?? []).map((e) => ({
     ...e,
@@ -84,41 +84,40 @@ function SecurityPage() {
       {permissionsError ? (
         <ErrorState onRetry={() => refetchPermissions()} />
       ) : permissions ? (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <KeyRound className="h-4 w-4" /> Roles & Policies
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div>
-              <p className="text-sm font-medium mb-1">Roles</p>
-              <div className="flex gap-2 flex-wrap">
-                {permissions.roles.map((role) => (
-                  <Badge key={role} variant="outline">
-                    {role}
-                  </Badge>
-                ))}
-              </div>
-            </div>
-            <div>
-              <p className="text-sm font-medium mb-2">Policies</p>
-              <div className="space-y-1">
-                {permissions.policies.map((policy) => (
-                  <div key={policy.name} className="flex items-center gap-2 text-sm">
-                    <Badge variant={policy.effect === 'allow' ? 'success' : 'destructive'}>
-                      {policy.effect}
-                    </Badge>
-                    <span>{policy.name}</span>
-                    {policy.resources.length > 0 && (
-                      <span className="text-muted-foreground">({policy.resources.join(', ')})</span>
+        <div className="space-y-3">
+          {permissions.policies
+            .slice()
+            .sort((a, b) => b.resources.length - a.resources.length)
+            .map((policy) => {
+              const roleName = policy.name.replace('-default', '')
+              return (
+                <Card key={policy.name}>
+                  <CardContent className="pt-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <KeyRound className="h-4 w-4 text-muted-foreground" />
+                        <span className="font-medium">{roleName}</span>
+                      </div>
+                      <span className="text-xs text-muted-foreground">
+                        {policy.resources.length} permission{policy.resources.length !== 1 ? 's' : ''}
+                      </span>
+                    </div>
+                    {policy.resources.length > 0 ? (
+                      <div className="flex gap-1.5 flex-wrap">
+                        {policy.resources.map((resource) => (
+                          <Badge key={resource} variant="secondary" className="text-xs">
+                            {resource}
+                          </Badge>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">No permissions</p>
                     )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+                  </CardContent>
+                </Card>
+              )
+            })}
+        </div>
       ) : null}
 
       {/* Audit Trail */}
@@ -144,7 +143,9 @@ function SecurityPage() {
                   className="flex items-center justify-between rounded-lg border p-3"
                 >
                   <div className="flex items-center gap-3">
-                    <Shield className="h-4 w-4 text-muted-foreground" />
+                    <Badge variant={entry.allowed ? 'success' : 'destructive'} className="shrink-0">
+                      {entry.allowed ? 'Allow' : 'Deny'}
+                    </Badge>
                     <div>
                       <p className="font-medium text-sm">{entry.action}</p>
                       {entry.resource && (
@@ -154,6 +155,9 @@ function SecurityPage() {
                         <p className="text-xs text-muted-foreground">
                           Agent: {entry.agent_id.slice(0, 8)}...
                         </p>
+                      )}
+                      {entry.reason && (
+                        <p className="text-xs text-amber-600">{entry.reason}</p>
                       )}
                     </div>
                   </div>

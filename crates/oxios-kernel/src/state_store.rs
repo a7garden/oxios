@@ -543,6 +543,45 @@ impl Default for PruneConfig {
     }
 }
 
+/// Tracks the last time a prune was performed, enabling cooldown.
+pub struct PruneThrottle {
+    /// Instant of the last prune (monotonic).
+    last_prune: std::sync::Mutex<Option<std::time::Instant>>,
+    /// Minimum seconds between prune runs.
+    cooldown_secs: u64,
+}
+
+impl PruneThrottle {
+    /// Create a new throttle with the given cooldown.
+    pub fn new(cooldown_secs: u64) -> Self {
+        Self {
+            last_prune: std::sync::Mutex::new(None),
+            cooldown_secs,
+        }
+    }
+
+    /// Check if enough time has elapsed since the last prune.
+    /// Returns `true` if prune should proceed.
+    pub fn should_prune(&self) -> bool {
+        let mut guard = self.last_prune.lock().unwrap();
+        let now = std::time::Instant::now();
+        match *guard {
+            Some(last) => {
+                if now.duration_since(last).as_secs() >= self.cooldown_secs {
+                    *guard = Some(now);
+                    true
+                } else {
+                    false
+                }
+            }
+            None => {
+                *guard = Some(now);
+                true
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
