@@ -1,6 +1,7 @@
 import { useRouterState } from '@tanstack/react-router'
 import { ArrowRightLeft } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   useDeleteFile,
   useKnowledgeFile,
@@ -12,6 +13,7 @@ import { useKnowledgeStore } from '@/stores/knowledge'
 import type { KnowledgeTreeEntry } from '@/types/knowledge'
 
 export function MoveModal() {
+  const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [focusedIndex, setFocusedIndex] = useState(0)
@@ -126,7 +128,7 @@ export function MoveModal() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Move to folder..."
+            placeholder={t('knowledge.moveToFolder')}
             className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
           />
           <kbd className="text-xs text-muted-foreground border rounded px-1.5 py-0.5">ESC</kbd>
@@ -151,7 +153,7 @@ export function MoveModal() {
             ))
           ) : (
             <li className="px-4 py-6 text-sm text-muted-foreground text-center">
-              No matching folders
+              {t('knowledge.noMatchingFolders')}
             </li>
           )}
         </ul>

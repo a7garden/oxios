@@ -110,6 +110,7 @@ impl ClawHubInstaller {
             slug: slug.to_string(),
             installed_version: version.clone(),
             installed_at: chrono::Utc::now().to_rfc3339(),
+            sha256: Some(archive.sha256.clone()),
         };
         let origin_path = target_dir.join(".clawhub").join("origin.json");
         fs::create_dir_all(origin_path.parent().unwrap())?;
@@ -179,6 +180,7 @@ impl ClawHubInstaller {
             slug: slug.to_string(),
             installed_version: latest.clone(),
             installed_at: chrono::Utc::now().to_rfc3339(),
+            sha256: Some(archive.sha256.clone()),
         };
         let origin_path = target_dir.join(".clawhub").join("origin.json");
         fs::create_dir_all(origin_path.parent().unwrap())?;
@@ -222,24 +224,38 @@ impl ClawHubInstaller {
     }
 
     /// Check which installed skills have updates available.
+    ///
+    /// Fetches skill details concurrently for lower latency.
     pub async fn check_updates(&self) -> Result<Vec<UpdateAvailable>> {
         let lock = self.read_lockfile()?;
-        let mut updates = Vec::new();
+        let skills: Vec<(String, ClawHubLockEntry)> = lock.skills.into_iter().collect();
 
-        for (slug, entry) in lock.skills {
-            if let Ok(detail) = self.client.get_skill(&slug).await {
-                if let Some(latest) = &detail.latest_version {
+        let futures: Vec<_> = skills
+            .into_iter()
+            .map(|(slug, entry)| {
+                let client = self.client.clone();
+                async move {
+                    let detail = client.get_skill(&slug).await.ok()?;
+                    let latest = detail.latest_version.as_ref()?;
                     if latest.version != entry.version {
-                        updates.push(UpdateAvailable {
+                        Some(UpdateAvailable {
                             slug,
                             current_version: entry.version,
                             latest_version: latest.version.clone(),
                             changelog: latest.changelog.clone(),
-                        });
+                        })
+                    } else {
+                        None
                     }
                 }
-            }
-        }
+            })
+            .collect();
+
+        let updates: Vec<UpdateAvailable> = futures::future::join_all(futures)
+            .await
+            .into_iter()
+            .flatten()
+            .collect();
 
         Ok(updates)
     }

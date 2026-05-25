@@ -1,10 +1,12 @@
 import { Bot, ExternalLink, Send } from 'lucide-react'
 import { useCallback, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { useKnowledgeCopilot } from '@/hooks/use-knowledge'
 import { useKnowledgeStore } from '@/stores/knowledge'
 
 export function Copilot() {
+  const { t } = useTranslation()
   const currentFilePath = useKnowledgeStore((s) => s.currentFilePath)
   const openFile = useKnowledgeStore((s) => s.openFile)
   const copilot = useKnowledgeCopilot()
@@ -39,14 +41,14 @@ export function Copilot() {
       <div className="p-3 border-b space-y-2">
         <div className="flex items-center gap-2">
           <Bot className="h-4 w-4 text-muted-foreground" />
-          <span className="text-sm font-medium">AI Copilot</span>
+          <span className="text-sm font-medium">{t('knowledge.copilot')}</span>
         </div>
         <div className="flex gap-2">
           <textarea
             value={question}
             onChange={(e) => setQuestion(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Ask about your notes..."
+            placeholder={t('knowledge.copilotPlaceholder')}
             className="flex-1 resize-none rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
             rows={2}
           />
@@ -59,16 +61,16 @@ export function Copilot() {
       {/* Response */}
       <div className="flex-1 overflow-y-auto p-3">
         {copilot.isPending && (
-          <div className="text-sm text-muted-foreground animate-pulse">Thinking...</div>
+          <div className="text-sm text-muted-foreground animate-pulse">{t('knowledge.copilotThinking')}</div>
         )}
-        {copilot.isError && <div className="text-sm text-destructive">Failed to get response</div>}
+        {copilot.isError && <div className="text-sm text-destructive">{t('knowledge.copilotFailedResponse')}</div>}
         {response && (
           <div className="space-y-3">
             <div className="text-sm whitespace-pre-wrap">{response.content}</div>
             {response.referenced_notes.length > 0 && (
               <div className="space-y-1">
                 <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                  Referenced Notes
+                  {t('knowledge.referencedNotes')}
                 </p>
                 {response.referenced_notes.map((note) => (
                   <button

@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { ArrowLeft, Clock, MessageSquare } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { ErrorState } from '@/components/shared/error-state'
 import { LoadingCards } from '@/components/shared/loading'
 import { Badge } from '@/components/ui/badge'
@@ -14,6 +15,7 @@ export const Route = createFileRoute('/sessions/$sessionId')({
 })
 
 function SessionDetailPage() {
+  const { t } = useTranslation()
   const { sessionId } = Route.useParams()
   const navigate = useNavigate()
 
@@ -29,7 +31,7 @@ function SessionDetailPage() {
 
   if (isLoading) return <LoadingCards count={3} />
   if (isError) return <ErrorState onRetry={() => refetch()} />
-  if (!session) return <p className="text-muted-foreground">Session not found.</p>
+  if (!session) return <p className="text-muted-foreground">{t('sessions.notFound')}</p>
 
   // Build interleaved messages from user_messages and agent_responses
   const messages: { role: 'user' | 'assistant'; content: string }[] = []
@@ -44,13 +46,13 @@ function SessionDetailPage() {
   }
 
   const details = [
-    { label: 'ID', value: session.id },
+    { label: t('sessions.sessionId'), value: session.id },
     { label: 'User ID', value: session.user_id ?? '—' },
-    { label: 'Seed ID', value: session.active_seed_id ?? '—' },
-    { label: 'Messages', value: messages.length },
-    { label: 'Created', value: new Date(session.created_at).toLocaleString() },
+    { label: t('seeds.seed'), value: session.active_seed_id ?? '—' },
+    { label: t('sessions.messages'), value: messages.length },
+    { label: t('sessions.createdAt'), value: new Date(session.created_at).toLocaleString() },
     {
-      label: 'Updated',
+      label: t('sessions.updated'),
       value: session.updated_at ? new Date(session.updated_at).toLocaleString() : '—',
     },
   ]
@@ -62,13 +64,13 @@ function SessionDetailPage() {
           variant="ghost"
           size="icon"
           onClick={() => navigate({ to: '/sessions' })}
-          aria-label="Go back"
+          aria-label={t('common.back')}
         >
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div className="flex-1">
           <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Clock className="h-6 w-6" /> Session Detail
+            <Clock className="h-6 w-6" /> {t('sessions.sessionDetail')}
           </h1>
           <p className="text-muted-foreground font-mono text-xs">{sessionId}</p>
         </div>
@@ -76,7 +78,7 @@ function SessionDetailPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Session Info</CardTitle>
+          <CardTitle>{t('sessions.sessionInfo')}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid gap-3 md:grid-cols-2">
@@ -96,7 +98,7 @@ function SessionDetailPage() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <MessageSquare className="h-4 w-4" /> Messages
+            <MessageSquare className="h-4 w-4" /> {t('sessions.messages')}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -112,7 +114,7 @@ function SessionDetailPage() {
                     variant={msg.role === 'user' ? 'default' : 'secondary'}
                     className="shrink-0 h-6"
                   >
-                    {msg.role}
+                    {msg.role === 'user' ? t('chat.user') : t('chat.assistant')}
                   </Badge>
                   <div className="flex-1 rounded-lg bg-muted p-3">
                     <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
@@ -121,7 +123,7 @@ function SessionDetailPage() {
               ))}
             </div>
           ) : (
-            <p className="text-sm text-muted-foreground">No messages in this session.</p>
+            <p className="text-sm text-muted-foreground">{t('sessions.noMessages')}</p>
           )}
         </CardContent>
       </Card>

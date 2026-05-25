@@ -1,5 +1,6 @@
 import { Save, Settings } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -8,6 +9,7 @@ import { useKnowledgeConfig, useKnowledgeConfigUpdate } from '@/hooks/use-knowle
 import type { KnowledgeConfig } from '@/types/knowledge'
 
 export function KnowledgeSettings() {
+  const { t } = useTranslation()
   const { data: config, isLoading } = useKnowledgeConfig()
   const updateConfig = useKnowledgeConfigUpdate()
   const [form, setForm] = useState<Partial<KnowledgeConfig>>({})
@@ -16,7 +18,7 @@ export function KnowledgeSettings() {
     if (config) setForm(config)
   }, [config])
 
-  if (isLoading) return <div className="p-6 text-muted-foreground">Loading settings...</div>
+  if (isLoading) return <div className="p-6 text-muted-foreground">{t('knowledge.loadingSettings')}</div>
 
   const handleSave = async () => {
     await updateConfig.mutateAsync(form)
@@ -30,16 +32,16 @@ export function KnowledgeSettings() {
     <div className="p-4 sm:p-6 space-y-6 max-w-2xl">
       <h2 className="text-lg font-semibold flex items-center gap-2">
         <Settings className="h-5 w-5" />
-        Knowledge Settings
+        {t('knowledge.title')} {t('common.settings')}
       </h2>
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-sm">General</CardTitle>
+          <CardTitle className="text-sm">{t('knowledge.general')}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-3 items-center gap-2 sm:gap-4">
-            <label className="text-sm text-muted-foreground">Language</label>
+            <label className="text-sm text-muted-foreground">{t('knowledge.language')}</label>
             <Input
               value={form.language ?? ''}
               onChange={(e) => update('language', e.target.value)}
@@ -47,7 +49,7 @@ export function KnowledgeSettings() {
             />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 items-center gap-2 sm:gap-4">
-            <label className="text-sm text-muted-foreground">Timezone</label>
+            <label className="text-sm text-muted-foreground">{t('knowledge.timezone')}</label>
             <Input
               value={form.timezone ?? ''}
               onChange={(e) => update('timezone', e.target.value)}
@@ -55,7 +57,7 @@ export function KnowledgeSettings() {
             />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 items-center gap-2 sm:gap-4">
-            <label className="text-sm text-muted-foreground">Mode</label>
+            <label className="text-sm text-muted-foreground">{t('knowledge.mode')}</label>
             <Input
               value={form.mode ?? ''}
               onChange={(e) => update('mode', e.target.value)}
@@ -64,7 +66,7 @@ export function KnowledgeSettings() {
             />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 items-center gap-2 sm:gap-4">
-            <label className="text-sm text-muted-foreground">Pomodoro (min)</label>
+            <label className="text-sm text-muted-foreground">{t('knowledge.pomodoro')}</label>
             <Input
               type="number"
               value={form.pomodoro_duration_in_minutes ?? 25}
@@ -77,18 +79,18 @@ export function KnowledgeSettings() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-sm">Features</CardTitle>
+          <CardTitle className="text-sm">{t('knowledge.features')}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between">
-            <label className="text-sm">Two emojis enabled</label>
+            <label className="text-sm">{t('knowledge.twoEmojisEnabled')}</label>
             <Switch
               checked={form.two_emojis_enabled ?? false}
               onCheckedChange={(v) => update('two_emojis_enabled', v)}
             />
           </div>
           <div className="flex items-center justify-between">
-            <label className="text-sm">Quick habits</label>
+            <label className="text-sm">{t('knowledge.quickHabitsEnabled')}</label>
             <Switch
               checked={form.quick_habits_enabled ?? false}
               onCheckedChange={(v) => update('quick_habits_enabled', v)}
@@ -99,7 +101,7 @@ export function KnowledgeSettings() {
 
       <Button onClick={handleSave} disabled={updateConfig.isPending}>
         <Save className="h-4 w-4 mr-2" />
-        {updateConfig.isPending ? 'Saving...' : 'Save'}
+        {updateConfig.isPending ? t('knowledge.saving') : t('knowledge.save')}
       </Button>
     </div>
   )

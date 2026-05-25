@@ -1,6 +1,7 @@
 import { useNavigate } from '@tanstack/react-router'
 import { Bell, Check, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -23,6 +24,7 @@ const severityDot: Record<NotificationSeverity, string> = {
  * Shows unread count badge and a dropdown panel with recent notifications.
  */
 export function NotificationBell() {
+  const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   const panelRef = useRef<HTMLDivElement>(null)
   const navigate = useNavigate()
@@ -59,7 +61,7 @@ export function NotificationBell() {
         type="button"
         onClick={() => setOpen((v) => !v)}
         className="relative rounded-md p-2 hover:bg-accent/50 transition-colors"
-        aria-label={`Notifications${unreadCount > 0 ? ` (${unreadCount} unread)` : ''}`}
+        aria-label={`${t('notifications.openNotifications')}${unreadCount > 0 ? t('common.unreadCount', { count: unreadCount }) : ''}`}
       >
         <Bell className="h-4 w-4" />
         {unreadCount > 0 && (
@@ -73,7 +75,7 @@ export function NotificationBell() {
         <div className="absolute right-0 top-full mt-2 z-50 w-80 rounded-lg border bg-popover text-popover-foreground shadow-lg">
           {/* Header */}
           <div className="flex items-center justify-between border-b px-3 py-2">
-            <span className="text-sm font-medium">Notifications</span>
+            <span className="text-sm font-medium">{t('notifications.title')}</span>
             {unreadCount > 0 && (
               <Button
                 variant="ghost"
@@ -81,7 +83,7 @@ export function NotificationBell() {
                 className="h-6 text-xs"
                 onClick={markAllRead}
               >
-                <Check className="h-3 w-3 mr-1" /> Mark all read
+                <Check className="h-3 w-3 mr-1" /> {t('notifications.markAllRead')}
               </Button>
             )}
           </div>
@@ -90,7 +92,7 @@ export function NotificationBell() {
           <ScrollArea className="max-h-80">
             {notifications.length === 0 ? (
               <div className="p-4 text-center text-sm text-muted-foreground">
-                No notifications
+                {t('notifications.noNotifications')}
               </div>
             ) : (
               <div className="divide-y">
@@ -127,7 +129,7 @@ export function NotificationBell() {
                         dismiss(n.id)
                       }}
                       className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity rounded p-0.5 hover:bg-muted"
-                      aria-label="Dismiss"
+                      aria-label={t('common.dismiss')}
                     >
                       <X className="h-3 w-3" />
                     </button>

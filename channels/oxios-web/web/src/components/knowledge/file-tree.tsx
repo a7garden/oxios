@@ -1,5 +1,6 @@
 import { ChevronRight, File, Folder, FolderOpen } from 'lucide-react'
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useKnowledgeTree } from '@/hooks/use-knowledge'
 import { cn } from '@/lib/utils'
 import type { KnowledgeTreeEntry } from '@/types/knowledge'
@@ -12,6 +13,7 @@ interface FileTreeProps {
 }
 
 export function FileTree({ entries, onFileSelect, currentPath, parentPath = '' }: FileTreeProps) {
+  const { t } = useTranslation()
   return (
     <ul className="space-y-0.5">
       {entries.map((entry) => (
@@ -98,7 +100,8 @@ function SubDirectory({
   currentPath: string | null
 }) {
   const { data: entries, isLoading } = useKnowledgeTree(dir)
-  if (isLoading) return <div className="pl-4 text-xs text-muted-foreground">...</div>
+  const { t } = useTranslation()
+  if (isLoading) return <div className="pl-4 text-xs text-muted-foreground">{t('knowledge.loading')}</div>
   if (!entries || entries.length === 0) return null
   return (
     <div className="pl-4">

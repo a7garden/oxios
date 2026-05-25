@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
 import { ChevronDown, ChevronRight, File, Folder, FolderOpen, RefreshCw } from 'lucide-react'
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { EmptyState } from '@/components/shared/empty-state'
 import { ErrorState } from '@/components/shared/error-state'
 import { LoadingCards } from '@/components/shared/loading'
@@ -13,6 +14,7 @@ import type { TreeEntry } from '@/types'
 export const Route = createFileRoute('/workspace/')({ component: WorkspacePage })
 
 function WorkspacePage() {
+  const { t } = useTranslation()
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set())
 
   const {
@@ -118,22 +120,22 @@ function WorkspacePage() {
           <p className="text-muted-foreground">File browser</p>
         </div>
         <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching}>
-          <RefreshCw className={`h-4 w-4 mr-1 ${isFetching ? 'animate-spin' : ''}`} /> Refresh
+          <RefreshCw className={`h-4 w-4 mr-1 ${isFetching ? 'animate-spin' : ''}`} /> {t('common.refresh')}
         </Button>
       </div>
 
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <FolderOpen className="h-4 w-4" /> Files
+            <FolderOpen className="h-4 w-4" /> {t('workspace.files')}
           </CardTitle>
         </CardHeader>
         <CardContent>
           {!entries || entries.length === 0 ? (
             <EmptyState
               icon={<FolderOpen className="h-8 w-8" />}
-              title="No workspace"
-              description="Workspace files will appear here."
+              title={t('workspace.noWorkspace')}
+              description={t('workspace.description')}
               className="py-6"
             />
           ) : (

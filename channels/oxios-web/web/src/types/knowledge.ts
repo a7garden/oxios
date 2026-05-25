@@ -101,3 +101,17 @@ export interface NightlyReport {
 export interface HabitsData {
   [key: string]: unknown
 }
+
+// Git version history
+export interface KnowledgeHistoryEntry {
+  hash: string
+  short_hash: string
+  message: string
+  timestamp: string
+  author: string
+}
+
+export interface KnowledgeHistoryResponse {
+  history: KnowledgeHistoryEntry[]
+  count: number
+}

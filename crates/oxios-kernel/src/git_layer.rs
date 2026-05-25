@@ -394,6 +394,11 @@ impl GitLayer {
         self.enabled
     }
 
+    /// Get the root path of this git repository.
+    pub fn root(&self) -> &Path {
+        &self.root
+    }
+
     // ── Private helpers ───────────────────────────────────────────────────────
 
     /// Get the current HEAD tree's ObjectId.

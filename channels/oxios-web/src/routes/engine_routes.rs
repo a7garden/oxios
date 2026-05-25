@@ -6,7 +6,7 @@ use std::sync::Arc;
 
 use axum::extract::{Query, State};
 use axum::Json;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 
 use crate::error::AppError;
 use crate::server::AppState;

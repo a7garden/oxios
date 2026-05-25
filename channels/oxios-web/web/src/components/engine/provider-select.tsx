@@ -1,5 +1,6 @@
 import { Check, ChevronDown, Key } from 'lucide-react'
 import { useState, useRef, useEffect, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import type { ProviderInfo, ProviderCategory } from '@/types/engine'
 import { cn } from '@/lib/utils'
 
@@ -8,10 +9,10 @@ import { cn } from '@/lib/utils'
 const CATEGORY_ORDER: ProviderCategory[] = ['major', 'open', 'regional', 'local']
 
 const CATEGORY_LABELS: Record<ProviderCategory, string> = {
-  major: 'Major Providers',
-  open: 'Open & Specialty',
-  regional: 'Regional',
-  local: 'Local / Self-hosted',
+  major: 'engine.majorProviders',
+  open: 'engine.openSpecialty',
+  regional: 'engine.regional',
+  local: 'engine.localSelfHosted',
 }
 
 // ─── Component ───────────────────────────────────────────────
@@ -29,6 +30,7 @@ export function ProviderSelect({
   onValueChange,
   className,
 }: ProviderSelectProps) {
+  const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
@@ -62,7 +64,7 @@ export function ProviderSelect({
         className="flex h-9 w-full items-center justify-between rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm ring-offset-background hover:bg-accent/50 focus:outline-none focus:ring-1 focus:ring-ring"
       >
         <span className={selected ? '' : 'text-muted-foreground'}>
-          {selected ? selected.name : 'Select provider...'}
+          {selected ? selected.name : t('engine.selectProvider')}
         </span>
         <ChevronDown className="h-4 w-4 opacity-50" />
       </button>
@@ -75,7 +77,7 @@ export function ProviderSelect({
             return (
               <div key={cat}>
                 <div className="px-3 py-1.5 text-xs font-semibold text-muted-foreground bg-muted/50">
-                  {CATEGORY_LABELS[cat]}
+                  {t(CATEGORY_LABELS[cat])}
                 </div>
                 {items.map((p) => (
                   <button

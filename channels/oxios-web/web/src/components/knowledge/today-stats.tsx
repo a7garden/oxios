@@ -1,13 +1,15 @@
 import { Activity } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useKnowledgeDoneToday, useKnowledgeStatsToday } from '@/hooks/use-knowledge'
 
 export function TodayStats() {
+  const { t } = useTranslation()
   const { data: report, isLoading: reportLoading } = useKnowledgeStatsToday()
   const { data: doneData, isLoading: doneLoading } = useKnowledgeDoneToday()
 
   if (reportLoading || doneLoading) {
-    return <div className="p-4 text-sm text-muted-foreground">Loading stats...</div>
+    return <div className="p-4 text-sm text-muted-foreground">{t('knowledge.loadingStats')}</div>
   }
 
   const doneItems = doneData?.items ?? []

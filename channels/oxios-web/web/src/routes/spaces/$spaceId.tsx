@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { ArrowLeft, Boxes } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { ErrorState } from '@/components/shared/error-state'
 import { LoadingCards } from '@/components/shared/loading'
 import { Button } from '@/components/ui/button'
@@ -13,6 +14,7 @@ export const Route = createFileRoute('/spaces/$spaceId')({
 })
 
 function SpaceDetailPage() {
+  const { t } = useTranslation()
   const { spaceId } = Route.useParams()
   const navigate = useNavigate()
 
@@ -28,17 +30,17 @@ function SpaceDetailPage() {
 
   if (isLoading) return <LoadingCards count={3} />
   if (isError) return <ErrorState onRetry={() => refetch()} />
-  if (!space) return <p className="text-muted-foreground">Space not found.</p>
+  if (!space) return <p className="text-muted-foreground">{t('spaces.notFound')}</p>
 
   const details = [
-    { label: 'ID', value: space.id },
-    { label: 'Name', value: space.name },
+    { label: t('sessions.sessionId'), value: space.id },
+    { label: t('spaces.spaceName'), value: space.name },
     { label: 'Source', value: space.source ?? '—' },
     { label: 'Tags', value: space.tags && space.tags.length > 0 ? space.tags.join(', ') : '—' },
-    { label: 'Active', value: space.active !== false ? 'Yes' : 'No' },
-    { label: 'Created', value: new Date(space.created_at).toLocaleString() },
+    { label: t('common.active'), value: space.active !== false ? t('common.yes') : t('common.no') },
+    { label: t('spaces.created'), value: new Date(space.created_at).toLocaleString() },
     ...(space.last_active_at
-      ? [{ label: 'Last Active', value: new Date(space.last_active_at).toLocaleString() }]
+      ? [{ label: t('sessions.lastActive'), value: new Date(space.last_active_at).toLocaleString() }]
       : []),
     ...(space.interaction_count != null
       ? [{ label: 'Interactions', value: String(space.interaction_count) }]
@@ -52,7 +54,7 @@ function SpaceDetailPage() {
           variant="ghost"
           size="icon"
           onClick={() => navigate({ to: '/spaces' })}
-          aria-label="Go back"
+          aria-label={t('common.back')}
         >
           <ArrowLeft className="h-4 w-4" />
         </Button>
@@ -60,13 +62,13 @@ function SpaceDetailPage() {
           <h1 className="text-2xl font-bold flex items-center gap-2">
             <Boxes className="h-6 w-6" /> {space.name}
           </h1>
-          <p className="text-muted-foreground">Space Detail</p>
+          <p className="text-muted-foreground">{t('spaces.spaceDetail')}</p>
         </div>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Space Information</CardTitle>
+          <CardTitle>{t('spaces.spaceInformation')}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid gap-3 md:grid-cols-2">
@@ -86,7 +88,7 @@ function SpaceDetailPage() {
       {space.paths && space.paths.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle>Paths</CardTitle>
+            <CardTitle>{t('spaces.paths')}</CardTitle>
           </CardHeader>
           <CardContent>
             <ul className="space-y-1">

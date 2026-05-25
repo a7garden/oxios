@@ -8,7 +8,7 @@ const languages = [
 ]
 
 export function LanguageSelector() {
-  const { i18n } = useTranslation()
+  const { i18n, t } = useTranslation()
 
   const handleChange = (lang: string) => {
     i18n.changeLanguage(lang)
@@ -21,7 +21,7 @@ export function LanguageSelector() {
       <Select
         value={i18n.language}
         onValueChange={handleChange}
-        placeholder="Language"
+        placeholder={t('common.language')}
         options={languages}
         className="w-[120px]"
       />

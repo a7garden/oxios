@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/utils'
 
 interface ErrorStateProps {
@@ -8,25 +9,28 @@ interface ErrorStateProps {
 }
 
 export function ErrorState({
-  title = 'Failed to load data',
-  message = 'Something went wrong. Please try again.',
+  title,
+  message,
   onRetry,
   className,
 }: ErrorStateProps) {
+  const { t } = useTranslation()
+  const resolvedTitle = title ?? t('common.errorFailedToLoad')
+  const resolvedMessage = message ?? t('common.errorSomethingWrong')
   return (
     <div
       className={cn('flex flex-col items-center justify-center py-12 text-center', className)}
       role="alert"
     >
-      <h3 className="text-lg font-semibold text-destructive">{title}</h3>
-      <p className="mt-1 text-sm text-muted-foreground max-w-md">{message}</p>
+      <h3 className="text-lg font-semibold text-destructive">{resolvedTitle}</h3>
+      <p className="mt-1 text-sm text-muted-foreground max-w-md">{resolvedMessage}</p>
       {onRetry && (
         <button
           type="button"
           onClick={onRetry}
           className="mt-4 rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground hover:bg-primary/90"
         >
-          Retry
+          {t('common.retry')}
         </button>
       )}
     </div>

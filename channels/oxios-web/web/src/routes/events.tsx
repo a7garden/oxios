@@ -71,7 +71,7 @@ function EventsPage() {
             ref={scrollRef}
             className="h-[500px] overflow-y-auto space-y-1"
             role="log"
-            aria-label="Event stream"
+            aria-label={t('common.eventStream')}
           >
             {liveEvents.length === 0 ? (
               <EmptyState

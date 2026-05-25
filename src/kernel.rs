@@ -9,10 +9,11 @@ use oxios_gateway::Gateway;
 use oxios_kernel::{
     access_manager::AccessManager, auth::AuthManager, config::load_config, A2AProtocol,
     AgentRuntime, AgentScheduler, AuditTrail, BasicSupervisor, BudgetManager, ClawHubClient,
-    ClawHubInstaller, CronScheduler, DreamProcess, EngineProvider, EventBus, GitLayer,
-    McpBridge, McpServer, MarketplaceApi, MarketplaceConfig, MemoryManager, Orchestrator,
+    ClawHubInstaller, CronScheduler, EngineProvider, EventBus, GitLayer,
+    McpBridge, McpServer, MarketplaceApi, MemoryManager, Orchestrator,
     OxiosConfig, PersonaManager, ResourceMonitor, SkillManager, SpaceManager, Supervisor,
 };
+use oxios_markdown::knowledge::FileChange;
 use oxios_markdown::KnowledgeBase;
 
 use oxios_ouroboros::{OuroborosEngine, OuroborosProtocol, Seed};
@@ -70,6 +71,82 @@ impl Kernel {
     pub fn handle(&self) -> Arc<oxios_kernel::KernelHandle> {
         self.handle_cache
             .get_or_init(|| {
+                // KnowledgeBase — single source of truth (RFC-003)
+                // Shared between KernelHandle.knowledge and KnowledgeLens.
+                let knowledge = Arc::new(
+                    KnowledgeBase::new(
+                        std::path::PathBuf::from(&self.config.kernel.workspace)
+                            .join("knowledge"),
+                    )
+                    .expect("KnowledgeBase init failed"),
+                );
+                let knowledge_lens = Arc::new(
+                    oxios_kernel::KnowledgeLens::new(
+                        knowledge.clone(),
+                        self.memory_manager.clone(),
+                    )
+                    .expect("KnowledgeLens init failed"),
+                );
+
+                // Git auto-commit for knowledge files (async channel pattern)
+                // Same pattern as KnowledgeLens — non-blocking to avoid delaying HTTP responses.
+                {
+                    let git = self.git_layer.clone();
+                    let kb_root = knowledge.root();
+                    let git_root = git.root().to_path_buf();
+                    let prefix = kb_root
+                        .strip_prefix(&git_root)
+                        .map(|p| p.to_string_lossy().to_string())
+                        .unwrap_or_else(|_| "knowledge".to_string());
+
+                    let (git_tx, mut git_rx) =
+                        tokio::sync::mpsc::channel::<(String, FileChange)>(64);
+
+                    // Register callback — spawns a task to avoid blocking note_write()
+                    knowledge.on_file_change(move |path: &str, change: FileChange| {
+                        let tx = git_tx.clone();
+                        let path = path.to_string();
+                        tokio::spawn(async move {
+                            let _ = tx.send((path, change)).await;
+                        });
+                    });
+
+                    // Background consumer — commits knowledge changes to git
+                    tokio::spawn(async move {
+                        while let Some((path, change)) = git_rx.recv().await {
+                            if !git.is_enabled() {
+                                continue;
+                            }
+                            let rel = format!("{}/{}", prefix, path);
+                            let msg = match &change {
+                                FileChange::Created(p) => format!("knowledge: create {}", p),
+                                FileChange::Updated(p) => format!("knowledge: update {}", p),
+                                FileChange::Deleted(p) => format!("knowledge: delete {}", p),
+                                FileChange::Moved { old, new } => {
+                                    format!("knowledge: rename {} → {}", old, new)
+                                }
+                            };
+                            match change {
+                                FileChange::Deleted(_) => {
+                                    if let Err(e) = git.remove_file(&rel, &msg) {
+                                        tracing::warn!(error = %e, "knowledge git delete failed");
+                                    }
+                                }
+                                FileChange::Moved { old, .. } => {
+                                    let old_rel = format!("{}/{}", prefix, old);
+                                    let _ = git.remove_file(&old_rel, &msg);
+                                    let _ = git.commit_file(&rel, &msg);
+                                }
+                                _ => {
+                                    if let Err(e) = git.commit_file(&rel, &msg) {
+                                        tracing::warn!(error = %e, "knowledge git commit failed");
+                                    }
+                                }
+                            }
+                        }
+                    });
+                }
+
                 Arc::new(oxios_kernel::KernelHandle::new(
                     oxios_kernel::StateApi::new(self.state_store.clone()),
                     oxios_kernel::AgentApi::new(
@@ -110,29 +187,8 @@ impl Kernel {
                         Arc::new(parking_lot::RwLock::new(self.config.clone())),
                         self.config_path.clone(),
                     ),
-                    // KnowledgeBase — single source of truth (RFC-003)
-                    Arc::new(
-                        KnowledgeBase::new(
-                            std::path::PathBuf::from(&self.config.kernel.workspace)
-                                .join("knowledge"),
-                        )
-                        .expect("KnowledgeBase init failed"),
-                    ),
-                    // KnowledgeLens — semantic overlay, shares same KnowledgeBase
-                    Arc::new(
-                        oxios_kernel::KnowledgeLens::new(
-                            // Note: clones the Arc, points to same KnowledgeBase
-                            Arc::new(
-                                KnowledgeBase::new(
-                                    std::path::PathBuf::from(&self.config.kernel.workspace)
-                                        .join("knowledge"),
-                                )
-                                .expect("KnowledgeBase init failed"),
-                            ),
-                            self.memory_manager.clone(),
-                        )
-                        .expect("KnowledgeLens init failed"),
-                    ),
+                    knowledge,
+                    knowledge_lens,
                     self.build_marketplace_api(),
                 ))
             })
@@ -608,7 +664,7 @@ impl KernelBuilder {
                     )
                     .expect("KnowledgeLens init failed"),
                 ),
-                build_marketplace_api_inline(&config),
+                build_marketplace_api_value(&config),
             ));
 
         // Build ToolRetriever for semantic capability discovery.
@@ -843,19 +899,6 @@ fn build_browser_api_value(config: &OxiosConfig) -> oxios_kernel::BrowserApi {
 #[cfg(not(feature = "browser"))]
 fn build_browser_api_value(_config: &OxiosConfig) -> oxios_kernel::BrowserApi {
     oxios_kernel::BrowserApi::default()
-}
-
-/// Build a MarketplaceApi inline (used during KernelBuilder::build before the Kernel is fully constructed).
-fn build_marketplace_api_inline(config: &OxiosConfig) -> MarketplaceApi {
-    let workspace = PathBuf::from(&config.kernel.workspace);
-    let skills_dir = workspace.join("skills");
-    let base_url = config.marketplace.base_url.clone();
-    let client = ClawHubClient::new(base_url).unwrap_or_else(|_| {
-        tracing::warn!("Invalid marketplace.base_url, using default");
-        ClawHubClient::new(Some("https://clawhub.ai".to_string())).unwrap()
-    });
-    let installer = ClawHubInstaller::new(skills_dir, workspace, config.marketplace.base_url.clone());
-    MarketplaceApi::new(Arc::new(installer), Arc::new(client))
 }
 
 /// Build a MarketplaceApi from the Kernel instance (used after Kernel construction).

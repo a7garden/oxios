@@ -73,10 +73,12 @@ pub(crate) use knowledge_routes::{
     handle_knowledge_checklist_complete, handle_knowledge_checklist_items,
     handle_knowledge_checklist_remove, handle_knowledge_config_get, handle_knowledge_config_put,
     handle_knowledge_convert_html, handle_knowledge_copilot, handle_knowledge_emoji,
-    handle_knowledge_file_delete, handle_knowledge_file_get, handle_knowledge_file_put,
-    handle_knowledge_graph, handle_knowledge_habits, handle_knowledge_habits_last_week,
-    handle_knowledge_journal_add, handle_knowledge_journal_emoji, handle_knowledge_journal_today,
-    handle_knowledge_search, handle_knowledge_stats_done_today, handle_knowledge_stats_today,
+    handle_knowledge_file_delete, handle_knowledge_file_get, handle_knowledge_file_history,
+    handle_knowledge_file_put, handle_knowledge_file_restore, handle_knowledge_graph,
+    handle_knowledge_habits, handle_knowledge_habits_last_week,
+    handle_knowledge_journal_add, handle_knowledge_journal_emoji,
+    handle_knowledge_journal_today, handle_knowledge_search,
+    handle_knowledge_stats_done_today, handle_knowledge_stats_today,
     handle_knowledge_tree, handle_knowledge_worker_nightly, handle_knowledge_worker_scheduled,
 };
 pub(crate) use marketplace::{
@@ -153,14 +155,10 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         .route("/health", get(handle_health))
         .route("/health/ready", get(handle_readiness))
         .route("/metrics", get(handle_metrics))
-        // Marketplace (ClawHub) — public, no auth required
+        // Marketplace (ClawHub) — read-only routes, public
         .route("/api/marketplace/search", get(handle_marketplace_search))
         .route("/api/marketplace/updates", get(handle_marketplace_updates))
-        .route("/api/marketplace/skills/{slug}", get(handle_marketplace_skill_detail))
-        .route(
-            "/api/marketplace/skills/{slug}/install",
-            post(handle_marketplace_install),
-        );
+        .route("/api/marketplace/skills/{slug}", get(handle_marketplace_skill_detail));
 
     // Protected API routes (auth middleware applied)
     let api = Router::new()
@@ -397,6 +395,20 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
             post(handle_knowledge_convert_html),
         )
         .route("/api/knowledge/emoji", get(handle_knowledge_emoji))
+        // Knowledge — Git version history
+        .route(
+            "/api/knowledge/file/{*path}/history",
+            get(handle_knowledge_file_history),
+        )
+        .route(
+            "/api/knowledge/file/{*path}/restore",
+            post(handle_knowledge_file_restore),
+        )
+        // Marketplace (ClawHub) — install requires auth
+        .route(
+            "/api/marketplace/skills/{slug}/install",
+            post(handle_marketplace_install),
+        )
         .layer(axum::middleware::from_fn_with_state(
             state.clone(),
             require_auth,

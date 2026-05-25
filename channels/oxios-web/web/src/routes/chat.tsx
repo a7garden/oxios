@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { Bot, Loader2, RefreshCw, Send, User } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -18,6 +19,7 @@ export const Route = createFileRoute('/chat')({ component: ChatPage })
 // ---------------------------------------------------------------------------
 
 function ChatPage() {
+  const { t } = useTranslation()
   const {
     messages,
     isStreaming,
@@ -64,10 +66,10 @@ function ChatPage() {
         <div className="flex items-center justify-between px-4 py-3 border-b">
           <div>
             <h2 className="text-sm font-semibold">
-              {activeSessionId ? '대화 중' : '새 대화'}
+              {activeSessionId ? t('chat.activeConversation') : t('chat.newConversation')}
             </h2>
             {!connected && (
-              <span className="text-xs text-muted-foreground">연결 중...</span>
+              <span className="text-xs text-muted-foreground">{t('chat.connecting')}</span>
             )}
           </div>
           <div className="flex items-center gap-1">
@@ -76,10 +78,10 @@ function ChatPage() {
               size="sm"
               onClick={() => { if (activeSessionId) loadSession(activeSessionId) }}
             >
-              <RefreshCw className="h-3 w-3 mr-1" /> 새로고침
+              <RefreshCw className="h-3 w-3 mr-1" /> {t('chat.refreshing')}
             </Button>
             <Button variant="outline" size="sm" onClick={newSession}>
-              + 새 대화
+              {t('chat.newConversationButton')}
             </Button>
           </div>
         </div>
@@ -89,14 +91,14 @@ function ChatPage() {
           <ScrollArea
             className="flex-1 p-4"
             role="log"
-            aria-label="Chat messages"
+            aria-label={t('common.chatMessages')}
           >
             {messages.length === 0 ? (
               <div className="flex items-center justify-center h-full text-muted-foreground">
                 <p>
                   {!connected
-                    ? '서버에 연결 중...'
-                    : '메시지를 보내 대화를 시작하세요.'}
+                    ? t('chat.serverConnecting')
+                    : t('chat.sendHint')}
                 </p>
               </div>
             ) : (
@@ -137,7 +139,7 @@ function ChatPage() {
                     </div>
                     <div className="flex items-center gap-2 rounded-lg bg-muted px-4 py-2">
                       <Loader2 className="h-4 w-4 animate-spin" />
-                      <span className="text-sm text-muted-foreground">Thinking...</span>
+                      <span className="text-sm text-muted-foreground">{t('chat.thinking')}</span>
                     </div>
                   </div>
                 )}
@@ -159,7 +161,7 @@ function ChatPage() {
                   }
                 }}
                 placeholder={
-                  connected ? '메시지를 입력하세요...' : '연결 대기 중...'
+                  connected ? t('chat.inputPlaceholder') : t('chat.waitingForConnection')
                 }
                 disabled={!connected || isStreaming}
                 className="min-h-[44px] max-h-[120px] resize-none"
@@ -169,7 +171,7 @@ function ChatPage() {
                 onClick={handleSend}
                 disabled={!input.trim() || isStreaming || !connected}
                 size="icon"
-                aria-label="Send message"
+                aria-label={t('common.sendMessage')}
               >
                 <Send className="h-4 w-4" />
               </Button>
@@ -202,6 +204,7 @@ function SpaceSessionSidebar({
   onToggleHistory: () => void
   showHistory: boolean
 }) {
+  const { t } = useTranslation()
   const { data: spacesData } = useQuery({
     queryKey: ['spaces'],
     queryFn: () =>
@@ -234,7 +237,7 @@ function SpaceSessionSidebar({
       <div className="p-2 border-b">
         <div className="flex items-center justify-between mb-2">
           <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-            Spaces
+            {t('chat.spacesLabel')}
           </span>
         </div>
         <div className="space-y-0.5">
@@ -258,7 +261,7 @@ function SpaceSessionSidebar({
           ))}
           {spaces.length === 0 && (
             <p className="text-xs text-muted-foreground px-2 py-1">
-              Spaces 로드 중...
+              {t('chat.loadingSpacesShort')}
             </p>
           )}
         </div>
@@ -268,7 +271,7 @@ function SpaceSessionSidebar({
       <div className="flex-1 overflow-y-auto">
         <div className="p-2 border-b flex items-center justify-between">
           <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-            Sessions
+            {t('chat.sessionsLabel')}
           </span>
           <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => refetchSessions()}>
             <RefreshCw className="h-3 w-3" />
@@ -283,11 +286,11 @@ function SpaceSessionSidebar({
               className="w-full mb-2"
               onClick={onNewSession}
             >
-              + 새 대화
+              {t('chat.newConversationButton')}
             </Button>
             {Object.entries(grouped).map(([label, group]) => (
               <div key={label} className="mb-2">
-                <p className="text-xs text-muted-foreground px-2 mb-1">{label}</p>
+                <p className="text-xs text-muted-foreground px-2 mb-1">{t(`chat.${label}`)}</p>
                 {group.map((s) => (
                   <button
                     key={s.id}
@@ -300,7 +303,7 @@ function SpaceSessionSidebar({
                   >
                     <span className="block truncate">
                       {s.message_count != null && s.message_count > 0
-                        ? `${s.message_count}개 메시지`
+                        ? t('chat.messageCount', { count: s.message_count })
                         : s.id.slice(0, 8) + '...'}
                     </span>
                     <span className="block text-[10px] text-muted-foreground/60">
@@ -320,7 +323,7 @@ function SpaceSessionSidebar({
                 onClick={onToggleHistory}
                 className="w-full text-xs text-muted-foreground hover:text-foreground mt-2 px-2"
               >
-                전체 {sessions.length}개 세션 보기 →
+                {t('chat.viewAllSessions', { count: sessions.length })}
               </button>
             )}
           </div>
@@ -330,7 +333,7 @@ function SpaceSessionSidebar({
               onClick={onToggleHistory}
               className="text-xs text-muted-foreground hover:text-foreground mb-1 px-2"
             >
-              ← 간략히 보기
+              {t('chat.showLess')}
             </button>
             {sessions.map((s) => (
               <button
@@ -366,13 +369,13 @@ function SpaceSessionSidebar({
           to="/sessions"
           className="flex items-center gap-2 rounded-md px-2 py-1.5 text-xs text-muted-foreground hover:bg-accent/50 hover:text-foreground"
         >
-          세션 관리 →
+          {t('chat.manageSessions')}
         </Link>
         <Link
           to="/spaces"
           className="flex items-center gap-2 rounded-md px-2 py-1.5 text-xs text-muted-foreground hover:bg-accent/50 hover:text-foreground"
         >
-          Spaces 관리 →
+          {t('chat.manageSpaces')}
         </Link>
       </div>
     </div>
@@ -395,10 +398,10 @@ function groupSessionsByDate(
     const diffDays = Math.floor(
       (now.getTime() - d.getTime()) / (1000 * 60 * 60 * 24),
     )
-    if (diffDays === 0) label = '오늘'
-    else if (diffDays === 1) label = '어제'
-    else if (diffDays < 7) label = '이번 주'
-    else label = '이전'
+    if (diffDays === 0) label = 'today'
+    else if (diffDays === 1) label = 'yesterday'
+    else if (diffDays < 7) label = 'thisWeek'
+    else label = 'previous'
 
     if (!groups[label]) groups[label] = []
     groups[label]!.push(s)

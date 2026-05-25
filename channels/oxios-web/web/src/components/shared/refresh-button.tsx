@@ -1,4 +1,5 @@
 import { RefreshCw } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 
 interface RefreshButtonProps {
@@ -22,12 +23,13 @@ export function RefreshButton({
   variant = 'button',
   disabled = false,
 }: RefreshButtonProps) {
+  const { t } = useTranslation()
   if (variant === 'icon') {
     return (
       <button
         type="button"
         onClick={onClick}
-        aria-label="Refresh"
+        aria-label={t('common.refresh')}
         disabled={disabled}
         className="rounded-md p-2 hover:bg-muted transition-colors"
       >
@@ -38,7 +40,7 @@ export function RefreshButton({
 
   return (
     <Button variant="outline" size="sm" onClick={onClick} disabled={disabled}>
-      <RefreshCw className={`h-4 w-4 mr-1 ${isFetching ? 'animate-spin' : ''}`} /> Refresh
+      <RefreshCw className={`h-4 w-4 mr-1 ${isFetching ? 'animate-spin' : ''}`} /> {t('common.refresh')}
     </Button>
   )
 }

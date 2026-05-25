@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { Archive, Boxes, Play } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { DataTable } from '@/components/shared/data-table'
 import { EmptyState } from '@/components/shared/empty-state'
 import { ErrorState } from '@/components/shared/error-state'
@@ -18,6 +19,7 @@ export const Route = createFileRoute('/spaces/')({
 function SpacesListPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const { t } = useTranslation()
 
   const { data, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ['spaces'],
@@ -42,7 +44,7 @@ function SpacesListPage() {
 
   const columns = [
     {
-      header: 'Name',
+      header: t('common.name'),
       accessor: (row: Space) => (
         <div className="flex items-center gap-2">
           <Boxes className="h-4 w-4 text-muted-foreground" />
@@ -60,14 +62,14 @@ function SpacesListPage() {
       ),
     },
     {
-      header: 'Status',
+      header: t('spaces.status'),
       accessor: (row: Space) => (
         <Badge variant={row.active !== false ? 'success' : 'secondary'}>
-          {row.active !== false ? 'Active' : 'Archived'}
+          {row.active !== false ? t('common.active') : t('spaces.archived')}
         </Badge>
       ),
     },
-    { header: 'Created', accessor: (row: Space) => new Date(row.created_at).toLocaleString() },
+    { header: t('spaces.created'), accessor: (row: Space) => new Date(row.created_at).toLocaleString() },
     {
       header: '',
       accessor: (row: Space) => (
@@ -83,7 +85,7 @@ function SpacesListPage() {
               variant="ghost"
               size="icon"
               onClick={() => activateMutation.mutate(row.id)}
-              aria-label="Activate space"
+              aria-label={t('spaces.activateSpace')}
             >
               <Play className="h-4 w-4 text-emerald-500" />
             </Button>
@@ -93,7 +95,7 @@ function SpacesListPage() {
               variant="ghost"
               size="icon"
               onClick={() => archiveMutation.mutate(row.id)}
-              aria-label="Archive space"
+              aria-label={t('spaces.archiveSpace')}
             >
               <Archive className="h-4 w-4 text-amber-500" />
             </Button>
@@ -107,8 +109,10 @@ function SpacesListPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Spaces</h1>
-          <p className="text-muted-foreground">{data?.total ?? 0} space(s)</p>
+          <h1 className="text-2xl font-bold">{t('spaces.title')}</h1>
+          <p className="text-muted-foreground">
+            {t('spaces.count', { count: data?.total ?? 0 })}
+          </p>
         </div>
         <RefreshButton onClick={() => refetch()} isFetching={isFetching} />
       </div>
@@ -116,8 +120,8 @@ function SpacesListPage() {
       {spaces.length === 0 ? (
         <EmptyState
           icon={<Boxes className="h-10 w-10" />}
-          title="No spaces"
-          description="Spaces are created during agent interactions."
+          title={t('spaces.noSpaces')}
+          description={t('spaces.description')}
         />
       ) : (
         <DataTable

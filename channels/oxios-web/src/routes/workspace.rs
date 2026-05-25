@@ -482,7 +482,7 @@ fn skill_entry_to_json(entry: &SkillEntry) -> serde_json::Value {
 /// GET /api/skills — List all skills (RFC-009 §5.1).
 pub(crate) async fn handle_skills_list(
     state: State<Arc<AppState>>,
-    Query(params): Query<PageParams>,
+    Query(_params): Query<PageParams>,
 ) -> Json<serde_json::Value> {
     let entries = state.kernel.extensions.list_skills_entries().await;
     let skills: Vec<serde_json::Value> = entries.iter().map(skill_entry_to_json).collect();

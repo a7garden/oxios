@@ -1,9 +1,11 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { ArrowLeft, Settings } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { KnowledgeSettings } from '@/components/knowledge/knowledge-settings'
 
 export const Route = createFileRoute('/knowledge/settings')({
   component: function SettingsPage() {
+    const { t } = useTranslation()
     return (
       <div className="flex flex-col h-full">
         <div className="flex items-center gap-3 px-5 py-3.5 border-b shrink-0">
@@ -12,12 +14,12 @@ export const Route = createFileRoute('/knowledge/settings')({
             className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
           >
             <ArrowLeft className="h-4 w-4" />
-            <span>Knowledge</span>
+            <span>{t('knowledge.title')}</span>
           </Link>
           <span className="text-muted-foreground">/</span>
           <h1 className="text-lg font-semibold flex items-center gap-2">
             <Settings className="h-5 w-5" />
-            Settings
+            {t('knowledge.knowledgeSettings')}
           </h1>
         </div>
         <div className="flex-1 overflow-y-auto">

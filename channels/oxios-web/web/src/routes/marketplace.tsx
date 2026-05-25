@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
 import { Search, Store } from 'lucide-react'
 import { useCallback, useDeferredValue, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { EmptyState } from '@/components/shared/empty-state'
 import { ErrorState } from '@/components/shared/error-state'
 import { LoadingCards } from '@/components/shared/loading'
@@ -16,6 +17,7 @@ import type { ClawHubSearchResult } from '@/types'
 export const Route = createFileRoute('/marketplace')({ component: MarketplacePage })
 
 function MarketplacePage() {
+  const { t } = useTranslation()
   const [query, setQuery] = useState('')
   const deferredQuery = useDeferredValue(query)
   const queryClient = useQueryClient()
@@ -44,12 +46,12 @@ function MarketplacePage() {
     mutationFn: ({ slug, version }: { slug: string; version?: string }) =>
       api.post('/api/marketplace/skills/' + slug + '/install', { version }),
     onSuccess: (_data, variables) => {
-      toast(`Installed "${variables.slug}" successfully.`, 'success')
+      toast(t('skills.installedSuccess', { slug: variables.slug }), 'success')
       queryClient.invalidateQueries({ queryKey: ['skills'] })
     },
     onError: (err: unknown, _variables) => {
       const message =
-        err instanceof Error ? err.message : 'Installation failed. Please try again.'
+        err instanceof Error ? err.message : t('marketplace.installFailed')
       toast(message, 'destructive')
     },
   })
@@ -65,10 +67,10 @@ function MarketplacePage() {
       <div>
         <h1 className="text-2xl font-bold flex items-center gap-2">
           <Store className="h-6 w-6" />
-          Marketplace
+          {t('marketplace.title')}
         </h1>
         <p className="text-muted-foreground">
-          Browse and install skills from ClawHub
+          {t('marketplace.subtitle')}
         </p>
       </div>
 
@@ -76,7 +78,7 @@ function MarketplacePage() {
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
         <Input
-          placeholder="Search skills..."
+          placeholder={t('marketplace.searchPlaceholder')}
           value={query}
           onChange={handleSearch}
           className="pl-10"
@@ -88,8 +90,8 @@ function MarketplacePage() {
       {!hasSearch ? (
         <EmptyState
           icon={<Search className="h-10 w-10" />}
-          title="Search the marketplace"
-          description="Type a query above to search for skills on ClawHub."
+          title={t('marketplace.emptyTitle')}
+          description={t('marketplace.emptyDescription')}
         />
       ) : isLoading ? (
         <LoadingCards count={4} />
@@ -98,8 +100,8 @@ function MarketplacePage() {
       ) : results?.length === 0 ? (
         <EmptyState
           icon={<Search className="h-10 w-10" />}
-          title="No results"
-          description={`No skills found for "${deferredQuery}". Try a different query.`}
+          title={t('marketplace.noResults')}
+          description={t('marketplace.noResultsFor', { query: deferredQuery })}
         />
       ) : (
         <div className="grid gap-4">
@@ -126,6 +128,7 @@ function MarketplaceCard({
   isInstalling: boolean
   onInstall: (slug: string, version?: string) => void
 }) {
+  const { t } = useTranslation()
   const version = skill.version
   const displayName = skill.displayName || skill.slug
   const summary = skill.summary || ''
@@ -171,7 +174,7 @@ function MarketplaceCard({
               disabled={isInstalling}
               className="gap-1.5"
             >
-              Install
+              {t('marketplace.install')}
             </Button>
           </div>
         </div>

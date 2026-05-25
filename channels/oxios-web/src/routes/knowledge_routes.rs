@@ -1,11 +1,15 @@
 //! Knowledge API route handlers — direct adapters over KnowledgeBase.
 //!
-//! Most file I/O, backlink tracking, and app features are delegated to
-//! `state.knowledge` (KnowledgeBase). This layer only handles HTTP request
+//! All file I/O, backlink tracking, and app features are delegated to
+//! `state.kernel.knowledge` (KnowledgeBase). This layer only handles HTTP request
 //! parsing and JSON serialization.
 //!
-//! AI-powered features (copilot_chat) go through `state.kernel.knowledge`
+//! AI-powered features (copilot_chat) go through `state.kernel.knowledge_lens`
 //! (KnowledgeLens in Phase 3).
+//!
+//! Git version control:
+//! - GET  /api/knowledge/file/{*path}/history — file commit history
+//! - POST /api/knowledge/file/{*path}/restore — restore file from commit
 //!
 //! Endpoints:
 //! - GET  /api/knowledge/tree/{*path} — file tree listing
@@ -399,7 +403,7 @@ fn guess_knowledge_mime(path: &str) -> String {
 }
 
 // ---------------------------------------------------------------------------
-// Handlers — all delegate to state.knowledge (KnowledgeBase)
+// Handlers — all delegate to state.kernel.knowledge (KnowledgeBase)
 // ---------------------------------------------------------------------------
 
 /// GET /api/knowledge/tree — File tree of the knowledge directory.
@@ -526,7 +530,7 @@ pub(crate) async fn handle_knowledge_backlinks(
     state: State<Arc<AppState>>,
     Query(params): Query<KnowledgeBacklinksParams>,
 ) -> Result<Json<Vec<KnowledgeBacklink>>, AppError> {
-    let backlinks = state.knowledge.backlinks_for(&params.path);
+    let backlinks = state.kernel.knowledge.backlinks_for(&params.path);
 
     let result: Vec<KnowledgeBacklink> = backlinks
         .into_iter()
@@ -544,7 +548,7 @@ pub(crate) async fn handle_knowledge_backlinks(
 pub(crate) async fn handle_knowledge_graph(
     state: State<Arc<AppState>>,
 ) -> Result<Json<KnowledgeGraph>, AppError> {
-    let graph = state.knowledge.link_graph();
+    let graph = state.kernel.knowledge.link_graph();
 
     Ok(Json(KnowledgeGraph {
         nodes: graph
@@ -762,7 +766,7 @@ pub(crate) async fn handle_knowledge_journal_emoji(
 pub(crate) async fn handle_knowledge_journal_today(
     state: State<Arc<AppState>>,
 ) -> Result<Json<JournalTodayResponse>, AppError> {
-    let path = state.knowledge.journal_today_path();
+    let path = state.kernel.knowledge.journal_today_path();
     Ok(Json(JournalTodayResponse { path }))
 }
 
@@ -945,7 +949,7 @@ pub(crate) async fn handle_knowledge_convert_html(
     state: State<Arc<AppState>>,
     Json(body): Json<ConvertHtmlBody>,
 ) -> Result<Json<ConvertHtmlResponse>, AppError> {
-    let html = state.knowledge.markdown_to_html(&body.md);
+    let html = state.kernel.knowledge.markdown_to_html(&body.md);
     Ok(Json(ConvertHtmlResponse { html }))
 }
 
@@ -958,10 +962,105 @@ pub(crate) async fn handle_knowledge_emoji(
     state: State<Arc<AppState>>,
     Query(params): Query<EmojiQueryParams>,
 ) -> Result<Json<EmojiResponse>, AppError> {
-    let emoji = state.knowledge.auto_emoji(&params.text);
+    let emoji = state.kernel.knowledge.auto_emoji(&params.text);
     Ok(Json(EmojiResponse { emoji }))
 }
 
+// ---------------------------------------------------------------------------
+// Git version history handlers
+// ---------------------------------------------------------------------------
+
+/// File history entry.
+#[derive(Debug, Serialize, Clone)]
+pub(crate) struct KnowledgeHistoryEntry {
+    /// Full commit hash.
+    pub hash: String,
+    /// Short commit hash (7 chars).
+    pub short_hash: String,
+    /// Commit message.
+    pub message: String,
+    /// ISO-8601 timestamp.
+    pub timestamp: String,
+    /// Author name.
+    pub author: String,
+}
+
+/// File restore request body.
+#[derive(Debug, Deserialize)]
+pub(crate) struct KnowledgeRestoreBody {
+    /// Commit hash to restore from.
+    pub hash: String,
+}
+
+/// GET /api/knowledge/file/{*path}/history — file commit history.
+pub(crate) async fn handle_knowledge_file_history(
+    state: State<Arc<AppState>>,
+    Path(path): Path<String>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    let git = state.kernel.infra.git();
+    let kb_root = state.kernel.knowledge.root();
+    let prefix = kb_root
+        .strip_prefix(git.root())
+        .map(|p| p.to_string_lossy().to_string())
+        .unwrap_or_else(|_| "knowledge".to_string());
+    let git_rel = format!("{}/{}", prefix, path);
+
+    let log = git.log(100).map_err(|e| AppError::Internal(e.to_string()))?;
+
+    // Filter commits that mention this file
+    let entries: Vec<KnowledgeHistoryEntry> = log
+        .into_iter()
+        .filter(|e| e.message.contains(&git_rel) || e.message.contains(&path))
+        .map(|e| KnowledgeHistoryEntry {
+            hash: e.hash,
+            short_hash: e.short_hash,
+            message: e.message,
+            timestamp: e.timestamp,
+            author: e.author,
+        })
+        .collect();
+
+    Ok(Json(serde_json::json!({
+        "history": entries,
+        "count": entries.len(),
+    })))
+}
+
+/// POST /api/knowledge/file/{*path}/restore — restore file from a commit.
+pub(crate) async fn handle_knowledge_file_restore(
+    state: State<Arc<AppState>>,
+    Path(path): Path<String>,
+    Json(body): Json<KnowledgeRestoreBody>,
+) -> Result<StatusCode, AppError> {
+    let git = state.kernel.infra.git();
+    let kb_root = state.kernel.knowledge.root();
+    let prefix = kb_root
+        .strip_prefix(git.root())
+        .map(|p| p.to_string_lossy().to_string())
+        .unwrap_or_else(|_| "knowledge".to_string());
+    let git_rel = format!("{}/{}", prefix, path);
+
+    // 1. Restore file content from git commit to disk
+    git.restore_file(&git_rel, &body.hash)
+        .map_err(|e| AppError::Internal(e.to_string()))?;
+
+    // 2. Re-read the restored content and update backlinks without triggering git callback
+    if let Some(content) = state
+        .kernel
+        .knowledge
+        .note_read(&path)
+        .map_err(|e| AppError::Internal(e.to_string()))?
+    {
+        state
+            .kernel
+            .knowledge
+            .note_restore(&path, &content)
+            .map_err(|e| AppError::Internal(e.to_string()))?;
+    }
+
+    tracing::info!(path = %path, hash = %body.hash, "Knowledge file restored from git");
+    Ok(StatusCode::OK)
+}
 #[cfg(test)]
 mod tests {
     use super::*;

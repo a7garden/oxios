@@ -91,6 +91,9 @@ pub struct ClawHubOrigin {
     pub installed_version: String,
     #[serde(rename = "installedAt")]
     pub installed_at: String,
+    /// SHA-256 hex digest of the downloaded archive.
+    #[serde(rename = "sha256", skip_serializing_if = "Option::is_none")]
+    pub sha256: Option<String>,
 }
 
 /// ClawHub lockfile (at workspace root as .clawhub/lock.json).

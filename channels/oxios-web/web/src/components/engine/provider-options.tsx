@@ -3,81 +3,82 @@ import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
 import { Label } from '@/components/ui/label'
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 // ─── Provider-specific option schemas ────────────────────────
 
 interface OptionDef {
   key: string
-  label: string
-  description: string
+  labelKey: string
+  descriptionKey: string
   type: 'select' | 'number'
-  options?: { value: string; label: string }[]
-  placeholder?: string
+  options?: { value: string; labelKey: string }[]
+  placeholderKey?: string
 }
 
 const PROVIDER_OPTION_SCHEMAS: Record<string, OptionDef[]> = {
   anthropic: [
     {
       key: 'thinking_type',
-      label: 'Thinking Type',
-      description: 'Enable extended thinking for complex reasoning tasks',
+      labelKey: 'engine.thinkingType',
+      descriptionKey: 'engine.thinkingTypeDescription',
       type: 'select',
       options: [
-        { value: 'enabled', label: 'Enabled' },
-        { value: 'disabled', label: 'Disabled' },
+        { value: 'enabled', labelKey: 'engine.enabled' },
+        { value: 'disabled', labelKey: 'engine.disabled' },
       ],
     },
     {
       key: 'thinking_budget_tokens',
-      label: 'Thinking Budget (tokens)',
-      description: 'Maximum tokens for thinking output (0 = unlimited)',
+      labelKey: 'engine.thinkingBudget',
+      descriptionKey: 'engine.thinkingBudgetDescription',
       type: 'number',
-      placeholder: '10000',
+      placeholderKey: 'engine.thinkingBudgetPlaceholder',
     },
   ],
   openai: [
     {
       key: 'reasoning_effort',
-      label: 'Reasoning Effort',
-      description: 'Controls how much reasoning the model performs',
+      labelKey: 'engine.reasoningEffort',
+      descriptionKey: 'engine.reasoningEffortDescription',
       type: 'select',
       options: [
-        { value: 'low', label: 'Low' },
-        { value: 'medium', label: 'Medium' },
-        { value: 'high', label: 'High' },
+        { value: 'low', labelKey: 'engine.low' },
+        { value: 'medium', labelKey: 'engine.medium' },
+        { value: 'high', labelKey: 'engine.high' },
       ],
     },
     {
       key: 'text_verbosity',
-      label: 'Text Verbosity',
-      description: 'Controls output length and detail level',
+      labelKey: 'engine.textVerbosity',
+      descriptionKey: 'engine.textVerbosityDescription',
       type: 'select',
       options: [
-        { value: 'low', label: 'Low (concise)' },
-        { value: 'medium', label: 'Medium' },
-        { value: 'high', label: 'High (detailed)' },
+        { value: 'low', labelKey: 'engine.verbosityLow' },
+        { value: 'medium', labelKey: 'engine.verbosityMedium' },
+        { value: 'high', labelKey: 'engine.verbosityHigh' },
       ],
     },
   ],
   google: [
     {
       key: 'thinking_level',
-      label: 'Thinking Level',
-      description: 'Depth of thinking for reasoning models',
+      labelKey: 'engine.thinkingLevel',
+      descriptionKey: 'engine.thinkingLevelDescription',
       type: 'select',
       options: [
-        { value: 'none', label: 'None' },
-        { value: 'light', label: 'Light' },
-        { value: 'medium', label: 'Medium' },
-        { value: 'heavy', label: 'Heavy' },
+        { value: 'none', labelKey: 'engine.thinkingNone' },
+        { value: 'light', labelKey: 'engine.thinkingLight' },
+        { value: 'medium', labelKey: 'engine.thinkingMedium' },
+        { value: 'heavy', labelKey: 'engine.thinkingHeavy' },
       ],
     },
     {
       key: 'thinking_budget',
-      label: 'Thinking Budget (tokens)',
-      description: 'Maximum tokens for thinking (0 = unlimited)',
+      labelKey: 'engine.thinkingBudget',
+      descriptionKey: 'engine.thinkingBudgetDescription',
       type: 'number',
-      placeholder: '8192',
+      placeholderKey: 'engine.thinkingBudgetPlaceholder',
     },
   ],
 }
@@ -94,13 +95,14 @@ interface ProviderOptionsProps {
 }
 
 export function ProviderOptions({ provider, values, onChange, className }: ProviderOptionsProps) {
+  const { t } = useTranslation()
   const schema = PROVIDER_OPTION_SCHEMAS[provider]
 
   if (!schema || schema.length === 0) {
     return (
       <div className={className}>
         <p className="text-sm text-muted-foreground">
-          No advanced options available for {provider}.
+          {t('engine.noAdvancedOptionsFor', { provider })}
         </p>
       </div>
     )
@@ -114,8 +116,8 @@ export function ProviderOptions({ provider, values, onChange, className }: Provi
             {i > 0 && <Separator className="mb-4" />}
             <div className="flex items-start justify-between gap-6">
               <div className="flex-1 min-w-0 pt-0.5">
-                <Label className="text-sm font-medium">{opt.label}</Label>
-                <p className="text-xs text-muted-foreground mt-0.5">{opt.description}</p>
+                <Label className="text-sm font-medium">{t(opt.labelKey)}</Label>
+                <p className="text-xs text-muted-foreground mt-0.5">{t(opt.descriptionKey)}</p>
               </div>
               <div className="shrink-0 w-56">
                 <OptionControl
@@ -143,13 +145,15 @@ function OptionControl({
   value: unknown
   onChange: (val: string | number) => void
 }) {
+  const { t } = useTranslation()
+
   if (option.type === 'select' && option.options) {
     return (
       <Select
         value={String(value ?? '')}
         onValueChange={(val) => onChange(val)}
-        options={option.options}
-        placeholder="Select..."
+        options={option.options.map((o) => ({ value: o.value, label: t(o.labelKey) }))}
+        placeholder={option.placeholderKey ? t(option.placeholderKey) : t('common.selectPlaceholder')}
       />
     )
   }
@@ -165,7 +169,7 @@ function OptionControl({
           onChange(num)
         }
       }}
-      placeholder={option.placeholder}
+      placeholder={option.placeholderKey ? t(option.placeholderKey) : undefined}
     />
   )
 }
@@ -193,6 +197,7 @@ export function ProviderOptionsPanel({
   isPending,
   className,
 }: ProviderOptionsPanelProps) {
+  const { t } = useTranslation()
   const [localValues, setLocalValues] = useState<Record<string, unknown>>(initialValues)
 
   // Reset when provider changes
@@ -218,7 +223,7 @@ export function ProviderOptionsPanel({
           disabled={isPending}
           className="inline-flex items-center justify-center rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground shadow hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {isPending ? 'Saving...' : 'Save Options'}
+          {isPending ? t('engine.saving') : t('engine.saveOptions')}
         </button>
       </div>
     </div>

@@ -1,6 +1,7 @@
 import { Link } from '@tanstack/react-router'
 import { BookOpen, FilePlus, FolderPlus, LayoutDashboard, MessageSquare, PanelLeftClose, Trash2 } from 'lucide-react'
 import { useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import {
   useDeleteFile,
@@ -18,6 +19,7 @@ import { ResizeHandle } from './resize-handle'
  * Renders the file tree, chat/journal buttons, and new file/folder actions.
  */
 export function KnowledgeSidebar() {
+  const { t } = useTranslation()
   const {
     sidebarWidth,
     setSidebarWidth,
@@ -69,7 +71,7 @@ export function KnowledgeSidebar() {
             size="icon"
             className="h-7 w-7 hover:bg-sidebar-accent/50"
             onClick={handleNewFile}
-            title="New file (⌘N)"
+            title={t('knowledge.newFileShortcut')}
           >
             <FilePlus className="h-4 w-4" />
           </Button>
@@ -80,7 +82,7 @@ export function KnowledgeSidebar() {
               size="icon"
               className="h-7 w-7 hover:bg-sidebar-accent/50"
               onClick={handleNewFolder}
-              title="New folder (⌘⇧N)"
+              title={t('knowledge.newFolderShortcut')}
             >
               <FolderPlus className="h-4 w-4" />
             </Button>
@@ -94,7 +96,7 @@ export function KnowledgeSidebar() {
                     await deleteFile.mutateAsync(currentFilePath)
                   }
                 }}
-                title="Delete current file (⌘D)"
+                title={t('knowledge.deleteCurrentFile')}
               >
                 <Trash2 className="h-4 w-4" />
               </Button>
@@ -106,8 +108,8 @@ export function KnowledgeSidebar() {
             size="icon"
             className="h-7 w-7 hover:bg-sidebar-accent/50"
             onClick={toggleSidebar}
-            aria-label="Collapse sidebar"
-            title="Collapse sidebar"
+            aria-label={t('common.closeSidebar')}
+            title={t('knowledge.collapseSidebar')}
           >
             <PanelLeftClose className="h-4 w-4" />
           </Button>
@@ -137,13 +139,13 @@ export function KnowledgeSidebar() {
         className="flex items-center gap-2.5 px-4 py-2.5 text-sm w-full text-left hover:bg-sidebar-accent/50 transition-colors border-b border-sidebar-border text-sidebar-foreground/70 disabled:opacity-50"
       >
         <BookOpen className="h-4 w-4" />
-        Journal
+        {t('knowledge.toJournal')}
       </button>
 
       {/* File tree */}
       <div className="flex-1 overflow-y-auto px-2 py-2">
         {isLoading ? (
-          <div className="p-3 text-sm text-sidebar-foreground/50">Loading...</div>
+          <div className="p-3 text-sm text-sidebar-foreground/50">{t('knowledge.loading')}</div>
         ) : entries ? (
           <FileTree entries={entries} onFileSelect={openFile} currentPath={currentFilePath} />
         ) : null}
@@ -156,15 +158,15 @@ export function KnowledgeSidebar() {
       <div className="px-4 py-3 border-t border-sidebar-border text-[11px] text-sidebar-foreground/40 space-y-1">
         <div className="flex items-center gap-2">
           <kbd className="font-mono border rounded px-1.5 py-0.5">⌘K</kbd>
-          <span>Search</span>
+          <span>{t('knowledge.search')}</span>
         </div>
         <div className="flex items-center gap-2">
           <kbd className="font-mono border rounded px-1.5 py-0.5">⌘M</kbd>
-          <span>Move file</span>
+          <span>{t('knowledge.moveFile')}</span>
         </div>
         <div className="flex items-center gap-2">
           <kbd className="font-mono border rounded px-1.5 py-0.5">⌘N</kbd>
-          <span>New file</span>
+          <span>{t('knowledge.newFile')}</span>
         </div>
       </div>
 
@@ -175,7 +177,7 @@ export function KnowledgeSidebar() {
           className="flex items-center gap-2 rounded-lg px-2.5 py-2 text-sm text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground transition-colors w-full"
         >
           <LayoutDashboard className="h-4 w-4 shrink-0" />
-          <span>Dashboard</span>
+          <span>{t('common.dashboard')}</span>
         </Link>
       </div>
     </div>

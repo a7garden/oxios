@@ -1,6 +1,7 @@
 import { Outlet, useRouterState } from '@tanstack/react-router'
 import React from 'react'
 import { Menu } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { InfoPanel } from '@/components/knowledge/info-panel'
 import { KnowledgeSidebar } from '@/components/knowledge/knowledge-sidebar'
 import { MoveModal } from '@/components/knowledge/move-modal'
@@ -21,6 +22,7 @@ import { Sidebar } from './sidebar'
  * Knowledge mode: Knowledge sidebar replaces main sidebar, knowledge content fills the outlet area
  */
 export function AppLayout() {
+  const { t } = useTranslation()
   const { mobileOpen, setMobileOpen } = useSidebarStore()
 
   // Single router subscription (B3 fix — consolidate two calls into one)
@@ -52,7 +54,7 @@ export function AppLayout() {
           {sidebarOpen && (
             <div
               role="dialog"
-              aria-label="Close sidebar"
+              aria-label={t('common.closeSidebar')}
               className="fixed inset-0 z-40 bg-black/50 lg:hidden"
               onClick={() => toggleSidebar()}
               onKeyDown={(e) => {
@@ -79,11 +81,11 @@ export function AppLayout() {
                 // B1 fix: show on all screen sizes. Desktop: 18px strip. Mobile: 36px tap target.
                 'flex w-[36px] lg:w-[18px]',
               )}
-              aria-label="Open sidebar"
+              aria-label={t('common.openSidebar')}
             >
               <Menu className="h-5 w-5 text-muted-foreground lg:hidden" />
               <span className="hidden lg:block text-muted-foreground text-xs rotate-90 whitespace-nowrap">
-                Notes
+                {t('common.notes')}
               </span>
             </button>
           )}
@@ -93,7 +95,7 @@ export function AppLayout() {
           {mobileOpen && (
             <div
               role="dialog"
-              aria-label="Close menu"
+              aria-label={t('common.closeMenu')}
               className="fixed inset-0 z-40 bg-black/50 lg:hidden"
               onClick={() => setMobileOpen(false)}
               onKeyDown={(e) => {

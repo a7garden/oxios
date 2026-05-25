@@ -1,6 +1,7 @@
 import { useRouterState } from '@tanstack/react-router'
 import { FileText, Folder, Search } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useKnowledgeSearch, useKnowledgeTree } from '@/hooks/use-knowledge'
 import { cn } from '@/lib/utils'
 import { useKnowledgeStore } from '@/stores/knowledge'
@@ -35,6 +36,7 @@ export function SearchModal({
   onMoveToDir,
   onClose,
 }: SearchModalProps) {
+  const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [focusedIndex, setFocusedIndex] = useState(0)
@@ -226,7 +228,7 @@ export function SearchModal({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={isMoveMode ? 'Search or select a destination...' : 'Search files...'}
+            placeholder={isMoveMode ? t('knowledge.searchOrSelectDestination') : t('knowledge.searchFiles')}
             className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
           />
           <kbd className="text-[10px] text-muted-foreground border rounded px-1.5 py-0.5 font-mono">
@@ -265,7 +267,7 @@ export function SearchModal({
             ))
           ) : hasQuery ? (
             <li className="px-4 py-6 text-sm text-muted-foreground text-center">
-              {isSearching ? 'Searching...' : 'No results'}
+              {isSearching ? t('knowledge.searching') : t('knowledge.noSearchResults')}
             </li>
           ) : (
             <li className="px-4 py-6 text-sm text-muted-foreground text-center">

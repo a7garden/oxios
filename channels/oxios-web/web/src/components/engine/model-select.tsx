@@ -1,5 +1,6 @@
 import { Check, ChevronDown } from 'lucide-react'
 import { useState, useRef, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import type { ModelInfo } from '@/types/engine'
 import { cn } from '@/lib/utils'
 
@@ -11,7 +12,7 @@ function formatContextWindow(tokens: number): string {
   return String(tokens)
 }
 
-function formatCost(cost: number): string {
+function formatCost(cost: number, t: (key: string) => string): string {
   if (cost === 0) return 'Free'
   if (cost < 0.01) return '<$0.01'
   return `$${cost.toFixed(2)}`
@@ -27,6 +28,7 @@ interface ModelSelectProps {
 }
 
 export function ModelSelect({ models, value, onValueChange, className }: ModelSelectProps) {
+  const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
@@ -55,14 +57,14 @@ export function ModelSelect({ models, value, onValueChange, className }: ModelSe
         <span className={selected ? '' : 'text-muted-foreground'}>
           {selected ? (
             <span className="flex items-center gap-1.5">
-              {selected.reasoning && <span title="Reasoning">✦</span>}
-              {selected.input.includes('image') && <span title="Vision">👁</span>}
+              {selected.reasoning && <span title={t('engine.supportsReasoning')}>✦</span>}
+              {selected.input.includes('image') && <span title={t('engine.supportsVision')}>👁</span>}
               {selected.name}
             </span>
           ) : models.length === 0 ? (
-            'No models available'
+            t('engine.noModelsAvailable')
           ) : (
-            'Select model...'
+            t('engine.selectModel')
           )}
         </span>
         <ChevronDown className="h-4 w-4 opacity-50" />
@@ -74,7 +76,7 @@ export function ModelSelect({ models, value, onValueChange, className }: ModelSe
           {reasoningModels.length > 0 && (
             <div>
               <div className="px-3 py-1.5 text-xs font-semibold text-muted-foreground bg-muted/50 flex items-center gap-1">
-                <span>✦</span> Reasoning Models
+                <span>✦</span> {t('engine.reasoningModels')}
               </div>
               {reasoningModels.map((m) => (
                 <ModelRow key={m.id} model={m} selected={value === m.id} onSelect={onValueChange} onClose={() => setOpen(false)} />
@@ -87,7 +89,7 @@ export function ModelSelect({ models, value, onValueChange, className }: ModelSe
             <div>
               {reasoningModels.length > 0 && (
                 <div className="px-3 py-1.5 text-xs font-semibold text-muted-foreground bg-muted/50 flex items-center gap-1">
-                  Standard Models
+                  {t('engine.standardModels')}
                 </div>
               )}
               {standardModels.map((m) => (
@@ -114,6 +116,8 @@ function ModelRow({
   onSelect: (id: string) => void
   onClose: () => void
 }) {
+  const { t } = useTranslation()
+
   return (
     <button
       type="button"
@@ -135,21 +139,21 @@ function ModelRow({
       <div className="flex-1 min-w-0 text-left">
         <div className="flex items-center gap-1.5">
           {model.reasoning && (
-            <span className="text-amber-500 text-xs" title="Supports reasoning/thinking">
+            <span className="text-amber-500 text-xs" title={t('engine.supportsReasoning')}>
               ✦
             </span>
           )}
           {model.input.includes('image') && (
-            <span className="text-blue-500 text-xs" title="Supports vision/image input">
+            <span className="text-blue-500 text-xs" title={t('engine.supportsVision')}>
               👁
             </span>
           )}
           <span className="font-medium truncate">{model.name}</span>
         </div>
         <div className="flex items-center gap-3 mt-0.5 text-xs text-muted-foreground">
-          <span>{formatContextWindow(model.context_window)} ctx</span>
-          <span>In: {formatCost(model.cost_input)}/M</span>
-          <span>Out: {formatCost(model.cost_output)}/M</span>
+          <span>{formatContextWindow(model.context_window)} {t('engine.ctx')}</span>
+          <span>{t('engine.input')} {formatCost(model.cost_input, t)}/M</span>
+          <span>{t('engine.output')} {formatCost(model.cost_output, t)}/M</span>
         </div>
       </div>
     </button>

@@ -1,14 +1,16 @@
 import { BarChart3, Dumbbell } from 'lucide-react'
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { useKnowledgeHabits } from '@/hooks/use-knowledge'
 
 export function Habits() {
+  const { t } = useTranslation()
   const currentYear = new Date().getFullYear()
   const [year, setYear] = useState(currentYear)
   const { data: habits, isLoading } = useKnowledgeHabits(year)
 
-  if (isLoading) return <div className="p-6 text-muted-foreground">Loading habits...</div>
+  if (isLoading) return <div className="p-6 text-muted-foreground">{t('knowledge.loadingHabits')}</div>
 
   // habits is a flexible object from oxios_markdown
   // For now, show a placeholder with year selector
@@ -20,7 +22,7 @@ export function Habits() {
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold flex items-center gap-2">
           <Dumbbell className="h-5 w-5" />
-          Habits
+          {t('knowledge.habits')}
         </h2>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={() => setYear((y) => y - 1)}>
@@ -52,9 +54,9 @@ export function Habits() {
       ) : (
         <div className="text-center py-12">
           <BarChart3 className="h-8 w-8 text-muted-foreground" />
-          <p className="text-muted-foreground">No habit data for {year}</p>
+          <p className="text-muted-foreground">{t('knowledge.noHabitData', { year })}</p>
           <p className="text-xs text-muted-foreground mt-1">
-            Track habits in your journal to see them here
+            {t('knowledge.trackHabitsHint')}
           </p>
         </div>
       )}

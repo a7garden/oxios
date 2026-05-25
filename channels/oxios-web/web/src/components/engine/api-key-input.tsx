@@ -1,5 +1,6 @@
 import { Eye, EyeOff, Key, Shield, Terminal, AlertCircle } from 'lucide-react'
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import type { ApiKeySource } from '@/types/engine'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -7,24 +8,24 @@ import { cn } from '@/lib/utils'
 
 // ─── API key source config ───────────────────────────────────
 
-const SOURCE_CONFIG: Record<ApiKeySource, { label: string; icon: React.ReactNode; color: string }> = {
+const SOURCE_CONFIG: Record<ApiKeySource, { labelKey: string; icon: React.ReactNode; color: string }> = {
   env: {
-    label: 'Environment Variable',
+    labelKey: 'engine.apiKeyEnv',
     icon: <Terminal className="h-3.5 w-3.5" />,
     color: 'text-emerald-600 dark:text-emerald-400',
   },
   auth_store: {
-    label: 'Auth Store (~/.oxi/auth.json)',
+    labelKey: 'engine.apiKeyAuthStore',
     icon: <Shield className="h-3.5 w-3.5" />,
     color: 'text-blue-600 dark:text-blue-400',
   },
   config: {
-    label: 'Config Override',
+    labelKey: 'engine.apiKeyConfig',
     icon: <Key className="h-3.5 w-3.5" />,
     color: 'text-amber-600 dark:text-amber-400',
   },
   none: {
-    label: 'No key set',
+    labelKey: 'engine.apiKeyNone',
     icon: <AlertCircle className="h-3.5 w-3.5" />,
     color: 'text-muted-foreground',
   },
@@ -73,7 +74,7 @@ export function ApiKeyInput({
       <div className="flex items-center gap-2 text-sm">
         <span className={cn('flex items-center gap-1.5', sourceInfo.color)}>
           {sourceInfo.icon}
-          <span>{sourceInfo.label}</span>
+          <span>{t(sourceInfo.labelKey)}</span>
         </span>
       </div>
 
@@ -84,11 +85,7 @@ export function ApiKeyInput({
             type={visible ? 'text' : 'password'}
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
-            placeholder={
-              hasKey
-                ? `Enter new key to override current ${providerName} key`
-                : `Enter your ${providerName} API key`
-            }
+            placeholder={hasKey ? t('engine.apiKeyOverrideHint') : `${providerName} API key를 입력하세요`}
             className="pr-9 font-mono text-sm"
           />
           <button
@@ -100,15 +97,14 @@ export function ApiKeyInput({
           </button>
         </div>
         <Button type="submit" size="sm" disabled={!inputValue.trim() || isPending}>
-          {isPending ? 'Saving...' : hasKey ? 'Update' : 'Set Key'}
+          {isPending ? t('engine.apiKeySaving') : hasKey ? t('engine.apiKeyUpdate') : t('engine.apiKeySetNew')}
         </Button>
       </form>
 
       {/* Hint */}
       {hasKey && (
         <p className="text-xs text-muted-foreground">
-          Leave blank to keep the current key. Keys are stored securely and never exposed in API
-          responses.
+          {t('engine.apiKeyOverrideHint')}
         </p>
       )}
     </div>

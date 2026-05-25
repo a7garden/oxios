@@ -1,11 +1,13 @@
 import { useRouterState } from '@tanstack/react-router'
 import { ArrowLeft, ArrowRight, Columns2, PanelRight, Save, X } from 'lucide-react'
 import { useEffect, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { Tooltip } from '@/components/ui/tooltip'
 import { useKnowledgeStore } from '@/stores/knowledge'
 
 export function EditorToolbar() {
+  const { t } = useTranslation()
   const {
     currentFilePath,
     history,
@@ -52,7 +54,7 @@ export function EditorToolbar() {
         className="h-7 w-7"
         onClick={() => goBack()}
         disabled={!canGoBack}
-        title="Go back"
+        title={t('knowledge.goBack')}
       >
         <ArrowLeft className="h-4 w-4" />
       </Button>
@@ -62,7 +64,7 @@ export function EditorToolbar() {
         className="h-7 w-7"
         onClick={() => goForward()}
         disabled={!canGoForward}
-        title="Go forward"
+        title={t('knowledge.goForward')}
       >
         <ArrowRight className="h-4 w-4" />
       </Button>
@@ -73,8 +75,8 @@ export function EditorToolbar() {
 
       {/* Save */}
       {currentFilePath && (
-        <Tooltip content="Save (⌘S)">
-          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleSave} title="Save">
+        <Tooltip content={t('knowledge.saveWithShortcut')}>
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleSave} title={t('common.save')}>
             <Save className="h-4 w-4" />
           </Button>
         </Tooltip>
@@ -82,13 +84,13 @@ export function EditorToolbar() {
 
       {/* Split editor */}
       {!splitEditorOpen && currentFilePath && (
-        <Tooltip content="Split view">
+        <Tooltip content={t('knowledge.splitView')}>
           <Button
             variant="ghost"
             size="icon"
             className="h-7 w-7"
             onClick={() => openSplit(currentFilePath)}
-            title="Open split view"
+            title={t('knowledge.openSplitView')}
           >
             <Columns2 className="h-4 w-4" />
           </Button>
@@ -97,13 +99,13 @@ export function EditorToolbar() {
 
       {/* Close split */}
       {splitEditorOpen && (
-        <Tooltip content="Close split (⌘W)">
+        <Tooltip content={t('knowledge.closeSplitWithShortcut')}>
           <Button
             variant="ghost"
             size="icon"
             className="h-7 w-7"
             onClick={closeSplit}
-            title="Close split"
+            title={t('knowledge.closeSplit')}
           >
             <X className="h-4 w-4" />
           </Button>
@@ -111,13 +113,13 @@ export function EditorToolbar() {
       )}
 
       {/* Info panel toggle */}
-      <Tooltip content={infoPanelOpen ? 'Hide info panel' : 'Show info panel'}>
+      <Tooltip content={infoPanelOpen ? t('knowledge.hideInfoPanel') : t('knowledge.showInfoPanel')}>
         <Button
           variant="ghost"
           size="icon"
           className="h-7 w-7"
           onClick={toggleInfoPanel}
-          title="Toggle info panel"
+          title={t('knowledge.toggleInfoPanel')}
         >
           <PanelRight className="h-4 w-4" />
         </Button>

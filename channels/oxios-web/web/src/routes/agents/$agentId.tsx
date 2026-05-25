@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { ArrowLeft, Bot, Skull } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { ErrorState } from '@/components/shared/error-state'
 import { LoadingCards } from '@/components/shared/loading'
 import { StatusIndicator } from '@/components/shared/status-indicator'
@@ -14,6 +15,7 @@ export const Route = createFileRoute('/agents/$agentId')({
 })
 
 function AgentDetailPage() {
+  const { t } = useTranslation()
   const { agentId } = Route.useParams()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
@@ -43,18 +45,18 @@ function AgentDetailPage() {
 
   if (isLoading) return <LoadingCards count={3} />
   if (isError) return <ErrorState onRetry={() => refetch()} />
-  if (!agent) return <p className="text-muted-foreground">Agent not found.</p>
+  if (!agent) return <p className="text-muted-foreground">{t('agents.notFound')}</p>
 
   const details = [
-    { label: 'ID', value: agent.id },
-    { label: 'Name', value: agent.name },
+    { label: t('agents.agentId'), value: agent.id },
+    { label: t('agents.name'), value: agent.name },
     {
-      label: 'Status',
+      label: t('agents.status'),
       value: <StatusIndicator status={agent.status?.toLowerCase() ?? 'unknown'} />,
     },
-    { label: 'Seed ID', value: agent.seed_id ?? '—' },
+    { label: t('seeds.seed'), value: agent.seed_id ?? '—' },
     {
-      label: 'Created At',
+      label: t('agents.created'),
       value: agent.created_at ? new Date(agent.created_at).toLocaleString() : '—',
     },
   ]
@@ -66,7 +68,7 @@ function AgentDetailPage() {
           variant="ghost"
           size="icon"
           onClick={() => navigate({ to: '/agents' })}
-          aria-label="Go back"
+          aria-label={t('common.goBack')}
         >
           <ArrowLeft className="h-4 w-4" />
         </Button>
@@ -74,7 +76,7 @@ function AgentDetailPage() {
           <h1 className="text-2xl font-bold flex items-center gap-2">
             <Bot className="h-6 w-6" /> {agent.name}
           </h1>
-          <p className="text-muted-foreground">Agent Detail</p>
+          <p className="text-muted-foreground">{t('agents.agentDetail')}</p>
         </div>
         <div className="flex gap-2">
           <Button
@@ -83,14 +85,14 @@ function AgentDetailPage() {
             onClick={() => killMutation.mutate()}
             disabled={killMutation.isPending || agent.status?.toLowerCase() === 'stopped'}
           >
-            <Skull className="h-4 w-4 mr-1" /> Kill
+            <Skull className="h-4 w-4 mr-1" /> {t('agents.terminate')}
           </Button>
         </div>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Agent Information</CardTitle>
+          <CardTitle>{t('agents.agentInformation')}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid gap-3 md:grid-cols-2">

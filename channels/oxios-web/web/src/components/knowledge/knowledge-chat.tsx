@@ -11,6 +11,7 @@ import {
   Tv,
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import {
   useChatAppend,
@@ -132,6 +133,7 @@ const CHECKLIST_TARGETS = [
 // ── Component ─────────────────────────────────────────────────
 
 export function KnowledgeChat() {
+  const { t } = useTranslation()
   const { data: rawMessages, isLoading } = useChatMessages()
   const chatAppend = useChatAppend()
   const chatDelete = useChatDelete()
@@ -333,14 +335,14 @@ export function KnowledgeChat() {
     <div className="flex flex-col flex-1 h-full">
       {/* Header */}
       <div className="px-4 py-2 border-b shrink-0 bg-muted/30">
-        <p className="text-xs text-muted-foreground">Free your head</p>
+        <p className="text-xs text-muted-foreground">{t('knowledge.chatHeader')}</p>
       </div>
 
       {/* Bulk action bar */}
       {hasSelection && (
         <div className="px-4 py-2 border-b bg-muted/50 flex items-center gap-1.5 shrink-0 overflow-x-auto">
           <span className="text-xs text-muted-foreground shrink-0 mr-1">
-            {selectedIndices.size} selected
+            {selectedIndices.size} {t('knowledge.selected')}
           </span>
           <Button
             variant="ghost"
@@ -379,11 +381,11 @@ export function KnowledgeChat() {
       {/* Messages area */}
       <div className="flex-1 overflow-y-auto p-4 select-none" onClick={handleBackgroundClick}>
         {isLoading ? (
-          <div className="text-center text-muted-foreground py-12">Loading…</div>
+          <div className="text-center text-muted-foreground py-12">{t('knowledge.loading')}</div>
         ) : groups.length === 0 ? (
           <div className="flex flex-col items-center text-muted-foreground py-16">
             <MessageSquare className="h-10 w-10 opacity-20 mb-4" />
-            <p className="font-medium text-foreground">Free your head</p>
+            <p className="font-medium text-foreground">{t('knowledge.noFilesYet')}</p>
             <p className="text-sm mt-1">Drop whatever's on your mind here</p>
           </div>
         ) : (
@@ -426,7 +428,7 @@ export function KnowledgeChat() {
                         <button
                           type="button"
                           className="mt-0.5 shrink-0 text-muted-foreground hover:text-foreground transition-colors"
-                          title={msg.done ? 'Mark incomplete' : 'Mark complete'}
+                          title={msg.done ? t('knowledge.markIncomplete') : t('knowledge.markComplete')}
                           disabled={chatDelete.isPending || chatAppend.isPending}
                           onClick={async (e) => {
                             e.stopPropagation()
@@ -470,7 +472,7 @@ export function KnowledgeChat() {
                               variant="ghost"
                               size="icon"
                               className="h-6 w-6"
-                              title="To Journal"
+                              title={t('knowledge.toJournal')}
                               onClick={(e) => {
                                 e.stopPropagation()
                                 moveToJournal(msg)
@@ -501,7 +503,7 @@ export function KnowledgeChat() {
                               variant="ghost"
                               size="icon"
                               className="h-6 w-6 text-destructive"
-                              title="Delete"
+                              title={t('common.delete')}
                               onClick={(e) => {
                                 e.stopPropagation()
                                 deleteMessage(msg)
@@ -530,7 +532,7 @@ export function KnowledgeChat() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Type a message… (jj for journal)"
+            placeholder={t('knowledge.chatPlaceholder')}
             className={cn(
               'flex-1 resize-none rounded-md border bg-background px-3 py-2 text-sm',
               'focus:outline-none focus:ring-1 focus:ring-primary',

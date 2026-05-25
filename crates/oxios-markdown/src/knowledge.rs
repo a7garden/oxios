@@ -181,6 +181,21 @@ impl KnowledgeBase {
         Ok(())
     }
 
+    /// Restore a note's content without triggering file-change callbacks.
+    ///
+    /// Used when reverting to a previous git version — writes the file
+    /// and updates the backlink index, but does **not** fire `on_file_change`
+    /// callbacks. This prevents an infinite loop where restore → write →
+    /// callback → git commit → ... repeats.
+    pub fn note_restore(&self, path: &str, content: &str) -> Result<()> {
+        self.fs.read().write_path(path, content)?;
+        let mut backlinks = self.backlinks.write();
+        backlinks.remove_file(path);
+        backlinks.index_file(path, content);
+        // Intentionally skip notify_change()
+        Ok(())
+    }
+
     /// Move/rename a note.
     pub fn note_move(&self, old_path: &str, new_path: &str) -> Result<()> {
         self.fs.read().rename_path(old_path, new_path)?;

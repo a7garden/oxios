@@ -10,6 +10,7 @@ import type {
   KnowledgeConfig,
   KnowledgeCopilotResponse,
   KnowledgeGraph,
+  KnowledgeHistoryResponse,
   KnowledgeSearchResult,
   KnowledgeTreeEntry,
   NightlyReport,
@@ -296,5 +297,29 @@ export function useAutoEmoji(text: string) {
     queryKey: ['knowledge', 'emoji', text],
     queryFn: () => api.get<EmojiResponse>('/api/knowledge/emoji', { text }),
     enabled: text.length > 0,
+  })
+}
+
+// ── Git Version History ────────────────────────────────────────
+
+export function useKnowledgeFileHistory(path: string | null) {
+  return useQuery({
+    queryKey: ['knowledge', 'history', path],
+    queryFn: () =>
+      api.get<KnowledgeHistoryResponse>(`/api/knowledge/file/${path}/history`),
+    enabled: !!path,
+  })
+}
+
+export function useKnowledgeFileRestore() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ path, hash }: { path: string; hash: string }) =>
+      api.post(`/api/knowledge/file/${path}/restore`, { hash }),
+    onSuccess: (_, { path }) => {
+      qc.invalidateQueries({ queryKey: ['knowledge', 'file', path] })
+      qc.invalidateQueries({ queryKey: ['knowledge', 'history', path] })
+      qc.invalidateQueries({ queryKey: ['knowledge', 'backlinks'] })
+    },
   })
 }

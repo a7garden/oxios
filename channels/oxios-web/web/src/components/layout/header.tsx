@@ -52,7 +52,7 @@ export function Header() {
 
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
         <div className="h-2 w-2 rounded-full bg-emerald-500" aria-hidden="true" />
-        <span>Oxios Agent OS</span>
+        <span>{t('common.oxiosBrand')}</span>
       </div>
     </header>
   )
