@@ -352,6 +352,11 @@ impl std::fmt::Debug for DreamProcess {
     }
 }
 
+/// Result of Phase 4 (Prune & Index).
+struct Phase4Result {
+    contradictions_resolved: usize,
+}
+
 impl DreamProcess {
     /// Create a new DreamProcess.
     pub fn new(
@@ -554,10 +559,6 @@ impl DreamProcess {
     }
 
     // ── Phase implementations ──────────────────────────
-    //
-    // Note: These are foundational implementations. The full Dream logic
-    // depends on tier-aware store operations being available in MemoryManager.
-    // The store.rs updates will be done in a follow-up step.
 
     async fn dream_orient(&self) -> Result<DreamState> {
         let hot = self.memory_manager.list_by_tier(MemoryTier::Hot, 10_000).await.unwrap_or_default();
@@ -772,10 +773,6 @@ impl DreamProcess {
         Ok(plan)
     }
 
-    struct Phase4Result {
-        contradictions_resolved: usize,
-    }
-
     async fn dream_prune_and_index(&self, plan: &ConsolidationPlan) -> Result<Phase4Result> {
         let mut contradictions_resolved = 0;
 
@@ -826,7 +823,7 @@ impl DreamProcess {
                 .await
                 .ok()
                 .flatten()
-                .map(|e| async {
+                .map(|e| async move {
                     self.memory_manager
                         .forget(&e.id, e.memory_type)
                         .await

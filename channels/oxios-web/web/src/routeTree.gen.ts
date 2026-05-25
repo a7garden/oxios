@@ -14,10 +14,8 @@ import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as SecurityRouteImport } from './routes/security'
 import { Route as SchedulerRouteImport } from './routes/scheduler'
 import { Route as ResourcesRouteImport } from './routes/resources'
-import { Route as ProgramsRouteImport } from './routes/programs'
 import { Route as PersonasRouteImport } from './routes/personas'
 import { Route as MemoryRouteImport } from './routes/memory'
-import { Route as HostToolsRouteImport } from './routes/host-tools'
 import { Route as GitRouteImport } from './routes/git'
 import { Route as EventsRouteImport } from './routes/events'
 import { Route as CronJobsRouteImport } from './routes/cron-jobs'
@@ -64,11 +62,6 @@ const ResourcesRoute = ResourcesRouteImport.update({
   path: '/resources',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ProgramsRoute = ProgramsRouteImport.update({
-  id: '/programs',
-  path: '/programs',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const PersonasRoute = PersonasRouteImport.update({
   id: '/personas',
   path: '/personas',
@@ -77,11 +70,6 @@ const PersonasRoute = PersonasRouteImport.update({
 const MemoryRoute = MemoryRouteImport.update({
   id: '/memory',
   path: '/memory',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const HostToolsRoute = HostToolsRouteImport.update({
-  id: '/host-tools',
-  path: '/host-tools',
   getParentRoute: () => rootRouteImport,
 } as any)
 const GitRoute = GitRouteImport.update({
@@ -193,10 +181,8 @@ export interface FileRoutesByFullPath {
   '/cron-jobs': typeof CronJobsRoute
   '/events': typeof EventsRoute
   '/git': typeof GitRoute
-  '/host-tools': typeof HostToolsRoute
   '/memory': typeof MemoryRoute
   '/personas': typeof PersonasRoute
-  '/programs': typeof ProgramsRoute
   '/resources': typeof ResourcesRoute
   '/scheduler': typeof SchedulerRoute
   '/security': typeof SecurityRoute
@@ -224,10 +210,8 @@ export interface FileRoutesByTo {
   '/cron-jobs': typeof CronJobsRoute
   '/events': typeof EventsRoute
   '/git': typeof GitRoute
-  '/host-tools': typeof HostToolsRoute
   '/memory': typeof MemoryRoute
   '/personas': typeof PersonasRoute
-  '/programs': typeof ProgramsRoute
   '/resources': typeof ResourcesRoute
   '/scheduler': typeof SchedulerRoute
   '/security': typeof SecurityRoute
@@ -256,10 +240,8 @@ export interface FileRoutesById {
   '/cron-jobs': typeof CronJobsRoute
   '/events': typeof EventsRoute
   '/git': typeof GitRoute
-  '/host-tools': typeof HostToolsRoute
   '/memory': typeof MemoryRoute
   '/personas': typeof PersonasRoute
-  '/programs': typeof ProgramsRoute
   '/resources': typeof ResourcesRoute
   '/scheduler': typeof SchedulerRoute
   '/security': typeof SecurityRoute
@@ -289,10 +271,8 @@ export interface FileRouteTypes {
     | '/cron-jobs'
     | '/events'
     | '/git'
-    | '/host-tools'
     | '/memory'
     | '/personas'
-    | '/programs'
     | '/resources'
     | '/scheduler'
     | '/security'
@@ -320,10 +300,8 @@ export interface FileRouteTypes {
     | '/cron-jobs'
     | '/events'
     | '/git'
-    | '/host-tools'
     | '/memory'
     | '/personas'
-    | '/programs'
     | '/resources'
     | '/scheduler'
     | '/security'
@@ -351,10 +329,8 @@ export interface FileRouteTypes {
     | '/cron-jobs'
     | '/events'
     | '/git'
-    | '/host-tools'
     | '/memory'
     | '/personas'
-    | '/programs'
     | '/resources'
     | '/scheduler'
     | '/security'
@@ -383,10 +359,8 @@ export interface RootRouteChildren {
   CronJobsRoute: typeof CronJobsRoute
   EventsRoute: typeof EventsRoute
   GitRoute: typeof GitRoute
-  HostToolsRoute: typeof HostToolsRoute
   MemoryRoute: typeof MemoryRoute
   PersonasRoute: typeof PersonasRoute
-  ProgramsRoute: typeof ProgramsRoute
   ResourcesRoute: typeof ResourcesRoute
   SchedulerRoute: typeof SchedulerRoute
   SecurityRoute: typeof SecurityRoute
@@ -444,13 +418,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ResourcesRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/programs': {
-      id: '/programs'
-      path: '/programs'
-      fullPath: '/programs'
-      preLoaderRoute: typeof ProgramsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/personas': {
       id: '/personas'
       path: '/personas'
@@ -463,13 +430,6 @@ declare module '@tanstack/react-router' {
       path: '/memory'
       fullPath: '/memory'
       preLoaderRoute: typeof MemoryRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/host-tools': {
-      id: '/host-tools'
-      path: '/host-tools'
-      fullPath: '/host-tools'
-      preLoaderRoute: typeof HostToolsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/git': {
@@ -623,10 +583,8 @@ const rootRouteChildren: RootRouteChildren = {
   CronJobsRoute: CronJobsRoute,
   EventsRoute: EventsRoute,
   GitRoute: GitRoute,
-  HostToolsRoute: HostToolsRoute,
   MemoryRoute: MemoryRoute,
   PersonasRoute: PersonasRoute,
-  ProgramsRoute: ProgramsRoute,
   ResourcesRoute: ResourcesRoute,
   SchedulerRoute: SchedulerRoute,
   SecurityRoute: SecurityRoute,

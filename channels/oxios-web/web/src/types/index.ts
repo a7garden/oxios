@@ -77,22 +77,42 @@ export interface Space {
   metadata?: Record<string, unknown>
 }
 
-// Program
-export interface Program {
-  name: string
-  enabled: boolean
-  version?: string
-  description?: string
-  author?: string
-  tools_count?: number
-  has_skill_content?: boolean
+// Skill (RFC-009 unified model)
+export type SkillSource = 'bundled' | 'managed' | 'workspace'
+export type SkillStatus = 'ready' | 'needs_setup' | 'disabled'
+
+export interface SkillRequirements {
+  bins: string[]
+  anyBins: string[]
+  env: string[]
+  config: string[]
 }
 
-// Skill
+export interface SkillInstallSpec {
+  kind: 'brew' | 'node' | 'go' | 'uv' | 'download'
+  label?: string
+  bins: string[]
+}
+
 export interface Skill {
   name: string
-  description?: string
-  content: string
+  description: string
+  author?: string
+  version?: string
+  emoji?: string
+  homepage?: string
+  source: SkillSource
+  bundled: boolean
+  status: SkillStatus
+  eligible: boolean
+  always: boolean
+  user_invocable: boolean
+  file_path: string
+  requirements: SkillRequirements
+  missing: SkillRequirements
+  os: string[]
+  install: SkillInstallSpec[]
+  config_checks: Array<{ path: string; satisfied: boolean }>
 }
 
 // Memory

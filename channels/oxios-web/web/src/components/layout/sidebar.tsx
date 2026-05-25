@@ -6,7 +6,6 @@ import {
   Brain,
   Calendar,
   CheckSquare,
-  Cpu,
   Dna,
   FolderOpen,
   GitBranch,
@@ -23,7 +22,6 @@ import {
   Timer,
   Theater,
   Wallet,
-  Wrench,
   Zap,
 } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
@@ -58,7 +56,6 @@ const navGroups: { label: string; items: NavItem[] }[] = [
       { label: 'Agents', href: '/agents', icon: <Bot className="h-4 w-4" /> },
       { label: 'Seeds', href: '/seeds', icon: <Dna className="h-4 w-4" /> },
       { label: 'Personas', href: '/personas', icon: <Theater className="h-4 w-4" /> },
-      { label: 'Programs', href: '/programs', icon: <Cpu className="h-4 w-4" /> },
       { label: 'Skills', href: '/skills', icon: <Zap className="h-4 w-4" /> },
     ],
   },
@@ -80,7 +77,6 @@ const navGroups: { label: string; items: NavItem[] }[] = [
       { label: 'Security', href: '/security', icon: <Shield className="h-4 w-4" /> },
       { label: 'Events', href: '/events', icon: <Bell className="h-4 w-4" /> },
       { label: 'Git', href: '/git', icon: <GitBranch className="h-4 w-4" /> },
-      { label: 'Host Tools', href: '/host-tools', icon: <Wrench className="h-4 w-4" /> },
     ],
   },
 ]

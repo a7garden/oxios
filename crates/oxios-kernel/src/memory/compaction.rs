@@ -111,10 +111,10 @@ impl CompactionTree {
             return content.to_string();
         }
 
-        let mut compacted = Vec::new();
+        let mut compacted: Vec<String> = Vec::new();
 
         // Preserve first 2 lines
-        compacted.extend(lines.iter().take(2).copied());
+        compacted.extend(lines.iter().take(2).map(|l| l.to_string()));
 
         // If long, add a summary indicator
         if lines.len() > 10 {
@@ -125,7 +125,7 @@ impl CompactionTree {
         }
 
         // Preserve last 2 lines
-        let tail = lines.iter().rev().take(2).copied().collect::<Vec<_>>();
+        let tail: Vec<String> = lines.iter().rev().take(2).map(|l| l.to_string()).collect();
         compacted.extend(tail.into_iter().rev());
 
         compacted.join("\n")

@@ -3,7 +3,7 @@
 //! Computes protection levels from behavior signals (access frequency,
 //! session appearances, user corrections) without user intervention.
 
-use chrono::{DateTime, Utc};
+use chrono::Utc;
 
 use super::{MemoryEntry, ProtectionLevel};
 

@@ -652,7 +652,8 @@ pub(crate) fn dedup_by_id(entries: &mut Vec<MemoryEntry>) {
 // Sub-modules
 // ---------------------------------------------------------------------------
 
-pub mod auto_classify;
+mod auto_classify;
+mod auto_protect;
 pub mod auto_memory_bridge;
 mod budget;
 mod chunking;
@@ -664,7 +665,7 @@ pub mod flash_attention;
 mod graph;
 mod hnsw;
 pub mod hyperbolic;
-mod normalizer;
+pub mod normalizer;
 mod proactive;
 mod root_index;
 pub mod sona;

@@ -9,6 +9,7 @@ use axum::Json;
 use serde::{Deserialize, Serialize};
 
 use oxios_kernel::memory::{MemoryEntry, MemoryType};
+use oxios_kernel::{SkillEntry, SkillSource, SkillStatus};
 
 use crate::error::AppError;
 use crate::routes::{paginate, PageParams};
@@ -338,55 +339,213 @@ pub(crate) async fn handle_seed_evolution(
 // Skills
 // ---------------------------------------------------------------------------
 
-/// Skill summary for listing.
-#[derive(Debug, Serialize, Clone)]
-pub(crate) struct SkillSummary {
-    /// Skill name.
-    name: String,
-    /// Skill description.
-    description: String,
+/// Compact a file path for display (replace home dir with ~).
+fn compact_path(path: &std::path::Path) -> String {
+    if let Some(home) = dirs::home_dir() {
+        let home_str = home.to_string_lossy();
+        let path_str = path.to_string_lossy();
+        if let Some(rest) = path_str.strip_prefix(home_str.as_ref()) {
+            return format!("~{}", rest);
+        }
+    }
+    path.to_string_lossy().into_owned()
 }
 
-/// GET /api/skills — List all skills.
+/// Convert a SkillEntry to its JSON API representation (RFC-009 §5.1).
+fn skill_entry_to_json(entry: &SkillEntry) -> serde_json::Value {
+    let meta = entry.metadata.as_ref();
+    let source_str = match entry.source {
+        SkillSource::Bundled => "bundled",
+        SkillSource::Managed => "managed",
+        SkillSource::Workspace => "workspace",
+    };
+    let status_str = match entry.status {
+        SkillStatus::Ready => "ready",
+        SkillStatus::NeedsSetup => "needs_setup",
+        SkillStatus::Disabled => "disabled",
+    };
+
+    let requirements = meta
+        .map(|m| serde_json::json!({
+            "bins": m.requires.bins,
+            "any_bins": m.requires.any_bins,
+            "env": m.requires.env,
+            "config": m.requires.config,
+        }))
+        .unwrap_or(serde_json::json!({
+            "bins": [],
+            "any_bins": [],
+            "env": [],
+            "config": [],
+        }));
+
+    let missing = serde_json::json!({
+        "bins": entry.eligibility.missing_bins,
+        "any_bins": entry.eligibility.missing_any_bins,
+        "env": entry.eligibility.missing_env,
+        "config": entry.eligibility.missing_config,
+    });
+
+    let install: Vec<serde_json::Value> = meta
+        .map(|m| {
+            m.install
+                .iter()
+                .map(|spec| {
+                    let label = match spec.kind {
+                        oxios_kernel::InstallKind::Brew => {
+                            let name = spec.formula.as_deref().unwrap_or("unknown");
+                            format!("Install {} (brew)", name)
+                        }
+                        oxios_kernel::InstallKind::Node => {
+                            let name = spec.package.as_deref().unwrap_or("unknown");
+                            format!("Install {} (npm)", name)
+                        }
+                        oxios_kernel::InstallKind::Go => {
+                            let name = spec.module.as_deref().unwrap_or("unknown");
+                            format!("Install {} (go)", name)
+                        }
+                        oxios_kernel::InstallKind::Uv => {
+                            let name = spec.package.as_deref().unwrap_or("unknown");
+                            format!("Install {} (uv)", name)
+                        }
+                        oxios_kernel::InstallKind::Download => {
+                            "Download".to_string()
+                        }
+                    };
+                    let bins: Vec<String> = match spec.kind {
+                        oxios_kernel::InstallKind::Brew => spec
+                            .formula
+                            .as_ref()
+                            .map(|f| vec![f.clone()])
+                            .unwrap_or_default(),
+                        oxios_kernel::InstallKind::Node => spec
+                            .package
+                            .as_ref()
+                            .map(|p| vec![p.clone()])
+                            .unwrap_or_default(),
+                        oxios_kernel::InstallKind::Go => spec
+                            .module
+                            .as_ref()
+                            .map(|m| vec![m.clone()])
+                            .unwrap_or_default(),
+                        oxios_kernel::InstallKind::Uv => spec
+                            .package
+                            .as_ref()
+                            .map(|p| vec![p.clone()])
+                            .unwrap_or_default(),
+                        oxios_kernel::InstallKind::Download => vec![],
+                    };
+                    serde_json::json!({
+                        "kind": spec.kind.to_string(),
+                        "label": label,
+                        "bins": bins,
+                    })
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+
+    let os = meta
+        .map(|m| m.os.clone())
+        .unwrap_or_default();
+
+    let config_checks: Vec<serde_json::Value> = entry
+        .eligibility
+        .config_checks
+        .iter()
+        .map(|c| serde_json::json!({ "path": c.path, "satisfied": c.satisfied }))
+        .collect();
+
+    serde_json::json!({
+        "name": entry.skill.name,
+        "description": entry.skill.description,
+        "author": meta.and_then(|m| m.author.clone()).unwrap_or_default(),
+        "version": meta.and_then(|m| m.version.clone()).unwrap_or_default(),
+        "emoji": meta.and_then(|m| m.emoji.clone()).unwrap_or_default(),
+        "homepage": meta.and_then(|m| m.homepage.clone()).unwrap_or_default(),
+        "source": source_str,
+        "bundled": entry.bundled,
+        "status": status_str,
+        "eligible": entry.eligibility.eligible,
+        "always": meta.map(|m| m.always).unwrap_or(false),
+        "user_invocable": entry.invocation.user_invocable,
+        "file_path": compact_path(&entry.skill.file_path),
+        "requirements": requirements,
+        "missing": missing,
+        "os": os,
+        "install": install,
+        "config_checks": config_checks,
+    })
+}
+
+/// GET /api/skills — List all skills (RFC-009 §5.1).
 pub(crate) async fn handle_skills_list(
     state: State<Arc<AppState>>,
     Query(params): Query<PageParams>,
 ) -> Json<serde_json::Value> {
-    match state.kernel.extensions.list_skills().await {
-        Ok(skills) => {
-            let summaries: Vec<SkillSummary> = skills
-                .into_iter()
-                .map(|s| SkillSummary {
-                    name: s.name,
-                    description: s.description,
-                })
-                .collect();
-            Json(paginate(&summaries, &params))
-        }
-        Err(e) => {
-            tracing::error!(error = %e, "Failed to list skills");
-            Json(paginate(&Vec::<SkillSummary>::new(), &params))
-        }
-    }
+    let entries = state.kernel.extensions.list_skills_entries().await;
+    let skills: Vec<serde_json::Value> = entries.iter().map(skill_entry_to_json).collect();
+    Json(serde_json::json!({ "skills": paginate(&skills, &params) }))
 }
 
-/// GET /api/skills/:name — Get skill content.
+/// GET /api/skills/:name — Get skill details (RFC-009 §5.1).
 pub(crate) async fn handle_skill_get(
     state: State<Arc<AppState>>,
     Path(name): Path<String>,
 ) -> Result<Json<serde_json::Value>, AppError> {
-    match state.kernel.extensions.load_skill(&name).await {
-        Ok(Some(skill)) => Ok(Json(serde_json::json!({
-            "name": skill.meta.name,
-            "description": skill.meta.description,
-            "content": skill.content,
-            "path": skill.path.to_string_lossy(),
+    match state.kernel.extensions.get_skill_entry(&name).await {
+        Some(entry) => Ok(Json(skill_entry_to_json(&entry))),
+        None => Err(AppError::NotFound("skill not found".into())),
+    }
+}
+
+/// POST /api/skills/:name/enable — Enable a skill.
+pub(crate) async fn handle_skill_enable(
+    state: State<Arc<AppState>>,
+    Path(name): Path<String>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    state
+        .kernel
+        .extensions
+        .enable_skill(&name)
+        .await
+        .map_err(|e| AppError::BadRequest(e.to_string()))?;
+    tracing::info!(skill = %name, "Skill enabled via API");
+    Ok(Json(serde_json::json!({ "status": "enabled", "name": name })))
+}
+
+/// POST /api/skills/:name/disable — Disable a skill.
+pub(crate) async fn handle_skill_disable(
+    state: State<Arc<AppState>>,
+    Path(name): Path<String>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    state
+        .kernel
+        .extensions
+        .disable_skill(&name)
+        .await
+        .map_err(|e| AppError::BadRequest(e.to_string()))?;
+    tracing::info!(skill = %name, "Skill disabled via API");
+    Ok(Json(serde_json::json!({ "status": "disabled", "name": name })))
+}
+
+/// GET /api/skills/:name/content — Get SKILL.md content.
+pub(crate) async fn handle_skill_content(
+    state: State<Arc<AppState>>,
+    Path(name): Path<String>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    let content = state
+        .kernel
+        .extensions
+        .skill_manager()
+        .get_skill_content(&name)
+        .await;
+    match content {
+        Some(md) => Ok(Json(serde_json::json!({
+            "name": name,
+            "content": md,
         }))),
-        Ok(None) => Err(AppError::NotFound("skill not found".into())),
-        Err(e) => {
-            tracing::error!(error = %e, "Failed to load skill");
-            Err(AppError::Internal("failed to load skill".into()))
-        }
+        None => Err(AppError::NotFound("skill not found".into())),
     }
 }
 
@@ -586,14 +745,29 @@ pub(crate) async fn handle_memory_create(
     let entry = MemoryEntry {
         id: uuid::Uuid::new_v4().to_string(),
         memory_type,
-        content: body.content,
+        tier: memory_type.initial_tier(),
+        content: body.content.clone(),
+        content_hash: oxios_kernel::memory::content_hash(&body.content),
         source: "api".to_string(),
         session_id: None,
-        tags: body.tags,
+        space_id: None,
+        tags: body.tags.clone(),
         importance: body.importance,
+        pinned: false,
+        protection: oxios_kernel::memory::ProtectionLevel::None,
+        auto_classified: false,
+        session_appearances: 0,
+        user_corrected: false,
+        seen_in_sessions: vec![],
         created_at: chrono::Utc::now(),
         accessed_at: chrono::Utc::now(),
+        modified_at: chrono::Utc::now(),
         access_count: 0,
+        decay_score: 1.0,
+        compaction_level: 0,
+        compacted_from: vec![],
+        related_ids: vec![],
+        contradicts: None,
     };
 
     // Use memory manager from kernel

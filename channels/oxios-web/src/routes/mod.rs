@@ -93,7 +93,8 @@ pub(crate) use system::{
 pub(crate) use workspace::{
     handle_memory_create, handle_memory_get, handle_memory_list, handle_memory_search,
     handle_memory_semantic_search, handle_seed_evolution, handle_seed_get, handle_seeds_list,
-    handle_skill_create, handle_skill_delete, handle_skill_get, handle_skills_list,
+    handle_skill_content, handle_skill_create, handle_skill_delete, handle_skill_disable,
+    handle_skill_enable, handle_skill_get, handle_skills_list,
     handle_workspace_file_get, handle_workspace_file_put, handle_workspace_tree,
 };
 
@@ -178,6 +179,9 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         .route("/api/skills/{name}", get(handle_skill_get))
         .route("/api/skills", post(handle_skill_create))
         .route("/api/skills/{name}", delete(handle_skill_delete))
+        .route("/api/skills/{name}/enable", post(handle_skill_enable))
+        .route("/api/skills/{name}/disable", post(handle_skill_disable))
+        .route("/api/skills/{name}/content", get(handle_skill_content))
         // Memory
         .route("/api/memory", get(handle_memory_list))
         .route("/api/memory", post(handle_memory_create))
