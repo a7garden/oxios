@@ -834,18 +834,7 @@ mod tests {
         let mgr = MemoryManager::new(store.clone());
 
         // Store a memory directly via state_store (bypassing remember to test rebuild)
-        let entry = MemoryEntry {
-            id: "rebuild-test-1".to_string(),
-            memory_type: MemoryType::Fact,
-            content: "memory for rebuild test".to_string(),
-            source: "test".to_string(),
-            session_id: None,
-            tags: vec![],
-            importance: 0.5,
-            created_at: Utc::now(),
-            accessed_at: Utc::now(),
-            access_count: 0,
-        };
+        let entry = make_entry_with_content("rebuild-test-1", MemoryType::Fact, "memory for rebuild test");
         store
             .save_json("memory/facts", "rebuild-test-1", &entry)
             .await
@@ -863,16 +852,20 @@ mod tests {
     }
 
     fn make_entry(id: &str, ty: MemoryType) -> MemoryEntry {
+        make_entry_with_content(id, ty, &format!("Test content for {}", id))
+    }
+
+    fn make_entry_with_content(id: &str, ty: MemoryType, content: &str) -> MemoryEntry {
         MemoryEntry {
             id: id.to_string(),
             memory_type: ty,
             tier: MemoryTier::Warm,
-            content: format!("Test content for {}", id),
+            content: content.to_string(),
             content_hash: 0,
-            tags: vec![],
             source: "test".to_string(),
             session_id: None,
             space_id: None,
+            tags: vec![],
             importance: 0.5,
             pinned: false,
             protection: ProtectionLevel::None,
