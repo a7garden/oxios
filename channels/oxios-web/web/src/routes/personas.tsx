@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
 import { Plus, Star, Trash2, Users } from 'lucide-react'
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { EmptyState } from '@/components/shared/empty-state'
 import { ErrorState } from '@/components/shared/error-state'
 import { LoadingCards } from '@/components/shared/loading'
@@ -15,6 +16,7 @@ import { api } from '@/lib/api-client'
 export const Route = createFileRoute('/personas')({ component: PersonasPage })
 
 function PersonasPage() {
+  const { t } = useTranslation()
   const queryClient = useQueryClient()
   const [showCreate, setShowCreate] = useState(false)
   const [name, setName] = useState('')
@@ -78,13 +80,13 @@ function PersonasPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Personas</h1>
-          <p className="text-muted-foreground">Manage agent personas</p>
+          <h1 className="text-2xl font-bold">{t('personas.title')}</h1>
+          <p className="text-muted-foreground">{t('personas.subtitle')}</p>
         </div>
         <div className="flex gap-2">
           <RefreshButton onClick={() => refetch()} isFetching={isFetching} />
           <Button size="sm" onClick={() => setShowCreate(true)}>
-            <Plus className="h-4 w-4 mr-1" /> Create
+            <Plus className="h-4 w-4 mr-1" /> {t('common.create')}
           </Button>
         </div>
       </div>
@@ -92,23 +94,23 @@ function PersonasPage() {
       {showCreate && (
         <Card>
           <CardHeader>
-            <CardTitle>Create Persona</CardTitle>
+            <CardTitle>{t('personas.createPersona')}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             <Input
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Persona name"
+              placeholder={t('personas.personaNamePlaceholder')}
             />
             <Input
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Description"
+              placeholder={t('common.description')}
             />
             <Textarea
               value={systemPrompt}
               onChange={(e) => setSystemPrompt(e.target.value)}
-              placeholder="System prompt..."
+              placeholder={t('personas.systemPromptPlaceholder')}
               rows={4}
             />
             <div className="flex gap-2">
@@ -119,10 +121,10 @@ function PersonasPage() {
                 }
                 disabled={!name.trim() || createMutation.isPending}
               >
-                Create
+                {t('common.create')}
               </Button>
               <Button variant="ghost" size="sm" onClick={() => setShowCreate(false)}>
-                Cancel
+                {t('common.cancel')}
               </Button>
             </div>
           </CardContent>
@@ -132,8 +134,8 @@ function PersonasPage() {
       {items.length === 0 && !showCreate ? (
         <EmptyState
           icon={<Users className="h-10 w-10" />}
-          title="No personas"
-          description="Create personas to give agents distinct personalities."
+          title={t('personas.noPersonas')}
+          description={t('personas.descriptionHint')}
         />
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -155,7 +157,7 @@ function PersonasPage() {
                       variant="ghost"
                       size="icon"
                       onClick={() => activateMutation.mutate(persona.id)}
-                      aria-label="Activate persona"
+                      aria-label={t('personas.activatePersona')}
                     >
                       <Star className="h-4 w-4" />
                     </Button>
@@ -164,7 +166,7 @@ function PersonasPage() {
                     variant="ghost"
                     size="icon"
                     onClick={() => deleteMutation.mutate(persona.id)}
-                    aria-label="Delete persona"
+                    aria-label={t('personas.deletePersona')}
                   >
                     <Trash2 className="h-4 w-4 text-destructive" />
                   </Button>
@@ -172,7 +174,9 @@ function PersonasPage() {
               </CardHeader>
               {persona.role && (
                 <CardContent>
-                  <p className="text-xs text-muted-foreground">Role: {persona.role}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {t('personas.role')}: {persona.role}
+                  </p>
                 </CardContent>
               )}
             </Card>

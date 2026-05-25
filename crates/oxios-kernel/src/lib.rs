@@ -157,8 +157,8 @@ pub use clawhub::{
 };
 pub use skill::{
     InstallKind, Requirements, RequirementsCheck, Skill, SkillConfig, SkillEntry,
-    SkillInstallSpec, SkillInvocationPolicy, SkillManager, SkillMeta, SkillMetadata, SkillRef,
-    SkillSnapshot, SkillSource, SkillState, SkillStatus,
+    SkillFormat, SkillInstallSpec, SkillInvocationPolicy, SkillManager, SkillMeta,
+    SkillMetadata, SkillRef, SkillSnapshot, SkillSource, SkillState, SkillStatus,
 };
 pub use tools::tool_types::{ArgumentDef, ToolDef};
 #[cfg(feature = "browser")]
@@ -193,9 +193,9 @@ pub use types::{AgentId, AgentInfo, AgentStatus};
 pub use kernel_handle::KernelHandle;
 pub use kernel_handle::MarketplaceApi;
 pub use kernel_handle::{
-    A2aApi, AgentApi, BrowserApi, CopilotResponse, ExecApi, ExtensionApi, InfraApi,
-    KnowledgeContext, KnowledgeLens, KnowledgeNote, McpApi, MemoryNote, PersonaApi, SecurityApi,
-    SpaceApi, StateApi,
+    A2aApi, AgentApi, BrowserApi, CopilotResponse, EngineApi, EngineConfigResponse, ExecApi,
+    ExtensionApi, InfraApi, KnowledgeContext, KnowledgeLens, KnowledgeNote, McpApi, MemoryNote,
+    ModelInfo, PersonaApi, ProviderInfo, SecurityApi, SpaceApi, StateApi, ValidateKeyResult,
 };
 
 // ─── oxi-sdk re-exports ─────────────────────────────────────────────
@@ -208,5 +208,5 @@ pub use kernel_handle::{
 // See ../oxi/docs/proposals/sdk-consumer-requirements.md
 pub use oxi_sdk::{
     AgentEvent, AgentLoop, InterAgentMessage, KernelToolContext, KernelToolProvider, MessageBus,
-    Model, Oxi, OxiBuilder, Provider, StreamOptions,
+    Model, Oxi, OxiBuilder, Provider, ProviderOptions, StreamOptions,
 };

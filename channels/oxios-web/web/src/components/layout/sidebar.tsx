@@ -18,13 +18,13 @@ import {
   PanelLeftClose,
   Settings,
   Shield,
-  Store,
   Sun,
   Timer,
   Theater,
   Wallet,
   Zap,
 } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { useQuery } from '@tanstack/react-query'
 import { Separator } from '@/components/ui/separator'
 import { Tooltip } from '@/components/ui/tooltip'
@@ -34,7 +34,7 @@ import { useThemeStore } from '@/stores/theme'
 import { api } from '@/lib/api-client'
 
 interface NavItem {
-  label: string
+  labelKey: string
   href: string
   icon: React.ReactNode
   /** Only show this item when condition is true. Always visible when omitted. */
@@ -43,42 +43,41 @@ interface NavItem {
   badge?: number
 }
 
-const navGroups: { label: string; items: NavItem[] }[] = [
+const navGroups: { labelKey: string; items: NavItem[] }[] = [
   {
-    label: 'Main',
+    labelKey: 'common.main',
     items: [
-      { label: 'Dashboard', href: '/', icon: <LayoutDashboard className="h-4 w-4" /> },
-      { label: 'Chat', href: '/chat', icon: <MessageSquare className="h-4 w-4" /> },
+      { labelKey: 'common.dashboard', href: '/', icon: <LayoutDashboard className="h-4 w-4" /> },
+      { labelKey: 'common.chat', href: '/chat', icon: <MessageSquare className="h-4 w-4" /> },
     ],
   },
   {
-    label: 'Agents',
+    labelKey: 'common.agents',
     items: [
-      { label: 'Agents', href: '/agents', icon: <Bot className="h-4 w-4" /> },
-      { label: 'Seeds', href: '/seeds', icon: <Dna className="h-4 w-4" /> },
-      { label: 'Personas', href: '/personas', icon: <Theater className="h-4 w-4" /> },
-      { label: 'Skills', href: '/skills', icon: <Zap className="h-4 w-4" /> },
-      { label: 'Marketplace', href: '/marketplace', icon: <Store className="h-4 w-4" /> },
+      { labelKey: 'common.agents', href: '/agents', icon: <Bot className="h-4 w-4" /> },
+      { labelKey: 'common.seeds', href: '/seeds', icon: <Dna className="h-4 w-4" /> },
+      { labelKey: 'common.personas', href: '/personas', icon: <Theater className="h-4 w-4" /> },
+      { labelKey: 'common.skills', href: '/skills', icon: <Zap className="h-4 w-4" /> },
     ],
   },
   {
-    label: 'Storage',
+    labelKey: 'common.storage',
     items: [
-      { label: 'Knowledge', href: '/knowledge', icon: <NotebookPen className="h-4 w-4" /> },
-      { label: 'Memory', href: '/memory', icon: <Brain className="h-4 w-4" /> },
-      { label: 'Workspace', href: '/workspace', icon: <FolderOpen className="h-4 w-4" /> },
+      { labelKey: 'common.knowledge', href: '/knowledge', icon: <NotebookPen className="h-4 w-4" /> },
+      { labelKey: 'common.memory', href: '/memory', icon: <Brain className="h-4 w-4" /> },
+      { labelKey: 'common.workspace', href: '/workspace', icon: <FolderOpen className="h-4 w-4" /> },
     ],
   },
   {
-    label: 'Monitor',
+    labelKey: 'common.monitor',
     items: [
-      { label: 'Resources', href: '/resources', icon: <Activity className="h-4 w-4" /> },
-      { label: 'Scheduler', href: '/scheduler', icon: <Calendar className="h-4 w-4" /> },
-      { label: 'Cron Jobs', href: '/cron-jobs', icon: <Timer className="h-4 w-4" /> },
-      { label: 'Budget', href: '/budget', icon: <Wallet className="h-4 w-4" /> },
-      { label: 'Security', href: '/security', icon: <Shield className="h-4 w-4" /> },
-      { label: 'Events', href: '/events', icon: <Bell className="h-4 w-4" /> },
-      { label: 'Git', href: '/git', icon: <GitBranch className="h-4 w-4" /> },
+      { labelKey: 'common.resources', href: '/resources', icon: <Activity className="h-4 w-4" /> },
+      { labelKey: 'common.scheduler', href: '/scheduler', icon: <Calendar className="h-4 w-4" /> },
+      { labelKey: 'common.cronJobs', href: '/cron-jobs', icon: <Timer className="h-4 w-4" /> },
+      { labelKey: 'common.budget', href: '/budget', icon: <Wallet className="h-4 w-4" /> },
+      { labelKey: 'common.security', href: '/security', icon: <Shield className="h-4 w-4" /> },
+      { labelKey: 'common.events', href: '/events', icon: <Bell className="h-4 w-4" /> },
+      { labelKey: 'common.git', href: '/git', icon: <GitBranch className="h-4 w-4" /> },
     ],
   },
 ]
@@ -98,7 +97,7 @@ function useDynamicItems(): NavItem[] {
   const count = data ?? 0
   return [
     {
-      label: 'Approvals',
+      labelKey: 'common.approvals',
       href: '/approvals',
       icon: <CheckSquare className="h-4 w-4" />,
       show: count > 0,
@@ -108,6 +107,7 @@ function useDynamicItems(): NavItem[] {
 }
 
 export function Sidebar() {
+  const { t } = useTranslation()
   const { collapsed, toggle } = useSidebarStore()
   const { theme, resolved, setTheme } = useThemeStore()
   const router = useRouterState()
@@ -121,6 +121,8 @@ export function Sidebar() {
     ...dynamicItems.filter((d) => d.show !== false),
     mainGroup.items[1]!, // Chat
   ]
+
+  const themeLabel = theme === 'system' ? t('common.system') : resolved === 'dark' ? t('common.light') : t('common.dark')
 
   return (
     <aside
@@ -141,7 +143,7 @@ export function Sidebar() {
           type="button"
           onClick={toggle}
           className="rounded-md p-1.5 hover:bg-sidebar-accent"
-          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          aria-label={collapsed ? t('common.expandSidebar') : t('common.collapseSidebar')}
         >
           {collapsed ? <PanelLeft className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
         </button>
@@ -154,7 +156,7 @@ export function Sidebar() {
         <div className="mb-3">
           {!collapsed && (
             <p className="mb-1 px-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-              Main
+              {t('common.main')}
             </p>
           )}
           {mainItems.map((item) => {
@@ -174,7 +176,7 @@ export function Sidebar() {
                 )}
               >
                 {item.icon}
-                {!collapsed && <span>{item.label}</span>}
+                {!collapsed && <span>{t(item.labelKey)}</span>}
                 {!collapsed && item.badge != null && item.badge > 0 && (
                   <span className="ml-auto flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-bold text-white">
                     {item.badge}
@@ -183,7 +185,7 @@ export function Sidebar() {
               </Link>
             )
             return collapsed ? (
-              <Tooltip key={item.href} content={`${item.label}${item.badge ? ` (${item.badge})` : ''}`} side="right">
+              <Tooltip key={item.href} content={`${t(item.labelKey)}${item.badge ? ` (${item.badge})` : ''}`} side="right">
                 {link}
               </Tooltip>
             ) : (
@@ -194,10 +196,10 @@ export function Sidebar() {
 
         {/* Remaining static groups */}
         {navGroups.slice(1).map((group) => (
-          <div key={group.label} className="mb-3">
+          <div key={group.labelKey} className="mb-3">
             {!collapsed && (
               <p className="mb-1 px-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                {group.label}
+                {t(group.labelKey)}
               </p>
             )}
             {group.items.map((item) => {
@@ -217,11 +219,11 @@ export function Sidebar() {
                   )}
                 >
                   {item.icon}
-                  {!collapsed && <span>{item.label}</span>}
+                  {!collapsed && <span>{t(item.labelKey)}</span>}
                 </Link>
               )
               return collapsed ? (
-                <Tooltip key={item.href} content={item.label} side="right">
+                <Tooltip key={item.href} content={t(item.labelKey)} side="right">
                   {link}
                 </Tooltip>
               ) : (
@@ -242,7 +244,7 @@ export function Sidebar() {
             setTheme(next)
           }}
           className="flex items-center gap-3 rounded-lg px-2.5 py-2 text-sm w-full hover:bg-sidebar-accent/50"
-          aria-label="Toggle theme"
+          aria-label={t('common.toggleTheme')}
         >
           {theme === 'system' ? (
             <Monitor className="h-4 w-4" />
@@ -252,7 +254,7 @@ export function Sidebar() {
             <Moon className="h-4 w-4" />
           )}
           {!collapsed && (
-            <span>{theme === 'system' ? 'System' : resolved === 'dark' ? 'Light' : 'Dark'}</span>
+            <span>{themeLabel}</span>
           )}
         </button>
         <Link
@@ -260,7 +262,7 @@ export function Sidebar() {
           className="flex items-center gap-3 rounded-lg px-2.5 py-2 text-sm hover:bg-sidebar-accent/50"
         >
           <Settings className="h-4 w-4" />
-          {!collapsed && <span>Settings</span>}
+          {!collapsed && <span>{t('common.settings')}</span>}
         </Link>
       </div>
     </aside>

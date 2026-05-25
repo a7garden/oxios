@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { ArrowLeft, Dna } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { ErrorState } from '@/components/shared/error-state'
 import { LoadingCards } from '@/components/shared/loading'
 import { Badge } from '@/components/ui/badge'
@@ -23,6 +24,7 @@ export const Route = createFileRoute('/seeds/$seedId')({
 })
 
 function SeedDetailPage() {
+  const { t } = useTranslation()
   const { seedId } = Route.useParams()
   const navigate = useNavigate()
 
@@ -38,7 +40,7 @@ function SeedDetailPage() {
 
   if (isLoading) return <LoadingCards count={3} />
   if (isError) return <ErrorState onRetry={() => refetch()} />
-  if (!seed) return <p className="text-muted-foreground">Seed not found.</p>
+  if (!seed) return <p className="text-muted-foreground">{t('seeds.notFound')}</p>
 
   return (
     <div className="space-y-6">
@@ -47,7 +49,7 @@ function SeedDetailPage() {
           variant="ghost"
           size="icon"
           onClick={() => navigate({ to: '/seeds' })}
-          aria-label="Go back"
+          aria-label={t('common.back')}
         >
           <ArrowLeft className="h-4 w-4" />
         </Button>
@@ -57,12 +59,16 @@ function SeedDetailPage() {
           </h1>
           <p className="text-muted-foreground font-mono text-xs">{seed.id}</p>
         </div>
-        {seed.generation != null && <Badge variant="default">Gen {seed.generation}</Badge>}
+        {seed.generation != null && (
+          <Badge variant="default">
+            {t('seeds.generation', { gen: seed.generation })}
+          </Badge>
+        )}
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Details</CardTitle>
+          <CardTitle>{t('seeds.details')}</CardTitle>
         </CardHeader>
         <CardContent>
           <pre className="rounded-lg bg-muted p-4 text-xs overflow-x-auto">
@@ -74,7 +80,7 @@ function SeedDetailPage() {
       {seed.constraints && seed.constraints.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle>Constraints</CardTitle>
+            <CardTitle>{t('seeds.constraints')}</CardTitle>
           </CardHeader>
           <CardContent>
             <ul className="space-y-1">

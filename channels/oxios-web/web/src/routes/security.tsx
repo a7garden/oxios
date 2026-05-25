@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
 import { FileWarning, KeyRound, Shield } from 'lucide-react'
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { EmptyState } from '@/components/shared/empty-state'
 import { ErrorState } from '@/components/shared/error-state'
 import { LoadingCards } from '@/components/shared/loading'
@@ -14,6 +15,7 @@ import { api } from '@/lib/api-client'
 export const Route = createFileRoute('/security')({ component: SecurityPage })
 
 function SecurityPage() {
+  const { t } = useTranslation()
   const {
     data: audits,
     isLoading: auditLoading,
@@ -74,8 +76,8 @@ function SecurityPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Security</h1>
-          <p className="text-muted-foreground">Audit trail and access control</p>
+          <h1 className="text-2xl font-bold">{t('security.title')}</h1>
+          <p className="text-muted-foreground">{t('security.subtitle')}</p>
         </div>
         <RefreshButton onClick={() => refetch()} isFetching={isFetching} />
       </div>
@@ -99,7 +101,10 @@ function SecurityPage() {
                         <span className="font-medium">{roleName}</span>
                       </div>
                       <span className="text-xs text-muted-foreground">
-                        {policy.resources.length} permission{policy.resources.length !== 1 ? 's' : ''}
+                        {policy.resources.length}{' '}
+                        {policy.resources.length !== 1
+                          ? t('security.permissions')
+                          : t('security.permission')}
                       </span>
                     </div>
                     {policy.resources.length > 0 ? (
@@ -111,7 +116,7 @@ function SecurityPage() {
                         ))}
                       </div>
                     ) : (
-                      <p className="text-xs text-muted-foreground">No permissions</p>
+                      <p className="text-xs text-muted-foreground">{t('security.noPermissions')}</p>
                     )}
                   </CardContent>
                 </Card>
@@ -124,15 +129,15 @@ function SecurityPage() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <FileWarning className="h-4 w-4" /> Audit Trail
+            <FileWarning className="h-4 w-4" /> {t('security.auditTrail')}
           </CardTitle>
         </CardHeader>
         <CardContent>
           {pagedEntries.length === 0 ? (
             <EmptyState
               icon={<Shield className="h-8 w-8" />}
-              title="No audit entries"
-              description="Security audit events will appear here."
+              title={t('security.noAuditEntries')}
+              description={t('security.noAuditEntriesDescription')}
               className="py-6"
             />
           ) : (
@@ -144,7 +149,7 @@ function SecurityPage() {
                 >
                   <div className="flex items-center gap-3">
                     <Badge variant={entry.allowed ? 'success' : 'destructive'} className="shrink-0">
-                      {entry.allowed ? 'Allow' : 'Deny'}
+                      {entry.allowed ? t('security.allow') : t('security.deny')}
                     </Badge>
                     <div>
                       <p className="font-medium text-sm">{entry.action}</p>
@@ -153,7 +158,7 @@ function SecurityPage() {
                       )}
                       {entry.agent_id && (
                         <p className="text-xs text-muted-foreground">
-                          Agent: {entry.agent_id.slice(0, 8)}...
+                          {t('security.agent')}: {entry.agent_id.slice(0, 8)}...
                         </p>
                       )}
                       {entry.reason && (
@@ -174,8 +179,11 @@ function SecurityPage() {
           {totalPages > 1 && (
             <div className="flex items-center justify-between pt-3 border-t mt-3">
               <p className="text-xs text-muted-foreground">
-                Showing {(auditPage - 1) * AUDIT_PAGE_SIZE + 1}–
-                {Math.min(auditPage * AUDIT_PAGE_SIZE, entries.length)} of {entries.length}
+                {t('security.showingEntries', {
+                  start: (auditPage - 1) * AUDIT_PAGE_SIZE + 1,
+                  end: Math.min(auditPage * AUDIT_PAGE_SIZE, entries.length),
+                  total: entries.length,
+                })}
               </p>
               <div className="flex gap-1">
                 <Button
@@ -184,7 +192,7 @@ function SecurityPage() {
                   disabled={auditPage <= 1}
                   onClick={() => setAuditPage((p) => Math.max(1, p - 1))}
                 >
-                  Previous
+                  {t('common.previous')}
                 </Button>
                 <Button
                   variant="outline"
@@ -192,7 +200,7 @@ function SecurityPage() {
                   disabled={auditPage >= totalPages}
                   onClick={() => setAuditPage((p) => Math.min(totalPages, p + 1))}
                 >
-                  Next
+                  {t('common.next')}
                 </Button>
               </div>
             </div>

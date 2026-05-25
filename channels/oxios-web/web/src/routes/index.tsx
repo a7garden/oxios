@@ -12,6 +12,7 @@ import {
   NotebookPen,
   Shield,
 } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { ErrorState } from '@/components/shared/error-state'
 import { LoadingCards } from '@/components/shared/loading'
 import { Badge } from '@/components/ui/badge'
@@ -24,6 +25,8 @@ export const Route = createFileRoute('/')({
 })
 
 function DashboardPage() {
+  const { t } = useTranslation()
+
   const {
     data: status,
     isLoading: statusLoading,
@@ -52,25 +55,25 @@ function DashboardPage() {
 
   const stats = [
     {
-      label: 'Running Agents',
+      labelKey: 'dashboard.runningAgents',
       value: status?.components?.agents?.active_count ?? 0,
       icon: <Bot className="h-4 w-4" />,
       color: 'text-emerald-500',
     },
     {
-      label: 'Total Agents',
+      labelKey: 'dashboard.totalAgents',
       value: status?.components?.agents?.total_forked ?? 0,
       icon: <Cpu className="h-4 w-4" />,
       color: 'text-blue-500',
     },
     {
-      label: 'Active Spaces',
+      labelKey: 'dashboard.activeSpaces',
       value: status?.components?.spaces_active ?? 0,
       icon: <LayoutDashboard className="h-4 w-4" />,
       color: 'text-purple-500',
     },
     {
-      label: 'Uptime',
+      labelKey: 'dashboard.uptime',
       value: status?.uptime ?? '-',
       icon: <Clock className="h-4 w-4" />,
       color: 'text-amber-500',
@@ -78,30 +81,30 @@ function DashboardPage() {
   ]
 
   const quickLinks = [
-    { label: 'Chat', href: '/chat', icon: <MessageSquare className="h-5 w-5 text-blue-500" />, desc: 'Start a conversation' },
-    { label: 'Knowledge', href: '/knowledge', icon: <NotebookPen className="h-5 w-5 text-violet-500" />, desc: 'Markdown notes & journal' },
-    { label: 'Agents', href: '/agents', icon: <Bot className="h-5 w-5 text-emerald-500" />, desc: 'Manage running agents' },
-    { label: 'Sessions', href: '/sessions', icon: <Clock className="h-5 w-5 text-blue-500" />, desc: 'View session history' },
-    { label: 'Resources', href: '/resources', icon: <Activity className="h-5 w-5 text-amber-500" />, desc: 'System resource usage' },
-    { label: 'Memory', href: '/memory', icon: <Brain className="h-5 w-5 text-purple-500" />, desc: 'Agent memory store' },
-    { label: 'Security', href: '/security', icon: <Shield className="h-5 w-5 text-red-500" />, desc: 'Audit trail & access control' },
-    { label: 'Scheduler', href: '/scheduler', icon: <Calendar className="h-5 w-5 text-teal-500" />, desc: 'Task queue management' },
+    { labelKey: 'common.chat', href: '/chat', icon: <MessageSquare className="h-5 w-5 text-blue-500" />, descKey: 'dashboard.startConversation' },
+    { labelKey: 'common.knowledge', href: '/knowledge', icon: <NotebookPen className="h-5 w-5 text-violet-500" />, descKey: 'dashboard.markdownNotesJournal' },
+    { labelKey: 'common.agents', href: '/agents', icon: <Bot className="h-5 w-5 text-emerald-500" />, descKey: 'dashboard.manageRunningAgents' },
+    { labelKey: 'common.sessions', href: '/sessions', icon: <Clock className="h-5 w-5 text-blue-500" />, descKey: 'dashboard.viewSessionHistory' },
+    { labelKey: 'common.resources', href: '/resources', icon: <Activity className="h-5 w-5 text-amber-500" />, descKey: 'dashboard.systemResourceUsage' },
+    { labelKey: 'common.memory', href: '/memory', icon: <Brain className="h-5 w-5 text-purple-500" />, descKey: 'dashboard.agentMemoryStore' },
+    { labelKey: 'common.security', href: '/security', icon: <Shield className="h-5 w-5 text-red-500" />, descKey: 'dashboard.auditTrailAccessControl' },
+    { labelKey: 'common.scheduler', href: '/scheduler', icon: <Calendar className="h-5 w-5 text-teal-500" />, descKey: 'dashboard.taskQueueManagement' },
   ]
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">Dashboard</h1>
-        <p className="text-muted-foreground">Oxios Agent OS overview</p>
+        <h1 className="text-2xl font-bold">{t('dashboard.title')}</h1>
+        <p className="text-muted-foreground">{t('dashboard.subtitle')}</p>
       </div>
 
       {/* Stats Grid */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {stats.map((stat) => (
-          <Card key={stat.label}>
+          <Card key={stat.labelKey}>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
-                {stat.label}
+                {t(stat.labelKey)}
               </CardTitle>
               <div className={stat.color}>{stat.icon}</div>
             </CardHeader>
@@ -118,7 +121,7 @@ function DashboardPage() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Activity className="h-4 w-4" /> Active Agents
+              <Activity className="h-4 w-4" /> {t('dashboard.activeAgents')}
               {runningAgents.length > 0 && (
                 <Badge variant="success" className="ml-1">{runningAgents.length}</Badge>
               )}
@@ -145,12 +148,12 @@ function DashboardPage() {
                         </p>
                       </div>
                     </div>
-                    <Badge variant="success">Running</Badge>
+                    <Badge variant="success">{t('common.running')}</Badge>
                   </Link>
                 ))}
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground py-2">No active agents</p>
+              <p className="text-sm text-muted-foreground py-2">{t('dashboard.noActiveAgents')}</p>
             )}
           </CardContent>
         </Card>
@@ -159,34 +162,34 @@ function DashboardPage() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Shield className="h-4 w-4" /> System Health
+              <Shield className="h-4 w-4" /> {t('dashboard.systemHealth')}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
               {status?.components?.state_store && (
                 <HealthRow
-                  label="State Store"
+                  labelKey="dashboard.stateStore"
                   healthy={status.components.state_store.healthy}
                   detail={status.components.state_store.detail}
                 />
               )}
               {status?.components?.event_bus && (
                 <HealthRow
-                  label="Event Bus"
+                  labelKey="dashboard.eventBus"
                   healthy={status.components.event_bus.healthy}
                   detail={status.components.event_bus.detail}
                 />
               )}
               {status?.components?.memory && (
                 <HealthRow
-                  label="Memory"
+                  labelKey="dashboard.memory"
                   healthy={status.components.memory.enabled}
-                  detail={`${status.components.memory.index_size} entries indexed`}
+                  detail={t('dashboard.entriesIndexed', { count: status.components.memory.index_size })}
                 />
               )}
               <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Version</span>
+                <span className="text-muted-foreground">{t('dashboard.version')}</span>
                 <span className="font-mono">{status?.version ?? 'unknown'}</span>
               </div>
             </div>
@@ -196,7 +199,7 @@ function DashboardPage() {
 
       {/* Quick Links — 2x4 grid */}
       <div>
-        <h2 className="text-lg font-semibold mb-3">Quick Links</h2>
+        <h2 className="text-lg font-semibold mb-3">{t('dashboard.quickLinks')}</h2>
         <div className="grid gap-3 grid-cols-2 md:grid-cols-4">
           {quickLinks.map((link) => (
             <Link key={link.href} to={link.href}>
@@ -204,8 +207,8 @@ function DashboardPage() {
                 <CardHeader className="flex flex-row items-center gap-3 pb-2">
                   {link.icon}
                   <div>
-                    <CardTitle className="text-sm font-medium">{link.label}</CardTitle>
-                    <p className="text-xs text-muted-foreground mt-0.5">{link.desc}</p>
+                    <CardTitle className="text-sm font-medium">{t(link.labelKey)}</CardTitle>
+                    <p className="text-xs text-muted-foreground mt-0.5">{t(link.descKey)}</p>
                   </div>
                 </CardHeader>
               </Card>
@@ -217,14 +220,16 @@ function DashboardPage() {
   )
 }
 
-function HealthRow({ label, healthy, detail }: { label: string; healthy: boolean; detail?: string | null }) {
+function HealthRow({ labelKey, healthy, detail }: { labelKey: string; healthy: boolean; detail?: string | null }) {
+  const { t } = useTranslation()
+
   return (
     <div className="flex items-center justify-between text-sm">
       <div className="flex items-center gap-2">
         <div className={`h-2 w-2 rounded-full ${healthy ? 'bg-emerald-500' : 'bg-red-500'}`} />
-        <span>{label}</span>
+        <span>{t(labelKey)}</span>
       </div>
-      <span className="text-xs text-muted-foreground">{detail ?? (healthy ? 'Healthy' : 'Unhealthy')}</span>
+      <span className="text-xs text-muted-foreground">{detail ?? (healthy ? t('common.healthy') : t('common.unhealthy'))}</span>
     </div>
   )
 }

@@ -3,7 +3,11 @@ import { createRouter, RouterProvider } from '@tanstack/react-router'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { routeTree } from './routeTree.gen'
+import { initI18n } from './i18n'
 import './index.css'
+
+// Initialize i18n
+initI18n()
 
 const queryClient = new QueryClient({
   defaultOptions: {

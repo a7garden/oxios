@@ -1,12 +1,15 @@
 import { Link, useRouterState } from '@tanstack/react-router'
 import { ArrowLeft, Menu } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { Separator } from '@/components/ui/separator'
 import { cn } from '@/lib/utils'
 import { useKnowledgeStore } from '@/stores/knowledge'
 import { useSidebarStore } from '@/stores/sidebar'
 import { NotificationBell } from './notification-bell'
+import { LanguageSelector } from './language-selector'
 
 export function Header() {
+  const { t } = useTranslation()
   const { setMobileOpen } = useSidebarStore()
   const toggleKnowledgeSidebar = useKnowledgeStore((s) => s.toggleSidebar)
   const router = useRouterState()
@@ -28,7 +31,7 @@ export function Header() {
         type="button"
         className="lg:hidden"
         onClick={handleMobileMenu}
-        aria-label={isKnowledge ? 'Toggle sidebar' : 'Open navigation menu'}
+        aria-label={isKnowledge ? t('common.toggleSidebar', 'Toggle sidebar') : t('common.openNav', 'Open navigation menu')}
       >
         <Menu className="h-5 w-5" />
       </button>
@@ -44,6 +47,9 @@ export function Header() {
       {/* Global notification bell */}
       <NotificationBell />
 
+      {/* Language selector */}
+      <LanguageSelector />
+
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
         <div className="h-2 w-2 rounded-full bg-emerald-500" aria-hidden="true" />
         <span>Oxios Agent OS</span>
@@ -58,6 +64,7 @@ export function Header() {
  * avoiding unnecessary re-renders on dashboard pages.
  */
 function KnowledgeBreadcrumb() {
+  const { t } = useTranslation()
   const currentFilePath = useKnowledgeStore((s) => s.currentFilePath)
   const mode = useKnowledgeStore((s) => s.mode)
 
@@ -68,11 +75,11 @@ function KnowledgeBreadcrumb() {
         className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
       >
         <ArrowLeft className="h-4 w-4" />
-        <span>Dashboard</span>
+        <span>{t('common.dashboard', 'Dashboard')}</span>
       </Link>
       <Separator orientation="vertical" className="h-6" />
       <div className="flex items-center gap-2 text-sm">
-        <span className={cn('font-medium', !currentFilePath && 'text-foreground')}>Knowledge</span>
+        <span className={cn('font-medium', !currentFilePath && 'text-foreground')}>{t('knowledge.title', 'Knowledge')}</span>
         {currentFilePath && (
           <>
             <span className="text-muted-foreground">/</span>
@@ -84,7 +91,7 @@ function KnowledgeBreadcrumb() {
         {mode === 'chat' && !currentFilePath && (
           <>
             <span className="text-muted-foreground">/</span>
-            <span className="text-muted-foreground">Chat</span>
+            <span className="text-muted-foreground">{t('chat.title', 'Chat')}</span>
           </>
         )}
       </div>

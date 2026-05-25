@@ -80,6 +80,7 @@ export interface Space {
 // Skill (RFC-009 unified model)
 export type SkillSource = 'bundled' | 'managed' | 'workspace'
 export type SkillStatus = 'ready' | 'needs_setup' | 'disabled'
+export type SkillFormat = 'oxios' | 'openclaw' | 'claude_code' | 'agent_skills'
 
 export interface SkillRequirements {
   bins: string[]
@@ -113,6 +114,7 @@ export interface Skill {
   os: string[]
   install: SkillInstallSpec[]
   config_checks: Array<{ path: string; satisfied: boolean }>
+  format: SkillFormat
 }
 
 // Memory

@@ -59,6 +59,13 @@ pub struct AgentRuntimeConfig {
     pub project_paths: Vec<std::path::PathBuf>,
     /// Scratch workspace directory for temp files.
     pub workspace_dir: Option<std::path::PathBuf>,
+    /// API key resolved from CredentialStore at build time.
+    /// Passed through to `AgentLoopConfig::api_key` so the provider
+    /// uses it instead of environment variables.
+    pub api_key: Option<String>,
+    /// Per-provider options for fine-grained control.
+    /// Passed through to `AgentLoopConfig::provider_options`.
+    pub provider_options: Option<oxi_sdk::ProviderOptions>,
 }
 
 impl Default for AgentRuntimeConfig {
@@ -71,6 +78,8 @@ impl Default for AgentRuntimeConfig {
             space_id: None,
             project_paths: Vec::new(),
             workspace_dir: None,
+            api_key: None,
+            provider_options: None,
         }
     }
 }
@@ -383,8 +392,9 @@ async fn run_agent_loop(ctx: AgentLoopContext) -> Result<(String, usize, bool)> 
         auto_retry_enabled: config.auto_retry_enabled,
         auto_retry_max_attempts: 3,
         auto_retry_base_delay_ms: 2000,
-        api_key: None,
+        api_key: config.api_key,
         workspace_dir: config.project_paths.first().cloned(), // Use first project path as workspace
+        provider_options: config.provider_options,
     };
 
     let state = SharedState::new();

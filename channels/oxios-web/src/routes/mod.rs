@@ -13,6 +13,7 @@ mod audit_routes;
 mod budget_routes;
 mod chat;
 mod cron_jobs;
+mod engine_routes;
 mod events;
 mod git_routes;
 mod infra;
@@ -49,6 +50,11 @@ pub(crate) use chat::{handle_chat, handle_chat_stream};
 pub(crate) use cron_jobs::{
     handle_cron_job_create, handle_cron_job_delete, handle_cron_job_get, handle_cron_job_trigger,
     handle_cron_jobs_list, update_cron_job,
+};
+pub(crate) use engine_routes::{
+    handle_engine_config, handle_engine_models, handle_engine_providers,
+    handle_engine_set_api_key, handle_engine_set_model, handle_engine_set_provider_options,
+    handle_engine_validate_key,
 };
 pub(crate) use events::{
     handle_approval_approve, handle_approval_reject, handle_approvals_list, handle_events,
@@ -168,6 +174,14 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         // Config
         .route("/api/config", get(handle_config_get))
         .route("/api/config", put(handle_config_put))
+        // Engine
+        .route("/api/engine/providers", get(handle_engine_providers))
+        .route("/api/engine/models", get(handle_engine_models))
+        .route("/api/engine/config", get(handle_engine_config))
+        .route("/api/engine/model", put(handle_engine_set_model))
+        .route("/api/engine/api-key", put(handle_engine_set_api_key))
+        .route("/api/engine/provider-options", put(handle_engine_set_provider_options))
+        .route("/api/engine/validate-key", post(handle_engine_validate_key))
         // Workspace
         .route("/api/workspace/tree", get(handle_workspace_tree))
         .route(

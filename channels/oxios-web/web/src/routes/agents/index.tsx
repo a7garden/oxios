@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { Bot } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { DataTable } from '@/components/shared/data-table'
 import { EmptyState } from '@/components/shared/empty-state'
 import { ErrorState } from '@/components/shared/error-state'
@@ -16,6 +17,7 @@ export const Route = createFileRoute('/agents/')({
 })
 
 function AgentsListPage() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
 
   const { data, isLoading, isError, refetch, isFetching } = useQuery({
@@ -31,7 +33,7 @@ function AgentsListPage() {
 
   const columns = [
     {
-      header: 'Name',
+      header: t('agents.name'),
       accessor: (row: Agent) => (
         <div className="flex items-center gap-2">
           <Bot className="h-4 w-4 text-muted-foreground" />
@@ -40,11 +42,11 @@ function AgentsListPage() {
       ),
     },
     {
-      header: 'Status',
+      header: t('agents.status'),
       accessor: (row: Agent) => <StatusIndicator status={row.status?.toLowerCase() ?? 'unknown'} />,
     },
     {
-      header: 'Seed',
+      header: t('agents.seed'),
       accessor: (row: Agent) =>
         row.seed_id ? (
           <Badge variant="outline">{row.seed_id.slice(0, 8)}...</Badge>
@@ -53,7 +55,7 @@ function AgentsListPage() {
         ),
     },
     {
-      header: 'Created',
+      header: t('agents.created'),
       accessor: (row: Agent) => (row.created_at ? new Date(row.created_at).toLocaleString() : '—'),
     },
   ]
@@ -62,8 +64,10 @@ function AgentsListPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Agents</h1>
-          <p className="text-muted-foreground">{data?.total ?? 0} agent(s) registered</p>
+          <h1 className="text-2xl font-bold">{t('agents.title')}</h1>
+          <p className="text-muted-foreground">
+            {t('agents.registered', { count: data?.total ?? 0 })}
+          </p>
         </div>
         <div className="flex gap-2">
           <RefreshButton onClick={() => refetch()} isFetching={isFetching} />
@@ -73,8 +77,8 @@ function AgentsListPage() {
       {agents.length === 0 ? (
         <EmptyState
           icon={<Bot className="h-10 w-10" />}
-          title="No agents"
-          description="Agents will appear here when they are spawned."
+          title={t('agents.noAgents')}
+          description={t('agents.noAgentsDescription')}
         />
       ) : (
         <DataTable

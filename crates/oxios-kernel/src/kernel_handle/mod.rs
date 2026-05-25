@@ -1,8 +1,9 @@
-//! Kernel facade — 12 domain Facades composing the System Call API.
+//! Kernel facade — 13 domain Facades composing the System Call API.
 
 pub mod a2a_api;
 pub mod agent_api;
 pub mod browser_api;
+pub mod engine_api;
 pub mod exec_api;
 pub mod extension_api;
 pub mod infra_api;
@@ -17,6 +18,7 @@ pub mod state_api;
 pub use a2a_api::A2aApi;
 pub use agent_api::AgentApi;
 pub use browser_api::BrowserApi;
+pub use engine_api::{EngineApi, EngineConfigResponse, ModelInfo, ProviderInfo, ValidateKeyResult};
 pub use exec_api::ExecApi;
 pub use extension_api::ExtensionApi;
 pub use infra_api::InfraApi;
@@ -54,7 +56,7 @@ use serde::Serialize;
 use std::sync::Arc;
 use std::time::Instant;
 
-/// Oxios kernel System Call API — composed of 12 domain Facades.
+/// Oxios kernel System Call API — composed of 13 domain Facades.
 ///
 /// Each Facade groups related system calls:
 /// - [`StateApi`]     — data persistence, sessions
@@ -67,6 +69,7 @@ use std::time::Instant;
 /// - [`ExecApi`]      — execution config, access management
 /// - [`BrowserApi`]   — browser backend
 /// - [`A2aApi`]       — agent-to-agent communication
+/// - [`EngineApi`]    — LLM engine providers, models, config
 /// - [`KnowledgeBase`] — markdown note management (kernel-free, via oxios-markdown)
 pub struct KernelHandle {
     /// State management: save/load/sessions.
@@ -91,6 +94,8 @@ pub struct KernelHandle {
     pub browser: BrowserApi,
     /// Agent-to-agent communication.
     pub a2a: A2aApi,
+    /// Engine: LLM providers, models, config.
+    pub engine: EngineApi,
     /// Knowledge base: markdown notes (direct access, no kernel dependency).
     pub knowledge: Arc<oxios_markdown::KnowledgeBase>,
     /// Semantic knowledge overlay (HNSW index + agent recall).
@@ -100,7 +105,7 @@ pub struct KernelHandle {
 }
 
 impl KernelHandle {
-    /// Create a new KernelHandle from 12 domain Facades.
+    /// Create a new KernelHandle from 13 domain Facades.
     ///
     /// Each Facade is assembled independently in `kernel.rs` and passed here.
     /// This enables testing individual Facades without the full kernel.
@@ -117,6 +122,7 @@ impl KernelHandle {
         exec: ExecApi,
         browser: BrowserApi,
         a2a: A2aApi,
+        engine: EngineApi,
         knowledge: Arc<oxios_markdown::KnowledgeBase>,
         knowledge_lens: Arc<KnowledgeLens>,
         marketplace_api: MarketplaceApi,
@@ -133,6 +139,7 @@ impl KernelHandle {
             exec,
             browser,
             a2a,
+            engine,
             knowledge,
             knowledge_lens,
             marketplace_api,
@@ -204,6 +211,10 @@ impl KernelHandle {
             #[allow(clippy::default_trait_access)]
             browser: BrowserApi::default(),
             a2a: A2aApi::new(Arc::new(A2AProtocol::new(crate::EventBus::new(0)))),
+            engine: EngineApi::new(
+                Arc::new(parking_lot::RwLock::new(config.clone())),
+                std::path::PathBuf::from("~/.oxios/config.toml"),
+            ),
             knowledge,
             knowledge_lens,
             marketplace_api: MarketplaceApi::new(

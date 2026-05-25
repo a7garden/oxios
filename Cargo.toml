@@ -57,8 +57,8 @@ regex = "1"
 parking_lot = "0.12"
 
 # oxi engine — single dependency for everything
-oxi-sdk = "0.19.0"
-oxi-ai = "0.19.0"
+oxi-sdk = "0.22.0"
+oxi-ai = "0.22.0"
 
 [features]
 default = ["web", "cli", "browser"]

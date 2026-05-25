@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { Dna } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { DataTable } from '@/components/shared/data-table'
 import { EmptyState } from '@/components/shared/empty-state'
 import { ErrorState } from '@/components/shared/error-state'
@@ -15,6 +16,7 @@ export const Route = createFileRoute('/seeds/')({
 })
 
 function SeedsListPage() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
 
   const { data, isLoading, isError, refetch, isFetching } = useQuery({
@@ -29,13 +31,16 @@ function SeedsListPage() {
   const seeds = data?.items ?? []
 
   const columns = [
-    { header: 'Goal', accessor: (row: Seed) => <span className="font-medium">{row.goal}</span> },
     {
-      header: 'Constraints',
+      header: t('seeds.goal'),
+      accessor: (row: Seed) => <span className="font-medium">{row.goal}</span>,
+    },
+    {
+      header: t('seeds.constraints'),
       accessor: (row: Seed) => <Badge variant="outline">{row.constraints_count}</Badge>,
     },
     {
-      header: 'Created',
+      header: t('seeds.created'),
       accessor: (row: Seed) => (row.created_at ? new Date(row.created_at).toLocaleString() : '—'),
     },
   ]
@@ -44,8 +49,10 @@ function SeedsListPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Seeds</h1>
-          <p className="text-muted-foreground">{data?.total ?? 0} seed(s)</p>
+          <h1 className="text-2xl font-bold">{t('seeds.title')}</h1>
+          <p className="text-muted-foreground">
+            {t('seeds.registered', { count: data?.total ?? 0 })}
+          </p>
         </div>
         <RefreshButton onClick={() => refetch()} isFetching={isFetching} />
       </div>
@@ -53,8 +60,8 @@ function SeedsListPage() {
       {seeds.length === 0 ? (
         <EmptyState
           icon={<Dna className="h-10 w-10" />}
-          title="No seeds"
-          description="Ouroboros seeds will appear here when created."
+          title={t('seeds.noSeeds')}
+          description={t('seeds.noSeedsDescription')}
         />
       ) : (
         <DataTable

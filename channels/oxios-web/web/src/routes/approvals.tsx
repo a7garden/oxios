@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
 import { CheckCircle, Timer, XCircle } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { ErrorState } from '@/components/shared/error-state'
 import { LoadingCards } from '@/components/shared/loading'
 import { RefreshButton } from '@/components/shared/refresh-button'
@@ -13,6 +14,7 @@ import type { Approval } from '@/types'
 export const Route = createFileRoute('/approvals')({ component: ApprovalsPage })
 
 function ApprovalsPage() {
+  const { t } = useTranslation()
   const queryClient = useQueryClient()
 
   const { data, isLoading, isError, refetch, isFetching } = useQuery({
@@ -46,8 +48,8 @@ function ApprovalsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Approvals</h1>
-          <p className="text-muted-foreground">Human-in-the-loop approval queue</p>
+          <h1 className="text-2xl font-bold">{t('approvals.title')}</h1>
+          <p className="text-muted-foreground">{t('approvals.subtitle')}</p>
         </div>
         <RefreshButton onClick={() => refetch()} isFetching={isFetching} />
       </div>
@@ -56,12 +58,12 @@ function ApprovalsPage() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Timer className="h-4 w-4" /> Pending ({pending.length})
+            <Timer className="h-4 w-4" /> {t('approvals.pendingWithCount', { count: pending.length })}
           </CardTitle>
         </CardHeader>
         <CardContent>
           {pending.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No pending approvals.</p>
+            <p className="text-sm text-muted-foreground">{t('approvals.noPending')}</p>
           ) : (
             <div className="space-y-3">
               {pending.map((approval) => (
@@ -84,7 +86,7 @@ function ApprovalsPage() {
                       onClick={() => approveMutation.mutate(approval.id)}
                       disabled={approveMutation.isPending}
                     >
-                      <CheckCircle className="h-4 w-4 mr-1" /> Approve
+                      <CheckCircle className="h-4 w-4 mr-1" /> {t('approvals.approve')}
                     </Button>
                     <Button
                       size="sm"
@@ -93,7 +95,7 @@ function ApprovalsPage() {
                       onClick={() => rejectMutation.mutate(approval.id)}
                       disabled={rejectMutation.isPending}
                     >
-                      <XCircle className="h-4 w-4 mr-1" /> Reject
+                      <XCircle className="h-4 w-4 mr-1" /> {t('approvals.reject')}
                     </Button>
                   </div>
                 </div>
@@ -107,7 +109,7 @@ function ApprovalsPage() {
       {resolved.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle>Resolved</CardTitle>
+            <CardTitle>{t('approvals.resolved')}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-2">

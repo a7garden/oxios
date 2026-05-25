@@ -46,6 +46,8 @@ pub struct Kernel {
     resource_monitor: Arc<ResourceMonitor>,
     space_manager: Arc<SpaceManager>,
     start_time: std::time::Instant,
+    /// Path to config.toml (for persistence).
+    config_path: PathBuf,
     /// Cached KernelHandle — created once, reused forever.
     handle_cache: OnceLock<Arc<oxios_kernel::KernelHandle>>,
     /// A2A protocol for inter-agent communication.
@@ -103,6 +105,11 @@ impl Kernel {
                     ),
                     self.build_browser_api(),
                     oxios_kernel::A2aApi::new(self.a2a_protocol.clone()),
+                    // EngineApi — LLM providers, models, config
+                    oxios_kernel::EngineApi::new(
+                        Arc::new(parking_lot::RwLock::new(self.config.clone())),
+                        self.config_path.clone(),
+                    ),
                     // KnowledgeBase — single source of truth (RFC-003)
                     Arc::new(
                         KnowledgeBase::new(
@@ -449,7 +456,7 @@ impl KernelBuilder {
             .context(format!("Failed to create provider: {}", model.provider))?;
 
         let ouroboros: Arc<dyn OuroborosProtocol> =
-            Arc::new(OuroborosEngine::new(Arc::clone(&provider), model));
+            Arc::new(OuroborosEngine::new(Arc::clone(&provider), model.clone()));
 
         let mut access_manager = AccessManager::new();
         if let Some(ref audit_path) = config.security.audit_log_path {
@@ -578,6 +585,11 @@ impl KernelBuilder {
                 oxios_kernel::ExecApi::new(Arc::new(config.exec.clone()), access_manager.clone()),
                 build_browser_api_value(&config),
                 oxios_kernel::A2aApi::new(a2a_protocol.clone()),
+                // EngineApi — LLM providers, models, config
+                oxios_kernel::EngineApi::new(
+                    Arc::new(parking_lot::RwLock::new(config.clone())),
+                    config_path.clone(),
+                ),
                 // KnowledgeBase — single source of truth (RFC-003)
                 Arc::new(
                     KnowledgeBase::new(PathBuf::from(&config.kernel.workspace).join("knowledge"))
@@ -604,7 +616,22 @@ impl KernelBuilder {
 
         let agent_runtime = AgentRuntime::new(provider, model_id, kernel_handle)
             .with_persona_manager(Arc::new(persona_manager.clone()))
-            .with_tool_retriever(Arc::new(tool_retriever));
+            .with_tool_retriever(Arc::new(tool_retriever))
+            .with_config({
+                // Resolve API key from CredentialStore based on the model's provider.
+                let provider_name = model.provider.as_str();
+                let config_api_key = config.engine.api_key.as_deref();
+                let api_key =
+                    oxios_kernel::CredentialStore::resolve(provider_name, config_api_key)
+                        .map(|(key, _)| key);
+
+                oxios_kernel::agent_runtime::AgentRuntimeConfig {
+                    model_id: model_id.clone(),
+                    api_key,
+                    provider_options: config.engine.provider_options.clone(),
+                    ..Default::default()
+                }
+            });
 
         let supervisor: Arc<dyn Supervisor> =
             Arc::new(BasicSupervisor::new(event_bus.clone(), agent_runtime));
@@ -691,6 +718,7 @@ impl KernelBuilder {
             resource_monitor,
             space_manager,
             start_time: std::time::Instant::now(),
+            config_path,
             handle_cache: OnceLock::new(),
             a2a_protocol,
         })

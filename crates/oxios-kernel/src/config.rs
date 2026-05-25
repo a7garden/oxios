@@ -340,6 +340,10 @@ pub struct EngineConfig {
     /// Masked when serialized to API responses.
     #[serde(default, skip_serializing)]
     pub api_key: Option<String>,
+    /// Per-provider options for fine-grained control (thinking mode, etc.).
+    /// Passed through to `AgentLoopConfig::provider_options`.
+    #[serde(default)]
+    pub provider_options: Option<oxi_sdk::ProviderOptions>,
 }
 
 #[allow(clippy::derivable_impls)]
@@ -348,6 +352,7 @@ impl Default for EngineConfig {
         Self {
             default_model: String::new(),
             api_key: None,
+            provider_options: None,
         }
     }
 }

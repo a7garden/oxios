@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
 import { GitBranch, RotateCcw, ShieldCheck, Tag } from 'lucide-react'
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { EmptyState } from '@/components/shared/empty-state'
 import { ErrorState } from '@/components/shared/error-state'
 import { LoadingCards } from '@/components/shared/loading'
@@ -16,6 +17,7 @@ import type { GitCommit } from '@/types'
 export const Route = createFileRoute('/git')({ component: GitPage })
 
 function GitPage() {
+  const { t } = useTranslation()
   const queryClient = useQueryClient()
   const [tagName, setTagName] = useState('')
   const [restoreHash, setRestoreHash] = useState('')
@@ -74,8 +76,8 @@ function GitPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Git</h1>
-          <p className="text-muted-foreground">In-process version control</p>
+          <h1 className="text-2xl font-bold">{t('git.title')}</h1>
+          <p className="text-muted-foreground">{t('git.subtitle')}</p>
         </div>
         <div className="flex gap-2">
           <RefreshButton onClick={() => refetch()} isFetching={isFetching} />
@@ -85,7 +87,7 @@ function GitPage() {
             onClick={() => verifyMutation.mutate()}
             disabled={verifyMutation.isPending}
           >
-            <ShieldCheck className="h-4 w-4 mr-1" /> Verify
+            <ShieldCheck className="h-4 w-4 mr-1" /> {t('git.verify')}
           </Button>
         </div>
       </div>
@@ -94,7 +96,7 @@ function GitPage() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Tag className="h-4 w-4" /> Tags
+            <Tag className="h-4 w-4" /> {t('git.tags')}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -102,7 +104,7 @@ function GitPage() {
             <Input
               value={tagName}
               onChange={(e) => setTagName(e.target.value)}
-              placeholder="Tag name..."
+              placeholder={t('git.tagNamePlaceholder')}
               className="max-w-xs"
             />
             <Button
@@ -110,7 +112,7 @@ function GitPage() {
               onClick={() => tagMutation.mutate(tagName)}
               disabled={!tagName.trim() || tagMutation.isPending}
             >
-              Create Tag
+              {t('git.createTag')}
             </Button>
           </div>
           {tagList.length > 0 ? (
@@ -122,7 +124,7 @@ function GitPage() {
               ))}
             </div>
           ) : (
-            <p className="text-sm text-muted-foreground">No tags.</p>
+            <p className="text-sm text-muted-foreground">{t('git.noTags')}</p>
           )}
         </CardContent>
       </Card>
@@ -131,7 +133,7 @@ function GitPage() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <RotateCcw className="h-4 w-4" /> Restore
+            <RotateCcw className="h-4 w-4" /> {t('git.restore')}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -139,7 +141,7 @@ function GitPage() {
             <Input
               value={restoreHash}
               onChange={(e) => setRestoreHash(e.target.value)}
-              placeholder="Commit hash to restore..."
+              placeholder={t('git.restorePlaceholder')}
               className="max-w-xs font-mono"
             />
             <Button
@@ -148,7 +150,7 @@ function GitPage() {
               onClick={() => restoreMutation.mutate(restoreHash)}
               disabled={!restoreHash.trim() || restoreMutation.isPending}
             >
-              Restore
+              {t('git.restore')}
             </Button>
           </div>
         </CardContent>
@@ -158,15 +160,15 @@ function GitPage() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <GitBranch className="h-4 w-4" /> Commit Log
+            <GitBranch className="h-4 w-4" /> {t('git.commitLog')}
           </CardTitle>
         </CardHeader>
         <CardContent>
           {commitList.length === 0 ? (
             <EmptyState
               icon={<GitBranch className="h-8 w-8" />}
-              title="No commits"
-              description="Commit history will appear here."
+              title={t('git.noCommits')}
+              description={t('git.noCommitsDescription')}
               className="py-6"
             />
           ) : (

@@ -475,6 +475,7 @@ fn skill_entry_to_json(entry: &SkillEntry) -> serde_json::Value {
         "os": os,
         "install": install,
         "config_checks": config_checks,
+        "format": entry.format.to_string(),
     })
 }
 

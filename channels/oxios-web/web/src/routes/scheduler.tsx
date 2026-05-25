@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
 import { Calendar, CheckCircle, Clock, Loader2 } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { EmptyState } from '@/components/shared/empty-state'
 import { ErrorState } from '@/components/shared/error-state'
 import { LoadingCards } from '@/components/shared/loading'
@@ -30,6 +31,7 @@ interface SchedulerTask {
 export const Route = createFileRoute('/scheduler')({ component: SchedulerPage })
 
 function SchedulerPage() {
+  const { t } = useTranslation()
   const { data, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ['scheduler'],
     queryFn: async () => {
@@ -64,8 +66,8 @@ function SchedulerPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Scheduler</h1>
-          <p className="text-muted-foreground">Task scheduling and queue management</p>
+          <h1 className="text-2xl font-bold">{t('scheduler.title')}</h1>
+          <p className="text-muted-foreground">{t('scheduler.subtitle')}</p>
         </div>
         <RefreshButton onClick={() => refetch()} isFetching={isFetching} />
       </div>
@@ -74,7 +76,7 @@ function SchedulerPage() {
       <div className="grid gap-4 md:grid-cols-4">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-muted-foreground">Status</CardTitle>
+            <CardTitle className="text-sm text-muted-foreground">{t('scheduler.status')}</CardTitle>
           </CardHeader>
           <CardContent>
             <StatusIndicator status={data?.running ? 'running' : 'stopped'} />
@@ -82,7 +84,7 @@ function SchedulerPage() {
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-muted-foreground">Queued</CardTitle>
+            <CardTitle className="text-sm text-muted-foreground">{t('scheduler.queued')}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{data?.total_tasks ?? 0}</div>
@@ -90,7 +92,7 @@ function SchedulerPage() {
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-muted-foreground">Active</CardTitle>
+            <CardTitle className="text-sm text-muted-foreground">{t('scheduler.active')}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{data?.active_tasks ?? 0}</div>
@@ -98,7 +100,9 @@ function SchedulerPage() {
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-muted-foreground">Max Concurrent</CardTitle>
+            <CardTitle className="text-sm text-muted-foreground">
+              {t('scheduler.maxConcurrent')}
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{data?.max_concurrent ?? '-'}</div>
@@ -110,15 +114,15 @@ function SchedulerPage() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Calendar className="h-4 w-4" /> Task Queue
+            <Calendar className="h-4 w-4" /> {t('scheduler.taskQueue')}
           </CardTitle>
         </CardHeader>
         <CardContent>
           {tasks.length === 0 ? (
             <EmptyState
               icon={<Calendar className="h-8 w-8" />}
-              title="No tasks"
-              description="The scheduler queue is empty."
+              title={t('scheduler.noTasks')}
+              description={t('scheduler.noTasksDescription')}
               className="py-6"
             />
           ) : (

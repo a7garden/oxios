@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
 import { Plus, Power, PowerOff, Timer, Trash2 } from 'lucide-react'
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { EmptyState } from '@/components/shared/empty-state'
 import { ErrorState } from '@/components/shared/error-state'
 import { LoadingCards } from '@/components/shared/loading'
@@ -16,6 +17,7 @@ import type { CronJob } from '@/types'
 export const Route = createFileRoute('/cron-jobs')({ component: CronJobsPage })
 
 function CronJobsPage() {
+  const { t } = useTranslation()
   const queryClient = useQueryClient()
   const [showCreate, setShowCreate] = useState(false)
   const [name, setName] = useState('')
@@ -63,13 +65,13 @@ function CronJobsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Cron Jobs</h1>
-          <p className="text-muted-foreground">Scheduled task management</p>
+          <h1 className="text-2xl font-bold">{t('cronJobs.title')}</h1>
+          <p className="text-muted-foreground">{t('cronJobs.subtitle')}</p>
         </div>
         <div className="flex gap-2">
           <RefreshButton onClick={() => refetch()} isFetching={isFetching} />
           <Button size="sm" onClick={() => setShowCreate(true)}>
-            <Plus className="h-4 w-4 mr-1" /> New Job
+            <Plus className="h-4 w-4 mr-1" /> {t('cronJobs.newJob')}
           </Button>
         </div>
       </div>
@@ -77,19 +79,19 @@ function CronJobsPage() {
       {showCreate && (
         <Card>
           <CardHeader>
-            <CardTitle>Create Cron Job</CardTitle>
+            <CardTitle>{t('cronJobs.createCronJob')}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Job name" />
+            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder={t('cronJobs.jobNamePlaceholder')} />
             <Input
               value={schedule}
               onChange={(e) => setSchedule(e.target.value)}
-              placeholder="Cron schedule (e.g. */5 * * * *)"
+              placeholder={t('cronJobs.cronSchedulePlaceholder')}
             />
             <Input
               value={command}
               onChange={(e) => setCommand(e.target.value)}
-              placeholder="Command to execute"
+              placeholder={t('cronJobs.commandPlaceholder')}
             />
             <div className="flex gap-2">
               <Button
@@ -97,10 +99,10 @@ function CronJobsPage() {
                 onClick={() => createMutation.mutate({ name, schedule, command })}
                 disabled={!name || !schedule || !command || createMutation.isPending}
               >
-                Create
+                {t('common.create')}
               </Button>
               <Button variant="ghost" size="sm" onClick={() => setShowCreate(false)}>
-                Cancel
+                {t('common.cancel')}
               </Button>
             </div>
           </CardContent>
@@ -110,8 +112,8 @@ function CronJobsPage() {
       {jobs.length === 0 && !showCreate ? (
         <EmptyState
           icon={<Timer className="h-10 w-10" />}
-          title="No cron jobs"
-          description="Create scheduled tasks to automate recurring work."
+          title={t('cronJobs.noCronJobs')}
+          description={t('cronJobs.description')}
         />
       ) : (
         <div className="space-y-3">
@@ -122,7 +124,7 @@ function CronJobsPage() {
                   <p className="font-medium flex items-center gap-2">
                     <Timer className="h-4 w-4" /> {job.name}
                     <Badge variant={job.enabled ? 'success' : 'secondary'}>
-                      {job.enabled ? 'Enabled' : 'Disabled'}
+                      {job.enabled ? t('common.enabled') : t('common.disabled')}
                     </Badge>
                   </p>
                   <p className="text-sm text-muted-foreground mt-1">
@@ -131,8 +133,8 @@ function CronJobsPage() {
                     <code className="text-xs bg-muted px-1 py-0.5 rounded">{job.command}</code>
                   </p>
                   <div className="flex gap-4 text-xs text-muted-foreground mt-1">
-                    {job.last_run && <span>Last: {new Date(job.last_run).toLocaleString()}</span>}
-                    {job.next_run && <span>Next: {new Date(job.next_run).toLocaleString()}</span>}
+                    {job.last_run && <span>{t('cronJobs.lastRunLabel')} {new Date(job.last_run).toLocaleString()}</span>}
+                    {job.next_run && <span>{t('cronJobs.nextRunLabel')} {new Date(job.next_run).toLocaleString()}</span>}
                   </div>
                 </div>
                 <div className="flex gap-1">
@@ -140,7 +142,7 @@ function CronJobsPage() {
                     variant="ghost"
                     size="icon"
                     onClick={() => toggleMutation.mutate({ id: job.id, enabled: !job.enabled })}
-                    aria-label={job.enabled ? 'Disable job' : 'Enable job'}
+                    aria-label={job.enabled ? t('cronJobs.disableJob') : t('cronJobs.enableJob')}
                   >
                     {job.enabled ? <PowerOff className="h-4 w-4" /> : <Power className="h-4 w-4" />}
                   </Button>
@@ -148,7 +150,7 @@ function CronJobsPage() {
                     variant="ghost"
                     size="icon"
                     onClick={() => deleteMutation.mutate(job.id)}
-                    aria-label="Delete job"
+                    aria-label={t('cronJobs.deleteJob')}
                   >
                     <Trash2 className="h-4 w-4 text-destructive" />
                   </Button>

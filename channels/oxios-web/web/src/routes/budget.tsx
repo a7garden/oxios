@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
 import { Wallet } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { EmptyState } from '@/components/shared/empty-state'
 import { ErrorState } from '@/components/shared/error-state'
 import { LoadingCards } from '@/components/shared/loading'
@@ -12,6 +13,7 @@ import type { Budget } from '@/types'
 export const Route = createFileRoute('/budget')({ component: BudgetPage })
 
 function BudgetPage() {
+  const { t } = useTranslation()
   const {
     data: budgets,
     isLoading,
@@ -39,8 +41,8 @@ function BudgetPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Budget</h1>
-          <p className="text-muted-foreground">Token and cost budget tracking</p>
+          <h1 className="text-2xl font-bold">{t('budget.title')}</h1>
+          <p className="text-muted-foreground">{t('budget.subtitle')}</p>
         </div>
         <RefreshButton onClick={() => refetch()} isFetching={isFetching} />
       </div>
@@ -49,7 +51,7 @@ function BudgetPage() {
       <div className="grid gap-4 md:grid-cols-2">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-muted-foreground">Total Tokens Used</CardTitle>
+            <CardTitle className="text-sm text-muted-foreground">{t('budget.totalTokensUsed')}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{totalTokens.toLocaleString()}</div>
@@ -57,7 +59,7 @@ function BudgetPage() {
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-muted-foreground">Total Cost</CardTitle>
+            <CardTitle className="text-sm text-muted-foreground">{t('budget.totalCost')}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">${totalCost.toFixed(4)}</div>
@@ -69,8 +71,8 @@ function BudgetPage() {
       {items.length === 0 ? (
         <EmptyState
           icon={<Wallet className="h-10 w-10" />}
-          title="No budget data"
-          description="Budget information will appear as agents consume tokens."
+          title={t('budget.noBudgetData')}
+          description={t('budget.noBudgetDataDescription')}
         />
       ) : (
         <div className="space-y-3">
@@ -93,7 +95,7 @@ function BudgetPage() {
                 <CardContent className="space-y-3">
                   <div>
                     <div className="flex justify-between text-sm mb-1">
-                      <span>Tokens: {(budget.tokens_used ?? 0).toLocaleString()}</span>
+                      <span>{t('budget.tokens')}: {(budget.tokens_used ?? 0).toLocaleString()}</span>
                       <span className="text-muted-foreground">
                         / {budget.tokens_limit?.toLocaleString() ?? '∞'}
                       </span>
@@ -107,7 +109,7 @@ function BudgetPage() {
                   </div>
                   <div>
                     <div className="flex justify-between text-sm mb-1">
-                      <span>Cost: ${(budget.cost_used ?? 0).toFixed(4)}</span>
+                      <span>{t('budget.cost')}: ${(budget.cost_used ?? 0).toFixed(4)}</span>
                       <span className="text-muted-foreground">
                         / ${budget.cost_limit?.toFixed(2) ?? '∞'}
                       </span>

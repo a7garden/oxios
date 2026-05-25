@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
 import { Brain, Search } from 'lucide-react'
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { EmptyState } from '@/components/shared/empty-state'
 import { ErrorState } from '@/components/shared/error-state'
 import { LoadingCards } from '@/components/shared/loading'
@@ -20,6 +21,7 @@ interface MemoryItem {
 export const Route = createFileRoute('/memory')({ component: MemoryPage })
 
 function MemoryPage() {
+  const { t } = useTranslation()
   const [search, setSearch] = useState('')
 
   const {
@@ -68,8 +70,8 @@ function MemoryPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Memory</h1>
-          <p className="text-muted-foreground">Agent memory store</p>
+          <h1 className="text-2xl font-bold">{t('memory.title')}</h1>
+          <p className="text-muted-foreground">{t('memory.subtitle')}</p>
         </div>
         <RefreshButton onClick={() => refetch()} isFetching={isFetching} />
       </div>
@@ -79,7 +81,7 @@ function MemoryPage() {
         <Input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search memories..."
+          placeholder={t('memory.searchPlaceholder')}
           className="pl-9"
         />
       </div>
@@ -87,10 +89,8 @@ function MemoryPage() {
       {items.length === 0 ? (
         <EmptyState
           icon={<Brain className="h-10 w-10" />}
-          title="No memories"
-          description={
-            search ? 'No results for your search.' : 'Memories will be stored as agents work.'
-          }
+          title={t('memory.noMemories')}
+          description={search ? t('memory.noSearchResults') : t('memory.description')}
         />
       ) : (
         <div className="space-y-3">

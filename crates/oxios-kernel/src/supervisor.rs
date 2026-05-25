@@ -423,6 +423,10 @@ mod tests {
             crate::kernel_handle::A2aApi::new(Arc::new(crate::a2a::A2AProtocol::new(
                 EventBus::new(64),
             ))),
+            crate::kernel_handle::EngineApi::new(
+                Arc::new(parking_lot::RwLock::new(crate::config::OxiosConfig::default())),
+                tmp.join("config.toml"),
+            ),
             Arc::new(oxios_markdown::KnowledgeBase::new(tmp.join("knowledge")).unwrap()),
             Arc::new(
                 crate::kernel_handle::KnowledgeLens::new(

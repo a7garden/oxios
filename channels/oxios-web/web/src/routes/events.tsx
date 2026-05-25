@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { Bell, RefreshCw } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { EmptyState } from '@/components/shared/empty-state'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -11,6 +12,7 @@ import type { OxiosEvent } from '@/types'
 export const Route = createFileRoute('/events')({ component: EventsPage })
 
 function EventsPage() {
+  const { t } = useTranslation()
   const { events: liveEvents, isConnected, error: connectionError, reconnect } = useEvents()
   const scrollRef = useRef<HTMLDivElement>(null)
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -25,8 +27,8 @@ function EventsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Events</h1>
-          <p className="text-muted-foreground">Live event stream</p>
+          <h1 className="text-2xl font-bold">{t('events.title')}</h1>
+          <p className="text-muted-foreground">{t('events.subtitle')}</p>
         </div>
         <Button
           variant="outline"
@@ -36,7 +38,7 @@ function EventsPage() {
             setRefreshKey((k) => k + 1)
           }}
         >
-          <RefreshCw className="h-4 w-4 mr-1" /> Refresh
+          <RefreshCw className="h-4 w-4 mr-1" /> {t('common.refresh')}
         </Button>
       </div>
 
@@ -44,7 +46,7 @@ function EventsPage() {
         <CardHeader className="pb-2">
           <CardTitle className="flex items-center gap-2 text-base">
             <Bell className="h-4 w-4" />
-            Event Stream
+            {t('events.eventStream')}
             <Badge variant="secondary" className="ml-2" aria-live="polite">
               {liveEvents.length}
             </Badge>
@@ -54,7 +56,7 @@ function EventsPage() {
             {connectionError && (
               <div className="ml-auto flex items-center gap-1.5 text-destructive text-xs">
                 <div className="h-2 w-2 rounded-full bg-destructive" />
-                Connection lost
+                {t('events.connectionLost')}
               </div>
             )}
           </CardTitle>
@@ -62,7 +64,7 @@ function EventsPage() {
         <CardContent className="flex-1">
           {connectionError && (
             <div className="mb-3 rounded border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-              Failed to connect to event stream: {connectionError.message}
+              {t('events.connectionFailed', { error: connectionError.message })}
             </div>
           )}
           <div
@@ -74,8 +76,8 @@ function EventsPage() {
             {liveEvents.length === 0 ? (
               <EmptyState
                 icon={<Bell className="h-8 w-8" />}
-                title="No events"
-                description="Events will stream in real-time."
+                title={t('events.noEvents')}
+                description={t('events.eventsStreamIn')}
                 className="py-8"
               />
             ) : (

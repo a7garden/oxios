@@ -10,6 +10,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
+import { useTranslation } from 'react-i18next'
 
 function getChartColor(token: string): string {
   if (typeof window === 'undefined') return '#888'
@@ -26,6 +27,7 @@ import type { ResourceSnapshot } from '@/types'
 export const Route = createFileRoute('/resources')({ component: ResourcesPage })
 
 function ResourcesPage() {
+  const { t } = useTranslation()
   const { data, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ['resources'],
     queryFn: async () => {
@@ -55,8 +57,8 @@ function ResourcesPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Resources</h1>
-          <p className="text-muted-foreground">System resource monitoring</p>
+          <h1 className="text-2xl font-bold">{t('resources.title')}</h1>
+          <p className="text-muted-foreground">{t('resources.subtitle')}</p>
         </div>
         <RefreshButton onClick={() => refetch()} isFetching={isFetching} />
       </div>
@@ -66,7 +68,7 @@ function ResourcesPage() {
         <div className="grid gap-4 md:grid-cols-3">
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm text-muted-foreground">CPU</CardTitle>
+              <CardTitle className="text-sm text-muted-foreground">{t('resources.cpu')}</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{latest.cpu_percent.toFixed(1)}%</div>
@@ -83,7 +85,9 @@ function ResourcesPage() {
           </Card>
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm text-muted-foreground">Memory</CardTitle>
+              <CardTitle className="text-sm text-muted-foreground">
+                {t('resources.memory')}
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{latest.memory_percent.toFixed(1)}%</div>
@@ -100,7 +104,7 @@ function ResourcesPage() {
           </Card>
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm text-muted-foreground">Disk</CardTitle>
+              <CardTitle className="text-sm text-muted-foreground">{t('resources.disk')}</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{latest.disk_percent.toFixed(1)}%</div>
@@ -122,7 +126,7 @@ function ResourcesPage() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Activity className="h-4 w-4" /> Resource History
+            <Activity className="h-4 w-4" /> {t('resources.resourceHistory')}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -147,7 +151,7 @@ function ResourcesPage() {
                   stroke={getChartColor('--chart-1')}
                   fill={getChartColor('--chart-1')}
                   fillOpacity={0.1}
-                  name="CPU %"
+                  name={`${t('resources.cpu')} %`}
                 />
                 <Area
                   type="monotone"
@@ -155,7 +159,7 @@ function ResourcesPage() {
                   stroke={getChartColor('--chart-2')}
                   fill={getChartColor('--chart-2')}
                   fillOpacity={0.1}
-                  name="Memory %"
+                  name={`${t('resources.memory')} %`}
                 />
                 <Area
                   type="monotone"
@@ -163,13 +167,13 @@ function ResourcesPage() {
                   stroke={getChartColor('--chart-3')}
                   fill={getChartColor('--chart-3')}
                   fillOpacity={0.1}
-                  name="Disk %"
+                  name={`${t('resources.disk')} %`}
                 />
               </AreaChart>
             </ResponsiveContainer>
           ) : (
             <p className="text-sm text-muted-foreground text-center py-8">
-              Not enough data to display chart. Data is collected over time.
+              {t('resources.notEnoughData')}
             </p>
           )}
         </CardContent>
