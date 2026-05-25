@@ -5,6 +5,51 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-05-25
+
+### Added
+
+#### Tiered Memory System (RFC-008)
+
+- **3-Tier Memory** (`memory/mod.rs`) — Hot (always loaded, ~3K tokens), Warm (on-demand), Cold (compressed archive)
+- **Dream Process** (`memory/dream.rs`) — 4-phase background consolidation: Orient → Gather Signal → Consolidate → Prune & Index. Supports checkpointing for crash recovery.
+- **Auto-Classification** (`memory/auto_classify.rs`) — Infers `MemoryType` (Fact, Decision, Episode, Knowledge, etc.) from content patterns
+- **Auto-Protection** (`memory/auto_protect.rs`) — Automatically promotes protection level based on access frequency, session appearances, and user corrections
+- **Decay Engine** (`memory/decay.rs`) — Ebbinghaus-inspired forgetting curve with protection-aware rate adjustment
+- **Compaction Tree** (`memory/compaction.rs`) — 5-level compression: Raw → Daily → Weekly → Monthly → Root
+- **ROOT Index** (`memory/root_index.rs`) — O(1) topic lookup so agents know what they know without scanning
+- **Proactive Recall** (`memory/proactive.rs`) — Automatically injects relevant memories at session start and topic transitions
+- **Auto Memory Bridge** (`memory/auto_memory_bridge.rs`) — Bridge between agent runtime and memory subsystem for automatic memory operations
+- **Memory Types**: Conversation, Session, Fact, Episode, Knowledge, Skill, Preference, Decision, UserProfile
+- **Protection Levels**: None → Low → Medium → High → Permanent (auto-calculated)
+
+#### Unified Skill System (RFC-009)
+
+- **SkillManager** (`skill.rs`) — Unified skill manager replacing `SkillStore` + `ProgramManager` + `HostToolValidator`
+- **SKILL.md Frontmatter** — All metadata in YAML frontmatter (no separate `program.toml`)
+- **4-Dimensional Requirements** — `bins`, `anyBins`, `env`, `config` checks per skill
+- **Install Specs** — Automatic dependency installation: brew, node, go, uv, download
+- **Skill Eligibility** — Per-skill status: Ready, NeedsSetup, Disabled with missing requirements details
+- **Skill Source Hierarchy** — agent-specific > workspace > global user > bundled
+- **Skill Snapshot** — XML prompt injection for agent initialization
+
+### Changed
+
+- **Memory system** upgraded from flat vector store to tiered memory with Dream-time consolidation
+- **Skills and Programs merged** into a single unified Skill model
+- Version bumped to `0.4.0`
+
+### Removed
+
+- **`program/` module** — replaced by unified `SkillManager` in `skill.rs`
+- **`ProgramManager`** — merged into `SkillManager`
+- **`SkillStore`** — merged into `SkillManager`
+- **`HostToolValidator`** (`host_tools.rs`) — replaced by per-skill `check_requirements()`
+- **`program.toml` format** — all metadata now in SKILL.md YAML frontmatter
+- **`.programs/` directory** — skills migrated to `share/default-skills/`
+- **Programs API endpoints** — merged into `/api/skills`
+- **Host Tools API endpoint** — deprecated, functionality in skill eligibility checks
+
 ## [0.2.0-alpha] - 2026-05-03
 
 ### Added

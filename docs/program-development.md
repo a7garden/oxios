@@ -1,5 +1,7 @@
 # Program Development Guide
 
+> **Deprecated (2026-05-25):** Programs have been unified into Skills per RFC-009. See `docs/rfc-009-skill-unification.md` for the current model. This document is retained for historical reference.
+
 > Read this when creating or modifying Oxios programs.
 
 ## What is a Program?

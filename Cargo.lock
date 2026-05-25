@@ -5216,6 +5216,7 @@ dependencies = [
  "oxios-ouroboros",
  "parking_lot",
  "regex",
+ "reqwest",
  "serde",
  "serde_json",
  "sha2",
@@ -5227,10 +5228,12 @@ dependencies = [
  "tracing",
  "tracing-opentelemetry",
  "tracing-subscriber",
+ "url",
  "usearch",
  "uuid",
  "wasmtime",
  "wasmtime-wasi",
+ "zip 2.4.2",
 ]
 
 [[package]]

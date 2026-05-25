@@ -18,6 +18,7 @@ import {
   PanelLeftClose,
   Settings,
   Shield,
+  Store,
   Sun,
   Timer,
   Theater,
@@ -57,6 +58,7 @@ const navGroups: { label: string; items: NavItem[] }[] = [
       { label: 'Seeds', href: '/seeds', icon: <Dna className="h-4 w-4" /> },
       { label: 'Personas', href: '/personas', icon: <Theater className="h-4 w-4" /> },
       { label: 'Skills', href: '/skills', icon: <Zap className="h-4 w-4" /> },
+      { label: 'Marketplace', href: '/marketplace', icon: <Store className="h-4 w-4" /> },
     ],
   },
   {

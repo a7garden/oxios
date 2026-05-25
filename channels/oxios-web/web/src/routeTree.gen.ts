@@ -16,6 +16,7 @@ import { Route as SchedulerRouteImport } from './routes/scheduler'
 import { Route as ResourcesRouteImport } from './routes/resources'
 import { Route as PersonasRouteImport } from './routes/personas'
 import { Route as MemoryRouteImport } from './routes/memory'
+import { Route as MarketplaceRouteImport } from './routes/marketplace'
 import { Route as GitRouteImport } from './routes/git'
 import { Route as EventsRouteImport } from './routes/events'
 import { Route as CronJobsRouteImport } from './routes/cron-jobs'
@@ -70,6 +71,11 @@ const PersonasRoute = PersonasRouteImport.update({
 const MemoryRoute = MemoryRouteImport.update({
   id: '/memory',
   path: '/memory',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MarketplaceRoute = MarketplaceRouteImport.update({
+  id: '/marketplace',
+  path: '/marketplace',
   getParentRoute: () => rootRouteImport,
 } as any)
 const GitRoute = GitRouteImport.update({
@@ -181,6 +187,7 @@ export interface FileRoutesByFullPath {
   '/cron-jobs': typeof CronJobsRoute
   '/events': typeof EventsRoute
   '/git': typeof GitRoute
+  '/marketplace': typeof MarketplaceRoute
   '/memory': typeof MemoryRoute
   '/personas': typeof PersonasRoute
   '/resources': typeof ResourcesRoute
@@ -210,6 +217,7 @@ export interface FileRoutesByTo {
   '/cron-jobs': typeof CronJobsRoute
   '/events': typeof EventsRoute
   '/git': typeof GitRoute
+  '/marketplace': typeof MarketplaceRoute
   '/memory': typeof MemoryRoute
   '/personas': typeof PersonasRoute
   '/resources': typeof ResourcesRoute
@@ -240,6 +248,7 @@ export interface FileRoutesById {
   '/cron-jobs': typeof CronJobsRoute
   '/events': typeof EventsRoute
   '/git': typeof GitRoute
+  '/marketplace': typeof MarketplaceRoute
   '/memory': typeof MemoryRoute
   '/personas': typeof PersonasRoute
   '/resources': typeof ResourcesRoute
@@ -271,6 +280,7 @@ export interface FileRouteTypes {
     | '/cron-jobs'
     | '/events'
     | '/git'
+    | '/marketplace'
     | '/memory'
     | '/personas'
     | '/resources'
@@ -300,6 +310,7 @@ export interface FileRouteTypes {
     | '/cron-jobs'
     | '/events'
     | '/git'
+    | '/marketplace'
     | '/memory'
     | '/personas'
     | '/resources'
@@ -329,6 +340,7 @@ export interface FileRouteTypes {
     | '/cron-jobs'
     | '/events'
     | '/git'
+    | '/marketplace'
     | '/memory'
     | '/personas'
     | '/resources'
@@ -359,6 +371,7 @@ export interface RootRouteChildren {
   CronJobsRoute: typeof CronJobsRoute
   EventsRoute: typeof EventsRoute
   GitRoute: typeof GitRoute
+  MarketplaceRoute: typeof MarketplaceRoute
   MemoryRoute: typeof MemoryRoute
   PersonasRoute: typeof PersonasRoute
   ResourcesRoute: typeof ResourcesRoute
@@ -430,6 +443,13 @@ declare module '@tanstack/react-router' {
       path: '/memory'
       fullPath: '/memory'
       preLoaderRoute: typeof MemoryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/marketplace': {
+      id: '/marketplace'
+      path: '/marketplace'
+      fullPath: '/marketplace'
+      preLoaderRoute: typeof MarketplaceRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/git': {
@@ -583,6 +603,7 @@ const rootRouteChildren: RootRouteChildren = {
   CronJobsRoute: CronJobsRoute,
   EventsRoute: EventsRoute,
   GitRoute: GitRoute,
+  MarketplaceRoute: MarketplaceRoute,
   MemoryRoute: MemoryRoute,
   PersonasRoute: PersonasRoute,
   ResourcesRoute: ResourcesRoute,

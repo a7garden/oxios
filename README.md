@@ -7,9 +7,9 @@
 *Where AI agents don't just talk — they work.*
 
 [![Rust](https://img.shields.io/badge/Rust-1.85%2B-orange?logo=rust&logoColor=white)](https://www.rust-lang.org/)
-[![Version](https://img.shields.io/badge/Version-0.1.2-6E40C9?logo=rust&logoColor=white)](https://crates.io/crates/oxios)
+[![Version](https://img.shields.io/badge/Version-0.4.0-6E40C9?logo=rust&logoColor=white)](https://crates.io/crates/oxios)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Lines of Code](https://img.shields.io/badge/LOC-52K%2B-00A86B?logo=rust&logoColor=white)]()
+[![Lines of Code](https://img.shields.io/badge/LOC-67K%2B-00A86B?logo=rust&logoColor=white)]()
 [![GitHub](https://img.shields.io/badge/GitHub-a7garden%2Foxios-181717?logo=github)](https://github.com/a7garden/oxios)
 
 **Built with**
@@ -36,7 +36,7 @@
   - [Supervisor](#-supervisor)
   - [Scheduler](#-scheduler)
   - [Built-in Browser](#-built-in-browser)
-  - [Programs](#-programs)
+  - [Skills](#-skills)
   - [Vector Memory](#-vector-memory)
   - [Spaces](#-spaces)
   - [Security Model](#-security-model)
@@ -64,13 +64,13 @@ Large language models are powerful, but they're stuck in chat boxes. Oxios gives
 |---|---|
 | Agents die when the chat closes | **Supervisor** manages agent lifecycle: fork, exec, wait, kill |
 | No specification → unreliable output | **Ouroboros**: interview → seed → execute → evaluate → evolve |
-| Every app reinvents browser/execution | **Built-in engine**: headless browser, host exec, MCP bridge, programs |
+| Every app reinvents browser/execution | **Built-in engine**: headless browser, host exec, MCP bridge, skills |
 | Agents have no memory between sessions | **Vector memory**: persistent, searchable knowledge with semantic recall |
 | No security boundary between agents | **Access Manager**: RBAC, path sandboxing, Merkle-chain audit trail |
 | LLM provider outages cascade | **Circuit Breaker**: 3-state protection against cascading failures |
 | No protocol for agent-to-agent work | **A2A**: Google's agent-to-agent protocol for horizontal communication |
 
-**~52,000 lines of Rust. 179+ source files. Zero containers. Zero subprocess browsers.** Everything runs in-process.
+**~67,000 lines of Rust. 196+ source files. Zero containers. Zero subprocess browsers.** Everything runs in-process.
 
 ---
 
@@ -158,7 +158,7 @@ That's it. The OS handles the rest.
 │  │              Agent Runtime                      │  │
 │  │  oxi-agent + oxi-ai (multi-provider)            │  │
 │  │  read · write · edit · bash · grep · browser   │  │
-│  │  programs · MCP · memory · A2A · git           │  │
+│  │  skills · MCP · memory · A2A · git             │  │
 │  └────────────────────────────────────────────────┘  │
 │                                                      │
 │  ┌─────────────┐ ┌──────────────┐ ┌──────────────┐  │
@@ -174,7 +174,7 @@ That's it. The OS handles the rest.
     └─────────┘
 ```
 
-**No containers. No subprocess browser.** Everything runs in-process, sandboxed by workspace rules and RBAC. The kernel exposes all functionality through `KernelHandle` — a facade with 11 typed APIs (Agent, Space, Security, Persona, Exec, Browser, MCP, Extension, Infra, A2A, State).
+**No containers. No subprocess browser.** Everything runs in-process, sandboxed by workspace rules and RBAC. The kernel exposes all functionality through `KernelHandle` — a facade with typed APIs (Agent, Space, Security, Persona, Exec, Browser, MCP, Extension, Infra, A2A, State, KnowledgeBase, KnowledgeLens).
 
 ---
 
@@ -237,30 +237,42 @@ Priority-based task queue inspired by [AIOS](https://arxiv.org/abs/2403.16971) a
 
 Agents can browse the web, fill forms, extract data, and execute JavaScript — all without leaving the process.
 
-### 📦 Programs
+### 🛠️ Skills
 
-OS-level installable capabilities — like apps for the agent OS. Each program is a self-contained directory with metadata, dependencies, and instructions.
+Unified skill system — every capability is a SKILL.md with YAML frontmatter. Skills replace the former Programs concept, providing a single model for agent instructions with requirements, install specs, and invocation policy.
 
-```bash
-oxios pkg install ./my-program          # Install from directory
-oxios pkg list                          # List installed programs
-oxios pkg search                        # Detailed listing with descriptions
-oxios program code-review               # View program details & SKILL.md
+```yaml
+---
+name: code-review
+description: Deep code review with quality domain analysis
+requires:
+  bins: ["git"]
+  env: ["GITHUB_TOKEN"]
+install:
+  - kind: brew
+    formula: git
+---
 ```
 
-Built-in programs include: `code-review`, `debug`, `deploy`, `guardian`, `refactor`, and `program-creator` (a program that creates programs).
+Skill sources (highest to lowest priority): agent-specific → workspace → global user → bundled.
+Built-in bundled skills include: `code-review`, `debug`, and `refactor`.
 
-### 🧠 Vector Memory
+### 🧠 Tiered Memory
 
-Agents remember across sessions. The memory subsystem provides persistent, searchable knowledge:
+Agents remember across sessions with a 3-tier memory system (Hot/Warm/Cold) and automatic Dream-time consolidation:
 
 | Component | Purpose |
 |-----------|---------|
-| **TF-IDF Embeddings** | Term-frequency based vector representations |
-| **HNSW Indexing** | Fast approximate nearest-neighbor search |
+| **Memory Tiers** | Hot (always loaded, ~3K tokens) → Warm (on-demand) → Cold (compressed archive) |
+| **Dream Process** | 4-phase background consolidation: Orient → Gather Signal → Consolidate → Prune & Index |
+| **Auto-Classification** | Infers memory type (Fact, Decision, Episode, etc.) from content patterns |
+| **Auto-Protection** | Automatically promotes importance based on access frequency and session appearances |
+| **Decay Engine** | Ebbinghaus-inspired forgetting curve with protection-aware rate adjustment |
+| **Compaction Tree** | Raw → Daily → Weekly → Monthly → Root progressive compression |
+| **ROOT Index** | O(1) topic lookup — agents know what they know without scanning |
+| **Proactive Recall** | Automatically injects relevant memories at session start and topic transitions |
+| **HNSW + TF-IDF** | Semantic vector search with term-frequency embeddings |
 | **Reasoning Bank** | Stores and retrieves agent reasoning chains |
-| **Semantic Search** | Meaning-based recall, not just keyword matching |
-| **Budget-aware Curation** | Evicts low-value memories when limits are reached |
 
 ### 🗂️ Spaces
 
@@ -376,8 +388,8 @@ oxios git                Git operations (log, tags, restore, verify)
 oxios budget             Budget management
 oxios daemon             Daemon management (install as system service)
 oxios log                View logs
-oxios program <name>     View program details & SKILL.md
-oxios pkg                Package management (install, list, search)
+oxios skill <name>       View skill details & SKILL.md
+oxios skills             List all skills with eligibility status
 oxios models             List available LLM models
 oxios backup             Backup workspace
 oxios restore            Restore from backup
@@ -481,22 +493,22 @@ Full REST API on **port 4200** with 76 endpoints. Auth middleware on all `/api/*
 |--------|----------|-------------|
 | `GET` | `/api/memory` | List memories |
 | `POST` | `/api/memory` | Create memory |
-| `GET` | `/api/memory/{name}` | Get memory |
+| `GET` | `/api/memory/{id}` | Get memory |
 | `POST` | `/api/memory/search` | Keyword search |
 | `POST` | `/api/memory/semantic` | Semantic search |
+| `GET` | `/api/memory/tiers` | List memories by tier |
 
-### Programs
+### Skills
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `GET` | `/api/programs` | List programs |
-| `POST` | `/api/programs` | Install program |
-| `GET` | `/api/programs/{name}` | Get program details |
-| `DELETE` | `/api/programs/{name}` | Uninstall program |
-| `POST` | `/api/programs/{name}/enable` | Enable program |
-| `POST` | `/api/programs/{name}/disable` | Disable program |
-| `GET` | `/api/programs/{name}/host-requirements` | Check requirements |
-| `GET` | `/api/host-tools` | Check host tool availability |
+| `GET` | `/api/skills` | List all skills with eligibility status |
+| `GET` | `/api/skills/{name}` | Get skill details & requirements check |
+| `POST` | `/api/skills` | Create skill |
+| `DELETE` | `/api/skills/{name}` | Delete skill |
+| `POST` | `/api/skills/{name}/enable` | Enable skill |
+| `POST` | `/api/skills/{name}/disable` | Disable skill |
+| `GET` | `/api/skills/{name}/content` | Get skill SKILL.md content |
 
 ### Scheduler & Audit
 
@@ -591,15 +603,14 @@ Full REST API on **port 4200** with 76 endpoints. Auth middleware on all `/api/*
 ```
 oxios/                          # Main binary (src/main.rs)
 ├── crates/
-│   ├── oxios-kernel/           # Core: supervisor, scheduler, event bus, state store, tools, memory
+│   ├── oxios-kernel/           # Core: supervisor, scheduler, event bus, state store, tools, tiered memory
 │   ├── oxios-ouroboros/        # Spec-first protocol (interview → seed → execute → evaluate → evolve)
 │   └── oxios-gateway/          # Channel-agnostic message hub
 ├── channels/
-│   ├── oxios-web/              # Web dashboard (Axum backend + Dioxus/WASM frontend)
+│   ├── oxios-web/              # Web dashboard (Axum backend + React frontend)
 │   ├── oxios-cli/              # CLI channel
 │   └── oxios-telegram/         # Telegram channel
-├── .programs/                  # Built-in programs (code-review, debug, deploy, guardian, refactor, program-creator)
-├── share/                      # Default skills, programs, config
+├── share/                      # Default skills, config, migration scripts
 └── docs/                       # Architecture docs, RFCs, design documents
 ```
 
@@ -622,8 +633,7 @@ oxios ──► oxios-kernel ──► oxi-sdk (crates.io)
 | `~/.oxios/workspace/` | Agent working directory |
 | `~/.oxios/workspace/sessions/` | Session data |
 | `~/.oxios/workspace/seeds/` | Ouroboros seed specifications |
-| `~/.oxios/workspace/programs/` | Installed programs |
-| `~/.oxios/workspace/skills/` | Skill definitions |
+| `~/.oxios/workspace/skills/` | Unified skill definitions |
 
 ---
 

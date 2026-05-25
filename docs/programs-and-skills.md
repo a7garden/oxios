@@ -1,5 +1,7 @@
 # Programs & Skills Guide
 
+> **Note (2026-05-25):** This document describes the legacy Programs system. As of RFC-009, Programs and Skills have been unified into a single **Skill** model. See `docs/rfc-009-skill-unification.md` for the new architecture. The skill format described in §4 (SKILL.md) is still valid, but `program.toml` is deprecated — all metadata now goes in SKILL.md YAML frontmatter.
+
 > Programs are OS-level installable capabilities for Oxios agents. Skills are markdown instruction templates that teach agents how to perform specific tasks. Together, they form the application layer of the Agent Operating System.
 
 ---

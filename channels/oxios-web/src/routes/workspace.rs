@@ -368,20 +368,20 @@ fn skill_entry_to_json(entry: &SkillEntry) -> serde_json::Value {
     let requirements = meta
         .map(|m| serde_json::json!({
             "bins": m.requires.bins,
-            "any_bins": m.requires.any_bins,
+            "anyBins": m.requires.any_bins,
             "env": m.requires.env,
             "config": m.requires.config,
         }))
         .unwrap_or(serde_json::json!({
             "bins": [],
-            "any_bins": [],
+            "anyBins": [],
             "env": [],
             "config": [],
         }));
 
     let missing = serde_json::json!({
         "bins": entry.eligibility.missing_bins,
-        "any_bins": entry.eligibility.missing_any_bins,
+        "anyBins": entry.eligibility.missing_any_bins,
         "env": entry.eligibility.missing_env,
         "config": entry.eligibility.missing_config,
     });
@@ -485,7 +485,7 @@ pub(crate) async fn handle_skills_list(
 ) -> Json<serde_json::Value> {
     let entries = state.kernel.extensions.list_skills_entries().await;
     let skills: Vec<serde_json::Value> = entries.iter().map(skill_entry_to_json).collect();
-    Json(serde_json::json!({ "skills": paginate(&skills, &params) }))
+    Json(serde_json::json!({ "skills": skills }))
 }
 
 /// GET /api/skills/:name — Get skill details (RFC-009 §5.1).

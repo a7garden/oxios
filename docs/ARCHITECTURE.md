@@ -87,16 +87,16 @@ Oxios is built on two foundational metaphors:
 │  │MemoryMgr   │ │SpaceMgr  │ │McpBridge │  │GitLayer       │          │
 │  └────────────┘ └──────────┘ └──────────┘  └───────────────┘          │
 │  ┌────────────┐ ┌──────────┐ ┌──────────┐  ┌───────────────┐          │
-│  │PersonaMgr  │ │SkillStore│ │ProgramMgr│  │CronScheduler  │          │
-│  └────────────┘ └──────────┘ └──────────┘  └───────────────┘          │
+│  │PersonaMgr  │ │SkillMgr  │ │CronScheduler        │   │
+│  └────────────┘ └──────────┘ └────────────────────┘   │
 │  ┌────────────┐ ┌──────────┐ ┌────────────────────────────┐           │
 │  │AuthManager │ │CircuitBkr│ │A2AProtocol + CardRegistry  │           │
 │  └────────────┘ └──────────┘ └────────────────────────────┘           │
 │                                                                        │
 │  ┌──────────────────────────────────────────────────────────────────┐   │
 │  │                  KernelHandle (Facade / Syscall Table)           │   │
-│  │  11 typed APIs: State · Agent · Security · Persona · Extension  │   │
-│  │  MCP · Infra · Space · Exec · Browser · A2A                     │   │
+│  │  13 typed APIs: State · Agent · Security · Persona · Extension  │   │
+│  │  MCP · Infra · Space · Exec · Browser · A2A · Knowledge          │   │
 │  └──────────────────────────────────────────────────────────────────┘   │
 └────────────────────────────────────────────────────────────────────────┘
        │
@@ -317,7 +317,7 @@ Wraps `oxi_sdk::AgentLoop` for executing Seeds through the multi-turn LLM tool-c
   │  │  Tier 2: CSpace-driven (exec, memory, space,     ││
   │  │          agent, a2a, persona, cron, security,    ││
   │  │          budget, resource)                        ││
-  │  │  Tier 3: Program tools + MCP tools               ││
+  │  │  Tier 3: Skill tools + MCP tools                  ││
   │  └──────────────────────┬───────────────────────────┘│
   │                         │                             │
   │  ┌──────────────────────┴───────────────────────────┐│
@@ -528,7 +528,7 @@ Merkle-chain style cryptographic audit log. Each entry is linked to the previous
 
   AuditAction variants:
   AgentSpawn · AgentExit · ToolCall · ToolResult
-  MemoryWrite · MemoryRead · ConfigChange · ProgramInstall
+  MemoryWrite · MemoryRead · ConfigChange · SkillInstall
   CronTrigger · GitCommit · AccessDenied · Other
 
   Integrity:
@@ -752,7 +752,7 @@ Spaces partition conversations and resources into isolated contexts. Auto-detect
   │  Server sources:                                         │
   │  1. config.toml [mcp.servers]                            │
   │  2. Environment variables (OXIOS_MCP_{NAME}_COMMAND)     │
-  │  3. Program MCP server configs                           │
+  │  3. Skill MCP server configs                             │
   │                                                          │
   │  Operations:                                             │
   │  register_server(McpServer)                              │
@@ -875,33 +875,42 @@ Google's A2A protocol for horizontal agent↔agent communication. Unlike MCP (ve
 
 ---
 
-### 3.20 ProgramManager — OS-Level Installable Capabilities
+### 3.20 SkillManager — Unified Skill System (RFC-009)
 
 ```
   ┌──────────────────────────────────────────────────────┐
-  │                ProgramManager                         │
+  │                  SkillManager                         │
   │                                                      │
-  │  Programs are installable capabilities:              │
-  │  ~/.oxios/workspace/programs/{name}/                 │
-  │    ├── PROGRAM.toml    (metadata + tool definitions) │
-  │    └── SKILL.md        (usage guide)                 │
+  │  Skills are unified capabilities:                     │
+  │  ~/.oxios/workspace/skills/{name}/                   │
+  │    └── SKILL.md  (YAML frontmatter + instructions)   │
   │                                                      │
-  │  ProgramMeta:                                        │
-  │  { name, description, version, enabled,              │
-  │    tools: [{name, description, command}],             │
-  │    dependencies: [required tool names],               │
-  │    mcp_servers: [{name, command, args, env}],         │
-  │    host_requirements }                               │
+  │  SkillSource hierarchy (priority):                    │
+  │  1. workspace/.agents/<id>/skills/ (agent-specific)  │
+  │  2. workspace/skills/             (project)         │
+  │  3. ~/.oxios/workspace/skills/    (global user)       │
+  │  4. share/default-skills/          (bundled, lowest)  │
+  │                                                      │
+  │  Requirements (4-dimensional):                        │
+  │  bins: ["git", "gh"]     — required binaries         │
+  │  anyBins: ["ffmpeg"]     — one must be present       │
+  │  env: ["GITHUB_TOKEN"]  — required env vars          │
+  │  config: []               — required config paths    │
+  │                                                      │
+  │  Install specs (automatic dependency installation):   │
+  │  - kind: brew, formula: git                           │
+  │  - kind: download, url: https://...                   │
   │                                                      │
   │  Operations:                                         │
-  │  install(path) → Result                              │
-  │  list_enabled() → Vec<Program>                       │
-  │  get_program(name) → Option<Program>                 │
-  │  init() → scan + validate                            │
+  │  init() → load + validate + watch                    │
+  │  list_skills() → Vec<SkillEntry>                     │
+  │  get_skill(name) → Option<SkillEntry>                │
+  │  build_snapshot() → SkillSnapshot (for agent prompt) │
+  │  set_enabled(name, bool)                             │
   └──────────────────────────────────────────────────────┘
 ```
 
-**Built-in programs** (in `.programs/`): code-review, debug, deploy, guardian, refactor, program-creator
+**Built-in skills** (in `share/default-skills/`): code-review, debug, refactor. Memory and Programs have been unified into Skills per RFC-009.
 
 **Source:** `crates/oxios-kernel/src/program/`
 
@@ -927,19 +936,25 @@ Google's A2A protocol for horizontal agent↔agent communication. Unlike MCP (ve
 
 ### 3.22 HostToolValidator — Binary Allowlist
 
+### 3.19 Skill Requirements — Unified Requirements Checking (RFC-009)
+
 ```
   ┌──────────────────────────────────────────────┐
-  │          HostToolValidator                    │
+  │          Skill Requirements Check              │
   │                                              │
-  │  Validates that host system tools exist:     │
-  │  required_host_tools: must be present        │
-  │  optional_host_tools: nice to have           │
+  │  4-dimensional requirements per skill:        │
+  │  bins:     all must be present                │
+  │  anyBins:  at least one must be present       │
+  │  env:      required environment variables      │
+  │  config:   required config paths               │
   │                                              │
-  │  Used by ProgramManager to check deps        │
+  │  Replaces former: HostToolValidator,          │
+  │  ProgramManager host_requirements,             │
+  │  ExecConfig.required/optional_host_tools       │
   └──────────────────────────────────────────────┘
 ```
 
-**Source:** `crates/oxios-kernel/src/host_tools.rs`
+**Source:** `crates/oxios-kernel/src/skill.rs` — `SkillManager::check_requirements()`
 
 ---
 
@@ -1014,7 +1029,7 @@ Google's A2A protocol for horizontal agent↔agent communication. Unlike MCP (ve
 
 ## 4. KernelHandle Facade
 
-The KernelHandle is the **syscall table** of the Agent OS. It is a facade composed of 11 typed APIs that provide the single path for all kernel operations.
+The KernelHandle is the **syscall table** of the Agent OS. It is a facade composed of 13 typed APIs that provide the single path for all kernel operations.
 
 ```
   ┌──────────────────────────────────────────────────────────────────┐

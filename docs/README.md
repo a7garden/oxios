@@ -17,7 +17,7 @@
 |----------|-------------|
 | [**Architecture**](architecture.md) | Internal architecture — layers, subsystems, data flow, KernelHandle, dependency rules |
 | [**REST API Reference**](api-reference.md) | Complete API documentation for all 76 endpoints with curl examples |
-| [**Programs & Skills**](programs-and-skills.md) | Program system (installable agent capabilities), skill templates, built-in programs |
+| [**Skills Guide**](programs-and-skills.md) | Unified skill system — SKILL.md frontmatter, requirements, install specs, built-in skills (formerly Programs & Skills) |
 | [**Security**](security.md) | Security model, RBAC, audit trail, circuit breaker, execution security, best practices |
 
 ## Integration
@@ -37,6 +37,13 @@ These documents describe internal design decisions and are primarily for contrib
 | [RFC-002: Kernel Module Organization](rfc-002-kernel-module-organization.md) | Module reorganization plan |
 | [RFC-003: CLI UX Improvements](rfc-003-cli-ux-improvements.md) | CLI user experience improvements |
 | [RFC-003: Web Dashboard Audit](rfc-003-web-dashboard-audit.md) | Web dashboard audit findings |
+| [RFC-003: Knowledge Separation](rfc-003-knowledge-separation.md) | Knowledge vs memory architecture separation |
+| [RFC-004: Knowledge System](rfc-004-knowledge-system.md) | Knowledge system design |
+| [RFC-005: Knowledge Integration](rfc-005-knowledge-integration.md) | Knowledge system integration with AI engine |
+| [RFC-006: JS/Space Integration](rfc-006-js-space-integration.md) | JavaScript/Space integration design |
+| [RFC-007: Remaining Port](rfc-007-remaining-port.md) | Remaining feature porting |
+| [RFC-008: Memory Consolidation](rfc-008-memory-consolidation.md) | Tiered memory with Dream-time compaction |
+| [RFC-009: Skill Unification](rfc-009-skill-unification.md) | Unified Skill model (Programs + Skills merged) |
 | [Refactoring Design](refactoring-design.md) | Large-scale refactoring plan |
 | [Remaining Items](remaining-items-design.md) | Outstanding design items |
 

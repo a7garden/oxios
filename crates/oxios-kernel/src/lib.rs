@@ -48,6 +48,7 @@ pub mod persona_store;
 
 // ─── Tools & Skills ───────────────────────────────────────────────
 // 에이전트가 사용하는 도구, 스킬.
+pub mod clawhub;
 pub mod skill;
 pub mod tools;
 #[cfg(feature = "wasm-sandbox")]
@@ -149,6 +150,11 @@ pub use persona_manager::PersonaManager;
 pub use persona_store::PersonaStore;
 
 // ─── Tools & Skills ────────────────────────────────────────────────
+pub use clawhub::{
+    ClawHubClient, ClawHubInstaller, ClawHubLockEntry, ClawHubLockfile, ClawHubOrigin,
+    ClawHubSearchResult, ClawHubSkillDetail, ClawHubSkillMeta, ClawHubVersion,
+    DownloadedArchive, InstallResult, UpdateAvailable, UpdateResult,
+};
 pub use skill::{
     InstallKind, Requirements, RequirementsCheck, Skill, SkillConfig, SkillEntry,
     SkillInstallSpec, SkillInvocationPolicy, SkillManager, SkillMeta, SkillMetadata, SkillRef,

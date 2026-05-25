@@ -7,7 +7,7 @@
 
 Oxios is an **Agent Operating System** in Rust. It's an OS where AI agents execute real work on behalf of users — fork, exec, wait, kill, just like Unix processes.
 
-**Stack:** Rust 2021, tokio async, serde (JSON+TOML), oxi-sdk + oxi-ai (crates.io). ~64.4K lines across 304 source files (193 Rust + 111 TypeScript/TSX).
+**Stack:** Rust 2021, tokio async, serde (JSON+TOML), oxi-sdk + oxi-ai (crates.io). ~66.7K lines across ~300 source files (196 Rust + 106 TypeScript/TSX).
 
 ```
 User → Channel (Web/CLI/Telegram) → Gateway → Kernel (supervisor + scheduler + ouroboros + agent_runtime)
@@ -27,9 +27,8 @@ oxios/                     # Main binary (src/main.rs, src/kernel.rs, src/cmd_ru
 │   ├── oxios-web/         # Web dashboard (Axum backend + React frontend)
 │   ├── oxios-cli/         # CLI channel
 │   └── oxios-telegram/    # Telegram channel
-├── .programs/             # OS-level programs (code-review, debug, deploy, guardian, refactor, program-creator)
-├── share/                 # Default skills, programs, config
-└── docs/                  # Architecture docs, RFCs, design docs
+├── share/                 # Default skills (share/default-skills/), default programs (legacy), config
+└── docs/                  # Architecture docs, RFCs, design documents
 ```
 
 **Dependency graph:**
@@ -49,7 +48,6 @@ oxios → oxios-kernel → oxios-ouroboros
 | Fact | Value |
 |------|-------|
 | **Language** | Rust 2021 + TypeScript 5 (frontend) |
-| **Version** | 0.2.0 |
 | **License** | MIT |
 | **CI** | GitHub Actions (macOS + Linux, fmt+clippy+test+audit+frontend) |
 | **Build** | `cargo build && cd channels/oxios-web/web && bun run build` |
@@ -139,8 +137,7 @@ oxios run --json --session "$SID" "follow-up"
 | `~/.oxios/workspace/` | Agent working directory |
 | `~/.oxios/workspace/sessions/` | Session data (ephemeral) |
 | `~/.oxios/workspace/seeds/` | Ouroboros seed specs |
-| `~/.oxios/workspace/programs/` | Installed programs |
-| `~/.oxios/workspace/skills/` | Skill definitions |
+| `~/.oxios/workspace/skills/` | Unified skill definitions (replaces former programs + skills) |
 | `~/.oxi/auth.json` | oxi-cli credentials (separate from Oxios) |
 
 ## Conventions
@@ -165,7 +162,7 @@ oxios run --json --session "$SID" "follow-up"
 - **KernelHandle** (`kernel_handle/`) — Facade exposing 13 typed APIs: AgentApi, SpaceApi, SecurityApi, PersonaApi, ExecApi, BrowserApi, McpApi, ExtensionApi, InfraApi, A2aApi, StateApi, KnowledgeBase, KnowledgeLens. Internally uses `CredentialStore` (`credential.rs`) for multi-source key resolution. Each API lives in its own file (`*_api.rs`).
 - **AccessManager** (`access_manager/`) — OWASP-inspired least-privilege. RBAC, path sandboxing, audit logging.
 - **AuditTrail** (`audit_trail.rs`) — Merkle-chain style tamper-evident audit log. Each entry cryptographically linked.
-- **Memory** (`memory/`) — Vector store with hyperbolic embeddings, HNSW indexing, flash attention, reasoning bank, Sona learning engine, RVF store.
+- **Memory** (`memory/`) — Tiered memory system (Hot/Warm/Cold) with Dream-time consolidation (RFC-008). Includes: auto-classification, auto-protection, Ebbinghaus-inspired decay, compaction tree (Raw→Daily→Weekly→Monthly→Root), ROOT index (O(1) topic lookup), proactive recall, HNSW vector search, hyperbolic embeddings, flash attention, reasoning bank, Sona learning engine, RVF store.
 - **MCP** (`mcp/`) — Model Context Protocol client. Web uses `oxios-mcp` (crates.io); kernel uses `crates/oxios-mcp` via `mcp/mod.rs` integration layer.
 - **Auth** (`auth.rs`) — Authentication manager. Used by KernelHandle for identity verification.
 - **Workers** (`workers/`) — Background worker pool for async task processing.
@@ -175,7 +172,7 @@ oxios run --json --session "$SID" "follow-up"
 - **Telemetry** (`telemetry_otel.rs` / `telemetry_stub.rs`) — OpenTelemetry integration with compile-time feature toggle to stub.
 - **ResourceMonitor** (`resource_monitor.rs`) — System resource tracking for agent budget enforcement.
 - **Kernel** (`src/kernel.rs`) — `Kernel::builder().build().await` assembles all components. `execute_prompt_with_session()` for CLI execution.
-- **Program** (`program/`) — OS-level installable capabilities. See `.programs/` for examples.
+- **Skill** (`skill.rs`) — Unified skill system (RFC-009). `SkillManager` replaces former `SkillStore` + `ProgramManager` + `HostToolValidator`. Each skill is a `SKILL.md` with YAML frontmatter carrying all metadata (4-dimensional requirements, install specs, invocation policy). No separate `program.toml` files. Skill source hierarchy: agent-specific > workspace > global user > bundled.
 - **Capability** (`capability/`) — Template-based capability resolution for agent tool discovery.
 - **A2A** (`a2a.rs`) — Google's agent-to-agent protocol. Horizontal agent communication.
 - **CircuitBreaker** (`circuit_breaker.rs`) — 3-state (Closed→Open→Half-Open) protection against cascading LLM provider failures.
@@ -212,6 +209,8 @@ impl AgentTool for MyTool {
 | File | When to read |
 |------|-------------|
 | `docs/ARCHITECTURE.md` | Before modifying kernel structure or adding modules |
+| `docs/rfc-008-memory-consolidation.md` | Before modifying memory system (tiered memory, Dream, decay, compaction) |
+| `docs/rfc-009-skill-unification.md` | Before modifying skill system (unified SKILL.md frontmatter, requirements) |
 | `docs/channel-plugin-guide.md` | Before adding a new channel (Web, Telegram, etc.) |
 | `docs/channel-registry.md` | Before registering a new channel |
 | `docs/rfc-003-knowledge-separation.md` | Before modifying knowledge/memory architecture |
@@ -220,9 +219,7 @@ impl AgentTool for MyTool {
 | `docs/rfc-006-js-space-integration.md` | Before modifying JS/Space integration |
 | `docs/rfc-007-remaining-port.md` | Before porting remaining features |
 | `docs/refactoring-design.md` | Before large-scale refactoring |
-| `docs/program-development.md` | Before creating or modifying programs |
-| `docs/refactoring-design.md` | Before large-scale refactoring |
-| `docs/program-development.md` | Before creating or modifying programs |
+| `docs/programs-and-skills.md` | Reference for skill frontmatter format (note: Programs terminology deprecated, now unified as Skills) |
 | `docs/USER-GUIDE.md` | Before changing user-facing features or CLI behavior |
 | `share/default-config.toml` | Before changing configuration options |
 
@@ -337,3 +334,5 @@ cd channels/oxios-web/web && bun dev
 - **Feature gates**: Web, CLI, Telegram are feature-gated. Browser is enabled by default (default feature). If a channel doesn't compile, check `cargo build -p oxios --features <feature>`.
 - **Tool registration**: All kernel tools must be registered in `tools/kernel_bridge.rs::register_all_kernel_tools()`. Don't add tools directly to `registration.rs` for kernel operations.
 - **Two knowledge storage systems**: Agent session memory is in MemoryManager (JSON per Space). User's markdown knowledge is in KnowledgeBase (`.md` files, global `~/.oxios/knowledge/`). Don't confuse the two — see `docs/rfc-003-knowledge-separation.md`.
+- **Unified skill model (RFC-009)**: Programs and skills were merged into a single Skill concept. There is no separate `program/` module or `program.toml`. `SkillManager` in `skill.rs` handles everything. Each skill is a SKILL.md with YAML frontmatter.
+- **Memory tiers (RFC-008)**: Memories are automatically tiered (Hot → Warm → Cold) based on type and access patterns. The Dream process runs in the background for consolidation. Protection levels are auto-calculated from access frequency and session appearances — users never need to manually manage memory.

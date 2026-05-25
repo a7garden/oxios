@@ -302,3 +302,39 @@ export interface SystemStatus {
     spaces_active?: number
   }
 }
+
+// ClawHub / Marketplace (RFC-010)
+
+export interface ClawHubSearchResult {
+  score: number
+  slug: string
+  displayName: string
+  summary?: string
+  version?: string
+  updatedAt?: number
+}
+
+export interface ClawHubSkillDetail {
+  skill: {
+    slug: string
+    displayName: string
+    summary?: string
+    tags?: Record<string, string>
+    createdAt: number
+    updatedAt: number
+  } | null
+  latestVersion?: {
+    version: string
+    createdAt: number
+    changelog?: string
+  }
+  metadata?: {
+    os?: string[]
+    systems?: string[]
+  }
+  owner?: {
+    handle?: string
+    displayName?: string
+    image?: string
+  }
+}

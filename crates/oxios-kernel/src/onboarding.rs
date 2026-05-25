@@ -23,7 +23,6 @@ const WORKSPACE_SUBDIRS: &[&str] = &[
     "workspace/seeds",
     "workspace/sessions",
     "workspace/skills",
-    "workspace/programs",
 ];
 
 /// Providers that don't need an API key (e.g., local models).

@@ -35,7 +35,12 @@ gix = { version = "0.83", features = ["tree-editor"] }
 toml = { workspace = true }
 glob = "0.3"
 tempfile = "3"
-# reqwest removed — unused in kernel crate
+# HTTP client for ClawHub API
+reqwest = { version = "0.12", features = ["json"] }
+# ZIP extraction for ClawHub skill archives
+zip = "2.2"
+# URL parsing
+url = "2.5"
 sha2 = { workspace = true }
 hex = { workspace = true }
 getrandom = { workspace = true }

@@ -207,7 +207,7 @@ After onboarding, you're asked whether to start the daemon right away:
 
 Behind the scenes, Oxios creates:
 - `~/.oxios/config.toml` — your configuration
-- `~/.oxios/workspace/` — agent workspace with subdirectories for sessions, seeds, programs, skills, and memory
+- `~/.oxios/workspace/` — agent workspace with subdirectories for sessions, seeds, skills, and memory
 
 ### Re-running the Wizard
 
@@ -241,7 +241,7 @@ Open **http://127.0.0.1:4200** in your browser:
 │ 💬 Chat  │                                              │
 │ 👥 Agents│  ┌──────────────────────────────────────┐   │
 │ 📅 Cron  │  │ Welcome to Oxios. How can I help you? │   │
-│ 📁 Programs│ │                                      │   │
+│ 📁 Skills │ │                                              │   │
 │ 🎯 Memory │  └──────────────────────────────────────┘   │
 │ ⚙️ Config │                                              │
 └──────────┴──────────────────────────────────────────────┘
@@ -251,7 +251,7 @@ The web dashboard provides:
 - **Chat** — talk to your agent, it works using the Ouroboros protocol
 - **Agents** — see running agents, kill misbehaving ones
 - **Cron** — schedule recurring tasks
-- **Programs** — manage installed agent capabilities
+- **Skills** — manage agent capabilities (unified Programs + Skills)
 - **Memory** — view and search persistent agent knowledge
 - **Config** — live configuration editing
 
@@ -621,33 +621,27 @@ $ oxios agent kill a1b2c3d4-e5f6-7890-abcd-ef1234567890
   ✓ Agent a1b2c3d4 terminated.
 ```
 
-### Package (Program) Management
+### Skill Management
 
-Programs are installable capabilities for agents — self-contained bundles of tools, skills, and executables.
+Skills are the unified model for agent capabilities — SKILL.md files with YAML frontmatter carrying all metadata (requirements, install specs, invocation policy). See [RFC-009](../rfc-009-skill-unification.md) for the full design.
 
 ```bash
-# Install from local directory
-$ oxios pkg install ./my-program
-  Installed 'my-program v1.0.0'
+# Install a skill
+$ oxios skill install ./my-skill
+  Installed 'my-skill v1.0.0'
 
-# Install from Git
-$ oxios pkg install https://github.com/example/oxios-program.git
+# List all skills
+$ oxios skills
 
-# Install from Git with branch
-$ oxios pkg install https://github.com/example/oxios-program.git --branch dev
-
-# List installed programs
-$ oxios pkg list
-
-# Search available programs
-$ oxios pkg search
+# Get skill details
+$ oxios skill code-review
 
 # View program details
-$ oxios program code-review
+$ oxios skill code-review
 
 # Uninstall
-$ oxios pkg uninstall my-program
-  Uninstalled 'my-program'
+$ oxios skill uninstall my-skill
+  Removed 'my-skill'
 ```
 
 ### Configuration
