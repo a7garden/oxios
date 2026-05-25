@@ -125,6 +125,13 @@ pub use mcp::{
 
 // ─── Intelligence ───────────────────────────────────────────────────
 pub use embedding::{EmbeddingProvider, EmbeddingVector, TfIdfEmbeddingProvider};
+
+// ─── MLX Embedding (RFC-012, Apple Silicon) ──────────────────────────
+#[cfg(feature = "embedding-mlx")]
+pub use embedding::mlx::{
+    EmbeddingDimension, MlxEmbeddingProvider, MlxModelLoader,
+    GemmaEmbeddingModel, GemmaModelArgs,
+};
 pub use memory::auto_memory_bridge::{
     AutoMemoryBridge, ExportResult, GuidancePattern, ImportResult, InsightCategory, MemoryInsight,
     SyncDirection, SyncResult,
