@@ -116,8 +116,13 @@ mod tests {
             ),
             crate::PersonaApi::new(Arc::new(crate::persona_manager::PersonaManager::new())),
             crate::ExtensionApi::new(
+                Arc::new(
+                    crate::skill::SkillManager::new(
+                        base.join("skills"),
+                        base.join("share/skills"),
+                    ),
+                ),
                 Arc::new(crate::program::ProgramManager::new(base.join("programs"))),
-                Arc::new(crate::skill::SkillStore::new(base.join("skills")).unwrap()),
                 Arc::new(crate::host_tools::HostToolValidator::new(vec![], vec![])),
             ),
             crate::McpApi::new(Arc::new(crate::mcp::McpBridge::new())),

@@ -359,91 +359,11 @@ async fn run_agent_loop(ctx: AgentLoopContext) -> Result<(String, usize, bool)> 
         "Tools registered from CSpace"
     );
 
-    // ── Program tools: registered individually from ProgramManager ──
-    let pm = kernel_handle.extensions.program_manager();
-
-    // Create a separate ExecTool for program routing (needed by ProgramTool).
-    let exec_for_programs: Option<std::sync::Arc<crate::tools::ExecTool>> = if cspace.can(
-        &crate::capability::ResourceRef::Exec {
-            mode: "shell".into(),
-        },
-        crate::capability::Rights::EXECUTE,
-    ) {
-        Some(std::sync::Arc::new(crate::tools::ExecTool::from_kernel(
-            &kernel_handle,
-        )))
-    } else {
-        None
-    };
-
-    // ── Load programs and register their tools ──
-    let programs: Vec<_> = pm.list_enabled().await;
-
-    // MCP bridge tools from program configs
-    let mut mcp_server_names: Vec<String> = Vec::new();
-    for program in &programs {
-        for server_config in &program.meta.mcp_servers {
-            if server_config.enabled {
-                mcp_server_names.push(server_config.name.clone());
-            }
-        }
-    }
-
-    if !mcp_server_names.is_empty() {
-        let bridge = kernel_handle.mcp.bridge();
-        if let Err(e) = bridge.initialize_all().await {
-            tracing::warn!(error = %e, "MCP bridge init failed — skipping MCP tools");
-        } else {
-            let _ = bridge.list_tools().await;
-            for server_name in &mcp_server_names {
-                if let Some(tool_defs) = bridge.cached_tools(server_name).await {
-                    for tool_def in tool_defs {
-                        let wrapper = crate::tools::McpToolWrapper::new(
-                            bridge.clone(),
-                            server_name,
-                            &tool_def.name,
-                            tool_def.description.clone(),
-                            serde_json::json!({"type": "object", "properties": {}}),
-                        );
-                        registry.register(wrapper);
-                    }
-                }
-            }
-        }
-    }
-
-    // Program-defined tools
-    for program in &programs {
-        let dep_names: Vec<&str> = program
-            .meta
-            .dependencies
-            .iter()
-            .map(|s| s.as_str())
-            .collect();
-        let missing = registry.missing(&dep_names);
-        if !missing.is_empty() {
-            tracing::warn!(
-                program = %program.meta.name,
-                missing_tools = ?missing,
-                "Skipping program: required tools not found"
-            );
-            continue;
-        }
-
-        for tool_def in &program.meta.tools {
-            if !tool_def.command.is_empty() {
-                if let Some(ref exec) = exec_for_programs {
-                    let tool = crate::tools::ProgramTool::from_definition(
-                        &program.meta.name,
-                        tool_def,
-                        &program.meta.host_requirements,
-                        exec.clone(),
-                    );
-                    registry.register(tool);
-                }
-            }
-        }
-    }
+    // ── Program tools: temporarily disabled during RFC-009 migration ──
+    // TODO: Re-enable program tool registration via SkillManager
+    // after Phase 3 migration completes. The old ProgramManager is
+    // being replaced by the unified SkillManager.
+    let _ = kernel_handle.extensions.skill_manager();
 
     let tools = Arc::new(registry);
 

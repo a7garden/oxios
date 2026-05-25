@@ -387,6 +387,10 @@ fn parse_memory_type(s: &str) -> MemoryType {
         "fact" => MemoryType::Fact,
         "episode" => MemoryType::Episode,
         "knowledge" => MemoryType::Knowledge,
+        "skill" => MemoryType::Skill,
+        "preference" => MemoryType::Preference,
+        "decision" => MemoryType::Decision,
+        "user_profile" | "profile" => MemoryType::UserProfile,
         _ => MemoryType::Fact,
     }
 }

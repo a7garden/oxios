@@ -155,7 +155,7 @@ pub fn register_tools_from_cspace(
             // Programs are not registered as separate tools.
             // ToolRetriever shows them in the capability index;
             // agents use exec to run program commands.
-            ResourceRef::Program { .. } => {}
+            ResourceRef::Skill { .. } => {}
 
             // Space, Agent, Mcp resource refs are handled through
             // their respective KernelDomain registrations above

@@ -96,6 +96,9 @@ pub struct MemoryConfig {
     /// Maximum embedding cache entries.
     #[serde(default = "default_cache_max_entries")]
     pub cache_max_entries: usize,
+    /// Consolidation configuration (RFC-008).
+    #[serde(default)]
+    pub consolidation: ConsolidationConfig,
 }
 
 fn default_true() -> bool {
@@ -125,6 +128,147 @@ impl Default for MemoryConfig {
             cache_enabled: true,
             cache_ttl_secs: 3600,
             cache_max_entries: 10000,
+            consolidation: ConsolidationConfig::default(),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ConsolidationConfig (RFC-008: Memory Consolidation)
+// ---------------------------------------------------------------------------
+
+/// Memory consolidation configuration (RFC-008).
+/// All values have sensible defaults — users never need to configure these.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConsolidationConfig {
+    // ── Dream Process ─────────────────────────────────
+    #[serde(default = "default_true")]
+    pub dream_enabled: bool,
+    #[serde(default = "default_dream_interval")]
+    pub dream_interval_hours: u64,
+    #[serde(default = "default_dream_min_sessions")]
+    pub dream_min_sessions: u32,
+
+    // ── Tier Budgets ──────────────────────────────────
+    #[serde(default = "default_hot_max")]
+    pub hot_max_entries: usize,
+    #[serde(default = "default_warm_max")]
+    pub warm_max_entries: usize,
+    #[serde(default = "default_cold_max")]
+    pub cold_max_entries: usize,
+    #[serde(default = "default_hot_token_budget")]
+    pub hot_token_budget: usize,
+
+    // ── Decay ─────────────────────────────────────────
+    #[serde(default = "default_true")]
+    pub decay_enabled: bool,
+    #[serde(default = "default_one")]
+    pub decay_multiplier: f32,
+    #[serde(default = "default_decay_threshold")]
+    pub decay_threshold: f32,
+    #[serde(default = "default_retention_days")]
+    pub retention_days: u32,
+
+    // ── Auto-Protection ───────────────────────────────
+    #[serde(default = "default_true")]
+    pub auto_protection: bool,
+    #[serde(default = "default_protection_low_access")]
+    pub protection_low_access: u32,
+    #[serde(default = "default_protection_medium_access")]
+    pub protection_medium_access: u32,
+    #[serde(default = "default_protection_high_access")]
+    pub protection_high_access: u32,
+    #[serde(default = "default_protection_medium_sessions")]
+    pub protection_medium_sessions: u32,
+    #[serde(default = "default_protection_high_sessions")]
+    pub protection_high_sessions: u32,
+
+    // ── Auto-Classification ───────────────────────────
+    #[serde(default = "default_true")]
+    pub auto_classification: bool,
+    #[serde(default = "default_type_promotion_threshold")]
+    pub type_promotion_repetitions: u32,
+
+    // ── Compaction ────────────────────────────────────
+    #[serde(default = "default_compaction_threshold")]
+    pub compaction_line_threshold: usize,
+    #[serde(default = "default_true")]
+    pub llm_compaction: bool,
+
+    // ── Dream LLM ──────────────────────────────────────
+    /// Optional model for Dream LLM operations (None = rule-based fallback).
+    #[serde(default)]
+    pub dream_model: Option<String>,
+
+    // ── Protection Demotion ────────────────────────────
+    #[serde(default = "default_true")]
+    pub protection_demotion_enabled: bool,
+    #[serde(default = "default_demotion_stale_days")]
+    pub protection_demotion_stale_days: u32,
+    #[serde(default = "default_demotion_max_step")]
+    pub protection_demotion_max_step: u32,
+
+    // ── Proactive Recall ──────────────────────────────
+    #[serde(default = "default_true")]
+    pub proactive_recall: bool,
+    #[serde(default = "default_proactive_limit")]
+    pub proactive_recall_limit: usize,
+    #[serde(default = "default_proactive_threshold")]
+    pub proactive_recall_threshold: f32,
+}
+
+fn default_dream_interval() -> u64 { 24 }
+fn default_dream_min_sessions() -> u32 { 5 }
+fn default_hot_max() -> usize { 50 }
+fn default_warm_max() -> usize { 500 }
+fn default_cold_max() -> usize { 10_000 }
+fn default_hot_token_budget() -> usize { 3_000 }
+fn default_one() -> f32 { 1.0 }
+fn default_decay_threshold() -> f32 { 0.05 }
+fn default_retention_days() -> u32 { 90 }
+fn default_protection_low_access() -> u32 { 2 }
+fn default_protection_medium_access() -> u32 { 3 }
+fn default_protection_high_access() -> u32 { 5 }
+fn default_protection_medium_sessions() -> u32 { 2 }
+fn default_protection_high_sessions() -> u32 { 3 }
+fn default_type_promotion_threshold() -> u32 { 3 }
+fn default_compaction_threshold() -> usize { 200 }
+fn default_proactive_limit() -> usize { 5 }
+fn default_proactive_threshold() -> f32 { 0.6 }
+fn default_demotion_stale_days() -> u32 { 30 }
+fn default_demotion_max_step() -> u32 { 1 }
+
+impl Default for ConsolidationConfig {
+    fn default() -> Self {
+        Self {
+            dream_enabled: true,
+            dream_interval_hours: 24,
+            dream_min_sessions: 5,
+            hot_max_entries: 50,
+            warm_max_entries: 500,
+            cold_max_entries: 10_000,
+            hot_token_budget: 3_000,
+            decay_enabled: true,
+            decay_multiplier: 1.0,
+            decay_threshold: 0.05,
+            retention_days: 90,
+            auto_protection: true,
+            protection_low_access: 2,
+            protection_medium_access: 3,
+            protection_high_access: 5,
+            protection_medium_sessions: 2,
+            protection_high_sessions: 3,
+            auto_classification: true,
+            type_promotion_repetitions: 3,
+            compaction_line_threshold: 200,
+            llm_compaction: true,
+            dream_model: None,
+            protection_demotion_enabled: true,
+            protection_demotion_stale_days: 30,
+            protection_demotion_max_step: 1,
+            proactive_recall: true,
+            proactive_recall_limit: 5,
+            proactive_recall_threshold: 0.6,
         }
     }
 }

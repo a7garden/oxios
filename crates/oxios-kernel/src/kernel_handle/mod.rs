@@ -185,7 +185,11 @@ impl KernelHandle {
             ),
             persona: PersonaApi::new(persona_manager),
             extensions: ExtensionApi::new(
-                Arc::new(SkillManager::from_parts(program_manager, skill_store)),
+                Arc::new(SkillManager::new(
+                    skill_store.path().clone(),
+                    skill_store.path().clone().join("../share/skills"),
+                )),
+                program_manager,
                 host_tool_validator,
             ),
             mcp: McpApi::new(mcp_bridge),

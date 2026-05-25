@@ -154,7 +154,11 @@ pub use program::{
     ArgumentDef, HostRequirementsCheck, InstallSource, Program, ProgramManager, ProgramMeta,
     ToolDef,
 };
-pub use skill::{Skill, SkillManager, SkillMeta, SkillStore};
+pub use skill::{
+    InstallKind, Requirements, RequirementsCheck, Skill, SkillConfig, SkillEntry,
+    SkillInstallSpec, SkillInvocationPolicy, SkillManager, SkillMeta, SkillMetadata, SkillRef,
+    SkillSnapshot, SkillSource, SkillState, SkillStatus, SkillStore,
+};
 #[cfg(feature = "browser")]
 pub use tools::BrowserTool;
 pub use tools::{ExecTool, KnowledgeTool, ProgramTool};

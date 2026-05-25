@@ -10,7 +10,7 @@ use oxios_kernel::{
     access_manager::AccessManager, auth::AuthManager, config::load_config, A2AProtocol,
     AgentRuntime, AgentScheduler, AuditTrail, BasicSupervisor, BudgetManager, CronScheduler,
     EngineProvider, EventBus, GitLayer, HostToolValidator, McpBridge, McpServer, MemoryManager,
-    Orchestrator, OxiosConfig, PersonaManager, ProgramManager, ResourceMonitor, SkillStore,
+    Orchestrator, OxiosConfig, PersonaManager, ProgramManager, ResourceMonitor, SkillManager,
     SpaceManager, Supervisor,
 };
 use oxios_markdown::KnowledgeBase;
@@ -30,7 +30,7 @@ pub struct Kernel {
     event_bus: EventBus,
     state_store: Arc<oxios_kernel::state_store::StateStore>,
     config: OxiosConfig,
-    skill_store: SkillStore,
+    skill_manager: SkillManager,
     supervisor: Arc<dyn Supervisor>,
     scheduler: Arc<AgentScheduler>,
     access_manager: Arc<parking_lot::Mutex<AccessManager>>,
@@ -86,8 +86,8 @@ impl Kernel {
                     ),
                     oxios_kernel::PersonaApi::new(Arc::new(self.persona_manager.clone())),
                     oxios_kernel::ExtensionApi::new(
+                        Arc::new(self.skill_manager.clone()),
                         self.program_manager.clone(),
-                        Arc::new(self.skill_store.clone()),
                         Arc::new(self.host_tool_validator.clone()),
                     ),
                     oxios_kernel::McpApi::new(self.mcp_bridge.clone()),
@@ -199,7 +199,8 @@ impl Kernel {
     /// Initialize default skills from the share directory.
     pub async fn init_default_skills(&self, share_dir: &std::path::Path) -> Result<()> {
         let defaults_dir = share_dir.join("default-skills");
-        self.skill_store.init_defaults(&defaults_dir).await?;
+        self.skill_manager.init().await?;
+        let _ = defaults_dir; // TODO: wire bundled defaults dir
         Ok(())
     }
 
@@ -475,7 +476,8 @@ impl KernelBuilder {
         )?);
 
         let skills_dir = PathBuf::from(&config.kernel.workspace).join("skills");
-        let skill_store = SkillStore::new(skills_dir)?;
+        let bundled_dir = PathBuf::from(&config.kernel.workspace).join("share/skills");
+        let skill_manager = SkillManager::new(skills_dir, bundled_dir);
         let programs_dir = PathBuf::from(&config.kernel.workspace).join("programs");
         let program_manager = Arc::new(ProgramManager::new(programs_dir));
         program_manager.init().await?;
@@ -564,8 +566,8 @@ impl KernelBuilder {
                 ),
                 oxios_kernel::PersonaApi::new(Arc::new(persona_manager.clone())),
                 oxios_kernel::ExtensionApi::new(
+                    Arc::new(skill_manager.clone()),
                     program_manager.clone(),
-                    Arc::new(skill_store.clone()),
                     Arc::new(host_tool_validator.clone()),
                 ),
                 oxios_kernel::McpApi::new(mcp_bridge.clone()),
@@ -679,7 +681,7 @@ impl KernelBuilder {
             event_bus: event_bus.clone(),
             state_store,
             config,
-            skill_store,
+            skill_manager,
             supervisor,
             scheduler,
             access_manager,

@@ -41,15 +41,8 @@ impl MemoryManager {
     /// Returns total entries across all memory types (from disk).
     pub async fn total_entries(&self) -> usize {
         let mut total = 0;
-        for mt in [
-            MemoryType::Conversation,
-            MemoryType::Session,
-            MemoryType::Fact,
-            MemoryType::Episode,
-            MemoryType::Knowledge,
-        ] {
-            // Use a large fixed limit to avoid overflow with usize::MAX
-            if let Ok(entries) = self.list(mt, 1_000_000).await {
+        for mt in MemoryType::all() {
+            if let Ok(entries) = self.list(*mt, 1_000_000).await {
                 total += entries.len();
             }
         }
@@ -64,13 +57,7 @@ impl MemoryManager {
         // Collect all entries outside the lock
         let mut entries_to_index: Vec<(String, EmbeddingVector)> = Vec::new();
 
-        for mt in &[
-            MemoryType::Conversation,
-            MemoryType::Session,
-            MemoryType::Fact,
-            MemoryType::Episode,
-            MemoryType::Knowledge,
-        ] {
+        for mt in MemoryType::all() {
             if let Ok(names) = self.state_store.list_category(mt.category()).await {
                 for name in names {
                     if let Ok(Some(entry)) = self
@@ -261,16 +248,9 @@ impl MemoryManager {
         }
 
         // Determine which memory types to search
-        let all_types: &[MemoryType] = &[
-            MemoryType::Conversation,
-            MemoryType::Session,
-            MemoryType::Fact,
-            MemoryType::Episode,
-            MemoryType::Knowledge,
-        ];
         let types: &[MemoryType] = match memory_type {
             Some(ref t) => std::slice::from_ref(t),
-            None => all_types,
+            None => MemoryType::all(),
         };
 
         // Load entries from state store (no lock held)
@@ -309,12 +289,7 @@ impl MemoryManager {
         let keywords = extract_keywords(query);
         let types = match memory_type {
             Some(t) => vec![t],
-            None => vec![
-                MemoryType::Conversation,
-                MemoryType::Fact,
-                MemoryType::Episode,
-                MemoryType::Knowledge,
-            ],
+            None => MemoryType::all().to_vec(),
         };
 
         let mut results = Vec::new();
@@ -469,13 +444,7 @@ impl MemoryManager {
         }
 
         // Then check exact content hash across all types
-        for mt in &[
-            MemoryType::Conversation,
-            MemoryType::Session,
-            MemoryType::Fact,
-            MemoryType::Episode,
-            MemoryType::Knowledge,
-        ] {
+        for mt in MemoryType::all() {
             if let Ok(entries) = self.list(*mt, 1000).await {
                 for entry in entries {
                     if content_hash(&entry.content) == hash {
@@ -772,16 +741,9 @@ impl MemoryManager {
         let raw_hits = hnsw_index.search(&query_f32, limit * 2)?;
 
         // Determine which memory types to search
-        let all_types: &[MemoryType] = &[
-            MemoryType::Conversation,
-            MemoryType::Session,
-            MemoryType::Fact,
-            MemoryType::Episode,
-            MemoryType::Knowledge,
-        ];
         let types: &[MemoryType] = match memory_type {
             Some(ref t) => std::slice::from_ref(t),
-            None => all_types,
+            None => MemoryType::all(),
         };
 
         // Load entries and build results
@@ -850,13 +812,7 @@ impl MemoryManager {
     pub async fn rebuild_hnsw_index(&self, hnsw_index: &HnswMemoryIndex) -> Result<usize> {
         let mut count = 0;
 
-        for mt in &[
-            MemoryType::Conversation,
-            MemoryType::Session,
-            MemoryType::Fact,
-            MemoryType::Episode,
-            MemoryType::Knowledge,
-        ] {
+        for mt in MemoryType::all() {
             if let Ok(names) = self.state_store.list_category(mt.category()).await {
                 for name in names {
                     if let Ok(Some(entry)) = self
@@ -883,5 +839,224 @@ impl MemoryManager {
 
         tracing::info!(entries = count, "HNSW index rebuilt");
         Ok(count)
+    }
+
+    // ------------------------------------------------------------------
+    // RFC-008: Tier-aware and new memory operations
+    // ------------------------------------------------------------------
+
+    /// List memories by tier (loads all types, filters by tier field).
+    pub async fn list_by_tier(
+        &self,
+        tier: super::MemoryTier,
+        limit: usize,
+    ) -> Result<Vec<MemoryEntry>> {
+        let mut results = Vec::new();
+        for mt in MemoryType::all() {
+            if let Ok(entries) = self.list(*mt, limit).await {
+                for entry in entries {
+                    if entry.tier == tier {
+                        results.push(entry);
+                    }
+                }
+            }
+            if results.len() >= limit {
+                break;
+            }
+        }
+        results.truncate(limit);
+        Ok(results)
+    }
+
+    /// Get a memory entry by ID (searches all types).
+    pub async fn get_by_id(&self, id: &str) -> Result<Option<MemoryEntry>> {
+        for mt in MemoryType::all() {
+            if let Ok(Some(entry)) = self.get(id, *mt).await {
+                return Ok(Some(entry));
+            }
+        }
+        Ok(None)
+    }
+
+    /// Load a memory entry by reference string (ID or category/id).
+    pub async fn load_by_reference(&self, reference: &str) -> Result<Option<MemoryEntry>> {
+        // Try as direct ID first
+        if let Ok(Some(entry)) = self.get_by_id(reference).await {
+            return Ok(Some(entry));
+        }
+        // Try as category/name format
+        if let Some((cat, name)) = reference.split_once('/') {
+            if let Ok(Some(entry)) = self
+                .state_store
+                .load_json::<MemoryEntry>(cat, name)
+                .await
+            {
+                return Ok(Some(entry));
+            }
+        }
+        Ok(None)
+    }
+
+    /// Select memories by manifest (keyword matching against content).
+    ///
+    /// Used by proactive recall Step 2 for cross-domain keyword matching.
+    pub async fn select_by_manifest(
+        &self,
+        query: &str,
+        limit: usize,
+    ) -> Result<Vec<MemoryEntry>> {
+        self.keyword_search(query, None, limit).await
+    }
+
+    /// Build the Hot tier context for agent prompt injection.
+    ///
+    /// Returns a formatted string of all Hot tier memories, truncated to
+    /// fit within the configured token budget (4 chars ≈ 1 token).
+    pub async fn build_hot_context(&self, token_budget: usize) -> Result<String> {
+        let hot_entries = self.list_by_tier(super::MemoryTier::Hot, 50).await?;
+
+        let mut context_parts = Vec::new();
+        let mut char_budget = token_budget * 4;
+
+        for entry in &hot_entries {
+            let line = format!("- [{}] {}", entry.memory_type.label(), entry.content);
+            if line.len() > char_budget {
+                break;
+            }
+            char_budget -= line.len();
+            context_parts.push(line);
+        }
+
+        if context_parts.is_empty() {
+            Ok(String::new())
+        } else {
+            Ok(format!("## Active Context\n\n{}", context_parts.join("\n")))
+        }
+    }
+
+    /// Build full context: hot context + proactive recall blended into system prompt.
+    pub async fn build_full_context(
+        &self,
+        query: &str,
+        system_prompt: &str,
+        token_budget: usize,
+    ) -> Result<String> {
+        let hot_ctx = self.build_hot_context(token_budget).await?;
+
+        if hot_ctx.is_empty() {
+            return Ok(system_prompt.to_string());
+        }
+
+        Ok(format!("{}\n\n{}", system_prompt, hot_ctx))
+    }
+
+    /// Shift a memory entry between tiers.
+    pub async fn shift_tier(
+        &self,
+        id: &str,
+        from: super::MemoryTier,
+        to: super::MemoryTier,
+    ) -> Result<()> {
+        if let Ok(Some(mut entry)) = self.get_by_id(id).await {
+            if entry.tier == from {
+                entry.tier = to;
+                self.remember(entry).await?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Pin a memory (set permanent protection).
+    pub async fn pin(&self, id: &str) -> Result<()> {
+        if let Ok(Some(mut entry)) = self.get_by_id(id).await {
+            entry.pinned = true;
+            entry.protection = super::ProtectionLevel::Permanent;
+            self.remember(entry).await?;
+        }
+        Ok(())
+    }
+
+    /// Unpin a memory (revert to auto-computed protection).
+    pub async fn unpin(&self, id: &str) -> Result<()> {
+        if let Ok(Some(mut entry)) = self.get_by_id(id).await {
+            entry.pinned = false;
+            // Recompute protection
+            let protector = super::auto_protect::AutoProtector::default_protector();
+            entry.protection = protector.compute_protection(&entry);
+            self.remember(entry).await?;
+        }
+        Ok(())
+    }
+
+    /// Set importance for a memory entry.
+    pub async fn set_importance(&self, id: &str, importance: f32) -> Result<()> {
+        if let Ok(Some(mut entry)) = self.get_by_id(id).await {
+            entry.importance = importance.clamp(0.0, 1.0);
+            self.remember(entry).await?;
+        }
+        Ok(())
+    }
+
+    /// Recompute decay scores for all entries.
+    ///
+    /// Returns the number of entries updated.
+    pub async fn recompute_all_decay(&self, multiplier: f32) -> Result<usize> {
+        let engine = super::decay::DecayEngine::new(multiplier);
+        let now = chrono::Utc::now();
+        let mut count = 0;
+
+        for mt in MemoryType::all() {
+            if let Ok(entries) = self.list(*mt, 1_000_000).await {
+                for mut entry in entries {
+                    let new_decay = engine.compute_decay(&entry, now);
+                    if (entry.decay_score - new_decay).abs() > 0.001 {
+                        entry.decay_score = new_decay;
+                        self.remember(entry).await?;
+                        count += 1;
+                    }
+                }
+            }
+        }
+
+        Ok(count)
+    }
+
+    /// Immediate Hot overflow handling.
+    ///
+    /// Called after remember() to immediately demote entries when Hot
+    /// exceeds its budget.
+    pub async fn immediate_hot_overflow(
+        &self,
+        hot_max: usize,
+    ) -> Result<usize> {
+        let hot_entries = self.list_by_tier(super::MemoryTier::Hot, hot_max * 2).await?;
+        if hot_entries.len() <= hot_max {
+            return Ok(0);
+        }
+
+        let overflow = hot_entries.len() - hot_max;
+        let mut candidates: Vec<MemoryEntry> = hot_entries
+            .into_iter()
+            .filter(|e| e.protection < super::ProtectionLevel::High && !e.pinned)
+            .collect();
+
+        candidates.sort_by(|a, b| {
+            a.protection
+                .cmp(&b.protection)
+                .then(
+                    a.decay_score
+                        .partial_cmp(&b.decay_score)
+                        .unwrap_or(std::cmp::Ordering::Equal),
+                )
+        });
+
+        let mut demoted = 0;
+        for entry in candidates.into_iter().take(overflow) {
+            self.shift_tier(&entry.id, super::MemoryTier::Hot, super::MemoryTier::Warm)
+                .await?;
+            demoted += 1;
+        }
+
+        Ok(demoted)
     }
 }
