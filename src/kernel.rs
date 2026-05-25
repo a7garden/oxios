@@ -8,10 +8,10 @@ use anyhow::{Context, Result};
 use oxios_gateway::Gateway;
 use oxios_kernel::{
     access_manager::AccessManager, auth::AuthManager, config::load_config, A2AProtocol,
-    AgentRuntime, AgentScheduler, AuditTrail, BasicSupervisor, BudgetManager, CronScheduler,
-    EngineProvider, EventBus, GitLayer, McpBridge, McpServer, MemoryManager,
-    Orchestrator, OxiosConfig, PersonaManager, ResourceMonitor, SkillManager,
-    SpaceManager, Supervisor, DreamProcess,
+    AgentRuntime, AgentScheduler, AuditTrail, BasicSupervisor, BudgetManager, ClawHubClient,
+    ClawHubInstaller, CronScheduler, DreamProcess, EngineProvider, EventBus, GitLayer,
+    McpBridge, McpServer, MarketplaceApi, MarketplaceConfig, MemoryManager, Orchestrator,
+    OxiosConfig, PersonaManager, ResourceMonitor, SkillManager, SpaceManager, Supervisor,
 };
 use oxios_markdown::KnowledgeBase;
 
@@ -126,6 +126,7 @@ impl Kernel {
                         )
                         .expect("KnowledgeLens init failed"),
                     ),
+                    self.build_marketplace_api(),
                 ))
             })
             .clone()
@@ -150,6 +151,29 @@ impl Kernel {
     #[cfg(not(feature = "browser"))]
     fn build_browser_api(&self) -> oxios_kernel::BrowserApi {
         oxios_kernel::BrowserApi::default()
+    }
+
+    /// Build a MarketplaceApi (ClawHub) from config.
+    fn build_marketplace_api(&self) -> MarketplaceApi {
+        let workspace = PathBuf::from(&self.config.kernel.workspace);
+        let skills_dir = workspace.join("skills");
+        let config = &self.config.marketplace;
+
+        let client = match ClawHubClient::new(config.base_url.clone()) {
+            Ok(c) => c,
+            Err(e) => {
+                tracing::warn!(error = %e, "Invalid marketplace.base_url, using default");
+                ClawHubClient::new(Some("https://clawhub.ai".to_string())).unwrap()
+            }
+        };
+
+        let installer = ClawHubInstaller::new(
+            skills_dir,
+            workspace,
+            config.base_url.clone(),
+        );
+
+        MarketplaceApi::new(Arc::new(installer), Arc::new(client))
     }
 
     /// Configuration reference.
@@ -572,6 +596,7 @@ impl KernelBuilder {
                     )
                     .expect("KnowledgeLens init failed"),
                 ),
+                build_marketplace_api_inline(&config),
             ));
 
         // Build ToolRetriever for semantic capability discovery.
@@ -790,4 +815,29 @@ fn build_browser_api_value(config: &OxiosConfig) -> oxios_kernel::BrowserApi {
 #[cfg(not(feature = "browser"))]
 fn build_browser_api_value(_config: &OxiosConfig) -> oxios_kernel::BrowserApi {
     oxios_kernel::BrowserApi::default()
+}
+
+/// Build a MarketplaceApi inline (used during KernelBuilder::build before the Kernel is fully constructed).
+fn build_marketplace_api_inline(config: &OxiosConfig) -> MarketplaceApi {
+    let workspace = PathBuf::from(&config.kernel.workspace);
+    let skills_dir = workspace.join("skills");
+    let base_url = config.marketplace.base_url.clone();
+    let client = ClawHubClient::new(base_url).unwrap_or_else(|_| {
+        tracing::warn!("Invalid marketplace.base_url, using default");
+        ClawHubClient::new(Some("https://clawhub.ai".to_string())).unwrap()
+    });
+    let installer = ClawHubInstaller::new(skills_dir, workspace, config.marketplace.base_url.clone());
+    MarketplaceApi::new(Arc::new(installer), Arc::new(client))
+}
+
+/// Build a MarketplaceApi from the Kernel instance (used after Kernel construction).
+fn build_marketplace_api_value(config: &OxiosConfig) -> MarketplaceApi {
+    let workspace = PathBuf::from(&config.kernel.workspace);
+    let skills_dir = workspace.join("skills");
+    let client = ClawHubClient::new(config.marketplace.base_url.clone()).unwrap_or_else(|_| {
+        tracing::warn!("Invalid marketplace.base_url, using default");
+        ClawHubClient::new(Some("https://clawhub.ai".to_string())).unwrap()
+    });
+    let installer = ClawHubInstaller::new(skills_dir, workspace, config.marketplace.base_url.clone());
+    MarketplaceApi::new(Arc::new(installer), Arc::new(client))
 }

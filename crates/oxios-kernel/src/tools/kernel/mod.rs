@@ -18,6 +18,7 @@ pub mod agent_tool;
 pub mod budget_tool;
 pub mod cron_tool;
 pub mod knowledge_tool;
+pub mod marketplace_tool;
 pub mod persona_tool;
 pub mod resource_tool;
 pub mod security_tool;
@@ -27,6 +28,7 @@ pub use agent_tool::AgentTool as KernelAgentTool;
 pub use budget_tool::BudgetTool;
 pub use cron_tool::CronTool;
 pub use knowledge_tool::KnowledgeTool;
+pub use marketplace_tool::MarketplaceTool;
 pub use persona_tool::PersonaTool;
 pub use resource_tool::ResourceTool;
 pub use security_tool::SecurityTool;
@@ -84,4 +86,7 @@ pub fn register_all_kernel_tools(registry: &ToolRegistry, kernel: &KernelHandle,
     {
         registry.register(crate::tools::BrowserTool::from_kernel(kernel));
     }
+
+    // Marketplace (ClawHub — search, install, update)
+    registry.register(MarketplaceTool::from_kernel(kernel));
 }

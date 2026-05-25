@@ -5,7 +5,7 @@
 use std::path::PathBuf;
 
 use anyhow::Result;
-use serde::Deserialize;
+use sha2::Digest;
 use url::Url;
 
 use super::types::{ClawHubSearchResult, ClawHubSkillDetail, SearchResponse};
@@ -41,6 +41,11 @@ impl ClawHubClient {
             base_url: base,
             client: reqwest::Client::new(),
         })
+    }
+
+    /// Returns the base URL of the registry this client targets.
+    pub fn base_url(&self) -> &Url {
+        &self.base_url
     }
 
     /// Search for skills by query string.
@@ -146,8 +151,7 @@ impl ClawHubClient {
             .prefix("clawhub-")
             .suffix(".zip")
             .tempfile()?;
-        use std::io::Write;
-        tmp.write_all(&bytes)?;
+        std::io::Write::write_all(&mut tmp, &bytes)?;
 
         let path = tmp.into_temp_path().keep().map_err(|e| {
             anyhow::anyhow!("failed to persist temp file: {}", e)

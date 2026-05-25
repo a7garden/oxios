@@ -208,6 +208,12 @@ enum Command {
         version: Option<String>,
     },
 
+    /// Search, browse, and install skills from ClawHub marketplace.
+    Marketplace {
+        #[command(subcommand)]
+        action: MarketplaceAction,
+    },
+
     /// Generate shell completion script.
     Completion { shell: Shell },
 }
@@ -256,6 +262,35 @@ enum DaemonAction {
     Install,
     /// Uninstall system service.
     Uninstall,
+}
+
+/// Marketplace subcommands (ClawHub).
+#[derive(Debug, Subcommand)]
+enum MarketplaceAction {
+    /// Search skills on ClawHub.
+    Search {
+        /// Search query.
+        #[arg(short, long)]
+        query: String,
+        /// Maximum results.
+        #[arg(short, long, default_value = "20")]
+        limit: usize,
+    },
+    /// Install a skill from ClawHub.
+    Install {
+        /// Skill slug.
+        slug: String,
+        /// Specific version (default: latest).
+        #[arg(short, long)]
+        version: Option<String>,
+    },
+    /// Update installed ClawHub skill(s).
+    Update {
+        /// Skill slug (default: all).
+        slug: Option<String>,
+    },
+    /// Check for available updates.
+    Updates,
 }
 
 // ─── Constants & helpers ───────────────────────────────────────────────────
@@ -1096,6 +1131,7 @@ async fn run() -> Result<()> {
             | Some(Command::Budget { .. })
             | Some(Command::Git { .. })
             | Some(Command::Pkg { .. })
+            | Some(Command::Marketplace { .. })
     );
 
     if needs_kernel && !oxios_kernel::onboarding::has_credentials(&config) {
@@ -1369,6 +1405,123 @@ async fn run() -> Result<()> {
                     Ok(())
                 }
             }
+        }
+
+        Some(Command::Marketplace { action }) => {
+            let api = kernel.handle().marketplace_api.clone();
+            match action {
+                MarketplaceAction::Search { query, limit } => {
+                    let results = api.search(query, Some(*limit)).await?;
+                    if results.is_empty() {
+                        println!("  No results for '{}'", query);
+                    } else {
+                        for r in results {
+                            println!(
+                                "{} - {} ({})",
+                                style(&r.slug).bold(),
+                                r.display_name,
+                                r.version.as_deref().unwrap_or("unknown")
+                            );
+                            if let Some(summary) = &r.summary {
+                                println!("  {}", summary.chars().take(80).collect::<String>());
+                            }
+                            println!();
+                        }
+                    }
+                }
+                MarketplaceAction::Install { slug, version } => {
+                    match api.install(slug, version.as_deref()).await {
+                        Ok(result) => {
+                            println!(
+                                "  {} {} v{}",
+                                style("Installed").green().bold(),
+                                style(&result.slug).cyan(),
+                                style(&result.version).cyan()
+                            );
+                        }
+                        Err(e) => {
+                            eprintln!(
+                                "  {} Failed to install '{}': {}",
+                                style("✗").red().bold(),
+                                slug,
+                                e
+                            );
+                        }
+                    }
+                }
+                MarketplaceAction::Update { slug } => {
+                    if let Some(s) = slug {
+                        match api.update(s).await {
+                            Ok(result) => {
+                                if result.changed {
+                                    println!(
+                                        "  {} {}: {} → {}",
+                                        style("Updated").green().bold(),
+                                        result.slug,
+                                        style(result.previous_version.as_deref().unwrap_or("?")).yellow(),
+                                        style(&result.version).cyan()
+                                    );
+                                } else {
+                                    println!("  {} is already up to date", result.slug);
+                                }
+                            }
+                            Err(e) => {
+                                eprintln!("  {} Failed to update '{}': {}", style("✗").red().bold(), s, e);
+                            }
+                        }
+                    } else {
+                        let results = api.update_all().await?;
+                        if results.is_empty() {
+                            println!("  No ClawHub skills installed.");
+                        } else {
+                            for r in results {
+                                if r.changed {
+                                    println!(
+                                        "  {} {}: {} → {}",
+                                        style("Updated").green().bold(),
+                                        r.slug,
+                                        style(r.previous_version.as_deref().unwrap_or("?")).yellow(),
+                                        style(&r.version).cyan()
+                                    );
+                                } else if r.ok {
+                                    println!("  {} is already up to date", r.slug);
+                                } else {
+                                    eprintln!(
+                                        "  {} Failed to update {}: {}",
+                                        style("✗").red().bold(),
+                                        r.slug,
+                                        r.error.as_deref().unwrap_or("unknown error")
+                                    );
+                                }
+                            }
+                        }
+                    }
+                }
+                MarketplaceAction::Updates => {
+                    match api.check_updates().await {
+                        Ok(updates) => {
+                            if updates.is_empty() {
+                                println!("  All skills up to date");
+                            } else {
+                                println!("  Available updates:");
+                                println!("  {}", "─".repeat(50));
+                                for u in updates {
+                                    println!(
+                                        "  {}: {} → {}",
+                                        style(&u.slug).bold(),
+                                        style(&u.current_version).yellow(),
+                                        style(&u.latest_version).cyan()
+                                    );
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            eprintln!("  {} Failed to check updates: {}", style("✗").red().bold(), e);
+                        }
+                    }
+                }
+            }
+            Ok(())
         }
 
         // Handled before kernel assembly above — unreachable here

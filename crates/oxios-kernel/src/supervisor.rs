@@ -431,7 +431,16 @@ mod tests {
                 )
                 .unwrap(),
             ),
+            crate::kernel_handle::MarketplaceApi::new(
+                Arc::new(crate::clawhub::ClawHubInstaller::new(
+                    tmp.join("skills"),
+                    tmp.join("state"),
+                    None,
+                )),
+                Arc::new(crate::clawhub::ClawHubClient::new(None).expect("valid ClawHub client")),
+            ),
         ));
+
 
         let runtime = AgentRuntime::new(provider, "mock/model", kernel_handle);
         BasicSupervisor::new(event_bus, runtime)

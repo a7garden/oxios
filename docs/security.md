@@ -229,7 +229,7 @@ Human-in-the-Loop approval workflow for high-risk operations.
 | Role | Description | Max Concurrent Agents |
 |------|-------------|----------------------|
 | **User** | Basic agent user. Limited tools and workspace-only paths. | 2 |
-| **Superuser** | Can manage programs, skills, workspaces, and use all tools. | 10 |
+| **Superuser** | Can manage skills, workspaces, and use all tools. | 10 |
 | **Admin** | Full system access including RBAC management and system config. | Unlimited |
 
 #### Default Policy by Role
@@ -240,7 +240,7 @@ allowed_actions: [
     UseTool("read"), UseTool("write"), UseTool("edit"),
     UseTool("bash"), UseTool("grep"), UseTool("find"),
     AccessPath("/workspace/**"),
-    ManageAgents,
+    ManageAgents, ManageSkills, ManageWorkspaces,
 ]
 resource_patterns: ["/workspace/**"]
 max_concurrent_agents: 2
@@ -251,7 +251,7 @@ max_concurrent_agents: 2
 allowed_actions: [
     UseTool("*"),                        // All tools
     AccessPath("/workspace/**"),
-    ManageAgents, ManagePrograms, ManageWorkspaces,
+    ManageAgents, ManageSkills, ManageWorkspaces,
     ViewAuditLog,
 ]
 resource_patterns: ["/workspace/**", "/tmp/**"]
@@ -263,7 +263,7 @@ max_concurrent_agents: 10
 allowed_actions: [
     UseTool("*"),                        // All tools
     AccessPath("*"),                     // All paths
-    ManageAgents, ManagePrograms, ManageWorkspaces,
+    ManageAgents, ManageSkills, ManageWorkspaces,
     ManageRBAC, ViewAuditLog, SystemConfig,
 ]
 resource_patterns: ["*"]
@@ -289,7 +289,7 @@ The `Action` enum defines all authorizable operations:
 | `UseTool(name)` | Use a specific tool | Yes if `*`, `osascript`, or `rm` |
 | `AccessPath(pattern)` | Access files matching a glob | No |
 | `ManageAgents` | Fork/exec/kill agents | No |
-| `ManagePrograms` | Install/uninstall programs | No |
+| `ManageSkills` | Install/uninstall skills | No |
 | `ManageWorkspaces` | Create/start/stop/remove workspaces | No |
 | `ManageRBAC` | Modify RBAC policies and roles | **Yes** |
 | `ViewAuditLog` | View the audit trail | No |
@@ -433,7 +433,7 @@ The `AuditAction` enum captures all kernel events:
 | `MemoryWrite { entry_id }` | Memory entry written |
 | `MemoryRead { entry_id }` | Memory entry read |
 | `ConfigChange { key }` | Configuration modified |
-| `ProgramInstall { program, version }` | Program installed |
+| `SkillInstall { skill }` | Skill installed |
 | `CronTrigger { job_id }` | Scheduled job ran |
 | `GitCommit { message }` | Git commit created |
 | `AccessDenied { permission }` | Access was denied |
@@ -468,14 +468,14 @@ match trail.verify() {
 
 ### Guardian Periodic Checks
 
-The Oxios guardian program should periodically verify audit trail integrity:
+The Oxios guardian skill should periodically verify audit trail integrity:
 
 ```bash
 # CLI verification (if exposed)
 oxios audit
 ```
 
-Programmatically, the guardian can schedule verification at regular intervals:
+Programmatically, the guardian skill can schedule verification at regular intervals:
 
 ```rust
 // Guardian pseudocode
@@ -1156,7 +1156,7 @@ chmod 700 ~/.oxi/
 
 #### 7. Regular Audit Trail Verification
 
-Verify audit trail integrity regularly — automate with the guardian program
+Verify audit trail integrity regularly — automate with the guardian skill
 or a cron job:
 
 ```bash

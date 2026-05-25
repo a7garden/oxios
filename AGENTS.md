@@ -27,7 +27,7 @@ oxios/                     # Main binary (src/main.rs, src/kernel.rs, src/cmd_ru
 │   ├── oxios-web/         # Web dashboard (Axum backend + React frontend)
 │   ├── oxios-cli/         # CLI channel
 │   └── oxios-telegram/    # Telegram channel
-├── share/                 # Default skills (share/default-skills/), default programs (legacy), config
+├── share/                 # Default skills (share/default-skills/), config
 └── docs/                  # Architecture docs, RFCs, design documents
 ```
 
@@ -137,7 +137,7 @@ oxios run --json --session "$SID" "follow-up"
 | `~/.oxios/workspace/` | Agent working directory |
 | `~/.oxios/workspace/sessions/` | Session data (ephemeral) |
 | `~/.oxios/workspace/seeds/` | Ouroboros seed specs |
-| `~/.oxios/workspace/skills/` | Unified skill definitions (replaces former programs + skills) |
+| `~/.oxios/workspace/skills/` | Unified skill definitions (replaces Programs + Skills) |
 | `~/.oxi/auth.json` | oxi-cli credentials (separate from Oxios) |
 
 ## Conventions

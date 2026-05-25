@@ -239,7 +239,7 @@ Agents can browse the web, fill forms, extract data, and execute JavaScript — 
 
 ### 🛠️ Skills
 
-Unified skill system — every capability is a SKILL.md with YAML frontmatter. Skills replace the former Programs concept, providing a single model for agent instructions with requirements, install specs, and invocation policy.
+Unified skill system — every capability is a SKILL.md with YAML frontmatter. Skills unify the former Programs and Skills concepts, providing a single model for agent instructions with requirements, install specs, and invocation policy.
 
 ```yaml
 ---

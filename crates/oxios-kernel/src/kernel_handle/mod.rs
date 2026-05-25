@@ -7,6 +7,7 @@ pub mod exec_api;
 pub mod extension_api;
 pub mod infra_api;
 pub mod knowledge_lens;
+pub mod marketplace_api;
 pub mod mcp_api;
 pub mod persona_api;
 pub mod security_api;
@@ -22,6 +23,7 @@ pub use infra_api::InfraApi;
 pub use knowledge_lens::{
     CopilotResponse, KnowledgeContext, KnowledgeLens, KnowledgeNote, MemoryNote,
 };
+pub use marketplace_api::MarketplaceApi;
 pub use mcp_api::McpApi;
 pub use persona_api::PersonaApi;
 pub use security_api::SecurityApi;
@@ -33,6 +35,7 @@ use crate::access_manager::AccessManager;
 use crate::audit_trail::AuditTrail;
 use crate::auth::AuthManager;
 use crate::budget::BudgetManager;
+use crate::clawhub::{ClawHubClient, ClawHubInstaller};
 use crate::config::OxiosConfig;
 use crate::cron::CronScheduler;
 use crate::event_bus::EventBus;
@@ -92,6 +95,8 @@ pub struct KernelHandle {
     pub knowledge: Arc<oxios_markdown::KnowledgeBase>,
     /// Semantic knowledge overlay (HNSW index + agent recall).
     pub knowledge_lens: Arc<KnowledgeLens>,
+    /// Marketplace API — ClawHub search, install, update.
+    pub marketplace_api: MarketplaceApi,
 }
 
 impl KernelHandle {
@@ -114,6 +119,7 @@ impl KernelHandle {
         a2a: A2aApi,
         knowledge: Arc<oxios_markdown::KnowledgeBase>,
         knowledge_lens: Arc<KnowledgeLens>,
+        marketplace_api: MarketplaceApi,
     ) -> Self {
         Self {
             state,
@@ -129,6 +135,7 @@ impl KernelHandle {
             a2a,
             knowledge,
             knowledge_lens,
+            marketplace_api,
         }
     }
 
@@ -173,7 +180,7 @@ impl KernelHandle {
                 access_manager.clone(),
                 state_store.clone(),
             ),
-            state: StateApi::new(state_store),
+            state: StateApi::new(state_store.clone()),
             agents: AgentApi::new(
                 supervisor,
                 budget_manager,
@@ -199,6 +206,15 @@ impl KernelHandle {
             a2a: A2aApi::new(Arc::new(A2AProtocol::new(crate::EventBus::new(0)))),
             knowledge,
             knowledge_lens,
+            marketplace_api: MarketplaceApi::new(
+                Arc::new(ClawHubInstaller::new(
+                    state_store.base_path.join("skills"),
+                    state_store.base_path.clone(),
+                    config.marketplace.base_url.clone(),
+                )),
+                Arc::new(ClawHubClient::new(config.marketplace.base_url.clone())
+                    .expect("valid ClawHub client")),
+            ),
         }
     }
 
@@ -315,5 +331,10 @@ impl KernelHandle {
         self.spaces.activate(id).await?;
         tracing::info!(space_id = %id, "Space activated (knowledge base is global)");
         Ok(())
+    }
+
+    /// Marketplace API — ClawHub search, install, update.
+    pub fn marketplace_api(&self) -> &MarketplaceApi {
+        &self.marketplace_api
     }
 }

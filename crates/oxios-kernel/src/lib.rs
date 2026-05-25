@@ -171,8 +171,8 @@ pub use wasm_sandbox::{ResourceKind, WasmConfig, WasmError, WasmSandbox};
 pub use backup::{BackupManifest, BackupSection};
 pub use config::{
     BrowserConfig, ChannelsConfig, CronConfig, DaemonConfig, EngineConfig, ExecConfig, ExecMode,
-    GitConfig, InlineCronJob, LoggingConfig, McpConfig, McpServerDef, MemoryConfig,
-    OrchestratorConfig, OxiosConfig, PersonaConfig, TelegramChannelConfig,
+    GitConfig, InlineCronJob, LoggingConfig, MarketplaceConfig, McpConfig, McpServerDef,
+    MemoryConfig, OrchestratorConfig, OxiosConfig, PersonaConfig, TelegramChannelConfig,
 };
 pub use git_layer::{CommitInfo, GitLayer, LogEntry};
 pub use resource_monitor::{OverloadThreshold, ResourceMonitor, ResourceSnapshot};
@@ -191,6 +191,7 @@ pub use types::{AgentId, AgentInfo, AgentStatus};
 
 // ─── API Surface ────────────────────────────────────────────────────
 pub use kernel_handle::KernelHandle;
+pub use kernel_handle::MarketplaceApi;
 pub use kernel_handle::{
     A2aApi, AgentApi, BrowserApi, CopilotResponse, ExecApi, ExtensionApi, InfraApi,
     KnowledgeContext, KnowledgeLens, KnowledgeNote, McpApi, MemoryNote, PersonaApi, SecurityApi,

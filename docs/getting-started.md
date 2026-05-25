@@ -636,7 +636,7 @@ $ oxios skills
 # Get skill details
 $ oxios skill code-review
 
-# View program details
+# View skill details
 $ oxios skill code-review
 
 # Uninstall
@@ -962,8 +962,7 @@ $ journalctl -u oxios -f    # live logs
     │   └── knowledge/          # Persistent agent knowledge base
     ├── sessions/               # Session data (ephemeral)
     ├── seeds/                  # Ouroboros seed specifications
-    ├── skills/                 # Skill definitions
-    ├── programs/               # Installed programs
+    ├── skills/                 # Unified skill definitions
     ├── backups/                # State backups
     └── ...
 ```
@@ -1113,7 +1112,7 @@ $ cargo uninstall oxios
 
 ## Next Steps
 
-- **Browse programs:** `oxios pkg search` — discover installable agent capabilities
+- **Browse skills:** `oxios skills` — discover available agent capabilities
 - **Schedule tasks:** Add cron jobs to `~/.oxios/config.toml`
 - **Connect Telegram:** Set `TELEGRAM_BOT_TOKEN` and add `"telegram"` to `channels.enabled`
 - **Enable MCP:** Add servers under `[mcp.servers]` to give agents external tools

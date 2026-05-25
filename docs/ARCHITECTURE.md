@@ -765,7 +765,7 @@ Spaces partition conversations and resources into isolated contexts. Auto-detect
   └──────────────────────────────────────────────────────────┘
 ```
 
-**Integration:** Program-level MCP servers are registered during `ProgramManager.init()`. Tools are surfaced to agents via `McpToolWrapper` in the tool registry.
+**Integration:** Skill-level MCP servers are registered during `SkillManager.init()`. Tools are surfaced to agents via `McpToolWrapper` in the tool registry.
 
 **Source:** `crates/oxios-kernel/src/mcp/`
 
@@ -912,7 +912,7 @@ Google's A2A protocol for horizontal agent↔agent communication. Unlike MCP (ve
 
 **Built-in skills** (in `share/default-skills/`): code-review, debug, refactor. Memory and Programs have been unified into Skills per RFC-009.
 
-**Source:** `crates/oxios-kernel/src/program/`
+**Source:** `crates/oxios-kernel/src/skill.rs` — `SkillManager`
 
 ---
 
@@ -949,7 +949,7 @@ Google's A2A protocol for horizontal agent↔agent communication. Unlike MCP (ve
   │  config:   required config paths               │
   │                                              │
   │  Replaces former: HostToolValidator,          │
-  │  ProgramManager host_requirements,             │
+  │  SkillManager host_requirements,                 │
   │  ExecConfig.required/optional_host_tools       │
   └──────────────────────────────────────────────┘
 ```
@@ -1047,10 +1047,10 @@ The KernelHandle is the **syscall table** of the Agent OS. It is a facade compos
   │  ┌──────────────┐ ┌────────┐ ┌────────┐ ┌──────────┐           │
   │  │ExtensionApi  │ │ McpApi │ │InfraApi│ │ SpaceApi │           │
   │  │              │ │        │ │        │ │          │           │
-  │  │programs     │ │bridge  │ │git     │ │spaces    │           │
-  │  │skills       │ │servers │ │scheduler│ │knowledge │           │
-  │  │host_tools   │ │        │ │cron    │ │          │           │
-  │  └──────────────┘ └────────┘ │resource│ └──────────┘           │
+  │  │skills        │ │bridge  │ │git     │ │spaces    │           │
+  │  │              │ │servers │ │scheduler│ │knowledge │           │
+  │  └──────────────┘ └────────┘ └────────┘ └──────────┘           │
+  │                              │resource│                        │
   │                              │events  │                        │
   │                              │config  │                        │
   │                              └────────┘                        │
@@ -1239,7 +1239,7 @@ Complete path of a user message through the system:
   │ MCP Bridge   │ │ (Provider)    │
   │ A2A          │ └───────────────┘
   │ PersonaMgr   │
-  │ ProgramMgr   │   ┌──────────────────────┐
+  │ SkillMgr     │   ┌──────────────────────┐
   │ GitLayer     │   │  oxi-sdk (crates.io) │
   │ CronSched    │   │  NOT a path dep!     │
   │ BudgetMgr    │   │  AgentLoop, Provider,│
@@ -1300,9 +1300,7 @@ Complete path of a user message through the system:
   │   │       ├── git_layer.rs
   │   │       ├── resource_monitor.rs
   │   │       ├── persona_manager.rs
-  │   │       ├── program/
   │   │       ├── skill.rs
-  │   │       ├── host_tools.rs
   │   │       ├── auth.rs
   │   │       ├── credential.rs
   │   │       ├── wasm_sandbox.rs
@@ -1319,8 +1317,8 @@ Complete path of a user message through the system:
   │   ├── oxios-web/           # Axum + Dioxus/WASM
   │   ├── oxios-cli/           # CLI channel
   │   └── oxios-telegram/      # Telegram channel
-  ├── .programs/               # OS-level programs
-  ├── share/                   # Default configs, skills, programs
+  ├── share/                   # Default configs, skills
+
   └── docs/                    # Architecture docs, RFCs
 ```
 
@@ -1457,8 +1455,8 @@ Complete path of a user message through the system:
 | `cron`            | `CronScheduler`                            | Scheduled job execution                        |
 | `git`             | `GitLayer`                                 | In-process version control via gix             |
 | `/etc`            | `OxiosConfig` (config.toml)                | System configuration                           |
-| Programs          | `ProgramManager` + `.programs/`            | Installable OS-level capabilities              |
-| `man` pages       | `SKILL.md` per program                     | Usage documentation for capabilities           |
+| Skills           | `SkillManager` + `skill.rs`              | Unified skill system (Programs + Skills)     |
+| `man` pages       | `SKILL.md` per skill                      | Usage documentation for capabilities           |
 | Shell             | `ExecTool` (shell/structured modes)        | Command execution with RBAC                    |
 | Sudo / polkit     | HitL Approval (RbacManager)                | Human-in-the-loop approval for dangerous ops   |
 
@@ -1514,8 +1512,7 @@ The construction order solves the `KernelHandle → AgentRuntime → Supervisor 
 | `~/.oxios/config.toml` | Main configuration |
 | `~/.oxios/workspace/` | Agent working directory |
 | `~/.oxios/workspace/seeds/` | Ouroboros seed specs |
-| `~/.oxios/workspace/programs/` | Installed programs |
-| `~/.oxios/workspace/skills/` | Skill definitions |
+| `~/.oxios/workspace/skills/` | Unified skill definitions (Programs + Skills) |
 | `~/.oxios/workspace/sessions/` | Session data (ephemeral) |
 | `~/.oxios/spaces/` | Space data (index + per-space dirs) |
 | `~/.oxi/auth.json` | oxi-cli credentials |

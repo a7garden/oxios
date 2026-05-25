@@ -5,12 +5,11 @@
 
 use std::collections::HashMap;
 use std::fs;
-use std::io::{Read, Write as _};
+use std::io::Read;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
 use serde::Serialize;
-use sha2::Digest;
 
 use super::client::{ClawHubClient, DownloadedArchive};
 use super::types::{ClawHubLockEntry, ClawHubLockfile, ClawHubOrigin};
@@ -91,6 +90,7 @@ impl ClawHubInstaller {
         // Download
         let archive = self.client.download_skill(slug, Some(&version)).await?;
         let target_dir = self.skills_dir.join(slug);
+
 
         if target_dir.exists() {
             anyhow::bail!(
@@ -281,11 +281,11 @@ impl ClawHubInstaller {
     /// that contains `SKILL.md` / `skill.md` / `skills.md`.
     fn extract_archive(&self, archive: &DownloadedArchive, target: &Path) -> Result<()> {
         let file = fs::File::open(&archive.path).context("open downloaded zip")?;
-        let mut zip = zip::ZipArchive::new(file).context("parse zip archive")?;
+        let mut zip = zip::ZipArchive::new(file)?;
 
         // Find the root directory inside the zip that contains a SKILL.md marker.
         // Some archives zip the skill directory directly, others zip the contents.
-        let root_prefix = self.find_skill_root(&mut zip)?;
+        let root_prefix = self.find_skill_root(&mut zip).context("parse zip archive")?;
 
         // Extract all entries, stripping the root prefix so contents land in `target`.
         for i in 0..zip.len() {
@@ -323,7 +323,7 @@ impl ClawHubInstaller {
     }
 
     /// Find the directory prefix inside the zip that contains a SKILL.md marker.
-    fn find_skill_root(&self, zip: &mut zip::ZipArchive<fs::File>) -> Result<String> {
+    fn find_skill_root<R: std::io::Read + std::io::Seek>(&self, zip: &mut zip::ZipArchive<R>) -> Result<String> {
         // MARKER_FILES in order of preference
         const MARKERS: &[&str] = &["SKILL.md", "skill.md", "skills.md"];
 
@@ -375,6 +375,11 @@ impl ClawHubInstaller {
             serde_json::from_str(&buf).context("parse origin.json")?;
         Ok(origin.installed_version)
     }
+
+    /// Access the underlying ClawHub client.
+    pub fn client(&self) -> &ClawHubClient {
+        &self.client
+    }
 }
 
 // ─── Tests ─────────────────────────────────────────────────────────────────
@@ -383,28 +388,56 @@ impl ClawHubInstaller {
 mod tests {
     use super::*;
 
-    /// Smoke-test: extract from an in-memory zip that contains a simple structure.
     #[test]
     fn test_find_skill_root() {
         use std::io::Write;
-
-        // Build a zip in memory:  code-review/SKILL.md
+        // Build a zip with SKILL.md nested inside a skill directory
         let mut buf = Vec::new();
         {
             let mut zipw = zip::ZipWriter::new(std::io::Cursor::new(&mut buf));
-            zipw.start_file("code-review/SKILL.md", zip::write::SimpleFileOptions::default())
-                .unwrap();
-            zipw.write_all(b"# Code Review\n\nReview code.")
-                .unwrap();
+            zipw.start_file(
+                "code-review/SKILL.md",
+                zip::write::SimpleFileOptions::default(),
+            )
+            .unwrap();
+            zipw.write_all(b"# Code Review\n").unwrap();
             zipw.finish().unwrap();
         }
 
         let cursor = std::io::Cursor::new(buf);
-        let file = fs::File::create_temp("test-zip", ".zip").unwrap();
         let mut arch = zip::ZipArchive::new(cursor).unwrap();
 
-        // Can't call find_skill_root without a real fs file — just validate types compile
-        let _ = arch.len();
+        let installer = ClawHubInstaller::new(
+            PathBuf::from("/tmp/skills"),
+            PathBuf::from("/tmp/workspace"),
+            None,
+        );
+        let prefix = installer.find_skill_root(&mut arch).unwrap();
+        assert_eq!(prefix, "code-review/");
+    }
+
+    #[test]
+    fn test_find_skill_root_skips_root_level() {
+        use std::io::Write;
+        // Some archives may have SKILL.md at root level (no subdirectory)
+        let mut buf = Vec::new();
+        {
+            let mut zipw = zip::ZipWriter::new(std::io::Cursor::new(&mut buf));
+            zipw.start_file("SKILL.md", zip::write::SimpleFileOptions::default())
+                .unwrap();
+            zipw.write_all(b"# Skill\n").unwrap();
+            zipw.finish().unwrap();
+        }
+        let cursor = std::io::Cursor::new(buf);
+        let mut arch = zip::ZipArchive::new(cursor).unwrap();
+        let installer = ClawHubInstaller::new(
+            PathBuf::from("/tmp/skills"),
+            PathBuf::from("/tmp/workspace"),
+            None,
+        );
+        // SKILL.md at root → prefix is empty (extract everything as-is)
+        let prefix = installer.find_skill_root(&mut arch).unwrap();
+        assert_eq!(prefix, "");
     }
 
     #[test]

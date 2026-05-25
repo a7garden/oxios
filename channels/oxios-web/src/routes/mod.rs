@@ -17,6 +17,7 @@ mod events;
 mod git_routes;
 mod infra;
 mod knowledge_routes;
+mod marketplace;
 mod resource_routes;
 mod space_routes;
 mod system;
@@ -71,6 +72,10 @@ pub(crate) use knowledge_routes::{
     handle_knowledge_journal_add, handle_knowledge_journal_emoji, handle_knowledge_journal_today,
     handle_knowledge_search, handle_knowledge_stats_done_today, handle_knowledge_stats_today,
     handle_knowledge_tree, handle_knowledge_worker_nightly, handle_knowledge_worker_scheduled,
+};
+pub(crate) use marketplace::{
+    handle_marketplace_install, handle_marketplace_search, handle_marketplace_skill_detail,
+    handle_marketplace_updates,
 };
 pub(crate) use resource_routes::{
     handle_resource_history, handle_resource_overload, handle_resource_snapshot,
@@ -370,6 +375,20 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
             post(handle_knowledge_convert_html),
         )
         .route("/api/knowledge/emoji", get(handle_knowledge_emoji))
+        // Marketplace (ClawHub)
+        .route("/api/marketplace/search", get(handle_marketplace_search))
+        .route(
+            "/api/marketplace/skills/{slug}",
+            get(handle_marketplace_skill_detail),
+        )
+        .route(
+            "/api/marketplace/skills/{slug}/install",
+            post(handle_marketplace_install),
+        )
+        .route(
+            "/api/marketplace/updates",
+            get(handle_marketplace_updates),
+        )
         .layer(axum::middleware::from_fn_with_state(
             state.clone(),
             require_auth,

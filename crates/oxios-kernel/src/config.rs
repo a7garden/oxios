@@ -521,6 +521,9 @@ pub struct OxiosConfig {
     /// Session management configuration.
     #[serde(default)]
     pub session: SessionConfig,
+    /// ClawHub marketplace configuration.
+    #[serde(default)]
+    pub marketplace: MarketplaceConfig,
 }
 
 /// Kernel configuration.
@@ -572,6 +575,27 @@ pub struct GatewayConfig {
     /// Port for the gateway server.
     #[serde(default = "default_gateway_port")]
     pub port: u16,
+}
+
+/// ClawHub marketplace configuration.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct MarketplaceConfig {
+    /// Base URL for the ClawHub registry.
+    /// Defaults to `https://clawhub.ai`.
+    #[serde(default)]
+    pub base_url: Option<String>,
+    /// Whether the marketplace is enabled.
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+}
+
+impl Default for MarketplaceConfig {
+    fn default() -> Self {
+        Self {
+            base_url: Some("https://clawhub.ai".to_string()),
+            enabled: true,
+        }
+    }
 }
 
 fn default_gateway_host() -> String {
