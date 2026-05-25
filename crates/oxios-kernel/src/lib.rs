@@ -145,6 +145,16 @@ pub use memory::{
     MemoryTier, MemoryType, ProtectionLevel, ProactiveRecall, RootEntry, RootIndex,
     SemanticHit, TextChunk, TextVector, TopicEntry,
 };
+
+// ─── SQLite Memory (RFC-012) ────────────────────────────────────────
+#[cfg(feature = "sqlite-memory")]
+pub use memory::database::{bytes_to_f32_slice, f32_slice_to_bytes, MemoryDatabase};
+#[cfg(feature = "sqlite-memory")]
+pub use memory::search::{Bm25Hit, RankedMemory, VectorHit, reciprocal_rank_fusion};
+#[cfg(feature = "sqlite-memory")]
+pub use memory::cache::{self as sqlite_cache};
+#[cfg(feature = "sqlite-memory")]
+pub use memory::migration::{self as sqlite_migration, MigrationReport};
 pub use persona::{default_personas, Persona};
 pub use persona_manager::PersonaManager;
 pub use persona_store::PersonaStore;
