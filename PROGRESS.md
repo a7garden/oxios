@@ -49,3 +49,9 @@ Completed
 - The `oxios` binary crate has pre-existing errors unrelated to this cleanup (`.meta` field access on `SkillEntry`, `SkillManager` clone, `dream` module privacy) — these are part of the broader Skill unification and not in scope
 - All remaining references to ProgramManager/SkillStore/HostToolValidator are in comments only
 - `ToolDef` and `ArgumentDef` now live in `tools/tool_types.rs` — used by MCP adapters
+
+### Binary Crate Cleanup (this task)
+
+- [x] Update `src/kernel.rs` — remove ProgramManager/HostToolValidator imports and usage, update ExtensionApi::new() signature
+- [x] Update `src/main.rs` — remove Command::Program, Pkg methods now use SkillManager, remove host_tools config handling
+- [x] `cargo check -p oxios-kernel` passes with 0 errors (the dream module error is pre-existing)

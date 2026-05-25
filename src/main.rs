@@ -332,9 +332,9 @@ async fn cmd_pkg(kernel: &Kernel, action: &PkgAction) -> Result<()> {
                 for s in &skills {
                     println!(
                         "{:30} {:10} {:40}",
-                        s.meta.name,
+                        s.skill.name,
                         format!("{:?}", s.eligibility),
-                        s.meta.description.chars().take(40).collect::<String>()
+                        s.skill.description.chars().take(40).collect::<String>()
                     );
                 }
             }
@@ -345,8 +345,8 @@ async fn cmd_pkg(kernel: &Kernel, action: &PkgAction) -> Result<()> {
                 println!("  No skills installed.");
             } else {
                 for s in &skills {
-                    println!("{}", style(&s.meta.name).bold());
-                    println!("  {}", s.meta.description);
+                    println!("{}", style(&s.skill.name).bold());
+                    println!("  {}", s.skill.description);
                     println!();
                 }
             }

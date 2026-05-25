@@ -84,7 +84,7 @@ impl Kernel {
                     ),
                     oxios_kernel::PersonaApi::new(Arc::new(self.persona_manager.clone())),
                     oxios_kernel::ExtensionApi::new(
-                        Arc::new(self.skill_manager.clone()),
+                        Arc::clone(&self.skill_manager),
                     ),
                     oxios_kernel::McpApi::new(self.mcp_bridge.clone()),
                     oxios_kernel::InfraApi::new(
@@ -455,7 +455,7 @@ impl KernelBuilder {
 
         let skills_dir = PathBuf::from(&config.kernel.workspace).join("skills");
         let bundled_dir = PathBuf::from(&config.kernel.workspace).join("share/skills");
-        let skill_manager = SkillManager::new(skills_dir, bundled_dir);
+        let skill_manager = Arc::new(SkillManager::new(skills_dir, bundled_dir));
 
         let mcp_bridge = Arc::new(init_mcp_bridge(&config).await?);
 
@@ -538,7 +538,7 @@ impl KernelBuilder {
                 ),
                 oxios_kernel::PersonaApi::new(Arc::new(persona_manager.clone())),
                 oxios_kernel::ExtensionApi::new(
-                    Arc::new(skill_manager.clone()),
+                    Arc::clone(&skill_manager),
                 ),
                 oxios_kernel::McpApi::new(mcp_bridge.clone()),
                 oxios_kernel::InfraApi::new(
@@ -575,7 +575,7 @@ impl KernelBuilder {
             ));
 
         // Build ToolRetriever for semantic capability discovery.
-        let tool_retriever = build_tool_retriever(&skill_manager).await;
+        let tool_retriever = build_tool_retriever(&*skill_manager).await;
 
         let agent_runtime = AgentRuntime::new(provider, model_id, kernel_handle)
             .with_persona_manager(Arc::new(persona_manager.clone()))
