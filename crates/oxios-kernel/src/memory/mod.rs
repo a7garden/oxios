@@ -809,30 +809,8 @@ mod tests {
         let mgr = MemoryManager::new(store.clone());
 
         // Store some memories
-        let entry1 = MemoryEntry {
-            id: "vec-test-1".to_string(),
-            memory_type: MemoryType::Fact,
-            content: "Rust is a systems programming language focused on safety".to_string(),
-            source: "test".to_string(),
-            session_id: None,
-            tags: vec![],
-            importance: 0.5,
-            created_at: Utc::now(),
-            accessed_at: Utc::now(),
-            access_count: 0,
-        };
-        let entry2 = MemoryEntry {
-            id: "vec-test-2".to_string(),
-            memory_type: MemoryType::Fact,
-            content: "Python is great for machine learning and data science".to_string(),
-            source: "test".to_string(),
-            session_id: None,
-            tags: vec![],
-            importance: 0.5,
-            created_at: Utc::now(),
-            accessed_at: Utc::now(),
-            access_count: 0,
-        };
+        let entry1 = make_entry_with_content("vec-test-1", MemoryType::Fact, "Rust is a systems programming language focused on safety");
+        let entry2 = make_entry_with_content("vec-test-2", MemoryType::Fact, "Python is great for machine learning and data science");
 
         mgr.remember(entry1).await.unwrap();
         mgr.remember(entry2).await.unwrap();
