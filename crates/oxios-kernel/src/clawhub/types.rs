@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use serde::Deserialize;
 
 /// ClawHub search result.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, Deserialize)]
 pub struct ClawHubSearchResult {
     pub score: f64,
     pub slug: String,
@@ -20,7 +20,7 @@ pub struct ClawHubSearchResult {
 }
 
 /// ClawHub skill detail.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ClawHubSkillDetail {
     #[serde(default)]
@@ -34,7 +34,7 @@ pub struct ClawHubSkillDetail {
 }
 
 /// ClawHub skill meta.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ClawHubSkillMeta {
     pub slug: String,
@@ -50,7 +50,7 @@ pub struct ClawHubSkillMeta {
 }
 
 /// ClawHub version entry.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ClawHubVersion {
     pub version: String,
@@ -60,7 +60,7 @@ pub struct ClawHubVersion {
 }
 
 /// ClawHub skill metadata.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ClawHubMetadata {
     #[serde(default)]
@@ -70,7 +70,7 @@ pub struct ClawHubMetadata {
 }
 
 /// ClawHub owner info.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ClawHubOwner {
     #[serde(default)]

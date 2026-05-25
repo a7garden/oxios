@@ -6,8 +6,7 @@ use std::sync::Arc;
 
 use axum::{
     extract::{Path, Query, State},
-    routing::{get, post},
-    Json, Router,
+    Json,
 };
 
 use oxios_kernel::{ClawHubSearchResult, ClawHubSkillDetail};
@@ -41,7 +40,7 @@ pub struct InstallBody {
 // ─── Handlers ─────────────────────────────────────────────────────────────────
 
 /// GET /api/marketplace/search — Search ClawHub for skills.
-pub async fn handle_marketplace_search(
+pub(crate) async fn handle_marketplace_search(
     state: State<Arc<AppState>>,
     Query(query): Query<SearchQuery>,
 ) -> Result<Json<Vec<ClawHubSearchResult>>, AppError> {
@@ -55,7 +54,7 @@ pub async fn handle_marketplace_search(
 }
 
 /// GET /api/marketplace/skills/{slug} — Get skill detail from ClawHub.
-pub async fn handle_marketplace_skill_detail(
+pub(crate) async fn handle_marketplace_skill_detail(
     state: State<Arc<AppState>>,
     Path(slug): Path<String>,
 ) -> Result<Json<ClawHubSkillDetail>, AppError> {
@@ -69,7 +68,7 @@ pub async fn handle_marketplace_skill_detail(
 }
 
 /// POST /api/marketplace/skills/{slug}/install — Install a skill from ClawHub.
-pub async fn handle_marketplace_install(
+pub(crate) async fn handle_marketplace_install(
     state: State<Arc<AppState>>,
     Path(slug): Path<String>,
     Json(body): Json<InstallBody>,
@@ -91,7 +90,7 @@ pub async fn handle_marketplace_install(
 }
 
 /// GET /api/marketplace/updates — Check for updates to installed ClawHub skills.
-pub async fn handle_marketplace_updates(
+pub(crate) async fn handle_marketplace_updates(
     state: State<Arc<AppState>>,
 ) -> Result<Json<Vec<serde_json::Value>>, AppError> {
     let updates = state
@@ -101,7 +100,7 @@ pub async fn handle_marketplace_updates(
         .await
         .map_err(|e| AppError::Internal(e.to_string()))?;
 
-    let results: Vec<_> = updates
+    let results: Vec<serde_json::Value> = updates
         .into_iter()
         .map(|u| {
             serde_json::json!({
@@ -114,21 +113,4 @@ pub async fn handle_marketplace_updates(
         .collect();
 
     Ok(Json(results))
-}
-
-// ─── Router ───────────────────────────────────────────────────────────────────
-
-/// Add marketplace routes to the given router.
-pub fn marketplace_router() -> Router<Arc<AppState>> {
-    Router::new()
-        .route("/api/marketplace/search", get(handle_marketplace_search))
-        .route(
-            "/api/marketplace/skills/{slug}",
-            get(handle_marketplace_skill_detail),
-        )
-        .route(
-            "/api/marketplace/skills/{slug}/install",
-            post(handle_marketplace_install),
-        )
-        .route("/api/marketplace/updates", get(handle_marketplace_updates))
 }

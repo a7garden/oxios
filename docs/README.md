@@ -49,7 +49,12 @@ These documents describe internal design decisions and are primarily for contrib
 
 ## Archive
 
-Historical design documents are in the [`archive/`](archive/) and [`design/`](design/) directories.
+Historical design documents are in the [`archive/`](archive/) directory. This includes:
+- Analysis results (clippy reports, security audits, kernel analysis)
+- Old design documents (superseded by RFCs)
+- Previous architecture iterations
+
+For recursive-improvement-loop artifacts, see `archive/designs/loop*.md`.
 
 ---
 
