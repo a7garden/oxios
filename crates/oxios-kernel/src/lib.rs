@@ -232,34 +232,46 @@ pub use kernel_handle::{
 // Only types actually USED by kernel modules are re-exported here.
 pub use oxi_sdk::{
     // Core agent types
-    Agent, AgentBuilder, AgentConfig, AgentEvent, AgentTool, AgentToolResult,
-    SharedState, ToolContext, ToolError, ToolExecutionMode, ToolRegistry,
+    Agent, AgentConfig, AgentEvent, AgentTool, AgentToolResult,
+    ToolContext, ToolError, ToolExecutionMode, ToolRegistry,
     // Engine
-    Oxi, OxiBuilder, Model, Provider, ProviderOptions, StreamOptions,
+    Oxi, OxiBuilder, Model, Provider, ProviderOptions,
     // Kernel bridge
-    KernelToolContext, KernelToolProvider,
+    KernelToolProvider,
     // Communication
-    InterAgentMessage, MessageBus,
-    // Lifecycle (oxi-sdk 0.23.0)
-    AgentHandle, AgentLifecycleEvent, AgentSnapshot, AgentStatus as SdkAgentStatus,
-    AgentSupervisor, SupervisorPolicy as SdkSupervisorPolicy, RestartBackoff, FileSnapshotStore,
-    // Security (oxi-sdk 0.23.0)
-    Authorizer, CapabilitySet, CapabilitySubject,
-    SecurityMiddleware, DefaultPolicy, StringPattern,
-    // Observability types not re-exported here — use observability module
-    AuditLog as SdkAuditLog,
-    // Middleware (oxi-sdk 0.23.0)
-    Middleware, MiddlewarePipeline, MiddlewareContext, MiddlewareData, MiddlewarePhase,
-    MiddlewareResult,
-    // Routing (oxi-sdk 0.23.0)
+    MessageBus,
+    // Middleware
+    MiddlewarePipeline,
+    // Routing
     RoutingControl,
-    // Coordination (oxi-sdk 0.23.0)
-    AgentGroup as SdkAgentGroup, GroupStrategy, GroupResult,
-    // Coordination types available via coordination module
-    // Metrics
-    AgentMetrics, MetricsSnapshot,
     // Circuit breaker
     ProviderCircuitBreaker, CircuitBreakerConfig,
-    // Browser
-    BrowseConfig, BrowseTool, BrowseExtractTool, BrowserEngine, BrowserError, BrowserTab,
 };
+
+/// Re-export oxi-sdk types available for consumers but not used internally.
+/// These are provided for convenience — use `oxi_sdk::` directly if preferred.
+///
+/// Includes: AgentBuilder, SharedState, StreamOptions, KernelToolContext,
+/// AgentSupervisor, AgentHandle, Authorizer, CapabilitySet, SecurityMiddleware,
+/// Middleware hooks, BrowserEngine, BrowseSessionTool, StructuredOutput,
+/// AgentState, CompactionHook, McpManager, SubagentTool, etc.
+pub mod sdk_exports {
+    //! Convenience re-exports from oxi-sdk for external consumers.
+    //! Not used internally by oxios-kernel — use when building extensions or tools.
+    pub use oxi_sdk::{
+        AgentBuilder, AgentHandle, AgentLifecycleEvent, AgentMetrics, AgentSnapshot,
+        AgentState, AgentSupervisor, Authorizer, BrowseConfig, BrowseExtractTool,
+        BrowserEngine, BrowserError, BrowserTab, CapabilitySet, CapabilitySubject,
+        CompactedContext, CompactionHook, DefaultPolicy, FileSnapshotStore,
+        GroupResult, GroupStrategy, InterAgentMessage, KernelToolContext,
+        MetricsSnapshot, Middleware, MiddlewareContext, MiddlewareData, MiddlewarePhase,
+        MiddlewareResult, OutputMode, ProviderPool, RateLimitPolicy, RestartBackoff,
+        SecurityMiddleware, SharedState, StreamOptions, StringPattern,
+        StructuredOutput, SupervisorPolicy as SdkSupervisorPolicy,
+        AgentGroup as SdkAgentGroup, AgentStatus as SdkAgentStatus,
+        AuditLog as SdkAuditLog,
+    };
+
+    #[cfg(feature = "native-browser")]
+    pub use oxi_sdk::{BrowseScriptTool, BrowseSessionTool, OxiBrowserEngine};
+}
