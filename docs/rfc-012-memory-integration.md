@@ -1,7 +1,7 @@
 # RFC-012: Memory System Full Integration
 
-> **상태:** 설계
-> **날짜:** 2026-05-25
+> **상태:** 구현 완료 (Phase 1–7)
+> **날짜:** 2026-05-26
 > **선행:** RFC-008 (Memory Consolidation)
 > **범위:** `crates/oxios-kernel/src/memory/`, `crates/oxios-kernel/src/embedding/`, `src/kernel.rs`
 
