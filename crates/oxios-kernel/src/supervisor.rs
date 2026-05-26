@@ -311,37 +311,15 @@ mod tests {
     use super::*;
     use crate::event_bus::EventBus;
     use crate::types::AgentStatus;
-    use async_trait::async_trait;
-    use futures::Stream;
-    use oxi_sdk::{Context, Model, ProviderError, ProviderEvent, StreamOptions};
+    // Note: imports kept for potential future test extensions.
     use oxios_ouroboros::Seed;
-    use std::pin::Pin;
 
-    /// Minimal mock LLM provider for constructing an AgentRuntime in tests.
-    struct MockProvider;
-
-    #[async_trait]
-    impl oxi_sdk::Provider for MockProvider {
-        async fn stream(
-            &self,
-            _model: &Model,
-            _context: &Context,
-            _options: Option<StreamOptions>,
-        ) -> Result<Pin<Box<dyn Stream<Item = ProviderEvent> + Send>>, ProviderError> {
-            // Return an empty stream — never actually invoked in supervisor lifecycle tests.
-            let stream = futures::stream::empty();
-            Ok(Box::pin(stream))
-        }
-
-        fn name(&self) -> &str {
-            "mock"
-        }
-    }
+    // Note: MockProvider no longer needed — OxiosEngine handles provider resolution.
+    // The engine resolves models internally, so tests just use OxiosEngine::new().
 
     /// Helper to create a real BasicSupervisor wired to a real EventBus.
     async fn make_supervisor() -> BasicSupervisor {
         let event_bus = EventBus::new(64);
-        let provider = Arc::new(MockProvider);
 
         // Build a mock KernelHandle with temp dirs.
         let tmp = std::env::temp_dir().join(format!("oxios-test-{}", uuid::Uuid::new_v4()));
@@ -446,7 +424,8 @@ mod tests {
         ));
 
 
-        let runtime = AgentRuntime::new(provider, "mock/model", kernel_handle);
+        let engine = crate::OxiosEngine::new("mock/model");
+        let runtime = AgentRuntime::new(Arc::new(engine), "mock/model", kernel_handle);
         BasicSupervisor::new(event_bus, runtime)
     }
 

@@ -1,8 +1,8 @@
-//! Agent runtime: wraps oxi-agent's AgentLoop for use by the kernel.
+//! Agent runtime: wraps oxi-sdk's Agent for Seed execution.
 //!
-//! The AgentRuntime creates an oxi-agent `AgentLoop` session, configures it
-//! with a custom ToolRegistry based on the agent's CSpace (capability space),
-//! and executes a Seed's goal through the multi-turn LLM tool-calling loop.
+//! The AgentRuntime creates an oxi-sdk `Agent` via `Agent::new_with_resolver()`,
+//! configures it with a ToolRegistry based on CSpace (capability space),
+//! and executes a Seed through the multi-turn LLM tool-calling loop.
 //!
 //! # Architecture
 //!
@@ -12,21 +12,23 @@
 //! 1. Resolves the agent's CSpace from persona/role/hint
 //! 2. Registers tools via `register_tools_from_cspace()`
 //! 3. Optionally queries `ToolRetriever` for semantic capability hints
-//! 4. Runs the agent loop with the assembled tool set
+//! 4. Creates an `Agent` with the assembled tool set
+//! 5. Runs via `Agent::run_streaming()` for real-time event processing
 //!
-//! Note: Since oxi-sdk 0.19+, `AgentLoop::run()` produces a `Send` future.
-//! We call it directly from async context without `spawn_blocking`.
+//! # oxi-sdk 0.23.0 Integration
+//!
+//! Uses `AgentConfig` for full control over temperature, max_tokens,
+//! compaction, context window, and API keys. Provider resolution goes
+//! through `OxiosEngine` which wraps `OxiBuilder`.
 
 use anyhow::Result;
-use oxi_sdk::ToolExecutionMode;
-use oxi_sdk::{AgentEvent, AgentLoop, AgentLoopConfig, SharedState, ToolRegistry};
-use oxi_sdk::{CompactionEvent, SearchCache};
-use oxi_sdk::{CompactionStrategy, Provider};
+use oxi_sdk::{Agent, AgentConfig, AgentEvent, CompactionEvent, CompactionStrategy, Provider};
+use oxi_sdk::{ProviderResolver, SearchCache, ToolExecutionMode, ToolRegistry};
 use parking_lot::Mutex;
 use std::sync::Arc;
 
 use crate::capability::resolve::resolve_cspace;
-// Circuit breaker now provided by oxi_sdk::ProviderCircuitBreaker
+use crate::engine::OxiosEngine;
 use crate::memory::{MemoryEntry, MemoryManager, MemoryType};
 use crate::persona_manager::PersonaManager;
 use crate::tools::registration::register_tools_from_cspace;
@@ -66,11 +68,8 @@ pub struct AgentRuntimeConfig {
     /// Scratch workspace directory for temp files.
     pub workspace_dir: Option<std::path::PathBuf>,
     /// API key resolved from CredentialStore at build time.
-    /// Passed through to `AgentLoopConfig::api_key` so the provider
-    /// uses it instead of environment variables.
     pub api_key: Option<String>,
     /// Per-provider options for fine-grained control.
-    /// Passed through to `AgentLoopConfig::provider_options`.
     pub provider_options: Option<oxi_sdk::ProviderOptions>,
 }
 
@@ -91,7 +90,6 @@ impl Default for AgentRuntimeConfig {
 }
 
 /// Mutable state shared between the event callback and the main execute flow.
-/// Wrapped in `Arc<Mutex<>>` because `AgentLoop::run()` takes `Fn` (not `FnMut`).
 #[derive(Default)]
 struct ExecuteState {
     final_content: String,
@@ -99,33 +97,15 @@ struct ExecuteState {
     success: bool,
 }
 
-/// Bundled context for `run_agent_loop()`.
+/// Runtime that wraps an oxi-sdk `Agent` for executing Seeds.
 ///
-/// All kernel access goes through `kernel_handle`. The CSpace determines
-/// which tools are registered for this agent.
-struct AgentLoopContext {
-    provider: Arc<dyn Provider>,
-    config: AgentRuntimeConfig,
-    system_prompt: String,
-    prompt: String,
-    seed_id: uuid::Uuid,
-    agent_id: AgentId,
-    kernel_handle: Arc<KernelHandle>,
-    cspace: crate::capability::CSpace,
-    /// Persona prompt for system prompt blending.
-    #[allow(dead_code)]
-    persona_prompt: Option<String>,
-}
-
-/// Runtime that wraps an oxi-agent `AgentLoop` for executing Seeds.
-///
-/// Each call to [`AgentRuntime::execute`] creates a fresh `AgentLoop`,
+/// Each call to [`AgentRuntime::execute`] creates a fresh `Agent`,
 /// builds a ToolRegistry based on the agent's CSpace, and runs it to completion.
 ///
-/// All OS-level access goes through `KernelHandle` — the single syscall-table
-/// for agent control.
+/// All OS-level access goes through `KernelHandle` — the single syscall table
+/// for agent control. Provider/model resolution goes through `OxiosEngine`.
 pub struct AgentRuntime {
-    provider: Arc<dyn Provider>,
+    engine: Arc<OxiosEngine>,
     config: AgentRuntimeConfig,
     /// Single path to all kernel services.
     kernel_handle: Arc<KernelHandle>,
@@ -136,16 +116,17 @@ pub struct AgentRuntime {
 }
 
 impl AgentRuntime {
-    /// Creates a new agent runtime with kernel access.
+    /// Creates a new agent runtime with engine and kernel access.
     ///
-    /// All tool access goes through `kernel_handle`.
+    /// Provider/model resolution goes through `engine`.
+    /// Tool access goes through `kernel_handle`.
     pub fn new(
-        provider: Arc<dyn Provider>,
+        engine: Arc<OxiosEngine>,
         model_id: impl Into<String>,
         kernel_handle: Arc<KernelHandle>,
     ) -> Self {
         Self {
-            provider,
+            engine,
             config: AgentRuntimeConfig {
                 model_id: model_id.into(),
                 ..Default::default()
@@ -177,12 +158,13 @@ impl AgentRuntime {
         self
     }
 
-    /// Execute a Seed by running the tool-calling loop to completion.
+    /// Execute a Seed by running the tool-calling agent to completion.
     ///
     /// 1. Resolves CSpace from persona/role/hint
     /// 2. Registers tools via CSpace
     /// 3. Recalls memories if available
-    /// 4. Runs the agent loop
+    /// 4. Creates Agent via `Agent::new_with_resolver()`
+    /// 5. Runs via `Agent::run_streaming()`
     pub async fn execute(&self, agent_id: AgentId, seed: &Seed) -> Result<ExecutionResult> {
         let prompt = build_user_prompt(seed);
 
@@ -291,25 +273,29 @@ impl AgentRuntime {
             Err(e) => tracing::warn!(error = %e, "Failed to recall knowledge context"),
         }
 
-        // Clone everything to move into spawn_blocking.
-        let config = self.config.clone();
-        let provider = Arc::clone(&self.provider);
+        // Resolve model and provider from engine.
+        let model = self.engine.resolve_model(&self.config.model_id)?;
+        let provider = self.engine.create_provider(&model.provider)?;
         let seed_id = seed.id;
+
+        // Build the agent.
+        let config = self.config.clone();
         let kernel_handle = Arc::clone(&self.kernel_handle);
 
-        let ctx = AgentLoopContext {
-            provider,
-            config,
-            system_prompt,
-            prompt,
-            seed_id,
-            agent_id,
-            kernel_handle,
-            cspace,
-            persona_prompt,
+        let (final_content, steps_completed, success) = {
+            run_agent(
+                provider,
+                &config,
+                &self.engine,
+                kernel_handle,
+                system_prompt,
+                prompt,
+                seed_id,
+                agent_id,
+                cspace,
+            )
+            .await?
         };
-
-        let (final_content, steps_completed, success) = run_agent_loop(ctx).await?;
 
         tracing::info!(
             seed_id = %seed_id,
@@ -330,24 +316,22 @@ impl AgentRuntime {
     }
 }
 
-/// Run the AgentLoop.
+/// Create and run an oxi-sdk `Agent` with CSpace-based tool registration.
 ///
-/// Since oxi-sdk 0.19+, `AgentLoop::run()` produces a `Send` future,
-/// so we can call it directly from async context without `spawn_blocking`.
-async fn run_agent_loop(ctx: AgentLoopContext) -> Result<(String, usize, bool)> {
-    let AgentLoopContext {
-        provider,
-        config,
-        system_prompt,
-        prompt,
-        seed_id,
-        agent_id,
-        kernel_handle,
-        cspace,
-        persona_prompt: _,
-    } = ctx;
-
-    // Extract workspace before using config
+/// Uses `Agent::new_with_resolver()` for full control over provider resolution,
+/// and `Agent::run_streaming()` for real-time event processing.
+async fn run_agent(
+    provider: Arc<dyn Provider>,
+    config: &AgentRuntimeConfig,
+    engine: &OxiosEngine,
+    kernel_handle: Arc<KernelHandle>,
+    system_prompt: String,
+    prompt: String,
+    seed_id: uuid::Uuid,
+    agent_id: AgentId,
+    cspace: crate::capability::CSpace,
+) -> Result<(String, usize, bool)> {
+    // Extract workspace.
     let workspace = if !config.project_paths.is_empty() {
         config.project_paths[0].clone()
     } else if let Some(ref ws) = config.workspace_dir {
@@ -374,49 +358,46 @@ async fn run_agent_loop(ctx: AgentLoopContext) -> Result<(String, usize, bool)> 
         "Tools registered from CSpace"
     );
 
-    // ── Skill tools ──
-    // Skills are surfaced through the CSpace tool set + semantic retrieval.
-    let _ = kernel_handle.extensions.skill_manager();
-
-    let tools = Arc::new(registry);
-
-    // Build the AgentLoop config from our runtime config.
-    let loop_config = AgentLoopConfig {
-        model_id: config.model_id,
+    // ── Build AgentConfig ──
+    let agent_config = AgentConfig {
+        name: format!("agent-{}", agent_id),
+        description: None,
+        model_id: config.model_id.clone(),
         system_prompt: Some(system_prompt),
-        temperature: 0.7,
-        max_tokens: 8192,
         max_iterations: config.max_iterations,
-        tool_execution: config.tool_execution,
+        timeout_seconds: 300,
+        temperature: Some(0.7),
+        max_tokens: Some(8192),
         compaction_strategy: CompactionStrategy::Threshold(0.8),
-        context_window: 128_000,
         compaction_instruction: None,
-        on_compaction: None,
-        session_id: Some(seed_id.to_string()),
-        transport: None,
-        compact_on_start: false,
-        max_retry_delay_ms: None,
-        auto_retry_enabled: config.auto_retry_enabled,
-        auto_retry_max_attempts: 3,
-        auto_retry_base_delay_ms: 2000,
-        api_key: config.api_key,
-        workspace_dir: config.project_paths.first().cloned(), // Use first project path as workspace
-        provider_options: config.provider_options,
+        context_window: 128_000,
+        api_key: config.api_key.clone(),
+        workspace_dir: config.project_paths.first().cloned(),
+        output_mode: None,
+        provider_options: config.provider_options.clone(),
     };
 
-    let state = SharedState::new();
-    let agent_loop = AgentLoop::new(provider, loop_config, tools, state);
+    // Create resolver from engine's Oxi instance (for model switching).
+    let resolver: Arc<dyn ProviderResolver> = Arc::new(engine.oxi().clone());
+
+    // Create Agent with CSpace tool registry and provider resolver.
+    let agent = Agent::new_with_resolver(
+        provider,
+        agent_config,
+        Arc::new(registry),
+        resolver,
+    );
 
     // Shared mutable state for the event callback.
     let exec_state = Arc::new(Mutex::new(ExecuteState::default()));
-    let exec_state_clone = Arc::clone(&exec_state);
+    let exec_state_cb = Arc::clone(&exec_state);
     let memory_for_callback: Arc<MemoryManager> = (*kernel_handle.agents.memory_manager()).clone();
     let session_id_for_callback = seed_id.to_string();
 
-    // Run the agent loop. Since oxi-sdk 0.19+, `run()` produces a `Send` future.
-    let result = agent_loop
-        .run(prompt, move |event| {
-            let mut s = exec_state_clone.lock();
+    // Run the agent with streaming events.
+    let result = agent
+        .run_streaming(prompt, move |event| {
+            let mut s = exec_state_cb.lock();
             match event {
                 AgentEvent::ToolExecutionEnd {
                     is_error: false, ..
@@ -438,7 +419,6 @@ async fn run_agent_loop(ctx: AgentLoopContext) -> Result<(String, usize, bool)> 
                     s.success = false;
                 }
                 AgentEvent::Compaction { event } => {
-                    let mm = &memory_for_callback;
                     if let CompactionEvent::Completed { result, .. } = event {
                         let entry = MemoryEntry {
                             id: uuid::Uuid::new_v4().to_string(),
@@ -467,8 +447,7 @@ async fn run_agent_loop(ctx: AgentLoopContext) -> Result<(String, usize, bool)> 
                             related_ids: vec![],
                             contradicts: None,
                         };
-                        // Fire-and-forget: spawn async remember from sync callback
-                        let mm = mm.clone();
+                        let mm = memory_for_callback.clone();
                         tokio::spawn(async move {
                             if let Err(e) = mm.remember(entry).await {
                                 tracing::warn!(error = %e, "Failed to save compaction summary");
@@ -481,7 +460,7 @@ async fn run_agent_loop(ctx: AgentLoopContext) -> Result<(String, usize, bool)> 
         })
         .await;
 
-    // Record circuit breaker result after agent execution
+    // Record circuit breaker result after agent execution.
     let circuit = get_llm_circuit_breaker();
     if result.is_err() {
         circuit.record_failure();
@@ -492,7 +471,7 @@ async fn run_agent_loop(ctx: AgentLoopContext) -> Result<(String, usize, bool)> 
     }
 
     if let Err(e) = result {
-        tracing::error!(seed_id = %seed_id, error = %e, "AgentLoop failed");
+        tracing::error!(seed_id = %seed_id, error = %e, "Agent failed");
         let s = exec_state.lock();
         return Ok((format!("Agent failed: {e}"), s.steps_completed, false));
     }
@@ -502,7 +481,7 @@ async fn run_agent_loop(ctx: AgentLoopContext) -> Result<(String, usize, bool)> 
         seed_id = %seed_id,
         steps = s.steps_completed,
         success = s.success,
-        "AgentLoop completed"
+        "Agent completed"
     );
     Ok((s.final_content.clone(), s.steps_completed, s.success))
 }
@@ -683,7 +662,6 @@ mod tests {
     fn test_requires_tools_validation_passes() {
         let registry = ToolRegistry::new();
 
-        // Register the tools the program depends on.
         registry.register(DummyTool {
             name: "read".into(),
         });
@@ -691,10 +669,6 @@ mod tests {
             name: "exec".into(),
         });
 
-        // Simulate a program that requires "read" and "exec".
-        let _required_tools = vec!["read".to_string(), "exec".to_string()];
-
-        // Validation: all required tools must exist in the registry.
         let missing = registry.missing(&["read", "exec"]);
 
         assert!(
@@ -709,19 +683,10 @@ mod tests {
     fn test_requires_tools_validation_fails() {
         let registry = ToolRegistry::new();
 
-        // Only register "read", not "exec" or "nonexistent".
         registry.register(DummyTool {
             name: "read".into(),
         });
 
-        // Simulate a program that requires tools that don't exist.
-        let _required_tools = vec![
-            "read".to_string(),        // exists
-            "exec".to_string(),        // missing
-            "nonexistent".to_string(), // missing
-        ];
-
-        // Validation: find missing tools.
         let missing = registry.missing(&["read", "exec", "nonexistent"]);
 
         assert_eq!(missing, vec!["exec", "nonexistent"]);
@@ -748,16 +713,9 @@ mod tests {
 
         let prompt = build_system_prompt(&seed, None, None, None);
 
-        // Verify goal is present
         assert!(prompt.contains("Build a web server"));
-
-        // Verify constraints are present
         assert!(prompt.contains("Must use Rust"));
-
-        // Verify acceptance criteria is present
         assert!(prompt.contains("Server responds to requests"));
-
-        // Verify domain entities are present
         assert!(prompt.contains("HttpServer"));
         assert!(prompt.contains("struct"));
     }
@@ -779,7 +737,6 @@ mod tests {
 
         let prompt = build_system_prompt(&seed, None, None, None);
 
-        // Verify goal is present
         assert!(prompt.contains("Test goal"));
     }
 }
