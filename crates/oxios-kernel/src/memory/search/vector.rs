@@ -3,6 +3,8 @@
 //! Uses brute-force KNN via the `vec0` virtual table for dense vector
 //! similarity search. Adequate for Oxios memory scale (~10K entries).
 
+#![allow(dead_code, unused_imports)]
+
 use anyhow::Result;
 
 use super::super::database::{bytes_to_f32_slice, f32_slice_to_bytes, MemoryDatabase};

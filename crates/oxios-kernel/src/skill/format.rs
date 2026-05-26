@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 //! Skill format detection.
 
 use std::path::Path;

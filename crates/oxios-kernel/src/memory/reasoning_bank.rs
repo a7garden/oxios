@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 //! Reasoning Bank — pattern learning, retrieval, and task routing.
 //!
 //! The ReasoningBank stores guidance patterns learned from agent execution,

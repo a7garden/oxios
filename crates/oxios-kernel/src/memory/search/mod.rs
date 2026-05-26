@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 //! Unified search: sqlite-vec KNN + FTS5 BM25 → Reciprocal Rank Fusion.
 //!
 //! This is the primary search API for the SQLite-backed memory system.

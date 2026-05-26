@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 //! ClawHub marketplace types.
 //!
 //! API types matching ClawHub API responses, plus origin/lockfile types.

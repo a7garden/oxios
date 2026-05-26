@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 //! SONA — Self-Optimizing Neural Architecture (simplified).
 //!
 //! Tracks execution trajectories, distills successful patterns,

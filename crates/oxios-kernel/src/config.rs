@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 //! Configuration loading from TOML files.
 //!
 //! Configuration is stored at `~/.oxios/config.toml` and controls

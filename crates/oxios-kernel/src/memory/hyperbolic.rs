@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 //! Hyperbolic embeddings using the Poincaré ball model.
 //!
 //! The Poincaré ball model embeds hierarchical data (trees, taxonomies,

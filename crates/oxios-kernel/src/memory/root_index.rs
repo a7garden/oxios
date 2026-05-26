@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 //! ROOT index — the "table of contents" for all agent knowledge.
 //!
 //! Provides O(1) topic lookup so agents can quickly understand what they know.

@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 //! GGUF-based embedding provider (cross-platform).
 //!
 //! Uses `llama-gguf` crate to load EmbeddingGemma-300m GGUF model

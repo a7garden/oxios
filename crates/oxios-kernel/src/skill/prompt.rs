@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 //! Prompt formatting.
 
 use std::path::Path;

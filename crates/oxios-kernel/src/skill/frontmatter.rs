@@ -1,3 +1,4 @@
+#![allow(missing_docs, dead_code)]
 //! Format-specific frontmatter types and unified parsing pipeline.
 
 use std::path::Path;

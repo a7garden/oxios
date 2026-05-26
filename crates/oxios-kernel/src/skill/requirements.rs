@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 //! Requirements evaluation.
 
 use super::types::*;

@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 #![allow(dead_code)]
 //! Dream process — 4-phase background memory consolidation.
 //!

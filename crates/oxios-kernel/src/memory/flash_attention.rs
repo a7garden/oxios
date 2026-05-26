@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 //! Flash Attention — block-wise attention for O(N) memory usage.
 //!
 //! Triton-inspired CPU implementation that processes attention in blocks

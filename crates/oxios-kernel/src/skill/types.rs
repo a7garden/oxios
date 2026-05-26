@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 //! Domain types for the skill system.
 
 use std::collections::HashMap;

@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 //! Memory budget and curation types.
 
 use serde::{Deserialize, Serialize};

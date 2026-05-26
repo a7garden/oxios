@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 //! ClawHub skill installer.
 //!
 //! Handles install, update, and update-all workflows for ClawHub skills,

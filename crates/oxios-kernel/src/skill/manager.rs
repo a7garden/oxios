@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 //! Skill manager — loads, stores, and manages skills.
 
 use std::collections::HashMap;
