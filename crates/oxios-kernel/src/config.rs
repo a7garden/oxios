@@ -210,7 +210,7 @@ pub struct EmbeddingConfig {
 }
 
 fn default_embedding_provider() -> String {
-    "tfidf".to_string()
+    "gguf".to_string()
 }
 
 fn default_model_ttl() -> u64 {

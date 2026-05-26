@@ -495,13 +495,40 @@ impl KernelBuilder {
 
         match emb_config.provider.as_str() {
             "gguf" => {
-                // GGUF embedding provider will be implemented in embedding/gguf/
-                // For now, falls back to TF-IDF
-                tracing::warn!(
-                    "GGUF embedding requested but not yet implemented. \
-                     Falling back to TF-IDF."
-                );
-                Arc::new(TfIdfEmbeddingProvider)
+                #[cfg(feature = "embedding-gguf")]
+                {
+                    use oxios_kernel::{EmbeddingDimension, GgufEmbeddingProvider};
+
+                    let model_dir = oxios_kernel::embedding::gguf::GgufModelLoader
+                        ::model_dir_for_workspace(
+                            Path::new(&config.kernel.workspace)
+                        );
+                    let dim = match emb_config.dimension {
+                        128 => EmbeddingDimension::Dim128,
+                        512 => EmbeddingDimension::Dim512,
+                        768 => EmbeddingDimension::Dim768,
+                        _ => EmbeddingDimension::Dim256,
+                    };
+                    tracing::info!(
+                        dir = %model_dir.display(),
+                        dim = emb_config.dimension,
+                        "Using GGUF EmbeddingGemma provider"
+                    );
+                    Arc::new(GgufEmbeddingProvider::new(
+                        model_dir,
+                        dim,
+                        emb_config.model_ttl_secs,
+                    ))
+                }
+
+                #[cfg(not(feature = "embedding-gguf"))]
+                {
+                    tracing::warn!(
+                        "GGUF embedding requested but embedding-gguf feature not enabled. \
+                         Falling back to TF-IDF."
+                    );
+                    Arc::new(TfIdfEmbeddingProvider)
+                }
             }
             _ => {
                 tracing::debug!("Using TF-IDF embedding provider");

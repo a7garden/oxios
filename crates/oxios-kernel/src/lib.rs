@@ -126,6 +126,10 @@ pub use mcp::{
 // ─── Intelligence ───────────────────────────────────────────────────
 pub use embedding::{EmbeddingProvider, EmbeddingVector, TfIdfEmbeddingProvider};
 
+// ─── GGUF Embedding (RFC-012) ──────────────────────────────────────
+#[cfg(feature = "embedding-gguf")]
+pub use embedding::gguf::{EmbeddingDimension, GgufEmbeddingProvider, GgufModelLoader};
+
 pub use memory::auto_memory_bridge::{
     AutoMemoryBridge, ExportResult, GuidancePattern, ImportResult, InsightCategory, MemoryInsight,
     SyncDirection, SyncResult,
