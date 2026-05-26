@@ -898,6 +898,11 @@ impl MemoryManager {
         tier: super::MemoryTier,
         limit: usize,
     ) -> Result<Vec<MemoryEntry>> {
+        #[cfg(feature = "sqlite-memory")]
+        if let Some(ref sqlite) = self.sqlite_store {
+            return sqlite.list_by_tier(tier, limit);
+        }
+
         let mut results = Vec::new();
         for mt in MemoryType::all() {
             if let Ok(entries) = self.list(*mt, limit).await {

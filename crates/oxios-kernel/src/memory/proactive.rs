@@ -11,7 +11,7 @@ use std::collections::HashSet;
 
 use anyhow::Result;
 
-use super::{MemoryEntry, MemoryManager, RootIndex};
+use super::{MemoryEntry, MemoryManager};
 
 // ---------------------------------------------------------------------------
 // RecallTiming
@@ -114,55 +114,34 @@ impl ProactiveRecall {
     /// Execute 3-step proactive recall.
     ///
     /// Steps:
-    /// 1. ROOT index triage (O(1) topic lookup)
-    /// 2. Manifest-based selection (keyword matching)
-    /// 3. HNSW vector search (semantic similarity)
+    /// 1. HOT tier memories (always injected for context)
+    /// 2. ROOT index triage (O(1) topic lookup)
+    /// 3. SQLite semantic + BM25 search (vector + keyword fusion)
     pub async fn recall(
         &self,
         mgr: &MemoryManager,
         query: &str,
         current_context: &[MemoryEntry],
-        root: &RootIndex,
     ) -> Result<Vec<MemoryEntry>> {
         let mut results = Vec::new();
         let mut seen_ids: HashSet<String> =
             current_context.iter().map(|e| e.id.clone()).collect();
 
-        // Step 1: ROOT index triage
-        for topic in &root.topics {
-            if root.topic_matches_query(topic, query) {
-                // Try to load by reference
-                if let Ok(Some(entry)) = mgr.load_by_reference(&topic.reference).await {
-                    if !seen_ids.contains(&entry.id) {
-                        seen_ids.insert(entry.id.clone());
-                        results.push(entry);
-                    }
-                }
-            }
-            if results.len() >= self.limit {
-                break;
-            }
-        }
-
-        // Step 2: Manifest-based keyword selection
-        if results.len() < self.limit {
-            let manifest_entries = mgr.select_by_manifest(query, self.limit).await?;
-            for entry in manifest_entries {
+        // Step 1: HOT tier memories (always included)
+        if let Ok(hot_entries) = mgr.list_by_tier(crate::memory::MemoryTier::Hot, self.limit).await {
+            for entry in hot_entries {
                 if !seen_ids.contains(&entry.id) {
                     seen_ids.insert(entry.id.clone());
                     results.push(entry);
                 }
-                if results.len() >= self.limit {
-                    break;
-                }
             }
         }
 
-        // Step 3: HNSW/Vector semantic search
+        // Step 2: SQLite semantic + BM25 search
         if results.len() < self.limit {
             let remaining = self.limit - results.len();
-            let semantic = mgr.search(query, None, remaining).await.unwrap_or_default();
-            for entry in semantic {
+            let search_results = mgr.search(query, None, remaining * 2).await.unwrap_or_default();
+            for entry in search_results {
                 if !seen_ids.contains(&entry.id) {
                     seen_ids.insert(entry.id.clone());
                     results.push(entry);

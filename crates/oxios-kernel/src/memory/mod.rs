@@ -487,6 +487,12 @@ impl MemoryManager {
         self.sqlite_store = Some(store);
     }
 
+    /// Get a reference to the SQLite store (if configured).
+    #[cfg(feature = "sqlite-memory")]
+    pub fn sqlite_store(&self) -> &Option<Arc<crate::memory::sqlite_store::SqliteMemoryStore>> {
+        &self.sqlite_store
+    }
+
     /// Create a Space-scoped MemoryManager.
     ///
     /// Each Space gets its own StateStore under the given directory,

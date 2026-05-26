@@ -378,6 +378,55 @@ impl SonaEngine {
             .cloned()
             .collect()
     }
+
+    /// Persist learned patterns to SQLite.
+    ///
+    /// Saves all distilled patterns to the `patterns` table.
+    #[cfg(feature = "sqlite-memory")]
+    pub fn persist_to_sqlite(
+        &self,
+        store: &crate::memory::sqlite_store::SqliteMemoryStore,
+    ) -> anyhow::Result<()> {
+        let patterns = self.learned_patterns.read();
+        for pattern in patterns.iter() {
+            let data = serde_json::to_string(pattern)?;
+            store.save_pattern(
+                &pattern.id,
+                "sona",
+                Some(&pattern.domain),
+                pattern.confidence,
+                &data,
+            )?;
+        }
+        tracing::debug!(count = patterns.len(), "SONA patterns persisted to SQLite");
+        Ok(())
+    }
+
+    /// Restore learned patterns from SQLite.
+    ///
+    /// Loads all SONA patterns from the `patterns` table.
+    #[cfg(feature = "sqlite-memory")]
+    pub fn restore_from_sqlite(
+        &self,
+        store: &crate::memory::sqlite_store::SqliteMemoryStore,
+    ) -> anyhow::Result<()> {
+        let rows = store.load_patterns()?;
+        let sona_rows: Vec<_> = rows
+            .into_iter()
+            .filter(|r| r.strategy == "sona")
+            .collect();
+
+        let mut patterns = Vec::new();
+        for row in &sona_rows {
+            if let Ok(pattern) = serde_json::from_str::<LearnedPattern>(&row.data) {
+                patterns.push(pattern);
+            }
+        }
+
+        *self.learned_patterns.write() = patterns;
+        tracing::debug!(count = sona_rows.len(), "SONA patterns restored from SQLite");
+        Ok(())
+    }
 }
 
 // ---------------------------------------------------------------------------

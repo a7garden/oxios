@@ -17,6 +17,31 @@ use super::search::{self, RankedMemory};
 use super::cache;
 use super::{content_hash, dedup_by_id, MemoryEntry, MemoryType, MemoryTier};
 
+/// A learning pattern row from the `patterns` table.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct PatternRow {
+    /// Unique pattern ID.
+    pub id: String,
+    /// Strategy name (e.g., "sona", "reasoning", "rvf").
+    pub strategy: String,
+    /// Optional domain.
+    pub domain: Option<String>,
+    /// Quality score (0.0–1.0).
+    pub quality: f32,
+    /// Number of times this pattern was used.
+    pub use_count: u32,
+    /// Success rate (0.0–1.0).
+    pub success_rate: f32,
+    /// Whether this pattern is long-term.
+    pub is_long_term: bool,
+    /// Pattern data as JSON.
+    pub data: String,
+    /// When created.
+    pub created_at: String,
+    /// When last updated.
+    pub updated_at: String,
+}
+
 /// SQLite-backed memory store.
 ///
 /// Wraps `MemoryDatabase` and provides high-level CRUD + search operations
@@ -318,6 +343,261 @@ impl SqliteMemoryStore {
     pub fn migrate_if_needed(&self, workspace_dir: &std::path::Path) -> Result<()> {
         super::migration::migrate_json_to_sqlite(workspace_dir, &self.db)?;
         Ok(())
+    }
+
+    // ── Phase 2: MemoryGraph / PageRank ────────────────────────────────
+
+    /// Build a co-access graph from memory session history.
+    ///
+    /// Groups memories by `session_id` and links all co-accessed pairs.
+    /// Returns a `MemoryGraph` ready for PageRank computation.
+    pub fn build_co_access_graph(&self) -> super::graph::MemoryGraph {
+        let conn = self.db.conn();
+
+        // Collect session_id -> [rowid] mappings
+        let mut sessions: std::collections::HashMap<String, Vec<u64>> =
+            std::collections::HashMap::new();
+
+        let mut stmt = match conn.prepare(
+            "SELECT rowid, session_id FROM memories WHERE session_id IS NOT NULL"
+        ) {
+            Ok(s) => s,
+            Err(_) => return super::graph::MemoryGraph::new(),
+        };
+
+        let rows: Vec<(i64, String)> = match stmt.query_map([], |row| {
+                Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?))
+            }) {
+            Ok(mapped) => mapped.filter_map(|r| r.ok()).collect(),
+            Err(_) => Vec::new(),
+        };
+
+        drop(stmt);
+        drop(conn);
+
+        for (rowid, session_id) in rows {
+            sessions
+                .entry(session_id)
+                .or_default()
+                .push(rowid as u64);
+        }
+
+        let session_vecs: Vec<Vec<u64>> = sessions.into_values().collect();
+        super::graph::MemoryGraph::from_co_access(&session_vecs)
+    }
+
+    /// Compute PageRank-based importance scores for all memories.
+    ///
+    /// Returns a map of memory rowid -> PageRank score.
+    /// Higher scores indicate memories that are more "central" in the
+    /// co-access graph — they bridge topics and appear in many sessions.
+    pub fn compute_pagerank(
+        &self,
+        damping: f64,
+        iterations: usize,
+        initial_scores: Option<&std::collections::HashMap<u64, f64>>,
+    ) -> std::collections::HashMap<u64, f64> {
+        let graph = self.build_co_access_graph();
+        graph.pagerank(damping, iterations, initial_scores)
+    }
+
+    /// Apply PageRank scores as importance boosts.
+    ///
+    /// For each memory, the importance is updated as:
+    /// `new_importance = old_importance * (1 + pagerank_boost * pagerank_score)`
+    ///
+    /// Returns the number of entries updated.
+    pub fn apply_pagerank_boost(&self, pagerank_scores: &std::collections::HashMap<u64, f64>, boost_factor: f32) -> usize {
+        let conn = self.db.conn();
+        let mut updated = 0;
+
+        for (&rowid, &score) in pagerank_scores {
+            // Get current importance
+            let importance: Option<f32> = conn
+                .query_row(
+                    "SELECT importance FROM memories WHERE rowid = ?1",
+                    rusqlite::params![rowid as i64],
+                    |row| row.get(0),
+                )
+                .ok();
+
+            if let Some(old_importance) = importance {
+                let new_importance = (old_importance * (1.0 + boost_factor * score as f32))
+                    .min(1.0) // Cap at 1.0
+                    .max(0.0);
+
+                if conn.execute(
+                    "UPDATE memories SET importance = ?1 WHERE rowid = ?2",
+                    rusqlite::params![new_importance, rowid as i64],
+                ).is_ok() {
+                    updated += 1;
+                }
+            }
+        }
+
+        updated
+    }
+
+    /// List memories by tier.
+    pub fn list_by_tier(&self, tier: MemoryTier, limit: usize) -> Result<Vec<MemoryEntry>> {
+        let tier_label = match tier {
+            MemoryTier::Hot => "hot",
+            MemoryTier::Warm => "warm",
+            MemoryTier::Cold => "cold",
+        };
+
+        let conn = self.db.conn();
+        let mut stmt = conn.prepare(
+            "SELECT id, memory_type, content, importance, tier, protection,
+                    source, session_id, space_id, tags, access_count, pinned,
+                    auto_classified, session_appearances, decay_score, content_hash,
+                    created_at, updated_at, accessed_at
+             FROM memories
+             WHERE tier = ?1
+             ORDER BY importance DESC
+             LIMIT ?2",
+        )?;
+
+        let entries: Vec<MemoryEntry> = stmt
+            .query_map(rusqlite::params![tier_label, limit], |row| {
+                Ok(search::row_to_memory_entry(row))
+            })?
+            .filter_map(|r| r.ok())
+            .collect();
+
+        Ok(entries)
+    }
+
+    /// Update a memory entry in-place.
+    pub fn update_entry(&self, entry: &MemoryEntry) -> Result<()> {
+        let tier_label = match entry.tier {
+            MemoryTier::Hot => "hot",
+            MemoryTier::Warm => "warm",
+            MemoryTier::Cold => "cold",
+        };
+        let protection_label = match entry.protection {
+            crate::memory::ProtectionLevel::None => "none",
+            crate::memory::ProtectionLevel::Low => "low",
+            crate::memory::ProtectionLevel::Medium => "medium",
+            crate::memory::ProtectionLevel::High => "high",
+            crate::memory::ProtectionLevel::Permanent => "permanent",
+        };
+
+        let conn = self.db.conn();
+        conn.execute(
+            "UPDATE memories SET
+                memory_type = ?2, content = ?3, importance = ?4, tier = ?5,
+                protection = ?6, source = ?7, session_id = ?8, space_id = ?9,
+                tags = ?10, access_count = ?11, pinned = ?12, auto_classified = ?13,
+                session_appearances = ?14, decay_score = ?15, compaction_level = ?16,
+                content_hash = ?17, updated_at = ?18, accessed_at = ?19
+             WHERE id = ?1",
+            rusqlite::params![
+                entry.id,
+                entry.memory_type.label(),
+                entry.content,
+                entry.importance,
+                tier_label,
+                protection_label,
+                entry.source,
+                entry.session_id,
+                entry.space_id,
+                serde_json::to_string(&entry.tags)?,
+                entry.access_count as i64,
+                entry.pinned as i64,
+                entry.auto_classified as i64,
+                entry.session_appearances as i64,
+                entry.decay_score,
+                entry.compaction_level as i64,
+                entry.content_hash as i64,
+                entry.modified_at.to_rfc3339(),
+                entry.accessed_at.to_rfc3339(),
+            ],
+        )?;
+        Ok(())
+    }
+
+    // ── Phase 4: Learning Patterns (SONA + ReasoningBank) ──────────────
+
+    /// Store a learning pattern.
+    pub fn save_pattern(
+        &self,
+        id: &str,
+        strategy: &str,
+        domain: Option<&str>,
+        quality: f32,
+        data: &str,
+    ) -> Result<()> {
+        let now = Utc::now().to_rfc3339();
+        let conn = self.db.conn();
+        conn.execute(
+            "INSERT OR REPLACE INTO patterns
+             (id, strategy, domain, quality, data, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            rusqlite::params![id, strategy, domain, quality, data, now, now],
+        )?;
+        Ok(())
+    }
+
+    /// Load all learning patterns.
+    pub fn load_patterns(&self) -> Result<Vec<PatternRow>> {
+        let conn = self.db.conn();
+        let mut stmt = conn.prepare(
+            "SELECT id, strategy, domain, quality, use_count, success_rate,
+                    is_long_term, data, created_at, updated_at
+             FROM patterns
+             ORDER BY quality DESC"
+        )?;
+
+        let rows: Vec<PatternRow> = stmt
+            .query_map([], |row| {
+                Ok(PatternRow {
+                    id: row.get(0)?,
+                    strategy: row.get(1)?,
+                    domain: row.get(2)?,
+                    quality: row.get(3)?,
+                    use_count: row.get::<_, i64>(4)? as u32,
+                    success_rate: row.get(5)?,
+                    is_long_term: row.get::<_, i64>(6)? != 0,
+                    data: row.get(7)?,
+                    created_at: row.get(8)?,
+                    updated_at: row.get(9)?,
+                })
+            })?
+            .filter_map(|r| r.ok())
+            .collect();
+
+        Ok(rows)
+    }
+
+    /// Record a pattern usage.
+    pub fn record_pattern_usage(&self, id: &str, success: bool) -> Result<()> {
+        let conn = self.db.conn();
+        let now = Utc::now().to_rfc3339();
+        conn.execute(
+            "UPDATE patterns SET
+                use_count = use_count + 1,
+                success_rate = CASE WHEN use_count = 0 THEN ?1
+                    ELSE (success_rate * use_count + ?1) / (use_count + 1) END,
+                updated_at = ?2
+             WHERE id = ?3",
+            rusqlite::params![success as i32 as f32, now, id],
+        )?;
+        Ok(())
+    }
+
+    /// Auto-promote high-quality patterns to long-term storage.
+    ///
+    /// Patterns with quality >= `min_quality` and use_count >= `min_usage`
+    /// are marked as long-term.
+    pub fn auto_promote_patterns(&self, min_quality: f32, min_usage: u32) -> usize {
+        let conn = self.db.conn();
+        conn.execute(
+            "UPDATE patterns SET is_long_term = 1
+             WHERE quality >= ?1 AND use_count >= ?2 AND is_long_term = 0",
+            rusqlite::params![min_quality, min_usage as i64],
+        )
+        .unwrap_or(0) as usize
     }
 
     // ── Private helpers ─────────────────────────────────────────────

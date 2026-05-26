@@ -424,17 +424,49 @@ impl ReasoningBank {
         short.values().chain(long.values()).cloned().collect()
     }
 
-    /// Load patterns from a serialized list (e.g. from RVF store).
-    pub fn load_patterns(&self, patterns: Vec<GuidancePattern>) {
-        let mut short = self.short_term.write();
-        let mut long = self.long_term.write();
-        for pattern in patterns {
-            if pattern.is_long_term {
-                long.insert(pattern.id.clone(), pattern);
-            } else {
-                short.insert(pattern.id.clone(), pattern);
+    /// Persist patterns to SQLite.
+    #[cfg(feature = "sqlite-memory")]
+    pub fn persist_to_sqlite(
+        &self,
+        store: &crate::memory::sqlite_store::SqliteMemoryStore,
+    ) -> anyhow::Result<()> {
+        let patterns = self.all_patterns();
+        for pattern in &patterns {
+            let data = serde_json::to_string(pattern)?;
+            store.save_pattern(
+                &pattern.id,
+                "reasoning",
+                pattern.domain.as_deref(),
+                pattern.quality,
+                &data,
+            )?;
+        }
+        tracing::debug!(count = patterns.len(), "ReasoningBank patterns persisted to SQLite");
+        Ok(())
+    }
+
+    /// Restore patterns from SQLite.
+    #[cfg(feature = "sqlite-memory")]
+    pub fn restore_from_sqlite(
+        &self,
+        store: &crate::memory::sqlite_store::SqliteMemoryStore,
+    ) -> anyhow::Result<()> {
+        let rows = store.load_patterns()?;
+        let rb_rows: Vec<_> = rows
+            .into_iter()
+            .filter(|r| r.strategy == "reasoning")
+            .collect();
+
+        let mut patterns = Vec::new();
+        for row in &rb_rows {
+            if let Ok(pattern) = serde_json::from_str::<GuidancePattern>(&row.data) {
+                patterns.push(pattern);
             }
         }
+
+        self.load_patterns(patterns);
+        tracing::debug!(count = rb_rows.len(), "ReasoningBank patterns restored from SQLite");
+        Ok(())
     }
 }
 

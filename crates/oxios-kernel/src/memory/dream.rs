@@ -112,6 +112,10 @@ pub struct DreamReport {
     pub root_updated: bool,
     /// Whether LLM was used for compaction.
     pub used_llm: bool,
+    /// Number of PageRank importance updates (Phase 2).
+    pub pagerank_updates: usize,
+    /// Number of learning patterns persisted (Phase 4).
+    pub patterns_persisted: usize,
     /// Duration in milliseconds.
     pub duration_ms: u64,
     /// Error if Dream failed (None = success).
@@ -156,6 +160,13 @@ pub enum MemorySignal {
     Contradiction {
         newer_id: String,
         older_id: String,
+    },
+    /// PageRank-based importance boost (Phase 2).
+    PageRankBoost {
+        rowid: u64,
+        old_importance: f32,
+        new_importance: f32,
+        pagerank_score: f64,
     },
 }
 
@@ -210,6 +221,21 @@ pub struct ConsolidationPlan {
     pub delete: Vec<String>,
     /// Entries to merge.
     pub merge: Vec<MergePlan>,
+    /// PageRank-based importance updates (Phase 2).
+    pub pagerank_updates: Vec<PageRankUpdate>,
+}
+
+/// A PageRank-based importance update.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PageRankUpdate {
+    /// Memory row ID.
+    pub rowid: u64,
+    /// Previous importance.
+    pub old_importance: f32,
+    /// New importance after PageRank boost.
+    pub new_importance: f32,
+    /// PageRank score (0.0–1.0).
+    pub pagerank_score: f64,
 }
 
 impl ConsolidationPlan {
@@ -221,6 +247,7 @@ impl ConsolidationPlan {
             + self.demote.len()
             + self.delete.len()
             + self.merge.len()
+            + self.pagerank_updates.len()
     }
 }
 
@@ -286,6 +313,14 @@ pub struct DreamConfig {
     pub compaction_line_threshold: usize,
     pub proactive_recall_limit: usize,
     pub proactive_recall_threshold: f32,
+    /// Enable PageRank-based importance boost (Phase 2).
+    pub pagerank_enabled: bool,
+    /// PageRank damping factor (typically 0.85).
+    pub pagerank_damping: f64,
+    /// PageRank iteration count (typically 20-50).
+    pub pagerank_iterations: usize,
+    /// How much PageRank score influences importance (0.0–1.0).
+    pub pagerank_boost_factor: f32,
 }
 
 impl DreamConfig {
@@ -315,6 +350,10 @@ impl DreamConfig {
             compaction_line_threshold: c.compaction_line_threshold,
             proactive_recall_limit: c.proactive_recall_limit,
             proactive_recall_threshold: c.proactive_recall_threshold,
+            pagerank_enabled: true,
+            pagerank_damping: 0.85,
+            pagerank_iterations: 30,
+            pagerank_boost_factor: 0.3,
         }
     }
 }
@@ -439,6 +478,8 @@ impl DreamProcess {
             type_promotions: 0,
             root_updated: false,
             used_llm: false,
+            pagerank_updates: 0,
+            patterns_persisted: 0,
             duration_ms: 0,
             error: None,
         };
@@ -503,6 +544,7 @@ impl DreamProcess {
                 .count();
             report.contradictions_resolved = phase4_result.contradictions_resolved;
             report.root_updated = true;
+            report.pagerank_updates = plan.pagerank_updates.len();
 
             // Clear checkpoint on success
             self.clear_checkpoint().await.ok();
@@ -718,6 +760,44 @@ impl DreamProcess {
             }
         }
 
+        // 5. PageRank-based importance boost (Phase 2)
+        if self.config.pagerank_enabled {
+            #[cfg(feature = "sqlite-memory")]
+            if let Some(ref sqlite) = self.memory_manager.sqlite_store() {
+                let scores = sqlite.compute_pagerank(
+                    self.config.pagerank_damping,
+                    self.config.pagerank_iterations,
+                    None,
+                );
+
+                if !scores.is_empty() {
+                    // Get current importance for each scored memory
+                    let conn = sqlite.db().conn();
+                    for (&rowid, &pr_score) in &scores {
+                        if let Ok(old_importance) = conn.query_row(
+                            "SELECT importance FROM memories WHERE rowid = ?1",
+                            rusqlite::params![rowid as i64],
+                            |row| row.get::<_, f32>(0),
+                        ) {
+                            let new_importance = (old_importance
+                                * (1.0 + self.config.pagerank_boost_factor * pr_score as f32))
+                                .min(1.0)
+                                .max(0.0);
+
+                            if (new_importance - old_importance).abs() > 0.001 {
+                                signals.push(MemorySignal::PageRankBoost {
+                                    rowid,
+                                    old_importance,
+                                    new_importance,
+                                    pagerank_score: pr_score,
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         Ok(signals)
     }
 
@@ -765,6 +845,19 @@ impl DreamProcess {
                         keep_id: newer_id.clone(),
                         remove_id: older_id.clone(),
                         merged_content: String::new(),
+                    });
+                }
+                MemorySignal::PageRankBoost {
+                    rowid,
+                    old_importance,
+                    new_importance,
+                    pagerank_score,
+                } => {
+                    plan.pagerank_updates.push(PageRankUpdate {
+                        rowid: *rowid,
+                        old_importance: *old_importance,
+                        new_importance: *new_importance,
+                        pagerank_score: *pagerank_score,
                     });
                 }
             }
@@ -831,7 +924,19 @@ impl DreamProcess {
                 });
         }
 
-        // 5. Apply deletions (with safety checks)
+        // 5. Apply PageRank importance updates (Phase 2)
+        #[cfg(feature = "sqlite-memory")]
+        if let Some(ref sqlite) = self.memory_manager.sqlite_store() {
+            for update in &plan.pagerank_updates {
+                let conn = sqlite.db().conn();
+                let _ = conn.execute(
+                    "UPDATE memories SET importance = ?1 WHERE rowid = ?2",
+                    rusqlite::params![update.new_importance, update.rowid as i64],
+                );
+            }
+        }
+
+        // 6. Apply deletions (with safety checks)
         for id in &plan.delete {
             if let Ok(Some(entry)) = self.memory_manager.get_by_id(id).await {
                 // Safety check: never delete protected entries
