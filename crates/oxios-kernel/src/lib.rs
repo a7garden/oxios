@@ -8,6 +8,8 @@
 
 // ─── Lifecycle ──────────────────────────────────────────────────────
 // Agent 생성, 실행, 종료. OS의 init + process management.
+// ─── Lifecycle ──────────────────────────────────────────────────────
+// Agent 생성, 실행, 종료. OS의 init + process management.
 pub mod a2a_circuit_breaker;
 pub mod agent_group;
 pub mod agent_lifecycle;
@@ -18,7 +20,7 @@ pub mod supervisor;
 // ─── Orchestration ──────────────────────────────────────────────────
 // 작업 조율, 스케줄링, 예산 관리.
 pub mod budget;
-pub mod circuit_breaker;
+// circuit_breaker removed — now using oxi_sdk::ProviderCircuitBreaker
 pub mod cron;
 pub mod orchestrator;
 pub mod scheduler;
@@ -95,7 +97,8 @@ pub use supervisor::{BasicSupervisor, Supervisor};
 
 // ─── Orchestration ──────────────────────────────────────────────────
 pub use budget::{BudgetExceeded, BudgetInfo, BudgetKind, BudgetLimit, BudgetManager};
-pub use circuit_breaker::CircuitBreaker;
+// Circuit breaker — delegates to oxi-sdk
+pub use oxi_sdk::ProviderCircuitBreaker as CircuitBreaker;
 pub use cron::{CronJob, CronJobResult, CronJobUpdate, CronScheduler, JobSource};
 pub use orchestrator::{AgentRole, OrchestrationResult, Orchestrator, SubTask};
 pub use scheduler::{AgentScheduler, Priority, ScheduledTask, SchedulerStats, TaskStatus};
@@ -202,7 +205,7 @@ pub use space::{
 pub use state_store::{AgentResponse, PruneConfig, PruneThrottle, Session, SessionId, SessionSummary, StateStore};
 
 // ─── Infrastructure ─────────────────────────────────────────────────
-pub use engine::{EngineProvider, OxiEngineProvider, OxiosEngine};
+pub use engine::{EngineProvider, OxiosEngine};
 pub use error::{HttpStatus, KernelError, KernelResult};
 pub use metrics::{get_metrics, register_builtin_metrics, registry};
 pub use types::{AgentId, AgentInfo, AgentStatus};
@@ -218,13 +221,41 @@ pub use kernel_handle::{
 
 // ─── oxi-sdk re-exports ─────────────────────────────────────────────
 //
-// Only types that are actually USED by kernel modules are re-exported.
-// Dead re-exports were removed (see audit 2026-05-16).
+// oxi-sdk 0.23.0 re-exports everything from oxi-ai and oxi-agent.
+// We no longer need direct oxi-ai/oxi-agent dependencies.
 //
-// When oxi-sdk adds full re-exports of oxi-ai/oxi-agent types,
-// we can drop direct oxi-ai/oxi-agent dependencies entirely.
-// See ../oxi/docs/proposals/sdk-consumer-requirements.md
+// Only types actually USED by kernel modules are re-exported here.
 pub use oxi_sdk::{
-    AgentEvent, AgentLoop, InterAgentMessage, KernelToolContext, KernelToolProvider, MessageBus,
-    Model, Oxi, OxiBuilder, Provider, ProviderOptions, StreamOptions,
+    // Core agent types
+    Agent, AgentBuilder, AgentConfig, AgentEvent, AgentLoop, AgentTool, AgentToolResult,
+    SharedState, ToolContext, ToolError, ToolExecutionMode, ToolRegistry,
+    // Engine
+    Oxi, OxiBuilder, Model, Provider, ProviderOptions, StreamOptions,
+    // Kernel bridge
+    KernelToolContext, KernelToolProvider,
+    // Communication
+    InterAgentMessage, MessageBus,
+    // Lifecycle (oxi-sdk 0.23.0)
+    AgentHandle, AgentLifecycleEvent, AgentSnapshot, AgentStatus as SdkAgentStatus,
+    AgentSupervisor, SupervisorPolicy as SdkSupervisorPolicy, RestartBackoff, FileSnapshotStore,
+    // Security (oxi-sdk 0.23.0)
+    Authorizer, CapabilitySet, CapabilitySubject,
+    SecurityMiddleware, DefaultPolicy, StringPattern,
+    // Observability (oxi-sdk 0.23.0)
+    AuditLog, CostTracker, CostTrackerConfig, Tracer, Span, SpanContext,
+    SpanId, SpanKind, SpanStatus, TraceId, SpanGuard, CostSnapshot,
+    // Middleware (oxi-sdk 0.23.0)
+    Middleware, MiddlewarePipeline, MiddlewareContext, MiddlewareData, MiddlewarePhase,
+    MiddlewareResult,
+    // Routing (oxi-sdk 0.23.0)
+    RoutingControl,
+    // Coordination (oxi-sdk 0.23.0)
+    AgentGroup as SdkAgentGroup, GroupStrategy, GroupResult, CoordinatedGroup, CoordinatedGroupBuilder,
+    WorkQueue, WorkQueueConfig, SharedMemory, Consensus,
+    // Metrics
+    AgentMetrics, MetricsSnapshot,
+    // Circuit breaker
+    ProviderCircuitBreaker, CircuitBreakerConfig,
+    // Browser
+    BrowseConfig, BrowseTool, BrowseExtractTool, BrowserEngine, BrowserError, BrowserTab,
 };

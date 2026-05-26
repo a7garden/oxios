@@ -13,7 +13,7 @@ oxios-gateway = { version = "0.4.0", path = "../../crates/oxios-gateway" }
 oxios-kernel = { version = "0.4.0", path = "../../crates/oxios-kernel", default-features = false }
 oxios-markdown = { version = "0.4.0", path = "../../crates/oxios-markdown" }
 oxios-ouroboros = { version = "0.4.0", path = "../../crates/oxios-ouroboros" }
-oxi-ai = { workspace = true }
+# oxi-ai re-exported via oxi-sdk — no direct dependency needed
 oxi-sdk = { workspace = true }
 tokio = { workspace = true }
 async-trait = { workspace = true }

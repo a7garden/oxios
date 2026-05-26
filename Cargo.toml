@@ -56,9 +56,8 @@ regex = "1"
 # Concurrency
 parking_lot = "0.12"
 
-# oxi engine — single dependency for everything
-oxi-sdk = "0.22.0"
-oxi-ai = "0.22.0"
+# oxi engine — single dependency for everything (oxi-ai re-exported via oxi-sdk)
+oxi-sdk = "0.23.0"
 
 [features]
 default = ["web", "cli", "browser"]

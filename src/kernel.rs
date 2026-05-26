@@ -9,9 +9,9 @@ use oxios_gateway::Gateway;
 use oxios_kernel::{
     access_manager::AccessManager, auth::AuthManager, config::load_config, A2AProtocol,
     AgentRuntime, AgentScheduler, AuditTrail, BasicSupervisor, BudgetManager, ClawHubClient,
-    ClawHubInstaller, CronScheduler, EngineProvider, EventBus, GitLayer,
+    ClawHubInstaller, CronScheduler, EventBus, GitLayer,
     McpBridge, McpServer, MarketplaceApi, MemoryManager,
-    Orchestrator, OxiosConfig, PersonaManager, ResourceMonitor,
+    Orchestrator, OxiosConfig, OxiosEngine, PersonaManager, ResourceMonitor,
     SkillManager, SpaceManager, Supervisor,
     TfIdfEmbeddingProvider,
 };
@@ -556,11 +556,11 @@ impl KernelBuilder {
 
         // Model comes from config, not hardcoded default
         let model_id = &config.engine.default_model;
-        let engine_provider = oxios_kernel::OxiEngineProvider::new(model_id);
-        let model = engine_provider
+        let engine = OxiosEngine::new(model_id);
+        let model = engine
             .resolve_model(model_id)
             .context(format!("Failed to resolve model: {}", model_id))?;
-        let provider = engine_provider
+        let provider = engine
             .create_provider(&model.provider)
             .context(format!("Failed to create provider: {}", model.provider))?;
 
@@ -641,6 +641,17 @@ impl KernelBuilder {
                         dim = sqlite_config.embedding_dim,
                         "SQLite memory backend initialized"
                     );
+
+                    // Prefetch the embedding model in the background so it's ready
+                    // before the first search. Non-blocking — errors are logged.
+                    if config.memory.embedding.provider == "gguf" {
+                        #[cfg(feature = "embedding-gguf")]
+                        oxios_kernel::embedding::gguf::GgufModelLoader::spawn_prefetch(
+                            oxios_kernel::embedding::gguf::GgufModelLoader::model_dir_for_workspace(
+                                Path::new(&config.kernel.workspace),
+                            ),
+                        );
+                    }
                 }
                 Err(e) => {
                     tracing::warn!(

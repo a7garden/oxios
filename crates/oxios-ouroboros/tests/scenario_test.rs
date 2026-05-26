@@ -7,7 +7,7 @@
 
 use std::sync::Arc;
 
-use oxi_sdk::{OxiBuilder, Provider};
+use oxi_sdk::{OxiBuilder, OpenAiProvider, Provider};
 use oxios_ouroboros::{OuroborosEngine, OuroborosProtocol};
 
 /// auth.json에서 zai API 키 읽기.
@@ -36,7 +36,7 @@ async fn make_engine() -> Arc<dyn OuroborosProtocol> {
     let builder = OxiBuilder::new().with_builtins();
     let builder = builder.provider_factory("zai", move || {
         let provider =
-            oxi_ai::OpenAiProvider::with_base_url_and_key(&base_url, Some(key_for_closure.clone()));
+            oxi_sdk::OpenAiProvider::with_base_url_and_key(&base_url, Some(key_for_closure.clone()));
         Ok(Arc::new(provider) as Arc<dyn Provider>)
     });
 

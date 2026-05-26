@@ -26,7 +26,7 @@ use parking_lot::Mutex;
 use std::sync::Arc;
 
 use crate::capability::resolve::resolve_cspace;
-use crate::circuit_breaker::CircuitBreaker;
+// Circuit breaker now provided by oxi_sdk::ProviderCircuitBreaker
 use crate::memory::{MemoryEntry, MemoryManager, MemoryType};
 use crate::persona_manager::PersonaManager;
 use crate::tools::registration::register_tools_from_cspace;
@@ -34,12 +34,18 @@ use crate::types::AgentId;
 use crate::KernelHandle;
 use oxios_ouroboros::{ExecutionResult, Seed};
 
-/// Global LLM circuit breaker instance.
-static LLM_CIRCUIT_BREAKER: std::sync::OnceLock<CircuitBreaker> = std::sync::OnceLock::new();
+/// Global LLM circuit breaker instance — delegates to oxi-sdk's ProviderCircuitBreaker.
+static LLM_CIRCUIT_BREAKER: std::sync::OnceLock<oxi_sdk::ProviderCircuitBreaker> =
+    std::sync::OnceLock::new();
 
 /// Get the global LLM circuit breaker.
-fn get_llm_circuit_breaker() -> &'static CircuitBreaker {
-    LLM_CIRCUIT_BREAKER.get_or_init(CircuitBreaker::default)
+fn get_llm_circuit_breaker() -> &'static oxi_sdk::ProviderCircuitBreaker {
+    LLM_CIRCUIT_BREAKER.get_or_init(|| {
+        oxi_sdk::ProviderCircuitBreaker::new(
+            "global".to_string(),
+            oxi_sdk::CircuitBreakerConfig::default(),
+        )
+    })
 }
 
 /// Configuration for creating AgentRuntime instances.
@@ -385,6 +391,7 @@ async fn run_agent_loop(ctx: AgentLoopContext) -> Result<(String, usize, bool)> 
         compaction_strategy: CompactionStrategy::Threshold(0.8),
         context_window: 128_000,
         compaction_instruction: None,
+        on_compaction: None,
         session_id: Some(seed_id.to_string()),
         transport: None,
         compact_on_start: false,
@@ -478,8 +485,10 @@ async fn run_agent_loop(ctx: AgentLoopContext) -> Result<(String, usize, bool)> 
     let circuit = get_llm_circuit_breaker();
     if result.is_err() {
         circuit.record_failure();
+        crate::metrics::get_metrics().llm_circuit_breaker_state.set(1.0);
     } else {
         circuit.record_success();
+        crate::metrics::get_metrics().llm_circuit_breaker_state.set(0.0);
     }
 
     if let Err(e) = result {

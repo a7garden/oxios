@@ -1,16 +1,27 @@
-//! Engine provider — thin wrapper around oxi-sdk's Oxi.
-//!
-//! oxios uses oxi-sdk as the AI engine. This module re-exports the
-//! EngineProvider trait for the kernel so it can be swapped for testing.
+//! Engine provider — wraps oxi-sdk's `Oxi` for the kernel.
 //!
 //! All provider/model resolution goes through `oxi_sdk::OxiBuilder`.
-//! The `OxiosEngine` struct wraps the SDK instance and exposes a clean API.
+//! The `OxiosEngine` struct wraps the SDK instance and exposes a clean API
+//! with support for routing, credentials, and multi-provider fallback.
+//!
+//! # Architecture
+//!
+//! ```text
+//! OxiosEngine (OxiBuilder → Oxi)
+//!   ├── resolve_model("provider/model") → Model
+//!   ├── create_provider("anthropic")     → Arc<dyn Provider>
+//!   ├── oxi()                            → &Oxi (for AgentBuilder, etc.)
+//!   └── agent(AgentConfig)               → AgentBuilder
+//! ```
 
 use anyhow::Result;
 use oxi_sdk::{Oxi, OxiBuilder};
 use std::sync::Arc;
 
 /// The kernel's engine — wraps oxi-sdk's Oxi instance.
+///
+/// Created via [`OxiosEngine::new()`] or [`OxiosEngine::builder()`].
+/// Provides access to providers, models, and agent construction.
 pub struct OxiosEngine {
     oxi: Oxi,
     default_model_id: String,
@@ -20,23 +31,33 @@ impl OxiosEngine {
     /// Create a new engine with the given default model.
     ///
     /// Internally calls `OxiBuilder::new().with_builtins()` to load all
-    /// 50+ built-in models and providers.
+    /// built-in models and providers.
     pub fn new(default_model_id: impl Into<String>) -> Self {
         let model_id = default_model_id.into();
-        let provider_name = model_id
-            .split_once('/')
-            .map(|(p, _)| p)
-            .unwrap_or("anthropic");
-
-        // Build Oxi with built-in providers.
-        // OpenAI-compatible providers (e.g. zai) are now handled through
-        // AgentLoopConfig.api_key / provider_options — no factory needed.
-        let builder = OxiBuilder::new().with_builtins();
-
-        let oxi = builder.build();
+        let oxi = OxiBuilder::new().with_builtins().build();
         Self {
             oxi,
             default_model_id: model_id,
+        }
+    }
+
+    /// Create an engine builder for advanced configuration.
+    ///
+    /// Use this when you need credential injection, routing, or
+    /// custom provider registration.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// let engine = OxiosEngine::builder()
+    ///     .default_model("anthropic/claude-sonnet-4-20250514")
+    ///     .api_key("anthropic", "sk-ant-...")
+    ///     .build();
+    /// ```
+    pub fn builder() -> OxiosEngineBuilder {
+        OxiosEngineBuilder {
+            inner: OxiBuilder::new().with_builtins(),
+            default_model_id: "anthropic/claude-sonnet-4-20250514".to_string(),
         }
     }
 
@@ -49,30 +70,83 @@ impl OxiosEngine {
     }
 
     /// Resolve a model ID to a Model.
-    ///
-    /// Accepts both `"provider/model"` and bare `"model"` forms.
-    /// When no provider prefix is given, defaults to `"anthropic"`.
     pub fn resolve_model(&self, model_id: &str) -> Result<oxi_sdk::Model> {
         self.oxi.resolve_model(model_id)
     }
 
     /// Create a provider for the given provider name.
-    ///
-    /// Checks custom providers first, then falls back to built-in
-    /// providers (stateless creation).
     pub fn create_provider(&self, name: &str) -> Result<Arc<dyn oxi_sdk::Provider>> {
         self.oxi.create_provider(name)
+    }
+
+    /// Get the default model ID.
+    pub fn default_model_id(&self) -> &str {
+        &self.default_model_id
     }
 }
 
 // ---------------------------------------------------------------------------
-// EngineProvider trait (kept for API compatibility)
+// EngineBuilder
+// ---------------------------------------------------------------------------
+
+/// Builder for creating an `OxiosEngine` with advanced configuration.
+pub struct OxiosEngineBuilder {
+    inner: OxiBuilder,
+    default_model_id: String,
+}
+
+impl OxiosEngineBuilder {
+    /// Set the default model ID.
+    pub fn default_model(mut self, model_id: impl Into<String>) -> Self {
+        self.default_model_id = model_id.into();
+        self
+    }
+
+    /// Register an API key for a specific provider.
+    pub fn api_key(self, provider: &str, key: impl Into<String>) -> Self {
+        Self {
+            inner: self.inner.api_key(provider, key),
+            default_model_id: self.default_model_id,
+        }
+    }
+
+    /// Register a full credential (API key + optional base URL).
+    pub fn credential(
+        self,
+        provider: &str,
+        api_key: impl Into<String>,
+        base_url: Option<&str>,
+    ) -> Self {
+        Self {
+            inner: self.inner.credential(provider, api_key, base_url),
+            default_model_id: self.default_model_id,
+        }
+    }
+
+    /// Register a custom provider.
+    pub fn provider(self, name: &str, p: impl oxi_sdk::Provider + 'static) -> Self {
+        Self {
+            inner: self.inner.provider(name, p),
+            default_model_id: self.default_model_id,
+        }
+    }
+
+    /// Build the engine.
+    pub fn build(self) -> OxiosEngine {
+        OxiosEngine {
+            oxi: self.inner.build(),
+            default_model_id: self.default_model_id,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// EngineProvider trait (for testability and dependency inversion)
 // ---------------------------------------------------------------------------
 
 /// Engine provider trait — abstracts how the kernel obtains AI providers.
 ///
-/// This trait is implemented by `OxiEngineProvider` and can be replaced
-/// with a mock for testing.
+/// Implemented by `OxiosEngine` directly. Use a mock for testing.
 pub trait EngineProvider: Send + Sync {
     /// Create a provider for the given provider name.
     fn create_provider(&self, provider_name: &str) -> Result<Arc<dyn oxi_sdk::Provider>>;
@@ -84,38 +158,24 @@ pub trait EngineProvider: Send + Sync {
     fn default_model_id(&self) -> &str;
 }
 
-/// Default engine provider using oxi-sdk.
-pub struct OxiEngineProvider {
-    engine: OxiosEngine,
-}
-
-impl OxiEngineProvider {
-    /// Create a new engine provider with the given default model ID.
-    pub fn new(default_model_id: impl Into<String>) -> Self {
-        Self {
-            engine: OxiosEngine::new(default_model_id),
-        }
-    }
-}
-
-impl EngineProvider for OxiEngineProvider {
+impl EngineProvider for OxiosEngine {
     fn create_provider(&self, provider_name: &str) -> Result<Arc<dyn oxi_sdk::Provider>> {
-        self.engine.create_provider(provider_name)
+        self.create_provider(provider_name)
     }
 
     fn resolve_model(&self, model_id: &str) -> Result<oxi_sdk::Model> {
-        self.engine.resolve_model(model_id)
+        self.resolve_model(model_id)
     }
 
     fn default_model_id(&self) -> &str {
-        &self.engine.default_model_id
+        &self.default_model_id
     }
 }
 
-impl std::fmt::Debug for OxiEngineProvider {
+impl std::fmt::Debug for OxiosEngine {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("OxiEngineProvider")
-            .field("default_model_id", &self.engine.default_model_id)
+        f.debug_struct("OxiosEngine")
+            .field("default_model_id", &self.default_model_id)
             .finish()
     }
 }
@@ -130,7 +190,7 @@ mod tests {
 
     #[test]
     fn test_resolve_model_with_provider_prefix() {
-        let engine = OxiEngineProvider::new("anthropic/claude-sonnet-4-20250514");
+        let engine = OxiosEngine::new("anthropic/claude-sonnet-4-20250514");
         let model = engine.resolve_model("openai/gpt-4o").unwrap();
         assert_eq!(model.provider, "openai");
         assert_eq!(model.id, "gpt-4o");
@@ -138,14 +198,14 @@ mod tests {
 
     #[test]
     fn test_resolve_model_without_provider_prefix() {
-        let engine = OxiEngineProvider::new("anthropic/claude-sonnet-4-20250514");
+        let engine = OxiosEngine::new("anthropic/claude-sonnet-4-20250514");
         let model = engine.resolve_model("claude-sonnet-4-20250514").unwrap();
         assert_eq!(model.provider, "anthropic");
     }
 
     #[test]
     fn test_default_model_id() {
-        let engine = OxiEngineProvider::new("anthropic/claude-sonnet-4-20250514");
+        let engine = OxiosEngine::new("anthropic/claude-sonnet-4-20250514");
         assert_eq!(
             engine.default_model_id(),
             "anthropic/claude-sonnet-4-20250514"
@@ -154,22 +214,39 @@ mod tests {
 
     #[test]
     fn test_resolve_model_not_found() {
-        let engine = OxiEngineProvider::new("anthropic/claude-sonnet-4-20250514");
+        let engine = OxiosEngine::new("anthropic/claude-sonnet-4-20250514");
         let result = engine.resolve_model("nonexistent/model-xyz");
         assert!(result.is_err());
     }
 
     #[test]
     fn test_create_provider_anthropic() {
-        let engine = OxiEngineProvider::new("anthropic/claude-sonnet-4-20250514");
+        let engine = OxiosEngine::new("anthropic/claude-sonnet-4-20250514");
         let provider = engine.create_provider("anthropic");
         assert!(provider.is_ok());
     }
 
     #[test]
     fn test_create_provider_not_found() {
-        let engine = OxiEngineProvider::new("anthropic/claude-sonnet-4-20250514");
+        let engine = OxiosEngine::new("anthropic/claude-sonnet-4-20250514");
         let result = engine.create_provider("nonexistent_provider");
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_builder_with_credential() {
+        let engine = OxiosEngine::builder()
+            .default_model("openai/gpt-4o")
+            .credential("openai", "sk-test", None)
+            .build();
+        assert_eq!(engine.default_model_id(), "openai/gpt-4o");
+    }
+
+    #[test]
+    fn test_engine_provider_trait_on_engine() {
+        let engine = OxiosEngine::new("anthropic/claude-sonnet-4-20250514");
+        let provider: &dyn EngineProvider = &engine;
+        assert!(provider.create_provider("anthropic").is_ok());
+        assert!(provider.resolve_model("openai/gpt-4o").is_ok());
     }
 }
