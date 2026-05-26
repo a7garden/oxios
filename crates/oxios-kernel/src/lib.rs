@@ -66,10 +66,11 @@ pub mod space;
 pub mod state_store;
 
 // ─── Infrastructure ─────────────────────────────────────────────────
-// 엔진, 에러, 타입, 메트릭, 텔레메트리.
+// 엔진, 에러, 타입, 메트릭, 텔레메트리, 옵저버빌리티.
 pub mod engine;
 pub mod error;
 pub mod metrics;
+pub mod observability;
 #[cfg(feature = "otel")]
 pub mod telemetry_otel;
 pub mod types;
@@ -208,6 +209,9 @@ pub use state_store::{AgentResponse, PruneConfig, PruneThrottle, Session, Sessio
 pub use engine::{EngineProvider, OxiosEngine};
 pub use error::{HttpStatus, KernelError, KernelResult};
 pub use metrics::{get_metrics, register_builtin_metrics, registry};
+pub use observability::{audit_log, cost_tracker, tracer,
+    AuditEntry as SdkAuditEntry, AuditFilter,
+    CostSnapshot, CostTracker, Span, SpanGuard, SpanKind, TokenUsage, Tracer as SdkTracer};
 pub use types::{AgentId, AgentInfo, AgentStatus};
 
 // ─── API Surface ────────────────────────────────────────────────────
@@ -241,9 +245,8 @@ pub use oxi_sdk::{
     // Security (oxi-sdk 0.23.0)
     Authorizer, CapabilitySet, CapabilitySubject,
     SecurityMiddleware, DefaultPolicy, StringPattern,
-    // Observability (oxi-sdk 0.23.0)
-    AuditLog, CostTracker, CostTrackerConfig, Tracer, Span, SpanContext,
-    SpanId, SpanKind, SpanStatus, TraceId, SpanGuard, CostSnapshot,
+    // Observability types not re-exported here — use observability module
+    AuditLog as SdkAuditLog,
     // Middleware (oxi-sdk 0.23.0)
     Middleware, MiddlewarePipeline, MiddlewareContext, MiddlewareData, MiddlewarePhase,
     MiddlewareResult,

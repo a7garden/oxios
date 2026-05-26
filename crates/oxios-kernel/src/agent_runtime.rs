@@ -347,6 +347,10 @@ async fn run_agent(
 
     tracing::debug!(workspace = %workspace.display(), "Agent workspace scoped");
 
+    // Start distributed trace span for this agent execution.
+    let _trace_guard = crate::observability::tracer()
+        .start(format!("seed-{}", &seed_id.to_string()[..8]).as_str(), oxi_sdk::SpanKind::Agent);
+
     // ── Register tools based on CSpace ──
     let registry = ToolRegistry::new();
     let search_cache = Arc::new(SearchCache::new());
@@ -393,6 +397,8 @@ async fn run_agent(
     let exec_state_cb = Arc::clone(&exec_state);
     let memory_for_callback: Arc<MemoryManager> = (*kernel_handle.agents.memory_manager()).clone();
     let session_id_for_callback = seed_id.to_string();
+    let model_id_for_callback = config.model_id.clone();
+    let agent_id_for_callback = agent_id.to_string();
 
     // Run the agent with streaming events.
     let result = agent
@@ -417,6 +423,29 @@ async fn run_agent(
                 AgentEvent::Error { message, .. } => {
                     s.final_content = message.clone();
                     s.success = false;
+                }
+                AgentEvent::Usage {
+                    input_tokens,
+                    output_tokens,
+                } => {
+                    // Record token usage to cost tracker.
+                    let agent_label = format!("agent-{}", agent_id_for_callback);
+                    crate::observability::cost_tracker().record(
+                        &agent_label,
+                        &oxi_sdk::Model::new(
+                            &model_id_for_callback,
+                            &model_id_for_callback,
+                            oxi_sdk::Api::OpenAiCompletions,
+                            "unknown",
+                            "https://unknown.com",
+                        ),
+                        oxi_sdk::TokenUsage {
+                            input: input_tokens as u64,
+                            output: output_tokens as u64,
+                            cache_read: 0,
+                            cache_write: 0,
+                        },
+                    );
                 }
                 AgentEvent::Compaction { event } => {
                     if let CompactionEvent::Completed { result, .. } = event {
