@@ -5,10 +5,21 @@
 //!
 //! When an agent is forked and executed, the supervisor delegates
 //! the actual tool-calling loop to the [`AgentRuntime`].
+//!
+//! # Agent Pool & Session Persistence
+//!
+//! Agents are retained in an [`AgentPool`] after execution for:
+//! - **Session continuation** via `Agent::continue_with()` — multi-turn
+//!   conversations without re-creating the agent.
+//! - **State export/import** — serialize agent conversation history to
+//!   JSON for crash recovery, migration, or debugging.
+//! - **Provider rate limiting** — all agents share a [`ProviderPool`] to
+//!   respect per-provider RPM/concurrency limits.
 
 use anyhow::Result;
 use async_trait::async_trait;
 use chrono::Utc;
+use oxi_sdk::Agent;
 use oxios_ouroboros::Seed;
 use parking_lot::RwLock;
 use std::collections::HashMap;
@@ -28,6 +39,73 @@ struct AgentHandle {
     cancelled: Arc<AtomicBool>,
     /// The tokio task running the agent execution. Aborted on `kill()`.
     task: JoinHandle<Result<ExecutionResult>>,
+}
+
+/// Pool of live `Agent` instances, keyed by AgentId.
+///
+/// Retains agents after execution for:
+/// - **Session continuation** — `continue_with()` for multi-turn without
+///   re-creating the agent from scratch.
+/// - **State persistence** — `export_state()` serializes conversation history
+///   to JSON for crash recovery, migration, or debugging.
+/// - **State restoration** — `import_state()` restores a previous session.
+pub struct AgentPool {
+    agents: RwLock<HashMap<AgentId, Arc<Agent>>>,
+}
+
+impl AgentPool {
+    /// Create an empty agent pool.
+    pub fn new() -> Self {
+        Self {
+            agents: RwLock::new(HashMap::new()),
+        }
+    }
+
+    /// Insert an agent into the pool.
+    pub fn insert(&self, id: AgentId, agent: Arc<Agent>) {
+        self.agents.write().insert(id, agent);
+    }
+
+    /// Get a pooled agent by ID.
+    pub fn get(&self, id: &AgentId) -> Option<Arc<Agent>> {
+        self.agents.read().get(id).cloned()
+    }
+
+    /// Remove an agent from the pool.
+    pub fn remove(&self, id: &AgentId) -> Option<Arc<Agent>> {
+        self.agents.write().remove(id)
+    }
+
+    /// Export an agent's state as JSON.
+    ///
+    /// Returns `None` if the agent is not in the pool or export fails.
+    pub fn export_state(&self, id: &AgentId) -> Option<serde_json::Value> {
+        self.agents
+            .read()
+            .get(id)
+            .and_then(|agent| agent.export_state().ok())
+    }
+
+    /// Import agent state from JSON.
+    ///
+    /// Returns `false` if the agent is not in the pool or import fails.
+    pub fn import_state(&self, id: &AgentId, state: serde_json::Value) -> bool {
+        if let Some(agent) = self.agents.read().get(id) {
+            agent.import_state(state).is_ok()
+        } else {
+            false
+        }
+    }
+
+    /// Number of agents currently in the pool.
+    pub fn len(&self) -> usize {
+        self.agents.read().len()
+    }
+
+    /// Whether the pool is empty.
+    pub fn is_empty(&self) -> bool {
+        self.agents.read().is_empty()
+    }
 }
 
 /// Supervisor trait for managing agent lifecycles.
@@ -58,6 +136,8 @@ pub struct BasicSupervisor {
     agents: RwLock<HashMap<AgentId, AgentInfo>>,
     /// Per-agent cancellation tokens and join handles for task abortion.
     handles: RwLock<HashMap<AgentId, AgentHandle>>,
+    /// Pool of live Agent instances for session continuation.
+    agent_pool: AgentPool,
     event_bus: EventBus,
     runtime: Arc<AgentRuntime>,
     resource_monitor: Option<Arc<ResourceMonitor>>,
@@ -69,6 +149,7 @@ impl BasicSupervisor {
         Self {
             agents: RwLock::new(HashMap::new()),
             handles: RwLock::new(HashMap::new()),
+            agent_pool: AgentPool::new(),
             event_bus,
             runtime: Arc::new(runtime),
             resource_monitor: None,
@@ -86,6 +167,11 @@ impl BasicSupervisor {
             let count = self.agents.read().len();
             rm.set_active_agents(count);
         }
+    }
+
+    /// Access the agent pool for session continuation.
+    pub fn pool(&self) -> &AgentPool {
+        &self.agent_pool
     }
 }
 
@@ -442,6 +528,7 @@ mod tests {
             parent_seed_id: None,
             cspace_hint: None,
             original_request: String::new(),
+            output_schema: None,
         }
     }
 

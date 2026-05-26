@@ -747,6 +747,7 @@ impl Orchestrator {
             parent_seed_id: Some(parent_seed.id),
             cspace_hint: None,
             original_request: parent_seed.original_request.clone(),
+            output_schema: None,
         };
         match self
             .lifecycle
@@ -1155,6 +1156,7 @@ async fn run_via_lifecycle(
         parent_seed_id: Some(parent_seed.id),
         cspace_hint: None,
         original_request: parent_seed.original_request.clone(),
+            output_schema: None,
     };
     match lifecycle.spawn_and_run(&child_seed, Priority::Normal).await {
         Ok(result) => (result.output, result.success),

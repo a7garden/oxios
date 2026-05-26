@@ -391,6 +391,7 @@ impl OuroborosProtocol for OuroborosEngine {
             parent_seed_id: None,
             cspace_hint: None,
             original_request: interview.original_message.clone(),
+            output_schema: None,
         };
 
         tracing::info!(seed_id = %seed.id, goal = %seed.goal, "Seed generated");
@@ -581,6 +582,7 @@ impl OuroborosProtocol for OuroborosEngine {
             parent_seed_id: evolved.parent_seed_id,
             cspace_hint: evolved.cspace_hint,
             original_request: seed.original_request.clone(),
+            output_schema: None,
         };
 
         tracing::info!(

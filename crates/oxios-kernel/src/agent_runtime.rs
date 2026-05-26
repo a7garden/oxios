@@ -292,7 +292,7 @@ impl AgentRuntime {
         let config = self.config.clone();
         let kernel_handle = Arc::clone(&self.kernel_handle);
 
-        let (final_content, steps_completed, success) = {
+        let (final_content, steps_completed, success, _agent) = {
             run_agent(
                 &config,
                 &self.engine,
@@ -338,7 +338,7 @@ async fn run_agent(
     seed_id: uuid::Uuid,
     agent_id: AgentId,
     cspace: crate::capability::CSpace,
-) -> Result<(String, usize, bool)> {
+) -> Result<(String, usize, bool, Arc<Agent>)> {
     // Extract workspace.
     let workspace = if !config.project_paths.is_empty() {
         config.project_paths[0].clone()
@@ -415,12 +415,12 @@ async fn run_agent(
     }
 
     // Create Agent with CSpace tool registry and provider resolver.
-    let agent = Agent::new_with_resolver(
+    let agent = Arc::new(Agent::new_with_resolver(
         provider,
         agent_config,
         Arc::new(registry),
         resolver,
-    );
+    ));
 
     // Wire middleware pipeline → AgentHooks.
     if !pipeline.is_empty() {
@@ -544,7 +544,7 @@ async fn run_agent(
     if let Err(e) = result {
         tracing::error!(seed_id = %seed_id, error = %e, "Agent failed");
         let s = exec_state.lock();
-        return Ok((format!("Agent failed: {e}"), s.steps_completed, false));
+        return Ok((format!("Agent failed: {e}"), s.steps_completed, false, agent));
     }
 
     let s = exec_state.lock();
@@ -554,7 +554,7 @@ async fn run_agent(
         success = s.success,
         "Agent completed"
     );
-    Ok((s.final_content.clone(), s.steps_completed, s.success))
+    Ok((s.final_content.clone(), s.steps_completed, s.success, agent))
 }
 
 /// Build a system prompt from the Seed's goal, constraints, persona,
@@ -780,6 +780,7 @@ mod tests {
             parent_seed_id: None,
             cspace_hint: None,
             original_request: String::new(),
+            output_schema: None,
         };
 
         let prompt = build_system_prompt(&seed, None, None, None);
@@ -804,6 +805,7 @@ mod tests {
             parent_seed_id: None,
             cspace_hint: None,
             original_request: String::new(),
+            output_schema: None,
         };
 
         let prompt = build_system_prompt(&seed, None, None, None);

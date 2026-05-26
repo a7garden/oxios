@@ -66,6 +66,7 @@ impl OxiosAgentGroup {
                     parent_seed_id: Some(parent_seed.id),
                     cspace_hint: parent_seed.cspace_hint.clone(),
                     original_request: parent_seed.original_request.clone(),
+            output_schema: None,
                 };
                 OxiosGroupAgent {
                     id: child_seed.id,
@@ -162,6 +163,7 @@ mod tests {
             parent_seed_id: None,
             cspace_hint: None,
             original_request: String::new(),
+            output_schema: None,
         };
 
         let descriptions = vec!["subtask 1".into(), "subtask 2".into()];
@@ -186,6 +188,7 @@ mod tests {
             parent_seed_id: None,
             cspace_hint: None,
             original_request: String::new(),
+            output_schema: None,
         };
 
         let group = OxiosAgentGroup::new(&parent, vec![]);

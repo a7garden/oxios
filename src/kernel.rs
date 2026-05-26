@@ -13,7 +13,6 @@ use oxios_kernel::{
     McpBridge, McpServer, MarketplaceApi, MemoryManager,
     Orchestrator, OxiosConfig, OxiosEngine, PersonaManager, ResourceMonitor,
     SkillManager, SpaceManager, Supervisor,
-    TfIdfEmbeddingProvider,
 };
 use oxios_markdown::knowledge::FileChange;
 use oxios_markdown::KnowledgeBase;
@@ -841,6 +840,7 @@ impl KernelBuilder {
                         parent_seed_id: None,
                         cspace_hint: None,
                         original_request: String::new(),
+            output_schema: None,
                     };
                     match lc
                         .spawn_and_run(&seed, oxios_kernel::scheduler::Priority::Normal)

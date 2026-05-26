@@ -55,6 +55,17 @@ pub struct Seed {
     /// sees the user's exact wording, including language-specific nuance.
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub original_request: String,
+
+    /// Optional JSON Schema for structured output validation.
+    ///
+    /// When set, the orchestrator uses `oxi_sdk::StructuredOutput` to
+    /// extract and validate the agent's response against this schema.
+    /// This replaces the simple boolean `success` check with proper
+    /// schema-based evaluation.
+    ///
+    /// Example: `{"type": "object", "required": ["files_changed"]}`
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub output_schema: Option<serde_json::Value>,
 }
 
 impl Seed {
@@ -99,6 +110,7 @@ impl Seed {
             generation: 0,
             parent_seed_id: None,
             cspace_hint: None,
+            output_schema: None,
         }
     }
 
@@ -120,6 +132,7 @@ impl Seed {
             generation: 0,
             parent_seed_id: None,
             cspace_hint: None,
+            output_schema: None,
         }
     }
 
@@ -139,6 +152,7 @@ impl Seed {
             generation: parent.generation + 1,
             parent_seed_id: Some(parent.id),
             cspace_hint: parent.cspace_hint.clone(),
+            output_schema: parent.output_schema.clone(),
         }
     }
 }

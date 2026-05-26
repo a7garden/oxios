@@ -37,7 +37,7 @@ use oxios_gateway::plugin::{ChannelContext, ChannelPlugin};
     name = "oxios",
     version,
     about = "Oxios Agent OS — Agent Operating System",
-    after_help = "Examples:\n  oxios start                  Start the daemon\n  oxios web                    Open web dashboard in browser\n  oxios run \"review this code\"  Execute a single prompt\n  oxios chat                   Start interactive chat\n  oxios status                 Show system status\n  oxios doctor                 Diagnose issues\n  oxios help                   Show all commands"
+    after_help = "Examples:\n  oxios                         First run: interactive setup\n  oxios start                   Start the daemon\n  oxios web                     Open web dashboard in browser\n  oxios run \"review this code\"  Execute a single prompt\n  oxios chat                    Start interactive chat\n  oxios status                  Show system status\n  oxios doctor                  Diagnose issues\n\nGetting started:\n  After cargo install oxios, just run:\n    oxios\n  The setup wizard will guide you through configuration."
 )]
 struct Cli {
     /// Run in foreground (do not daemonize).
@@ -984,6 +984,10 @@ async fn run() -> Result<()> {
 
     let config_path = oxios_kernel::config::expand_home(&cli.config);
     let oxios_home = oxios_home_from_config(&config_path);
+
+    // Detect first run (before ensure_workspace creates the dir).
+    let is_first_run = !oxios_home.join("config.toml").exists();
+
     ensure_workspace(&oxios_home)?;
 
     // ── Load config ──
@@ -1071,8 +1075,8 @@ async fn run() -> Result<()> {
             return cmd_config(&action, &config_path).await;
         }
         Some(Command::Onboard) => {
-            let completed = oxios_kernel::onboarding::run_onboarding(&oxios_home, &mut config)?;
-            if !completed {
+            let result = oxios_kernel::onboarding::run_onboarding(&oxios_home, &mut config, false)?;
+            if result.skipped {
                 println!("  Onboarding skipped or cancelled.");
             }
             return Ok(());
@@ -1135,19 +1139,10 @@ async fn run() -> Result<()> {
     );
 
     if needs_kernel && !oxios_kernel::onboarding::has_credentials(&config) {
-        let completed = oxios_kernel::onboarding::run_onboarding(&oxios_home, &mut config)?;
-        if completed {
+        let result = oxios_kernel::onboarding::run_onboarding(&oxios_home, &mut config, is_first_run)?;
+        if result.configured {
             if config_path.exists() {
                 config = oxios_kernel::config::load_config(&config_path)?;
-            }
-
-            // ── Onboarding → start flow ──
-            let start_now = inquire::Confirm::new("  Start daemon now?")
-                .with_default(true)
-                .prompt()?;
-            if !start_now {
-                println!("  Run {} when ready.", style("`oxios start`").cyan());
-                return Ok(());
             }
             // fall through to kernel assembly → daemon start
         } else {
