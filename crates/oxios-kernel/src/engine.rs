@@ -2,7 +2,7 @@
 //!
 //! All provider/model resolution goes through `oxi_sdk::OxiBuilder`.
 //! The `OxiosEngine` struct wraps the SDK instance and exposes a clean API
-//! with support for routing, credentials, and multi-provider fallback.
+//! with support for routing, credentials, provider pooling, and multi-provider fallback.
 //!
 //! # Architecture
 //!
@@ -10,12 +10,13 @@
 //! OxiosEngine (OxiBuilder → Oxi)
 //!   ├── resolve_model("provider/model") → Model
 //!   ├── create_provider("anthropic")     → Arc<dyn Provider>
+//!   ├── pooled_provider("anthropic")     → Arc<dyn Provider> (rate-limited)
 //!   ├── oxi()                            → &Oxi (for AgentBuilder, etc.)
 //!   └── agent(AgentConfig)               → AgentBuilder
 //! ```
 
 use anyhow::Result;
-use oxi_sdk::{Oxi, OxiBuilder};
+use oxi_sdk::{Oxi, OxiBuilder, ProviderPool, RateLimitPolicy};
 use std::sync::Arc;
 
 use crate::credential::CredentialStore;
@@ -23,12 +24,15 @@ use crate::credential::CredentialStore;
 /// The kernel's engine — wraps oxi-sdk's Oxi instance.
 ///
 /// Created via [`OxiosEngine::new()`] or [`OxiosEngine::builder()`].
-/// Provides access to providers, models, routing, and agent construction.
+/// Provides access to providers, models, routing, pooling, and agent construction.
 pub struct OxiosEngine {
     oxi: Oxi,
     default_model_id: String,
     /// Runtime routing control for dynamic model selection.
     routing_control: Option<oxi_sdk::RoutingControl>,
+    /// Pooled providers with rate limiting.
+    /// Key: provider name (e.g. "anthropic"), Value: ProviderPool wrapper.
+    pools: parking_lot::RwLock<std::collections::HashMap<String, Arc<dyn oxi_sdk::Provider>>>,
 }
 
 impl OxiosEngine {
@@ -43,6 +47,7 @@ impl OxiosEngine {
             oxi,
             default_model_id: model_id,
             routing_control: None,
+            pools: parking_lot::RwLock::new(std::collections::HashMap::new()),
         }
     }
 
@@ -94,6 +99,7 @@ impl OxiosEngine {
             oxi,
             default_model_id: model_id,
             routing_control: None,
+            pools: parking_lot::RwLock::new(std::collections::HashMap::new()),
         }
     }
 
@@ -143,6 +149,42 @@ impl OxiosEngine {
     /// Get the routing control, if routing is enabled.
     pub fn routing_control(&self) -> Option<&oxi_sdk::RoutingControl> {
         self.routing_control.as_ref()
+    }
+
+    /// Get a rate-limited provider from the pool.
+    ///
+    /// On first call for a provider name, creates a `ProviderPool` wrapping
+    /// the base provider with the given RPM/concurrency limits.
+    /// Subsequent calls return the same pooled instance.
+    ///
+    /// If no rate limit is needed, returns the base provider directly.
+    pub fn pooled_provider(
+        &self,
+        name: &str,
+        rpm: u32,
+    ) -> Result<Arc<dyn oxi_sdk::Provider>> {
+        // Check if already pooled.
+        {
+            let pools = self.pools.read();
+            if let Some(pooled) = pools.get(name) {
+                return Ok(pooled.clone());
+            }
+        }
+
+        // Create new pool.
+        let base = self.create_provider(name)?;
+        let policy = RateLimitPolicy::rpm(rpm);
+        let pool = ProviderPool::new(base, policy, name);
+        let pooled: Arc<dyn oxi_sdk::Provider> = Arc::new(pool);
+
+        // Cache it.
+        {
+            let mut pools = self.pools.write();
+            pools.insert(name.to_string(), pooled.clone());
+        }
+
+        tracing::info!(provider = name, rpm, "Created provider pool");
+        Ok(pooled)
     }
 }
 
@@ -198,6 +240,7 @@ impl OxiosEngineBuilder {
             oxi: self.inner.build(),
             default_model_id: self.default_model_id,
             routing_control: None,
+            pools: parking_lot::RwLock::new(std::collections::HashMap::new()),
         }
     }
 
@@ -213,6 +256,7 @@ impl OxiosEngineBuilder {
             oxi: self.inner.build(),
             default_model_id: self.default_model_id,
             routing_control: Some(routing_control.clone()),
+            pools: parking_lot::RwLock::new(std::collections::HashMap::new()),
         };
         (engine, routing_control)
     }

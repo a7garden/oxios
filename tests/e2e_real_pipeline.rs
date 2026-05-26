@@ -80,6 +80,7 @@ mod tests {
             parent_seed_id: None,
             cspace_hint: None,
             original_request: String::new(),
+            output_schema: None,
         };
 
         let execution = oxios_ouroboros::ExecutionResult {

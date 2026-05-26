@@ -79,6 +79,9 @@ pub struct AgentRuntimeConfig {
     pub token_budget: usize,
     /// Enable audit logging for all tool executions.
     pub audit_tool_calls: bool,
+    /// Provider-level RPM for rate-limited provider pool. 0 = no pooling.
+    /// When set, uses `OxiosEngine::pooled_provider()` instead of `create_provider()`.
+    pub provider_rpm: u32,
 }
 
 impl Default for AgentRuntimeConfig {
@@ -96,6 +99,7 @@ impl Default for AgentRuntimeConfig {
             rate_limit_per_minute: 0,
             token_budget: 0,
             audit_tool_calls: false,
+            provider_rpm: 0,
         }
     }
 }
@@ -391,10 +395,14 @@ async fn run_agent(
 
     // ── Build Agent with middleware pipeline ──
     // Create provider and resolver from engine.
+    // Use pooled provider when provider_rpm is set for rate-limited access.
     let resolver: Arc<dyn ProviderResolver> = Arc::new(engine.oxi().clone());
-    let provider = engine.create_provider(
-        &engine.resolve_model(&config.model_id)?.provider,
-    )?;
+    let provider_name = engine.resolve_model(&config.model_id)?.provider;
+    let provider = if config.provider_rpm > 0 {
+        engine.pooled_provider(&provider_name, config.provider_rpm)?
+    } else {
+        engine.create_provider(&provider_name)?
+    };
 
     // Build middleware pipeline.
     let mut pipeline = oxi_sdk::MiddlewarePipeline::new();
@@ -491,39 +499,11 @@ async fn run_agent(
                 }
                 AgentEvent::Compaction { event } => {
                     if let CompactionEvent::Completed { result, .. } = event {
-                        let entry = MemoryEntry {
-                            id: uuid::Uuid::new_v4().to_string(),
-                            memory_type: MemoryType::Conversation,
-                            tier: crate::memory::MemoryTier::Warm,
-                            content: result.summary.clone(),
-                            content_hash: 0,
-                            source: "compaction".to_string(),
-                            session_id: Some(session_id_for_callback.clone()),
-                            space_id: None,
-                            tags: vec![],
-                            importance: 0.5,
-                            pinned: false,
-                            protection: crate::memory::ProtectionLevel::None,
-                            auto_classified: false,
-                            session_appearances: 0,
-                            user_corrected: false,
-                            seen_in_sessions: vec![],
-                            created_at: chrono::Utc::now(),
-                            accessed_at: chrono::Utc::now(),
-                            modified_at: chrono::Utc::now(),
-                            access_count: 0,
-                            decay_score: 1.0,
-                            compaction_level: 0,
-                            compacted_from: vec![],
-                            related_ids: vec![],
-                            contradicts: None,
-                        };
-                        let mm = memory_for_callback.clone();
-                        tokio::spawn(async move {
-                            if let Err(e) = mm.remember(entry).await {
-                                tracing::warn!(error = %e, "Failed to save compaction summary");
-                            }
-                        });
+                        handle_compaction(
+                            result.summary.clone(),
+                            session_id_for_callback.clone(),
+                            memory_for_callback.clone(),
+                        );
                     }
                 }
                 _ => {}
@@ -555,6 +535,50 @@ async fn run_agent(
         "Agent completed"
     );
     Ok((s.final_content.clone(), s.steps_completed, s.success, agent))
+}
+
+/// Handle compaction completion by storing the summary as a Warm memory.
+///
+/// Extracts the compaction summary from the event and spawns a background
+/// task to persist it via MemoryManager. This replaces the inline 30-line
+/// block that was previously in the event callback.
+fn handle_compaction(
+    summary: String,
+    session_id: String,
+    memory_manager: Arc<MemoryManager>,
+) {
+    let entry = MemoryEntry {
+        id: uuid::Uuid::new_v4().to_string(),
+        memory_type: MemoryType::Conversation,
+        tier: crate::memory::MemoryTier::Warm,
+        content: summary,
+        content_hash: 0,
+        source: "compaction".to_string(),
+        session_id: Some(session_id),
+        space_id: None,
+        tags: vec![],
+        importance: 0.5,
+        pinned: false,
+        protection: crate::memory::ProtectionLevel::None,
+        auto_classified: false,
+        session_appearances: 0,
+        user_corrected: false,
+        seen_in_sessions: vec![],
+        created_at: chrono::Utc::now(),
+        accessed_at: chrono::Utc::now(),
+        modified_at: chrono::Utc::now(),
+        access_count: 0,
+        decay_score: 1.0,
+        compaction_level: 0,
+        compacted_from: vec![],
+        related_ids: vec![],
+        contradicts: None,
+    };
+    tokio::spawn(async move {
+        if let Err(e) = memory_manager.remember(entry).await {
+            tracing::warn!(error = %e, "Failed to save compaction summary");
+        }
+    });
 }
 
 /// Build a system prompt from the Seed's goal, constraints, persona,

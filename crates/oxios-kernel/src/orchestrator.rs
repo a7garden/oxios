@@ -573,7 +573,33 @@ impl Orchestrator {
             sessions.remove(&session_id);
         }
 
-        let passed = exec_result.success;
+        // Evaluate result — use StructuredOutput if seed has output_schema.
+        let passed = if let Some(ref schema) = seed.output_schema {
+            match oxi_sdk::StructuredOutput::extract(
+                &exec_result.output,
+                &oxi_sdk::OutputMode::ValidatedJson {
+                    schema: schema.clone(),
+                },
+            ) {
+                Ok(_) => {
+                    tracing::info!(
+                        session_id = %session_id,
+                        "Structured output validation passed"
+                    );
+                    true
+                }
+                Err(e) => {
+                    tracing::warn!(
+                        session_id = %session_id,
+                        error = %e,
+                        "Structured output validation failed"
+                    );
+                    false
+                }
+            }
+        } else {
+            exec_result.success
+        };
 
         tracing::info!(
             session_id = %session_id,
