@@ -227,7 +227,7 @@ pub use kernel_handle::{
 // Only types actually USED by kernel modules are re-exported here.
 pub use oxi_sdk::{
     // Core agent types
-    Agent, AgentBuilder, AgentConfig, AgentEvent, AgentLoop, AgentTool, AgentToolResult,
+    Agent, AgentBuilder, AgentConfig, AgentEvent, AgentTool, AgentToolResult,
     SharedState, ToolContext, ToolError, ToolExecutionMode, ToolRegistry,
     // Engine
     Oxi, OxiBuilder, Model, Provider, ProviderOptions, StreamOptions,
