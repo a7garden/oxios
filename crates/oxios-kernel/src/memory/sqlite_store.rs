@@ -264,6 +264,70 @@ impl SqliteMemoryStore {
         Ok(combined)
     }
 
+    /// Recall with Flash Attention re-ranking (Phase 6).
+    ///
+    /// First does standard recall, then re-ranks results using
+    /// Flash Attention to compute context-aware relevance scores.
+    ///
+    /// The query and memory embeddings form the Q/K/V of the attention
+    /// mechanism. The output attention weights determine final ranking.
+    pub async fn recall_with_rerank(
+        &self,
+        query: &str,
+        max_recall: usize,
+    ) -> Result<Vec<MemoryEntry>> {
+        let candidates = self.recall(query, max_recall * 3).await?;
+        if candidates.len() <= max_recall {
+            return Ok(candidates);
+        }
+
+        // Get query embedding
+        let query_vec = match self.get_query_vector(query).await? {
+            Some(v) => v,
+            None => return Ok(candidates.into_iter().take(max_recall).collect()),
+        };
+
+        // Get candidate embeddings
+        let mut candidate_vecs: Vec<(MemoryEntry, Vec<f32>)> = Vec::new();
+        for entry in &candidates {
+            if let Ok(Some(vec)) = self.get_query_vector(&entry.content).await {
+                candidate_vecs.push((entry.clone(), vec));
+            }
+        }
+
+        if candidate_vecs.is_empty() {
+            return Ok(candidates.into_iter().take(max_recall).collect());
+        }
+
+        // Flash Attention re-ranking
+        let fa = super::flash_attention::FlashAttention::with_dimensions(query_vec.len());
+
+        let queries = vec![query_vec.clone()];
+        let keys: Vec<Vec<f32>> = candidate_vecs.iter().map(|(_, v)| v.clone()).collect();
+        let values = keys.clone(); // K=V for self-supervised re-ranking
+
+        let attention_output = fa.attention(&queries, &keys, &values);
+        let output = match attention_output.first() {
+            Some(o) => o,
+            None => return Ok(candidates.into_iter().take(max_recall).collect()),
+        };
+
+        // Score candidates by similarity to attention output
+        let mut scored: Vec<(MemoryEntry, f32)> = candidate_vecs
+            .into_iter()
+            .zip(keys.iter())
+            .map(|((entry, _), key_vec)| {
+                let similarity = cosine_similarity(output, key_vec);
+                (entry, similarity)
+            })
+            .collect();
+
+        scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        scored.truncate(max_recall);
+
+        Ok(scored.into_iter().map(|(e, _)| e).collect())
+    }
+
     /// Count total entries in the database.
     pub fn total_entries(&self) -> usize {
         let conn = self.db.conn();
@@ -603,7 +667,7 @@ impl SqliteMemoryStore {
     // ── Private helpers ─────────────────────────────────────────────
 
     /// Get or compute a query embedding, using the cache.
-    async fn get_query_vector(&self, query: &str) -> Result<Option<Vec<f32>>> {
+    pub async fn get_query_vector(&self, query: &str) -> Result<Option<Vec<f32>>> {
         // Check cache first
         if let Ok(Some(cached)) = cache::get_cached(&self.db, query) {
             return Ok(Some(cached));
@@ -628,6 +692,18 @@ impl SqliteMemoryStore {
 // ---------------------------------------------------------------------------
 
 use crate::embedding::EmbeddingProvider;
+
+/// Cosine similarity between two vectors.
+fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
+    let dot: f32 = a.iter().zip(b).map(|(x, y)| x * y).sum();
+    let norm_a: f32 = a.iter().map(|x| x * x).sum::<f32>().sqrt();
+    let norm_b: f32 = b.iter().map(|x| x * x).sum::<f32>().sqrt();
+    if norm_a > 0.0 && norm_b > 0.0 {
+        dot / (norm_a * norm_b)
+    } else {
+        0.0
+    }
+}
 
 fn memory_insert_vector(db: &MemoryDatabase, rowid: i64, vector: &[f32]) -> anyhow::Result<()> {
     super::search::vector::insert_vector(db, rowid, vector)

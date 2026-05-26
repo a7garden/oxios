@@ -300,6 +300,69 @@ impl AutoMemoryBridge {
         &self.auto_memory_dir
     }
 
+    /// Sync learned patterns from SQLite to external MEMORY.md (Phase 7).
+    ///
+    /// Reads patterns from the SQLite `patterns` table and exports
+    /// them as structured markdown to the auto-memory directory.
+    #[cfg(feature = "sqlite-memory")]
+    pub async fn sync_sqlite_to_auto(
+        &self,
+        store: &crate::memory::sqlite_store::SqliteMemoryStore,
+    ) -> Result<ExportResult> {
+        let rows = store.load_patterns()?;
+        if rows.is_empty() {
+            return Ok(ExportResult::default());
+        }
+
+        let patterns: Vec<GuidancePattern> = rows
+            .iter()
+            .map(|r| GuidancePattern {
+                id: r.id.clone(),
+                category: r.domain
+                    .as_deref()
+                    .map(InsightCategory::from_str_loose)
+                    .unwrap_or(InsightCategory::General),
+                description: format!("[{}] quality={:.2} uses={}", r.strategy, r.quality, r.use_count),
+                confidence: r.quality,
+                usage_count: r.use_count,
+            })
+            .collect();
+
+        self.export_to_auto(&patterns).await
+    }
+
+    /// Import external MEMORY.md insights into SQLite patterns (Phase 7).
+    ///
+    /// Reads from auto-memory directory and stores as patterns.
+    #[cfg(feature = "sqlite-memory")]
+    pub async fn sync_auto_to_sqlite(
+        &self,
+        store: &crate::memory::sqlite_store::SqliteMemoryStore,
+    ) -> Result<ImportResult> {
+        let import_result = self.import_from_auto().await?;
+
+        // Also store imported insights as patterns in SQLite
+        let memory_files = self.find_memory_files()?;
+        for file_path in &memory_files {
+            if let Ok(content) = tokio::fs::read_to_string(file_path).await {
+                let insights = self.parse_insights(&content);
+                for insight in insights {
+                    let id = uuid::Uuid::new_v4().to_string();
+                    let data = serde_json::to_string(&insight)?;
+                    let _ = store.save_pattern(
+                        &id,
+                        "imported",
+                        Some(insight.category.to_tag()),
+                        insight.confidence,
+                        &data,
+                    );
+                }
+            }
+        }
+
+        Ok(import_result)
+    }
+
     /// Export all knowledge memories from Oxios to external format.
     ///
     /// Reads from MemoryManager (primary) or falls back to KnowledgeBase
@@ -375,6 +438,44 @@ impl AutoMemoryBridge {
 
 impl AutoMemoryBridge {
     /// Find all MEMORY.md files in the auto_memory_dir.
+    /// Parse insights from a markdown content string.
+    fn parse_insights(&self, content: &str) -> Vec<MemoryInsight> {
+        let mut insights = Vec::new();
+
+        for line in content.lines() {
+            let line = line.trim();
+            if line.is_empty() || line.starts_with('#') {
+                continue;
+            }
+            // Each bullet point is an insight
+            if line.starts_with("- ") || line.starts_with("* ") {
+                let text = line.trim_start_matches("- ").trim_start_matches("* ");
+                let category = if text.contains("debug") || text.contains("fix") {
+                    InsightCategory::Debugging
+                } else if text.contains("arch") || text.contains("design") {
+                    InsightCategory::Architecture
+                } else if text.contains("perf") || text.contains("speed") {
+                    InsightCategory::Performance
+                } else if text.contains("security") || text.contains("vuln") {
+                    InsightCategory::Security
+                } else if text.contains("pattern") || text.contains("convention") {
+                    InsightCategory::ProjectPatterns
+                } else {
+                    InsightCategory::General
+                };
+                insights.push(MemoryInsight {
+                    category,
+                    summary: text.to_string(),
+                    detail: None,
+                    source: "auto-bridge".to_string(),
+                    confidence: 0.7,
+                });
+            }
+        }
+
+        insights
+    }
+
     fn find_memory_files(&self) -> Result<Vec<PathBuf>> {
         let mut files = Vec::new();
 

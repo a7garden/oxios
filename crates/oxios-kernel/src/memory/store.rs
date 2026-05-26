@@ -377,6 +377,11 @@ impl MemoryManager {
 
     /// Blend recalled memories into the system prompt.
     pub fn blend_into_prompt(&self, memories: &[MemoryEntry], system_prompt: &str) -> String {
+        #[cfg(feature = "sqlite-memory")]
+        if let Some(ref sqlite) = self.sqlite_store {
+            return sqlite.blend_into_prompt(memories, system_prompt);
+        }
+
         if memories.is_empty() {
             return system_prompt.to_string();
         }
@@ -388,6 +393,19 @@ impl MemoryManager {
             .join("\n");
 
         format!("{system_prompt}\n\n## Relevant Memory\n\n{memory_block}")
+    }
+
+    /// Recall with Flash Attention re-ranking (Phase 6).
+    ///
+    /// First does standard recall, then re-ranks using attention-based
+    /// scoring for context-aware ordering.
+    #[cfg(feature = "sqlite-memory")]
+    pub async fn recall_with_rerank(&self, query: &str) -> Result<Vec<MemoryEntry>> {
+        if let Some(ref sqlite) = self.sqlite_store {
+            return sqlite.recall_with_rerank(query, self.max_recall).await;
+        }
+        // Fallback to standard recall
+        self.recall(query).await
     }
 
     /// Create a session summary memory entry from a completed session.

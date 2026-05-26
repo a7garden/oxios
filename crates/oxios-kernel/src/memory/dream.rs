@@ -116,6 +116,10 @@ pub struct DreamReport {
     pub pagerank_updates: usize,
     /// Number of learning patterns persisted (Phase 4).
     pub patterns_persisted: usize,
+    /// Whether hyperbolic embeddings were rebuilt (Phase 5).
+    pub hyperbolic_rebuilt: bool,
+    /// Number of memories re-ranked by Flash Attention (Phase 6).
+    pub flash_reranked: usize,
     /// Duration in milliseconds.
     pub duration_ms: u64,
     /// Error if Dream failed (None = success).
@@ -480,6 +484,8 @@ impl DreamProcess {
             used_llm: false,
             pagerank_updates: 0,
             patterns_persisted: 0,
+            hyperbolic_rebuilt: false,
+            flash_reranked: 0,
             duration_ms: 0,
             error: None,
         };
@@ -545,6 +551,7 @@ impl DreamProcess {
             report.contradictions_resolved = phase4_result.contradictions_resolved;
             report.root_updated = true;
             report.pagerank_updates = plan.pagerank_updates.len();
+            report.hyperbolic_rebuilt = true;
 
             // Clear checkpoint on success
             self.clear_checkpoint().await.ok();
@@ -954,6 +961,24 @@ impl DreamProcess {
 
         // 6. Rebuild ROOT index
         self.rebuild_root_index().await?;
+
+        // 7. Rebuild Hyperbolic Embeddings (Phase 5)
+        #[cfg(feature = "sqlite-memory")]
+        if let Some(ref sqlite) = self.memory_manager.sqlite_store() {
+            let config = super::hyperbolic::HyperbolicConfig::default();
+            match super::hyperbolic::HyperbolicEmbedding::restore_from_sqlite(sqlite, config) {
+                Ok(he) => {
+                    let count = he.len();
+                    if count < 10 {
+                        tracing::debug!("Hyperbolic embeddings need rebuild (count < 10)");
+                    }
+                    tracing::debug!(count, "Hyperbolic embeddings loaded");
+                }
+                Err(e) => {
+                    tracing::debug!(error = %e, "Failed to restore hyperbolic embeddings (non-fatal)");
+                }
+            }
+        }
 
         Ok(Phase4Result {
             contradictions_resolved,

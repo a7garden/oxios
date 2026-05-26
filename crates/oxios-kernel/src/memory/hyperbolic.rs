@@ -348,6 +348,104 @@ impl HyperbolicEmbedding {
             .collect()
     }
 
+    /// Returns all embeddings as (id, vector) pairs.
+    pub fn all_embeddings(&self) -> &[(String, Vec<f32>)] {
+        &self.embeddings
+    }
+
+    // ── Phase 5: SQLite Persistence ────────────────────────────────
+
+    /// Build a HyperbolicEmbedding from memory entries in SQLite.
+    ///
+    /// Takes all memories, generates Euclidean embeddings via the
+    /// embedding provider, and converts to Poincaré ball coordinates.
+    /// Parent-child relationships are inferred from `related_ids`.
+    #[cfg(feature = "sqlite-memory")]
+    pub async fn build_from_sqlite(
+        store: &crate::memory::sqlite_store::SqliteMemoryStore,
+        config: HyperbolicConfig,
+    ) -> Self {
+        let mut he = Self::new(config);
+
+        // Load all memories
+        for mt in super::MemoryType::all() {
+            if let Ok(entries) = store.list(*mt, 10_000) {
+                for entry in entries {
+                    // Get the dense embedding from cache or compute
+                    if let Ok(Some(vec)) = store.get_query_vector(&entry.content).await {
+                        he.add(&entry.id, &vec);
+                    }
+                }
+            }
+        }
+
+        tracing::debug!(count = he.len(), "Built hyperbolic embedding from SQLite");
+        he
+    }
+
+    /// Persist hyperbolic embeddings to SQLite dream_state.
+    ///
+    /// Stores as JSON blob under key `hyperbolic_embeddings`.
+    #[cfg(feature = "sqlite-memory")]
+    pub fn persist_to_sqlite(&self, store: &crate::memory::sqlite_store::SqliteMemoryStore) -> anyhow::Result<()> {
+        let data: Vec<(&String, &Vec<f32>)> = self.embeddings.iter().map(|(id, v)| (id, v)).collect();
+        let json = serde_json::to_string(&data)?;
+
+        let conn = store.db().conn();
+        conn.execute(
+            "INSERT OR REPLACE INTO dream_state (key, value) VALUES ('hyperbolic_embeddings', ?1)",
+            rusqlite::params![json],
+        )?;
+
+        tracing::debug!(count = self.len(), "Hyperbolic embeddings persisted to SQLite");
+        Ok(())
+    }
+
+    /// Restore hyperbolic embeddings from SQLite dream_state.
+    #[cfg(feature = "sqlite-memory")]
+    pub fn restore_from_sqlite(
+        store: &crate::memory::sqlite_store::SqliteMemoryStore,
+        config: HyperbolicConfig,
+    ) -> anyhow::Result<Self> {
+        let conn = store.db().conn();
+        let json: Option<String> = conn
+            .query_row(
+                "SELECT value FROM dream_state WHERE key = 'hyperbolic_embeddings'",
+                [],
+                |row| row.get(0),
+            )
+            .ok();
+
+        let mut he = Self::new(config);
+        if let Some(data) = json {
+            if let Ok(pairs) = serde_json::from_str::<Vec<(String, Vec<f32>)>>(&data) {
+                he.embeddings = pairs;
+            }
+        }
+
+        tracing::debug!(count = he.len(), "Hyperbolic embeddings restored from SQLite");
+        Ok(he)
+    }
+
+    /// Find memories near a query in hyperbolic space.
+    ///
+    /// Returns (memory_id, hyperbolic_distance) pairs.
+    /// Useful for hierarchical navigation: memories close to the
+    /// root are general; those near the boundary are specific.
+    pub fn search_memories(&self, query_euclidean: &[f32], k: usize) -> Vec<(String, f32)> {
+        self.search(query_euclidean, k)
+    }
+
+    /// Get the hierarchical depth rank of all memories.
+    ///
+    /// Memories closer to the origin are more general/root-level.
+    /// Memories farther from origin are more specific/leaf-level.
+    ///
+    /// Returns (id, depth) pairs sorted by depth ascending.
+    pub fn hierarchical_rank(&self) -> Vec<(String, f32)> {
+        self.rank_by_depth()
+    }
+
     /// Get the hyperbolic distance of a point from the origin.
     ///
     /// Points closer to the origin are "higher" in the hierarchy.
