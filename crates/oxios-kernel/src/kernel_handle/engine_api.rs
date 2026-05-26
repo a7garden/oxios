@@ -284,8 +284,10 @@ impl EngineApi {
 
     /// Attempt a lightweight validation call.
     fn try_validate(&self, provider: &str, api_key: &str) -> anyhow::Result<()> {
-        // Build an OxiBuilder with builtins and try to create a provider
-        let builder = oxi_sdk::OxiBuilder::new().with_builtins();
+        // Build an OxiBuilder with builtins and the provided key
+        let builder = oxi_sdk::OxiBuilder::new()
+            .with_builtins()
+            .api_key(provider, api_key);
         let oxi = builder.build();
 
         // Try to resolve any model from this provider
@@ -295,25 +297,25 @@ impl EngineApi {
         }
 
         let model_id = format!("{}/{}", provider, models[0].id);
-        let model = oxi.resolve_model(&model_id)?;
+        let _model = oxi.resolve_model(&model_id)?;
 
-        // Create a provider — this doesn't actually validate the key.
-        // For a real validation we'd need to make an API call, which
-        // requires setting the key in the provider. Since oxi_sdk providers
-        // resolve keys from env/auth store, we store temporarily.
+        // Create a provider with the injected key
         let _provider = oxi.create_provider(provider)?;
 
-        // If we got this far, the provider is at least known.
-        // A real key validation would need a lightweight API call.
-        // For now, we do a basic sanity check.
+        // If we got this far, the provider was created with the key.
+        // Note: Actual API call validation would require a lightweight
+        // completion request. For now, this validates key format + provider existence.
         if api_key.is_empty() {
             anyhow::bail!("API key is empty");
+        }
+        if api_key.len() < 8 {
+            anyhow::bail!("API key appears too short");
         }
 
         tracing::debug!(
             provider = %provider,
             model = %model_id,
-            "Key validation: provider and model resolved successfully"
+            "Key validation: provider resolved with injected key"
         );
         Ok(())
     }

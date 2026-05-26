@@ -490,6 +490,7 @@ impl KernelBuilder {
     ///
     /// - `"tfidf"` → TfIdfEmbeddingProvider (default, zero-dependency)
     /// - `"gguf"` → GGUF-based embedding (requires `embedding-gguf` feature)
+    #[cfg(feature = "sqlite-memory")]
     fn create_embedding_provider(config: &OxiosConfig) -> Arc<dyn oxios_kernel::EmbeddingProvider> {
         let emb_config = &config.memory.embedding;
 
@@ -562,7 +563,10 @@ impl KernelBuilder {
             let (engine, _routing_control) = engine_builder.build_with_routing();
             Arc::new(engine)
         } else {
-            Arc::new(OxiosEngine::new(model_id))
+            Arc::new(OxiosEngine::from_config(
+                model_id,
+                config.engine.api_key.as_deref(),
+            ))
         };
         let model = engine
             .resolve_model(model_id)

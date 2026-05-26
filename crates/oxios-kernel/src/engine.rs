@@ -18,6 +18,8 @@ use anyhow::Result;
 use oxi_sdk::{Oxi, OxiBuilder};
 use std::sync::Arc;
 
+use crate::credential::CredentialStore;
+
 /// The kernel's engine — wraps oxi-sdk's Oxi instance.
 ///
 /// Created via [`OxiosEngine::new()`] or [`OxiosEngine::builder()`].
@@ -37,6 +39,57 @@ impl OxiosEngine {
     pub fn new(default_model_id: impl Into<String>) -> Self {
         let model_id = default_model_id.into();
         let oxi = OxiBuilder::new().with_builtins().build();
+        Self {
+            oxi,
+            default_model_id: model_id,
+            routing_control: None,
+        }
+    }
+
+    /// Create a new engine with credentials from config.
+    ///
+    /// Resolves API keys from CredentialStore for each known provider
+    /// and injects them into the OxiBuilder. This enables the engine
+    /// to create properly authenticated providers.
+    ///
+    /// Resolution order (per provider): env var → config.toml → ~/.oxi/auth.json
+    pub fn from_config(
+        default_model_id: impl Into<String>,
+        config_api_key: Option<&str>,
+    ) -> Self {
+        let model_id = default_model_id.into();
+
+        // Resolve the primary provider's credential
+        let primary_provider = model_id
+            .split_once('/')
+            .map(|(p, _)| p)
+            .unwrap_or("anthropic");
+
+        let mut builder = OxiBuilder::new().with_builtins();
+
+        // Inject credentials for all major providers via CredentialStore.
+        // This ensures `create_provider()` can always build an authenticated provider.
+        let providers = ["anthropic", "openai", "google", "deepseek", "xai"];
+        for provider in providers {
+            // Use the config-level key only for the primary provider;
+            // other providers resolve from env/auth.json.
+            let config_key = if provider == primary_provider {
+                config_api_key
+            } else {
+                None
+            };
+
+            if let Some((key, source)) = CredentialStore::resolve(provider, config_key) {
+                tracing::debug!(
+                    provider,
+                    source = ?source,
+                    "Injected credential into engine"
+                );
+                builder = builder.api_key(provider, key);
+            }
+        }
+
+        let oxi = builder.build();
         Self {
             oxi,
             default_model_id: model_id,

@@ -1,20 +1,24 @@
 //! Interactive first-run setup wizard.
 //!
-//! Uses oxi-sdk's provider/model catalog and env key detection.
-//! No hardcoded provider lists — everything comes from oxi-ai.
+//! Inspired by @clack/prompts (OpenClaw, Vercel CLI, SvelteKit):
+//!   - intro() / outro() bookends
+//!   - spinner for async work
+//!   - note() for information boxes
+//!   - one question per screen
 //!
-//! UI powered by `inquire` — arrow-key navigation for all selections.
+//! Flow:
+//!   Welcome → Provider (auto-detect) → API Key (auto-detect) → Model →
+//!   Embedding download → Summary → Done
 
 use crate::config::OxiosConfig;
 use crate::credential::CredentialStore;
 use console::style;
+use indicatif::{ProgressBar, ProgressStyle};
 use inquire::{Confirm, CustomType, Select, Text};
-use std::io::{self, IsTerminal, Write};
+use std::io::{self, IsTerminal};
 use std::path::Path;
 
 // ── Constants ───────────────────────────────────────────────────────────────
-
-const TOTAL_STEPS: usize = 5;
 
 const WORKSPACE_SUBDIRS: &[&str] = &[
     "workspace",
@@ -25,32 +29,80 @@ const WORKSPACE_SUBDIRS: &[&str] = &[
     "workspace/skills",
 ];
 
-/// Providers that don't need an API key (e.g., local models).
 const NO_KEY_PROVIDERS: &[&str] = &[];
 
-/// Providers to exclude from the interactive list (cloud gateways, regional variants).
-/// Users who need these can set them up via config.toml directly.
 const HIDDEN_PROVIDERS: &[&str] = &[
-    "amazon-bedrock",         // requires AWS setup, not a simple API key
-    "azure-openai-responses", // requires Azure deployment
+    "amazon-bedrock",
+    "azure-openai-responses",
     "cloudflare-ai-gateway",
     "cloudflare-workers-ai",
-    "google-vertex", // requires ADC, not a simple API key
+    "google-vertex",
     "minimax-cn",
     "moonshotai-cn",
-    "openai-codex", // subset of openai
+    "openai-codex",
     "opencode-go",
     "vercel-ai-gateway",
     "xiaomi",
 ];
 
-// ── Helpers for formatted display items ─────────────────────────────────────
+// ── Theme (clack-inspired) ──────────────────────────────────────────────────
 
-/// A provider entry in the selection list.
+mod theme {
+    use console::style;
+    use std::fmt::Display;
+
+    pub fn accent<T: Display>(s: T) -> console::StyledObject<T> {
+        style(s).cyan()
+    }
+
+    pub fn success<T: Display>(s: T) -> console::StyledObject<T> {
+        style(s).green()
+    }
+
+    pub fn warn<T: Display>(s: T) -> console::StyledObject<T> {
+        style(s).yellow()
+    }
+
+    pub fn dim<T: Display>(s: T) -> console::StyledObject<T> {
+        style(s).dim()
+    }
+
+    pub fn bold<T: Display>(s: T) -> console::StyledObject<T> {
+        style(s).bold()
+    }
+
+    pub fn muted<T: Display>(s: T) -> console::StyledObject<T> {
+        style(s).dim()
+    }
+
+    /// Step heading: "  ◇ Provider"
+    pub fn step(name: &str) -> String {
+        format!("  {} {}", style("◇").cyan(), style(name).bold())
+    }
+
+    /// Spinner frame character.
+    pub fn spinner_frame() -> &'static str {
+        "◯"
+    }
+
+    /// Success mark: ✓
+    pub fn ok() -> &'static str {
+        "✓"
+    }
+
+    /// Fail mark: ✗
+    pub fn fail() -> &'static str {
+        "✗"
+    }
+}
+
+// ── Display helpers ─────────────────────────────────────────────────────────
+
 #[derive(Clone)]
 struct ProviderEntry {
     id: String,
     display: String,
+    has_env_key: bool,
 }
 
 impl std::fmt::Display for ProviderEntry {
@@ -59,12 +111,9 @@ impl std::fmt::Display for ProviderEntry {
     }
 }
 
-/// A model entry in the selection list.
 #[derive(Clone)]
 struct ModelEntry {
-    /// Full model ID: "provider/model-id"
     full_id: String,
-    /// Display label
     display: String,
 }
 
@@ -74,15 +123,14 @@ impl std::fmt::Display for ModelEntry {
     }
 }
 
-/// Manual model entry sentinel.
-const MANUAL_MODEL_DISPLAY: &str = "✎ Enter model ID manually...";
+const MANUAL_MODEL_DISPLAY: &str = "✎  Enter model ID manually";
 
 // ── Public API ──────────────────────────────────────────────────────────────
 
 /// Check if the system is fully configured (model + credentials).
-/// Returns `true` when onboarding should be skipped.
 pub fn has_credentials(config: &OxiosConfig) -> bool {
-    let Some(provider) = CredentialStore::provider_from_model(&config.engine.default_model) else {
+    let Some(provider) = CredentialStore::provider_from_model(&config.engine.default_model)
+    else {
         return false;
     };
     CredentialStore::has_credential(provider, config.api_key().as_deref())
@@ -93,76 +141,94 @@ pub fn is_interactive() -> bool {
     io::stdin().is_terminal()
 }
 
+/// Result of onboarding.
+pub struct OnboardingResult {
+    /// Config was written successfully.
+    pub configured: bool,
+    /// User chose to skip (cancelled / non-interactive).
+    pub skipped: bool,
+}
+
 /// Run the first-time setup wizard.
-///
-/// Returns `Ok(true)` — onboarding completed, config written.
-/// Returns `Ok(false)` — skipped (already configured, non-interactive, or cancelled).
-pub fn run_onboarding(oxios_home: &Path, config: &mut OxiosConfig) -> anyhow::Result<bool> {
-    // ── Re-run detection ──
+pub fn run_onboarding(
+    oxios_home: &Path,
+    config: &mut OxiosConfig,
+    is_first_run: bool,
+) -> anyhow::Result<OnboardingResult> {
+    // ── Already configured? ──
     if !config.engine.default_model.is_empty() {
         if let Some(provider_id) =
             CredentialStore::provider_from_model(&config.engine.default_model)
         {
             if CredentialStore::has_credential(provider_id, config.api_key().as_deref()) {
                 println!();
-                println!("  Already configured as '{}'.", config.engine.default_model);
+                println!(
+                    "  {} {}",
+                    style("✓").green(),
+                    style(&config.engine.default_model).cyan(),
+                );
 
                 let ans = Select::new(
-                    "  What would you like to do?",
-                    vec![
-                        "Keep current configuration",
-                        "Modify (re-run wizard)",
-                        "Reset (clear everything)",
-                    ],
+                    "  What next?",
+                    vec!["Keep current configuration", "Reconfigure"],
                 )
                 .with_starting_cursor(0)
                 .prompt()?;
 
-                match ans {
-                    "Keep current configuration" => {
-                        return Ok(false);
-                    }
-                    "Reset (clear everything)" => { /* fall through to wizard */ }
-                    _ => { /* modify — fall through */ }
+                if ans == "Keep current configuration" {
+                    return Ok(OnboardingResult {
+                        configured: true,
+                        skipped: false,
+                    });
                 }
             }
         }
     }
 
-    // ── Need a terminal for interactive input ──
+    // ── Non-interactive bail ──
     if !is_interactive() {
         println!();
-        println!("  Oxios requires initial setup but is not running in a terminal.");
-        println!("  Please run `oxios` in an interactive shell.");
+        println!(
+            "  {} Setup requires a terminal. Run {} interactively.",
+            style("!").yellow(),
+            style("oxios").cyan(),
+        );
         println!();
-        return Ok(false);
+        return Ok(OnboardingResult {
+            configured: false,
+            skipped: true,
+        });
     }
 
-    print_banner();
+    // ── intro ──
+    print_intro(is_first_run);
 
-    // ── Step 0 [auto]: Check for env vars and existing auth tokens ──
+    // ── Auto-detect ──
     let env_providers = oxi_sdk::get_all_env_keys();
     if !env_providers.is_empty() {
-        // Find the first provider that also has models in the registry
         let detected = env_providers
             .keys()
             .find(|p| !oxi_sdk::get_provider_models(p).is_empty());
 
         if let Some(provider) = detected {
-            println!();
             let keys = oxi_sdk::find_env_keys(provider);
             let var_name = keys.and_then(|k| k.first().copied()).unwrap_or(provider);
-            println!("  Detected {} in environment for '{}'.", var_name, provider);
+            println!(
+                "  {} {} {}",
+                theme::accent("◇"),
+                theme::dim(format!("Found {} →", var_name)),
+                theme::accent(provider),
+            );
             let use_it = Confirm::new("  Use this provider?")
                 .with_default(true)
                 .prompt()?;
             if use_it {
-                return finish_with_provider(oxios_home, config, provider);
+                return run_provider_flow(oxios_home, config, provider);
             }
         }
     }
 
-    // ── Step 1: Provider selection from oxi model DB ──
+    // ── Manual provider selection ──
     let all_providers = oxi_sdk::get_providers();
     let visible: Vec<&str> = all_providers
         .iter()
@@ -171,135 +237,141 @@ pub fn run_onboarding(oxios_home: &Path, config: &mut OxiosConfig) -> anyhow::Re
         .collect();
 
     let provider = prompt_provider(&visible)?;
-    finish_with_provider(oxios_home, config, provider)
+    run_provider_flow(oxios_home, config, provider)
 }
 
-// ── Core flow for a chosen provider ─────────────────────────────────────────
+// ── Provider flow ───────────────────────────────────────────────────────────
 
-/// Complete onboarding for a given provider: key → model → workspace → write.
-fn finish_with_provider(
+fn run_provider_flow(
     oxios_home: &Path,
     config: &mut OxiosConfig,
     provider: &str,
-) -> anyhow::Result<bool> {
-    let mut api_key: Option<String> = None;
-    let mut skip_key = false;
+) -> anyhow::Result<OnboardingResult> {
+    // ── API Key ──
+    let (api_key, key_source) = resolve_api_key(provider)?;
 
-    // ── Check existing auth.json ──
+    // ── Model ──
+    let model = prompt_model(provider)?;
+
+    // ── Save config (needed for embedding download path) ──
+    with_spinner("Saving configuration...", "Configuration saved", || {
+        persist_config(oxios_home, config, provider, api_key.as_deref().unwrap_or(""), &model)
+    })?;
+
+    // ── Embedding model ──
+    let embed_status = setup_embedding(config)?;
+
+    // ── Summary + outro ──
+    print_summary(oxios_home, provider, &model, key_source, &embed_status);
+
+    Ok(OnboardingResult {
+        configured: true,
+        skipped: false,
+    })
+}
+
+// ── Step: API Key ────────────────────────────────────────────────────────────
+
+fn resolve_api_key(provider: &str) -> anyhow::Result<(Option<String>, &'static str)> {
+    if NO_KEY_PROVIDERS.contains(&provider) {
+        return Ok((None, "none"));
+    }
+
+    // Try auth.json
     if let Ok(Some(token)) = oxi_sdk::load_token(provider) {
         if !token.access_token.is_empty() {
             println!();
             println!(
-                "  Found existing credentials for '{}' in ~/.oxi/auth.json.",
-                provider
+                "  {} Credentials found in {}",
+                theme::step("API Key"),
+                theme::dim("~/.oxi/auth.json"),
             );
-            let use_it = Confirm::new("  Use them?").with_default(true).prompt()?;
+            let use_it = Confirm::new("  Use them?")
+                .with_default(true)
+                .prompt()?;
             if use_it {
-                skip_key = true;
+                return Ok((None, "auth.json"));
             }
         }
     }
 
-    // ── Step 2: API key ──
-    if !skip_key && !NO_KEY_PROVIDERS.contains(&provider) {
-        // Check if env var already has the key
-        if let Some(env_key) = oxi_sdk::get_env_api_key(provider) {
-            println!();
-            println!("  Using {} key from environment.", provider);
-            api_key = Some(env_key);
-            skip_key = true;
-        }
-
-        if !skip_key {
-            api_key = Some(prompt_api_key(provider)?);
-        }
-    }
-
-    // ── Step 3: Model selection from oxi model DB ──
-    let model = prompt_model(provider)?;
-
-    // ── Step 4: Workspace ──
-    let workspace = prompt_workspace()?;
-
-    // ── Summary ──
-    let key_preview = if skip_key {
-        let key = api_key.as_deref().unwrap_or("(from auth store)");
-        mask_key(key)
-    } else {
-        mask_key(api_key.as_deref().unwrap_or("(none)"))
-    };
-
-    if !confirm_summary(provider, &model, &key_preview, &workspace)? {
+    // Try env var
+    if let Some(env_key) = oxi_sdk::get_env_api_key(provider) {
         println!();
-        println!("  Setup cancelled.");
-        return Ok(false);
+        println!(
+            "  {} {}",
+            theme::step("API Key"),
+            theme::dim("Using key from environment"),
+        );
+        return Ok((Some(env_key), "env"));
     }
 
-    // ── Step 5: Write ──
-    persist_config(
-        oxios_home,
-        config,
-        provider,
-        api_key.as_deref().unwrap_or(""),
-        &model,
-        &workspace,
-    )?;
-    print_success(oxios_home, &model);
-    Ok(true)
+    // Manual entry
+    println!();
+    println!("  {}", theme::step("API Key"));
+    println!(
+        "  {}",
+        theme::dim("Stored locally, never shared."),
+    );
+
+    let key = CustomType::<String>::new("  →")
+        .with_placeholder("sk-...")
+        .with_error_message("API key is required")
+        .prompt()?;
+    Ok((Some(key), "manual"))
 }
 
-// ── Prompt steps ─────────────────────────────────────────────────────────────
+// ── Step: Provider ───────────────────────────────────────────────────────────
 
-/// Step 1: Show providers from oxi model DB — arrow-key selection.
 fn prompt_provider<'a>(providers: &[&'a str]) -> anyhow::Result<&'a str> {
-    let entries: Vec<ProviderEntry> = providers
+    let mut entries: Vec<ProviderEntry> = providers
         .iter()
         .map(|&p| {
-            let mut suffix = String::new();
-            if oxi_sdk::has_env_key(p) {
-                suffix = " 🔑".to_string();
-            }
             let model_count = oxi_sdk::get_provider_models(p).len();
+            let has_env = oxi_sdk::has_env_key(p);
+            let mut badges = vec![format!("{} models", model_count)];
+            if has_env {
+                badges.push("🔑 detected".into());
+            }
             ProviderEntry {
                 id: p.to_string(),
-                display: format!("{} [{} models]{}", p, model_count, suffix),
+                display: format!(
+                    "  {}  {}",
+                    style(p).bold(),
+                    theme::muted(badges.join(" · ")),
+                ),
+                has_env_key: has_env,
             }
         })
         .collect();
 
-    println!();
-    println!("  [1/{}] Select an LLM provider:", TOTAL_STEPS);
+    // Sort: providers with detected env keys first
+    entries.sort_by(|a, b| b.has_env_key.cmp(&a.has_env_key));
 
-    let selected = Select::new("  Provider:", entries)
+    println!();
+    println!("  {}", theme::step("Provider"));
+    println!(
+        "  {}",
+        theme::dim("Which cloud hosts your LLM?"),
+    );
+
+    let selected = Select::new("  →", entries)
         .with_starting_cursor(0)
         .prompt()?;
 
-    // Find the original &str by matching the id
     Ok(providers.iter().find(|&&p| p == selected.id).unwrap())
 }
 
-/// Step 2: Prompt for API key (masked input).
-fn prompt_api_key(provider: &str) -> anyhow::Result<String> {
-    println!();
-    println!("  [2/{}] Enter your {} API key:", TOTAL_STEPS, provider);
+// ── Step: Model ──────────────────────────────────────────────────────────────
 
-    let key = CustomType::<String>::new("  API key:")
-        .with_placeholder("sk-...")
-        .with_error_message("API key is required")
-        .prompt()?;
-    Ok(key)
-}
-
-/// Step 3: Model selection — arrow-key selection with manual entry option.
 fn prompt_model(provider: &str) -> anyhow::Result<String> {
     let models = oxi_sdk::get_provider_models(provider);
 
     println!();
-    println!("  [3/{}] Select a model for {}:", TOTAL_STEPS, provider);
+    println!("  {}", theme::step("Model"));
 
     if models.is_empty() {
-        // Unknown provider — manual entry
-        let model = Text::new("  Enter model ID:").prompt()?;
+        let model = Text::new("  → Model ID:").prompt()?;
         if model.is_empty() {
             anyhow::bail!("Model ID is required.");
         }
@@ -310,40 +382,47 @@ fn prompt_model(provider: &str) -> anyhow::Result<String> {
         });
     }
 
-    // Build model entries (skip "latest" aliases, up to 8)
     let mut entries: Vec<ModelEntry> = Vec::new();
     for entry in models.iter() {
         if entry.name.contains("latest") {
             continue;
         }
+        let full_id = format!("{}/{}", provider, entry.id);
         let ctx = if entry.context_window >= 1_000_000 {
-            format!("{}M ctx", entry.context_window / 1_000_000)
+            format!("{}M", entry.context_window / 1_000_000)
         } else {
-            format!("{}K ctx", entry.context_window / 1000)
+            format!("{}K", entry.context_window / 1000)
         };
-        let reasoning = if entry.reasoning { " ✦reasoning" } else { "" };
+        let reasoning = if entry.reasoning {
+            format!(" {}", style("reasoning").magenta())
+        } else {
+            String::new()
+        };
         entries.push(ModelEntry {
-            full_id: format!("{}/{}", provider, entry.id),
-            display: format!("{:<40} {:>10}{}", entry.name, ctx, reasoning),
+            full_id,
+            display: format!(
+                "  {}  {}{}",
+                style(&entry.name).bold(),
+                theme::muted(format!("{} ctx", ctx)),
+                reasoning,
+            ),
         });
-        if entries.len() >= 8 {
+        if entries.len() >= 12 {
             break;
         }
     }
 
-    // Add manual entry option
-    let manual_entry = ModelEntry {
-        full_id: String::new(), // sentinel
-        display: MANUAL_MODEL_DISPLAY.to_string(),
-    };
-    entries.push(manual_entry);
+    entries.push(ModelEntry {
+        full_id: String::new(),
+        display: format!("  {}", MANUAL_MODEL_DISPLAY),
+    });
 
-    let selected = Select::new("  Model:", entries)
+    let selected = Select::new("  →", entries)
         .with_starting_cursor(0)
         .prompt()?;
 
-    if selected.display == MANUAL_MODEL_DISPLAY {
-        let manual = Text::new("  Model ID:").prompt()?;
+    if selected.display.contains(MANUAL_MODEL_DISPLAY) {
+        let manual = Text::new("  → Model ID:").prompt()?;
         if manual.is_empty() {
             anyhow::bail!("Model ID cannot be empty.");
         }
@@ -357,152 +436,214 @@ fn prompt_model(provider: &str) -> anyhow::Result<String> {
     Ok(selected.full_id.clone())
 }
 
-/// Step 4: Workspace path with default.
-fn prompt_workspace() -> anyhow::Result<String> {
-    let default_workspace = dirs::home_dir()
-        .map(|h| format!("{}/.oxios/workspace", h.display()))
-        .unwrap_or_else(|| "~/.oxios/workspace".to_string());
+// ── Step: Embedding model ────────────────────────────────────────────────────
 
-    println!();
-    println!("  [4/{}] Workspace path:", TOTAL_STEPS);
+fn setup_embedding(config: &OxiosConfig) -> anyhow::Result<String> {
+    let workspace = crate::config::expand_home(&config.kernel.workspace);
 
-    let workspace = Text::new("  Workspace:")
-        .with_default(&default_workspace)
-        .prompt()?;
+    #[cfg(feature = "embedding-gguf")]
+    {
+        let model_dir =
+            crate::embedding::gguf::GgufModelLoader::model_dir_for_workspace(&workspace);
 
-    Ok(crate::config::expand_home(&workspace)
-        .to_string_lossy()
-        .to_string())
+        if crate::embedding::gguf::GgufModelLoader::is_model_cached(&model_dir) {
+            return Ok("cached".to_string());
+        }
+
+        let display_name = crate::embedding::gguf::MODEL_DISPLAY_NAME;
+        let size_mb = crate::embedding::gguf::MODEL_SIZE_MB;
+
+        println!();
+        println!(
+            "  {} {} model (~{} MB)",
+            theme::step("Embedding"),
+            display_name,
+            size_mb,
+        );
+        println!(
+            "  {}",
+            theme::dim("For semantic memory search. One-time download."),
+        );
+
+        let result = with_spinner(
+            &format!("Downloading {}...", display_name),
+            &format!("{} Downloaded", theme::success(theme::ok()).to_string()),
+            || crate::embedding::gguf::GgufModelLoader::ensure_model(&model_dir),
+        );
+
+        match result {
+            Ok(path) => {
+                let size_mb = path.metadata().map(|m| m.len() / 1_000_000).unwrap_or(0);
+                println!(
+                    "  {} {} MB",
+                    theme::success(theme::ok()),
+                    theme::accent(size_mb),
+                );
+                Ok("downloaded".to_string())
+            }
+            Err(e) => {
+                println!(
+                    "  {} {}",
+                    theme::warn(theme::fail()),
+                    e,
+                );
+                println!(
+                    "  {} Will retry on first search.",
+                    theme::accent("→"),
+                );
+                Ok("failed".to_string())
+            }
+        }
+    }
+
+    #[cfg(not(feature = "embedding-gguf"))]
+    {
+        let _ = (config, workspace);
+        Ok("tfidf".to_string())
+    }
 }
 
-/// Step 5: Summary confirmation.
-fn confirm_summary(
-    provider: &str,
-    model: &str,
-    key_preview: &str,
-    workspace: &str,
-) -> anyhow::Result<bool> {
-    println!();
-    println!("  ┌─────────────────────────────────────────────┐");
-    println!("  │            Configuration Summary             │");
-    println!("  ├─────────────────────────────────────────────┤");
-    println!("  │  Provider:  {:<32}│", provider);
-    println!("  │  Model:     {:<32}│", model);
-    println!("  │  Key:       {:<32}│", key_preview);
-    println!("  │  Workspace: {:<32}│", truncate_str(workspace, 32));
-    println!("  └─────────────────────────────────────────────┘");
-    println!();
-    println!("  [5/{}] Write configuration?", TOTAL_STEPS);
+// ── Spinner helper ───────────────────────────────────────────────────────────
 
-    Confirm::new("  Save this configuration?")
-        .with_default(true)
-        .prompt()
-        .map_err(Into::into)
+/// Run a closure with a spinner. Shows `message` while running,
+/// replaces with `done` on success.
+fn with_spinner<T, F>(message: &str, done: &str, f: F) -> T
+where
+    F: FnOnce() -> T,
+{
+    let pb = ProgressBar::new_spinner();
+    pb.set_style(
+        ProgressStyle::default_spinner()
+            .tick_chars("⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏ ")
+            .template("  {spinner} {msg}")
+            .unwrap(),
+    );
+    pb.set_message(message.to_string());
+    pb.enable_steady_tick(std::time::Duration::from_millis(80));
+
+    let result = f();
+
+    pb.finish_with_message(done.to_string());
+    result
 }
 
 // ── Persistence ──────────────────────────────────────────────────────────────
 
-/// Write everything to disk.
 fn persist_config(
     oxios_home: &Path,
     config: &mut OxiosConfig,
     provider: &str,
     api_key: &str,
     model: &str,
-    workspace: &str,
 ) -> anyhow::Result<()> {
-    print!("\n  Saving configuration... ");
-    std::io::stdout().flush()?;
-
     if !api_key.is_empty() {
         CredentialStore::store(provider, api_key)?;
     }
 
-    std::fs::create_dir_all(workspace)?;
+    let workspace = crate::config::expand_home(&config.kernel.workspace);
+    std::fs::create_dir_all(&workspace)?;
     for subdir in WORKSPACE_SUBDIRS {
-        std::fs::create_dir_all(Path::new(workspace).join(subdir))?;
+        std::fs::create_dir_all(Path::new(&workspace).join(subdir))?;
     }
 
     config.engine.default_model = model.to_string();
-    config.kernel.workspace = workspace.to_string();
-    write_config(oxios_home, config)?;
 
-    println!("done");
-    Ok(())
-}
-
-fn write_config(oxios_home: &Path, config: &OxiosConfig) -> anyhow::Result<()> {
     std::fs::create_dir_all(oxios_home)?;
     let toml_str = toml::to_string_pretty(config)
         .map_err(|e| anyhow::anyhow!("Failed to serialize config: {}", e))?;
     std::fs::write(oxios_home.join("config.toml"), &toml_str)?;
+
     Ok(())
 }
 
-// ── UI ───────────────────────────────────────────────────────────────────────
+// ── UI: intro / outro ───────────────────────────────────────────────────────
 
-fn print_banner() {
+fn print_intro(is_first_run: bool) {
     println!();
-    println!("  ╔═══════════════════════════════════════════╗");
-    println!(
-        "  ║       {}  ║",
-        style("⬡  Oxios — First-time Setup").bold()
-    );
-    println!("  ╚═══════════════════════════════════════════╝");
-    println!();
-    println!("  This wizard will configure your API credentials.");
-    println!(
-        "  Use {} arrow keys to navigate, Enter to confirm.",
-        style("↑↓").cyan()
-    );
-    println!(
-        "  Press {} at any time to cancel.",
-        style("Ctrl+C").yellow()
-    );
-}
 
-fn print_success(oxios_home: &Path, model: &str) {
-    println!();
-    println!("  ╔═══════════════════════════════════════════╗");
-    println!(
-        "  ║             {}               ║",
-        style("Setup Complete!").green().bold()
-    );
-    println!("  ╚═══════════════════════════════════════════╝");
-    println!();
-    println!(
-        "    {}   {}",
-        style("Config:").dim(),
-        oxios_home.join("config.toml").display()
-    );
-    println!("    {}    {}", style("Model:").dim(), style(model).cyan());
-    println!();
-    println!("  Next steps:");
-    println!("    {} → start the daemon", style("oxios start").cyan());
-    println!(
-        "    {} → register as system service",
-        style("oxios daemon install").cyan()
-    );
-    println!(
-        "    {} → open web dashboard",
-        style("open http://127.0.0.1:4200").cyan()
-    );
-    println!();
-}
-
-// ── Helpers ──────────────────────────────────────────────────────────────────
-
-fn mask_key(key: &str) -> String {
-    if key.len() <= 8 {
-        return key.to_string();
-    }
-    format!("{}...{}", &key[..4], &key[key.len() - 4..])
-}
-
-fn truncate_str(s: &str, max_len: usize) -> String {
-    if s.len() <= max_len {
-        s.to_string()
+    if is_first_run {
+        println!(
+            "  {}",
+            style("⬡ Oxios Agent OS").bold().cyan(),
+        );
+        println!(
+            "  {}",
+            theme::dim("Your AI agents, organized."),
+        );
+        println!();
+        println!("  Let's get you set up. About 30 seconds.");
     } else {
-        format!("{}...", &s[..max_len.saturating_sub(3)])
+        println!("  {}", style("⬡ Oxios Setup").bold());
     }
+
+    println!(
+        "  {}",
+        theme::dim("↑↓ navigate · Enter confirm · Ctrl+C skip"),
+    );
+    println!();
+}
+
+fn print_summary(
+    oxios_home: &Path,
+    provider: &str,
+    model: &str,
+    key_source: &str,
+    embed_status: &str,
+) {
+    println!();
+    println!("  {}", theme::dim("─────────────────────────────────────────"));
+
+    println!(
+        "  {:<14} {}",
+        theme::dim("LLM:"),
+        theme::accent(model),
+    );
+    println!(
+        "  {:<14} {}",
+        theme::dim("Provider:"),
+        theme::muted(provider),
+    );
+    println!(
+        "  {:<14} {}",
+        theme::dim("Key:"),
+        theme::muted(key_source),
+    );
+
+    let embed_label = match embed_status {
+        "cached" | "downloaded" => {
+            #[cfg(feature = "embedding-gguf")]
+            {
+                let name = crate::embedding::gguf::MODEL_DISPLAY_NAME;
+                Some(if embed_status == "downloaded" {
+                    format!("{} ✓", name)
+                } else {
+                    format!("{} ✓ (cached)", name)
+                })
+            }
+            #[cfg(not(feature = "embedding-gguf"))]
+            {
+                None
+            }
+        }
+        "failed" => Some("will download on first search".to_string()),
+        _ => None,
+    };
+
+    if let Some(ref label) = embed_label {
+        let styled = if embed_status == "failed" {
+            theme::warn(label).to_string()
+        } else {
+            theme::accent(label).to_string()
+        };
+        println!("  {:<14} {}", theme::dim("Embedding:"), styled);
+    }
+
+    println!(
+        "  {:<14} {}",
+        theme::dim("Home:"),
+        theme::muted(oxios_home.display()),
+    );
+
+    println!("  {}", theme::dim("─────────────────────────────────────────"));
+    println!();
 }
