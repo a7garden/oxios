@@ -21,10 +21,12 @@ use std::sync::Arc;
 /// The kernel's engine — wraps oxi-sdk's Oxi instance.
 ///
 /// Created via [`OxiosEngine::new()`] or [`OxiosEngine::builder()`].
-/// Provides access to providers, models, and agent construction.
+/// Provides access to providers, models, routing, and agent construction.
 pub struct OxiosEngine {
     oxi: Oxi,
     default_model_id: String,
+    /// Runtime routing control for dynamic model selection.
+    routing_control: Option<oxi_sdk::RoutingControl>,
 }
 
 impl OxiosEngine {
@@ -38,6 +40,7 @@ impl OxiosEngine {
         Self {
             oxi,
             default_model_id: model_id,
+            routing_control: None,
         }
     }
 
@@ -82,6 +85,11 @@ impl OxiosEngine {
     /// Get the default model ID.
     pub fn default_model_id(&self) -> &str {
         &self.default_model_id
+    }
+
+    /// Get the routing control, if routing is enabled.
+    pub fn routing_control(&self) -> Option<&oxi_sdk::RoutingControl> {
+        self.routing_control.as_ref()
     }
 }
 
@@ -136,7 +144,24 @@ impl OxiosEngineBuilder {
         OxiosEngine {
             oxi: self.inner.build(),
             default_model_id: self.default_model_id,
+            routing_control: None,
         }
+    }
+
+    /// Build the engine with routing enabled.
+    ///
+    /// Returns `(OxiosEngine, RoutingControl)` for runtime routing control.
+    pub fn build_with_routing(self) -> (OxiosEngine, oxi_sdk::RoutingControl) {
+        use oxi_sdk::RoutingControl;
+
+        let routing_config = oxi_sdk::routing::RoutingConfig::default();
+        let routing_control = RoutingControl::new(routing_config);
+        let engine = OxiosEngine {
+            oxi: self.inner.build(),
+            default_model_id: self.default_model_id,
+            routing_control: Some(routing_control.clone()),
+        };
+        (engine, routing_control)
     }
 }
 
@@ -176,6 +201,7 @@ impl std::fmt::Debug for OxiosEngine {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("OxiosEngine")
             .field("default_model_id", &self.default_model_id)
+            .field("routing_enabled", &self.routing_control.is_some())
             .finish()
     }
 }

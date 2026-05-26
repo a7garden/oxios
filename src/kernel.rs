@@ -556,7 +556,14 @@ impl KernelBuilder {
 
         // Model comes from config, not hardcoded default
         let model_id = &config.engine.default_model;
-        let engine = Arc::new(OxiosEngine::new(model_id));
+        let engine = if config.engine.routing_enabled {
+            let engine_builder = OxiosEngine::builder()
+                .default_model(model_id);
+            let (engine, _routing_control) = engine_builder.build_with_routing();
+            Arc::new(engine)
+        } else {
+            Arc::new(OxiosEngine::new(model_id))
+        };
         let model = engine
             .resolve_model(model_id)
             .context(format!("Failed to resolve model: {}", model_id))?;

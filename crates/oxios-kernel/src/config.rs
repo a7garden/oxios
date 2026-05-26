@@ -105,6 +105,12 @@ pub struct MemoryConfig {
     /// Embedding provider configuration (RFC-012).
     #[serde(default)]
     pub embedding: EmbeddingConfig,
+    /// Learning configuration (RFC-012 Phase 4: SONA + ReasoningBank).
+    #[serde(default)]
+    pub learning: LearningConfig,
+    /// AutoMemoryBridge configuration (RFC-012 Phase 7: SQLite ↔ MEMORY.md sync).
+    #[serde(default)]
+    pub bridge: MemoryBridgeConfig,
 }
 
 fn default_true() -> bool {
@@ -137,6 +143,8 @@ impl Default for MemoryConfig {
             consolidation: ConsolidationConfig::default(),
             sqlite: SqliteMemoryConfig::default(),
             embedding: EmbeddingConfig::default(),
+            learning: LearningConfig::default(),
+            bridge: MemoryBridgeConfig::default(),
         }
     }
 }
@@ -223,6 +231,91 @@ impl Default for EmbeddingConfig {
             provider: default_embedding_provider(),
             dimension: default_embedding_dim(),
             model_ttl_secs: default_model_ttl(),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// LearningConfig (RFC-012 Phase 4: SONA + ReasoningBank)
+// ---------------------------------------------------------------------------
+
+/// Learning engine configuration (RFC-012 Phase 4).
+///
+/// Controls SONA self-learning and ReasoningBank persistence.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LearningConfig {
+    /// Enable the learning subsystem (SONA + ReasoningBank).
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+    /// SONA operating mode: "realtime", "balanced", "research", "edge".
+    #[serde(default = "default_sona_mode")]
+    pub sona_mode: String,
+    /// Interval between automatic distillation runs (hours).
+    #[serde(default = "default_distill_interval")]
+    pub distill_interval_hours: u64,
+    /// Minimum quality score for auto-promoting patterns to long-term.
+    #[serde(default = "default_auto_promote_quality")]
+    pub auto_promote_quality: f32,
+    /// Minimum usage count before auto-promotion is considered.
+    #[serde(default = "default_auto_promote_min_usage")]
+    pub auto_promote_min_usage: u32,
+}
+
+fn default_sona_mode() -> String {
+    "balanced".to_string()
+}
+
+fn default_distill_interval() -> u64 {
+    6
+}
+
+fn default_auto_promote_quality() -> f32 {
+    0.8
+}
+
+fn default_auto_promote_min_usage() -> u32 {
+    3
+}
+
+impl Default for LearningConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            sona_mode: default_sona_mode(),
+            distill_interval_hours: default_distill_interval(),
+            auto_promote_quality: default_auto_promote_quality(),
+            auto_promote_min_usage: default_auto_promote_min_usage(),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// MemoryBridgeConfig (RFC-012 Phase 7: SQLite ↔ MEMORY.md)
+// ---------------------------------------------------------------------------
+
+/// AutoMemoryBridge configuration (RFC-012 Phase 7).
+///
+/// Controls bidirectional sync between SQLite memory store
+/// and external MEMORY.md files.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MemoryBridgeConfig {
+    /// Enable bidirectional sync with MEMORY.md.
+    #[serde(default)]
+    pub sync_enabled: bool,
+    /// Sync interval in seconds.
+    #[serde(default = "default_bridge_interval")]
+    pub interval_secs: u64,
+}
+
+fn default_bridge_interval() -> u64 {
+    3600
+}
+
+impl Default for MemoryBridgeConfig {
+    fn default() -> Self {
+        Self {
+            sync_enabled: false,
+            interval_secs: default_bridge_interval(),
         }
     }
 }
@@ -438,6 +531,17 @@ pub struct EngineConfig {
     /// Passed through to `AgentLoopConfig::provider_options`.
     #[serde(default)]
     pub provider_options: Option<oxi_sdk::ProviderOptions>,
+    /// Enable complexity-based model routing.
+    /// When enabled, the engine can route simple tasks to cheaper models
+    /// and complex tasks to more capable ones.
+    #[serde(default)]
+    pub routing_enabled: bool,
+    /// Prefer cost-efficient models when routing.
+    #[serde(default)]
+    pub prefer_cost_efficient: bool,
+    /// Fallback models to try when the primary model fails.
+    #[serde(default)]
+    pub fallback_models: Vec<String>,
 }
 
 #[allow(clippy::derivable_impls)]
@@ -447,6 +551,9 @@ impl Default for EngineConfig {
             default_model: String::new(),
             api_key: None,
             provider_options: None,
+            routing_enabled: false,
+            prefer_cost_efficient: false,
+            fallback_models: Vec::new(),
         }
     }
 }
