@@ -16,7 +16,7 @@ sqlite-memory = ["dep:rusqlite", "dep:sqlite-vec"]
 # MLX embedding provider (Apple Silicon only)
 # Provides EmbeddingGemma-300m dense vectors for semantic search.
 # When disabled, falls back to TF-IDF sparse embeddings.
-embedding-mlx = ["dep:mlx-rs", "dep:tokenizers", "dep:hf-hub"]
+embedding-gguf = ["dep:llama-gguf", "dep:hf-hub"]
 
 [dependencies]
 oxios-ouroboros = { version = "0.4.0", path = "../oxios-ouroboros" }
@@ -75,8 +75,7 @@ sqlite-vec = { version = "0.1", optional = true }
 
 # MLX embedding (Apple Silicon, optional)
 [target.'cfg(target_arch = "aarch64")'.dependencies]
-mlx-rs = { version = "0.25", optional = true }
-tokenizers = { version = "0.21", optional = true }
+llama-gguf = { version = "0.14", optional = true, features = ["cpu", "huggingface"] }
 hf-hub = { version = "0.4", optional = true }
 
 # Headless browser (built-in)

@@ -968,24 +968,48 @@ interval_secs = 3600
 
 ## 12. 모델 구현 상세
 
-### 12.1 Gemma 3 vs LLaMA 차이점
+### 12.1 GGUF 추론 파이프라인
 
-| 특징 | LLaMA | Gemma 3 (EmbeddingGemma-300m) |
-|------|-------|-------------------------|
-| 임베딩 스케일 | 없음 | `h * sqrt(768)` ≈ 27.7× |
-| 정규화 | RMSNorm | RMSNorm |
-| 어텐션 | GQA + causal mask | GQA + **양방향** |
-| 어텐션 스케일 | 1/√head_dim | 1/query_pre_attn_scalar (**1/256**) |
-| MLP | SwiGLU | GeGLU (gelu_pytorch_tanh) |
-| 위치 임베딩 | RoPE | RoPE (theta=1M) |
-| 슬라이딩 윈도우 | 없음 | 512 (20 layers), full (4 layers) |
-| KV Cache | 필요 | **불필요** |
-| 출력 | logits | **Mean pool → L2 norm** |
-| hidden_size | 4096+ | **768** |
-| num_heads | 32+ | **3** (1 KV head) |
-| num_layers | 32+ | **24** |
+`llama-gguf` 크레이트가 모든 것을 처리한다. Oxios에서 구현할 것은 `GgufEmbeddingProvider` 래퍼뿐이다.
 
-### 12.2 구현 추정치
+```
+입력 텍스트 "Rust programming language"
+       │
+       ▼
+  Tokenizer::from_gguf()  ← GGUF 파일에 내장
+       │  [1234, 5678, 9012, ...]
+       ▼
+  load_llama_model()      ← Q4_K_M 자동 양자화 해제
+       │  forward(tokens)
+       ▼
+  Hidden states [1, seq_len, 768]
+       │
+       ▼
+  Mean pooling            ← 마지막 토큰 또는 전체 평균
+       │  [768]
+       ▼
+  L2 normalize
+       │  [768]
+       ▼
+  Matryoshka truncate     → [256] (설정 기준)
+```
+
+### 12.2 llama-gguf가 처리하는 것
+
+| 기능 | llama-gguf 내장 | Oxios 구현 |
+|------|---------------|------------|
+| GGUF 파일 파싱 | ✅ | - |
+| 토크나이저 | ✅ (GGUF 내장) | - |
+| Q4_K_M 양자화 해제 | ✅ | - |
+| Gemma 3 forward pass | ✅ | - |
+| CPU SIMD (AVX2, NEON) | ✅ | - |
+| GPU 가속 | ✅ (선택적) | - |
+| Lazy load + TTL | - | ✅ `GgufEmbeddingProvider` |
+| Mean pooling | - | ✅ (또는 llama-gguf embed API) |
+| Matryoshka truncate | - | ✅ |
+| 모델 다운로드 | - | ✅ `hf-hub` |
+
+### 12.3 구현 추정치
 
 | 컴포넌트 | 줄 수 | 복잡도 |
 |----------|-------|--------|
@@ -996,13 +1020,13 @@ interval_secs = 3600
 | `search/rrf.rs` | ~30 | 낮음 |
 | `cache.rs` (SQLite 기반) | ~60 | 낮음 |
 | `migration.rs` | ~80 | 낮음 |
-| `gemma.rs` (모델) | ~350 | 중간 (mlx-lm LLaMA 참고) |
-| `loader.rs` | ~80 | 낮음 |
-| `pooler.rs` | ~40 | 낮음 |
-| `mlx/mod.rs` (provider) | ~120 | 중간 |
+| `gguf/mod.rs` (provider) | ~120 | 낮음 |
+| `gguf/loader.rs` | ~80 | 낮음 |
 | `kernel.rs` 수정 | ~40 | 낮음 |
 | `config.rs` 수정 | ~40 | 낮음 |
-| **총 Phase 1** | **~1,210줄** | |
+| **총 Phase 1** | **~820줄** | |
+
+> MLX 대비 ~390줄 감소 (Gemma 3 직접 포팅 불필요)
 
 ---
 
