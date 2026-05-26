@@ -38,14 +38,36 @@ pub fn search_bm25(db: &MemoryDatabase, query: &str, limit: usize) -> Result<Vec
         query.to_string()
     } else {
         // Simple query — split into words, join with OR
-        let words: Vec<&str> = query
-            .split_whitespace()
-            .filter(|w| w.len() >= 2)
-            .collect();
-        if words.is_empty() {
+        // CJK characters: split each character as a token
+        // since unicode61 doesn't segment Korean/Chinese/Japanese
+        let mut tokens = Vec::new();
+        for word in query.split_whitespace() {
+            if word.chars().all(|c| c.is_ascii_alphanumeric()) {
+                if word.len() >= 2 {
+                    tokens.push(word.to_string());
+                }
+            } else {
+        // CJK or mixed: FTS5 unicode61 can't segment these,
+        // so we just use the full word. If it's all CJK,
+        // add each char separately for partial matching.
+        let has_cjk = word.chars().any(|c| !c.is_ascii());
+        if has_cjk {
+            // Add individual CJK chars for char-by-char matching
+            for ch in word.chars() {
+                if !ch.is_ascii() && ch.is_alphabetic() {
+                    tokens.push(ch.to_string());
+                }
+            }
+        }
+        if word.len() >= 2 {
+            tokens.push(word.to_string());
+        }
+            }
+        }
+        if tokens.is_empty() {
             return Ok(Vec::new());
         }
-        words.join(" OR ")
+        tokens.join(" OR ")
     };
 
     let sql = format!(
@@ -56,14 +78,26 @@ pub fn search_bm25(db: &MemoryDatabase, query: &str, limit: usize) -> Result<Vec
          LIMIT ?2"
     );
 
-    let mut stmt = conn.prepare(&sql)?;
-    let rows = stmt.query_map(rusqlite::params![fts_query, limit], |row| {
+    let mut stmt = match conn.prepare(&sql) {
+        Ok(s) => s,
+        Err(e) => {
+            tracing::debug!(query = %fts_query, error = %e, "FTS5 query parse error");
+            return Ok(Vec::new());
+        }
+    };
+    let rows = match stmt.query_map(rusqlite::params![fts_query, limit], |row| {
         Ok(Bm25Hit {
             rowid: row.get(0)?,
             id: row.get(1)?,
             score: row.get(2)?,
         })
-    })?;
+    }) {
+        Ok(r) => r,
+        Err(e) => {
+            tracing::debug!(query = %fts_query, error = %e, "FTS5 query execution error");
+            return Ok(Vec::new());
+        }
+    };
 
     let mut results = Vec::new();
     for row in rows {
@@ -111,13 +145,14 @@ mod tests {
     #[test]
     fn test_bm25_korean() {
         let db = MemoryDatabase::open_in_memory(256).unwrap();
-        let conn = db.conn();
-
-        conn.execute(
-            "INSERT INTO memories (id, memory_type, content, importance, tier, source, created_at, updated_at)
-             VALUES ('kr-bm-1', 'fact', '한국어 메모리 테스트입니다', 0.5, 'warm', 'test', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')",
-            [],
-        ).unwrap();
+        {
+            let conn = db.conn();
+            conn.execute(
+                "INSERT INTO memories (id, memory_type, content, importance, tier, source, created_at, updated_at)
+                 VALUES ('kr-bm-1', 'fact', '한국어 메모리 테스트입니다', 0.5, 'warm', 'test', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')",
+                [],
+            ).unwrap();
+        }
 
         let results = search_bm25(&db, "한국어", 10).unwrap();
         assert!(!results.is_empty(), "Korean BM25 should find results");
@@ -126,17 +161,18 @@ mod tests {
     #[test]
     fn test_bm25_limit() {
         let db = MemoryDatabase::open_in_memory(256).unwrap();
-        let conn = db.conn();
-
-        for i in 0..20 {
-            conn.execute(
-                &format!(
-                    "INSERT INTO memories (id, memory_type, content, importance, tier, source, created_at, updated_at)
-                     VALUES ('limit-{}', 'fact', 'test content number {}', 0.5, 'warm', 'test', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')",
-                    i, i
-                ),
-                [],
-            ).unwrap();
+        {
+            let conn = db.conn();
+            for i in 0..20 {
+                conn.execute(
+                    &format!(
+                        "INSERT INTO memories (id, memory_type, content, importance, tier, source, created_at, updated_at)
+                         VALUES ('limit-{}', 'fact', 'test content number {}', 0.5, 'warm', 'test', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')",
+                        i, i
+                    ),
+                    [],
+                ).unwrap();
+            }
         }
 
         let results = search_bm25(&db, "test content", 5).unwrap();

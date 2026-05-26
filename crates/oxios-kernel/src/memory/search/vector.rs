@@ -102,15 +102,15 @@ mod tests {
     #[test]
     fn test_vector_insert_and_search() {
         let db = MemoryDatabase::open_in_memory(8).unwrap();
-        let conn = db.conn();
-
-        // Insert a memory to get a rowid
-        conn.execute(
-            "INSERT INTO memories (id, memory_type, content, importance, tier, source, created_at, updated_at)
-             VALUES ('vec-1', 'fact', 'test', 0.5, 'warm', 'test', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')",
-            [],
-        ).unwrap();
-        let rowid: i64 = conn.last_insert_rowid();
+        let rowid: i64 = {
+            let conn = db.conn();
+            conn.execute(
+                "INSERT INTO memories (id, memory_type, content, importance, tier, source, created_at, updated_at)
+                 VALUES ('vec-1', 'fact', 'test', 0.5, 'warm', 'test', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')",
+                [],
+            ).unwrap();
+            conn.last_insert_rowid()
+        };
 
         let v = make_test_vector(8, 1.0);
         insert_vector(&db, rowid, &v).unwrap();
@@ -126,23 +126,23 @@ mod tests {
     #[test]
     fn test_vector_knn_ordering() {
         let db = MemoryDatabase::open_in_memory(4).unwrap();
-        let conn = db.conn();
-
-        // Insert 3 memories with different vectors
         let v1 = vec![1.0, 0.0, 0.0, 0.0f32];
         let v2 = vec![0.9, 0.1, 0.0, 0.0f32];
         let v3 = vec![0.0, 0.0, 1.0, 0.0f32];
 
         for (i, v) in [&v1, &v2, &v3].iter().enumerate() {
-            conn.execute(
-                &format!(
-                    "INSERT INTO memories (id, memory_type, content, importance, tier, source, created_at, updated_at)
-                     VALUES ('knn-{}', 'fact', 'test', 0.5, 'warm', 'test', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')",
-                    i
-                ),
-                [],
-            ).unwrap();
-            let rowid = conn.last_insert_rowid();
+            let rowid: i64 = {
+                let conn = db.conn();
+                conn.execute(
+                    &format!(
+                        "INSERT INTO memories (id, memory_type, content, importance, tier, source, created_at, updated_at)
+                         VALUES ('knn-{}', 'fact', 'test', 0.5, 'warm', 'test', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')",
+                        i
+                    ),
+                    [],
+                ).unwrap();
+                conn.last_insert_rowid()
+            };
             insert_vector(&db, rowid, v).unwrap();
         }
 
@@ -157,14 +157,15 @@ mod tests {
     #[test]
     fn test_vector_delete() {
         let db = MemoryDatabase::open_in_memory(4).unwrap();
-        let conn = db.conn();
-
-        conn.execute(
-            "INSERT INTO memories (id, memory_type, content, importance, tier, source, created_at, updated_at)
-             VALUES ('del-1', 'fact', 'test', 0.5, 'warm', 'test', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')",
-            [],
-        ).unwrap();
-        let rowid = conn.last_insert_rowid();
+        let rowid: i64 = {
+            let conn = db.conn();
+            conn.execute(
+                "INSERT INTO memories (id, memory_type, content, importance, tier, source, created_at, updated_at)
+                 VALUES ('del-1', 'fact', 'test', 0.5, 'warm', 'test', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')",
+                [],
+            ).unwrap();
+            conn.last_insert_rowid()
+        };
 
         let v = vec![1.0, 0.0, 0.0, 0.0f32];
         insert_vector(&db, rowid, &v).unwrap();

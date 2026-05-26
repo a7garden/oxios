@@ -237,18 +237,19 @@ mod tests {
     #[test]
     fn test_search_with_bm25_only() {
         let db = MemoryDatabase::open_in_memory(256).unwrap();
-        let conn = db.conn();
-
-        conn.execute(
-            "INSERT INTO memories (id, memory_type, content, importance, tier, source, created_at, updated_at)
-             VALUES ('search-1', 'fact', 'Rust programming language', 0.6, 'warm', 'test', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')",
-            [],
-        ).unwrap();
-        conn.execute(
-            "INSERT INTO memories (id, memory_type, content, importance, tier, source, created_at, updated_at)
-             VALUES ('search-2', 'fact', 'Python data science', 0.5, 'warm', 'test', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')",
-            [],
-        ).unwrap();
+        {
+            let conn = db.conn();
+            conn.execute(
+                "INSERT INTO memories (id, memory_type, content, importance, tier, source, created_at, updated_at)
+                 VALUES ('search-1', 'fact', 'Rust programming language', 0.6, 'warm', 'test', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')",
+                [],
+            ).unwrap();
+            conn.execute(
+                "INSERT INTO memories (id, memory_type, content, importance, tier, source, created_at, updated_at)
+                 VALUES ('search-2', 'fact', 'Python data science', 0.5, 'warm', 'test', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')",
+                [],
+            ).unwrap();
+        }
 
         let results = search(&db, None, "Rust", None, 10).unwrap();
         assert!(!results.is_empty());
@@ -258,18 +259,19 @@ mod tests {
     #[test]
     fn test_search_with_type_filter() {
         let db = MemoryDatabase::open_in_memory(256).unwrap();
-        let conn = db.conn();
-
-        conn.execute(
-            "INSERT INTO memories (id, memory_type, content, importance, tier, source, created_at, updated_at)
-             VALUES ('filter-1', 'fact', 'test content', 0.5, 'warm', 'test', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')",
-            [],
-        ).unwrap();
-        conn.execute(
-            "INSERT INTO memories (id, memory_type, content, importance, tier, source, created_at, updated_at)
-             VALUES ('filter-2', 'episode', 'test content episode', 0.5, 'warm', 'test', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')",
-            [],
-        ).unwrap();
+        {
+            let conn = db.conn();
+            conn.execute(
+                "INSERT INTO memories (id, memory_type, content, importance, tier, source, created_at, updated_at)
+                 VALUES ('filter-1', 'fact', 'test content', 0.5, 'warm', 'test', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')",
+                [],
+            ).unwrap();
+            conn.execute(
+                "INSERT INTO memories (id, memory_type, content, importance, tier, source, created_at, updated_at)
+                 VALUES ('filter-2', 'episode', 'test content episode', 0.5, 'warm', 'test', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')",
+                [],
+            ).unwrap();
+        }
 
         let results = search(&db, None, "test", Some(MemoryType::Fact), 10).unwrap();
         assert!(results.iter().all(|r| r.entry.memory_type == MemoryType::Fact));
@@ -285,13 +287,14 @@ mod tests {
     #[test]
     fn test_load_memory_by_id() {
         let db = MemoryDatabase::open_in_memory(256).unwrap();
-        let conn = db.conn();
-
-        conn.execute(
-            "INSERT INTO memories (id, memory_type, content, importance, tier, source, created_at, updated_at)
-             VALUES ('load-test', 'fact', 'load this', 0.7, 'hot', 'test', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')",
-            [],
-        ).unwrap();
+        {
+            let conn = db.conn();
+            conn.execute(
+                "INSERT INTO memories (id, memory_type, content, importance, tier, source, created_at, updated_at)
+                 VALUES ('load-test', 'fact', 'load this', 0.7, 'hot', 'test', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')",
+                [],
+            ).unwrap();
+        }
 
         let entry = load_memory_by_id(&db, "load-test").unwrap();
         assert!(entry.is_some());
