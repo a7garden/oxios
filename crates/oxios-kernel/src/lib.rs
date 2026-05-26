@@ -34,8 +34,9 @@ pub mod capability;
 pub mod credential;
 
 // ─── Communication ──────────────────────────────────────────────────
-// 이벤트, 메시징, 외부 프로토콜.
+// 이벤트, 메시징, 외부 프로토콜, 멀티 에이전트 조정.
 pub mod a2a;
+pub mod coordination;
 pub mod event_bus;
 pub mod mcp;
 
@@ -253,8 +254,8 @@ pub use oxi_sdk::{
     // Routing (oxi-sdk 0.23.0)
     RoutingControl,
     // Coordination (oxi-sdk 0.23.0)
-    AgentGroup as SdkAgentGroup, GroupStrategy, GroupResult, CoordinatedGroup, CoordinatedGroupBuilder,
-    WorkQueue, WorkQueueConfig, SharedMemory, Consensus,
+    AgentGroup as SdkAgentGroup, GroupStrategy, GroupResult,
+    // Coordination types available via coordination module
     // Metrics
     AgentMetrics, MetricsSnapshot,
     // Circuit breaker

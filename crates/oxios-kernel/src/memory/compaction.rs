@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 //! Compaction tree — 5-level memory compression hierarchy.
 //!
 //! Raw → Daily → Weekly → Monthly → Root

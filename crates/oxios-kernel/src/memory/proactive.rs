@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 //! Proactive recall — automatically inject relevant memories into context.
 //!
 //! Implements 3-step selective recall:

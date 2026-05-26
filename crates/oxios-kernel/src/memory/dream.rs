@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 //! Dream process — 4-phase background memory consolidation.
 //!
 //! Phase 1: Orient — scan current state, build map
@@ -398,6 +399,10 @@ impl std::fmt::Debug for DreamProcess {
 /// Result of Phase 4 (Prune & Index).
 struct Phase4Result {
     contradictions_resolved: usize,
+    /// Number of memories re-ranked by Flash Attention (Phase 6).
+    flash_reranked: usize,
+    /// Number of learning patterns persisted (Phase 4: SONA + ReasoningBank).
+    patterns_persisted: usize,
 }
 
 impl DreamProcess {
@@ -552,6 +557,8 @@ impl DreamProcess {
             report.root_updated = true;
             report.pagerank_updates = plan.pagerank_updates.len();
             report.hyperbolic_rebuilt = true;
+            report.flash_reranked = phase4_result.flash_reranked;
+            report.patterns_persisted = phase4_result.patterns_persisted;
 
             // Clear checkpoint on success
             self.clear_checkpoint().await.ok();
@@ -959,10 +966,10 @@ impl DreamProcess {
             }
         }
 
-        // 6. Rebuild ROOT index
+        // 7. Rebuild ROOT index
         self.rebuild_root_index().await?;
 
-        // 7. Rebuild Hyperbolic Embeddings (Phase 5)
+        // 8. Rebuild Hyperbolic Embeddings (Phase 5)
         #[cfg(feature = "sqlite-memory")]
         if let Some(ref sqlite) = self.memory_manager.sqlite_store() {
             let config = super::hyperbolic::HyperbolicConfig::default();
@@ -980,8 +987,50 @@ impl DreamProcess {
             }
         }
 
+        // 9. Persist & auto-promote learning patterns (Phase 4: SONA + ReasoningBank)
+        let patterns_persisted = {
+            #[cfg(feature = "sqlite-memory")]
+            if let Some(ref sqlite) = self.memory_manager.sqlite_store() {
+                // Auto-promote high-quality patterns to long-term storage
+                let _ = sqlite.auto_promote_patterns(0.8, 3);
+                // Count total patterns in store as the persistence metric
+                let conn = sqlite.db().conn();
+                let total: usize = conn
+                    .query_row("SELECT COUNT(*) FROM patterns", [], |row| row.get(0))
+                    .unwrap_or(0);
+                total
+            } else {
+                0
+            }
+            #[cfg(not(feature = "sqlite-memory"))]
+            { 0 }
+        };
+
+        // 10. Flash Attention reranking (Phase 6)
+        let flash_reranked = {
+            #[cfg(feature = "sqlite-memory")]
+            if let Some(ref sqlite) = self.memory_manager.sqlite_store() {
+                let hot = self.memory_manager.list_by_tier(MemoryTier::Hot, 50).await.unwrap_or_default();
+                if !hot.is_empty() {
+                    let query: String = hot.iter().take(3).map(|e| e.content.as_str()).collect::<Vec<_>>().join(" ");
+                    if !query.is_empty() {
+                        match sqlite.recall_with_rerank(&query, hot.len()).await {
+                            Ok(reranked) => reranked.len(),
+                            Err(_) => 0,
+                        }
+                    } else { 0 }
+                } else { 0 }
+            } else {
+                0
+            }
+            #[cfg(not(feature = "sqlite-memory"))]
+            { 0 }
+        };
+
         Ok(Phase4Result {
             contradictions_resolved,
+            flash_reranked,
+            patterns_persisted,
         })
     }
 

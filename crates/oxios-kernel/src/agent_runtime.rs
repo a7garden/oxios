@@ -24,7 +24,7 @@
 //! - `.middleware()` — custom middleware chain
 
 use anyhow::Result;
-use oxi_sdk::{Agent, AgentConfig, AgentEvent, CompactionEvent, CompactionStrategy, Provider, ProviderResolver};
+use oxi_sdk::{Agent, AgentConfig, AgentEvent, CompactionEvent, CompactionStrategy, ProviderResolver};
 use oxi_sdk::{SearchCache, ToolExecutionMode, ToolRegistry};
 use parking_lot::Mutex;
 use std::sync::Arc;
@@ -406,6 +406,11 @@ async fn run_agent(
     if config.token_budget > 0 {
         pipeline = pipeline.push(
             oxi_sdk::middleware::builtins::TokenBudgetMiddleware::new(config.token_budget)
+        );
+    }
+    if config.audit_tool_calls {
+        pipeline = pipeline.push(
+            oxi_sdk::middleware::builtins::LoggingMiddleware::new(tracing::Level::INFO)
         );
     }
 

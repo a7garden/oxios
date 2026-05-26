@@ -48,6 +48,7 @@ const HIDDEN_PROVIDERS: &[&str] = &[
 // ── Theme (clack-inspired) ──────────────────────────────────────────────────
 
 mod theme {
+    #![allow(dead_code)]
     use console::style;
     use std::fmt::Display;
 

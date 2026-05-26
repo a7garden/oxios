@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 //! Automatic memory protection based on access patterns.
 //!
 //! Computes protection levels from behavior signals (access frequency,
