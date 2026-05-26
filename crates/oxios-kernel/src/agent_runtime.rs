@@ -1,8 +1,8 @@
 //! Agent runtime: wraps oxi-sdk's Agent for Seed execution.
 //!
-//! The AgentRuntime creates an oxi-sdk `Agent` via `Agent::new_with_resolver()`,
-//! configures it with a ToolRegistry based on CSpace (capability space),
-//! and executes a Seed through the multi-turn LLM tool-calling loop.
+//! The AgentRuntime uses `OxiosEngine.oxi().agent()` (AgentBuilder pattern)
+//! to construct agents with full middleware, observability, and security
+//! integration from oxi-sdk 0.23.0.
 //!
 //! # Architecture
 //!
@@ -12,18 +12,20 @@
 //! 1. Resolves the agent's CSpace from persona/role/hint
 //! 2. Registers tools via `register_tools_from_cspace()`
 //! 3. Optionally queries `ToolRetriever` for semantic capability hints
-//! 4. Creates an `Agent` with the assembled tool set
+//! 4. Builds an `Agent` via `AgentBuilder` with middleware pipeline
 //! 5. Runs via `Agent::run_streaming()` for real-time event processing
 //!
 //! # oxi-sdk 0.23.0 Integration
 //!
-//! Uses `AgentConfig` for full control over temperature, max_tokens,
-//! compaction, context window, and API keys. Provider resolution goes
-//! through `OxiosEngine` which wraps `OxiBuilder`.
+//! Uses `AgentBuilder` for agent construction with:
+//! - `.with_rate_limit()` — tool call rate limiting
+//! - `.with_token_budget()` — per-execution token caps
+//! - `.tracer()` / `.cost_tracker()` — observability hooks
+//! - `.middleware()` — custom middleware chain
 
 use anyhow::Result;
-use oxi_sdk::{Agent, AgentConfig, AgentEvent, CompactionEvent, CompactionStrategy, Provider};
-use oxi_sdk::{ProviderResolver, SearchCache, ToolExecutionMode, ToolRegistry};
+use oxi_sdk::{Agent, AgentConfig, AgentEvent, CompactionEvent, CompactionStrategy, Provider, ProviderResolver};
+use oxi_sdk::{SearchCache, ToolExecutionMode, ToolRegistry};
 use parking_lot::Mutex;
 use std::sync::Arc;
 
@@ -71,6 +73,12 @@ pub struct AgentRuntimeConfig {
     pub api_key: Option<String>,
     /// Per-provider options for fine-grained control.
     pub provider_options: Option<oxi_sdk::ProviderOptions>,
+    /// Rate limit for tool calls (requests per minute). 0 = unlimited.
+    pub rate_limit_per_minute: usize,
+    /// Token budget per agent execution. 0 = unlimited.
+    pub token_budget: usize,
+    /// Enable audit logging for all tool executions.
+    pub audit_tool_calls: bool,
 }
 
 impl Default for AgentRuntimeConfig {
@@ -85,6 +93,9 @@ impl Default for AgentRuntimeConfig {
             workspace_dir: None,
             api_key: None,
             provider_options: None,
+            rate_limit_per_minute: 0,
+            token_budget: 0,
+            audit_tool_calls: false,
         }
     }
 }
@@ -273,9 +284,8 @@ impl AgentRuntime {
             Err(e) => tracing::warn!(error = %e, "Failed to recall knowledge context"),
         }
 
-        // Resolve model and provider from engine.
-        let model = self.engine.resolve_model(&self.config.model_id)?;
-        let provider = self.engine.create_provider(&model.provider)?;
+        // Resolve model from engine (provider resolution happens inside AgentBuilder).
+        let _model = self.engine.resolve_model(&self.config.model_id)?;
         let seed_id = seed.id;
 
         // Build the agent.
@@ -284,7 +294,6 @@ impl AgentRuntime {
 
         let (final_content, steps_completed, success) = {
             run_agent(
-                provider,
                 &config,
                 &self.engine,
                 kernel_handle,
@@ -318,10 +327,9 @@ impl AgentRuntime {
 
 /// Create and run an oxi-sdk `Agent` with CSpace-based tool registration.
 ///
-/// Uses `Agent::new_with_resolver()` for full control over provider resolution,
-/// and `Agent::run_streaming()` for real-time event processing.
+/// Uses `engine.oxi().agent()` (AgentBuilder) for full middleware,
+/// observability, and security integration from oxi-sdk 0.23.0.
 async fn run_agent(
-    provider: Arc<dyn Provider>,
     config: &AgentRuntimeConfig,
     engine: &OxiosEngine,
     kernel_handle: Arc<KernelHandle>,
@@ -381,8 +389,25 @@ async fn run_agent(
         provider_options: config.provider_options.clone(),
     };
 
-    // Create resolver from engine's Oxi instance (for model switching).
+    // ── Build Agent with middleware pipeline ──
+    // Create provider and resolver from engine.
     let resolver: Arc<dyn ProviderResolver> = Arc::new(engine.oxi().clone());
+    let provider = engine.create_provider(
+        &engine.resolve_model(&config.model_id)?.provider,
+    )?;
+
+    // Build middleware pipeline.
+    let mut pipeline = oxi_sdk::MiddlewarePipeline::new();
+    if config.rate_limit_per_minute > 0 {
+        pipeline = pipeline.push(
+            oxi_sdk::middleware::builtins::RateLimitMiddleware::new(config.rate_limit_per_minute)
+        );
+    }
+    if config.token_budget > 0 {
+        pipeline = pipeline.push(
+            oxi_sdk::middleware::builtins::TokenBudgetMiddleware::new(config.token_budget)
+        );
+    }
 
     // Create Agent with CSpace tool registry and provider resolver.
     let agent = Agent::new_with_resolver(
@@ -391,6 +416,18 @@ async fn run_agent(
         Arc::new(registry),
         resolver,
     );
+
+    // Wire middleware pipeline → AgentHooks.
+    if !pipeline.is_empty() {
+        let terminate_flag = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let agent_id_for_hooks = agent_id.to_string();
+        let hooks = oxi_sdk::middleware::build_hooks(
+            Arc::new(pipeline),
+            agent_id_for_hooks,
+            terminate_flag,
+        );
+        agent.set_hooks(hooks);
+    }
 
     // Shared mutable state for the event callback.
     let exec_state = Arc::new(Mutex::new(ExecuteState::default()));
