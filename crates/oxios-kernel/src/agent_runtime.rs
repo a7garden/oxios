@@ -33,7 +33,10 @@ use crate::capability::resolve::resolve_cspace;
 use crate::engine::OxiosEngine;
 use crate::memory::{MemoryEntry, MemoryManager, MemoryType};
 use crate::persona_manager::PersonaManager;
-use crate::tools::registration::register_tools_from_cspace;
+use crate::tools::registration::{register_tools_from_cspace, register_tools_from_cspace_gated};
+use crate::access_manager::{AccessGate, AgentContext, TracingAuditSink};
+use crate::config::ExecConfig;
+use crate::session_context::SessionContext;
 use crate::types::AgentId;
 use crate::KernelHandle;
 use oxios_ouroboros::{ExecutionResult, Seed};
@@ -110,6 +113,10 @@ struct ExecuteState {
     final_content: String,
     steps_completed: usize,
     success: bool,
+    /// Collected trajectory steps for SONA learning (RFC-020 Phase 2).
+    trajectory_steps: Vec<crate::memory::sona::TrajectoryStep>,
+    /// Map of tool_call_id → start instant, for duration computation.
+    tool_start_times: std::collections::HashMap<String, std::time::Instant>,
 }
 
 /// Runtime that wraps an oxi-sdk `Agent` for executing Seeds.
@@ -180,7 +187,7 @@ impl AgentRuntime {
     /// 3. Recalls memories if available
     /// 4. Creates Agent via `Agent::new_with_resolver()`
     /// 5. Runs via `Agent::run_streaming()`
-    pub async fn execute(&self, agent_id: AgentId, seed: &Seed) -> Result<ExecutionResult> {
+    pub async fn execute(&self, agent_id: AgentId, seed: &Seed, session_ctx: &mut SessionContext) -> Result<ExecutionResult> {
         let prompt = build_user_prompt(seed);
 
         // Get active persona system prompt.
@@ -252,13 +259,33 @@ impl AgentRuntime {
 
         // Blend relevant memories into system prompt.
         let memory_manager = self.kernel_handle.agents.memory_manager();
-        match memory_manager.recall(&seed.goal).await {
+        match memory_manager.recall_with_proactive(&seed.goal, &mut session_ctx.recall_timing).await {
             Ok(memories) if !memories.is_empty() => {
                 tracing::info!(count = memories.len(), "Recalled memories for seed");
                 system_prompt = memory_manager.blend_into_prompt(&memories, &system_prompt);
             }
             Ok(_) => tracing::debug!("No memories recalled"),
             Err(e) => tracing::warn!(error = %e, "Failed to recall memories"),
+        }
+
+        // Inject learned strategy from SONA (RFC-020 Phase 2).
+        if let Some(sona) = memory_manager.sona_engine() {
+            match sona.adapt(&seed.goal).await {
+                Ok(Some(pattern)) if pattern.confidence > 0.5 => {
+                    tracing::info!(
+                        domain = %pattern.domain,
+                        confidence = pattern.confidence,
+                        "SONA learned pattern injected"
+                    );
+                    system_prompt.push_str(&format!(
+                        "\n\n## Learned Strategy (confidence: {:.0}%)\n{}\n",
+                        pattern.confidence * 100.0,
+                        pattern.strategy,
+                    ));
+                }
+                Ok(_) => tracing::debug!("No high-confidence SONA pattern found"),
+                Err(e) => tracing::debug!(error = %e, "SONA adapt failed (non-fatal)"),
+            }
         }
 
         // Blend relevant knowledge notes into system prompt (KnowledgeLens, RFC-003 Phase 3).
@@ -304,6 +331,7 @@ impl AgentRuntime {
                 system_prompt,
                 prompt,
                 seed_id,
+                seed.goal.clone(),
                 agent_id,
                 cspace,
             )
@@ -340,6 +368,7 @@ async fn run_agent(
     system_prompt: String,
     prompt: String,
     seed_id: uuid::Uuid,
+    seed_goal: String,
     agent_id: AgentId,
     cspace: crate::capability::CSpace,
 ) -> Result<(String, usize, bool, Arc<Agent>)> {
@@ -363,10 +392,33 @@ async fn run_agent(
     let _trace_guard = crate::observability::tracer()
         .start(format!("seed-{}", &seed_id.to_string()[..8]).as_str(), oxi_sdk::SpanKind::Agent);
 
-    // ── Register tools based on CSpace ──
+    // ── Register tools based on CSpace (with access gate) ──
     let registry = ToolRegistry::new();
     let search_cache = Arc::new(SearchCache::new());
-    register_tools_from_cspace(&registry, &kernel_handle, &cspace, search_cache, agent_id);
+
+    // Build agent context for security
+    let agent_context = AgentContext {
+        agent_id,
+        agent_name: format!("agent-{}", agent_id),
+        cspace: Arc::new(cspace.clone()),
+    };
+
+    // Build access gate from kernel's security infrastructure
+    let access_gate = Arc::new(AccessGate::new(
+        kernel_handle.exec.access_manager().clone(),
+        Arc::new(kernel_handle.exec.config().clone()),
+        Arc::new(TracingAuditSink), // TODO: replace with TrailAuditSink when wired
+    ));
+
+    register_tools_from_cspace_gated(
+        &registry,
+        &kernel_handle,
+        &cspace,
+        search_cache,
+        agent_id,
+        access_gate,
+        agent_context,
+    );
 
     tracing::info!(
         seed_id = %seed_id,
@@ -455,10 +507,46 @@ async fn run_agent(
         .run_streaming(prompt, move |event| {
             let mut s = exec_state_cb.lock();
             match event {
-                AgentEvent::ToolExecutionEnd {
-                    is_error: false, ..
+                AgentEvent::ToolExecutionStart {
+                    tool_name,
+                    tool_call_id,
+                    ..
                 } => {
-                    s.steps_completed += 1;
+                    // Record start time for duration calculation.
+                    s.tool_start_times.insert(tool_call_id.clone(), std::time::Instant::now());
+                    // Store a placeholder step — input is the tool name
+                    // (not the call ID, which is meaningless for embeddings).
+                    s.trajectory_steps.push(
+                        crate::memory::sona::TrajectoryStep {
+                            input: tool_name.clone(),
+                            output: String::new(),
+                            duration_ms: 0,
+                            confidence: 0.0, // Updated on ToolExecutionEnd
+                        },
+                    );
+                }
+                AgentEvent::ToolExecutionEnd {
+                    tool_call_id,
+                    is_error,
+                    result,
+                    ..
+                } => {
+                    if !is_error {
+                        s.steps_completed += 1;
+                    }
+                    // Compute duration from start time.
+                    let duration_ms = s.tool_start_times
+                        .remove(tool_call_id.as_str())
+                        .map(|start| start.elapsed().as_millis() as u64)
+                        .unwrap_or(0);
+                    // Update the last matching trajectory step.
+                    if let Some(step) = s.trajectory_steps.iter_mut().rev().find(|step| {
+                        step.output.is_empty() // Find the first unresolved step
+                    }) {
+                        step.output = summarize_tool_result(&result.content, 200);
+                        step.duration_ms = duration_ms;
+                        step.confidence = if is_error { 0.3 } else { 0.8 };
+                    }
                 }
                 AgentEvent::AgentEnd {
                     messages,
@@ -534,7 +622,92 @@ async fn run_agent(
         success = s.success,
         "Agent completed"
     );
+
+    // Record trajectory to SONA learning engine (RFC-020 Phase 2).
+    // Fire-and-forget: don't block the result on learning.
+    if !s.trajectory_steps.is_empty() {
+        if let Some(sona) = kernel_handle.agents.memory_manager().sona_engine() {
+            let steps = s.trajectory_steps.clone();
+            let success = s.success;
+            let sona = Arc::clone(sona);
+            let domain = infer_domain(&seed_goal);
+            tokio::spawn(async move {
+                let verdict = if success {
+                    crate::memory::sona::Verdict::Success
+                } else {
+                    crate::memory::sona::Verdict::Failure
+                };
+                let trajectory = crate::memory::sona::Trajectory::new(steps, verdict, &domain);
+                if let Err(e) = sona.record(trajectory).await {
+                    tracing::debug!(error = %e, "SONA trajectory recording failed (non-fatal)");
+                }
+            });
+        }
+    }
+
     Ok((s.final_content.clone(), s.steps_completed, s.success, agent))
+}
+
+/// Summarize a tool result string to fit within `max_len` characters.
+fn summarize_tool_result(result: &str, max_len: usize) -> String {
+    let trimmed = result.trim();
+    if trimmed.len() <= max_len {
+        return trimmed.to_string();
+    }
+    // Take the first line or truncate.
+    let first_line = trimmed.lines().next().unwrap_or("");
+    if first_line.len() <= max_len {
+        first_line.to_string()
+    } else {
+        format!("{}...", &first_line[..max_len - 3])
+    }
+}
+
+/// Infer a domain category from a seed goal for SONA trajectory grouping.
+///
+/// Extracts the core verb + object from the goal to create a meaningful
+/// domain label. Falls back to "general" for unrecognizable patterns.
+fn infer_domain(goal: &str) -> String {
+    let lower = goal.to_lowercase();
+    let keywords: Vec<&str> = lower.split_whitespace().take(8).collect();
+
+    // Check for known domain indicators.
+    if keywords.iter().any(|k| ["test", "tests", "spec", "testing", "assert", "unit test", "integration"].contains(k)) {
+        return "testing".to_string();
+    }
+    if keywords.iter().any(|k| ["deploy", "release", "publish", "ship"].contains(k)) {
+        return "deployment".to_string();
+    }
+    if keywords.iter().any(|k| ["fix", "bug", "patch", "repair", "debug"].contains(k)) {
+        return "bugfix".to_string();
+    }
+    if keywords.iter().any(|k| ["refactor", "restructure", "reorganize", "rewrite"].contains(k)) {
+        return "refactoring".to_string();
+    }
+    if keywords.iter().any(|k| ["doc", "document", "readme", "guide", "explain"].contains(k)) {
+        return "documentation".to_string();
+    }
+    if keywords.iter().any(|k| ["build", "create", "implement", "add", "make", "new"].contains(k)) {
+        return "development".to_string();
+    }
+    if keywords.iter().any(|k| ["analyze", "review", "audit", "inspect", "check"].contains(k)) {
+        return "analysis".to_string();
+    }
+    if keywords.iter().any(|k| ["config", "setup", "install", "configure", "init"].contains(k)) {
+        return "configuration".to_string();
+    }
+
+    // Fallback: first 2 meaningful words
+    let meaningful: Vec<&str> = lower
+        .split_whitespace()
+        .filter(|w| w.len() > 2)
+        .take(2)
+        .collect();
+    if meaningful.len() >= 2 {
+        meaningful.join("_")
+    } else {
+        "general".to_string()
+    }
 }
 
 /// Handle compaction completion by storing the summary as a Warm memory.
@@ -835,5 +1008,37 @@ mod tests {
         let prompt = build_system_prompt(&seed, None, None, None);
 
         assert!(prompt.contains("Test goal"));
+    }
+
+    #[test]
+    fn test_infer_domain_testing() {
+        assert_eq!(infer_domain("run all unit tests for the kernel"), "testing");
+    }
+
+    #[test]
+    fn test_infer_domain_deployment() {
+        assert_eq!(infer_domain("deploy the web service to production"), "deployment");
+    }
+
+    #[test]
+    fn test_infer_domain_bugfix() {
+        assert_eq!(infer_domain("fix the null pointer error in main"), "bugfix");
+    }
+
+    #[test]
+    fn test_infer_domain_development() {
+        assert_eq!(infer_domain("create a new REST API endpoint"), "development");
+    }
+
+    #[test]
+    fn test_infer_domain_analysis() {
+        assert_eq!(infer_domain("review the code for security issues"), "analysis");
+    }
+
+    #[test]
+    fn test_infer_domain_fallback() {
+        let domain = infer_domain("optimize performance metrics");
+        // Should fall back to first 2 meaningful words
+        assert!(!domain.is_empty());
     }
 }

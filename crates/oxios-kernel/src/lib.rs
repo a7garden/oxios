@@ -63,6 +63,7 @@ pub mod backup;
 pub mod config;
 pub mod git_layer;
 pub mod resource_monitor;
+pub mod session_context;
 pub mod space;
 pub mod state_store;
 
@@ -218,6 +219,7 @@ pub use types::{AgentId, AgentInfo, AgentStatus};
 // ─── API Surface ────────────────────────────────────────────────────
 pub use kernel_handle::KernelHandle;
 pub use kernel_handle::MarketplaceApi;
+pub use session_context::SessionContext;
 pub use kernel_handle::{
     A2aApi, AgentApi, BrowserApi, CopilotResponse, EngineApi, EngineConfigResponse, ExecApi,
     ExtensionApi, InfraApi, KnowledgeContext, KnowledgeLens, KnowledgeNote, McpApi, MemoryNote,

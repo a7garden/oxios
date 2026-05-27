@@ -1,0 +1,527 @@
+# RFC-020: Proactive Recall & Sona 학습 엔진 활성화
+
+> **상태:** 📝 설계
+> **날짜:** 2026-05-27
+> **우선순위:** P3
+> **범위:** `crates/oxios-kernel/src/memory/{proactive,sona,store}.rs`, `crates/oxios-kernel/src/agent_runtime.rs`, `crates/oxios-kernel/src/memory/dream.rs`
+> **선행:** RFC-017 (미사용 모듈 정리)
+> **후행:** 없음
+
+---
+
+## 1. 동기
+
+### 1.1 현황
+
+`proactive` (220줄)와 `sona` (585줄)는 **완전히 구현되고 테스트까지 작성된 모듈**이지만,
+프로덕션에서 한 번도 실행된 적이 없다.
+
+| 모듈 | 컴파일 | re-export | 인스턴스화 | 호출 |
+|------|--------|-----------|-----------|------|
+| `proactive` | ✅ | ✅ (`lib.rs`) | ❌ 0건 | ❌ 0건 |
+| `sona` | ✅ | ✅ (`mod.rs`) | ❌ 0건 | ❌ 0건 |
+
+RFC-017에서 분리한 이유: 이 두 모듈은 "죽은 코드"(이미 컴파일에서 제외됨)가 아니라 **"실행되지 않은 코드"**이며, 활성화 전 별도의 검증과 설계가 필요하다.
+
+### 1.2 각 모듈이 풀려는 문제
+
+#### proactive — "묻기 전에 기억 꺼내주기"
+
+현재 `build_full_context()`는 Hot tier 메모리만 프롬프트에 주입한다:
+
+```rust
+// store.rs — 현재 구현
+pub async fn build_full_context(&self, _query: &str, system_prompt: &str, token_budget: usize)
+    -> Result<String>
+{
+    let hot_ctx = self.build_hot_context(token_budget).await?;
+    if hot_ctx.is_empty() { return Ok(system_prompt.to_string()); }
+    Ok(format!("{}\n\n{}", system_prompt, hot_ctx))
+}
+```
+
+문제: 사용자가 "지금 내 프로젝트 설정 어떻게 돼?"라고 물을 때, Warm tier에 있는 과거 결정(Decision)이나 선호(Preference)가 자동으로 주입되지 않는다.
+
+`proactive`는 3가지 시점에 추가 기억을 주입하려 한다:
+1. **세션 첫 메시지** — 컨텍스트 부재 상태에서 관련 기억 미리 제공
+2. **토픽 변경** — 대화 주제가 바뀔 때 새 주제 관련 기억 회상
+3. **주기적 (10메시지마다)** — 누적된 대화 맥락에서 갱신된 기억 제공
+
+#### sona — "성공한 실행 패턴 학습하기"
+
+현재 Oxios는 에이전트 실행 결과를 평가(evaluate)하지만, **성공한 실행의 "방법"을 학습하지 않는다**.
+동일한 작업이 반복되어도 매번 같은 과정을 거쳐야 한다.
+
+`sona`는:
+1. 에이전트 실행 trajectory를 기록 (`record`)
+2. 같은 도메인에서 성공한 trajectory ≥ 2개면 패턴 추출 (`distill`)
+3. 새 작업에서 유사 패턴을 찾아 프롬프트에 힌트로 주입 (`adapt`)
+
+### 1.3 위험
+
+이 모듈들은 **프로덕션에서 한 번도 실행된 적 없다**. 활성화하면:
+
+| 위험 | 원인 | 영향 |
+|------|------|------|
+| 토큰 예산 초과 | proactive recall이 Hot context 위에 추가됨 | 프롬프트 길이 초과, API 에러 |
+| TF-IDF 품질 낮음 | sona의 embedding이 TF-IDF 기반 | 의미 없는 패턴 추출 |
+| 성능 저하 | sona record가 매 실행마다 embedding 생성 | 응답 지연 |
+| 토픽 감지 부정확 | Jaccard 유사도 기반 토픽 변경 감지 | 빈번한 불필요한 recall |
+
+따라서 이 RFC는 **점진적 활성화 + 실측 기반 의사결정**을 원칙으로 한다.
+
+---
+
+## 2. 설계
+
+### 2.1 Phase 0: 실험 기반 (1일)
+
+활성화 전 각 모듈의 실제 성능을 측정한다.
+
+#### 2.1.1 Proactive recall 벤치마크
+
+```bash
+# 기존 벤치마크 스위트에 추가
+# benchmarks/oxios-bench/src/memory_bench.rs
+
+#[bench]
+fn bench_proactive_recall(b: &mut Bencher) {
+    // 1000개 메모리 entries가 있는 store에서
+    // proactive recall 시간 측정
+    // 목표: < 50ms (recall 자체), 토큰 증가 < 500 tokens
+}
+
+#[bench]
+fn bench_recall_timing(b: &mut Bencher) {
+    // RecallTiming::should_recall() < 0.01ms
+}
+```
+
+**측정 항목**:
+
+| 항목 | 허용 기준 | 측정 방법 |
+|------|----------|----------|
+| recall 소요 시간 | < 50ms | 벤치마크 |
+| 추가 토큰 수 | < token_budget의 1/3 | 결과 프롬프트 길이 측정 |
+| 토픽 감지 정확도 | 수동 평가 | 20개 시나리오 테스트 |
+
+#### 2.1.2 Sona distill 품질 평가
+
+```bash
+# 수동 평가 스크립트
+# 5개 도메인 × 각각 10개 성공 trajectory → distill → 패턴 품질 평가
+```
+
+**측정 항목**:
+
+| 항목 | 허용 기준 | 측정 방법 |
+|------|----------|----------|
+| distill 소요 시간 | < 100ms (500개 trajectory) | 벤치마크 |
+| 패턴 품질 | 의미 있는 전략 추출 (수동 평가) | 5명 평가자 × 5개 패턴 |
+| adapt 정확도 | 유사 작업에서 올바른 패턴 반환 ≥ 70% | 20개 쿼리 테스트 |
+
+**Phase 0의 판정 기준**:
+- 허용 기준을 모두 충족 → Phase 1 진행
+- 토큰/성능 기준 미달 → 구현 수정 후 재측정
+- 품질 기준 미달 → distill 알고리즘 개선 또는 모듈 삭제 결정
+
+### 2.2 Phase 1: Proactive Recall 연결 (1일)
+
+Phase 0를 통과한 경우에만 진행.
+
+#### 2.1 아키텍처 문제 해결
+
+현재 `build_full_context()`는 `HnswMemoryIndex`의 메서드이고,
+`ProactiveRecall::recall()`은 `MemoryManager`를 인자로 받는다.
+이 의존성 방향 불일치를 해결해야 한다.
+
+**해결 방안**: `ProactiveRecall`을 `HnswMemoryIndex`의 내부 필드로 통합하지 않고,
+`MemoryManager` 레벨에 새 메서드를 추가한다:
+
+```rust
+// memory/mod.rs — MemoryManager에 추가
+impl MemoryManager {
+    /// 토큰 예산 내에서 Hot + Proactive context를 빌드.
+    /// 
+    /// 내부적으로:
+    /// 1. Hot tier를 먼저 채움 (최대 token_budget의 2/3)
+    /// 2. 남은 예산으로 proactive recall 실행
+    /// 3. 합쳐서 system prompt와 함께 반환
+    pub async fn build_enriched_context(
+        &self,
+        query: &str,
+        system_prompt: &str,
+        token_budget: usize,
+        recall_timing: &mut Option<proactive::RecallTiming>,
+    ) -> Result<String> {
+        // ...
+    }
+}
+```
+
+**왜 `HnswMemoryIndex.build_full_context()`를 수정하지 않는가**:
+- `HnswMemoryIndex`는 인덱스 자료구조에 집중해야 함
+- `MemoryManager`가 더 넓은 접근 권한(search, list_by_tier 등)을 가짐
+- proactive recall은 "어떤 기억을 꺼낼지"를 결정하는 비즈니스 로직
+
+#### 2.2 토큰 예산 관리
+
+```rust
+impl MemoryManager {
+    pub async fn build_enriched_context(
+        &self,
+        query: &str,
+        system_prompt: &str,
+        token_budget: usize,
+        recall_timing: &mut Option<proactive::RecallTiming>,
+    ) -> Result<String> {
+        let mut context_parts = Vec::new();
+
+        // 1. Should we recall? (세션 시작 / 토픽 변경 / 주기)
+        let should_recall = recall_timing
+            .as_mut()
+            .map(|t| t.should_recall(query))
+            .unwrap_or(true); // RecallTiming이 없으면 항상 recall
+
+        // 2. Hot context — 예산의 2/3 우선 할당
+        let hot_budget = token_budget * 2 / 3;
+        let hot_ctx = self.build_hot_context_string(hot_budget).await?;
+        if !hot_ctx.is_empty() {
+            context_parts.push(hot_ctx);
+        }
+
+        // 3. Proactive recall — 남은 예산의 1/3
+        if should_recall {
+            let proactive_budget = token_budget / 3;
+            if let Ok(proactive_ctx) = self.proactive_recall_context(query, proactive_budget).await {
+                if !proactive_ctx.is_empty() {
+                    context_parts.push(proactive_ctx);
+                }
+            }
+        }
+
+        if context_parts.is_empty() {
+            return Ok(system_prompt.to_string());
+        }
+
+        Ok(format!("{}\n\n{}", system_prompt, context_parts.join("\n\n")))
+    }
+
+    /// Proactive recall로 보강된 컨텍스트 문자열 생성.
+    async fn proactive_recall_context(&self, query: &str, budget: usize) -> Result<String> {
+        let proactive = proactive::ProactiveRecall::new(5, 0.6);
+        let entries = proactive.recall(self, query, &[]).await?;
+        if entries.is_empty() {
+            return Ok(String::new());
+        }
+        Ok(self.blend_into_prompt(&entries, ""))
+    }
+}
+```
+
+#### 2.3 RecallTiming 상태 관리
+
+`RecallTiming`은 세션 단위 상태이다. 세션 시작 시 생성, 세션 종료 시 폐기:
+
+```rust
+// agent_runtime.rs — AgentRuntime에 필드 추가
+pub struct AgentRuntime {
+    // 기존 필드들...
+    
+    /// Proactive recall 타이밍 추적 (세션 단위).
+    recall_timing: Option<proactive::RecallTiming>,
+}
+
+impl AgentRuntime {
+    pub fn new(/* ... */) -> Self {
+        Self {
+            // 기존 초기화...
+            recall_timing: Some(proactive::RecallTiming::new()),
+        }
+    }
+}
+```
+
+세션 재시작 시 `RecallTiming`은 자동으로 초기화됨 (새 AgentRuntime 인스턴스).
+
+#### 2.4 `HnswMemoryIndex.build_full_context()` 유지
+
+기존 `build_full_context()`는 변경하지 않는다. 
+새 `build_enriched_context()`는 `MemoryManager` 레벨에서 동작하며,
+기존 코드는 Hot context만 반환하는 단순한 역할을 유지한다.
+호환성을 위해 기존 메서드를 그대로 두고, 호출하는 쪽에서 새 메서드로 점진적 전환.
+
+### 2.3 Phase 2: Sona 학습 루프 연결 (1-2일)
+
+Phase 1 완료 후 진행.
+
+#### 2.3.1 SonaEngine 인스턴스 보관
+
+```rust
+// memory/mod.rs — MemoryManager에 필드 추가
+pub struct MemoryManager {
+    // 기존 필드들...
+    
+    /// SONA 학습 엔진 (선택적).
+    sona_engine: Option<sona::SonaEngine>,
+}
+
+impl MemoryManager {
+    /// config 기반으로 SonaEngine을 초기화.
+    pub fn init_sona(&mut self, mode: sona::SonaMode, embedding: Arc<dyn EmbeddingProvider>) {
+        self.sona_engine = Some(sona::SonaEngine::new(mode, embedding));
+    }
+
+    pub fn sona_engine(&self) -> Option<&sona::SonaEngine> {
+        self.sona_engine.as_ref()
+    }
+}
+```
+
+초기화 순서:
+1. `MemoryManager::new()` — sona_engine = None
+2. `MemoryManager::init_sona(mode, embedding)` — config.sona_mode에서 모드 결정
+3. (SQLite 사용 시) `restore_from_sqlite()`로 기존 패턴 복원
+
+#### 2.3.2 Trajectory 기록 — AgentRuntime에서
+
+```rust
+// agent_runtime.rs — execute() 완료 후 기록
+
+async fn execute(&mut self) -> Result<ExecutionResult> {
+    let result = self.run_tool_loop().await?;
+
+    // Sona trajectory 기록 (성공/실패 관계없이)
+    if let Some(sona) = self.kernel_handle.memory().sona_engine() {
+        let steps: Vec<sona::TrajectoryStep> = self.execution_trace.iter()
+            .map(|step| sona::TrajectoryStep {
+                input: step.tool_name.clone(),
+                output: step.result_summary.clone(),
+                duration_ms: step.duration_ms,
+                confidence: step.confidence,
+            })
+            .collect();
+
+        if !steps.is_empty() {
+            let verdict = if result.success {
+                sona::Verdict::Success
+            } else {
+                sona::Verdict::Failure
+            };
+
+            let trajectory = sona::Trajectory::new(
+                steps,
+                verdict,
+                &self.current_domain().unwrap_or("general"),
+            );
+
+            // fire-and-forget — blocking 금지
+            let sona = sona.clone(); // SonaEngine은 Arc가 아니므로...
+            // 실제 구현에서는 Arc<SonaEngine> 필요
+        }
+    }
+
+    Ok(result)
+}
+```
+
+**전제조건**: `AgentRuntime`에 `execution_trace: Vec<ExecutionStep>` 필드가 필요.
+현재 이 필드가 없으므로, tool call 루프에서 각 스텝을 기록하는 로직을 추가해야 한다.
+
+```rust
+/// 단일 tool execution 추적 정보.
+struct ExecutionStep {
+    tool_name: String,
+    result_summary: String,
+    duration_ms: u64,
+    confidence: f32,
+}
+```
+
+#### 2.3.3 Distill — Dream에서
+
+```rust
+// dream.rs — dream_prune_and_index()에 추가
+
+// 11. Sona 패턴 추출 (Phase 7)
+let sona_patterns = {
+    if let Some(ref sona) = self.memory_manager.sona_engine() {
+        match sona.distill().await {
+            Ok(patterns) => {
+                tracing::info!(count = patterns.len(), "SONA patterns distilled");
+                // SQLite에 persist
+                #[cfg(feature = "sqlite-memory")]
+                if let Some(ref sqlite) = self.memory_manager.sqlite_store() {
+                    if let Err(e) = sona.persist_to_sqlite(sqlite) {
+                        tracing::warn!(error = %e, "SONA persist failed");
+                    }
+                }
+                patterns.len()
+            }
+            Err(e) => {
+                tracing::warn!(error = %e, "SONA distillation failed");
+                0
+            }
+        }
+    } else {
+        0
+    }
+};
+```
+
+#### 2.3.4 학습된 패턴 주입 — 프롬프트 빌드에서
+
+```rust
+// agent_runtime.rs — build_system_prompt()에 추가
+
+fn build_system_prompt(&self) -> String {
+    let mut prompt = self.base_system_prompt.clone();
+
+    // ... 기존 persona, skill 등 주입 ...
+
+    // Sona 학습 패턴 주입
+    if let Some(sona) = self.kernel_handle.memory().sona_engine() {
+        if let Ok(Some(pattern)) = sona.adapt(&self.current_query).await {
+            prompt.push_str(&format!(
+                "\n\n## Learned Strategy (confidence: {:.0}%)\n{}\n",
+                pattern.confidence * 100.0,
+                pattern.strategy,
+            ));
+        }
+    }
+
+    prompt
+}
+```
+
+#### 2.3.5 SonaEngine을 `Arc`로 래핑
+
+현재 `SonaEngine`은 `Arc`가 아니다. `MemoryManager`와 `DreamProcess`, `AgentRuntime`에서
+동시에 접근해야 하므로 `Arc<SonaEngine>`이 필요하다:
+
+```rust
+// memory/mod.rs
+pub struct MemoryManager {
+    sona_engine: Option<Arc<sona::SonaEngine>>,
+}
+```
+
+`SonaEngine` 내부는 이미 `RwLock`으로 보호되어 있으므로 추가 lock 불필요.
+
+### 2.4 기능 플래그
+
+proactive와 sona는 기본적으로 활성화하되, config로 개별 비활성화 가능:
+
+```toml
+# config.toml
+[memory]
+proactive_recall = true       # 기존 설정 필드 (이미 존재)
+sona_mode = "balanced"         # 기존 설정 필드 (이미 존재)
+sona_enabled = true            # 신규: false면 trajectory 기록/패턴 주입 스킵
+```
+
+---
+
+## 3. 마이그레이션 계획
+
+### Phase 0: 실험 (1일)
+
+| 작업 | 산출물 | 판정 기준 |
+|------|--------|----------|
+| proactive recall 벤치마크 | 벤치마크 결과 | < 50ms, 토큰 증가 < 1/3 |
+| recall timing 단위 테스트 확장 | 테스트 커버리지 | 20개 시나리오 통과 |
+| sona distill 품질 수동 평가 | 평가 보고서 | 의미 있는 패턴 ≥ 60% |
+| sona adapt 정확도 측정 | 측정 결과 | 올바른 패턴 반환 ≥ 70% |
+
+**Phase 0 실패 시**: 모듈 삭제 여부를 별도 논의. git history에 보존.
+
+### Phase 1: Proactive Recall (1일) — Phase 0 통과 시
+
+| 작업 | 파일 |
+|------|------|
+| `MemoryManager.build_enriched_context()` 구현 | `memory/mod.rs` |
+| `AgentRuntime.recall_timing` 필드 추가 | `agent_runtime.rs` |
+| 기존 `build_full_context()` 호출 → `build_enriched_context()` 전환 | 호출처 전체 |
+| 통합 테스트: proactive recall이 문맥에 주입되는지 | 신규 테스트 |
+| 통합 테스트: 토큰 예산 초과하지 않는지 | 신규 테스트 |
+
+### Phase 2: Sona (1-2일) — Phase 1 완료 후
+
+| 작업 | 파일 |
+|------|------|
+| `MemoryManager.sona_engine` 필드 + `init_sona()` | `memory/mod.rs` |
+| `SonaEngine` → `Arc<SonaEngine>` 래핑 | `memory/sona.rs`, `memory/mod.rs` |
+| `ExecutionStep` 추적 구조체 추가 | `agent_runtime.rs` |
+| tool call 루프에서 trajectory 기록 | `agent_runtime.rs` |
+| Dream에 `sona.distill()` + `persist_to_sqlite()` 추가 | `memory/dream.rs` |
+| `build_system_prompt()`에 학습 패턴 주입 | `agent_runtime.rs` |
+| config에 `sona_enabled` 필드 추가 | `config.rs` |
+| 통합 테스트: trajectory 기록 → distill → adapt 전체 흐름 | 신규 테스트 |
+
+### Phase 3: 검증 (0.5일)
+
+| 작업 | 비고 |
+|------|------|
+| end-to-end 시나리오 테스트 | "동일 작업 2회 실행 → 2회차에서 학습 패턴 주입 확인" |
+| 성능 회귀 테스트 | 기존 벤치마크 대비 응답 시간 증가 < 10% |
+| `cargo test --workspace` | 전체 테스트 통과 |
+
+---
+
+## 4. 고려사항
+
+### 4.1 Proactive recall vs 기존 Hot context
+
+현재 `build_hot_context()`가 이미 Hot tier 메모리를 주입하고 있다.
+`ProactiveRecall.recall()`도 Step 1에서 Hot tier를 읽는다.
+
+**중복 방지**: `build_enriched_context()`에서는:
+1. `build_hot_context()`로 Hot tier를 먼저 주입
+2. `ProactiveRecall`에는 `current_context`(이미 주입된 항목)를 전달하여 중복 제외
+3. Warm/Cold tier에서 추가로 발견한 항목만 주입
+
+### 4.2 Sona embedding 비용
+
+`SonaEngine.record()`는 매번 `embedding.embed()`를 호출한다.
+TF-IDF이므로 API 호출은 없지만 CPU 비용이 있다.
+
+**완화**: 
+- `record()`는 fire-and-forget으로 비동기 실행
+- embedding이 이미 캐시되어 있으면 재사용 (embedding_cache 활용)
+
+### 4.3 Sona distill 알고리즘 개선 필요
+
+현재 distill은 "첫 3 스텝을 →로 연결"하는 매우 단순한 전략이다.
+Phase 0에서 품질 기준을 통과하지 못하면 개선이 필요하다:
+
+**개선 방향** (Phase 0 실패 시에만):
+- 공통 스텝 subsequence 추출 (LCS 기반)
+- 도메인별 전략 템플릿 매칭
+- LLM 기반 패턴 요약 (Dream에서 이미 LLM을 사용하므로 추가 비용 없음)
+
+---
+
+## 5. 성공 기준
+
+### Phase 0
+
+- [ ] Proactive recall 벤치마크: < 50ms, 토큰 증가 < 1/3
+- [ ] Sona distill 품질: 의미 있는 패턴 ≥ 60%
+
+### Phase 1
+
+- [ ] `build_enriched_context()`가 proactive recall 결과를 포함
+- [ ] 토큰 예산 초과하지 않음 (기존 대비 증가 < 50%)
+- [ ] 세션 시작 / 토픽 변경 시 recall 트리거 확인
+
+### Phase 2
+
+- [ ] 에이전트 실행 후 Sona에 trajectory가 기록됨
+- [ ] Dream 통합 시 Sona 패턴이 추출됨
+- [ ] 동일 도메인 재실행 시 학습 패턴이 프롬프트에 주입됨
+- [ ] `sona_enabled = false` 시 성능 영향 없음
+
+### Phase 3
+
+- [ ] `cargo test --workspace` 통과
+- [ ] 기존 벤치마크 대비 응답 시간 증가 < 10%

@@ -30,6 +30,7 @@ use tokio::task::JoinHandle;
 use crate::agent_runtime::AgentRuntime;
 use crate::event_bus::EventBus;
 use crate::resource_monitor::ResourceMonitor;
+use crate::session_context::SessionContext;
 use crate::types::{AgentId, AgentInfo, AgentStatus};
 use oxios_ouroboros::ExecutionResult;
 
@@ -257,7 +258,7 @@ impl Supervisor for BasicSupervisor {
                     success: false,
                 });
             }
-            runtime.execute(id, &seed).await
+            runtime.execute(id, &seed, &mut SessionContext::new()).await
         });
 
         // Store the handle so kill() can abort the task.

@@ -16,7 +16,7 @@ use crate::embedding::EmbeddingVector;
 
 use super::hnsw::HnswIndex;
 use super::normalizer::l2_normalize_f32;
-use super::{content_hash, dedup_by_id, extract_keywords, MemoryEntry, MemoryManager, MemoryType};
+use super::{content_hash, dedup_by_id, extract_keywords, MemoryEntry, MemoryManager, MemoryTier, MemoryType};
 
 // ---------------------------------------------------------------------------
 // VectorIndexSnapshot
@@ -406,6 +406,76 @@ impl MemoryManager {
         }
         // Fallback to standard recall
         self.recall(query).await
+    }
+
+    /// Recall with proactive enhancement (RFC-020 Phase 1).
+    ///
+    /// Extends the standard `recall()` with proactive memory injection
+    /// based on `RecallTiming` triggers:
+    /// - Session first message (count == 0)
+    /// - Topic change (Jaccard < 0.3 after 3+ messages)
+    /// - Periodic (every 10 messages)
+    ///
+    /// Avoids duplication by passing existing recalled entries to proactive
+    /// recall's `current_context` parameter.
+    ///
+    /// For SQLite backend, `recall()` already performs BM25+vector hybrid
+    /// search, so proactive recall only supplements from Warm tier listings.
+    pub async fn recall_with_proactive(
+        &self,
+        query: &str,
+        recall_timing: &mut Option<crate::memory::proactive::RecallTiming>,
+    ) -> Result<Vec<MemoryEntry>> {
+        // Step 1: Standard recall (Hot + search)
+        let mut combined = self.recall(query).await?;
+
+        // Step 2: Proactive enhancement based on timing triggers
+        let should_recall = recall_timing
+            .as_mut()
+            .map(|t| t.should_recall(query))
+            .unwrap_or(true);
+
+        if should_recall && combined.len() < self.max_recall {
+            // SQLite backend: recall() already did BM25+vector hybrid search.
+            // Only supplement with Warm tier entries not already found.
+            #[cfg(feature = "sqlite-memory")]
+            if self.sqlite_store.is_some() {
+                let remaining = self.max_recall - combined.len();
+                let warm = self.list_by_tier(MemoryTier::Warm, remaining).await?;
+                let mut seen_ids: std::collections::HashSet<String> =
+                    combined.iter().map(|e| e.id.clone()).collect();
+                for entry in warm {
+                    if seen_ids.insert(entry.id.clone()) && combined.len() < self.max_recall {
+                        combined.push(entry);
+                    }
+                }
+            }
+
+            // JSON backend (or SQLite without store): proactive recall adds
+            // semantic search beyond recall().
+            // When sqlite-memory feature is disabled, this is the only path.
+            #[cfg(not(feature = "sqlite-memory"))]
+            {
+                let proactive = crate::memory::proactive::ProactiveRecall::new(5, 0.6);
+                let extra = proactive.recall(self, query, &combined).await?;
+                combined.extend(extra);
+                dedup_by_id(&mut combined);
+                combined.truncate(self.max_recall);
+            }
+
+            // When sqlite-memory IS enabled but no store configured,
+            // fall through to proactive recall (JSON path).
+            #[cfg(feature = "sqlite-memory")]
+            if self.sqlite_store.is_none() {
+                let proactive = crate::memory::proactive::ProactiveRecall::new(5, 0.6);
+                let extra = proactive.recall(self, query, &combined).await?;
+                combined.extend(extra);
+                dedup_by_id(&mut combined);
+                combined.truncate(self.max_recall);
+            }
+        }
+
+        Ok(combined)
     }
 
     /// Create a session summary memory entry from a completed session.

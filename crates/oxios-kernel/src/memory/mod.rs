@@ -3,6 +3,24 @@
 //! Provides persistent memory for agents across sessions.
 //! Memory entries are stored as JSON files via StateStore.
 //! Supports embedding-based vector search using TF-IDF + cosine similarity.
+//!
+//! ## Module Activity Status (RFC-017, 2026-05)
+//!
+//! 모든 모듈은 활성 경로에서 사용된다:
+//!
+//! | 범주 | 모듈 | 핵심 역할 |
+//! |------|------|----------|
+//! | **핵심** | store, sqlite_store, search | CRUD + 영속화 + 검색 |
+//! | **통합** | dream | 4-phase 백그라운드 통합 |
+//! | **분석** | graph, hnsw, flash_attention | PageRank, ANN, re-ranking |
+//! | **생명주기** | decay, auto_protect, auto_classify, compaction | 감쇠/보호/분류/압축 |
+//! | **인프라** | cache, embedding_cache, database, migration, migrate | 캐시/스키마/마이그레이션 |
+//! | **유틸** | budget, normalizer, chunking, root_index | 예산/정규화/청킹/인덱스 |
+//! | **학습** | sona, proactive | ⚠️ 구현됨, RFC-020에서 활성화 예정 |
+//!
+//! 삭제된 모듈 (git history에 보존):
+//! - `reasoning_bank` (RFC-017): Ouroboros가 동일 역할 담당
+//! - `rvf_store` (RFC-017): LLM 에이전트에 부적합한 RL/EWC 개념
 
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -442,6 +460,9 @@ pub struct MemoryManager {
     git_layer: Option<Arc<GitLayer>>,
     /// Optional HNSW index for fast ANN search.
     hnsw_index: RwLock<Option<Arc<HnswMemoryIndex>>>,
+    /// Optional SONA learning engine (RFC-020 Phase 2).
+    /// Shared via Arc so DreamProcess and AgentRuntime can access concurrently.
+    sona_engine: Option<Arc<sona::SonaEngine>>,
     /// Optional SQLite-backed store (RFC-012). When present, remember/search
     /// operations delegate here instead of StateStore.
     #[cfg(feature = "sqlite-memory")]
@@ -453,6 +474,7 @@ impl std::fmt::Debug for MemoryManager {
         f.debug_struct("MemoryManager")
             .field("max_recall", &self.max_recall)
             .field("index_size", &self.vector_index.read().len())
+            .field("sona_enabled", &self.sona_engine.is_some())
             .finish()
     }
 }
@@ -467,6 +489,7 @@ impl MemoryManager {
             embedding: Arc::new(TfIdfEmbeddingProvider),
             git_layer: None,
             hnsw_index: RwLock::new(None),
+            sona_engine: None,
             #[cfg(feature = "sqlite-memory")]
             sqlite_store: None,
         }
@@ -491,6 +514,19 @@ impl MemoryManager {
     #[cfg(feature = "sqlite-memory")]
     pub fn sqlite_store(&self) -> &Option<Arc<crate::memory::sqlite_store::SqliteMemoryStore>> {
         &self.sqlite_store
+    }
+
+    /// Attach a SONA learning engine (RFC-020 Phase 2).
+    ///
+    /// Once attached, `sona_engine()` returns the engine for
+    /// trajectory recording, pattern distillation, and adaptation.
+    pub fn set_sona_engine(&mut self, engine: Arc<sona::SonaEngine>) {
+        self.sona_engine = Some(engine);
+    }
+
+    /// Get a reference to the SONA engine (if configured).
+    pub fn sona_engine(&self) -> Option<&Arc<sona::SonaEngine>> {
+        self.sona_engine.as_ref()
     }
 
     /// Create a Space-scoped MemoryManager.
@@ -701,6 +737,7 @@ pub use compaction::CompactionTree;
 pub use decay::DecayEngine;
 pub use dream::{DreamCheckpoint, DreamProcess, DreamReport};
 pub use proactive::ProactiveRecall;
+pub use proactive::RecallTiming;
 pub use root_index::{HistoricalPeriod, RootEntry, RootIndex, TopicEntry};
 
 pub use embedding_cache::{CacheStats, EmbeddingCache};

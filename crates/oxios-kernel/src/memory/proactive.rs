@@ -19,6 +19,7 @@ use super::{MemoryEntry, MemoryManager};
 // ---------------------------------------------------------------------------
 
 /// Tracks when proactive recall should be triggered.
+#[derive(Debug, Clone)]
 pub struct RecallTiming {
     /// Last topic that triggered a recall.
     pub last_recall_topic: Option<String>,
