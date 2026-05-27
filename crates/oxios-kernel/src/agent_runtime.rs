@@ -114,9 +114,13 @@ struct ExecuteState {
     steps_completed: usize,
     success: bool,
     /// Collected trajectory steps for SONA learning (RFC-020 Phase 2).
+    /// Ordered by insertion — parallel tools get their final position
+    /// resolved when they complete, preserving approximate execution order.
     trajectory_steps: Vec<crate::memory::sona::TrajectoryStep>,
-    /// Map of tool_call_id → start instant, for duration computation.
-    tool_start_times: std::collections::HashMap<String, std::time::Instant>,
+    /// Map of tool_call_id → (start instant, index into trajectory_steps).
+    /// Used to correlate ToolExecutionEnd with the correct step when
+    /// parallel tool calls complete out of order.
+    pending_tools: std::collections::HashMap<String, (std::time::Instant, usize)>,
 }
 
 /// Runtime that wraps an oxi-sdk `Agent` for executing Seeds.
@@ -512,16 +516,18 @@ async fn run_agent(
                     tool_call_id,
                     ..
                 } => {
-                    // Record start time for duration calculation.
-                    s.tool_start_times.insert(tool_call_id.clone(), std::time::Instant::now());
-                    // Store a placeholder step — input is the tool name
-                    // (not the call ID, which is meaningless for embeddings).
+                    // Record start time and push a placeholder step.
+                    let idx = s.trajectory_steps.len();
+                    s.pending_tools.insert(
+                        tool_call_id.clone(),
+                        (std::time::Instant::now(), idx),
+                    );
                     s.trajectory_steps.push(
                         crate::memory::sona::TrajectoryStep {
                             input: tool_name.clone(),
                             output: String::new(),
                             duration_ms: 0,
-                            confidence: 0.0, // Updated on ToolExecutionEnd
+                            confidence: 0.0,
                         },
                     );
                 }
@@ -534,18 +540,14 @@ async fn run_agent(
                     if !is_error {
                         s.steps_completed += 1;
                     }
-                    // Compute duration from start time.
-                    let duration_ms = s.tool_start_times
-                        .remove(tool_call_id.as_str())
-                        .map(|start| start.elapsed().as_millis() as u64)
-                        .unwrap_or(0);
-                    // Update the last matching trajectory step.
-                    if let Some(step) = s.trajectory_steps.iter_mut().rev().find(|step| {
-                        step.output.is_empty() // Find the first unresolved step
-                    }) {
-                        step.output = summarize_tool_result(&result.content, 200);
-                        step.duration_ms = duration_ms;
-                        step.confidence = if is_error { 0.3 } else { 0.8 };
+                    // Look up the exact step by tool_call_id.
+                    if let Some((start, idx)) = s.pending_tools.remove(tool_call_id.as_str()) {
+                        let duration_ms = start.elapsed().as_millis() as u64;
+                        if let Some(step) = s.trajectory_steps.get_mut(idx) {
+                            step.output = summarize_tool_result(&result.content, 200);
+                            step.duration_ms = duration_ms;
+                            step.confidence = if is_error { 0.3 } else { 0.8 };
+                        }
                     }
                 }
                 AgentEvent::AgentEnd {
@@ -649,17 +651,21 @@ async fn run_agent(
 }
 
 /// Summarize a tool result string to fit within `max_len` characters.
+///
+/// Uses char-aware truncation to avoid panicking on multi-byte UTF-8
+/// (e.g., Korean, CJK, emoji).
 fn summarize_tool_result(result: &str, max_len: usize) -> String {
     let trimmed = result.trim();
-    if trimmed.len() <= max_len {
+    if trimmed.chars().count() <= max_len {
         return trimmed.to_string();
     }
     // Take the first line or truncate.
     let first_line = trimmed.lines().next().unwrap_or("");
-    if first_line.len() <= max_len {
+    if first_line.chars().count() <= max_len {
         first_line.to_string()
     } else {
-        format!("{}...", &first_line[..max_len - 3])
+        let truncated: String = first_line.chars().take(max_len - 3).collect();
+        format!("{}...", truncated)
     }
 }
 

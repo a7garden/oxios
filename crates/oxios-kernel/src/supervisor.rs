@@ -142,6 +142,12 @@ pub struct BasicSupervisor {
     event_bus: EventBus,
     runtime: Arc<AgentRuntime>,
     resource_monitor: Option<Arc<ResourceMonitor>>,
+    /// Session context for proactive recall timing (RFC-020).
+    /// Shared across all Seed executions within this supervisor's lifetime
+    /// so that RecallTiming can track message count and topic changes.
+    /// Uses tokio::sync::RwLock (not parking_lot) so the guard is Send,
+    /// allowing it to be held across .await in tokio::spawn.
+    session_context: Arc<tokio::sync::RwLock<SessionContext>>,
 }
 
 impl BasicSupervisor {
@@ -154,6 +160,7 @@ impl BasicSupervisor {
             event_bus,
             runtime: Arc::new(runtime),
             resource_monitor: None,
+            session_context: Arc::new(tokio::sync::RwLock::new(SessionContext::new())),
         }
     }
 
@@ -249,6 +256,10 @@ impl Supervisor for BasicSupervisor {
         let seed = seed.clone();
         let cancelled_clone = cancelled.clone();
 
+        // Share the session context so RecallTiming persists across Seeds.
+        // Uses tokio::sync::RwLock so the guard is Send-safe across .await.
+        let session_ctx = self.session_context.clone();
+
         let handle: JoinHandle<Result<ExecutionResult>> = tokio::spawn(async move {
             // Check for cancellation before starting.
             if cancelled_clone.load(Ordering::Relaxed) {
@@ -258,7 +269,8 @@ impl Supervisor for BasicSupervisor {
                     success: false,
                 });
             }
-            runtime.execute(id, &seed, &mut SessionContext::new()).await
+            let mut ctx = session_ctx.write().await;
+            runtime.execute(id, &seed, &mut ctx).await
         });
 
         // Store the handle so kill() can abort the task.

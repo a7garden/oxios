@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 //! Proactive recall — automatically inject relevant memories into context.
 //!
 //! Implements 3-step selective recall:
@@ -106,11 +105,6 @@ impl ProactiveRecall {
     /// Create with the given limit and threshold.
     pub fn new(limit: usize, threshold: f32) -> Self {
         Self { limit, threshold }
-    }
-
-    /// Create with default settings.
-    pub fn default_recall() -> Self {
-        Self::new(5, 0.6)
     }
 
     /// Execute 3-step proactive recall.
