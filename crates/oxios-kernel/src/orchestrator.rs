@@ -15,7 +15,7 @@ use std::time::Duration;
 
 use anyhow::{Context, Result};
 use chrono;
-use oxios_ouroboros::{ExecutionResult, InterviewResult, OuroborosProtocol, Phase, Seed};
+use oxios_ouroboros::{EvaluationResult, ExecutionResult, InterviewResult, OuroborosProtocol, Phase, Seed};
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -98,6 +98,8 @@ pub struct Orchestrator {
     delegation_config: DelegationConfig,
     /// A2A circuit breaker for delegation reliability.
     a2a_breaker: Arc<crate::a2a_circuit_breaker::A2ACircuitBreaker>,
+    /// Evolution loop settings.
+    evolution_config: EvolutionConfig,
 }
 
 /// Configuration for A2A delegation retries.
@@ -133,6 +135,27 @@ impl DelegationConfig {
     }
 }
 
+/// Evolution loop settings extracted from OrchestratorConfig.
+#[derive(Debug, Clone)]
+struct EvolutionConfig {
+    /// Maximum evolution iterations (0 = evaluate only).
+    max_iterations: u32,
+    /// Minimum score to pass evaluation.
+    score_threshold: f64,
+    /// Enable evaluation result caching.
+    eval_cache_enabled: bool,
+}
+
+impl From<crate::config::OrchestratorConfig> for EvolutionConfig {
+    fn from(c: crate::config::OrchestratorConfig) -> Self {
+        Self {
+            max_iterations: c.max_evolution_iterations,
+            score_threshold: c.min_evaluation_score,
+            eval_cache_enabled: c.eval_cache_enabled,
+        }
+    }
+}
+
 impl Orchestrator {
     /// Creates a new orchestrator.
     pub fn new(
@@ -150,14 +173,15 @@ impl Orchestrator {
         )
     }
 
-    /// Creates a new orchestrator with custom config (kept for API compat).
+    /// Creates a new orchestrator with custom config.
     pub fn with_config(
         ouroboros: Arc<dyn OuroborosProtocol>,
         event_bus: EventBus,
         state_store: Arc<StateStore>,
         lifecycle: AgentLifecycleManager,
-        _config: crate::config::OrchestratorConfig,
+        config: crate::config::OrchestratorConfig,
     ) -> Self {
+        let evolution_config = EvolutionConfig::from(config);
         Self {
             ouroboros,
             event_bus,
@@ -170,6 +194,7 @@ impl Orchestrator {
             conversation_buffer: RwLock::new(ConversationBuffer::default()),
             delegation_config: DelegationConfig::default(),
             a2a_breaker: Arc::new(crate::a2a_circuit_breaker::A2ACircuitBreaker::new(5, 30)),
+            evolution_config,
         }
     }
 
@@ -187,6 +212,11 @@ impl Orchestrator {
     }
 
     /// Get the current Space name tag for response decoration.
+    /// Get a reference to the SpaceManager, if set.
+    pub fn space_manager(&self) -> Option<Arc<SpaceManager>> {
+        self.space_manager.read().as_ref().cloned()
+    }
+
     pub fn current_space_tag(&self) -> String {
         self.space_manager
             .read()
@@ -236,6 +266,7 @@ impl Orchestrator {
         user_id: &str,
         user_message: &str,
         session_id: Option<&str>,
+        space_id: Option<&str>,
     ) -> Result<OrchestrationResult> {
         tracing::info!(name = "orchestrator.handle_message", session_id = %session_id.unwrap_or("new"), "starting");
         get_metrics().messages.inc();
@@ -247,7 +278,24 @@ impl Orchestrator {
 
         tracing::info!(session_id = %session_id, user_id = %user_id, content_len = user_message.len(), "Orchestrator handling message");
 
-        // ── Space Detection ──
+        // ── Space Activation (explicit) then Detection (auto) ──
+        // If the caller provided an explicit space_id, activate it first.
+        if let Some(explicit_sid) = space_id {
+            if let Ok(uuid) = uuid::Uuid::parse_str(explicit_sid) {
+                let sm_opt = {
+                    let sm_guard = self.space_manager.read();
+                    sm_guard.as_ref().cloned()
+                };
+                if let Some(sm) = sm_opt {
+                    if let Err(e) = sm.activate(&uuid).await {
+                        tracing::warn!(space_id = %explicit_sid, error = %e, "Failed to activate explicit space_id");
+                    } else {
+                        tracing::info!(space_id = %explicit_sid, "Activated explicit space");
+                    }
+                }
+            }
+        }
+
         let space_tag = self.current_space_tag();
         let (turns, sm_arc) = {
             let buffer = self.conversation_buffer.read();
@@ -567,43 +615,71 @@ impl Orchestrator {
         self.publish_phase_completed(&session_id, Phase::Execute, "completed")
             .await;
 
+        // ── Evaluate + Evolve ──
+        //
+        // Three paths:
+        // 1. output_schema → structured validation (no evolution)
+        // 2. acceptance_criteria present → full evaluate + optional evolve loop
+        // 3. neither → simple boolean pass/fail
+        let (final_result, final_seed, passed, phase_reached) =
+            if let Some(ref schema) = seed.output_schema {
+                // Structured output validation — no evolution.
+                let passed = match oxi_sdk::StructuredOutput::extract(
+                    &exec_result.output,
+                    &oxi_sdk::OutputMode::ValidatedJson {
+                        schema: schema.clone(),
+                    },
+                ) {
+                    Ok(_) => {
+                        tracing::info!(session_id = %session_id, "Structured output validation passed");
+                        true
+                    }
+                    Err(e) => {
+                        tracing::warn!(session_id = %session_id, error = %e, "Structured output validation failed");
+                        false
+                    }
+                };
+                (exec_result, seed.clone(), passed, Phase::Execute)
+            } else if self.should_evaluate(&seed) {
+                // Full Ouroboros evaluate + optional evolve loop.
+                self.publish_phase_started(&session_id, Phase::Evaluate).await;
+
+                let (result, eval, evolved_seed) = self
+                    .run_evolution_loop(&session_id, &seed, exec_result)
+                    .await?;
+
+                let passed = eval.all_passed() && eval.score >= self.evolution_config.score_threshold;
+
+                self.publish_phase_completed(
+                    &session_id,
+                    Phase::Evaluate,
+                    &format!("score={:.2}", eval.score),
+                )
+                .await;
+
+                let reached = if evolved_seed.generation > 0 {
+                    Phase::Evolve
+                } else {
+                    Phase::Evaluate
+                };
+
+                (result, evolved_seed, passed, reached)
+            } else {
+                // Simple task: boolean pass/fail, no LLM evaluation.
+                let passed = exec_result.success;
+                (exec_result, seed.clone(), passed, Phase::Execute)
+            };
+
         // Clean up the session.
         {
             let mut sessions = self.sessions.write();
             sessions.remove(&session_id);
         }
 
-        // Evaluate result — use StructuredOutput if seed has output_schema.
-        let passed = if let Some(ref schema) = seed.output_schema {
-            match oxi_sdk::StructuredOutput::extract(
-                &exec_result.output,
-                &oxi_sdk::OutputMode::ValidatedJson {
-                    schema: schema.clone(),
-                },
-            ) {
-                Ok(_) => {
-                    tracing::info!(
-                        session_id = %session_id,
-                        "Structured output validation passed"
-                    );
-                    true
-                }
-                Err(e) => {
-                    tracing::warn!(
-                        session_id = %session_id,
-                        error = %e,
-                        "Structured output validation failed"
-                    );
-                    false
-                }
-            }
-        } else {
-            exec_result.success
-        };
-
         tracing::info!(
             session_id = %session_id,
             passed,
+            phase = %phase_reached,
             "Orchestration complete"
         );
 
@@ -621,20 +697,141 @@ impl Orchestrator {
         // Record agent response in conversation buffer (for topic shift detection)
         {
             let mut buffer = self.conversation_buffer.write();
-            buffer.push_agent(&seed.goal, &space_id);
+            buffer.push_agent(&final_seed.goal, &space_id);
         }
 
         Ok(OrchestrationResult {
             session_id: Some(session_id),
             space_id: Some(space_id),
             space_tag: Some(space_tag.clone()),
-            response: format_execution_result(&seed, &exec_result),
-            seed_id: Some(seed.id),
+            response: format_execution_result(&final_seed, &final_result),
+            seed_id: Some(final_seed.id),
             agent_id: None,
-            phase_reached: Phase::Execute,
+            phase_reached,
             evaluation_passed: passed,
-            output: Some(exec_result.output.clone()),
+            output: Some(final_result.output.clone()),
         })
+    }
+
+    /// Check whether a seed should go through full evaluate + evolve.
+    ///
+    /// Only seeds with acceptance criteria and no output_schema qualify.
+    /// Simple tasks (from_message, no criteria) get boolean pass/fail.
+    fn should_evaluate(&self, seed: &Seed) -> bool {
+        !seed.acceptance_criteria.is_empty() && seed.output_schema.is_none()
+    }
+
+    /// Execute a seed via the lifecycle manager.
+    async fn execute_seed(&self, seed: &Seed) -> Result<ExecutionResult> {
+        self.lifecycle.spawn_and_run(seed, Priority::Normal).await
+    }
+
+    /// Evaluate → (optional) Evolve → re-execute loop.
+    ///
+    /// Tracks the best result seen across iterations. If evolution
+    /// degrades the score, returns the previous best.
+    async fn run_evolution_loop(
+        &self,
+        session_id: &str,
+        seed: &Seed,
+        initial_result: ExecutionResult,
+    ) -> Result<(ExecutionResult, EvaluationResult, Seed)> {
+        let max_iterations = self.evolution_config.max_iterations;
+        let threshold = self.evolution_config.score_threshold;
+
+        let mut current_seed = seed.clone();
+        let mut current_result = initial_result;
+
+        // Best-result tracking.
+        let mut best_result = current_result.clone();
+        let mut best_seed = current_seed.clone();
+        let mut best_eval: Option<EvaluationResult> = None;
+
+        for iteration in 0..=max_iterations {
+            // Evaluate
+            let evaluation = self
+                .ouroboros
+                .evaluate(&current_seed, &current_result)
+                .await?;
+
+            tracing::info!(
+                iteration,
+                seed_id = %current_seed.id,
+                score = evaluation.score,
+                passed = evaluation.all_passed(),
+                "Evaluation complete"
+            );
+
+            let _ = self.event_bus.publish(KernelEvent::EvaluationComplete {
+                seed_id: current_seed.id,
+                passed: evaluation.all_passed(),
+            });
+
+            // Update best if this iteration improved.
+            if best_eval
+                .as_ref()
+                .map_or(true, |b| evaluation.score >= b.score)
+            {
+                best_result = current_result.clone();
+                best_seed = current_seed.clone();
+                best_eval = Some(evaluation.clone());
+            }
+
+            // Passed or exhausted iterations.
+            if evaluation.score >= threshold || iteration == max_iterations {
+                if iteration == max_iterations && max_iterations > 0 {
+                    let _ = self.event_bus.publish(KernelEvent::EvolutionMaxReached {
+                        seed_id: current_seed.id,
+                        final_score: evaluation.score,
+                        iterations: iteration,
+                    });
+                }
+                return Ok((best_result, best_eval.unwrap(), best_seed));
+            }
+
+            // max_iterations == 0 → evaluate only, no evolution.
+            if max_iterations == 0 {
+                return Ok((best_result, best_eval.unwrap(), best_seed));
+            }
+
+            // Evolve: produce an improved seed.
+            let evolved = self
+                .ouroboros
+                .evolve(&current_seed, &evaluation)
+                .await?;
+            match evolved {
+                Some(new_seed) => {
+                    tracing::info!(
+                        old_seed_id = %current_seed.id,
+                        new_seed_id = %new_seed.id,
+                        iteration,
+                        "Seed evolved, re-executing"
+                    );
+
+                    let _ = self.event_bus.publish(KernelEvent::EvolutionStarted {
+                        seed_id: current_seed.id,
+                        new_seed_id: new_seed.id,
+                        iteration,
+                    });
+
+                    // Save the evolved seed.
+                    self.save_seed(&new_seed).await?;
+
+                    current_seed = new_seed;
+                    current_result = self.execute_seed(&current_seed).await?;
+                }
+                None => {
+                    tracing::info!(
+                        seed_id = %current_seed.id,
+                        "Evolve returned None, stopping loop"
+                    );
+                    return Ok((best_result, best_eval.unwrap(), best_seed));
+                }
+            }
+        }
+
+        // Unreachable: every branch above returns.
+        unreachable!()
     }
 
     /// Save a seed to the state store.

@@ -12,9 +12,16 @@
 | 2 | [RFC-014: 채널 UX 통일](rfc-014-channel-ux-unification.md) | **P0-P1** | web, cli, telegram | 📝 설계 |
 | 3 | [RFC-015: 보안 모델 통합](rfc-015-security-unification.md) | **P0-P1** | access_manager, tools, exec | 📝 설계 |
 | 4 | [RFC-016: Frontend 정리 및 패턴 통일](rfc-016-frontend-cleanup.md) | **P1** | web frontend | 📝 설계 |
-| 5 | [RFC-017: 메모리 시스템 복잡도 축소](rfc-017-memory-simplification.md) | **P2** | memory | 📝 설계 |
+| 5 | [RFC-017: 메모리 시스템 모듈 활성도 정리](rfc-017-memory-simplification.md) | **P2** | memory | 📝 설계 (개정) |
 | 6 | [RFC-018: 설정 UX 개선](rfc-018-configuration-ux.md) | **P2** | config, cli, onboarding | 📝 설계 |
-| 7 | [RFC-019: Ouroboros Dead Code 정리](rfc-019-ouroboros-cleanup.md) | **P2** | ouroboros, orchestrator | 📝 설계 |
+| 7 | [RFC-019: Ouroboros Evolution 루프 활성화](rfc-019-ouroboros-cleanup.md) | **P2** | ouroboros, orchestrator | 📝 설계 (개정) |
+
+## 개정 이력
+
+| 날짜 | RFC | 변경 사항 |
+|------|-----|----------|
+| 2026-05-27 | RFC-017 | "복잡도 축소" → "활성도 정리". 검증 결과 대부분의 모듈이 활성 코드였음. proactive/sona는 미연결 활성화 대상으로 재분류 |
+| 2026-05-27 | RFC-019 | "Dead Code 정리" → "Evolution 루프 활성화". evaluate/evolve가 완전 구현되어 있었음. 연결만 필요 |
 
 ## 우선순위 정의
 

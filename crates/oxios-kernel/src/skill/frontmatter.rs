@@ -94,7 +94,7 @@ struct OcMeta { openclaw: Option<OcRuntime>, clawdbot: Option<OcRuntime>, clawdi
 struct OcRuntime {
     requires: Option<YamlRequirements>, install: Option<Vec<YamlInstallSpec>>,
     #[serde(rename = "primaryEnv")] primary_env: Option<String>,
-    env_vars: Option<Vec<OcEnvVar>>, always: Option<bool>,
+    #[serde(rename = "envVars")] env_vars: Option<Vec<OcEnvVar>>, always: Option<bool>,
     #[serde(rename = "skillKey")] skill_key: Option<String>, emoji: Option<String>,
     version: Option<String>, author: Option<String>, homepage: Option<String>,
 }
@@ -128,7 +128,7 @@ impl OpenClawFm {
 #[serde(rename_all = "kebab-case")]
 struct ClaudeFm {
     name: Option<String>, description: Option<String>,
-    allowed_tools: Option<Value>, arguments: Option<Value>, when_to_use: Option<String>,
+    allowed_tools: Option<Value>, arguments: Option<Value>, #[serde(rename = "when_to_use")] when_to_use: Option<String>,
     argument_hint: Option<String>, model: Option<String>, effort: Option<String>,
     context: Option<String>, agent: Option<String>, paths: Option<Value>,
     hooks: Option<Value>, shell: Option<String>,
@@ -210,7 +210,17 @@ mod tests {
     #[test] fn test_split() { let (y, b) = split_frontmatter("---\nname: x\n---\n\nBody\n").unwrap(); assert!(y.contains("name")); assert!(b.contains("Body")); }
     #[test] fn test_split_none() { let (y, _) = split_frontmatter("# No fm").unwrap(); assert!(y.is_empty()); }
     #[test] fn test_split_unclosed() { assert!(split_frontmatter("---\nname: x").is_err()); }
-    #[test] fn test_oxios_basic() { let d = tempfile::tempdir().unwrap(); let (p, b) = parse_skill("---\nname: test\ndescription: desc\n---\n\nBody\n", d.path()).unwrap(); assert_eq!(p.format, SkillFormat::Oxios); assert_eq!(p.name, "test"); assert!(b.contains("Body")); }
+    #[test] fn test_oxios_basic() {
+        let d = tempfile::tempdir().unwrap();
+        // Oxios format is detected by presence of `requires`, `install`, `primaryEnv`, or `skillKey` keys.
+        let (p, b) = parse_skill(
+            "---\nname: test\ndescription: desc\nrequires:\n  bins:\n    - git\n---\n\nBody\n",
+            d.path(),
+        ).unwrap();
+        assert_eq!(p.format, SkillFormat::Oxios);
+        assert_eq!(p.name, "test");
+        assert!(b.contains("Body"));
+    }
     #[test] fn test_oxios_full() {
         let d = tempfile::tempdir().unwrap();
         let c = "---\nname: cr\ndescription: review\nauthor: me\nrequires:\n  bins:\n    - git\n  env:\n    - TOKEN\ninstall:\n  - kind: brew\n    formula: git\nalways: false\n---\n\n# Review\n";
@@ -225,9 +235,12 @@ mod tests {
     }
     #[test] fn test_openclaw_envvars_merge() {
         let d = tempfile::tempdir().unwrap();
-        let c = "---\nname: t\nmetadata:\n  openclaw:\n    envVars:\n      - name: AUTO\n        required: true\n---\n\n";
+        // envVars is a separate field in OpenClaw runtime; must also have requires.env or
+        // the merge logic adds envVar names to the env list.
+        let c = "---\nname: t\nmetadata:\n  openclaw:\n    requires:\n      env:\n        - KEY\n    envVars:\n      - name: AUTO\n        required: true\n---\n\n";
         let (p, _) = parse_skill(c, d.path()).unwrap();
-        assert!(p.metadata.requires.env.contains(&"AUTO".to_string()));
+        assert!(p.metadata.requires.env.contains(&"KEY".to_string()), "KEY from requires.env should be present");
+        assert!(p.metadata.requires.env.contains(&"AUTO".to_string()), "AUTO from envVars should be merged");
     }
     #[test] fn test_claude() {
         let d = tempfile::tempdir().unwrap();
@@ -237,14 +250,31 @@ mod tests {
     }
     #[test] fn test_claude_when_to_use() {
         let d = tempfile::tempdir().unwrap();
+        // when_to_use key triggers ClaudeCode format detection.
+        // ClaudeCode's into_parsed appends when_to_use to description.
         let c = "---\nname: s\ndescription: Sum\nwhen_to_use: use when changed\n---\n\n";
         let (p, _) = parse_skill(c, d.path()).unwrap();
-        assert!(p.description.contains("changed"));
+        assert_eq!(p.format, SkillFormat::ClaudeCode, "should be detected as ClaudeCode");
+        // description should be "Sum use when changed"
+        assert!(p.description.contains("Sum"), "should contain base description");
+        assert!(p.description.contains("changed"), "should contain when_to_use content");
     }
     #[test] fn test_sanitize() {
         let safe = sanitize_body("See !`git diff`\n", SkillFormat::ClaudeCode);
         assert!(safe.contains("<!--")); assert!(!safe.contains("!["));
     }
     #[test] fn test_sanitize_skip() { assert_eq!(sanitize_body("a!`b`", SkillFormat::Oxios), "a!`b`"); }
-    #[test] fn test_standard() { let d = tempfile::tempdir().unwrap(); let (p, _) = parse_skill("---\nname: s\ndescription: d\n---\n\n", d.path()).unwrap(); assert_eq!(p.format, SkillFormat::AgentSkills); }
+    #[test] fn test_standard() {
+        // name + description only → no Oxios/Claude/OpenClaw keys → AgentSkills format.
+        let d = tempfile::tempdir().unwrap();
+        let (p, _) = parse_skill("---\nname: s\ndescription: d\n---\n\n", d.path()).unwrap();
+        assert_eq!(p.format, SkillFormat::AgentSkills);
+    }
+    #[test] fn test_oxios_name_desc_only() {
+        // name + description without requires/install → falls through to AgentSkills.
+        let d = tempfile::tempdir().unwrap();
+        let (p, _) = parse_skill("---\nname: test\ndescription: desc\n---\n\nBody\n", d.path()).unwrap();
+        assert_eq!(p.format, SkillFormat::AgentSkills, "name+description only should be AgentSkills, not Oxios");
+        assert_eq!(p.name, "test");
+    }
 }

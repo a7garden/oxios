@@ -16,11 +16,11 @@ pub mod degraded;
 pub mod eval_cache;
 pub mod evaluation;
 pub mod interview;
+pub mod lateral;
 pub mod ouroboros_engine;
 pub mod protocol;
+pub mod regression;
 pub mod seed;
-// pub mod lateral; // Removed: evolve() is not called by any caller
-// pub mod regression; // Removed: evolve() is not called by any caller
 
 pub use evaluation::EvaluationResult;
 pub use interview::InterviewResult;

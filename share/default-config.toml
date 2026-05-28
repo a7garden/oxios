@@ -29,7 +29,8 @@ max_agents = 10
 
 [gateway]
 # Host to bind the web server to.
-host = "0.0.0.0"
+# NOTE: Bind to localhost only. Change to "0.0.0.0" only if you understand the risks.
+host = "127.0.0.1"
 # Port for the web dashboard.
 port = 4200
 
@@ -40,7 +41,17 @@ default_mode = "structured"
 # Allow shell mode (bash -c execution). DANGEROUS — keep false in production.
 allow_shell_mode = false
 # Commands allowed for structured execution.
-allowed_commands = ["git", "gh", "open", "shortcuts", "osascript"]
+allowlist_mode = "enforced"
+allowed_commands = [
+    "ls", "cat", "head", "tail", "wc",
+    "grep", "rg", "find", "fd",
+    "git",
+    "cargo", "rustc",
+    "python3", "node", "bun",
+    "curl", "wget",
+    "jq", "yq",
+    "echo", "mkdir", "cp", "mv",
+]
 # Default command timeout in seconds.
 default_timeout_secs = 120
 # Maximum command timeout in seconds.
@@ -56,18 +67,20 @@ zombie_timeout_secs = 300
 max_evolution_iterations = 3
 # Minimum evaluation score for task to be considered passed.
 min_evaluation_score = 0.8
+# Enable evaluation result caching (avoids re-evaluating same seed+output).
+eval_cache_enabled = true
 
 [context]
 active_limit_tokens = 100000
 cache_limit_entries = 50
 
 [security]
-# Enable API key authentication.
+# NOTE: auth_enabled should be true in production.
 auth_enabled = false
 # Allowed CORS origins.
 cors_origins = ["http://localhost:4200"]
 # Default allowed tools for agents.
-allowed_tools = ["read", "write", "edit", "bash", "grep", "find"]
+allowed_tools = ["read", "write", "edit", "bash", "grep", "find", "exec"]
 network_access = false
 max_execution_time_secs = 300
 max_memory_mb = 512
@@ -146,7 +159,11 @@ sync_enabled = false
 # interval_secs = 3600
 
 # Memory consolidation (RFC-008 Dream process).
+# 프리셋: "conservative" | "balanced" | "aggressive" | "custom"
+# 프리셋을 변경하면 아래 개별 필드가 무시되고 프리셋 값으로 덮어씌워집니다.
+# 개별 필드를 직접 제어하려면 preset = "custom" 으로 설정하세요.
 [memory.consolidation]
+preset = "balanced"
 # dream_enabled = true
 # dream_interval_hours = 24
 # decay_enabled = true

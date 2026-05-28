@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 //! Auto-memory bridge: synchronization between external memory systems and Oxios.
 //!
 //! Bridges Oxios MemoryManager with Claude Code's MEMORY.md format and

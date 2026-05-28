@@ -175,6 +175,24 @@ pub enum KernelEvent {
         /// Number of entries migrated.
         entries_migrated: usize,
     },
+    /// Evolution has started (evaluate → evolve → re-execute loop).
+    EvolutionStarted {
+        /// Seed ID before evolution.
+        seed_id: uuid::Uuid,
+        /// Seed ID after evolution.
+        new_seed_id: uuid::Uuid,
+        /// Current iteration (0-based).
+        iteration: u32,
+    },
+    /// Evolution loop reached max iterations.
+    EvolutionMaxReached {
+        /// The final seed ID.
+        seed_id: uuid::Uuid,
+        /// Final evaluation score.
+        final_score: f64,
+        /// Number of iterations completed.
+        iterations: u32,
+    },
 }
 
 /// Convert a KernelEvent to an AuditAction for the audit trail.
@@ -284,6 +302,23 @@ pub fn kernel_event_to_audit_action(event: &KernelEvent) -> AuditAction {
             detail: format!(
                 "spaces_merged:{}<-{}:{}entries",
                 survivor, absorbed, entries_migrated
+            ),
+        },
+        KernelEvent::EvolutionStarted {
+            seed_id,
+            new_seed_id,
+            iteration,
+        } => AuditAction::Other {
+            detail: format!("evolution:{}->{}:iter{}", seed_id, new_seed_id, iteration),
+        },
+        KernelEvent::EvolutionMaxReached {
+            seed_id,
+            final_score,
+            iterations,
+        } => AuditAction::Other {
+            detail: format!(
+                "evolution_max:{}:score={}:iters={}",
+                seed_id, final_score, iterations
             ),
         },
     }

@@ -5,6 +5,7 @@
 
 pub mod a2a_tools;
 pub mod exec_tool;
+pub mod gated_tool;
 pub mod kernel;
 pub mod kernel_bridge;
 pub mod mcp_tool;

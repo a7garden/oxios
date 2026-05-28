@@ -1,12 +1,8 @@
 //! End-to-end smoke test for the Oxios pipeline.
 //!
 //! Tests the full Ouroboros lifecycle with fully-mocked protocol and supervisor.
-//! This avoids needing real LLM API calls — we mock:
-//!   - OuroborosProtocol (no LLM calls for interview/seed/evaluate/evolve)
-//!   - Supervisor (no actual agent execution)
-//!
-//! The orchestrator pipeline (interview → seed → execute → evaluate → evolve)
-//! is exercised end-to-end to verify the call chain works.
+//! Uses `Orchestrator::with_config` to control evolution iterations explicitly,
+//! so each test verifies a specific pipeline path.
 
 use async_trait::async_trait;
 use std::collections::HashMap;
@@ -14,11 +10,11 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
 
 use anyhow::Result;
-use chrono::Utc;
 use oxios_kernel::supervisor::Supervisor;
 use oxios_kernel::types::{AgentId, AgentInfo, AgentStatus};
 use oxios_kernel::{
-    A2AProtocol, AccessManager, AgentLifecycleManager, EventBus, KernelEvent, Orchestrator,
+    config::OrchestratorConfig, A2AProtocol, AccessManager, AgentLifecycleManager, EventBus,
+    KernelEvent, Orchestrator, StateStore,
 };
 use oxios_ouroboros::{
     AmbiguityScore, EvaluationResult, ExecutionResult, InterviewResult, OuroborosProtocol, Phase,
@@ -26,11 +22,22 @@ use oxios_ouroboros::{
 };
 
 // ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+fn make_config(max_iterations: u32) -> OrchestratorConfig {
+    OrchestratorConfig {
+        max_evolution_iterations: max_iterations,
+        min_evaluation_score: 0.8,
+        eval_cache_enabled: true,
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Mock OuroborosProtocol — deterministic, no LLM calls
 // ---------------------------------------------------------------------------
 
 /// A mock Ouroboros protocol that returns deterministic results.
-/// This exercises the full orchestrator pipeline without any LLM dependency.
 struct MockOuroboros {
     interview_called: AtomicUsize,
     generate_seed_called: AtomicUsize,
@@ -38,8 +45,6 @@ struct MockOuroboros {
     evolve_called: AtomicUsize,
     /// If false, evaluation fails on first pass (triggers evolve).
     evaluation_passes: AtomicBool,
-    /// If true, evolve returns None (no evolution possible).
-    no_evolution: AtomicBool,
 }
 
 impl MockOuroboros {
@@ -50,7 +55,6 @@ impl MockOuroboros {
             evaluate_called: AtomicUsize::new(0),
             evolve_called: AtomicUsize::new(0),
             evaluation_passes: AtomicBool::new(true),
-            no_evolution: AtomicBool::new(false),
         }
     }
 
@@ -75,7 +79,10 @@ impl OuroborosProtocol for MockOuroboros {
 
     async fn generate_seed(&self, _interview: &InterviewResult) -> Result<Seed> {
         self.generate_seed_called.fetch_add(1, Ordering::SeqCst);
-        Ok(Seed::new("Test task from e2e smoke test"))
+        // Seed with acceptance_criteria so should_evaluate() returns true.
+        let mut seed = Seed::new("Test task from e2e smoke test");
+        seed.acceptance_criteria.push("Output contains 'done'".into());
+        Ok(seed)
     }
 
     async fn execute(&self, seed: &Seed) -> Result<ExecutionResult> {
@@ -106,10 +113,8 @@ impl OuroborosProtocol for MockOuroboros {
 
     async fn evolve(&self, seed: &Seed, _evaluation: &EvaluationResult) -> Result<Option<Seed>> {
         self.evolve_called.fetch_add(1, Ordering::SeqCst);
-        if self.no_evolution.load(Ordering::SeqCst) {
-            return Ok(None);
-        }
-        Ok(Some(Seed::evolved_from(seed)))
+        let evolved = Seed::evolved_from(seed);
+        Ok(Some(evolved))
     }
 }
 
@@ -144,7 +149,7 @@ impl Supervisor for MockSupervisor {
             id,
             name: spec.goal.clone(),
             status: AgentStatus::Starting,
-            created_at: Utc::now(),
+            created_at: chrono::Utc::now(),
             seed_id: Some(spec.id),
         };
         self.agents.write().insert(id, info);
@@ -204,240 +209,233 @@ impl Supervisor for MockSupervisor {
 // Test orchestrator builder
 // ---------------------------------------------------------------------------
 
-async fn build_test_orchestrator() -> Result<Orchestrator> {
+fn build_orchestrator_parts(
+) -> (Arc<MockOuroboros>, Arc<MockSupervisor>, EventBus, Arc<StateStore>) {
     let event_bus = EventBus::new(64);
-    let tmp = tempfile::tempdir()?;
+    let tmp = tempfile::tempdir().unwrap();
     let state_store = Arc::new(
-        oxios_kernel::StateStore::new(tmp.path().join("state"))
-            .map_err(|e| anyhow::anyhow!("StateStore: {}", e))?,
+        StateStore::new(tmp.path().to_path_buf())
+            .expect("StateStore creation failed"),
     );
-
-    let ouroboros: Arc<dyn OuroborosProtocol> = Arc::new(MockOuroboros::new());
+    let ouroboros = Arc::new(MockOuroboros::new());
     let supervisor = Arc::new(MockSupervisor::new(event_bus.clone()));
+    (ouroboros, supervisor, event_bus, state_store)
+}
 
-    let scheduler = Arc::new(oxios_kernel::AgentScheduler::new(4, 60, 300));
+fn make_lifecycle(
+    supervisor: Arc<MockSupervisor>,
+    scheduler: Arc<oxios_kernel::scheduler::AgentScheduler>,
+    event_bus: &EventBus,
+) -> AgentLifecycleManager {
     let access_manager = Arc::new(parking_lot::Mutex::new(AccessManager::new()));
     let a2a = Arc::new(A2AProtocol::new(event_bus.clone()));
-
-    let lifecycle = AgentLifecycleManager::new(
+    AgentLifecycleManager::new(
         supervisor,
         scheduler,
         access_manager,
         a2a,
         event_bus.clone(),
-        300, // max_execution_time_secs
-    );
-
-    let orchestrator = Orchestrator::new(ouroboros, event_bus, state_store, lifecycle);
-
-    Ok(orchestrator)
+        300,
+    )
 }
 
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
-/// Verifies the orchestrator handles a message end-to-end.
-/// The mock protocol returns low ambiguity → should reach Evaluate phase.
+/// Verifies the happy path: Interview → Seed → Execute → Evaluate (no evolve).
+/// Uses max_evolution_iterations=0 so evaluate runs but no evolution occurs.
 #[tokio::test]
-async fn test_orchestrator_handles_message() -> Result<()> {
-    let orchestrator = build_test_orchestrator().await?;
-
-    let result = orchestrator
-        .handle_message(
-            "test-user",
-            "Fix the bug in main.rs that causes crashes",
-            None,
-        )
-        .await?;
-
-    // Response should not be empty.
-    assert!(!result.response.is_empty(), "Response should not be empty");
-
-    // Should reach at least Execute phase (current pipeline: Interview → Seed → Execute).
-    assert!(
-        result.phase_reached == Phase::Execute,
-        "Expected Execute phase, got {:?}",
-        result.phase_reached
+async fn test_orchestrator_happy_path() {
+    let (ouroboros, supervisor, event_bus, state_store) = build_orchestrator_parts();
+    let scheduler = Arc::new(oxios_kernel::scheduler::AgentScheduler::default());
+    let lifecycle = make_lifecycle(supervisor.clone(), scheduler, &event_bus);
+    let orchestrator = Orchestrator::with_config(
+        ouroboros.clone(),
+        event_bus,
+        state_store,
+        lifecycle,
+        make_config(0), // evaluate only, no evolve
     );
 
-    // Should have a seed.
-    assert!(result.seed_id.is_some(), "Seed ID should be set");
+    let result = orchestrator
+        .handle_message("test-user", "Fix the bug in main.rs", None, None)
+        .await
+        .unwrap();
 
-    // Evaluation should pass (mock passes on first try).
-    assert!(result.evaluation_passed, "Evaluation should pass");
+    // With acceptance_criteria on seed → should_evaluate=true → reaches Evaluate.
+    assert!(result.session_id.is_some());
+    assert!(result.seed_id.is_some());
+    assert_eq!(result.phase_reached, Phase::Evaluate);
+    assert!(result.evaluation_passed);
+    assert!(!result.response.is_empty());
 
-    println!("Phase reached: {:?}", result.phase_reached);
-    println!("Response: {}", result.response);
+    // Verify phases: interview, seed, execute, evaluate (no evolve).
+    assert_eq!(ouroboros.interview_called.load(Ordering::SeqCst), 1);
+    assert_eq!(ouroboros.generate_seed_called.load(Ordering::SeqCst), 1);
+    assert_eq!(ouroboros.evaluate_called.load(Ordering::SeqCst), 1);
+    assert_eq!(ouroboros.evolve_called.load(Ordering::SeqCst), 0);
 
-    Ok(())
+    assert_eq!(supervisor.fork_called.load(Ordering::SeqCst), 1);
+    assert_eq!(supervisor.run_called.load(Ordering::SeqCst), 1);
 }
 
-/// Verifies the orchestrator exercises the evolution loop when evaluation fails.
+/// Verifies the evolution loop: evaluate(fail) → evolve → re-execute → evaluate(pass).
 #[tokio::test]
-async fn test_orchestrator_evolution_loop() -> Result<()> {
+async fn test_orchestrator_evolution_loop() {
     let event_bus = EventBus::new(64);
-    let tmp = tempfile::tempdir()?;
+    let tmp = tempfile::tempdir().unwrap();
     let state_store = Arc::new(
-        oxios_kernel::StateStore::new(tmp.path().join("state"))
-            .map_err(|e| anyhow::anyhow!("StateStore: {}", e))?,
+        StateStore::new(tmp.path().to_path_buf()).unwrap(),
     );
 
-    // Mock that fails evaluation first time → triggers evolve.
-    let ouroboros: Arc<dyn OuroborosProtocol> = Arc::new(MockOuroboros::with_failing_evaluation());
+    let ouroboros = Arc::new(MockOuroboros::with_failing_evaluation());
     let supervisor = Arc::new(MockSupervisor::new(event_bus.clone()));
-    let scheduler = Arc::new(oxios_kernel::AgentScheduler::new(4, 60, 300));
-    let access_manager = Arc::new(parking_lot::Mutex::new(AccessManager::new()));
-    let a2a = Arc::new(A2AProtocol::new(event_bus.clone()));
-
-    let lifecycle = AgentLifecycleManager::new(
-        supervisor.clone(),
-        scheduler,
-        access_manager,
-        a2a,
-        event_bus.clone(),
-        300, // max_execution_time_secs
+    let scheduler = Arc::new(oxios_kernel::scheduler::AgentScheduler::default());
+    let lifecycle = make_lifecycle(supervisor.clone(), scheduler, &event_bus);
+    let orchestrator = Orchestrator::with_config(
+        ouroboros.clone(),
+        event_bus,
+        state_store,
+        lifecycle,
+        make_config(3), // evolve loop enabled
     );
-
-    let orchestrator = Orchestrator::new(ouroboros, event_bus, state_store, lifecycle);
 
     let result = orchestrator
-        .handle_message("test-user", "Something that needs evolution", None)
-        .await?;
+        .handle_message("test-user", "Something that needs evolution", None, None)
+        .await
+        .unwrap();
 
-    // Should still reach Execute (evolve→re-execute).
-    // Note: current pipeline stops at Execute; evaluate is not a separate phase.
-    assert_eq!(result.phase_reached, Phase::Execute);
-    assert!(
-        result.evaluation_passed,
-        "Execution should succeed after evolution"
-    );
+    // Phase should reach Evolve (new seed was generated via evolve).
+    assert_eq!(result.phase_reached, Phase::Evolve);
+    assert!(result.evaluation_passed, "Final evaluation should pass");
 
-    println!("Evolution loop: {:?}", result.phase_reached);
-
-    Ok(())
+    // Verify the evolution loop:
+    // evaluate(fail) → evolve → fork+run → evaluate(pass)
+    assert_eq!(ouroboros.evaluate_called.load(Ordering::SeqCst), 2);
+    assert_eq!(ouroboros.evolve_called.load(Ordering::SeqCst), 1);
+    assert_eq!(supervisor.fork_called.load(Ordering::SeqCst), 2);
+    assert_eq!(supervisor.run_called.load(Ordering::SeqCst), 2);
 }
 
 /// Verifies session ID is preserved across messages in the same session.
 #[tokio::test]
-async fn test_session_continuation() -> Result<()> {
-    let orchestrator = build_test_orchestrator().await?;
+async fn test_session_continuation() {
+    let (ouroboros, supervisor, event_bus, state_store) = build_orchestrator_parts();
+    let scheduler = Arc::new(oxios_kernel::scheduler::AgentScheduler::default());
+    let lifecycle = make_lifecycle(supervisor.clone(), scheduler, &event_bus);
+    let orchestrator = Orchestrator::with_config(
+        ouroboros.clone(),
+        event_bus,
+        state_store,
+        lifecycle,
+        make_config(0),
+    );
+
     let session_id = "test-session-123";
 
     let result1 = orchestrator
-        .handle_message("test-user", "Work on the project", Some(session_id))
-        .await?;
+        .handle_message("test-user", "Work on the project", Some(session_id), None)
+        .await
+        .unwrap();
 
-    assert_eq!(
-        result1.session_id.as_deref(),
-        Some(session_id),
-        "Session ID should be preserved"
-    );
+    assert_eq!(result1.session_id.as_deref(), Some(session_id));
 
+    // Second message with same session triggers multi-turn.
     let result2 = orchestrator
-        .handle_message("test-user", "Make it production ready", Some(session_id))
-        .await?;
+        .handle_message("test-user", "Make it production ready", Some(session_id), None)
+        .await
+        .unwrap();
 
-    assert_eq!(
-        result2.session_id.as_deref(),
-        Some(session_id),
-        "Session ID should be preserved in follow-up"
-    );
-
-    println!(
-        "Session continuation: {:?} → {:?}",
-        result1.phase_reached, result2.phase_reached
-    );
-
-    Ok(())
+    assert_eq!(result2.session_id.as_deref(), Some(session_id));
 }
 
 /// Verifies multiple sessions are independent.
 #[tokio::test]
-async fn test_multiple_sessions_independent() -> Result<()> {
-    let orchestrator = build_test_orchestrator().await?;
+async fn test_multiple_sessions_independent() {
+    let (ouroboros, supervisor, event_bus, state_store) = build_orchestrator_parts();
+    let scheduler = Arc::new(oxios_kernel::scheduler::AgentScheduler::default());
+    let lifecycle = make_lifecycle(supervisor.clone(), scheduler, &event_bus);
+    let orchestrator = Orchestrator::with_config(
+        ouroboros.clone(),
+        event_bus,
+        state_store,
+        lifecycle,
+        make_config(0),
+    );
 
     let result_a = orchestrator
-        .handle_message("user-a", "Task A", Some("session-a"))
-        .await?;
+        .handle_message("user-a", "Task A", Some("session-a"), None)
+        .await
+        .unwrap();
 
     let result_b = orchestrator
-        .handle_message("user-b", "Task B", Some("session-b"))
-        .await?;
+        .handle_message("user-b", "Task B", Some("session-b"), None)
+        .await
+        .unwrap();
 
     assert_eq!(result_a.session_id.as_deref(), Some("session-a"));
     assert_eq!(result_b.session_id.as_deref(), Some("session-b"));
     assert_ne!(result_a.session_id, result_b.session_id);
-
-    println!(
-        "Session A: phase={:?}, Session B: phase={:?}",
-        result_a.phase_reached, result_b.phase_reached
-    );
-
-    Ok(())
 }
 
 /// Verifies session cleanup after orchestration completes.
 #[tokio::test]
-async fn test_session_cleaned_after_completion() -> Result<()> {
-    let orchestrator = build_test_orchestrator().await?;
+async fn test_session_cleaned_after_completion() {
+    let (ouroboros, supervisor, event_bus, state_store) = build_orchestrator_parts();
+    let scheduler = Arc::new(oxios_kernel::scheduler::AgentScheduler::default());
+    let lifecycle = make_lifecycle(supervisor.clone(), scheduler, &event_bus);
+    let orchestrator = Orchestrator::with_config(
+        ouroboros.clone(),
+        event_bus,
+        state_store,
+        lifecycle,
+        make_config(0),
+    );
+
     let session_id = "cleanup-test-session";
 
     orchestrator
-        .handle_message("test-user", "Simple task", Some(session_id))
-        .await?;
+        .handle_message("test-user", "Simple task", Some(session_id), None)
+        .await
+        .unwrap();
 
     // New message without session ID should get a fresh session.
     let result2 = orchestrator
-        .handle_message("test-user", "Another task", None)
-        .await?;
+        .handle_message("test-user", "Another task", None, None)
+        .await
+        .unwrap();
 
-    assert_ne!(
-        result2.session_id.as_deref(),
-        Some(session_id),
-        "New message should get a fresh session ID"
-    );
-
-    Ok(())
+    assert_ne!(result2.session_id.as_deref(), Some(session_id));
 }
 
 /// Verifies event bus publishes phase events during orchestration.
 #[tokio::test]
-async fn test_phase_events_published() -> Result<()> {
+async fn test_phase_events_published() {
     let event_bus = EventBus::new(64);
     let mut rx = event_bus.subscribe();
-    let tmp = tempfile::tempdir()?;
-    let state_store = Arc::new(
-        oxios_kernel::StateStore::new(tmp.path().join("state"))
-            .map_err(|e| anyhow::anyhow!("StateStore: {}", e))?,
-    );
+    let tmp = tempfile::tempdir().unwrap();
+    let state_store = Arc::new(StateStore::new(tmp.path().to_path_buf()).unwrap());
 
-    let ouroboros: Arc<dyn OuroborosProtocol> = Arc::new(MockOuroboros::new());
+    let ouroboros = Arc::new(MockOuroboros::new());
     let supervisor = Arc::new(MockSupervisor::new(event_bus.clone()));
-    let scheduler = Arc::new(oxios_kernel::AgentScheduler::new(4, 60, 300));
-    let access_manager = Arc::new(parking_lot::Mutex::new(AccessManager::new()));
-    let a2a = Arc::new(A2AProtocol::new(event_bus.clone()));
-
-    let lifecycle = AgentLifecycleManager::new(
-        supervisor,
-        scheduler,
-        access_manager,
-        a2a,
+    let scheduler = Arc::new(oxios_kernel::scheduler::AgentScheduler::default());
+    let lifecycle = make_lifecycle(supervisor, scheduler, &event_bus);
+    let orchestrator = Orchestrator::with_config(
+        ouroboros,
         event_bus.clone(),
-        300, // max_execution_time_secs
+        state_store,
+        lifecycle,
+        make_config(0), // evaluate only
     );
 
-    let orchestrator = Orchestrator::new(ouroboros, event_bus.clone(), state_store, lifecycle);
-
-    // Run orchestration in background.
     let handle = tokio::spawn(async move {
         orchestrator
-            .handle_message("test-user", "Test events", None)
+            .handle_message("test-user", "Test events", None, None)
             .await
             .unwrap()
     });
 
-    // Collect phase events.
     let mut phase_started = 0;
     let mut phase_completed = 0;
     let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(5);
@@ -449,7 +447,7 @@ async fn test_phase_events_published() -> Result<()> {
         }
 
         let evt = tokio::select! {
-            evt = rx.recv() => evt?,
+            evt = rx.recv() => evt.unwrap(),
             _ = tokio::time::sleep(elapsed) => break,
         };
 
@@ -460,24 +458,17 @@ async fn test_phase_events_published() -> Result<()> {
         }
     }
 
-    // Should have at least 3 phase started events (Interview, Seed, Execute).
+    // Pipeline: Interview → Seed → Execute → Evaluate = 4 phases.
     assert!(
-        phase_started >= 3,
-        "Expected ≥3 PhaseStarted events, got {}",
+        phase_started >= 4,
+        "Expected ≥4 PhaseStarted events, got {}",
         phase_started
     );
     assert!(
-        phase_completed >= 3,
-        "Expected ≥3 PhaseCompleted events, got {}",
+        phase_completed >= 4,
+        "Expected ≥4 PhaseCompleted events, got {}",
         phase_completed
     );
 
-    let _ = handle.await?;
-
-    println!(
-        "Phase events: started={}, completed={}",
-        phase_started, phase_completed
-    );
-
-    Ok(())
+    let _ = handle.await.unwrap();
 }

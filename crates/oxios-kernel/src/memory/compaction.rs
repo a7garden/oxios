@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 //! Compaction tree — 5-level memory compression hierarchy.
 //!
 //! Raw → Daily → Weekly → Monthly → Root
@@ -14,6 +13,7 @@ use serde::{Deserialize, Serialize};
 
 /// Compaction level in the compression hierarchy.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub enum CompactionLevel {
     /// Raw session data (uncompressed).
     Raw = 0,
@@ -29,6 +29,7 @@ pub enum CompactionLevel {
 
 impl CompactionLevel {
     /// Line count threshold for triggering compaction at this level.
+    #[allow(dead_code)]
     pub fn threshold(&self) -> usize {
         match self {
             CompactionLevel::Raw => 200,
@@ -40,6 +41,7 @@ impl CompactionLevel {
     }
 
     /// Storage subdirectory name for this level.
+    #[allow(dead_code)]
     pub fn dir_name(&self) -> &'static str {
         match self {
             CompactionLevel::Raw => "raw",
@@ -51,6 +53,7 @@ impl CompactionLevel {
     }
 
     /// All levels in order.
+    #[allow(dead_code)]
     pub fn all() -> &'static [CompactionLevel] {
         &[
             CompactionLevel::Raw,
@@ -62,6 +65,7 @@ impl CompactionLevel {
     }
 
     /// Get the next higher compaction level.
+    #[allow(dead_code)]
     pub fn next(&self) -> Option<CompactionLevel> {
         match self {
             CompactionLevel::Raw => Some(CompactionLevel::Daily),

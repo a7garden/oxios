@@ -19,6 +19,7 @@ use std::sync::Arc;
 
 use kernel::Kernel;
 use oxios_kernel::{credential::CredentialStore, DaemonManager, OxiosConfig};
+use oxios_kernel::onboarding::WORKSPACE_SUBDIRS;
 
 #[cfg(feature = "cli")]
 use oxios_cli::CliPlugin;
@@ -220,9 +221,19 @@ enum Command {
 
 #[derive(Debug, Clone, Subcommand)]
 enum ConfigAction {
+    /// 전체 설정 출력
     Show,
-    Set { key: String, value: String },
+    /// 설정값 조회
     Get { key: String },
+    /// 설정값 변경 (코멘트/포맷팅 보존)
+    Set { key: String, value: String },
+    /// 모든 설정 키 나열
+    List {
+        /// 필터 접두어 (예: "memory" → memory.* 만 표시)
+        prefix: Option<String>,
+    },
+    /// 설정값을 기본값으로 되돌림
+    Reset { key: String },
 }
 
 #[derive(Debug, Subcommand)]
@@ -295,15 +306,6 @@ enum MarketplaceAction {
 
 // ─── Constants & helpers ───────────────────────────────────────────────────
 
-const WORKSPACE_SUBDIRS: &[&str] = &[
-    "workspace",
-    "workspace/memory",
-    "workspace/memory/knowledge",
-    "workspace/seeds",
-    "workspace/sessions",
-    "workspace/skills",
-];
-
 const DEFAULT_CONFIG: &str = include_str!("../share/default-config.toml");
 
 fn ensure_workspace(oxios_home: &Path) -> Result<()> {
@@ -349,9 +351,27 @@ fn tail_file(path: &Path, lines: usize) -> Result<String> {
 async fn cmd_pkg(kernel: &Kernel, action: &PkgAction) -> Result<()> {
     let handle = kernel.handle();
     match action {
-        PkgAction::Install { source, branch: _ } => {
-            // TODO: Implement skill install from source (git/local/tarball)
-            println!("  {} Skill install from '{}' not yet implemented.", style("⚠").yellow(), source);
+        PkgAction::Install { source, branch } => {
+            // Delegate to marketplace install
+            let api = handle.marketplace_api.clone();
+            match api.install(source, branch.as_deref()).await {
+                Ok(result) => {
+                    println!(
+                        "  {} {} v{}",
+                        style("Installed").green().bold(),
+                        style(&result.slug).cyan(),
+                        style(&result.version).cyan()
+                    );
+                }
+                Err(e) => {
+                    eprintln!(
+                        "  {} Failed to install '{}': {}",
+                        style("✗").red().bold(),
+                        source,
+                        e
+                    );
+                }
+            }
         }
         PkgAction::Uninstall { name } => {
             handle.extensions.delete_skill(name).await?;
@@ -375,6 +395,11 @@ async fn cmd_pkg(kernel: &Kernel, action: &PkgAction) -> Result<()> {
             }
         }
         PkgAction::Search => {
+            // Redirect to marketplace search
+            println!(
+                "  {} Use `oxios marketplace search --query <term>` instead.",
+                style("Tip:").cyan()
+            );
             let skills = handle.extensions.list_skills_entries().await;
             if skills.is_empty() {
                 println!("  No skills installed.");
@@ -391,94 +416,254 @@ async fn cmd_pkg(kernel: &Kernel, action: &PkgAction) -> Result<()> {
 }
 
 async fn cmd_config(action: &ConfigAction, config_path: &Path) -> Result<()> {
-    let config = if config_path.exists() {
-        oxios_kernel::config::load_config(config_path)?
-    } else {
-        OxiosConfig::default()
-    };
     match action {
         ConfigAction::Show => {
+            let config = load_config_or_default(config_path)?;
             let toml_str = toml::to_string_pretty(&config).context("failed to serialize config")?;
             println!("{}", toml_str);
         }
         ConfigAction::Get { key } => {
-            let value = get_config_value(&config, key)
-                .ok_or_else(|| anyhow::anyhow!("Unknown config key: {}", key))?;
+            let config = load_config_or_default(config_path)?;
+            let value = config_get(&config, key)?;
             println!("{}", value);
         }
         ConfigAction::Set { key, value } => {
-            let mut config = if config_path.exists() {
-                let raw = std::fs::read_to_string(config_path)?;
-                toml::from_str(&raw)?
-            } else {
-                OxiosConfig::default()
-            };
-            set_config_value(&mut config, key, value)
-                .ok_or_else(|| anyhow::anyhow!("Unknown config key: {}", key))?;
-            let toml_str = toml::to_string_pretty(&config)?;
-            std::fs::write(config_path, toml_str)?;
+            config_set(config_path, key, value)?;
             println!("  {} {} = {}", style("Set").green(), key, value);
+        }
+        ConfigAction::List { prefix } => {
+            let config = load_config_or_default(config_path)?;
+            config_list(&config, prefix.as_deref())?;
+        }
+        ConfigAction::Reset { key } => {
+            let defaults = OxiosConfig::default();
+            let default_value = config_get(&defaults, key)?;
+            config_set(config_path, key, &default_value)?;
+            println!(
+                "  {} {} → 기본값 ({})",
+                style("Reset").green(),
+                key,
+                default_value
+            );
         }
     }
     Ok(())
 }
 
-fn get_config_value(config: &OxiosConfig, key: &str) -> Option<String> {
-    let parts: Vec<&str> = key.split('.').collect();
-    match parts.as_slice() {
-        ["kernel", "workspace"] => Some(config.kernel.workspace.clone()),
-        ["kernel", "event_bus_capacity"] => Some(config.kernel.event_bus_capacity.to_string()),
-        ["kernel", "max_agents"] => Some(config.kernel.max_agents.to_string()),
-        ["engine", "default_model"] => Some(config.engine.default_model.clone()),
-        ["engine", "api_key"] => Some(config.engine.api_key.clone().unwrap_or_default()),
-        ["gateway", "host"] => Some(config.gateway.host.clone()),
-        ["gateway", "port"] => Some(config.gateway.port.to_string()),
-        ["exec", "default_timeout_secs"] => Some(config.exec.default_timeout_secs.to_string()),
-        ["exec", "max_timeout_secs"] => Some(config.exec.max_timeout_secs.to_string()),
-        _ => None,
+fn load_config_or_default(config_path: &Path) -> Result<OxiosConfig> {
+    if config_path.exists() {
+        oxios_kernel::config::load_config(config_path)
+    } else {
+        Ok(OxiosConfig::default())
     }
 }
 
-fn set_config_value(config: &mut OxiosConfig, key: &str, value: &str) -> Option<()> {
+// ─── Config Get: serde_json 기반 전체 필드 dot-notation 조회 ─────────────
+
+fn config_get(config: &OxiosConfig, key: &str) -> Result<String> {
+    let json = serde_json::to_value(config)
+        .context("설정을 JSON으로 변환 실패")?;
+
+    let value = json
+        .pointer(&format!("/{}", key.replace('.', "/")))
+        .ok_or_else(|| {
+            anyhow::anyhow!(
+                "알 수 없는 설정 키: '{}'\n\
+                 사용 가능한 키는 `oxios config list`로 확인하세요.",
+                key
+            )
+        })?;
+
+    match value {
+        serde_json::Value::String(s) => Ok(s.clone()),
+        serde_json::Value::Number(n) => Ok(n.to_string()),
+        serde_json::Value::Bool(b) => Ok(b.to_string()),
+        serde_json::Value::Null => Ok("null".to_string()),
+        serde_json::Value::Array(_) | serde_json::Value::Object(_) => {
+            Ok(serde_json::to_string_pretty(value)?)
+        }
+    }
+}
+
+// ─── Config Set: toml_edit 기반 (코멘트/포맷팅 보존) ─────────────────────
+
+fn config_set(config_path: &Path, key: &str, raw_value: &str) -> Result<()> {
+    // config 파일이 없으면 기본 설정에서 생성
+    if !config_path.exists() {
+        if let Some(parent) = config_path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+        std::fs::write(config_path, DEFAULT_CONFIG)?;
+    }
+
+    let toml_str = std::fs::read_to_string(config_path)
+        .with_context(|| format!("설정 파일을 읽을 수 없습니다: {}", config_path.display()))?;
+    let mut doc = toml_str
+        .parse::<toml_edit::DocumentMut>()
+        .context("설정 파일 파싱 실패")?;
+
+    // 기존 필드 타입 존중
+    let existing_type = get_existing_type(&doc, key);
+    let parsed = parse_toml_value(raw_value, existing_type);
+
+    // dot-notation으로 테이블 탐색 + leaf 값 설정
+    set_toml_dot(&mut doc, key, parsed)?;
+
+    std::fs::write(config_path, doc.to_string())?;
+    tracing::info!(key, value = raw_value, "설정 변경");
+    Ok(())
+}
+
+fn set_toml_dot(
+    doc: &mut toml_edit::DocumentMut,
+    key: &str,
+    value: toml_edit::Item,
+) -> Result<()> {
     let parts: Vec<&str> = key.split('.').collect();
-    match parts.as_slice() {
-        ["kernel", "workspace"] => {
-            config.kernel.workspace = value.to_string();
-            Some(())
+    let mut table = doc.as_table_mut();
+
+    // Navigate to the parent table, then set the leaf value
+    for (i, part) in parts.iter().enumerate() {
+        if i == parts.len() - 1 {
+            table[*part] = value;
+            return Ok(());
+        } else {
+            table = table
+                .entry(*part)
+                .or_insert_with(|| toml_edit::Item::Table(toml_edit::Table::new()))
+                .as_table_mut()
+                .ok_or_else(|| anyhow::anyhow!("'{}'는 테이블이 아닙니다", parts[..=i].join(".")))?;
         }
-        ["kernel", "event_bus_capacity"] => {
-            config.kernel.event_bus_capacity = value.parse().ok()?;
-            Some(())
+    }
+    Ok(())
+}
+
+/// 기존 TOML 문서에서 해당 키의 값 타입을 조사.
+enum ExistingType {
+    Bool,
+    Integer,
+    Float,
+    String,
+    Unknown,
+}
+
+fn get_existing_type(doc: &toml_edit::DocumentMut, key: &str) -> ExistingType {
+    let parts: Vec<&str> = key.split('.').collect();
+    let mut table = doc.as_table();
+    for (i, part) in parts.iter().enumerate() {
+        if i == parts.len() - 1 {
+            return match table.get(*part) {
+                Some(toml_edit::Item::Value(v)) => {
+                    if v.is_bool() {
+                        ExistingType::Bool
+                    } else if v.is_integer() {
+                        ExistingType::Integer
+                    } else if v.is_float() {
+                        ExistingType::Float
+                    } else {
+                        ExistingType::String
+                    }
+                }
+                _ => ExistingType::Unknown,
+            };
         }
-        ["kernel", "max_agents"] => {
-            config.kernel.max_agents = value.parse().ok()?;
-            Some(())
+        table = match table.get(*part).and_then(|t| t.as_table()) {
+            Some(t) => t,
+            None => return ExistingType::Unknown,
+        };
+    }
+    ExistingType::Unknown
+}
+
+/// 기존 필드 타입을 존중하여 값을 파싱.
+fn parse_toml_value(raw: &str, existing: ExistingType) -> toml_edit::Item {
+    match existing {
+        ExistingType::Bool => match raw.parse::<bool>() {
+            Ok(v) => return toml_edit::value(v),
+            Err(_) => {
+                // boolean 필드에 boolean이 아닌 값 → 문자열로 폴백
+                return toml_edit::value(raw);
+            }
+        },
+        ExistingType::Integer => {
+            if let Ok(n) = raw.parse::<i64>() {
+                return toml_edit::value(n);
+            }
         }
-        ["engine", "default_model"] => {
-            config.engine.default_model = value.to_string();
-            Some(())
+        ExistingType::Float => {
+            if let Ok(n) = raw.parse::<f64>() {
+                return toml_edit::value(n);
+            }
         }
-        ["engine", "api_key"] => {
-            config.engine.api_key = Some(value.to_string());
-            Some(())
+        ExistingType::String | ExistingType::Unknown => {}
+    }
+    // Unknown 또는 파싱 실패: 자동 추론
+    if raw == "true" {
+        return toml_edit::value(true);
+    }
+    if raw == "false" {
+        return toml_edit::value(false);
+    }
+    if let Ok(n) = raw.parse::<i64>() {
+        return toml_edit::value(n);
+    }
+    if let Ok(n) = raw.parse::<f64>() {
+        return toml_edit::value(n);
+    }
+    toml_edit::value(raw)
+}
+
+// ─── Config List: 모든 leaf 키 나열 ───────────────────────────────────────
+
+fn config_list(config: &OxiosConfig, prefix: Option<&str>) -> Result<()> {
+    let json = serde_json::to_value(config)?;
+
+    let root = if let Some(p) = prefix {
+        json.pointer(&format!("/{}", p.replace('.', "/")))
+            .ok_or_else(|| anyhow::anyhow!("알 수 없는 접두어: '{}'", p))?
+    } else {
+        &json
+    };
+
+    let mut keys = Vec::new();
+    collect_leaf_keys(root, prefix.unwrap_or(""), &mut keys);
+
+    if keys.is_empty() {
+        println!("  설정 키가 없습니다.");
+    } else {
+        for (key, value) in &keys {
+            println!("  {:<50} {}", key, style(value).dim());
         }
-        ["gateway", "host"] => {
-            config.gateway.host = value.to_string();
-            Some(())
+        println!();
+        println!("  {}개 설정 키", style(keys.len()).cyan());
+    }
+    Ok(())
+}
+
+fn collect_leaf_keys(
+    value: &serde_json::Value,
+    prefix: &str,
+    out: &mut Vec<(String, String)>,
+) {
+    match value {
+        serde_json::Value::Object(map) => {
+            for (k, v) in map {
+                let new_prefix = if prefix.is_empty() {
+                    k.clone()
+                } else {
+                    format!("{}.{}", prefix, k)
+                };
+                collect_leaf_keys(v, &new_prefix, out);
+            }
         }
-        ["gateway", "port"] => {
-            config.gateway.port = value.parse().ok()?;
-            Some(())
+        _ => {
+            let display = match value {
+                serde_json::Value::String(s) => format!("\"{}\"", s),
+                serde_json::Value::Null => "null".into(),
+                other => other.to_string(),
+            };
+            out.push((prefix.to_string(), display));
         }
-        ["exec", "default_timeout_secs"] => {
-            config.exec.default_timeout_secs = value.parse().ok()?;
-            Some(())
-        }
-        ["exec", "max_timeout_secs"] => {
-            config.exec.max_timeout_secs = value.parse().ok()?;
-            Some(())
-        }
-        _ => None,
     }
 }
 
@@ -1203,10 +1388,13 @@ async fn run() -> Result<()> {
         Some(Command::Chat) => {
             #[cfg(feature = "cli")]
             {
-                let cli_channel = oxios_cli::CliChannel::new(256);
+                let kernel_handle = kernel.handle();
+                let cli_channel = oxios_cli::CliChannel::with_kernel(256, Some(kernel_handle.clone()));
                 let handle = cli_channel.handle();
-                kernel.register_channel(Box::new(cli_channel)).await;
-                let mut loop_ = oxios_cli::InteractiveLoop::new(handle);
+                if let Err(e) = kernel.register_channel(Box::new(cli_channel)).await {
+                    tracing::error!(error = %e, "Failed to register CLI channel");
+                }
+                let mut loop_ = oxios_cli::InteractiveLoop::with_kernel(handle, Some(kernel_handle));
                 loop_.run().await?;
                 Ok(())
             }
@@ -1554,23 +1742,12 @@ async fn cmd_serve(kernel: &Kernel, config_path: &Path) -> Result<()> {
     // Start guardian
     kernel.start_guardian();
 
-    // Run gateway event loop on a dedicated thread (parking_lot guards are not Send,
-    // so we cannot use tokio::spawn which may move futures between threads).
-    // The gateway polls channels and routes messages to the kernel.
+    // Run gateway event loop on the main tokio runtime.
+    // Event-driven architecture: each channel runs its own background task,
+    // pushing messages into a shared mpsc. The gateway dispatches concurrently.
     let gateway = kernel.gateway();
-    let gateway_shutdown = {
-        // Signal the gateway to stop before joining its thread.
-        let gw = Arc::clone(&gateway);
-        move || {
-            gw.signal_shutdown();
-        }
-    };
-    let gateway_handle = std::thread::spawn(move || {
-        let rt = tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .expect("gateway thread runtime");
-        rt.block_on(gateway.run()).expect("gateway run error");
+    let gateway_task = tokio::spawn(async move {
+        gateway.run().await.expect("gateway run error");
     });
 
     let config = kernel.config();
@@ -1601,18 +1778,22 @@ async fn cmd_serve(kernel: &Kernel, config_path: &Path) -> Result<()> {
     tracing::info!("Received shutdown signal, starting graceful shutdown...");
 
     // Phase 1: Signal gateway to stop accepting new messages
-    gateway_shutdown();
+    kernel.gateway().signal_shutdown();
 
     // Phase 2: Cancel channel tasks
     for task in channel_tasks {
         task.abort();
     }
 
-    // Phase 3: Wait for gateway thread with timeout
-    let gateway_result = gateway_handle.join();
+    // Phase 3: Wait for gateway task with timeout
+    let gateway_result = tokio::time::timeout(
+        std::time::Duration::from_secs(10),
+        gateway_task,
+    ).await;
     match gateway_result {
-        Ok(()) => tracing::info!("Gateway stopped cleanly"),
-        Err(e) => tracing::warn!(error = ?e, "Gateway thread panicked"),
+        Ok(Ok(())) => tracing::info!("Gateway stopped cleanly"),
+        Ok(Err(e)) => tracing::warn!(error = %e, "Gateway task error"),
+        Err(_) => tracing::warn!("Gateway shutdown timed out"),
     }
 
     // Phase 4: Terminate running agents (parallel)
@@ -1686,7 +1867,9 @@ async fn activate_channels(
                 match plugin.setup(ctx).await {
                     Ok(bundle) => {
                         tracing::info!(channel = %name, "Channel activated");
-                        kernel.register_channel(bundle.channel).await;
+                        if let Err(e) = kernel.register_channel(bundle.channel).await {
+                            tracing::error!(channel = %name, error = %e, "Failed to register channel");
+                        }
                         all_tasks.extend(bundle.tasks);
                     }
                     Err(e) => {

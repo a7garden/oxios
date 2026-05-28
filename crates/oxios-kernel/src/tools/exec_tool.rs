@@ -27,6 +27,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use tokio::sync::oneshot;
 
+use crate::access_manager::{AccessGate, AgentContext};
 use crate::access_manager::AccessManager;
 use crate::config::ExecConfig;
 
@@ -66,52 +67,109 @@ pub struct ExecResult {
 pub struct ExecTool {
     /// Execution configuration (allowlist, timeouts).
     config: Arc<ExecConfig>,
-    /// Access manager for permission checks.
+    /// Access manager for direct permission checks (legacy path).
     access: Arc<Mutex<AccessManager>>,
-    /// Agent name for access control and audit logging.
-    /// `None` = unrestricted (tests / development mode).
-    agent_name: Option<String>,
+    /// Agent security context — always present in production.
+    context: Option<AgentContext>,
+    /// Optional access gate for unified checks.
+    #[allow(dead_code)] // Used via gate when new_gated() is called
+    gate: Option<Arc<AccessGate>>,
 }
 
 impl ExecTool {
-    /// Create a new `ExecTool` with the given config and access manager.
+    /// Create a new `ExecTool` with an `AgentContext` (production path).
     ///
-    /// No agent context is attached, so access control is not enforced.
-    /// Use [`ExecTool::for_agent`] for production.
-    pub fn new(config: Arc<ExecConfig>, access: Arc<Mutex<AccessManager>>) -> Self {
-        Self {
-            config,
-            access,
-            agent_name: None,
-        }
-    }
-
-    /// Create an `ExecTool` from a [`KernelHandle`].
-    ///
-    /// Extracts `ExecConfig` and `AccessManager` from the kernel's exec facade
-    /// and binds the tool to the default agent name `"oxios-agent"`.
-    pub fn from_kernel(kernel: &crate::kernel_handle::KernelHandle) -> Self {
-        Self::for_agent(
-            Arc::new(kernel.exec.config().clone()),
-            kernel.exec.access_manager().clone(),
-            "oxios-agent".to_string(),
-        )
-    }
-
-    /// Create a new `ExecTool` bound to a specific agent.
-    ///
-    /// All executions through this instance are attributed to `agent_name`
-    /// for access control and audit logging.
-    pub fn for_agent(
+    /// All executions are attributed to the agent and pass through access checks.
+    pub fn new(
         config: Arc<ExecConfig>,
         access: Arc<Mutex<AccessManager>>,
-        agent_name: String,
+        context: AgentContext,
     ) -> Self {
         Self {
             config,
             access,
-            agent_name: Some(agent_name),
+            context: Some(context),
+            gate: None,
         }
+    }
+
+    /// Create a gated `ExecTool` with both context and access gate.
+    pub fn new_gated(
+        config: Arc<ExecConfig>,
+        context: AgentContext,
+        gate: Arc<AccessGate>,
+    ) -> Self {
+        // Extract access manager from gate for fallback path
+        Self {
+            config,
+            access: gate.access_clone(),
+            context: Some(context),
+            gate: Some(gate),
+        }
+    }
+
+    /// Create an `ExecTool` from a [`KernelHandle`] with an agent context.
+    ///
+    /// This is the primary production constructor.
+    pub fn from_kernel_with_context(
+        kernel: &crate::kernel_handle::KernelHandle,
+        context: AgentContext,
+    ) -> Self {
+        Self::new(
+            Arc::new(kernel.exec.config().clone()),
+            kernel.exec.access_manager().clone(),
+            context,
+        )
+    }
+
+    /// Create an `ExecTool` from a [`KernelHandle`] (legacy, no context).
+    ///
+    /// Binds the tool to the default agent name `"oxios-agent"`.
+    /// Prefer `from_kernel_with_context` for full security.
+    pub fn from_kernel(kernel: &crate::kernel_handle::KernelHandle) -> Self {
+        Self {
+            config: Arc::new(kernel.exec.config().clone()),
+            access: kernel.exec.access_manager().clone(),
+            context: None,
+            gate: None,
+        }
+    }
+
+    /// Create a new `ExecTool` bound to a specific agent name (legacy).
+    ///
+    /// Prefer `new()` with `AgentContext` for full security.
+    pub fn for_agent(
+        config: Arc<ExecConfig>,
+        access: Arc<Mutex<AccessManager>>,
+        _agent_name: String,
+    ) -> Self {
+        Self {
+            config,
+            access,
+            context: None,
+            gate: None,
+        }
+    }
+
+    /// Legacy constructor without agent context (for backward compatibility).
+    ///
+    /// **Warning:** This bypasses the new `AgentContext` / `AccessGate` path.
+    /// Use only for migration or testing.
+    pub fn new_unrestricted(
+        config: Arc<ExecConfig>,
+        access: Arc<Mutex<AccessManager>>,
+    ) -> Self {
+        Self {
+            config,
+            access,
+            context: None,
+            gate: None,
+        }
+    }
+
+    /// Returns the agent name if a context is attached.
+    fn agent_name(&self) -> Option<&str> {
+        self.context.as_ref().map(|c| c.agent_name.as_str())
     }
 
     /// Execute a raw command string via `bash -c <cmd>`.
@@ -134,7 +192,7 @@ impl ExecTool {
         }
 
         // Audit + access check.
-        if let Some(ref name) = self.agent_name {
+        if let Some(name) = self.agent_name() {
             let mut access = self.access.lock();
             if !access.can_use_tool(name, "bash") {
                 return Err(format!(
@@ -209,7 +267,7 @@ impl ExecTool {
         timeout_ms: u64,
     ) -> Result<ExecResult, String> {
         // --- Access control ---
-        if let Some(ref name) = self.agent_name {
+        if let Some(name) = self.agent_name() {
             let mut access = self.access.lock();
             if !access.can_use_tool(name, binary) {
                 return Err(format!(
@@ -490,12 +548,15 @@ mod tests {
     use super::*;
 
     /// Helper: build an `ExecTool` with default config and empty access manager.
-    /// Shell mode is enabled for testing purposes.
+    /// Shell mode is enabled for testing purposes. No agent context.
     fn make_tool(allowed_commands: Vec<&str>) -> ExecTool {
-        let mut config = ExecConfig::default();
+        let mut config = ExecConfig {
+            allowlist_mode: crate::config::AllowlistMode::Permissive,
+            allow_shell_mode: true,
+            ..Default::default()
+        };
         config.allowed_commands = allowed_commands.into_iter().map(String::from).collect();
-        config.allow_shell_mode = true; // Enable for tests
-        ExecTool::new(Arc::new(config), Arc::new(Mutex::new(AccessManager::new())))
+        ExecTool::new_unrestricted(Arc::new(config), Arc::new(Mutex::new(AccessManager::new())))
     }
 
     // ─── shell_exec ──────────────────────────────────────────────────
@@ -856,8 +917,11 @@ mod tests {
 
     /// Helper: build ExecTool bound to a named agent with specific permissions.
     fn make_agent_tool(agent_name: &str, allowed_tools: &[&str]) -> ExecTool {
-        let mut config = ExecConfig::default();
-        config.allow_shell_mode = true; // Enable for tests
+        let config = ExecConfig {
+            allowlist_mode: crate::config::AllowlistMode::Permissive,
+            allow_shell_mode: true,
+            ..Default::default()
+        };
         let mut access = AccessManager::new();
         // Create default permissions, then set specific allowed tools.
         {
@@ -868,10 +932,11 @@ mod tests {
                 perms.allow_tool(tool);
             }
         }
-        ExecTool::for_agent(
+        let ctx = crate::access_manager::AgentContext::test_fixture(agent_name);
+        ExecTool::new(
             Arc::new(config),
             Arc::new(Mutex::new(access)),
-            agent_name.to_string(),
+            ctx,
         )
     }
 
@@ -931,12 +996,12 @@ mod tests {
 
     #[tokio::test]
     async fn test_no_agent_name_bypasses_access_control() {
-        // ExecTool::new() (agent_name=None) should NOT check permissions,
+        // ExecTool::new_unrestricted() (no context) should NOT check permissions,
         // but shell mode must still be enabled in config.
         let mut config = ExecConfig::default();
         config.allow_shell_mode = true; // Enable shell mode for this test
         let access = AccessManager::new(); // empty — no permissions for anyone
-        let tool = ExecTool::new(Arc::new(config), Arc::new(Mutex::new(access)));
+        let tool = ExecTool::new_unrestricted(Arc::new(config), Arc::new(Mutex::new(access)));
         let result = tool.shell_exec("echo unrestricted", 5_000).await;
         assert!(
             result.is_ok(),
@@ -947,12 +1012,12 @@ mod tests {
     #[test]
     fn test_agent_name_set_correctly() {
         let tool = make_agent_tool("my-agent", &[]);
-        assert_eq!(tool.agent_name.as_deref(), Some("my-agent"));
+        assert_eq!(tool.agent_name(), Some("my-agent"));
     }
 
     #[test]
     fn test_new_has_no_agent_name() {
         let tool = make_tool(vec![]);
-        assert!(tool.agent_name.is_none());
+        assert!(tool.agent_name().is_none());
     }
 }

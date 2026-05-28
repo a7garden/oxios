@@ -20,7 +20,7 @@ use std::path::Path;
 
 // ── Constants ───────────────────────────────────────────────────────────────
 
-const WORKSPACE_SUBDIRS: &[&str] = &[
+pub const WORKSPACE_SUBDIRS: &[&str] = &[
     "workspace",
     "workspace/memory",
     "workspace/memory/knowledge",

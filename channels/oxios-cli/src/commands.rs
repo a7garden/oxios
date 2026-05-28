@@ -16,6 +16,10 @@ pub enum MetaCommand {
     Model(Option<String>),
     /// Switch the active persona. Carries the persona name, if provided.
     Persona(Option<String>),
+    /// Switch the active Space. Carries the Space name/ID, if provided.
+    Space(Option<String>),
+    /// List all Spaces.
+    Spaces,
     /// Clear the terminal screen.
     Clear,
 }
@@ -44,6 +48,8 @@ impl MetaCommand {
             ".reset" | ".r" => Some(Self::Reset),
             ".model" | ".m" => Some(Self::Model(arg)),
             ".persona" | ".p" => Some(Self::Persona(arg)),
+            ".space" | ".sp" => Some(Self::Space(arg)),
+            ".spaces" => Some(Self::Spaces),
             ".clear" | ".cls" => Some(Self::Clear),
             _ => None,
         }
@@ -52,12 +58,14 @@ impl MetaCommand {
     /// Returns the help text shown by `.help`.
     pub fn help_text() -> &'static str {
         r#"Oxios CLI — Meta-commands:
-  .quit, .exit, .q   Exit the session
-  .help, .h, .?      Show this help
-  .reset, .r          Reset the current session
-  .model, .m [NAME]   Show or switch the active model
-  .persona, .p [NAME] Show or switch the active persona
-  .clear, .cls        Clear the terminal screen
+  .quit, .exit, .q      Exit the session
+  .help, .h, .?         Show this help
+  .reset, .r             Reset the current session
+  .model, .m [NAME]      Show or switch the active model
+  .persona, .p [NAME]    Show or switch the active persona
+  .space, .sp [ID|NAME]  Show or switch the active Space
+  .spaces                List all Spaces
+  .clear, .cls           Clear the terminal screen
 "#
     }
 }
@@ -103,6 +111,29 @@ mod tests {
             MetaCommand::parse(".persona coder"),
             Some(MetaCommand::Persona(Some("coder".into())))
         );
+    }
+
+    #[test]
+    fn parse_space_no_arg() {
+        assert_eq!(MetaCommand::parse(".space"), Some(MetaCommand::Space(None)));
+        assert_eq!(MetaCommand::parse(".sp"), Some(MetaCommand::Space(None)));
+    }
+
+    #[test]
+    fn parse_space_with_arg() {
+        assert_eq!(
+            MetaCommand::parse(".space my-space"),
+            Some(MetaCommand::Space(Some("my-space".into())))
+        );
+        assert_eq!(
+            MetaCommand::parse(".sp 550e8400-e29b-41d4-a716-446655440000"),
+            Some(MetaCommand::Space(Some("550e8400-e29b-41d4-a716-446655440000".into())))
+        );
+    }
+
+    #[test]
+    fn parse_spaces() {
+        assert_eq!(MetaCommand::parse(".spaces"), Some(MetaCommand::Spaces));
     }
 
     #[test]

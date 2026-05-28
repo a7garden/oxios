@@ -6,6 +6,7 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use uuid::Uuid;
 
 /// A message arriving from a channel.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -43,6 +44,66 @@ impl IncomingMessage {
     }
 }
 
+/// Orchestration result metadata.
+///
+/// Attached by `Gateway::dispatch()` from `OrchestrationResult`.
+/// The legacy `HashMap<String, String>` metadata is retained for channel-specific data
+/// (chat_id, message_id, etc.).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ResponseMeta {
+    /// Session ID for multi-turn conversations.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub session_id: Option<String>,
+    /// Space ID that handled the message.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub space_id: Option<String>,
+    /// Space decoration tag (e.g., "[🔧 oxios]").
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub space_tag: Option<String>,
+    /// Seed ID created during orchestration.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub seed_id: Option<String>,
+    /// Furthest phase reached (Interview | Seed | Execute | Evaluate | Evolve).
+    pub phase: String,
+    /// Whether evaluation passed.
+    pub evaluation_passed: bool,
+    /// Wall-clock duration of the dispatch in milliseconds.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub duration_ms: Option<u64>,
+    /// Structured error, if this is an error response.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<UserFacingError>,
+}
+
+/// A user-facing structured error.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UserFacingError {
+    /// User-visible message (Korean).
+    pub message: String,
+    /// Error classification.
+    pub kind: ErrorKind,
+    /// Recovery suggestion.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub suggestion: Option<String>,
+}
+
+/// Error kind classification.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ErrorKind {
+    /// Agent execution failed.
+    ExecutionFailed,
+    /// LLM provider error (rate limit, API error, etc.).
+    ProviderError,
+    /// Timeout.
+    Timeout,
+    /// Insufficient permissions.
+    PermissionDenied,
+    /// Input validation failed.
+    ValidationError,
+    /// Internal system error (details not exposed to user).
+    Internal,
+}
+
 /// A message being sent to a channel.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OutgoingMessage {
@@ -59,6 +120,9 @@ pub struct OutgoingMessage {
     /// Optional metadata (e.g., session_id, phase, evaluation_passed).
     #[serde(default)]
     pub metadata: HashMap<String, String>,
+    /// RFC-014: typed orchestration metadata.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub meta: Option<ResponseMeta>,
 }
 
 impl OutgoingMessage {
@@ -85,6 +149,7 @@ impl OutgoingMessage {
             content: content.into(),
             timestamp: Utc::now(),
             metadata: HashMap::new(),
+            meta: None,
         }
     }
 
@@ -113,6 +178,7 @@ impl OutgoingMessage {
             content: content.into(),
             timestamp: Utc::now(),
             metadata,
+            meta: None,
         }
     }
 
@@ -120,5 +186,59 @@ impl OutgoingMessage {
     pub fn with_metadata_only(mut self, metadata: HashMap<String, String>) -> Self {
         self.metadata = metadata;
         self
+    }
+
+    /// Creates a success response with typed metadata.
+    ///
+    /// Combines channel-specific metadata (chat_id, message_id, etc.) with
+    /// structured orchestration metadata.
+    pub fn success(
+        correlation_id: Uuid,
+        channel: &str,
+        user_id: &str,
+        content: &str,
+        channel_meta: HashMap<String, String>,
+        response_meta: ResponseMeta,
+    ) -> Self {
+        Self {
+            id: correlation_id,
+            channel: channel.to_string(),
+            user_id: user_id.to_string(),
+            content: content.to_string(),
+            timestamp: Utc::now(),
+            metadata: channel_meta,
+            meta: Some(response_meta),
+        }
+    }
+
+    /// Creates an error response.
+    ///
+    /// The `UserFacingError` provides structured error information.
+    /// Callers can set `session_id` etc. on the returned message's metadata
+    /// to preserve conversation continuity.
+    pub fn error(
+        correlation_id: Uuid,
+        channel: &str,
+        user_id: &str,
+        err: UserFacingError,
+    ) -> Self {
+        Self {
+            id: correlation_id,
+            channel: channel.to_string(),
+            user_id: user_id.to_string(),
+            content: err.message.clone(),
+            timestamp: Utc::now(),
+            metadata: HashMap::new(),
+            meta: Some(ResponseMeta {
+                session_id: None,
+                space_id: None,
+                space_tag: None,
+                seed_id: None,
+                phase: String::new(),
+                evaluation_passed: false,
+                duration_ms: None,
+                error: Some(err),
+            }),
+        }
     }
 }

@@ -106,7 +106,7 @@ pub struct MemoryConfig {
     /// Embedding provider configuration (RFC-012).
     #[serde(default)]
     pub embedding: EmbeddingConfig,
-    /// Learning configuration (RFC-012 Phase 4: SONA + ReasoningBank).
+    /// Learning configuration (RFC-012 Phase 4: SONA).
     #[serde(default)]
     pub learning: LearningConfig,
     /// AutoMemoryBridge configuration (RFC-012 Phase 7: SQLite ↔ MEMORY.md sync).
@@ -237,15 +237,15 @@ impl Default for EmbeddingConfig {
 }
 
 // ---------------------------------------------------------------------------
-// LearningConfig (RFC-012 Phase 4: SONA + ReasoningBank)
+// LearningConfig (RFC-012 Phase 4: SONA)
 // ---------------------------------------------------------------------------
 
 /// Learning engine configuration (RFC-012 Phase 4).
 ///
-/// Controls SONA self-learning and ReasoningBank persistence.
+/// Controls SONA self-learning persistence.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LearningConfig {
-    /// Enable the learning subsystem (SONA + ReasoningBank).
+    /// Enable the learning subsystem (SONA).
     #[serde(default = "default_true")]
     pub enabled: bool,
     /// SONA operating mode: "realtime", "balanced", "research", "edge".
@@ -329,6 +329,12 @@ impl Default for MemoryBridgeConfig {
 /// All values have sensible defaults — users never need to configure these.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConsolidationConfig {
+    /// Preset: "conservative" | "balanced" | "aggressive" | "custom".
+    /// When not "custom", all other fields are overridden by the preset values.
+    /// Call `apply_preset()` once during kernel init to resolve.
+    #[serde(default = "default_preset")]
+    pub preset: String,
+
     // ── Dream Process ─────────────────────────────────
     #[serde(default = "default_true")]
     pub dream_enabled: bool,
@@ -426,9 +432,14 @@ fn default_proactive_threshold() -> f32 { 0.6 }
 fn default_demotion_stale_days() -> u32 { 30 }
 fn default_demotion_max_step() -> u32 { 1 }
 
+fn default_preset() -> String {
+    "balanced".into()
+}
+
 impl Default for ConsolidationConfig {
     fn default() -> Self {
         Self {
+            preset: default_preset(),
             dream_enabled: true,
             dream_interval_hours: 24,
             dream_min_sessions: 5,
@@ -457,6 +468,91 @@ impl Default for ConsolidationConfig {
             proactive_recall: true,
             proactive_recall_limit: 5,
             proactive_recall_threshold: 0.6,
+        }
+    }
+}
+
+impl ConsolidationConfig {
+    /// Apply the preset to all fields.
+    /// Call once during kernel initialization.
+    /// When `preset` is "custom", individual fields are left untouched.
+    pub fn apply_preset(&mut self) {
+        let resolved = match self.preset.as_str() {
+            "conservative" => Self::conservative(),
+            "aggressive" => Self::aggressive(),
+            "custom" => return,
+            _ => Self::default(), // "balanced" 및 알 수 없는 값
+        };
+        *self = resolved;
+    }
+
+    /// Conservative preset: slow decay, long retention, larger capacities.
+    fn conservative() -> Self {
+        Self {
+            preset: "conservative".into(),
+            dream_enabled: true,
+            dream_interval_hours: 48,
+            dream_min_sessions: 10,
+            hot_max_entries: 100,
+            warm_max_entries: 1000,
+            cold_max_entries: 50_000,
+            hot_token_budget: 5_000,
+            decay_enabled: true,
+            decay_multiplier: 0.8,
+            decay_threshold: 0.05,
+            retention_days: 365,
+            auto_protection: true,
+            protection_low_access: 3,
+            protection_medium_access: 5,
+            protection_high_access: 10,
+            protection_medium_sessions: 3,
+            protection_high_sessions: 5,
+            auto_classification: true,
+            type_promotion_repetitions: 5,
+            compaction_line_threshold: 300,
+            llm_compaction: true,
+            dream_model: None,
+            protection_demotion_enabled: true,
+            protection_demotion_stale_days: 90,
+            protection_demotion_max_step: 1,
+            proactive_recall: true,
+            proactive_recall_limit: 8,
+            proactive_recall_threshold: 0.5,
+        }
+    }
+
+    /// Aggressive preset: fast decay, short retention, smaller capacities.
+    fn aggressive() -> Self {
+        Self {
+            preset: "aggressive".into(),
+            dream_enabled: true,
+            dream_interval_hours: 4,
+            dream_min_sessions: 2,
+            hot_max_entries: 20,
+            warm_max_entries: 100,
+            cold_max_entries: 1_000,
+            hot_token_budget: 2_000,
+            decay_enabled: true,
+            decay_multiplier: 1.0,
+            decay_threshold: 0.1,
+            retention_days: 30,
+            auto_protection: true,
+            protection_low_access: 1,
+            protection_medium_access: 2,
+            protection_high_access: 3,
+            protection_medium_sessions: 1,
+            protection_high_sessions: 2,
+            auto_classification: true,
+            type_promotion_repetitions: 2,
+            compaction_line_threshold: 150,
+            llm_compaction: true,
+            dream_model: None,
+            protection_demotion_enabled: true,
+            protection_demotion_stale_days: 14,
+            protection_demotion_max_step: 2,
+            proactive_recall: true,
+            proactive_recall_limit: 3,
+            proactive_recall_threshold: 0.7,
         }
     }
 }
@@ -760,7 +856,7 @@ fn default_event_bus_capacity() -> usize {
 }
 
 fn default_max_agents() -> usize {
-    16
+    10
 }
 
 impl Default for KernelConfig {
@@ -768,7 +864,7 @@ impl Default for KernelConfig {
         Self {
             workspace: default_workspace(),
             event_bus_capacity: default_event_bus_capacity(),
-            max_agents: default_max_agents(),
+            max_agents: 10,
         }
     }
 }
@@ -836,6 +932,22 @@ pub enum ExecMode {
     Shell,
 }
 
+/// Execution allowlist behavior mode.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AllowlistMode {
+    /// All binaries are permitted (development only).
+    Permissive,
+    /// Only binaries in `allowed_commands` may execute.
+    Enforced,
+}
+
+impl Default for AllowlistMode {
+    fn default() -> Self {
+        Self::Enforced
+    }
+}
+
 /// Exec configuration.
 ///
 /// Governs how the kernel dispatches commands for execution.
@@ -851,6 +963,11 @@ pub struct ExecConfig {
     /// If empty, *all* bare-name commands are permitted (development mode).
     #[serde(default)]
     pub allowed_commands: Vec<String>,
+    /// Allowlist enforcement mode.
+    /// `Permissive` = empty list means all allowed (dev mode).
+    /// `Enforced` = only listed commands allowed (production).
+    #[serde(default)]
+    pub allowlist_mode: AllowlistMode,
     /// Default timeout for an exec call in seconds.
     #[serde(default = "default_exec_timeout")]
     pub default_timeout_secs: u64,
@@ -874,10 +991,18 @@ fn default_exec_max_timeout() -> u64 {
 impl ExecConfig {
     /// Check whether a binary / command name is allowed to execute.
     ///
-    /// Returns `true` when `allowed_commands` is empty (permissive dev mode)
-    /// **or** when the name is present in the allow-list.
+    /// In `Permissive` mode, returns `true` when `allowed_commands` is empty
+    /// (all allowed) **or** when the name is present in the allow-list.
+    ///
+    /// In `Enforced` mode, only names present in the allow-list are permitted.
     pub fn is_binary_allowed(&self, name: &str) -> bool {
-        self.allowed_commands.is_empty() || self.allowed_commands.iter().any(|c| c == name)
+        match self.allowlist_mode {
+            AllowlistMode::Permissive => {
+                self.allowed_commands.is_empty()
+                    || self.allowed_commands.iter().any(|c| c == name)
+            }
+            AllowlistMode::Enforced => self.allowed_commands.iter().any(|c| c == name),
+        }
     }
 }
 
@@ -887,6 +1012,7 @@ impl Default for ExecConfig {
             default_mode: ExecMode::default(),
             allow_shell_mode: default_false(),
             allowed_commands: Vec::new(),
+            allowlist_mode: AllowlistMode::default(),
             default_timeout_secs: default_exec_timeout(),
             max_timeout_secs: default_exec_max_timeout(),
         }
@@ -930,10 +1056,40 @@ impl Default for SchedulerConfig {
 }
 
 /// Orchestrator configuration (Ouroboros protocol execution).
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
-pub struct OrchestratorConfig {}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct OrchestratorConfig {
+    /// Maximum evolution iterations (0 = evaluate only, no evolution).
+    /// Default: 3.
+    #[serde(default = "default_max_evolution_iterations")]
+    pub max_evolution_iterations: u32,
 
-// (removed manual impl Default — now derived)
+    /// Minimum evaluation score for task to be considered passed (0.0–1.0).
+    /// Default: 0.8.
+    #[serde(default = "default_min_evaluation_score")]
+    pub min_evaluation_score: f64,
+
+    /// Enable evaluation result caching.
+    #[serde(default = "default_true")]
+    pub eval_cache_enabled: bool,
+}
+
+fn default_max_evolution_iterations() -> u32 {
+    3
+}
+
+fn default_min_evaluation_score() -> f64 {
+    0.8
+}
+
+impl Default for OrchestratorConfig {
+    fn default() -> Self {
+        Self {
+            max_evolution_iterations: default_max_evolution_iterations(),
+            min_evaluation_score: default_min_evaluation_score(),
+            eval_cache_enabled: true,
+        }
+    }
+}
 
 /// Context manager configuration (inspired by AIOS).
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -1006,6 +1162,7 @@ fn default_allowed_tools() -> Vec<String> {
         "bash".to_string(),
         "grep".to_string(),
         "find".to_string(),
+        "exec".to_string(),
     ]
 }
 
@@ -1496,11 +1653,22 @@ mod tests {
     #[test]
     fn test_exec_config_default_allowed_commands() {
         let config = ExecConfig::default();
-        // Empty allowed_commands means all commands are permitted.
+        // Default is Enforced mode — empty list means NOTHING allowed.
         assert!(config.allowed_commands.is_empty());
+        assert_eq!(config.allowlist_mode, AllowlistMode::Enforced);
+        assert!(!config.is_binary_allowed("anything"));
+        assert!(!config.is_binary_allowed("bash"));
+    }
+
+    #[test]
+    fn test_exec_config_permissive_mode() {
+        let config = ExecConfig {
+            allowlist_mode: AllowlistMode::Permissive,
+            ..Default::default()
+        };
+        // Permissive + empty list = all allowed
         assert!(config.is_binary_allowed("anything"));
         assert!(config.is_binary_allowed("bash"));
-        assert!(config.is_binary_allowed("rm"));
     }
 
     #[test]
@@ -1612,5 +1780,53 @@ mod tests {
         config.kernel.max_agents = 0;
         let (errors, _warnings) = config.validate();
         assert!(errors.iter().any(|e| e.contains("max_agents must be > 0")));
+    }
+
+    /// Rust Default와 share/default-config.toml 간 핵심 기본값 일치 확인.
+    /// TOML 템플릿은 "프로덕션 준비" 기본값을 가지며,
+    /// Rust Default는 "안전한 최소" 기본값을 가질 수 있음.
+    /// 핵심 스칼라 값(포트, 호스트, max_agents 등)은 반드시 일치해야 함.
+    #[test]
+    fn test_default_config_matches_toml() {
+        let from_rust = OxiosConfig::default();
+
+        let toml_str = include_str!("../../../share/default-config.toml");
+        let from_toml: OxiosConfig = toml::from_str(toml_str)
+            .expect("share/default-config.toml이 유효하지 않습니다");
+
+        // 핵심 스칼라 필드 — Rust와 TOML이 반드시 일치해야 함
+        assert_eq!(
+            from_rust.kernel.max_agents, from_toml.kernel.max_agents,
+            "kernel.max_agents 불일치: Rust={}, TOML={}",
+            from_rust.kernel.max_agents, from_toml.kernel.max_agents
+        );
+        assert_eq!(
+            from_rust.gateway.host, from_toml.gateway.host,
+            "gateway.host 불일치: Rust={}, TOML={}",
+            from_rust.gateway.host, from_toml.gateway.host
+        );
+        assert_eq!(
+            from_rust.gateway.port, from_toml.gateway.port,
+            "gateway.port 불일치: Rust={}, TOML={}",
+            from_rust.gateway.port, from_toml.gateway.port
+        );
+        assert_eq!(
+            from_rust.kernel.event_bus_capacity, from_toml.kernel.event_bus_capacity,
+            "kernel.event_bus_capacity 불일치"
+        );
+        assert_eq!(
+            from_rust.scheduler.max_concurrent, from_toml.scheduler.max_concurrent,
+            "scheduler.max_concurrent 불일치"
+        );
+        assert_eq!(
+            from_rust.memory.consolidation.preset, from_toml.memory.consolidation.preset,
+            "memory.consolidation.preset 불일치"
+        );
+
+        // TOML 템플릿이 파싱 가능한지 확인
+        let (_, warnings) = from_toml.validate();
+        for w in &warnings {
+            eprintln!("default-config.toml 경고: {}", w);
+        }
     }
 }

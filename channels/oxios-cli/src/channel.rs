@@ -10,11 +10,14 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use oxios_gateway::channel::Channel;
+use oxios_gateway::format::ChannelFormatter;
 use oxios_gateway::message::{IncomingMessage, OutgoingMessage};
+use oxios_gateway::GatewayInbox;
 use std::sync::Arc;
-use tokio::sync::mpsc;
-use tokio::sync::Mutex;
+use std::sync::atomic::{AtomicBool, Ordering};
+use tokio::sync::{mpsc, watch, Mutex};
 
+use crate::format::CliFormatter;
 use crate::session::Session;
 
 /// The CLI channel adapter.
@@ -23,23 +26,40 @@ use crate::session::Session;
 /// interface using mpsc channels for message passing.
 pub struct CliChannel {
     /// Receiver for incoming messages (user input from readline).
-    incoming_rx: Mutex<mpsc::Receiver<IncomingMessage>>,
+    /// `Option` so `start()` can take ownership via `take()`.
+    incoming_rx: Mutex<Option<mpsc::Receiver<IncomingMessage>>>,
     /// Sender for injecting incoming messages.
     incoming_tx: mpsc::Sender<IncomingMessage>,
     /// Current session metadata.
     session: Arc<std::sync::Mutex<Session>>,
+    /// CLI response formatter.
+    formatter: CliFormatter,
+    /// Shared flag indicating whether a request is currently being processed.
+    /// Set to `true` by the interactive loop on send, `false` by `send()` on response.
+    processing: Arc<AtomicBool>,
+    /// Optional kernel handle for Space management.
+    kernel: Option<Arc<oxios_kernel::KernelHandle>>,
 }
 
 impl CliChannel {
     /// Creates a new CLI channel with the given buffer size.
     pub fn new(buffer: usize) -> Self {
+        Self::with_kernel(buffer, None)
+    }
+
+    /// Creates a new CLI channel with an optional kernel handle.
+    pub fn with_kernel(buffer: usize, kernel: Option<Arc<oxios_kernel::KernelHandle>>) -> Self {
         let (incoming_tx, incoming_rx) = mpsc::channel(buffer);
         let session = Arc::new(std::sync::Mutex::new(Session::new(None)));
+        let processing = Arc::new(AtomicBool::new(false));
 
         Self {
-            incoming_rx: Mutex::new(incoming_rx),
+            incoming_rx: Mutex::new(Some(incoming_rx)),
             incoming_tx,
             session,
+            formatter: CliFormatter,
+            processing,
+            kernel,
         }
     }
 
@@ -53,7 +73,14 @@ impl CliChannel {
         CliChannelHandle {
             incoming_tx: self.incoming_tx.clone(),
             session: self.session.clone(),
+            processing: self.processing.clone(),
+            kernel: self.kernel.clone(),
         }
+    }
+
+    /// Returns a clone of the shared processing flag.
+    pub fn processing_flag(&self) -> Arc<AtomicBool> {
+        self.processing.clone()
     }
 }
 
@@ -63,14 +90,47 @@ impl Channel for CliChannel {
         "cli"
     }
 
-    async fn receive(&self) -> Result<Option<IncomingMessage>> {
-        let mut rx = self.incoming_rx.lock().await;
-        Ok(rx.recv().await)
+    async fn start(
+        &self,
+        tx: mpsc::Sender<GatewayInbox>,
+        mut shutdown: watch::Receiver<bool>,
+    ) -> Result<tokio::task::JoinHandle<()>> {
+        let internal_rx = self.incoming_rx.lock().await.take();
+        let Some(mut internal_rx) = internal_rx else {
+            anyhow::bail!("CLI channel already started (no receiver)");
+        };
+        let channel_name = self.name().to_owned();
+
+        let handle = tokio::spawn(async move {
+            loop {
+                tokio::select! {
+                    msg = internal_rx.recv() => {
+                        match msg {
+                            Some(msg) => {
+                                if tx.send((channel_name.clone(), msg)).await.is_err() {
+                                    break; // Gateway receiver closed
+                                }
+                            }
+                            None => break,
+                        }
+                    }
+                    _ = shutdown.changed() => break,
+                }
+            }
+            tracing::info!(channel = %channel_name, "CLI channel stopped");
+        });
+
+        Ok(handle)
     }
 
     async fn send(&self, msg: OutgoingMessage) -> Result<()> {
-        // Print the response to stdout.
-        println!("{}", msg.content);
+        let output = match &msg.meta {
+            Some(meta) if meta.error.is_some() => self.formatter.format_error(&msg),
+            Some(_) => self.formatter.format_success(&msg),
+            None => msg.content.clone(),
+        };
+        println!("{}", output);
+        self.processing.store(false, Ordering::Relaxed);
         Ok(())
     }
 }
@@ -82,18 +142,35 @@ impl std::fmt::Debug for CliChannel {
 }
 
 /// Handle to the CLI channel, used to inject messages from the readline loop.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct CliChannelHandle {
     /// Sender for injecting incoming messages into the gateway pipeline.
     pub incoming_tx: mpsc::Sender<IncomingMessage>,
     /// Shared session reference.
     session: Arc<std::sync::Mutex<Session>>,
+    /// Shared processing flag (set `true` on send, `false` on response).
+    processing: Arc<AtomicBool>,
+    /// Optional kernel handle for Space management.
+    kernel: Option<Arc<oxios_kernel::KernelHandle>>,
+}
+
+impl std::fmt::Debug for CliChannelHandle {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CliChannelHandle")
+            .field("has_kernel", &self.kernel.is_some())
+            .finish()
+    }
 }
 
 impl CliChannelHandle {
     /// Creates a handle from a CliChannel.
     pub fn from_channel(channel: &CliChannel) -> Self {
         channel.handle()
+    }
+
+    /// Returns a reference to the kernel handle, if available.
+    pub fn kernel(&self) -> Option<&Arc<oxios_kernel::KernelHandle>> {
+        self.kernel.as_ref()
     }
 
     /// Send a user message into the gateway pipeline.
@@ -128,5 +205,15 @@ impl CliChannelHandle {
     /// Get the current session ID.
     pub fn session_id(&self) -> uuid::Uuid {
         self.session.lock().map(|s| s.id).unwrap_or_default()
+    }
+
+    /// Mark that a request is being processed.
+    pub fn set_processing(&self, value: bool) {
+        self.processing.store(value, Ordering::Relaxed);
+    }
+
+    /// Check whether a request is currently being processed.
+    pub fn is_processing(&self) -> bool {
+        self.processing.load(Ordering::Relaxed)
     }
 }

@@ -23,14 +23,13 @@ use oxios_kernel::orchestrator::Orchestrator;
 use oxios_kernel::scheduler::AgentScheduler;
 use oxios_kernel::state_store::StateStore;
 use oxios_kernel::supervisor::Supervisor;
-use oxios_kernel::types::{AgentId, AgentInfo, AgentStatus};
+use oxios_kernel::config::OrchestratorConfig;
 use oxios_ouroboros::evaluation::EvaluationResult;
 use oxios_ouroboros::interview::InterviewResult;
 use oxios_ouroboros::protocol::{ExecutionResult, OuroborosProtocol, Phase};
 use oxios_ouroboros::seed::{AmbiguityScore, Seed};
 
-// ---------------------------------------------------------------------------
-// Mock OuroborosProtocol
+use oxios_kernel::types::{AgentId, AgentInfo, AgentStatus};
 // ---------------------------------------------------------------------------
 
 /// Mock Ouroboros protocol that skips LLM calls.
@@ -83,19 +82,10 @@ impl OuroborosProtocol for MockOuroboros {
 
     async fn generate_seed(&self, _interview: &InterviewResult) -> anyhow::Result<Seed> {
         self.generate_seed_called.fetch_add(1, Ordering::SeqCst);
-        Ok(Seed {
-            id: uuid::Uuid::new_v4(),
-            goal: "Test goal".into(),
-            constraints: vec!["No errors".into()],
-            acceptance_criteria: vec!["Output contains 'done'".into()],
-            ontology: vec![],
-            created_at: chrono::Utc::now(),
-            generation: 0,
-            parent_seed_id: None,
-            cspace_hint: None,
-            original_request: String::new(),
-            output_schema: None,
-        })
+        let mut seed = Seed::new("Test goal");
+        seed.constraints = vec!["No errors".into()];
+        seed.acceptance_criteria = vec!["Output contains 'done'".into()];
+        Ok(seed)
     }
 
     async fn execute(&self, seed: &Seed) -> anyhow::Result<ExecutionResult> {
@@ -130,19 +120,8 @@ impl OuroborosProtocol for MockOuroboros {
         _evaluation: &EvaluationResult,
     ) -> anyhow::Result<Option<Seed>> {
         self.evolve_called.fetch_add(1, Ordering::SeqCst);
-        Ok(Some(Seed {
-            id: uuid::Uuid::new_v4(),
-            goal: format!("Evolved: {}", seed.goal),
-            constraints: seed.constraints.clone(),
-            acceptance_criteria: seed.acceptance_criteria.clone(),
-            ontology: vec![],
-            created_at: chrono::Utc::now(),
-            generation: seed.generation + 1,
-            parent_seed_id: Some(seed.id),
-            cspace_hint: None,
-            original_request: String::new(),
-            output_schema: None,
-        }))
+        let evolved = Seed::evolved_from(seed);
+        Ok(Some(evolved))
     }
 }
 
@@ -247,7 +226,7 @@ impl Supervisor for MockSupervisor {
 /// Mock channel that captures outgoing messages for verification.
 struct MockChannel {
     outgoing: tokio::sync::Mutex<Vec<OutgoingMessage>>,
-    incoming_rx: tokio::sync::Mutex<tokio::sync::mpsc::Receiver<IncomingMessage>>,
+    incoming_rx: tokio::sync::Mutex<Option<tokio::sync::mpsc::Receiver<IncomingMessage>>>,
 }
 
 impl MockChannel {
@@ -255,7 +234,7 @@ impl MockChannel {
         let (_tx, rx) = tokio::sync::mpsc::channel(buffer);
         Self {
             outgoing: tokio::sync::Mutex::new(Vec::new()),
-            incoming_rx: tokio::sync::Mutex::new(rx),
+            incoming_rx: tokio::sync::Mutex::new(Some(rx)),
         }
     }
 }
@@ -266,9 +245,18 @@ impl Channel for MockChannel {
         "mock"
     }
 
-    async fn receive(&self) -> anyhow::Result<Option<IncomingMessage>> {
-        let mut rx = self.incoming_rx.lock().await;
-        Ok(rx.try_recv().ok())
+    async fn start(
+        &self,
+        _tx: tokio::sync::mpsc::Sender<oxios_gateway::GatewayInbox>,
+        mut shutdown: tokio::sync::watch::Receiver<bool>,
+    ) -> anyhow::Result<tokio::task::JoinHandle<()>> {
+        // Take the receiver so it can't be started twice.
+        self.incoming_rx.lock().await.take();
+        let handle = tokio::spawn(async move {
+            // Just wait for shutdown.
+            let _ = shutdown.changed().await;
+        });
+        Ok(handle)
     }
 
     async fn send(&self, msg: OutgoingMessage) -> anyhow::Result<()> {
@@ -422,6 +410,14 @@ async fn test_state_store_path_traversal_blocked() {
     assert!(result.is_err());
 }
 
+fn make_evolution_config(max_iterations: u32) -> OrchestratorConfig {
+    OrchestratorConfig {
+        max_evolution_iterations: max_iterations,
+        min_evaluation_score: 0.8,
+        eval_cache_enabled: true,
+    }
+}
+
 // --- Orchestrator tests ---
 
 #[tokio::test]
@@ -444,27 +440,31 @@ async fn test_orchestrator_happy_path() {
         event_bus.clone(),
         300,
     );
-    let orchestrator =
-        Orchestrator::new(ouroboros.clone(), event_bus.clone(), state_store, lifecycle);
+    let orchestrator = Orchestrator::with_config(
+        ouroboros.clone(),
+        event_bus.clone(),
+        state_store,
+        lifecycle,
+        make_evolution_config(0), // evaluate only, no evolve loop
+    );
 
     let result = orchestrator
-        .handle_message("test-user", "Do something useful", None)
+        .handle_message("test-user", "Do something useful", None, None)
         .await
         .unwrap();
 
     assert!(result.session_id.is_some());
     assert!(result.seed_id.is_some());
-    // Current pipeline: Interview → Seed → Execute (no separate Evaluate phase)
-    // phase_reached reflects the last phase entered before returning
-    assert_eq!(result.phase_reached, Phase::Execute);
-    assert!(result.evaluation_passed); // reflects exec_result.success
-    assert!(result.response.contains("completed") || !result.response.is_empty());
+    // With acceptance_criteria → should_evaluate=true → reaches Evaluate.
+    assert_eq!(result.phase_reached, Phase::Evaluate);
+    assert!(result.evaluation_passed);
+    assert!(!result.response.is_empty());
 
-    // Verify phases called: Interview, Seed, Execute (Evaluate not called separately)
+    // Verify phases called: Interview, Seed, Execute, Evaluate.
     assert_eq!(ouroboros.interview_called.load(Ordering::SeqCst), 1);
     assert_eq!(ouroboros.generate_seed_called.load(Ordering::SeqCst), 1);
-    // evaluate is called internally, not as a separate phase
-    assert_eq!(ouroboros.evaluate_called.load(Ordering::SeqCst), 0);
+    assert_eq!(ouroboros.evaluate_called.load(Ordering::SeqCst), 1); // evaluate IS called
+    assert_eq!(ouroboros.evolve_called.load(Ordering::SeqCst), 0); // evolve NOT called
 
     // Verify supervisor was called.
     assert_eq!(supervisor.fork_called.load(Ordering::SeqCst), 1);
@@ -492,23 +492,28 @@ async fn test_orchestrator_evolution_loop() {
         event_bus.clone(),
         300,
     );
-    let orchestrator =
-        Orchestrator::new(ouroboros.clone(), event_bus.clone(), state_store, lifecycle);
+    let orchestrator = Orchestrator::with_config(
+        ouroboros.clone(),
+        event_bus.clone(),
+        state_store,
+        lifecycle,
+        make_evolution_config(3), // evolve loop enabled
+    );
 
     let result = orchestrator
-        .handle_message("test-user", "Do something tricky", None)
+        .handle_message("test-user", "Do something tricky", None, None)
         .await
         .unwrap();
 
-    // Current pipeline: Interview → Seed → Execute.
-    // No separate Evaluate phase — evaluation_passed is exec_result.success.
-    // with_failing_evaluation() sets evaluation_passes=false but orchestrator never
-    // calls evaluate(), so evolution is never triggered. This test validates that
-    // path (single fork+run) rather than the evolve path.
-    assert_eq!(result.phase_reached, Phase::Execute);
-    assert!(result.evaluation_passed); // exec_result.success from MockSupervisor
-    assert_eq!(supervisor.fork_called.load(Ordering::SeqCst), 1);
-    assert_eq!(supervisor.run_called.load(Ordering::SeqCst), 1);
+    // Evaluation fails first → evolve → re-execute → evaluate(pass).
+    assert_eq!(result.phase_reached, Phase::Evolve);
+    assert!(result.evaluation_passed);
+
+    // Verify the evolution loop was exercised.
+    assert_eq!(ouroboros.evaluate_called.load(Ordering::SeqCst), 2); // fail + pass
+    assert_eq!(ouroboros.evolve_called.load(Ordering::SeqCst), 1);
+    assert_eq!(supervisor.fork_called.load(Ordering::SeqCst), 2); // initial + re-exec
+    assert_eq!(supervisor.run_called.load(Ordering::SeqCst), 2);
 }
 
 #[tokio::test]
@@ -532,12 +537,12 @@ async fn test_orchestrator_events_published() {
         event_bus.clone(),
         300,
     );
-    let orchestrator = Orchestrator::new(ouroboros, event_bus.clone(), state_store, lifecycle);
+    let orchestrator = Orchestrator::with_config(ouroboros, event_bus.clone(), state_store, lifecycle, make_evolution_config(0));
 
     // Run orchestration in background.
     let handle = tokio::spawn(async move {
         orchestrator
-            .handle_message("test-user", "Check events", None)
+            .handle_message("test-user", "Check events", None, None)
             .await
             .unwrap()
     });
@@ -604,24 +609,23 @@ async fn test_gateway_routes_message_through_orchestrator() {
             event_bus.clone(),
             300,
         );
-        Orchestrator::new(ouroboros, event_bus.clone(), state_store, lifecycle)
+        Orchestrator::with_config(ouroboros, event_bus.clone(), state_store, lifecycle, make_evolution_config(0))
     });
 
     let gateway = Gateway::new(orchestrator);
     let mock_channel = Box::new(MockChannel::new(16));
 
-    // Register the mock channel.
-    gateway.register(mock_channel).await;
+    // Register the mock channel (start() will be called internally).
+    gateway.register(mock_channel).await.unwrap();
     assert_eq!(gateway.channel_names().await, vec!["mock"]);
 
-    // Route a message.
-    let msg = IncomingMessage::new("mock", "test-user", "Hello gateway");
-    gateway.route(msg).await.unwrap();
+    // Test that channel registration works and the gateway can send_to.
+    let outgoing = OutgoingMessage::new("mock", "test-user", "Hello from gateway");
+    let result = gateway.send_to("mock", outgoing).await;
+    assert!(result.is_ok());
 
-    // The mock channel should have received the response.
-    // We need to get a reference to the mock channel — since register
-    // took ownership, let's test routing directly.
-    // Instead, test that the gateway successfully routes and doesn't panic.
+    // Clean shutdown.
+    gateway.signal_shutdown();
 }
 
 #[tokio::test]
@@ -645,17 +649,15 @@ async fn test_gateway_unknown_channel() {
             event_bus.clone(),
             300,
         );
-        Orchestrator::new(ouroboros, event_bus.clone(), state_store, lifecycle)
+        Orchestrator::with_config(ouroboros, event_bus.clone(), state_store, lifecycle, make_evolution_config(0))
     });
 
     let gateway = Gateway::new(orchestrator);
 
-    // Routing to a non-existent channel should still succeed
-    // (the orchestrator runs, but the response can't be delivered).
-    let msg = IncomingMessage::new("nonexistent", "test-user", "Test");
-    let result = gateway.route(msg).await;
-    // The route itself should succeed — the missing channel just means
-    // the response won't be delivered, which is logged as a warning.
+    // Sending to a non-existent channel should succeed (logged as warning).
+    let outgoing = OutgoingMessage::new("nonexistent", "test-user", "Test");
+    let result = gateway.send_to("nonexistent", outgoing).await;
+    // send_to succeeds even if channel doesn't exist — just logs a warning.
     assert!(result.is_ok());
 }
 
@@ -783,18 +785,18 @@ async fn test_scheduler_orchestrator_integration() {
         event_bus.clone(),
         300,
     );
-    let orchestrator = Orchestrator::new(ouroboros, event_bus.clone(), state_store, lifecycle);
+    let orchestrator = Orchestrator::with_config(ouroboros, event_bus.clone(), state_store, lifecycle, make_evolution_config(0));
 
     // Run a single orchestration.
     let result = orchestrator
-        .handle_message("test-user", "Build a simple thing", None)
+        .handle_message("test-user", "Build a simple thing", None, None)
         .await
         .unwrap();
 
     assert!(result.session_id.is_some());
     assert!(result.seed_id.is_some());
-    // Pipeline ends at Execute (no separate Evaluate phase).
-    assert_eq!(result.phase_reached, Phase::Execute);
+    // With acceptance_criteria → should_evaluate=true, max_iterations=0 → evaluate only.
+    assert_eq!(result.phase_reached, Phase::Evaluate);
 
     // Scheduler stats - tasks were submitted by the supervisor.
     // They may still be queued if next_task was never called, or running if called.
@@ -870,7 +872,7 @@ async fn test_scheduler_priority_ordering_in_orchestration() {
         event_bus.clone(),
         300,
     );
-    let _orchestrator = Orchestrator::new(ouroboros, event_bus, state_store, lifecycle);
+    let _orchestrator = Orchestrator::with_config(ouroboros, event_bus, state_store, lifecycle, make_evolution_config(0));
     // Orchestrator is created successfully — shared state is fine.
 }
 

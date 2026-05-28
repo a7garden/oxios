@@ -1,5 +1,4 @@
 #![allow(missing_docs)]
-#![allow(dead_code)]
 //! Dream process — 4-phase background memory consolidation.
 //!
 //! Phase 1: Orient — scan current state, build map
@@ -380,6 +379,7 @@ pub struct DreamProcess {
     /// Auto-protector.
     auto_protector: AutoProtector,
     /// Compaction tree.
+    #[allow(dead_code)]
     compaction_tree: CompactionTree,
     /// Configuration.
     config: DreamConfig,
@@ -402,7 +402,7 @@ struct Phase4Result {
     contradictions_resolved: usize,
     /// Number of memories re-ranked by Flash Attention (Phase 6).
     flash_reranked: usize,
-    /// Number of learning patterns persisted (Phase 4: SONA + ReasoningBank).
+    /// Number of learning patterns persisted (Phase 4: SONA).
     patterns_persisted: usize,
 }
 
@@ -988,7 +988,7 @@ impl DreamProcess {
             }
         }
 
-        // 9. Persist & auto-promote learning patterns (Phase 4: SONA + ReasoningBank)
+        // 9. Persist & auto-promote learning patterns (Phase 4: SONA)
         let patterns_persisted = {
             #[cfg(feature = "sqlite-memory")]
             if let Some(ref sqlite) = self.memory_manager.sqlite_store() {

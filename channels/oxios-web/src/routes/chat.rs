@@ -58,6 +58,18 @@ pub(crate) struct ChatResponse {
     /// Phase reached during orchestration.
     #[serde(skip_serializing_if = "Option::is_none")]
     phase: Option<String>,
+    /// RFC-014: Space tag decoration.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    space_tag: Option<String>,
+    /// RFC-014: Seed ID.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    seed_id: Option<String>,
+    /// RFC-014: Evaluation passed.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    evaluation_passed: Option<bool>,
+    /// RFC-014: Duration in milliseconds.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    duration_ms: Option<u64>,
 }
 
 /// POST /api/chat — Send a message to the kernel via gateway and get response.
@@ -100,30 +112,40 @@ pub(crate) async fn handle_chat(
         Ok(response) => {
             tracing::info!(reply_len = response.content.len(), "Chat response received");
 
+            // Extract from typed meta (RFC-014) or fall back to metadata HashMap
+            let meta = response.meta.as_ref();
+            let session_id = meta
+                .and_then(|m| m.session_id.clone())
+                .or_else(|| response.metadata.get("session_id").cloned());
+            let space_id = meta
+                .and_then(|m| m.space_id.clone())
+                .or_else(|| response.metadata.get("space_id").cloned());
+            let phase = meta
+                .map(|m| m.phase.clone())
+                .or_else(|| response.metadata.get("phase").cloned());
+            let space_tag = meta.and_then(|m| m.space_tag.clone());
+            let seed_id = meta.and_then(|m| m.seed_id.clone());
+            let evaluation_passed = meta.map(|m| m.evaluation_passed);
+            let duration_ms = meta.and_then(|m| m.duration_ms);
+
             // Persist session
             {
-                let session_id_for_save = response
-                    .metadata
-                    .get("session_id")
-                    .cloned()
-                    .unwrap_or_else(|| msg_id.clone());
-                let session_id = oxios_kernel::state_store::SessionId(session_id_for_save.clone());
-                match state.kernel.state.load_session(&session_id).await {
+                let session_id_for_save =
+                    session_id.clone().unwrap_or_else(|| msg_id.clone());
+                let sid = oxios_kernel::state_store::SessionId(session_id_for_save.clone());
+                match state.kernel.state.load_session(&sid).await {
                     Ok(Some(mut session)) => {
                         session.add_user_message(&content_echo);
                         session.add_agent_response(oxios_kernel::state_store::AgentResponse {
                             content: response.content.clone(),
-                            session_id: Some(session_id.0.clone()),
-                            seed_id: response.metadata.get("seed_id").cloned(),
-                            phase_reached: response.metadata.get("phase").cloned(),
-                            evaluation_passed: response
-                                .metadata
-                                .get("evaluation_passed")
-                                .and_then(|v| v.parse().ok()),
+                            session_id: Some(sid.0.clone()),
+                            seed_id: seed_id.clone(),
+                            phase_reached: phase.clone(),
+                            evaluation_passed,
                             timestamp: chrono::Utc::now(),
                         });
                         // Attach space_id to session metadata if provided by orchestrator
-                        if let Some(vid) = response.metadata.get("space_id") {
+                        if let Some(ref vid) = space_id {
                             session.set_metadata("space_id", serde_json::json!(vid));
                         }
                         if let Err(e) = state.kernel.state.save_session(&session).await {
@@ -134,22 +156,18 @@ pub(crate) async fn handle_chat(
                         // Create new session
                         let mut session =
                             oxios_kernel::state_store::Session::new(body.user_id.clone());
-                        session.id =
-                            oxios_kernel::state_store::SessionId(session_id_for_save.clone());
+                        session.id = oxios_kernel::state_store::SessionId(session_id_for_save);
                         session.add_user_message(&content_echo);
                         session.add_agent_response(oxios_kernel::state_store::AgentResponse {
                             content: response.content.clone(),
-                            session_id: Some(session_id.0.clone()),
-                            seed_id: response.metadata.get("seed_id").cloned(),
-                            phase_reached: response.metadata.get("phase").cloned(),
-                            evaluation_passed: response
-                                .metadata
-                                .get("evaluation_passed")
-                                .and_then(|v| v.parse().ok()),
+                            session_id: Some(sid.0.clone()),
+                            seed_id: seed_id.clone(),
+                            phase_reached: phase.clone(),
+                            evaluation_passed,
                             timestamp: chrono::Utc::now(),
                         });
                         // Attach space_id to session metadata if provided by orchestrator
-                        if let Some(vid) = response.metadata.get("space_id") {
+                        if let Some(ref vid) = space_id {
                             session.set_metadata("space_id", serde_json::json!(vid));
                         }
                         if let Err(e) = state.kernel.state.save_session(&session).await {
@@ -180,9 +198,13 @@ pub(crate) async fn handle_chat(
                 id: msg_id,
                 echo: content_echo,
                 reply: response.content,
-                session_id: response.metadata.get("session_id").cloned(),
-                space_id: response.metadata.get("space_id").cloned(),
-                phase: response.metadata.get("phase").cloned(),
+                session_id: session_id.clone(),
+                space_id: space_id.clone(),
+                phase,
+                space_tag,
+                seed_id,
+                evaluation_passed,
+                duration_ms,
             }))
         }
         Err(e) => {
@@ -266,10 +288,23 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
     let recv_task = tokio::spawn(async move {
         while let Ok(msg) = outgoing_rx.recv().await {
             let msg_id = msg.id;
-            let session_id = msg.metadata.get("session_id").cloned();
-            let space_id = msg.metadata.get("space_id").cloned();
-            let phase = msg.metadata.get("phase").cloned();
-            let evaluation_passed = msg.metadata.get("evaluation_passed").cloned();
+            let session_id = msg.meta.as_ref()
+                .and_then(|m| m.session_id.clone())
+                .or_else(|| msg.metadata.get("session_id").cloned());
+            let space_id = msg.meta.as_ref()
+                .and_then(|m| m.space_id.clone())
+                .or_else(|| msg.metadata.get("space_id").cloned());
+            let phase = msg.meta.as_ref()
+                .map(|m| m.phase.clone())
+                .or_else(|| msg.metadata.get("phase").cloned());
+            let evaluation_passed = msg.meta.as_ref()
+                .map(|m| m.evaluation_passed);
+            let space_tag = msg.meta.as_ref()
+                .and_then(|m| m.space_tag.clone());
+            let seed_id = msg.meta.as_ref()
+                .and_then(|m| m.seed_id.clone());
+            let duration_ms = msg.meta.as_ref()
+                .and_then(|m| m.duration_ms);
 
             // ── Persist session to disk FIRST ──
             // Always persist, even if WS send fails later. This ensures
@@ -326,6 +361,9 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
                 "space_id": space_id,
                 "phase": phase,
                 "evaluation_passed": evaluation_passed,
+                "space_tag": space_tag,
+                "seed_id": seed_id,
+                "duration_ms": duration_ms,
             });
             let done_json = match serde_json::to_string(&done_chunk) {
                 Ok(j) => j,
@@ -372,7 +410,7 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
                         continue;
                     }
 
-                    let mut incoming = IncomingMessage::new("web", "web-user", content.clone());
+                    let mut incoming = IncomingMessage::new("web", "default", content.clone());
 
                     if let Some(ref sid) = incoming_session_id {
                         incoming.metadata.insert("session_id".into(), sid.clone());
@@ -386,7 +424,7 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
                         let mut pending = pending_for_send.lock().await;
                         *pending = Some((incoming.id, PendingMessage {
                             content,
-                            user_id: "web-user".to_string(),
+                            user_id: "default".to_string(),
                         }));
                     }
 

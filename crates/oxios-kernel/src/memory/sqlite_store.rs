@@ -22,7 +22,7 @@ use super::{content_hash, dedup_by_id, MemoryEntry, MemoryType, MemoryTier};
 pub struct PatternRow {
     /// Unique pattern ID.
     pub id: String,
-    /// Strategy name (e.g., "sona", "reasoning", "rvf").
+    /// Strategy name (e.g., "sona").
     pub strategy: String,
     /// Optional domain.
     pub domain: Option<String>,
@@ -581,7 +581,7 @@ impl SqliteMemoryStore {
         Ok(())
     }
 
-    // ── Phase 4: Learning Patterns (SONA + ReasoningBank) ──────────────
+    // ── Phase 4: Learning Patterns (SONA) ──────────────
 
     /// Store a learning pattern.
     pub fn save_pattern(

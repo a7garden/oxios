@@ -1,15 +1,19 @@
+pub mod format;
 pub mod plugin;
 
+pub use format::TelegramFormatter;
 pub use plugin::TelegramPlugin;
 
 use anyhow::Result;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use oxios_gateway::channel::Channel;
+use oxios_gateway::format::ChannelFormatter;
 use oxios_gateway::message::{IncomingMessage, OutgoingMessage};
+use oxios_gateway::GatewayInbox;
 use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::sync::RwLock;
+use tokio::sync::{mpsc, watch, RwLock};
 
 /// Per-chat session state for Telegram.
 #[derive(Debug, Clone)]
@@ -96,6 +100,7 @@ impl Default for TelegramSessionSettings {
 /// - Each `chat_id` gets its own session tracked in memory.
 /// - Sessions auto-rotate after a configurable period of inactivity.
 /// - Users can force a new session with the `/new` command.
+#[derive(Clone)]
 pub struct TelegramChannel {
     bot_token: String,
     api_base: String,
@@ -106,6 +111,8 @@ pub struct TelegramChannel {
     chat_sessions: Arc<RwLock<HashMap<i64, ChatSession>>>,
     /// Session rotation settings
     session_settings: TelegramSessionSettings,
+    /// Optional kernel handle for Space management.
+    kernel: Option<Arc<oxios_kernel::KernelHandle>>,
 }
 
 impl TelegramChannel {
@@ -115,14 +122,27 @@ impl TelegramChannel {
     /// * `bot_token` - Telegram Bot API token from @BotFather
     /// * `allowed_users` - List of allowed Telegram user IDs (empty = allow all)
     pub fn new(bot_token: String, allowed_users: Vec<i64>) -> Self {
+        Self::with_kernel(bot_token, allowed_users, None)
+    }
+
+    /// Create a new Telegram channel with an optional kernel handle.
+    pub fn with_kernel(
+        bot_token: String,
+        allowed_users: Vec<i64>,
+        kernel: Option<Arc<oxios_kernel::KernelHandle>>,
+    ) -> Self {
         Self {
             bot_token,
             api_base: "https://api.telegram.org".to_string(),
             allowed_users,
-            client: reqwest::Client::new(),
+            client: reqwest::Client::builder()
+                .timeout(std::time::Duration::from_secs(60))
+                .build()
+                .unwrap_or_else(|_| reqwest::Client::new()),
             offset: Arc::new(RwLock::new(0)),
             chat_sessions: Arc::new(RwLock::new(HashMap::new())),
             session_settings: TelegramSessionSettings::default(),
+            kernel,
         }
     }
 
@@ -223,40 +243,32 @@ impl TelegramChannel {
         Ok(updates)
     }
 
+    /// Send a chat action indicator (e.g. "typing").
+    async fn send_chat_action(&self, chat_id: i64, action: &str) -> Result<()> {
+        self.client
+            .post(self.api_url("sendChatAction"))
+            .json(&serde_json::json!({ "chat_id": chat_id, "action": action }))
+            .send()
+            .await?;
+        Ok(())
+    }
+
     /// Send a text message to a chat.
     async fn send_text(&self, chat_id: i64, text: &str, reply_to: Option<i64>) -> Result<()> {
-        let mut body = serde_json::json!({
-            "chat_id": chat_id,
-            "text": text,
-            "parse_mode": "Markdown",
-        });
-        if let Some(msg_id) = reply_to {
-            body["reply_to_message_id"] = serde_json::Value::Number(msg_id.into());
-        }
-
-        // Telegram message limit is 4096 chars
-        // If message is too long, split it
-        if text.len() > 4000 {
-            for chunk in text
-                .as_bytes()
-                .chunks(4000)
-                .map(|c| String::from_utf8_lossy(c).to_string())
-            {
-                body["text"] = serde_json::Value::String(chunk);
-                self.client
-                    .post(self.api_url("sendMessage"))
-                    .json(&body)
-                    .send()
-                    .await?;
+        for chunk in split_message(text, 4000) {
+            let mut body = serde_json::json!({
+                "chat_id": chat_id,
+                "text": &chunk,
+                "parse_mode": "Markdown",
+            });
+            if let Some(msg_id) = reply_to {
+                body["reply_to_message_id"] = serde_json::Value::Number(msg_id.into());
             }
-        } else {
-            let resp = self
-                .client
+            let resp = self.client
                 .post(self.api_url("sendMessage"))
                 .json(&body)
                 .send()
                 .await?;
-
             if !resp.status().is_success() {
                 // Fallback: send without parse_mode
                 body["parse_mode"] = serde_json::Value::Null;
@@ -267,7 +279,6 @@ impl TelegramChannel {
                     .await?;
             }
         }
-
         Ok(())
     }
 }
@@ -278,137 +289,266 @@ impl Channel for TelegramChannel {
         "telegram"
     }
 
-    async fn receive(&self) -> Result<Option<IncomingMessage>> {
-        loop {
-            let updates = self.poll_updates().await?;
+    async fn start(
+        &self,
+        tx: mpsc::Sender<GatewayInbox>,
+        mut shutdown: watch::Receiver<bool>,
+    ) -> Result<tokio::task::JoinHandle<()>> {
+        let this = Arc::new(self.clone());
+        let channel_name = this.name().to_owned();
 
-            for update in updates {
-                // Extract message from update
-                let message = update
-                    .get("message")
-                    .or_else(|| update.get("channel_post"))
-                    .or_else(|| update.get("edited_message"));
+        let handle = tokio::spawn(async move {
+            let mut retry_count: u32 = 0;
+            loop {
+                tokio::select! {
+                    updates_result = this.poll_updates() => {
+                        match updates_result {
+                            Ok(updates) => {
+                                retry_count = 0;
+                                for update in updates {
+                                    let message = update
+                                        .get("message")
+                                        .or_else(|| update.get("channel_post"))
+                                        .or_else(|| update.get("edited_message"));
+                                    let Some(msg) = message else { continue };
 
-                if let Some(msg) = message {
-                    let chat_id = msg
-                        .get("chat")
-                        .and_then(|c| c.get("id"))
-                        .and_then(|id| id.as_i64());
+                                    let chat_id = msg
+                                        .get("chat")
+                                        .and_then(|c| c.get("id"))
+                                        .and_then(|id| id.as_i64());
+                                    let user_id = msg
+                                        .get("from")
+                                        .and_then(|f| f.get("id"))
+                                        .and_then(|id| id.as_i64());
+                                    let text = msg
+                                        .get("text")
+                                        .and_then(|t| t.as_str())
+                                        .unwrap_or("");
+                                    let message_id = msg
+                                        .get("message_id")
+                                        .and_then(|id| id.as_i64())
+                                        .unwrap_or(0);
 
-                    let user_id = msg
-                        .get("from")
-                        .and_then(|f| f.get("id"))
-                        .and_then(|id| id.as_i64());
+                                    if text.is_empty() {
+                                        continue;
+                                    }
 
-                    let text = msg.get("text").and_then(|t| t.as_str()).unwrap_or("");
+                                    // Permission check
+                                    if let Some(uid) = user_id {
+                                        if !this.is_user_allowed(uid) {
+                                            tracing::warn!(user_id = uid, "Unauthorized Telegram user");
+                                            if let Some(cid) = chat_id {
+                                                let _ = this
+                                                    .send_text(
+                                                        cid,
+                                                        "Unauthorized. Your user ID is not in the allowed list.",
+                                                        None,
+                                                    )
+                                                    .await;
+                                            }
+                                            continue;
+                                        }
+                                    }
 
-                    let message_id = msg
-                        .get("message_id")
-                        .and_then(|id| id.as_i64())
-                        .unwrap_or(0);
+                                    let Some(cid) = chat_id else { continue };
+                                    let user_id_str = user_id
+                                        .map(|id| id.to_string())
+                                        .unwrap_or_else(|| "unknown".to_string());
 
-                    // Skip empty messages
-                    if text.is_empty() {
-                        continue;
+                                    // /new command — start a new session
+                                    let trimmed = text.trim();
+                                    if trimmed == "/new" || trimmed == "/new@me" {
+                                        let new_session_id = this.force_new_session(cid).await;
+                                        let _ = this
+                                            .send_text(
+                                                cid,
+                                                &format!("🔄 새 세션을 시작합니다.\\n`{}`", &new_session_id[..8]),
+                                                Some(message_id),
+                                            )
+                                            .await;
+                                        continue;
+                                    }
+
+                                    // /session command — show current session info
+                                    if trimmed == "/session" || trimmed == "/session@me" {
+                                        let sessions = this.chat_sessions.read().await;
+                                        if let Some(session) = sessions.get(&cid) {
+                                            let info = format!(
+                                                "📋 현재 세션\\n• ID: `{}`\\n• 메시지: {}개\\n• 시작: {}\\n• 마지막 활동: {}",
+                                                &session.session_id[..8],
+                                                session.message_count,
+                                                session.created_at.format("%m/%d %H:%M"),
+                                                session.last_active_at.format("%m/%d %H:%M"),
+                                            );
+                                            drop(sessions);
+                                            let _ = this.send_text(cid, &info, Some(message_id)).await;
+                                        } else {
+                                            drop(sessions);
+                                            let _ = this
+                                                .send_text(cid, "📋 활성 세션이 없습니다.", Some(message_id))
+                                                .await;
+                                        }
+                                        continue;
+                                    }
+
+                                    // /spaces command — list all spaces
+                                    if trimmed == "/spaces" || trimmed.starts_with("/spaces@") {
+                                        if let Some(ref kernel) = this.kernel {
+                                            let spaces = kernel.spaces.list_spaces();
+                                            if spaces.is_empty() {
+                                                let _ = this.send_text(cid, "📋 등록된 Space가 없습니다.", Some(message_id)).await;
+                                            } else {
+                                                let mut lines = vec!["📋 *Spaces:*".to_string()];
+                                                for space in &spaces {
+                                                    let marker = if space.active { "→ " } else { "  " };
+                                                    lines.push(format!(
+                                                        "{}{} (`{}`) — {} interactions",
+                                                        marker, space.name, &space.id[..8], space.interaction_count
+                                                    ));
+                                                }
+                                                let _ = this.send_text(cid, &lines.join("\n"), Some(message_id)).await;
+                                            }
+                                        } else {
+                                            let _ = this.send_text(cid, "Space 관리를 사용할 수 없습니다.", Some(message_id)).await;
+                                        }
+                                        continue;
+                                    }
+
+                                    // /space command — show or switch space
+                                    if trimmed.starts_with("/space") && !trimmed.starts_with("/spaces") {
+                                        let arg = trimmed
+                                            .strip_prefix("/space@")
+                                            .or_else(|| trimmed.strip_prefix("/space"))
+                                            .unwrap_or("")
+                                            .trim();
+
+                                        if let Some(ref kernel) = this.kernel {
+                                            if arg.is_empty() {
+                                                // Show current space
+                                                match kernel.spaces.current_space() {
+                                                    Some(space) => {
+                                                        let _ = this
+                                                            .send_text(
+                                                                cid,
+                                                                &format!("📋 현재 Space: {} (`{}`)", space.name, &space.id[..8]),
+                                                                Some(message_id),
+                                                            )
+                                                            .await;
+                                                    }
+                                                    None => {
+                                                        let _ = this
+                                                            .send_text(cid, "📋 현재 Space: (기본)", Some(message_id))
+                                                            .await;
+                                                    }
+                                                }
+                                            } else {
+                                                // Try to activate
+                                                let resolved_id = if uuid::Uuid::parse_str(arg).is_ok() {
+                                                    arg.to_string()
+                                                } else {
+                                                    let spaces = kernel.spaces.list_spaces();
+                                                    spaces
+                                                        .iter()
+                                                        .find(|s| s.name == arg)
+                                                        .map(|s| s.id.clone())
+                                                        .unwrap_or_else(|| arg.to_string())
+                                                };
+                                                match kernel.spaces.activate(&resolved_id).await {
+                                                    Ok(()) => {
+                                                        let spaces = kernel.spaces.list_spaces();
+                                                        if let Some(space) = spaces.iter().find(|s| s.id == resolved_id) {
+                                                            let _ = this
+                                                                .send_text(
+                                                                    cid,
+                                                                    &format!("✅ Space 전환: {} (`{}`)", space.name, &space.id[..8]),
+                                                                    Some(message_id),
+                                                                )
+                                                                .await;
+                                                        } else {
+                                                            let _ = this
+                                                                .send_text(cid, "✅ Space 전환됨", Some(message_id))
+                                                                .await;
+                                                        }
+                                                    }
+                                                    Err(e) => {
+                                                        let _ = this
+                                                            .send_text(
+                                                                cid,
+                                                                &format!("❌ Space 전환 실패: {}", e),
+                                                                Some(message_id),
+                                                            )
+                                                            .await;
+                                                    }
+                                                }
+                                            }
+                                        } else {
+                                            let _ = this
+                                                .send_text(cid, "Space 관리를 사용할 수 없습니다.", Some(message_id))
+                                                .await;
+                                        }
+                                        continue;
+                                    }
+
+                                    // Skip other /command messages
+                                    if text.starts_with('/') {
+                                        continue;
+                                    }
+
+                                    // Get or auto-rotate session
+                                    let session_id = this.get_or_create_session(cid).await;
+
+                                    let mut metadata = HashMap::new();
+                                    metadata.insert("chat_id".to_string(), cid.to_string());
+                                    metadata.insert("message_id".to_string(), message_id.to_string());
+                                    metadata.insert("session_id".to_string(), session_id);
+
+                                    let incoming = IncomingMessage {
+                                        channel: "telegram".to_string(),
+                                        user_id: user_id_str,
+                                        content: text.to_string(),
+                                        metadata,
+                                        ..Default::default()
+                                    };
+
+                                    tracing::info!(
+                                        chat_id = cid,
+                                        text = %text.chars().take(50).collect::<String>(),
+                                        "Telegram message received"
+                                    );
+
+                                    if tx.send((channel_name.clone(), incoming)).await.is_err() {
+                                        break; // Gateway receiver closed
+                                    }
+                                    // Send typing indicator
+                                    let _ = this.send_chat_action(cid, "typing").await;
+                                }
+                            }
+                            Err(e) => {
+                                tracing::warn!(error = %e, "Telegram poll error");
+                                let delay = std::time::Duration::from_secs(5 * 2u64.pow(retry_count.min(4)));
+                                tokio::time::sleep(delay).await;
+                                retry_count += 1;
+                            }
+                        }
                     }
 
-                    // Check user permission
-                    if let Some(uid) = user_id {
-                        if !self.is_user_allowed(uid) {
-                            tracing::warn!(user_id = uid, "Unauthorized Telegram user");
-                            if let Some(cid) = chat_id {
-                                let _ = self
-                                    .send_text(
-                                        cid,
-                                        "Unauthorized. Your user ID is not in the allowed list.",
-                                        None,
-                                    )
-                                    .await;
-                            }
-                            continue;
-                        }
-                    }
-
-                    if let Some(cid) = chat_id {
-                        let user_id_str = user_id
-                            .map(|id| id.to_string())
-                            .unwrap_or_else(|| "unknown".to_string());
-
-                        // Handle /new command — start a new session
-                        if text.trim() == "/new" || text.trim() == "/new@me" {
-                            let new_session_id = self.force_new_session(cid).await;
-                            let _ = self
-                                .send_text(
-                                    cid,
-                                    &format!("🔄 새 세션을 시작합니다.\\n`{}`", &new_session_id[..8]),
-                                    Some(message_id),
-                                )
-                                .await;
-                            continue;
-                        }
-
-                        // Handle /session command — show current session info
-                        if text.trim() == "/session" || text.trim() == "/session@me" {
-                            let sessions = self.chat_sessions.read().await;
-                            if let Some(session) = sessions.get(&cid) {
-                                let info = format!(
-                                    "📋 현재 세션\\n• ID: `{}`\\n• 메시지: {}개\\n• 시작: {}\\n• 마지막 활동: {}",
-                                    &session.session_id[..8],
-                                    session.message_count,
-                                    session.created_at.format("%m/%d %H:%M"),
-                                    session.last_active_at.format("%m/%d %H:%M"),
-                                );
-                                let _ = self.send_text(cid, &info, Some(message_id)).await;
-                            } else {
-                                let _ = self
-                                    .send_text(cid, "📋 활성 세션이 없습니다.", Some(message_id))
-                                    .await;
-                            }
-                            continue;
-                        }
-
-                        // Skip other /command messages (let other bots handle)
-                        if text.starts_with('/') {
-                            continue;
-                        }
-
-                        // Get or auto-rotate session
-                        let session_id = self.get_or_create_session(cid).await;
-
-                        let mut metadata = HashMap::new();
-                        metadata.insert("chat_id".to_string(), cid.to_string());
-                        metadata.insert("message_id".to_string(), message_id.to_string());
-                        metadata.insert("session_id".to_string(), session_id);
-
-                        let incoming = IncomingMessage {
-                            channel: "telegram".to_string(),
-                            user_id: user_id_str,
-                            content: text.to_string(),
-                            metadata,
-                            ..Default::default()
-                        };
-
-                        tracing::info!(chat_id = cid, text = %text.chars().take(50).collect::<String>(), "Telegram message received");
-                        return Ok(Some(incoming));
+                    _ = shutdown.changed() => {
+                        tracing::info!(channel = %channel_name, "Telegram channel stopped");
+                        break;
                     }
                 }
             }
+        });
 
-            // No valid messages in this poll, continue polling
-            continue;
-        }
+        Ok(handle)
     }
 
     async fn send(&self, msg: OutgoingMessage) -> Result<()> {
-        // Look up chat_id from metadata or sessions
         let chat_id: i64 = msg
             .metadata
             .get("chat_id")
             .and_then(|id| id.parse().ok())
-            .or_else(|| {
-                // Try to parse user_id as chat_id
-                msg.user_id.parse().ok()
-            })
+            .or_else(|| msg.user_id.parse().ok())
             .ok_or_else(|| anyhow::anyhow!("No chat_id for Telegram message"))?;
 
         let reply_to = msg
@@ -416,10 +556,42 @@ impl Channel for TelegramChannel {
             .get("message_id")
             .and_then(|id| id.parse().ok());
 
-        self.send_text(chat_id, &msg.content, reply_to).await?;
+        let formatter = crate::TelegramFormatter;
+        let raw = match &msg.meta {
+            Some(meta) if meta.error.is_some() => formatter.format_error(&msg),
+            Some(_) => formatter.format_success(&msg),
+            None => msg.content.clone(),
+        };
+
+        for chunk in split_message(&raw, 4000) {
+            self.send_text(chat_id, &chunk, reply_to).await?;
+        }
+
         tracing::debug!(chat_id = chat_id, "Telegram response sent");
         Ok(())
     }
+}
+
+/// Split a message into chunks of at most `max_chars` Unicode characters.
+///
+/// Unlike byte-based splitting, this is safe for multi-byte UTF-8
+/// (Korean, Chinese, emoji, etc.).
+fn split_message(text: &str, max_chars: usize) -> Vec<String> {
+    if text.chars().count() <= max_chars {
+        return vec![text.to_string()];
+    }
+    let mut chunks = Vec::new();
+    let mut current = String::new();
+    for ch in text.chars() {
+        if current.chars().count() >= max_chars {
+            chunks.push(std::mem::take(&mut current));
+        }
+        current.push(ch);
+    }
+    if !current.is_empty() {
+        chunks.push(current);
+    }
+    chunks
 }
 
 #[cfg(test)]
@@ -491,5 +663,26 @@ mod tests {
         assert_eq!(session.message_count, 1);
         session.touch();
         assert_eq!(session.message_count, 2);
+    }
+
+    #[test]
+    fn test_split_message_ascii() {
+        let text = "hello world";
+        let chunks = split_message(text, 5);
+        assert_eq!(chunks, vec!["hello", " worl", "d"]);
+    }
+
+    #[test]
+    fn test_split_message_utf8() {
+        let text = "안녕하세요세계"; // 7 Korean chars
+        let chunks = split_message(text, 3);
+        assert_eq!(chunks, vec!["안녕하", "세요세", "계"]);
+    }
+
+    #[test]
+    fn test_split_message_short() {
+        let text = "hello";
+        let chunks = split_message(text, 10);
+        assert_eq!(chunks, vec!["hello"]);
     }
 }

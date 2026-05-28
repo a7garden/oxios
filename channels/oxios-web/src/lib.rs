@@ -9,6 +9,7 @@
 pub mod api_docs;
 pub mod channel;
 pub mod error;
+pub mod format;
 pub mod middleware;
 pub mod persona_routes;
 pub mod plugin;

@@ -263,13 +263,13 @@ impl Kernel {
         session_id: Option<&str>,
     ) -> Result<oxios_kernel::OrchestrationResult> {
         self.orchestrator
-            .handle_message("cli", prompt, session_id)
+            .handle_message("cli", prompt, session_id, None)
             .await
     }
 
     /// Register a channel with the gateway.
-    pub async fn register_channel(&self, channel: Box<dyn oxios_gateway::Channel>) {
-        self.gateway.register(channel).await;
+    pub async fn register_channel(&self, channel: Box<dyn oxios_gateway::Channel>) -> anyhow::Result<()> {
+        self.gateway.register(channel).await
     }
 
     /// Run the gateway event loop (blocking).
@@ -541,13 +541,17 @@ impl KernelBuilder {
     pub async fn build(self) -> Result<Kernel> {
         let config_path = self.config_path;
 
-        let config = if config_path.exists() {
+        let mut config = if config_path.exists() {
             tracing::info!(path = %config_path.display(), "Loading config");
             load_config(&config_path)?
         } else {
             tracing::info!("No config file found, using defaults");
             OxiosConfig::default()
         };
+
+        // RFC-018: Apply consolidation preset if not "custom".
+        // This overwrites individual consolidation fields with preset values.
+        config.memory.consolidation.apply_preset();
 
         let event_bus = EventBus::new(config.kernel.event_bus_capacity);
         let state_store = Arc::new(oxios_kernel::state_store::StateStore::new(PathBuf::from(

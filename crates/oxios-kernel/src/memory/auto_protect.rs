@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 //! Automatic memory protection based on access patterns.
 //!
 //! Computes protection levels from behavior signals (access frequency,
@@ -149,6 +148,7 @@ impl AutoProtector {
     /// Record access to a memory entry (updates tracking fields).
     ///
     /// Call this whenever a memory is recalled or searched.
+    #[allow(dead_code)]
     pub fn record_access(entry: &mut MemoryEntry, current_session_id: &str) {
         entry.access_count += 1;
         entry.accessed_at = Utc::now();

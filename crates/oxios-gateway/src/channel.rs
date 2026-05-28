@@ -2,21 +2,43 @@
 //!
 //! A channel is a plugin that connects the gateway to a specific
 //! interface (Web, CLI, Telegram, etc.).
+//!
+//! Channels implement [`Channel::start`] to push incoming messages
+//! into a shared mpsc channel, and [`Channel::send`] for outgoing
+//! responses.
 
 use anyhow::Result;
 use async_trait::async_trait;
+use tokio::sync::{mpsc, watch};
+use tokio::task::JoinHandle;
 
-use crate::message::{IncomingMessage, OutgoingMessage};
+use crate::message::OutgoingMessage;
+use crate::GatewayInbox;
 
 /// A communication channel that plugs into the gateway.
+///
+/// Each channel runs its own background task (started via [`Channel::start`])
+/// and pushes incoming messages into the gateway's shared mpsc channel.
+/// The gateway dispatches responses back via [`Channel::send`].
 #[async_trait]
 pub trait Channel: Send + Sync {
     /// Returns the name of this channel (e.g., "web", "telegram").
     fn name(&self) -> &str;
 
-    /// Receive the next incoming message, or None if the channel is closed.
-    async fn receive(&self) -> Result<Option<IncomingMessage>>;
+    /// Start the channel's background receive loop.
+    ///
+    /// Implementations should spawn an internal `tokio::spawn` task that:
+    /// 1. Receives messages from the channel's own source (HTTP, readline, Telegram API).
+    /// 2. Pushes them via `tx.send((name, msg)).await`.
+    /// 3. Exits gracefully when `shutdown` changes.
+    ///
+    /// Returns the spawned task's `JoinHandle` so the gateway can track its lifetime.
+    async fn start(
+        &self,
+        tx: mpsc::Sender<GatewayInbox>,
+        shutdown: watch::Receiver<bool>,
+    ) -> Result<JoinHandle<()>>;
 
-    /// Send a message through this channel.
+    /// Send a response message through this channel.
     async fn send(&self, msg: OutgoingMessage) -> Result<()>;
 }

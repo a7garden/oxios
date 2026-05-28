@@ -395,8 +395,8 @@ impl WorkerManager {
     /// Execute the actual worker logic.
     ///
     /// In a full implementation, each worker would interact with the
-    /// ReasoningBank, SONA engine, and other subsystems. For now,
-    /// each returns a summary of what it would do.
+    /// ReasoningBank, SONA engine, and other subsystems.
+    /// Each returns a summary of what it would do.
     fn execute_worker(&self, worker_type: WorkerType) -> Result<String, String> {
         match worker_type {
             WorkerType::Audit => {

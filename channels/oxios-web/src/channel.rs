@@ -11,9 +11,10 @@ use anyhow::Result;
 use async_trait::async_trait;
 use oxios_gateway::channel::Channel;
 use oxios_gateway::message::{IncomingMessage, OutgoingMessage};
+use oxios_gateway::GatewayInbox;
 use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::sync::{broadcast, mpsc, oneshot, Mutex, RwLock};
+use tokio::sync::{broadcast, mpsc, oneshot, watch, Mutex, RwLock};
 
 /// The web channel adapter.
 ///
@@ -21,7 +22,8 @@ use tokio::sync::{broadcast, mpsc, oneshot, Mutex, RwLock};
 /// using mpsc channels for message passing.
 pub struct WebChannel {
     /// Receiver for incoming messages from the HTTP layer.
-    incoming_rx: Mutex<mpsc::Receiver<IncomingMessage>>,
+    /// `Option` so `start()` can take ownership via `take()`.
+    incoming_rx: Mutex<Option<mpsc::Receiver<IncomingMessage>>>,
     /// Sender to pass to the HTTP layer for injecting messages.
     incoming_tx: mpsc::Sender<IncomingMessage>,
     /// Broadcaster for outgoing messages to WebSocket/SSE clients.
@@ -36,7 +38,7 @@ impl WebChannel {
         let (incoming_tx, incoming_rx) = mpsc::channel(buffer);
         let (outgoing_tx, _) = broadcast::channel(buffer);
         Self {
-            incoming_rx: Mutex::new(incoming_rx),
+            incoming_rx: Mutex::new(Some(incoming_rx)),
             incoming_tx,
             outgoing_tx,
             responses: Arc::new(RwLock::new(HashMap::new())),
@@ -86,9 +88,37 @@ impl Channel for WebChannel {
         "web"
     }
 
-    async fn receive(&self) -> Result<Option<IncomingMessage>> {
-        let mut rx = self.incoming_rx.lock().await;
-        Ok(rx.recv().await)
+    async fn start(
+        &self,
+        tx: mpsc::Sender<GatewayInbox>,
+        mut shutdown: watch::Receiver<bool>,
+    ) -> Result<tokio::task::JoinHandle<()>> {
+        let internal_rx = self.incoming_rx.lock().await.take();
+        let Some(mut internal_rx) = internal_rx else {
+            anyhow::bail!("Web channel already started (no receiver)");
+        };
+        let channel_name = self.name().to_owned();
+
+        let handle = tokio::spawn(async move {
+            loop {
+                tokio::select! {
+                    msg = internal_rx.recv() => {
+                        match msg {
+                            Some(msg) => {
+                                if tx.send((channel_name.clone(), msg)).await.is_err() {
+                                    break; // Gateway receiver closed
+                                }
+                            }
+                            None => break,
+                        }
+                    }
+                    _ = shutdown.changed() => break,
+                }
+            }
+            tracing::info!(channel = %channel_name, "Web channel stopped");
+        });
+
+        Ok(handle)
     }
 
     async fn send(&self, msg: OutgoingMessage) -> Result<()> {

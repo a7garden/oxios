@@ -310,6 +310,26 @@ pub(crate) fn sanitize_event(event: &oxios_kernel::event_bus::KernelEvent) -> se
             "entries": entries,
             "flow": format!("{:?}", flow),
         }),
+        KernelEvent::EvolutionStarted {
+            seed_id,
+            new_seed_id,
+            iteration,
+        } => serde_json::json!({
+            "type": "evolution_started",
+            "seed_id": seed_id.to_string(),
+            "new_seed_id": new_seed_id.to_string(),
+            "iteration": iteration,
+        }),
+        KernelEvent::EvolutionMaxReached {
+            seed_id,
+            final_score,
+            iterations,
+        } => serde_json::json!({
+            "type": "evolution_max_reached",
+            "seed_id": seed_id.to_string(),
+            "final_score": final_score,
+            "iterations": iterations,
+        }),
     };
     // Merge payload into base
     if let serde_json::Value::Object(mut map) = base {

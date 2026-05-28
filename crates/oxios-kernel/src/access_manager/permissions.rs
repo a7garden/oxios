@@ -43,7 +43,7 @@ impl Default for AgentPermissions {
             agent_name: String::new(),
             // By default, agents get basic file tools.
             // Network access is denied by default.
-            allowed_tools: ["read", "write", "edit", "bash", "grep", "find"]
+            allowed_tools: ["read", "write", "edit", "bash", "grep", "find", "exec"]
                 .iter()
                 .map(|s| s.to_string())
                 .collect(),

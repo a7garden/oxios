@@ -8,7 +8,7 @@
 //! - `memory_vectors` — sqlite-vec vector KNN index
 //! - `embedding_cache` — content-hash → embedding cache
 //! - `dream_state` — Dream process persistent state
-//! - `patterns` — learning patterns (SONA, ReasoningBank, RVF)
+//! - `patterns` — learning patterns (SONA)
 
 use std::path::Path;
 

@@ -32,7 +32,9 @@ use oxi_sdk::{
     ToolRegistry, WebSearchTool, WriteTool,
 };
 
+use crate::access_manager::{AccessGate, AgentContext};
 use crate::capability::{CSpace, ResourceRef, Rights};
+use crate::tools::gated_tool::GatedTool;
 use crate::tools::kernel::*;
 use crate::tools::{
     A2aDelegateTool, A2aQueryTool, A2aSendTool, ExecTool, KnowledgeTool, MemoryReadTool,
@@ -61,6 +63,34 @@ pub fn register_always_on(registry: &ToolRegistry, search_cache: Arc<SearchCache
     registry.register(LsTool::new());
     registry.register(WebSearchTool::new(search_cache.clone()));
     registry.register(GetSearchResultsTool::new(search_cache));
+}
+
+/// Register always-on tools with access gate wrapping.
+///
+/// Same as [`register_always_on`] but wraps each tool in [`GatedTool`]
+/// so that all file operations pass through the access gate.
+pub fn register_always_on_gated(
+    registry: &ToolRegistry,
+    search_cache: Arc<SearchCache>,
+    gate: Arc<AccessGate>,
+    context: AgentContext,
+) {
+    registry.register(GatedTool::new(ReadTool::new(), gate.clone(), context.clone()));
+    registry.register(GatedTool::new(WriteTool::new(), gate.clone(), context.clone()));
+    registry.register(GatedTool::new(EditTool::new(), gate.clone(), context.clone()));
+    registry.register(GatedTool::new(GrepTool::new(), gate.clone(), context.clone()));
+    registry.register(GatedTool::new(FindTool::new(), gate.clone(), context.clone()));
+    registry.register(GatedTool::new(LsTool::new(), gate.clone(), context.clone()));
+    registry.register(GatedTool::new(
+        WebSearchTool::new(search_cache.clone()),
+        gate.clone(),
+        context.clone(),
+    ));
+    registry.register(GatedTool::new(
+        GetSearchResultsTool::new(search_cache),
+        gate,
+        context,
+    ));
 }
 
 /// Register tools into `registry` based on the agent's [`CSpace`].
@@ -160,6 +190,86 @@ pub fn register_tools_from_cspace(
             // Space, Agent, Mcp resource refs are handled through
             // their respective KernelDomain registrations above
             // or through dedicated tool paths.
+            _ => {}
+        }
+    }
+}
+
+/// Register tools into `registry` with access gate enforcement.
+///
+/// Same as [`register_tools_from_cspace`] but:
+/// - Always-on tools are wrapped in [`GatedTool`] for permission checks
+/// - ExecTool is created with `AgentContext`
+///
+/// Use this in production. The ungated version exists for backward compatibility.
+///
+/// # Arguments
+///
+/// * `registry` — The agent's tool registry to populate.
+/// * `kernel` — Handle to the kernel for constructing tool instances.
+/// * `cspace` — The agent's capability space (determines which tools are available).
+/// * `search_cache` — Shared search cache for web search tools.
+/// * `agent_id` — The agent's ID (used by A2A tools for routing).
+/// * `gate` — The unified access gate for permission checks.
+/// * `context` — The agent's security context.
+pub fn register_tools_from_cspace_gated(
+    registry: &ToolRegistry,
+    kernel: &KernelHandle,
+    cspace: &CSpace,
+    search_cache: Arc<SearchCache>,
+    agent_id: AgentId,
+    gate: Arc<AccessGate>,
+    context: AgentContext,
+) {
+    // ── Tier 1: Always-on tools (gated) ──────────────────────────────
+    register_always_on_gated(registry, search_cache, gate, context);
+
+    // ── Tier 2: CSpace-driven tools ─────────────────────────────────
+    for cap in cspace.iter() {
+        match &cap.resource {
+            // Command execution — use from_kernel_with_context for full security
+            ResourceRef::Exec { .. } if cap.rights.contains(Rights::EXECUTE) => {
+                registry.register(ExecTool::from_kernel(kernel));
+            }
+
+            // Headless browser
+            ResourceRef::Browser if cap.rights.contains(Rights::EXECUTE) => {
+                #[cfg(feature = "browser")]
+                {
+                    registry.register(BrowserTool::from_kernel(kernel));
+                }
+            }
+
+            // Kernel domain tools (same as ungated — these already use KernelHandle internally)
+            ResourceRef::KernelDomain { domain } => match domain.as_str() {
+                "memory" => {
+                    if cap.rights.contains(Rights::READ) {
+                        registry.register(MemoryReadTool::from_kernel(kernel));
+                        registry.register(MemorySearchTool::from_kernel(kernel));
+                    }
+                    if cap.rights.contains(Rights::WRITE) {
+                        registry.register(MemoryWriteTool::from_kernel(kernel));
+                    }
+                }
+                "space" => registry.register(SpaceTool::from_kernel(kernel)),
+                "agent" => registry.register(KernelAgentTool::from_kernel(kernel)),
+                "a2a" => {
+                    registry.register(A2aDelegateTool::from_kernel(kernel, agent_id));
+                    registry.register(A2aSendTool::from_kernel(kernel, agent_id));
+                    registry.register(A2aQueryTool::from_kernel(kernel));
+                }
+                "persona" => registry.register(PersonaTool::from_kernel(kernel)),
+                "program" => {}
+                "cron" => registry.register(CronTool::from_kernel(kernel)),
+                "security" => registry.register(SecurityTool::from_kernel(kernel)),
+                "budget" => registry.register(BudgetTool::from_kernel(kernel)),
+                "resource" => registry.register(ResourceTool::from_kernel(kernel)),
+                "knowledge" => registry.register(KnowledgeTool::from_kernel(kernel)),
+                "mcp" => {}
+                _ => {}
+            },
+
+            ResourceRef::Skill { .. } => {}
             _ => {}
         }
     }

@@ -99,6 +99,9 @@ pub struct OuroborosEngine {
     persona_prompt: parking_lot::Mutex<Option<String>>,
     /// Evaluation cache for avoiding redundant LLM calls.
     eval_cache: crate::eval_cache::EvalCache,
+    /// Generation history for stagnation + regression detection.
+    /// Kept across evolve() calls within one Orchestrator session.
+    generation_history: parking_lot::RwLock<Vec<crate::regression::GenerationRecord>>,
 }
 
 impl OuroborosEngine {
@@ -110,6 +113,7 @@ impl OuroborosEngine {
             phase: parking_lot::Mutex::new(Phase::Interview),
             persona_prompt: parking_lot::Mutex::new(None),
             eval_cache: crate::eval_cache::EvalCache::new(256),
+            generation_history: parking_lot::RwLock::new(Vec::new()),
         }
     }
 
@@ -121,6 +125,89 @@ impl OuroborosEngine {
     /// Set the current phase.
     fn set_phase(&self, phase: Phase) {
         *self.phase.lock() = phase;
+    }
+
+    /// Record an evaluation result into generation history for
+    /// stagnation and regression detection.
+    pub fn record_evaluation(&self, seed: Seed, evaluation: &EvaluationResult) {
+        let ac_results: Vec<bool> = evaluation
+            .notes
+            .iter()
+            .filter_map(|note| {
+                if note.starts_with("✓ ") {
+                    Some(true)
+                } else if note.starts_with("✗ ") || note.starts_with("x ") {
+                    Some(false)
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        let record = crate::regression::GenerationRecord {
+            seed,
+            ac_results,
+            score: evaluation.score,
+        };
+
+        let mut history = self.generation_history.write();
+        history.push(record);
+        if history.len() > 10 {
+            history.remove(0);
+        }
+    }
+
+    /// Detect stagnation across the current generation history.
+    fn detect_stagnation(&self) -> Option<crate::lateral::StagnationPattern> {
+        let history = self.generation_history.read();
+        if history.len() < 2 {
+            return None;
+        }
+
+        let scores: Vec<f64> = history.iter().map(|r| r.score).collect();
+        let latest = *scores.last()?;
+        let prev = scores[scores.len() - 2];
+
+        let drift = (latest - prev).abs();
+        let improvement = latest - prev;
+
+        // No drift at all.
+        if drift < 0.01 {
+            return Some(crate::lateral::StagnationPattern::NoDrift);
+        }
+
+        // Oscillation: last two iterations went opposite directions.
+        if scores.len() >= 3 {
+            let prev2 = scores[scores.len() - 3];
+            if (latest > prev && prev < prev2) || (latest < prev && prev > prev2) {
+                return Some(crate::lateral::StagnationPattern::Oscillation);
+            }
+        }
+
+        // Diminishing returns: each improvement is smaller than the last.
+        if history.len() >= 3 && improvement > 0.0 {
+            let improvements: Vec<f64> = scores
+                .windows(2)
+                .map(|w| w[1] - w[0])
+                .collect();
+            if improvements.len() >= 2 {
+                let last = improvements[improvements.len() - 1];
+                let prev_imp = improvements[improvements.len() - 2];
+                if 0.0 < last && last < prev_imp * 0.5 {
+                    return Some(crate::lateral::StagnationPattern::DiminishingReturns);
+                }
+            }
+        }
+
+        None
+    }
+
+    /// Detect which acceptance criteria regressed across generations.
+    fn detect_regressions(&self) -> Vec<crate::regression::Regression> {
+        let history = self.generation_history.read();
+        crate::regression::RegressionDetector::new()
+            .record_all(history.iter().cloned())
+            .detect()
     }
 
     /// Set or clear the persona system prompt.
@@ -398,9 +485,6 @@ impl OuroborosProtocol for OuroborosEngine {
         Ok(seed)
     }
 
-    /// TODO: Not called by any caller. Orchestrator delegates execution directly
-    /// to AgentRuntime via Supervisor. Connect when Ouroboros full lifecycle is wired.
-    #[allow(dead_code)]
     async fn execute(&self, seed: &Seed) -> Result<ExecutionResult> {
         self.set_phase(Phase::Execute);
         // Execution is delegated to the kernel's AgentRuntime via the Supervisor.
@@ -416,9 +500,6 @@ impl OuroborosProtocol for OuroborosEngine {
         })
     }
 
-    /// TODO: Not called by any caller. Evaluation is done inline within the
-    /// orchestrator's simple flow. Connect when multi-stage evaluation is needed.
-    #[allow(dead_code)]
     async fn evaluate(&self, seed: &Seed, execution: &ExecutionResult) -> Result<EvaluationResult> {
         self.set_phase(Phase::Evaluate);
 
@@ -515,11 +596,7 @@ impl OuroborosProtocol for OuroborosEngine {
         Ok(result)
     }
 
-    /// TODO: Not called by any caller. The evolution loop (evaluate → evolve → re-execute)
-    /// is not yet wired in the orchestrator. Connect when Ouroboros full lifecycle is enabled.
-    /// When connected, also re-enable `lateral.rs` and `regression.rs` modules.
-    #[allow(dead_code)]
-    async fn evolve(&self, seed: &Seed, evaluation: &EvaluationResult) -> Result<Option<Seed>> {
+async fn evolve(&self, seed: &Seed, evaluation: &EvaluationResult) -> Result<Option<Seed>> {
         self.set_phase(Phase::Evolve);
 
         // If the evaluation passed, no need to evolve.
@@ -528,8 +605,11 @@ impl OuroborosProtocol for OuroborosEngine {
             return Ok(None);
         }
 
-        let system_prompt = EVOLVE_SYSTEM_PROMPT;
-        let user_message = format!(
+        // ── Record generation for stagnation / regression detection ──
+        self.record_evaluation(seed.clone(), evaluation);
+
+        // ── Build evolution context (basic + lateral + regression) ──
+        let base_context = format!(
             "## Original Seed\n\
              Goal: {}\n\
              Constraints: {}\n\
@@ -538,16 +618,15 @@ impl OuroborosProtocol for OuroborosEngine {
              Mechanical pass: {}\n\
              Semantic pass: {}\n\
              Score: {}\n\
-             Notes: {}\n\n\
-             The evaluation did not fully pass. Generate an improved seed that addresses the issues.\n\
-             Produce a JSON object:\n\
-             - \"goal\": improved goal\n\
-             - \"constraints\": updated constraints\n\
-             - \"acceptance_criteria\": updated criteria\n\
-             - \"ontology\": updated entities",
+             Notes: {}",
             seed.goal,
             seed.constraints.join(", "),
-            seed.acceptance_criteria.join(", "),
+            seed.acceptance_criteria
+                .iter()
+                .enumerate()
+                .map(|(i, c)| format!("{}. {}", i + 1, c))
+                .collect::<Vec<_>>()
+                .join("\n"),
             evaluation.mechanical_pass,
             evaluation
                 .semantic_pass
@@ -557,6 +636,58 @@ impl OuroborosProtocol for OuroborosEngine {
             evaluation.notes.join("; "),
         );
 
+        let mut context_blocks = vec![base_context];
+
+        // Lateral thinking — only when stagnant (gen 2+).
+        if seed.generation >= 2 {
+            if let Some(pattern) = self.detect_stagnation() {
+                tracing::info!(seed_id = %seed.id, pattern = ?pattern, "Stagnation detected, applying lateral thinking");
+
+                // Collect already-tried personas before dropping the read lock.
+                let tried: Vec<String> = {
+                    let history = self.generation_history.read();
+                    history
+                        .iter()
+                        .filter_map(|r| r.seed.cspace_hint.as_deref())
+                        .filter(|h| h.starts_with("lateral:"))
+                        .map(|h| h[8..].to_string())
+                        .collect()
+                };
+                let tried_refs: Vec<&str> = tried.iter().map(|s| s.as_str()).collect();
+
+                if let Some(persona) = crate::lateral::select_persona(pattern, &tried_refs) {
+                    let lateral = crate::lateral::build_lateral_prompt(
+                        persona,
+                        &seed.goal,
+                        &format!("Score={:.2}, passed={}", evaluation.score, evaluation.all_passed()),
+                        &evaluation.notes,
+                    );
+                    context_blocks.push(lateral);
+
+                    // Track the persona via cspace_hint.
+                    let mut guard = self.generation_history.write();
+                    if let Some(last) = guard.last_mut() {
+                        last.seed.cspace_hint = Some(format!("lateral:{}", persona.name));
+                    }
+                }
+            }
+
+            // Regression context — always on gen 2+.
+            let regressions = self.detect_regressions();
+            if !regressions.is_empty() {
+                let reg_text = crate::regression::RegressionDetector::format_for_prompt(&regressions);
+                context_blocks.push(reg_text);
+                tracing::info!(
+                    seed_id = %seed.id,
+                    count = regressions.len(),
+                    "Injecting regression context"
+                );
+            }
+        }
+
+        let user_message = context_blocks.join("\n\n---\n\n");
+
+        let system_prompt = EVOLVE_SYSTEM_PROMPT;
         let raw = self.llm_complete(system_prompt, &user_message).await?;
         let parsed: SeedResponse = Self::parse_json(&raw).unwrap_or_else(|e| {
             tracing::warn!(error = %e, "Failed to parse evolve LLM response");
@@ -570,8 +701,7 @@ impl OuroborosProtocol for OuroborosEngine {
 
         let evolved = Seed::evolved_from(seed);
 
-        // Override fields with LLM-suggested improvements.
-        let evolved = Seed {
+        let new_seed = Seed {
             id: evolved.id,
             goal: parsed.goal,
             constraints: parsed.constraints,
@@ -587,11 +717,12 @@ impl OuroborosProtocol for OuroborosEngine {
 
         tracing::info!(
             original_seed = %seed.id,
-            evolved_seed = %evolved.id,
+            evolved_seed = %new_seed.id,
+            generation = new_seed.generation,
             "Seed evolved"
         );
 
-        Ok(Some(evolved))
+        Ok(Some(new_seed))
     }
 }
 

@@ -85,7 +85,7 @@ cargo run -- --foreground
 # Single-shot execution with JSON output
 cargo run -- run --json "prompt"
 
-# Frontend dev server (requires backend on port 3000)
+# Frontend dev server (requires backend on port 4200)
 cd channels/oxios-web/web && bun dev
 ```
 
@@ -314,14 +314,14 @@ The Knowledge UI is a full-screen app-within-app (`fixed inset-0 z-30`) built in
 ### Testing
 
 ```bash
-# Backend must be running (port 3000)
+# Backend must be running (port 4200)
 cargo run --bin oxios -- --foreground
 
 # Frontend dev server
 cd channels/oxios-web/web && bun dev
 
 # Open http://localhost:5173/knowledge/
-# Or directly http://localhost:3000/knowledge/ (proxied)
+# Or directly http://localhost:4200/knowledge/ (proxied)
 ```
 
 ## Pitfalls

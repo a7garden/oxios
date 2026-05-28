@@ -9,9 +9,17 @@
 //! Every agent starts with minimal permissions and must be explicitly granted
 //! access to tools, paths, and network resources.
 
+mod audit_sink;
+mod context;
+mod gate;
 mod permissions;
 mod rbac;
 
+pub use audit_sink::{AuditEvent, AuditSink, TrailAuditSink, TracingAuditSink};
+#[cfg(test)]
+pub use audit_sink::NoOpAuditSink;
+pub use context::AgentContext;
+pub use gate::{AccessDenied, AccessGate, CheckRequest, DenyLayer, PathMode};
 pub use permissions::{AgentPermissions, AuditEntry, PermissionUpdate};
 pub use rbac::{
     Action, ApprovalStatus, PendingApproval, RbacAuditEntry, RbacManager, RbacPolicy, Role, Subject,
