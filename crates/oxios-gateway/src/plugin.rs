@@ -13,9 +13,11 @@ use tokio::task::JoinHandle;
 use crate::Channel;
 
 /// Shared context provided to channel plugins during setup.
+///
+/// Channels are message interfaces — they don't have kernel access.
+/// For kernel-connected surfaces (like the web dashboard),
+/// see the [`Surface`](crate::surface::Surface) trait.
 pub struct ChannelContext {
-    /// Kernel subsystem handle (supervisor, state store, etc.).
-    pub kernel: Arc<oxios_kernel::KernelHandle>,
     /// Hot-reloadable configuration.
     pub config: Arc<parking_lot::RwLock<oxios_kernel::OxiosConfig>>,
     /// Path to the config file.

@@ -1,0 +1,14 @@
+# Skill: Debug — invoke debug skill
+[task]
+id = "skill_debug"
+name = "Debug Skill"
+tier = "integration"
+suite = "skill"
+tags = ["skill"]
+timeout_secs = 60
+
+prompt = "Debug this code: let x: Option<i32> = None; let y = x.unwrap(); — it panics at runtime."
+
+[expect]
+exit_code = 0
+response_not_contains = ["panic", "crash"]

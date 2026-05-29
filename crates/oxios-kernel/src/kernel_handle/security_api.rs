@@ -6,7 +6,14 @@ use crate::access_manager::{
 use crate::audit_trail::{AuditAction, AuditEntry, AuditTrail};
 use crate::auth::AuthManager;
 use crate::state_store::StateStore;
+use std::collections::HashMap;
 use std::sync::Arc;
+
+/// A one-time ticket for WebSocket authentication.
+/// Valid for 30 seconds after creation, single-use.
+struct WsTicket {
+    created_at: std::time::Instant,
+}
 
 /// Security system calls.
 pub struct SecurityApi {
@@ -14,6 +21,7 @@ pub struct SecurityApi {
     pub(crate) audit_trail: Arc<AuditTrail>,
     pub(crate) access_manager: Arc<parking_lot::Mutex<AccessManager>>,
     pub(crate) state_store: Arc<StateStore>,
+    ws_tickets: Arc<parking_lot::Mutex<HashMap<String, WsTicket>>>,
 }
 
 impl SecurityApi {
@@ -29,6 +37,33 @@ impl SecurityApi {
             audit_trail,
             access_manager,
             state_store,
+            ws_tickets: Arc::new(parking_lot::Mutex::new(HashMap::new())),
+        }
+    }
+
+    /// Generate a one-time WebSocket ticket. Valid for 30 seconds, single-use.
+    pub fn generate_ws_ticket(&self) -> String {
+        let bytes: [u8; 16] = *uuid::Uuid::new_v4().as_bytes();
+        let ticket = format!("wst_{}", hex::encode(bytes));
+        let mut tickets = self.ws_tickets.lock();
+        // Prune expired tickets (older than 60s)
+        tickets.retain(|_, t| t.created_at.elapsed().as_secs() < 60);
+        tickets.insert(
+            ticket.clone(),
+            WsTicket {
+                created_at: std::time::Instant::now(),
+            },
+        );
+        ticket
+    }
+
+    /// Validate and consume a one-time WebSocket ticket. Returns false if invalid/expired/already used.
+    pub fn validate_ws_ticket(&self, ticket: &str) -> bool {
+        let mut tickets = self.ws_tickets.lock();
+        if let Some(t) = tickets.remove(ticket) {
+            t.created_at.elapsed().as_secs() < 30
+        } else {
+            false
         }
     }
     /// Audit an action.

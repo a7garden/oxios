@@ -1,0 +1,16 @@
+# Memory: Cross-session recall — verify persistence
+[task]
+id = "memory_cross_session"
+name = "Cross-Session Memory Recall"
+tier = "integration"
+suite = "memory"
+tags = ["memory", "multi-turn"]
+timeout_secs = 60
+
+[[turns]]
+message = "Remember that my database host is 'db.internal.example.com'."
+
+[[turns]]
+message = "What is my database host?"
+[turns.expect]
+response_contains = ["db.internal.example.com"]

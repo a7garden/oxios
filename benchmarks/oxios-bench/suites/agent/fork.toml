@@ -1,0 +1,15 @@
+# Agent: Fork — spawn an agent
+[task]
+id = "agent_fork"
+name = "Agent Fork"
+tier = "integration"
+suite = "agent"
+tags = ["agent", "core"]
+timeout_secs = 60
+
+prompt = "Count the number of files in the current workspace directory."
+
+[expect]
+phase_reached = "Execute"
+require_agent_id = true
+exit_code = 0

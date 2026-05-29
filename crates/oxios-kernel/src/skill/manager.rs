@@ -66,6 +66,14 @@ impl SkillManager {
     pub async fn load_skill(&self, name: &str) -> Result<Option<Skill>> { Ok(self.installed.read().await.get(name).map(|e| e.skill.clone())) }
     pub fn path(&self) -> &PathBuf { &self.skills_dir }
 
+    /// Load additional skills from an external directory (e.g. bundled defaults).
+    /// Each subdirectory containing a `SKILL.md` is loaded as a bundled skill.
+    pub async fn load_from_dir(&self, dir: &Path) -> Result<()> {
+        let mut map = self.installed.write().await;
+        self.load_skills_from_dir(dir, true, &mut map).await?;
+        Ok(())
+    }
+
     async fn load_skills_from_dir(&self, dir: &Path, bundled: bool, map: &mut HashMap<String, SkillEntry>) -> Result<()> {
         if !dir.exists() { return Ok(()); }
         let mut entries = tokio::fs::read_dir(dir).await?;

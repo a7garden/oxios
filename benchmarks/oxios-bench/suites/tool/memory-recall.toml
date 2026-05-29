@@ -1,0 +1,16 @@
+# Tool: Memory recall — save then recall in multi-turn
+[task]
+id = "tool_memory_recall"
+name = "Memory Recall"
+tier = "integration"
+suite = "tool"
+tags = ["memory", "tool", "multi-turn"]
+timeout_secs = 60
+
+[[turns]]
+message = "Save this to memory: my_api_key = sk-test-12345"
+
+[[turns]]
+message = "What is my API key?"
+[turns.expect]
+response_contains = ["sk-test-12345"]

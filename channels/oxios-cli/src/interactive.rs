@@ -10,7 +10,6 @@
 
 use anyhow::Result;
 use reedline::{DefaultPrompt, DefaultPromptSegment, Reedline, Signal};
-use std::sync::Arc;
 
 use crate::channel::CliChannelHandle;
 use crate::commands::MetaCommand;
@@ -23,18 +22,11 @@ pub struct InteractiveLoop {
     editor: Reedline,
     /// The prompt to display.
     prompt: DefaultPrompt,
-    /// Optional kernel handle for Space management.
-    kernel: Option<Arc<oxios_kernel::KernelHandle>>,
 }
 
 impl InteractiveLoop {
     /// Create a new interactive loop.
     pub fn new(handle: CliChannelHandle) -> Self {
-        Self::with_kernel(handle, None)
-    }
-
-    /// Create with an optional kernel handle for Space management.
-    pub fn with_kernel(handle: CliChannelHandle, kernel: Option<Arc<oxios_kernel::KernelHandle>>) -> Self {
         let editor = Reedline::create();
         let prompt = DefaultPrompt::default();
 
@@ -42,21 +34,11 @@ impl InteractiveLoop {
             handle,
             editor,
             prompt,
-            kernel,
         }
     }
 
     /// Create with a custom prompt label.
     pub fn with_prompt_label(handle: CliChannelHandle, left: &str) -> Self {
-        Self::with_prompt_label_and_kernel(handle, left, None)
-    }
-
-    /// Create with a custom prompt label and optional kernel handle.
-    pub fn with_prompt_label_and_kernel(
-        handle: CliChannelHandle,
-        left: &str,
-        kernel: Option<Arc<oxios_kernel::KernelHandle>>,
-    ) -> Self {
         let editor = Reedline::create();
         let prompt = DefaultPrompt::new(
             DefaultPromptSegment::Basic(left.to_string()),
@@ -67,7 +49,6 @@ impl InteractiveLoop {
             handle,
             editor,
             prompt,
-            kernel,
         }
     }
 
@@ -165,68 +146,19 @@ impl InteractiveLoop {
                 Ok(false)
             }
             MetaCommand::Space(None) => {
-                if let Some(ref kernel) = self.kernel {
-                    match kernel.spaces.current_space() {
-                        Some(space) => println!(
-                            "📋 현재 Space: {} ({}) — {}",
-                            space.name,
-                            &space.id[..8],
-                            if space.active { "활성" } else { "비활성" }
-                        ),
-                        None => println!("📋 현재 Space: (기본)"),
-                    }
-                } else {
-                    println!("Space 관리를 사용할 수 없습니다.");
-                }
+                // Space info is managed by the kernel via message routing.
+                // Channels don't have direct kernel access.
+                println!("📋 .space 명령어는 현재 Surface(Web 대시보드)에서만 사용 가능합니다.");
                 Ok(false)
             }
-            MetaCommand::Space(Some(id_or_name)) => {
-                if let Some(ref kernel) = self.kernel {
-                    // Try as UUID first, then search by name
-                    let resolved_id = if uuid::Uuid::parse_str(&id_or_name).is_ok() {
-                        id_or_name.clone()
-                    } else {
-                        let spaces = kernel.spaces.list_spaces();
-                        spaces
-                            .iter()
-                            .find(|s| s.name == id_or_name)
-                            .map(|s| s.id.clone())
-                            .unwrap_or_else(|| id_or_name.clone())
-                    };
-                    match kernel.spaces.activate(&resolved_id).await {
-                        Ok(()) => {
-                            let spaces = kernel.spaces.list_spaces();
-                            if let Some(space) = spaces.iter().find(|s| s.id == resolved_id) {
-                                println!("✅ Space 전환: {} ({})", space.name, &space.id[..8]);
-                            } else {
-                                println!("✅ Space 전환됨");
-                            }
-                        }
-                        Err(e) => println!("❌ Space 전환 실패: {e}"),
-                    }
-                } else {
-                    println!("Space 관리를 사용할 수 없습니다.");
-                }
+            MetaCommand::Space(Some(_id_or_name)) => {
+                // Space switching requires kernel access.
+                // Channels don't have direct kernel access.
+                println!("📋 .space 명령어는 현재 Surface(Web 대시보드)에서만 사용 가능합니다.");
                 Ok(false)
             }
             MetaCommand::Spaces => {
-                if let Some(ref kernel) = self.kernel {
-                    let spaces = kernel.spaces.list_spaces();
-                    if spaces.is_empty() {
-                        println!("📋 등록된 Space가 없습니다.");
-                    } else {
-                        println!("📋 Spaces:");
-                        for space in &spaces {
-                            let marker = if space.active { "→ " } else { "  " };
-                            println!(
-                                "{}{} ({}) — {} interactions",
-                                marker, space.name, &space.id[..8], space.interaction_count
-                            );
-                        }
-                    }
-                } else {
-                    println!("Space 관리를 사용할 수 없습니다.");
-                }
+                println!("📋 .spaces 명령어는 현재 Surface(Web 대시보드)에서만 사용 가능합니다.");
                 Ok(false)
             }
             MetaCommand::Clear => {

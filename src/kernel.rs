@@ -284,7 +284,26 @@ impl Kernel {
     pub async fn init_default_skills(&self, share_dir: &std::path::Path) -> Result<()> {
         let defaults_dir = share_dir.join("default-skills");
         self.skill_manager.init().await?;
-        let _ = defaults_dir; // TODO: wire bundled defaults dir
+
+        if defaults_dir.exists() {
+            let count_before = self.skill_manager.list_skills().await.len();
+            if let Err(e) = self.skill_manager.load_from_dir(&defaults_dir).await {
+                tracing::warn!(
+                    path = %defaults_dir.display(),
+                    error = %e,
+                    "Failed to load default skills directory"
+                );
+            } else {
+                let count_after = self.skill_manager.list_skills().await.len();
+                let installed = count_after.saturating_sub(count_before);
+                if installed > 0 {
+                    tracing::info!(count = installed, "Default skills installed");
+                }
+            }
+        } else {
+            tracing::debug!("No default skills directory found");
+        }
+
         Ok(())
     }
 
@@ -491,6 +510,7 @@ impl KernelBuilder {
     /// - `"gguf"` → GGUF-based embedding (requires `embedding-gguf` feature)
     #[cfg(feature = "sqlite-memory")]
     fn create_embedding_provider(config: &OxiosConfig) -> Arc<dyn oxios_kernel::EmbeddingProvider> {
+        use oxios_kernel::TfIdfEmbeddingProvider;
         let emb_config = &config.memory.embedding;
 
         match emb_config.provider.as_str() {

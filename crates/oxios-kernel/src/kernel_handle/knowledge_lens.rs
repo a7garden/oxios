@@ -401,3 +401,76 @@ fn index_to_memory(path: &str, content: &str, memory: &Arc<MemoryManager>) {
         });
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_knowledge_context_default() {
+        let ctx = KnowledgeContext::default();
+        assert!(ctx.notes.is_empty());
+        assert!(ctx.memories.is_empty());
+        assert_eq!(ctx.index_entries_used, 0);
+    }
+
+    #[test]
+    fn test_knowledge_note_serialization() {
+        let note = KnowledgeNote {
+            path: "notes/Rust.md".to_string(),
+            name: "Rust".to_string(),
+            content: "Rust is a systems language".to_string(),
+            backlink_count: 3,
+        };
+        let json = serde_json::to_string(&note).unwrap();
+        let restored: KnowledgeNote = serde_json::from_str(&json).unwrap();
+        assert_eq!(restored.path, "notes/Rust.md");
+        assert_eq!(restored.backlink_count, 3);
+    }
+
+    #[test]
+    fn test_memory_note_serialization() {
+        let note = MemoryNote {
+            id: "mem-123".to_string(),
+            source: "session:abc".to_string(),
+            content: "User prefers dark mode".to_string(),
+            importance: 0.85,
+        };
+        let json = serde_json::to_string(&note).unwrap();
+        let restored: MemoryNote = serde_json::from_str(&json).unwrap();
+        assert_eq!(restored.id, "mem-123");
+        assert!((restored.importance - 0.85).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_copilot_response_serialization() {
+        let resp = CopilotResponse {
+            content: "The answer is 42".to_string(),
+            referenced_notes: vec!["notes/answer.md".to_string()],
+            referenced_memories: vec!["mem-1".to_string()],
+        };
+        let json = serde_json::to_string(&resp).unwrap();
+        let restored: CopilotResponse = serde_json::from_str(&json).unwrap();
+        assert_eq!(restored.content, "The answer is 42");
+        assert_eq!(restored.referenced_notes.len(), 1);
+        assert_eq!(restored.referenced_memories.len(), 1);
+    }
+
+    #[test]
+    fn test_knowledge_context_with_data() {
+        let ctx = KnowledgeContext {
+            notes: vec![KnowledgeNote {
+                path: "test.md".to_string(),
+                name: "Test".to_string(),
+                content: "Hello".to_string(),
+                backlink_count: 0,
+            }],
+            memories: vec![],
+            index_entries_used: 42,
+        };
+        let json = serde_json::to_string(&ctx).unwrap();
+        let restored: KnowledgeContext = serde_json::from_str(&json).unwrap();
+        assert_eq!(restored.notes.len(), 1);
+        assert_eq!(restored.index_entries_used, 42);
+    }
+}

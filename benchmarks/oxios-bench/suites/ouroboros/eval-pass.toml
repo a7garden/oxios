@@ -1,0 +1,15 @@
+# Ouroboros: Eval pass — well-scoped task should pass evaluation
+[task]
+id = "ouroboros_eval_pass"
+name = "Evaluation Pass"
+tier = "integration"
+suite = "ouroboros"
+tags = ["smoke", "core"]
+timeout_secs = 60
+
+prompt = "Calculate 17 multiplied by 23 and show the result."
+
+[expect]
+phase_reached = "Execute"
+evaluation_passed = true
+response_contains = ["391"]

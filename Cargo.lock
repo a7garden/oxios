@@ -5138,11 +5138,13 @@ dependencies = [
  "glob",
  "libc",
  "oxi-ai",
+ "oxibrowser-core 0.11.0",
  "parking_lot",
  "regex",
  "reqwest",
  "serde",
  "serde_json",
+ "serde_yaml",
  "thiserror 2.0.18",
  "tokio",
  "tracing",
@@ -5225,8 +5227,44 @@ dependencies = [
  "html5ever",
  "image",
  "markup5ever",
- "oxibrowser-webapi",
+ "oxibrowser-webapi 0.9.1",
  "parking_lot",
+ "pollster",
+ "regex",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "string_cache",
+ "thiserror 2.0.18",
+ "tokio",
+ "tracing",
+ "url",
+ "uuid",
+]
+
+[[package]]
+name = "oxibrowser-core"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "87aedf82afa7a5b3c4c7fb56a23fe4385279ecc42c571aae569d2e071d5ee81b"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "base64 0.22.1",
+ "boa_engine",
+ "boa_gc",
+ "bytes",
+ "chrono",
+ "encoding_rs",
+ "futures",
+ "getrandom 0.3.4",
+ "html5ever",
+ "image",
+ "markup5ever",
+ "oxibrowser-webapi 0.11.0",
+ "parking_lot",
+ "percent-encoding",
  "pollster",
  "regex",
  "reqwest",
@@ -5257,6 +5295,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "oxibrowser-webapi"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "62bb773f19223e8ffdb845e5d58250bc17ccd49361c6e197aea394962bcdf6e6"
+dependencies = [
+ "html5ever",
+ "markup5ever",
+ "serde",
+ "serde_json",
+ "string_cache",
+ "thiserror 2.0.18",
+ "tracing",
+]
+
+[[package]]
 name = "oxios"
 version = "0.4.0"
 dependencies = [
@@ -5266,7 +5319,7 @@ dependencies = [
  "clap_complete",
  "console",
  "criterion",
- "dirs 5.0.1",
+ "dirs 6.0.0",
  "hex",
  "inquire",
  "libc",
@@ -5298,14 +5351,15 @@ dependencies = [
 
 [[package]]
 name = "oxios-bench"
-version = "0.1.2"
+version = "0.5.0"
 dependencies = [
  "anyhow",
  "async-trait",
  "chrono",
  "clap",
+ "console",
  "futures",
- "futures-util",
+ "regex",
  "reqwest",
  "serde",
  "serde_json",
@@ -5313,6 +5367,7 @@ dependencies = [
  "thiserror 1.0.69",
  "tokio",
  "tokio-test",
+ "toml",
  "tracing",
  "tracing-subscriber",
  "uuid",
@@ -5326,7 +5381,6 @@ dependencies = [
  "async-trait",
  "chrono",
  "oxios-gateway",
- "oxios-kernel",
  "reedline",
  "serde",
  "serde_json",
@@ -5380,7 +5434,7 @@ dependencies = [
  "opentelemetry-stdout",
  "opentelemetry_sdk",
  "oxi-sdk",
- "oxibrowser-core",
+ "oxibrowser-core 0.9.1",
  "oxios-gateway",
  "oxios-markdown",
  "oxios-mcp",
@@ -5440,7 +5494,7 @@ dependencies = [
 
 [[package]]
 name = "oxios-mcp"
-version = "0.1.0"
+version = "0.4.0"
 dependencies = [
  "anyhow",
  "parking_lot",
@@ -5476,7 +5530,6 @@ dependencies = [
  "async-trait",
  "chrono",
  "oxios-gateway",
- "oxios-kernel",
  "reqwest",
  "serde",
  "serde_json",
@@ -5493,7 +5546,7 @@ dependencies = [
  "async-trait",
  "axum 0.8.9",
  "chrono",
- "dirs 5.0.1",
+ "dirs 6.0.0",
  "futures-util",
  "mime_guess",
  "oxi-sdk",

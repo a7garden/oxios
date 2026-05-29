@@ -1,0 +1,15 @@
+# Agent: Long task — ensure completion within timeout
+[task]
+id = "agent_long_task"
+name = "Long Task Completion"
+tier = "integration"
+suite = "agent"
+tags = ["agent"]
+timeout_secs = 90
+
+prompt = "Write a detailed analysis of the benefits of using Rust for systems programming. Include at least 3 key points."
+
+[expect]
+exit_code = 0
+response_not_contains = ["panic", "crash", "timeout"]
+max_duration_ms = 60_000

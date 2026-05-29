@@ -178,3 +178,85 @@ pub fn default_personas() -> Vec<Persona> {
         },
     ]
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_persona_default() {
+        let p = Persona::default();
+        assert!(!p.id.is_empty());
+        assert_eq!(p.name, "Default");
+        assert_eq!(p.role, "assistant");
+        assert!(p.enabled);
+        assert!(p.model.is_none());
+        assert!(p.personality_traits.is_empty());
+    }
+
+    #[test]
+    fn test_persona_new() {
+        let p = Persona::new("Dev", "developer", "A dev", "You are a dev");
+        assert!(!p.id.is_empty());
+        assert_eq!(p.name, "Dev");
+        assert_eq!(p.role, "developer");
+        assert!(p.enabled);
+    }
+
+    #[test]
+    fn test_persona_with_id() {
+        let p = Persona::with_id("dev", "Dev", "developer", "A dev", "You are a dev");
+        assert_eq!(p.id, "dev");
+        assert_eq!(p.name, "Dev");
+    }
+
+    #[test]
+    fn test_persona_serialization_roundtrip() {
+        let mut p = Persona::new("Test", "tester", "Test persona", "Test prompt");
+        p.model = Some("anthropic/claude-sonnet-4".to_string());
+        p.personality_traits = vec!["curious".to_string(), "thorough".to_string()];
+
+        let json = serde_json::to_string(&p).unwrap();
+        let restored: Persona = serde_json::from_str(&json).unwrap();
+        assert_eq!(restored.id, p.id);
+        assert_eq!(restored.name, "Test");
+        assert_eq!(restored.model.as_deref(), Some("anthropic/claude-sonnet-4"));
+        assert_eq!(restored.personality_traits.len(), 2);
+    }
+
+    #[test]
+    fn test_default_personas_contains_three() {
+        let personas = default_personas();
+        assert_eq!(personas.len(), 3);
+
+        let ids: Vec<&str> = personas.iter().map(|p| p.id.as_str()).collect();
+        assert!(ids.contains(&"dev"));
+        assert!(ids.contains(&"review"));
+        assert!(ids.contains(&"research"));
+
+        // All should be enabled
+        for p in &personas {
+            assert!(p.enabled);
+            assert!(!p.system_prompt.is_empty());
+            assert!(!p.personality_traits.is_empty());
+        }
+    }
+
+    #[test]
+    fn test_default_personas_have_unique_roles() {
+        let personas = default_personas();
+        let roles: std::collections::HashSet<&str> = personas.iter().map(|p| p.role.as_str()).collect();
+        assert_eq!(roles.len(), 3);
+    }
+
+    #[test]
+    fn test_persona_with_disabled() {
+        let mut p = Persona::new("Off", "unused", "Disabled persona", "N/A");
+        p.enabled = false;
+        assert!(!p.enabled);
+
+        let json = serde_json::to_string(&p).unwrap();
+        let restored: Persona = serde_json::from_str(&json).unwrap();
+        assert!(!restored.enabled);
+    }
+}

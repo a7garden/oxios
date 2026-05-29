@@ -1,0 +1,15 @@
+# Ouroboros: Degraded mode — still produces a response even under constraints
+[task]
+id = "ouroboros_degraded"
+name = "Degraded Mode Handling"
+tier = "integration"
+suite = "ouroboros"
+tags = ["resilience"]
+timeout_secs = 60
+
+prompt = "Tell me a short joke."
+
+[expect]
+# Should always succeed — this is a trivial task
+exit_code = 0
+response_not_contains = ["error", "panic"]

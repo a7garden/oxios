@@ -277,7 +277,6 @@ impl SpaceManager {
     /// 1. Filesystem path extraction (fast, free)
     /// 2. Keyword/tag matching (fast, free)
     /// 3. LLM topic classification (slow, only when needed)
-    #[allow(clippy::await_holding_lock)]
     pub async fn detect_or_create(
         &self,
         message: &str,

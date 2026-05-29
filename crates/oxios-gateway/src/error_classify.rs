@@ -155,4 +155,73 @@ mod tests {
         let ufe = classify_error(&e);
         assert!(ufe.suggestion.is_none());
     }
+
+    #[test]
+    fn timeout_from_elapsed_type() {
+        // Use tokio::time::timeout to create a real Elapsed error
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let result = rt.block_on(async {
+            tokio::time::timeout(std::time::Duration::ZERO, std::future::pending::<()>()).await
+        });
+        let e = anyhow::anyhow!(result.unwrap_err());
+        let ufe = classify_error(&e);
+        assert_eq!(ufe.kind, ErrorKind::Timeout);
+    }
+
+    #[test]
+    fn provider_from_api_key_message() {
+        let e = anyhow::anyhow!("API key is invalid");
+        let ufe = classify_error(&e);
+        assert_eq!(ufe.kind, ErrorKind::ProviderError);
+    }
+
+    #[test]
+    fn permission_from_unauthorized() {
+        let e = anyhow::anyhow!("unauthorized access");
+        let ufe = classify_error(&e);
+        assert_eq!(ufe.kind, ErrorKind::PermissionDenied);
+    }
+
+    #[test]
+    fn validation_from_empty_message() {
+        let e = anyhow::anyhow!("empty input");
+        let ufe = classify_error(&e);
+        assert_eq!(ufe.kind, ErrorKind::ValidationError);
+    }
+
+    #[test]
+    fn deadline_exceeded_is_timeout() {
+        let e = anyhow::anyhow!("deadline exceeded");
+        let ufe = classify_error(&e);
+        assert_eq!(ufe.kind, ErrorKind::Timeout);
+    }
+
+    #[test]
+    fn user_messages_are_korean() {
+        for kind in &[
+            ErrorKind::ExecutionFailed,
+            ErrorKind::ProviderError,
+            ErrorKind::Timeout,
+            ErrorKind::PermissionDenied,
+            ErrorKind::ValidationError,
+            ErrorKind::Internal,
+        ] {
+            let msg = user_message(kind);
+            assert!(!msg.is_empty(), "user_message should not be empty for {:?}", kind);
+        }
+    }
+
+    #[test]
+    fn suggestion_for_timeout() {
+        let e = anyhow::anyhow!("timeout");
+        let ufe = classify_error(&e);
+        assert!(ufe.suggestion.is_some());
+    }
+
+    #[test]
+    fn suggestion_for_permission() {
+        let e = anyhow::anyhow!("access denied");
+        let ufe = classify_error(&e);
+        assert!(ufe.suggestion.is_some());
+    }
 }

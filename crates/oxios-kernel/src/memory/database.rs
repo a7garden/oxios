@@ -332,7 +332,13 @@ mod tests {
             .unwrap()
             .query_map([], |row| row.get(0))
             .unwrap()
-            .filter_map(|r| r.ok())
+            .filter_map(|r| match r {
+                Ok(v) => Some(v),
+                Err(e) => {
+                    tracing::warn!(error = %e, "Failed to deserialize memory row, skipping");
+                    None
+                }
+            })
             .collect();
 
         assert!(tables.contains(&"memories".to_string()), "memories table missing");
@@ -352,7 +358,13 @@ mod tests {
             .unwrap()
             .query_map([], |row| row.get(0))
             .unwrap()
-            .filter_map(|r| r.ok())
+            .filter_map(|r| match r {
+                Ok(v) => Some(v),
+                Err(e) => {
+                    tracing::warn!(error = %e, "Failed to deserialize memory row, skipping");
+                    None
+                }
+            })
             .collect();
 
         assert!(tables.contains(&"memories_fts".to_string()), "memories_fts missing");
@@ -449,7 +461,13 @@ mod tests {
             .unwrap()
             .query_map(rusqlite::params!["한국어"], |row| row.get(0))
             .unwrap()
-            .filter_map(|r| r.ok())
+            .filter_map(|r| match r {
+                Ok(v) => Some(v),
+                Err(e) => {
+                    tracing::warn!(error = %e, "Failed to deserialize memory row, skipping");
+                    None
+                }
+            })
             .collect();
 
         assert!(
@@ -493,7 +511,13 @@ mod tests {
             .unwrap()
             .query_map([], |row| Ok((row.get::<_, String>(0)?, row.get::<_, f64>(1)?)))
             .unwrap()
-            .filter_map(|r| r.ok())
+            .filter_map(|r| match r {
+                Ok(v) => Some(v),
+                Err(e) => {
+                    tracing::warn!(error = %e, "Failed to deserialize memory row, skipping");
+                    None
+                }
+            })
             .collect();
 
         // bm-3 has "Rust" 3 times → should rank highest

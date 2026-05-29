@@ -260,7 +260,6 @@ impl Orchestrator {
     /// the result will contain the questions and the phase will be
     /// `Phase::Interview`. The caller should send these questions to
     /// the user and include the `session_id` in follow-up messages.
-    #[allow(clippy::await_holding_lock)]
     pub async fn handle_message(
         &self,
         user_id: &str,
@@ -732,7 +731,7 @@ impl Orchestrator {
     /// degrades the score, returns the previous best.
     async fn run_evolution_loop(
         &self,
-        session_id: &str,
+        _session_id: &str,
         seed: &Seed,
         initial_result: ExecutionResult,
     ) -> Result<(ExecutionResult, EvaluationResult, Seed)> {
@@ -786,12 +785,12 @@ impl Orchestrator {
                         iterations: iteration,
                     });
                 }
-                return Ok((best_result, best_eval.unwrap(), best_seed));
+                return Ok((best_result, best_eval.ok_or_else(|| anyhow::anyhow!("Evolve loop exited with threshold met but no evaluation was produced"))?, best_seed));
             }
 
             // max_iterations == 0 → evaluate only, no evolution.
             if max_iterations == 0 {
-                return Ok((best_result, best_eval.unwrap(), best_seed));
+                return Ok((best_result, best_eval.ok_or_else(|| anyhow::anyhow!("No iterations configured and no evaluation was produced"))?, best_seed));
             }
 
             // Evolve: produce an improved seed.
@@ -825,7 +824,7 @@ impl Orchestrator {
                         seed_id = %current_seed.id,
                         "Evolve returned None, stopping loop"
                     );
-                    return Ok((best_result, best_eval.unwrap(), best_seed));
+                    return Ok((best_result, best_eval.ok_or_else(|| anyhow::anyhow!("Evolve returned no seed and no evaluation was produced"))?, best_seed));
                 }
             }
         }

@@ -8,6 +8,7 @@ mod cmd_run;
 mod cmd_update;
 mod kernel;
 mod otel;
+mod surface;
 
 use anyhow::{Context, Result};
 use clap::{CommandFactory, Parser, Subcommand};
@@ -25,8 +26,6 @@ use oxios_kernel::onboarding::WORKSPACE_SUBDIRS;
 use oxios_cli::CliPlugin;
 #[cfg(feature = "telegram")]
 use oxios_telegram::TelegramPlugin;
-#[cfg(feature = "web")]
-use oxios_web::WebPlugin;
 
 use oxios_gateway::plugin::{ChannelContext, ChannelPlugin};
 
@@ -1388,13 +1387,12 @@ async fn run() -> Result<()> {
         Some(Command::Chat) => {
             #[cfg(feature = "cli")]
             {
-                let kernel_handle = kernel.handle();
-                let cli_channel = oxios_cli::CliChannel::with_kernel(256, Some(kernel_handle.clone()));
+                let cli_channel = oxios_cli::CliChannel::new(256);
                 let handle = cli_channel.handle();
                 if let Err(e) = kernel.register_channel(Box::new(cli_channel)).await {
                     tracing::error!(error = %e, "Failed to register CLI channel");
                 }
-                let mut loop_ = oxios_cli::InteractiveLoop::with_kernel(handle, Some(kernel_handle));
+                let mut loop_ = oxios_cli::InteractiveLoop::new(handle);
                 loop_.run().await?;
                 Ok(())
             }
@@ -1737,6 +1735,7 @@ async fn cmd_serve(kernel: &Kernel, config_path: &Path) -> Result<()> {
     }
 
     // Activate channels
+    let surface_tasks = surface::activate_surfaces(kernel, config_path).await?;
     let channel_tasks = activate_channels(kernel, config_path).await?;
 
     // Start guardian
@@ -1780,7 +1779,10 @@ async fn cmd_serve(kernel: &Kernel, config_path: &Path) -> Result<()> {
     // Phase 1: Signal gateway to stop accepting new messages
     kernel.gateway().signal_shutdown();
 
-    // Phase 2: Cancel channel tasks
+    // Phase 2: Cancel surface and channel tasks
+    for task in surface_tasks {
+        task.abort();
+    }
     for task in channel_tasks {
         task.abort();
     }
@@ -1836,8 +1838,6 @@ async fn cmd_serve(kernel: &Kernel, config_path: &Path) -> Result<()> {
 fn build_channel_plugins() -> Vec<Box<dyn ChannelPlugin>> {
     let plugins: Vec<Box<dyn ChannelPlugin>> = vec![];
     let mut plugins = plugins;
-    #[cfg(feature = "web")]
-    plugins.push(Box::new(WebPlugin::new()));
     #[cfg(feature = "cli")]
     plugins.push(Box::new(CliPlugin::new()));
     #[cfg(feature = "telegram")]
@@ -1860,7 +1860,6 @@ async fn activate_channels(
         match plugin_map.get(name.as_str()) {
             Some(plugin) => {
                 let ctx = ChannelContext {
-                    kernel: kernel.handle(),
                     config: Arc::new(parking_lot::RwLock::new(config.clone())),
                     config_path: config_path.to_path_buf(),
                 };

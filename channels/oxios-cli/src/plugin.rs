@@ -35,8 +35,8 @@ impl ChannelPlugin for CliPlugin {
         "cli"
     }
 
-    async fn setup(&self, ctx: ChannelContext) -> Result<ChannelBundle> {
-        let channel = CliChannel::with_kernel(256, Some(ctx.kernel.clone()));
+    async fn setup(&self, _ctx: ChannelContext) -> Result<ChannelBundle> {
+        let channel = CliChannel::new(256);
         Ok(ChannelBundle {
             channel: Box::new(channel),
             tasks: vec![],

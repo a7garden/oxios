@@ -1,0 +1,14 @@
+# Tool: Memory write — save a value
+[task]
+id = "tool_memory_write"
+name = "Memory Write"
+tier = "integration"
+suite = "tool"
+tags = ["smoke", "memory", "tool"]
+timeout_secs = 30
+
+prompt = "Save the following to memory: favorite_language = Rust"
+
+[expect]
+exit_code = 0
+response_not_contains = ["error", "panic"]

@@ -1,0 +1,16 @@
+# Ouroboros: Session chain — multi-turn preserves context
+[task]
+id = "ouroboros_session_chain"
+name = "Session Chain"
+tier = "integration"
+suite = "ouroboros"
+tags = ["multi-turn"]
+timeout_secs = 90
+
+[[turns]]
+message = "Remember that my project is called 'Aurora'."
+
+[[turns]]
+message = "What is the name of my project?"
+[turns.expect]
+response_contains = ["Aurora"]

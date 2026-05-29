@@ -310,7 +310,6 @@ mod tests {
     use super::*;
 
     #[test]
-    #[ignore] // TODO: regex pattern in full context
     fn test_extract_unix_path() {
         // Basic slash paths should work
         assert!(extract_filesystem_path("/test").is_some());
@@ -318,7 +317,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore] // TODO: keyword matching needs verification
     fn test_match_keywords() {
         use super::super::{Space, SpaceSource};
 

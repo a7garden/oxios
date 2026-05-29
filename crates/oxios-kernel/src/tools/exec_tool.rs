@@ -177,7 +177,15 @@ impl ExecTool {
     /// Primary shell execution path.
     /// The entire command string is forwarded to `bash -c`, so pipelines,
     /// redirects, and compound commands all work.
-    pub async fn shell_exec(&self, command: &str, timeout_ms: u64) -> Result<ExecResult, String> {
+    ///
+    /// If a `shutdown` signal is provided and fires before the command
+    /// completes, the child process is killed and an error is returned.
+    pub async fn shell_exec(
+        &self,
+        command: &str,
+        timeout_ms: u64,
+        shutdown: Option<oneshot::Receiver<()>>,
+    ) -> Result<ExecResult, String> {
         // Check if shell mode is allowed
         if !self.config.allow_shell_mode {
             return Err(
@@ -218,39 +226,71 @@ impl ExecTool {
 
         let start = std::time::Instant::now();
 
-        let result = tokio::time::timeout(
-            std::time::Duration::from_millis(effective_timeout),
-            tokio::process::Command::new("bash")
-                .arg("-c")
-                .arg(command)
-                .env_clear()
-                .env("HOME", std::env::var("HOME").unwrap_or_default())
-                .env("USER", std::env::var("USER").unwrap_or_default())
-                .env("LOGNAME", std::env::var("LOGNAME").unwrap_or_default())
-                .env("PATH", std::env::var("PATH").unwrap_or_default())
-                .env(
-                    "LANG",
-                    std::env::var("LANG").unwrap_or_else(|_| "en_US.UTF-8".to_string()),
-                )
-                .env("TERM", "dumb")
-                .output(),
-        )
-        .await;
+        // Spawn the child process so we can kill it on shutdown.
+        let mut child = tokio::process::Command::new("bash")
+            .arg("-c")
+            .arg(command)
+            .env_clear()
+            .env("HOME", std::env::var("HOME").unwrap_or_default())
+            .env("USER", std::env::var("USER").unwrap_or_default())
+            .env("LOGNAME", std::env::var("LOGNAME").unwrap_or_default())
+            .env("PATH", std::env::var("PATH").unwrap_or_default())
+            .env(
+                "LANG",
+                std::env::var("LANG").unwrap_or_else(|_| "en_US.UTF-8".to_string()),
+            )
+            .env("TERM", "dumb")
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .spawn()
+            .map_err(|e| format!("shell spawn error: {e}"))?;
 
-        let duration_ms = start.elapsed().as_millis() as u64;
+        // Take stdout/stderr handles before the select! so we can read them
+        // after wait() completes (wait_with_output consumes the child).
+        let stdout_handle = child.stdout.take();
+        let stderr_handle = child.stderr.take();
 
-        match result {
-            Ok(Ok(output)) => Ok(ExecResult {
-                stdout: String::from_utf8_lossy(&output.stdout).to_string(),
-                stderr: String::from_utf8_lossy(&output.stderr).to_string(),
-                exit_code: output.status.code().unwrap_or(-1),
-                duration_ms,
-            }),
-            Ok(Err(e)) => Err(format!("shell execution error: {e}")),
-            Err(_) => Err(format!(
-                "shell command timed out after {effective_timeout}ms"
-            )),
-        }
+        // Build a shutdown-aware future that either waits for the signal or
+        // stays pending forever (so select! only fires when a signal exists).
+        let shutdown_fut = async {
+            if let Some(rx) = shutdown {
+                let _ = rx.await;
+            } else {
+                std::future::pending::<()>().await;
+            }
+        };
+
+        let result = tokio::select! {
+            status = tokio::time::timeout(
+                std::time::Duration::from_millis(effective_timeout),
+                child.wait(),
+            ) => {
+                match status {
+                    Ok(Ok(status)) => {
+                        let stdout = read_handle(stdout_handle).await;
+                        let stderr = read_stderr_handle(stderr_handle).await;
+                        Ok(ExecResult {
+                            stdout,
+                            stderr,
+                            exit_code: status.code().unwrap_or(-1),
+                            duration_ms: start.elapsed().as_millis() as u64,
+                        })
+                    }
+                    Ok(Err(e)) => Err(format!("shell execution error: {e}")),
+                    Err(_) => Err(format!(
+                        "shell command timed out after {effective_timeout}ms"
+                    )),
+                }
+            }
+            _ = shutdown_fut => {
+                // Shutdown signal received — kill the child process.
+                let _ = child.kill().await;
+                let _ = child.wait().await; // reap to avoid zombies
+                Err("Execution cancelled by shutdown signal".to_string())
+            }
+        };
+
+        result
     }
 
     /// Execute a binary with explicit args, enforcing allowlist + metachar blocking.
@@ -260,11 +300,15 @@ impl ExecTool {
     /// 1. Binary must be a bare name (no `/` or `..`).
     /// 2. Binary must be in the allowlist (or allowlist is empty = dev mode).
     /// 3. Arguments must not contain shell metacharacters or path traversal.
+    ///
+    /// If a `shutdown` signal is provided and fires before the command
+    /// completes, the child process is killed and an error is returned.
     pub async fn structured_exec(
         &self,
         binary: &str,
         args: Vec<String>,
         timeout_ms: u64,
+        shutdown: Option<oneshot::Receiver<()>>,
     ) -> Result<ExecResult, String> {
         // --- Access control ---
         if let Some(name) = self.agent_name() {
@@ -307,42 +351,113 @@ impl ExecTool {
 
         let start = std::time::Instant::now();
 
-        let result = tokio::time::timeout(
-            std::time::Duration::from_millis(effective_timeout),
-            tokio::process::Command::new(binary)
-                .args(&args)
-                .env_clear()
-                .env("HOME", std::env::var("HOME").unwrap_or_default())
-                .env("USER", std::env::var("USER").unwrap_or_default())
-                .env("LOGNAME", std::env::var("LOGNAME").unwrap_or_default())
-                .env("PATH", std::env::var("PATH").unwrap_or_default())
-                .env(
-                    "LANG",
-                    std::env::var("LANG").unwrap_or_else(|_| "en_US.UTF-8".to_string()),
-                )
-                .env("TERM", "dumb")
-                .output(),
-        )
-        .await;
+        // Spawn the child process so we can kill it on shutdown.
+        let mut child = tokio::process::Command::new(binary)
+            .args(&args)
+            .env_clear()
+            .env("HOME", std::env::var("HOME").unwrap_or_default())
+            .env("USER", std::env::var("USER").unwrap_or_default())
+            .env("LOGNAME", std::env::var("LOGNAME").unwrap_or_default())
+            .env("PATH", std::env::var("PATH").unwrap_or_default())
+            .env(
+                "LANG",
+                std::env::var("LANG").unwrap_or_else(|_| "en_US.UTF-8".to_string()),
+            )
+            .env("TERM", "dumb")
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .spawn()
+            .map_err(|e| format!("structured spawn error: {e}"))?;
 
-        let duration_ms = start.elapsed().as_millis() as u64;
+        // Take stdout/stderr handles before the select! so we can read them
+        // after wait() completes (wait_with_output consumes the child).
+        let stdout_handle = child.stdout.take();
+        let stderr_handle = child.stderr.take();
 
-        match result {
-            Ok(Ok(output)) => Ok(ExecResult {
-                stdout: String::from_utf8_lossy(&output.stdout).to_string(),
-                stderr: String::from_utf8_lossy(&output.stderr).to_string(),
-                exit_code: output.status.code().unwrap_or(-1),
-                duration_ms,
-            }),
-            Ok(Err(e)) => Err(format!("structured execution error: {e}")),
-            Err(_) => Err(format!(
-                "structured command timed out after {effective_timeout}ms"
-            )),
-        }
+        // Build a shutdown-aware future that either waits for the signal or
+        // stays pending forever (so select! only fires when a signal exists).
+        let shutdown_fut = async {
+            if let Some(rx) = shutdown {
+                let _ = rx.await;
+            } else {
+                std::future::pending::<()>().await;
+            }
+        };
+
+        let result = tokio::select! {
+            status = tokio::time::timeout(
+                std::time::Duration::from_millis(effective_timeout),
+                child.wait(),
+            ) => {
+                match status {
+                    Ok(Ok(status)) => {
+                        let stdout = read_handle(stdout_handle).await;
+                        let stderr = read_stderr_handle(stderr_handle).await;
+                        Ok(ExecResult {
+                            stdout,
+                            stderr,
+                            exit_code: status.code().unwrap_or(-1),
+                            duration_ms: start.elapsed().as_millis() as u64,
+                        })
+                    }
+                    Ok(Err(e)) => Err(format!("structured execution error: {e}")),
+                    Err(_) => Err(format!(
+                        "structured command timed out after {effective_timeout}ms"
+                    )),
+                }
+            }
+            _ = shutdown_fut => {
+                // Shutdown signal received — kill the child process.
+                let _ = child.kill().await;
+                let _ = child.wait().await; // reap to avoid zombies
+                Err("Execution cancelled by shutdown signal".to_string())
+            }
+        };
+
+        result
     }
 }
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
+
+/// Read a piped stdout/stderr handle to a String, returning empty on failure.
+async fn read_handle(handle: Option<tokio::process::ChildStdout>) -> String {
+    match handle {
+        Some(mut h) => {
+            let mut buf = Vec::new();
+            // Use a timeout so we don't block forever on a stuck pipe.
+            match tokio::time::timeout(
+                std::time::Duration::from_secs(10),
+                tokio::io::AsyncReadExt::read_to_end(&mut h, &mut buf),
+            )
+            .await
+            {
+                Ok(Ok(_)) => String::from_utf8_lossy(&buf).to_string(),
+                _ => String::new(),
+            }
+        }
+        None => String::new(),
+    }
+}
+
+/// Read a piped stderr handle to a String, returning empty on failure.
+async fn read_stderr_handle(handle: Option<tokio::process::ChildStderr>) -> String {
+    match handle {
+        Some(mut h) => {
+            let mut buf = Vec::new();
+            match tokio::time::timeout(
+                std::time::Duration::from_secs(10),
+                tokio::io::AsyncReadExt::read_to_end(&mut h, &mut buf),
+            )
+            .await
+            {
+                Ok(Ok(_)) => String::from_utf8_lossy(&buf).to_string(),
+                _ => String::new(),
+            }
+        }
+        None => String::new(),
+    }
+}
 
 /// Check whether any argument contains shell metacharacters or `..`.
 fn has_metacharacters(args: &[String]) -> bool {
@@ -464,7 +579,7 @@ impl AgentTool for ExecTool {
         &self,
         _tool_call_id: &str,
         params: Value,
-        _signal: Option<oneshot::Receiver<()>>,
+        shutdown: Option<oneshot::Receiver<()>>,
         _ctx: &ToolContext,
     ) -> Result<AgentToolResult, String> {
         let mode = params.get("mode").and_then(|v| v.as_str()).ok_or_else(|| {
@@ -488,7 +603,7 @@ impl AgentTool for ExecTool {
                     }
                 };
 
-                match self.shell_exec(command, timeout_ms).await {
+                match self.shell_exec(command, timeout_ms, shutdown).await {
                     Ok(result) => {
                         let output = format_exec_output(&result);
                         if result.exit_code == 0 {
@@ -521,7 +636,7 @@ impl AgentTool for ExecTool {
                     })
                     .unwrap_or_default();
 
-                match self.structured_exec(binary, args, timeout_ms).await {
+                match self.structured_exec(binary, args, timeout_ms, shutdown).await {
                     Ok(result) => {
                         let output = format_exec_output(&result);
                         if result.exit_code == 0 {
@@ -564,7 +679,7 @@ mod tests {
     #[tokio::test]
     async fn test_shell_exec_echo() {
         let tool = make_tool(vec![]);
-        let result = tool.shell_exec("echo hello", 5_000).await;
+        let result = tool.shell_exec("echo hello", 5_000, None).await;
         assert!(result.is_ok());
         let r = result.unwrap();
         assert_eq!(r.exit_code, 0);
@@ -575,7 +690,7 @@ mod tests {
     #[tokio::test]
     async fn test_shell_exec_pipeline() {
         let tool = make_tool(vec![]);
-        let result = tool.shell_exec("echo foo | tr f b", 5_000).await;
+        let result = tool.shell_exec("echo foo | tr f b", 5_000, None).await;
         assert!(result.is_ok());
         let r = result.unwrap();
         assert_eq!(r.exit_code, 0);
@@ -585,7 +700,7 @@ mod tests {
     #[tokio::test]
     async fn test_shell_exec_nonzero_exit() {
         let tool = make_tool(vec![]);
-        let result = tool.shell_exec("exit 42", 5_000).await;
+        let result = tool.shell_exec("exit 42", 5_000, None).await;
         assert!(result.is_ok());
         assert_eq!(result.unwrap().exit_code, 42);
     }
@@ -593,7 +708,7 @@ mod tests {
     #[tokio::test]
     async fn test_shell_exec_empty_command() {
         let tool = make_tool(vec![]);
-        let result = tool.shell_exec("   ", 5_000).await;
+        let result = tool.shell_exec("   ", 5_000, None).await;
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("must not be empty"));
     }
@@ -601,7 +716,7 @@ mod tests {
     #[tokio::test]
     async fn test_shell_exec_timeout() {
         let tool = make_tool(vec![]);
-        let result = tool.shell_exec("sleep 300", 1_000).await;
+        let result = tool.shell_exec("sleep 300", 1_000, None).await;
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("timed out"));
     }
@@ -612,7 +727,7 @@ mod tests {
     async fn test_structured_exec_echo() {
         let tool = make_tool(vec!["echo"]);
         let result = tool
-            .structured_exec("echo", vec!["hello".into()], 5_000)
+            .structured_exec("echo", vec!["hello".into()], 5_000, None)
             .await;
         assert!(result.is_ok());
         let r = result.unwrap();
@@ -624,7 +739,7 @@ mod tests {
     async fn test_structured_exec_blocked_binary() {
         let tool = make_tool(vec!["echo"]);
         let result = tool
-            .structured_exec("rm", vec!["-rf".into(), "/".into()], 5_000)
+            .structured_exec("rm", vec!["-rf".into(), "/".into()], 5_000, None)
             .await;
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("not in the allowlist"));
@@ -633,7 +748,7 @@ mod tests {
     #[tokio::test]
     async fn test_structured_exec_path_binary() {
         let tool = make_tool(vec![]);
-        let result = tool.structured_exec("/usr/bin/echo", vec![], 5_000).await;
+        let result = tool.structured_exec("/usr/bin/echo", vec![], 5_000, None).await;
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("bare name"));
     }
@@ -641,7 +756,7 @@ mod tests {
     #[tokio::test]
     async fn test_structured_exec_traversal_binary() {
         let tool = make_tool(vec![]);
-        let result = tool.structured_exec("../bin/evil", vec![], 5_000).await;
+        let result = tool.structured_exec("../bin/evil", vec![], 5_000, None).await;
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("path traversal"));
     }
@@ -650,7 +765,7 @@ mod tests {
     async fn test_structured_exec_metachar_args() {
         let tool = make_tool(vec!["echo"]);
         let result = tool
-            .structured_exec("echo", vec!["foo; rm -rf /".into()], 5_000)
+            .structured_exec("echo", vec!["foo; rm -rf /".into()], 5_000, None)
             .await;
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("metacharacters"));
@@ -660,7 +775,7 @@ mod tests {
     async fn test_structured_exec_path_traversal_args() {
         let tool = make_tool(vec!["cat"]);
         let result = tool
-            .structured_exec("cat", vec!["../etc/passwd".into()], 5_000)
+            .structured_exec("cat", vec!["../etc/passwd".into()], 5_000, None)
             .await;
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("metacharacters"));
@@ -670,7 +785,7 @@ mod tests {
     async fn test_structured_exec_clean_args() {
         let tool = make_tool(vec!["echo"]);
         let result = tool
-            .structured_exec("echo", vec!["hello".into(), "world".into()], 5_000)
+            .structured_exec("echo", vec!["hello".into(), "world".into()], 5_000, None)
             .await;
         assert!(result.is_ok());
         let r = result.unwrap();
@@ -944,7 +1059,7 @@ mod tests {
     async fn test_for_agent_structured_exec_allowed() {
         let tool = make_agent_tool("test-agent", &["echo", "ls"]);
         let result = tool
-            .structured_exec("echo", vec!["hello".into()], 5_000)
+            .structured_exec("echo", vec!["hello".into()], 5_000, None)
             .await;
         assert!(result.is_ok(), "Allowed binary should succeed");
         let r = result.unwrap();
@@ -956,7 +1071,7 @@ mod tests {
     async fn test_for_agent_structured_exec_denied() {
         let tool = make_agent_tool("test-agent", &["ls"]); // no "echo"
         let result = tool
-            .structured_exec("echo", vec!["hello".into()], 5_000)
+            .structured_exec("echo", vec!["hello".into()], 5_000, None)
             .await;
         assert!(result.is_err());
         let err = result.unwrap_err();
@@ -973,7 +1088,7 @@ mod tests {
     #[tokio::test]
     async fn test_for_agent_shell_exec_allowed() {
         let tool = make_agent_tool("test-agent", &["bash"]);
-        let result = tool.shell_exec("echo hello", 5_000).await;
+        let result = tool.shell_exec("echo hello", 5_000, None).await;
         assert!(
             result.is_ok(),
             "Agent with 'bash' permission should succeed"
@@ -984,7 +1099,7 @@ mod tests {
     #[tokio::test]
     async fn test_for_agent_shell_exec_denied() {
         let tool = make_agent_tool("test-agent", &["ls"]); // no "bash"
-        let result = tool.shell_exec("echo hello", 5_000).await;
+        let result = tool.shell_exec("echo hello", 5_000, None).await;
         assert!(result.is_err());
         let err = result.unwrap_err();
         assert!(
@@ -1002,7 +1117,7 @@ mod tests {
         config.allow_shell_mode = true; // Enable shell mode for this test
         let access = AccessManager::new(); // empty — no permissions for anyone
         let tool = ExecTool::new_unrestricted(Arc::new(config), Arc::new(Mutex::new(access)));
-        let result = tool.shell_exec("echo unrestricted", 5_000).await;
+        let result = tool.shell_exec("echo unrestricted", 5_000, None).await;
         assert!(
             result.is_ok(),
             "Shell mode enabled + no agent_name = unrestricted execution"

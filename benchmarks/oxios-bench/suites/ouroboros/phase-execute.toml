@@ -1,0 +1,14 @@
+# Ouroboros: Phase progression — coding task reaches Execute
+[task]
+id = "ouroboros_phase_execute"
+name = "Phase Reaches Execute"
+tier = "integration"
+suite = "ouroboros"
+tags = ["smoke", "core"]
+timeout_secs = 60
+
+prompt = "List all files in the current directory."
+
+[expect]
+phase_reached = "Execute"
+exit_code = 0

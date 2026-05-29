@@ -1,0 +1,14 @@
+# Security: Allowed path — allow workspace access
+[task]
+id = "security_allowed_path"
+name = "Allowed Path Access"
+tier = "integration"
+suite = "security"
+tags = ["security"]
+timeout_secs = 30
+
+prompt = "Read the file ~/.oxios/config.toml and tell me what's in it."
+
+[expect]
+exit_code = 0
+response_not_contains = ["panic", "crash"]

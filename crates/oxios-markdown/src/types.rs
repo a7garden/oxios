@@ -334,6 +334,181 @@ fn default_mode() -> String {
     "full".to_string()
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_file_entry_new() {
+        let entry = FileEntry::new(
+            "Rust.md".to_string(),
+            "abc12345678".to_string(),
+            "Rust".to_string(),
+            1700000000000,
+            true,
+            false,
+            "/notes".to_string(),
+        );
+        assert_eq!(entry.name, "Rust.md");
+        assert_eq!(entry.hash, "abc12345678");
+        assert_eq!(entry.display_name, "Rust");
+        assert!(entry.has_content);
+        assert!(!entry.is_dir);
+        assert_eq!(entry.parent_dir, "/notes");
+    }
+
+    #[test]
+    fn test_file_entry_serialization() {
+        let entry = FileEntry::new(
+            "Test.md".to_string(),
+            "hash".to_string(),
+            "Test".to_string(),
+            1000,
+            false,
+            true,
+            "/".to_string(),
+        );
+        let json = serde_json::to_string(&entry).unwrap();
+        let restored: FileEntry = serde_json::from_str(&json).unwrap();
+        assert_eq!(restored.name, entry.name);
+        assert_eq!(restored.is_dir, true);
+        assert_eq!(restored.has_content, false);
+    }
+
+    #[test]
+    fn test_fs_error_display() {
+        assert_eq!(FsError::QuotaExceeded.to_string(), "storage quota exceeded");
+        assert_eq!(FsError::UnsafePath.to_string(), "unsafe path, possible security issue");
+        assert_eq!(FsError::CannotUnhash.to_string(), "cannot unhash, maybe the file is missing");
+    }
+
+    #[test]
+    fn test_sync_response_default() {
+        let resp = SyncResponse::default();
+        assert_eq!(resp.status, STATUS_OK);
+        assert!(resp.files.is_empty());
+        assert!(resp.timestamps.is_empty());
+        assert!(resp.renames.is_empty());
+    }
+
+    #[test]
+    fn test_sync_file_serialization() {
+        let file = SyncFile {
+            status: STATUS_OK.to_string(),
+            path: "notes/Test.md".to_string(),
+            last_modified: 1700000000000,
+            client_last_modified: 1700000000000,
+            client_last_synced: 1700000000000,
+            content: "# Hello".to_string(),
+        };
+        let json = serde_json::to_string(&file).unwrap();
+        let restored: SyncFile = serde_json::from_str(&json).unwrap();
+        assert_eq!(restored.path, "notes/Test.md");
+        assert_eq!(restored.content, "# Hello");
+    }
+
+    #[test]
+    fn test_sync_request_serialization() {
+        let req = SyncRequest {
+            modified: vec![],
+            deleted: vec!["old.md".to_string()],
+            timestamps: {
+                let mut m = HashMap::new();
+                m.insert("/".to_string(), 1700000000000);
+                m
+            },
+        };
+        let json = serde_json::to_string(&req).unwrap();
+        let restored: SyncRequest = serde_json::from_str(&json).unwrap();
+        assert!(restored.modified.is_empty());
+        assert_eq!(restored.deleted.len(), 1);
+        assert_eq!(restored.deleted[0], "old.md");
+    }
+
+    #[test]
+    fn test_sync_error_from_fs_error() {
+        let err = SyncError::from(FsError::QuotaExceeded);
+        assert!(matches!(err, SyncError::QuotaExceeded));
+
+        let err = SyncError::from(FsError::CannotUnhash);
+        assert!(matches!(err, SyncError::Storage(_)));
+    }
+
+    #[test]
+    fn test_sync_error_display() {
+        assert_eq!(SyncError::InvalidJson.to_string(), "invalid JSON");
+        assert_eq!(SyncError::NotFound.to_string(), "file not found");
+        assert_eq!(SyncError::QuotaExceeded.to_string(), "quota exceeded");
+    }
+
+    #[test]
+    fn test_knowledge_config_default() {
+        let config = KnowledgeConfig::default();
+        assert_eq!(config.language, "en");
+        assert_eq!(config.timezone, "UTC");
+        assert_eq!(config.mode, "full");
+        assert_eq!(config.pomodoro_duration_in_minutes, 50);
+        assert!(config.move_to_commands.is_empty());
+        assert!(config.schedules.is_empty());
+        assert!(config.quick_commands.is_empty());
+        assert!(!config.two_emojis_enabled);
+        assert!(!config.quick_habits_enabled);
+        assert!(config.channels.is_empty());
+    }
+
+    #[test]
+    fn test_knowledge_config_serialization_roundtrip() {
+        let config = KnowledgeConfig {
+            language: "ko".to_string(),
+            timezone: "+09:00".to_string(),
+            move_to_commands: vec!["archive".to_string()],
+            pomodoro_duration_in_minutes: 25,
+            schedules: vec![Schedule {
+                filename: "Daily.md".to_string(),
+                scheduled_at: 1700000000000,
+                cron: "9:00".to_string(),
+                cmd: String::new(),
+            }],
+            quick_commands: vec!["today".to_string()],
+            two_emojis_enabled: true,
+            mode: "chat".to_string(),
+            quick_habits_enabled: true,
+            channels: vec![42],
+        };
+        let json = serde_json::to_string(&config).unwrap();
+        let restored: KnowledgeConfig = serde_json::from_str(&json).unwrap();
+        assert_eq!(restored.language, "ko");
+        assert_eq!(restored.timezone, "+09:00");
+        assert_eq!(restored.mode, "chat");
+        assert_eq!(restored.pomodoro_duration_in_minutes, 25);
+        assert_eq!(restored.schedules.len(), 1);
+        assert_eq!(restored.schedules[0].cron, "9:00");
+        assert!(restored.two_emojis_enabled);
+        assert!(restored.quick_habits_enabled);
+        assert_eq!(restored.channels, vec![42]);
+    }
+
+    #[test]
+    fn test_constants() {
+        assert_eq!(MAX_TEXT_SIZE, 5 * 1024 * 1024);
+        assert_eq!(MAX_TEXTS_SIZE, 10 * 1024 * 1024);
+        assert_eq!(MAX_MEDIA_SIZE, 20 * 1024 * 1024);
+        assert_eq!(MAX_MEDIAS_SIZE, 512 * 1024);
+        assert_eq!(MAX_TOKEN_SIZE, 4 * 1024);
+        assert_eq!(CHAT_FILENAME, "Chat.md");
+        assert_eq!(DIR_ARCHIVE, "archive");
+        assert_eq!(DIR_JOURNAL, "journal");
+        assert_eq!(DIR_HABITS, "habits");
+        assert_eq!(MD_EXT, ".md");
+        assert_eq!(HABIT_SKIPPED, "\u{26aa}\u{fe0f}");
+        assert_eq!(HABIT_COMPLETED, "\u{1f7e2}");
+        assert_eq!(MODE_CHAT, "chat");
+        assert_eq!(MODE_FULL, "full");
+        assert_eq!(MOOD_HABIT, "Mood");
+        assert_eq!(MOOD_EMOJIS.len(), 6);
+    }
+}
+
 impl Default for KnowledgeConfig {
     fn default() -> Self {
         Self {

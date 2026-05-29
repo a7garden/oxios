@@ -561,8 +561,8 @@ impl ConsolidationConfig {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ChannelsConfig {
     /// List of channel names to activate on startup.
-    /// Default: ["web"]
-    #[serde(default = "default_channels_enabled")]
+    /// Channels are message-only interfaces (CLI, Telegram).
+    #[serde(default)]
     pub enabled: Vec<String>,
 
     /// Telegram-specific configuration.
@@ -570,15 +570,35 @@ pub struct ChannelsConfig {
     pub telegram: TelegramChannelConfig,
 }
 
-fn default_channels_enabled() -> Vec<String> {
-    vec!["web".to_string()]
-}
-
 impl Default for ChannelsConfig {
     fn default() -> Self {
         Self {
-            enabled: default_channels_enabled(),
+            enabled: vec![],
             telegram: TelegramChannelConfig::default(),
+        }
+    }
+}
+
+/// Surface activation configuration.
+///
+/// Surfaces are kernel-connected control interfaces (Web dashboard, future desktop apps).
+/// They have direct kernel access for management, monitoring, and configuration.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct SurfacesConfig {
+    /// List of surface names to activate on startup.
+    /// Default: ["web"] if the web feature is compiled in.
+    #[serde(default = "default_surfaces_enabled")]
+    pub enabled: Vec<String>,
+}
+
+fn default_surfaces_enabled() -> Vec<String> {
+    vec!["web".to_string()]
+}
+
+impl Default for SurfacesConfig {
+    fn default() -> Self {
+        Self {
+            enabled: default_surfaces_enabled(),
         }
     }
 }
@@ -815,9 +835,12 @@ pub struct OxiosConfig {
     /// Logging configuration.
     #[serde(default)]
     pub logging: LoggingConfig,
-    /// Channel activation configuration.
+    /// Channel activation configuration (message interfaces: CLI, Telegram).
     #[serde(default)]
     pub channels: ChannelsConfig,
+    /// Surface activation configuration (control interfaces: Web dashboard).
+    #[serde(default)]
+    pub surfaces: Option<SurfacesConfig>,
     /// Headless browser configuration.
     #[serde(default)]
     pub browser: BrowserConfig,
@@ -1603,12 +1626,16 @@ impl OxiosConfig {
             errors.push("resource_monitor.memory_threshold must be <= 100".into());
         }
 
-        // Channels validation
+        // Channels validation (message interfaces only)
         for name in &self.channels.enabled {
-            let valid = ["web", "cli", "telegram"];
+            let valid = ["cli", "telegram"];
             if !valid.contains(&name.as_str()) {
                 warnings.push(format!("channels.enabled: unknown channel '{}'", name));
             }
+        }
+        // Warn if 'web' is listed in channels — it should be in surfaces
+        if self.channels.enabled.iter().any(|c| c == "web") {
+            warnings.push("channels.enabled: 'web' should be listed under [surfaces], not [channels]".into());
         }
         if self.channels.enabled.iter().any(|c| c == "telegram")
             && std::env::var(&self.channels.telegram.bot_token_env).is_err()

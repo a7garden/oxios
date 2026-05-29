@@ -1,0 +1,16 @@
+# Memory: Write and verify — store then confirm
+[task]
+id = "memory_write_verify"
+name = "Memory Write and Verify"
+tier = "integration"
+suite = "memory"
+tags = ["smoke", "memory"]
+timeout_secs = 60
+
+[[turns]]
+message = "Store this fact: the project uses Tokio runtime version 1."
+
+[[turns]]
+message = "What runtime does my project use?"
+[turns.expect]
+response_contains = ["Tokio"]

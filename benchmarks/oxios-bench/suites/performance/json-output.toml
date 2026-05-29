@@ -1,0 +1,15 @@
+# Performance: JSON output — verify structured output
+[task]
+id = "perf_json_output"
+name = "JSON Output Integrity"
+tier = "e2e"
+suite = "performance"
+tags = ["performance", "smoke"]
+timeout_secs = 30
+
+prompt = "What is 2 + 2?"
+
+[expect]
+exit_code = 0
+phase_reached = "Execute"
+response_contains = ["4"]

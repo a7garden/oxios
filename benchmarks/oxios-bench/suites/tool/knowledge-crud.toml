@@ -1,0 +1,14 @@
+# Tool: Knowledge CRUD — create a note
+[task]
+id = "tool_knowledge_crud"
+name = "Knowledge CRUD"
+tier = "integration"
+suite = "tool"
+tags = ["tool", "knowledge"]
+timeout_secs = 30
+
+prompt = "Create a knowledge note called 'bench-test.md' with the content '# Benchmark Test\nThis is a test note from oxios-bench.'"
+
+[expect]
+exit_code = 0
+response_not_contains = ["error", "panic"]

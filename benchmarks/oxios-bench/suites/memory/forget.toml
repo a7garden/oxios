@@ -1,0 +1,14 @@
+# Memory: Forget — delete a memory
+[task]
+id = "memory_forget"
+name = "Memory Delete"
+tier = "integration"
+suite = "memory"
+tags = ["memory"]
+timeout_secs = 30
+
+prompt = "Delete all memories containing 'bench-test-temp'."
+
+[expect]
+exit_code = 0
+response_not_contains = ["panic", "crash"]

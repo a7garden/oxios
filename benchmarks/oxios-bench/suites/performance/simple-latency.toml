@@ -1,0 +1,15 @@
+# Performance: Simple latency — trivial task should be fast
+[task]
+id = "perf_simple_latency"
+name = "Simple Task Latency"
+tier = "e2e"
+suite = "performance"
+tags = ["performance", "smoke"]
+timeout_secs = 30
+
+prompt = "Say 'ok'."
+
+[expect]
+exit_code = 0
+max_duration_ms = 15_000
+response_not_contains = ["error"]

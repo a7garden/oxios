@@ -1,0 +1,14 @@
+# Regression: Special characters — handle shell metacharacters safely
+[task]
+id = "regression_special_chars"
+name = "Special Characters Handling"
+tier = "integration"
+suite = "regression"
+tags = ["regression"]
+timeout_secs = 30
+
+prompt = "What does this expression evaluate to: $(echo hello) or `ls` or ; rm -rf / ?"
+
+[expect]
+exit_code = 0
+response_not_contains = ["panic", "crash"]

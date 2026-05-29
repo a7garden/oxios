@@ -1,0 +1,15 @@
+# Agent: Budget enforcement — respect token budget
+[task]
+id = "agent_budget"
+name = "Budget Enforcement"
+tier = "integration"
+suite = "agent"
+tags = ["agent"]
+timeout_secs = 30
+
+prompt = "Write a very short one-sentence summary of what Oxios is."
+
+[expect]
+exit_code = 0
+response_not_contains = ["panic"]
+max_duration_ms = 15_000

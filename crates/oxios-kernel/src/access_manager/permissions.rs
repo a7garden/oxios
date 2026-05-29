@@ -204,7 +204,7 @@ pub struct AuditEntry {
 
 impl AuditEntry {
     /// Creates a new audit entry.
-    pub(crate) fn new(
+    pub fn new(
         agent_name: &str,
         action: &str,
         resource: &str,
@@ -219,5 +219,219 @@ impl AuditEntry {
             allowed,
             reason,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_default_permissions_has_basic_tools() {
+        let perms = AgentPermissions::default();
+        assert!(perms.allowed_tools.contains("read"));
+        assert!(perms.allowed_tools.contains("write"));
+        assert!(perms.allowed_tools.contains("bash"));
+        assert!(perms.allowed_tools.contains("exec"));
+        assert!(!perms.network_access);
+        assert!(!perms.can_fork);
+        assert_eq!(perms.max_execution_time_secs, 300);
+        assert_eq!(perms.max_memory_mb, 512);
+    }
+
+    #[test]
+    fn test_default_permissions_denies_sensitive_paths() {
+        let perms = AgentPermissions::default();
+        assert!(perms.is_path_denied("/etc/passwd"));
+        assert!(perms.is_path_denied("/root/.ssh/id_rsa"));
+        assert!(perms.is_path_denied("/proc/self/environ"));
+        assert!(perms.is_path_denied("/sys/kernel/addr"));
+        assert!(perms.is_path_denied(".oxios/config.toml"));
+    }
+
+    #[test]
+    fn test_default_permissions_allows_workspace() {
+        let perms = AgentPermissions::default();
+        assert!(perms.is_path_allowed("/workspace/src/main.rs"));
+        assert!(perms.is_path_allowed("/workspace/README.md"));
+        assert!(!perms.is_path_allowed("/tmp/evil"));
+    }
+
+    #[test]
+    fn test_for_new_agent_sets_name() {
+        let perms = AgentPermissions::for_new_agent("test-agent");
+        assert_eq!(perms.agent_name, "test-agent");
+        assert!(perms.allowed_tools.contains("read"));
+    }
+
+    #[test]
+    fn test_allow_and_deny_tool() {
+        let mut perms = AgentPermissions::for_new_agent("a");
+        perms.allow_tool("custom_tool");
+        assert!(perms.allowed_tools.contains("custom_tool"));
+
+        perms.deny_tool("bash");
+        assert!(!perms.allowed_tools.contains("bash"));
+
+        // denying non-existent tool is a no-op
+        perms.deny_tool("nonexistent");
+    }
+
+    #[test]
+    fn test_allow_and_deny_path_deduplication() {
+        let mut perms = AgentPermissions::for_new_agent("a");
+        perms.allow_path("/data/**");
+        perms.allow_path("/data/**"); // duplicate
+        assert_eq!(perms.allowed_paths.iter().filter(|p| **p == "/data/**").count(), 1);
+
+        perms.deny_path("/secret/**");
+        perms.deny_path("/secret/**"); // duplicate
+        assert_eq!(perms.denied_paths.iter().filter(|p| **p == "/secret/**").count(), 1);
+    }
+
+    #[test]
+    fn test_enable_network_and_forking() {
+        let mut perms = AgentPermissions::for_new_agent("a");
+        assert!(!perms.network_access);
+        assert!(!perms.can_fork);
+
+        perms.enable_network();
+        assert!(perms.network_access);
+
+        perms.enable_forking();
+        assert!(perms.can_fork);
+    }
+
+    #[test]
+    fn test_denied_overrides_allowed() {
+        let mut perms = AgentPermissions::for_new_agent("a");
+        perms.allowed_paths = vec!["/workspace/**".to_string()];
+        perms.denied_paths = vec!["/workspace/secret/**".to_string()];
+
+        assert!(perms.is_path_allowed("/workspace/secret/key.pem"));
+        assert!(perms.is_path_denied("/workspace/secret/key.pem"));
+        // Both match — denied takes precedence at the gate level
+    }
+
+    #[test]
+    fn test_invalid_glob_pattern() {
+        let mut perms = AgentPermissions::for_new_agent("a");
+        perms.allowed_paths = vec!["[invalid".to_string()];
+        // Invalid glob should not panic, just not match
+        assert!(!perms.is_path_allowed("/anything"));
+    }
+
+    #[test]
+    fn test_permission_update_partial() {
+        let mut perms = AgentPermissions::for_new_agent("a");
+        let original_tools = perms.allowed_tools.clone();
+
+        let update = PermissionUpdate {
+            network_access: Some(true),
+            max_execution_time_secs: Some(600),
+            ..Default::default()
+        };
+        update.apply(&mut perms);
+
+        assert!(perms.network_access);
+        assert_eq!(perms.max_execution_time_secs, 600);
+        // Untouched fields remain the same
+        assert_eq!(perms.allowed_tools, original_tools);
+        assert!(!perms.can_fork);
+    }
+
+    #[test]
+    fn test_permission_update_full_replace() {
+        let mut perms = AgentPermissions::for_new_agent("a");
+
+        let update = PermissionUpdate {
+            allowed_tools: Some(HashSet::from(["read".to_string()])),
+            allowed_paths: Some(vec!["/safe/**".to_string()]),
+            denied_paths: Some(vec![]),
+            network_access: Some(true),
+            max_execution_time_secs: Some(0),
+            max_memory_mb: Some(1024),
+            can_fork: Some(true),
+        };
+        update.apply(&mut perms);
+
+        assert_eq!(perms.allowed_tools.len(), 1);
+        assert!(perms.allowed_tools.contains("read"));
+        assert_eq!(perms.allowed_paths, vec!["/safe/**"]);
+        assert!(perms.denied_paths.is_empty());
+        assert!(perms.network_access);
+        assert!(perms.can_fork);
+        assert_eq!(perms.max_memory_mb, 1024);
+    }
+
+    #[test]
+    fn test_audit_entry_new_allowed() {
+        let entry = AuditEntry::new("agent-1", "use_tool", "bash", true, None);
+        assert_eq!(entry.agent_name, "agent-1");
+        assert_eq!(entry.action, "use_tool");
+        assert_eq!(entry.resource, "bash");
+        assert!(entry.allowed);
+        assert!(entry.reason.is_none());
+    }
+
+    #[test]
+    fn test_audit_entry_new_denied_with_reason() {
+        let entry = AuditEntry::new(
+            "rogue-agent",
+            "access_path",
+            "/etc/shadow",
+            false,
+            Some("path not in allowed list".to_string()),
+        );
+        assert!(!entry.allowed);
+        assert_eq!(entry.reason.as_deref(), Some("path not in allowed list"));
+    }
+
+    #[test]
+    fn test_permissions_serialization_roundtrip() {
+        let mut perms = AgentPermissions::for_new_agent("serializer");
+        perms.enable_network();
+        perms.allow_tool("curl");
+
+        let json = serde_json::to_string(&perms).unwrap();
+        let restored: AgentPermissions = serde_json::from_str(&json).unwrap();
+        assert_eq!(restored.agent_name, "serializer");
+        assert!(restored.network_access);
+        assert!(restored.allowed_tools.contains("curl"));
+    }
+
+    #[test]
+    fn test_audit_entry_serialization_roundtrip() {
+        let entry = AuditEntry::new(
+            "test",
+            "network_request",
+            "https://example.com",
+            false,
+            Some("network not allowed".to_string()),
+        );
+        let json = serde_json::to_string(&entry).unwrap();
+        let restored: AuditEntry = serde_json::from_str(&json).unwrap();
+        assert_eq!(restored.agent_name, entry.agent_name);
+        assert_eq!(restored.action, entry.action);
+        assert_eq!(restored.allowed, entry.allowed);
+        assert_eq!(restored.reason, entry.reason);
+    }
+
+    #[test]
+    fn test_permission_update_default_is_noop() {
+        let mut perms = AgentPermissions::for_new_agent("a");
+        let snapshot = perms.clone();
+
+        let update = PermissionUpdate::default();
+        update.apply(&mut perms);
+
+        assert_eq!(perms.agent_name, snapshot.agent_name);
+        assert_eq!(perms.allowed_tools, snapshot.allowed_tools);
+        assert_eq!(perms.allowed_paths, snapshot.allowed_paths);
+        assert_eq!(perms.denied_paths, snapshot.denied_paths);
+        assert_eq!(perms.network_access, snapshot.network_access);
+        assert_eq!(perms.max_execution_time_secs, snapshot.max_execution_time_secs);
+        assert_eq!(perms.max_memory_mb, snapshot.max_memory_mb);
+        assert_eq!(perms.can_fork, snapshot.can_fork);
     }
 }

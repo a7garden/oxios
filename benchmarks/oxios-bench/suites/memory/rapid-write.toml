@@ -1,0 +1,14 @@
+# Memory: Rapid write — multiple memories in sequence
+[task]
+id = "memory_rapid_write"
+name = "Rapid Memory Write"
+tier = "integration"
+suite = "memory"
+tags = ["memory"]
+timeout_secs = 60
+
+prompt = "Save these three items to memory: 1) color=blue, 2) size=large, 3) count=42"
+
+[expect]
+exit_code = 0
+response_not_contains = ["error", "panic"]

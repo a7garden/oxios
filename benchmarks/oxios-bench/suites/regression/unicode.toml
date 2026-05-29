@@ -1,0 +1,14 @@
+# Regression: Unicode — Korean/CJK prompts handled correctly
+[task]
+id = "regression_unicode"
+name = "Unicode Prompt Handling"
+tier = "integration"
+suite = "regression"
+tags = ["regression"]
+timeout_secs = 30
+
+prompt = "안녕하세요. 반갑습니다."
+
+[expect]
+exit_code = 0
+response_not_contains = ["panic", "crash"]

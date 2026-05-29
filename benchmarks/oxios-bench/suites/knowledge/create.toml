@@ -1,0 +1,14 @@
+# Knowledge: Create note
+[task]
+id = "knowledge_create"
+name = "Knowledge Note Creation"
+tier = "integration"
+suite = "knowledge"
+tags = ["knowledge"]
+timeout_secs = 30
+
+prompt = "Create a new knowledge note titled 'rust-basics' with the content about Rust ownership and borrowing."
+
+[expect]
+exit_code = 0
+response_not_contains = ["error", "panic"]

@@ -1,0 +1,14 @@
+# Skill: Code review — invoke code-review skill
+[task]
+id = "skill_code_review"
+name = "Code Review Skill"
+tier = "integration"
+suite = "skill"
+tags = ["skill"]
+timeout_secs = 60
+
+prompt = "Review this code: fn add(a: i32, b: i32) -> i32 { a - b } — it should add, not subtract."
+
+[expect]
+exit_code = 0
+response_not_contains = ["panic", "crash"]

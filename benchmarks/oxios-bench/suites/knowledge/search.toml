@@ -1,0 +1,14 @@
+# Knowledge: Search notes
+[task]
+id = "knowledge_search_notes"
+name = "Knowledge Search"
+tier = "integration"
+suite = "knowledge"
+tags = ["knowledge"]
+timeout_secs = 30
+
+prompt = "Search my knowledge base for notes about 'programming'."
+
+[expect]
+exit_code = 0
+response_not_contains = ["error", "panic"]

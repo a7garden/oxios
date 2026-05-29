@@ -111,8 +111,6 @@ pub struct TelegramChannel {
     chat_sessions: Arc<RwLock<HashMap<i64, ChatSession>>>,
     /// Session rotation settings
     session_settings: TelegramSessionSettings,
-    /// Optional kernel handle for Space management.
-    kernel: Option<Arc<oxios_kernel::KernelHandle>>,
 }
 
 impl TelegramChannel {
@@ -122,15 +120,6 @@ impl TelegramChannel {
     /// * `bot_token` - Telegram Bot API token from @BotFather
     /// * `allowed_users` - List of allowed Telegram user IDs (empty = allow all)
     pub fn new(bot_token: String, allowed_users: Vec<i64>) -> Self {
-        Self::with_kernel(bot_token, allowed_users, None)
-    }
-
-    /// Create a new Telegram channel with an optional kernel handle.
-    pub fn with_kernel(
-        bot_token: String,
-        allowed_users: Vec<i64>,
-        kernel: Option<Arc<oxios_kernel::KernelHandle>>,
-    ) -> Self {
         Self {
             bot_token,
             api_base: "https://api.telegram.org".to_string(),
@@ -142,7 +131,6 @@ impl TelegramChannel {
             offset: Arc::new(RwLock::new(0)),
             chat_sessions: Arc::new(RwLock::new(HashMap::new())),
             session_settings: TelegramSessionSettings::default(),
-            kernel,
         }
     }
 
@@ -391,101 +379,15 @@ impl Channel for TelegramChannel {
                                         continue;
                                     }
 
-                                    // /spaces command — list all spaces
+                                    // /spaces command — channels don't have kernel access
                                     if trimmed == "/spaces" || trimmed.starts_with("/spaces@") {
-                                        if let Some(ref kernel) = this.kernel {
-                                            let spaces = kernel.spaces.list_spaces();
-                                            if spaces.is_empty() {
-                                                let _ = this.send_text(cid, "📋 등록된 Space가 없습니다.", Some(message_id)).await;
-                                            } else {
-                                                let mut lines = vec!["📋 *Spaces:*".to_string()];
-                                                for space in &spaces {
-                                                    let marker = if space.active { "→ " } else { "  " };
-                                                    lines.push(format!(
-                                                        "{}{} (`{}`) — {} interactions",
-                                                        marker, space.name, &space.id[..8], space.interaction_count
-                                                    ));
-                                                }
-                                                let _ = this.send_text(cid, &lines.join("\n"), Some(message_id)).await;
-                                            }
-                                        } else {
-                                            let _ = this.send_text(cid, "Space 관리를 사용할 수 없습니다.", Some(message_id)).await;
-                                        }
+                                        let _ = this.send_text(cid, "Space 관리는 Web 대시보드에서 사용 가능합니다.", Some(message_id)).await;
                                         continue;
                                     }
 
-                                    // /space command — show or switch space
+                                    // /space command — channels don't have kernel access
                                     if trimmed.starts_with("/space") && !trimmed.starts_with("/spaces") {
-                                        let arg = trimmed
-                                            .strip_prefix("/space@")
-                                            .or_else(|| trimmed.strip_prefix("/space"))
-                                            .unwrap_or("")
-                                            .trim();
-
-                                        if let Some(ref kernel) = this.kernel {
-                                            if arg.is_empty() {
-                                                // Show current space
-                                                match kernel.spaces.current_space() {
-                                                    Some(space) => {
-                                                        let _ = this
-                                                            .send_text(
-                                                                cid,
-                                                                &format!("📋 현재 Space: {} (`{}`)", space.name, &space.id[..8]),
-                                                                Some(message_id),
-                                                            )
-                                                            .await;
-                                                    }
-                                                    None => {
-                                                        let _ = this
-                                                            .send_text(cid, "📋 현재 Space: (기본)", Some(message_id))
-                                                            .await;
-                                                    }
-                                                }
-                                            } else {
-                                                // Try to activate
-                                                let resolved_id = if uuid::Uuid::parse_str(arg).is_ok() {
-                                                    arg.to_string()
-                                                } else {
-                                                    let spaces = kernel.spaces.list_spaces();
-                                                    spaces
-                                                        .iter()
-                                                        .find(|s| s.name == arg)
-                                                        .map(|s| s.id.clone())
-                                                        .unwrap_or_else(|| arg.to_string())
-                                                };
-                                                match kernel.spaces.activate(&resolved_id).await {
-                                                    Ok(()) => {
-                                                        let spaces = kernel.spaces.list_spaces();
-                                                        if let Some(space) = spaces.iter().find(|s| s.id == resolved_id) {
-                                                            let _ = this
-                                                                .send_text(
-                                                                    cid,
-                                                                    &format!("✅ Space 전환: {} (`{}`)", space.name, &space.id[..8]),
-                                                                    Some(message_id),
-                                                                )
-                                                                .await;
-                                                        } else {
-                                                            let _ = this
-                                                                .send_text(cid, "✅ Space 전환됨", Some(message_id))
-                                                                .await;
-                                                        }
-                                                    }
-                                                    Err(e) => {
-                                                        let _ = this
-                                                            .send_text(
-                                                                cid,
-                                                                &format!("❌ Space 전환 실패: {}", e),
-                                                                Some(message_id),
-                                                            )
-                                                            .await;
-                                                    }
-                                                }
-                                            }
-                                        } else {
-                                            let _ = this
-                                                .send_text(cid, "Space 관리를 사용할 수 없습니다.", Some(message_id))
-                                                .await;
-                                        }
+                                        let _ = this.send_text(cid, "Space 관리는 Web 대시보드에서 사용 가능합니다.", Some(message_id)).await;
                                         continue;
                                     }
 

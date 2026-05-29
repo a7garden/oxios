@@ -1,0 +1,112 @@
+import { create } from 'zustand'
+import { persist } from 'zustand/middleware'
+
+interface KnowledgeState {
+  // View mode
+  mode: 'editor' | 'chat'
+
+  // Current file
+  currentFilePath: string | null
+
+  // Navigation history
+  history: string[]
+  historyIndex: number
+
+  // Layout
+  sidebarOpen: boolean
+  sidebarWidth: number
+  infoPanelOpen: boolean
+
+  // Split editor
+  splitEditorOpen: boolean
+  splitFilePath: string | null
+
+  // Actions
+  openFile: (path: string) => void
+  openChat: () => void
+  goBack: () => string | null | undefined
+  goForward: () => string | null | undefined
+  toggleSidebar: () => void
+  setSidebarWidth: (w: number) => void
+  toggleInfoPanel: () => void
+  openSplit: (path: string) => void
+  closeSplit: () => void
+}
+
+export const useKnowledgeStore = create<KnowledgeState>()(
+  persist(
+    (set, get) => ({
+      mode: 'chat',
+      currentFilePath: null,
+      history: [],
+      historyIndex: -1,
+      sidebarOpen: true,
+      sidebarWidth: 280,
+      infoPanelOpen: false,
+      splitEditorOpen: false,
+      splitFilePath: null,
+
+      openFile: (path) => {
+        const { history, historyIndex } = get()
+        // Trim forward history
+        const newHistory = [...history.slice(0, historyIndex + 1), path]
+        set({
+          mode: 'editor',
+          currentFilePath: path,
+          history: newHistory,
+          historyIndex: newHistory.length - 1,
+        })
+      },
+
+      openChat: () => {
+        set({ mode: 'chat' })
+      },
+
+      goBack: () => {
+        const { history, historyIndex } = get()
+        if (historyIndex <= 0) return null
+        const newIndex = historyIndex - 1
+        const path = history[newIndex]
+        set({ historyIndex: newIndex, currentFilePath: path, mode: 'editor' })
+        return path
+      },
+
+      goForward: () => {
+        const { history, historyIndex } = get()
+        if (historyIndex >= history.length - 1) return null
+        const newIndex = historyIndex + 1
+        const path = history[newIndex]
+        set({ historyIndex: newIndex, currentFilePath: path, mode: 'editor' })
+        return path
+      },
+
+      toggleSidebar: () => {
+        set({ sidebarOpen: !get().sidebarOpen })
+      },
+
+      setSidebarWidth: (w) => {
+        const clamped = Math.min(Math.max(w, 200), 600)
+        set({ sidebarWidth: clamped })
+      },
+
+      toggleInfoPanel: () => {
+        set({ infoPanelOpen: !get().infoPanelOpen })
+      },
+
+      openSplit: (path) => {
+        set({ splitEditorOpen: true, splitFilePath: path })
+      },
+
+      closeSplit: () => {
+        set({ splitEditorOpen: false, splitFilePath: null })
+      },
+    }),
+    {
+      name: 'oxios-knowledge',
+      partialize: (state) => ({
+        sidebarWidth: state.sidebarWidth,
+        sidebarOpen: state.sidebarOpen,
+      }),
+    }
+  )
+)

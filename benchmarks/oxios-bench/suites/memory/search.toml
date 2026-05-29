@@ -1,0 +1,14 @@
+# Memory: Search — find a stored memory
+[task]
+id = "memory_search"
+name = "Memory Search"
+tier = "integration"
+suite = "memory"
+tags = ["memory"]
+timeout_secs = 30
+
+prompt = "Search my memories for anything about 'database' or 'config'."
+
+[expect]
+exit_code = 0
+response_not_contains = ["panic", "crash"]

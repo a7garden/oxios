@@ -1,0 +1,15 @@
+# Tool: Context file — pass a file as context
+[task]
+id = "tool_context_file"
+name = "Context File Usage"
+tier = "integration"
+suite = "tool"
+tags = ["tool"]
+timeout_secs = 30
+
+prompt = "Summarize the code file I'm providing as context."
+context_file = "fixtures/sample_code.rs"
+
+[expect]
+exit_code = 0
+response_not_contains = ["error", "panic"]

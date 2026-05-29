@@ -1,0 +1,15 @@
+# Tool: Shell exec — simple command
+[task]
+id = "tool_exec_shell"
+name = "Shell Exec: Echo"
+tier = "integration"
+suite = "tool"
+tags = ["smoke", "tool"]
+timeout_secs = 30
+
+prompt = "Run the shell command 'echo hello-world' and show me the output."
+
+[expect]
+phase_reached = "Execute"
+response_contains = ["hello-world"]
+response_not_contains = ["error", "failed"]

@@ -250,7 +250,7 @@ impl StateStore {
         let path = dir.join(format!("{name}.md"));
 
         // Write to temp file first, then atomic rename
-        let temp_path = dir.join(format!("{name}.{}.tmp", std::process::id()));
+        let temp_path = dir.join(format!("{name}.{}.{}.tmp", std::process::id(), uuid::Uuid::new_v4()));
         fs::write(&temp_path, content).await?;
         tokio::fs::rename(&temp_path, &path).await?;
 
@@ -308,7 +308,7 @@ impl StateStore {
         let content = serde_json::to_string_pretty(data)?;
 
         // Write to temp file first, then atomic rename
-        let temp_path = dir.join(format!("{name}.{}.tmp", std::process::id()));
+        let temp_path = dir.join(format!("{name}.{}.{}.tmp", std::process::id(), uuid::Uuid::new_v4()));
         fs::write(&temp_path, &content).await?;
         tokio::fs::rename(&temp_path, &path).await?;
 
@@ -563,7 +563,12 @@ impl PruneThrottle {
     /// Check if enough time has elapsed since the last prune.
     /// Returns `true` if prune should proceed.
     pub fn should_prune(&self) -> bool {
-        let mut guard = self.last_prune.lock().unwrap();
+        // SAFETY: parking_lot::Mutex never poisons, but std::sync::Mutex does.
+        // Recover from poison by taking the inner value so pruning continues.
+        let mut guard = self.last_prune.lock().unwrap_or_else(|e| {
+            tracing::warn!("PruneThrottle mutex poisoned, recovering: {e}");
+            e.into_inner()
+        });
         let now = std::time::Instant::now();
         match *guard {
             Some(last) => {

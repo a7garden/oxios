@@ -8,7 +8,6 @@ repository = "https://github.com/a7garden/oxios"
 
 [dependencies]
 oxios-gateway = { version = "0.4.0", path = "../../crates/oxios-gateway" }
-oxios-kernel = { version = "0.4.0", path = "../../crates/oxios-kernel", default-features = false }
 reedline = "0.38"
 tokio = { workspace = true }
 async-trait = { workspace = true }

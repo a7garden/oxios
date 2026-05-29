@@ -1,0 +1,14 @@
+# Tool: Knowledge search — search the knowledge base
+[task]
+id = "tool_knowledge_search"
+name = "Knowledge Search"
+tier = "integration"
+suite = "tool"
+tags = ["tool", "knowledge"]
+timeout_secs = 30
+
+prompt = "Search the knowledge base for any notes about 'Rust'."
+
+[expect]
+exit_code = 0
+response_not_contains = ["panic", "crash"]

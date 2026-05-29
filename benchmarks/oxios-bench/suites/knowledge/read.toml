@@ -1,0 +1,14 @@
+# Knowledge: Read note content
+[task]
+id = "knowledge_read"
+name = "Knowledge Note Read"
+tier = "integration"
+suite = "knowledge"
+tags = ["knowledge"]
+timeout_secs = 30
+
+prompt = "Open and show me the content of any knowledge note I have."
+
+[expect]
+exit_code = 0
+response_not_contains = ["error", "panic"]

@@ -37,18 +37,11 @@ pub struct CliChannel {
     /// Shared flag indicating whether a request is currently being processed.
     /// Set to `true` by the interactive loop on send, `false` by `send()` on response.
     processing: Arc<AtomicBool>,
-    /// Optional kernel handle for Space management.
-    kernel: Option<Arc<oxios_kernel::KernelHandle>>,
 }
 
 impl CliChannel {
     /// Creates a new CLI channel with the given buffer size.
     pub fn new(buffer: usize) -> Self {
-        Self::with_kernel(buffer, None)
-    }
-
-    /// Creates a new CLI channel with an optional kernel handle.
-    pub fn with_kernel(buffer: usize, kernel: Option<Arc<oxios_kernel::KernelHandle>>) -> Self {
         let (incoming_tx, incoming_rx) = mpsc::channel(buffer);
         let session = Arc::new(std::sync::Mutex::new(Session::new(None)));
         let processing = Arc::new(AtomicBool::new(false));
@@ -59,7 +52,6 @@ impl CliChannel {
             session,
             formatter: CliFormatter,
             processing,
-            kernel,
         }
     }
 
@@ -74,7 +66,6 @@ impl CliChannel {
             incoming_tx: self.incoming_tx.clone(),
             session: self.session.clone(),
             processing: self.processing.clone(),
-            kernel: self.kernel.clone(),
         }
     }
 
@@ -150,15 +141,11 @@ pub struct CliChannelHandle {
     session: Arc<std::sync::Mutex<Session>>,
     /// Shared processing flag (set `true` on send, `false` on response).
     processing: Arc<AtomicBool>,
-    /// Optional kernel handle for Space management.
-    kernel: Option<Arc<oxios_kernel::KernelHandle>>,
 }
 
 impl std::fmt::Debug for CliChannelHandle {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("CliChannelHandle")
-            .field("has_kernel", &self.kernel.is_some())
-            .finish()
+        f.debug_struct("CliChannelHandle").finish()
     }
 }
 
@@ -168,16 +155,14 @@ impl CliChannelHandle {
         channel.handle()
     }
 
-    /// Returns a reference to the kernel handle, if available.
-    pub fn kernel(&self) -> Option<&Arc<oxios_kernel::KernelHandle>> {
-        self.kernel.as_ref()
-    }
-
     /// Send a user message into the gateway pipeline.
     pub async fn send_user_message(&self, content: String) -> Result<()> {
         let mut msg = IncomingMessage::new("cli", "cli-user", &content);
         {
-            let session = self.session.lock().unwrap();
+            let session = self.session.lock().unwrap_or_else(|e| {
+                tracing::error!("Mutex poisoned: {e}");
+                e.into_inner()
+            });
             msg.metadata
                 .insert("session_id".to_owned(), session.id.to_string());
         }

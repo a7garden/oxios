@@ -206,7 +206,13 @@ impl SqliteMemoryStore {
             .query_map(rusqlite::params![memory_type.label(), limit], |row| {
                 Ok(search::row_to_memory_entry(row))
             })?
-            .filter_map(|r| r.ok())
+            .filter_map(|r| match r {
+                Ok(v) => Some(v),
+                Err(e) => {
+                    tracing::warn!(error = %e, "Failed to deserialize memory row, skipping");
+                    None
+                }
+            })
             .collect();
 
         Ok(entries)
@@ -432,7 +438,15 @@ impl SqliteMemoryStore {
         let rows: Vec<(i64, String)> = match stmt.query_map([], |row| {
                 Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?))
             }) {
-            Ok(mapped) => mapped.filter_map(|r| r.ok()).collect(),
+            Ok(mapped) => mapped
+                .filter_map(|r| match r {
+                    Ok(v) => Some(v),
+                    Err(e) => {
+                        tracing::warn!(error = %e, "Failed to deserialize memory row, skipping");
+                        None
+                    }
+                })
+                .collect(),
             Err(_) => Vec::new(),
         };
 
@@ -526,7 +540,13 @@ impl SqliteMemoryStore {
             .query_map(rusqlite::params![tier_label, limit], |row| {
                 Ok(search::row_to_memory_entry(row))
             })?
-            .filter_map(|r| r.ok())
+            .filter_map(|r| match r {
+                Ok(v) => Some(v),
+                Err(e) => {
+                    tracing::warn!(error = %e, "Failed to deserialize memory row, skipping");
+                    None
+                }
+            })
             .collect();
 
         Ok(entries)
@@ -628,7 +648,13 @@ impl SqliteMemoryStore {
                     updated_at: row.get(9)?,
                 })
             })?
-            .filter_map(|r| r.ok())
+            .filter_map(|r| match r {
+                Ok(v) => Some(v),
+                Err(e) => {
+                    tracing::warn!(error = %e, "Failed to deserialize memory row, skipping");
+                    None
+                }
+            })
             .collect();
 
         Ok(rows)

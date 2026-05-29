@@ -112,3 +112,92 @@ fn copy_dir_recursive<'a>(
         Ok(())
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_backup_manifest_serialization() {
+        let manifest = BackupManifest {
+            version: 1,
+            created_at: "2025-01-01T00:00:00Z".to_string(),
+            oxios_version: "0.1.0".to_string(),
+            sections: vec![
+                BackupSection {
+                    name: "seeds".to_string(),
+                    entry_count: 42,
+                },
+                BackupSection {
+                    name: "memory/facts".to_string(),
+                    entry_count: 100,
+                },
+            ],
+        };
+
+        let json = serde_json::to_string_pretty(&manifest).unwrap();
+        let restored: BackupManifest = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(restored.version, 1);
+        assert_eq!(restored.oxios_version, "0.1.0");
+        assert_eq!(restored.sections.len(), 2);
+        assert_eq!(restored.sections[0].name, "seeds");
+        assert_eq!(restored.sections[0].entry_count, 42);
+        assert_eq!(restored.sections[1].name, "memory/facts");
+        assert_eq!(restored.sections[1].entry_count, 100);
+    }
+
+    #[test]
+    fn test_backup_section_ordering() {
+        let sections = vec![
+            BackupSection { name: "a".into(), entry_count: 1 },
+            BackupSection { name: "b".into(), entry_count: 2 },
+        ];
+        let manifest = BackupManifest {
+            version: 1,
+            created_at: String::new(),
+            oxios_version: String::new(),
+            sections,
+        };
+        assert_eq!(manifest.sections[0].name, "a");
+        assert_eq!(manifest.sections[1].name, "b");
+    }
+
+    #[test]
+    fn test_backup_manifest_empty_sections() {
+        let manifest = BackupManifest {
+            version: 1,
+            created_at: "2025-01-01T00:00:00Z".to_string(),
+            oxios_version: "0.1.0".to_string(),
+            sections: vec![],
+        };
+        assert!(manifest.sections.is_empty());
+
+        let json = serde_json::to_string(&manifest).unwrap();
+        let restored: BackupManifest = serde_json::from_str(&json).unwrap();
+        assert!(restored.sections.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_copy_dir_recursive_basic() {
+        let src_dir = tempfile::tempdir().unwrap();
+        let dest_dir = tempfile::tempdir().unwrap();
+
+        // Create source files
+        tokio::fs::write(src_dir.path().join("file1.txt"), "hello").await.unwrap();
+        tokio::fs::create_dir_all(src_dir.path().join("subdir")).await.unwrap();
+        tokio::fs::write(src_dir.path().join("subdir/file2.txt"), "world").await.unwrap();
+
+        copy_dir_recursive(src_dir.path(), dest_dir.path())
+            .await
+            .unwrap();
+
+        assert!(dest_dir.path().join("file1.txt").exists());
+        assert!(dest_dir.path().join("subdir/file2.txt").exists());
+
+        let content = tokio::fs::read_to_string(dest_dir.path().join("file1.txt"))
+            .await
+            .unwrap();
+        assert_eq!(content, "hello");
+    }
+}

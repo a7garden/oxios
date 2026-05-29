@@ -16,6 +16,7 @@ pub mod gateway;
 pub mod message;
 pub mod meta;
 pub mod plugin;
+pub mod surface;
 
 pub use channel::Channel;
 pub use error_classify::classify_error;
@@ -25,6 +26,7 @@ pub use message::{
     ErrorKind, IncomingMessage, OutgoingMessage, ResponseMeta, UserFacingError,
 };
 pub use plugin::{ChannelBundle, ChannelContext, ChannelPlugin};
+pub use surface::{Surface, SurfaceContext, SurfaceHandle};
 
 /// Unified inbox type for the gateway.
 ///

@@ -44,7 +44,7 @@ impl ChannelPlugin for TelegramPlugin {
         let rotation_hours = session_settings.rotation_hours;
         let max_messages = session_settings.max_messages_per_session;
 
-        let channel = TelegramChannel::with_kernel(token, allowed, Some(ctx.kernel.clone()))
+        let channel = TelegramChannel::new(token, allowed)
             .with_session_settings(session_settings);
 
         tracing::info!(

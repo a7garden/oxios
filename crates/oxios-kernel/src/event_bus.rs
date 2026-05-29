@@ -382,11 +382,23 @@ impl EventBus {
     pub fn attach_audit_trail(&self, audit: Arc<AuditTrail>) {
         let mut rx = self.subscribe();
         tokio::spawn(async move {
-            while let Ok(event) = rx.recv().await {
-                let actor = extract_agent_id(&event);
-                let action = kernel_event_to_audit_action(&event);
-                let resource = format!("{:?}", event);
-                audit.append(actor, action, resource);
+            loop {
+                match rx.recv().await {
+                    Ok(event) => {
+                        let actor = extract_agent_id(&event);
+                        let action = kernel_event_to_audit_action(&event);
+                        let resource = format!("{:?}", event);
+                        audit.append(actor, action, resource);
+                    }
+                    Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
+                        tracing::warn!(skipped = n, "Audit trail subscriber lagged, skipping events");
+                        continue;
+                    }
+                    Err(tokio::sync::broadcast::error::RecvError::Closed) => {
+                        tracing::info!("Audit trail event bus closed, exiting");
+                        break;
+                    }
+                }
             }
         });
     }
@@ -395,5 +407,253 @@ impl EventBus {
 impl std::fmt::Debug for EventBus {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("EventBus").finish()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn sample_event(name: &str) -> KernelEvent {
+        KernelEvent::AgentCreated {
+            id: AgentId::new_v4(),
+            name: name.to_string(),
+        }
+    }
+
+    #[test]
+    fn test_event_bus_new_and_debug() {
+        let bus = EventBus::new(256);
+        assert!(format!("{:?}", bus).contains("EventBus"));
+    }
+
+    #[tokio::test]
+    async fn test_publish_no_subscribers_ok() {
+        let bus = EventBus::new(16);
+        let result = bus.publish(sample_event("orphan"));
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_single_subscriber_receives_event() {
+        let bus = EventBus::new(16);
+        let mut rx = bus.subscribe();
+
+        let event = sample_event("test-agent");
+        bus.publish(event.clone()).unwrap();
+
+        let received = rx.try_recv().expect("should receive event");
+        match received {
+            KernelEvent::AgentCreated { name, .. } => assert_eq!(name, "test-agent"),
+            _ => panic!("wrong event type"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_multiple_subscribers_receive_events() {
+        let bus = EventBus::new(16);
+        let mut rx1 = bus.subscribe();
+        let mut rx2 = bus.subscribe();
+
+        bus.publish(sample_event("multi")).unwrap();
+
+        assert!(rx1.try_recv().is_ok());
+        assert!(rx2.try_recv().is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_subscriber_receives_only_post_subscribe() {
+        let bus = EventBus::new(16);
+
+        // Publish before subscribing
+        bus.publish(sample_event("before")).unwrap();
+
+        let mut rx = bus.subscribe();
+
+        // Publish after subscribing
+        bus.publish(sample_event("after")).unwrap();
+
+        // Should only get the "after" event
+        let received = rx.try_recv().expect("should receive event");
+        match received {
+            KernelEvent::AgentCreated { name, .. } => assert_eq!(name, "after"),
+            _ => panic!("wrong event type"),
+        }
+        // No more events
+        assert!(rx.try_recv().is_err());
+    }
+
+    #[test]
+    fn test_kernel_event_serialization_roundtrip() {
+        let events = vec![
+            KernelEvent::AgentCreated {
+                id: AgentId::new_v4(),
+                name: "agent-1".to_string(),
+            },
+            KernelEvent::AgentFailed {
+                id: AgentId::new_v4(),
+                error: "timeout".to_string(),
+            },
+            KernelEvent::SeedCreated {
+                seed_id: uuid::Uuid::new_v4(),
+            },
+            KernelEvent::EvaluationComplete {
+                seed_id: uuid::Uuid::new_v4(),
+                passed: true,
+            },
+            KernelEvent::MemoryStored {
+                id: "mem-123".to_string(),
+                memory_type: "fact".to_string(),
+                source: "session".to_string(),
+            },
+            KernelEvent::MemoryRecalled {
+                query: "test query".to_string(),
+                count: 5,
+            },
+            KernelEvent::SpaceCreated {
+                space_id: uuid::Uuid::new_v4(),
+                name: "my-space".to_string(),
+                source: "manual".to_string(),
+            },
+            KernelEvent::EvolutionStarted {
+                seed_id: uuid::Uuid::new_v4(),
+                new_seed_id: uuid::Uuid::new_v4(),
+                iteration: 2,
+            },
+            KernelEvent::EvolutionMaxReached {
+                seed_id: uuid::Uuid::new_v4(),
+                final_score: 0.85,
+                iterations: 10,
+            },
+        ];
+
+        for event in events {
+            let json = serde_json::to_string(&event).unwrap();
+            let restored: KernelEvent = serde_json::from_str(&json).unwrap();
+            let json2 = serde_json::to_string(&restored).unwrap();
+            assert_eq!(json, json2, "roundtrip failed for {:?}", event);
+        }
+    }
+
+    #[test]
+    fn test_kernel_event_to_audit_action() {
+        // AgentCreated
+        let event = KernelEvent::AgentCreated {
+            id: AgentId::new_v4(),
+            name: "worker".to_string(),
+        };
+        let action = kernel_event_to_audit_action(&event);
+        match action {
+            AuditAction::AgentSpawn { task_type } => assert_eq!(task_type, "worker"),
+            _ => panic!("expected AgentSpawn"),
+        }
+
+        // AgentFailed
+        let event = KernelEvent::AgentFailed {
+            id: AgentId::new_v4(),
+            error: "OOM".to_string(),
+        };
+        let action = kernel_event_to_audit_action(&event);
+        match action {
+            AuditAction::AgentExit { reason } => assert_eq!(reason, "OOM"),
+            _ => panic!("expected AgentExit"),
+        }
+
+        // MemoryStored
+        let event = KernelEvent::MemoryStored {
+            id: "m1".to_string(),
+            memory_type: "fact".to_string(),
+            source: "auto".to_string(),
+        };
+        let action = kernel_event_to_audit_action(&event);
+        match action {
+            AuditAction::MemoryWrite { entry_id } => {
+                assert!(entry_id.contains("m1"));
+                assert!(entry_id.contains("fact"));
+            }
+            _ => panic!("expected MemoryWrite"),
+        }
+
+        // MemoryRecalled
+        let event = KernelEvent::MemoryRecalled {
+            query: "rust".to_string(),
+            count: 3,
+        };
+        let action = kernel_event_to_audit_action(&event);
+        match action {
+            AuditAction::MemoryRead { entry_id } => {
+                assert!(entry_id.contains("rust"));
+                assert!(entry_id.contains("3"));
+            }
+            _ => panic!("expected MemoryRead"),
+        }
+    }
+
+    #[test]
+    fn test_extract_agent_id() {
+        let id = AgentId::new_v4();
+
+        // AgentCreated
+        let event = KernelEvent::AgentCreated {
+            id,
+            name: "a".to_string(),
+        };
+        assert_eq!(extract_agent_id(&event), id.to_string());
+
+        // AgentStarted
+        let event = KernelEvent::AgentStarted { id };
+        assert_eq!(extract_agent_id(&event), id.to_string());
+
+        // AgentStopped
+        let event = KernelEvent::AgentStopped { id };
+        assert_eq!(extract_agent_id(&event), id.to_string());
+
+        // AgentFailed
+        let event = KernelEvent::AgentFailed {
+            id,
+            error: "err".to_string(),
+        };
+        assert_eq!(extract_agent_id(&event), id.to_string());
+
+        // MessageReceived
+        let event = KernelEvent::MessageReceived {
+            from: id,
+            content: "hello".to_string(),
+        };
+        assert_eq!(extract_agent_id(&event), id.to_string());
+
+        // SeedCreated → system
+        let event = KernelEvent::SeedCreated {
+            seed_id: uuid::Uuid::new_v4(),
+        };
+        assert_eq!(extract_agent_id(&event), "system");
+
+        // SpaceActivated → space: prefix
+        let space_id = uuid::Uuid::new_v4();
+        let event = KernelEvent::SpaceActivated {
+            space_id,
+            name: "test".to_string(),
+        };
+        assert_eq!(extract_agent_id(&event), format!("space:{}", space_id));
+    }
+
+    #[tokio::test]
+    async fn test_attach_audit_trail_forwards_events() {
+        let bus = EventBus::new(64);
+        let audit = Arc::new(AuditTrail::new(1000));
+
+        bus.attach_audit_trail(audit.clone());
+
+        bus.publish(KernelEvent::AgentCreated {
+            id: AgentId::new_v4(),
+            name: "audit-test".to_string(),
+        })
+        .unwrap();
+
+        // Give the spawned task time to process
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+
+        // Audit trail should have at least one entry
+        assert!(audit.len() >= 1, "audit trail should have recorded the event");
     }
 }

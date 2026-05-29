@@ -1,0 +1,14 @@
+# Tool: Space list — list existing spaces
+[task]
+id = "tool_space_list"
+name = "Space List"
+tier = "integration"
+suite = "tool"
+tags = ["tool", "space"]
+timeout_secs = 30
+
+prompt = "List all my spaces."
+
+[expect]
+exit_code = 0
+response_not_contains = ["error", "panic"]

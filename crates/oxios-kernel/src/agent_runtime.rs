@@ -33,9 +33,10 @@ use crate::capability::resolve::resolve_cspace;
 use crate::engine::OxiosEngine;
 use crate::memory::{MemoryEntry, MemoryManager, MemoryType};
 use crate::persona_manager::PersonaManager;
-use crate::tools::registration::{register_tools_from_cspace, register_tools_from_cspace_gated};
-use crate::access_manager::{AccessGate, AgentContext, TracingAuditSink};
-use crate::config::ExecConfig;
+use crate::tools::registration::register_tools_from_cspace_gated;
+use crate::access_manager::{AccessGate, AgentContext, TrailAuditSink, TracingAuditSink};
+use crate::audit_trail::AuditTrail;
+
 use crate::session_context::SessionContext;
 use crate::types::AgentId;
 use crate::KernelHandle;
@@ -327,6 +328,10 @@ impl AgentRuntime {
         let config = self.config.clone();
         let kernel_handle = Arc::clone(&self.kernel_handle);
 
+        // Extract audit trail from kernel for TrailAuditSink wiring.
+        let audit_trail: Option<Arc<AuditTrail>> =
+            Some(Arc::clone(&self.kernel_handle.security.audit_trail));
+
         let (final_content, steps_completed, success, _agent) = {
             run_agent(
                 &config,
@@ -338,6 +343,7 @@ impl AgentRuntime {
                 seed.goal.clone(),
                 agent_id,
                 cspace,
+                audit_trail,
             )
             .await?
         };
@@ -375,6 +381,7 @@ async fn run_agent(
     seed_goal: String,
     agent_id: AgentId,
     cspace: crate::capability::CSpace,
+    audit_trail: Option<Arc<AuditTrail>>,
 ) -> Result<(String, usize, bool, Arc<Agent>)> {
     // Extract workspace.
     let workspace = if !config.project_paths.is_empty() {
@@ -407,11 +414,25 @@ async fn run_agent(
         cspace: Arc::new(cspace.clone()),
     };
 
+    // Build audit sink: TrailAuditSink (Merkle chain + JSONL) when audit_trail
+    // is available, otherwise fall back to TracingAuditSink.
+    let audit_sink: Arc<dyn crate::access_manager::AuditSink> =
+        if let Some(trail) = audit_trail {
+            let audit_path = kernel_handle
+                .state
+                .workspace_path()
+                .join("audit")
+                .join("access.jsonl");
+            Arc::new(TrailAuditSink::new(trail, audit_path))
+        } else {
+            Arc::new(TracingAuditSink)
+        };
+
     // Build access gate from kernel's security infrastructure
     let access_gate = Arc::new(AccessGate::new(
         kernel_handle.exec.access_manager().clone(),
         Arc::new(kernel_handle.exec.config().clone()),
-        Arc::new(TracingAuditSink), // TODO: replace with TrailAuditSink when wired
+        audit_sink,
     ));
 
     register_tools_from_cspace_gated(

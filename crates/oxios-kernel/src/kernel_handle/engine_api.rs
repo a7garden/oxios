@@ -338,3 +338,80 @@ impl std::fmt::Debug for EngineApi {
             .finish()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_provider_info_serialization() {
+        let info = ProviderInfo {
+            id: "anthropic".to_string(),
+            model_count: 15,
+            has_key: true,
+        };
+        let json = serde_json::to_string(&info).unwrap();
+        let restored: ProviderInfo = serde_json::from_str(&json).unwrap();
+        assert_eq!(restored.id, "anthropic");
+        assert_eq!(restored.model_count, 15);
+        assert!(restored.has_key);
+    }
+
+    #[test]
+    fn test_model_info_serialization() {
+        let info = ModelInfo {
+            id: "anthropic/claude-sonnet-4".to_string(),
+            name: "Claude Sonnet 4".to_string(),
+            provider: "anthropic".to_string(),
+            reasoning: true,
+            context_window: 200000,
+            max_tokens: 16000,
+            cost_input: 3.0,
+            cost_output: 15.0,
+        };
+        let json = serde_json::to_string(&info).unwrap();
+        let restored: ModelInfo = serde_json::from_str(&json).unwrap();
+        assert_eq!(restored.id, "anthropic/claude-sonnet-4");
+        assert!(restored.reasoning);
+        assert_eq!(restored.context_window, 200000);
+    }
+
+    #[test]
+    fn test_engine_config_response_serialization() {
+        let resp = EngineConfigResponse {
+            default_model: "anthropic/claude-sonnet-4".to_string(),
+            api_key_set: true,
+            api_key_source: Some("config.toml".to_string()),
+            provider: Some("anthropic".to_string()),
+        };
+        let json = serde_json::to_string(&resp).unwrap();
+        let restored: EngineConfigResponse = serde_json::from_str(&json).unwrap();
+        assert_eq!(restored.default_model, "anthropic/claude-sonnet-4");
+        assert!(restored.api_key_set);
+        assert_eq!(restored.api_key_source.as_deref(), Some("config.toml"));
+    }
+
+    #[test]
+    fn test_validate_key_result_serialization() {
+        let result = ValidateKeyResult {
+            valid: true,
+            provider: "openai".to_string(),
+            message: Some("API key is valid".to_string()),
+        };
+        let json = serde_json::to_string(&result).unwrap();
+        let restored: ValidateKeyResult = serde_json::from_str(&json).unwrap();
+        assert!(restored.valid);
+        assert_eq!(restored.provider, "openai");
+    }
+
+    #[test]
+    fn test_validate_key_result_invalid() {
+        let result = ValidateKeyResult {
+            valid: false,
+            provider: "anthropic".to_string(),
+            message: Some("Validation failed: key too short".to_string()),
+        };
+        assert!(!result.valid);
+        assert!(result.message.as_ref().unwrap().contains("failed"));
+    }
+}

@@ -1,0 +1,16 @@
+# Ouroboros: Simple cycle — create a file
+[task]
+id = "ouroboros_simple"
+name = "Simple Ouroboros Cycle"
+tier = "integration"
+suite = "ouroboros"
+tags = ["smoke", "core"]
+timeout_secs = 60
+
+prompt = "Create a file called hello.txt with the content 'Hello, Oxios!' in the workspace."
+
+[expect]
+phase_reached = "Execute"
+evaluation_passed = true
+require_seed_id = true
+response_contains = ["hello.txt"]
