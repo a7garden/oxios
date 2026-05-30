@@ -90,6 +90,16 @@ impl AgentApi {
         self.budget_manager.reset_window(agent_id);
     }
 
+    /// Get full budget info (limits + usage) for an agent.
+    pub fn full_budget_info(&self, agent_id: &AgentId) -> Option<crate::budget::FullBudgetInfo> {
+        self.budget_manager.full_info(agent_id)
+    }
+
+    /// Get full budget info for all agents with configured budgets.
+    pub fn all_budget_info(&self) -> Vec<crate::budget::FullBudgetInfo> {
+        self.budget_manager.all_full_info()
+    }
+
     /// Get memory stats.
     pub async fn memory_stats(&self) -> (usize, usize) {
         (

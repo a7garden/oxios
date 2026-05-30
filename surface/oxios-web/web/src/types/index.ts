@@ -240,14 +240,7 @@ export interface CronJob {
   next_run?: string
 }
 
-// Budget
-export interface Budget {
-  agent_id: string
-  tokens_used?: number
-  tokens_limit?: number
-  cost_used?: number
-  cost_limit?: number
-}
+// Budget — moved to types/budget.ts
 
 // Resource
 export interface ResourceSnapshot {

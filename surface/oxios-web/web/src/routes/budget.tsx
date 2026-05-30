@@ -1,41 +1,76 @@
-import { useQuery } from '@tanstack/react-query'
+import { useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
-import { Wallet } from 'lucide-react'
+import { Plus, Wallet } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { EmptyState } from '@/components/shared/empty-state'
 import { ErrorState } from '@/components/shared/error-state'
 import { LoadingCards } from '@/components/shared/loading'
 import { RefreshButton } from '@/components/shared/refresh-button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { api } from '@/lib/api-client'
-import type { Budget } from '@/types'
+import { Button } from '@/components/ui/button'
+import { useBudgetDelete, useBudgetList, useBudgetReset, useBudgetSet } from '@/hooks/use-budget'
+import { useToast } from '@/components/ui/sonner'
+import { BudgetSummaryCard } from '@/components/budget/budget-summary'
+import { AgentBudgetCard } from '@/components/budget/agent-budget-card'
+import { SetBudgetDialog } from '@/components/budget/set-budget-dialog'
+import type { AgentBudget } from '@/types/budget'
 
 export const Route = createFileRoute('/budget')({ component: BudgetPage })
 
 function BudgetPage() {
   const { t } = useTranslation()
+  const { toast } = useToast()
   const {
-    data: budgets,
+    data,
     isLoading,
     isError,
     refetch,
     isFetching,
-  } = useQuery({
-    queryKey: ['budgets'],
-    queryFn: async (): Promise<Budget[]> => {
-      const res = await api.get<{ items: Budget[] }>('/api/budget')
-      return res.items ?? []
-    },
-    refetchInterval: 10000,
-  })
+  } = useBudgetList()
+
+  const setMutation = useBudgetSet()
+  const deleteMutation = useBudgetDelete()
+  const resetMutation = useBudgetReset()
+
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [editingAgent, setEditingAgent] = useState<AgentBudget | null>(null)
+  const [newAgentId, setNewAgentId] = useState('')
 
   if (isLoading) return <LoadingCards count={4} />
   if (isError) return <ErrorState onRetry={() => refetch()} />
 
-  const items = budgets ?? []
+  const agents = data?.agents ?? []
+  const summary = data?.summary ?? { total_agents: 0, total_tokens_used: 0, total_tokens_limit: 0, exhausted_agents: 0 }
 
-  const totalTokens = items.reduce((acc, b) => acc + (b.tokens_used ?? 0), 0)
-  const totalCost = items.reduce((acc, b) => acc + (b.cost_used ?? 0), 0)
+  const handleEdit = (agent: AgentBudget) => {
+    setEditingAgent(agent)
+    setNewAgentId('')
+    setDialogOpen(true)
+  }
+
+  const handleNewBudget = () => {
+    setEditingAgent(null)
+    setNewAgentId('')
+    setDialogOpen(true)
+  }
+
+  const handleSubmit = (params: { agentId: string; token_budget: number; calls_budget: number; window_secs: number }) => {
+    setMutation.mutate(params, {
+      onSuccess: () => toast(t('budget.setSuccess'), 'success'),
+      onError: (e: unknown) => toast(e instanceof Error ? e.message : t('common.error'), 'destructive'),
+    })
+  }
+
+  const handleReset = (agentId: string) => {
+    resetMutation.mutate(agentId, {
+      onSuccess: () => toast(t('budget.resetSuccess'), 'success'),
+    })
+  }
+
+  const handleRemove = (agentId: string) => {
+    deleteMutation.mutate(agentId, {
+      onSuccess: () => toast(t('budget.removeSuccess'), 'success'),
+    })
+  }
 
   return (
     <div className="space-y-6">
@@ -44,31 +79,19 @@ function BudgetPage() {
           <h1 className="text-2xl font-bold">{t('budget.title')}</h1>
           <p className="text-muted-foreground">{t('budget.subtitle')}</p>
         </div>
-        <RefreshButton onClick={() => refetch()} isFetching={isFetching} />
+        <div className="flex items-center gap-2">
+          <Button size="sm" onClick={handleNewBudget} className="gap-1.5">
+            <Plus className="h-4 w-4" /> {t('budget.setBudget')}
+          </Button>
+          <RefreshButton onClick={() => refetch()} isFetching={isFetching} />
+        </div>
       </div>
 
       {/* Summary */}
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-muted-foreground">{t('budget.totalTokensUsed')}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{totalTokens.toLocaleString()}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-muted-foreground">{t('budget.totalCost')}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">${totalCost.toFixed(4)}</div>
-          </CardContent>
-        </Card>
-      </div>
+      <BudgetSummaryCard summary={summary} />
 
-      {/* Per-Agent Budget */}
-      {items.length === 0 ? (
+      {/* Agent Budgets */}
+      {agents.length === 0 ? (
         <EmptyState
           icon={<Wallet className="h-10 w-10" />}
           title={t('budget.noBudgetData')}
@@ -76,57 +99,29 @@ function BudgetPage() {
         />
       ) : (
         <div className="space-y-3">
-          {items.map((budget) => {
-            const tokenPercent = budget.tokens_limit
-              ? Math.min(100, ((budget.tokens_used ?? 0) / budget.tokens_limit) * 100)
-              : 0
-            const costPercent = budget.cost_limit
-              ? Math.min(100, ((budget.cost_used ?? 0) / budget.cost_limit) * 100)
-              : 0
-
-            return (
-              <Card key={budget.agent_id}>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm flex items-center gap-2">
-                    <Wallet className="h-4 w-4" />
-                    <span className="font-mono">{budget.agent_id.slice(0, 12)}...</span>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div>
-                    <div className="flex justify-between text-sm mb-1">
-                      <span>{t('budget.tokens')}: {(budget.tokens_used ?? 0).toLocaleString()}</span>
-                      <span className="text-muted-foreground">
-                        / {budget.tokens_limit?.toLocaleString() ?? '∞'}
-                      </span>
-                    </div>
-                    <div className="h-2 rounded-full bg-muted overflow-hidden">
-                      <div
-                        className="h-full rounded-full bg-primary transition-all"
-                        style={{ width: `${tokenPercent}%` }}
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <div className="flex justify-between text-sm mb-1">
-                      <span>{t('budget.cost')}: ${(budget.cost_used ?? 0).toFixed(4)}</span>
-                      <span className="text-muted-foreground">
-                        / ${budget.cost_limit?.toFixed(2) ?? '∞'}
-                      </span>
-                    </div>
-                    <div className="h-2 rounded-full bg-muted overflow-hidden">
-                      <div
-                        className="h-full rounded-full bg-amber-500 transition-all"
-                        style={{ width: `${costPercent}%` }}
-                      />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )
-          })}
+          {agents.map((agent) => (
+            <AgentBudgetCard
+              key={agent.agent_id}
+              agent={agent}
+              onEdit={handleEdit}
+              onReset={handleReset}
+              onRemove={handleRemove}
+              isResetting={resetMutation.isPending}
+              isRemoving={deleteMutation.isPending}
+            />
+          ))}
         </div>
       )}
+
+      {/* Set Budget Dialog */}
+      <SetBudgetDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        agent={editingAgent}
+        agentId={newAgentId || undefined}
+        onSubmit={handleSubmit}
+        isPending={setMutation.isPending}
+      />
     </div>
   )
 }

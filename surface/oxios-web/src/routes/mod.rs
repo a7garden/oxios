@@ -8,6 +8,7 @@
 //! - **infra**: Scheduler, audit, permissions, MCP
 //! - **events**: Sessions, SSE events, approvals
 
+mod a2a;
 mod agent_groups;
 mod audit_routes;
 mod budget_routes;
@@ -37,7 +38,12 @@ use crate::persona_routes;
 use crate::server::AppState;
 
 // Re-export all handlers for use in build_routes
-pub(crate) use agent_groups::{handle_agent_group_get, handle_agent_groups_list};
+pub(crate) use a2a::{
+    handle_a2a_agent_detail, handle_a2a_agents, handle_a2a_messages, handle_a2a_topology,
+};
+pub(crate) use agent_groups::{
+    handle_agent_group_get, handle_agent_group_progress, handle_agent_groups_list,
+};
 pub(crate) use audit_routes::{
     handle_audit_by_agent, handle_audit_entries, handle_audit_export, handle_audit_flush,
     handle_audit_verify,
@@ -253,6 +259,12 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         // Agent Groups
         .route("/api/agent-groups", get(handle_agent_groups_list))
         .route("/api/agent-groups/{id}", get(handle_agent_group_get))
+        .route("/api/agent-groups/{id}/progress", get(handle_agent_group_progress))
+        // A2A Monitor
+        .route("/api/a2a/agents", get(handle_a2a_agents))
+        .route("/api/a2a/agents/{id}", get(handle_a2a_agent_detail))
+        .route("/api/a2a/messages", get(handle_a2a_messages))
+        .route("/api/a2a/topology", get(handle_a2a_topology))
         // Events
         .route("/api/events", get(handle_events))
         // Personas (delegated to persona_routes)

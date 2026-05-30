@@ -5,9 +5,9 @@ use std::sync::Arc;
 use axum::extract::{Path, State};
 use axum::Json;
 
-use oxios_kernel::agent_group::{OxiosAgentGroup, OxiosAgentGroupStatus};
 use crate::error::AppError;
 use crate::server::AppState;
+use oxios_kernel::agent_group::{OxiosAgentGroup, OxiosAgentGroupStatus};
 
 /// GET /api/agent-groups — List all agent groups from the state store.
 pub(crate) async fn handle_agent_groups_list(
@@ -34,7 +34,7 @@ pub(crate) async fn handle_agent_groups_list(
     Ok(Json(groups))
 }
 
-/// GET /api/agent-groups/:id — Get a specific agent group by ID.
+/// GET /api/agent-groups/{id} — Get a specific agent group by ID.
 pub(crate) async fn handle_agent_group_get(
     state: State<Arc<AppState>>,
     Path(id): Path<String>,
@@ -50,20 +50,7 @@ pub(crate) async fn handle_agent_group_get(
     }
 }
 
-/// Derive overall group status from agent statuses.
-fn derive_group_status(group: &OxiosAgentGroup) -> &'static str {
-    if group.all_completed() {
-        "Completed"
-    } else if group.any_failed() {
-        "Failed"
-    } else if group.agents.iter().any(|a| a.status == OxiosAgentGroupStatus::Running) {
-        "Running"
-    } else {
-        "Pending"
-    }
-}
-
-/// GET /api/agent-groups/{id}/progress — Real-time progress for a group.
+/// GET /api/agent-groups/{id}/progress — Get real-time progress for a group.
 pub(crate) async fn handle_agent_group_progress(
     state: State<Arc<AppState>>,
     Path(id): Path<String>,
@@ -78,16 +65,27 @@ pub(crate) async fn handle_agent_group_progress(
     let total = group.agents.len();
     let completed = group.completed_agents().len();
     let failed = group.failed_agents().len();
+    let pending = group.pending_agents().len();
     let running = group
         .agents
         .iter()
         .filter(|a| matches!(a.status, OxiosAgentGroupStatus::Running))
         .count();
-    let pending = group.pending_agents().len();
+
+    // Derive overall status from agent statuses
+    let status = if group.all_completed() && !group.any_failed() {
+        "Completed"
+    } else if group.any_failed() {
+        "Failed"
+    } else if running > 0 || completed > 0 {
+        "Running"
+    } else {
+        "Pending"
+    };
 
     Ok(Json(serde_json::json!({
         "id": group.id.to_string(),
-        "status": derive_group_status(&group),
+        "status": status,
         "total_agents": total,
         "completed": completed,
         "failed": failed,

@@ -13,6 +13,7 @@ import {
   MessageSquare,
   Monitor,
   Moon,
+  Network,
   NotebookPen,
   PanelLeft,
   PanelLeftClose,
@@ -21,6 +22,7 @@ import {
   Sun,
   Timer,
   Theater,
+  Users,
   Wallet,
   Zap,
 } from 'lucide-react'
@@ -55,6 +57,7 @@ const navGroups: { labelKey: string; items: NavItem[] }[] = [
     labelKey: 'common.agents',
     items: [
       { labelKey: 'common.agents', href: '/agents', icon: <Bot className="h-4 w-4" /> },
+      { labelKey: 'common.agentGroups', href: '/agent-groups', icon: <Users className="h-4 w-4" /> },
       { labelKey: 'common.seeds', href: '/seeds', icon: <Dna className="h-4 w-4" /> },
       { labelKey: 'common.personas', href: '/personas', icon: <Theater className="h-4 w-4" /> },
       { labelKey: 'common.skills', href: '/skills', icon: <Zap className="h-4 w-4" /> },
@@ -79,6 +82,7 @@ const navGroups: { labelKey: string; items: NavItem[] }[] = [
       { labelKey: 'common.events', href: '/events', icon: <Bell className="h-4 w-4" /> },
       { labelKey: 'common.git', href: '/git', icon: <GitBranch className="h-4 w-4" /> },
       { labelKey: 'common.mcpServers', href: '/mcp', icon: <Zap className="h-4 w-4" /> },
+      { labelKey: 'common.a2aMonitor', href: '/a2a', icon: <Network className="h-4 w-4" /> },
     ],
   },
 ]
