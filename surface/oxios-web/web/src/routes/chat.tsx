@@ -26,11 +26,11 @@ function ChatPage() {
     isStreaming,
     connected,
     activeSessionId,
-    activeSpaceId,
+    activeProjectId,
     sendMessage,
     loadSession,
     newSession,
-    setActiveSpace,
+    setActiveProject,
     disconnect,
     connect,
   } = useChatStore()
@@ -70,9 +70,9 @@ function ChatPage() {
     <div className="flex h-[calc(100vh-8rem)]">
       {/* ── Left: Space + Session sidebar ─────────────────────────── */}
       <SpaceSessionSidebar
-        activeSpaceId={activeSpaceId}
+        activeProjectId={activeProjectId}
         activeSessionId={activeSessionId}
-        onSelectSpace={setActiveSpace}
+        onSelectSpace={setActiveProject}
         onSelectSession={loadSession}
         onNewSession={newSession}
         onToggleHistory={() => setShowHistory((v) => !v)}
@@ -151,7 +151,7 @@ function ChatPage() {
 // ---------------------------------------------------------------------------
 
 function SpaceSessionSidebar({
-  activeSpaceId,
+  activeProjectId,
   activeSessionId,
   onSelectSpace,
   onSelectSession,
@@ -159,7 +159,7 @@ function SpaceSessionSidebar({
   onToggleHistory,
   showHistory,
 }: {
-  activeSpaceId: string | null
+  activeProjectId: string | null
   activeSessionId: string | null
   onSelectSpace: (id: string | null) => void
   onSelectSession: (id: string) => void
@@ -176,7 +176,7 @@ function SpaceSessionSidebar({
   })
 
   const { data: sessionsData, refetch: refetchSessions } = useQuery({
-    queryKey: ['sessions', activeSpaceId],
+    queryKey: ['sessions', activeProjectId],
     queryFn: () =>
       api.get<{ items: Session[]; total: number }>('/api/sessions'),
     refetchInterval: 10000,
@@ -203,7 +203,7 @@ function SpaceSessionSidebar({
               key={space.id}
               onClick={() => onSelectSpace(space.id)}
               className={`w-full flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-left transition-colors ${
-                activeSpaceId === space.id
+                activeProjectId === space.id
                   ? 'bg-accent text-accent-foreground font-medium'
                   : 'hover:bg-accent/50 text-muted-foreground'
               }`}

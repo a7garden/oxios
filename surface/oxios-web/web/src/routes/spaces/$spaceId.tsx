@@ -9,13 +9,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { api } from '@/lib/api-client'
 import type { Space } from '@/types'
 
-export const Route = createFileRoute('/spaces/$spaceId')({
+export const Route = createFileRoute('/spaces/$projectId')({
   component: SpaceDetailPage,
 })
 
 function SpaceDetailPage() {
   const { t } = useTranslation()
-  const { spaceId } = Route.useParams()
+  const { projectId } = Route.useParams()
   const navigate = useNavigate()
 
   const {
@@ -24,8 +24,8 @@ function SpaceDetailPage() {
     isError,
     refetch,
   } = useQuery({
-    queryKey: ['space', spaceId],
-    queryFn: () => api.get<Space>(`/api/spaces/${spaceId}`),
+    queryKey: ['space', projectId],
+    queryFn: () => api.get<Space>(`/api/spaces/${projectId}`),
   })
 
   if (isLoading) return <LoadingCards count={3} />

@@ -11,7 +11,7 @@ interface PersistedState {
   /** Last active session ID (null = no conversation started yet). */
   activeSessionId: string | null
   /** Space ID associated with the active session. */
-  activeSpaceId: string | null
+  activeProjectId: string | null
 }
 
 const PERSIST_KEY = 'oxios-chat-persist'
@@ -31,7 +31,7 @@ interface ChatRuntimeState {
   /** The session ID from the last "done" chunk. */
   _lastDoneSessionId: string | null
   /** The space ID from the last "done" chunk. */
-  _lastDoneSpaceId: string | null
+  _lastDoneProjectId: string | null
 }
 
 // ---------------------------------------------------------------------------
@@ -50,7 +50,7 @@ interface ChatActions {
   /** Start a fresh session (clears messages). */
   newSession: () => void
   /** Set the active space explicitly. */
-  setActiveSpace: (spaceId: string | null) => void
+  setActiveProject: (projectId: string | null) => void
   /** Clear persisted state (e.g. on logout). */
   clearPersist: () => void
   /** Handle an incoming WS chunk. */
@@ -118,7 +118,7 @@ export const useChatStore = create<ChatStore>()(
     (set, get) => ({
       // ── Persisted ──
       activeSessionId: null,
-      activeSpaceId: null,
+      activeProjectId: null,
 
       // ── Runtime ──
       messages: [],
@@ -126,7 +126,7 @@ export const useChatStore = create<ChatStore>()(
       connected: false,
       _sendQueue: [],
       _lastDoneSessionId: null,
-      _lastDoneSpaceId: null,
+      _lastDoneProjectId: null,
 
       // ── Actions ──
 
@@ -185,7 +185,7 @@ export const useChatStore = create<ChatStore>()(
       },
 
       sendMessage(content: string) {
-        const { activeSessionId, activeSpaceId, connected, connect } = get()
+        const { activeSessionId, activeProjectId, connected, connect } = get()
 
         // Ensure WS is connected first
         if (!connected) {
@@ -214,7 +214,7 @@ export const useChatStore = create<ChatStore>()(
             type: 'message',
             content,
             session_id: activeSessionId ?? '',
-            space_id: activeSpaceId ?? '',
+            project_ids: activeProjectId ?? '',
           }),
         )
       },
@@ -258,12 +258,12 @@ export const useChatStore = create<ChatStore>()(
             }
           }
 
-          const spaceId = data.space_id ?? data.metadata?.space_id ?? null
+          const projectId = data.project_id ?? data.metadata?.project_ids ?? null
 
           set({
             messages,
             activeSessionId: sessionId,
-            activeSpaceId: spaceId,
+            activeProjectId: projectId,
             isStreaming: false,
           })
         } catch {
@@ -277,13 +277,13 @@ export const useChatStore = create<ChatStore>()(
           isStreaming: false,
           activeSessionId: null,
           _lastDoneSessionId: null,
-          _lastDoneSpaceId: null,
+          _lastDoneProjectId: null,
         })
       },
 
-      setActiveSpace(spaceId: string | null) {
+      setActiveProject(projectId: string | null) {
         set({
-          activeSpaceId: spaceId,
+          activeProjectId: projectId,
           activeSessionId: null,
           messages: [],
         })
@@ -292,7 +292,7 @@ export const useChatStore = create<ChatStore>()(
       clearPersist() {
         set({
           activeSessionId: null,
-          activeSpaceId: null,
+          activeProjectId: null,
           messages: [],
         })
       },
@@ -316,7 +316,7 @@ export const useChatStore = create<ChatStore>()(
           })
         } else if (chunk.type === 'done') {
           const sid = chunk.session_id ?? null
-          const vid = chunk.space_id ?? null
+          const vid = chunk.project_ids ?? null
           const toolCalls = chunk.tool_calls ?? []
           const phase = chunk.phase
           const evaluationPassed = chunk.evaluation_passed === 'true' || chunk.evaluation_passed === true
@@ -362,7 +362,7 @@ export const useChatStore = create<ChatStore>()(
             set({ _lastDoneSessionId: sid, activeSessionId: sid })
           }
           if (vid) {
-            set({ activeSpaceId: vid, _lastDoneSpaceId: vid })
+            set({ activeProjectId: vid, _lastDoneProjectId: vid })
           }
         } else if (chunk.type === 'error') {
           const err = chunk.error ?? 'Unknown error'
@@ -375,7 +375,7 @@ export const useChatStore = create<ChatStore>()(
       name: PERSIST_KEY,
       partialize: (state): PersistedState => ({
         activeSessionId: state.activeSessionId,
-        activeSpaceId: state.activeSpaceId,
+        activeProjectId: state.activeProjectId,
       }),
       onRehydrateStorage: () => (state) => {
         if (!state) return
