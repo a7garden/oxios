@@ -73,6 +73,16 @@ impl McpApi {
         self.mcp_bridge.servers().len()
     }
 
+    /// Remove (disconnect and delete) an MCP server.
+    pub async fn remove_server(&self, name: &str) -> anyhow::Result<()> {
+        self.mcp_bridge.remove_server(name).await
+    }
+
+    /// Toggle MCP server enabled/disabled. Returns the new enabled state.
+    pub async fn toggle_server(&self, name: &str) -> anyhow::Result<bool> {
+        self.mcp_bridge.toggle_server(name).await
+    }
+
     /// Shutdown all MCP servers.
     pub async fn shutdown_all(&self) -> anyhow::Result<()> {
         self.mcp_bridge.shutdown_all().await

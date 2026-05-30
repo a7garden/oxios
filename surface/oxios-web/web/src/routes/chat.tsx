@@ -1,17 +1,17 @@
 import { useQuery } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { Bot, Loader2, RefreshCw, Send, User } from 'lucide-react'
+import { RefreshCw } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { Textarea } from '@/components/ui/textarea'
-import ReactMarkdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
 import { useChatStore } from '@/stores/chat'
 import { api } from '@/lib/api-client'
 import type { Space, Session } from '@/types'
+import { MessageBubble } from '@/components/chat/message-bubble'
+import { ChatInput } from '@/components/chat/chat-input'
+import { ConnectionStatus } from '@/components/chat/connection-status'
 
 export const Route = createFileRoute('/chat')({ component: ChatPage })
 
@@ -31,21 +31,39 @@ function ChatPage() {
     loadSession,
     newSession,
     setActiveSpace,
+    disconnect,
+    connect,
   } = useChatStore()
 
   const [input, setInput] = useState('')
   const [showHistory, setShowHistory] = useState(false)
+  const [userScrolledUp, setUserScrolledUp] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
+  const scrollAreaRef = useRef<HTMLDivElement>(null)
 
-  // Auto-scroll to bottom on new messages
+  // Auto-scroll to bottom on new messages, but only if user hasn't scrolled up
   useEffect(() => {
+    if (userScrolledUp) return
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages, isStreaming])
+  }, [messages, isStreaming, userScrolledUp])
+
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const el = e.currentTarget
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80
+    setUserScrolledUp(!atBottom)
+  }
 
   const handleSend = () => {
     if (!input.trim() || isStreaming) return
     sendMessage(input.trim())
     setInput('')
+    setUserScrolledUp(false)
+  }
+
+  const handleCancel = () => {
+    disconnect()
+    // Small delay before reconnecting to ensure clean state
+    setTimeout(() => connect(), 100)
   }
 
   return (
@@ -65,13 +83,11 @@ function ChatPage() {
       <div className="flex flex-1 flex-col min-w-0">
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b">
-          <div>
+          <div className="flex items-center gap-3">
             <h2 className="text-sm font-semibold">
               {activeSessionId ? t('chat.activeConversation') : t('chat.newConversation')}
             </h2>
-            {!connected && (
-              <span className="text-xs text-muted-foreground">{t('chat.connecting')}</span>
-            )}
+            <ConnectionStatus connected={connected} />
           </div>
           <div className="flex items-center gap-1">
             <Button
@@ -90,7 +106,9 @@ function ChatPage() {
         {/* Messages */}
         <Card className="flex-1 flex flex-col min-h-0 mx-4 my-3 border-t-0">
           <ScrollArea
+            ref={scrollAreaRef as any}
             className="flex-1 p-4"
+            onScroll={handleScroll}
             role="log"
             aria-label={t('common.chatMessages')}
           >
@@ -104,80 +122,24 @@ function ChatPage() {
               </div>
             ) : (
               <div className="space-y-4">
-                {messages.map((msg, i) => (
-                  <div
-                    // biome-ignore lint/suspicious/noArrayIndexKey: messages lack unique IDs
-                    key={`${msg.role}-${i}`}
-                    className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : ''}`}
-                  >
-                    {msg.role === 'assistant' && (
-                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
-                        <Bot className="h-4 w-4" />
-                      </div>
-                    )}
-                    <div
-                      className={`rounded-lg px-4 py-2 max-w-[80%] ${msg.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}
-                    >
-                      {msg.role === 'user' ? (
-                        <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
-                      ) : (
-                        <div className="text-sm prose prose-sm dark:prose-invert max-w-none [&>p:first-child]:mt-0 [&>p:last-child]:mb-0">
-                          <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
-                        </div>
-                      )}
-                    </div>
-                    {msg.role === 'user' && (
-                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted">
-                        <User className="h-4 w-4" />
-                      </div>
-                    )}
-                  </div>
+                {messages.map((msg) => (
+                  <MessageBubble key={msg.id} message={msg} />
                 ))}
-                {isStreaming && (
-                  <div className="flex gap-3">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground">
-                      <Bot className="h-4 w-4" />
-                    </div>
-                    <div className="flex items-center gap-2 rounded-lg bg-muted px-4 py-2">
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      <span className="text-sm text-muted-foreground">{t('chat.thinking')}</span>
-                    </div>
-                  </div>
-                )}
                 <div ref={bottomRef} />
               </div>
             )}
           </ScrollArea>
 
           {/* Input */}
-          <div className="border-t p-4">
-            <div className="flex gap-2">
-              <Textarea
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault()
-                    handleSend()
-                  }
-                }}
-                placeholder={
-                  connected ? t('chat.inputPlaceholder') : t('chat.waitingForConnection')
-                }
-                disabled={!connected || isStreaming}
-                className="min-h-[44px] max-h-[120px] resize-none"
-                rows={1}
-              />
-              <Button
-                onClick={handleSend}
-                disabled={!input.trim() || isStreaming || !connected}
-                size="icon"
-                aria-label={t('common.sendMessage')}
-              >
-                <Send className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
+          <ChatInput
+            value={input}
+            onChange={setInput}
+            onSend={handleSend}
+            onCancel={handleCancel}
+            disabled={isStreaming}
+            isStreaming={isStreaming}
+            connected={connected}
+          />
         </Card>
       </div>
     </div>

@@ -158,6 +158,106 @@ pub(crate) async fn handle_workspace_file_put(
     }
 }
 
+// ---------------------------------------------------------------------------
+// File Create & Delete
+// ---------------------------------------------------------------------------
+
+/// Request body for creating a file.
+#[derive(Debug, Deserialize)]
+pub(crate) struct CreateFileRequest {
+    /// Whether to create a directory instead of a file.
+    #[serde(default)]
+    pub is_dir: bool,
+}
+
+/// POST /api/workspace/file/*path — Create an empty file or directory.
+pub(crate) async fn handle_workspace_file_create(
+    state: State<Arc<AppState>>,
+    Path(path): Path<String>,
+    Json(body): Json<CreateFileRequest>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    let base = state.kernel.state.workspace_path();
+    let full_path = base.join(&path);
+
+    // Security: path traversal check
+    let canonical_base = base.canonicalize().unwrap_or_else(|_| base.to_path_buf());
+    // Ensure parent exists
+    if let Some(parent) = full_path.parent() {
+        let canonical_parent = parent
+            .canonicalize()
+            .map_err(|_| AppError::NotFound("parent directory not found".into()))?;
+        if !canonical_parent.starts_with(&canonical_base) {
+            return Err(AppError::Forbidden("path traversal denied".into()));
+        }
+    }
+
+    if full_path.exists() {
+        return Err(AppError::BadRequest("file already exists".into()));
+    }
+
+    if body.is_dir {
+        tokio::fs::create_dir_all(&full_path)
+            .await
+            .map_err(|e| AppError::Internal(format!("failed to create directory: {e}")))?;
+    } else {
+        // Ensure parent dir exists
+        if let Some(parent) = full_path.parent() {
+            tokio::fs::create_dir_all(parent).await.ok();
+        }
+        tokio::fs::write(&full_path, "")
+            .await
+            .map_err(|e| AppError::Internal(format!("failed to create file: {e}")))?;
+    }
+
+    tracing::info!(path = %path, is_dir = body.is_dir, "File created");
+    Ok(Json(serde_json::json!({ "status": "created", "path": path, "is_dir": body.is_dir })))
+}
+
+/// DELETE /api/workspace/file/*path — Delete a file or empty directory.
+pub(crate) async fn handle_workspace_file_delete(
+    state: State<Arc<AppState>>,
+    Path(path): Path<String>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    let base = state.kernel.state.workspace_path();
+    let full_path = base.join(&path);
+
+    // Security: path traversal check
+    let canonical_base = base.canonicalize().unwrap_or_else(|_| base.to_path_buf());
+    let canonical = match full_path.canonicalize() {
+        Ok(c) => c,
+        Err(_) => return Err(AppError::NotFound("file not found".into())),
+    };
+
+    if !canonical.starts_with(&canonical_base) {
+        return Err(AppError::Forbidden("path traversal denied".into()));
+    }
+
+    if canonical.is_dir() {
+        // Only delete empty directories
+        let mut entries = tokio::fs::read_dir(&canonical).await.map_err(|e| {
+            AppError::Internal(format!("failed to read directory: {e}"))
+        })?;
+        if entries
+            .next_entry()
+            .await
+            .map(|e| e.is_some())
+            .unwrap_or(true)
+        {
+            return Err(AppError::BadRequest("directory is not empty".into()));
+        }
+        tokio::fs::remove_dir(&canonical)
+            .await
+            .map_err(|e| AppError::Internal(format!("failed to delete directory: {e}")))?;
+    } else {
+        tokio::fs::remove_file(&canonical)
+            .await
+            .map_err(|e| AppError::Internal(format!("failed to delete file: {e}")))?;
+    }
+
+    tracing::info!(path = %path, "File deleted");
+    Ok(Json(serde_json::json!({ "status": "deleted", "path": path })))
+}
+
 /// Guess MIME type from file extension.
 fn guess_mime(path: &str) -> String {
     match path.rsplit('.').next() {

@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { ChatMessage } from '@/types'
+import type { ChatMessage, StreamChunk } from '@/types'
 import { useAuthStore } from './auth'
 
 // ---------------------------------------------------------------------------
@@ -54,10 +54,18 @@ interface ChatActions {
   /** Clear persisted state (e.g. on logout). */
   clearPersist: () => void
   /** Handle an incoming WS chunk. */
-  handleChunk: (chunk: { type: string; content?: string; error?: string; session_id?: string; space_id?: string }) => void
+  handleChunk: (chunk: StreamChunk) => void
 }
 
 export type ChatStore = PersistedState & ChatRuntimeState & ChatActions
+
+// Helper to build a typed chunk from unknown WS data
+function parseChunk(raw: unknown): StreamChunk {
+  if (typeof raw === 'object' && raw !== null && !Array.isArray(raw)) {
+    return raw as StreamChunk
+  }
+  return { type: 'error', error: 'Malformed chunk' }
+}
 
 // ---------------------------------------------------------------------------
 // WS singleton
@@ -99,7 +107,7 @@ async function buildWsUrl(): Promise<string> {
 }
 
 /** Set by the store on connect; used by the WS onmessage handler. */
-let chunkHandler: ((chunk: { type: string; content?: string; error?: string; session_id?: string; space_id?: string }) => void) | null = null
+let chunkHandler: ((chunk: StreamChunk) => void) | null = null
 
 // ---------------------------------------------------------------------------
 // Store definition
@@ -145,7 +153,8 @@ export const useChatStore = create<ChatStore>()(
 
         ws.onmessage = (event) => {
           try {
-            const chunk = JSON.parse(event.data as string)
+            const raw = JSON.parse(event.data as string)
+            const chunk = parseChunk(raw)
             if (chunkHandler) chunkHandler(chunk)
           } catch {
             // Ignore malformed JSON
@@ -162,7 +171,7 @@ export const useChatStore = create<ChatStore>()(
         }
 
         // Wire up chunk handler to current store
-        chunkHandler = (chunk) => get().handleChunk(chunk)
+        chunkHandler = (chunk: StreamChunk) => get().handleChunk(chunk)
       },
 
       disconnect() {
@@ -192,6 +201,7 @@ export const useChatStore = create<ChatStore>()(
 
         // Optimistic: add user message immediately
         const userMsg: ChatMessage = {
+          id: crypto.randomUUID(),
           role: 'user',
           content,
           timestamp: new Date().toISOString(),
@@ -224,24 +234,26 @@ export const useChatStore = create<ChatStore>()(
 
           // Reconstruct messages from session history
           const messages: ChatMessage[] = []
-          const userMsgs: { content: string }[] = data.user_messages ?? []
-          const agentMsgs: { content: string }[] = data.agent_responses ?? []
+          const userMsgs: { content: string; timestamp?: string }[] = data.user_messages ?? []
+          const agentMsgs: { content: string; timestamp?: string }[] = data.agent_responses ?? []
           const maxLen = Math.max(userMsgs.length, agentMsgs.length)
           for (let i = 0; i < maxLen; i++) {
             const userMsg = userMsgs[i]
             const agentMsg = agentMsgs[i]
             if (userMsg != null) {
               messages.push({
+                id: crypto.randomUUID(),
                 role: 'user',
                 content: userMsg.content,
-                timestamp: data.created_at,
+                timestamp: userMsg.timestamp ?? data.created_at,
               })
             }
             if (agentMsg) {
               messages.push({
+                id: crypto.randomUUID(),
                 role: 'assistant',
                 content: agentMsg.content ?? '',
-                timestamp: data.updated_at,
+                timestamp: agentMsg.timestamp ?? data.updated_at,
               })
             }
           }
@@ -298,42 +310,64 @@ export const useChatStore = create<ChatStore>()(
             return {
               messages: [
                 ...updated,
-                { role: 'assistant' as const, content: chunk.content ?? '', timestamp: new Date().toISOString() },
+                { id: crypto.randomUUID(), role: 'assistant' as const, content: chunk.content ?? '', timestamp: new Date().toISOString() },
               ],
             }
           })
         } else if (chunk.type === 'done') {
           const sid = chunk.session_id ?? null
           const vid = chunk.space_id ?? null
+          const toolCalls = chunk.tool_calls ?? []
+          const phase = chunk.phase
+          const evaluationPassed = chunk.evaluation_passed === 'true' || chunk.evaluation_passed === true
+          const seedId = chunk.seed_id
+          const durationMs = chunk.duration_ms
+
+          // Insert tool call messages and attach metadata
+          set((s) => {
+            const updated = [...s.messages]
+            const toolMessages: ChatMessage[] = (Array.isArray(toolCalls) ? toolCalls : []).map(
+              (tc: any) => ({
+                id: crypto.randomUUID(),
+                role: 'tool' as const,
+                content: '',
+                toolName: tc.tool_name,
+                toolArgs: typeof tc.input === 'string' ? undefined : tc.input,
+                toolResult: tc.output,
+                toolDurationMs: tc.duration_ms,
+                timestamp: new Date().toISOString(),
+              })
+            )
+
+            // Find last assistant message and attach metadata
+            const lastAssistantIdx = [...updated].reverse().findIndex((m) => m.role === 'assistant')
+            if (lastAssistantIdx >= 0) {
+              const idx = updated.length - 1 - lastAssistantIdx
+              updated[idx] = {
+                ...updated[idx],
+                metadata: {
+                  phase,
+                  evaluation_passed: evaluationPassed,
+                  seed_id: seedId,
+                  duration_ms: durationMs,
+                  tool_calls: Array.isArray(toolCalls) ? toolCalls : [],
+                },
+              }
+            }
+
+            return { messages: [...updated, ...toolMessages], isStreaming: false }
+          })
 
           if (sid) {
-            set({
-              isStreaming: false,
-              _lastDoneSessionId: sid,
-              activeSessionId: sid,
-            })
-          } else {
-            set({ isStreaming: false })
+            set({ _lastDoneSessionId: sid, activeSessionId: sid })
           }
-
           if (vid) {
             set({ activeSpaceId: vid, _lastDoneSpaceId: vid })
           }
         } else if (chunk.type === 'error') {
           const err = chunk.error ?? 'Unknown error'
-          const msgs = get().messages
-          const last = msgs[msgs.length - 1]
-          if (last?.role === 'assistant') {
-            set({
-              messages: [
-                ...msgs.slice(0, -1),
-                { ...last, content: last.content + `\n\n[Error: ${err}]` },
-              ],
-              isStreaming: false,
-            })
-          } else {
-            set({ isStreaming: false })
-          }
+          set({ isStreaming: false })
+          // Don't inline error into message — will be shown as toast
         }
       },
     }),

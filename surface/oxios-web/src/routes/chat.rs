@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use axum::extract::Query;
+use axum::extract::{Path, Query};
 use axum::extract::{
     ws::{Message, WebSocket},
     State, WebSocketUpgrade,
@@ -381,6 +381,10 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
                 "space_tag": space_tag,
                 "seed_id": seed_id,
                 "duration_ms": duration_ms,
+                // TODO: populate tool_calls from trajectory_steps once kernel provides them
+                "tool_calls": msg.metadata.get("tool_calls")
+                    .and_then(|v| serde_json::from_str::<serde_json::Value>(v).ok())
+                    .unwrap_or(serde_json::json!([])),
             });
             let done_json = match serde_json::to_string(&done_chunk) {
                 Ok(j) => j,
@@ -558,4 +562,18 @@ async fn persist_session(
             });
         }
     }
+}
+
+/// GET /api/sessions/{id}/tool-calls — Get tool call timeline for a session.
+pub(crate) async fn handle_session_tool_calls(
+    _state: State<Arc<AppState>>,
+    Path(id): Path<String>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    // Session tool calls are not yet stored persistently.
+    // Return empty array for now — will be populated when trajectory_steps
+    // are persisted to sessions.
+    Ok(Json(serde_json::json!({
+        "session_id": id,
+        "tool_calls": []
+    })))
 }

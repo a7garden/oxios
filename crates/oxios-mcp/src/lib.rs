@@ -232,6 +232,56 @@ impl McpBridge {
         self.tool_cache.write().await.remove(server_name);
     }
 
+    /// Remove a server by name (disconnects client if active, removes config).
+    pub async fn remove_server(&self, name: &str) -> Result<()> {
+        // Shut down client if active.
+        if let Some(client) = self.clients.write().await.remove(name) {
+            if let Err(e) = client.shutdown().await {
+                tracing::warn!(server = %name, error = %e, "Error shutting down MCP server during removal");
+            }
+        }
+        // Remove from config list.
+        let found = {
+            let mut servers = self.servers.write();
+            let len_before = servers.len();
+            servers.retain(|s| s.name != name);
+            servers.len() != len_before
+        };
+        if !found {
+            return Err(anyhow!("MCP server '{}' not found", name));
+        }
+        // Clear cache.
+        self.tool_cache.write().await.remove(name);
+        Ok(())
+    }
+
+    /// Toggle a server's enabled flag. Returns the new enabled state.
+    pub async fn toggle_server(&self, name: &str) -> Result<bool> {
+        // Extract new_state inside a block scope so the parking_lot lock
+        // is released before any .await points in the async block below.
+        let new_state = {
+            let mut servers = self.servers.write();
+            let server = servers
+                .iter_mut()
+                .find(|s| s.name == name)
+                .ok_or_else(|| anyhow!("MCP server '{}' not found", name))?;
+            server.enabled = !server.enabled;
+            server.enabled
+        };
+
+        // If disabled, disconnect the client (now fully outside the lock).
+        if !new_state {
+            if let Some(client) = self.clients.write().await.remove(name) {
+                if let Err(e) = client.shutdown().await {
+                    tracing::warn!(server = %name, error = %e, "Error shutting down MCP server on disable");
+                }
+            }
+            self.tool_cache.write().await.remove(name);
+        }
+
+        Ok(new_state)
+    }
+
     /// Clear all caches.
     pub async fn clear_all_caches(&self) {
         self.tool_cache.write().await.clear();

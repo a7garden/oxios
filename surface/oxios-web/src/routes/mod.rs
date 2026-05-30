@@ -37,9 +37,7 @@ use crate::persona_routes;
 use crate::server::AppState;
 
 // Re-export all handlers for use in build_routes
-pub(crate) use agent_groups::{
-    handle_agent_group_get, handle_agent_group_progress, handle_agent_groups_list,
-};
+pub(crate) use agent_groups::{handle_agent_group_get, handle_agent_groups_list};
 pub(crate) use audit_routes::{
     handle_audit_by_agent, handle_audit_entries, handle_audit_export, handle_audit_flush,
     handle_audit_verify,
@@ -48,7 +46,7 @@ pub(crate) use budget_routes::{
     handle_budget_get, handle_budget_list, handle_budget_remove, handle_budget_reserve,
     handle_budget_reset, handle_budget_set,
 };
-pub(crate) use chat::{handle_chat, handle_chat_stream, handle_chat_ticket};
+pub(crate) use chat::{handle_chat, handle_chat_stream, handle_chat_ticket, handle_session_tool_calls};
 pub(crate) use cron_jobs::{
     handle_cron_job_create, handle_cron_job_delete, handle_cron_job_get, handle_cron_job_trigger,
     handle_cron_jobs_list, update_cron_job,
@@ -67,7 +65,10 @@ pub(crate) use git_routes::{
 };
 pub(crate) use infra::{
     handle_audit_log, handle_metrics, handle_permissions_get, handle_permissions_put,
-    handle_scheduler_stats, handle_scheduler_tasks, handle_security_permissions,
+    handle_mcp_server_delete, handle_mcp_server_refresh, handle_mcp_server_register,
+    handle_mcp_server_toggle, handle_mcp_servers_list, handle_mcp_tool_call,
+    handle_mcp_tools_list, handle_scheduler_stats, handle_scheduler_tasks,
+    handle_security_permissions,
 };
 pub(crate) use knowledge_routes::{
     handle_knowledge_backlinks, handle_knowledge_chat_append, handle_knowledge_chat_delete,
@@ -97,17 +98,16 @@ pub(crate) use space_routes::{
     handle_spaces_list,
 };
 pub(crate) use system::{
-    handle_agent_get, handle_agent_kill, handle_agent_logs, handle_agent_trace, handle_agents_list,
-    handle_config_get, handle_config_put, handle_health, handle_readiness, handle_status,
+    handle_agent_kill, handle_agents_list, handle_config_get, handle_config_put, handle_health,
+    handle_readiness, handle_status,
 };
 pub(crate) use workspace::{
-    handle_dream_reports, handle_dream_status, handle_memory_create, handle_memory_delete,
-    handle_memory_get, handle_memory_list, handle_memory_pin, handle_memory_search,
-    handle_memory_semantic_search, handle_memory_stats, handle_seed_agents,
-    handle_seed_evolution, handle_seed_get, handle_seeds_list, handle_skill_content,
-    handle_skill_create, handle_skill_delete, handle_skill_disable, handle_skill_enable,
-    handle_skill_get, handle_skills_list, handle_workspace_file_get, handle_workspace_file_put,
-    handle_workspace_tree,
+    handle_memory_create, handle_memory_get, handle_memory_list, handle_memory_search,
+    handle_memory_semantic_search, handle_seed_evolution, handle_seed_get, handle_seeds_list,
+    handle_skill_content, handle_skill_create, handle_skill_delete, handle_skill_disable,
+    handle_skill_enable, handle_skill_get, handle_skills_list,
+    handle_workspace_file_create, handle_workspace_file_delete, handle_workspace_file_get,
+    handle_workspace_file_put, handle_workspace_tree,
 };
 
 // ---------------------------------------------------------------------------
@@ -173,9 +173,6 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         // Control
         .route("/api/status", get(handle_status))
         .route("/api/agents", get(handle_agents_list))
-        .route("/api/agents/{id}", get(handle_agent_get))
-        .route("/api/agents/{id}/trace", get(handle_agent_trace))
-        .route("/api/agents/{id}/logs", get(handle_agent_logs))
         .route("/api/agents/{id}/kill", post(handle_agent_kill))
         // Config
         .route("/api/config", get(handle_config_get))
@@ -198,11 +195,18 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
             "/api/workspace/file/{*path}",
             put(handle_workspace_file_put),
         )
+        .route(
+            "/api/workspace/file/{*path}",
+            post(handle_workspace_file_create),
+        )
+        .route(
+            "/api/workspace/file/{*path}",
+            delete(handle_workspace_file_delete),
+        )
         // Seeds
         .route("/api/seeds", get(handle_seeds_list))
         .route("/api/seeds/{id}", get(handle_seed_get))
         .route("/api/seeds/{id}/evolution", get(handle_seed_evolution))
-        .route("/api/seeds/{id}/agents", get(handle_seed_agents))
         // Skills
         .route("/api/skills", get(handle_skills_list))
         .route("/api/skills/{name}", get(handle_skill_get))
@@ -216,12 +220,7 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         .route("/api/memory", post(handle_memory_create))
         .route("/api/memory/search", post(handle_memory_search))
         .route("/api/memory/semantic", post(handle_memory_semantic_search))
-        .route("/api/memory/stats", get(handle_memory_stats))
         .route("/api/memory/{name}", get(handle_memory_get))
-        .route("/api/memory/{id}/pin", put(handle_memory_pin))
-        .route("/api/memory/{id}", delete(handle_memory_delete))
-        .route("/api/memory/dream/reports", get(handle_dream_reports))
-        .route("/api/memory/dream/status", get(handle_dream_status))
         // Scheduler stats & tasks
         .route("/api/scheduler/stats", get(handle_scheduler_stats))
         .route("/api/scheduler/tasks", get(handle_scheduler_tasks))
@@ -239,6 +238,12 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         )
         .route("/api/permissions/{agent}", get(handle_permissions_get))
         .route("/api/permissions/{agent}", put(handle_permissions_put))
+        // MCP
+        .route("/api/mcp/servers", get(handle_mcp_servers_list).post(handle_mcp_server_register))
+        .route("/api/mcp/servers/{name}", delete(handle_mcp_server_delete))
+        .route("/api/mcp/servers/{name}/toggle", post(handle_mcp_server_toggle))
+        .route("/api/mcp/servers/{name}/refresh", post(handle_mcp_server_refresh))
+        .route("/api/mcp/tools", get(handle_mcp_tools_list).post(handle_mcp_tool_call))
         // Prometheus metrics
         .route("/api/metrics", get(handle_metrics))
         // Resources
@@ -248,7 +253,6 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         // Agent Groups
         .route("/api/agent-groups", get(handle_agent_groups_list))
         .route("/api/agent-groups/{id}", get(handle_agent_group_get))
-        .route("/api/agent-groups/{id}/progress", get(handle_agent_group_progress))
         // Events
         .route("/api/events", get(handle_events))
         // Personas (delegated to persona_routes)
@@ -279,6 +283,7 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         .route("/api/sessions/prune", post(handle_sessions_prune))
         .route("/api/sessions/{id}", get(handle_session_get))
         .route("/api/sessions/{id}", delete(handle_session_delete))
+        .route("/api/sessions/{id}/tool-calls", get(handle_session_tool_calls))
         // Cron Jobs
         .route("/api/cron-jobs", get(handle_cron_jobs_list))
         .route("/api/cron-jobs", post(handle_cron_job_create))

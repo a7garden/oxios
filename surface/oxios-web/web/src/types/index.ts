@@ -146,9 +146,30 @@ export interface OxiosConfig {
 
 // Chat
 export interface ChatMessage {
-  role: 'user' | 'assistant' | 'system'
+  id: string
+  role: 'user' | 'assistant' | 'system' | 'tool'
   content: string
   timestamp?: string
+  // Tool call fields (role === 'tool')
+  toolName?: string
+  toolArgs?: Record<string, unknown>
+  toolResult?: unknown
+  toolDurationMs?: number
+  // Completion metadata (last assistant message)
+  metadata?: {
+    phase?: string
+    evaluation_passed?: boolean
+    seed_id?: string
+    duration_ms?: number
+    tool_calls?: ToolCallSummary[]
+  }
+}
+
+export interface ToolCallSummary {
+  tool_name: string
+  input: string
+  output: string
+  duration_ms: number
 }
 
 export interface ChatRequest {
@@ -176,14 +197,13 @@ export interface StreamChunk {
   tool_args?: Record<string, unknown>
   tool_result?: unknown
   error?: string
-  /** Session ID returned by the backend (present on 'done' and 'token' chunks). */
   session_id?: string
-  /** Space ID returned by the backend. */
   space_id?: string
-  /** Phase reached (present on 'done' chunk). */
   phase?: string
-  /** Whether evaluation passed (present on 'done' chunk). */
   evaluation_passed?: string
+  seed_id?: string
+  duration_ms?: number
+  tool_calls?: ToolCallSummary[]
 }
 
 // Event (SSE)

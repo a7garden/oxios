@@ -78,6 +78,7 @@ const navGroups: { labelKey: string; items: NavItem[] }[] = [
       { labelKey: 'common.security', href: '/security', icon: <Shield className="h-4 w-4" /> },
       { labelKey: 'common.events', href: '/events', icon: <Bell className="h-4 w-4" /> },
       { labelKey: 'common.git', href: '/git', icon: <GitBranch className="h-4 w-4" /> },
+      { labelKey: 'common.mcpServers', href: '/mcp', icon: <Zap className="h-4 w-4" /> },
     ],
   },
 ]
