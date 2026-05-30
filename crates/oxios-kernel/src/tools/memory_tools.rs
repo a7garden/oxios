@@ -125,7 +125,6 @@ impl AgentTool for MemoryWriteTool {
             content_hash: crate::memory::content_hash(&content),
             source: "agent".to_string(),
             session_id: None,
-            space_id: None,
             tags: tags.clone(),
             importance: importance.clamp(0.0, 1.0),
             pinned: false,

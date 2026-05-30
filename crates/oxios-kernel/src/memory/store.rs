@@ -529,7 +529,6 @@ impl MemoryManager {
             content_hash: 0,
             source: "session_summary".to_string(),
             session_id: Some(session.id.0.clone()),
-            space_id: None,
             tags: vec![],
             importance: 0.6,
             pinned: false,

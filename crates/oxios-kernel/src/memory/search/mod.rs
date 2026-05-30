@@ -114,7 +114,7 @@ fn load_memory_by_rowid(db: &MemoryDatabase, rowid: i64) -> Result<Option<Memory
     let conn = db.conn();
     let mut stmt = conn.prepare(
         "SELECT id, memory_type, content, importance, tier, protection,
-                source, session_id, space_id, tags, access_count, pinned,
+                source, session_id, tags, access_count, pinned,
                 auto_classified, session_appearances, decay_score, content_hash,
                 created_at, updated_at, accessed_at
          FROM memories WHERE rowid = ?1"
@@ -132,7 +132,7 @@ pub fn load_memory_by_id(db: &MemoryDatabase, id: &str) -> Result<Option<MemoryE
     let conn = db.conn();
     let mut stmt = conn.prepare(
         "SELECT id, memory_type, content, importance, tier, protection,
-                source, session_id, space_id, tags, access_count, pinned,
+                source, session_id, tags, access_count, pinned,
                 auto_classified, session_appearances, decay_score, content_hash,
                 created_at, updated_at, accessed_at
          FROM memories WHERE id = ?1"
@@ -149,19 +149,19 @@ pub fn load_memory_by_id(db: &MemoryDatabase, id: &str) -> Result<Option<MemoryE
 ///
 /// Column order must match the SELECT statement above:
 ///  0: id, 1: memory_type, 2: content, 3: importance, 4: tier, 5: protection,
-///  6: source, 7: session_id, 8: space_id, 9: tags, 10: access_count, 11: pinned,
-/// 12: auto_classified, 13: session_appearances, 14: decay_score, 15: content_hash,
-/// 16: created_at, 17: updated_at, 18: accessed_at
+///  6: source, 7: session_id, 8: tags, 9: access_count, 10: pinned,
+/// 11: auto_classified, 12: session_appearances, 13: decay_score, 14: content_hash,
+/// 15: created_at, 16: updated_at, 17: accessed_at
 pub fn row_to_memory_entry(row: &rusqlite::Row<'_>) -> MemoryEntry {
     use chrono::Utc;
 
     let memory_type_str: String = row.get_unwrap(1);
     let tier_str: String = row.get_unwrap(4);
     let protection_str: String = row.get_unwrap(5);
-    let tags_str: Option<String> = row.get_unwrap(9);
-    let created_at_str: String = row.get_unwrap(16);
-    let updated_at_str: String = row.get_unwrap(17);
-    let accessed_at_str: Option<String> = row.get_unwrap(18);
+    let tags_str: Option<String> = row.get_unwrap(8);
+    let created_at_str: String = row.get_unwrap(15);
+    let updated_at_str: String = row.get_unwrap(16);
+    let accessed_at_str: Option<String> = row.get_unwrap(17);
 
     MemoryEntry {
         id: row.get_unwrap(0),
@@ -172,14 +172,13 @@ pub fn row_to_memory_entry(row: &rusqlite::Row<'_>) -> MemoryEntry {
         protection: parse_protection(&protection_str),
         source: row.get_unwrap(6),
         session_id: row.get_unwrap(7),
-        space_id: row.get_unwrap(8),
         tags: tags_str
             .and_then(|s| serde_json::from_str(&s).ok())
             .unwrap_or_default(),
-        content_hash: row.get::<_, i64>(15).unwrap() as u64,
-        pinned: row.get::<_, i64>(11).unwrap() != 0,
-        auto_classified: row.get::<_, i64>(12).unwrap() != 0,
-        session_appearances: row.get::<_, i64>(13).unwrap() as u32,
+        content_hash: row.get::<_, i64>(14).unwrap() as u64,
+        pinned: row.get::<_, i64>(10).unwrap() != 0,
+        auto_classified: row.get::<_, i64>(11).unwrap() != 0,
+        session_appearances: row.get::<_, i64>(12).unwrap() as u32,
         user_corrected: false,
         seen_in_sessions: vec![],
         created_at: created_at_str.parse().unwrap_or_else(|_| Utc::now()),

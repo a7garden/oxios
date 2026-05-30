@@ -373,7 +373,6 @@ fn index_to_memory(path: &str, content: &str, memory: &Arc<MemoryManager>) {
         content_hash: 0,
         source: "knowledge:lens".to_string(),
         session_id: None,
-        space_id: None,
         tags,
         importance,
         pinned: false,

@@ -369,9 +369,6 @@ pub struct MemoryEntry {
     /// Related session ID.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub session_id: Option<String>,
-    /// Related space ID.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub space_id: Option<String>,
 
     // ── Importance ────────────────────────────────────
     /// Base importance (0.0–1.0), set by type or auto-computed.
@@ -923,7 +920,6 @@ mod tests {
             content_hash: 0,
             source: "test".to_string(),
             session_id: None,
-            space_id: None,
             tags: vec![],
             importance: 0.5,
             pinned: false,

@@ -851,7 +851,6 @@ pub(crate) async fn handle_memory_create(
         content_hash: oxios_kernel::memory::content_hash(&body.content),
         source: "api".to_string(),
         session_id: None,
-        space_id: None,
         tags: body.tags.clone(),
         importance: body.importance,
         pinned: false,

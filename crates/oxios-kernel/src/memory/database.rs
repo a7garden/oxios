@@ -31,7 +31,6 @@ CREATE TABLE IF NOT EXISTS memories (
     protection      TEXT NOT NULL DEFAULT 'none',
     source          TEXT NOT NULL DEFAULT 'unknown',
     session_id      TEXT,
-    space_id        TEXT,
     tags            TEXT,                       -- JSON array
     metadata        TEXT,                       -- JSON object
     access_count    INTEGER NOT NULL DEFAULT 0,

@@ -97,11 +97,11 @@ impl SqliteMemoryStore {
             conn.execute(
                 "INSERT OR REPLACE INTO memories
                  (id, memory_type, content, importance, tier, protection, source,
-                  session_id, space_id, tags, access_count, pinned, auto_classified,
+                  session_id, tags, access_count, pinned, auto_classified,
                   session_appearances, decay_score, compaction_level, content_hash,
                   created_at, updated_at, accessed_at, decay_rate)
                  VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13,
-                         ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21)",
+                         ?14, ?15, ?16, ?17, ?18, ?19, ?20)",
                 rusqlite::params![
                     entry.id,
                     entry.memory_type.label(),
@@ -111,7 +111,6 @@ impl SqliteMemoryStore {
                     protection_label,
                     entry.source,
                     entry.session_id,
-                    entry.space_id,
                     tags_json,
                     entry.access_count as i64,
                     entry.pinned as i64,
@@ -193,7 +192,7 @@ impl SqliteMemoryStore {
         let conn = self.db.conn();
         let mut stmt = conn.prepare(
             "SELECT id, memory_type, content, importance, tier, protection,
-                    source, session_id, space_id, tags, access_count, pinned,
+                    source, session_id, tags, access_count, pinned,
                     auto_classified, session_appearances, decay_score, content_hash,
                     created_at, updated_at, accessed_at
              FROM memories
@@ -526,7 +525,7 @@ impl SqliteMemoryStore {
         let conn = self.db.conn();
         let mut stmt = conn.prepare(
             "SELECT id, memory_type, content, importance, tier, protection,
-                    source, session_id, space_id, tags, access_count, pinned,
+                    source, session_id, tags, access_count, pinned,
                     auto_classified, session_appearances, decay_score, content_hash,
                     created_at, updated_at, accessed_at
              FROM memories
@@ -570,10 +569,10 @@ impl SqliteMemoryStore {
         conn.execute(
             "UPDATE memories SET
                 memory_type = ?2, content = ?3, importance = ?4, tier = ?5,
-                protection = ?6, source = ?7, session_id = ?8, space_id = ?9,
-                tags = ?10, access_count = ?11, pinned = ?12, auto_classified = ?13,
-                session_appearances = ?14, decay_score = ?15, compaction_level = ?16,
-                content_hash = ?17, updated_at = ?18, accessed_at = ?19
+                protection = ?6, source = ?7, session_id = ?8,
+                tags = ?9, access_count = ?10, pinned = ?11, auto_classified = ?12,
+                session_appearances = ?13, decay_score = ?14, compaction_level = ?15,
+                content_hash = ?16, updated_at = ?17, accessed_at = ?18
              WHERE id = ?1",
             rusqlite::params![
                 entry.id,
@@ -584,7 +583,6 @@ impl SqliteMemoryStore {
                 protection_label,
                 entry.source,
                 entry.session_id,
-                entry.space_id,
                 serde_json::to_string(&entry.tags)?,
                 entry.access_count as i64,
                 entry.pinned as i64,
@@ -757,7 +755,6 @@ mod tests {
             content_hash: content_hash(content),
             source: "test".to_string(),
             session_id: None,
-            space_id: None,
             tags: vec![],
             importance: 0.5,
             pinned: false,

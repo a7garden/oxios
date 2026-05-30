@@ -37,7 +37,7 @@ pub struct DreamCheckpoint {
     /// Unique dream ID.
     pub dream_id: String,
     /// Space ID this dream is running for.
-    pub space_id: String,
+
     /// When the dream started.
     pub started_at: DateTime<Utc>,
     /// Last completed phase (0 = not started).
@@ -76,7 +76,7 @@ pub struct DreamReport {
     /// Unique dream ID.
     pub dream_id: String,
     /// Space ID.
-    pub space_id: String,
+
     /// When the dream started.
     pub started_at: DateTime<Utc>,
     /// When the dream completed.
@@ -469,7 +469,7 @@ impl DreamProcess {
         // Run phases
         let mut report = DreamReport {
             dream_id: dream_id.clone(),
-            space_id: String::new(),
+
             started_at,
             completed_at: started_at,
             resumed_from_checkpoint,
@@ -1125,7 +1125,7 @@ impl DreamProcess {
     ) -> Result<()> {
         let checkpoint = DreamCheckpoint {
             dream_id: dream_id.to_string(),
-            space_id: String::new(),
+
             started_at: Utc::now(),
             completed_phase,
             cached_signals: signals.map(|s| s.to_vec()),
@@ -1166,7 +1166,7 @@ mod tests {
     fn test_dream_checkpoint_stale() {
         let cp = DreamCheckpoint {
             dream_id: "test".to_string(),
-            space_id: "space".to_string(),
+
             started_at: Utc::now() - chrono::Duration::hours(2),
             completed_phase: 2,
             cached_signals: None,
@@ -1179,7 +1179,7 @@ mod tests {
     fn test_dream_checkpoint_fresh() {
         let cp = DreamCheckpoint {
             dream_id: "test".to_string(),
-            space_id: "space".to_string(),
+
             started_at: Utc::now(),
             completed_phase: 2,
             cached_signals: None,

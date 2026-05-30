@@ -129,11 +129,11 @@ fn insert_memory_entry(db: &MemoryDatabase, entry: &MemoryEntry) -> Result<()> {
     conn.execute(
         "INSERT OR IGNORE INTO memories
          (id, memory_type, content, importance, tier, protection, source,
-          session_id, space_id, tags, access_count, pinned, auto_classified,
+          session_id, tags, access_count, pinned, auto_classified,
           session_appearances, decay_score, compaction_level, content_hash,
           created_at, updated_at, accessed_at, decay_rate)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13,
-                 ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21)",
+                 ?14, ?15, ?16, ?17, ?18, ?19, ?20)",
         rusqlite::params![
             entry.id,
             entry.memory_type.label(),
@@ -143,7 +143,6 @@ fn insert_memory_entry(db: &MemoryDatabase, entry: &MemoryEntry) -> Result<()> {
             protection_label,
             entry.source,
             entry.session_id,
-            entry.space_id,
             tags_json,
             entry.access_count as i64,
             entry.pinned as i64,
@@ -176,7 +175,6 @@ fn make_test_entry(id: &str, ty: crate::memory::MemoryType) -> crate::memory::Me
         content_hash: 0,
         source: "test".to_string(),
         session_id: None,
-        space_id: None,
         tags: vec![],
         importance: 0.5,
         pinned: false,

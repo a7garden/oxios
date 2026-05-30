@@ -125,12 +125,12 @@ pub struct RunOutput {
     /// Session ID for multi-turn.
     #[serde(default)]
     pub session_id: Option<String>,
-    /// Space ID that handled the message.
+    /// Project ID that handled the message.
     #[serde(default)]
-    pub space_id: Option<String>,
-    /// Space tag (e.g. "[🔧 oxios]").
+    pub project_id: Option<String>,
+    /// Project tag (e.g. "[🔧 oxios]").
     #[serde(default)]
-    pub space_tag: Option<String>,
+    pub project_tag: Option<String>,
     /// Seed ID if seed was created.
     #[serde(default)]
     pub seed_id: Option<String>,
@@ -157,8 +157,8 @@ impl RunOutput {
         Ok(Self {
             response: val["response"].as_str().unwrap_or("").to_string(),
             session_id: val["session_id"].as_str().map(|s| s.to_string()),
-            space_id: val["space_id"].as_str().map(|s| s.to_string()),
-            space_tag: val["space_tag"].as_str().map(|s| s.to_string()),
+            project_id: val["primary_project_id"].as_str().map(|s| s.to_string()),
+            project_tag: val["project_tag"].as_str().map(|s| s.to_string()),
             seed_id: val["seed_id"].as_str().map(|s| s.to_string()),
             agent_id: val["agent_id"].as_str().map(|s| s.to_string()),
             phase_reached: val["phase_reached"]
@@ -178,8 +178,8 @@ impl RunOutput {
         Self {
             response: val["response"].as_str().unwrap_or("").to_string(),
             session_id: val["session_id"].as_str().map(|s| s.to_string()),
-            space_id: val["space_id"].as_str().map(|s| s.to_string()),
-            space_tag: val["space_tag"].as_str().map(|s| s.to_string()),
+            project_id: val["primary_project_id"].as_str().map(|s| s.to_string()),
+            project_tag: val["project_tag"].as_str().map(|s| s.to_string()),
             seed_id: val["seed_id"].as_str().map(|s| s.to_string()),
             agent_id: val["agent_id"].as_str().map(|s| s.to_string()),
             phase_reached: val["phase_reached"]

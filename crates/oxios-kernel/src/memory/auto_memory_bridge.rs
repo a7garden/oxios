@@ -557,7 +557,6 @@ impl AutoMemoryBridge {
                 content_hash: 0,
                 source: insight.source.clone(),
                 session_id: None,
-                space_id: None,
                 tags: vec![insight.category.to_tag().to_string()],
                 importance: insight.confidence,
                 pinned: false,

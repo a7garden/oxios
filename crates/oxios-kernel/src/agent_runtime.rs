@@ -67,8 +67,6 @@ pub struct AgentRuntimeConfig {
     pub tool_execution: ToolExecutionMode,
     /// Whether auto-retry is enabled for retryable LLM errors.
     pub auto_retry_enabled: bool,
-    /// Space ID for scoped memory and workspace.
-    pub space_id: Option<uuid::Uuid>,
     /// Bound project paths. AgentRuntime sets CWD to paths[0].
     pub project_paths: Vec<std::path::PathBuf>,
     /// Scratch workspace directory for temp files.
@@ -95,7 +93,6 @@ impl Default for AgentRuntimeConfig {
             max_iterations: 8,
             tool_execution: ToolExecutionMode::Parallel,
             auto_retry_enabled: true,
-            space_id: None,
             project_paths: Vec::new(),
             workspace_dir: None,
             api_key: None,
@@ -756,7 +753,6 @@ fn handle_compaction(
         content_hash: 0,
         source: "compaction".to_string(),
         session_id: Some(session_id),
-        space_id: None,
         tags: vec![],
         importance: 0.5,
         pinned: false,

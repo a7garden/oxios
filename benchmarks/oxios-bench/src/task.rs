@@ -502,8 +502,8 @@ response_contains = ["42"]
         let output = RunOutput {
             response: String::new(),
             session_id: None,
-            space_id: None,
-            space_tag: None,
+            project_id: None,
+            project_tag: None,
             seed_id: None,
             agent_id: None,
             phase_reached: "Execute".to_string(),
@@ -524,8 +524,8 @@ response_contains = ["42"]
         let output = RunOutput {
             response: String::new(),
             session_id: None,
-            space_id: None,
-            space_tag: None,
+            project_id: None,
+            project_tag: None,
             seed_id: None,
             agent_id: None,
             phase_reached: "Execute".to_string(),
@@ -547,8 +547,8 @@ response_contains = ["42"]
         let output = RunOutput {
             response: "Hello, World!".to_string(),
             session_id: None,
-            space_id: None,
-            space_tag: None,
+            project_id: None,
+            project_tag: None,
             seed_id: None,
             agent_id: None,
             phase_reached: "Execute".to_string(),
@@ -569,8 +569,8 @@ response_contains = ["42"]
         let output = RunOutput {
             response: "success!".to_string(),
             session_id: None,
-            space_id: None,
-            space_tag: None,
+            project_id: None,
+            project_tag: None,
             seed_id: None,
             agent_id: None,
             phase_reached: "Execute".to_string(),

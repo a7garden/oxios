@@ -108,7 +108,6 @@ mod tests {
             tags: vec![],
             source: "test".to_string(),
             session_id: None,
-            space_id: None,
             importance: 0.5,
             pinned: false,
             protection: ProtectionLevel::None,

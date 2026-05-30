@@ -125,8 +125,8 @@ impl Runner for ProcessRunner {
             let output = last_output.unwrap_or_else(|| RunOutput {
                 response: String::new(),
                 session_id: None,
-                space_id: None,
-                space_tag: None,
+                project_id: None,
+                project_tag: None,
                 seed_id: None,
                 agent_id: None,
                 phase_reached: "unknown".to_string(),
