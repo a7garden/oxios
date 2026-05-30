@@ -132,49 +132,6 @@ pub enum KernelEvent {
         /// Whether the agent succeeded.
         success: bool,
     },
-    /// A new Space has been created.
-    SpaceCreated {
-        /// The Space's ID.
-        space_id: uuid::Uuid,
-        /// The Space's name.
-        name: String,
-        /// How it was created (auto_resource, auto_topic, manual).
-        source: String,
-    },
-    /// Active Space has changed.
-    SpaceActivated {
-        /// The Space's ID.
-        space_id: uuid::Uuid,
-        /// The Space's name.
-        name: String,
-    },
-    /// A Space has been archived.
-    SpaceArchived {
-        /// The Space's ID.
-        space_id: uuid::Uuid,
-        /// The Space's name.
-        name: String,
-    },
-    /// Cross-Space knowledge was accessed.
-    KnowledgeCrossReferenced {
-        /// Source Space.
-        from_space: uuid::Uuid,
-        /// Target Space.
-        to_space: uuid::Uuid,
-        /// Number of entries accessed.
-        entries: usize,
-        /// Flow type (reference, transfer, synthesis).
-        flow: String,
-    },
-    /// Spaces have been merged.
-    SpacesMerged {
-        /// The surviving Space.
-        survivor: uuid::Uuid,
-        /// The absorbed Space.
-        absorbed: uuid::Uuid,
-        /// Number of entries migrated.
-        entries_migrated: usize,
-    },
     /// A new Project has been created (RFC-011).
     ProjectCreated {
         /// The project's ID.
@@ -286,40 +243,6 @@ pub fn kernel_event_to_audit_action(event: &KernelEvent) -> AuditAction {
                 group_id, agent_id, success
             ),
         },
-        KernelEvent::SpaceCreated {
-            space_id,
-            name,
-            source,
-        } => AuditAction::Other {
-            detail: format!("space_created:{}:{}:{}", space_id, name, source),
-        },
-        KernelEvent::SpaceActivated { space_id, name } => AuditAction::Other {
-            detail: format!("space_activated:{}:{}", space_id, name),
-        },
-        KernelEvent::SpaceArchived { space_id, name } => AuditAction::Other {
-            detail: format!("space_archived:{}:{}", space_id, name),
-        },
-        KernelEvent::KnowledgeCrossReferenced {
-            from_space,
-            to_space,
-            entries,
-            flow,
-        } => AuditAction::Other {
-            detail: format!(
-                "knowledge_xref:{}->{}:{}:{}entries",
-                from_space, to_space, flow, entries
-            ),
-        },
-        KernelEvent::SpacesMerged {
-            survivor,
-            absorbed,
-            entries_migrated,
-        } => AuditAction::Other {
-            detail: format!(
-                "spaces_merged:{}<-{}:{}entries",
-                survivor, absorbed, entries_migrated
-            ),
-        },
         KernelEvent::EvolutionStarted {
             seed_id,
             new_seed_id,
@@ -363,7 +286,6 @@ fn extract_agent_id(event: &KernelEvent) -> String {
         KernelEvent::MessageReceived { from, .. } => from.to_string(),
         KernelEvent::AgentOutput { agent_id, .. } => agent_id.to_string(),
         KernelEvent::AgentGroupMemberCompleted { agent_id, .. } => agent_id.to_string(),
-        KernelEvent::SpaceActivated { space_id, .. } => format!("space:{}", space_id),
         KernelEvent::ProjectActivated { project_id, .. } => format!("project:{}", project_id),
         _ => "system".to_string(),
     }
@@ -540,11 +462,6 @@ mod tests {
                 query: "test query".to_string(),
                 count: 5,
             },
-            KernelEvent::SpaceCreated {
-                space_id: uuid::Uuid::new_v4(),
-                name: "my-space".to_string(),
-                source: "manual".to_string(),
-            },
             KernelEvent::EvolutionStarted {
                 seed_id: uuid::Uuid::new_v4(),
                 new_seed_id: uuid::Uuid::new_v4(),
@@ -657,14 +574,6 @@ mod tests {
             seed_id: uuid::Uuid::new_v4(),
         };
         assert_eq!(extract_agent_id(&event), "system");
-
-        // SpaceActivated → space: prefix
-        let space_id = uuid::Uuid::new_v4();
-        let event = KernelEvent::SpaceActivated {
-            space_id,
-            name: "test".to_string(),
-        };
-        assert_eq!(extract_agent_id(&event), format!("space:{}", space_id));
     }
 
     #[tokio::test]
