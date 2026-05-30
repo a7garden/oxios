@@ -7,6 +7,7 @@ use axum::Json;
 
 use crate::error::AppError;
 use crate::server::AppState;
+use oxios_kernel::agent_group::{OxiosAgentGroup, OxiosAgentGroupStatus};
 
 /// GET /api/agent-groups — List all agent groups from the state store.
 pub(crate) async fn handle_agent_groups_list(
@@ -33,7 +34,7 @@ pub(crate) async fn handle_agent_groups_list(
     Ok(Json(groups))
 }
 
-/// GET /api/agent-groups/:id — Get a specific agent group by ID.
+/// GET /api/agent-groups/{id} — Get a specific agent group by ID.
 pub(crate) async fn handle_agent_group_get(
     state: State<Arc<AppState>>,
     Path(id): Path<String>,
@@ -47,4 +48,50 @@ pub(crate) async fn handle_agent_group_get(
         Ok(None) => Err(AppError::NotFound(format!("agent group '{id}' not found"))),
         Err(e) => Err(AppError::Internal(e.to_string())),
     }
+}
+
+/// GET /api/agent-groups/{id}/progress — Get real-time progress for a group.
+pub(crate) async fn handle_agent_group_progress(
+    state: State<Arc<AppState>>,
+    Path(id): Path<String>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    let group: OxiosAgentGroup = state
+        .kernel
+        .load_json::<OxiosAgentGroup>("agent_groups", &id)
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))?
+        .ok_or_else(|| AppError::NotFound(format!("agent group '{id}' not found")))?;
+
+    let total = group.agents.len();
+    let completed = group.completed_agents().len();
+    let failed = group.failed_agents().len();
+    let pending = group.pending_agents().len();
+    let running = group
+        .agents
+        .iter()
+        .filter(|a| matches!(a.status, OxiosAgentGroupStatus::Running))
+        .count();
+
+    // Derive overall status from agent statuses
+    let status = if group.all_completed() && !group.any_failed() {
+        "Completed"
+    } else if group.any_failed() {
+        "Failed"
+    } else if running > 0 || completed > 0 {
+        "Running"
+    } else {
+        "Pending"
+    };
+
+    Ok(Json(serde_json::json!({
+        "id": group.id.to_string(),
+        "status": status,
+        "total_agents": total,
+        "completed": completed,
+        "failed": failed,
+        "pending": pending,
+        "running": running,
+        "completion_pct": group.completion_pct(),
+        "combined_results": group.combined_results(),
+    })))
 }

@@ -99,7 +99,7 @@ pub use daemon::{DaemonManager, DaemonStatus};
 pub use supervisor::{BasicSupervisor, Supervisor};
 
 // ─── Orchestration ──────────────────────────────────────────────────
-pub use budget::{BudgetExceeded, BudgetInfo, BudgetKind, BudgetLimit, BudgetManager};
+pub use budget::{BudgetExceeded, BudgetInfo, BudgetKind, BudgetLimit, BudgetManager, FullBudgetInfo};
 // Circuit breaker — delegates to oxi-sdk
 pub use oxi_sdk::ProviderCircuitBreaker as CircuitBreaker;
 pub use cron::{CronJob, CronJobResult, CronJobUpdate, CronScheduler, JobSource};

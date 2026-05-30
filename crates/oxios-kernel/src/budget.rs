@@ -78,6 +78,31 @@ impl std::fmt::Display for BudgetExceeded {
 
 impl std::error::Error for BudgetExceeded {}
 
+/// Full budget information including limits and usage.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FullBudgetInfo {
+    /// The agent this budget applies to.
+    pub agent_id: AgentId,
+    /// Maximum tokens allowed in the window.
+    pub token_limit: u64,
+    /// Tokens consumed in the current window.
+    pub tokens_used: u64,
+    /// Tokens remaining in the current window.
+    pub tokens_remaining: u64,
+    /// Maximum calls allowed in the window.
+    pub calls_limit: u64,
+    /// Calls made in the current window.
+    pub calls_used: u64,
+    /// Calls remaining in the current window.
+    pub calls_remaining: u64,
+    /// Window duration in seconds.
+    pub window_secs: u64,
+    /// Seconds remaining until window resets.
+    pub window_remaining_secs: u64,
+    /// Whether all budget has been exhausted.
+    pub is_exhausted: bool,
+}
+
 /// Manages budgets for all agents with sliding window reset semantics.
 pub struct BudgetManager {
     budgets: RwLock<HashMap<AgentId, BudgetLimit>>,
@@ -290,6 +315,55 @@ impl BudgetManager {
             entry.calls_used = 0;
             entry.window_start = Utc::now();
         }
+    }
+
+    /// Returns full budget information including limits and usage for an agent.
+    ///
+    /// Returns `None` if no budget is configured for the agent.
+    pub fn full_info(&self, agent_id: &AgentId) -> Option<FullBudgetInfo> {
+        let limit = self.budgets.read().get(agent_id).cloned()?;
+
+        let usage = self.usage.read().get(agent_id).cloned();
+        let (tokens_used, calls_used, window_remaining_secs) = if let Some(entry) = usage {
+            let elapsed = Utc::now()
+                .signed_duration_since(entry.window_start)
+                .to_std()
+                .unwrap_or(Duration::ZERO);
+            let window_duration = Duration::from_secs(limit.window_secs);
+            let window_remaining = window_duration.saturating_sub(elapsed).as_secs();
+            let elapsed_secs = elapsed.as_secs();
+
+            if window_remaining == 0 && elapsed_secs >= limit.window_secs {
+                (0u64, 0u64, 0u64)
+            } else {
+                (entry.tokens_used, entry.calls_used, window_remaining)
+            }
+        } else {
+            (0u64, 0u64, limit.window_secs)
+        };
+
+        let tokens_remaining = limit.token_budget.saturating_sub(tokens_used);
+        let calls_remaining = limit.calls_budget.saturating_sub(calls_used);
+        let is_exhausted = tokens_remaining == 0 || calls_remaining == 0;
+
+        Some(FullBudgetInfo {
+            agent_id: *agent_id,
+            token_limit: limit.token_budget,
+            tokens_used,
+            tokens_remaining,
+            calls_limit: limit.calls_budget,
+            calls_used,
+            calls_remaining,
+            window_secs: limit.window_secs,
+            window_remaining_secs,
+            is_exhausted,
+        })
+    }
+
+    /// Returns full budget info for all agents with configured budgets.
+    pub fn all_full_info(&self) -> Vec<FullBudgetInfo> {
+        let budgets = self.budgets.read();
+        budgets.keys().filter_map(|id| self.full_info(id)).collect()
     }
 
     /// Persist budgets and usage to a JSON file at the given path.
