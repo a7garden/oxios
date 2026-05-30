@@ -104,31 +104,6 @@ impl std::fmt::Display for BudgetExceeded {
 
 impl std::error::Error for BudgetExceeded {}
 
-/// Full budget information including limits and usage.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FullBudgetInfo {
-    /// The agent this budget applies to.
-    pub agent_id: AgentId,
-    /// Maximum tokens allowed in the window.
-    pub token_limit: u64,
-    /// Tokens consumed in the current window.
-    pub tokens_used: u64,
-    /// Tokens remaining in the current window.
-    pub tokens_remaining: u64,
-    /// Maximum calls allowed in the window.
-    pub calls_limit: u64,
-    /// Calls made in the current window.
-    pub calls_used: u64,
-    /// Calls remaining in the current window.
-    pub calls_remaining: u64,
-    /// Window duration in seconds.
-    pub window_secs: u64,
-    /// Seconds remaining until window resets.
-    pub window_remaining_secs: u64,
-    /// Whether all budget has been exhausted.
-    pub is_exhausted: bool,
-}
-
 /// Manages budgets for all agents with sliding window reset semantics.
 pub struct BudgetManager {
     budgets: RwLock<HashMap<AgentId, BudgetLimit>>,

@@ -198,7 +198,7 @@ pub use config::{
     MemoryConfig, OrchestratorConfig, OxiosConfig, PersonaConfig, SqliteMemoryConfig,
     EmbeddingConfig,
 };
-pub use git_layer::{CommitInfo, GitLayer, LogEntry};
+pub use git_layer::{CommitDiff, CommitContext, CommitInfo, DiffKind, DiffStats, FileDiff, GitLayer, LogEntry};
 pub use resource_monitor::{OverloadThreshold, ResourceMonitor, ResourceSnapshot};
 pub use space::{
     extract_filesystem_path, match_keywords, ConversationBuffer, ConversationTurn, CrossRefEntry,

@@ -1,8 +1,16 @@
 //! Git-based version control layer using gix.
-//! Provides in-process commits, logs, tags, and restore.
+//! Provides in-process commits, logs, tags, restore, and diffs.
+//!
+//! # RFC-013 Improvements
+//!
+//! - **B1**: `Signature` captures fresh timestamp per commit (not `OnceLock` cached).
+//! - **B2**: `restore_file` traverses nested paths (e.g. `audit/2024-05.audit`).
+//! - **D1**: `CommitContext` enables per-agent author tracking.
+//! - **D2**: `diff_commits` / `file_at_commit` for Ouroboros evaluate.
+//! - **D3**: Removed hex round-trips; `list_tags` uses `Category::Tag`.
 
 use anyhow::{bail, Result};
-use gix::bstr::{BStr, ByteSlice};
+use gix::bstr::BStr;
 use gix::hash::ObjectId;
 use gix::objs::tree::EntryKind;
 use gix::refs::transaction::PreviousValue;
@@ -16,6 +24,8 @@ const GITIGNORE: &str = r#"# Oxios
 .env
 api-keys.json
 "#;
+
+// ── Public types ────────────────────────────────────────────────────────────
 
 /// Commit information returned after a successful commit.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -47,6 +57,163 @@ pub struct LogEntry {
     pub author: String,
 }
 
+/// Commit metadata supplied by the caller to identify who is committing.
+///
+/// Enables per-agent author tracking while keeping the existing
+/// `commit_file(path, msg)` API fully backward-compatible.
+#[derive(Default, Debug, Clone)]
+pub struct CommitContext {
+    /// Agent ID — if present the author becomes `agent-{short_id}`,
+    /// otherwise `"oxios"`.
+    pub agent_id: Option<uuid::Uuid>,
+    /// Seed ID — if present, included in the commit message prefix.
+    pub seed_id: Option<uuid::Uuid>,
+    /// Extra tag such as `"memory"`, `"audit"`, `"cron"`.
+    pub tag: Option<&'static str>,
+}
+
+impl CommitContext {
+    /// Default system commit (no agent context).
+    pub fn system() -> Self {
+        Self::default()
+    }
+
+    /// Agent commit.
+    pub fn agent(agent_id: uuid::Uuid, seed_id: Option<uuid::Uuid>) -> Self {
+        Self {
+            agent_id: Some(agent_id),
+            seed_id,
+            tag: None,
+        }
+    }
+
+    /// Tagged commit (no agent).
+    pub fn tagged(tag: &'static str) -> Self {
+        Self {
+            tag: Some(tag),
+            ..Default::default()
+        }
+    }
+
+    /// Derive the author name for this context.
+    fn author_name(&self) -> String {
+        match &self.agent_id {
+            Some(id) => {
+                let hex = id.to_string();
+                format!("agent-{}", &hex[..8])
+            }
+            None => "oxios".to_string(),
+        }
+    }
+
+    /// Build a prefix for the commit message (e.g. `[audit] [seed-abc123] `).
+    fn message_prefix(&self) -> String {
+        let mut parts = Vec::new();
+        if let Some(tag) = self.tag {
+            parts.push(format!("[{}]", tag));
+        }
+        if let Some(ref seed) = self.seed_id {
+            let hex = seed.to_string();
+            parts.push(format!("[seed-{}]", &hex[..8]));
+        }
+        if parts.is_empty() {
+            String::new()
+        } else {
+            format!("{} ", parts.join(" "))
+        }
+    }
+}
+
+// ── Diff types (Phase 3) ────────────────────────────────────────────────────
+
+/// Change kind for a single file.
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
+pub enum DiffKind {
+    /// New file added.
+    Added,
+    /// File deleted.
+    Deleted,
+    /// File content changed.
+    Modified,
+}
+
+/// Change record for a single file between two commits.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct FileDiff {
+    /// File path (relative to repo root).
+    pub path: String,
+    /// Hex hash in the "from" commit (None for added files).
+    pub old_hash: Option<String>,
+    /// Hex hash in the "to" commit (None for deleted files).
+    pub new_hash: Option<String>,
+    /// Kind of change.
+    pub kind: DiffKind,
+    /// Unified diff text (None for binary files).
+    pub patch: Option<String>,
+}
+
+/// Aggregate diff statistics.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct DiffStats {
+    /// Number of files changed.
+    pub files_changed: usize,
+    /// Total lines added.
+    pub additions: usize,
+    /// Total lines removed.
+    pub deletions: usize,
+}
+
+/// Diff result between two commits.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct CommitDiff {
+    /// Hex hash of the "from" commit.
+    pub from_hash: String,
+    /// Hex hash of the "to" commit.
+    pub to_hash: String,
+    /// Per-file changes.
+    pub files: Vec<FileDiff>,
+    /// Aggregate statistics.
+    pub stats: DiffStats,
+}
+
+// ── Internal types ──────────────────────────────────────────────────────────
+
+/// Default committer email used across all commits.
+const DEFAULT_EMAIL: &str = "oxios@oxios";
+
+/// Owned signature that captures the timestamp at creation time.
+///
+/// Fixes B1: the old `self_signature_ref()` used `OnceLock` and cached the
+/// timestamp for the entire process lifetime, causing all commits to share
+/// the same timestamp.
+struct Signature {
+    name: String,
+    email: String,
+    time: String,
+}
+
+impl Signature {
+    /// Create a new signature with the current timestamp.
+    fn new(name: impl Into<String>, email: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            email: email.into(),
+            time: gix::date::Time::now_local_or_utc().to_string(),
+        }
+    }
+
+    /// Produce a `SignatureRef` valid for as long as `self` lives.
+    fn as_ref(&self) -> gix::actor::SignatureRef<'_> {
+        gix::actor::SignatureRef {
+            name: self.name.as_str().into(),
+            email: self.email.as_str().into(),
+            time: &self.time,
+        }
+    }
+}
+
+// ── GitLayer ────────────────────────────────────────────────────────────────
+
 /// Git-based version control layer.
 ///
 /// Uses `gix` for in-process git operations — no subprocess spawning,
@@ -54,7 +221,6 @@ pub struct LogEntry {
 pub struct GitLayer {
     repo: Arc<Mutex<gix::Repository>>,
     root: PathBuf,
-    committer_name: String,
     #[allow(dead_code)]
     committer_email: String,
     enabled: bool,
@@ -86,15 +252,19 @@ impl GitLayer {
         Ok(Self {
             repo: repo_ref,
             root,
-            committer_name: "oxios".into(),
-            committer_email: "oxios@oxios".into(),
+            committer_email: DEFAULT_EMAIL.into(),
             enabled,
         })
     }
 
-    /// Get head commit as ObjectId (detached, no repo reference).
+    // ── Private helpers (repo-level) ──────────────────────────────────────
+
     fn head_id_detached(repo_arc: &Arc<Mutex<gix::Repository>>) -> Option<ObjectId> {
         let repo = repo_arc.lock();
+        repo.head_id().ok().map(|id| id.detach())
+    }
+
+    fn head_id_detached_raw(repo: &gix::Repository) -> Option<ObjectId> {
         repo.head_id().ok().map(|id| id.detach())
     }
 
@@ -107,10 +277,10 @@ impl GitLayer {
         let mut editor = repo_lock.edit_tree(empty_tree)?;
         editor.upsert(".gitignore", EntryKind::Blob, blob_id)?;
         let tree_id = editor.write()?;
-        let _sig = self_signature_ref();
+        let sig = Signature::new("oxios", DEFAULT_EMAIL);
         repo_lock.commit_as(
-            self_signature_ref(),
-            self_signature_ref(),
+            sig.as_ref(),
+            sig.as_ref(),
             "refs/heads/main",
             "Initial commit",
             tree_id.detach(),
@@ -119,10 +289,78 @@ impl GitLayer {
         Ok(())
     }
 
-    /// Commit a single file with a message.
+    /// Get the current HEAD tree's ObjectId (no hex round-trip).
+    fn head_tree_oid(repo: &gix::Repository) -> Result<ObjectId> {
+        match Self::head_id_detached_raw(repo) {
+            Some(id) => {
+                let commit = repo.find_commit(id)?;
+                let decoded = commit.decode()?;
+                Ok(decoded.tree())
+            }
+            None => Ok(ObjectId::empty_tree(repo.object_hash())),
+        }
+    }
+
+    /// Get tree ObjectId for a commit (no hex round-trip).
+    fn commit_tree_id(repo: &gix::Repository, commit_id: ObjectId) -> Result<ObjectId> {
+        let commit = repo.find_commit(commit_id)?;
+        let decoded = commit.decode()?;
+        Ok(decoded.tree())
+    }
+
+    /// Traverse path components through sub-trees to locate a blob.
+    ///
+    /// Supports nested paths like `audit/2024-05.audit`.
+    fn find_blob_in_tree(
+        repo: &gix::Repository,
+        tree_id: ObjectId,
+        rel_path: &str,
+    ) -> Result<ObjectId> {
+        let components: Vec<&str> = Path::new(rel_path)
+            .iter()
+            .filter_map(|c| c.to_str())
+            .collect();
+        anyhow::ensure!(!components.is_empty(), "empty path: {}", rel_path);
+
+        let mut current_tree_id = tree_id;
+
+        for (i, component) in components.iter().enumerate() {
+            let tree = repo.find_tree(current_tree_id)?;
+            let decoded = tree.decode()?;
+            let comp_bytes = BStr::new(component);
+            let entry = decoded
+                .entries
+                .iter()
+                .find(|e| e.filename == comp_bytes)
+                .ok_or_else(|| {
+                    anyhow::anyhow!("path component '{}' not found in '{}'", component, rel_path)
+                })?;
+
+            if i == components.len() - 1 {
+                return Ok(entry.oid.to_owned());
+            }
+            current_tree_id = entry.oid.to_owned();
+        }
+
+        unreachable!()
+    }
+
+    // ── Public commit API ─────────────────────────────────────────────────
+
+    /// Commit a single file with a message (backward-compatible).
     pub fn commit_file(&self, rel_path: &str, message: &str) -> Result<CommitInfo> {
+        self.commit_file_with(rel_path, message, CommitContext::default())
+    }
+
+    /// Commit a single file with a message and explicit commit context.
+    pub fn commit_file_with(
+        &self,
+        rel_path: &str,
+        message: &str,
+        ctx: CommitContext,
+    ) -> Result<CommitInfo> {
         if !self.enabled {
-            return self.noop_commit(message);
+            return self.noop_commit(&ctx, message);
         }
         let repo = self.repo.lock();
         let abs = self.root.join(rel_path);
@@ -137,26 +375,36 @@ impl GitLayer {
         editor.upsert(rel_path, EntryKind::Blob, blob_id)?;
         let tree_id = editor.write()?;
 
-        // BUGFIX: Use the already-locked repo reference instead of self.repo
-        // which would deadlock (parking_lot::Mutex is not reentrant).
         let parent = repo.head_id().ok().map(|id| id.detach());
-        let _sig = self_signature_ref();
+        let author_name = ctx.author_name();
+        let full_message = format!("{}{}", ctx.message_prefix(), message);
+        let sig = Signature::new(&author_name, &self.committer_email);
         let commit_id = repo.commit_as(
-            self_signature_ref(),
-            self_signature_ref(),
+            sig.as_ref(),
+            sig.as_ref(),
             "refs/heads/main",
-            message,
+            &full_message,
             tree_id.detach(),
             parent.into_iter().collect::<Vec<_>>(),
         )?;
 
-        Ok(self.make_info(&commit_id, message))
+        Ok(self.make_info(&commit_id, &full_message, &author_name))
     }
 
-    /// Commit multiple files in a single commit.
+    /// Commit multiple files in a single commit (backward-compatible).
     pub fn commit_files(&self, rel_paths: &[&str], message: &str) -> Result<CommitInfo> {
+        self.commit_files_with(rel_paths, message, CommitContext::default())
+    }
+
+    /// Commit multiple files with a message and explicit commit context.
+    pub fn commit_files_with(
+        &self,
+        rel_paths: &[&str],
+        message: &str,
+        ctx: CommitContext,
+    ) -> Result<CommitInfo> {
         if !self.enabled {
-            return self.noop_commit(message);
+            return self.noop_commit(&ctx, message);
         }
         let repo = self.repo.lock();
         let head_tree = Self::head_tree_oid(&repo)?;
@@ -172,26 +420,26 @@ impl GitLayer {
         }
         let tree_id = editor.write()?;
 
-        // BUGFIX: Use the already-locked repo reference instead of self.repo
-        // which would deadlock (parking_lot::Mutex is not reentrant).
         let parent = repo.head_id().ok().map(|id| id.detach());
-        let _sig = self_signature_ref();
+        let author_name = ctx.author_name();
+        let full_message = format!("{}{}", ctx.message_prefix(), message);
+        let sig = Signature::new(&author_name, &self.committer_email);
         let commit_id = repo.commit_as(
-            self_signature_ref(),
-            self_signature_ref(),
+            sig.as_ref(),
+            sig.as_ref(),
             "refs/heads/main",
-            message,
+            &full_message,
             tree_id.detach(),
             parent.into_iter().collect::<Vec<_>>(),
         )?;
 
-        Ok(self.make_info(&commit_id, message))
+        Ok(self.make_info(&commit_id, &full_message, &author_name))
     }
 
     /// Remove a file from the repo and commit.
     pub fn remove_file(&self, rel_path: &str, message: &str) -> Result<CommitInfo> {
         if !self.enabled {
-            return self.noop_commit(message);
+            return self.noop_commit(&CommitContext::default(), message);
         }
         let repo = self.repo.lock();
         let head_tree = Self::head_tree_oid(&repo)?;
@@ -200,17 +448,17 @@ impl GitLayer {
         let tree_id = editor.write()?;
 
         let parent = repo.head_id().ok().map(|id| id.detach());
-        let _sig = self_signature_ref();
+        let sig = Signature::new("oxios", &self.committer_email);
         let commit_id = repo.commit_as(
-            self_signature_ref(),
-            self_signature_ref(),
+            sig.as_ref(),
+            sig.as_ref(),
             "refs/heads/main",
             message,
             tree_id.detach(),
             parent.into_iter().collect::<Vec<_>>(),
         )?;
 
-        Ok(self.make_info(&commit_id, message))
+        Ok(self.make_info(&commit_id, message, "oxios"))
     }
 
     /// Append an audit entry to a monthly audit log file and commit it.
@@ -248,6 +496,8 @@ impl GitLayer {
         Ok(())
     }
 
+    // ── Tags ──────────────────────────────────────────────────────────────
+
     /// Create an annotated tag at the current HEAD.
     pub fn tag(&self, name: &str, message: &str) -> Result<()> {
         if !self.enabled {
@@ -259,12 +509,12 @@ impl GitLayer {
             .ok()
             .map(|id| id.detach())
             .ok_or_else(|| anyhow::anyhow!("No HEAD commit to tag"))?;
-        let _sig = self_signature_ref();
+        let sig = Signature::new("oxios", &self.committer_email);
         repo.tag(
             name,
             head_id,
             gix::objs::Kind::Commit,
-            Some(_sig),
+            Some(sig.as_ref()),
             message,
             PreviousValue::MustNotExist,
         )?;
@@ -272,19 +522,25 @@ impl GitLayer {
     }
 
     /// List all tags in the repository.
+    ///
+    /// Uses `Category::Tag` to correctly filter only tag refs.
     pub fn list_tags(&self) -> Result<Vec<String>> {
         let repo = self.repo.lock();
         let mut tags = Vec::new();
         for reference in repo.references()?.all()? {
             let reference = reference.map_err(|e| anyhow::anyhow!("ref iter: {e:#}"))?;
-            let name = reference.name().shorten().to_string();
-            if name.starts_with("tags/") || (!name.contains('/') && !name.is_empty()) {
-                let tag_name = name.strip_prefix("tags/").unwrap_or(&name);
-                tags.push(tag_name.to_string());
+            if reference
+                .name()
+                .category()
+                .is_some_and(|c| matches!(c, gix::refs::Category::Tag))
+            {
+                tags.push(reference.name().shorten().to_string());
             }
         }
         Ok(tags)
     }
+
+    // ── Log / resolve ─────────────────────────────────────────────────────
 
     /// Return commit log entries, most recent first.
     pub fn log(&self, max_count: usize) -> Result<Vec<LogEntry>> {
@@ -318,7 +574,6 @@ impl GitLayer {
                 timestamp,
                 author,
             });
-            // First parent via iterator
             current_id = decoded.parents().next();
         }
 
@@ -326,54 +581,214 @@ impl GitLayer {
     }
 
     /// Resolve a partial commit hash to full ObjectId.
-    ///
-    /// Git allows abbreviating commit hashes (e.g., "abc1234") as long as
-    /// they're unique within the repository. This method uses `rev_parse_single`
-    /// to resolve partial hashes to full commit IDs.
-    ///
-    /// # Arguments
-    /// * `partial` - A partial hash (4-40 hex characters)
-    ///
-    /// # Returns
-    /// The resolved `ObjectId` or error if the hash cannot be resolved.
     pub fn resolve_partial_hash(&self, partial: &str) -> Result<ObjectId> {
         if partial.len() < 4 {
             bail!("Partial hash too short (minimum 4 characters)");
         }
-        // Check if it's already a full hash (40 hex chars for SHA-1)
         if partial.len() >= 40 {
-            // Full hash - validate and return directly
             return Ok(ObjectId::from_hex(partial.as_bytes())?);
         }
-        // Partial hash - use rev_parse_single to resolve
         let repo = self.repo.lock();
-        // rev_parse_single handles both full and partial hashes
         let id = repo.rev_parse_single(BStr::new(partial))?;
         Ok(id.detach())
     }
 
+    /// Resolve a hash string using a pre-locked repo.
+    fn resolve_hash_inner(&self, repo: &gix::Repository, partial: &str) -> Result<ObjectId> {
+        if partial.len() >= 40 {
+            return Ok(ObjectId::from_hex(partial.as_bytes())?);
+        }
+        if partial.len() < 4 {
+            bail!("Hash too short (minimum 4 characters)");
+        }
+        let id = repo.rev_parse_single(BStr::new(partial))?;
+        Ok(id.detach())
+    }
+
+    // ── Restore ───────────────────────────────────────────────────────────
+
     /// Restore a file to its state in a specific commit.
+    ///
+    /// Supports nested paths like `audit/2024-05.audit` by traversing
+    /// each path component through sub-trees.
     pub fn restore_file(&self, rel_path: &str, hash: &str) -> Result<()> {
         let commit_id = self.resolve_partial_hash(hash)?;
         let repo = self.repo.lock();
-        let commit = repo.find_commit(commit_id)?;
-        let decoded = commit.decode()?;
-        let tree_id = ObjectId::from_hex(decoded.tree.as_bytes())?;
-        let tree = repo.find_tree(tree_id)?;
-        let decoded_tree = tree.decode()?;
-
-        // Find entry by filename (as bytes)
-        let rel_bytes = BStr::new(rel_path);
-        let entry = decoded_tree
-            .entries
-            .iter()
-            .find(|e| e.filename == rel_bytes)
-            .ok_or_else(|| anyhow::anyhow!("Path {} not found in commit {}", rel_path, hash))?;
-
-        let blob = repo.find_blob(entry.oid.to_owned())?;
+        let commit_tree_id = Self::commit_tree_id(&repo, commit_id)?;
+        let blob_id = Self::find_blob_in_tree(&repo, commit_tree_id, rel_path)?;
+        let blob = repo.find_blob(blob_id)?;
         std::fs::write(self.root.join(rel_path), &blob.data)?;
         Ok(())
     }
+
+    // ── Diff API (Phase 3) ────────────────────────────────────────────────
+
+    /// Compute the diff between two commits.
+    pub fn diff_commits(&self, from_hash: &str, to_hash: &str) -> Result<CommitDiff> {
+        let repo = self.repo.lock();
+        let from_id = self.resolve_hash_inner(&repo, from_hash)?;
+        let to_id = self.resolve_hash_inner(&repo, to_hash)?;
+
+        let from_tree_id = Self::commit_tree_id(&repo, from_id)?;
+        let to_tree_id = Self::commit_tree_id(&repo, to_id)?;
+
+        let mut files = Vec::new();
+        Self::diff_trees(&repo, from_tree_id, to_tree_id, "", &mut files)?;
+
+        // Compute patches for modified/added files.
+        for fd in &mut files {
+            let old_data = fd
+                .old_hash
+                .as_ref()
+                .and_then(|h| ObjectId::from_hex(h.as_bytes()).ok())
+                .and_then(|id| repo.find_blob(id).ok())
+                .map(|b| b.data.to_vec());
+            let new_data = fd
+                .new_hash
+                .as_ref()
+                .and_then(|h| ObjectId::from_hex(h.as_bytes()).ok())
+                .and_then(|id| repo.find_blob(id).ok())
+                .map(|b| b.data.to_vec());
+
+            match (&old_data, &new_data) {
+                (Some(old), Some(new)) => {
+                    fd.patch = compute_unified_diff(old, new, &fd.path);
+                }
+                (None, Some(new)) => {
+                    fd.patch = compute_unified_diff(&[], new, &fd.path);
+                }
+                _ => {}
+            }
+        }
+
+        let stats = DiffStats {
+            files_changed: files.len(),
+            additions: files
+                .iter()
+                .filter_map(|f| f.patch.as_ref())
+                .map(|p| {
+                    p.lines()
+                        .filter(|l| l.starts_with('+') && !l.starts_with("+++"))
+                        .count()
+                })
+                .sum(),
+            deletions: files
+                .iter()
+                .filter_map(|f| f.patch.as_ref())
+                .map(|p| {
+                    p.lines()
+                        .filter(|l| l.starts_with('-') && !l.starts_with("---"))
+                        .count()
+                })
+                .sum(),
+        };
+
+        Ok(CommitDiff {
+            from_hash: from_id.to_hex().to_string(),
+            to_hash: to_id.to_hex().to_string(),
+            files,
+            stats,
+        })
+    }
+
+    /// Retrieve file content as it was at a specific commit.
+    pub fn file_at_commit(&self, rel_path: &str, hash: &str) -> Result<Vec<u8>> {
+        let repo = self.repo.lock();
+        let commit_id = self.resolve_hash_inner(&repo, hash)?;
+        let tree_id = Self::commit_tree_id(&repo, commit_id)?;
+        let blob_id = Self::find_blob_in_tree(&repo, tree_id, rel_path)?;
+        let blob = repo.find_blob(blob_id)?;
+        Ok(blob.data.to_vec())
+    }
+
+    // ── Diff helpers ──────────────────────────────────────────────────────
+
+    /// Recursively compare two trees and collect changed files.
+    fn diff_trees(
+        repo: &gix::Repository,
+        old_tree: ObjectId,
+        new_tree: ObjectId,
+        prefix: &str,
+        changes: &mut Vec<FileDiff>,
+    ) -> Result<()> {
+        let old_tree_obj = repo.find_tree(old_tree)?;
+        let old_decoded = old_tree_obj.decode()?;
+        let new_tree_obj = repo.find_tree(new_tree)?;
+        let new_decoded = new_tree_obj.decode()?;
+
+        let old_entries: std::collections::HashMap<&BStr, &gix::objs::tree::EntryRef<'_>> =
+            old_decoded.entries.iter().map(|e| (e.filename, e)).collect();
+        let new_entries: std::collections::HashMap<&BStr, &gix::objs::tree::EntryRef<'_>> =
+            new_decoded.entries.iter().map(|e| (e.filename, e)).collect();
+
+        // Detect additions and modifications.
+        for (name, new_entry) in &new_entries {
+            let path = format!("{}{}", prefix, name);
+            match old_entries.get(name) {
+                None => {
+                    if new_entry.mode.is_tree() {
+                        let empty = ObjectId::empty_tree(repo.object_hash());
+                        Self::diff_trees(
+                            repo,
+                            empty,
+                            new_entry.oid.to_owned(),
+                            &format!("{}/", path),
+                            changes,
+                        )?;
+                    } else {
+                        changes.push(FileDiff {
+                            path,
+                            old_hash: None,
+                            new_hash: Some(new_entry.oid.to_hex().to_string()),
+                            kind: DiffKind::Added,
+                            patch: None,
+                        });
+                    }
+                }
+                Some(old_entry) => {
+                    if old_entry.oid == new_entry.oid {
+                        continue;
+                    }
+                    if new_entry.mode.is_tree() && old_entry.mode.is_tree() {
+                        Self::diff_trees(
+                            repo,
+                            old_entry.oid.to_owned(),
+                            new_entry.oid.to_owned(),
+                            &format!("{}/", path),
+                            changes,
+                        )?;
+                    } else {
+                        changes.push(FileDiff {
+                            path,
+                            old_hash: Some(old_entry.oid.to_hex().to_string()),
+                            new_hash: Some(new_entry.oid.to_hex().to_string()),
+                            kind: DiffKind::Modified,
+                            patch: None,
+                        });
+                    }
+                }
+            }
+        }
+
+        // Detect deletions.
+        for (name, old_entry) in &old_entries {
+            if new_entries.contains_key(name) {
+                continue;
+            }
+            let path = format!("{}{}", prefix, name);
+            changes.push(FileDiff {
+                path,
+                old_hash: Some(old_entry.oid.to_hex().to_string()),
+                new_hash: None,
+                kind: DiffKind::Deleted,
+                patch: None,
+            });
+        }
+
+        Ok(())
+    }
+
+    // ── Verify / accessors ────────────────────────────────────────────────
 
     /// Verify repository integrity.
     pub fn verify(&self) -> Result<bool> {
@@ -382,7 +797,6 @@ impl GitLayer {
         for reference in refs.all()? {
             let _ = reference.map_err(|e| anyhow::anyhow!("ref verify: {e:#}"))?;
         }
-        // head_id() fails on an empty repo (no commits yet) — that's fine.
         if repo.head_id().is_err() {
             tracing::debug!("verify: no HEAD yet (empty repository)");
         }
@@ -399,60 +813,54 @@ impl GitLayer {
         &self.root
     }
 
-    // ── Private helpers ───────────────────────────────────────────────────────
+    // ── Private info builders ─────────────────────────────────────────────
 
-    /// Get the current HEAD tree's ObjectId.
-    fn head_tree_oid(repo: &gix::Repository) -> Result<ObjectId> {
-        match Self::head_id_detached_raw(repo) {
-            Some(id) => {
-                let commit = repo.find_commit(id)?;
-                let decoded = commit.decode()?;
-                let oid = ObjectId::from_hex(decoded.tree)?;
-                Ok(oid)
-            }
-            None => Ok(ObjectId::empty_tree(repo.object_hash())),
-        }
-    }
-
-    /// Get head commit as ObjectId (raw, borrowed repo).
-    fn head_id_detached_raw(repo: &gix::Repository) -> Option<ObjectId> {
-        repo.head_id().ok().map(|id| id.detach())
-    }
-
-    fn noop_commit(&self, message: &str) -> Result<CommitInfo> {
+    fn noop_commit(&self, ctx: &CommitContext, message: &str) -> Result<CommitInfo> {
         Ok(CommitInfo {
             hash: "(disabled)".into(),
             short_hash: "(dis)".into(),
             message: message.into(),
             timestamp: chrono::Utc::now().to_rfc3339(),
-            author: "oxios".into(),
+            author: ctx.author_name(),
         })
     }
 
-    fn make_info(&self, id: &gix::Id, message: &str) -> CommitInfo {
+    fn make_info(&self, id: &gix::Id, message: &str, author: &str) -> CommitInfo {
         let hex = id.to_hex().to_string();
         CommitInfo {
             short_hash: hex[..7].into(),
             hash: hex,
             message: message.into(),
             timestamp: chrono::Utc::now().to_rfc3339(),
-            author: self.committer_name.clone(),
+            author: author.into(),
         }
     }
 }
 
-/// Create a signature ref for committer/author identity.
-fn self_signature_ref() -> gix::actor::SignatureRef<'static> {
-    static TIME_BUF: std::sync::OnceLock<String> = std::sync::OnceLock::new();
-    let time_str = TIME_BUF.get_or_init(|| gix::date::Time::now_local_or_utc().to_string());
-    gix::actor::SignatureRef {
-        name: "oxios".into(),
-        email: "oxios@oxios".into(),
-        time: time_str.as_str(),
+// ── Free functions ──────────────────────────────────────────────────────────
+
+/// Produce a simple unified-style diff between two byte sequences.
+fn compute_unified_diff(old: &[u8], new: &[u8], path: &str) -> Option<String> {
+    let old_str = std::str::from_utf8(old).ok()?;
+    let new_str = std::str::from_utf8(new).ok()?;
+
+    use similar::{ChangeTag, TextDiff};
+    let diff = TextDiff::from_lines(old_str, new_str);
+
+    let mut output = format!("--- a/{}\n+++ b/{}\n", path, path);
+    for change in diff.iter_all_changes() {
+        let prefix = match change.tag() {
+            ChangeTag::Delete => '-',
+            ChangeTag::Insert => '+',
+            ChangeTag::Equal => ' ',
+        };
+        output.push_str(&format!("{}{}", prefix, change));
     }
+
+    Some(output)
 }
 
-// ── Tests ────────────────────────────────────────────────────────────────────
+// ── Tests ───────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
 mod tests {
@@ -501,7 +909,7 @@ mod tests {
         layer.commit_file("x.json", "tag test").unwrap();
         layer.tag("v1", "first tag").unwrap();
         let tags = layer.list_tags().unwrap();
-        assert!(tags.iter().any(|t| t.contains("v1")));
+        assert!(tags.iter().any(|t| t == "v1"));
     }
 
     #[test]
@@ -577,5 +985,237 @@ mod tests {
         assert!(dir.path().join(".gitignore").exists());
         let content = std::fs::read_to_string(dir.path().join(".gitignore")).unwrap();
         assert!(content.contains("Oxios"));
+    }
+
+    // ── B1: Signature timestamps ──────────────────────────────────────────
+
+    #[test]
+    fn test_signature_timestamps_are_fresh() {
+        // B1 fix: each Signature captures its own timestamp at creation time,
+        // not a process-wide cached value. Verify that signatures created 1s
+        // apart produce different timestamps.
+        let sig1 = Signature::new("a", "a@a");
+        assert!(!sig1.time.is_empty());
+
+        std::thread::sleep(std::time::Duration::from_millis(1100));
+        let sig3 = Signature::new("c", "c@c");
+        assert_ne!(
+            sig1.time, sig3.time,
+            "Signature created 1s later must have a different timestamp"
+        );
+    }
+
+    // ── D1: Agent identification ──────────────────────────────────────────
+
+    #[test]
+    fn test_commit_file_with_agent_context() {
+        let (dir, layer) = setup();
+        std::fs::write(dir.path().join("agent_work.json"), b"{\"result\":42}").unwrap();
+
+        let agent_id = uuid::Uuid::new_v4();
+        let ctx = CommitContext::agent(agent_id, None);
+        layer
+            .commit_file_with("agent_work.json", "agent did work", ctx)
+            .unwrap();
+
+        let log = layer.log(10).unwrap();
+        let agent_commit = log
+            .iter()
+            .find(|e| e.message.contains("agent did work"))
+            .expect("should find agent commit");
+
+        let expected_author = format!("agent-{}", &agent_id.to_string()[..8]);
+        assert_eq!(agent_commit.author, expected_author);
+    }
+
+    #[test]
+    fn test_commit_file_with_tag() {
+        let (dir, layer) = setup();
+        std::fs::write(dir.path().join("audit.json"), b"{\"event\":\"test\"}").unwrap();
+
+        let ctx = CommitContext::tagged("audit");
+        let info = layer
+            .commit_file_with("audit.json", "flush audit trail", ctx)
+            .unwrap();
+
+        assert!(info.message.contains("[audit]"));
+        assert!(info.message.contains("flush audit trail"));
+    }
+
+    #[test]
+    fn test_default_context_is_oxios() {
+        let (dir, layer) = setup();
+        std::fs::write(dir.path().join("sys.json"), b"1").unwrap();
+
+        let info = layer
+            .commit_file_with("sys.json", "system commit", CommitContext::default())
+            .unwrap();
+
+        assert_eq!(info.author, "oxios");
+    }
+
+    #[test]
+    fn test_commit_context_author_name() {
+        assert_eq!(CommitContext::default().author_name(), "oxios");
+        assert_eq!(CommitContext::system().author_name(), "oxios");
+
+        let id = uuid::Uuid::parse_str("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee").unwrap();
+        assert_eq!(CommitContext::agent(id, None).author_name(), "agent-aaaaaaaa");
+
+        assert_eq!(CommitContext::tagged("memory").author_name(), "oxios");
+    }
+
+    #[test]
+    fn test_commit_context_message_prefix() {
+        assert!(CommitContext::default().message_prefix().is_empty());
+        assert_eq!(CommitContext::tagged("audit").message_prefix(), "[audit] ");
+
+        let seed_id = uuid::Uuid::parse_str("11111111-2222-3333-4444-555555555555").unwrap();
+        let ctx = CommitContext {
+            tag: Some("memory"),
+            seed_id: Some(seed_id),
+            ..Default::default()
+        };
+        assert_eq!(ctx.message_prefix(), "[memory] [seed-11111111] ");
+    }
+
+    #[test]
+    fn test_commit_files_with_context() {
+        let (dir, layer) = setup();
+        std::fs::write(dir.path().join("a.json"), b"1").unwrap();
+        std::fs::write(dir.path().join("b.json"), b"2").unwrap();
+
+        let agent_id = uuid::Uuid::new_v4();
+        let ctx = CommitContext::agent(agent_id, None);
+        let info = layer
+            .commit_files_with(&["a.json", "b.json"], "batch agent work", ctx)
+            .unwrap();
+
+        let expected_author = format!("agent-{}", &agent_id.to_string()[..8]);
+        assert_eq!(info.author, expected_author);
+    }
+
+    #[test]
+    fn test_backward_compat_commit_file_is_oxios() {
+        let (dir, layer) = setup();
+        std::fs::write(dir.path().join("compat.json"), b"1").unwrap();
+        let info = layer.commit_file("compat.json", "compat check").unwrap();
+        assert_eq!(info.author, "oxios");
+    }
+
+    // ── B2: Nested path restore ───────────────────────────────────────────
+
+    #[test]
+    fn test_restore_nested_file() {
+        let (dir, layer) = setup();
+
+        // Create a nested file via log_action.
+        layer
+            .log_action("agent-X", "write", "secret.txt", true, None)
+            .unwrap();
+
+        let audit_rel = format!("audit/{}.audit", chrono::Utc::now().format("%Y-%m"));
+        let audit_path = dir.path().join(&audit_rel);
+        assert!(audit_path.exists(), "audit file should exist");
+
+        // Overwrite it.
+        let original = std::fs::read_to_string(&audit_path).unwrap();
+        std::fs::write(&audit_path, "CORRUPTED").unwrap();
+        layer.commit_file(&audit_rel, "corrupt").unwrap();
+
+        // Find the audit commit and restore.
+        let log = layer.log(10).unwrap();
+        let audit_commit = log
+            .iter()
+            .find(|e| e.message.contains("audit: agent-X"))
+            .expect("should find audit commit");
+
+        layer
+            .restore_file(&audit_rel, &audit_commit.short_hash)
+            .unwrap();
+
+        let restored = std::fs::read_to_string(&audit_path).unwrap();
+        assert!(restored.contains("agent-X"));
+        assert!(!restored.contains("CORRUPTED"));
+    }
+
+    // ── D3b: list_tags filter ─────────────────────────────────────────────
+
+    #[test]
+    fn test_list_tags_excludes_non_tags() {
+        let (dir, layer) = setup();
+        std::fs::write(dir.path().join("t.json"), b"1").unwrap();
+        layer.commit_file("t.json", "for tag").unwrap();
+        layer.tag("release-v1", "first release").unwrap();
+        let tags = layer.list_tags().unwrap();
+        assert!(tags.iter().any(|t| t == "release-v1"));
+        assert!(tags.iter().all(|t| t != "main" && t != "HEAD"));
+    }
+
+    // ── Phase 3: Diff ─────────────────────────────────────────────────────
+
+    #[test]
+    fn test_diff_added_file() {
+        let (dir, layer) = setup();
+        let first = layer.log(1).unwrap()[0].hash.clone();
+
+        std::fs::write(dir.path().join("new.txt"), b"hello\n").unwrap();
+        let info = layer.commit_file("new.txt", "add file").unwrap();
+
+        let diff = layer.diff_commits(&first, &info.hash).unwrap();
+        assert!(diff.files.iter().any(|f| f.path == "new.txt" && f.kind == DiffKind::Added));
+    }
+
+    #[test]
+    fn test_diff_modified_file() {
+        let (dir, layer) = setup();
+
+        std::fs::write(dir.path().join("data.txt"), b"v1\n").unwrap();
+        let first = layer.commit_file("data.txt", "v1").unwrap();
+
+        std::fs::write(dir.path().join("data.txt"), b"v2\n").unwrap();
+        let second = layer.commit_file("data.txt", "v2").unwrap();
+
+        let diff = layer.diff_commits(&first.hash, &second.hash).unwrap();
+        assert!(diff.files.iter().any(|f| f.path == "data.txt" && f.kind == DiffKind::Modified));
+
+        let patch = diff
+            .files
+            .iter()
+            .find(|f| f.path == "data.txt")
+            .unwrap()
+            .patch
+            .as_ref()
+            .expect("should have patch");
+        assert!(patch.contains("-v1"));
+        assert!(patch.contains("+v2"));
+    }
+
+    #[test]
+    fn test_diff_deleted_file() {
+        let (dir, layer) = setup();
+
+        std::fs::write(dir.path().join("temp.txt"), b"bye\n").unwrap();
+        let first = layer.commit_file("temp.txt", "add temp").unwrap();
+
+        std::fs::remove_file(dir.path().join("temp.txt")).unwrap();
+        let second = layer.remove_file("temp.txt", "remove temp").unwrap();
+
+        let diff = layer.diff_commits(&first.hash, &second.hash).unwrap();
+        assert!(diff.files.iter().any(|f| f.path == "temp.txt" && f.kind == DiffKind::Deleted));
+    }
+
+    #[test]
+    fn test_file_at_commit() {
+        let (dir, layer) = setup();
+
+        std::fs::write(dir.path().join("state.json"), b"{\"v\":1}").unwrap();
+        let first = layer.commit_file("state.json", "v1").unwrap();
+
+        std::fs::write(dir.path().join("state.json"), b"{\"v\":2}").unwrap();
+        layer.commit_file("state.json", "v2").unwrap();
+
+        let content = layer.file_at_commit("state.json", &first.short_hash).unwrap();
+        assert_eq!(content, b"{\"v\":1}");
     }
 }
