@@ -21,7 +21,6 @@ mod infra;
 mod knowledge_routes;
 mod marketplace;
 mod resource_routes;
-mod space_routes;
 mod system;
 mod workspace;
 
@@ -96,13 +95,6 @@ pub(crate) use marketplace::{
 };
 pub(crate) use resource_routes::{
     handle_resource_history, handle_resource_overload, handle_resource_snapshot,
-};
-pub(crate) use space_routes::{
-    handle_memory_flow, handle_memory_flow_for,
-    handle_project_get, handle_projects_list,
-    handle_space_activate, handle_space_archive,
-    handle_space_current, handle_space_get, handle_space_merge,
-    handle_space_restore, handle_spaces_list,
 };
 pub(crate) use system::{
     handle_agent_kill, handle_agents_list, handle_config_get, handle_config_put, handle_health,
@@ -313,16 +305,7 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         .route("/api/git/tags", get(handle_git_tags))
         .route("/api/git/verify", post(handle_git_verify))
         .route("/api/git/restore", post(handle_git_restore))
-        // Spaces
-        .route("/api/spaces", get(handle_spaces_list))
-        .route("/api/spaces/current", get(handle_space_current))
-        .route("/api/spaces/{id}", get(handle_space_get))
-        .route("/api/spaces/{id}/activate", post(handle_space_activate))
-        .route("/api/spaces/{id}/archive", post(handle_space_archive))
-        .route("/api/spaces/{id}/restore", post(handle_space_restore))
-        .route("/api/spaces/merge", post(handle_space_merge))
-        .route("/api/spaces/memory-flow", get(handle_memory_flow))
-        .route("/api/spaces/{id}/memory-flow", get(handle_memory_flow_for))
+        // Projects
         // Budget
         .route("/api/budget", get(handle_budget_list))
         .route("/api/budget/{agent_id}", get(handle_budget_get))

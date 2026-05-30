@@ -6,7 +6,7 @@ export interface AgentDetail {
   name: string
   status: string
   seed_id: string | null
-  space_id: string | null
+  project_id: string | null
   created_at: string
   started_at: string | null
   completed_at: string | null

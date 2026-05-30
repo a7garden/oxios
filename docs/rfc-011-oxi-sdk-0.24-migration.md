@@ -1,398 +1,695 @@
-# RFC-011: oxi-sdk 0.23.0 → 0.24.0 마이그레이션
+# RFC-011: oxi-sdk 0.23.0 → 0.24.0 마이그레이션 + Model Routing UI
 
 > **상태**: Draft
 > **날짜**: 2026-05-30
-> **범위**: oxi-sdk 의존성 업그레이드 및 API 정렬
-> **영향 크레이트**: oxios-kernel, oxios-ouroboros, oxios-web
+> **범위**: SDK 업그레이드 + 백엔드 라우팅 엔진 + Web UI 설정/시각화
+> **영향 크레이트**: oxios-kernel, oxios-ouroboros, oxios-web (backend + frontend)
 
 ---
 
 ## 1. 배경
 
-oxi-sdk 0.24.0이 crates.io에 배포되었다. 핵심 변경사항:
+### 1.1 oxi-sdk 0.24.0 핵심 변경사항
 
 | 영역 | 변경 내용 | 영향도 |
 |------|-----------|--------|
 | **Model Routing** | `ComplexityRouter` + `MultiProviderBuilder` + `FallbackChain` 실구현 | High |
 | **Runtime Routing** | `RoutingControl` (runtime toggle, exclude, fallback) 추가 | High |
 | **Agent Supervisor** | SDK 내장 `AgentSupervisor` + `AgentHandle` + `SnapshotStore` | Medium |
-| **Middleware** | `MiddlewarePipeline`, `MiddlewarePhase`, built-in middleware 실구현 | Medium |
+| **Middleware** | `MiddlewarePipeline`, built-in middleware 정식 구현 | Medium |
 | **Observability** | `Tracer`, `CostTracker`, `AuditLog`, `EventStore` 정식 API | Medium |
 | **Security** | `Authorizer`, `CapabilitySet`, `SecurityMiddleware` | Low |
 | **Coordination** | `WorkQueue`, `SharedMemory`, `Consensus`, `CoordinatedGroup` | Low |
-| **Agent Builder** | `.enable_routing()`, `.supervisor()`, `provider_factory()` | High |
 | **Error 타입** | `SdkError` + `SdkResult` 통일 | Low |
-| **Token Usage** | `AgentHandle::run()`에서 `AgentEvent::Usage` 집계 | Low |
 
-### 1.1 구조 비교
+### 1.2 호환성
+
+API는 **purely additive**다. 기존 0.23.0 시그니처가 그대로 유지된다. Breaking change 없음.
+
+---
+
+## 2. 현재 구조 분석
+
+### 2.1 Backend 엔진 API (engine_routes.rs)
 
 ```
-oxi-sdk 0.23.0                     oxi-sdk 0.24.0
-─────────────────────              ─────────────────────────────────
-src/lib.rs                         src/lib.rs (+re-exports 확대)
-src/builder.rs                     src/builder.rs (+enable_routing, supervisor)
-src/agent_builder.rs               src/agent_builder.rs (동일 구조)
-src/routing.rs  (신규)             → RoutingControl, RoutingConfig
-src/multi_provider.rs (신규)       → MultiProviderBuilder, RoutingConfig
-src/metrics.rs                     → AgentMetrics, MetricsSnapshot, extract_token_usage
-src/lifecycle/ (신규)              → AgentSupervisor, AgentHandle, SnapshotStore
-src/middleware/ (신규)             → MiddlewarePipeline, Built-in Middleware
-src/coordination/ (신규)           → WorkQueue, SharedMemory, Consensus, CoordinatedGroup
-src/observability/ (신규)          → Tracer, CostTracker, AuditLog, EventStore
-src/security/ (신규)               → Authorizer, CapabilitySet, SecurityMiddleware
-src/message_bus.rs                 → MessageBus, InterAgentMessage
-src/closure_tool.rs                → ClosureTool
-src/kernel_bridge.rs               → KernelToolProvider, KernelToolContext
-src/tool_factory.rs                → coding_tools(), readonly_tools()
+GET  /api/engine/providers          → 프로바이더 목록
+GET  /api/engine/models             → 모델 목록 (provider/q 필터)
+GET  /api/engine/config             → 현재 엔진 설정
+PUT  /api/engine/model              → 기본 모델 설정
+PUT  /api/engine/api-key            → API 키 설정
+PUT  /api/engine/provider-options   → 프로바이더 옵션 설정
+POST /api/engine/validate-key       → API 키 검증
 ```
 
-### 1.2 새 re-export (lib.rs)
+### 2.2 Frontend 구조
 
-```rust
-// 신규 re-export
-pub use routing::RoutingControl;
-pub use multi_provider::{MultiProviderBuilder, RoutingConfig};
-pub use lifecycle::{
-    AgentHandle, AgentLifecycleEvent, AgentSnapshot, AgentStatus, AgentSupervisor,
-    FileSnapshotStore, RestartBackoff, SnapshotStore, SupervisorPolicy, ToolManifest,
-};
-pub use middleware::{
-    build_hooks, Middleware, MiddlewareContext, MiddlewareData, MiddlewarePhase,
-    MiddlewarePipeline, MiddlewareResult,
-};
-pub use observability::{
-    AuditEntry, AuditFilter, AuditLog, CostBreakdown, CostSnapshot, CostTracker,
-    CostTrackerConfig, EventQuery, EventStore, EventStoreConfig, GlobalCostSnapshot,
-    Span, SpanContext, SpanGuard, SpanId, SpanKind, SpanStatus, StoredEvent,
-    TokenUsage, TraceId, Tracer,
-};
-pub use security::{
-    Authorizer, Capability, CapabilitySet, CapabilitySubject, DefaultPolicy,
-    SecurityMiddleware, StringPattern,
-};
-pub use coordination::{
-    Consensus, CoordinatedGroup, CoordinatedGroupBuilder, MemoryEntry, MemoryEvent,
-    MemoryKey, SharedMemory, VoteResult, WorkEvent, WorkItem, WorkQueue,
-    WorkQueueConfig, WorkQueueStats, WorkResult, WorkStatus,
-};
+```
+surface/oxios-web/
+├── src/
+│   ├── routes/
+│   │   ├── index.tsx              → 대시보드 (에이전트 상태, 시스템 상태)
+│   │   └── settings.tsx           → 설정 페이지 (엔진, 커널, 보안 탭)
+│   ├── components/engine/
+│   │   ├── provider-select.tsx     → 프로바이더 선택
+│   │   ├── model-select.tsx       → 모델 선택
+│   │   ├── api-key-input.tsx       → API 키 입력
+│   │   └── provider-options.tsx    → 고급 옵션
+│   └── hooks/
+│       └── use-engine.ts          → TanStack Query hooks (API 호출)
+```
 
-// oxi-ai 신규 re-export
-pub use oxi_ai::multi_provider::MultiProviderConfig;
-pub use oxi_ai::provider_pool::{ProviderPool, RateLimitPolicy};
-pub use oxi_ai::circuit_breaker::{CircuitBreakerConfig, ProviderCircuitBreaker};
-pub use oxi_ai::model_db::{...}; // model_db 전체
+### 2.3 현재 빈 공간 (라우팅 관련)
+
+| 위치 | 현재 상태 | 필요 변경 |
+|------|----------|-----------|
+| `/api/engine/config` 응답 | `model`, `api_key`, `provider_options` | `routing` 필드 추가 |
+| `settings.tsx` | 엔진/커널/보안 탭 | **라우팅 탭 추가** |
+| `index.tsx` (대시보드) | 에이전트/메모리 카운트 | **모델 사용량 시각화 추가** |
+| `use-engine.ts` | providers/models/config hooks | 라우팅 훅 추가 |
+
+---
+
+## 3. 아키텍처 설계
+
+### 3.1 Backend 레이어
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  Web UI (React)                                             │
+│  ├── /settings → 라우팅 설정 탭                               │
+│  └── / (대시보드) → 모델 사용량 + fallback 히스토리 카드        │
+└────────────────────────┬────────────────────────────────────┘
+                         │ HTTP / SSE
+┌────────────────────────▼────────────────────────────────────┐
+│  engine_routes.rs                                        │
+│  ├── GET  /api/engine/config          (+ 라우팅 상태)       │
+│  ├── PUT  /api/engine/routing          (설정 변경)           │
+│  ├── GET  /api/engine/routing/stats    (사용량 통계)         │
+│  └── GET  /api/engine/routing/fallback-history              │
+└────────────────────────┬────────────────────────────────────┘
+                         │
+┌────────────────────────▼────────────────────────────────────┐
+│  OxiosEngine                                        │
+│  ├── oxi: Oxi               (provider/model resolution)  │
+│  ├── routing_control: RoutingControl                  │
+│  │   ├── auto_routing: bool                             │
+│  │   ├── prefer_cost_efficient: bool                    │
+│  │   ├── fallback_models: Vec<String>                   │
+│  │   └── excluded_models: Vec<String>                  │
+│  ├── routing_stats: RoutingStats  (사용량 누적)            │
+│  └── pools: HashMap<provider, PooledProvider>           │
+└────────────────────────┬────────────────────────────────────┘
+                         │
+┌────────────────────────▼────────────────────────────────────┐
+│  oxi-sdk 0.24.0                                       │
+│  ├── OxiBuilder.enable_routing(RoutingConfig)          │
+│  ├── RoutingControl (runtime toggle)                    │
+│  ├── MultiProviderBuilder (complexity-based routing)    │
+│  ├── ComplexityRouter (task → model 매핑)               │
+│  └── FallbackChain (순차 fallback)                      │
+└────────────────────────────────────────────────────────────┘
+```
+
+### 3.2 Frontend 라우팅 탭 UI
+
+```
+┌──────────────────────────────────────────────────────────────────────────┐
+│  라우팅 설정                                                               │
+├──────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  ┌─ 자동 라우팅 ──────────────────────────────────────────────────────┐   │
+│  │                                                                      │   │
+│  │  [ON/OFF]  복잡도 기반 자동 모델 선택 활성화                         │   │
+│  │                                                                      │   │
+│  │  설명: 작업 복잡도를 분석하여 적절한 모델 자동 선택                  │   │
+│  │        (간단한 작업은 Haiku, 복잡한 작업은 Opus)                   │   │
+│  │                                                                      │   │
+│  └────────────────────────────────────────────────────────────────────┘   │
+│                                                                          │
+│  ┌─ 비용 최적화 ──────────────────────────────────────────────────────┐   │
+│  │                                                                      │   │
+│  │  [ON/OFF]  가능한 경우 비용 효율적인 모델 선호                       │   │
+│  │                                                                      │   │
+│  │  설명: 동일 성능 가능 시 더 저렴한 모델 선택                        │   │
+│  └────────────────────────────────────────────────────────────────────┘   │
+│                                                                          │
+│  ┌─ fallback 모델 ───────────────────────────────────────────────────┐   │
+│  │                                                                      │   │
+│  │  1. [ Anthropic / Claude Sonnet 4     ▼ ]  ← 기본                   │   │
+│  │  2. [ OpenAI / GPT-4o-mini           ▼ ]                           │   │
+│  │  3. [ + fallback 모델 추가 ]                                       │   │
+│  │                                                                      │   │
+│  │  주요 모델 실패 시 순서대로 시도                                    │   │
+│  └────────────────────────────────────────────────────────────────────┘   │
+│                                                                          │
+│  ┌─ 제외 모델 ─────────────────────────────────────────────────────────┐   │
+│  │                                                                      │   │
+│  │  ┌─model-chip─────────────────┐  ┌─model-chip──────────────────┐    │   │
+│  │  │  GPT-4-Turbo    [x]       │  │  Gemini 1.5 Pro  [x]       │    │   │
+│  │  └───────────────────────────┘  └─────────────────────────────┘    │   │
+│  │                                                                      │   │
+│  │  [ + 제외 모델 추가 ]                                              │   │
+│  │                                                                      │   │
+│  └────────────────────────────────────────────────────────────────────┘   │
+│                                                                          │
+│  [ 변경사항 저장 ]                                                         │
+└──────────────────────────────────────────────────────────────────────────┘
+```
+
+### 3.3 대시보드 모델 사용량 시각화
+
+```
+┌──────────────────────────────────────────────────────────────────────────┐
+│  모델 사용량                                                               │
+├──────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  오늘        │ Claude Sonnet 4  ████████████████  67%  (1,234 calls)    │
+│              │ GPT-4o-mini      ██████            25%  (461 calls)       │
+│              │ Claude 3.5 Haiku ██                8%   (148 calls)       │
+│                                                                          │
+│  비용       │ $12.34 (입력: 2.1M 토큰 / 출력: 890K 토큰)                 │
+│                                                                          │
+├──────────────────────────────────────────────────────────────────────────┤
+│  최근 fallback 이력                                                         │
+├──────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  14:32  Sonnet 4 실패 → GPT-4o-mini 성공  (	context exceeded	)        │
+│  14:15  Haiku 실패 → Sonnet 4 성공     (	rate limit	)             │
+│  13:58  Sonnet 4 실패 → Opus 4 성공     (	timeout	)                │
+│                                                                          │
+│  [전체 이력 보기 →]                                                        │
+└──────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 2. 현재 oxios의 oxi-sdk 사용 현황
+## 4. 상세 구현 설계
 
-### 2.1 직접 참조 통계
+### 4.1 Backend: OxiosEngine에 라우팅 상태 추가
 
-oxios-kernel에서 `oxi_sdk::` prefix로 참조하는 타입 (37개):
+**파일**: `crates/oxios-kernel/src/engine.rs`
 
-```
-Agent, AgentTool, AgentToolResult, Api, CircuitBreakerConfig, Context,
-find_env_keys, get_all_env_keys, get_env_api_key, get_provider_models,
-get_providers, has_env_key, InterAgentMessage, KernelToolProvider,
-load_token, Message, MessageBus, middleware, MiddlewarePipeline, Model,
-ModelEntry, ModelRegistry, OutputMode, OxiBuilder, Provider,
-ProviderCircuitBreaker, ProviderEvent, ProviderOptions, ReadTool, routing,
-RoutingControl, save_token, search_models, SearchCache, SpanKind,
-StructuredOutput, TokenBundle, TokenUsage, ToolError, ToolRegistry,
-UserMessage
-```
-
-### 2.2 영향받는 파일
-
-| 파일 | 사용 중인 API | 변경 필요 |
-|------|--------------|-----------|
-| `engine.rs` | `OxiBuilder`, `RoutingControl`, `ProviderPool`, `RateLimitPolicy` | `enable_routing()` 활용 |
-| `agent_runtime.rs` | `Agent`, `AgentConfig`, `AgentEvent`, `CompactionStrategy`, `ProviderResolver`, `ToolRegistry`, `CircuitBreakerConfig` | Middleware 통합, Token Usage 집계 |
-| `supervisor.rs` | `Agent`, `AgentPool` | SDK `AgentSupervisor`와의 관계 정립 |
-| `observability.rs` | `Tracer`, `CostTracker`, `AuditLog`, `SpanKind`, `ModelRegistry` | SDK observability와 통합 |
-| `coordination.rs` | `WorkQueue`, `SharedMemory`, `Consensus`, `CoordinatedGroup` | SDK 그대로 re-export |
-| `tools/kernel_bridge.rs` | `AgentTool`, `AgentToolResult`, `ToolRegistry` | 변화 없음 |
-| `orchestrator.rs` | 간접 참조 | 변화 없음 |
-| `credential.rs` | `get_env_api_key`, `has_env_key`, `find_env_keys` | 변화 없음 |
-| `onboarding.rs` | `search_models`, `get_providers` | 변화 없음 |
-
----
-
-## 3. 마이그레이션 설계
-
-### 3.1 Phase 1: Cargo.toml 업데이트 (즉시)
-
-```toml
-# Cargo.toml (workspace root)
-oxi-sdk = "0.24.0"
-```
-
-**호환성 분석**: API 레벨에서 breaking change는 없다. 기존 0.23.0 타입이 0.24.0에서도 동일하게 유지됨. 새 기능은 additive.
-
-### 3.2 Phase 2: OxiosEngine에 Routing 통합 (Medium)
-
-**현재** (`engine.rs`):
 ```rust
+// ── 라우팅 통계 ────────────────────────────────────────────────
+
+/// 라우팅 통계를 추적하기 위한 공유 상태.
+#[derive(Default)]
+pub struct RoutingStats {
+    /// 모델별 호출 카운트.
+    pub model_calls: RwLock<HashMap<String, u64>>,
+    /// 모델별 총 비용.
+    pub model_cost: RwLock<HashMap<String, f64>>,
+    /// fallback 발생 이력 (최근 100개).
+    pub fallback_history: RwLock<Vec<FallbackEvent>>,
+}
+
+/// 단일 fallback 이벤트.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FallbackEvent {
+    pub timestamp: DateTime<Utc>,
+    pub from_model: String,
+    pub to_model: String,
+    pub reason: String,
+    pub success: bool,
+}
+
+/// 엔진 라우팅 설정.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RoutingSettings {
+    pub auto_routing: bool,
+    pub prefer_cost_efficient: bool,
+    pub fallback_models: Vec<String>,
+    pub excluded_models: Vec<String>,
+}
+
+impl Default for RoutingSettings {
+    fn default() -> Self {
+        Self {
+            auto_routing: false,
+            prefer_cost_efficient: false,
+            fallback_models: Vec::new(),
+            excluded_models: Vec::new(),
+        }
+    }
+}
+
+// ── OxiosEngine 확장 ──────────────────────────────────────────
+
 pub struct OxiosEngine {
     oxi: Oxi,
     default_model_id: String,
-    routing_control: Option<oxi_sdk::RoutingControl>,  // 수동 생성
-    pools: parking_lot::RwLock<HashMap<String, Arc<dyn Provider>>>,
+    routing_control: oxi_sdk::RoutingControl,
+    routing_settings: RwLock<RoutingSettings>,  // ← persisted
+    routing_stats: RoutingStats,                 // ← in-memory
+    pools: RwLock<HashMap<String, Arc<dyn Provider>>>,
 }
 ```
 
-**변경 후**:
+### 4.2 Backend: Engine Routes에 라우팅 API 추가
+
+**파일**: `surface/oxios-web/src/routes/engine_routes.rs`
+
 ```rust
-pub struct OxiosEngine {
-    oxi: Oxi,
-    default_model_id: String,
-    routing_control: oxi_sdk::RoutingControl,  // 항상 존재
-    pools: parking_lot::RwLock<HashMap<String, Arc<dyn Provider>>>,
+// ── Request types ──────────────────────────────────────────────
+
+/// PUT /api/engine/routing — 라우팅 설정 변경
+#[derive(Debug, Deserialize)]
+pub struct SetRoutingRequest {
+    pub auto_routing: Option<bool>,
+    pub prefer_cost_efficient: Option<bool>,
+    pub fallback_models: Option<Vec<String>>,
+    pub excluded_models: Option<Vec<String>>,
+}
+
+/// GET /api/engine/routing/stats — 라우팅 통계
+#[derive(Debug, Serialize)]
+pub struct RoutingStatsResponse {
+    pub model_calls: HashMap<String, u64>,
+    pub model_cost: HashMap<String, f64>,
+    pub total_requests: u64,
+    pub fallback_count: u64,
+    pub success_rate: f64,
+}
+
+/// GET /api/engine/routing/fallback-history — fallback 이력
+#[derive(Debug, Serialize)]
+pub struct FallbackHistoryResponse {
+    pub events: Vec<FallbackEvent>,
+    pub total_count: usize,
+}
+
+// ── Handlers ───────────────────────────────────────────────────
+
+/// GET /api/engine/config — 현재 엔진 설정 (라우팅 포함)
+pub(crate) async fn handle_engine_config(state: State<Arc<AppState>>) -> Result<Json<Value>, AppError> {
+    let routing = state.kernel.engine.routing_settings();
+    let config = state.kernel.engine.config();
+    Ok(Json(json!({
+        "model": config.model,
+        "api_key_set": config.api_key_set,
+        "provider_options": config.provider_options,
+        "routing": routing,
+    })))
+}
+
+/// PUT /api/engine/routing — 라우팅 설정 변경
+pub(crate) async fn handle_engine_set_routing(
+    state: State<Arc<AppState>>,
+    Json(body): Json<SetRoutingRequest>,
+) -> Result<Json<Value>, AppError> {
+    state
+        .kernel
+        .engine
+        .update_routing(body.into())
+        .map_err(|e| AppError::Internal(e.to_string()))?;
+
+    Ok(Json(json!({ "ok": true })))
+}
+
+/// GET /api/engine/routing/stats — 라우팅 통계
+pub(crate) async fn handle_engine_routing_stats(
+    state: State<Arc<AppState>>,
+) -> Result<Json<RoutingStatsResponse>, AppError> {
+    let stats = state.kernel.engine.routing_stats();
+    Ok(Json(stats))
+}
+
+/// GET /api/engine/routing/fallback-history — fallback 이력
+pub(crate) async fn handle_engine_routing_fallback_history(
+    state: State<Arc<AppState>>,
+    Query(params): Query<PageParams>,
+) -> Result<Json<FallbackHistoryResponse>, AppError> {
+    let history = state.kernel.engine.fallback_history(params.limit);
+    Ok(Json(FallbackHistoryResponse {
+        events: history,
+        total_count: history.len(),
+    }))
 }
 ```
 
-**OxiosEngineBuilder 변경**:
+### 4.3 Frontend: use-engine.ts에 라우팅 훅 추가
 
-```rust
-impl OxiosEngineBuilder {
-    /// 기존 build() — routing 비활성화
-    pub fn build(self) -> OxiosEngine { ... }
+**파일**: `surface/oxios-web/web/src/hooks/use-engine.ts`
 
-    /// 라우팅 활성화 빌드
-    pub fn build_with_routing(self) -> (OxiosEngine, oxi_sdk::RoutingControl) {
-        let routing_config = oxi_sdk::routing::RoutingConfig::default();
-        let routing_control = RoutingControl::new(routing_config);
+```typescript
+// ── Routing hooks ───────────────────────────────────────────────
 
-        // OxiBuilder에 라우팅 설정 반영
-        let inner = self.inner.enable_routing(
-            oxi_sdk::RoutingConfig::new()
-                .auto_routing(true)
-                .prefer_cost_efficient(true)
-        );
+export function useRoutingConfig() {
+  return useQuery<{
+    auto_routing: boolean
+    prefer_cost_efficient: boolean
+    fallback_models: string[]
+    excluded_models: string[]
+  }>({
+    queryKey: ['engine', 'routing', 'config'],
+    queryFn: () => api.get('/api/engine/routing/config'),
+  })
+}
 
-        let engine = OxiosEngine {
-            oxi: inner.build(),
-            default_model_id: self.default_model_id,
-            routing_control: routing_control.clone(),
-            pools: parking_lot::RwLock::new(HashMap::new()),
-        };
-        (engine, routing_control)
-    }
+export function useSetRouting() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: {
+      auto_routing?: boolean
+      prefer_cost_efficient?: boolean
+      fallback_models?: string[]
+      excluded_models?: string[]
+    }) => api.put('/api/engine/routing', body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['engine', 'routing'] })
+    },
+  })
+}
+
+export function useRoutingStats() {
+  return useQuery<{
+    model_calls: Record<string, number>
+    model_cost: Record<string, number>
+    total_requests: number
+    fallback_count: number
+    success_rate: number
+  }>({
+    queryKey: ['engine', 'routing', 'stats'],
+    queryFn: () => api.get('/api/engine/routing/stats'),
+    refetchInterval: 30000,
+  })
+}
+
+export function useFallbackHistory(limit = 50) {
+  return useQuery<{ events: FallbackEvent[]; total_count: number }>({
+    queryKey: ['engine', 'routing', 'fallback-history', limit],
+    queryFn: () => api.get(`/api/engine/routing/fallback-history?limit=${limit}`),
+  })
 }
 ```
 
-**주요 변경점**:
-- `routing_control: Option` → 항상 존재 (기본은 `RoutingControl::disabled()`)
-- `OxiBuilder::enable_routing()`으로 MultiProvider 자동 구성
-- `pooled_provider()`는 유지하되, 라우팅 활성 시 routing을 통한 fallback 지원
+### 4.4 Frontend: 라우팅 설정 탭
 
-### 3.3 Phase 3: AgentRuntime Middleware 파이프라인 정식화 (Medium)
+**파일**: `surface/oxios-web/web/src/components/engine/routing-settings.tsx` (신규)
 
-**현재** (`agent_runtime.rs`):
-- middleware 설정이 있으나 실제 연결이 약함
-- SDK의 `MiddlewarePipeline`을 직접 사용하지 않고 커스텀 훅 사용
+```tsx
+import { useTranslation } from 'react-i18next'
+import { useRoutingConfig, useSetRouting } from '@/hooks/use-engine'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Switch } from '@/components/ui/switch'
+import { Button } from '@/components/ui/button'
+import { ModelSelect } from './model-select'
 
-**변경 후**:
-```rust
-impl AgentRuntime {
-    fn build_agent_with_middleware(
-        config: &AgentRuntimeConfig,
-        engine: &OxiosEngine,
-        tools: Arc<ToolRegistry>,
-    ) -> Result<Agent> {
-        let agent_config = AgentConfig {
-            model_id: config.model_id.clone(),
-            max_iterations: config.max_iterations,
-            tool_execution: config.tool_execution,
-            ..Default::default()
-        };
+export function RoutingSettings() {
+  const { t } = useTranslation()
+  const { data, isLoading } = useRoutingConfig()
+  const setRouting = useSetRouting()
 
-        let mut builder = engine.oxi().agent(agent_config)
-            .workspace(&config.workspace_dir)
-            .tracer(Arc::new(observability::tracer().clone()))
-            .cost_tracker(Arc::new(observability::cost_tracker().clone()))
-            .audit_log(Arc::new(observability::audit_log().clone()));
+  if (isLoading || !data) return null
 
-        // Rate limiting
-        if config.rate_limit_per_minute > 0 {
-            builder = builder.with_rate_limit(config.rate_limit_per_minute);
-        }
+  return (
+    <div className="space-y-6">
+      {/* 자동 라우팅 */}
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('settings.routing.auto')}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-muted-foreground">
+                {t('settings.routing.autoDescription')}
+              </p>
+            </div>
+            <Switch
+              checked={data.auto_routing}
+              onCheckedChange={(checked) =>
+                setRouting.mutate({ auto_routing: checked })
+              }
+            />
+          </div>
+        </CardContent>
+      </Card>
 
-        // Token budget
-        if config.token_budget > 0 {
-            builder = builder.with_token_budget(config.token_budget);
-        }
+      {/* 비용 최적화 */}
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('settings.routing.costEfficient')}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-muted-foreground">
+                {t('settings.routing.costEfficientDescription')}
+              </p>
+            </div>
+            <Switch
+              checked={data.prefer_cost_efficient}
+              onCheckedChange={(checked) =>
+                setRouting.mutate({ prefer_cost_efficient: checked })
+              }
+            />
+          </div>
+        </CardContent>
+      </Card>
 
-        // 커스텀 audit middleware
-        if config.audit_enabled {
-            builder = builder.middleware(AuditMiddleware::new(audit_trail));
-        }
+      {/* Fallback 모델 */}
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('settings.routing.fallbackModels')}</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {data.fallback_models.map((model, i) => (
+            <ModelSelect key={i} value={model} />
+          ))}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() =>
+              setRouting.mutate({
+                fallback_models: [...data.fallback_models, ''],
+              })
+            }
+          >
+            + {t('settings.routing.addFallback')}
+          </Button>
+        </CardContent>
+      </Card>
 
-        // Tools (KernelBridge를 통한 등록은 유지)
-        builder = builder.kernel_tools(&*kernel_provider, &context);
-
-        builder.build()
-    }
+      {/* 제외 모델 */}
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('settings.routing.excludedModels')}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap gap-2">
+            {data.excluded_models.map((model) => (
+              <div
+                key={model}
+                className="flex items-center gap-2 rounded-full bg-muted px-3 py-1 text-sm"
+              >
+                {model}
+                <button
+                  onClick={() =>
+                    setRouting.mutate({
+                      excluded_models: data.excluded_models.filter(
+                        (m) => m !== model
+                      ),
+                    })
+                  }
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
 }
 ```
 
-**이점**:
-- SDK의 `MiddlewarePipeline`이 `AgentHooks`로 자동 변환 (`build_hooks()`)
-- BeforeTool → RBAC 체크, AfterTool → audit 로깅 등이 구조화
-- Token budget, rate limit이 SDK 미들웨어로 통합
+### 4.5 Frontend: settings.tsx에 라우팅 탭 통합
 
-### 3.4 Phase 4: Supervisor와 AgentSupervisor의 관계 정립 (Low)
+**파일**: `surface/oxios-web/web/src/routes/settings.tsx` (수정)
 
-**현재**: oxios의 `supervisor.rs`가 자체 `AgentPool`과 lifecycle을 관리
-**SDK 신규**: `AgentSupervisor` + `AgentHandle` + `SnapshotStore` 제공
+```tsx
+import { RoutingSettings } from '@/components/engine/routing-settings'
 
-**전략: 점진적 위임**
-
-```
-현재:
-  oxios Supervisor (fork/exec/wait/kill)
-    ├── AgentPool (HashMap<AgentId, Arc<Agent>>)
-    ├── AgentRuntime (tool loop)
-    └── SessionContext
-
-0.24.0 이후 (Phase 4):
-  oxios AgentLifecycleManager
-    ├── SDK AgentSupervisor (spawn/terminate/restart/snapshot)
-    │   └── AgentHandle (status, metrics, routing)
-    ├── AgentRuntime (tool loop — 변경 없음)
-    └── SessionContext
+// Tabs에 "routing" 추가
+const tabs = [
+  { value: 'engine', label: t('settings.tabs.engine'), content: <EngineTab /> },
+  { value: 'routing', label: t('settings.tabs.routing'), content: <RoutingSettings /> },
+  { value: 'kernel', label: t('settings.tabs.kernel'), content: <KernelTab /> },
+  { value: 'security', label: t('settings.tabs.security'), content: <SecurityTab /> },
+]
 ```
 
-**변경 내용**:
-- `AgentLifecycleManager`가 내부적으로 `AgentSupervisor`를 사용
-- `AgentHandle`의 `run()`, `suspend()`, `terminate()`, `restart()` 위임
-- Snapshot persistence를 SDK의 `FileSnapshotStore`로 통합
-- `RoutingControl` per-agent 관리는 `AgentHandle.routing()`으로
+### 4.6 Frontend: 대시보드에 모델 사용량 카드 추가
 
-**단, 이 단계는 선택사항**:
-- 기존 `supervisor.rs`는 여전히 동작함
-- `AgentSupervisor`는 더 높은 수준의 lifecycle 관리이므로,
-  oxios의 supervisor가 충분하면 그대로 유지 가능
-- 권장: `AgentLifecycleManager`에서 SDK supervisor를 시도해보고,  
-  기존 방식으로 fallback
+**파일**: `surface/oxios-web/web/src/routes/index.tsx` (수정)
 
-### 3.5 Phase 5: Observability 글로벌 인스턴스 정리 (Low)
+```tsx
+import { useRoutingStats } from '@/hooks/use-engine'
 
-**현재** (`observability.rs`):
-```rust
-// OnceLock으로 글로벌 인스턴스 관리
-static TRACER: OnceLock<Tracer> = OnceLock::new();
-static COST_TRACKER: OnceLock<CostTracker> = OnceLock::new();
-static AUDIT_LOG: OnceLock<AuditLog> = OnceLock::new();
-```
+function ModelUsageCard() {
+  const { data } = useRoutingStats()
 
-**0.24.0에서의 변화**: 동일한 패턴 유지. `EventStore`가 추가됨.
+  if (!data) return null
 
-**변경**:
-```rust
-/// Global EventStore instance (신규).
-static EVENT_STORE: OnceLock<EventStore> = OnceLock::new();
+  const total = Object.values(data.model_calls).reduce((a, b) => a + b, 0)
+  const sorted = Object.entries(data.model_calls)
+    .sort(([, a], [, b]) => b - a)
+    .slice(0, 5)
 
-pub fn event_store() -> &'static EventStore {
-    EVENT_STORE.get_or_init(|| EventStore::new(EventStoreConfig::default()))
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>모델 사용량</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-2">
+        {sorted.map(([model, count]) => {
+          const pct = total > 0 ? (count / total) * 100 : 0
+          return (
+            <div key={model} className="space-y-1">
+              <div className="flex justify-between text-sm">
+                <span>{model}</span>
+                <span className="text-muted-foreground">
+                  {pct.toFixed(0)}% ({count})
+                </span>
+              </div>
+              <Progress value={pct} />
+            </div>
+          )
+        })}
+        <div className="pt-2 text-xs text-muted-foreground">
+          Fallback: {data.fallback_count}회 | 성공률: {(data.success_rate * 100).toFixed(1)}%
+        </div>
+      </CardContent>
+    </Card>
+  )
 }
 ```
-
-이것만 추가하면 됨. 기존 구조와 완전 호환.
 
 ---
 
-## 4. 호환성 매트릭스
+## 5. 마이그레이션 단계
 
-| oxios 모듈 | SDK 0.23.0 API | SDK 0.24.0 상태 | 조치 |
-|------------|----------------|-----------------|------|
-| `engine.rs` | `OxiBuilder::new().with_builtins()` | 동일 | 없음 |
-| `engine.rs` | `OxiBuilder::api_key()` | 동일 | 없음 |
-| `engine.rs` | `Oxi::resolve_model()` | 동일 | 없음 |
-| `engine.rs` | `Oxi::create_provider()` | 동일 | 없음 |
-| `engine.rs` | `ProviderPool::new()` | 동일 + re-export | 없음 |
-| `engine.rs` | `RoutingControl` | **개선**: runtime toggle | Phase 2 |
-| `agent_runtime.rs` | `Agent::new_with_resolver()` | 동일 | 없음 |
-| `agent_runtime.rs` | `Agent::run_streaming()` | 동일 | 없음 |
-| `agent_runtime.rs` | `AgentEvent::Usage` | **개선**: 실제 emit | Phase 3 |
-| `agent_runtime.rs` | `MiddlewarePipeline` | **개선**: build_hooks() | Phase 3 |
-| `supervisor.rs` | `Agent` pool | 동일 + SDK 대안 | Phase 4 (선택) |
-| `observability.rs` | `Tracer`, `CostTracker`, `AuditLog` | 동일 + `EventStore` | Phase 5 |
-| `coordination.rs` | re-export만 | 동일 | 없음 |
-| `credential.rs` | `get_env_api_key`, `has_env_key` | 동일 | 없음 |
+### Phase 1: SDK 버전업 + 빌드 확인 (~10분)
+```
+Cargo.toml: oxi-sdk = "0.24.0"
+cargo build
+```
+
+### Phase 2: Backend 라우팅 상태 구현 (~2시간)
+```
+engine.rs
+  ├── RoutingSettings struct 추가
+  ├── routing_stats struct 추가
+  ├── FallbackEvent struct 추가
+  ├── routing_settings() getter 추가
+  ├── update_routing() method 추가
+  ├── routing_stats() method 추가
+  └── fallback_history() method 추가
+
+engine_routes.rs
+  ├── GET /api/engine/routing/config
+  ├── PUT /api/engine/routing
+  ├── GET /api/engine/routing/stats
+  └── GET /api/engine/routing/fallback-history
+```
+
+### Phase 3: Frontend 라우팅 설정 탭 (~2시간)
+```
+use-engine.ts
+  ├── useRoutingConfig()
+  ├── useSetRouting()
+  ├── useRoutingStats()
+  └── useFallbackHistory()
+
+components/engine/routing-settings.tsx (신규)
+settings.tsx (탭 추가)
+```
+
+### Phase 4: Frontend 대시보드 시각화 (~1시간)
+```
+index.tsx
+  ├── ModelUsageCard 추가
+  └── FallbackHistoryCard 추가 (선택)
+```
+
+### Phase 5: 라우팅 로깅 통합 (~1시간)
+```
+AgentRuntime 실행 시:
+  1. 라우팅이 active면 ComplexityRouter가 호출되는 시점 로깅
+  2. fallback 발생 시 FallbackEvent 기록
+  3. 성공/실패 결과 후 model_calls, model_cost 업데이트
+```
 
 ---
 
-## 5. 작업 순서
+## 6. 파일별 변경 요약
+
+| 파일 | 변경 유형 | 설명 |
+|------|-----------|------|
+| `Cargo.toml` | 수정 | `oxi-sdk = "0.24.0"` |
+| `crates/oxios-kernel/src/engine.rs` | 수정 | 라우팅 상태/통계 추가 |
+| `surface/oxios-web/src/routes/engine_routes.rs` | 수정 | 라우팅 API 4개 추가 |
+| `surface/oxios-web/src/routes/mod.rs` | 수정 | 라우팅 핸들러 export |
+| `surface/oxios-web/web/src/hooks/use-engine.ts` | 수정 | 라우팅 훅 4개 추가 |
+| `surface/oxios-web/web/src/components/engine/routing-settings.tsx` | **신규** | 라우팅 설정 UI |
+| `surface/oxios-web/web/src/routes/settings.tsx` | 수정 | 라우팅 탭 추가 |
+| `surface/oxios-web/web/src/routes/index.tsx` | 수정 | 모델 사용량 카드 추가 |
+| `i18n/ko.json` | 수정 | 라우팅 관련 번역 키 추가 |
+| `docs/rfc-011-oxi-sdk-0.24-migration.md` | 수정 | 본 RFC (이 파일) |
+
+---
+
+## 7. 우선순위 및 일정
 
 ```
-Phase 1: Cargo.toml 업데이트 + 빌드 확인     [~10분]
-   └── oxi-sdk = "0.24.0" 변경 후 cargo build
+Week 1:
+  ├── Phase 1 (SDK 버전업)              ← 하루 안에 끝
+  ├── Phase 2 (Backend 라우팅 상태)     ← 핵심 로직
+  └── Phase 3 (Frontend 설정 탭)        ← 사용자-facing
 
-Phase 2: Engine 라우팅 통합                   [~2시간]
-   ├── build_with_routing() 구현
-   ├── RoutingConfig 기본값 설정
-   └── Scheduler에 라우팅 상태 노출
+Week 2:
+  ├── Phase 4 (대시보드 시각화)          ← 있으면 좋음
+  └── Phase 5 (로깅 통합)               ← 모니터링 완성
 
-Phase 3: AgentRuntime 미들웨어 정식화          [~3시간]
-   ├── SDK MiddlewarePipeline 적용
-   ├── Token Usage 집계 (extract_token_usage)
-   ├── AuditMiddleware를 SDK 내장으로 교체
-   └── AgentBuilder의 .with_rate_limit(), .with_token_budget() 활용
-
-Phase 4: Supervisor 위임 (선택)               [~4시간]
-   ├── AgentLifecycleManager에 AgentSupervisor 통합
-   ├── FileSnapshotStore로 세션 영속화
-   └── AgentHandle.routing()으로 per-agent routing
-
-Phase 5: Observability 확장                   [~1시간]
-   ├── EventStore 글로벌 인스턴스 추가
-   └── TokenUsage → CostTracker 자동 연결
+총 예상 시간: ~8시간 (backend 5h + frontend 3h)
 ```
 
 ---
 
-## 6. 위험 및 완화
+## 8.風險 및 완화
 
 | 위험 | 가능성 | 영향 | 완화 |
 |------|--------|------|------|
-| oxi-ai 타입 변경으로 컴파일 에러 | 낮음 | 중간 | Phase 1에서 `cargo build`로 즉시 확인 |
-| RoutingConfig 기본값이 기존 동작 변경 | 낮음 | 낮음 | `RoutingControl::disabled()`로 명시적 비활성 |
-| AgentSupervisor와 기존 Supervisor 충돌 | 중간 | 높음 | Phase 4는 선택사항으로 분리 |
-| MiddlewarePipeline hooks 변환 버그 | 낮음 | 중간 | 기존 hooks 테스트로 회귀 확인 |
+| SDK API 미스매치 | 낮음 | 중간 | Phase 1 빌드 확인으로 즉시 감지 |
+| 라우팅 설정 persisted 형태 | 중간 | 중간 | `RoutingSettings`를 config.toml에 별도 섹션으로 저장 |
+| 라우팅 stats 메모리 누수 | 낮음 | 낮음 | `fallback_history`는 고정 크기 circular buffer |
+| UI 상태와 백엔드 불일치 | 낮음 | 중간 | TanStack Query invalidation으로 동기화 |
 
 ---
 
-## 7. 테스트 계획
+## 9. 테스트
 
-1. **Phase 1**: `cargo test --workspace` 전체 통과 확인
-2. **Phase 2**: `OxiosEngine::build_with_routing()` → `RoutingControl.is_enabled()` 확인
-3. **Phase 3**: `agent_runtime` 통합 테스트 — middleware 파이프라인 실행 확인
-4. **Phase 4**: supervisor lifecycle 테스트 — spawn/suspend/restore/restart
-5. **Phase 5**: observability 테스트 — EventStore 저장/조회 확인
-6. **E2E**: `cargo run -- run --json "hello"` 기본 실행 확인
-
----
-
-## 8. 커밋 전략
-
-```
-feat(deps): upgrade oxi-sdk 0.23.0 → 0.24.0              (Phase 1)
-feat(kernel): integrate SDK routing into OxiosEngine      (Phase 2)
-feat(kernel): adopt SDK middleware pipeline in runtime     (Phase 3)
-refactor(kernel): delegate lifecycle to SDK supervisor     (Phase 4)
-feat(kernel): add EventStore to observability globals      (Phase 5)
-```
+1. **Backend**: `cargo test -p oxios-kernel` — engine 라우팅 테스트
+2. **API**: `curl http://localhost:4200/api/engine/routing/config` — 설정 조회
+3. **API**: `curl -X PUT http://localhost:4200/api/engine/routing -d '{"auto_routing": true}'` — 설정 변경
+4. **Frontend**: `cd surface/oxios-web/web && bun dev` → `/settings` → 라우팅 탭 동작 확인
+5. **E2E**: `/settings` → 라우팅 on → 채팅 → fallback 발생 → 대시보드에서 확인
 
 ---
 
-## 9. 결론
+## 10. 결론
 
-oxi-sdk 0.24.0은 **additive changes**만 포함한다. 기존 API가 깨지지 않으므로, Phase 1 (버전업)만으로도 즉시 빌드 가능하다. 그 위에 Phase 2~5는 점진적으로 SDK의 새 기능을 활용하는 개선 작업이다.
+이 RFC는 기존 rfc-011을 **Web UI까지 포함하는 완전한 설계**로 확장한다.
 
-**권장 우선순위**: Phase 1 → Phase 3 → Phase 2 → Phase 5 → Phase 4 (선택)
+- Phase 1 (SDK 버전업): 10분, breaking change 없음
+- Phase 2 (Backend): 2시간, 핵심 로직
+- Phase 3 (Frontend 설정): 2시간, 사용자-facing
+- Phase 4 (Frontend 시각화): 1시간, 대시보드 보강
+- Phase 5 (로깅): 1시간, 모니터링 완성
 
-Phase 3(미들웨어)이 Phase 2(라우팅)보다 먼저인 이유:
-- 미들웨어는 모든 에이전트 실행에 영향을 미치고
-- 라우팅은 고급 기능이므로 안정적인 기반 위에서 활성화하는 것이 안전
+**전체工期: ~6시간** (설계 제외, 구현만)
+
+백엔드 없이 UI만 만드는 것은 의미 없으므로, Phase 2 → 3 순서로 진행하는 것을 권장한다.

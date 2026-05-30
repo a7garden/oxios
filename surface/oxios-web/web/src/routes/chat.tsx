@@ -8,7 +8,7 @@ import { Card } from '@/components/ui/card'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { useChatStore } from '@/stores/chat'
 import { api } from '@/lib/api-client'
-import type { Space, Session } from '@/types'
+import type { Session } from '@/types'
 import { MessageBubble } from '@/components/chat/message-bubble'
 import { ChatInput } from '@/components/chat/chat-input'
 import { ConnectionStatus } from '@/components/chat/connection-status'
@@ -68,11 +68,11 @@ function ChatPage() {
 
   return (
     <div className="flex h-[calc(100vh-8rem)]">
-      {/* ── Left: Space + Session sidebar ─────────────────────────── */}
-      <SpaceSessionSidebar
+      {/* ── Left: Project + Session sidebar ─────────────────────────── */}
+      <ProjectSessionSidebar
         activeProjectId={activeProjectId}
         activeSessionId={activeSessionId}
-        onSelectSpace={setActiveProject}
+        onSelectProject={setActiveProject}
         onSelectSession={loadSession}
         onNewSession={newSession}
         onToggleHistory={() => setShowHistory((v) => !v)}
@@ -147,13 +147,13 @@ function ChatPage() {
 }
 
 // ---------------------------------------------------------------------------
-// Space + Session sidebar
+// Project + Session sidebar
 // ---------------------------------------------------------------------------
 
-function SpaceSessionSidebar({
+function ProjectSessionSidebar({
   activeProjectId,
   activeSessionId,
-  onSelectSpace,
+  onSelectProject,
   onSelectSession,
   onNewSession,
   onToggleHistory,
@@ -161,17 +161,17 @@ function SpaceSessionSidebar({
 }: {
   activeProjectId: string | null
   activeSessionId: string | null
-  onSelectSpace: (id: string | null) => void
+  onSelectProject: (id: string | null) => void
   onSelectSession: (id: string) => void
   onNewSession: () => void
   onToggleHistory: () => void
   showHistory: boolean
 }) {
   const { t } = useTranslation()
-  const { data: spacesData } = useQuery({
-    queryKey: ['spaces'],
+  const { data: projectsData } = useQuery({
+    queryKey: ['projects'],
     queryFn: () =>
-      api.get<{ items: Space[]; total: number }>('/api/spaces'),
+      api.get<{ items: Project[]; total: number }>('/api/projects'),
     refetchInterval: 30000,
   })
 
@@ -182,7 +182,7 @@ function SpaceSessionSidebar({
     refetchInterval: 10000,
   })
 
-  const spaces: Space[] = spacesData?.items ?? []
+  const projects: Project[] = projectsData?.items ?? []
   const sessions: Session[] = sessionsData?.items ?? []
 
   // Group sessions by date for display
@@ -190,35 +190,35 @@ function SpaceSessionSidebar({
 
   return (
     <div className="w-56 shrink-0 border-r flex flex-col overflow-hidden">
-      {/* Spaces */}
+      {/* Projects */}
       <div className="p-2 border-b">
         <div className="flex items-center justify-between mb-2">
           <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-            {t('chat.spacesLabel')}
+            {t('chat.projectsLabel', 'Projects')}
           </span>
         </div>
         <div className="space-y-0.5">
-          {spaces.map((space) => (
+          {projects.map((project) => (
             <button
-              key={space.id}
-              onClick={() => onSelectSpace(space.id)}
+              key={project.id}
+              onClick={() => onSelectProject(project.id)}
               className={`w-full flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-left transition-colors ${
-                activeProjectId === space.id
+                activeProjectId === project.id
                   ? 'bg-accent text-accent-foreground font-medium'
                   : 'hover:bg-accent/50 text-muted-foreground'
               }`}
             >
               <span
                 className={`h-2 w-2 rounded-full shrink-0 ${
-                  space.active !== false ? 'bg-emerald-500' : 'bg-muted'
+                  true ? 'bg-emerald-500' : 'bg-muted'
                 }`}
               />
-              <span className="truncate">{space.name}</span>
+              <span className="truncate">{project.name}</span>
             </button>
           ))}
-          {spaces.length === 0 && (
+          {projects.length === 0 && (
             <p className="text-xs text-muted-foreground px-2 py-1">
-              {t('chat.loadingSpacesShort')}
+              {t('chat.loadingProjectsShort', 'No projects')}
             </p>
           )}
         </div>
@@ -329,10 +329,10 @@ function SpaceSessionSidebar({
           {t('chat.manageSessions')}
         </Link>
         <Link
-          to="/spaces"
+          to="/projects"
           className="flex items-center gap-2 rounded-md px-2 py-1.5 text-xs text-muted-foreground hover:bg-accent/50 hover:text-foreground"
         >
-          {t('chat.manageSpaces')}
+          {t('chat.manageProjects', 'Manage Projects')}
         </Link>
       </div>
     </div>

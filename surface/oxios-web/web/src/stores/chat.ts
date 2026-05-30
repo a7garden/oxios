@@ -10,7 +10,7 @@ import { useAuthStore } from './auth'
 interface PersistedState {
   /** Last active session ID (null = no conversation started yet). */
   activeSessionId: string | null
-  /** Space ID associated with the active session. */
+  /** Project ID associated with the active session. */
   activeProjectId: string | null
 }
 
@@ -30,7 +30,7 @@ interface ChatRuntimeState {
   _sendQueue: string[]
   /** The session ID from the last "done" chunk. */
   _lastDoneSessionId: string | null
-  /** The space ID from the last "done" chunk. */
+  /** The project ID from the last "done" chunk. */
   _lastDoneProjectId: string | null
 }
 
@@ -49,7 +49,7 @@ interface ChatActions {
   loadSession: (sessionId: string) => Promise<void>
   /** Start a fresh session (clears messages). */
   newSession: () => void
-  /** Set the active space explicitly. */
+  /** Set the active project explicitly. */
   setActiveProject: (projectId: string | null) => void
   /** Clear persisted state (e.g. on logout). */
   clearPersist: () => void

@@ -18,7 +18,7 @@ export interface MemoryDetail {
   memory_type: string
   content: string
   summary: string | null
-  space_id: string | null
+  project_ids: string[]
   created_at: string
   updated_at: string
   last_accessed: string | null

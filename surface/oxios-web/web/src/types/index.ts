@@ -18,7 +18,7 @@ export interface AgentListResponse {
 export interface Session {
   id: string
   user_id?: string
-  space_id?: string
+  project_id?: string
   active_seed_id?: string
   created_at: string
   updated_at?: string
@@ -30,7 +30,7 @@ export interface Session {
 export interface SessionDetail {
   id: string
   user_id: string
-  space_id?: string
+  project_id?: string
   user_messages: { content: string; timestamp: string }[]
   agent_responses: {
     content: string
@@ -62,18 +62,19 @@ export interface EvolutionEntry {
   changes?: Record<string, unknown>
 }
 
-// Space
-export interface Space {
+// Project (replaces Space)
+export interface Project {
   id: string
   name: string
-  source?: string
+  description?: string
   paths?: string[]
   tags?: string[]
-  active?: boolean
-  created_at: string
-  last_active_at?: string
-  interaction_count?: number
+  emoji?: string
+  source?: string
   memory_visible?: boolean
+  created_at: string
+  updated_at?: string
+  last_active_at?: string
   metadata?: Record<string, unknown>
 }
 
@@ -175,13 +176,13 @@ export interface ToolCallSummary {
 export interface ChatRequest {
   message: string
   session_id?: string
-  space_id?: string
+  project_id?: string
 }
 
 export interface ChatResponse {
   response: string
   session_id: string
-  space_id?: string
+  project_id?: string
   seed_id?: string
   agent_id?: string
   phase_reached?: string
@@ -198,7 +199,7 @@ export interface StreamChunk {
   tool_result?: unknown
   error?: string
   session_id?: string
-  space_id?: string
+  project_id?: string
   phase?: string
   evaluation_passed?: string
   seed_id?: string
@@ -315,6 +316,7 @@ export interface SystemStatus {
       total_failed: number
     }
     spaces_active?: number
+    projects_active?: number
   }
 }
 
