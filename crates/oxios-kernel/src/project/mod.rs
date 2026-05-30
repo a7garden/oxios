@@ -12,6 +12,7 @@
 //! - `detection.rs` — Detection logic (name/path/tag matching)
 
 pub mod detection;
+#[cfg(feature = "sqlite-memory")]
 pub mod manager;
 
 use chrono::{DateTime, Utc};
@@ -21,6 +22,7 @@ use uuid::Uuid;
 
 // ── Re-exports ──────────────────────────────────────────────
 pub use detection::{detect_project, extract_path, find_by_id, find_by_name, DetectionResult};
+#[cfg(feature = "sqlite-memory")]
 pub use manager::{ProjectManager, ProjectManagerError};
 
 /// Unique identifier for a Project.

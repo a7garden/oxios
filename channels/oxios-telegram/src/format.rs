@@ -19,7 +19,7 @@ impl ChannelFormatter for TelegramFormatter {
                 let eval = if meta.evaluation_passed { "✅" } else { "⚠️" };
                 footer_parts.push(format!("{} {}", eval, meta.phase));
             }
-            if let Some(tag) = &meta.space_tag {
+            if let Some(tag) = &meta.project_tag {
                 footer_parts.push(tag.clone());
             }
             if let Some(dur) = meta.duration_ms {
@@ -96,8 +96,8 @@ mod tests {
     fn format_success_with_phase() {
         let meta = ResponseMeta {
             session_id: None,
-            space_id: None,
-            space_tag: Some("[🔧 Test]".to_string()),
+            project_id: None,
+            project_tag: Some("[🔧 Test]".to_string()),
             seed_id: None,
             phase: "Execute".to_string(),
             evaluation_passed: true,
@@ -117,8 +117,8 @@ mod tests {
     fn format_error_internal() {
         let meta = ResponseMeta {
             session_id: None,
-            space_id: None,
-            space_tag: None,
+            project_id: None,
+            project_tag: None,
             seed_id: None,
             phase: String::new(),
             evaluation_passed: false,
@@ -139,8 +139,8 @@ mod tests {
     fn format_error_provider_with_suggestion() {
         let meta = ResponseMeta {
             session_id: None,
-            space_id: None,
-            space_tag: None,
+            project_id: None,
+            project_tag: None,
             seed_id: None,
             phase: String::new(),
             evaluation_passed: false,

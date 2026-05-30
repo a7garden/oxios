@@ -35,7 +35,7 @@ impl ChannelFormatter for CliFormatter {
                 ));
             }
 
-            if let Some(tag) = &meta.space_tag {
+            if let Some(tag) = &meta.project_tag {
                 out.push_str(&format!(" | {}", tag));
             }
 
@@ -116,8 +116,8 @@ mod tests {
     fn format_success_with_phase_and_eval() {
         let meta = ResponseMeta {
             session_id: None,
-            space_id: None,
-            space_tag: Some("[🔧 oxios]".into()),
+            project_id: None,
+            project_tag: Some("[🔧 oxios]".into()),
             seed_id: None,
             phase: "Execute".into(),
             evaluation_passed: true,
@@ -136,8 +136,8 @@ mod tests {
     fn format_success_failed_eval() {
         let meta = ResponseMeta {
             session_id: None,
-            space_id: None,
-            space_tag: None,
+            project_id: None,
+            project_tag: None,
             seed_id: None,
             phase: "Evaluate".into(),
             evaluation_passed: false,
@@ -155,8 +155,8 @@ mod tests {
     fn format_error_timeout() {
         let meta = ResponseMeta {
             session_id: None,
-            space_id: None,
-            space_tag: None,
+            project_id: None,
+            project_tag: None,
             seed_id: None,
             phase: String::new(),
             evaluation_passed: false,
@@ -178,8 +178,8 @@ mod tests {
     fn format_error_provider() {
         let meta = ResponseMeta {
             session_id: None,
-            space_id: None,
-            space_tag: None,
+            project_id: None,
+            project_tag: None,
             seed_id: None,
             phase: String::new(),
             evaluation_passed: false,

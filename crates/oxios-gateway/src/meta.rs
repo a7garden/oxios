@@ -9,8 +9,8 @@
 pub mod meta {
     /// Session ID for multi-turn conversations.
     pub const SESSION_ID: &str = "session_id";
-    /// Space ID for space-scoped operations.
-    pub const SPACE_ID: &str = "space_id";
+    /// Project IDs (comma-separated) for project-scoped operations.
+    pub const PROJECT_IDS: &str = "project_ids";
     /// Chat ID (used by Telegram and similar chat channels).
     pub const CHAT_ID: &str = "chat_id";
     /// Message ID for reply correlation.

@@ -13,6 +13,7 @@ pub mod mcp_api;
 pub mod persona_api;
 pub mod security_api;
 pub mod space_api;
+pub mod project_api;
 pub mod state_api;
 
 pub use a2a_api::A2aApi;
@@ -30,6 +31,7 @@ pub use mcp_api::McpApi;
 pub use persona_api::PersonaApi;
 pub use security_api::SecurityApi;
 pub use space_api::SpaceApi;
+pub use project_api::ProjectApi;
 pub use state_api::StateApi;
 
 use crate::a2a::A2AProtocol;
@@ -88,6 +90,8 @@ pub struct KernelHandle {
     pub infra: InfraApi,
     /// Space management: context partitioning, knowledge flow.
     pub spaces: SpaceApi,
+    /// Project management: work context (RFC-011).
+    pub projects: Option<ProjectApi>,
     /// Execution: config + access management.
     pub exec: ExecApi,
     /// Browser backend (zero-sized when `browser` feature is disabled).
@@ -119,6 +123,7 @@ impl KernelHandle {
         mcp: McpApi,
         infra: InfraApi,
         spaces: SpaceApi,
+        projects: Option<ProjectApi>,
         exec: ExecApi,
         browser: BrowserApi,
         a2a: A2aApi,
@@ -136,6 +141,7 @@ impl KernelHandle {
             mcp,
             infra,
             spaces,
+            projects,
             exec,
             browser,
             a2a,
@@ -207,6 +213,7 @@ impl KernelHandle {
                 start_time,
             ),
             spaces: SpaceApi::new(space_manager, event_bus),
+            projects: None,
             exec: ExecApi::new(Arc::new(config.exec.clone()), access_manager),
             #[allow(clippy::default_trait_access)]
             browser: BrowserApi::default(),

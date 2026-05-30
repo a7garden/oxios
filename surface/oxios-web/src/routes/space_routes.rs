@@ -67,7 +67,7 @@ pub(crate) async fn handle_space_activate(
         .activate_space(&id)
         .await
         .map_err(|e| AppError::Internal(e.to_string()))?;
-    Ok(Json(serde_json::json!({ "ok": true, "space_id": id })))
+    Ok(Json(serde_json::json!({ "ok": true, "project_id": id })))
 }
 
 // ---------------------------------------------------------------------------
@@ -85,7 +85,7 @@ pub(crate) async fn handle_space_archive(
         .archive(&id)
         .await
         .map_err(|e| AppError::Internal(e.to_string()))?;
-    Ok(Json(serde_json::json!({ "ok": true, "space_id": id })))
+    Ok(Json(serde_json::json!({ "ok": true, "project_id": id })))
 }
 
 // ---------------------------------------------------------------------------
@@ -103,7 +103,7 @@ pub(crate) async fn handle_space_restore(
         .restore(&id)
         .await
         .map_err(|e| AppError::Internal(e.to_string()))?;
-    Ok(Json(serde_json::json!({ "ok": true, "space_id": id })))
+    Ok(Json(serde_json::json!({ "ok": true, "project_id": id })))
 }
 
 // ---------------------------------------------------------------------------
