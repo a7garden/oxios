@@ -55,6 +55,7 @@ impl SdkKernelToolProvider for OxiosKernelBridge {
             "memory_write",
             "memory_search",
             "space",
+            "project",
             "agent",
             "a2a_delegate",
             "a2a_send",
@@ -184,6 +185,6 @@ mod tests {
 
         let names = bridge.tool_names();
         // 6 always-on + 17 kernel domain = 23 ... plus knowledge = 24
-        assert_eq!(names.len(), 24, "expected 24 tools, got {:?}", names);
+        assert_eq!(names.len(), 25, "expected 25 tools, got {:?}", names);
     }
 }
