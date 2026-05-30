@@ -65,6 +65,7 @@ pub mod git_layer;
 pub mod resource_monitor;
 pub mod session_context;
 pub mod space;
+pub mod project;
 pub mod state_store;
 
 // ─── Infrastructure ─────────────────────────────────────────────────
@@ -204,6 +205,10 @@ pub use space::{
     extract_filesystem_path, match_keywords, ConversationBuffer, ConversationTurn, CrossRefEntry,
     MemoryFlow, PathMatcher, Space, SpaceBridge, SpaceId, SpaceManager, SpaceManagerError,
     SpaceSource,
+};
+pub use project::{
+    detect_project, extract_path, find_by_id, find_by_name, DetectionResult, Project,
+    ProjectId, ProjectManager, ProjectManagerError, ProjectSource,
 };
 pub use state_store::{AgentResponse, PruneConfig, PruneThrottle, Session, SessionId, SessionSummary, StateStore};
 

@@ -175,6 +175,22 @@ pub enum KernelEvent {
         /// Number of entries migrated.
         entries_migrated: usize,
     },
+    /// A new Project has been created (RFC-011).
+    ProjectCreated {
+        /// The project's ID.
+        project_id: uuid::Uuid,
+        /// The project's name.
+        name: String,
+        /// How it was created.
+        source: String,
+    },
+    /// A Project has been activated (RFC-011).
+    ProjectActivated {
+        /// The project's ID.
+        project_id: uuid::Uuid,
+        /// The project's name.
+        name: String,
+    },
     /// Evolution has started (evaluate → evolve → re-execute loop).
     EvolutionStarted {
         /// Seed ID before evolution.
@@ -321,6 +337,19 @@ pub fn kernel_event_to_audit_action(event: &KernelEvent) -> AuditAction {
                 seed_id, final_score, iterations
             ),
         },
+        KernelEvent::ProjectCreated {
+            project_id,
+            name,
+            source,
+        } => AuditAction::Other {
+            detail: format!("project_created:{}:{}", name, source),
+        },
+        KernelEvent::ProjectActivated {
+            project_id,
+            name,
+        } => AuditAction::Other {
+            detail: format!("project_activated:{}", name),
+        },
     }
 }
 
@@ -335,6 +364,7 @@ fn extract_agent_id(event: &KernelEvent) -> String {
         KernelEvent::AgentOutput { agent_id, .. } => agent_id.to_string(),
         KernelEvent::AgentGroupMemberCompleted { agent_id, .. } => agent_id.to_string(),
         KernelEvent::SpaceActivated { space_id, .. } => format!("space:{}", space_id),
+        KernelEvent::ProjectActivated { project_id, .. } => format!("project:{}", project_id),
         _ => "system".to_string(),
     }
 }

@@ -115,6 +115,38 @@ CREATE TABLE IF NOT EXISTS patterns (
     created_at   TEXT NOT NULL,
     updated_at   TEXT NOT NULL
 );
+
+-- ─────────────────────────────────────────────
+-- 6. Projects (RFC-011)
+-- ─────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS projects (
+    id              TEXT PRIMARY KEY,
+    name            TEXT NOT NULL UNIQUE,
+    description     TEXT,
+    paths           TEXT,            -- JSON array of PathBuf strings
+    tags            TEXT,            -- JSON array of strings
+    emoji           TEXT NOT NULL DEFAULT '📦',
+    source          TEXT NOT NULL DEFAULT 'manual',
+    memory_visible  INTEGER NOT NULL DEFAULT 1,
+    created_at      TEXT NOT NULL,
+    updated_at      TEXT NOT NULL,
+    last_active_at  TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_projects_name ON projects(name);
+
+-- ─────────────────────────────────────────────
+-- 7. Project-Memory junction (RFC-011)
+-- ─────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS project_memory (
+    project_id  TEXT NOT NULL,
+    memory_id   TEXT NOT NULL,
+    created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+    PRIMARY KEY (project_id, memory_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_pm_project ON project_memory(project_id);
+CREATE INDEX IF NOT EXISTS idx_pm_memory ON project_memory(memory_id);
 "#;
 
 /// Vector table DDL (separate because sqlite-vec must be loaded first).
@@ -291,6 +323,83 @@ impl MemoryDatabase {
             .map(|v| v == "true")
             .unwrap_or(false)
     }
+
+    // ── Project operations (RFC-011) ──────────────────────────
+
+    /// Save a project (insert or replace).
+    pub fn save_project(&self, project: &crate::project::Project) -> Result<()> {
+        let conn = self.conn();
+        conn.execute(
+            "INSERT OR REPLACE INTO projects
+             (id, name, description, paths, tags, emoji, source, memory_visible, created_at, updated_at, last_active_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+            rusqlite::params![
+                project.id.to_string(),
+                project.name,
+                project.description,
+                serde_json::to_string(&project.paths)?,
+                serde_json::to_string(&project.tags)?,
+                project.emoji,
+                project.source.to_string(),
+                project.memory_visible as i32,
+                project.created_at.to_rfc3339(),
+                project.updated_at.to_rfc3339(),
+                project.last_active_at.to_rfc3339(),
+            ],
+        )?;
+        Ok(())
+    }
+
+    /// List all projects.
+    pub fn list_projects(&self) -> Result<Vec<crate::project::Project>> {
+        let conn = self.conn();
+        let mut stmt = conn.prepare(
+            "SELECT id, name, description, paths, tags, emoji, source, memory_visible,
+                    created_at, updated_at, last_active_at
+             FROM projects ORDER BY name",
+        )?;
+        let rows = stmt.query_map([], row_to_project)?;
+        rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
+    }
+
+    /// Delete a project by ID.
+    pub fn delete_project(&self, id: &str) -> Result<()> {
+        let conn = self.conn();
+        // Delete junction entries first
+        conn.execute("DELETE FROM project_memory WHERE project_id = ?1", rusqlite::params![id])?;
+        conn.execute("DELETE FROM projects WHERE id = ?1", rusqlite::params![id])?;
+        Ok(())
+    }
+
+    /// Link a memory to a project.
+    pub fn link_project_memory(&self, project_id: &str, memory_id: &str) -> Result<()> {
+        let conn = self.conn();
+        conn.execute(
+            "INSERT OR IGNORE INTO project_memory (project_id, memory_id, created_at) VALUES (?1, ?2, datetime('now'))",
+            rusqlite::params![project_id, memory_id],
+        )?;
+        Ok(())
+    }
+
+    /// Unlink a memory from a project.
+    pub fn unlink_project_memory(&self, project_id: &str, memory_id: &str) -> Result<()> {
+        let conn = self.conn();
+        conn.execute(
+            "DELETE FROM project_memory WHERE project_id = ?1 AND memory_id = ?2",
+            rusqlite::params![project_id, memory_id],
+        )?;
+        Ok(())
+    }
+
+    /// Get all memory IDs associated with a project.
+    pub fn get_project_memory_ids(&self, project_id: &str) -> Result<Vec<String>> {
+        let conn = self.conn();
+        let mut stmt = conn.prepare(
+            "SELECT memory_id FROM project_memory WHERE project_id = ?1 ORDER BY created_at DESC",
+        )?;
+        let rows = stmt.query_map(rusqlite::params![project_id], |row| row.get(0))?;
+        rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
+    }
 }
 
 /// Convert a `&[f32]` to a byte blob for sqlite-vec storage.
@@ -313,6 +422,47 @@ pub fn bytes_to_f32_slice(bytes: &[u8]) -> Vec<f32> {
             f32::from_le_bytes(arr)
         })
         .collect()
+}
+
+/// Convert a SQLite row into a Project struct.
+fn row_to_project(row: &rusqlite::Row<'_>) -> rusqlite::Result<crate::project::Project> {
+    use crate::project::{Project, ProjectSource};
+    use chrono::{DateTime, Utc};
+    use std::path::PathBuf;
+
+    let id_str: String = row.get(0)?;
+    let name: String = row.get(1)?;
+    let description: String = row.get::<_, Option<String>>(2)?.unwrap_or_default();
+    let paths_str: String = row.get::<_, Option<String>>(3)?.unwrap_or_else(|| "[]".to_string());
+    let tags_str: String = row.get::<_, Option<String>>(4)?.unwrap_or_else(|| "[]".to_string());
+    let emoji: String = row.get::<_, Option<String>>(5)?.unwrap_or_else(|| "📦".to_string());
+    let source_str: String = row.get::<_, Option<String>>(6)?.unwrap_or_else(|| "manual".to_string());
+    let memory_visible: bool = row.get::<_, Option<i32>>(7)?.unwrap_or(1) != 0;
+    let created_at: String = row.get(8)?;
+    let updated_at: String = row.get(9)?;
+    let last_active_at: String = row.get(10)?;
+
+    let id = uuid::Uuid::parse_str(&id_str).map_err(|e| rusqlite::Error::FromSqlConversionFailure(0, rusqlite::types::Type::Text, Box::new(e)))?;
+    let paths: Vec<PathBuf> = serde_json::from_str(&paths_str).unwrap_or_default();
+    let tags: Vec<String> = serde_json::from_str(&tags_str).unwrap_or_default();
+    let source = match source_str.as_str() {
+        "auto_detected" => ProjectSource::AutoDetected,
+        _ => ProjectSource::Manual,
+    };
+
+    Ok(Project {
+        id,
+        name,
+        description,
+        paths,
+        tags,
+        emoji,
+        source,
+        memory_visible,
+        created_at: created_at.parse::<DateTime<Utc>>().unwrap_or_else(|_| Utc::now()),
+        updated_at: updated_at.parse::<DateTime<Utc>>().unwrap_or_else(|_| Utc::now()),
+        last_active_at: last_active_at.parse::<DateTime<Utc>>().unwrap_or_else(|_| Utc::now()),
+    })
 }
 
 // ---------------------------------------------------------------------------
@@ -347,6 +497,8 @@ mod tests {
         assert!(tables.contains(&"embedding_cache".to_string()), "embedding_cache table missing");
         assert!(tables.contains(&"dream_state".to_string()), "dream_state table missing");
         assert!(tables.contains(&"patterns".to_string()), "patterns table missing");
+        assert!(tables.contains(&"projects".to_string()), "projects table missing");
+        assert!(tables.contains(&"project_memory".to_string()), "project_memory table missing");
     }
 
     #[test]
