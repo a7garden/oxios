@@ -19,8 +19,7 @@ import { ProviderSelect } from '@/components/engine/provider-select'
 import { ModelSelect } from '@/components/engine/model-select'
 import { ApiKeyInput } from '@/components/engine/api-key-input'
 import { ProviderOptionsPanel } from '@/components/engine/provider-options'
-import { ErrorState } from '@/components/shared/error-state'
-import { LoadingCards } from '@/components/shared/loading'
+import { RoutingSection } from '@/components/engine/routing-section'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -274,6 +273,9 @@ function EnginePanel() {
             </>
           )}
       </CardContent>
+
+      {/* Routing section — model routing configuration (RFC-011) */}
+      <RoutingSection />
     </Card>
   )
 }

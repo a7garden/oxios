@@ -253,6 +253,22 @@ impl ProjectManager {
     pub fn get_project_memory_ids(&self, project_id: ProjectId) -> Result<Vec<String>> {
         self.db.get_project_memory_ids(&project_id.to_string())
     }
+
+    /// Save (upsert) a project to SQLite directly.
+    ///
+    /// Used when fields like `memory_visible` need updating
+    /// outside the standard `update_project()` flow.
+    pub fn save_project(&self, project: &Project) -> Result<()> {
+        self.db.save_project(project)?;
+
+        // Refresh in-memory indices
+        let mut projects = self.projects.write();
+        let mut name_index = self.name_index.write();
+        name_index.insert(project.name.clone(), project.id);
+        projects.insert(project.id, project.clone());
+
+        Ok(())
+    }
 }
 
 #[cfg(test)]

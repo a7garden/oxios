@@ -18,7 +18,10 @@ pub mod state_api;
 pub use a2a_api::A2aApi;
 pub use agent_api::AgentApi;
 pub use browser_api::BrowserApi;
-pub use engine_api::{EngineApi, EngineConfigResponse, ModelInfo, ProviderInfo, ValidateKeyResult};
+pub use engine_api::{
+    EngineApi, EngineConfigResponse, FallbackEvent, ModelInfo, ProviderInfo,
+    RoutingConfigSnapshot, RoutingStats, RoutingStatsSnapshot, RoutingUpdate, ValidateKeyResult,
+};
 pub use exec_api::ExecApi;
 pub use extension_api::ExtensionApi;
 pub use infra_api::InfraApi;
@@ -29,7 +32,7 @@ pub use marketplace_api::MarketplaceApi;
 pub use mcp_api::McpApi;
 pub use persona_api::PersonaApi;
 pub use security_api::SecurityApi;
-pub use project_api::ProjectApi;
+pub use project_api::{ProjectApi, ProjectInfo};
 pub use state_api::StateApi;
 
 use crate::a2a::A2AProtocol;
@@ -213,6 +216,7 @@ impl KernelHandle {
             engine: EngineApi::new(
                 Arc::new(parking_lot::RwLock::new(config.clone())),
                 std::path::PathBuf::from("~/.oxios/config.toml"),
+                Arc::new(RoutingStats::new()),
             ),
             knowledge,
             knowledge_lens,

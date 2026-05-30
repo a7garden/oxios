@@ -1,0 +1,74 @@
+import { useTranslation } from 'react-i18next'
+import { useDeleteProject } from '@/hooks/use-projects'
+import type { Project } from '@/types'
+import { Button } from '@/components/ui/button'
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+} from '@/components/ui/dialog'
+import { useToast } from '@/components/ui/sonner'
+import { useNavigate } from '@tanstack/react-router'
+
+interface DeleteProjectDialogProps {
+  project: Project | null
+  open: boolean
+  onOpenChange: (open: boolean) => void
+}
+
+export function DeleteProjectDialog({ project, open, onOpenChange }: DeleteProjectDialogProps) {
+  const { t } = useTranslation()
+  const deleteProject = useDeleteProject()
+  const { toast } = useToast()
+  const navigate = useNavigate()
+
+  const handleDelete = () => {
+    if (!project) return
+
+    deleteProject.mutate(project.id, {
+      onSuccess: () => {
+        toast(t('projects.deleteSuccess', 'Project deleted'))
+        onOpenChange(false)
+        navigate({ to: '/projects' })
+      },
+      onError: (err) => {
+        toast(t('projects.deleteError', `Failed to delete: ${err}`), { variant: 'destructive' })
+      },
+    })
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-sm">
+        <DialogHeader>
+          <DialogTitle>
+            {t('projects.deleteTitle', 'Delete "{{name}}"?', { name: project?.name ?? '' })}
+          </DialogTitle>
+          <DialogDescription>
+            {t('projects.deleteDesc', 'This will remove the project but NOT delete:')}
+          </DialogDescription>
+        </DialogHeader>
+
+        <ul className="text-sm text-muted-foreground list-disc pl-5 space-y-1">
+          <li>{t('projects.deleteMemories', 'Memories associated with this project')}</li>
+          <li>{t('projects.deleteFiles', 'Files in the project paths')}</li>
+        </ul>
+
+        <p className="text-xs text-destructive font-medium">
+          ⚠️ {t('projects.undoWarning', 'This action cannot be undone.')}
+        </p>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            {t('common.cancel', 'Cancel')}
+          </Button>
+          <Button
+            variant="destructive"
+            onClick={handleDelete}
+            disabled={deleteProject.isPending}
+          >
+            {deleteProject.isPending ? '...' : t('projects.delete', 'Delete')}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}

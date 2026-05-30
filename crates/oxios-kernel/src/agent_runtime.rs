@@ -2,7 +2,7 @@
 //!
 //! The AgentRuntime uses `OxiosEngine.oxi().agent()` (AgentBuilder pattern)
 //! to construct agents with full middleware, observability, and security
-//! integration from oxi-sdk 0.23.0.
+//! integration from oxi-sdk 0.24.0.
 //!
 //! # Architecture
 //!
@@ -21,7 +21,11 @@
 //! - `.with_rate_limit()` — tool call rate limiting
 //! - `.with_token_budget()` — per-execution token caps
 //! - `.tracer()` / `.cost_tracker()` — observability hooks
-//! - `.middleware()` — custom middleware chain
+//! ## Routing integration (RFC-011)
+//!
+//! Model usage events (`AgentEvent::Usage`) are recorded to the shared
+//! `RoutingStats` so the Web dashboard can display per-model call counts
+//! and estimated costs.
 
 use anyhow::Result;
 use oxi_sdk::{Agent, AgentConfig, AgentEvent, CompactionEvent, CompactionStrategy, ProviderResolver};
@@ -137,6 +141,8 @@ pub struct AgentRuntime {
     persona_manager: Option<Arc<PersonaManager>>,
     /// Semantic tool retriever for capability discovery.
     tool_retriever: Option<Arc<crate::tools::retrieval::ToolRetriever>>,
+    /// Shared routing stats (shared with EngineApi).
+    routing_stats: Option<Arc<crate::kernel_handle::RoutingStats>>,
 }
 
 impl AgentRuntime {
@@ -148,6 +154,7 @@ impl AgentRuntime {
         engine: Arc<OxiosEngine>,
         model_id: impl Into<String>,
         kernel_handle: Arc<KernelHandle>,
+        routing_stats: Option<Arc<crate::kernel_handle::RoutingStats>>,
     ) -> Self {
         Self {
             engine,
@@ -158,6 +165,7 @@ impl AgentRuntime {
             kernel_handle,
             persona_manager: None,
             tool_retriever: None,
+            routing_stats,
         }
     }
 
@@ -341,6 +349,7 @@ impl AgentRuntime {
                 agent_id,
                 cspace,
                 audit_trail,
+                self.routing_stats.clone(),
             )
             .await?
         };
@@ -380,6 +389,7 @@ async fn run_agent(
     agent_id: AgentId,
     cspace: crate::capability::CSpace,
     audit_trail: Option<Arc<AuditTrail>>,
+    routing_stats: Option<Arc<crate::kernel_handle::RoutingStats>>,
 ) -> Result<(String, usize, bool, Arc<Agent>)> {
     // Extract workspace.
     let workspace = if !config.project_paths.is_empty() {
@@ -524,6 +534,7 @@ async fn run_agent(
     let session_id_for_callback = seed_id.to_string();
     let model_id_for_callback = config.model_id.clone();
     let agent_id_for_callback = agent_id.to_string();
+    let routing_stats_for_cb = routing_stats.clone();
 
     // Run the agent with streaming events.
     let result = agent
@@ -587,7 +598,7 @@ async fn run_agent(
                     input_tokens,
                     output_tokens,
                 } => {
-                    // Record token usage to cost tracker.
+                    // Record token usage to cost tracker (existing).
                     let agent_label = format!("agent-{}", agent_id_for_callback);
                     crate::observability::cost_tracker().record(
                         &agent_label,
@@ -605,6 +616,16 @@ async fn run_agent(
                             cache_write: 0,
                         },
                     );
+
+                    // Record to routing stats (RFC-011).
+                    if let Some(stats) = &routing_stats_for_cb {
+                        let cost = crate::kernel_handle::engine_api::estimate_cost(
+                            &model_id_for_callback,
+                            input_tokens as u64,
+                            output_tokens as u64,
+                        );
+                        stats.record_model_usage(&model_id_for_callback, cost);
+                    }
                 }
                 AgentEvent::Compaction {
                     event: CompactionEvent::Completed { result, .. },

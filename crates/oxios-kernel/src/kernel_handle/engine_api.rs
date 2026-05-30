@@ -1,18 +1,167 @@
-//! Engine API — read-only facade for LLM engine introspection + config writes.
+//! Engine API — LLM engine introspection + config writes + routing control.
 //!
 //! Provides access to the oxi-sdk model catalog (providers, models, search)
-//! and write operations that persist to config.toml (model, API key, provider
-//! options). No references to `Oxi`, `Supervisor`, or any runtime engine
-//! instance — only config and the static model catalog.
+//! and write operations that persist to config.toml (model, API key, routing).
+//!
+//! Routing statistics (`RoutingStats`) are shared between this API and
+//! `AgentRuntime` via an `Arc`, so model usage is recorded end-to-end.
 
 use crate::config::OxiosConfig;
 use crate::credential::CredentialStore;
+use chrono::{DateTime, Utc};
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-// ── Response types ──────────────────────────────────────────────────────────
+// ── Routing types ─────────────────────────────────────────────────────────────
+
+/// Snapshot of routing configuration (read-only API response).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RoutingConfigSnapshot {
+    /// Whether automatic model routing is enabled.
+    pub routing_enabled: bool,
+    /// Whether cost-efficient models are preferred when routing.
+    pub prefer_cost_efficient: bool,
+    /// Ordered list of fallback models (tried left-to-right on primary failure).
+    pub fallback_models: Vec<String>,
+    /// Models excluded from automatic routing.
+    pub excluded_models: Vec<String>,
+}
+
+/// Model usage statistics.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RoutingStatsSnapshot {
+    /// Model ID → number of calls.
+    pub model_calls: HashMap<String, u64>,
+    /// Model ID → estimated total cost (USD).
+    pub model_cost: HashMap<String, f64>,
+    /// Total number of requests.
+    pub total_requests: u64,
+    /// Total estimated cost (USD).
+    pub total_cost: f64,
+}
+
+/// Single fallback event record.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FallbackEvent {
+    /// When the fallback occurred.
+    pub timestamp: DateTime<Utc>,
+    /// Model that was skipped/replaced.
+    pub from_model: String,
+    /// Model that was used instead.
+    pub to_model: String,
+    /// Reason for fallback (e.g. "rate_limit", "context_overflow", "error").
+    pub reason: String,
+    /// Whether the fallback succeeded (no further fallback needed).
+    pub success: bool,
+}
+
+/// Request body for `PUT /api/engine/routing`.
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RoutingUpdate {
+    pub routing_enabled: Option<bool>,
+    pub prefer_cost_efficient: Option<bool>,
+    pub fallback_models: Option<Vec<String>>,
+    pub excluded_models: Option<Vec<String>>,
+}
+
+// ── RoutingStats ─────────────────────────────────────────────────────────────
+
+/// In-memory routing statistics, shared between `EngineApi` and `AgentRuntime`.
+/// Uses simple RwLock for thread-safe reads/writes.
+pub struct RoutingStats {
+    calls: RwLock<HashMap<String, u64>>,
+    costs: RwLock<HashMap<String, f64>>,
+    /// Circular buffer of recent fallback events (max 200).
+    fallbacks: RwLock<Vec<FallbackEvent>>,
+}
+
+impl Default for RoutingStats {
+    fn default() -> Self {
+        Self {
+            calls: RwLock::new(HashMap::new()),
+            costs: RwLock::new(HashMap::new()),
+            fallbacks: RwLock::new(Vec::new()),
+        }
+    }
+}
+
+impl RoutingStats {
+    /// Create a new stats tracker.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Record one model invocation.
+    pub fn record_model_usage(&self, model_id: &str, cost_usd: f64) {
+        let mut calls = self.calls.write();
+        *calls.entry(model_id.to_string()).or_insert(0) += 1;
+        if cost_usd > 0.0 {
+            let mut costs = self.costs.write();
+            *costs.entry(model_id.to_string()).or_insert(0.0) += cost_usd;
+        }
+    }
+
+    /// Record a fallback event.
+    pub fn record_fallback(&self, event: FallbackEvent) {
+        let mut fb = self.fallbacks.write();
+        fb.push(event);
+        let keep = fb.len().saturating_sub(200);
+        if keep > 0 {
+            fb.drain(0..keep);
+        }
+    }
+
+    /// Get a snapshot of current stats.
+    pub fn snapshot(&self) -> RoutingStatsSnapshot {
+        let calls = self.calls.read();
+        let costs = self.costs.read();
+        let total_requests: u64 = calls.values().sum();
+        let total_cost: f64 = costs.values().sum();
+        RoutingStatsSnapshot {
+            model_calls: calls.clone(),
+            model_cost: costs.clone(),
+            total_requests,
+            total_cost,
+        }
+    }
+
+    /// Get recent fallback events, newest first.
+    pub fn fallback_history(&self, limit: usize) -> Vec<FallbackEvent> {
+        let fb = self.fallbacks.read();
+        fb.iter().rev().take(limit).cloned().collect()
+    }
+}
+
+// ── Model cost estimation ────────────────────────────────────────────────────
+
+/// Estimate cost in USD for a model given token usage.
+/// Uses oxi-sdk's model_db for per-model pricing.
+pub fn estimate_cost(model_id: &str, input_tokens: u64, output_tokens: u64) -> f64 {
+    let entries = oxi_sdk::get_provider_models(
+        &model_id.split('/').next().unwrap_or(model_id),
+    );
+    let entry = entries.iter().find(|e| format!("{}/{}", e.provider, e.id) == model_id);
+    match entry {
+        Some(e) => {
+            (e.cost_input * input_tokens as f64 / 1_000_000.0)
+                + (e.cost_output * output_tokens as f64 / 1_000_000.0)
+        }
+        None => {
+            // Fall back to a rough estimate for unknown models
+            (0.003 * input_tokens as f64 / 1_000_000.0)
+                + (0.015 * output_tokens as f64 / 1_000_000.0)
+        }
+    }
+}
+
+// ── Provider/Model response types ──────────────────────────────────────────
 
 /// Summary of an LLM provider.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -61,7 +210,7 @@ impl From<&oxi_sdk::ModelEntry> for ModelInfo {
     }
 }
 
-/// Current engine configuration + credential status.
+/// Current engine configuration + credential status + routing.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EngineConfigResponse {
     /// Currently configured default model.
@@ -72,6 +221,8 @@ pub struct EngineConfigResponse {
     pub api_key_source: Option<String>,
     /// Provider name extracted from default_model.
     pub provider: Option<String>,
+    /// Current routing configuration.
+    pub routing: RoutingConfigSnapshot,
 }
 
 /// Result of an API key validation attempt.
@@ -87,19 +238,38 @@ pub struct ValidateKeyResult {
 
 // ── EngineApi ───────────────────────────────────────────────────────────────
 
-/// Engine API facade — read-only introspection + config writes.
+/// Engine API facade — model catalog introspection + config writes + routing.
 ///
 /// Holds a shared reference to the live config (behind `RwLock`) and the
 /// path to config.toml so write operations can persist to disk.
+/// Routing stats are shared with `AgentRuntime` via `Arc<RoutingStats>`.
 pub struct EngineApi {
     config: Arc<RwLock<OxiosConfig>>,
     config_path: PathBuf,
+    routing_stats: Arc<RoutingStats>,
 }
 
 impl EngineApi {
     /// Create a new EngineApi.
-    pub fn new(config: Arc<RwLock<OxiosConfig>>, config_path: PathBuf) -> Self {
-        Self { config, config_path }
+    ///
+    /// - `config` — shared config store (backed by RwLock)
+    /// - `config_path` — path to config.toml for persistence
+    /// - `routing_stats` — shared stats tracker (shared with AgentRuntime)
+    pub fn new(
+        config: Arc<RwLock<OxiosConfig>>,
+        config_path: PathBuf,
+        routing_stats: Arc<RoutingStats>,
+    ) -> Self {
+        Self {
+            config,
+            config_path,
+            routing_stats,
+        }
+    }
+
+    /// Get the shared `RoutingStats` reference (for `AgentRuntime` wiring).
+    pub fn routing_stats(&self) -> Arc<RoutingStats> {
+        Arc::clone(&self.routing_stats)
     }
 
     // ── Read operations ────────────────────────────────────────────────
@@ -177,7 +347,7 @@ impl EngineApi {
             .collect()
     }
 
-    /// Get the current engine configuration + credential status.
+    /// Get the current engine configuration + credential status + routing.
     pub fn config(&self) -> EngineConfigResponse {
         let cfg = self.config.read();
         let provider = CredentialStore::provider_from_model(&cfg.engine.default_model)
@@ -204,7 +374,23 @@ impl EngineApi {
             api_key_set,
             api_key_source,
             provider,
+            routing: RoutingConfigSnapshot {
+                routing_enabled: cfg.engine.routing_enabled,
+                prefer_cost_efficient: cfg.engine.prefer_cost_efficient,
+                fallback_models: cfg.engine.fallback_models.clone(),
+                excluded_models: cfg.engine.excluded_models.clone(),
+            },
         }
+    }
+
+    /// Get routing stats snapshot (for Web dashboard).
+    pub fn routing_stats_snapshot(&self) -> RoutingStatsSnapshot {
+        self.routing_stats.snapshot()
+    }
+
+    /// Get recent fallback history.
+    pub fn fallback_history(&self, limit: usize) -> Vec<FallbackEvent> {
+        self.routing_stats.fallback_history(limit)
     }
 
     // ── Write operations ───────────────────────────────────────────────
@@ -258,6 +444,31 @@ impl EngineApi {
         // ProviderOptions are currently per-request, not persisted in config.toml.
         // Future: add [engine.provider_options] section to OxiosConfig.
         tracing::info!("Provider options update requested (no-op for now)");
+        Ok(())
+    }
+
+    /// Update routing configuration in config.toml.
+    ///
+    /// Only the fields provided in `update` are changed; others are left untouched.
+    /// Changes are persisted to disk immediately.
+    pub fn set_routing(&self, update: RoutingUpdate) -> anyhow::Result<()> {
+        {
+            let mut cfg = self.config.write();
+            if let Some(v) = update.routing_enabled {
+                cfg.engine.routing_enabled = v;
+            }
+            if let Some(v) = update.prefer_cost_efficient {
+                cfg.engine.prefer_cost_efficient = v;
+            }
+            if let Some(v) = update.fallback_models {
+                cfg.engine.fallback_models = v;
+            }
+            if let Some(v) = update.excluded_models {
+                cfg.engine.excluded_models = v;
+            }
+            self.persist(&cfg)?;
+        }
+        tracing::info!("Routing configuration updated via API");
         Ok(())
     }
 
@@ -322,6 +533,11 @@ impl EngineApi {
 
     // ── Helpers ─────────────────────────────────────────────────────────
 
+    /// Estimate cost for a model invocation.
+    pub fn estimate_cost(model_id: &str, input_tokens: u64, output_tokens: u64) -> f64 {
+        estimate_cost(model_id, input_tokens, output_tokens)
+    }
+
     /// Persist the current config to disk.
     fn persist(&self, config: &OxiosConfig) -> anyhow::Result<()> {
         let content = toml::to_string_pretty(config)
@@ -336,6 +552,20 @@ impl std::fmt::Debug for EngineApi {
         f.debug_struct("EngineApi")
             .field("config_path", &self.config_path)
             .finish()
+    }
+}
+
+// Expose `RoutingStats::record_model_usage` via a public helper for AgentRuntime.
+// This avoids exposing the internal Arc to outside crates.
+pub fn record_usage_to_stats(
+    stats: &Option<Arc<RoutingStats>>,
+    model_id: &str,
+    input_tokens: u64,
+    output_tokens: u64,
+) {
+    if let Some(s) = stats {
+        let cost = estimate_cost(model_id, input_tokens, output_tokens);
+        s.record_model_usage(model_id, cost);
     }
 }
 
@@ -383,12 +613,19 @@ mod tests {
             api_key_set: true,
             api_key_source: Some("config.toml".to_string()),
             provider: Some("anthropic".to_string()),
+            routing: RoutingConfigSnapshot {
+                routing_enabled: false,
+                prefer_cost_efficient: false,
+                fallback_models: vec![],
+                excluded_models: vec![],
+            },
         };
         let json = serde_json::to_string(&resp).unwrap();
         let restored: EngineConfigResponse = serde_json::from_str(&json).unwrap();
         assert_eq!(restored.default_model, "anthropic/claude-sonnet-4");
         assert!(restored.api_key_set);
         assert_eq!(restored.api_key_source.as_deref(), Some("config.toml"));
+        assert!(!restored.routing.routing_enabled);
     }
 
     #[test]
@@ -413,5 +650,38 @@ mod tests {
         };
         assert!(!result.valid);
         assert!(result.message.as_ref().unwrap().contains("failed"));
+    }
+
+    #[test]
+    fn test_routing_stats_snapshot() {
+        let stats = RoutingStats::new();
+        stats.record_model_usage("anthropic/claude-sonnet-4", 0.05);
+        stats.record_model_usage("anthropic/claude-sonnet-4", 0.03);
+        stats.record_model_usage("openai/gpt-4o-mini", 0.01);
+
+        let snap = stats.snapshot();
+        assert_eq!(snap.total_requests, 3);
+        assert_eq!(snap.model_calls["anthropic/claude-sonnet-4"], 2);
+        assert_eq!(snap.model_calls["openai/gpt-4o-mini"], 1);
+        assert!((snap.total_cost - 0.09).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_fallback_history_circular() {
+        let stats = RoutingStats::new();
+        for i in 0..210 {
+            stats.record_fallback(FallbackEvent {
+                timestamp: DateTime::from_timestamp(i as i64, 0).unwrap(),
+                from_model: format!("model-{}", i),
+                to_model: "fallback".to_string(),
+                reason: "test".to_string(),
+                success: true,
+            });
+        }
+        let history = stats.fallback_history(200);
+        assert_eq!(history.len(), 200);
+        // Most recent first (i=209 down to i=10)
+        assert_eq!(history[0].from_model, "model-209");
+        assert_eq!(history[199].from_model, "model-10");
     }
 }

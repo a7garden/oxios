@@ -12,7 +12,7 @@ use oxios_kernel::{
     ClawHubInstaller, CronScheduler, EventBus, GitLayer,
     McpBridge, McpServer, MarketplaceApi, MemoryManager,
     Orchestrator, OxiosConfig, OxiosEngine, PersonaManager, ResourceMonitor,
-    SkillManager, ProjectManager, Supervisor,
+    RoutingStats, SkillManager, ProjectManager, Supervisor,
 };
 use oxios_markdown::knowledge::FileChange;
 use oxios_markdown::KnowledgeBase;
@@ -183,10 +183,11 @@ impl Kernel {
                     ),
                     self.build_browser_api(),
                     oxios_kernel::A2aApi::new(self.a2a_protocol.clone()),
-                    // EngineApi — LLM providers, models, config
+                    // EngineApi — LLM providers, models, config + routing stats
                     oxios_kernel::EngineApi::new(
                         Arc::new(parking_lot::RwLock::new(self.config.clone())),
                         self.config_path.clone(),
+                        Arc::new(oxios_kernel::RoutingStats::new()),
                     ),
                     knowledge,
                     knowledge_lens,
@@ -767,6 +768,14 @@ impl KernelBuilder {
         }
 
 
+        // Routing stats — shared between EngineApi and AgentRuntime
+        let routing_stats = Arc::new(oxios_kernel::RoutingStats::new());
+        let _engine_api = oxios_kernel::EngineApi::new(
+            Arc::new(parking_lot::RwLock::new(config.clone())),
+            config_path.clone(),
+            Arc::clone(&routing_stats),
+        );
+
         // ── KernelHandle — the syscall table for agent OS control ──
         // Created inline here because AgentRuntime needs it.
         // Will be cached again in the Kernel instance.
@@ -805,10 +814,11 @@ impl KernelBuilder {
                 oxios_kernel::ExecApi::new(Arc::new(config.exec.clone()), access_manager.clone()),
                 build_browser_api_value(&config),
                 oxios_kernel::A2aApi::new(a2a_protocol.clone()),
-                // EngineApi — LLM providers, models, config
+                // EngineApi — routing stats shared between EngineApi and AgentRuntime
                 oxios_kernel::EngineApi::new(
                     Arc::new(parking_lot::RwLock::new(config.clone())),
                     config_path.clone(),
+                    Arc::clone(&routing_stats),
                 ),
                 // KnowledgeBase — single source of truth (RFC-003)
                 Arc::new(
@@ -834,7 +844,8 @@ impl KernelBuilder {
         // Build ToolRetriever for semantic capability discovery.
         let tool_retriever = build_tool_retriever(&skill_manager).await;
 
-        let agent_runtime = AgentRuntime::new(Arc::clone(&engine), model_id, kernel_handle)
+        let agent_runtime = AgentRuntime::new(Arc::clone(&engine), model_id, kernel_handle.clone(),
+            Some(Arc::clone(&routing_stats)))
             .with_persona_manager(Arc::new(persona_manager.clone()))
             .with_tool_retriever(Arc::new(tool_retriever))
             .with_config({

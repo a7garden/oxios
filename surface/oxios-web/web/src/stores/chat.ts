@@ -14,6 +14,14 @@ interface PersistedState {
   activeProjectId: string | null
 }
 
+/** Stub for Phase 2 AI detection. Currently always null. */
+interface AiDetectionState {
+  /** Project detected from user message (Phase 2: populated by backend detection). */
+  detectedProject: import('@/types').Project | null
+  /** Dismissed project IDs (don't show badge again for these). */
+  dismissedProjectIds: string[]
+}
+
 const PERSIST_KEY = 'oxios-chat-persist'
 
 // ---------------------------------------------------------------------------
@@ -32,6 +40,10 @@ interface ChatRuntimeState {
   _lastDoneSessionId: string | null
   /** The project ID from the last "done" chunk. */
   _lastDoneProjectId: string | null
+  /** AI-detected project (Phase 2 stub, always null). */
+  detectedProject: import('@/types').Project | null
+  /** IDs of dismissed detection badges. */
+  dismissedProjectIds: string[]
 }
 
 // ---------------------------------------------------------------------------
@@ -51,6 +63,10 @@ interface ChatActions {
   newSession: () => void
   /** Set the active project explicitly. */
   setActiveProject: (projectId: string | null) => void
+  /** Set the detected project (Phase 2: called from WS response). */
+  setDetectedProject: (project: import('@/types').Project | null) => void
+  /** Dismiss a detection badge (don't show again for this project). */
+  dismissDetection: (projectId: string) => void
   /** Clear persisted state (e.g. on logout). */
   clearPersist: () => void
   /** Handle an incoming WS chunk. */
@@ -127,6 +143,8 @@ export const useChatStore = create<ChatStore>()(
       _sendQueue: [],
       _lastDoneSessionId: null,
       _lastDoneProjectId: null,
+      detectedProject: null,       // Phase 2 stub: always null
+      dismissedProjectIds: [],     // Dismissed detection badges
 
       // ── Actions ──
 
@@ -286,7 +304,19 @@ export const useChatStore = create<ChatStore>()(
           activeProjectId: projectId,
           activeSessionId: null,
           messages: [],
+          detectedProject: null,   // Clear detection when project changes
         })
+      },
+
+      setDetectedProject(project: import('@/types').Project | null) {
+        set({ detectedProject: project })
+      },
+
+      dismissDetection(projectId: string) {
+        set((s) => ({
+          dismissedProjectIds: [...s.dismissedProjectIds, projectId],
+          detectedProject: s.detectedProject?.id === projectId ? null : s.detectedProject,
+        }))
       },
 
       clearPersist() {

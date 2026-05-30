@@ -54,6 +54,9 @@ pub struct ValidateKeyRequest {
     pub api_key: String,
 }
 
+/// Request body for PUT /api/engine/routing
+pub type RoutingUpdateRequest = oxios_kernel::RoutingUpdate;
+
 // ── Response types ──────────────────────────────────────────────────────────
 
 // ── Handlers ────────────────────────────────────────────────────────────────
@@ -190,4 +193,45 @@ pub(crate) async fn handle_engine_validate_key(
 
     let result = state.kernel.engine.validate_key(&body.provider, &body.api_key);
     Ok(Json(serde_json::json!(result)))
+}
+
+/// PUT /api/engine/routing — Update routing configuration.
+pub(crate) async fn handle_engine_set_routing(
+    state: State<Arc<AppState>>,
+    Json(body): Json<RoutingUpdateRequest>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    state
+        .kernel
+        .engine
+        .set_routing(body)
+        .map_err(|e| AppError::Internal(e.to_string()))?;
+
+    tracing::info!("Routing configuration updated via API");
+    Ok(Json(serde_json::json!({ "ok": true })))
+}
+
+/// GET /api/engine/routing/stats — Get model usage statistics.
+pub(crate) async fn handle_engine_routing_stats(
+    state: State<Arc<AppState>>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    let stats = state.kernel.engine.routing_stats_snapshot();
+    Ok(Json(serde_json::json!(stats)))
+}
+
+/// GET /api/engine/routing/fallbacks — Get recent fallback history.
+#[derive(Debug, Deserialize, Default)]
+pub struct FallbacksQuery {
+    pub limit: Option<usize>,
+}
+
+pub(crate) async fn handle_engine_routing_fallbacks(
+    state: State<Arc<AppState>>,
+    Query(params): Query<FallbacksQuery>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    let limit = params.limit.unwrap_or(20);
+    let events = state.kernel.engine.fallback_history(limit);
+    Ok(Json(serde_json::json!({
+        "events": events,
+        "total_count": events.len(),
+    })))
 }

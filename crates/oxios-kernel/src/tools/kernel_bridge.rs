@@ -148,6 +148,7 @@ mod tests {
             crate::EngineApi::new(
                 Arc::new(parking_lot::RwLock::new(crate::OxiosConfig::default())),
                 base.join("config.toml"),
+                Arc::new(crate::RoutingStats::new()),
             ),
             Arc::new(oxios_markdown::KnowledgeBase::new(base.join("knowledge")).unwrap()),
             Arc::new(

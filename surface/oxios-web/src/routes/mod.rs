@@ -20,6 +20,7 @@ mod git_routes;
 mod infra;
 mod knowledge_routes;
 mod marketplace;
+mod project_routes;
 mod resource_routes;
 mod system;
 mod workspace;
@@ -58,7 +59,8 @@ pub(crate) use cron_jobs::{
 };
 pub(crate) use engine_routes::{
     handle_engine_config, handle_engine_models, handle_engine_providers,
-    handle_engine_set_api_key, handle_engine_set_model, handle_engine_set_provider_options,
+    handle_engine_routing_fallbacks, handle_engine_routing_stats, handle_engine_set_api_key,
+    handle_engine_set_model, handle_engine_set_provider_options, handle_engine_set_routing,
     handle_engine_validate_key,
 };
 pub(crate) use events::{
@@ -92,6 +94,11 @@ pub(crate) use knowledge_routes::{
 pub(crate) use marketplace::{
     handle_marketplace_install, handle_marketplace_search, handle_marketplace_skill_detail,
     handle_marketplace_updates,
+};
+pub(crate) use project_routes::{
+    handle_project_create, handle_project_delete, handle_project_get,
+    handle_project_link_memory, handle_project_memories, handle_projects_list,
+    handle_project_unlink_memory, handle_project_update,
 };
 pub(crate) use resource_routes::{
     handle_resource_history, handle_resource_overload, handle_resource_snapshot,
@@ -184,6 +191,9 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         .route("/api/engine/api-key", put(handle_engine_set_api_key))
         .route("/api/engine/provider-options", put(handle_engine_set_provider_options))
         .route("/api/engine/validate-key", post(handle_engine_validate_key))
+        .route("/api/engine/routing", put(handle_engine_set_routing))
+        .route("/api/engine/routing/stats", get(handle_engine_routing_stats))
+        .route("/api/engine/routing/fallbacks", get(handle_engine_routing_fallbacks))
         // Workspace
         .route("/api/workspace/tree", get(handle_workspace_tree))
         .route(
@@ -306,6 +316,14 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         .route("/api/git/verify", post(handle_git_verify))
         .route("/api/git/restore", post(handle_git_restore))
         // Projects
+        .route("/api/projects", get(handle_projects_list))
+        .route("/api/projects", post(handle_project_create))
+        .route("/api/projects/{id}", get(handle_project_get))
+        .route("/api/projects/{id}", put(handle_project_update))
+        .route("/api/projects/{id}", delete(handle_project_delete))
+        .route("/api/projects/{id}/memories", get(handle_project_memories))
+        .route("/api/projects/{id}/memories", post(handle_project_link_memory))
+        .route("/api/projects/{id}/memories/{memoryId}", delete(handle_project_unlink_memory))
         // Budget
         .route("/api/budget", get(handle_budget_list))
         .route("/api/budget/{agent_id}", get(handle_budget_get))

@@ -52,6 +52,8 @@ export const en = {
     knowledge: 'Knowledge',
     chat: 'Chat',
     memory: 'Memory',
+    projects: 'Projects',
+    project: 'Project',
     resources: 'Resources',
     agents: 'Agents',
     agentGroups: 'Agent Groups',

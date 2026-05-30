@@ -495,6 +495,7 @@ mod tests {
             crate::kernel_handle::EngineApi::new(
                 Arc::new(parking_lot::RwLock::new(crate::config::OxiosConfig::default())),
                 tmp.join("config.toml"),
+                Arc::new(crate::kernel_handle::RoutingStats::new()),
             ),
             Arc::new(oxios_markdown::KnowledgeBase::new(tmp.join("knowledge")).unwrap()),
             Arc::new(
@@ -516,7 +517,7 @@ mod tests {
 
 
         let engine = crate::OxiosEngine::new("mock/model");
-        let runtime = AgentRuntime::new(Arc::new(engine), "mock/model", kernel_handle);
+        let runtime = AgentRuntime::new(Arc::new(engine), "mock/model", kernel_handle, None);
         BasicSupervisor::new(event_bus, runtime)
     }
 

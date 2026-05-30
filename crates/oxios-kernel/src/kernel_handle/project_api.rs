@@ -5,10 +5,15 @@
 //! - CRUD operations on Projects
 //! - Project-Memory association (link/unlink)
 
-use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 use std::sync::Arc;
 
-use crate::project::{Project, ProjectManager};
+use anyhow::{Context, Result};
+use chrono::Utc;
+use serde::{Deserialize, Serialize};
+use uuid::Uuid;
+
+use crate::project::{Project, ProjectManager, ProjectSource};
 
 /// Serialized Project info for API responses.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -22,7 +27,9 @@ pub struct ProjectInfo {
     pub tags: Vec<String>,
     pub emoji: String,
     pub memory_visible: bool,
-    pub last_active: String,
+    pub created_at: String,
+    pub updated_at: String,
+    pub last_active_at: String,
 }
 
 impl From<&Project> for ProjectInfo {
@@ -40,12 +47,17 @@ impl From<&Project> for ProjectInfo {
             tags: project.tags.clone(),
             emoji: project.emoji.clone(),
             memory_visible: project.memory_visible,
-            last_active: project.last_active_at.to_rfc3339(),
+            created_at: project.created_at.to_rfc3339(),
+            updated_at: project.updated_at.to_rfc3339(),
+            last_active_at: project.last_active_at.to_rfc3339(),
         }
     }
 }
 
 /// Project system calls.
+///
+/// All methods return `Result` for operations that can fail,
+/// and `Option` for lookup operations.
 #[allow(dead_code)]
 pub struct ProjectApi {
     /// Project manager for Project lifecycle.
@@ -63,16 +75,94 @@ impl ProjectApi {
         self.project_manager
             .list_projects()
             .iter()
-            .map(|p| ProjectInfo::from(p))
+            .map(ProjectInfo::from)
             .collect()
     }
 
     /// Get Project details by ID.
     pub fn get_project(&self, id: &str) -> Option<ProjectInfo> {
-        let project_id = uuid::Uuid::parse_str(id).ok()?;
+        let project_id = Uuid::parse_str(id).ok()?;
         self.project_manager
             .get_project(project_id)
             .as_ref()
             .map(ProjectInfo::from)
+    }
+
+    /// Create a new project.
+    pub fn create_project(
+        &self,
+        name: String,
+        paths: Vec<String>,
+        tags: Vec<String>,
+        emoji: Option<String>,
+        description: Option<String>,
+    ) -> Result<ProjectInfo> {
+        let paths: Vec<PathBuf> = paths.into_iter().map(PathBuf::from).collect();
+        let project = self.project_manager.create_project(
+            name,
+            paths,
+            tags,
+            emoji,
+            description,
+            ProjectSource::Manual,
+        )?;
+        Ok(ProjectInfo::from(&project))
+    }
+
+    /// Update a project. Only non-None fields are changed.
+    pub fn update_project(
+        &self,
+        id: &str,
+        name: Option<String>,
+        paths: Option<Vec<String>>,
+        tags: Option<Vec<String>>,
+        emoji: Option<String>,
+        description: Option<String>,
+        memory_visible: Option<bool>,
+    ) -> Result<ProjectInfo> {
+        let project_id = Uuid::parse_str(id).context("Invalid project ID")?;
+        let paths = paths.map(|v| v.into_iter().map(PathBuf::from).collect());
+
+        let mut project = self.project_manager.update_project(
+            project_id,
+            name,
+            paths,
+            tags,
+            emoji,
+            description,
+        )?;
+
+        // memory_visible requires separate save (not part of update_project signature)
+        if let Some(visible) = memory_visible {
+            project.memory_visible = visible;
+            project.updated_at = Utc::now();
+            self.project_manager.save_project(&project)?;
+        }
+
+        Ok(ProjectInfo::from(&project))
+    }
+
+    /// Remove a project.
+    pub fn remove_project(&self, id: &str) -> Result<()> {
+        let project_id = Uuid::parse_str(id).context("Invalid project ID")?;
+        self.project_manager.remove_project(project_id)
+    }
+
+    /// Link a memory to a project.
+    pub fn link_memory(&self, project_id: &str, memory_id: &str) -> Result<()> {
+        let pid = Uuid::parse_str(project_id).context("Invalid project ID")?;
+        self.project_manager.link_memory(pid, memory_id)
+    }
+
+    /// Unlink a memory from a project.
+    pub fn unlink_memory(&self, project_id: &str, memory_id: &str) -> Result<()> {
+        let pid = Uuid::parse_str(project_id).context("Invalid project ID")?;
+        self.project_manager.unlink_memory(pid, memory_id)
+    }
+
+    /// Get all memory IDs linked to a project.
+    pub fn get_project_memory_ids(&self, project_id: &str) -> Result<Vec<String>> {
+        let pid = Uuid::parse_str(project_id).context("Invalid project ID")?;
+        self.project_manager.get_project_memory_ids(pid)
     }
 }

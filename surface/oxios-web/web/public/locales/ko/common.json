@@ -52,6 +52,8 @@ export const ko = {
     knowledge: '지식',
     chat: '채팅',
     memory: '메모리',
+    projects: '프로젝트',
+    project: '프로젝트',
     resources: '리소스',
     agents: '에이전트',
     agentGroups: '에이전트 그룹',

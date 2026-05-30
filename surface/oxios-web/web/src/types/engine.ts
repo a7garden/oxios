@@ -86,8 +86,16 @@ export interface ProviderOptions {
 
 /** Response shape for the engine config endpoint. */
 export interface EngineConfigResponse {
-  engine: EngineConfig
-  providers: ProviderInfo[]
+  default_model: string
+  api_key_set: boolean
+  api_key_source?: ApiKeySource
+  provider?: string
+  routing: {
+    routingEnabled: boolean
+    preferCostEfficient: boolean
+    fallbackModels: string[]
+    excludedModels: string[]
+  }
 }
 
 /** Response shape for provider models. */

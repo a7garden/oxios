@@ -223,8 +223,10 @@ pub use kernel_handle::MarketplaceApi;
 pub use session_context::SessionContext;
 pub use kernel_handle::{
     A2aApi, AgentApi, BrowserApi, CopilotResponse, EngineApi, EngineConfigResponse, ExecApi,
-    ExtensionApi, InfraApi, KnowledgeContext, KnowledgeLens, KnowledgeNote, McpApi, MemoryNote,
-    ModelInfo, PersonaApi, ProjectApi, ProviderInfo, SecurityApi, StateApi, ValidateKeyResult,
+    ExtensionApi, FallbackEvent, InfraApi, KnowledgeContext, KnowledgeLens, KnowledgeNote,
+    McpApi, MemoryNote, ModelInfo, PersonaApi, ProjectApi, ProjectInfo, ProviderInfo,
+    RoutingConfigSnapshot, RoutingStats, RoutingStatsSnapshot, RoutingUpdate, SecurityApi,
+    StateApi, ValidateKeyResult,
 };
 
 // ─── oxi-sdk re-exports ─────────────────────────────────────────────

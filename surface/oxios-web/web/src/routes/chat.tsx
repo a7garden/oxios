@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { AiDetectionBadge } from '@/components/project/ai-detection-badge'
 import { useChatStore } from '@/stores/chat'
 import { api } from '@/lib/api-client'
 import type { Session } from '@/types'
@@ -27,10 +28,12 @@ function ChatPage() {
     connected,
     activeSessionId,
     activeProjectId,
+    detectedProject,
     sendMessage,
     loadSession,
     newSession,
     setActiveProject,
+    dismissDetection,
     disconnect,
     connect,
   } = useChatStore()
@@ -102,6 +105,15 @@ function ChatPage() {
             </Button>
           </div>
         </div>
+
+        {/* AI Detection Badge (Phase 2 stub — always hidden) */}
+        {detectedProject && !activeProjectId && (
+          <AiDetectionBadge
+            project={detectedProject}
+            onApply={() => setActiveProject(detectedProject.id)}
+            onDismiss={() => dismissDetection(detectedProject.id)}
+          />
+        )}
 
         {/* Messages */}
         <Card className="flex-1 flex flex-col min-h-0 mx-4 my-3 border-t-0">

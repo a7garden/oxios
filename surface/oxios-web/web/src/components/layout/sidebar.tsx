@@ -7,6 +7,7 @@ import {
   Calendar,
   CheckSquare,
   Dna,
+  FolderKanban,
   FolderOpen,
   GitBranch,
   LayoutDashboard,
@@ -61,6 +62,12 @@ const navGroups: { labelKey: string; items: NavItem[] }[] = [
       { labelKey: 'common.seeds', href: '/seeds', icon: <Dna className="h-4 w-4" /> },
       { labelKey: 'common.personas', href: '/personas', icon: <Theater className="h-4 w-4" /> },
       { labelKey: 'common.skills', href: '/skills', icon: <Zap className="h-4 w-4" /> },
+    ],
+  },
+  {
+    labelKey: 'common.projects',
+    items: [
+      { labelKey: 'common.projects', href: '/projects', icon: <FolderKanban className="h-4 w-4" /> },
     ],
   },
   {

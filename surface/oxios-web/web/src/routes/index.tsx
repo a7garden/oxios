@@ -15,6 +15,7 @@ import {
 import { useTranslation } from 'react-i18next'
 import { ErrorState } from '@/components/shared/error-state'
 import { LoadingCards } from '@/components/shared/loading'
+import { ModelUsageCard } from '@/components/dashboard/model-usage-card'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { api } from '@/lib/api-client'
@@ -196,6 +197,9 @@ function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Model Usage — routing stats (RFC-011) */}
+      <ModelUsageCard />
 
       {/* Quick Links — 2x4 grid */}
       <div>
