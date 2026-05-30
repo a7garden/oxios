@@ -1,13 +1,13 @@
 [package]
 name = "oxios-telegram"
-version = "0.4.0"
+version = "0.5.0"
 edition = "2021"
 description = "Telegram channel for Oxios Agent OS"
 license = "MIT"
 repository = "https://github.com/a7garden/oxios"
 
 [dependencies]
-oxios-gateway = { version = "0.4.0", path = "../../crates/oxios-gateway" }
+oxios-gateway = { version = "0.5.0", path = "../../crates/oxios-gateway" }
 anyhow = { workspace = true }
 async-trait = { workspace = true }
 reqwest = { workspace = true }

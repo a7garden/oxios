@@ -5,6 +5,74 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2026-05-30
+
+### Added
+
+#### Architecture Review Implementation (RFC-013~020)
+
+- **Gateway Event-Driven** (RFC-013) — `tokio::select!` + shared `mpsc` channel replacing polling loop. Semaphore-bounded concurrency (32). Per-channel `tokio::spawn` receive tasks with graceful shutdown
+- **Channel UX Unification** (RFC-014) — Shared `format.rs` module (CLI/Telegram/Web). `ErrorKind` classification (`error_classify.rs`). Typed `ResponseMeta` (session_id, space_id, seed_id, phase, evaluation_passed, duration_ms). `ChannelFormatter` trait
+- **Security Model Integration** (RFC-015) — 4-layer `AccessGate` (CSpace → RBAC → Permissions → ExecConfig) with short-circuit evaluation. `AuditSink` for policy decision recording. `AgentContext` (who/why/where) tracking. `GatedTool` wrapper for permission enforcement
+- **Proactive Recall & SONA** (RFC-020) — Activated proactive recall at session start and topic transitions. SONA learning engine: trajectory recording, pattern distillation, embedding-based similarity
+- **Ouroboros Evolution Loop** (RFC-019) — Full evaluate + evolve cycle connected. `should_evaluate()`, structured evaluation with caching, LLM-based seed evolution with max iteration control
+
+#### Memory Infrastructure (RFC-012)
+
+- **SQLite Memory Store** — Persistent memory backend replacing in-memory-only storage
+- **GGUF Embedding Provider** — Local embedding via llama-gguf (replacing MLX for cross-platform support)
+- **PageRank** — Importance scoring via link graph analysis
+- **Hyperbolic Embeddings** — Hierarchical memory representation
+- **Flash Attention** — Efficient context window utilization
+- **Auto Memory Bridge** — Automatic memory operations during agent execution
+
+#### Observability & Routing
+
+- **Observability Module** — `Tracer`, `CostTracker`, `AuditLog` for production monitoring
+- **Model Routing** — `EngineConfig` + `RoutingControl` for complexity-based model selection
+- **ProviderPool** — Rate limiting across LLM providers
+- **AgentPool** — Session persistence for multi-turn conversations without re-creation
+- **StructuredOutput** — Evaluation result parsing with typed output
+
+#### Frontend
+
+- **i18n** — English and Korean support with react-i18next
+- **Session Prune API** — `DELETE /api/sessions/prune` for stale session cleanup
+
+#### Coordination
+
+- **Middleware Pipeline** — Audit logging middleware for agent execution
+- **Coordination Module** — Multi-agent coordination primitives
+
+### Changed
+
+- **oxi-sdk 0.22.0 → 0.23.0** — Removed direct `oxi-ai` deps, use `oxi_sdk::Oxi` via `OxiBuilder`
+- **Agent Runtime** — Uses `Agent::run_streaming()` instead of deprecated `AgentLoop`
+- **Kernel Re-exports** — 33 dead re-exports moved to `sdk_exports` module
+- **Web surface promotion** — `channels/oxios-web` → `surface/oxios-web` (first-class citizen)
+- **Frontend auth** — `getToken()` / `api-client` / `sse-client` unified to `useAuthStore` (single source of truth)
+- **Config UX** — `toml_edit`-based `config set` (comment-preserving). Added `config list`, `config reset` subcommands
+- **Clippy** — 82 → 0 warnings across entire workspace
+- **Version bumped** to `0.5.0`
+
+### Fixed
+
+- **MutexGuard across await** in `sona.rs` — potential deadlock eliminated
+- **agent_id RBAC bug** — `can_access_path_in_workspace` now receives real `AgentId` instead of random UUID
+- **ExecTool production connection** — `with_exec_tool()` properly wired in kernel assembly
+- **SQLite deadlocks** in memory tests + CJK BM25 tokenization support
+- **Engine credential injection** — `validate_key` improvement for multi-provider setup
+- **Release workflow** — Path corrected from `channels/oxios-web` to `surface/oxios-web`
+- **`ko-KR` hardcoded locale** → browser default locale in chat UI
+
+### Removed
+
+- **`reasoning_bank.rs`** — Unused module (RFC-017)
+- **`rvf_store.rs`** — Unused module (RFC-017)
+- **`lateral.rs` / `regression.rs`** in ouroboros — Superseded by integrated evolution loop
+- **`oxi-ai` direct dependency** — All provider construction via `oxi-sdk`
+- **280+ missing_docs warnings** — Resolved across kernel crate
+
 ## [0.4.0] - 2026-05-25
 
 ### Added
