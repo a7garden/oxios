@@ -201,6 +201,14 @@ impl Kernel {
         self.gateway.clone()
     }
 
+    /// Get the ProjectManager reference.
+    /// Panics if SQLite is not enabled (project_manager is None).
+    pub fn project_manager(&self) -> Arc<oxios_kernel::ProjectManager> {
+        self.project_manager
+            .clone()
+            .expect("ProjectManager not available — SQLite must be enabled")
+    }
+
     /// Build a BrowserApi facade based on feature flag and config.
     #[cfg(feature = "browser")]
     fn build_browser_api(&self) -> oxios_kernel::BrowserApi {

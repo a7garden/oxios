@@ -214,6 +214,12 @@ enum Command {
         action: MarketplaceAction,
     },
 
+    /// Manage registered projects (RFC-011).
+    Project {
+        #[command(subcommand)]
+        action: ProjectAction,
+    },
+
     /// Generate shell completion script.
     Completion { shell: Shell },
 }
@@ -301,6 +307,46 @@ enum MarketplaceAction {
     },
     /// Check for available updates.
     Updates,
+}
+
+#[derive(Debug, Subcommand)]
+enum ProjectAction {
+    /// List all registered projects.
+    List,
+
+    /// Show project details.
+    Show {
+        /// Project name or ID.
+        name: String,
+    },
+
+    /// Register a new project.
+    Add {
+        /// Project name (unique).
+        name: String,
+
+        /// Filesystem path(s) for the project.
+        #[arg(short, long = "path", num_args = 1..)]
+        paths: Vec<String>,
+
+        /// Tags for keyword matching.
+        #[arg(short, long = "tag", num_args = 1..)]
+        tags: Vec<String>,
+
+        /// Display emoji.
+        #[arg(short, long, default_value = "📦")]
+        emoji: String,
+
+        /// Description.
+        #[arg(short, long)]
+        description: Option<String>,
+    },
+
+    /// Remove a project.
+    Remove {
+        /// Project name or ID.
+        name: String,
+    },
 }
 
 // ─── Constants & helpers ───────────────────────────────────────────────────
@@ -1699,6 +1745,94 @@ async fn run() -> Result<()> {
                         Err(e) => {
                             eprintln!("  {} Failed to check updates: {}", style("✗").red().bold(), e);
                         }
+                    }
+                }
+            }
+            Ok(())
+        }
+
+        Some(Command::Project { action }) => {
+            let pm = kernel.project_manager();
+            match action {
+                ProjectAction::List => {
+                    let projects = pm.list_projects();
+                    if projects.is_empty() {
+                        println!("No projects registered.");
+                        println!("Use `oxios project add <name> --path /path/to/project` to register one.");
+                    } else {
+                        println!("{}", style(format!("Projects ({}):", projects.len())).bold());
+                        println!("{}", "─".repeat(50));
+                        for p in &projects {
+                            let paths_str = if p.paths.is_empty() {
+                                "(no paths)".to_string()
+                            } else {
+                                p.paths.iter().map(|x| x.to_string_lossy().to_string()).collect::<Vec<_>>().join(", ")
+                            };
+                            println!(
+                                "  {} {} — {}",
+                                p.emoji, style(&p.name).bold(), &paths_str
+                            );
+                            if !p.tags.is_empty() {
+                                println!("     tags: {}", p.tags.join(", "));
+                            }
+                        }
+                    }
+                }
+                ProjectAction::Show { name } => {
+                    let project = if let Ok(id) = uuid::Uuid::parse_str(name) {
+                        pm.get_project(id)
+                    } else {
+                        pm.get_project_by_name(name)
+                    };
+                    match project {
+                        Some(p) => {
+                            println!("{}", style(format!("{} {}", p.emoji, p.name)).bold());
+                            println!("{}", "─".repeat(30));
+                            println!("  ID:          {}", p.id);
+                            if !p.description.is_empty() {
+                                println!("  Description: {}", p.description);
+                            }
+                            println!("  Source:       {}", p.source);
+                            println!("  Paths:       {}", if p.paths.is_empty() { "(none)".to_string() } else { p.paths.iter().map(|x| x.to_string_lossy().to_string()).collect::<Vec<_>>().join(", ") });
+                            if !p.tags.is_empty() {
+                                println!("  Tags:        {}", p.tags.join(", "));
+                            }
+                            println!("  Created:     {}", p.created_at.to_rfc3339());
+                            println!("  Last active: {}", p.last_active_at.to_rfc3339());
+                        }
+                        None => eprintln!("{} Project '{}' not found", style("✗").red().bold(), name),
+                    }
+                }
+                ProjectAction::Add { name, paths, tags, emoji, description } => {
+                    let path_bufs: Vec<_> = paths.iter().map(|p| std::path::PathBuf::from(p)).collect();
+                    match pm.create_project(
+                        name.clone(),
+                        path_bufs,
+                        tags.clone(),
+                        Some(emoji.clone()),
+                        description.clone(),
+                        oxios_kernel::ProjectSource::Manual,
+                    ) {
+                        Ok(p) => {
+                            println!("{} Project '{}' created ({})", style("✓").green().bold(), p.name, p.id);
+                        }
+                        Err(e) => {
+                            eprintln!("{} Failed to create project: {}", style("✗").red().bold(), e);
+                        }
+                    }
+                }
+                ProjectAction::Remove { name } => {
+                    let project = if let Ok(id) = uuid::Uuid::parse_str(&name) {
+                        pm.get_project(id).map(|p| p.id)
+                    } else {
+                        pm.get_project_by_name(&name).map(|p| p.id)
+                    };
+                    match project {
+                        Some(id) => match pm.remove_project(id) {
+                            Ok(()) => println!("{} Project '{}' removed", style("✓").green().bold(), name),
+                            Err(e) => eprintln!("{} Failed to remove project: {}", style("✗").red().bold(), e),
+                        },
+                        None => eprintln!("{} Project '{}' not found", style("✗").red().bold(), name),
                     }
                 }
             }
