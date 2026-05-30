@@ -46,7 +46,7 @@ pub(crate) use budget_routes::{
     handle_budget_get, handle_budget_list, handle_budget_remove, handle_budget_reserve,
     handle_budget_reset, handle_budget_set,
 };
-pub(crate) use chat::{handle_chat, handle_chat_stream, handle_chat_ticket};
+pub(crate) use chat::{handle_chat, handle_chat_stream, handle_chat_ticket, handle_session_tool_calls};
 pub(crate) use cron_jobs::{
     handle_cron_job_create, handle_cron_job_delete, handle_cron_job_get, handle_cron_job_trigger,
     handle_cron_jobs_list, update_cron_job,
@@ -65,7 +65,10 @@ pub(crate) use git_routes::{
 };
 pub(crate) use infra::{
     handle_audit_log, handle_metrics, handle_permissions_get, handle_permissions_put,
-    handle_scheduler_stats, handle_scheduler_tasks, handle_security_permissions,
+    handle_mcp_server_delete, handle_mcp_server_refresh, handle_mcp_server_register,
+    handle_mcp_server_toggle, handle_mcp_servers_list, handle_mcp_tool_call,
+    handle_mcp_tools_list, handle_scheduler_stats, handle_scheduler_tasks,
+    handle_security_permissions,
 };
 pub(crate) use knowledge_routes::{
     handle_knowledge_backlinks, handle_knowledge_chat_append, handle_knowledge_chat_delete,
@@ -103,7 +106,8 @@ pub(crate) use workspace::{
     handle_memory_semantic_search, handle_seed_evolution, handle_seed_get, handle_seeds_list,
     handle_skill_content, handle_skill_create, handle_skill_delete, handle_skill_disable,
     handle_skill_enable, handle_skill_get, handle_skills_list,
-    handle_workspace_file_get, handle_workspace_file_put, handle_workspace_tree,
+    handle_workspace_file_create, handle_workspace_file_delete, handle_workspace_file_get,
+    handle_workspace_file_put, handle_workspace_tree,
 };
 
 // ---------------------------------------------------------------------------
@@ -191,6 +195,14 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
             "/api/workspace/file/{*path}",
             put(handle_workspace_file_put),
         )
+        .route(
+            "/api/workspace/file/{*path}",
+            post(handle_workspace_file_create),
+        )
+        .route(
+            "/api/workspace/file/{*path}",
+            delete(handle_workspace_file_delete),
+        )
         // Seeds
         .route("/api/seeds", get(handle_seeds_list))
         .route("/api/seeds/{id}", get(handle_seed_get))
@@ -226,6 +238,12 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         )
         .route("/api/permissions/{agent}", get(handle_permissions_get))
         .route("/api/permissions/{agent}", put(handle_permissions_put))
+        // MCP
+        .route("/api/mcp/servers", get(handle_mcp_servers_list).post(handle_mcp_server_register))
+        .route("/api/mcp/servers/{name}", delete(handle_mcp_server_delete))
+        .route("/api/mcp/servers/{name}/toggle", post(handle_mcp_server_toggle))
+        .route("/api/mcp/servers/{name}/refresh", post(handle_mcp_server_refresh))
+        .route("/api/mcp/tools", get(handle_mcp_tools_list).post(handle_mcp_tool_call))
         // Prometheus metrics
         .route("/api/metrics", get(handle_metrics))
         // Resources
@@ -265,6 +283,7 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         .route("/api/sessions/prune", post(handle_sessions_prune))
         .route("/api/sessions/{id}", get(handle_session_get))
         .route("/api/sessions/{id}", delete(handle_session_delete))
+        .route("/api/sessions/{id}/tool-calls", get(handle_session_tool_calls))
         // Cron Jobs
         .route("/api/cron-jobs", get(handle_cron_jobs_list))
         .route("/api/cron-jobs", post(handle_cron_job_create))

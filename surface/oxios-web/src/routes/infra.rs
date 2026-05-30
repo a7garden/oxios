@@ -279,7 +279,6 @@ pub(crate) async fn handle_permissions_put(
 // ---------------------------------------------------------------------------
 
 /// MCP server configuration response.
-#[allow(dead_code)] // Reserved for future MCP management API
 #[derive(Debug, Serialize)]
 pub(crate) struct McpServerResponse {
     name: String,
@@ -290,7 +289,6 @@ pub(crate) struct McpServerResponse {
 }
 
 /// GET /api/mcp/servers — List registered MCP servers.
-#[allow(dead_code)] // Reserved for future MCP management API
 pub(crate) async fn handle_mcp_servers_list(
     state: State<Arc<AppState>>,
 ) -> Json<Vec<McpServerResponse>> {
@@ -316,7 +314,6 @@ pub(crate) async fn handle_mcp_servers_list(
 }
 
 /// MCP server registration request.
-#[allow(dead_code)] // Reserved for future MCP management API
 #[derive(Debug, Deserialize)]
 pub(crate) struct McpServerRegisterRequest {
     name: String,
@@ -326,7 +323,6 @@ pub(crate) struct McpServerRegisterRequest {
 }
 
 /// POST /api/mcp/servers — Register a new MCP server and start it.
-#[allow(dead_code)] // Reserved for future MCP management API
 pub(crate) async fn handle_mcp_server_register(
     state: State<Arc<AppState>>,
     Json(body): Json<McpServerRegisterRequest>,
@@ -350,7 +346,6 @@ pub(crate) async fn handle_mcp_server_register(
 }
 
 /// MCP tool summary exposed to agents.
-#[allow(dead_code)] // Reserved for future MCP management API
 #[derive(Debug, Serialize)]
 pub(crate) struct McpToolResponse {
     name: String,
@@ -360,7 +355,6 @@ pub(crate) struct McpToolResponse {
 }
 
 /// GET /api/mcp/tools — List all available MCP tools.
-#[allow(dead_code)] // Reserved for future MCP management API
 pub(crate) async fn handle_mcp_tools_list(
     state: State<Arc<AppState>>,
 ) -> Json<Vec<McpToolResponse>> {
@@ -401,7 +395,6 @@ pub(crate) async fn handle_mcp_tools_list(
 }
 
 /// Request body for calling an MCP tool.
-#[allow(dead_code)] // Reserved for future MCP management API
 #[derive(Debug, Deserialize)]
 pub(crate) struct McpToolCallRequest {
     server: String,
@@ -411,7 +404,6 @@ pub(crate) struct McpToolCallRequest {
 }
 
 /// POST /api/mcp/tools — Call an MCP tool.
-#[allow(dead_code)] // Reserved for future MCP management API
 pub(crate) async fn handle_mcp_tool_call(
     state: State<Arc<AppState>>,
     Json(body): Json<McpToolCallRequest>,
@@ -434,6 +426,45 @@ pub(crate) async fn handle_mcp_tool_call(
         "content": content,
         "is_error": result.is_error,
     })))
+}
+
+/// DELETE /api/mcp/servers/{name} — Disconnect and remove an MCP server.
+pub(crate) async fn handle_mcp_server_delete(
+    state: State<Arc<AppState>>,
+    Path(name): Path<String>,
+) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    state.kernel.mcp.remove_server(&name).await.map_err(|e| {
+        tracing::error!(server = %name, error = %e, "Failed to remove MCP server");
+        (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+    })?;
+    tracing::info!(server = %name, "MCP server removed");
+    Ok(Json(serde_json::json!({ "status": "removed", "name": name })))
+}
+
+/// POST /api/mcp/servers/{name}/toggle — Toggle MCP server enabled/disabled.
+pub(crate) async fn handle_mcp_server_toggle(
+    state: State<Arc<AppState>>,
+    Path(name): Path<String>,
+) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    let enabled = state.kernel.mcp.toggle_server(&name).await.map_err(|e| {
+        tracing::error!(server = %name, error = %e, "Failed to toggle MCP server");
+        (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+    })?;
+    tracing::info!(server = %name, enabled = enabled, "MCP server toggled");
+    Ok(Json(serde_json::json!({ "status": "toggled", "name": name, "enabled": enabled })))
+}
+
+/// POST /api/mcp/servers/{name}/refresh — Refresh tools for an MCP server.
+pub(crate) async fn handle_mcp_server_refresh(
+    state: State<Arc<AppState>>,
+    Path(name): Path<String>,
+) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    state.kernel.mcp.init_server(&name).await.map_err(|e| {
+        tracing::error!(server = %name, error = %e, "Failed to refresh MCP server");
+        (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+    })?;
+    tracing::info!(server = %name, "MCP server tools refreshed");
+    Ok(Json(serde_json::json!({ "status": "refreshed", "name": name })))
 }
 
 // ---------------------------------------------------------------------------
