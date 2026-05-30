@@ -47,7 +47,6 @@ pub struct Kernel {
     budget_manager: Arc<BudgetManager>,
     resource_monitor: Arc<ResourceMonitor>,
     project_manager: Option<Arc<ProjectManager>>,
-    space_manager: Arc<oxios_kernel::SpaceManager>,
     start_time: std::time::Instant,
     /// Path to config.toml (for persistence).
     config_path: PathBuf,
@@ -177,7 +176,6 @@ impl Kernel {
                         self.config.clone(),
                         self.start_time,
                     ),
-                    oxios_kernel::SpaceApi::new(self.space_manager.clone(), self.event_bus.clone()),
                     self.project_manager.clone().map(oxios_kernel::ProjectApi::new),
                     oxios_kernel::ExecApi::new(
                         Arc::new(self.config.exec.clone()),
@@ -795,9 +793,6 @@ impl KernelBuilder {
                     config.clone(),
                     std::time::Instant::now(),
                 ),
-                oxios_kernel::SpaceApi::new(Arc::new(
-                    oxios_kernel::SpaceManager::new(state_store.clone(), event_bus.clone()).await?
-                ), event_bus.clone()),
                 project_manager.clone().map(oxios_kernel::ProjectApi::new),
                 oxios_kernel::ExecApi::new(Arc::new(config.exec.clone()), access_manager.clone()),
                 build_browser_api_value(&config),
@@ -937,9 +932,6 @@ impl KernelBuilder {
             budget_manager,
             resource_monitor,
             project_manager,
-            space_manager: Arc::new(
-                oxios_kernel::SpaceManager::new(state_store, event_bus.clone()).await?
-            ),
             start_time: std::time::Instant::now(),
             config_path,
             handle_cache: OnceLock::new(),

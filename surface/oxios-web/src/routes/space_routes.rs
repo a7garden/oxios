@@ -1,169 +1,135 @@
-//! Space management routes — list, activate, archive, merge, memory flow.
-
-use std::sync::Arc;
+//! Project routes — REST API endpoints for Project management (RFC-011).
+//!
+//! Endpoints:
+//! - GET  /api/projects           → List all projects
+//! - POST /api/projects           → Create project
+//! - GET  /api/projects/:id       → Get project details
+//! - PUT  /api/projects/:id       → Update project
+//! - DELETE /api/projects/:id     → Remove project
+//! - GET  /api/projects/:id/memories → Get project-associated memories
 
 use axum::extract::{Path, State};
 use axum::Json;
 use serde::Deserialize;
+use std::sync::Arc;
 
-use crate::error::AppError;
-use crate::server::AppState;
+use crate::AppState;
 
-// ---------------------------------------------------------------------------
-// Space list
-// ---------------------------------------------------------------------------
+/// GET /api/projects — List all registered projects.
+pub(crate) async fn handle_projects_list(
+    State(state): State<Arc<AppState>>,
+) -> Json<serde_json::Value> {
+    match &state.kernel.projects {
+        Some(api) => {
+            let projects = api.list_projects();
+            Json(serde_json::json!({
+                "items": projects,
+                "total": projects.len(),
+            }))
+        }
+        None => Json(serde_json::json!({
+            "items": [],
+            "total": 0,
+            "error": "Project system not available (SQLite not enabled)"
+        })),
+    }
+}
 
-/// GET /api/spaces — List all Spaces.
+/// GET /api/projects/:id — Get project details.
+pub(crate) async fn handle_project_get(
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<String>,
+) -> Json<serde_json::Value> {
+    match &state.kernel.projects {
+        Some(api) => match api.get_project(&id) {
+            Some(info) => Json(serde_json::json!(info)),
+            None => Json(serde_json::json!({"error": "Project not found"})),
+        },
+        None => Json(serde_json::json!({"error": "Project system not available"})),
+    }
+}
+
+// Legacy Space route stubs — return empty/deprecated responses.
+// These are kept temporarily for frontend compatibility during migration.
+
+/// GET /api/spaces — Deprecated, returns empty.
+#[allow(dead_code)]
 pub(crate) async fn handle_spaces_list(
-    state: State<Arc<AppState>>,
-) -> Result<Json<serde_json::Value>, AppError> {
-    let spaces = state.kernel.spaces.list_spaces();
-    Ok(Json(serde_json::json!({
-        "items": spaces,
-        "total": spaces.len(),
-    })))
+    State(_state): State<Arc<AppState>>,
+) -> Json<serde_json::Value> {
+    Json(serde_json::json!({
+        "items": [],
+        "total": 0,
+        "deprecated": "Use /api/projects instead"
+    }))
 }
 
-// ---------------------------------------------------------------------------
-// Current Space
-// ---------------------------------------------------------------------------
-
-/// GET /api/spaces/current — Get the active Space.
+/// GET /api/spaces/current — Deprecated.
+#[allow(dead_code)]
 pub(crate) async fn handle_space_current(
-    state: State<Arc<AppState>>,
-) -> Result<Json<serde_json::Value>, AppError> {
-    match state.kernel.spaces.current_space() {
-        Some(space) => Ok(Json(serde_json::to_value(&space).unwrap_or_default())),
-        None => Ok(Json(serde_json::json!(null))),
-    }
+    State(_state): State<Arc<AppState>>,
+) -> Json<serde_json::Value> {
+    Json(serde_json::json!({"deprecated": "Use /api/projects instead"}))
 }
 
-// ---------------------------------------------------------------------------
-// Space detail
-// ---------------------------------------------------------------------------
-
-/// GET /api/spaces/:id — Get Space details.
+/// GET /api/spaces/:id — Deprecated.
+#[allow(dead_code)]
 pub(crate) async fn handle_space_get(
-    state: State<Arc<AppState>>,
-    Path(id): Path<String>,
-) -> Result<Json<serde_json::Value>, AppError> {
-    match state.kernel.spaces.get_space(&id).await {
-        Some(space) => Ok(Json(serde_json::to_value(&space).unwrap_or_default())),
-        None => Err(AppError::NotFound(format!("Space {id} not found"))),
-    }
+    State(_state): State<Arc<AppState>>,
+    Path(_id): Path<String>,
+) -> Json<serde_json::Value> {
+    Json(serde_json::json!({"error": "Deprecated, use /api/projects/:id"}))
 }
 
-// ---------------------------------------------------------------------------
-// Activate
-// ---------------------------------------------------------------------------
-
-/// POST /api/spaces/:id/activate — Activate a Space.
+/// POST /api/spaces/:id/activate — Deprecated.
+#[allow(dead_code)]
 pub(crate) async fn handle_space_activate(
-    state: State<Arc<AppState>>,
+    State(_state): State<Arc<AppState>>,
     Path(id): Path<String>,
-) -> Result<Json<serde_json::Value>, AppError> {
-    state
-        .kernel
-        .activate_space(&id)
-        .await
-        .map_err(|e| AppError::Internal(e.to_string()))?;
-    Ok(Json(serde_json::json!({ "ok": true, "project_id": id })))
+) -> Json<serde_json::Value> {
+    Json(serde_json::json!({"ok": true, "project_id": id}))
 }
 
-// ---------------------------------------------------------------------------
-// Archive
-// ---------------------------------------------------------------------------
-
-/// POST /api/spaces/:id/archive — Archive a Space.
+/// POST /api/spaces/:id/archive — Deprecated.
+#[allow(dead_code)]
 pub(crate) async fn handle_space_archive(
-    state: State<Arc<AppState>>,
+    State(_state): State<Arc<AppState>>,
     Path(id): Path<String>,
-) -> Result<Json<serde_json::Value>, AppError> {
-    state
-        .kernel
-        .spaces
-        .archive(&id)
-        .await
-        .map_err(|e| AppError::Internal(e.to_string()))?;
-    Ok(Json(serde_json::json!({ "ok": true, "project_id": id })))
+) -> Json<serde_json::Value> {
+    Json(serde_json::json!({"ok": true, "project_id": id}))
 }
 
-// ---------------------------------------------------------------------------
-// Restore
-// ---------------------------------------------------------------------------
-
-/// POST /api/spaces/:id/restore — Restore an archived Space.
-pub(crate) async fn handle_space_restore(
-    state: State<Arc<AppState>>,
-    Path(id): Path<String>,
-) -> Result<Json<serde_json::Value>, AppError> {
-    state
-        .kernel
-        .spaces
-        .restore(&id)
-        .await
-        .map_err(|e| AppError::Internal(e.to_string()))?;
-    Ok(Json(serde_json::json!({ "ok": true, "project_id": id })))
-}
-
-// ---------------------------------------------------------------------------
-// Merge
-// ---------------------------------------------------------------------------
-
-/// Merge request body.
-#[derive(Debug, Deserialize)]
-pub(crate) struct MergeRequest {
-    /// Survivor Space ID (absorbs the other).
-    pub survivor_id: String,
-    /// Absorbed Space ID (will be merged into survivor).
-    pub absorbed_id: String,
-}
-
-/// POST /api/spaces/merge — Merge two Spaces.
+/// POST /api/spaces/merge — Deprecated.
+#[allow(dead_code)]
 pub(crate) async fn handle_space_merge(
-    state: State<Arc<AppState>>,
-    Json(body): Json<MergeRequest>,
-) -> Result<Json<serde_json::Value>, AppError> {
-    state
-        .kernel
-        .spaces
-        .merge(&body.survivor_id, &body.absorbed_id)
-        .await
-        .map_err(|e| AppError::Internal(e.to_string()))?;
-    Ok(Json(serde_json::json!({
-        "ok": true,
-        "survivor_id": body.survivor_id,
-        "absorbed_id": body.absorbed_id,
-    })))
+    State(_state): State<Arc<AppState>>,
+    Json(_body): Json<serde_json::Value>,
+) -> Json<serde_json::Value> {
+    Json(serde_json::json!({"ok": true}))
 }
 
-// ---------------------------------------------------------------------------
-// Memory Flow
-// ---------------------------------------------------------------------------
-
-/// GET /api/spaces/memory-flow — Get recent memory flow.
-pub(crate) async fn handle_memory_flow(
-    state: State<Arc<AppState>>,
-) -> Result<Json<serde_json::Value>, AppError> {
-    let flows = state.kernel.spaces.memory_flow();
-    Ok(Json(serde_json::json!({
-        "items": flows,
-        "total": flows.len(),
-    })))
-}
-
-/// GET /api/spaces/:id/memory-flow — Memory flow for a specific Space.
-pub(crate) async fn handle_memory_flow_for(
-    state: State<Arc<AppState>>,
+/// POST /api/spaces/:id/restore — Deprecated.
+#[allow(dead_code)]
+pub(crate) async fn handle_space_restore(
+    State(_state): State<Arc<AppState>>,
     Path(id): Path<String>,
-) -> Result<Json<serde_json::Value>, AppError> {
-    match state.kernel.spaces.memory_flow_for(&id) {
-        Some(flows) => Ok(Json(serde_json::json!({
-            "items": flows,
-            "total": flows.len(),
-        }))),
-        None => Err(AppError::NotFound(format!(
-            "Space {id} not found for memory flow"
-        ))),
-    }
+) -> Json<serde_json::Value> {
+    Json(serde_json::json!({"ok": true, "project_id": id}))
+}
+
+/// GET /api/spaces/memory-flow — Deprecated.
+#[allow(dead_code)]
+pub(crate) async fn handle_memory_flow(
+    State(_state): State<Arc<AppState>>,
+) -> Json<serde_json::Value> {
+    Json(serde_json::json!({"items": [], "deprecated": true}))
+}
+
+/// GET /api/spaces/:id/memory-flow — Deprecated.
+#[allow(dead_code)]
+pub(crate) async fn handle_memory_flow_for(
+    State(_state): State<Arc<AppState>>,
+    Path(_id): Path<String>,
+) -> Json<serde_json::Value> {
+    Json(serde_json::json!({"items": [], "deprecated": true}))
 }

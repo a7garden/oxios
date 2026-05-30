@@ -230,7 +230,7 @@ pub use session_context::SessionContext;
 pub use kernel_handle::{
     A2aApi, AgentApi, BrowserApi, CopilotResponse, EngineApi, EngineConfigResponse, ExecApi,
     ExtensionApi, InfraApi, KnowledgeContext, KnowledgeLens, KnowledgeNote, McpApi, MemoryNote,
-    ModelInfo, PersonaApi, ProjectApi, ProviderInfo, SecurityApi, SpaceApi, StateApi, ValidateKeyResult,
+    ModelInfo, PersonaApi, ProjectApi, ProviderInfo, SecurityApi, StateApi, ValidateKeyResult,
 };
 
 // ─── oxi-sdk re-exports ─────────────────────────────────────────────

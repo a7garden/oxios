@@ -30,7 +30,6 @@ pub use marketplace_api::MarketplaceApi;
 pub use mcp_api::McpApi;
 pub use persona_api::PersonaApi;
 pub use security_api::SecurityApi;
-pub use space_api::SpaceApi;
 pub use project_api::ProjectApi;
 pub use state_api::StateApi;
 
@@ -88,8 +87,6 @@ pub struct KernelHandle {
     pub mcp: McpApi,
     /// Infrastructure: Git/scheduler/cron/resources/events/system.
     pub infra: InfraApi,
-    /// Space management: context partitioning, knowledge flow.
-    pub spaces: SpaceApi,
     /// Project management: work context (RFC-011).
     pub projects: Option<ProjectApi>,
     /// Execution: config + access management.
@@ -122,7 +119,6 @@ impl KernelHandle {
         extensions: ExtensionApi,
         mcp: McpApi,
         infra: InfraApi,
-        spaces: SpaceApi,
         projects: Option<ProjectApi>,
         exec: ExecApi,
         browser: BrowserApi,
@@ -140,7 +136,6 @@ impl KernelHandle {
             extensions,
             mcp,
             infra,
-            spaces,
             projects,
             exec,
             browser,
@@ -175,7 +170,6 @@ impl KernelHandle {
         access_manager: Arc<parking_lot::Mutex<AccessManager>>,
         config: OxiosConfig,
         start_time: Instant,
-        space_manager: Arc<SpaceManager>,
     ) -> Self {
         let knowledge_dir = state_store.base_path.join("knowledge");
         let knowledge = Arc::new(
@@ -212,7 +206,6 @@ impl KernelHandle {
                 config.clone(),
                 start_time,
             ),
-            spaces: SpaceApi::new(space_manager, event_bus),
             projects: None,
             exec: ExecApi::new(Arc::new(config.exec.clone()), access_manager),
             #[allow(clippy::default_trait_access)]
@@ -339,16 +332,6 @@ impl KernelHandle {
     /// Get kernel start time.
     pub fn start_time(&self) -> std::time::Instant {
         self.infra.start_time
-    }
-
-    /// Activate a Space.
-    ///
-    /// Note: Knowledge base is global (`~/.oxios/knowledge/`), not Space-scoped.
-    /// Space activation only switches the agent's execution context and memory graph.
-    pub async fn activate_space(&self, id: &str) -> anyhow::Result<()> {
-        self.spaces.activate(id).await?;
-        tracing::info!(space_id = %id, "Space activated (knowledge base is global)");
-        Ok(())
     }
 
     /// Marketplace API — ClawHub search, install, update.

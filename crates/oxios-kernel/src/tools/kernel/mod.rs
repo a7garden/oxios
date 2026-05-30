@@ -6,7 +6,7 @@
 //!
 //! ## Tools
 //!
-//! - [`SpaceTool`] — Space management (list, get, create, archive, merge, restore)
+//! - [`ProjectTool`] — Project management (list, get, link_memory, unlink_memory)
 //! - [`AgentTool`] — Agent lifecycle (list, kill, budget)
 //! - [`PersonaTool`] — Persona management (list, set_active, get)
 //! - [`CronTool`] — Cron scheduling (list, add, remove, trigger)
@@ -23,7 +23,6 @@ pub mod persona_tool;
 pub mod project_tool;
 pub mod resource_tool;
 pub mod security_tool;
-pub mod space_tool;
 
 pub use agent_tool::AgentTool as KernelAgentTool;
 pub use budget_tool::BudgetTool;
@@ -34,7 +33,6 @@ pub use persona_tool::PersonaTool;
 pub use project_tool::ProjectTool;
 pub use resource_tool::ResourceTool;
 pub use security_tool::SecurityTool;
-pub use space_tool::SpaceTool;
 
 use crate::types::AgentId;
 use crate::KernelHandle;
@@ -56,7 +54,6 @@ pub fn register_all_kernel_tools(registry: &ToolRegistry, kernel: &KernelHandle,
     registry.register(crate::tools::MemoryWriteTool::from_kernel(kernel));
 
     // Kernel domain tools (take &KernelHandle)
-    registry.register(SpaceTool::from_kernel(kernel));
     registry.register(ProjectTool::from_kernel(kernel));
     registry.register(KernelAgentTool::from_kernel(kernel));
     registry.register(PersonaTool::from_kernel(kernel));

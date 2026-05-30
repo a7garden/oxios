@@ -163,7 +163,7 @@ pub fn register_tools_from_cspace(
                         registry.register(MemoryWriteTool::from_kernel(kernel));
                     }
                 }
-                "space" => registry.register(SpaceTool::from_kernel(kernel)),
+                "space" => registry.register(ProjectTool::from_kernel(kernel)),
                 "agent" => registry.register(KernelAgentTool::from_kernel(kernel)),
                 "a2a" => {
                     registry.register(A2aDelegateTool::from_kernel(kernel, agent_id));
@@ -251,7 +251,7 @@ pub fn register_tools_from_cspace_gated(
                         registry.register(MemoryWriteTool::from_kernel(kernel));
                     }
                 }
-                "space" => registry.register(SpaceTool::from_kernel(kernel)),
+                "space" => registry.register(ProjectTool::from_kernel(kernel)),
                 "agent" => registry.register(KernelAgentTool::from_kernel(kernel)),
                 "a2a" => {
                     registry.register(A2aDelegateTool::from_kernel(kernel, agent_id));

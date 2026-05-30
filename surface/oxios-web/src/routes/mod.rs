@@ -98,10 +98,11 @@ pub(crate) use resource_routes::{
     handle_resource_history, handle_resource_overload, handle_resource_snapshot,
 };
 pub(crate) use space_routes::{
-
-    handle_memory_flow, handle_memory_flow_for, handle_space_activate, handle_space_archive,
-    handle_space_current, handle_space_get, handle_space_merge, handle_space_restore,
-    handle_spaces_list,
+    handle_memory_flow, handle_memory_flow_for,
+    handle_project_get, handle_projects_list,
+    handle_space_activate, handle_space_archive,
+    handle_space_current, handle_space_get, handle_space_merge,
+    handle_space_restore, handle_spaces_list,
 };
 pub(crate) use system::{
     handle_agent_kill, handle_agents_list, handle_config_get, handle_config_put, handle_health,
