@@ -12,7 +12,6 @@ pub mod marketplace_api;
 pub mod mcp_api;
 pub mod persona_api;
 pub mod security_api;
-pub mod space_api;
 pub mod project_api;
 pub mod state_api;
 
@@ -50,7 +49,7 @@ use crate::persona_manager::PersonaManager;
 use crate::resource_monitor::ResourceMonitor;
 use crate::scheduler::AgentScheduler;
 use crate::skill::SkillManager;
-use crate::space::SpaceManager;
+use crate::project::ProjectManager;
 use crate::state_store::StateStore;
 use crate::supervisor::Supervisor;
 use serde::Serialize;

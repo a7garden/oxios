@@ -24,7 +24,7 @@
 //! assert!(cspace.len() > 0);
 //! ```
 
-use crate::space::SpaceId;
+use uuid::Uuid;
 use crate::types::AgentId;
 
 use super::types::{CSpace, Capability, CapabilityId, Issuer, ResourceRef, Rights};
@@ -82,7 +82,7 @@ impl CapabilityTemplate {
         let mut t = Self::standard();
         let extra = vec![
             (
-                ResourceRef::Space { id: SpaceId::nil() },
+                ResourceRef::Space { id: Uuid::nil() },
                 Rights::READ | Rights::WRITE,
             ),
             (

@@ -11,6 +11,7 @@
 //! - `manager.rs` — ProjectManager (CRUD, lookup, detection)
 //! - `detection.rs` — Detection logic (name/path/tag matching)
 
+pub mod conversation_buffer;
 pub mod detection;
 #[cfg(feature = "sqlite-memory")]
 pub mod manager;
@@ -21,6 +22,7 @@ use std::path::PathBuf;
 use uuid::Uuid;
 
 // ── Re-exports ──────────────────────────────────────────────
+pub use conversation_buffer::{ConversationBuffer, ConversationTurn};
 pub use detection::{detect_project, extract_path, find_by_id, find_by_name, DetectionResult};
 #[cfg(feature = "sqlite-memory")]
 pub use manager::{ProjectManager, ProjectManagerError};

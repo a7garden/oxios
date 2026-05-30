@@ -64,7 +64,6 @@ pub mod config;
 pub mod git_layer;
 pub mod resource_monitor;
 pub mod session_context;
-pub mod space;
 pub mod project;
 pub mod state_store;
 
@@ -201,14 +200,9 @@ pub use config::{
 };
 pub use git_layer::{CommitDiff, CommitContext, CommitInfo, DiffKind, DiffStats, FileDiff, GitLayer, LogEntry};
 pub use resource_monitor::{OverloadThreshold, ResourceMonitor, ResourceSnapshot};
-pub use space::{
-    extract_filesystem_path, match_keywords, ConversationBuffer, ConversationTurn, CrossRefEntry,
-    MemoryFlow, PathMatcher, Space, SpaceBridge, SpaceId, SpaceManager, SpaceManagerError,
-    SpaceSource,
-};
 pub use project::{
-    detect_project, extract_path, find_by_id, find_by_name, DetectionResult, Project,
-    ProjectId, ProjectSource,
+    detect_project, extract_path, find_by_id, find_by_name, ConversationBuffer,
+    ConversationTurn, DetectionResult, Project, ProjectId, ProjectSource,
 };
 #[cfg(feature = "sqlite-memory")]
 pub use project::{ProjectManager, ProjectManagerError};

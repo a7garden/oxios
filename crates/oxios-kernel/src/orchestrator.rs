@@ -25,8 +25,7 @@ use crate::event_bus::{EventBus, KernelEvent};
 use crate::git_layer::GitLayer;
 use crate::metrics::get_metrics;
 use crate::scheduler::Priority;
-use crate::project::{ProjectId, ProjectManager};
-use crate::space::ConversationBuffer;
+use crate::project::{ConversationBuffer, ProjectId, ProjectManager};
 use crate::state_store::StateStore;
 use crate::types::AgentId;
 
@@ -386,7 +385,7 @@ impl Orchestrator {
             // Record agent response in conversation buffer
             {
                 let mut buffer = self.conversation_buffer.write();
-                buffer.push_agent(&response_text, &Uuid::nil());
+                buffer.push_agent(&response_text, None);
             }
 
             // Record exchange in conversation history for multi-turn
@@ -494,7 +493,7 @@ impl Orchestrator {
         // but we record it for completeness.
         {
             let mut buffer = self.conversation_buffer.write();
-            buffer.push_agent("[interview: ready]", &Uuid::nil());
+            buffer.push_agent("[interview: ready]", None);
         }
 
         // Interview complete and ready.
@@ -590,7 +589,7 @@ impl Orchestrator {
         // Record agent response in conversation buffer (for multi-agent case)
         {
             let mut buffer = self.conversation_buffer.write();
-            buffer.push_agent("[multi-agent: complete]", &Uuid::nil());
+            buffer.push_agent("[multi-agent: complete]", None);
         }
 
         // Execute agent via lifecycle manager.
@@ -688,7 +687,7 @@ impl Orchestrator {
         // Record agent response in conversation buffer (for topic shift detection)
         {
             let mut buffer = self.conversation_buffer.write();
-            buffer.push_agent(&final_seed.goal, &Uuid::nil());
+            buffer.push_agent(&final_seed.goal, None);
         }
 
         Ok(OrchestrationResult {

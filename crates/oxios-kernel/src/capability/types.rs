@@ -23,7 +23,7 @@ use std::fmt;
 
 use serde::{Deserialize, Serialize};
 
-use crate::space::SpaceId;
+use uuid::Uuid;
 use crate::types::AgentId;
 
 /// Unique identifier for a capability.
@@ -185,7 +185,7 @@ pub enum ResourceRef {
     /// A workspace space.
     Space {
         /// Space identifier.
-        id: SpaceId,
+        id: Uuid,
     },
     /// Another agent (for inter-agent communication).
     Agent {
