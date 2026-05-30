@@ -227,7 +227,7 @@ mod tests {
         assert!(cache.get("test").is_some());
 
         // Wait for expiration
-        thread::sleep(Duration::from_secs(2));
+        thread::sleep(Duration::from_millis(1_100));
 
         // Should be expired
         assert!(cache.get("test").is_none());

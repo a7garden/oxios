@@ -1,0 +1,28 @@
+# Oxios nextest configuration
+# https://nexte.st/book/configuration.html
+
+[store]
+# Store test binaries in a dedicated directory for reuse across runs
+dir = "target/nextest"
+
+[profile.default]
+# Max concurrent tests — leave headroom for the rest of the system
+test-threads = "num-cpus"
+# Fail fast on first failure
+fail-fast = true
+# Mark tests slower than 1s as "slow"
+slow-timeout = { period = "2s", terminate-after = 2, grace-period = "10s" }
+# Treat warnings as non-failing (some tests intentionally produce warnings)
+status-level = "pass"
+# Final summary with failure details
+failure-output = "immediate-final"
+success-output = "never"
+
+[profile.ci]
+# CI profile: more retries for flaky tests, no fail-fast to see all failures
+fail-fast = false
+retries = 2
+
+[profile.default.junit]
+# JUnit XML output for CI integration
+path = "target/nextest/junit.xml"

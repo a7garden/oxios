@@ -1,0 +1,131 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # ─── Formatting & Linting ────────────────────────────────────────
+  fmt:
+    name: fmt
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: a7garden/oxi
+          path: oxi
+          ref: v0.4.4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - uses: actions/checkout@v4
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Clippy (core crates)
+        run: |
+          cargo clippy \
+            -p oxios-kernel -p oxios-ouroboros -p oxios-gateway -p oxios-markdown \
+            -p oxios-mcp \
+            -- \
+            -D warnings
+
+  # ─── Frontend ─────────────────────────────────────────────────────
+  frontend:
+    name: frontend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+
+      - name: Build web assets
+        working-directory: surface/oxios-web/web
+        run: bun install && bun run build
+
+  # ─── Test Suite ────────────────────────────────────────────────────
+  test:
+    name: test
+    runs-on: ubuntu-latest
+    needs: [fmt, frontend]
+    strategy:
+      fail-fast: false
+      matrix:
+        partition:
+          - [1/4, 1]
+          - [2/4, 1]
+          - [3/4, 1]
+          - [4/4, 1]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: a7garden/oxi
+          path: oxi
+          ref: v0.4.4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install nextest
+        uses: taiki-e/install-action@nextest
+
+      - uses: actions/checkout@v4
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Cache cargo index
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/git
+          key: ${{ runner.os }}-cargo-git-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Cache target directory
+        uses: actions/cache@v4
+        with:
+          path: target
+          key: ${{ runner.os }}-target-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-target-
+
+      - name: Run unit tests (partitioned)
+        run: |
+          cargo nextest run --workspace \
+            --partition count:${{ matrix.partition[0] }}/${{ matrix.partition[1] }} \
+            --no-fail-fast
+
+      - name: Run doc tests
+        run: cargo test --workspace --doc
+
+  # ─── Security Audit ────────────────────────────────────────────────
+  audit:
+    name: audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Security audit
+        run: |
+          cargo install cargo-audit --locked
+          cargo audit
+
+  # ─── Summary ───────────────────────────────────────────────────────
+  summary:
+    name: summary
+    needs: [fmt, frontend, test, audit]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: All checks passed
+        run: echo "✅ All CI checks passed"

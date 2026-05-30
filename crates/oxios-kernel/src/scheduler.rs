@@ -856,7 +856,7 @@ mod tests {
         let _ = scheduler.next_task();
 
         // Wait longer than the zombie timeout.
-        thread::sleep(Duration::from_secs(2));
+        thread::sleep(Duration::from_millis(1_100));
 
         // Reap zombies.
         let reaped = scheduler.reap_zombies();

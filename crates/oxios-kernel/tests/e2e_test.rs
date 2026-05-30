@@ -438,7 +438,7 @@ async fn test_phase_events_published() {
 
     let mut phase_started = 0;
     let mut phase_completed = 0;
-    let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(5);
+    let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(1);
 
     loop {
         let elapsed = deadline.saturating_duration_since(tokio::time::Instant::now());

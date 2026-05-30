@@ -555,7 +555,7 @@ mod tests {
         assert!(manager.reserve(&agent_id, 1).is_err());
 
         // Wait for window to expire
-        thread::sleep(Duration::from_secs(2));
+        thread::sleep(Duration::from_millis(1_100));
 
         // Should be able to reserve again
         let result = manager.reserve(&agent_id, 50);

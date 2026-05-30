@@ -716,7 +716,7 @@ mod tests {
     #[tokio::test]
     async fn test_shell_exec_timeout() {
         let tool = make_tool(vec![]);
-        let result = tool.shell_exec("sleep 300", 1_000, None).await;
+        let result = tool.shell_exec("sleep 300", 200, None).await;
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("timed out"));
     }

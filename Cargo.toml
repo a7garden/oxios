@@ -6,6 +6,12 @@ description = "Oxios Agent OS — Agent Operating System powered by oxi-sdk"
 license = "MIT"
 repository = "https://github.com/a7garden/oxios"
 
+# Optimize dev profile: dependencies compile at release speed,
+# workspace crates stay in debug mode for fast iteration.
+# This dramatically speeds up incremental compiles and linking.
+[profile.dev.package."*"]
+opt-level = 2
+
 [workspace]
 resolver = "2"
 members = [

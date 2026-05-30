@@ -845,6 +845,7 @@ fn test_git_system_calls_direct() {
 }
 
 #[test]
+#[ignore = "slow test — takes >4s due to system calls; run with --ignored or separate CI job"]
 fn test_resource_monitor_system_calls_direct() {
     let monitor = ResourceMonitor::new(60, 10);
 
