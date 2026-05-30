@@ -115,7 +115,7 @@ pub fn register_always_on_gated(
 /// | `Browser` | `EXECUTE` | `BrowserTool` *(browser feature)* |
 /// | `KernelDomain { "memory" }` | `READ` | `MemoryReadTool`, `MemorySearchTool` |
 /// | `KernelDomain { "memory" }` | `WRITE` | `MemoryWriteTool` |
-/// | `KernelDomain { "space" }` | any | `SpaceTool` |
+/// | `KernelDomain { "project" }` | any | `ProjectTool` |
 /// | `KernelDomain { "agent" }` | any | `KernelAgentTool` |
 /// | `KernelDomain { "a2a" }` | any | `A2aDelegateTool`, `A2aSendTool`, `A2aQueryTool` |
 /// | `KernelDomain { "persona" }` | any | `PersonaTool` |

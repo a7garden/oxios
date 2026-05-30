@@ -82,10 +82,10 @@ function AgentDetailPage() {
                 </Button>
               </div>
             )}
-            {agent.space_id && (
+            {agent.project_id && (
               <div className="flex items-center gap-1">
-                <span className="text-muted-foreground">{t('agents.space')}:</span>
-                <span className="text-xs font-mono">{agent.space_id.slice(0, 8)}...</span>
+                <span className="text-muted-foreground">{t('agents.project', 'Project')}:</span>
+                <span className="text-xs font-mono">{agent.project_id.slice(0, 8)}...</span>
               </div>
             )}
             <div className="flex items-center gap-1">

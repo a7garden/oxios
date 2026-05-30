@@ -5125,9 +5125,9 @@ checksum = "1a80800c0488c3a21695ea981a54918fbb37abf04f4d0720c453632255e2ff0e"
 
 [[package]]
 name = "oxi-agent"
-version = "0.23.0"
+version = "0.24.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9bfae5efe9d5b76052fcccf5668a4aabc34adba205c10aac073c780c4faab836"
+checksum = "11a7c872c4ea7645921fe4ebbc54398013779ff62d633eef55ec374fd28db270"
 dependencies = [
  "a3s-search",
  "anyhow",
@@ -5154,9 +5154,9 @@ dependencies = [
 
 [[package]]
 name = "oxi-ai"
-version = "0.23.0"
+version = "0.24.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f5a4494a96f1316426943f4958d410a558ef14b007b60034aabacbc552fe9b0f"
+checksum = "78d4676c969d311383b26e53f783425ef2c90c7c3ef50c0f9a6e76ff55f57e91"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5190,18 +5190,20 @@ dependencies = [
 
 [[package]]
 name = "oxi-sdk"
-version = "0.23.0"
+version = "0.24.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ac5d99d11b74492b04bc7e96b1947ecad57c87f671921da3470046bf1f58a2c7"
+checksum = "d16d297d8b38d771e43e206640e11d23d4c8e962fed95ec30d76667be063cc86"
 dependencies = [
  "anyhow",
  "async-trait",
+ "dirs 5.0.1",
  "fastrand",
  "oxi-agent",
  "oxi-ai",
  "parking_lot",
  "serde",
  "serde_json",
+ "serde_yaml",
  "thiserror 2.0.18",
  "tokio",
  "tracing",

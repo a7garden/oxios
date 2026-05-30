@@ -59,12 +59,12 @@ export function MemoryDetail({ memory, open, onClose }: MemoryDetailProps) {
                 <span className="font-mono text-xs">{memory.key}</span>
               </div>
             )}
-            {memory.space_id && (
+            {memory.project_ids && (
               <div className="flex justify-between">
                 <span className="text-muted-foreground">
                   {t('memory.source')}
                 </span>
-                <span className="text-xs">{memory.space_id}</span>
+                <span className="text-xs">{memory.project_ids}</span>
               </div>
             )}
             {memory.created_at && (

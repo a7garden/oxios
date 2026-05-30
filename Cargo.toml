@@ -63,7 +63,7 @@ regex = "1"
 parking_lot = "0.12"
 
 # oxi engine — single dependency for everything (oxi-ai re-exported via oxi-sdk)
-oxi-sdk = "0.23.0"
+oxi-sdk = "0.24.0"
 
 # HTTP client
 reqwest = { version = "0.12", features = ["json", "rustls-tls"] }

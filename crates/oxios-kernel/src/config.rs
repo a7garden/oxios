@@ -652,6 +652,9 @@ pub struct EngineConfig {
     /// Fallback models to try when the primary model fails.
     #[serde(default)]
     pub fallback_models: Vec<String>,
+    /// Models excluded from automatic routing.
+    #[serde(default)]
+    pub excluded_models: Vec<String>,
 }
 
 #[allow(clippy::derivable_impls)]
@@ -664,6 +667,7 @@ impl Default for EngineConfig {
             routing_enabled: false,
             prefer_cost_efficient: false,
             fallback_models: Vec::new(),
+            excluded_models: Vec::new(),
         }
     }
 }

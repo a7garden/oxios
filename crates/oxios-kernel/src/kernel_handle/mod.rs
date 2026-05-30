@@ -65,7 +65,7 @@ use std::time::Instant;
 /// - [`PersonaApi`]   — multi-persona management
 /// - [`ExtensionApi`] — programs, skills, host tools
 /// - [`McpApi`]       — MCP server bridge
-/// - [`SpaceApi`]     — Space management, knowledge flow
+/// - [`ProjectApi`]    — Project management, memory linking
 /// - [`ExecApi`]      — execution config, access management
 /// - [`BrowserApi`]   — browser backend
 /// - [`A2aApi`]       — agent-to-agent communication
