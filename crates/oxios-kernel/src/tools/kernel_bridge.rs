@@ -145,6 +145,7 @@ mod tests {
                 ),
                 crate::event_bus::EventBus::new(256),
             ),
+            None,
             crate::ExecApi::new(
                 Arc::new(crate::config::ExecConfig::default()),
                 Arc::new(parking_lot::Mutex::new(

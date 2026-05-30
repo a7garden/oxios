@@ -489,6 +489,7 @@ mod tests {
                 ),
                 EventBus::new(64),
             ),
+            None,
             crate::kernel_handle::ExecApi::new(
                 Arc::new(crate::config::ExecConfig::default()),
                 Arc::new(parking_lot::Mutex::new(
