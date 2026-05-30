@@ -578,7 +578,7 @@ pub(crate) async fn handle_space_activate(
 |------|------|
 | `crates/oxios-kernel/src/kernel_handle/mod.rs` | `activate_space()` 편의 메서드 추가 |
 | `crates/oxios-kernel/src/kernel_handle/space_api.rs` | `workspace_dir()` 메서드 추가 |
-| `channels/oxios-web/src/routes/space_routes.rs` | `activate_space()` 사용 |
+| `surface/oxios-web/src/routes/space_routes.rs` | `activate_space()` 사용 |
 
 ---
 

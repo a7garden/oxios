@@ -45,11 +45,10 @@ struct AgentHandle {
 /// Pool of live `Agent` instances, keyed by AgentId.
 ///
 /// Retains agents after execution for:
-/// - **Session continuation** — `continue_with()` for multi-turn without
-///   re-creating the agent from scratch.
 /// - **State persistence** — `export_state()` serializes conversation history
 ///   to JSON for crash recovery, migration, or debugging.
 /// - **State restoration** — `import_state()` restores a previous session.
+#[derive(Default)]
 pub struct AgentPool {
     agents: RwLock<HashMap<AgentId, Arc<Agent>>>,
 }

@@ -133,9 +133,11 @@ async fn run_cli(cli: Cli) -> anyhow::Result<()> {
             verbose,
             suites_dir,
         } => {
-            let mut config = BenchConfig::default();
-            config.parallel = parallel;
-            config.timeout_secs = timeout;
+            let mut config = BenchConfig {
+                parallel,
+                timeout_secs: timeout,
+                ..BenchConfig::default()
+            };
 
             if let Some(bin_path) = bin {
                 config.oxios_bin = std::path::PathBuf::from(bin_path);

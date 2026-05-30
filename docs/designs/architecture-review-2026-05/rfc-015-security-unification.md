@@ -1,6 +1,6 @@
 # RFC-015: 보안 모델 통합
 
-> **상태:** 📝 설계 (v2 — 구조 재설계)
+> **상태:** ✅ 구현 완료
 > **날짜:** 2026-05-27
 > **우선순위:** P0-P1
 > **범위:** `access_manager/`, `capability/`, `tools/exec_tool.rs`, `tools/registration.rs`, `audit_trail.rs`

@@ -23,8 +23,9 @@ oxios/                     # Main binary (src/main.rs, src/kernel.rs, src/cmd_ru
 │   └── oxios-mcp/         # MCP client library (JSON-RPC 2.0 over stdio)
 ├── benchmarks/
 │   └── oxios-bench/       # Performance benchmarking suite
+├── surface/
+│   └── oxios-web/         # Web dashboard (Axum backend + React frontend)
 ├── channels/
-│   ├── oxios-web/         # Web dashboard (Axum backend + React frontend)
 │   ├── oxios-cli/         # CLI channel
 │   └── oxios-telegram/    # Telegram channel
 ├── share/                 # Default skills (share/default-skills/), config
@@ -50,7 +51,7 @@ oxios → oxios-kernel → oxios-ouroboros
 | **Language** | Rust 2021 + TypeScript 5 (frontend) |
 | **License** | MIT |
 | **CI** | GitHub Actions (macOS + Linux, fmt+clippy+test+audit+frontend) |
-| **Build** | `cargo build && cd channels/oxios-web/web && bun run build` |
+| **Build** | `cargo build && cd surface/oxios-web/web && bun run build` |
 | **Test** | `cargo test --workspace` |
 
 ## Why
@@ -68,7 +69,7 @@ oxios → oxios-kernel → oxios-ouroboros
 
 ```bash
 # Frontend build (required for CI/web channel)
-cd channels/oxios-web/web && bun install && bun run build
+cd surface/oxios-web/web && bun install && bun run build
 
 # Build everything (Rust only)
 cargo build
@@ -86,7 +87,7 @@ cargo run -- --foreground
 cargo run -- run --json "prompt"
 
 # Frontend dev server (requires backend on port 4200)
-cd channels/oxios-web/web && bun dev
+cd surface/oxios-web/web && bun dev
 ```
 
 ## Daemon & CLI
@@ -232,7 +233,7 @@ The Knowledge UI is a full-screen app-within-app (`fixed inset-0 z-30`) built in
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│  channels/oxios-web/web/src/                                 │
+│  surface/oxios-web/web/src/                                 │
 │                                                              │
 │  routes/knowledge/index.tsx     → /knowledge/                  │
 │    └── components/knowledge/                                  │
@@ -266,7 +267,7 @@ The Knowledge UI is a full-screen app-within-app (`fixed inset-0 z-30`) built in
 
 ### Backend
 
-- **Route registration**: `channels/oxios-web/src/routes/knowledge_routes.rs` — all Axum handlers
+- **Route registration**: `surface/oxios-web/src/routes/knowledge_routes.rs` — all Axum handlers
 - **KnowledgeBase** (direct): `crates/oxios-markdown/src/knowledge.rs` — web uses `state.knowledge` (KnowledgeBase) directly, bypassing the kernel. No AI engine dependency at the web layer.
 - **KnowledgeBase** (kernel-free, via oxios-markdown): markdown note management, backlinks, AI copilot. Access via `kernel.knowledge` (Arc). See RFC-003 for architecture.
 - **KnowledgeLens** (`kernel_handle/knowledge_lens.rs`) — Semantic HNSW overlay. Subscribes to KnowledgeBase `on_file_change` callbacks to keep agent memory index in sync.
@@ -318,7 +319,7 @@ The Knowledge UI is a full-screen app-within-app (`fixed inset-0 z-30`) built in
 cargo run --bin oxios -- --foreground
 
 # Frontend dev server
-cd channels/oxios-web/web && bun dev
+cd surface/oxios-web/web && bun dev
 
 # Open http://localhost:5173/knowledge/
 # Or directly http://localhost:4200/knowledge/ (proxied)

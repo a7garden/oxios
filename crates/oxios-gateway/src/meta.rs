@@ -5,6 +5,7 @@
 //! and improve discoverability.
 
 /// Well-known metadata keys.
+#[allow(clippy::module_inception)]
 pub mod meta {
     /// Session ID for multi-turn conversations.
     pub const SESSION_ID: &str = "session_id";

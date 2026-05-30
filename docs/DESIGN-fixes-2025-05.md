@@ -44,7 +44,7 @@ native-browser = ["dep:oxibrowser-core"]  # 또는 단순 gate
 
 **문제:** `ToastProvider`가 컴포넌트 트리에 렌더링되지 않아 모든 토스트가 조용히 무시됨.
 
-**수정 파일:** `channels/oxios-web/web/src/routes/__root.tsx`
+**수정 파일:** `surface/oxios-web/web/src/routes/__root.tsx`
 
 **설계:**
 
@@ -70,7 +70,7 @@ component: function RootComponent() {
 
 **문제:** `SpaceSessionSidebar`가 raw `fetch()`를 사용하여 `Authorization` 헤더 누락.
 
-**수정 파일:** `channels/oxios-web/web/src/routes/chat.tsx`
+**수정 파일:** `surface/oxios-web/web/src/routes/chat.tsx`
 
 **설계:** raw `fetch()` → `api.get()` 교체.
 
@@ -508,7 +508,7 @@ async fn shell_exec_with_shutdown(
 
 **문제:** `SseClient`에 재연결 로직 없음.
 
-**수정 파일:** `channels/oxios-web/web/src/lib/sse-client.ts`
+**수정 파일:** `surface/oxios-web/web/src/lib/sse-client.ts`
 
 **설계:**
 
@@ -645,7 +645,7 @@ rows.filter_map(|row| match row {
 
 ### FIX-17: 프론트엔드 Mutation 글로벌 에러 핸들링
 
-**수정 파일:** `channels/oxios-web/web/src/main.tsx`
+**수정 파일:** `surface/oxios-web/web/src/main.tsx`
 
 ```typescript
 const queryClient = new QueryClient({
@@ -686,10 +686,10 @@ React.useEffect(() => {
 
 ### FIX-18: `useChatStream` Dead Code 제거
 
-**수정 파일:** `channels/oxios-web/web/src/hooks/use-chat-stream.ts` — **파일 삭제**
+**수정 파일:** `surface/oxios-web/web/src/hooks/use-chat-stream.ts` — **파일 삭제**
 
 ```bash
-rm channels/oxios-web/web/src/hooks/use-chat-stream.ts
+rm surface/oxios-web/web/src/hooks/use-chat-stream.ts
 ```
 
 **검증:** `bun run build` 성공 (import 없으므로 영향 없음).
@@ -698,7 +698,7 @@ rm channels/oxios-web/web/src/hooks/use-chat-stream.ts
 
 ### FIX-19: 사용하지 않는 npm 의존성 제거
 
-**수정 파일:** `channels/oxios-web/web/package.json`
+**수정 파일:** `surface/oxios-web/web/package.json`
 
 제거 대상:
 - `react-hook-form` — import 없음
@@ -708,7 +708,7 @@ rm channels/oxios-web/web/src/hooks/use-chat-stream.ts
 - `eslint`, `@eslint/js`, `eslint-plugin-react-hooks`, `eslint-plugin-react-refresh`, `typescript-eslint` — Biome 사용 중
 
 ```bash
-cd channels/oxios-web/web
+cd surface/oxios-web/web
 bun remove react-hook-form @hookform/resolvers zod shadcn
 bun remove -D eslint @eslint/js eslint-plugin-react-hooks eslint-plugin-react-refresh typescript-eslint
 ```
@@ -747,8 +747,8 @@ pub async fn handle_message(...) -> Result<...> {
 ### FIX-21: WebSocket 토큰 전달 방식 개선
 
 **수정 파일:**
-- `channels/oxios-web/web/src/stores/chat.ts`
-- `channels/oxios-web/src/routes/chat_routes.rs` (또는 WS 핸들러)
+- `surface/oxios-web/web/src/stores/chat.ts`
+- `surface/oxios-web/src/routes/chat_routes.rs` (또는 WS 핸들러)
 
 **설계 — 단기 티켓 방식:**
 

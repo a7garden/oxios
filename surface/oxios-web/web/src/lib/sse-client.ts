@@ -1,3 +1,5 @@
+import { useAuthStore } from '@/stores/auth'
+
 const MAX_RECONNECT_ATTEMPTS = 10
 const BASE_DELAY_MS = 1000
 
@@ -24,7 +26,7 @@ export class SseClient {
 
   private async doConnect() {
     this.controller = new AbortController()
-    const token = localStorage.getItem('oxios-api-key')
+    const token = useAuthStore.getState().token
     const protocol = window.location.protocol
     const url = `${protocol}//${window.location.host}${this.currentPath}`
 

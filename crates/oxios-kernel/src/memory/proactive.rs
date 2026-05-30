@@ -18,7 +18,7 @@ use super::{MemoryEntry, MemoryManager};
 // ---------------------------------------------------------------------------
 
 /// Tracks when proactive recall should be triggered.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct RecallTiming {
     /// Last topic that triggered a recall.
     pub last_recall_topic: Option<String>,
@@ -45,7 +45,7 @@ impl RecallTiming {
         let topic_changed = self
             .last_recall_topic
             .as_ref()
-            .map_or(true, |prev| !topics_similar(prev, query));
+            .is_none_or(|prev| !topics_similar(prev, query));
 
         let should = self.message_count_since_recall == 0 // First message
             || (topic_changed && self.message_count_since_recall >= 3) // Topic change

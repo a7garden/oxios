@@ -2,7 +2,7 @@
 
 > **Status**: Implemented (v0.1.3)
 > **Date**: 2025-05-19
-> **Scope**: `channels/oxios-web/frontend/src/views/config.rs`, backend `system.rs`
+> **Scope**: `surface/oxios-web/frontend/src/views/config.rs`, backend `system.rs`
 
 ---
 
@@ -668,7 +668,7 @@ PATCH /api/config/:section → 섹션별 부분 업데이트
 ## 9. 프론트엔드 파일 구조
 
 ```
-channels/oxios-web/frontend/src/
+surface/oxios-web/frontend/src/
 ├── views/
 │   └── settings/                     ← 기존 config.rs 대체
 │       ├── mod.rs                    ← SettingsView (탭 컨테이너 + 전역 Save)

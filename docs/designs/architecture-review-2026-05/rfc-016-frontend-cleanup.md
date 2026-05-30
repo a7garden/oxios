@@ -3,7 +3,7 @@
 > **상태:** 📝 설계
 > **날짜:** 2026-05-27 (개정)
 > **우선순위:** P1
-> **범위:** `channels/oxios-web/web/src/`
+> **범위:** `surface/oxios-web/web/src/`
 > **선행:** 없음
 > **후행:** 없음
 
@@ -44,7 +44,7 @@
 **제거 대상:**
 
 ```
-channels/oxios-web/web/src/
+surface/oxios-web/web/src/
 ├── hooks/use-chat-stream.ts     ← 삭제 (import 없음)
 └── lib/ws-client.ts             ← 삭제 (use-chat-stream.ts만 import)
 ```

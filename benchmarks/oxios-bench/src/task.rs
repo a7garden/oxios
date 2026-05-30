@@ -142,7 +142,7 @@ impl Assertion {
         match self {
             Assertion::PhaseReached { min } => {
                 let actual_phase = output.phase();
-                let passed = actual_phase.map_or(false, |p| p >= *min);
+                let passed = actual_phase.is_some_and(|p| p >= *min);
                 AssertionResult {
                     assertion: self.describe(),
                     passed,
@@ -369,8 +369,7 @@ impl TaskToml {
 
         // Build fixtures
         let fixtures = self
-            .setup
-            .and_then(|s| Some(s.files))
+            .setup.map(|s| s.files)
             .unwrap_or_default()
             .into_iter()
             .map(|f| Fixture {

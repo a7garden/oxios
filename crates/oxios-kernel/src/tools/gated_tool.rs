@@ -133,7 +133,7 @@ impl<T: AgentTool + 'static> AgentTool for GatedTool<T> {
                 layer = ?denied.layer,
                 "GatedTool: tool access denied"
             );
-            return Ok(AgentToolResult::error(&format_denied(&denied)));
+            return Ok(AgentToolResult::error(format_denied(&denied)));
         }
 
         // Step 2: For file tools, check path access permission
@@ -153,7 +153,7 @@ impl<T: AgentTool + 'static> AgentTool for GatedTool<T> {
                     layer = ?denied.layer,
                     "GatedTool: path access denied"
                 );
-                return Ok(AgentToolResult::error(&format!(
+                return Ok(AgentToolResult::error(format!(
                     "🔒 경로 접근 거부: {}",
                     denied.reason
                 )));

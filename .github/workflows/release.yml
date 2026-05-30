@@ -16,12 +16,12 @@ jobs:
       - uses: oven-sh/setup-bun@v2
 
       - name: Build web assets
-        working-directory: channels/oxios-web/web
+        working-directory: surface/oxios-web/web
         run: bun install && bun run build
 
       - name: Package
         run: |
-          cd channels/oxios-web/web/dist
+          cd surface/oxios-web/web/dist
           zip -r $GITHUB_WORKSPACE/web-dist.zip .
 
       - name: Get version

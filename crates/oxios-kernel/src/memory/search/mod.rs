@@ -185,7 +185,7 @@ pub fn row_to_memory_entry(row: &rusqlite::Row<'_>) -> MemoryEntry {
         created_at: created_at_str.parse().unwrap_or_else(|_| Utc::now()),
         accessed_at: accessed_at_str
             .and_then(|s| s.parse().ok())
-            .unwrap_or_else(|| Utc::now()),
+            .unwrap_or_else(Utc::now),
         modified_at: updated_at_str.parse().unwrap_or_else(|_| Utc::now()),
         access_count: row.get::<_, i64>(10).unwrap() as u32,
         decay_score: row.get_unwrap(14),

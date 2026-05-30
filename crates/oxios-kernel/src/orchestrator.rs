@@ -143,6 +143,7 @@ struct EvolutionConfig {
     /// Minimum score to pass evaluation.
     score_threshold: f64,
     /// Enable evaluation result caching.
+    #[allow(dead_code)]
     eval_cache_enabled: bool,
 }
 
@@ -217,6 +218,7 @@ impl Orchestrator {
         self.space_manager.read().as_ref().cloned()
     }
 
+    /// Returns the current space tag, or a default placeholder.
     pub fn current_space_tag(&self) -> String {
         self.space_manager
             .read()
@@ -769,7 +771,7 @@ impl Orchestrator {
             // Update best if this iteration improved.
             if best_eval
                 .as_ref()
-                .map_or(true, |b| evaluation.score >= b.score)
+                .is_none_or(|b| evaluation.score >= b.score)
             {
                 best_result = current_result.clone();
                 best_seed = current_seed.clone();

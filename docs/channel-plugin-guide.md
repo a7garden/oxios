@@ -500,4 +500,4 @@ async def watch_events():
 | SSE Events | Real-time progress monitoring, dashboards |
 | Telegram Webhook | Chat-based interaction with LLM agent |
 
-For more details, see the [API reference](../channels/oxios-web/src/routes.rs) and [gateway crate](../crates/oxios-gateway/src/lib.rs).
+For more details, see the [API reference](../surface/oxios-web/src/routes.rs) and [gateway crate](../crates/oxios-gateway/src/lib.rs).

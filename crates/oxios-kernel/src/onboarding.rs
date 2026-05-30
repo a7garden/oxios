@@ -20,6 +20,7 @@ use std::path::Path;
 
 // ── Constants ───────────────────────────────────────────────────────────────
 
+/// Subdirectories to create under the Oxios home directory during setup.
 pub const WORKSPACE_SUBDIRS: &[&str] = &[
     "workspace",
     "workspace/memory",
@@ -347,7 +348,7 @@ fn prompt_provider<'a>(providers: &[&'a str]) -> anyhow::Result<&'a str> {
         .collect();
 
     // Sort: providers with detected env keys first
-    entries.sort_by(|a, b| b.has_env_key.cmp(&a.has_env_key));
+    entries.sort_by_key(|b| std::cmp::Reverse(b.has_env_key));
 
     println!();
     println!("  {}", theme::step("Provider"));

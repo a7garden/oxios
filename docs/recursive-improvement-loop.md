@@ -169,7 +169,7 @@ pi-agent가 일반 사용자처럼 oxios를 조작하고, 문제를 발견하면
 | # | 기능 | 모듈 | 레벨 | 블로커 |
 |---|------|------|------|--------|
 | CH01 | CLI 채널 | `channels/oxios-cli/` | **L1** | oxios run 동작 |
-| CH02 | Web 대시보드 | `channels/oxios-web/` | **L0** | 빌드만 됨 |
+| CH02 | Web 대시보드 | `surface/oxios-web/` | **L0** | 빌드만 됨 |
 | CH03 | Telegram 채널 | `channels/oxios-telegram/` | **L0** | 빌드만 됨 |
 | CH04 | Gateway (메시지 허브) | `oxios-gateway/` | **L1** | 데몬에서 구동 확인 |
 

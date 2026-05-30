@@ -21,6 +21,7 @@ use crate::audit_trail::{AuditAction, AuditTrail};
 /// Merkle-chain `AuditTrail` for tamper-evidence.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "kind")]
+#[allow(missing_docs)]
 pub enum AuditEvent {
     /// Tool access decision.
     ToolAccess {

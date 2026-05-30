@@ -214,7 +214,7 @@ kernel을 통해서만 간접 참조.
 
 추가 필요:
 ```toml
-# channels/oxios-web/Cargo.toml
+# surface/oxios-web/Cargo.toml
 [dependencies]
 oxios-markdown = { path = "../../crates/oxios-markdown" }
 ```

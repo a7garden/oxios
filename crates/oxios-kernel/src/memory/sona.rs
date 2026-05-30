@@ -22,10 +22,12 @@ use crate::embedding::{EmbeddingProvider, EmbeddingVector};
 /// Operating mode for the SONA engine.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[derive(Default)]
 pub enum SonaMode {
     /// Real-time adaptation (< 0.05ms target).
     RealTime,
     /// Balanced between speed and depth.
+    #[default]
     Balanced,
     /// Research mode — deep analysis, no time constraints.
     Research,
@@ -33,11 +35,6 @@ pub enum SonaMode {
     Edge,
 }
 
-impl Default for SonaMode {
-    fn default() -> Self {
-        Self::Balanced
-    }
-}
 
 /// Verdict for a trajectory outcome.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -244,18 +241,20 @@ impl SonaEngine {
     /// Groups successful trajectories by domain and extracts common
     /// patterns. Returns the newly distilled patterns.
     pub async fn distill(&self) -> Result<Vec<LearnedPattern>, anyhow::Error> {
-        let trajs = self.trajectories.read();
-
-        // Group successful trajectories by domain
-        let mut domain_groups: HashMap<String, Vec<&Trajectory>> = HashMap::new();
-        for traj in trajs.iter() {
-            if traj.verdict == Verdict::Success {
-                domain_groups
-                    .entry(traj.domain.clone())
-                    .or_default()
-                    .push(traj);
+        // Collect data under lock, then release before any .await
+        let domain_groups: HashMap<String, Vec<Trajectory>> = {
+            let trajs = self.trajectories.read();
+            let mut groups: HashMap<String, Vec<Trajectory>> = HashMap::new();
+            for traj in trajs.iter() {
+                if traj.verdict == Verdict::Success {
+                    groups
+                        .entry(traj.domain.clone())
+                        .or_default()
+                        .push(traj.clone());
+                }
             }
-        }
+            groups
+        }; // lock dropped here
 
         let mut new_patterns = Vec::new();
 
@@ -302,8 +301,6 @@ impl SonaEngine {
 
             new_patterns.push(pattern);
         }
-
-        drop(trajs); // Release read lock
 
         // Store new patterns
         {

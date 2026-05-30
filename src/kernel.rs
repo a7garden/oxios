@@ -812,7 +812,7 @@ impl KernelBuilder {
             ));
 
         // Build ToolRetriever for semantic capability discovery.
-        let tool_retriever = build_tool_retriever(&*skill_manager).await;
+        let tool_retriever = build_tool_retriever(&skill_manager).await;
 
         let agent_runtime = AgentRuntime::new(Arc::clone(&engine), model_id, kernel_handle)
             .with_persona_manager(Arc::new(persona_manager.clone()))

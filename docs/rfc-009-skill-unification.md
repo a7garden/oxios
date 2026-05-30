@@ -41,9 +41,9 @@ crates/oxios-kernel/src/capability/types.rs         — ResourceRef::Program
 crates/oxios-kernel/src/capability/template.rs       — with_programs()
 crates/oxios-kernel/src/config.rs                   — ExecConfig (host_tools)
 crates/oxios-kernel/src/types.rs                    — SkillMeta
-channels/oxios-web/web/src/routes/host-tools.tsx    — Host Tools 탭
-channels/oxios-web/web/src/routes/programs.tsx      — Programs 탭
-channels/oxios-web/web/src/routes/skills.tsx        — Skills 탭
+surface/oxios-web/web/src/routes/host-tools.tsx    — Host Tools 탭
+surface/oxios-web/web/src/routes/programs.tsx      — Programs 탭
+surface/oxios-web/web/src/routes/skills.tsx        — Skills 탭
 ```
 
 ---

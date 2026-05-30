@@ -528,7 +528,7 @@ fn set_toml_dot(
             return Ok(());
         } else {
             table = table
-                .entry(*part)
+                .entry(part)
                 .or_insert_with(|| toml_edit::Item::Table(toml_edit::Table::new()))
                 .as_table_mut()
                 .ok_or_else(|| anyhow::anyhow!("'{}'는 테이블이 아닙니다", parts[..=i].join(".")))?;
@@ -551,7 +551,7 @@ fn get_existing_type(doc: &toml_edit::DocumentMut, key: &str) -> ExistingType {
     let mut table = doc.as_table();
     for (i, part) in parts.iter().enumerate() {
         if i == parts.len() - 1 {
-            return match table.get(*part) {
+            return match table.get(part) {
                 Some(toml_edit::Item::Value(v)) => {
                     if v.is_bool() {
                         ExistingType::Bool
@@ -566,7 +566,7 @@ fn get_existing_type(doc: &toml_edit::DocumentMut, key: &str) -> ExistingType {
                 _ => ExistingType::Unknown,
             };
         }
-        table = match table.get(*part).and_then(|t| t.as_table()) {
+        table = match table.get(part).and_then(|t| t.as_table()) {
             Some(t) => t,
             None => return ExistingType::Unknown,
         };

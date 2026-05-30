@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { ChatMessage } from '@/types'
+import { useAuthStore } from './auth'
 
 // ---------------------------------------------------------------------------
 // Persisted state (survives tab switches)
@@ -65,7 +66,7 @@ export type ChatStore = PersistedState & ChatRuntimeState & ChatActions
 let wsInstance: WebSocket | null = null
 
 function getToken(): string {
-  return localStorage.getItem('oxios-api-key') || ''
+  return useAuthStore.getState().token || ''
 }
 
 async function buildWsUrl(): Promise<string> {

@@ -514,7 +514,7 @@ interface KnowledgeState {
 ## 6. 파일 구조
 
 ```
-channels/oxios-web/web/src/
+surface/oxios-web/web/src/
 ├── routes/knowledge/
 │   ├── knowledge.tsx                # KnowledgeLayout 래퍼
 │   ├── chat.tsx                     # /knowledge/chat

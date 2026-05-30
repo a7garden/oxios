@@ -194,7 +194,7 @@ fn sanitize_body(body: &str, format: SkillFormat) -> String {
         if c == '!' && chars.peek() == Some(&'`') {
             chars.next();
             let mut cmd = String::new(); let mut found = false;
-            while let Some(cc) = chars.next() { if cc == '`' { found = true; break; } cmd.push(cc); }
+            for cc in chars.by_ref() { if cc == '`' { found = true; break; } cmd.push(cc); }
             if found { result.push_str(&format!("<!-- !`{}` (Claude Code dynamic injection, not active in Oxios) -->", cmd)); }
             else { result.push('!'); result.push('`'); result.push_str(&cmd); }
         } else { result.push(c); }

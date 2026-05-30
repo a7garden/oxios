@@ -1,9 +1,9 @@
 # RFC-014: 채널 UX 통일 (v2)
 
-> **상태:** 📝 설계 (개정)
+> **상태:** ✅ 구현 완료
 > **날짜:** 2026-05-27
 > **우선순위:** P0-P1
-> **범위:** `crates/oxios-gateway/`, `channels/oxios-cli/`, `channels/oxios-telegram/`, `channels/oxios-web/`
+> **범위:** `crates/oxios-gateway/`, `channels/oxios-cli/`, `channels/oxios-telegram/`, `surface/oxios-web/`
 > **선행:** RFC-013 (Gateway Event-Driven) — ✅ 완료
 > **후행:** 없음
 > **독립:** RFC-015~019와 겹침 없음
@@ -78,7 +78,7 @@ RFC-013이 완료된 상태. Gateway는 event-driven 구조다:
 - 타이핑 인디케이터 없음 → 긴 작업 시 봇 고장으로 착각
 - 오케스트레이션 메타데이터 전부 무시
 
-**Web (`channels/oxios-web/`):**
+**Web (`surface/oxios-web/`):**
 - WebSocket이 `user_id`를 `"web-user"`로 하드코딩
 - `AgentResponse.seed_id`가 항상 `None` (Gateway가 `seed_id`를 전달하지 않음)
 - `oxios run --json`이 gateway를 우회 → 별도의 JSON 출력 형식 유지
@@ -490,7 +490,7 @@ impl ChannelFormatter for TelegramFormatter {
 #### WebFormatter
 
 ```rust
-// channels/oxios-web/src/format.rs (신규)
+// surface/oxios-web/src/format.rs (신규)
 
 /// Web은 OutgoingMessage를 그대로 JSON 직렬화하여 route handler에 전달.
 /// 포매팅은 route handler의 책임 (ChatResponse, WS JSON 등).
@@ -809,7 +809,7 @@ pub async fn handle_message(
 ### 3.8 Web `user_id` 통일
 
 ```rust
-// channels/oxios-web/src/routes/chat.rs — WebSocket 핸들러
+// surface/oxios-web/src/routes/chat.rs — WebSocket 핸들러
 
 // 변경 전:
 let mut incoming = IncomingMessage::new("web", "web-user", content.clone());
@@ -912,8 +912,8 @@ pub mod meta {
 | `oxios-gateway` | **중** | `message.rs` 확장, `error_classify.rs` 신규, `format.rs` 신규, `meta.rs` 신규, `gateway.rs` dispatch 개선 |
 | `channels/oxios-cli` | **중** | `format.rs` 신규, `channel.rs` send() 개선, `interactive.rs` 순차 입력 |
 | `channels/oxios-telegram` | **중** | `format.rs` 신규, `lib.rs` UTF-8+타임아웃+백오프+인디케이터 |
-| `channels/oxios-web` (Rust) | **소** | `format.rs` 신규, `chat.rs` user_id 통일 + ChatResponse 확장 |
-| `channels/oxios-web` (Frontend) | **없음** | 기존 JSON 소비 방식 유지. meta 필드는 무시(serde default) |
+| `surface/oxios-web` (Rust) | **소** | `format.rs` 신규, `chat.rs` user_id 통일 + ChatResponse 확장 |
+| `surface/oxios-web` (Frontend) | **없음** | 기존 JSON 소비 방식 유지. meta 필드는 무시(serde default) |
 | `oxios-kernel/orchestrator.rs` | **소** | Phase 3에서 `handle_message` 시그니처 변경 |
 | `src/cmd_run.rs` | **없음** | `oxios run --json`은 gateway 우회 유지. 별도 JSON 출력 형식 |
 

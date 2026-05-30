@@ -501,8 +501,7 @@ impl SqliteMemoryStore {
 
             if let Some(old_importance) = importance {
                 let new_importance = (old_importance * (1.0 + boost_factor * score as f32))
-                    .min(1.0) // Cap at 1.0
-                    .max(0.0);
+                    .clamp(0.0, 1.0);
 
                 if conn.execute(
                     "UPDATE memories SET importance = ?1 WHERE rowid = ?2",
@@ -687,7 +686,7 @@ impl SqliteMemoryStore {
              WHERE quality >= ?1 AND use_count >= ?2 AND is_long_term = 0",
             rusqlite::params![min_quality, min_usage as i64],
         )
-        .unwrap_or(0) as usize
+        .unwrap_or(0)
     }
 
     // ── Private helpers ─────────────────────────────────────────────

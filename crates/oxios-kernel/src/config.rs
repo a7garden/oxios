@@ -559,6 +559,7 @@ impl ConsolidationConfig {
 
 /// Channel activation configuration.
 #[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Default)]
 pub struct ChannelsConfig {
     /// List of channel names to activate on startup.
     /// Channels are message-only interfaces (CLI, Telegram).
@@ -570,14 +571,6 @@ pub struct ChannelsConfig {
     pub telegram: TelegramChannelConfig,
 }
 
-impl Default for ChannelsConfig {
-    fn default() -> Self {
-        Self {
-            enabled: vec![],
-            telegram: TelegramChannelConfig::default(),
-        }
-    }
-}
 
 /// Surface activation configuration.
 ///
@@ -958,18 +951,15 @@ pub enum ExecMode {
 /// Execution allowlist behavior mode.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[derive(Default)]
 pub enum AllowlistMode {
     /// All binaries are permitted (development only).
     Permissive,
     /// Only binaries in `allowed_commands` may execute.
+    #[default]
     Enforced,
 }
 
-impl Default for AllowlistMode {
-    fn default() -> Self {
-        Self::Enforced
-    }
-}
 
 /// Exec configuration.
 ///

@@ -117,7 +117,7 @@ pub fn print_compare(result: &CompareResult) {
         for imp in &result.improvements {
             println!(
                 "    {} {} — {:.0} → {:.0} (Δ +{:.0})",
-                style("✅").to_string(),
+                style("✅"),
                 style(&imp.task_id).bold(),
                 imp.previous_score,
                 imp.current_score,
@@ -139,7 +139,7 @@ pub fn print_compare(result: &CompareResult) {
             };
             println!(
                 "    {} {} — {:.0} → {:.0} (Δ {:.0}) — {}",
-                style("❌").to_string(),
+                style("❌"),
                 style(&reg.task_id).bold(),
                 reg.previous_score,
                 reg.current_score,

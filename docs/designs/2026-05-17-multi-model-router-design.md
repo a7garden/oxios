@@ -434,7 +434,7 @@ fn get_provider_circuit_breaker(provider: &str) -> &'static CircuitBreaker {
 ### 6.2 Frontend Components
 
 ```
-channels/oxios-web/frontend/src/
+surface/oxios-web/frontend/src/
 ├── components/
 │   └── engine/
 │       ├── ModelList.tsx      # 모델 목록 + 상태

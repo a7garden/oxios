@@ -472,6 +472,7 @@ struct PendingMessage {
 ///
 /// Mirrors the logic in the POST `/api/chat` handler so that WebSocket-based
 /// conversations are also durable across tab switches and browser restarts.
+#[allow(clippy::too_many_arguments)]
 async fn persist_session(
     state_store: &oxios_kernel::state_store::StateStore,
     session_id: &str,

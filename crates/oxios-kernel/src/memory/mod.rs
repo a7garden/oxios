@@ -308,8 +308,10 @@ fn default_tier() -> MemoryTier {
 /// Auto-protection level. Users never need to know about this.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[derive(Default)]
 pub enum ProtectionLevel {
     /// No protection. Normal decay + deletion.
+    #[default]
     None = 0,
     /// Slow decay, deletion possible.
     /// Trigger: 2+ accesses.
@@ -338,11 +340,6 @@ impl ProtectionLevel {
     }
 }
 
-impl Default for ProtectionLevel {
-    fn default() -> Self {
-        ProtectionLevel::None
-    }
-}
 
 /// A single memory entry with lifecycle and auto-protection metadata.
 #[derive(Debug, Clone, Serialize, Deserialize)]

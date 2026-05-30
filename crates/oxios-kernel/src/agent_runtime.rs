@@ -371,6 +371,7 @@ impl AgentRuntime {
 ///
 /// Uses `engine.oxi().agent()` (AgentBuilder) for full middleware,
 /// observability, and security integration from oxi-sdk 0.23.0.
+#[allow(clippy::too_many_arguments)]
 async fn run_agent(
     config: &AgentRuntimeConfig,
     engine: &OxiosEngine,
@@ -608,14 +609,14 @@ async fn run_agent(
                         },
                     );
                 }
-                AgentEvent::Compaction { event } => {
-                    if let CompactionEvent::Completed { result, .. } = event {
-                        handle_compaction(
-                            result.summary.clone(),
-                            session_id_for_callback.clone(),
-                            memory_for_callback.clone(),
-                        );
-                    }
+                AgentEvent::Compaction {
+                    event: CompactionEvent::Completed { result, .. },
+                } => {
+                    handle_compaction(
+                        result.summary.clone(),
+                        session_id_for_callback.clone(),
+                        memory_for_callback.clone(),
+                    );
                 }
                 _ => {}
             }

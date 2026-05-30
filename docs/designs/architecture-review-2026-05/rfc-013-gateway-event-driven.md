@@ -1,6 +1,6 @@
 # RFC-013: Gateway Event-Driven 마이그레이션
 
-> **상태:** 📝 설계
+> **상태:** ✅ 구현 완료
 > **날짜:** 2026-05-27
 > **우선순위:** P0
 > **범위:** `crates/oxios-gateway/`, `channels/`
@@ -977,7 +977,7 @@ impl<C: ChannelV1 + 'static> Channel for LegacyChannelAdapter<C> {
 | 컴포넌트 | 변경 | 상세 |
 |----------|------|------|
 | `oxios-gateway` | **대폭** | `gateway.rs`, `channel.rs` 핵심 재작성. `lib.rs` 타입 추가. `plugin.rs` 변경 없음. `message.rs` 변경 없음 |
-| `channels/oxios-web` | 소폭 | `channel.rs`에 `start()` 구현. `plugin.rs` 변경 없음 |
+| `surface/oxios-web` | 소폭 | `channel.rs`에 `start()` 구현. `plugin.rs` 변경 없음 |
 | `channels/oxios-cli` | 소폭 | `channel.rs`에 `start()` 구현. `plugin.rs`, `interactive.rs` 변경 없음 |
 | `channels/oxios-telegram` | 중간 | `lib.rs`에 `start()` 구현 + `#[derive(Clone)]`. `plugin.rs` 변경 없음 |
 | `src/main.rs` | 소폭 | Gateway 실행 방식 (thread → spawn) |

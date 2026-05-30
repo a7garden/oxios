@@ -8,13 +8,13 @@
 
 | # | 문서 | 우선순위 | 범위 | 상태 |
 |---|------|----------|------|------|
-| 1 | [RFC-013: Gateway Event-Driven 마이그레이션](rfc-013-gateway-event-driven.md) | **P0** | gateway, 모든 채널 | 📝 설계 |
-| 2 | [RFC-014: 채널 UX 통일](rfc-014-channel-ux-unification.md) | **P0-P1** | web, cli, telegram | 📝 설계 |
-| 3 | [RFC-015: 보안 모델 통합](rfc-015-security-unification.md) | **P0-P1** | access_manager, tools, exec | 📝 설계 |
+| 1 | [RFC-013: Gateway Event-Driven 마이그레이션](rfc-013-gateway-event-driven.md) | **P0** | gateway, 모든 채널 | ✅ 구현 완료 |
+| 2 | [RFC-014: 채널 UX 통일](rfc-014-channel-ux-unification.md) | **P0-P1** | web, cli, telegram | ✅ 구현 완료 |
+| 3 | [RFC-015: 보안 모델 통합](rfc-015-security-unification.md) | **P0-P1** | access_manager, tools, exec | ✅ 구현 완료 |
 | 4 | [RFC-016: Frontend 정리 및 패턴 통일](rfc-016-frontend-cleanup.md) | **P1** | web frontend | 📝 설계 |
-| 5 | [RFC-017: 메모리 시스템 모듈 활성도 정리](rfc-017-memory-simplification.md) | **P2** | memory | 📝 설계 (개정) |
+| 5 | [RFC-017: 메모리 시스템 모듈 활성도 정리](rfc-017-memory-simplification.md) | **P2** | memory | ✅ 구현 완료 |
 | 6 | [RFC-018: 설정 UX 개선](rfc-018-configuration-ux.md) | **P2** | config, cli, onboarding | 📝 설계 |
-| 7 | [RFC-019: Ouroboros Evolution 루프 활성화](rfc-019-ouroboros-cleanup.md) | **P2** | ouroboros, orchestrator | 📝 설계 (개정) |
+| 7 | [RFC-019: Ouroboros Evolution 루프 활성화](rfc-019-ouroboros-cleanup.md) | **P2** | ouroboros, orchestrator | ✅ 구현 완료 |
 
 ## 개정 이력
 

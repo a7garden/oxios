@@ -302,7 +302,7 @@ function SpaceSessionSidebar({
                         : s.id.slice(0, 8) + '...'}
                     </span>
                     <span className="block text-[10px] text-muted-foreground/60">
-                      {new Date(s.created_at).toLocaleString('ko-KR', {
+                      {new Date(s.created_at).toLocaleString(undefined, {
                         month: 'short',
                         day: 'numeric',
                         hour: '2-digit',
@@ -345,7 +345,7 @@ function SpaceSessionSidebar({
               >
                 <div className="truncate font-mono">{s.id.slice(0, 12)}...</div>
                 <div className="text-[10px] text-muted-foreground/70">
-                  {new Date(s.created_at).toLocaleString('ko-KR', {
+                  {new Date(s.created_at).toLocaleString(undefined, {
                     month: 'short',
                     day: 'numeric',
                     hour: '2-digit',

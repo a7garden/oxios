@@ -212,6 +212,8 @@ impl MemoryDatabase {
             std::sync::atomic::AtomicBool::new(false);
         if !REGISTERED.swap(true, std::sync::atomic::Ordering::SeqCst) {
             unsafe {
+                // SAFETY: sqlite3_vec_init matches the sqlite3_auto_extension prototype.
+                #[allow(clippy::missing_transmute_annotations)]
                 rusqlite::ffi::sqlite3_auto_extension(Some(std::mem::transmute(
                     sqlite_vec::sqlite3_vec_init as *const (),
                 )));
@@ -249,7 +251,7 @@ impl MemoryDatabase {
         let db_path = {
             let conn = self.conn();
             conn.path()
-                .map(|p| std::path::PathBuf::from(p))
+                .map(std::path::PathBuf::from)
                 .ok_or_else(|| anyhow::anyhow!("Cannot backup in-memory database"))?
         };
 

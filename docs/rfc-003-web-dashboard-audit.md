@@ -2,7 +2,7 @@
 
 > **상태**: Draft
 > **작성일**: 2025-05-17
-> **범위**: `channels/oxios-web/` 전체 (backend routes + frontend WASM)
+> **범위**: `surface/oxios-web/` 전체 (backend routes + frontend WASM)
 
 ---
 
@@ -459,11 +459,11 @@ let _scheduler = use_resource(|| async move {
 
 ### 🔵 L-3. 중복 CSS 파일
 
-**현상**: `channels/oxios-web/static/style.css`와
-`channels/oxios-web/frontend/static/style.css`가 완전히 동일함.
+**현상**: `surface/oxios-web/static/style.css`와
+`surface/oxios-web/frontend/static/style.css`가 완전히 동일함.
 
 **해결**: `frontend/static/style.css`만 유지.
-`channels/oxios-web/static/`의 `style.css`를 심볼릭 링크로 변경하거나 제거.
+`surface/oxios-web/static/`의 `style.css`를 심볼릭 링크로 변경하거나 제거.
 빌드 스크립트가 하나의 소스만 참조하도록 수정.
 
 ---
@@ -545,7 +545,7 @@ match api::fetch_text(&format!("/api/workspace/file/{full}")).await {
 |---|------|------|-----------|
 | 15 | Dead types 삭제 | `frontend/src/api/mod.rs` | S |
 | 16 | placeholder.rs 제거 | `frontend/src/views/` | S |
-| 17 | 중복 CSS 해소 | `channels/oxios-web/static/` | S |
+| 17 | 중복 CSS 해소 | `surface/oxios-web/static/` | S |
 | 18 | Rate limiter 분리 | `src/middleware.rs` + `plugin.rs` | M |
 | 19 | CSS 정리 (선택) | `style.css` | S |
 
@@ -554,7 +554,7 @@ match api::fetch_text(&format!("/api/workspace/file/{full}")).await {
 ## 4. 파일별 변경 요약
 
 ```
-channels/oxios-web/
+surface/oxios-web/
 ├── src/
 │   ├── routes/
 │   │   ├── infra.rs            # C-1: rate_remaining 수정
@@ -605,7 +605,7 @@ channels/oxios-web/
 
 ```bash
 # Frontend 컴파일
-cd channels/oxios-web/frontend
+cd surface/oxios-web/frontend
 cargo check --target wasm32-unknown-unknown
 
 # Backend 컴파일 (커널 에러 해결 후)

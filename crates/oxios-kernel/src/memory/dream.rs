@@ -795,9 +795,8 @@ impl DreamProcess {
                             |row| row.get::<_, f32>(0),
                         ) {
                             let new_importance = (old_importance
-                                * (1.0 + self.config.pagerank_boost_factor * pr_score as f32))
-                                .min(1.0)
-                                .max(0.0);
+                            * (1.0 + self.config.pagerank_boost_factor * pr_score as f32))
+                            .clamp(0.0, 1.0);
 
                             if (new_importance - old_importance).abs() > 0.001 {
                                 signals.push(MemorySignal::PageRankBoost {

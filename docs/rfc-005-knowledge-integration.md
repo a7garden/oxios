@@ -377,7 +377,7 @@ app.js → oxios-adapter.js의 함수를 호출하려 했지만...
 #### D2. 사이드바에 Knowledge 추가
 
 ```rust
-// channels/oxios-web/frontend/src/components/sidebar.rs
+// surface/oxios-web/frontend/src/components/sidebar.rs
 // Panel enum에 Knowledge 변형 추가:
 pub enum Panel {
     // ... 기존 패널들 ...
@@ -901,11 +901,11 @@ impl KnowledgeRegistry {
 | `crates/oxios-markdown/src/tokens.rs` | 삭제 | AuthManager로 대체 |
 | `crates/oxios-kernel/src/kernel_handle/knowledge_api.rs` | 재작성 | EngineProvider 주입, copilot, index_all |
 | `crates/oxios-kernel/src/tools/kernel/knowledge_tool.rs` | 수정 | 새 API에 맞춤 |
-| `channels/oxios-web/src/routes/knowledge_routes.rs` | 재작성 | KnowledgeApi 어댑터로 경량화 |
-| `channels/oxios-web/src/routes/mod.rs` | 수정 | 라우트 정리 |
-| `channels/oxios-web/frontend/src/components/sidebar.rs` | 수정 | Knowledge 패널 추가 |
-| `channels/oxios-web/static/knowledge/app.js` | 수정 | Oxios API 직접 호출 |
-| `channels/oxios-web/static/knowledge/oxios-adapter.js` | 삭제 | app.js에 직접 통합 |
+| `surface/oxios-web/src/routes/knowledge_routes.rs` | 재작성 | KnowledgeApi 어댑터로 경량화 |
+| `surface/oxios-web/src/routes/mod.rs` | 수정 | 라우트 정리 |
+| `surface/oxios-web/frontend/src/components/sidebar.rs` | 수정 | Knowledge 패널 추가 |
+| `surface/oxios-web/static/knowledge/app.js` | 수정 | Oxios API 직접 호출 |
+| `surface/oxios-web/static/knowledge/oxios-adapter.js` | 삭제 | app.js에 직접 통합 |
 | `src/kernel.rs` | 수정 | KnowledgeApi에 EngineProvider 주입 |
 | `docs/rfc-004-knowledge-system.md` | 수정 | Phase 5+를 이 RFC로 대체 |
 

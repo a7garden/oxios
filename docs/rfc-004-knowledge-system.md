@@ -3,7 +3,7 @@
 > **날짜**: 2026-05-19
 > **상태**: 초안
 > **관련**: RFC-001 (KernelHandle Facade), RFC-002 (Module Organization)
-> **범위**: `crates/oxios-markdown/`, `kernel_handle/knowledge_api.rs`, `channels/oxios-web/`
+> **범위**: `crates/oxios-markdown/`, `kernel_handle/knowledge_api.rs`, `surface/oxios-web/`
 
 ---
 
@@ -1501,7 +1501,7 @@ impl AgentTool for KnowledgeSearchTool {
 ### 6.2 라우트 구성
 
 ```rust
-// channels/oxios-web/src/routes/mod.rs에 추가:
+// surface/oxios-web/src/routes/mod.rs에 추가:
 
 // Knowledge API routes
 .route("/api/knowledge/tree", get(handle_knowledge_tree))
@@ -1518,7 +1518,7 @@ impl AgentTool for KnowledgeSearchTool {
 ### 6.3 Files.md JS 에디터 임베드
 
 ```
-channels/oxios-web/
+surface/oxios-web/
 ├── static/
 │   └── knowledge/           ← files.md web/ 내용
 │       ├── index.html       ← files.md의 index.html (수정: API 엔드포인트 변경)
@@ -1562,7 +1562,7 @@ Dioxus 대시보드의 사이드바에 "Knowledge" 링크를 추가한다.
 에디터 안에서 코파일럿 채팅이 가능 (WebSocket).
 
 ```rust
-// channels/oxios-web/frontend/src/components/sidebar.rs
+// surface/oxios-web/frontend/src/components/sidebar.rs
 // 기존 네비게이션 항목들에 추가:
 "Knowledge" → href = "/knowledge/"
 ```
@@ -1773,7 +1773,7 @@ impl KnowledgeBridge {
 **목표**: 브라우저에서 마크다운 에디터 사용 가능.
 
 작업:
-- [ ] files.md `web/` → `channels/oxios-web/static/knowledge/` 복사
+- [ ] files.md `web/` → `surface/oxios-web/static/knowledge/` 복사
 - [ ] API 경로 수정 (app.js, files.js)
 - [ ] `routes/knowledge_routes.rs` 구현
 - [ ] Axum 라우트에 `/knowledge/*` 추가

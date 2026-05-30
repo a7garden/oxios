@@ -1,6 +1,6 @@
 # Oxios Architecture Reference
 
-> **Version:** 0.1.0 · **Stack:** Rust 2021, tokio, serde (JSON+TOML), oxi-sdk · **License:** MIT
+> **Version:** 0.4.0 · **Stack:** Rust 2021, tokio, serde (JSON+TOML), oxi-sdk · **License:** MIT
 
 This document is a standalone reference for every subsystem in the Oxios Agent OS.
 Read it before modifying kernel structure, adding modules, or onboarding onto the project.

@@ -11,6 +11,7 @@ use oxios_gateway::plugin::{ChannelBundle, ChannelContext, ChannelPlugin};
 use crate::{TelegramChannel, TelegramSessionSettings};
 
 /// Telegram channel plugin — creates a Telegram Bot channel.
+#[derive(Default)]
 pub struct TelegramPlugin;
 
 impl TelegramPlugin {

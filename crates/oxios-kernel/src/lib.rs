@@ -250,13 +250,13 @@ pub use oxi_sdk::{
     ProviderCircuitBreaker, CircuitBreakerConfig,
 };
 
-/// Re-export oxi-sdk types available for consumers but not used internally.
-/// These are provided for convenience — use `oxi_sdk::` directly if preferred.
-///
-/// Includes: AgentBuilder, SharedState, StreamOptions, KernelToolContext,
-/// AgentSupervisor, AgentHandle, Authorizer, CapabilitySet, SecurityMiddleware,
-/// Middleware hooks, BrowserEngine, BrowseSessionTool, StructuredOutput,
-/// AgentState, CompactionHook, McpManager, SubagentTool, etc.
+// Re-export oxi-sdk types available for consumers but not used internally.
+// These are provided for convenience — use `oxi_sdk::` directly if preferred.
+//
+// Includes: AgentBuilder, SharedState, StreamOptions, KernelToolContext,
+// AgentSupervisor, AgentHandle, Authorizer, CapabilitySet, SecurityMiddleware,
+// Middleware hooks, BrowserEngine, BrowseSessionTool, StructuredOutput,
+// AgentState, CompactionHook, McpManager, SubagentTool, etc.
 pub mod sdk_exports {
     //! Convenience re-exports from oxi-sdk for external consumers.
     //! Not used internally by oxios-kernel — use when building extensions or tools.

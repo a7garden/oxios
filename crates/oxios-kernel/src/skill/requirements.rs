@@ -14,7 +14,7 @@ pub fn current_platform() -> &'static str {
 pub fn check_requirements(metadata: &SkillMetadata) -> RequirementsCheck {
     let platform = current_platform();
     let missing_bins: Vec<String> = metadata.requires.bins.iter().filter(|b| !has_bin(b)).cloned().collect();
-    let missing_any_bins = if metadata.requires.any_bins.is_empty() { Vec::new() } else if metadata.requires.any_bins.iter().any(|b| has_bin(b)) { Vec::new() } else { metadata.requires.any_bins.clone() };
+    let missing_any_bins = if metadata.requires.any_bins.is_empty() || metadata.requires.any_bins.iter().any(|b| has_bin(b)) { Vec::new() } else { metadata.requires.any_bins.clone() };
     let missing_env: Vec<String> = metadata.requires.env.iter().filter(|e| std::env::var(e).is_err()).cloned().collect();
     let config_checks: Vec<ConfigCheck> = metadata.requires.config.iter().map(|path| ConfigCheck { path: path.clone(), satisfied: true }).collect();
     let missing_config: Vec<String> = config_checks.iter().filter(|c| !c.satisfied).map(|c| c.path.clone()).collect();

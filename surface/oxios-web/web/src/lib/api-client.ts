@@ -1,3 +1,5 @@
+import { useAuthStore } from '@/stores/auth'
+
 const API_BASE = import.meta.env.VITE_API_BASE || ''
 
 export class ApiError extends Error {
@@ -28,7 +30,7 @@ export async function apiClient<T>(path: string, options?: RequestOptions): Prom
     }
   }
 
-  const token = localStorage.getItem('oxios-api-key')
+  const token = useAuthStore.getState().token
   const isRawBody = options?.rawBody === true
   const res = await fetch(url.toString(), {
     method: options?.method ?? 'GET',
