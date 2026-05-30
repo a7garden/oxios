@@ -295,7 +295,90 @@ pub(crate) async fn handle_agents_list(
     }
 }
 
-/// POST /api/agents/:id/kill — Kill an agent.
+/// GET /api/agents/{id} — Agent detail.
+pub(crate) async fn handle_agent_get(
+    state: State<Arc<AppState>>,
+    Path(id): Path<String>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    let agents = state
+        .kernel
+        .agents
+        .list()
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))?;
+    let agent = agents
+        .into_iter()
+        .find(|a| a.id.to_string() == id)
+        .ok_or_else(|| AppError::NotFound("agent not found".into()))?;
+
+    let budget = state.kernel.agents.check_budget(&agent.id);
+
+    Ok(Json(serde_json::json!({
+        "id": agent.id.to_string(),
+        "name": agent.name,
+        "status": agent.status.to_string(),
+        "created_at": agent.created_at.to_rfc3339(),
+        "seed_id": agent.seed_id.map(|s| s.to_string()),
+        "steps_completed": 0,
+        "budget": {
+            "tokens_remaining": budget.tokens_remaining,
+            "calls_remaining": budget.calls_remaining,
+            "window_remaining_secs": budget.window_remaining_secs,
+            "is_exhausted": budget.is_exhausted,
+        },
+    })))
+}
+
+/// GET /api/agents/{id}/trace — Agent execution trace.
+pub(crate) async fn handle_agent_trace(
+    state: State<Arc<AppState>>,
+    Path(id): Path<String>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    // Verify the agent exists
+    let agents = state
+        .kernel
+        .agents
+        .list()
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))?;
+    let _agent = agents
+        .into_iter()
+        .find(|a| a.id.to_string() == id)
+        .ok_or_else(|| AppError::NotFound("agent not found".into()))?;
+
+    // Try to load trace from sessions/{session_id}/trace.json
+    // For now, return empty trace
+    Ok(Json(serde_json::json!({
+        "agent_id": id,
+        "steps": [],
+        "completed_at": null,
+    })))
+}
+
+/// GET /api/agents/{id}/logs — Agent execution logs.
+pub(crate) async fn handle_agent_logs(
+    state: State<Arc<AppState>>,
+    Path(id): Path<String>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    // Verify the agent exists
+    let agents = state
+        .kernel
+        .agents
+        .list()
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))?;
+    let _agent = agents
+        .into_iter()
+        .find(|a| a.id.to_string() == id)
+        .ok_or_else(|| AppError::NotFound("agent not found".into()))?;
+
+    Ok(Json(serde_json::json!({
+        "agent_id": id,
+        "entries": [],
+    })))
+}
+
+/// POST /api/agents/{id}/kill — Kill an agent.
 pub(crate) async fn handle_agent_kill(
     state: State<Arc<AppState>>,
     Path(id): Path<String>,

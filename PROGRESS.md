@@ -4,13 +4,21 @@
 In Progress
 
 ## Tasks
-- [x] Phase 1: default-config.toml — 위험 바이너리 제거 + host + allowlist_mode
-- [x] Phase 1: config.rs — AllowlistMode enum + is_binary_allowed() + tests
+
+- [x] Create TypeScript types for Phase 1 Web UI (memory.ts, seed.ts, agent.ts)
+- [x] Add i18n keys for Phase 1 to en and ko locale files
 
 ## Files Changed
-- `share/default-config.toml` — gateway host 127.0.0.1, exec allowlist_mode=enforced, 위험 바이너리 제거, security 경고 주석
-- `crates/oxios-kernel/src/config.rs` — AllowlistMode enum, ExecConfig.allowlist_mode field, is_binary_allowed() mode-aware logic, 3 updated tests
+
+- `surface/oxios-web/web/src/types/memory.ts` — Memory Phase 1 types (MemoryTier, MemoryType, ProtectionLevel, MemoryStats, MemoryDetail, DreamReport, DreamStatus, SemanticSearchResult)
+- `surface/oxios-web/web/src/types/seed.ts` — Seed Phase 1 types (OuroborosPhase, SeedDetail, SeedEntity, EvaluationResult, EvolutionEntry, LinkedAgent)
+- `surface/oxios-web/web/src/types/agent.ts` — Agent Phase 1 types (AgentDetail, TraceStep, AgentTrace, AgentLog, AgentLogs)
 
 ## Notes
-- Phase 1 완료: osascript, open, shortcuts, gh 제거; 24개 안전 바이너리만 허용
-- Phase 1 config.rs 완료: AllowlistMode::Enforced 기본값, Permissive/Enforced 모드 분기, 9개 테스트 통과
+
+- All 3 type files pass `tsc --noEmit` with zero errors
+- Types align with Rust backend structs: MemoryManager, Ouroboros seed/evaluation, AgentRuntime
+- i18n keys: EN and KO files have perfect key symmetry (68 memory, 36 seeds, 46 agents including nested logLevel)
+- Memory section fully replaced (was 9 keys → now 68 keys covering overview, browse, dream, search)
+- Seeds section extended (was 12 keys → now 36 keys covering ouroboros phases, evaluation, evolution chain)
+- Agents section extended (was 14 keys → now 46 keys covering detail, trace, logs, budget, logLevel)

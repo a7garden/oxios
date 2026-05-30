@@ -889,6 +889,161 @@ pub(crate) async fn handle_memory_semantic_search(
     })))
 }
 
+// ---------------------------------------------------------------------------
+// Memory stats, pin, delete, dream
+// ---------------------------------------------------------------------------
+
+/// GET /api/memory/stats — Aggregate memory statistics.
+pub(crate) async fn handle_memory_stats(
+    state: State<Arc<AppState>>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    let (_index_size, _total) = state.kernel.agents.memory_stats().await;
+
+    // Count by category
+    let mut by_type = serde_json::Map::new();
+    let mut count = 0usize;
+    for category in [
+        "memory/facts",
+        "memory/episodes",
+        "memory/knowledge",
+        "memory/sessions",
+    ] {
+        if let Ok(names) = state.kernel.state.list_category(category).await {
+            let cat = category.split('/').nth(1).unwrap_or("unknown");
+            by_type.insert(cat.to_string(), serde_json::Value::Number(names.len().into()));
+            count += names.len();
+        }
+    }
+
+    Ok(Json(serde_json::json!({
+        "total": count,
+        "by_tier": { "hot": 0, "warm": count, "cold": 0 },
+        "by_type": by_type,
+        "by_protection": { "none": count, "low": 0, "medium": 0, "high": 0, "permanent": 0 },
+        "dream": {
+            "status": "idle",
+            "last_run": null,
+            "last_report_id": null,
+        }
+    })))
+}
+
+/// Request body for pinning a memory entry.
+#[derive(Debug, Deserialize)]
+pub(crate) struct PinRequest {
+    pinned: bool,
+}
+
+/// PUT /api/memory/{id}/pin — Toggle pin status on a memory entry.
+pub(crate) async fn handle_memory_pin(
+    state: State<Arc<AppState>>,
+    Path(id): Path<String>,
+    Json(body): Json<PinRequest>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    for category in [
+        "memory/facts",
+        "memory/episodes",
+        "memory/knowledge",
+        "memory/sessions",
+    ] {
+        if let Ok(Some(mut entry)) = state
+            .kernel
+            .state
+            .load::<MemoryEntry>(category, &id)
+            .await
+        {
+            entry.pinned = body.pinned;
+            state
+                .kernel
+                .state
+                .save(category, &id, &entry)
+                .await
+                .map_err(|e| AppError::Internal(e.to_string()))?;
+            return Ok(Json(serde_json::json!({ "id": id, "pinned": body.pinned })));
+        }
+    }
+    Err(AppError::NotFound("memory entry not found".into()))
+}
+
+/// DELETE /api/memory/{id} — Delete a memory entry.
+pub(crate) async fn handle_memory_delete(
+    state: State<Arc<AppState>>,
+    Path(id): Path<String>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    for category in [
+        "memory/facts",
+        "memory/episodes",
+        "memory/knowledge",
+        "memory/sessions",
+    ] {
+        if let Ok(Some(_)) = state
+            .kernel
+            .state
+            .load::<serde_json::Value>(category, &id)
+            .await
+        {
+            state
+                .kernel
+                .state
+                .delete(category, &id)
+                .await
+                .map_err(|e| AppError::Internal(e.to_string()))?;
+            return Ok(Json(serde_json::json!({ "id": id, "deleted": true })));
+        }
+    }
+    Err(AppError::NotFound("memory entry not found".into()))
+}
+
+/// GET /api/memory/dream/reports — List dream reports.
+pub(crate) async fn handle_dream_reports(
+    _state: State<Arc<AppState>>,
+) -> Json<serde_json::Value> {
+    // Placeholder — return empty list until dream persistence is implemented
+    Json(serde_json::json!({ "reports": [] }))
+}
+
+/// GET /api/memory/dream/status — Dream status.
+pub(crate) async fn handle_dream_status(
+    _state: State<Arc<AppState>>,
+) -> Json<serde_json::Value> {
+    Json(serde_json::json!({
+        "status": "idle",
+        "last_run": null,
+        "checkpoint_exists": false,
+    }))
+}
+
+// ---------------------------------------------------------------------------
+// Seed agents
+// ---------------------------------------------------------------------------
+
+/// GET /api/seeds/{id}/agents — List agents spawned from this seed.
+pub(crate) async fn handle_seed_agents(
+    state: State<Arc<AppState>>,
+    Path(id): Path<String>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    let agents = state
+        .kernel
+        .agents
+        .list()
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))?;
+    let filtered: Vec<serde_json::Value> = agents
+        .into_iter()
+        .filter(|a| a.seed_id.as_ref().map(|s| s.to_string()) == Some(id.clone()))
+        .map(|a| {
+            serde_json::json!({
+                "id": a.id.to_string(),
+                "name": a.name,
+                "status": a.status.to_string(),
+                "steps_completed": 0,
+                "created_at": a.created_at.to_rfc3339(),
+            })
+        })
+        .collect();
+    Ok(Json(serde_json::json!({ "agents": filtered })))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

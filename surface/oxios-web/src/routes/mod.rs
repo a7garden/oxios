@@ -95,15 +95,17 @@ pub(crate) use space_routes::{
     handle_spaces_list,
 };
 pub(crate) use system::{
-    handle_agent_kill, handle_agents_list, handle_config_get, handle_config_put, handle_health,
-    handle_readiness, handle_status,
+    handle_agent_get, handle_agent_kill, handle_agent_logs, handle_agent_trace, handle_agents_list,
+    handle_config_get, handle_config_put, handle_health, handle_readiness, handle_status,
 };
 pub(crate) use workspace::{
-    handle_memory_create, handle_memory_get, handle_memory_list, handle_memory_search,
-    handle_memory_semantic_search, handle_seed_evolution, handle_seed_get, handle_seeds_list,
-    handle_skill_content, handle_skill_create, handle_skill_delete, handle_skill_disable,
-    handle_skill_enable, handle_skill_get, handle_skills_list,
-    handle_workspace_file_get, handle_workspace_file_put, handle_workspace_tree,
+    handle_dream_reports, handle_dream_status, handle_memory_create, handle_memory_delete,
+    handle_memory_get, handle_memory_list, handle_memory_pin, handle_memory_search,
+    handle_memory_semantic_search, handle_memory_stats, handle_seed_agents,
+    handle_seed_evolution, handle_seed_get, handle_seeds_list, handle_skill_content,
+    handle_skill_create, handle_skill_delete, handle_skill_disable, handle_skill_enable,
+    handle_skill_get, handle_skills_list, handle_workspace_file_get, handle_workspace_file_put,
+    handle_workspace_tree,
 };
 
 // ---------------------------------------------------------------------------
@@ -169,6 +171,9 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         // Control
         .route("/api/status", get(handle_status))
         .route("/api/agents", get(handle_agents_list))
+        .route("/api/agents/{id}", get(handle_agent_get))
+        .route("/api/agents/{id}/trace", get(handle_agent_trace))
+        .route("/api/agents/{id}/logs", get(handle_agent_logs))
         .route("/api/agents/{id}/kill", post(handle_agent_kill))
         // Config
         .route("/api/config", get(handle_config_get))
@@ -195,6 +200,7 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         .route("/api/seeds", get(handle_seeds_list))
         .route("/api/seeds/{id}", get(handle_seed_get))
         .route("/api/seeds/{id}/evolution", get(handle_seed_evolution))
+        .route("/api/seeds/{id}/agents", get(handle_seed_agents))
         // Skills
         .route("/api/skills", get(handle_skills_list))
         .route("/api/skills/{name}", get(handle_skill_get))
@@ -208,7 +214,12 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         .route("/api/memory", post(handle_memory_create))
         .route("/api/memory/search", post(handle_memory_search))
         .route("/api/memory/semantic", post(handle_memory_semantic_search))
+        .route("/api/memory/stats", get(handle_memory_stats))
         .route("/api/memory/{name}", get(handle_memory_get))
+        .route("/api/memory/{id}/pin", put(handle_memory_pin))
+        .route("/api/memory/{id}", delete(handle_memory_delete))
+        .route("/api/memory/dream/reports", get(handle_dream_reports))
+        .route("/api/memory/dream/status", get(handle_dream_status))
         // Scheduler stats & tasks
         .route("/api/scheduler/stats", get(handle_scheduler_stats))
         .route("/api/scheduler/tasks", get(handle_scheduler_tasks))

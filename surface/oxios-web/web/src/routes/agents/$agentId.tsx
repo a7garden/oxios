@@ -1,14 +1,18 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { ArrowLeft, Bot, Skull } from 'lucide-react'
+import { Skull, ExternalLink } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ErrorState } from '@/components/shared/error-state'
 import { LoadingCards } from '@/components/shared/loading'
-import { StatusIndicator } from '@/components/shared/status-indicator'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { api } from '@/lib/api-client'
-import type { Agent } from '@/types'
+import { AgentHeader } from '@/components/agent/agent-header'
+import { AgentBudgetBar } from '@/components/agent/agent-budget-bar'
+import { ExecutionTrace } from '@/components/agent/execution-trace'
+import { AgentLogs as AgentLogsComponent } from '@/components/agent/agent-logs'
+import { useAgentDetail, useAgentTrace, useAgentLogs } from '@/hooks/use-agent-trace'
 
 export const Route = createFileRoute('/agents/$agentId')({
   component: AgentDetailPage,
@@ -20,26 +24,21 @@ function AgentDetailPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
 
-  // No GET /api/agents/:id endpoint — fetch from list and filter
   const {
     data: agent,
     isLoading,
     isError,
     refetch,
-  } = useQuery({
-    queryKey: ['agent', agentId],
-    queryFn: async () => {
-      const res = await api.get<{ items: Agent[] }>('/api/agents')
-      return res.items?.find((a) => a.id === agentId)
-    },
-    refetchInterval: 5000,
-  })
+  } = useAgentDetail(agentId)
+  const { data: trace, isLoading: traceLoading } = useAgentTrace(agentId)
+  const { data: logs } = useAgentLogs(agentId)
 
   const killMutation = useMutation({
     mutationFn: () => api.post(`/api/agents/${agentId}/kill`),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['agent', agentId] })
       queryClient.invalidateQueries({ queryKey: ['agents'] })
+      queryClient.invalidateQueries({ queryKey: ['agents', 'detail', agentId] })
+      navigate({ to: '/agents' })
     },
   })
 
@@ -47,67 +46,85 @@ function AgentDetailPage() {
   if (isError) return <ErrorState onRetry={() => refetch()} />
   if (!agent) return <p className="text-muted-foreground">{t('agents.notFound')}</p>
 
-  const details = [
-    { label: t('agents.agentId'), value: agent.id },
-    { label: t('agents.name'), value: agent.name },
-    {
-      label: t('agents.status'),
-      value: <StatusIndicator status={agent.status?.toLowerCase() ?? 'unknown'} />,
-    },
-    { label: t('seeds.seed'), value: agent.seed_id ?? '—' },
-    {
-      label: t('agents.created'),
-      value: agent.created_at ? new Date(agent.created_at).toLocaleString() : '—',
-    },
-  ]
-
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-4">
+      <AgentHeader agent={agent} onBack={() => navigate({ to: '/agents' })}>
         <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => navigate({ to: '/agents' })}
-          aria-label={t('common.goBack')}
+          variant="destructive"
+          size="sm"
+          onClick={() => {
+            if (confirm(t('agents.terminateConfirm'))) killMutation.mutate()
+          }}
+          disabled={killMutation.isPending || agent.status?.toLowerCase() === 'stopped'}
         >
-          <ArrowLeft className="h-4 w-4" />
+          <Skull className="h-4 w-4 mr-1" /> {t('agents.terminate')}
         </Button>
-        <div className="flex-1">
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Bot className="h-6 w-6" /> {agent.name}
-          </h1>
-          <p className="text-muted-foreground">{t('agents.agentDetail')}</p>
-        </div>
-        <div className="flex gap-2">
-          <Button
-            variant="destructive"
-            size="sm"
-            onClick={() => killMutation.mutate()}
-            disabled={killMutation.isPending || agent.status?.toLowerCase() === 'stopped'}
-          >
-            <Skull className="h-4 w-4 mr-1" /> {t('agents.terminate')}
-          </Button>
-        </div>
-      </div>
+      </AgentHeader>
 
+      {/* Meta info */}
       <Card>
-        <CardHeader>
-          <CardTitle>{t('agents.agentInformation')}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-3 md:grid-cols-2">
-            {details.map((d) => (
-              <div
-                key={d.label}
-                className="flex items-center justify-between rounded-lg border p-3"
-              >
-                <span className="text-sm text-muted-foreground">{d.label}</span>
-                <span className="text-sm font-medium">{d.value}</span>
+        <CardContent className="pt-4 space-y-3">
+          <div className="grid gap-2 md:grid-cols-3 text-sm">
+            {agent.seed_id && (
+              <div className="flex items-center gap-1">
+                <span className="text-muted-foreground">{t('agents.seed')}:</span>
+                <Button
+                  variant="link"
+                  className="h-auto p-0 text-xs"
+                  onClick={() =>
+                    navigate({
+                      to: '/seeds/$seedId',
+                      params: { seedId: agent.seed_id! },
+                    })
+                  }
+                >
+                  {agent.seed_id.slice(0, 8)}...
+                </Button>
               </div>
-            ))}
+            )}
+            {agent.space_id && (
+              <div className="flex items-center gap-1">
+                <span className="text-muted-foreground">{t('agents.space')}:</span>
+                <span className="text-xs font-mono">{agent.space_id.slice(0, 8)}...</span>
+              </div>
+            )}
+            <div className="flex items-center gap-1">
+              <span className="text-muted-foreground">{t('agents.created')}:</span>
+              <span>{new Date(agent.created_at).toLocaleString()}</span>
+            </div>
           </div>
+          <AgentBudgetBar agent={agent} />
         </CardContent>
       </Card>
+
+      {/* Tabs */}
+      <Tabs defaultValue="trace" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="trace">{t('agents.trace')}</TabsTrigger>
+          <TabsTrigger value="logs">{t('agents.logs')}</TabsTrigger>
+        </TabsList>
+        <TabsContent value="trace">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-lg font-semibold">{t('agents.executionTrace')}</h3>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() =>
+                navigate({
+                  to: '/agents/$agentId/trace',
+                  params: { agentId },
+                })
+              }
+            >
+              <ExternalLink className="h-4 w-4 mr-1" /> {t('agents.traceFullscreen')}
+            </Button>
+          </div>
+          <ExecutionTrace trace={trace} isLoading={traceLoading} />
+        </TabsContent>
+        <TabsContent value="logs">
+          <AgentLogsComponent logs={logs} />
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }
