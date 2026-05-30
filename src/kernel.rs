@@ -12,7 +12,7 @@ use oxios_kernel::{
     ClawHubInstaller, CronScheduler, EventBus, GitLayer,
     McpBridge, McpServer, MarketplaceApi, MemoryManager,
     Orchestrator, OxiosConfig, OxiosEngine, PersonaManager, ResourceMonitor,
-    SkillManager, SpaceManager, Supervisor,
+    SkillManager, ProjectManager, Supervisor,
 };
 use oxios_markdown::knowledge::FileChange;
 use oxios_markdown::KnowledgeBase;
@@ -46,7 +46,7 @@ pub struct Kernel {
     audit_trail: Arc<AuditTrail>,
     budget_manager: Arc<BudgetManager>,
     resource_monitor: Arc<ResourceMonitor>,
-    space_manager: Arc<SpaceManager>,
+    project_manager: Option<Arc<ProjectManager>>,
     start_time: std::time::Instant,
     /// Path to config.toml (for persistence).
     config_path: PathBuf,
@@ -176,7 +176,7 @@ impl Kernel {
                         self.config.clone(),
                         self.start_time,
                     ),
-                    oxios_kernel::SpaceApi::new(self.space_manager.clone(), self.event_bus.clone()),
+                    self.project_manager.clone().map(oxios_kernel::ProjectApi::new),
                     oxios_kernel::ExecApi::new(
                         Arc::new(self.config.exec.clone()),
                         self.access_manager.clone(),
@@ -199,6 +199,14 @@ impl Kernel {
     /// Gateway reference — for channel registration and message routing.
     pub fn gateway(&self) -> Arc<Gateway> {
         self.gateway.clone()
+    }
+
+    /// Get the ProjectManager reference.
+    /// Panics if SQLite is not enabled (project_manager is None).
+    pub fn project_manager(&self) -> Arc<oxios_kernel::ProjectManager> {
+        self.project_manager
+            .clone()
+            .expect("ProjectManager not available — SQLite must be enabled")
     }
 
     /// Build a BrowserApi facade based on feature flag and config.
@@ -640,6 +648,9 @@ impl KernelBuilder {
         let mut memory_manager = MemoryManager::new(state_store.clone());
         memory_manager.set_git_layer(git_layer.clone());
 
+        // ProjectManager — initialized after SQLite (RFC-011)
+        let mut project_manager: Option<Arc<oxios_kernel::ProjectManager>> = None;
+
         // ── RFC-012: SQLite memory backend ──
         // When enabled, initialize the SQLite database and attach it to the memory manager.
         #[cfg(feature = "sqlite-memory")]
@@ -661,6 +672,7 @@ impl KernelBuilder {
                     let embedding: Arc<dyn oxios_kernel::EmbeddingProvider> =
                         Self::create_embedding_provider(&config);
 
+                    let db_clone = db.clone();
                     let sqlite_store = SqliteMemoryStore::new(db, embedding);
 
                     // Run JSON → SQLite migration (one-time, best effort)
@@ -675,6 +687,17 @@ impl KernelBuilder {
                         dim = sqlite_config.embedding_dim,
                         "SQLite memory backend initialized"
                     );
+
+                    // Initialize ProjectManager using the same SQLite database
+                    match oxios_kernel::ProjectManager::new(db_clone, Some(event_bus.clone())) {
+                        Ok(pm) => {
+                            project_manager = Some(Arc::new(pm));
+                            tracing::info!("ProjectManager initialized");
+                        }
+                        Err(e) => {
+                            tracing::warn!(error = %e, "ProjectManager init failed (non-fatal)");
+                        }
+                    }
 
                     // Prefetch the embedding model in the background so it's ready
                     // before the first search. Non-blocking — errors are logged.
@@ -743,9 +766,6 @@ impl KernelBuilder {
             }
         }
 
-        // ── Space Management (early — needed for KernelHandle) ──
-        let space_manager = SpaceManager::new(state_store.clone(), event_bus.clone()).await?;
-        let space_manager = Arc::new(space_manager);
 
         // ── KernelHandle — the syscall table for agent OS control ──
         // Created inline here because AgentRuntime needs it.
@@ -781,7 +801,7 @@ impl KernelBuilder {
                     config.clone(),
                     std::time::Instant::now(),
                 ),
-                oxios_kernel::SpaceApi::new(space_manager.clone(), event_bus.clone()),
+                project_manager.clone().map(oxios_kernel::ProjectApi::new),
                 oxios_kernel::ExecApi::new(Arc::new(config.exec.clone()), access_manager.clone()),
                 build_browser_api_value(&config),
                 oxios_kernel::A2aApi::new(a2a_protocol.clone()),
@@ -893,7 +913,9 @@ impl KernelBuilder {
         );
         orchestrator.set_git_layer(git_layer.clone());
         orchestrator.set_a2a(a2a_protocol.clone());
-        orchestrator.set_space_manager(space_manager.clone());
+        if let Some(pm) = project_manager.clone() {
+            orchestrator.set_project_manager(pm);
+        }
         let orchestrator = Arc::new(orchestrator);
 
         let gateway = Arc::new(Gateway::new(orchestrator.clone()));
@@ -902,7 +924,7 @@ impl KernelBuilder {
             orchestrator,
             gateway,
             event_bus: event_bus.clone(),
-            state_store,
+            state_store: state_store.clone(),
             config,
             skill_manager,
             supervisor,
@@ -917,7 +939,7 @@ impl KernelBuilder {
             audit_trail,
             budget_manager,
             resource_monitor,
-            space_manager,
+            project_manager,
             start_time: std::time::Instant::now(),
             config_path,
             handle_cache: OnceLock::new(),

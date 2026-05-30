@@ -21,7 +21,7 @@ use crate::server::AppState;
 pub(crate) struct SessionListItem {
     id: String,
     user_id: String,
-    space_id: Option<String>,
+    project_id: Option<String>,
     message_count: usize,
     active_seed_id: Option<String>,
     created_at: String,
@@ -40,7 +40,7 @@ pub(crate) async fn handle_sessions_list(
                 .map(|s| SessionListItem {
                     id: s.id,
                     user_id: s.user_id,
-                    space_id: s.space_id,
+                    project_id: s.space_id,
                     message_count: s.message_count,
                     active_seed_id: s.active_seed_id,
                     created_at: s.created_at.to_rfc3339(),
@@ -64,7 +64,7 @@ pub(crate) async fn handle_session_get(
         Ok(Some(session)) => Ok(Json(serde_json::json!({
             "id": session.id.0,
             "user_id": session.user_id,
-            "space_id": session.metadata.get("space_id").and_then(|v| v.as_str()).map(String::from),
+            "project_id": session.metadata.get("project_ids").and_then(|v| v.as_str()).map(String::from),
             "user_messages": session.user_messages,
             "agent_responses": session.agent_responses,
             "active_seed_id": session.active_seed_id,
@@ -267,15 +267,26 @@ pub(crate) fn sanitize_event(event: &oxios_kernel::event_bus::KernelEvent) -> se
             "agent_id": agent_id.to_string(),
             "success": success,
         }),
-        KernelEvent::SpaceCreated {
-            space_id,
+        KernelEvent::ProjectCreated {
+            project_id,
             name,
             source,
         } => serde_json::json!({
+            "type": "project_created",
+            "project_id": project_id.to_string(),
+            "name": name,
+            "source": source,
+        }),
+        KernelEvent::ProjectActivated { project_id, name } => serde_json::json!({
+            "type": "project_activated",
+            "project_id": project_id.to_string(),
+            "name": name,
+        }),
+        // Legacy Space events (kept until Space module removed)
+        KernelEvent::SpaceCreated { space_id, name, .. } => serde_json::json!({
             "type": "space_created",
             "space_id": space_id.to_string(),
             "name": name,
-            "source": format!("{:?}", source),
         }),
         KernelEvent::SpaceActivated { space_id, name } => serde_json::json!({
             "type": "space_activated",

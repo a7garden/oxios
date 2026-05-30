@@ -210,7 +210,7 @@ pub(crate) async fn handle_status(state: State<Arc<AppState>>) -> Json<StatusRes
         },
         memory: memory_health,
         agents: agent_health,
-        spaces_active: state.kernel.spaces.list_spaces().len(),
+        spaces_active: state.kernel.projects.as_ref().map(|p| p.list_projects().len()).unwrap_or(0),
     });
 
     Json(StatusResponse {

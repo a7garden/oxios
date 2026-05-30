@@ -224,9 +224,9 @@ impl Gateway {
             let start = std::time::Instant::now();
 
             let session_id = msg.metadata.get(meta::SESSION_ID).cloned();
-            let space_id = msg.metadata.get(meta::SPACE_ID).cloned();
+            let project_ids = msg.metadata.get(meta::PROJECT_IDS).cloned();
             let result = orchestrator
-                .handle_message(&msg.user_id, &msg.content, session_id.as_deref(), space_id.as_deref())
+                .handle_message(&msg.user_id, &msg.content, session_id.as_deref(), project_ids.as_deref())
                 .await;
 
             let duration_ms = start.elapsed().as_millis() as u64;
@@ -248,15 +248,15 @@ impl Gateway {
                     if let Some(ref sid) = orchestration.session_id {
                         channel_meta.insert(meta::SESSION_ID.to_owned(), sid.clone());
                     }
-                    if let Some(ref vid) = orchestration.space_id {
-                        channel_meta.insert(meta::SPACE_ID.to_owned(), vid.to_string());
+                    if let Some(ref pid) = orchestration.primary_project_id {
+                        channel_meta.insert(meta::PROJECT_IDS.to_owned(), pid.to_string());
                     }
 
                     // Typed orchestration metadata (RFC-014)
                     let response_meta = ResponseMeta {
                         session_id: orchestration.session_id,
-                        space_id: orchestration.space_id.map(|u| u.to_string()),
-                        space_tag: orchestration.space_tag,
+                        project_id: orchestration.primary_project_id.map(|u| u.to_string()),
+                        project_tag: orchestration.project_tag,
                         seed_id: orchestration.seed_id.map(|u| u.to_string()),
                         phase: orchestration.phase_reached.to_string(),
                         evaluation_passed: orchestration.evaluation_passed,

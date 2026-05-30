@@ -71,8 +71,8 @@ pub async fn cmd_run(kernel: &Kernel, prompt: &str, opts: &RunOptions) -> Result
         let json_output = json!({
             "response": result.response,
             "session_id": result.session_id,
-            "space_id": result.space_id.map(|id| id.to_string()),
-            "space_tag": result.space_tag,
+            "primary_project_id": result.primary_project_id.map(|id| id.to_string()),
+            "project_tag": result.project_tag,
             "seed_id": result.seed_id.map(|id| id.to_string()),
             "agent_id": result.agent_id.map(|id| id.to_string()),
             "phase_reached": result.phase_reached.to_string(),

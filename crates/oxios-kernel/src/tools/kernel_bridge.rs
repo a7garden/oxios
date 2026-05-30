@@ -54,7 +54,7 @@ impl SdkKernelToolProvider for OxiosKernelBridge {
             "memory_read",
             "memory_write",
             "memory_search",
-            "space",
+            "project",
             "agent",
             "a2a_delegate",
             "a2a_send",
@@ -134,17 +134,7 @@ mod tests {
                 crate::OxiosConfig::default(),
                 std::time::Instant::now(),
             ),
-            crate::SpaceApi::new(
-                Arc::new(
-                    crate::space::SpaceManager::new(
-                        state_store.clone(),
-                        crate::event_bus::EventBus::new(256),
-                    )
-                    .await
-                    .unwrap(),
-                ),
-                crate::event_bus::EventBus::new(256),
-            ),
+            None,
             crate::ExecApi::new(
                 Arc::new(crate::config::ExecConfig::default()),
                 Arc::new(parking_lot::Mutex::new(

@@ -54,12 +54,12 @@ pub struct ResponseMeta {
     /// Session ID for multi-turn conversations.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub session_id: Option<String>,
-    /// Space ID that handled the message.
+    /// Primary project ID that handled the message.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub space_id: Option<String>,
-    /// Space decoration tag (e.g., "[🔧 oxios]").
+    pub project_id: Option<String>,
+    /// Project decoration tag (e.g., "[🔧 oxios]").
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub space_tag: Option<String>,
+    pub project_tag: Option<String>,
     /// Seed ID created during orchestration.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub seed_id: Option<String>,
@@ -231,8 +231,8 @@ impl OutgoingMessage {
             metadata: HashMap::new(),
             meta: Some(ResponseMeta {
                 session_id: None,
-                space_id: None,
-                space_tag: None,
+                project_id: None,
+                project_tag: None,
                 seed_id: None,
                 phase: String::new(),
                 evaluation_passed: false,

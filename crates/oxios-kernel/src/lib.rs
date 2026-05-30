@@ -65,6 +65,7 @@ pub mod git_layer;
 pub mod resource_monitor;
 pub mod session_context;
 pub mod space;
+pub mod project;
 pub mod state_store;
 
 // ─── Infrastructure ─────────────────────────────────────────────────
@@ -205,6 +206,12 @@ pub use space::{
     MemoryFlow, PathMatcher, Space, SpaceBridge, SpaceId, SpaceManager, SpaceManagerError,
     SpaceSource,
 };
+pub use project::{
+    detect_project, extract_path, find_by_id, find_by_name, DetectionResult, Project,
+    ProjectId, ProjectSource,
+};
+#[cfg(feature = "sqlite-memory")]
+pub use project::{ProjectManager, ProjectManagerError};
 pub use state_store::{AgentResponse, PruneConfig, PruneThrottle, Session, SessionId, SessionSummary, StateStore};
 
 // ─── Infrastructure ─────────────────────────────────────────────────
@@ -223,7 +230,7 @@ pub use session_context::SessionContext;
 pub use kernel_handle::{
     A2aApi, AgentApi, BrowserApi, CopilotResponse, EngineApi, EngineConfigResponse, ExecApi,
     ExtensionApi, InfraApi, KnowledgeContext, KnowledgeLens, KnowledgeNote, McpApi, MemoryNote,
-    ModelInfo, PersonaApi, ProviderInfo, SecurityApi, SpaceApi, StateApi, ValidateKeyResult,
+    ModelInfo, PersonaApi, ProjectApi, ProviderInfo, SecurityApi, StateApi, ValidateKeyResult,
 };
 
 // ─── oxi-sdk re-exports ─────────────────────────────────────────────

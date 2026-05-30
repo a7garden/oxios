@@ -128,7 +128,7 @@ function SpacesListPage() {
           columns={columns}
           data={spaces}
           keyExtractor={(row) => row.id}
-          onRowClick={(row) => navigate({ to: '/spaces/$spaceId', params: { spaceId: row.id } })}
+          onRowClick={(row) => navigate({ to: '/spaces/$projectId', params: { projectId: row.id } })}
         />
       )}
     </div>

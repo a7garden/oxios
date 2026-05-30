@@ -481,14 +481,7 @@ mod tests {
                 crate::config::OxiosConfig::default(),
                 std::time::Instant::now(),
             ),
-            crate::kernel_handle::SpaceApi::new(
-                Arc::new(
-                    crate::space::SpaceManager::new(state_store_for_space, EventBus::new(64))
-                        .await
-                        .expect("space mgr"),
-                ),
-                EventBus::new(64),
-            ),
+            None,
             crate::kernel_handle::ExecApi::new(
                 Arc::new(crate::config::ExecConfig::default()),
                 Arc::new(parking_lot::Mutex::new(
