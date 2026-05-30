@@ -1,0 +1,17 @@
+# Oxios Cargo configuration
+
+[build]
+# Use clang linker for faster linking
+rustflags = ["-C", "linker=clang"]
+
+[profile.dev]
+# Keep incremental for speed, but limit cache size
+incremental = true
+
+[profile.dev.package."*"]
+# Dependencies compile faster
+opt-level = 2
+
+[profile.release]
+lto = "thin"
+codegen-units = 16
