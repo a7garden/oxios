@@ -37,7 +37,9 @@ use crate::persona_routes;
 use crate::server::AppState;
 
 // Re-export all handlers for use in build_routes
-pub(crate) use agent_groups::{handle_agent_group_get, handle_agent_groups_list};
+pub(crate) use agent_groups::{
+    handle_agent_group_get, handle_agent_group_progress, handle_agent_groups_list,
+};
 pub(crate) use audit_routes::{
     handle_audit_by_agent, handle_audit_entries, handle_audit_export, handle_audit_flush,
     handle_audit_verify,
@@ -246,6 +248,7 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         // Agent Groups
         .route("/api/agent-groups", get(handle_agent_groups_list))
         .route("/api/agent-groups/{id}", get(handle_agent_group_get))
+        .route("/api/agent-groups/{id}/progress", get(handle_agent_group_progress))
         // Events
         .route("/api/events", get(handle_events))
         // Personas (delegated to persona_routes)

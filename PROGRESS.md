@@ -4,21 +4,35 @@
 In Progress
 
 ## Tasks
+- [x] Phase 1 Types & Hooks (memory.ts, seed.ts, agent.ts) + i18n keys
+- [x] Phase 1 Backend API endpoints
+- [x] Phase 1 Frontend: Memory UI (4-tab), Seed Detail, Agent Detail, Trace page
 
-- [x] Create TypeScript types for Phase 1 Web UI (memory.ts, seed.ts, agent.ts)
-- [x] Add i18n keys for Phase 1 to en and ko locale files
+## Phase 1 Notes
 
-## Files Changed
+**Backend API additions:**
+- GET /api/agents/{id} — agent detail with budget
+- GET /api/agents/{id}/trace — execution trace (placeholder)
+- GET /api/agents/{id}/logs — execution logs (placeholder)
+- GET /api/memory/stats — tier/type/protection aggregation
+- PUT /api/memory/{id}/pin — toggle pin
+- DELETE /api/memory/{id} — delete entry
+- GET /api/memory/dream/reports — Dream reports (placeholder)
+- GET /api/memory/dream/status — Dream status (placeholder)
+- GET /api/seeds/{id}/agents — agents linked to seed
 
-- `surface/oxios-web/web/src/types/memory.ts` — Memory Phase 1 types (MemoryTier, MemoryType, ProtectionLevel, MemoryStats, MemoryDetail, DreamReport, DreamStatus, SemanticSearchResult)
-- `surface/oxios-web/web/src/types/seed.ts` — Seed Phase 1 types (OuroborosPhase, SeedDetail, SeedEntity, EvaluationResult, EvolutionEntry, LinkedAgent)
-- `surface/oxios-web/web/src/types/agent.ts` — Agent Phase 1 types (AgentDetail, TraceStep, AgentTrace, AgentLog, AgentLogs)
+**Frontend components:**
+- components/memory/ — 9 components (overview, browser, card, detail, dream-panel, search, badges)
+- components/seed/ — 7 components (phase-progress, constraint-list, criteria-list, evaluation-card, evolution-chain, ontology-grid, linked-agents)
+- components/agent/ — 5 components (header, budget-bar, trace-step, execution-trace, agent-logs)
 
-## Notes
+**Routes changed:**
+- routes/memory.tsx — 4-tab rewrite
+- routes/seeds/$seedId.tsx — Ouroboros structured view
+- routes/agents/$agentId.tsx — tabbed layout
+- routes/agents/$agentId/trace.tsx — full-screen trace
 
-- All 3 type files pass `tsc --noEmit` with zero errors
-- Types align with Rust backend structs: MemoryManager, Ouroboros seed/evaluation, AgentRuntime
-- i18n keys: EN and KO files have perfect key symmetry (68 memory, 36 seeds, 46 agents including nested logLevel)
-- Memory section fully replaced (was 9 keys → now 68 keys covering overview, browse, dream, search)
-- Seeds section extended (was 12 keys → now 36 keys covering ouroboros phases, evaluation, evolution chain)
-- Agents section extended (was 14 keys → now 46 keys covering detail, trace, logs, budget, logLevel)
+**Build verification:**
+- `cargo build -p oxios-web` ✅
+- `bun run build` ✅
+- Worktree: /Volumes/MERCURY/PROJECTS/oxios-p1 → merged to main

@@ -1,22 +1,31 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
-import { Check, PackagePlus, Search, Store, X, Zap } from 'lucide-react'
+import { Check, PackagePlus, Power, Search, Store, Trash2, X, Zap } from 'lucide-react'
 import { useCallback, useDeferredValue, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { EmptyState } from '@/components/shared/empty-state'
 import { ErrorState } from '@/components/shared/error-state'
 import { LoadingCards } from '@/components/shared/loading'
 import { RefreshButton } from '@/components/shared/refresh-button'
+import { SkillDetail } from '@/components/skills/skill-detail'
+import { MarketplaceDetail } from '@/components/skills/marketplace-detail'
+import { UpdateBadge, useSkillUpdates } from '@/components/skills/update-badge'
 import { useToast } from '@/components/ui/sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { api } from '@/lib/api-client'
 import { cn } from '@/lib/utils'
 import type { ClawHubSearchResult, Skill, SkillFormat, SkillStatus } from '@/types'
 
-export const Route = createFileRoute('/skills')({ component: SkillsPage })
+export const Route = createFileRoute('/skills')({
+  component: SkillsPage,
+  validateSearch: (search: Record<string, unknown>) => ({
+    tab: (search.tab as string) || undefined,
+  }),
+})
 
 type Tab = 'installed' | 'marketplace'
 
@@ -46,11 +55,16 @@ function FormatBadge({ format }: { format: SkillFormat }) {
 
 function SkillsPage() {
   const { t } = useTranslation()
-  const [tab, setTab] = useState<Tab>('installed')
+  const search = Route.useSearch()
+  const [tab, setTab] = useState<Tab>(search.tab === 'marketplace' ? 'marketplace' : 'installed')
   const [filter, setFilter] = useState<'all' | SkillStatus>('all')
-  const [search, setSearch] = useState('')
+  const [searchQuery, setSearchQuery] = useState('')
   const [mktQuery, setMktQuery] = useState('')
   const deferredQuery = useDeferredValue(mktQuery)
+
+  // Selected skill for detail panel
+  const [selectedSkill, setSelectedSkill] = useState<Skill | null>(null)
+  const [selectedMktSlug, setSelectedMktSlug] = useState<string | null>(null)
 
   const { data: skills, isLoading: sl, isError: se, refetch: sr, isFetching: sf } = useQuery({
     queryKey: ['skills'],
@@ -64,6 +78,10 @@ function SkillsPage() {
     refetchOnWindowFocus: false,
   })
 
+  // Updates check
+  const { data: updates } = useSkillUpdates()
+  const updateCount = updates?.length ?? 0
+
   const counts = useMemo(() => {
     const l = skills ?? []
     return { all: l.length, ready: l.filter(s => s.status === 'ready').length, needs_setup: l.filter(s => s.status === 'needs_setup').length, disabled: l.filter(s => s.status === 'disabled').length }
@@ -72,9 +90,16 @@ function SkillsPage() {
   const filtered = useMemo(() => {
     let l = skills ?? []
     if (filter !== 'all') l = l.filter(s => s.status === filter)
-    if (search.trim()) { const q = search.toLowerCase(); l = l.filter(s => s.name.toLowerCase().includes(q) || s.description.toLowerCase().includes(q)) }
+    if (searchQuery.trim()) { const q = searchQuery.toLowerCase(); l = l.filter(s => s.name.toLowerCase().includes(q) || s.description.toLowerCase().includes(q)) }
     return l
-  }, [skills, filter, search])
+  }, [skills, filter, searchQuery])
+
+  // Close detail panel when switching tabs
+  const handleTabChange = useCallback((newTab: Tab) => {
+    setTab(newTab)
+    setSelectedSkill(null)
+    setSelectedMktSlug(null)
+  }, [])
 
   return (
     <div className="space-y-6">
@@ -88,29 +113,112 @@ function SkillsPage() {
 
       {/* Tab switcher */}
       <div className="inline-flex h-9 items-center rounded-lg bg-muted p-1 text-muted-foreground gap-0.5">
-        <button onClick={() => setTab('installed')} className={cn('inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1 text-sm font-medium transition-all gap-1.5', tab === 'installed' ? 'bg-background text-foreground shadow' : 'hover:bg-background/50')}>
+        <button onClick={() => handleTabChange('installed')} className={cn('inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1 text-sm font-medium transition-all gap-1.5', tab === 'installed' ? 'bg-background text-foreground shadow' : 'hover:bg-background/50')}>
           <Zap className="h-3.5 w-3.5" /> {t('skills.installed')} <span className="text-xs text-muted-foreground">{counts.all}</span>
         </button>
-        <button onClick={() => setTab('marketplace')} className={cn('inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1 text-sm font-medium transition-all gap-1.5', tab === 'marketplace' ? 'bg-background text-foreground shadow' : 'hover:bg-background/50')}>
+        <button onClick={() => handleTabChange('marketplace')} className={cn('inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1 text-sm font-medium transition-all gap-1.5', tab === 'marketplace' ? 'bg-background text-foreground shadow' : 'hover:bg-background/50')}>
           <Store className="h-3.5 w-3.5" /> {t('skills.marketplace')}
+          <UpdateBadge count={updateCount} />
         </button>
       </div>
 
-      {tab === 'installed' ? (
-        <InstalledTab filtered={filtered} allSkills={skills ?? []} counts={counts} filter={filter} setFilter={setFilter} search={search} setSearch={setSearch} isLoading={sl} isError={se} refetch={sr} />
-      ) : (
-        <MarketplaceTab results={mktResults} query={mktQuery} setQuery={setMktQuery} deferredQuery={deferredQuery} isLoading={ml} isError={me} refetch={mr} />
-      )}
+      {/* Main content area with optional side panel */}
+      <div className={cn('grid gap-6', (selectedSkill || selectedMktSlug) ? 'grid-cols-1 lg:grid-cols-[1fr_380px]' : 'grid-cols-1')}>
+        <div>
+          {tab === 'installed' ? (
+            <InstalledTab
+              filtered={filtered}
+              allSkills={skills ?? []}
+              counts={counts}
+              filter={filter}
+              setFilter={setFilter}
+              search={searchQuery}
+              setSearch={setSearchQuery}
+              isLoading={sl}
+              isError={se}
+              refetch={sr}
+              selectedSkill={selectedSkill}
+              onSelectSkill={setSelectedSkill}
+              updates={updates}
+            />
+          ) : (
+            <MarketplaceTab
+              results={mktResults}
+              query={mktQuery}
+              setQuery={setMktQuery}
+              deferredQuery={deferredQuery}
+              isLoading={ml}
+              isError={me}
+              refetch={mr}
+              selectedSlug={selectedMktSlug}
+              onSelectSlug={setSelectedMktSlug}
+            />
+          )}
+        </div>
+
+        {/* Side panel */}
+        {selectedSkill && (
+          <div className="border rounded-lg p-4 h-fit sticky top-6">
+            <SkillDetail skill={selectedSkill} onClose={() => setSelectedSkill(null)} />
+          </div>
+        )}
+        {selectedMktSlug && (
+          <div className="border rounded-lg p-4 h-fit sticky top-6">
+            <MarketplaceDetail slug={selectedMktSlug} onClose={() => setSelectedMktSlug(null)} />
+          </div>
+        )}
+      </div>
     </div>
   )
 }
 
 // ─── Installed Tab ────────────────────────────────────────────
 
-function InstalledTab({ filtered, allSkills, counts, filter, setFilter, search, setSearch, isLoading, isError, refetch }: {
-  filtered: Skill[]; allSkills: Skill[]; counts: Record<string, number>; filter: 'all' | SkillStatus; setFilter: (f: 'all' | SkillStatus) => void; search: string; setSearch: (s: string) => void; isLoading: boolean; isError: boolean; refetch: () => void
+interface SkillUpdate {
+  slug: string
+  currentVersion: string
+  latestVersion: string
+  changelog?: string
+}
+
+function InstalledTab({ filtered, allSkills, counts, filter, setFilter, search, setSearch, isLoading, isError, refetch, selectedSkill, onSelectSkill, updates }: {
+  filtered: Skill[]; allSkills: Skill[]; counts: Record<string, number>; filter: 'all' | SkillStatus; setFilter: (f: 'all' | SkillStatus) => void; search: string; setSearch: (s: string) => void; isLoading: boolean; isError: boolean; refetch: () => void; selectedSkill: Skill | null; onSelectSkill: (s: Skill | null) => void; updates?: SkillUpdate[]
 }) {
   const { t } = useTranslation()
+  const qc = useQueryClient()
+  const { toast } = useToast()
+  const [deleteTarget, setDeleteTarget] = useState<Skill | null>(null)
+
+  const toggleMutation = useMutation({
+    mutationFn: ({ name, enable }: { name: string; enable: boolean }) => {
+      const endpoint = enable
+        ? `/api/skills/${encodeURIComponent(name)}/enable`
+        : `/api/skills/${encodeURIComponent(name)}/disable`
+      return api.post(endpoint)
+    },
+    onSuccess: () => {
+      toast(t('skills.toggleSuccess'), 'success')
+      qc.invalidateQueries({ queryKey: ['skills'] })
+    },
+    onError: (err: unknown) => {
+      toast(err instanceof Error ? err.message : t('common.error'), 'destructive')
+    },
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: (name: string) => api.delete(`/api/skills/${encodeURIComponent(name)}`),
+    onSuccess: () => {
+      toast(t('skills.deleteSuccess', { name: deleteTarget?.name }), 'success')
+      qc.invalidateQueries({ queryKey: ['skills'] })
+      setDeleteTarget(null)
+      if (selectedSkill && deleteTarget && selectedSkill.name === deleteTarget.name) {
+        onSelectSkill(null)
+      }
+    },
+    onError: (err: unknown) => {
+      toast(err instanceof Error ? err.message : t('common.error'), 'destructive')
+    },
+  })
 
   if (isLoading) return <LoadingCards count={4} />
   if (isError) return <ErrorState onRetry={() => refetch()} />
@@ -129,22 +237,61 @@ function InstalledTab({ filtered, allSkills, counts, filter, setFilter, search, 
     {filtered.length === 0 ? (
       <EmptyState icon={<Zap className="h-10 w-10" />} title={allSkills.length === 0 ? t('skills.noSkills') : t('skills.noMatching')} description={allSkills.length === 0 ? t('skills.noSkillsDescription') : t('skills.noMatchingDescription')} />
     ) : (
-      <div className="grid gap-4">{filtered.map(s => <SkillCard key={s.name} skill={s} />)}</div>
+      <div className="grid gap-4">{filtered.map(s => {
+        const hasUpdate = updates?.some(u => u.slug === s.name)
+        return (
+          <SkillCard
+            key={s.name}
+            skill={s}
+            isSelected={selectedSkill?.name === s.name}
+            hasUpdate={hasUpdate}
+            onSelect={() => onSelectSkill(selectedSkill?.name === s.name ? null : s)}
+            onToggle={() => toggleMutation.mutate({ name: s.name, enable: s.status === 'disabled' })}
+            onDelete={() => setDeleteTarget(s)}
+            isToggling={toggleMutation.isPending}
+          />
+        )
+      })}</div>
     )}
+
+    {/* Delete confirmation dialog */}
+    <Dialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null) }}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{t('skills.deleteConfirm')}</DialogTitle>
+          <DialogDescription>
+            {t('skills.deleteDescription', { name: deleteTarget?.name ?? '' })}
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button variant="outline" size="sm" onClick={() => setDeleteTarget(null)}>
+            {t('common.cancel')}
+          </Button>
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={() => deleteTarget && deleteMutation.mutate(deleteTarget.name)}
+            disabled={deleteMutation.isPending}
+          >
+            {t('common.delete')}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   </>)
 }
 
 // ─── Marketplace Tab ──────────────────────────────────────────
 
-function MarketplaceTab({ results, query, setQuery, deferredQuery, isLoading, isError, refetch }: {
-  results?: ClawHubSearchResult[]; query: string; setQuery: (s: string) => void; deferredQuery: string; isLoading: boolean; isError: boolean; refetch: () => void
+function MarketplaceTab({ results, query, setQuery, deferredQuery, isLoading, isError, refetch, selectedSlug, onSelectSlug }: {
+  results?: ClawHubSearchResult[]; query: string; setQuery: (s: string) => void; deferredQuery: string; isLoading: boolean; isError: boolean; refetch: () => void; selectedSlug: string | null; onSelectSlug: (s: string | null) => void
 }) {
   const { t } = useTranslation()
   const qc = useQueryClient()
   const { toast } = useToast()
   const mut = useMutation({
     mutationFn: ({ slug, version }: { slug: string; version?: string }) => api.post('/api/marketplace/skills/' + slug + '/install', { version }),
-    onSuccess: (_: unknown, v: { slug: string }) => { toast(t('skills.installedSuccess', { slug: v.slug })), 'success'; qc.invalidateQueries({ queryKey: ['skills'] }) },
+    onSuccess: (_: unknown, v: { slug: string; version?: string }) => { toast(t('skills.installSuccess', { slug: v.slug }), 'success'); qc.invalidateQueries({ queryKey: ['skills'] }) },
     onError: (e: unknown) => { toast(e instanceof Error ? e.message : t('skills.installFailed'), 'destructive') },
   })
   const hasQ = deferredQuery.trim().length > 0
@@ -159,24 +306,36 @@ function MarketplaceTab({ results, query, setQuery, deferredQuery, isLoading, is
     ) : isLoading ? <LoadingCards count={4} /> : isError ? <ErrorState onRetry={() => refetch()} /> : results?.length === 0 ? (
       <EmptyState icon={<Search className="h-10 w-10" />} title={t('skills.noResults')} description={t('skills.noResultsFor', { query: deferredQuery })} />
     ) : (
-      <div className="grid gap-4">{results!.map(s => <MarketplaceCard key={s.slug} skill={s} isInstalling={mut.isPending} onInstall={(sl, v) => mut.mutate({ slug: sl, version: v })} />)}</div>
+      <div className="grid gap-4">{results!.map(s => (
+        <MarketplaceCard
+          key={s.slug}
+          skill={s}
+          isSelected={selectedSlug === s.slug}
+          isInstalling={mut.isPending}
+          onSelect={() => onSelectSlug(selectedSlug === s.slug ? null : s.slug)}
+          onInstall={(sl, v) => mut.mutate({ slug: sl, version: v })}
+        />
+      ))}</div>
     )}
   </>)
 }
 
-// ─── Skill Card ───────────────────────────────────────────────
+// ─── Skill Card (enhanced) ────────────────────────────────────
 
-function SkillCard({ skill }: { skill: Skill }) {
+function SkillCard({ skill, isSelected, hasUpdate, onSelect, onToggle, onDelete, isToggling }: {
+  skill: Skill; isSelected: boolean; hasUpdate?: boolean; onSelect: () => void; onToggle: () => void; onDelete: () => void; isToggling: boolean
+}) {
   const { t } = useTranslation()
   const sd = STATUS_DISPLAY[skill.status]
   const isClaude = skill.format === 'claude_code'
+  const isDisabled = skill.status === 'disabled'
   const hasMissing = skill.missing.bins.length > 0 || skill.missing.anyBins.length > 0 || skill.missing.env.length > 0 || skill.missing.config.length > 0
 
   return (
-    <Card className="transition-shadow hover:shadow-md">
+    <Card className={cn('transition-shadow hover:shadow-md cursor-pointer', isSelected && 'ring-2 ring-primary')}>
       <CardContent className="p-5 space-y-3">
         <div className="flex items-start justify-between gap-3">
-          <div className="flex items-start gap-2 min-w-0">
+          <div className="flex items-start gap-2 min-w-0" onClick={onSelect}>
             <span className="text-lg leading-none mt-0.5 shrink-0">{skill.emoji || '⚡'}</span>
             <div className="min-w-0">
               <h3 className="font-semibold text-base leading-tight">{skill.name}</h3>
@@ -184,6 +343,11 @@ function SkillCard({ skill }: { skill: Skill }) {
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
+            {hasUpdate && (
+              <Badge variant="outline" className="text-xs gap-1 border-amber-500/50 text-amber-600 dark:text-amber-400">
+                {t('skills.updateAvailable')}
+              </Badge>
+            )}
             <FormatBadge format={skill.format} />
             {skill.always && <Badge variant="outline" className="text-xs">{t('skills.always')}</Badge>}
             <Badge variant={sd.variant} className="text-xs gap-1"><span>{sd.emoji}</span> {sd.label}</Badge>
@@ -226,22 +390,44 @@ function SkillCard({ skill }: { skill: Skill }) {
             <p className="text-xs text-amber-700 dark:text-amber-400">{t('skills.missingWarning', { missing: [...skill.missing.bins.map(b => `bin:${b}`), ...skill.missing.env.map(e => `env:${e}`), ...skill.missing.config.map(c => `config:${c}`), ...skill.missing.anyBins.map(b => `any_bin:${b}`)].join(', ') })}</p>
           </div>
         )}
+        {/* Inline actions */}
+        <div className="flex items-center gap-2 pt-2 border-t" onClick={(e) => e.stopPropagation()}>
+          <Button
+            variant={isDisabled ? 'default' : 'outline'}
+            size="sm"
+            onClick={onToggle}
+            disabled={isToggling}
+            className="gap-1.5"
+          >
+            <Power className="h-3.5 w-3.5" />
+            {isDisabled ? t('skills.enable') : t('skills.disable')}
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onDelete}
+            className="gap-1.5 text-destructive hover:text-destructive"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            {t('skills.delete')}
+          </Button>
+        </div>
       </CardContent>
     </Card>
   )
 }
 
-// ─── Marketplace Card ─────────────────────────────────────────
+// ─── Marketplace Card (enhanced) ──────────────────────────────
 
-function MarketplaceCard({ skill, isInstalling, onInstall }: { skill: ClawHubSearchResult; isInstalling: boolean; onInstall: (s: string, v?: string) => void }) {
+function MarketplaceCard({ skill, isSelected, isInstalling, onSelect, onInstall }: { skill: ClawHubSearchResult; isSelected: boolean; isInstalling: boolean; onSelect: () => void; onInstall: (s: string, v?: string) => void }) {
   const { t } = useTranslation()
   const v = skill.version; const dn = skill.displayName || skill.slug
   const rt = useMemo(() => { if (!skill.updatedAt) return null; const d = Math.floor((Date.now() - skill.updatedAt) / 86_400_000); if (d === 0) return 'today'; if (d === 1) return '1d ago'; if (d < 30) return `${d}d ago`; const w = Math.floor(d / 7); if (w < 4) return `${w}w ago`; return `${Math.floor(d / 30)}mo ago` }, [skill.updatedAt])
   return (
-    <Card className="transition-shadow hover:shadow-md">
+    <Card className={cn('transition-shadow hover:shadow-md cursor-pointer', isSelected && 'ring-2 ring-primary')}>
       <CardContent className="p-5 space-y-3">
         <div className="flex items-start justify-between gap-3">
-          <div className="flex items-start gap-2 min-w-0">
+          <div className="flex items-start gap-2 min-w-0" onClick={onSelect}>
             <span className="text-lg leading-none mt-0.5 shrink-0">🔍</span>
             <div className="min-w-0">
               <h3 className="font-semibold text-base leading-tight">{dn}</h3>
@@ -251,7 +437,7 @@ function MarketplaceCard({ skill, isInstalling, onInstall }: { skill: ClawHubSea
           <div className="flex items-center gap-2 shrink-0">
             <FormatBadge format="openclaw" />
             {v && <Badge variant="outline" className="text-xs font-mono">v{v}</Badge>}
-            <Button size="sm" onClick={() => onInstall(skill.slug, v)} disabled={isInstalling} className="gap-1.5">{t('skills.install')}</Button>
+            <Button size="sm" onClick={(e) => { e.stopPropagation(); onInstall(skill.slug, v) }} disabled={isInstalling} className="gap-1.5">{t('skills.install')}</Button>
           </div>
         </div>
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
