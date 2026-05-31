@@ -81,7 +81,19 @@ jobs:
           path: oxi
           ref: v0.4.4
 
-      - uses: dtolnay/rust-toolchain@stable
+      - name: Read rust-toolchain channel
+        id: rust-channel
+        run: |
+          if grep -q 'channel = "' rust-toolchain.toml 2>/dev/null; then
+            CHANNEL=$(grep 'channel = "' rust-toolchain.toml | sed 's/.*= "\([^"]*\)".*/\1/')
+            echo "channel=$CHANNEL" >> $GITHUB_OUTPUT
+          else
+            echo "channel=stable" >> $GITHUB_OUTPUT
+          fi
+
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ steps.rust-channel.outputs.channel }}
 
       - name: Install nextest
         uses: taiki-e/install-action@nextest
@@ -124,7 +136,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: dtolnay/rust-toolchain@stable
+      - name: Read rust-toolchain channel
+        id: rust-channel
+        run: |
+          if grep -q 'channel = "' rust-toolchain.toml 2>/dev/null; then
+            CHANNEL=$(grep 'channel = "' rust-toolchain.toml | sed 's/.*= "\([^"]*\)".*/\1/')
+            echo "channel=$CHANNEL" >> $GITHUB_OUTPUT
+          else
+            echo "channel=stable" >> $GITHUB_OUTPUT
+          fi
+
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ steps.rust-channel.outputs.channel }}
 
       - name: Security audit
         continue-on-error: true
