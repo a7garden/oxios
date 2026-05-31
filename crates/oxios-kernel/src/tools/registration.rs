@@ -13,16 +13,15 @@
 //!
 //! # Example
 //!
-//! ```ignore
+//! ```no_run
 //! use std::sync::Arc;
-//! use oxi_sdk::{ToolRegistry, SearchCache};
+//! use oxi_sdk::ToolRegistry;
 //! use oxios_kernel::capability::template::CapabilityTemplate;
-//! use oxios_kernel::tools::registration::register_tools_from_cspace;
 //!
 //! let registry = ToolRegistry::new();
 //! let cspace = CapabilityTemplate::standard().build();
-//! let cache = Arc::new(SearchCache::new());
-//! register_tools_from_cspace(&registry, &kernel, &cspace, cache, agent_id);
+//! let cache = Arc::new(oxi_sdk::SearchCache::new());
+//! // register_tools_from_cspace(&registry, &kernel, &cspace, cache, agent_id);
 //! ```
 
 use std::sync::Arc;
@@ -75,11 +74,31 @@ pub fn register_always_on_gated(
     gate: Arc<AccessGate>,
     context: AgentContext,
 ) {
-    registry.register(GatedTool::new(ReadTool::new(), gate.clone(), context.clone()));
-    registry.register(GatedTool::new(WriteTool::new(), gate.clone(), context.clone()));
-    registry.register(GatedTool::new(EditTool::new(), gate.clone(), context.clone()));
-    registry.register(GatedTool::new(GrepTool::new(), gate.clone(), context.clone()));
-    registry.register(GatedTool::new(FindTool::new(), gate.clone(), context.clone()));
+    registry.register(GatedTool::new(
+        ReadTool::new(),
+        gate.clone(),
+        context.clone(),
+    ));
+    registry.register(GatedTool::new(
+        WriteTool::new(),
+        gate.clone(),
+        context.clone(),
+    ));
+    registry.register(GatedTool::new(
+        EditTool::new(),
+        gate.clone(),
+        context.clone(),
+    ));
+    registry.register(GatedTool::new(
+        GrepTool::new(),
+        gate.clone(),
+        context.clone(),
+    ));
+    registry.register(GatedTool::new(
+        FindTool::new(),
+        gate.clone(),
+        context.clone(),
+    ));
     registry.register(GatedTool::new(LsTool::new(), gate.clone(), context.clone()));
     registry.register(GatedTool::new(
         WebSearchTool::new(search_cache.clone()),

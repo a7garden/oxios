@@ -137,7 +137,7 @@ impl McpBridge {
             .iter()
             .find(|s| s.name == name)
             .cloned()
-            .ok_or_else(|| anyhow!("MCP server '{}' not found", name))?;
+            .ok_or_else(|| anyhow!("MCP server '{name}' not found"))?;
 
         let client = Arc::new(McpClient::new(server));
         client.initialize().await?;
@@ -189,7 +189,7 @@ impl McpBridge {
         let clients = self.clients.read().await;
         let client = clients
             .get(server_name)
-            .ok_or_else(|| anyhow!("MCP server '{}' not connected", server_name))?;
+            .ok_or_else(|| anyhow!("MCP server '{server_name}' not connected"))?;
 
         client.call_tool(tool_name, args).await
     }
@@ -213,7 +213,7 @@ impl McpBridge {
         let clients = self.clients.read().await;
         let client = clients
             .get(server_name)
-            .ok_or_else(|| anyhow!("MCP server '{}' not connected", server_name))?;
+            .ok_or_else(|| anyhow!("MCP server '{server_name}' not connected"))?;
 
         let mcp_tools = client.refresh_tools().await?;
 
@@ -248,7 +248,7 @@ impl McpBridge {
             servers.len() != len_before
         };
         if !found {
-            return Err(anyhow!("MCP server '{}' not found", name));
+            return Err(anyhow!("MCP server '{name}' not found"));
         }
         // Clear cache.
         self.tool_cache.write().await.remove(name);
@@ -264,7 +264,7 @@ impl McpBridge {
             let server = servers
                 .iter_mut()
                 .find(|s| s.name == name)
-                .ok_or_else(|| anyhow!("MCP server '{}' not found", name))?;
+                .ok_or_else(|| anyhow!("MCP server '{name}' not found"))?;
             server.enabled = !server.enabled;
             server.enabled
         };
@@ -491,7 +491,7 @@ mod tests {
     fn test_mcp_client_debug() {
         let server = McpServer::new("debug-test", "echo");
         let client = McpClient::new(server);
-        let debug = format!("{:?}", client);
+        let debug = format!("{client:?}");
         assert!(debug.contains("debug-test"));
     }
 

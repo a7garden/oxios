@@ -554,7 +554,7 @@ impl A2AProtocol {
 
         self.event_bus.publish(KernelEvent::MessageReceived {
             from,
-            content: format!("[{}] {:?}", msg_type, request_id),
+            content: format!("[{msg_type}] {request_id:?}"),
         })?;
 
         tracing::debug!(
@@ -727,7 +727,7 @@ impl A2AProtocol {
             // No match yet — wait for notification or timeout.
             let remaining = deadline.saturating_duration_since(tokio::time::Instant::now());
             if remaining.is_zero() {
-                anyhow::bail!("A2A response timeout after {:?}", timeout);
+                anyhow::bail!("A2A response timeout after {timeout:?}");
             }
 
             tokio::select! {
@@ -735,7 +735,7 @@ impl A2AProtocol {
                     // A new message arrived — loop to check for a match.
                 }
                 _ = tokio::time::sleep(remaining) => {
-                    anyhow::bail!("A2A response timeout after {:?}", timeout);
+                    anyhow::bail!("A2A response timeout after {timeout:?}");
                 }
             }
         }

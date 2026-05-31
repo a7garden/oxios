@@ -182,7 +182,7 @@ impl OxiAgentTool for KnowledgeTool {
                 }
                 match self.kb.note_read(path) {
                     Ok(Some(content)) => Ok(AgentToolResult::success(&content)),
-                    Ok(None) => Ok(AgentToolResult::error(format!("Note '{}' not found", path))),
+                    Ok(None) => Ok(AgentToolResult::error(format!("Note '{path}' not found"))),
                     Err(e) => Ok(AgentToolResult::error(format!("Failed to read note: {e}"))),
                 }
             }
@@ -197,8 +197,7 @@ impl OxiAgentTool for KnowledgeTool {
                 }
                 match self.kb.note_write(path, content) {
                     Ok(()) => Ok(AgentToolResult::success(format!(
-                        "Note '{}' written successfully",
-                        path
+                        "Note '{path}' written successfully"
                     ))),
                     Err(e) => Ok(AgentToolResult::error(format!("Failed to write note: {e}"))),
                 }
@@ -209,7 +208,7 @@ impl OxiAgentTool for KnowledgeTool {
                     return Ok(AgentToolResult::error("path is required for delete"));
                 }
                 match self.kb.note_delete(path) {
-                    Ok(()) => Ok(AgentToolResult::success(format!("Note '{}' deleted", path))),
+                    Ok(()) => Ok(AgentToolResult::success(format!("Note '{path}' deleted"))),
                     Err(e) => Ok(AgentToolResult::error(format!("Failed to delete note: {e}"))),
                 }
             }
@@ -233,8 +232,7 @@ impl OxiAgentTool for KnowledgeTool {
                 }
                 match self.kb.note_move(old_path, new_path) {
                     Ok(()) => Ok(AgentToolResult::success(format!(
-                        "Note moved from '{}' to '{}'",
-                        old_path, new_path
+                        "Note moved from '{old_path}' to '{new_path}'"
                     ))),
                     Err(e) => Ok(AgentToolResult::error(format!("Failed to move note: {e}"))),
                 }
@@ -302,8 +300,7 @@ impl OxiAgentTool for KnowledgeTool {
                 let backlinks = self.kb.backlinks_for(path);
                 if backlinks.is_empty() {
                     return Ok(AgentToolResult::success(format!(
-                        "No backlinks for '{}'",
-                        path
+                        "No backlinks for '{path}'"
                     )));
                 }
                 let mut output = format!("Backlinks for '{}' ({}):\n\n", path, backlinks.len());
@@ -330,7 +327,7 @@ impl OxiAgentTool for KnowledgeTool {
                         let mut output = format!("Checklist items for '{}' ({}):\n\n", path, items.len());
                         for item in &items {
                             let status = checked_map.get(item).map(|b| if *b { "✅" } else { "⬜" }).unwrap_or("⬜");
-                            output.push_str(&format!("{} {}\n", status, item));
+                            output.push_str(&format!("{status} {item}\n"));
                         }
                         Ok(AgentToolResult::success(&output))
                     }
@@ -350,7 +347,7 @@ impl OxiAgentTool for KnowledgeTool {
                 }
                 match self.kb.checklist_add(path, item, checked) {
                     Ok(()) => Ok(AgentToolResult::success(format!(
-                        "Checklist item added to '{}'", path
+                        "Checklist item added to '{path}'"
                     ))),
                     Err(e) => Ok(AgentToolResult::error(format!("Failed to add checklist item: {e}"))),
                 }
@@ -367,10 +364,10 @@ impl OxiAgentTool for KnowledgeTool {
                 }
                 match self.kb.checklist_complete(path, item_hash) {
                     Ok(true) => Ok(AgentToolResult::success(format!(
-                        "Checklist item completed in '{}'", path
+                        "Checklist item completed in '{path}'"
                     ))),
                     Ok(false) => Ok(AgentToolResult::error(format!(
-                        "Checklist item '{}' not found in '{}'", item_hash, path
+                        "Checklist item '{item_hash}' not found in '{path}'"
                     ))),
                     Err(e) => Ok(AgentToolResult::error(format!("Failed to complete checklist item: {e}"))),
                 }
@@ -387,10 +384,10 @@ impl OxiAgentTool for KnowledgeTool {
                 }
                 match self.kb.checklist_remove(path, item_or_hash) {
                     Ok(true) => Ok(AgentToolResult::success(format!(
-                        "Checklist item removed from '{}'", path
+                        "Checklist item removed from '{path}'"
                     ))),
                     Ok(false) => Ok(AgentToolResult::error(format!(
-                        "Checklist item '{}' not found in '{}'", item_or_hash, path
+                        "Checklist item '{item_or_hash}' not found in '{path}'"
                     ))),
                     Err(e) => Ok(AgentToolResult::error(format!("Failed to remove checklist item: {e}"))),
                 }
@@ -432,10 +429,10 @@ impl OxiAgentTool for KnowledgeTool {
                 }
                 match self.kb.chat_delete(msg_hash) {
                     Ok(true) => Ok(AgentToolResult::success(format!(
-                        "Chat message '{}' deleted", msg_hash
+                        "Chat message '{msg_hash}' deleted"
                     ))),
                     Ok(false) => Ok(AgentToolResult::error(format!(
-                        "Chat message '{}' not found", msg_hash
+                        "Chat message '{msg_hash}' not found"
                     ))),
                     Err(e) => Ok(AgentToolResult::error(format!("Failed to delete chat message: {e}"))),
                 }
@@ -452,10 +449,10 @@ impl OxiAgentTool for KnowledgeTool {
                 }
                 match self.kb.chat_move_to(msg_hash, target_path) {
                     Ok(true) => Ok(AgentToolResult::success(format!(
-                        "Chat message moved to '{}'", target_path
+                        "Chat message moved to '{target_path}'"
                     ))),
                     Ok(false) => Ok(AgentToolResult::error(format!(
-                        "Chat message '{}' not found", msg_hash
+                        "Chat message '{msg_hash}' not found"
                     ))),
                     Err(e) => Ok(AgentToolResult::error(format!("Failed to move chat message: {e}"))),
                 }
@@ -480,7 +477,7 @@ impl OxiAgentTool for KnowledgeTool {
                     return Ok(AgentToolResult::error("emoji is required for journal_emoji"));
                 }
                 match self.kb.journal_add_emoji(emoji) {
-                    Ok(()) => Ok(AgentToolResult::success(format!("Journal emoji set to '{}'", emoji))),
+                    Ok(()) => Ok(AgentToolResult::success(format!("Journal emoji set to '{emoji}'"))),
                     Err(e) => Ok(AgentToolResult::error(format!("Failed to set journal emoji: {e}"))),
                 }
             }
@@ -597,7 +594,7 @@ impl OxiAgentTool for KnowledgeTool {
                         } else {
                             let mut output = format!("Moved {} scheduled tasks to chat:\n\n", moved.len());
                             for task in &moved {
-                                output.push_str(&format!("- {}\n", task));
+                                output.push_str(&format!("- {task}\n"));
                             }
                             Ok(AgentToolResult::success(&output))
                         }
@@ -627,14 +624,13 @@ impl OxiAgentTool for KnowledgeTool {
             }
 
             _ => Ok(AgentToolResult::error(format!(
-                "Unknown action '{}'. Must be one of: read, write, delete, move, tree, search, backlinks, \
+                "Unknown action '{action}'. Must be one of: read, write, delete, move, tree, search, backlinks, \
                  checklist_items, checklist_add, checklist_complete, checklist_remove, \
                  chat_append, chat_messages, chat_delete, chat_move, \
                  journal_add, journal_emoji, journal_today, \
                  habits, habits_last_week, today_report, done_today, \
                  config_read, config_write, nightly_cleanup, run_scheduled, \
-                 markdown_to_html, auto_emoji",
-                action
+                 markdown_to_html, auto_emoji"
             ))),
         }
     }

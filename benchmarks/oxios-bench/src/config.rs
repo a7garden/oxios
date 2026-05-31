@@ -25,14 +25,13 @@ impl BenchConfig {
     /// Detect the oxios binary path.
     pub fn detect_oxios_bin() -> PathBuf {
         // Try current target first (most likely during development)
-        let local = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("../../target/debug/oxios");
+        let local = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../target/debug/oxios");
         if local.exists() {
             return local;
         }
 
-        let local_release = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("../../target/release/oxios");
+        let local_release =
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../target/release/oxios");
         if local_release.exists() {
             return local_release;
         }

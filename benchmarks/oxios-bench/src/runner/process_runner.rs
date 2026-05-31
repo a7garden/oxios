@@ -4,8 +4,8 @@
 //! It spawns the actual `oxios` binary, ensuring full end-to-end testing.
 
 use crate::fixture::FixtureManager;
-use crate::task::Task;
 use crate::runner::Runner;
+use crate::task::Task;
 use crate::{RunOutput, Tier};
 use async_trait::async_trait;
 use std::path::{Path, PathBuf};
@@ -70,7 +70,8 @@ impl ProcessRunner {
         let stdout = String::from_utf8_lossy(&output.stdout).to_string();
         let exit_code = output.status.code().unwrap_or(-1);
 
-        let mut run_output = RunOutput::from_process_output(&stdout, exit_code, workspace.to_path_buf());
+        let mut run_output =
+            RunOutput::from_process_output(&stdout, exit_code, workspace.to_path_buf());
         // Use our measured duration (more accurate than internal one)
         run_output.duration_ms = elapsed;
 
@@ -97,9 +98,7 @@ impl Runner for ProcessRunner {
             let mut last_output: Option<RunOutput> = None;
 
             for (i, turn) in task.turns.iter().enumerate() {
-                let session_id = last_output
-                    .as_ref()
-                    .and_then(|o| o.session_id.clone());
+                let session_id = last_output.as_ref().and_then(|o| o.session_id.clone());
 
                 let output = self
                     .run_single(

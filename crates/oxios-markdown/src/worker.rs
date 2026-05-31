@@ -87,7 +87,7 @@ pub fn remove_completed_items(
         let tasks = checklist_items(&removed_md);
         for task in &tasks {
             let stripped = strip_chat_timestamp(task);
-            let _ = journal_add_record(fs, &format!("✅ {}", stripped), tz);
+            let _ = journal_add_record(fs, &format!("✅ {stripped}"), tz);
             report.journal_count += 1;
         }
         report.archived_count += tasks.len();
@@ -227,10 +227,10 @@ pub fn schedule_report(schedules: &[(String, i64)]) -> String {
 
     let mut report = String::new();
     for day in &day_order {
-        report.push_str(&format!("{}\n", day));
+        report.push_str(&format!("{day}\n"));
         if let Some(tasks) = day_tasks.get(day) {
             for task in tasks {
-                report.push_str(&format!("- {}\n", task));
+                report.push_str(&format!("- {task}\n"));
             }
         }
         report.push('\n');

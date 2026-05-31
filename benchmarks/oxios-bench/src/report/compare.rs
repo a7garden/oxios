@@ -174,10 +174,7 @@ pub fn print_compare(result: &CompareResult) {
         );
     }
 
-    println!(
-        "  Unchanged: {} tasks",
-        style(result.unchanged.len()).dim()
-    );
+    println!("  Unchanged: {} tasks", style(result.unchanged.len()).dim());
 
     if result.has_regressions {
         println!();

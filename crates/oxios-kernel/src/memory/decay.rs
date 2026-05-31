@@ -132,7 +132,11 @@ mod tests {
         let engine = DecayEngine::new(1.0);
         let entry = make_entry(0); // Just accessed
         let score = engine.compute_decay(&entry, Utc::now());
-        assert!(score > 0.99, "Fresh entry should have decay ~1.0, got {}", score);
+        assert!(
+            score > 0.99,
+            "Fresh entry should have decay ~1.0, got {}",
+            score
+        );
     }
 
     #[test]
@@ -140,7 +144,11 @@ mod tests {
         let engine = DecayEngine::new(1.0);
         let entry = make_entry(720); // 30 days ago
         let score = engine.compute_decay(&entry, Utc::now());
-        assert!(score < 0.5, "Old entry should have significant decay, got {}", score);
+        assert!(
+            score < 0.5,
+            "Old entry should have significant decay, got {}",
+            score
+        );
     }
 
     #[test]
@@ -206,7 +214,11 @@ mod tests {
         entry.access_count = 5;
         entry.decay_score = 0.8;
         let eff = DecayEngine::effective_importance(&entry);
-        assert!(eff > 0.6, "Effective importance should be boosted, got {}", eff);
+        assert!(
+            eff > 0.6,
+            "Effective importance should be boosted, got {}",
+            eff
+        );
     }
 
     #[test]

@@ -37,7 +37,10 @@ pub fn evaluate_task(task: &Task, output: &RunOutput, duration_ms: u64) -> TaskR
 
     // Calculate weighted score
     let total_weight: f64 = assertion_results.len() as f64; // uniform weight for now
-    let earned: f64 = assertion_results.iter().map(|r| if r.passed { 1.0 } else { 0.0 }).sum();
+    let earned: f64 = assertion_results
+        .iter()
+        .map(|r| if r.passed { 1.0 } else { 0.0 })
+        .sum();
     let score = if assertion_results.is_empty() {
         100.0 // No assertions = auto-pass
     } else {

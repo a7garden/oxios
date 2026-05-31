@@ -590,9 +590,7 @@ pub(crate) async fn handle_knowledge_copilot(
         .kernel
         .knowledge_lens
         .copilot_chat(
-            Arc::new(oxios_kernel::OxiosEngine::new(
-                "anthropic/claude-sonnet-4",
-            )),
+            Arc::new(oxios_kernel::OxiosEngine::new("anthropic/claude-sonnet-4")),
             "anthropic/claude-sonnet-4",
             &body.question,
             body.context_path.as_deref(),
@@ -1003,9 +1001,11 @@ pub(crate) async fn handle_knowledge_file_history(
         .strip_prefix(git.root())
         .map(|p| p.to_string_lossy().to_string())
         .unwrap_or_else(|_| "knowledge".to_string());
-    let git_rel = format!("{}/{}", prefix, path);
+    let git_rel = format!("{prefix}/{path}");
 
-    let log = git.log(100).map_err(|e| AppError::Internal(e.to_string()))?;
+    let log = git
+        .log(100)
+        .map_err(|e| AppError::Internal(e.to_string()))?;
 
     // Filter commits that mention this file
     let entries: Vec<KnowledgeHistoryEntry> = log
@@ -1038,7 +1038,7 @@ pub(crate) async fn handle_knowledge_file_restore(
         .strip_prefix(git.root())
         .map(|p| p.to_string_lossy().to_string())
         .unwrap_or_else(|_| "knowledge".to_string());
-    let git_rel = format!("{}/{}", prefix, path);
+    let git_rel = format!("{prefix}/{path}");
 
     // 1. Restore file content from git commit to disk
     git.restore_file(&git_rel, &body.hash)

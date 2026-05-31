@@ -36,12 +36,27 @@ pub fn detect_format(value: &Value) -> SkillFormat {
             return SkillFormat::OpenClaw;
         }
     }
-    for key in &["allowed-tools", "arguments", "when_to_use", "argument-hint", "effort", "hooks", "paths"] {
+    for key in &[
+        "allowed-tools",
+        "arguments",
+        "when_to_use",
+        "argument-hint",
+        "effort",
+        "hooks",
+        "paths",
+    ] {
         if value.get(*key).is_some() {
             return SkillFormat::ClaudeCode;
         }
     }
-    for key in &["requires", "install", "primaryEnv", "primary-env", "skillKey", "skill-key"] {
+    for key in &[
+        "requires",
+        "install",
+        "primaryEnv",
+        "primary-env",
+        "skillKey",
+        "skill-key",
+    ] {
         if value.get(*key).is_some() {
             return SkillFormat::Oxios;
         }
@@ -66,7 +81,10 @@ mod tests {
     }
     #[test]
     fn test_detect_openclaw() {
-        let v: Value = serde_yaml::from_str("name: test\nmetadata:\n  openclaw:\n    requires:\n      env:\n        - KEY\n").unwrap();
+        let v: Value = serde_yaml::from_str(
+            "name: test\nmetadata:\n  openclaw:\n    requires:\n      env:\n        - KEY\n",
+        )
+        .unwrap();
         assert_eq!(detect_format(&v), SkillFormat::OpenClaw);
     }
     #[test]

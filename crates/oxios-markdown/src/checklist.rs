@@ -77,7 +77,7 @@ pub fn add_checklist_item(md: &str, item: &str, checked: bool) -> String {
     let mut lines: Vec<String> = md.lines().map(|l| l.to_string()).collect();
 
     if checked {
-        lines.push(format!("- [x] {}", item));
+        lines.push(format!("- [x] {item}"));
     } else {
         // Find the first incomplete item and insert before it
         let mut insert_index = lines.len();
@@ -90,9 +90,9 @@ pub fn add_checklist_item(md: &str, item: &str, checked: bool) -> String {
         }
 
         if insert_index == lines.len() {
-            lines.push(format!("- [ ] {}", item));
+            lines.push(format!("- [ ] {item}"));
         } else {
-            lines.insert(insert_index, format!("- [ ] {}", item));
+            lines.insert(insert_index, format!("- [ ] {item}"));
         }
     }
 
@@ -133,7 +133,7 @@ pub fn complete_checklist_item(md: &str, item_hash: &str) -> (String, String) {
     }
 
     if let Some(idx) = found_index {
-        lines[idx] = format!("- [x] {}", found_item);
+        lines[idx] = format!("- [x] {found_item}");
     }
 
     (lines.join("\n"), found_item)
@@ -257,9 +257,9 @@ pub fn checklist_item(md: &str, item_or_hash: &str) -> String {
 pub fn add_header_and_text(content: &str, header: &str, new_content: &str) -> String {
     if !content.contains(header) {
         if content.is_empty() {
-            return format!("{}\n{}", header, new_content);
+            return format!("{header}\n{new_content}");
         } else {
-            return format!("{}\n{}\n\n{}", header, new_content, content);
+            return format!("{header}\n{new_content}\n\n{content}");
         }
     }
 
@@ -275,7 +275,7 @@ pub fn add_header_and_text(content: &str, header: &str, new_content: &str) -> St
 
     let header_index = match header_index {
         Some(idx) => idx,
-        None => return format!("{}\n{}\n\n{}", header, new_content, content),
+        None => return format!("{header}\n{new_content}\n\n{content}"),
     };
 
     // Find where to insert (after the last line belonging to this header,

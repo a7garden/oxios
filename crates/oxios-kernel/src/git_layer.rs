@@ -110,7 +110,7 @@ impl CommitContext {
     fn message_prefix(&self) -> String {
         let mut parts = Vec::new();
         if let Some(tag) = self.tag {
-            parts.push(format!("[{}]", tag));
+            parts.push(format!("[{tag}]"));
         }
         if let Some(ref seed) = self.seed_id {
             let hex = seed.to_string();
@@ -320,7 +320,7 @@ impl GitLayer {
             .iter()
             .filter_map(|c| c.to_str())
             .collect();
-        anyhow::ensure!(!components.is_empty(), "empty path: {}", rel_path);
+        anyhow::ensure!(!components.is_empty(), "empty path: {rel_path}");
 
         let mut current_tree_id = tree_id;
 
@@ -333,7 +333,7 @@ impl GitLayer {
                 .iter()
                 .find(|e| e.filename == comp_bytes)
                 .ok_or_else(|| {
-                    anyhow::anyhow!("path component '{}' not found in '{}'", component, rel_path)
+                    anyhow::anyhow!("path component '{component}' not found in '{rel_path}'")
                 })?;
 
             if i == components.len() - 1 {
@@ -365,7 +365,7 @@ impl GitLayer {
         let repo = self.repo.lock();
         let abs = self.root.join(rel_path);
         if !abs.exists() {
-            bail!("File not found: {}", rel_path);
+            bail!("File not found: {rel_path}");
         }
 
         let content = std::fs::read(&abs)?;
@@ -489,10 +489,7 @@ impl GitLayer {
             .append(true)
             .open(self.root.join(&filename))?
             .write_all(entry.as_bytes())?;
-        self.commit_file(
-            &filename,
-            &format!("audit: {} {} {}", agent, action, target),
-        )?;
+        self.commit_file(&filename, &format!("audit: {agent} {action} {target}"))?;
         Ok(())
     }
 
@@ -717,13 +714,21 @@ impl GitLayer {
         let new_decoded = new_tree_obj.decode()?;
 
         let old_entries: std::collections::HashMap<&BStr, &gix::objs::tree::EntryRef<'_>> =
-            old_decoded.entries.iter().map(|e| (e.filename, e)).collect();
+            old_decoded
+                .entries
+                .iter()
+                .map(|e| (e.filename, e))
+                .collect();
         let new_entries: std::collections::HashMap<&BStr, &gix::objs::tree::EntryRef<'_>> =
-            new_decoded.entries.iter().map(|e| (e.filename, e)).collect();
+            new_decoded
+                .entries
+                .iter()
+                .map(|e| (e.filename, e))
+                .collect();
 
         // Detect additions and modifications.
         for (name, new_entry) in &new_entries {
-            let path = format!("{}{}", prefix, name);
+            let path = format!("{prefix}{name}");
             match old_entries.get(name) {
                 None => {
                     if new_entry.mode.is_tree() {
@@ -732,7 +737,7 @@ impl GitLayer {
                             repo,
                             empty,
                             new_entry.oid.to_owned(),
-                            &format!("{}/", path),
+                            &format!("{path}/"),
                             changes,
                         )?;
                     } else {
@@ -754,7 +759,7 @@ impl GitLayer {
                             repo,
                             old_entry.oid.to_owned(),
                             new_entry.oid.to_owned(),
-                            &format!("{}/", path),
+                            &format!("{path}/"),
                             changes,
                         )?;
                     } else {
@@ -775,7 +780,7 @@ impl GitLayer {
             if new_entries.contains_key(name) {
                 continue;
             }
-            let path = format!("{}{}", prefix, name);
+            let path = format!("{prefix}{name}");
             changes.push(FileDiff {
                 path,
                 old_hash: Some(old_entry.oid.to_hex().to_string()),
@@ -847,14 +852,14 @@ fn compute_unified_diff(old: &[u8], new: &[u8], path: &str) -> Option<String> {
     use similar::{ChangeTag, TextDiff};
     let diff = TextDiff::from_lines(old_str, new_str);
 
-    let mut output = format!("--- a/{}\n+++ b/{}\n", path, path);
+    let mut output = format!("--- a/{path}\n+++ b/{path}\n");
     for change in diff.iter_all_changes() {
         let prefix = match change.tag() {
             ChangeTag::Delete => '-',
             ChangeTag::Insert => '+',
             ChangeTag::Equal => ' ',
         };
-        output.push_str(&format!("{}{}", prefix, change));
+        output.push_str(&format!("{prefix}{change}"));
     }
 
     Some(output)
@@ -1060,7 +1065,10 @@ mod tests {
         assert_eq!(CommitContext::system().author_name(), "oxios");
 
         let id = uuid::Uuid::parse_str("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee").unwrap();
-        assert_eq!(CommitContext::agent(id, None).author_name(), "agent-aaaaaaaa");
+        assert_eq!(
+            CommitContext::agent(id, None).author_name(),
+            "agent-aaaaaaaa"
+        );
 
         assert_eq!(CommitContext::tagged("memory").author_name(), "oxios");
     }
@@ -1163,7 +1171,10 @@ mod tests {
         let info = layer.commit_file("new.txt", "add file").unwrap();
 
         let diff = layer.diff_commits(&first, &info.hash).unwrap();
-        assert!(diff.files.iter().any(|f| f.path == "new.txt" && f.kind == DiffKind::Added));
+        assert!(diff
+            .files
+            .iter()
+            .any(|f| f.path == "new.txt" && f.kind == DiffKind::Added));
     }
 
     #[test]
@@ -1177,7 +1188,10 @@ mod tests {
         let second = layer.commit_file("data.txt", "v2").unwrap();
 
         let diff = layer.diff_commits(&first.hash, &second.hash).unwrap();
-        assert!(diff.files.iter().any(|f| f.path == "data.txt" && f.kind == DiffKind::Modified));
+        assert!(diff
+            .files
+            .iter()
+            .any(|f| f.path == "data.txt" && f.kind == DiffKind::Modified));
 
         let patch = diff
             .files
@@ -1202,7 +1216,10 @@ mod tests {
         let second = layer.remove_file("temp.txt", "remove temp").unwrap();
 
         let diff = layer.diff_commits(&first.hash, &second.hash).unwrap();
-        assert!(diff.files.iter().any(|f| f.path == "temp.txt" && f.kind == DiffKind::Deleted));
+        assert!(diff
+            .files
+            .iter()
+            .any(|f| f.path == "temp.txt" && f.kind == DiffKind::Deleted));
     }
 
     #[test]
@@ -1215,7 +1232,9 @@ mod tests {
         std::fs::write(dir.path().join("state.json"), b"{\"v\":2}").unwrap();
         layer.commit_file("state.json", "v2").unwrap();
 
-        let content = layer.file_at_commit("state.json", &first.short_hash).unwrap();
+        let content = layer
+            .file_at_commit("state.json", &first.short_hash)
+            .unwrap();
         assert_eq!(content, b"{\"v\":1}");
     }
 }

@@ -97,12 +97,9 @@ impl AgentTool for MemoryWriteTool {
             "fact" => MemoryType::Fact,
             "episode" => MemoryType::Episode,
             "knowledge" => MemoryType::Knowledge,
-            _ => {
-                return Ok(AgentToolResult::error(format!(
-                    "Invalid memory_type '{}'. Must be one of: fact, episode, knowledge",
-                    memory_type_str
-                )))
-            }
+            _ => return Ok(AgentToolResult::error(format!(
+                "Invalid memory_type '{memory_type_str}'. Must be one of: fact, episode, knowledge"
+            ))),
         };
 
         let tags: Vec<String> = params["tags"]
@@ -147,8 +144,7 @@ impl AgentTool for MemoryWriteTool {
 
         match self.memory_manager.remember(entry).await {
             Ok(_) => Ok(AgentToolResult::success(format!(
-                "Memory entry saved (id: {}, type: {})",
-                entry_id, memory_type_str,
+                "Memory entry saved (id: {entry_id}, type: {memory_type_str})",
             ))),
             Err(e) => Ok(AgentToolResult::error(format!(
                 "Failed to write memory: {e}"
@@ -246,8 +242,7 @@ impl AgentTool for MemoryReadTool {
                     Ok(AgentToolResult::success(&output))
                 }
                 Ok(None) => Ok(AgentToolResult::error(format!(
-                    "Memory entry '{}' not found",
-                    id
+                    "Memory entry '{id}' not found"
                 ))),
                 Err(e) => Ok(AgentToolResult::error(format!(
                     "Failed to read memory: {e}"
@@ -262,8 +257,7 @@ impl AgentTool for MemoryReadTool {
                 Ok(entries) => {
                     if entries.is_empty() {
                         return Ok(AgentToolResult::success(format!(
-                            "No {} memory entries found.",
-                            memory_type_str,
+                            "No {memory_type_str} memory entries found.",
                         )));
                     }
                     let mut output =

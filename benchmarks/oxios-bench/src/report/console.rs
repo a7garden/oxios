@@ -11,26 +11,18 @@ pub fn print_report(run: &BenchmarkRun, verbose: bool) {
 
     // Header
     println!();
-    println!(
-        "{}",
-        style("━".repeat(65)).dim()
-    );
+    println!("{}", style("━".repeat(65)).dim());
     println!(
         "  {} — {} tasks · {} · {}",
         style("OXIOS BENCHMARK").bold().cyan(),
         style(summary.total).bold(),
         format_duration(summary.duration_total_ms),
-        run.oxios_version
-            .as_deref()
-            .unwrap_or("unknown")
+        run.oxios_version.as_deref().unwrap_or("unknown")
     );
     if let Some(ref git_ref) = run.git_ref {
         println!("  git: {}", style(git_ref).dim());
     }
-    println!(
-        "{}",
-        style("━".repeat(65)).dim()
-    );
+    println!("{}", style("━".repeat(65)).dim());
     println!();
 
     // Per-suite table
@@ -52,10 +44,7 @@ pub fn print_report(run: &BenchmarkRun, verbose: bool) {
         print_regressions(&summary.regressions);
     }
 
-    println!(
-        "{}",
-        style("━".repeat(65)).dim()
-    );
+    println!("{}", style("━".repeat(65)).dim());
     println!();
 }
 
@@ -70,10 +59,7 @@ fn print_suite_table(stats: &BTreeMap<String, SuiteStats>) {
         style("SCORE").bold().dim(),
         style("TIME").bold().dim(),
     );
-    println!(
-        "  {}",
-        style("─".repeat(60)).dim()
-    );
+    println!("  {}", style("─".repeat(60)).dim());
 
     for (name, s) in stats {
         let score_str = format!("{:.0}%", s.avg_score());

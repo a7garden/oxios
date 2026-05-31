@@ -18,7 +18,7 @@ pub mod manager;
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use uuid::Uuid;
 
 // ── Re-exports ──────────────────────────────────────────────
@@ -113,14 +113,14 @@ impl Project {
     /// Create a Project from a filesystem path.
     ///
     /// Derives the name from the directory name.
-    pub fn from_path(path: &PathBuf) -> Self {
+    pub fn from_path(path: &Path) -> Self {
         let name = path
             .file_name()
             .and_then(|n| n.to_str())
             .unwrap_or("unknown")
             .to_string();
         let mut project = Self::new(&name, ProjectSource::AutoDetected);
-        project.paths.push(path.clone());
+        project.paths.push(path.to_path_buf());
         project
     }
 

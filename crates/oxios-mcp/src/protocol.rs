@@ -210,7 +210,7 @@ impl McpResponse {
     /// Extract the result value, erroring if there is one
     pub fn into_result(self) -> Result<serde_json::Value> {
         if let Some(err) = self.error {
-            return Err(anyhow!("{}", err));
+            return Err(anyhow!("{err}"));
         }
         Ok(self.result.unwrap_or(serde_json::Value::Null))
     }

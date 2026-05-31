@@ -23,9 +23,7 @@ use super::auto_protect::AutoProtector;
 use super::compaction::CompactionTree;
 use super::decay::DecayEngine;
 use super::root_index::RootIndex;
-use super::{
-    MemoryEntry, MemoryManager, MemoryTier, MemoryType, ProtectionLevel,
-};
+use super::{MemoryEntry, MemoryManager, MemoryTier, MemoryType, ProtectionLevel};
 
 // ---------------------------------------------------------------------------
 // DreamCheckpoint
@@ -131,7 +129,9 @@ pub struct DreamReport {
 impl DreamReport {
     /// Path for saving dream reports.
     pub fn report_path(space_dir: &Path, dream_id: &str) -> PathBuf {
-        space_dir.join("memory/dream_reports").join(format!("{}.json", dream_id))
+        space_dir
+            .join("memory/dream_reports")
+            .join(format!("{dream_id}.json"))
     }
 }
 
@@ -145,10 +145,7 @@ pub enum MemorySignal {
     /// A protection level change.
     ProtectionChanged(ProtectionChange),
     /// Auto-classify an entry.
-    AutoClassify {
-        id: String,
-        new_type: MemoryType,
-    },
+    AutoClassify { id: String, new_type: MemoryType },
     /// Type promotion (e.g., Fact → Skill).
     TypePromotion(TypePromotion),
     /// Tier promotion candidate.
@@ -162,10 +159,7 @@ pub enum MemorySignal {
         similarity: f64,
     },
     /// Contradiction detected.
-    Contradiction {
-        newer_id: String,
-        older_id: String,
-    },
+    Contradiction { newer_id: String, older_id: String },
     /// PageRank-based importance boost (Phase 2).
     PageRankBoost {
         rowid: u64,
@@ -461,10 +455,7 @@ impl DreamProcess {
         let resumed = self.load_checkpoint().await.ok().flatten();
         let resumed_from_checkpoint = resumed.is_some();
 
-        let start_phase = resumed
-            .as_ref()
-            .map(|cp| cp.completed_phase)
-            .unwrap_or(0);
+        let start_phase = resumed.as_ref().map(|cp| cp.completed_phase).unwrap_or(0);
 
         // Run phases
         let mut report = DreamReport {
@@ -618,9 +609,21 @@ impl DreamProcess {
     // ── Phase implementations ──────────────────────────
 
     async fn dream_orient(&self) -> Result<DreamState> {
-        let hot = self.memory_manager.list_by_tier(MemoryTier::Hot, 10_000).await.unwrap_or_default();
-        let warm = self.memory_manager.list_by_tier(MemoryTier::Warm, 10_000).await.unwrap_or_default();
-        let cold = self.memory_manager.list_by_tier(MemoryTier::Cold, 10_000).await.unwrap_or_default();
+        let hot = self
+            .memory_manager
+            .list_by_tier(MemoryTier::Hot, 10_000)
+            .await
+            .unwrap_or_default();
+        let warm = self
+            .memory_manager
+            .list_by_tier(MemoryTier::Warm, 10_000)
+            .await
+            .unwrap_or_default();
+        let cold = self
+            .memory_manager
+            .list_by_tier(MemoryTier::Cold, 10_000)
+            .await
+            .unwrap_or_default();
 
         let hot_count = hot.len();
         let warm_count = warm.len();
@@ -640,7 +643,8 @@ impl DreamProcess {
         }
 
         let mut prot_dist: Vec<(ProtectionLevel, usize)> = Vec::new();
-        let all_entries: Vec<&MemoryEntry> = hot.iter().chain(warm.iter()).chain(cold.iter()).collect();
+        let all_entries: Vec<&MemoryEntry> =
+            hot.iter().chain(warm.iter()).chain(cold.iter()).collect();
         for level in &[
             ProtectionLevel::None,
             ProtectionLevel::Low,
@@ -648,7 +652,10 @@ impl DreamProcess {
             ProtectionLevel::High,
             ProtectionLevel::Permanent,
         ] {
-            let count = all_entries.iter().filter(|e| e.protection == *level).count();
+            let count = all_entries
+                .iter()
+                .filter(|e| e.protection == *level)
+                .count();
             if count > 0 {
                 prot_dist.push((*level, count));
             }
@@ -733,7 +740,10 @@ impl DreamProcess {
         // 3. Decay computation and deletion candidates
         for entry in &all_entries {
             let decay = self.decay_engine.compute_decay(entry, now);
-            if self.decay_engine.is_prunable(entry, self.config.decay_threshold) {
+            if self
+                .decay_engine
+                .is_prunable(entry, self.config.decay_threshold)
+            {
                 signals.push(MemorySignal::DecayCandidate(DecayCandidate {
                     id: entry.id.clone(),
                     decay_score: decay,
@@ -753,9 +763,7 @@ impl DreamProcess {
             let mut candidates: Vec<&MemoryEntry> = all_entries
                 .iter()
                 .filter(|e| {
-                    e.tier == MemoryTier::Hot
-                        && e.protection < ProtectionLevel::High
-                        && !e.pinned
+                    e.tier == MemoryTier::Hot && e.protection < ProtectionLevel::High && !e.pinned
                 })
                 .collect();
             candidates.sort_by(|a, b| {
@@ -795,8 +803,8 @@ impl DreamProcess {
                             |row| row.get::<_, f32>(0),
                         ) {
                             let new_importance = (old_importance
-                            * (1.0 + self.config.pagerank_boost_factor * pr_score as f32))
-                            .clamp(0.0, 1.0);
+                                * (1.0 + self.config.pagerank_boost_factor * pr_score as f32))
+                                .clamp(0.0, 1.0);
 
                             if (new_importance - old_importance).abs() > 0.001 {
                                 signals.push(MemorySignal::PageRankBoost {
@@ -850,10 +858,7 @@ impl DreamProcess {
                         merged_content: String::new(), // Would be computed in full impl
                     });
                 }
-                MemorySignal::Contradiction {
-                    newer_id,
-                    older_id,
-                } => {
+                MemorySignal::Contradiction { newer_id, older_id } => {
                     // Mark older as contradicted
                     plan.merge.push(MergePlan {
                         keep_id: newer_id.clone(),
@@ -885,11 +890,7 @@ impl DreamProcess {
 
         // 1. Apply protection updates
         for change in &plan.protection_updates {
-            if let Ok(Some(mut entry)) = self
-                .memory_manager
-                .get_by_id(&change.id)
-                .await
-            {
+            if let Ok(Some(mut entry)) = self.memory_manager.get_by_id(&change.id).await {
                 entry.protection = change.to;
                 let _ = self.memory_manager.remember(entry).await;
             }
@@ -897,11 +898,7 @@ impl DreamProcess {
 
         // 2. Apply type reclassification
         for reclassify in &plan.reclassify {
-            if let Ok(Some(mut entry)) = self
-                .memory_manager
-                .get_by_id(&reclassify.id)
-                .await
-            {
+            if let Ok(Some(mut entry)) = self.memory_manager.get_by_id(&reclassify.id).await {
                 entry.memory_type = reclassify.new_type;
                 entry.auto_classified = true;
                 let _ = self.memory_manager.remember(entry).await;
@@ -910,11 +907,7 @@ impl DreamProcess {
 
         // 3. Apply tier changes
         for tc in &plan.demote {
-            if let Ok(Some(mut entry)) = self
-                .memory_manager
-                .get_by_id(&tc.id)
-                .await
-            {
+            if let Ok(Some(mut entry)) = self.memory_manager.get_by_id(&tc.id).await {
                 entry.tier = tc.to_tier;
                 let _ = self.memory_manager.remember(entry).await;
             }
@@ -930,12 +923,9 @@ impl DreamProcess {
                 .await
                 .ok()
                 .flatten()
-                .map(|e| async move {
-                    self.memory_manager
-                        .forget(&e.id, e.memory_type)
-                        .await
-                        .ok()
-                });
+                .map(
+                    |e| async move { self.memory_manager.forget(&e.id, e.memory_type).await.ok() },
+                );
         }
 
         // 5. Apply PageRank importance updates (Phase 2)
@@ -958,10 +948,7 @@ impl DreamProcess {
                     && !entry.pinned
                     && !entry.memory_type.is_auto_protected()
                 {
-                    let _ = self
-                        .memory_manager
-                        .forget(id, entry.memory_type)
-                        .await;
+                    let _ = self.memory_manager.forget(id, entry.memory_type).await;
                 }
             }
         }
@@ -1003,28 +990,45 @@ impl DreamProcess {
                 0
             }
             #[cfg(not(feature = "sqlite-memory"))]
-            { 0 }
+            {
+                0
+            }
         };
 
         // 10. Flash Attention reranking (Phase 6)
         let flash_reranked = {
             #[cfg(feature = "sqlite-memory")]
             if let Some(ref sqlite) = self.memory_manager.sqlite_store() {
-                let hot = self.memory_manager.list_by_tier(MemoryTier::Hot, 50).await.unwrap_or_default();
+                let hot = self
+                    .memory_manager
+                    .list_by_tier(MemoryTier::Hot, 50)
+                    .await
+                    .unwrap_or_default();
                 if !hot.is_empty() {
-                    let query: String = hot.iter().take(3).map(|e| e.content.as_str()).collect::<Vec<_>>().join(" ");
+                    let query: String = hot
+                        .iter()
+                        .take(3)
+                        .map(|e| e.content.as_str())
+                        .collect::<Vec<_>>()
+                        .join(" ");
                     if !query.is_empty() {
                         match sqlite.recall_with_rerank(&query, hot.len()).await {
                             Ok(reranked) => reranked.len(),
                             Err(_) => 0,
                         }
-                    } else { 0 }
-                } else { 0 }
+                    } else {
+                        0
+                    }
+                } else {
+                    0
+                }
             } else {
                 0
             }
             #[cfg(not(feature = "sqlite-memory"))]
-            { 0 }
+            {
+                0
+            }
         };
 
         Ok(Phase4Result {
@@ -1053,10 +1057,7 @@ impl DreamProcess {
         // Build active context (recent, important)
         let mut recent: Vec<&MemoryEntry> = all_entries
             .iter()
-            .filter(|e| {
-                (now - e.accessed_at).num_days() <= 7
-                    && e.importance >= 0.5
-            })
+            .filter(|e| (now - e.accessed_at).num_days() <= 7 && e.importance >= 0.5)
             .collect();
         recent.sort_by(|a, b| {
             b.importance
@@ -1087,11 +1088,7 @@ impl DreamProcess {
                 name: first_sentence.clone(),
                 category: entry.memory_type.label().to_string(),
                 age_days: (now - entry.created_at).num_days() as u32,
-                description: entry
-                    .content
-                    .chars()
-                    .take(100)
-                    .collect(),
+                description: entry.content.chars().take(100).collect(),
                 reference: entry.id.clone(),
             });
         }
@@ -1203,11 +1200,11 @@ mod tests {
 
     #[test]
     fn test_should_dream_never_ran() {
-        let config = DreamConfig::from_consolidation(&crate::config::ConsolidationConfig::default());
+        let config =
+            DreamConfig::from_consolidation(&crate::config::ConsolidationConfig::default());
         let temp = tempfile::tempdir().unwrap();
-        let store = Arc::new(
-            crate::state_store::StateStore::new(temp.path().to_path_buf()).unwrap(),
-        );
+        let store =
+            Arc::new(crate::state_store::StateStore::new(temp.path().to_path_buf()).unwrap());
         let mgr = Arc::new(MemoryManager::new(store));
         let dream = DreamProcess::new(mgr, config, temp.path().to_path_buf());
 
@@ -1216,11 +1213,11 @@ mod tests {
 
     #[test]
     fn test_should_dream_too_recent() {
-        let config = DreamConfig::from_consolidation(&crate::config::ConsolidationConfig::default());
+        let config =
+            DreamConfig::from_consolidation(&crate::config::ConsolidationConfig::default());
         let temp = tempfile::tempdir().unwrap();
-        let store = Arc::new(
-            crate::state_store::StateStore::new(temp.path().to_path_buf()).unwrap(),
-        );
+        let store =
+            Arc::new(crate::state_store::StateStore::new(temp.path().to_path_buf()).unwrap());
         let mgr = Arc::new(MemoryManager::new(store));
         let dream = DreamProcess::new(mgr, config, temp.path().to_path_buf());
 

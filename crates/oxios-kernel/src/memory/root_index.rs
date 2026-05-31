@@ -59,7 +59,11 @@ impl RootIndex {
             .iter()
             .map(|e| e.topic.len() + e.reference.len())
             .chain(self.recent_patterns.iter().map(|p| p.len()))
-            .chain(self.topics.iter().map(|t| t.name.len() + t.description.len()))
+            .chain(
+                self.topics
+                    .iter()
+                    .map(|t| t.name.len() + t.description.len()),
+            )
             .sum();
         total_chars / 4
     }

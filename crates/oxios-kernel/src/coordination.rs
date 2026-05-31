@@ -16,14 +16,13 @@
 //!
 //! # Usage
 //!
-//! ```ignore
+//! ```no_run
 //! use oxios_kernel::coordination::{WorkQueue, WorkQueueConfig};
 //!
 //! let queue = WorkQueue::new(WorkQueueConfig::default());
-//! queue.submit(WorkItem { id: "task-1".into(), description: "...".into(), .. });
-//!
-//! let item = queue.claim("agent-1");
-//! queue.complete("task-1", WorkResult { output: "...".into(), success: true });
+//! // queue.submit(WorkItem { id: "task-1".into(), .. });
+//! // let item = queue.claim("agent-1");
+//! // queue.complete("task-1", WorkResult { output: "...".into(), success: true });
 //! ```
 
 pub use oxi_sdk::{

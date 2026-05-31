@@ -15,7 +15,9 @@ use std::time::Duration;
 
 use anyhow::{Context, Result};
 use chrono;
-use oxios_ouroboros::{EvaluationResult, ExecutionResult, InterviewResult, OuroborosProtocol, Phase, Seed};
+use oxios_ouroboros::{
+    EvaluationResult, ExecutionResult, InterviewResult, OuroborosProtocol, Phase, Seed,
+};
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -24,8 +26,8 @@ use crate::agent_lifecycle::AgentLifecycleManager;
 use crate::event_bus::{EventBus, KernelEvent};
 use crate::git_layer::GitLayer;
 use crate::metrics::get_metrics;
+use crate::project::{ConversationBuffer, ProjectManager};
 use crate::scheduler::Priority;
-use crate::project::{ConversationBuffer, ProjectId, ProjectManager};
 use crate::state_store::StateStore;
 use crate::types::AgentId;
 
@@ -211,19 +213,14 @@ impl Orchestrator {
 
     /// Detect a project from a message, returning tag string.
     pub fn detect_project_tag(&self, message: &str) -> Option<String> {
-        self.project_manager
-            .read()
-            .as_ref()
-            .and_then(|pm| {
-                let projects = pm.list_projects();
-                let result = crate::project::detect_project(message, &projects);
-                match result {
-                    crate::project::DetectionResult::Found(id) => {
-                        pm.get_project(id).map(|p| p.tag())
-                    }
-                    crate::project::DetectionResult::NoMatch { .. } => None,
-                }
-            })
+        self.project_manager.read().as_ref().and_then(|pm| {
+            let projects = pm.list_projects();
+            let result = crate::project::detect_project(message, &projects);
+            match result {
+                crate::project::DetectionResult::Found(id) => pm.get_project(id).map(|p| p.tag()),
+                crate::project::DetectionResult::NoMatch { .. } => None,
+            }
+        })
     }
 
     /// Set the A2A protocol for inter-agent task delegation.
@@ -234,6 +231,13 @@ impl Orchestrator {
     /// Set the GitLayer for auto-commits after state saves.
     pub fn set_git_layer(&mut self, git_layer: Arc<GitLayer>) {
         self.git_layer = Some(git_layer);
+    }
+
+    /// Restore sessions from persisted state (stub).
+    ///
+    /// TODO: Implement session persistence restoration.
+    pub async fn restore_sessions(&self) {
+        // Stub — not yet implemented
     }
 
     /// Commit a file to git if GitLayer is configured and enabled.
@@ -259,8 +263,9 @@ impl Orchestrator {
         user_message: &str,
         session_id: Option<&str>,
         project_ids: Option<&str>,
+        request_id: &str,
     ) -> Result<OrchestrationResult> {
-        tracing::info!(name = "orchestrator.handle_message", session_id = %session_id.unwrap_or("new"), "starting");
+        tracing::info!(name = "orchestrator.handle_message", session_id = %session_id.unwrap_or("new"), request_id = %request_id, "starting");
         get_metrics().messages.inc();
         let orch_start = std::time::Instant::now();
 
@@ -268,16 +273,19 @@ impl Orchestrator {
             .map(String::from)
             .unwrap_or_else(|| Uuid::new_v4().to_string());
 
-        tracing::info!(session_id = %session_id, user_id = %user_id, content_len = user_message.len(), "Orchestrator handling message");
+        tracing::info!(session_id = %session_id, user_id = %user_id, request_id = %request_id, content_len = user_message.len(), "Orchestrator handling message");
 
         // ── Project Detection ──
         // Parse project IDs from caller ("uuid1,uuid2,...") or auto-detect.
         let primary_project_id: Option<Uuid> = if let Some(ids_str) = project_ids {
             // Explicit project IDs from caller
-            ids_str.split(',').next().and_then(|s| Uuid::parse_str(s.trim()).ok())
+            ids_str
+                .split(',')
+                .next()
+                .and_then(|s| Uuid::parse_str(s.trim()).ok())
         } else {
             // Auto-detect from message
-            self.detect_project_tag(user_message).and_then(|tag| {
+            self.detect_project_tag(user_message).and_then(|_tag| {
                 // Extract UUID from project manager
                 self.project_manager().and_then(|pm| {
                     let projects = pm.list_projects();
@@ -305,7 +313,7 @@ impl Orchestrator {
             }
         }
 
-        let conversation_turns = {
+        let _conversation_turns = {
             let buffer = self.conversation_buffer.read();
             buffer.turns().iter().cloned().collect::<Vec<_>>()
         };
@@ -354,7 +362,7 @@ impl Orchestrator {
                             ));
                         }
                     }
-                    context_parts.push(format!("User: {}", user_message));
+                    context_parts.push(format!("User: {user_message}"));
                     context_parts.join("\n\n")
                 };
 
@@ -611,54 +619,56 @@ impl Orchestrator {
         // 1. output_schema → structured validation (no evolution)
         // 2. acceptance_criteria present → full evaluate + optional evolve loop
         // 3. neither → simple boolean pass/fail
-        let (final_result, final_seed, passed, phase_reached) =
-            if let Some(ref schema) = seed.output_schema {
-                // Structured output validation — no evolution.
-                let passed = match oxi_sdk::StructuredOutput::extract(
-                    &exec_result.output,
-                    &oxi_sdk::OutputMode::ValidatedJson {
-                        schema: schema.clone(),
-                    },
-                ) {
-                    Ok(_) => {
-                        tracing::info!(session_id = %session_id, "Structured output validation passed");
-                        true
-                    }
-                    Err(e) => {
-                        tracing::warn!(session_id = %session_id, error = %e, "Structured output validation failed");
-                        false
-                    }
-                };
-                (exec_result, seed.clone(), passed, Phase::Execute)
-            } else if self.should_evaluate(&seed) {
-                // Full Ouroboros evaluate + optional evolve loop.
-                self.publish_phase_started(&session_id, Phase::Evaluate).await;
-
-                let (result, eval, evolved_seed) = self
-                    .run_evolution_loop(&session_id, &seed, exec_result)
-                    .await?;
-
-                let passed = eval.all_passed() && eval.score >= self.evolution_config.score_threshold;
-
-                self.publish_phase_completed(
-                    &session_id,
-                    Phase::Evaluate,
-                    &format!("score={:.2}", eval.score),
-                )
+        let (final_result, final_seed, passed, phase_reached) = if let Some(ref schema) =
+            seed.output_schema
+        {
+            // Structured output validation — no evolution.
+            let passed = match oxi_sdk::StructuredOutput::extract(
+                &exec_result.output,
+                &oxi_sdk::OutputMode::ValidatedJson {
+                    schema: schema.clone(),
+                },
+            ) {
+                Ok(_) => {
+                    tracing::info!(session_id = %session_id, "Structured output validation passed");
+                    true
+                }
+                Err(e) => {
+                    tracing::warn!(session_id = %session_id, error = %e, "Structured output validation failed");
+                    false
+                }
+            };
+            (exec_result, seed.clone(), passed, Phase::Execute)
+        } else if self.should_evaluate(&seed) {
+            // Full Ouroboros evaluate + optional evolve loop.
+            self.publish_phase_started(&session_id, Phase::Evaluate)
                 .await;
 
-                let reached = if evolved_seed.generation > 0 {
-                    Phase::Evolve
-                } else {
-                    Phase::Evaluate
-                };
+            let (result, eval, evolved_seed) = self
+                .run_evolution_loop(&session_id, &seed, exec_result)
+                .await?;
 
-                (result, evolved_seed, passed, reached)
+            let passed = eval.all_passed() && eval.score >= self.evolution_config.score_threshold;
+
+            self.publish_phase_completed(
+                &session_id,
+                Phase::Evaluate,
+                &format!("score={:.2}", eval.score),
+            )
+            .await;
+
+            let reached = if evolved_seed.generation > 0 {
+                Phase::Evolve
             } else {
-                // Simple task: boolean pass/fail, no LLM evaluation.
-                let passed = exec_result.success;
-                (exec_result, seed.clone(), passed, Phase::Execute)
+                Phase::Evaluate
             };
+
+            (result, evolved_seed, passed, reached)
+        } else {
+            // Simple task: boolean pass/fail, no LLM evaluation.
+            let passed = exec_result.success;
+            (exec_result, seed.clone(), passed, Phase::Execute)
+        };
 
         // Clean up the session.
         {
@@ -776,19 +786,30 @@ impl Orchestrator {
                         iterations: iteration,
                     });
                 }
-                return Ok((best_result, best_eval.ok_or_else(|| anyhow::anyhow!("Evolve loop exited with threshold met but no evaluation was produced"))?, best_seed));
+                return Ok((
+                    best_result,
+                    best_eval.ok_or_else(|| {
+                        anyhow::anyhow!(
+                            "Evolve loop exited with threshold met but no evaluation was produced"
+                        )
+                    })?,
+                    best_seed,
+                ));
             }
 
             // max_iterations == 0 → evaluate only, no evolution.
             if max_iterations == 0 {
-                return Ok((best_result, best_eval.ok_or_else(|| anyhow::anyhow!("No iterations configured and no evaluation was produced"))?, best_seed));
+                return Ok((
+                    best_result,
+                    best_eval.ok_or_else(|| {
+                        anyhow::anyhow!("No iterations configured and no evaluation was produced")
+                    })?,
+                    best_seed,
+                ));
             }
 
             // Evolve: produce an improved seed.
-            let evolved = self
-                .ouroboros
-                .evolve(&current_seed, &evaluation)
-                .await?;
+            let evolved = self.ouroboros.evolve(&current_seed, &evaluation).await?;
             match evolved {
                 Some(new_seed) => {
                     tracing::info!(
@@ -815,7 +836,15 @@ impl Orchestrator {
                         seed_id = %current_seed.id,
                         "Evolve returned None, stopping loop"
                     );
-                    return Ok((best_result, best_eval.ok_or_else(|| anyhow::anyhow!("Evolve returned no seed and no evaluation was produced"))?, best_seed));
+                    return Ok((
+                        best_result,
+                        best_eval.ok_or_else(|| {
+                            anyhow::anyhow!(
+                                "Evolve returned no seed and no evaluation was produced"
+                            )
+                        })?,
+                        best_seed,
+                    ));
                 }
             }
         }
@@ -833,7 +862,7 @@ impl Orchestrator {
             .await
             .context("failed to save seed to state store")?;
 
-        self.git_commit(&format!("seeds/{}.json", key), "ourobors: save seed");
+        self.git_commit(&format!("seeds/{key}.json"), "ourobors: save seed");
 
         Ok(())
     }
@@ -1202,7 +1231,7 @@ impl Orchestrator {
             .save_json("agent_groups", &group_id.to_string(), &group)
             .await;
         self.git_commit(
-            &format!("agent_groups/{}.json", group_id),
+            &format!("agent_groups/{group_id}.json"),
             "orchestrator: save group",
         );
 
@@ -1348,7 +1377,7 @@ fn format_result_combined(combined: &str) -> String {
     if combined.is_empty() {
         "No subtasks completed successfully.".to_string()
     } else {
-        format!("Multi-agent execution completed:\n\n{}", combined)
+        format!("Multi-agent execution completed:\n\n{combined}")
     }
 }
 
@@ -1369,7 +1398,7 @@ async fn run_via_lifecycle(
         parent_seed_id: Some(parent_seed.id),
         cspace_hint: None,
         original_request: parent_seed.original_request.clone(),
-            output_schema: None,
+        output_schema: None,
     };
     match lifecycle.spawn_and_run(&child_seed, Priority::Normal).await {
         Ok(result) => (result.output, result.success),

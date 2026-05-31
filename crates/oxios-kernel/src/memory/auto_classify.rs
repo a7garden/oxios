@@ -134,11 +134,15 @@ impl AutoClassifier {
     }
 
     fn is_correction(content_lower: &str) -> bool {
-        CORRECTION_PATTERNS.iter().any(|p| content_lower.contains(p))
+        CORRECTION_PATTERNS
+            .iter()
+            .any(|p| content_lower.contains(p))
     }
 
     fn is_preference(content_lower: &str) -> bool {
-        PREFERENCE_PATTERNS.iter().any(|p| content_lower.contains(p))
+        PREFERENCE_PATTERNS
+            .iter()
+            .any(|p| content_lower.contains(p))
     }
 
     fn is_decision(content_lower: &str) -> bool {
@@ -179,9 +183,9 @@ impl AutoClassifier {
 
     fn is_stop_word(word: &str) -> bool {
         const STOP: &[&str] = &[
-            "that", "this", "with", "from", "have", "been", "were", "will",
-            "would", "could", "should", "about", "which", "their", "there",
-            "these", "those", "other", "than", "then", "also", "some",
+            "that", "this", "with", "from", "have", "been", "were", "will", "would", "could",
+            "should", "about", "which", "their", "there", "these", "those", "other", "than",
+            "then", "also", "some",
         ];
         STOP.contains(&word)
     }
@@ -281,11 +285,11 @@ mod tests {
 
     #[test]
     fn test_extract_tags() {
-        let tags = AutoClassifier::extract_tags(
-            "Rust tokio async runtime memory consolidation system",
-            5,
-        );
+        let tags =
+            AutoClassifier::extract_tags("Rust tokio async runtime memory consolidation system", 5);
         assert!(!tags.is_empty());
-        assert!(tags.iter().any(|t| t.contains("rust") || t.contains("memory")));
+        assert!(tags
+            .iter()
+            .any(|t| t.contains("rust") || t.contains("memory")));
     }
 }

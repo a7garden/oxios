@@ -208,7 +208,7 @@ impl AgentTool for BrowserTool {
                 let url = param_str(&params, "url", "browse requires 'url'")?;
                 match browser.browse(url).await {
                     Ok(r) => Ok(AgentToolResult::success(format_browse(&r))),
-                    Err(e) => Ok(AgentToolResult::error(format!("Browse failed: {}", e))),
+                    Err(e) => Ok(AgentToolResult::error(format!("Browse failed: {e}"))),
                 }
             }
 
@@ -218,28 +218,28 @@ impl AgentTool for BrowserTool {
                 let tab = self.get_or_create_tab().await.map_err(|e| e.to_string())?;
                 match tab.goto(url).await {
                     Ok(r) => Ok(AgentToolResult::success(format_browse(&r))),
-                    Err(e) => Ok(AgentToolResult::error(format!("Navigation failed: {}", e))),
+                    Err(e) => Ok(AgentToolResult::error(format!("Navigation failed: {e}"))),
                 }
             }
             "back" => {
                 let tab = self.get_or_create_tab().await.map_err(|e| e.to_string())?;
                 match tab.back().await {
                     Ok(r) => Ok(AgentToolResult::success(format_browse(&r))),
-                    Err(e) => Ok(AgentToolResult::error(format!("Back failed: {}", e))),
+                    Err(e) => Ok(AgentToolResult::error(format!("Back failed: {e}"))),
                 }
             }
             "forward" => {
                 let tab = self.get_or_create_tab().await.map_err(|e| e.to_string())?;
                 match tab.forward().await {
                     Ok(r) => Ok(AgentToolResult::success(format_browse(&r))),
-                    Err(e) => Ok(AgentToolResult::error(format!("Forward failed: {}", e))),
+                    Err(e) => Ok(AgentToolResult::error(format!("Forward failed: {e}"))),
                 }
             }
             "reload" => {
                 let tab = self.get_or_create_tab().await.map_err(|e| e.to_string())?;
                 match tab.reload().await {
                     Ok(r) => Ok(AgentToolResult::success(format_browse(&r))),
-                    Err(e) => Ok(AgentToolResult::error(format!("Reload failed: {}", e))),
+                    Err(e) => Ok(AgentToolResult::error(format!("Reload failed: {e}"))),
                 }
             }
             "post" => {
@@ -252,7 +252,7 @@ impl AgentTool for BrowserTool {
                 let tab = self.get_or_create_tab().await.map_err(|e| e.to_string())?;
                 match tab.post(url, body, ct).await {
                     Ok(r) => Ok(AgentToolResult::success(format_browse(&r))),
-                    Err(e) => Ok(AgentToolResult::error(format!("POST failed: {}", e))),
+                    Err(e) => Ok(AgentToolResult::error(format!("POST failed: {e}"))),
                 }
             }
 
@@ -261,8 +261,8 @@ impl AgentTool for BrowserTool {
                 let selector = param_str(&params, "selector", "click requires 'selector'")?;
                 let tab = self.get_or_create_tab().await.map_err(|e| e.to_string())?;
                 match tab.click(selector).await {
-                    Ok(()) => Ok(AgentToolResult::success(format!("Clicked '{}'", selector))),
-                    Err(e) => Ok(AgentToolResult::error(format!("Click failed: {}", e))),
+                    Ok(()) => Ok(AgentToolResult::success(format!("Clicked '{selector}'"))),
+                    Err(e) => Ok(AgentToolResult::error(format!("Click failed: {e}"))),
                 }
             }
             "type" => {
@@ -275,15 +275,15 @@ impl AgentTool for BrowserTool {
                         text.len(),
                         selector
                     ))),
-                    Err(e) => Ok(AgentToolResult::error(format!("Type failed: {}", e))),
+                    Err(e) => Ok(AgentToolResult::error(format!("Type failed: {e}"))),
                 }
             }
             "press_key" => {
                 let key = param_str(&params, "key", "press_key requires 'key'")?;
                 let tab = self.get_or_create_tab().await.map_err(|e| e.to_string())?;
                 match tab.press_key(key).await {
-                    Ok(()) => Ok(AgentToolResult::success(format!("Pressed '{}'", key))),
-                    Err(e) => Ok(AgentToolResult::error(format!("Press key failed: {}", e))),
+                    Ok(()) => Ok(AgentToolResult::success(format!("Pressed '{key}'"))),
+                    Err(e) => Ok(AgentToolResult::error(format!("Press key failed: {e}"))),
                 }
             }
 
@@ -292,7 +292,7 @@ impl AgentTool for BrowserTool {
                 let tab = self.get_or_create_tab().await.map_err(|e| e.to_string())?;
                 match tab.content().await {
                     Ok(r) => Ok(AgentToolResult::success(format_browse(&r))),
-                    Err(e) => Ok(AgentToolResult::error(format!("Content failed: {}", e))),
+                    Err(e) => Ok(AgentToolResult::error(format!("Content failed: {e}"))),
                 }
             }
             "query_all" => {
@@ -301,7 +301,7 @@ impl AgentTool for BrowserTool {
                 match tab.query_all(selector).await {
                     Ok(texts) => {
                         let output = if texts.is_empty() {
-                            format!("No elements found matching '{}'", selector)
+                            format!("No elements found matching '{selector}'")
                         } else {
                             texts
                                 .iter()
@@ -312,7 +312,7 @@ impl AgentTool for BrowserTool {
                         };
                         Ok(AgentToolResult::success(output))
                     }
-                    Err(e) => Ok(AgentToolResult::error(format!("Query failed: {}", e))),
+                    Err(e) => Ok(AgentToolResult::error(format!("Query failed: {e}"))),
                 }
             }
             "evaluate" => {
@@ -324,7 +324,7 @@ impl AgentTool for BrowserTool {
                             serde_json::to_string_pretty(&value).unwrap_or_else(|_| value.to_string());
                         Ok(AgentToolResult::success(output))
                     }
-                    Err(e) => Ok(AgentToolResult::error(format!("JS evaluation failed: {}", e))),
+                    Err(e) => Ok(AgentToolResult::error(format!("JS evaluation failed: {e}"))),
                 }
             }
             "evaluate_await" => {
@@ -336,7 +336,7 @@ impl AgentTool for BrowserTool {
                             serde_json::to_string_pretty(&value).unwrap_or_else(|_| value.to_string());
                         Ok(AgentToolResult::success(output))
                     }
-                    Err(e) => Ok(AgentToolResult::error(format!("JS evaluation failed: {}", e))),
+                    Err(e) => Ok(AgentToolResult::error(format!("JS evaluation failed: {e}"))),
                 }
             }
 
@@ -347,10 +347,9 @@ impl AgentTool for BrowserTool {
                 let tab = self.get_or_create_tab().await.map_err(|e| e.to_string())?;
                 match tab.wait_for(selector, timeout_ms).await {
                     Ok(()) => Ok(AgentToolResult::success(format!(
-                        "Element '{}' found within {}ms",
-                        selector, timeout_ms
+                        "Element '{selector}' found within {timeout_ms}ms"
                     ))),
-                    Err(e) => Ok(AgentToolResult::error(format!("wait_for failed: {}", e))),
+                    Err(e) => Ok(AgentToolResult::error(format!("wait_for failed: {e}"))),
                 }
             }
 
@@ -359,10 +358,10 @@ impl AgentTool for BrowserTool {
                 let tab = self.get_or_create_tab().await.map_err(|e| e.to_string())?;
                 match tab.load_resources().await {
                     Ok(count) => {
-                        Ok(AgentToolResult::success(format!("Loaded {} resources", count)))
+                        Ok(AgentToolResult::success(format!("Loaded {count} resources")))
                     }
                     Err(e) => {
-                        Ok(AgentToolResult::error(format!("load_resources failed: {}", e)))
+                        Ok(AgentToolResult::error(format!("load_resources failed: {e}")))
                     }
                 }
             }
@@ -377,7 +376,7 @@ impl AgentTool for BrowserTool {
                         png.len(),
                         width
                     ))),
-                    Err(e) => Ok(AgentToolResult::error(format!("Screenshot failed: {}", e))),
+                    Err(e) => Ok(AgentToolResult::error(format!("Screenshot failed: {e}"))),
                 }
             }
 
@@ -390,12 +389,11 @@ impl AgentTool for BrowserTool {
                 match runner.run(yaml).await {
                     Ok(result) => {
                         let output = serde_json::to_string_pretty(&result)
-                            .unwrap_or_else(|e| format!("{{\"error\": \"{}\"}}", e));
+                            .unwrap_or_else(|e| format!("{{\"error\": \"{e}\"}}"));
                         Ok(AgentToolResult::success(output))
                     }
                     Err(e) => Ok(AgentToolResult::error(format!(
-                        "Script failed: {}",
-                        e
+                        "Script failed: {e}"
                     ))),
                 }
             }
@@ -410,8 +408,7 @@ impl AgentTool for BrowserTool {
             }
 
             other => Err(format!(
-                "Unknown browser action '{}'. Valid: browse, goto, back, forward, reload, post, click, type, press_key, evaluate, evaluate_await, content, query_all, wait_for, load_resources, screenshot, run_script, close",
-                other
+                "Unknown browser action '{other}'. Valid: browse, goto, back, forward, reload, post, click, type, press_key, evaluate, evaluate_await, content, query_all, wait_for, load_resources, screenshot, run_script, close"
             )),
         }
     }
@@ -421,11 +418,24 @@ impl AgentTool for BrowserTool {
 // Helpers
 // ---------------------------------------------------------------------------
 
+/// Stable polyfill for `str::floor_char_boundary` (unstable as of Rust 1.88).
+/// Finds the largest valid char boundary ≤ `max_len`.
+fn floor_char_boundary(s: &str, max_len: usize) -> usize {
+    if max_len >= s.len() {
+        return s.len();
+    }
+    let mut i = max_len;
+    while !s.is_char_boundary(i) {
+        i -= 1;
+    }
+    i
+}
+
 /// Format a `BrowseResult` for agent consumption.
 fn format_browse(r: &oxibrowser_core::BrowseResult) -> String {
     let md = &r.markdown;
     if md.len() > 50_000 {
-        let cut = md.floor_char_boundary(50_000);
+        let cut = floor_char_boundary(md, 50_000);
         format!(
             "URL: {} (status {})\nTitle: {}\n\n{}\n\n... (truncated, {} total chars)",
             r.url,

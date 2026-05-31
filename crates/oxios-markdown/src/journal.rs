@@ -46,9 +46,9 @@ pub fn add_record(fs: &VirtualFs, record: &str, timezone: FixedOffset) -> Result
             .map(|m| m.as_str().to_string())
             .unwrap_or_default();
         let rest = record.replace(&img_link, "").trim().to_string();
-        md.push_str(&format!("{}\n{} {}\n", img_link, timestamp, rest));
+        md.push_str(&format!("{img_link}\n{timestamp} {rest}\n"));
     } else {
-        md.push_str(&format!("{} {}\n", timestamp, record));
+        md.push_str(&format!("{timestamp} {record}\n"));
     }
 
     fs.write(DIR_JOURNAL, &filename, &md)
@@ -72,10 +72,10 @@ pub fn add_emoji(fs: &VirtualFs, emoji: &str, timezone: FixedOffset) -> Result<(
     let header = today_header(timezone);
     let header_re = Regex::new(&format!("({}) *(.*)", regex::escape(&header))).unwrap();
     if header_re.is_match(&md) {
-        let replacement = format!("$1 {}", emoji);
+        let replacement = format!("$1 {emoji}");
         md = header_re.replace(&md, &replacement).to_string();
     } else {
-        md.push_str(&format!("\n{} {}", header, emoji));
+        md.push_str(&format!("\n{header} {emoji}"));
     }
 
     fs.write(DIR_JOURNAL, &filename, &md)

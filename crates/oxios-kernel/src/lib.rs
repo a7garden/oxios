@@ -4,7 +4,7 @@
 //! through here: agent lifecycle, inter-agent communication, and
 //! persistent state management.
 
-#![warn(missing_docs)]
+#![allow(missing_docs)]
 
 // ─── Lifecycle ──────────────────────────────────────────────────────
 // Agent 생성, 실행, 종료. OS의 init + process management.
@@ -62,9 +62,9 @@ pub mod wasm_sandbox;
 pub mod backup;
 pub mod config;
 pub mod git_layer;
+pub mod project;
 pub mod resource_monitor;
 pub mod session_context;
-pub mod project;
 pub mod state_store;
 
 // ─── Infrastructure ─────────────────────────────────────────────────
@@ -99,11 +99,13 @@ pub use daemon::{DaemonManager, DaemonStatus};
 pub use supervisor::{BasicSupervisor, Supervisor};
 
 // ─── Orchestration ──────────────────────────────────────────────────
-pub use budget::{BudgetExceeded, BudgetInfo, BudgetKind, BudgetLimit, BudgetManager, FullBudgetInfo};
+pub use budget::{
+    BudgetExceeded, BudgetInfo, BudgetKind, BudgetLimit, BudgetManager, FullBudgetInfo,
+};
 // Circuit breaker — delegates to oxi-sdk
-pub use oxi_sdk::ProviderCircuitBreaker as CircuitBreaker;
 pub use cron::{CronJob, CronJobResult, CronJobUpdate, CronScheduler, JobSource};
 pub use orchestrator::{AgentRole, OrchestrationResult, Orchestrator, SubTask};
+pub use oxi_sdk::ProviderCircuitBreaker as CircuitBreaker;
 pub use scheduler::{AgentScheduler, Priority, ScheduledTask, SchedulerStats, TaskStatus};
 
 // ─── Security ───────────────────────────────────────────────────────
@@ -149,25 +151,25 @@ pub use memory::hyperbolic::{
     mobius_scalar_mul, HyperbolicConfig, HyperbolicEmbedding,
 };
 pub use memory::{
-    AutoClassifier, chunk_fixed, chunk_paragraphs, content_hash, cosine_similarity_f32,
-    l2_normalize_f32, l2_normalize_f64, ChunkConfig, CompactionTree, CurationCandidate,
-    CurationReport, DecayEngine, DreamCheckpoint, DreamProcess, DreamReport, HnswIndex,
-    HnswMemoryIndex, HistoricalPeriod, MemoryBudget, MemoryEntry, MemoryGraph, MemoryManager,
-    MemoryTier, MemoryType, ProtectionLevel, ProactiveRecall, RootEntry, RootIndex,
-    SemanticHit, TextChunk, TextVector, TopicEntry,
+    chunk_fixed, chunk_paragraphs, content_hash, cosine_similarity_f32, l2_normalize_f32,
+    l2_normalize_f64, AutoClassifier, ChunkConfig, CompactionTree, CurationCandidate,
+    CurationReport, DecayEngine, DreamCheckpoint, DreamProcess, DreamReport, HistoricalPeriod,
+    HnswIndex, HnswMemoryIndex, MemoryBudget, MemoryEntry, MemoryGraph, MemoryManager, MemoryTier,
+    MemoryType, ProactiveRecall, ProtectionLevel, RootEntry, RootIndex, SemanticHit, TextChunk,
+    TextVector, TopicEntry,
 };
 
 // ─── SQLite Memory (RFC-012) ────────────────────────────────────────
 #[cfg(feature = "sqlite-memory")]
-pub use memory::database::{bytes_to_f32_slice, f32_slice_to_bytes, MemoryDatabase};
-#[cfg(feature = "sqlite-memory")]
-pub use memory::search::{Bm25Hit, RankedMemory, VectorHit, reciprocal_rank_fusion};
-#[cfg(feature = "sqlite-memory")]
-pub use memory::sqlite_store::SqliteMemoryStore;
-#[cfg(feature = "sqlite-memory")]
 pub use memory::cache::{self as sqlite_cache};
 #[cfg(feature = "sqlite-memory")]
+pub use memory::database::{bytes_to_f32_slice, f32_slice_to_bytes, MemoryDatabase};
+#[cfg(feature = "sqlite-memory")]
 pub use memory::migration::{self as sqlite_migration, MigrationReport};
+#[cfg(feature = "sqlite-memory")]
+pub use memory::search::{reciprocal_rank_fusion, Bm25Hit, RankedMemory, VectorHit};
+#[cfg(feature = "sqlite-memory")]
+pub use memory::sqlite_store::SqliteMemoryStore;
 pub use persona::{default_personas, Persona};
 pub use persona_manager::PersonaManager;
 pub use persona_store::PersonaStore;
@@ -175,13 +177,13 @@ pub use persona_store::PersonaStore;
 // ─── Tools & Skills ────────────────────────────────────────────────
 pub use clawhub::{
     ClawHubClient, ClawHubInstaller, ClawHubLockEntry, ClawHubLockfile, ClawHubOrigin,
-    ClawHubSearchResult, ClawHubSkillDetail, ClawHubSkillMeta, ClawHubVersion,
-    DownloadedArchive, InstallResult, UpdateAvailable, UpdateResult,
+    ClawHubSearchResult, ClawHubSkillDetail, ClawHubSkillMeta, ClawHubVersion, DownloadedArchive,
+    InstallResult, UpdateAvailable, UpdateResult,
 };
 pub use skill::{
-    InstallKind, Requirements, RequirementsCheck, Skill, SkillConfig, SkillEntry,
-    SkillFormat, SkillInstallSpec, SkillInvocationPolicy, SkillManager, SkillMeta,
-    SkillMetadata, SkillRef, SkillSnapshot, SkillSource, SkillState, SkillStatus,
+    InstallKind, Requirements, RequirementsCheck, Skill, SkillConfig, SkillEntry, SkillFormat,
+    SkillInstallSpec, SkillInvocationPolicy, SkillManager, SkillMeta, SkillMetadata, SkillRef,
+    SkillSnapshot, SkillSource, SkillState, SkillStatus,
 };
 pub use tools::tool_types::{ArgumentDef, ToolDef};
 #[cfg(feature = "browser")]
@@ -193,41 +195,45 @@ pub use wasm_sandbox::{ResourceKind, WasmConfig, WasmError, WasmSandbox};
 // ─── State & Config ─────────────────────────────────────────────────
 pub use backup::{BackupManifest, BackupSection};
 pub use config::{
-    BrowserConfig, ChannelsConfig, CronConfig, DaemonConfig, EngineConfig, ExecConfig, ExecMode,
-    GitConfig, InlineCronJob, LoggingConfig, MarketplaceConfig, McpConfig, McpServerDef,
-    MemoryConfig, OrchestratorConfig, OxiosConfig, PersonaConfig, SqliteMemoryConfig,
-    EmbeddingConfig,
+    BrowserConfig, ChannelsConfig, CronConfig, DaemonConfig, EmbeddingConfig, EngineConfig,
+    ExecConfig, ExecMode, GitConfig, InlineCronJob, LoggingConfig, MarketplaceConfig, McpConfig,
+    McpServerDef, MemoryConfig, OrchestratorConfig, OxiosConfig, PersonaConfig, SqliteMemoryConfig,
 };
-pub use git_layer::{CommitDiff, CommitContext, CommitInfo, DiffKind, DiffStats, FileDiff, GitLayer, LogEntry};
-pub use resource_monitor::{OverloadThreshold, ResourceMonitor, ResourceSnapshot};
+pub use git_layer::{
+    CommitContext, CommitDiff, CommitInfo, DiffKind, DiffStats, FileDiff, GitLayer, LogEntry,
+};
 pub use project::{
-    detect_project, extract_path, find_by_id, find_by_name, ConversationBuffer,
-    ConversationTurn, DetectionResult, Project, ProjectId, ProjectSource,
+    detect_project, extract_path, find_by_id, find_by_name, ConversationBuffer, ConversationTurn,
+    DetectionResult, Project, ProjectId, ProjectSource,
 };
 #[cfg(feature = "sqlite-memory")]
 pub use project::{ProjectManager, ProjectManagerError};
-pub use state_store::{AgentResponse, PruneConfig, PruneThrottle, Session, SessionId, SessionSummary, StateStore};
+pub use resource_monitor::{OverloadThreshold, ResourceMonitor, ResourceSnapshot};
+pub use state_store::{
+    AgentResponse, PruneConfig, PruneThrottle, Session, SessionId, SessionSummary, StateStore,
+};
 
 // ─── Infrastructure ─────────────────────────────────────────────────
 pub use engine::{EngineProvider, OxiosEngine};
 pub use error::{HttpStatus, KernelError, KernelResult};
 pub use metrics::{get_metrics, register_builtin_metrics, registry};
-pub use observability::{audit_log, cost_tracker, tracer,
-    AuditEntry as SdkAuditEntry, AuditFilter,
-    CostSnapshot, CostTracker, Span, SpanGuard, SpanKind, TokenUsage, Tracer as SdkTracer};
+pub use observability::{
+    audit_log, cost_tracker, tracer, AuditEntry as SdkAuditEntry, AuditFilter, CostSnapshot,
+    CostTracker, Span, SpanGuard, SpanKind, TokenUsage, Tracer as SdkTracer,
+};
 pub use types::{AgentId, AgentInfo, AgentStatus};
 
 // ─── API Surface ────────────────────────────────────────────────────
 pub use kernel_handle::KernelHandle;
 pub use kernel_handle::MarketplaceApi;
-pub use session_context::SessionContext;
 pub use kernel_handle::{
     A2aApi, AgentApi, BrowserApi, CopilotResponse, EngineApi, EngineConfigResponse, ExecApi,
-    ExtensionApi, FallbackEvent, InfraApi, KnowledgeContext, KnowledgeLens, KnowledgeNote,
-    McpApi, MemoryNote, ModelInfo, PersonaApi, ProjectApi, ProjectInfo, ProviderInfo,
+    ExtensionApi, FallbackEvent, InfraApi, KnowledgeContext, KnowledgeLens, KnowledgeNote, McpApi,
+    MemoryNote, ModelInfo, PersonaApi, ProjectApi, ProjectInfo, ProviderInfo,
     RoutingConfigSnapshot, RoutingStats, RoutingStatsSnapshot, RoutingUpdate, SecurityApi,
     StateApi, ValidateKeyResult,
 };
+pub use session_context::SessionContext;
 
 // ─── oxi-sdk re-exports ─────────────────────────────────────────────
 //
@@ -237,20 +243,32 @@ pub use kernel_handle::{
 // Only types actually USED by kernel modules are re-exported here.
 pub use oxi_sdk::{
     // Core agent types
-    Agent, AgentConfig, AgentEvent, AgentTool, AgentToolResult,
-    ToolContext, ToolError, ToolExecutionMode, ToolRegistry,
-    // Engine
-    Oxi, OxiBuilder, Model, Provider, ProviderOptions,
+    Agent,
+    AgentConfig,
+    AgentEvent,
+    AgentTool,
+    AgentToolResult,
+    CircuitBreakerConfig,
     // Kernel bridge
     KernelToolProvider,
     // Communication
     MessageBus,
     // Middleware
     MiddlewarePipeline,
+    Model,
+    // Engine
+    Oxi,
+    OxiBuilder,
+    Provider,
+    // Circuit breaker
+    ProviderCircuitBreaker,
+    ProviderOptions,
     // Routing
     RoutingControl,
-    // Circuit breaker
-    ProviderCircuitBreaker, CircuitBreakerConfig,
+    ToolContext,
+    ToolError,
+    ToolExecutionMode,
+    ToolRegistry,
 };
 
 // Re-export oxi-sdk types available for consumers but not used internally.
@@ -264,17 +282,15 @@ pub mod sdk_exports {
     //! Convenience re-exports from oxi-sdk for external consumers.
     //! Not used internally by oxios-kernel — use when building extensions or tools.
     pub use oxi_sdk::{
-        AgentBuilder, AgentHandle, AgentLifecycleEvent, AgentMetrics, AgentSnapshot,
-        AgentState, AgentSupervisor, Authorizer, BrowseConfig, BrowseExtractTool,
-        BrowserEngine, BrowserError, BrowserTab, CapabilitySet, CapabilitySubject,
-        CompactedContext, CompactionHook, DefaultPolicy, FileSnapshotStore,
-        GroupResult, GroupStrategy, InterAgentMessage, KernelToolContext,
-        MetricsSnapshot, Middleware, MiddlewareContext, MiddlewareData, MiddlewarePhase,
-        MiddlewareResult, OutputMode, ProviderPool, RateLimitPolicy, RestartBackoff,
-        SecurityMiddleware, SharedState, StreamOptions, StringPattern,
-        StructuredOutput, SupervisorPolicy as SdkSupervisorPolicy,
-        AgentGroup as SdkAgentGroup, AgentStatus as SdkAgentStatus,
-        AuditLog as SdkAuditLog,
+        AgentBuilder, AgentGroup as SdkAgentGroup, AgentHandle, AgentLifecycleEvent, AgentMetrics,
+        AgentSnapshot, AgentState, AgentStatus as SdkAgentStatus, AgentSupervisor,
+        AuditLog as SdkAuditLog, Authorizer, BrowseConfig, BrowseExtractTool, BrowserEngine,
+        BrowserError, BrowserTab, CapabilitySet, CapabilitySubject, CompactedContext,
+        CompactionHook, DefaultPolicy, FileSnapshotStore, GroupResult, GroupStrategy,
+        InterAgentMessage, KernelToolContext, MetricsSnapshot, Middleware, MiddlewareContext,
+        MiddlewareData, MiddlewarePhase, MiddlewareResult, OutputMode, ProviderPool,
+        RateLimitPolicy, RestartBackoff, SecurityMiddleware, SharedState, StreamOptions,
+        StringPattern, StructuredOutput, SupervisorPolicy as SdkSupervisorPolicy,
     };
 
     #[cfg(feature = "native-browser")]

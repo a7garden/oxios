@@ -191,7 +191,10 @@ pub(crate) async fn handle_engine_validate_key(
         return Err(AppError::BadRequest("provider is required".into()));
     }
 
-    let result = state.kernel.engine.validate_key(&body.provider, &body.api_key);
+    let result = state
+        .kernel
+        .engine
+        .validate_key(&body.provider, &body.api_key);
     Ok(Json(serde_json::json!(result)))
 }
 

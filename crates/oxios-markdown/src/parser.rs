@@ -228,7 +228,7 @@ pub fn emoji_prefix(emoji: &str, s: &str) -> String {
     if emoji.is_empty() {
         return s;
     }
-    format!("{} {}", emoji, s)
+    format!("{emoji} {s}")
 }
 
 /// Check if text contains a markdown image.

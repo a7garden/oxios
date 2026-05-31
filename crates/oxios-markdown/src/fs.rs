@@ -427,6 +427,7 @@ impl VirtualFs {
 
     // ── Private helpers ─────────────────────────────────────
 
+    #[allow(clippy::only_used_in_recursion)]
     fn walk_dir(
         &self,
         root_path: &Path,
@@ -453,7 +454,7 @@ impl VirtualFs {
                     let ext = path
                         .extension()
                         .and_then(|e| e.to_str())
-                        .map(|e| format!(".{}", e));
+                        .map(|e| format!(".{e}"));
                     let ext_match = ext
                         .as_ref()
                         .map(|e| extensions.contains(&e.as_str()))
@@ -480,6 +481,7 @@ impl VirtualFs {
         Ok(())
     }
 
+    #[allow(clippy::only_used_in_recursion)]
     fn collect_md_files(
         &self,
         root_path: &Path,

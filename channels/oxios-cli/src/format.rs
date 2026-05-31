@@ -36,14 +36,14 @@ impl ChannelFormatter for CliFormatter {
             }
 
             if let Some(tag) = &meta.project_tag {
-                out.push_str(&format!(" | {}", tag));
+                out.push_str(&format!(" | {tag}"));
             }
 
             if let Some(dur) = meta.duration_ms {
                 if dur >= 1000 {
                     out.push_str(&format!(" | {:.1}s", dur as f64 / 1000.0));
                 } else {
-                    out.push_str(&format!(" | {}ms", dur));
+                    out.push_str(&format!(" | {dur}ms"));
                 }
             }
         }
@@ -68,7 +68,7 @@ impl ChannelFormatter for CliFormatter {
 
         if let Some(err) = meta.and_then(|m| m.error.as_ref()) {
             if let Some(s) = &err.suggestion {
-                out.push_str(&format!("\n💡 {}", s));
+                out.push_str(&format!("\n💡 {s}"));
             }
         }
 

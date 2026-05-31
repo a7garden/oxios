@@ -168,7 +168,7 @@ impl McpClient {
             Ok::<(), tokio::io::Error>(())
         })
         .await
-        .map_err(|e| anyhow::anyhow!("MCP request timed out (write): {}", e))??;
+        .map_err(|e| anyhow::anyhow!("MCP request timed out (write): {e}"))??;
 
         // Acquire stdout lock for reading
         let mut stdout_guard = self.stdout.write().await;
@@ -181,14 +181,14 @@ impl McpClient {
             stdout.lines().next_line().await
         })
         .await
-        .map_err(|e| anyhow::anyhow!("MCP request timed out (read): {}", e))?;
+        .map_err(|e| anyhow::anyhow!("MCP request timed out (read): {e}"))?;
 
         let response_str: String = line
             .context("Failed to read MCP response line from stdout")?
             .with_context(|| format!("MCP server {} returned no response", self.server.name))?;
 
         let parsed: McpResponse = serde_json::from_str(&response_str)
-            .with_context(|| format!("Failed to parse MCP response JSON: {}", response_str))?;
+            .with_context(|| format!("Failed to parse MCP response JSON: {response_str}"))?;
 
         // Sanity check: ID should match
         if parsed.id != request_id {
@@ -341,7 +341,7 @@ impl McpClient {
             }
         }
 
-        Err(anyhow!("Tool '{}' returned no text content", tool_name))
+        Err(anyhow!("Tool '{tool_name}' returned no text content"))
     }
 
     /// Gracefully shutdown the MCP server process.
@@ -438,7 +438,7 @@ mod tests {
         let server = McpServer::new("debug-test", "echo");
         let client = McpClient::new(server);
 
-        let debug_str = format!("{:?}", client);
+        let debug_str = format!("{client:?}");
 
         // Debug output should contain the server name
         assert!(debug_str.contains("debug-test"));
@@ -453,8 +453,8 @@ mod tests {
         let client1 = McpClient::new(server1);
         let client2 = McpClient::new(server2);
 
-        let debug1 = format!("{:?}", client1);
-        let debug2 = format!("{:?}", client2);
+        let debug1 = format!("{client1:?}");
+        let debug2 = format!("{client2:?}");
 
         assert!(debug1.contains("server-a"));
         assert!(debug2.contains("server-b"));

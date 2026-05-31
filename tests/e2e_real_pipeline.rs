@@ -28,7 +28,7 @@ mod tests {
         let oxi = oxi_sdk::OxiBuilder::new().with_builtins().build();
         let model = oxi
             .resolve_model(&model_id)
-            .unwrap_or_else(|_| panic!("Model '{}' not found", model_id));
+            .unwrap_or_else(|_| panic!("Model '{model_id}' not found"));
         let provider = oxi
             .create_provider(&model.provider)
             .unwrap_or_else(|_| panic!("Provider '{}' not available", model.provider));

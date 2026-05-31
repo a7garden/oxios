@@ -19,8 +19,8 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use kernel::Kernel;
-use oxios_kernel::{credential::CredentialStore, DaemonManager, OxiosConfig};
 use oxios_kernel::onboarding::WORKSPACE_SUBDIRS;
+use oxios_kernel::{credential::CredentialStore, DaemonManager, OxiosConfig};
 
 #[cfg(feature = "cli")]
 use oxios_cli::CliPlugin;
@@ -465,12 +465,12 @@ async fn cmd_config(action: &ConfigAction, config_path: &Path) -> Result<()> {
         ConfigAction::Show => {
             let config = load_config_or_default(config_path)?;
             let toml_str = toml::to_string_pretty(&config).context("failed to serialize config")?;
-            println!("{}", toml_str);
+            println!("{toml_str}");
         }
         ConfigAction::Get { key } => {
             let config = load_config_or_default(config_path)?;
             let value = config_get(&config, key)?;
-            println!("{}", value);
+            println!("{value}");
         }
         ConfigAction::Set { key, value } => {
             config_set(config_path, key, value)?;
@@ -506,16 +506,14 @@ fn load_config_or_default(config_path: &Path) -> Result<OxiosConfig> {
 // ─── Config Get: serde_json 기반 전체 필드 dot-notation 조회 ─────────────
 
 fn config_get(config: &OxiosConfig, key: &str) -> Result<String> {
-    let json = serde_json::to_value(config)
-        .context("설정을 JSON으로 변환 실패")?;
+    let json = serde_json::to_value(config).context("설정을 JSON으로 변환 실패")?;
 
     let value = json
         .pointer(&format!("/{}", key.replace('.', "/")))
         .ok_or_else(|| {
             anyhow::anyhow!(
-                "알 수 없는 설정 키: '{}'\n\
-                 사용 가능한 키는 `oxios config list`로 확인하세요.",
-                key
+                "알 수 없는 설정 키: '{key}'\n\
+                 사용 가능한 키는 `oxios config list`로 확인하세요."
             )
         })?;
 
@@ -559,11 +557,7 @@ fn config_set(config_path: &Path, key: &str, raw_value: &str) -> Result<()> {
     Ok(())
 }
 
-fn set_toml_dot(
-    doc: &mut toml_edit::DocumentMut,
-    key: &str,
-    value: toml_edit::Item,
-) -> Result<()> {
+fn set_toml_dot(doc: &mut toml_edit::DocumentMut, key: &str, value: toml_edit::Item) -> Result<()> {
     let parts: Vec<&str> = key.split('.').collect();
     let mut table = doc.as_table_mut();
 
@@ -577,7 +571,9 @@ fn set_toml_dot(
                 .entry(part)
                 .or_insert_with(|| toml_edit::Item::Table(toml_edit::Table::new()))
                 .as_table_mut()
-                .ok_or_else(|| anyhow::anyhow!("'{}'는 테이블이 아닙니다", parts[..=i].join(".")))?;
+                .ok_or_else(|| {
+                    anyhow::anyhow!("'{}'는 테이블이 아닙니다", parts[..=i].join("."))
+                })?;
         }
     }
     Ok(())
@@ -665,7 +661,7 @@ fn config_list(config: &OxiosConfig, prefix: Option<&str>) -> Result<()> {
 
     let root = if let Some(p) = prefix {
         json.pointer(&format!("/{}", p.replace('.', "/")))
-            .ok_or_else(|| anyhow::anyhow!("알 수 없는 접두어: '{}'", p))?
+            .ok_or_else(|| anyhow::anyhow!("알 수 없는 접두어: '{p}'"))?
     } else {
         &json
     };
@@ -685,25 +681,21 @@ fn config_list(config: &OxiosConfig, prefix: Option<&str>) -> Result<()> {
     Ok(())
 }
 
-fn collect_leaf_keys(
-    value: &serde_json::Value,
-    prefix: &str,
-    out: &mut Vec<(String, String)>,
-) {
+fn collect_leaf_keys(value: &serde_json::Value, prefix: &str, out: &mut Vec<(String, String)>) {
     match value {
         serde_json::Value::Object(map) => {
             for (k, v) in map {
                 let new_prefix = if prefix.is_empty() {
                     k.clone()
                 } else {
-                    format!("{}.{}", prefix, k)
+                    format!("{prefix}.{k}")
                 };
                 collect_leaf_keys(v, &new_prefix, out);
             }
         }
         _ => {
             let display = match value {
-                serde_json::Value::String(s) => format!("\"{}\"", s),
+                serde_json::Value::String(s) => format!("\"{s}\""),
                 serde_json::Value::Null => "null".into(),
                 other => other.to_string(),
             };
@@ -795,7 +787,7 @@ async fn cmd_status(kernel: &Kernel) -> Result<()> {
         .agents
         .list()
         .await
-        .map_err(|e| anyhow::anyhow!("failed to list agents: {}", e))?;
+        .map_err(|e| anyhow::anyhow!("failed to list agents: {e}"))?;
     println!("  {:<16}  {}", "Active Agents:", agents.len());
     if !agents.is_empty() {
         println!();
@@ -927,8 +919,7 @@ async fn cmd_doctor(kernel: &Kernel, config_path: &Path) -> Result<()> {
                     style(provider).cyan()
                 );
                 issues.push(format!(
-                    "No API key for '{}'. Run `oxios onboard` to configure.",
-                    provider
+                    "No API key for '{provider}'. Run `oxios onboard` to configure."
                 ));
             }
         },
@@ -1002,7 +993,7 @@ async fn cmd_doctor(kernel: &Kernel, config_path: &Path) -> Result<()> {
     checks += 1;
     let oxi_auth_exists = {
         let home = std::env::var("HOME").unwrap_or_default();
-        std::path::PathBuf::from(format!("{}/.oxi/auth.json", home)).exists()
+        std::path::PathBuf::from(format!("{home}/.oxi/auth.json")).exists()
     };
     let oxi_bin_exists = std::path::PathBuf::from("/usr/local/bin/oxi").exists()
         || std::path::PathBuf::from(std::env::var("HOME").unwrap_or_default() + "/.cargo/bin/oxi")
@@ -1023,7 +1014,7 @@ async fn cmd_doctor(kernel: &Kernel, config_path: &Path) -> Result<()> {
     // 8. Gateway port available
     checks += 1;
     let port = config.gateway.port;
-    let port_in_use = TcpStream::connect(format!("127.0.0.1:{}", port)).is_ok();
+    let port_in_use = TcpStream::connect(format!("127.0.0.1:{port}")).is_ok();
     if port_in_use && !is_running {
         println!(
             "  {} Port {} is already in use",
@@ -1031,8 +1022,7 @@ async fn cmd_doctor(kernel: &Kernel, config_path: &Path) -> Result<()> {
             style(port).cyan()
         );
         issues.push(format!(
-            "Port {} is occupied. Change with `oxios config set gateway.port <port>`.",
-            port
+            "Port {port} is occupied. Change with `oxios config set gateway.port <port>`."
         ));
     } else if port_in_use && is_running {
         println!(
@@ -1082,7 +1072,7 @@ fn cmd_models(provider: Option<&str>) -> Result<()> {
             // Try reading from config
             let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
             let config_path =
-                oxios_kernel::config::expand_home(&format!("{}/.oxios/config.toml", home));
+                oxios_kernel::config::expand_home(&format!("{home}/.oxios/config.toml"));
             if config_path.exists() {
                 let config = oxios_kernel::config::load_config(&config_path)?;
                 if config.engine.default_model.is_empty() {
@@ -1105,10 +1095,7 @@ fn cmd_models(provider: Option<&str>) -> Result<()> {
 
     let models = oxi_sdk::get_provider_models(&provider_id);
     if models.is_empty() {
-        println!(
-            "  No models found for '{}'. Check the provider name.",
-            provider_id
-        );
+        println!("  No models found for '{provider_id}'. Check the provider name.");
         return Ok(());
     }
 
@@ -1167,11 +1154,11 @@ fn cmd_web(config: &OxiosConfig, port_override: Option<u16>) -> Result<()> {
         daemon.start(&config_path)?;
 
         // Give the server a moment to bind the port
-        let url = format!("http://127.0.0.1:{}", port);
+        let url = format!("http://127.0.0.1:{port}");
         let mut attempts = 0;
         loop {
             std::thread::sleep(std::time::Duration::from_millis(300));
-            if TcpStream::connect(format!("127.0.0.1:{}", port)).is_ok() {
+            if TcpStream::connect(format!("127.0.0.1:{port}")).is_ok() {
                 break;
             }
             attempts += 1;
@@ -1186,10 +1173,10 @@ fn cmd_web(config: &OxiosConfig, port_override: Option<u16>) -> Result<()> {
         }
     }
 
-    let url = format!("http://127.0.0.1:{}", port);
+    let url = format!("http://127.0.0.1:{port}");
     println!("  {} Opening {}", style("↗").green(), style(&url).cyan());
 
-    webbrowser::open(&url).map_err(|e| anyhow::anyhow!("failed to open browser: {}", e))?;
+    webbrowser::open(&url).map_err(|e| anyhow::anyhow!("failed to open browser: {e}"))?;
 
     Ok(())
 }
@@ -1369,7 +1356,8 @@ async fn run() -> Result<()> {
     );
 
     if needs_kernel && !oxios_kernel::onboarding::has_credentials(&config) {
-        let result = oxios_kernel::onboarding::run_onboarding(&oxios_home, &mut config, is_first_run)?;
+        let result =
+            oxios_kernel::onboarding::run_onboarding(&oxios_home, &mut config, is_first_run)?;
         if result.configured {
             if config_path.exists() {
                 config = oxios_kernel::config::load_config(&config_path)?;
@@ -1483,7 +1471,7 @@ async fn run() -> Result<()> {
                         .agents
                         .list()
                         .await
-                        .map_err(|e| anyhow::anyhow!("failed to list agents: {}", e))?;
+                        .map_err(|e| anyhow::anyhow!("failed to list agents: {e}"))?;
                     if agents.is_empty() {
                         println!("  No active agents.");
                     } else {
@@ -1504,12 +1492,12 @@ async fn run() -> Result<()> {
                 }
                 AgentAction::Kill { id } => {
                     let _ = uuid::Uuid::parse_str(id)
-                        .map_err(|e| anyhow::anyhow!("invalid agent id '{}': {}", id, e))?;
+                        .map_err(|e| anyhow::anyhow!("invalid agent id '{id}': {e}"))?;
                     handle
                         .agents
                         .kill(id)
                         .await
-                        .map_err(|e| anyhow::anyhow!("failed to kill agent {}: {}", id, e))?;
+                        .map_err(|e| anyhow::anyhow!("failed to kill agent {id}: {e}"))?;
                     println!(
                         "  {} Agent {} terminated.",
                         style("✓").green(),
@@ -1566,7 +1554,7 @@ async fn run() -> Result<()> {
                     let entries = handle
                         .infra
                         .git_log(limit)
-                        .map_err(|e| anyhow::anyhow!("failed to get git log: {}", e))?;
+                        .map_err(|e| anyhow::anyhow!("failed to get git log: {e}"))?;
                     if entries.is_empty() {
                         println!("  No commits yet.");
                     } else {
@@ -1576,7 +1564,7 @@ async fn run() -> Result<()> {
                             let short_hash = &entry.hash[..8.min(entry.hash.len())];
                             let author = entry.author.chars().take(20).collect::<String>();
                             let msg = entry.message.chars().take(40).collect::<String>();
-                            println!("{:8} {:20} {:40}", short_hash, author, msg);
+                            println!("{short_hash:8} {author:20} {msg:40}");
                         }
                     }
                     Ok(())
@@ -1586,10 +1574,10 @@ async fn run() -> Result<()> {
                     handle
                         .infra
                         .git_tag(name, msg)
-                        .map_err(|e| anyhow::anyhow!("failed to create tag: {}", e))?;
+                        .map_err(|e| anyhow::anyhow!("failed to create tag: {e}"))?;
                     println!("  {} '{}'.", style("Tagged").green(), style(name).cyan());
                     if !msg.is_empty() {
-                        println!("  Message: {}", msg);
+                        println!("  Message: {msg}");
                     }
                     Ok(())
                 }
@@ -1601,9 +1589,9 @@ async fn run() -> Result<()> {
             match agent_id {
                 Some(id) => {
                     let uuid = uuid::Uuid::parse_str(id)
-                        .map_err(|e| anyhow::anyhow!("invalid agent id '{}': {}", id, e))?;
+                        .map_err(|e| anyhow::anyhow!("invalid agent id '{id}': {e}"))?;
                     let budget = handle.agents.check_budget(&uuid);
-                    println!("\n  Agent: {}", id);
+                    println!("\n  Agent: {id}");
                     println!("  {}", "─".repeat(40));
                     println!("  {:<22}  {}", "Tokens remaining:", budget.tokens_remaining);
                     println!("  {:<22}  {}", "Calls remaining:", budget.calls_remaining);
@@ -1640,7 +1628,7 @@ async fn run() -> Result<()> {
                 MarketplaceAction::Search { query, limit } => {
                     let results = api.search(query, Some(*limit)).await?;
                     if results.is_empty() {
-                        println!("  No results for '{}'", query);
+                        println!("  No results for '{query}'");
                     } else {
                         for r in results {
                             println!(
@@ -1685,7 +1673,8 @@ async fn run() -> Result<()> {
                                         "  {} {}: {} → {}",
                                         style("Updated").green().bold(),
                                         result.slug,
-                                        style(result.previous_version.as_deref().unwrap_or("?")).yellow(),
+                                        style(result.previous_version.as_deref().unwrap_or("?"))
+                                            .yellow(),
                                         style(&result.version).cyan()
                                     );
                                 } else {
@@ -1693,7 +1682,12 @@ async fn run() -> Result<()> {
                                 }
                             }
                             Err(e) => {
-                                eprintln!("  {} Failed to update '{}': {}", style("✗").red().bold(), s, e);
+                                eprintln!(
+                                    "  {} Failed to update '{}': {}",
+                                    style("✗").red().bold(),
+                                    s,
+                                    e
+                                );
                             }
                         }
                     } else {
@@ -1707,7 +1701,8 @@ async fn run() -> Result<()> {
                                         "  {} {}: {} → {}",
                                         style("Updated").green().bold(),
                                         r.slug,
-                                        style(r.previous_version.as_deref().unwrap_or("?")).yellow(),
+                                        style(r.previous_version.as_deref().unwrap_or("?"))
+                                            .yellow(),
                                         style(&r.version).cyan()
                                     );
                                 } else if r.ok {
@@ -1724,29 +1719,31 @@ async fn run() -> Result<()> {
                         }
                     }
                 }
-                MarketplaceAction::Updates => {
-                    match api.check_updates().await {
-                        Ok(updates) => {
-                            if updates.is_empty() {
-                                println!("  All skills up to date");
-                            } else {
-                                println!("  Available updates:");
-                                println!("  {}", "─".repeat(50));
-                                for u in updates {
-                                    println!(
-                                        "  {}: {} → {}",
-                                        style(&u.slug).bold(),
-                                        style(&u.current_version).yellow(),
-                                        style(&u.latest_version).cyan()
-                                    );
-                                }
+                MarketplaceAction::Updates => match api.check_updates().await {
+                    Ok(updates) => {
+                        if updates.is_empty() {
+                            println!("  All skills up to date");
+                        } else {
+                            println!("  Available updates:");
+                            println!("  {}", "─".repeat(50));
+                            for u in updates {
+                                println!(
+                                    "  {}: {} → {}",
+                                    style(&u.slug).bold(),
+                                    style(&u.current_version).yellow(),
+                                    style(&u.latest_version).cyan()
+                                );
                             }
                         }
-                        Err(e) => {
-                            eprintln!("  {} Failed to check updates: {}", style("✗").red().bold(), e);
-                        }
                     }
-                }
+                    Err(e) => {
+                        eprintln!(
+                            "  {} Failed to check updates: {}",
+                            style("✗").red().bold(),
+                            e
+                        );
+                    }
+                },
             }
             Ok(())
         }
@@ -1760,18 +1757,22 @@ async fn run() -> Result<()> {
                         println!("No projects registered.");
                         println!("Use `oxios project add <name> --path /path/to/project` to register one.");
                     } else {
-                        println!("{}", style(format!("Projects ({}):", projects.len())).bold());
+                        println!(
+                            "{}",
+                            style(format!("Projects ({}):", projects.len())).bold()
+                        );
                         println!("{}", "─".repeat(50));
                         for p in &projects {
                             let paths_str = if p.paths.is_empty() {
                                 "(no paths)".to_string()
                             } else {
-                                p.paths.iter().map(|x| x.to_string_lossy().to_string()).collect::<Vec<_>>().join(", ")
+                                p.paths
+                                    .iter()
+                                    .map(|x| x.to_string_lossy().to_string())
+                                    .collect::<Vec<_>>()
+                                    .join(", ")
                             };
-                            println!(
-                                "  {} {} — {}",
-                                p.emoji, style(&p.name).bold(), &paths_str
-                            );
+                            println!("  {} {} — {}", p.emoji, style(&p.name).bold(), &paths_str);
                             if !p.tags.is_empty() {
                                 println!("     tags: {}", p.tags.join(", "));
                             }
@@ -1793,18 +1794,37 @@ async fn run() -> Result<()> {
                                 println!("  Description: {}", p.description);
                             }
                             println!("  Source:       {}", p.source);
-                            println!("  Paths:       {}", if p.paths.is_empty() { "(none)".to_string() } else { p.paths.iter().map(|x| x.to_string_lossy().to_string()).collect::<Vec<_>>().join(", ") });
+                            println!(
+                                "  Paths:       {}",
+                                if p.paths.is_empty() {
+                                    "(none)".to_string()
+                                } else {
+                                    p.paths
+                                        .iter()
+                                        .map(|x| x.to_string_lossy().to_string())
+                                        .collect::<Vec<_>>()
+                                        .join(", ")
+                                }
+                            );
                             if !p.tags.is_empty() {
                                 println!("  Tags:        {}", p.tags.join(", "));
                             }
                             println!("  Created:     {}", p.created_at.to_rfc3339());
                             println!("  Last active: {}", p.last_active_at.to_rfc3339());
                         }
-                        None => eprintln!("{} Project '{}' not found", style("✗").red().bold(), name),
+                        None => {
+                            eprintln!("{} Project '{}' not found", style("✗").red().bold(), name)
+                        }
                     }
                 }
-                ProjectAction::Add { name, paths, tags, emoji, description } => {
-                    let path_bufs: Vec<_> = paths.iter().map(|p| std::path::PathBuf::from(p)).collect();
+                ProjectAction::Add {
+                    name,
+                    paths,
+                    tags,
+                    emoji,
+                    description,
+                } => {
+                    let path_bufs: Vec<_> = paths.iter().map(std::path::PathBuf::from).collect();
                     match pm.create_project(
                         name.clone(),
                         path_bufs,
@@ -1814,25 +1834,42 @@ async fn run() -> Result<()> {
                         oxios_kernel::ProjectSource::Manual,
                     ) {
                         Ok(p) => {
-                            println!("{} Project '{}' created ({})", style("✓").green().bold(), p.name, p.id);
+                            println!(
+                                "{} Project '{}' created ({})",
+                                style("✓").green().bold(),
+                                p.name,
+                                p.id
+                            );
                         }
                         Err(e) => {
-                            eprintln!("{} Failed to create project: {}", style("✗").red().bold(), e);
+                            eprintln!(
+                                "{} Failed to create project: {}",
+                                style("✗").red().bold(),
+                                e
+                            );
                         }
                     }
                 }
                 ProjectAction::Remove { name } => {
-                    let project = if let Ok(id) = uuid::Uuid::parse_str(&name) {
+                    let project = if let Ok(id) = uuid::Uuid::parse_str(name) {
                         pm.get_project(id).map(|p| p.id)
                     } else {
-                        pm.get_project_by_name(&name).map(|p| p.id)
+                        pm.get_project_by_name(name).map(|p| p.id)
                     };
                     match project {
                         Some(id) => match pm.remove_project(id) {
-                            Ok(()) => println!("{} Project '{}' removed", style("✓").green().bold(), name),
-                            Err(e) => eprintln!("{} Failed to remove project: {}", style("✗").red().bold(), e),
+                            Ok(()) => {
+                                println!("{} Project '{}' removed", style("✓").green().bold(), name)
+                            }
+                            Err(e) => eprintln!(
+                                "{} Failed to remove project: {}",
+                                style("✗").red().bold(),
+                                e
+                            ),
                         },
-                        None => eprintln!("{} Project '{}' not found", style("✗").red().bold(), name),
+                        None => {
+                            eprintln!("{} Project '{}' not found", style("✗").red().bold(), name)
+                        }
                     }
                 }
             }
@@ -1922,10 +1959,8 @@ async fn cmd_serve(kernel: &Kernel, config_path: &Path) -> Result<()> {
     }
 
     // Phase 3: Wait for gateway task with timeout
-    let gateway_result = tokio::time::timeout(
-        std::time::Duration::from_secs(10),
-        gateway_task,
-    ).await;
+    let gateway_result =
+        tokio::time::timeout(std::time::Duration::from_secs(10), gateway_task).await;
     match gateway_result {
         Ok(Ok(())) => tracing::info!("Gateway stopped cleanly"),
         Ok(Err(e)) => tracing::warn!(error = %e, "Gateway task error"),

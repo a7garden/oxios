@@ -150,10 +150,9 @@ async fn run_cli(cli: Cli) -> anyhow::Result<()> {
             let tier_filter = if tier == "all" {
                 None
             } else {
-                Some(
-                    Tier::from_str_opt(&tier)
-                        .ok_or_else(|| anyhow::anyhow!("Unknown tier: {}. Use: unit, integration, e2e, all", tier))?
-                )
+                Some(Tier::from_str_opt(&tier).ok_or_else(|| {
+                    anyhow::anyhow!("Unknown tier: {}. Use: unit, integration, e2e, all", tier)
+                })?)
             };
 
             // Load suites
@@ -194,10 +193,7 @@ async fn run_cli(cli: Cli) -> anyhow::Result<()> {
                         let duration_ms = task_start.elapsed().as_millis() as u64;
                         let result = oxios_bench::runner::evaluate_task(task, &output, duration_ms);
                         let icon = if result.passed { "✅" } else { "❌" };
-                        println!(
-                            "{} ({:.0}%, {}ms)",
-                            icon, result.score, result.duration_ms
-                        );
+                        println!("{} ({:.0}%, {}ms)", icon, result.score, result.duration_ms);
                         results.push(result);
                     }
                     Err(e) => {
@@ -223,7 +219,8 @@ async fn run_cli(cli: Cli) -> anyhow::Result<()> {
             let regressions = if let Some(baseline_path) = &baseline {
                 match load_report(baseline_path) {
                     Ok(baseline_run) => {
-                        let current_run = make_run(&results, &regressions_from_results(&baseline_run, &results));
+                        let current_run =
+                            make_run(&results, &regressions_from_results(&baseline_run, &results));
                         let cmp = compare_runs(&baseline_run, &current_run, 5.0);
                         if !json {
                             print_compare(&cmp);
@@ -328,7 +325,10 @@ async fn run_cli(cli: Cli) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn make_run(results: &[oxios_bench::TaskResult], regressions: &[oxios_bench::Regression]) -> BenchmarkRun {
+fn make_run(
+    results: &[oxios_bench::TaskResult],
+    regressions: &[oxios_bench::Regression],
+) -> BenchmarkRun {
     let summary = build_summary(results, regressions.to_vec());
     let id = uuid::Uuid::new_v4().to_string();
 
@@ -339,7 +339,9 @@ fn make_run(results: &[oxios_bench::TaskResult], regressions: &[oxios_bench::Reg
         .ok()
         .and_then(|o| {
             if o.status.success() {
-                String::from_utf8(o.stdout).ok().map(|s| s.trim().to_string())
+                String::from_utf8(o.stdout)
+                    .ok()
+                    .map(|s| s.trim().to_string())
             } else {
                 None
             }

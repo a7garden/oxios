@@ -72,7 +72,7 @@ impl BrowserApi {
                 })?;
                 let browser = oxibrowser_core::Browser::new(config.clone())
                     .await
-                    .map_err(|e| anyhow::anyhow!("Failed to initialize browser engine: {}", e))?;
+                    .map_err(|e| anyhow::anyhow!("Failed to initialize browser engine: {e}"))?;
                 Ok(Arc::new(browser))
             })
             .await

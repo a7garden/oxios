@@ -50,13 +50,10 @@ fn user_web_version_file() -> Option<PathBuf> {
     dirs::home_dir().map(|h| h.join(".oxios").join("web").join("version"))
 }
 
-
 /// Fetches the latest release tag from GitHub API.
 async fn fetch_latest_release_tag() -> Result<String> {
-    let url = format!("https://api.github.com/repos/{}/releases/latest", GITHUB_REPO);
-    let client = reqwest::Client::builder()
-        .user_agent("oxios-web")
-        .build()?;
+    let url = format!("https://api.github.com/repos/{GITHUB_REPO}/releases/latest");
+    let client = reqwest::Client::builder().user_agent("oxios-web").build()?;
     let resp: serde_json::Value = client.get(&url).send().await?.json().await?;
     let tag = resp["tag_name"]
         .as_str()
@@ -66,28 +63,21 @@ async fn fetch_latest_release_tag() -> Result<String> {
 
 /// Downloads `web-dist.zip` from a GitHub release and extracts to `~/.oxios/web/dist/`.
 async fn download_and_extract_web_dist(version_tag: &str) -> Result<PathBuf> {
-    let dist_dir = user_web_dist_dir()
-        .ok_or_else(|| anyhow::anyhow!("cannot determine home directory"))?;
+    let dist_dir =
+        user_web_dist_dir().ok_or_else(|| anyhow::anyhow!("cannot determine home directory"))?;
     let version_file = user_web_version_file()
         .ok_or_else(|| anyhow::anyhow!("cannot determine home directory"))?;
 
     // Download zip
-    let url = format!(
-        "https://github.com/{}/releases/download/{}/web-dist.zip",
-        GITHUB_REPO, version_tag
-    );
+    let url =
+        format!("https://github.com/{GITHUB_REPO}/releases/download/{version_tag}/web-dist.zip");
     tracing::info!(url = %url, "Downloading web UI from GitHub Releases");
 
-    let client = reqwest::Client::builder()
-        .user_agent("oxios-web")
-        .build()?;
+    let client = reqwest::Client::builder().user_agent("oxios-web").build()?;
     let resp = client.get(&url).send().await?;
 
     if !resp.status().is_success() {
-        anyhow::bail!(
-            "Failed to download web-dist.zip: HTTP {}",
-            resp.status()
-        );
+        anyhow::bail!("Failed to download web-dist.zip: HTTP {}", resp.status());
     }
 
     let bytes = resp.bytes().await?;
@@ -236,7 +226,7 @@ fn serve_file(dist: Option<&std::path::Path>, path: &str) -> Response {
             let lookup = if clean.starts_with("assets/") {
                 clean.to_string()
             } else {
-                format!("assets/{}", clean)
+                format!("assets/{clean}")
             };
             return Response::builder()
                 .status(200)
@@ -246,7 +236,7 @@ fn serve_file(dist: Option<&std::path::Path>, path: &str) -> Response {
                 .unwrap();
         }
         // Try without assets/ prefix
-        if let Some(data) = fs_read(d, &format!("assets/{}", clean)) {
+        if let Some(data) = fs_read(d, &format!("assets/{clean}")) {
             return Response::builder()
                 .status(200)
                 .header("Content-Type", mime_type(clean))
@@ -258,14 +248,14 @@ fn serve_file(dist: Option<&std::path::Path>, path: &str) -> Response {
 
     // Fall back to embedded assets
     let asset =
-        EmbeddedAssets::get(clean).or_else(|| EmbeddedAssets::get(&format!("assets/{}", clean)));
+        EmbeddedAssets::get(clean).or_else(|| EmbeddedAssets::get(&format!("assets/{clean}")));
 
     match asset {
         Some(content) => {
             let lookup = if clean.starts_with("assets/") {
                 clean.to_string()
             } else {
-                format!("assets/{}", clean)
+                format!("assets/{clean}")
             };
             let mime = mime_guess::from_path(lookup.as_str())
                 .first_or_octet_stream()
@@ -349,10 +339,7 @@ impl Surface for WebSurface {
         "web"
     }
 
-    async fn start(
-        &self,
-        ctx: SurfaceContext,
-    ) -> Result<SurfaceHandle> {
+    async fn start(&self, ctx: SurfaceContext) -> Result<SurfaceHandle> {
         let config = ctx.config.read().clone();
         let host = config.gateway.host.clone();
         let port = config.gateway.port;
@@ -368,7 +355,7 @@ impl Surface for WebSurface {
 
         // Build app state — all knowledge access goes through kernel.knowledge
         let state = Arc::new(AppState {
-            base_url: format!("http://{}:{}", host, port),
+            base_url: format!("http://{host}:{port}"),
             kernel: ctx.kernel.clone(),
             channel: channel_handle,
             config: ctx.config.clone(),
@@ -415,7 +402,7 @@ impl Surface for WebSurface {
             .with_state(state);
 
         // Bind listener
-        let addr = format!("{}:{}", host, port);
+        let addr = format!("{host}:{port}");
         let listener = tokio::net::TcpListener::bind(&addr).await?;
         tracing::info!(addr = %addr, "Web server listening");
 

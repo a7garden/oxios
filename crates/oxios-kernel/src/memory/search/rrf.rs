@@ -16,10 +16,7 @@ use std::collections::HashMap;
 ///
 /// # Returns
 /// A single merged list of `(id, rrf_score)`, sorted by score descending.
-pub fn reciprocal_rank_fusion(
-    results: Vec<Vec<(i64, f64)>>,
-    k: f64,
-) -> Vec<(i64, f64)> {
+pub fn reciprocal_rank_fusion(results: Vec<Vec<(i64, f64)>>, k: f64) -> Vec<(i64, f64)> {
     let mut scores: HashMap<i64, f64> = HashMap::new();
 
     for tier_results in &results {
@@ -47,9 +44,20 @@ mod tests {
         // Items appearing in both tiers should rank highest
         assert!(!fused.is_empty());
         // IDs 1 and 2 appear in both → higher score
-        let score_1 = fused.iter().find(|(id, _)| *id == 1).map(|(_, s)| *s).unwrap_or(0.0);
-        let score_4 = fused.iter().find(|(id, _)| *id == 4).map(|(_, s)| *s).unwrap_or(0.0);
-        assert!(score_1 > score_4, "ID 1 (in both tiers) should outscore ID 4 (one tier)");
+        let score_1 = fused
+            .iter()
+            .find(|(id, _)| *id == 1)
+            .map(|(_, s)| *s)
+            .unwrap_or(0.0);
+        let score_4 = fused
+            .iter()
+            .find(|(id, _)| *id == 4)
+            .map(|(_, s)| *s)
+            .unwrap_or(0.0);
+        assert!(
+            score_1 > score_4,
+            "ID 1 (in both tiers) should outscore ID 4 (one tier)"
+        );
     }
 
     #[test]

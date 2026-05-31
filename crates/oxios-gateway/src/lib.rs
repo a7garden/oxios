@@ -22,9 +22,7 @@ pub use channel::Channel;
 pub use error_classify::classify_error;
 pub use format::ChannelFormatter;
 pub use gateway::Gateway;
-pub use message::{
-    ErrorKind, IncomingMessage, OutgoingMessage, ResponseMeta, UserFacingError,
-};
+pub use message::{ErrorKind, IncomingMessage, OutgoingMessage, ResponseMeta, UserFacingError};
 pub use plugin::{ChannelBundle, ChannelContext, ChannelPlugin};
 pub use surface::{Surface, SurfaceContext, SurfaceHandle};
 

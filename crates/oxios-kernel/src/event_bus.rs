@@ -184,29 +184,26 @@ pub fn kernel_event_to_audit_action(event: &KernelEvent) -> AuditAction {
             reason: error.clone(),
         },
         KernelEvent::MessageReceived { content, .. } => AuditAction::Other {
-            detail: format!("message: {}", content),
+            detail: format!("message: {content}"),
         },
         KernelEvent::SeedCreated { seed_id, .. } => AuditAction::Other {
-            detail: format!("seed_created:{}", seed_id),
+            detail: format!("seed_created:{seed_id}"),
         },
         KernelEvent::EvaluationComplete { seed_id, passed } => AuditAction::Other {
-            detail: format!("evaluation:{}:{}", seed_id, passed),
+            detail: format!("evaluation:{seed_id}:{passed}"),
         },
         KernelEvent::PhaseStarted { session_id, phase } => AuditAction::Other {
-            detail: format!("phase_started:{}:{}", session_id, phase),
+            detail: format!("phase_started:{session_id}:{phase}"),
         },
         KernelEvent::PhaseCompleted {
             session_id,
             phase,
             result_summary,
         } => AuditAction::Other {
-            detail: format!(
-                "phase_completed:{}:{}:{}",
-                session_id, phase, result_summary
-            ),
+            detail: format!("phase_completed:{session_id}:{phase}:{result_summary}"),
         },
         KernelEvent::AgentOutput { output, .. } => AuditAction::Other {
-            detail: format!("agent_output:{}", output),
+            detail: format!("agent_output:{output}"),
         },
         KernelEvent::ApprovalRequested {
             id,
@@ -214,64 +211,58 @@ pub fn kernel_event_to_audit_action(event: &KernelEvent) -> AuditAction {
             resource,
             reason: _,
         } => AuditAction::Other {
-            detail: format!("approval_requested:{}:{}:{}", id, action, resource),
+            detail: format!("approval_requested:{id}:{action}:{resource}"),
         },
         KernelEvent::ApprovalResolved { id, approved } => AuditAction::Other {
-            detail: format!("approval_resolved:{}:{}", id, approved),
+            detail: format!("approval_resolved:{id}:{approved}"),
         },
         KernelEvent::MemoryStored {
             id, memory_type, ..
         } => AuditAction::MemoryWrite {
-            entry_id: format!("{}:{}", id, memory_type),
+            entry_id: format!("{id}:{memory_type}"),
         },
         KernelEvent::MemoryRecalled { query, count } => AuditAction::MemoryRead {
-            entry_id: format!("query:{}:{}results", query, count),
+            entry_id: format!("query:{query}:{count}results"),
         },
         KernelEvent::AgentGroupCreated {
             group_id,
             agent_count,
         } => AuditAction::Other {
-            detail: format!("group_created:{}:{}agents", group_id, agent_count),
+            detail: format!("group_created:{group_id}:{agent_count}agents"),
         },
         KernelEvent::AgentGroupMemberCompleted {
             group_id,
             agent_id,
             success,
         } => AuditAction::Other {
-            detail: format!(
-                "group_member_completed:{}:{}:{}",
-                group_id, agent_id, success
-            ),
+            detail: format!("group_member_completed:{group_id}:{agent_id}:{success}"),
         },
         KernelEvent::EvolutionStarted {
             seed_id,
             new_seed_id,
             iteration,
         } => AuditAction::Other {
-            detail: format!("evolution:{}->{}:iter{}", seed_id, new_seed_id, iteration),
+            detail: format!("evolution:{seed_id}->{new_seed_id}:iter{iteration}"),
         },
         KernelEvent::EvolutionMaxReached {
             seed_id,
             final_score,
             iterations,
         } => AuditAction::Other {
-            detail: format!(
-                "evolution_max:{}:score={}:iters={}",
-                seed_id, final_score, iterations
-            ),
+            detail: format!("evolution_max:{seed_id}:score={final_score}:iters={iterations}"),
         },
         KernelEvent::ProjectCreated {
-            project_id,
+            project_id: _,
             name,
             source,
         } => AuditAction::Other {
-            detail: format!("project_created:{}:{}", name, source),
+            detail: format!("project_created:{name}:{source}"),
         },
         KernelEvent::ProjectActivated {
-            project_id,
+            project_id: _,
             name,
         } => AuditAction::Other {
-            detail: format!("project_activated:{}", name),
+            detail: format!("project_activated:{name}"),
         },
     }
 }
@@ -286,7 +277,7 @@ fn extract_agent_id(event: &KernelEvent) -> String {
         KernelEvent::MessageReceived { from, .. } => from.to_string(),
         KernelEvent::AgentOutput { agent_id, .. } => agent_id.to_string(),
         KernelEvent::AgentGroupMemberCompleted { agent_id, .. } => agent_id.to_string(),
-        KernelEvent::ProjectActivated { project_id, .. } => format!("project:{}", project_id),
+        KernelEvent::ProjectActivated { project_id, .. } => format!("project:{project_id}"),
         _ => "system".to_string(),
     }
 }
@@ -339,11 +330,14 @@ impl EventBus {
                     Ok(event) => {
                         let actor = extract_agent_id(&event);
                         let action = kernel_event_to_audit_action(&event);
-                        let resource = format!("{:?}", event);
+                        let resource = format!("{event:?}");
                         audit.append(actor, action, resource);
                     }
                     Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
-                        tracing::warn!(skipped = n, "Audit trail subscriber lagged, skipping events");
+                        tracing::warn!(
+                            skipped = n,
+                            "Audit trail subscriber lagged, skipping events"
+                        );
                         continue;
                     }
                     Err(tokio::sync::broadcast::error::RecvError::Closed) => {
@@ -593,6 +587,9 @@ mod tests {
         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
 
         // Audit trail should have at least one entry
-        assert!(audit.len() >= 1, "audit trail should have recorded the event");
+        assert!(
+            audit.len() >= 1,
+            "audit trail should have recorded the event"
+        );
     }
 }

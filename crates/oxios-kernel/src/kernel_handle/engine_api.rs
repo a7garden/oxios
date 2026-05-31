@@ -144,10 +144,10 @@ impl RoutingStats {
 /// Estimate cost in USD for a model given token usage.
 /// Uses oxi-sdk's model_db for per-model pricing.
 pub fn estimate_cost(model_id: &str, input_tokens: u64, output_tokens: u64) -> f64 {
-    let entries = oxi_sdk::get_provider_models(
-        &model_id.split('/').next().unwrap_or(model_id),
-    );
-    let entry = entries.iter().find(|e| format!("{}/{}", e.provider, e.id) == model_id);
+    let entries = oxi_sdk::get_provider_models(model_id.split('/').next().unwrap_or(model_id));
+    let entry = entries
+        .iter()
+        .find(|e| format!("{}/{}", e.provider, e.id) == model_id);
     match entry {
         Some(e) => {
             (e.cost_input * input_tokens as f64 / 1_000_000.0)
@@ -350,20 +350,18 @@ impl EngineApi {
     /// Get the current engine configuration + credential status + routing.
     pub fn config(&self) -> EngineConfigResponse {
         let cfg = self.config.read();
-        let provider = CredentialStore::provider_from_model(&cfg.engine.default_model)
-            .map(|s| s.to_string());
-        let api_key_source = provider
-            .as_deref()
-            .and_then(|p| {
-                CredentialStore::resolve(p, cfg.api_key().as_deref()).map(|(_, src)| {
-                    match src {
-                        crate::credential::CredentialSource::EnvVar => "env",
-                        crate::credential::CredentialSource::Config => "config",
-                        crate::credential::CredentialSource::OxiAuthStore => "auth_store",
-                    }
-                    .to_string()
-                })
-            });
+        let provider =
+            CredentialStore::provider_from_model(&cfg.engine.default_model).map(|s| s.to_string());
+        let api_key_source = provider.as_deref().and_then(|p| {
+            CredentialStore::resolve(p, cfg.api_key().as_deref()).map(|(_, src)| {
+                match src {
+                    crate::credential::CredentialSource::EnvVar => "env",
+                    crate::credential::CredentialSource::Config => "config",
+                    crate::credential::CredentialSource::OxiAuthStore => "auth_store",
+                }
+                .to_string()
+            })
+        });
         let api_key_set = provider
             .as_deref()
             .map(|p| CredentialStore::has_credential(p, cfg.api_key().as_deref()))
@@ -437,10 +435,7 @@ impl EngineApi {
     ///
     /// This is a placeholder for per-provider option persistence.
     /// Currently stores the serialized options as a TOML section.
-    pub fn set_provider_options(
-        &self,
-        _opts: &oxi_sdk::ProviderOptions,
-    ) -> anyhow::Result<()> {
+    pub fn set_provider_options(&self, _opts: &oxi_sdk::ProviderOptions) -> anyhow::Result<()> {
         // ProviderOptions are currently per-request, not persisted in config.toml.
         // Future: add [engine.provider_options] section to OxiosConfig.
         tracing::info!("Provider options update requested (no-op for now)");
@@ -504,7 +499,7 @@ impl EngineApi {
         // Try to resolve any model from this provider
         let models = oxi_sdk::get_provider_models(provider);
         if models.is_empty() {
-            anyhow::bail!("No models found for provider '{}'", provider);
+            anyhow::bail!("No models found for provider '{provider}'");
         }
 
         let model_id = format!("{}/{}", provider, models[0].id);

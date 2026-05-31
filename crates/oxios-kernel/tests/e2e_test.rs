@@ -81,7 +81,8 @@ impl OuroborosProtocol for MockOuroboros {
         self.generate_seed_called.fetch_add(1, Ordering::SeqCst);
         // Seed with acceptance_criteria so should_evaluate() returns true.
         let mut seed = Seed::new("Test task from e2e smoke test");
-        seed.acceptance_criteria.push("Output contains 'done'".into());
+        seed.acceptance_criteria
+            .push("Output contains 'done'".into());
         Ok(seed)
     }
 
@@ -209,14 +210,16 @@ impl Supervisor for MockSupervisor {
 // Test orchestrator builder
 // ---------------------------------------------------------------------------
 
-fn build_orchestrator_parts(
-) -> (Arc<MockOuroboros>, Arc<MockSupervisor>, EventBus, Arc<StateStore>) {
+fn build_orchestrator_parts() -> (
+    Arc<MockOuroboros>,
+    Arc<MockSupervisor>,
+    EventBus,
+    Arc<StateStore>,
+) {
     let event_bus = EventBus::new(64);
     let tmp = tempfile::tempdir().unwrap();
-    let state_store = Arc::new(
-        StateStore::new(tmp.path().to_path_buf())
-            .expect("StateStore creation failed"),
-    );
+    let state_store =
+        Arc::new(StateStore::new(tmp.path().to_path_buf()).expect("StateStore creation failed"));
     let ouroboros = Arc::new(MockOuroboros::new());
     let supervisor = Arc::new(MockSupervisor::new(event_bus.clone()));
     (ouroboros, supervisor, event_bus, state_store)
@@ -259,7 +262,13 @@ async fn test_orchestrator_happy_path() {
     );
 
     let result = orchestrator
-        .handle_message("test-user", "Fix the bug in main.rs", None, None)
+        .handle_message(
+            "test-user",
+            "Fix the bug in main.rs",
+            None,
+            None,
+            "test-req",
+        )
         .await
         .unwrap();
 
@@ -285,9 +294,7 @@ async fn test_orchestrator_happy_path() {
 async fn test_orchestrator_evolution_loop() {
     let event_bus = EventBus::new(64);
     let tmp = tempfile::tempdir().unwrap();
-    let state_store = Arc::new(
-        StateStore::new(tmp.path().to_path_buf()).unwrap(),
-    );
+    let state_store = Arc::new(StateStore::new(tmp.path().to_path_buf()).unwrap());
 
     let ouroboros = Arc::new(MockOuroboros::with_failing_evaluation());
     let supervisor = Arc::new(MockSupervisor::new(event_bus.clone()));
@@ -302,7 +309,13 @@ async fn test_orchestrator_evolution_loop() {
     );
 
     let result = orchestrator
-        .handle_message("test-user", "Something that needs evolution", None, None)
+        .handle_message(
+            "test-user",
+            "Something that needs evolution",
+            None,
+            None,
+            "test-req",
+        )
         .await
         .unwrap();
 
@@ -335,7 +348,13 @@ async fn test_session_continuation() {
     let session_id = "test-session-123";
 
     let result1 = orchestrator
-        .handle_message("test-user", "Work on the project", Some(session_id), None)
+        .handle_message(
+            "test-user",
+            "Work on the project",
+            Some(session_id),
+            None,
+            "test-req",
+        )
         .await
         .unwrap();
 
@@ -343,7 +362,13 @@ async fn test_session_continuation() {
 
     // Second message with same session triggers multi-turn.
     let result2 = orchestrator
-        .handle_message("test-user", "Make it production ready", Some(session_id), None)
+        .handle_message(
+            "test-user",
+            "Make it production ready",
+            Some(session_id),
+            None,
+            "test-req",
+        )
         .await
         .unwrap();
 
@@ -365,12 +390,12 @@ async fn test_multiple_sessions_independent() {
     );
 
     let result_a = orchestrator
-        .handle_message("user-a", "Task A", Some("session-a"), None)
+        .handle_message("user-a", "Task A", Some("session-a"), None, "test-req")
         .await
         .unwrap();
 
     let result_b = orchestrator
-        .handle_message("user-b", "Task B", Some("session-b"), None)
+        .handle_message("user-b", "Task B", Some("session-b"), None, "test-req")
         .await
         .unwrap();
 
@@ -396,13 +421,19 @@ async fn test_session_cleaned_after_completion() {
     let session_id = "cleanup-test-session";
 
     orchestrator
-        .handle_message("test-user", "Simple task", Some(session_id), None)
+        .handle_message(
+            "test-user",
+            "Simple task",
+            Some(session_id),
+            None,
+            "test-req",
+        )
         .await
         .unwrap();
 
     // New message without session ID should get a fresh session.
     let result2 = orchestrator
-        .handle_message("test-user", "Another task", None, None)
+        .handle_message("test-user", "Another task", None, None, "test-req")
         .await
         .unwrap();
 
@@ -431,7 +462,7 @@ async fn test_phase_events_published() {
 
     let handle = tokio::spawn(async move {
         orchestrator
-            .handle_message("test-user", "Test events", None, None)
+            .handle_message("test-user", "Test events", None, None, "test-req")
             .await
             .unwrap()
     });
@@ -461,13 +492,11 @@ async fn test_phase_events_published() {
     // Pipeline: Interview → Seed → Execute → Evaluate = 4 phases.
     assert!(
         phase_started >= 4,
-        "Expected ≥4 PhaseStarted events, got {}",
-        phase_started
+        "Expected ≥4 PhaseStarted events, got {phase_started}"
     );
     assert!(
         phase_completed >= 4,
-        "Expected ≥4 PhaseCompleted events, got {}",
-        phase_completed
+        "Expected ≥4 PhaseCompleted events, got {phase_completed}"
     );
 
     let _ = handle.await.unwrap();

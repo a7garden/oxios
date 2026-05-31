@@ -1,10 +1,10 @@
 use std::sync::Arc;
 
-use axum::extract::{Path, Query};
 use axum::extract::{
     ws::{Message, WebSocket},
     State, WebSocketUpgrade,
 };
+use axum::extract::{Path, Query};
 use axum::response::IntoResponse;
 use axum::Json;
 use futures_util::{SinkExt, StreamExt as FuturesStreamExt};
@@ -130,8 +130,7 @@ pub(crate) async fn handle_chat(
 
             // Persist session
             {
-                let session_id_for_save =
-                    session_id.clone().unwrap_or_else(|| msg_id.clone());
+                let session_id_for_save = session_id.clone().unwrap_or_else(|| msg_id.clone());
                 let sid = oxios_kernel::state_store::SessionId(session_id_for_save.clone());
                 match state.kernel.state.load_session(&sid).await {
                     Ok(Some(mut session)) => {
@@ -305,23 +304,25 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
     let recv_task = tokio::spawn(async move {
         while let Ok(msg) = outgoing_rx.recv().await {
             let msg_id = msg.id;
-            let session_id = msg.meta.as_ref()
+            let session_id = msg
+                .meta
+                .as_ref()
                 .and_then(|m| m.session_id.clone())
                 .or_else(|| msg.metadata.get("session_id").cloned());
-            let project_id = msg.meta.as_ref()
+            let project_id = msg
+                .meta
+                .as_ref()
                 .and_then(|m| m.project_id.clone())
                 .or_else(|| msg.metadata.get("project_id").cloned());
-            let phase = msg.meta.as_ref()
+            let phase = msg
+                .meta
+                .as_ref()
                 .map(|m| m.phase.clone())
                 .or_else(|| msg.metadata.get("phase").cloned());
-            let evaluation_passed = msg.meta.as_ref()
-                .map(|m| m.evaluation_passed);
-            let project_tag = msg.meta.as_ref()
-                .and_then(|m| m.project_tag.clone());
-            let seed_id = msg.meta.as_ref()
-                .and_then(|m| m.seed_id.clone());
-            let duration_ms = msg.meta.as_ref()
-                .and_then(|m| m.duration_ms);
+            let evaluation_passed = msg.meta.as_ref().map(|m| m.evaluation_passed);
+            let project_tag = msg.meta.as_ref().and_then(|m| m.project_tag.clone());
+            let seed_id = msg.meta.as_ref().and_then(|m| m.seed_id.clone());
+            let duration_ms = msg.meta.as_ref().and_then(|m| m.duration_ms);
 
             // ── Persist session to disk FIRST ──
             // Always persist, even if WS send fails later. This ensures
@@ -443,10 +444,13 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
                     // Save user message + its ID for correlated session persistence.
                     {
                         let mut pending = pending_for_send.lock().await;
-                        *pending = Some((incoming.id, PendingMessage {
-                            content,
-                            user_id: "default".to_string(),
-                        }));
+                        *pending = Some((
+                            incoming.id,
+                            PendingMessage {
+                                content,
+                                user_id: "default".to_string(),
+                            },
+                        ));
                     }
 
                     if incoming_tx.send(incoming).await.is_err() {
@@ -503,10 +507,7 @@ async fn persist_session(
             });
             // Attach project_id to session metadata if provided
             if let Some(vid) = project_id {
-                session.set_metadata(
-                    "project_id",
-                    serde_json::json!(vid),
-                );
+                session.set_metadata("project_id", serde_json::json!(vid));
             }
             if let Err(e) = state_store.save_session(&session).await {
                 tracing::warn!(error = %e, "WS: failed to persist session");
@@ -528,10 +529,7 @@ async fn persist_session(
             });
             // Attach project_id to session metadata
             if let Some(vid) = project_id {
-                session.set_metadata(
-                    "project_id",
-                    serde_json::json!(vid),
-                );
+                session.set_metadata("project_id", serde_json::json!(vid));
             }
             if let Err(e) = state_store.save_session(&session).await {
                 tracing::warn!(error = %e, "WS: failed to create session");

@@ -91,7 +91,7 @@ impl MetricsRegistry {
                         "{{{}}}",
                         c.labels
                             .iter()
-                            .map(|(k, v)| format!("{}=\"{}\"", k, v))
+                            .map(|(k, v)| format!("{k}=\"{v}\""))
                             .collect::<Vec<_>>()
                             .join(",")
                     )
@@ -267,6 +267,13 @@ pub struct MetricsHandles {
     pub messages: CounterHandle,
     /// LLM circuit breaker state: 0=closed, 1=open, 2=half_open.
     pub llm_circuit_breaker_state: GaugeHandle,
+    /// Tool execution metrics.
+    pub tool_calls: CounterHandle,
+    pub tool_errors: CounterHandle,
+    pub tool_duration: HistogramHandle,
+    /// LLM call metrics.
+    pub llm_calls: CounterHandle,
+    pub llm_errors: CounterHandle,
 }
 
 impl MetricsHandles {
@@ -322,6 +329,15 @@ pub fn get_metrics() -> &'static MetricsHandles {
                 "LLM circuit breaker state: 0=closed, 1=open, 2=half_open",
                 0.0,
             ),
+            tool_calls: r.counter("oxios_tool_calls_total", "Tool calls", &[]),
+            tool_errors: r.counter("oxios_tool_errors_total", "Tool errors", &[]),
+            tool_duration: r.histogram(
+                "oxios_tool_duration_seconds",
+                "Tool call duration",
+                vec![0.01, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0],
+            ),
+            llm_calls: r.counter("oxios_llm_calls_total", "LLM API calls", &[]),
+            llm_errors: r.counter("oxios_llm_errors_total", "LLM API errors", &[]),
         }
     })
 }

@@ -86,11 +86,8 @@ where
 /// Get cache statistics.
 pub fn stats(db: &MemoryDatabase) -> Result<CacheStats> {
     let conn = db.conn();
-    let entries: i64 = conn.query_row(
-        "SELECT COUNT(*) FROM embedding_cache",
-        [],
-        |row| row.get(0),
-    )?;
+    let entries: i64 =
+        conn.query_row("SELECT COUNT(*) FROM embedding_cache", [], |row| row.get(0))?;
     Ok(CacheStats {
         entries: entries as usize,
         ..Default::default()
@@ -197,6 +194,10 @@ mod tests {
         .unwrap();
 
         assert_eq!(result2, result);
-        assert_eq!(call_count.load(std::sync::atomic::Ordering::SeqCst), 1, "Should have hit cache");
+        assert_eq!(
+            call_count.load(std::sync::atomic::Ordering::SeqCst),
+            1,
+            "Should have hit cache"
+        );
     }
 }

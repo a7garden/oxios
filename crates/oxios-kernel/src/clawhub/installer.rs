@@ -92,12 +92,8 @@ impl ClawHubInstaller {
         let archive = self.client.download_skill(slug, Some(&version)).await?;
         let target_dir = self.skills_dir.join(slug);
 
-
         if target_dir.exists() {
-            anyhow::bail!(
-                "skill already installed: {} (use update to reinstall)",
-                slug
-            );
+            anyhow::bail!("skill already installed: {slug} (use update to reinstall)");
         }
 
         // Extract
@@ -283,8 +279,7 @@ impl ClawHubInstaller {
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent).context("create .clawhub dir")?;
         }
-        let json =
-            serde_json::to_string_pretty(lock).context("serialize lockfile to JSON")?;
+        let json = serde_json::to_string_pretty(lock).context("serialize lockfile to JSON")?;
         fs::write(&path, json).context("write lockfile")?;
         Ok(())
     }
@@ -302,7 +297,9 @@ impl ClawHubInstaller {
 
         // Find the root directory inside the zip that contains a SKILL.md marker.
         // Some archives zip the skill directory directly, others zip the contents.
-        let root_prefix = self.find_skill_root(&mut zip).context("parse zip archive")?;
+        let root_prefix = self
+            .find_skill_root(&mut zip)
+            .context("parse zip archive")?;
 
         // Extract all entries, stripping the root prefix so contents land in `target`.
         for i in 0..zip.len() {
@@ -340,18 +337,26 @@ impl ClawHubInstaller {
     }
 
     /// Find the directory prefix inside the zip that contains a SKILL.md marker.
-    fn find_skill_root<R: std::io::Read + std::io::Seek>(&self, zip: &mut zip::ZipArchive<R>) -> Result<String> {
+    fn find_skill_root<R: std::io::Read + std::io::Seek>(
+        &self,
+        zip: &mut zip::ZipArchive<R>,
+    ) -> Result<String> {
         // MARKER_FILES in order of preference
         const MARKERS: &[&str] = &["SKILL.md", "skill.md", "skills.md"];
 
         for i in 0..zip.len() {
             let name = zip.by_index(i).unwrap().name().to_string();
             let name_lower = name.to_lowercase();
-            if MARKERS.iter().any(|m| name_lower.ends_with(&format!("/{}", m.to_lowercase()))
-                || name_lower == m.to_lowercase())
-            {
+            if MARKERS.iter().any(|m| {
+                name_lower.ends_with(&format!("/{}", m.to_lowercase()))
+                    || name_lower == m.to_lowercase()
+            }) {
                 // Return everything up to and including the directory component
-                if let Some(slash) = name.strip_prefix('/').and_then(|s| s.rfind('/')).map(|p| p + 1) {
+                if let Some(slash) = name
+                    .strip_prefix('/')
+                    .and_then(|s| s.rfind('/'))
+                    .map(|p| p + 1)
+                {
                     return Ok(name[..slash].to_string());
                 }
                 // File is at root level
@@ -383,13 +388,16 @@ impl ClawHubInstaller {
 
     /// Read the installed version for a slug from its origin file.
     fn get_installed_version(&self, slug: &str) -> Result<String> {
-        let origin_path = self.skills_dir.join(slug).join(".clawhub").join("origin.json");
+        let origin_path = self
+            .skills_dir
+            .join(slug)
+            .join(".clawhub")
+            .join("origin.json");
         let mut file = fs::File::open(&origin_path).context("open origin.json")?;
         let mut buf = String::new();
         file.read_to_string(&mut buf)
             .context("read origin.json content")?;
-        let origin: ClawHubOrigin =
-            serde_json::from_str(&buf).context("parse origin.json")?;
+        let origin: ClawHubOrigin = serde_json::from_str(&buf).context("parse origin.json")?;
         Ok(origin.installed_version)
     }
 

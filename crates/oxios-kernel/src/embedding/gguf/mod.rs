@@ -15,18 +15,15 @@
 
 pub mod loader;
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use anyhow::{Context, Result};
 use llama_gguf::{
     backend::cpu::CpuBackend,
-    model::{
-        load_llama_model, EmbeddingConfig, EmbeddingExtractor, InferenceContext, LlamaModel,
-        PoolingStrategy,
-    },
     gguf::GgufFile,
+    model::{load_llama_model, EmbeddingConfig, EmbeddingExtractor, LlamaModel, PoolingStrategy},
     tokenizer::Tokenizer,
     HfClient,
 };
@@ -35,6 +32,7 @@ use parking_lot::Mutex;
 use crate::embedding::{EmbeddingProvider, EmbeddingVector};
 
 pub use self::loader::GgufModelLoader;
+pub use self::loader::{MODEL_DISPLAY_NAME, MODEL_SIZE_MB};
 
 /// Matryoshka dimension truncation.
 #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
@@ -140,8 +138,8 @@ impl GgufEmbeddingProvider {
             .with_context(|| format!("Failed to open GGUF file: {}", gguf_path.display()))?;
         let model = load_llama_model(&gguf_path)
             .with_context(|| format!("Failed to load model from: {}", gguf_path.display()))?;
-        let tokenizer = Tokenizer::from_gguf(&gguf)
-            .context("Failed to load tokenizer from GGUF")?;
+        let tokenizer =
+            Tokenizer::from_gguf(&gguf).context("Failed to load tokenizer from GGUF")?;
 
         // Build embedding extractor (mean pooling + L2 normalize)
         let embed_config = EmbeddingConfig {
@@ -266,9 +264,8 @@ mod tests {
 
     #[test]
     fn test_provider_creation() {
-        let provider = GgufEmbeddingProvider::with_defaults(
-            PathBuf::from("/tmp/test-models/embedding"),
-        );
+        let provider =
+            GgufEmbeddingProvider::with_defaults(PathBuf::from("/tmp/test-models/embedding"));
         assert_eq!(provider.dimension(), 256);
         assert_eq!(provider.name(), "gguf-embeddinggemma-300m");
     }

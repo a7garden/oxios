@@ -438,7 +438,9 @@ pub(crate) async fn handle_mcp_server_delete(
         (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
     })?;
     tracing::info!(server = %name, "MCP server removed");
-    Ok(Json(serde_json::json!({ "status": "removed", "name": name })))
+    Ok(Json(
+        serde_json::json!({ "status": "removed", "name": name }),
+    ))
 }
 
 /// POST /api/mcp/servers/{name}/toggle — Toggle MCP server enabled/disabled.
@@ -451,7 +453,9 @@ pub(crate) async fn handle_mcp_server_toggle(
         (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
     })?;
     tracing::info!(server = %name, enabled = enabled, "MCP server toggled");
-    Ok(Json(serde_json::json!({ "status": "toggled", "name": name, "enabled": enabled })))
+    Ok(Json(
+        serde_json::json!({ "status": "toggled", "name": name, "enabled": enabled }),
+    ))
 }
 
 /// POST /api/mcp/servers/{name}/refresh — Refresh tools for an MCP server.
@@ -464,7 +468,9 @@ pub(crate) async fn handle_mcp_server_refresh(
         (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
     })?;
     tracing::info!(server = %name, "MCP server tools refreshed");
-    Ok(Json(serde_json::json!({ "status": "refreshed", "name": name })))
+    Ok(Json(
+        serde_json::json!({ "status": "refreshed", "name": name }),
+    ))
 }
 
 // ---------------------------------------------------------------------------
@@ -492,7 +498,7 @@ pub(crate) async fn handle_security_permissions(
         // Serialize the policy to get its allowed actions
         let val = serde_json::to_value(&policy).unwrap_or_default();
         policies.push(serde_json::json!({
-            "name": format!("{}-default", format!("{:?}", role).to_lowercase()),
+            "name": format!("{}-default", format!("{role:?}").to_lowercase()),
             "effect": "allow",
             "resources": val.get("allowed_actions").and_then(|v| v.as_array())
                 .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect::<Vec<_>>())

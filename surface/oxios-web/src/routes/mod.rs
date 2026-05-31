@@ -52,7 +52,9 @@ pub(crate) use budget_routes::{
     handle_budget_get, handle_budget_list, handle_budget_remove, handle_budget_reserve,
     handle_budget_reset, handle_budget_set,
 };
-pub(crate) use chat::{handle_chat, handle_chat_stream, handle_chat_ticket, handle_session_tool_calls};
+pub(crate) use chat::{
+    handle_chat, handle_chat_stream, handle_chat_ticket, handle_session_tool_calls,
+};
 pub(crate) use cron_jobs::{
     handle_cron_job_create, handle_cron_job_delete, handle_cron_job_get, handle_cron_job_trigger,
     handle_cron_jobs_list, update_cron_job,
@@ -71,10 +73,10 @@ pub(crate) use git_routes::{
     handle_git_log, handle_git_restore, handle_git_tags, handle_git_verify,
 };
 pub(crate) use infra::{
-    handle_audit_log, handle_metrics, handle_permissions_get, handle_permissions_put,
-    handle_mcp_server_delete, handle_mcp_server_refresh, handle_mcp_server_register,
-    handle_mcp_server_toggle, handle_mcp_servers_list, handle_mcp_tool_call,
-    handle_mcp_tools_list, handle_scheduler_stats, handle_scheduler_tasks,
+    handle_audit_log, handle_mcp_server_delete, handle_mcp_server_refresh,
+    handle_mcp_server_register, handle_mcp_server_toggle, handle_mcp_servers_list,
+    handle_mcp_tool_call, handle_mcp_tools_list, handle_metrics, handle_permissions_get,
+    handle_permissions_put, handle_scheduler_stats, handle_scheduler_tasks,
     handle_security_permissions,
 };
 pub(crate) use knowledge_routes::{
@@ -85,20 +87,19 @@ pub(crate) use knowledge_routes::{
     handle_knowledge_convert_html, handle_knowledge_copilot, handle_knowledge_emoji,
     handle_knowledge_file_delete, handle_knowledge_file_get, handle_knowledge_file_history,
     handle_knowledge_file_put, handle_knowledge_file_restore, handle_knowledge_graph,
-    handle_knowledge_habits, handle_knowledge_habits_last_week,
-    handle_knowledge_journal_add, handle_knowledge_journal_emoji,
-    handle_knowledge_journal_today, handle_knowledge_search,
-    handle_knowledge_stats_done_today, handle_knowledge_stats_today,
-    handle_knowledge_tree, handle_knowledge_worker_nightly, handle_knowledge_worker_scheduled,
+    handle_knowledge_habits, handle_knowledge_habits_last_week, handle_knowledge_journal_add,
+    handle_knowledge_journal_emoji, handle_knowledge_journal_today, handle_knowledge_search,
+    handle_knowledge_stats_done_today, handle_knowledge_stats_today, handle_knowledge_tree,
+    handle_knowledge_worker_nightly, handle_knowledge_worker_scheduled,
 };
 pub(crate) use marketplace::{
     handle_marketplace_install, handle_marketplace_search, handle_marketplace_skill_detail,
     handle_marketplace_updates,
 };
 pub(crate) use project_routes::{
-    handle_project_create, handle_project_delete, handle_project_get,
-    handle_project_link_memory, handle_project_memories, handle_projects_list,
-    handle_project_unlink_memory, handle_project_update,
+    handle_project_create, handle_project_delete, handle_project_get, handle_project_link_memory,
+    handle_project_memories, handle_project_unlink_memory, handle_project_update,
+    handle_projects_list,
 };
 pub(crate) use resource_routes::{
     handle_resource_history, handle_resource_overload, handle_resource_snapshot,
@@ -111,9 +112,9 @@ pub(crate) use workspace::{
     handle_memory_create, handle_memory_get, handle_memory_list, handle_memory_search,
     handle_memory_semantic_search, handle_seed_evolution, handle_seed_get, handle_seeds_list,
     handle_skill_content, handle_skill_create, handle_skill_delete, handle_skill_disable,
-    handle_skill_enable, handle_skill_get, handle_skills_list,
-    handle_workspace_file_create, handle_workspace_file_delete, handle_workspace_file_get,
-    handle_workspace_file_put, handle_workspace_tree,
+    handle_skill_enable, handle_skill_get, handle_skills_list, handle_workspace_file_create,
+    handle_workspace_file_delete, handle_workspace_file_get, handle_workspace_file_put,
+    handle_workspace_tree,
 };
 
 // ---------------------------------------------------------------------------
@@ -168,7 +169,10 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         // Marketplace (ClawHub) — read-only routes, public
         .route("/api/marketplace/search", get(handle_marketplace_search))
         .route("/api/marketplace/updates", get(handle_marketplace_updates))
-        .route("/api/marketplace/skills/{slug}", get(handle_marketplace_skill_detail));
+        .route(
+            "/api/marketplace/skills/{slug}",
+            get(handle_marketplace_skill_detail),
+        );
 
     // Protected API routes (auth middleware applied)
     let api = Router::new()
@@ -189,11 +193,20 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         .route("/api/engine/config", get(handle_engine_config))
         .route("/api/engine/model", put(handle_engine_set_model))
         .route("/api/engine/api-key", put(handle_engine_set_api_key))
-        .route("/api/engine/provider-options", put(handle_engine_set_provider_options))
+        .route(
+            "/api/engine/provider-options",
+            put(handle_engine_set_provider_options),
+        )
         .route("/api/engine/validate-key", post(handle_engine_validate_key))
         .route("/api/engine/routing", put(handle_engine_set_routing))
-        .route("/api/engine/routing/stats", get(handle_engine_routing_stats))
-        .route("/api/engine/routing/fallbacks", get(handle_engine_routing_fallbacks))
+        .route(
+            "/api/engine/routing/stats",
+            get(handle_engine_routing_stats),
+        )
+        .route(
+            "/api/engine/routing/fallbacks",
+            get(handle_engine_routing_fallbacks),
+        )
         // Workspace
         .route("/api/workspace/tree", get(handle_workspace_tree))
         .route(
@@ -248,11 +261,23 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         .route("/api/permissions/{agent}", get(handle_permissions_get))
         .route("/api/permissions/{agent}", put(handle_permissions_put))
         // MCP
-        .route("/api/mcp/servers", get(handle_mcp_servers_list).post(handle_mcp_server_register))
+        .route(
+            "/api/mcp/servers",
+            get(handle_mcp_servers_list).post(handle_mcp_server_register),
+        )
         .route("/api/mcp/servers/{name}", delete(handle_mcp_server_delete))
-        .route("/api/mcp/servers/{name}/toggle", post(handle_mcp_server_toggle))
-        .route("/api/mcp/servers/{name}/refresh", post(handle_mcp_server_refresh))
-        .route("/api/mcp/tools", get(handle_mcp_tools_list).post(handle_mcp_tool_call))
+        .route(
+            "/api/mcp/servers/{name}/toggle",
+            post(handle_mcp_server_toggle),
+        )
+        .route(
+            "/api/mcp/servers/{name}/refresh",
+            post(handle_mcp_server_refresh),
+        )
+        .route(
+            "/api/mcp/tools",
+            get(handle_mcp_tools_list).post(handle_mcp_tool_call),
+        )
         // Prometheus metrics
         .route("/api/metrics", get(handle_metrics))
         // Resources
@@ -262,7 +287,10 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         // Agent Groups
         .route("/api/agent-groups", get(handle_agent_groups_list))
         .route("/api/agent-groups/{id}", get(handle_agent_group_get))
-        .route("/api/agent-groups/{id}/progress", get(handle_agent_group_progress))
+        .route(
+            "/api/agent-groups/{id}/progress",
+            get(handle_agent_group_progress),
+        )
         // A2A Monitor
         .route("/api/a2a/agents", get(handle_a2a_agents))
         .route("/api/a2a/agents/{id}", get(handle_a2a_agent_detail))
@@ -298,7 +326,10 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         .route("/api/sessions/prune", post(handle_sessions_prune))
         .route("/api/sessions/{id}", get(handle_session_get))
         .route("/api/sessions/{id}", delete(handle_session_delete))
-        .route("/api/sessions/{id}/tool-calls", get(handle_session_tool_calls))
+        .route(
+            "/api/sessions/{id}/tool-calls",
+            get(handle_session_tool_calls),
+        )
         // Cron Jobs
         .route("/api/cron-jobs", get(handle_cron_jobs_list))
         .route("/api/cron-jobs", post(handle_cron_job_create))
@@ -322,8 +353,14 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         .route("/api/projects/{id}", put(handle_project_update))
         .route("/api/projects/{id}", delete(handle_project_delete))
         .route("/api/projects/{id}/memories", get(handle_project_memories))
-        .route("/api/projects/{id}/memories", post(handle_project_link_memory))
-        .route("/api/projects/{id}/memories/{memoryId}", delete(handle_project_unlink_memory))
+        .route(
+            "/api/projects/{id}/memories",
+            post(handle_project_link_memory),
+        )
+        .route(
+            "/api/projects/{id}/memories/{memoryId}",
+            delete(handle_project_unlink_memory),
+        )
         // Budget
         .route("/api/budget", get(handle_budget_list))
         .route("/api/budget/{agent_id}", get(handle_budget_get))

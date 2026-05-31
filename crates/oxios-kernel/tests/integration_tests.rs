@@ -18,12 +18,12 @@ use oxios_gateway::message::{IncomingMessage, OutgoingMessage};
 use oxios_kernel::a2a::A2AProtocol;
 use oxios_kernel::access_manager::{AccessManager, AgentPermissions};
 use oxios_kernel::agent_lifecycle::AgentLifecycleManager;
+use oxios_kernel::config::OrchestratorConfig;
 use oxios_kernel::event_bus::{EventBus, KernelEvent};
 use oxios_kernel::orchestrator::Orchestrator;
 use oxios_kernel::scheduler::AgentScheduler;
 use oxios_kernel::state_store::StateStore;
 use oxios_kernel::supervisor::Supervisor;
-use oxios_kernel::config::OrchestratorConfig;
 use oxios_ouroboros::evaluation::EvaluationResult;
 use oxios_ouroboros::interview::InterviewResult;
 use oxios_ouroboros::protocol::{ExecutionResult, OuroborosProtocol, Phase};
@@ -284,7 +284,7 @@ async fn test_event_bus_publish_subscribe() {
     let event = rx.recv().await.unwrap();
     match event {
         KernelEvent::SeedCreated { .. } => {}
-        other => panic!("Expected SeedCreated, got {:?}", other),
+        other => panic!("Expected SeedCreated, got {other:?}"),
     }
 }
 
@@ -449,7 +449,7 @@ async fn test_orchestrator_happy_path() {
     );
 
     let result = orchestrator
-        .handle_message("test-user", "Do something useful", None, None)
+        .handle_message("test-user", "Do something useful", None, None, "test-req")
         .await
         .unwrap();
 
@@ -501,7 +501,7 @@ async fn test_orchestrator_evolution_loop() {
     );
 
     let result = orchestrator
-        .handle_message("test-user", "Do something tricky", None, None)
+        .handle_message("test-user", "Do something tricky", None, None, "test-req")
         .await
         .unwrap();
 
@@ -537,12 +537,18 @@ async fn test_orchestrator_events_published() {
         event_bus.clone(),
         300,
     );
-    let orchestrator = Orchestrator::with_config(ouroboros, event_bus.clone(), state_store, lifecycle, make_evolution_config(0));
+    let orchestrator = Orchestrator::with_config(
+        ouroboros,
+        event_bus.clone(),
+        state_store,
+        lifecycle,
+        make_evolution_config(0),
+    );
 
     // Run orchestration in background.
     let handle = tokio::spawn(async move {
         orchestrator
-            .handle_message("test-user", "Check events", None, None)
+            .handle_message("test-user", "Check events", None, None, "test-req")
             .await
             .unwrap()
     });
@@ -609,7 +615,13 @@ async fn test_gateway_routes_message_through_orchestrator() {
             event_bus.clone(),
             300,
         );
-        Orchestrator::with_config(ouroboros, event_bus.clone(), state_store, lifecycle, make_evolution_config(0))
+        Orchestrator::with_config(
+            ouroboros,
+            event_bus.clone(),
+            state_store,
+            lifecycle,
+            make_evolution_config(0),
+        )
     });
 
     let gateway = Gateway::new(orchestrator);
@@ -649,7 +661,13 @@ async fn test_gateway_unknown_channel() {
             event_bus.clone(),
             300,
         );
-        Orchestrator::with_config(ouroboros, event_bus.clone(), state_store, lifecycle, make_evolution_config(0))
+        Orchestrator::with_config(
+            ouroboros,
+            event_bus.clone(),
+            state_store,
+            lifecycle,
+            make_evolution_config(0),
+        )
     });
 
     let gateway = Gateway::new(orchestrator);
@@ -719,8 +737,7 @@ impl Supervisor for SchedulerAwareSupervisor {
 
     async fn run_with_seed(&self, id: AgentId, _seed: &Seed) -> anyhow::Result<ExecutionResult> {
         // Submit to the scheduler before running.
-        let task =
-            ScheduledTask::for_agent(id, format!("Agent {} execution", id), Priority::Normal);
+        let task = ScheduledTask::for_agent(id, format!("Agent {id} execution"), Priority::Normal);
         self.scheduler.submit(task)?;
 
         self.tasks_claimed.fetch_add(1, Ordering::SeqCst);
@@ -744,7 +761,7 @@ impl Supervisor for SchedulerAwareSupervisor {
         let agents = self.agents.read();
         match agents.get(&id) {
             Some(a) => Ok(a.status),
-            None => anyhow::bail!("Agent {} not found", id),
+            None => anyhow::bail!("Agent {id} not found"),
         }
     }
 
@@ -785,11 +802,17 @@ async fn test_scheduler_orchestrator_integration() {
         event_bus.clone(),
         300,
     );
-    let orchestrator = Orchestrator::with_config(ouroboros, event_bus.clone(), state_store, lifecycle, make_evolution_config(0));
+    let orchestrator = Orchestrator::with_config(
+        ouroboros,
+        event_bus.clone(),
+        state_store,
+        lifecycle,
+        make_evolution_config(0),
+    );
 
     // Run a single orchestration.
     let result = orchestrator
-        .handle_message("test-user", "Build a simple thing", None, None)
+        .handle_message("test-user", "Build a simple thing", None, None, "test-req")
         .await
         .unwrap();
 
@@ -872,7 +895,13 @@ async fn test_scheduler_priority_ordering_in_orchestration() {
         event_bus.clone(),
         300,
     );
-    let _orchestrator = Orchestrator::with_config(ouroboros, event_bus, state_store, lifecycle, make_evolution_config(0));
+    let _orchestrator = Orchestrator::with_config(
+        ouroboros,
+        event_bus,
+        state_store,
+        lifecycle,
+        make_evolution_config(0),
+    );
     // Orchestrator is created successfully — shared state is fine.
 }
 

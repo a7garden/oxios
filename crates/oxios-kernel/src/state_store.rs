@@ -208,8 +208,8 @@ impl StateStore {
     ///
     /// # Example
     ///
-    /// ```ignore
-    /// use oxios_kernel::StateStore;
+    /// ```no_run
+    /// use oxios_kernel::state_store::StateStore;
     /// use std::path::PathBuf;
     ///
     /// let store = StateStore::new(PathBuf::from("/tmp/oxios-state")).unwrap();
@@ -221,14 +221,14 @@ impl StateStore {
     /// Validate that a category name does not contain path traversal.
     fn validate_category(category: &str) -> Result<()> {
         if category.contains("..") || category.contains('\\') {
-            bail!("invalid category name: '{}'", category);
+            bail!("invalid category name: '{category}'");
         }
         if category.is_empty()
             || category.starts_with('/')
             || category.ends_with('/')
             || category.contains("//")
         {
-            bail!("invalid category name: '{}'", category);
+            bail!("invalid category name: '{category}'");
         }
         Ok(())
     }
@@ -236,7 +236,7 @@ impl StateStore {
     /// Validate that a file name does not contain path traversal.
     fn validate_name(name: &str) -> Result<()> {
         if name.contains("..") || name.contains('/') || name.contains('\\') {
-            bail!("invalid file name: '{}'", name);
+            bail!("invalid file name: '{name}'");
         }
         Ok(())
     }
@@ -250,7 +250,11 @@ impl StateStore {
         let path = dir.join(format!("{name}.md"));
 
         // Write to temp file first, then atomic rename
-        let temp_path = dir.join(format!("{name}.{}.{}.tmp", std::process::id(), uuid::Uuid::new_v4()));
+        let temp_path = dir.join(format!(
+            "{name}.{}.{}.tmp",
+            std::process::id(),
+            uuid::Uuid::new_v4()
+        ));
         fs::write(&temp_path, content).await?;
         tokio::fs::rename(&temp_path, &path).await?;
 
@@ -308,7 +312,11 @@ impl StateStore {
         let content = serde_json::to_string_pretty(data)?;
 
         // Write to temp file first, then atomic rename
-        let temp_path = dir.join(format!("{name}.{}.{}.tmp", std::process::id(), uuid::Uuid::new_v4()));
+        let temp_path = dir.join(format!(
+            "{name}.{}.{}.tmp",
+            std::process::id(),
+            uuid::Uuid::new_v4()
+        ));
         fs::write(&temp_path, &content).await?;
         tokio::fs::rename(&temp_path, &path).await?;
 
@@ -400,7 +408,11 @@ impl StateStore {
                         user_id: session.user_id.clone(),
                         message_count: session.user_messages.len(),
                         active_seed_id: session.active_seed_id.clone(),
-                        project_id: session.metadata.get("project_ids").and_then(|v| v.as_str()).map(String::from),
+                        project_id: session
+                            .metadata
+                            .get("project_ids")
+                            .and_then(|v| v.as_str())
+                            .map(String::from),
                         created_at: session.created_at,
                         updated_at: session.updated_at,
                     });

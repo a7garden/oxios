@@ -40,9 +40,13 @@ pub async fn activate_surfaces(
         .unwrap_or_else(|| {
             // Default: enable web if the feature is compiled in.
             #[cfg(feature = "web")]
-            { vec!["web".to_string()] }
+            {
+                vec!["web".to_string()]
+            }
             #[cfg(not(feature = "web"))]
-            { vec![] }
+            {
+                vec![]
+            }
         });
 
     let surface_map: std::collections::HashMap<&str, &dyn Surface> =

@@ -217,6 +217,7 @@ impl Gateway {
                 channel = %msg.channel,
                 user = %msg.user_id,
                 content_len = msg.content.len(),
+                request_id = %msg.id,
                 "Routing incoming message"
             );
 
@@ -225,8 +226,15 @@ impl Gateway {
 
             let session_id = msg.metadata.get(meta::SESSION_ID).cloned();
             let project_ids = msg.metadata.get(meta::PROJECT_IDS).cloned();
+            let request_id = msg.id.to_string();
             let result = orchestrator
-                .handle_message(&msg.user_id, &msg.content, session_id.as_deref(), project_ids.as_deref())
+                .handle_message(
+                    &msg.user_id,
+                    &msg.content,
+                    session_id.as_deref(),
+                    project_ids.as_deref(),
+                    &request_id,
+                )
                 .await;
 
             let duration_ms = start.elapsed().as_millis() as u64;
@@ -281,12 +289,8 @@ impl Gateway {
                     let user_err = classify_error(&e);
 
                     // Preserve session_id in error response for conversation continuity
-                    let mut outgoing = OutgoingMessage::error(
-                        msg.id,
-                        &msg.channel,
-                        &msg.user_id,
-                        user_err,
-                    );
+                    let mut outgoing =
+                        OutgoingMessage::error(msg.id, &msg.channel, &msg.user_id, user_err);
                     if let Some(sid) = msg.metadata.get(meta::SESSION_ID).cloned() {
                         outgoing.metadata.insert(meta::SESSION_ID.to_string(), sid);
                     }

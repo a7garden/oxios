@@ -145,10 +145,7 @@ impl AgentTool for PersonaTool {
                         }))
                         .unwrap_or_default(),
                     )),
-                    None => Ok(AgentToolResult::error(format!(
-                        "Persona '{}' not found",
-                        id
-                    ))),
+                    None => Ok(AgentToolResult::error(format!("Persona '{id}' not found"))),
                 }
             }
 
@@ -160,19 +157,16 @@ impl AgentTool for PersonaTool {
 
                 match api.set_active(id) {
                     Ok(()) => Ok(AgentToolResult::success(format!(
-                        "Active persona set to '{}'.",
-                        id
+                        "Active persona set to '{id}'."
                     ))),
                     Err(e) => Ok(AgentToolResult::error(format!(
-                        "Failed to set active persona: {}",
-                        e
+                        "Failed to set active persona: {e}"
                     ))),
                 }
             }
 
             other => Err(format!(
-                "Unknown persona action '{}'. Valid: list, get, set_active",
-                other
+                "Unknown persona action '{other}'. Valid: list, get, set_active"
             )),
         }
     }

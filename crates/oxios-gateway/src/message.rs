@@ -216,12 +216,7 @@ impl OutgoingMessage {
     /// The `UserFacingError` provides structured error information.
     /// Callers can set `session_id` etc. on the returned message's metadata
     /// to preserve conversation continuity.
-    pub fn error(
-        correlation_id: Uuid,
-        channel: &str,
-        user_id: &str,
-        err: UserFacingError,
-    ) -> Self {
+    pub fn error(correlation_id: Uuid, channel: &str, user_id: &str, err: UserFacingError) -> Self {
         Self {
             id: correlation_id,
             channel: channel.to_string(),

@@ -23,8 +23,8 @@ use std::fmt;
 
 use serde::{Deserialize, Serialize};
 
-use uuid::Uuid;
 use crate::types::AgentId;
+use uuid::Uuid;
 
 /// Unique identifier for a capability.
 ///
@@ -69,7 +69,7 @@ impl fmt::Display for Issuer {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Issuer::Kernel => write!(f, "kernel"),
-            Issuer::Agent(id) => write!(f, "agent:{}", id),
+            Issuer::Agent(id) => write!(f, "agent:{id}"),
         }
     }
 }
@@ -211,14 +211,14 @@ pub enum ResourceRef {
 impl fmt::Display for ResourceRef {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ResourceRef::KernelDomain { domain } => write!(f, "kernel:{}", domain),
-            ResourceRef::Skill { name } => write!(f, "skill:{}", name),
-            ResourceRef::Space { id } => write!(f, "space:{}", id),
-            ResourceRef::Agent { id } => write!(f, "agent:{}", id),
-            ResourceRef::Exec { mode } => write!(f, "exec:{}", mode),
+            ResourceRef::KernelDomain { domain } => write!(f, "kernel:{domain}"),
+            ResourceRef::Skill { name } => write!(f, "skill:{name}"),
+            ResourceRef::Space { id } => write!(f, "space:{id}"),
+            ResourceRef::Agent { id } => write!(f, "agent:{id}"),
+            ResourceRef::Exec { mode } => write!(f, "exec:{mode}"),
             ResourceRef::Browser => write!(f, "browser"),
             ResourceRef::A2a => write!(f, "a2a"),
-            ResourceRef::Mcp { server } => write!(f, "mcp:{}", server),
+            ResourceRef::Mcp { server } => write!(f, "mcp:{server}"),
         }
     }
 }

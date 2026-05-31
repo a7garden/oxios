@@ -11,16 +11,16 @@ pub mod knowledge_lens;
 pub mod marketplace_api;
 pub mod mcp_api;
 pub mod persona_api;
-pub mod security_api;
 pub mod project_api;
+pub mod security_api;
 pub mod state_api;
 
 pub use a2a_api::A2aApi;
 pub use agent_api::AgentApi;
 pub use browser_api::BrowserApi;
 pub use engine_api::{
-    EngineApi, EngineConfigResponse, FallbackEvent, ModelInfo, ProviderInfo,
-    RoutingConfigSnapshot, RoutingStats, RoutingStatsSnapshot, RoutingUpdate, ValidateKeyResult,
+    EngineApi, EngineConfigResponse, FallbackEvent, ModelInfo, ProviderInfo, RoutingConfigSnapshot,
+    RoutingStats, RoutingStatsSnapshot, RoutingUpdate, ValidateKeyResult,
 };
 pub use exec_api::ExecApi;
 pub use extension_api::ExtensionApi;
@@ -31,8 +31,8 @@ pub use knowledge_lens::{
 pub use marketplace_api::MarketplaceApi;
 pub use mcp_api::McpApi;
 pub use persona_api::PersonaApi;
-pub use security_api::SecurityApi;
 pub use project_api::{ProjectApi, ProjectInfo};
+pub use security_api::SecurityApi;
 pub use state_api::StateApi;
 
 use crate::a2a::A2AProtocol;
@@ -52,7 +52,6 @@ use crate::persona_manager::PersonaManager;
 use crate::resource_monitor::ResourceMonitor;
 use crate::scheduler::AgentScheduler;
 use crate::skill::SkillManager;
-use crate::project::ProjectManager;
 use crate::state_store::StateStore;
 use crate::supervisor::Supervisor;
 use serde::Serialize;
@@ -226,8 +225,10 @@ impl KernelHandle {
                     state_store.base_path.clone(),
                     config.marketplace.base_url.clone(),
                 )),
-                Arc::new(ClawHubClient::new(config.marketplace.base_url.clone())
-                    .expect("valid ClawHub client")),
+                Arc::new(
+                    ClawHubClient::new(config.marketplace.base_url.clone())
+                        .expect("valid ClawHub client"),
+                ),
             ),
         }
     }
@@ -246,8 +247,8 @@ impl KernelHandle {
         self.state.save(category, name, data).await?;
         let git = self.infra.git();
         if git.is_enabled() {
-            let rel_path = format!("{}/{}.json", category, name);
-            let _ = git.commit_file(&rel_path, &format!("save {}/{}", category, name));
+            let rel_path = format!("{category}/{name}.json");
+            let _ = git.commit_file(&rel_path, &format!("save {category}/{name}"));
         }
         Ok(())
     }
@@ -262,8 +263,8 @@ impl KernelHandle {
         self.state.save_markdown(category, name, content).await?;
         let git = self.infra.git();
         if git.is_enabled() {
-            let rel_path = format!("{}/{}.md", category, name);
-            let _ = git.commit_file(&rel_path, &format!("save {}/{}", category, name));
+            let rel_path = format!("{category}/{name}.md");
+            let _ = git.commit_file(&rel_path, &format!("save {category}/{name}"));
         }
         Ok(())
     }
@@ -274,8 +275,8 @@ impl KernelHandle {
         if deleted {
             let git = self.infra.git();
             if git.is_enabled() {
-                let rel_path = format!("{}/{}.json", category, name);
-                let _ = git.remove_file(&rel_path, &format!("delete {}/{}", category, name));
+                let rel_path = format!("{category}/{name}.json");
+                let _ = git.remove_file(&rel_path, &format!("delete {category}/{name}"));
             }
         }
         Ok(deleted)

@@ -155,7 +155,7 @@ fn test_git_commit_and_log() {
 
     // Log
     let log = git.log(10).unwrap();
-    assert!(log.len() >= 1);
+    assert!(!log.is_empty());
     assert_eq!(log[0].message, "initial commit");
     assert!(!log[0].hash.is_empty());
 }
@@ -361,7 +361,7 @@ fn test_audit_entries_range() {
         audit.append(
             "agent-001".to_string(),
             AuditAction::Other {
-                detail: format!("action-{}", i),
+                detail: format!("action-{i}"),
             },
             "/test/resource".to_string(),
         );
@@ -475,7 +475,7 @@ fn test_audit_auto_prune() {
         audit.append(
             "agent-001".to_string(),
             AuditAction::Other {
-                detail: format!("action-{}", i),
+                detail: format!("action-{i}"),
             },
             "/test/resource".to_string(),
         );
@@ -791,7 +791,7 @@ fn test_audit_and_budget_integration() {
         AuditAction::ConfigChange {
             key: "token_budget".to_string(),
         },
-        format!("/agents/{}", agent_id),
+        format!("/agents/{agent_id}"),
     );
 
     // Reserve tokens
@@ -803,7 +803,7 @@ fn test_audit_and_budget_integration() {
             tool: "reserve_tokens".to_string(),
             args_json: "200".to_string(),
         },
-        format!("/agents/{}/budget", agent_id),
+        format!("/agents/{agent_id}/budget"),
     );
 
     // Verify both are consistent

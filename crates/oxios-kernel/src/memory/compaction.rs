@@ -123,10 +123,7 @@ impl CompactionTree {
 
         // If long, add a summary indicator
         if lines.len() > 10 {
-            compacted.push(format!(
-                "... ({} lines omitted) ...",
-                lines.len() - 4
-            ));
+            compacted.push(format!("... ({} lines omitted) ...", lines.len() - 4));
         }
 
         // Preserve last 2 lines
@@ -149,7 +146,10 @@ mod tests {
     fn test_compaction_level_next() {
         assert_eq!(CompactionLevel::Raw.next(), Some(CompactionLevel::Daily));
         assert_eq!(CompactionLevel::Daily.next(), Some(CompactionLevel::Weekly));
-        assert_eq!(CompactionLevel::Weekly.next(), Some(CompactionLevel::Monthly));
+        assert_eq!(
+            CompactionLevel::Weekly.next(),
+            Some(CompactionLevel::Monthly)
+        );
         assert_eq!(CompactionLevel::Monthly.next(), Some(CompactionLevel::Root));
         assert_eq!(CompactionLevel::Root.next(), None);
     }
@@ -164,7 +164,10 @@ mod tests {
     #[test]
     fn test_should_compact_long() {
         let tree = CompactionTree::new(5);
-        let content = (0..10).map(|i| format!("line {}", i)).collect::<Vec<_>>().join("\n");
+        let content = (0..10)
+            .map(|i| format!("line {}", i))
+            .collect::<Vec<_>>()
+            .join("\n");
         assert!(tree.should_compact(&content));
     }
 
@@ -179,11 +182,17 @@ mod tests {
     #[test]
     fn test_rule_based_compact_long() {
         let tree = CompactionTree::new(10);
-        let content = (0..20).map(|i| format!("line {}", i)).collect::<Vec<_>>().join("\n");
+        let content = (0..20)
+            .map(|i| format!("line {}", i))
+            .collect::<Vec<_>>()
+            .join("\n");
         let result = tree.rule_based_compact(&content);
         assert!(result.lines().count() < 20, "Should be compacted");
         assert!(result.contains("line 0"), "Should preserve first line");
         assert!(result.contains("line 19"), "Should preserve last line");
-        assert!(result.contains("omitted"), "Should indicate omitted content");
+        assert!(
+            result.contains("omitted"),
+            "Should indicate omitted content"
+        );
     }
 }

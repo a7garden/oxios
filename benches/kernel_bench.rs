@@ -46,11 +46,11 @@ fn bench_audit_append(c: &mut Criterion) {
         b.iter(|| {
             i += 1;
             black_box(audit.append(
-                format!("agent-{}", i),
+                format!("agent-{i}"),
                 AuditAction::Other {
-                    detail: format!("test-{}", i),
+                    detail: format!("test-{i}"),
                 },
-                format!("resource-{}", i),
+                format!("resource-{i}"),
             ));
         });
     });

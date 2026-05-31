@@ -114,7 +114,7 @@ impl FsLog {
             .create(true)
             .append(true)
             .open(&self.log_path)?;
-        writeln!(file, "{}", record)?;
+        writeln!(file, "{record}")?;
         file.sync_all()?;
         Ok(())
     }

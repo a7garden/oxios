@@ -16,7 +16,11 @@ impl ChannelFormatter for TelegramFormatter {
         if let Some(meta) = &msg.meta {
             let mut footer_parts = Vec::new();
             if !meta.phase.is_empty() {
-                let eval = if meta.evaluation_passed { "✅" } else { "⚠️" };
+                let eval = if meta.evaluation_passed {
+                    "✅"
+                } else {
+                    "⚠️"
+                };
                 footer_parts.push(format!("{} {}", eval, meta.phase));
             }
             if let Some(tag) = &meta.project_tag {
@@ -47,7 +51,7 @@ impl ChannelFormatter for TelegramFormatter {
 
         if let Some(err) = meta.and_then(|m| m.error.as_ref()) {
             if let Some(s) = &err.suggestion {
-                out.push_str(&format!("\n\n💡 _{}_", s));
+                out.push_str(&format!("\n\n💡 _{s}_"));
             }
         }
 

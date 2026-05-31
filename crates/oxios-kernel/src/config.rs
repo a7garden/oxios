@@ -411,26 +411,66 @@ pub struct ConsolidationConfig {
     pub proactive_recall_threshold: f32,
 }
 
-fn default_dream_interval() -> u64 { 24 }
-fn default_dream_min_sessions() -> u32 { 5 }
-fn default_hot_max() -> usize { 50 }
-fn default_warm_max() -> usize { 500 }
-fn default_cold_max() -> usize { 10_000 }
-fn default_hot_token_budget() -> usize { 3_000 }
-fn default_one() -> f32 { 1.0 }
-fn default_decay_threshold() -> f32 { 0.05 }
-fn default_retention_days() -> u32 { 90 }
-fn default_protection_low_access() -> u32 { 2 }
-fn default_protection_medium_access() -> u32 { 3 }
-fn default_protection_high_access() -> u32 { 5 }
-fn default_protection_medium_sessions() -> u32 { 2 }
-fn default_protection_high_sessions() -> u32 { 3 }
-fn default_type_promotion_threshold() -> u32 { 3 }
-fn default_compaction_threshold() -> usize { 200 }
-fn default_proactive_limit() -> usize { 5 }
-fn default_proactive_threshold() -> f32 { 0.6 }
-fn default_demotion_stale_days() -> u32 { 30 }
-fn default_demotion_max_step() -> u32 { 1 }
+fn default_dream_interval() -> u64 {
+    24
+}
+fn default_dream_min_sessions() -> u32 {
+    5
+}
+fn default_hot_max() -> usize {
+    50
+}
+fn default_warm_max() -> usize {
+    500
+}
+fn default_cold_max() -> usize {
+    10_000
+}
+fn default_hot_token_budget() -> usize {
+    3_000
+}
+fn default_one() -> f32 {
+    1.0
+}
+fn default_decay_threshold() -> f32 {
+    0.05
+}
+fn default_retention_days() -> u32 {
+    90
+}
+fn default_protection_low_access() -> u32 {
+    2
+}
+fn default_protection_medium_access() -> u32 {
+    3
+}
+fn default_protection_high_access() -> u32 {
+    5
+}
+fn default_protection_medium_sessions() -> u32 {
+    2
+}
+fn default_protection_high_sessions() -> u32 {
+    3
+}
+fn default_type_promotion_threshold() -> u32 {
+    3
+}
+fn default_compaction_threshold() -> usize {
+    200
+}
+fn default_proactive_limit() -> usize {
+    5
+}
+fn default_proactive_threshold() -> f32 {
+    0.6
+}
+fn default_demotion_stale_days() -> u32 {
+    30
+}
+fn default_demotion_max_step() -> u32 {
+    1
+}
 
 fn default_preset() -> String {
     "balanced".into()
@@ -558,8 +598,7 @@ impl ConsolidationConfig {
 }
 
 /// Channel activation configuration.
-#[derive(Debug, Clone, Deserialize, Serialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
 pub struct ChannelsConfig {
     /// List of channel names to activate on startup.
     /// Channels are message-only interfaces (CLI, Telegram).
@@ -570,7 +609,6 @@ pub struct ChannelsConfig {
     #[serde(default)]
     pub telegram: TelegramChannelConfig,
 }
-
 
 /// Surface activation configuration.
 ///
@@ -964,7 +1002,6 @@ pub enum AllowlistMode {
     Enforced,
 }
 
-
 /// Exec configuration.
 ///
 /// Governs how the kernel dispatches commands for execution.
@@ -1015,8 +1052,7 @@ impl ExecConfig {
     pub fn is_binary_allowed(&self, name: &str) -> bool {
         match self.allowlist_mode {
             AllowlistMode::Permissive => {
-                self.allowed_commands.is_empty()
-                    || self.allowed_commands.iter().any(|c| c == name)
+                self.allowed_commands.is_empty() || self.allowed_commands.iter().any(|c| c == name)
             }
             AllowlistMode::Enforced => self.allowed_commands.iter().any(|c| c == name),
         }
@@ -1512,7 +1548,7 @@ pub fn load_config(path: &std::path::Path) -> anyhow::Result<OxiosConfig> {
     }
     if !errors.is_empty() {
         let msg = errors.join("; ");
-        anyhow::bail!("Configuration validation failed: {}", msg);
+        anyhow::bail!("Configuration validation failed: {msg}");
     }
     Ok(config)
 }
@@ -1556,7 +1592,7 @@ impl OxiosConfig {
         // Cron validation
         for (name, job) in &self.cron.jobs {
             if job.schedule.is_empty() {
-                errors.push(format!("cron.jobs.{}: schedule is empty", name));
+                errors.push(format!("cron.jobs.{name}: schedule is empty"));
             } else {
                 // Normalize 5-field to 6-field (prepend "0 " for seconds)
                 let normalized = {
@@ -1574,7 +1610,7 @@ impl OxiosConfig {
                 }
             }
             if job.goal.is_empty() {
-                errors.push(format!("cron.jobs.{}: goal is empty", name));
+                errors.push(format!("cron.jobs.{name}: goal is empty"));
             }
         }
 
@@ -1594,7 +1630,8 @@ impl OxiosConfig {
         }
 
         // Session validation
-        if self.session.max_sessions == 0 && self.session.ttl_hours == 0 && self.session.auto_prune {
+        if self.session.max_sessions == 0 && self.session.ttl_hours == 0 && self.session.auto_prune
+        {
             warnings.push("session: auto_prune is enabled but both max_sessions and ttl_hours are 0 — nothing will be pruned".into());
         }
 
@@ -1624,12 +1661,14 @@ impl OxiosConfig {
         for name in &self.channels.enabled {
             let valid = ["cli", "telegram"];
             if !valid.contains(&name.as_str()) {
-                warnings.push(format!("channels.enabled: unknown channel '{}'", name));
+                warnings.push(format!("channels.enabled: unknown channel '{name}'"));
             }
         }
         // Warn if 'web' is listed in channels — it should be in surfaces
         if self.channels.enabled.iter().any(|c| c == "web") {
-            warnings.push("channels.enabled: 'web' should be listed under [surfaces], not [channels]".into());
+            warnings.push(
+                "channels.enabled: 'web' should be listed under [surfaces], not [channels]".into(),
+            );
         }
         if self.channels.enabled.iter().any(|c| c == "telegram")
             && std::env::var(&self.channels.telegram.bot_token_env).is_err()
@@ -1812,8 +1851,8 @@ mod tests {
         let from_rust = OxiosConfig::default();
 
         let toml_str = include_str!("../../../share/default-config.toml");
-        let from_toml: OxiosConfig = toml::from_str(toml_str)
-            .expect("share/default-config.toml이 유효하지 않습니다");
+        let from_toml: OxiosConfig =
+            toml::from_str(toml_str).expect("share/default-config.toml이 유효하지 않습니다");
 
         // 핵심 스칼라 필드 — Rust와 TOML이 반드시 일치해야 함
         assert_eq!(

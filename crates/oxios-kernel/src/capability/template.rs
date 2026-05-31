@@ -24,8 +24,8 @@
 //! assert!(cspace.len() > 0);
 //! ```
 
-use uuid::Uuid;
 use crate::types::AgentId;
+use uuid::Uuid;
 
 use super::types::{CSpace, Capability, CapabilityId, Issuer, ResourceRef, Rights};
 
@@ -275,10 +275,7 @@ mod tests {
     #[test]
     fn with_skills_scoped() {
         let cs = CapabilityTemplate::with_skills(&["git", "gh"]).build();
-        assert!(cs.can(
-            &ResourceRef::Skill { name: "git".into() },
-            Rights::EXECUTE
-        ));
+        assert!(cs.can(&ResourceRef::Skill { name: "git".into() }, Rights::EXECUTE));
         assert!(cs.can(&ResourceRef::Skill { name: "gh".into() }, Rights::EXECUTE));
         assert!(!cs.can(
             &ResourceRef::Skill {

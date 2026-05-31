@@ -186,10 +186,7 @@ impl OuroborosEngine {
 
         // Diminishing returns: each improvement is smaller than the last.
         if history.len() >= 3 && improvement > 0.0 {
-            let improvements: Vec<f64> = scores
-                .windows(2)
-                .map(|w| w[1] - w[0])
-                .collect();
+            let improvements: Vec<f64> = scores.windows(2).map(|w| w[1] - w[0]).collect();
             if improvements.len() >= 2 {
                 let last = improvements[improvements.len() - 1];
                 let prev_imp = improvements[improvements.len() - 2];
@@ -220,7 +217,7 @@ impl OuroborosEngine {
     async fn llm_complete(&self, system_prompt: &str, user_message: &str) -> Result<String> {
         // Prepend persona prompt if set.
         let effective_system = if let Some(ref persona) = *self.persona_prompt.lock() {
-            format!("{}\n\n{}", persona, system_prompt)
+            format!("{persona}\n\n{system_prompt}")
         } else {
             system_prompt.to_string()
         };
@@ -303,7 +300,7 @@ impl OuroborosEngine {
                 );
                 let retry_raw = self.llm_complete(system_prompt, &retry_msg).await?;
                 Self::parse_json::<T>(&retry_raw)
-                    .map_err(|e2| anyhow::anyhow!("JSON parse failed after retry: {}", e2))
+                    .map_err(|e2| anyhow::anyhow!("JSON parse failed after retry: {e2}"))
             }
         }
     }
@@ -320,7 +317,7 @@ impl OuroborosProtocol for OuroborosEngine {
 
         let system_prompt = INTERVIEW_SYSTEM_PROMPT;
         let user_message = format!(
-            "The user said:\n\"{}\"\n\n\
+            "The user said:\n\"{user_input}\"\n\n\
              Analyze this message and produce a JSON object with:\n\
              - \"is_task\": true if the message requests a concrete action (create, read, write, run, find, fix, analyze, deploy, etc.) or describes something to build/execute. false for greetings, small talk, questions, gratitude, opinions, or conversational messages.\n\
              - \"chat_response\": (only when is_task=false) A natural, friendly response. Be warm, concise, and helpful. Skip this field when is_task=true.\n\
@@ -331,8 +328,7 @@ impl OuroborosProtocol for OuroborosEngine {
              - Score GOAL_CLARITY 0.9+ ONLY if the request is immediately executable with no ambiguity\n\
              - Score CONSTRAINT_CLARITY 0.8+ ONLY if specific filenames, paths, or content are provided\n\
              - Score SUCCESS_CRITERIA 0.7+ ONLY if 'done' is clearly defined\n\
-             - Be HONEST with clarity scores. When in doubt, score LOWER.",
-            user_input
+             - Be HONEST with clarity scores. When in doubt, score LOWER."
         );
 
         let raw = self.llm_complete(system_prompt, &user_message).await?;
@@ -425,20 +421,17 @@ impl OuroborosProtocol for OuroborosEngine {
                 .questions
                 .iter()
                 .zip(interview.answers.iter())
-                .map(|(q, a)| format!("Q: {}\nA: {}", q, a))
+                .map(|(q, a)| format!("Q: {q}\nA: {a}"))
                 .collect::<Vec<_>>()
                 .join("\n\n");
-            format!(
-                "## Original Request\n{}\n\n## Clarification Q&A\n{}",
-                original_message, qa_block
-            )
+            format!("## Original Request\n{original_message}\n\n## Clarification Q&A\n{qa_block}")
         } else {
-            format!("## Original Request\n{}", original_message)
+            format!("## Original Request\n{original_message}")
         };
 
         let system_prompt = SEED_SYSTEM_PROMPT;
         let user_message = format!(
-            "{}\n\n\
+            "{context_block}\n\n\
              Generate a Seed specification that faithfully captures the user's ORIGINAL request.\n\
              The goal MUST preserve exact details (filenames, content, paths, languages) from the request.\n\
              Do NOT generalize or abstract — keep the specific details.\n\n\
@@ -446,8 +439,7 @@ impl OuroborosProtocol for OuroborosEngine {
              - \"goal\": a single clear goal that preserves ALL specifics from the original request\n\
              - \"constraints\": list of constraints\n\
              - \"acceptance_criteria\": list of measurable acceptance criteria that verify the specific details\n\
-             - \"ontology\": list of {{ \"name\": \"\", \"entity_type\": \"\", \"description\": \"\" }} domain entities",
-            context_block
+             - \"ontology\": list of {{ \"name\": \"\", \"entity_type\": \"\", \"description\": \"\" }} domain entities"
         );
 
         let raw = self.llm_complete(system_prompt, &user_message).await?;
@@ -596,7 +588,7 @@ impl OuroborosProtocol for OuroborosEngine {
         Ok(result)
     }
 
-async fn evolve(&self, seed: &Seed, evaluation: &EvaluationResult) -> Result<Option<Seed>> {
+    async fn evolve(&self, seed: &Seed, evaluation: &EvaluationResult) -> Result<Option<Seed>> {
         self.set_phase(Phase::Evolve);
 
         // If the evaluation passed, no need to evolve.
@@ -659,7 +651,11 @@ async fn evolve(&self, seed: &Seed, evaluation: &EvaluationResult) -> Result<Opt
                     let lateral = crate::lateral::build_lateral_prompt(
                         persona,
                         &seed.goal,
-                        &format!("Score={:.2}, passed={}", evaluation.score, evaluation.all_passed()),
+                        &format!(
+                            "Score={:.2}, passed={}",
+                            evaluation.score,
+                            evaluation.all_passed()
+                        ),
                         &evaluation.notes,
                     );
                     context_blocks.push(lateral);
@@ -675,7 +671,8 @@ async fn evolve(&self, seed: &Seed, evaluation: &EvaluationResult) -> Result<Opt
             // Regression context — always on gen 2+.
             let regressions = self.detect_regressions();
             if !regressions.is_empty() {
-                let reg_text = crate::regression::RegressionDetector::format_for_prompt(&regressions);
+                let reg_text =
+                    crate::regression::RegressionDetector::format_for_prompt(&regressions);
                 context_blocks.push(reg_text);
                 tracing::info!(
                     seed_id = %seed.id,

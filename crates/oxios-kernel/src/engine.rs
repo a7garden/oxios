@@ -58,10 +58,7 @@ impl OxiosEngine {
     /// to create properly authenticated providers.
     ///
     /// Resolution order (per provider): env var → config.toml → ~/.oxi/auth.json
-    pub fn from_config(
-        default_model_id: impl Into<String>,
-        config_api_key: Option<&str>,
-    ) -> Self {
+    pub fn from_config(default_model_id: impl Into<String>, config_api_key: Option<&str>) -> Self {
         let model_id = default_model_id.into();
 
         // Resolve the primary provider's credential
@@ -110,7 +107,9 @@ impl OxiosEngine {
     ///
     /// # Example
     ///
-    /// ```ignore
+    /// ```no_run
+    /// use oxios_kernel::engine::OxiosEngine;
+    ///
     /// let engine = OxiosEngine::builder()
     ///     .default_model("anthropic/claude-sonnet-4-20250514")
     ///     .api_key("anthropic", "sk-ant-...")
@@ -158,11 +157,7 @@ impl OxiosEngine {
     /// Subsequent calls return the same pooled instance.
     ///
     /// If no rate limit is needed, returns the base provider directly.
-    pub fn pooled_provider(
-        &self,
-        name: &str,
-        rpm: u32,
-    ) -> Result<Arc<dyn oxi_sdk::Provider>> {
+    pub fn pooled_provider(&self, name: &str, rpm: u32) -> Result<Arc<dyn oxi_sdk::Provider>> {
         // Check if already pooled.
         {
             let pools = self.pools.read();

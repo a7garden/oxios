@@ -56,7 +56,7 @@ impl PersonaStore {
                 p.enabled = enabled;
                 Ok(())
             }
-            None => Err(anyhow!("Persona '{}' not found", id)),
+            None => Err(anyhow!("Persona '{id}' not found")),
         }
     }
 
@@ -66,7 +66,7 @@ impl PersonaStore {
         if personas.remove(id).is_some() {
             Ok(())
         } else {
-            Err(anyhow!("Persona '{}' not found", id))
+            Err(anyhow!("Persona '{id}' not found"))
         }
     }
 
@@ -77,7 +77,7 @@ impl PersonaStore {
             personas.insert(id.to_string(), updated);
             Ok(())
         } else {
-            Err(anyhow!("Persona '{}' not found", id))
+            Err(anyhow!("Persona '{id}' not found"))
         }
     }
 

@@ -85,7 +85,7 @@ impl BacklinkIndex {
                 }
             }
             self.details
-                .retain(|k, _| !k.starts_with(&format!("{}→", path)));
+                .retain(|k, _| !k.starts_with(&format!("{path}→")));
         }
 
         // Extract and register new links
@@ -100,7 +100,7 @@ impl BacklinkIndex {
                     .or_default()
                     .insert(path.to_string());
                 self.details.insert(
-                    format!("{}→{}", path, target),
+                    format!("{path}→{target}"),
                     vec![Backlink {
                         source_path: path.to_string(),
                         target_path: target,
@@ -118,7 +118,7 @@ impl BacklinkIndex {
             s.remove(path);
         });
         self.details
-            .retain(|k, _| !k.starts_with(&format!("{}→", path)));
+            .retain(|k, _| !k.starts_with(&format!("{path}→")));
 
         let mut new_targets = HashSet::new();
         for (text, target) in &links {
@@ -128,7 +128,7 @@ impl BacklinkIndex {
                 .or_default()
                 .insert(path.to_string());
             self.details.insert(
-                format!("{}→{}", path, target),
+                format!("{path}→{target}"),
                 vec![Backlink {
                     source_path: path.to_string(),
                     target_path: target.clone(),
@@ -160,7 +160,7 @@ impl BacklinkIndex {
         let sources = self.backward.get(path).cloned().unwrap_or_default();
         let mut result = Vec::new();
         for source in &sources {
-            let key = format!("{}→{}", source, path);
+            let key = format!("{source}→{path}");
             if let Some(details) = self.details.get(&key) {
                 result.extend(details.clone());
             }

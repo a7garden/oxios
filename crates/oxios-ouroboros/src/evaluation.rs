@@ -79,7 +79,7 @@ impl MechanicalEvalResult {
                 if c_lower.contains("exit code") || c_lower.contains("exit status") {
                     let has_zero = output_lower.contains("exit code 0")
                         || output_lower.contains("exit status 0");
-                    (has_zero, format!("exit_code_0={}", has_zero))
+                    (has_zero, format!("exit_code_0={has_zero}"))
                 } else {
                     // Extract key tokens from the criterion (words > 3 chars)
                     // and check if most of them appear in the output
@@ -105,7 +105,7 @@ impl MechanicalEvalResult {
                     if key_tokens.is_empty() {
                         // Fallback to full substring match
                         let contains = output_lower.contains(&c_lower);
-                        (contains, format!("substring_match={}", contains))
+                        (contains, format!("substring_match={contains}"))
                     } else {
                         // Check how many key tokens appear in the output
                         let matched = key_tokens

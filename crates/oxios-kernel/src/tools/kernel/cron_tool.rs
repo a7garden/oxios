@@ -165,8 +165,7 @@ impl AgentTool for CronTool {
                         .unwrap_or_default(),
                     )),
                     Err(e) => Ok(AgentToolResult::error(format!(
-                        "Failed to add cron job: {}",
-                        e
+                        "Failed to add cron job: {e}"
                     ))),
                 }
             }
@@ -184,12 +183,10 @@ impl AgentTool for CronTool {
 
                 match self.cron_scheduler.remove_job(job_id).await {
                     Ok(()) => Ok(AgentToolResult::success(format!(
-                        "Cron job '{}' removed.",
-                        id_str
+                        "Cron job '{id_str}' removed."
                     ))),
                     Err(e) => Ok(AgentToolResult::error(format!(
-                        "Failed to remove cron job: {}",
-                        e
+                        "Failed to remove cron job: {e}"
                     ))),
                 }
             }
@@ -211,15 +208,13 @@ impl AgentTool for CronTool {
                         job.name, id_str
                     ))),
                     Err(e) => Ok(AgentToolResult::error(format!(
-                        "Failed to trigger cron job: {}",
-                        e
+                        "Failed to trigger cron job: {e}"
                     ))),
                 }
             }
 
             other => Err(format!(
-                "Unknown cron action '{}'. Valid: list, add, remove, trigger",
-                other
+                "Unknown cron action '{other}'. Valid: list, add, remove, trigger"
             )),
         }
     }

@@ -84,6 +84,9 @@ mod tests {
 
         assert!(mgr.file_exists(Path::new("hello.txt")));
         assert!(mgr.file_exists(Path::new("sub/deep.txt")));
-        assert_eq!(mgr.read_file(Path::new("hello.txt")).unwrap(), "Hello, World!");
+        assert_eq!(
+            mgr.read_file(Path::new("hello.txt")).unwrap(),
+            "Hello, World!"
+        );
     }
 }

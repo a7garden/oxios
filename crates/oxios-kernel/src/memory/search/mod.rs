@@ -12,7 +12,7 @@ pub(super) mod vector;
 use anyhow::Result;
 
 use super::database::MemoryDatabase;
-use crate::memory::{MemoryEntry, MemoryType, MemoryTier, ProtectionLevel};
+use crate::memory::{MemoryEntry, MemoryTier, MemoryType, ProtectionLevel};
 
 // Re-export for external use
 pub use bm25::Bm25Hit;
@@ -59,10 +59,8 @@ pub fn search(
     if let Some(query_vec) = query_vector {
         match vector::search_vector(db, query_vec, fetch_limit) {
             Ok(hits) => {
-                let tier: Vec<(i64, f64)> = hits
-                    .into_iter()
-                    .map(|h| (h.rowid, h.distance))
-                    .collect();
+                let tier: Vec<(i64, f64)> =
+                    hits.into_iter().map(|h| (h.rowid, h.distance)).collect();
                 if !tier.is_empty() {
                     tier_results.push(tier);
                 }
@@ -76,10 +74,7 @@ pub fn search(
     // ── Tier 2: FTS5 BM25 ──
     match bm25::search_bm25(db, query_text, fetch_limit) {
         Ok(hits) => {
-            let tier: Vec<(i64, f64)> = hits
-                .into_iter()
-                .map(|h| (h.rowid, h.score))
-                .collect();
+            let tier: Vec<(i64, f64)> = hits.into_iter().map(|h| (h.rowid, h.score)).collect();
             if !tier.is_empty() {
                 tier_results.push(tier);
             }
@@ -117,7 +112,7 @@ fn load_memory_by_rowid(db: &MemoryDatabase, rowid: i64) -> Result<Option<Memory
                 source, session_id, tags, access_count, pinned,
                 auto_classified, session_appearances, decay_score, content_hash,
                 created_at, updated_at, accessed_at
-         FROM memories WHERE rowid = ?1"
+         FROM memories WHERE rowid = ?1",
     )?;
 
     let mut rows = stmt.query(rusqlite::params![rowid])?;
@@ -135,7 +130,7 @@ pub fn load_memory_by_id(db: &MemoryDatabase, id: &str) -> Result<Option<MemoryE
                 source, session_id, tags, access_count, pinned,
                 auto_classified, session_appearances, decay_score, content_hash,
                 created_at, updated_at, accessed_at
-         FROM memories WHERE id = ?1"
+         FROM memories WHERE id = ?1",
     )?;
 
     let mut rows = stmt.query(rusqlite::params![id])?;
@@ -274,7 +269,9 @@ mod tests {
         }
 
         let results = search(&db, None, "test", Some(MemoryType::Fact), 10).unwrap();
-        assert!(results.iter().all(|r| r.entry.memory_type == MemoryType::Fact));
+        assert!(results
+            .iter()
+            .all(|r| r.entry.memory_type == MemoryType::Fact));
     }
 
     #[test]

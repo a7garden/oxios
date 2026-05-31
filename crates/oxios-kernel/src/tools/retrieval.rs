@@ -7,11 +7,12 @@
 //!
 //! # Usage
 //!
-//! ```ignore
+//! ```no_run
 //! use std::sync::Arc;
 //! use oxios_kernel::embedding::TfIdfEmbeddingProvider;
 //! use oxios_kernel::tools::retrieval::{ToolRetriever, ToolEntry};
 //!
+//! # async fn example() {
 //! let embedder = Arc::new(TfIdfEmbeddingProvider);
 //! let mut retriever = ToolRetriever::new(embedder);
 //!
@@ -23,10 +24,7 @@
 //!     command: None,
 //! };
 //! retriever.index_tool(tool).await;
-//!
-//! let query_embedding = retriever.embedder().embed("run a bash command").await?;
-//! let results = retriever.retrieve(&query_embedding, 5);
-//! ```
+//! # }
 
 use std::sync::Arc;
 
@@ -68,7 +66,7 @@ impl ToolEntry {
     fn embedding_text(&self) -> String {
         let mut parts = format!("[{}] {}: {}", self.category, self.name, self.description);
         if let Some(ref cmd) = self.command {
-            parts.push_str(&format!(" command: {}", cmd));
+            parts.push_str(&format!(" command: {cmd}"));
         }
         parts
     }
@@ -302,7 +300,7 @@ pub fn build_kernel_manifest(active_domains: &[&str]) -> String {
 
     for domain in &domain_list {
         let description = domain_description(domain);
-        md.push_str(&format!("### {}\n{}\n\n", domain, description));
+        md.push_str(&format!("### {domain}\n{description}\n\n"));
     }
 
     md

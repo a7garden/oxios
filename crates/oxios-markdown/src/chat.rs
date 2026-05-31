@@ -78,7 +78,7 @@ pub fn rename_chat_msg(content: &str, msg_hash: &str, new_body: &str) -> Result<
     let idx = blocks
         .iter()
         .position(|b| !header_re.is_match(b) && chat_block_hash(b) == msg_hash)
-        .ok_or_else(|| format!("chat block not found for hash {:?}", msg_hash))?;
+        .ok_or_else(|| format!("chat block not found for hash {msg_hash:?}"))?;
 
     let prefix = prefix_re
         .find(&blocks[idx])
@@ -86,7 +86,7 @@ pub fn rename_chat_msg(content: &str, msg_hash: &str, new_body: &str) -> Result<
         .unwrap_or_default();
     let new_body = new_body.trim().replace('\n', " ");
     let mut new_blocks = blocks;
-    new_blocks[idx] = format!("{}{}", prefix, new_body);
+    new_blocks[idx] = format!("{prefix}{new_body}");
     Ok(new_blocks.join("\n"))
 }
 
@@ -104,7 +104,7 @@ pub fn append_to_chat_msg(content: &str, msg_hash: &str, new_text: &str) -> Resu
 
     let idx = match idx {
         Some(i) => i,
-        None => return Err(format!("chat block not found for hash {:?}", msg_hash)),
+        None => return Err(format!("chat block not found for hash {msg_hash:?}")),
     };
 
     let new_text = new_text.trim_end_matches('\n');
@@ -114,7 +114,7 @@ pub fn append_to_chat_msg(content: &str, msg_hash: &str, new_text: &str) -> Resu
 
     let mut new_blocks = blocks;
     let block = new_blocks[idx].trim_end_matches('\n').to_string();
-    new_blocks[idx] = format!("{}\n{}", block, new_text);
+    new_blocks[idx] = format!("{block}\n{new_text}");
 
     Ok(new_blocks.join("\n"))
 }
@@ -146,7 +146,7 @@ pub fn move_from_chat(
 
             // Add as checklist item to target
             let new_target = if target_content.is_empty() {
-                format!("- [ ] {}", body)
+                format!("- [ ] {body}")
             } else {
                 format!("{}\n- [ ] {}", target_content.trim_end(), body)
             };
@@ -165,7 +165,7 @@ pub fn delete_chat_msg(content: &str, msg_hash: &str) -> Result<String, String> 
     let idx = blocks
         .iter()
         .position(|b| !header_re.is_match(b) && chat_block_hash(b) == msg_hash)
-        .ok_or_else(|| format!("chat block not found for hash {:?}", msg_hash))?;
+        .ok_or_else(|| format!("chat block not found for hash {msg_hash:?}"))?;
 
     let mut new_blocks = blocks;
     new_blocks.remove(idx);

@@ -48,6 +48,7 @@ pub(crate) struct CreateProjectRequest {
     pub emoji: Option<String>,
     pub description: Option<String>,
     #[serde(default = "default_true")]
+    #[allow(dead_code)]
     pub memory_visible: bool,
 }
 
@@ -75,7 +76,10 @@ pub(crate) struct LinkMemoryRequest {
 /// Shorthand to get ProjectApi from AppState, or error.
 macro_rules! project_api {
     ($state:expr) => {
-        $state.kernel.projects.as_ref()
+        $state
+            .kernel
+            .projects
+            .as_ref()
             .ok_or_else(|| AppError::Internal("Projects not available".into()))?
     };
 }
@@ -215,12 +219,7 @@ pub(crate) async fn handle_project_memories(
             "memory/knowledge",
             "memory/sessions",
         ] {
-            if let Ok(Some(entry)) = state
-                .kernel
-                .state
-                .load::<MemoryEntry>(category, mid)
-                .await
-            {
+            if let Ok(Some(entry)) = state.kernel.state.load::<MemoryEntry>(category, mid).await {
                 memories.push(serde_json::json!({
                     "id": entry.id,
                     "content": entry.content,

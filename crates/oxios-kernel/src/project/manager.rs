@@ -10,7 +10,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use anyhow::{bail, Context, Result};
+use anyhow::Result;
 use chrono::Utc;
 use parking_lot::RwLock;
 
@@ -239,13 +239,15 @@ impl ProjectManager {
                 return Err(ProjectManagerError::NotFound(project_id).into());
             }
         }
-        self.db.link_project_memory(&project_id.to_string(), memory_id)?;
+        self.db
+            .link_project_memory(&project_id.to_string(), memory_id)?;
         Ok(())
     }
 
     /// Unlink a memory from a project.
     pub fn unlink_memory(&self, project_id: ProjectId, memory_id: &str) -> Result<()> {
-        self.db.unlink_project_memory(&project_id.to_string(), memory_id)?;
+        self.db
+            .unlink_project_memory(&project_id.to_string(), memory_id)?;
         Ok(())
     }
 

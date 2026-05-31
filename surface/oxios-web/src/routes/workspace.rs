@@ -210,7 +210,9 @@ pub(crate) async fn handle_workspace_file_create(
     }
 
     tracing::info!(path = %path, is_dir = body.is_dir, "File created");
-    Ok(Json(serde_json::json!({ "status": "created", "path": path, "is_dir": body.is_dir })))
+    Ok(Json(
+        serde_json::json!({ "status": "created", "path": path, "is_dir": body.is_dir }),
+    ))
 }
 
 /// DELETE /api/workspace/file/*path — Delete a file or empty directory.
@@ -234,9 +236,9 @@ pub(crate) async fn handle_workspace_file_delete(
 
     if canonical.is_dir() {
         // Only delete empty directories
-        let mut entries = tokio::fs::read_dir(&canonical).await.map_err(|e| {
-            AppError::Internal(format!("failed to read directory: {e}"))
-        })?;
+        let mut entries = tokio::fs::read_dir(&canonical)
+            .await
+            .map_err(|e| AppError::Internal(format!("failed to read directory: {e}")))?;
         if entries
             .next_entry()
             .await
@@ -255,7 +257,9 @@ pub(crate) async fn handle_workspace_file_delete(
     }
 
     tracing::info!(path = %path, "File deleted");
-    Ok(Json(serde_json::json!({ "status": "deleted", "path": path })))
+    Ok(Json(
+        serde_json::json!({ "status": "deleted", "path": path }),
+    ))
 }
 
 /// Guess MIME type from file extension.
@@ -398,7 +402,7 @@ pub(crate) async fn handle_seed_evolution(
                 }
 
                 let (score, passed) = {
-                    let eval_name = format!("{}-eval", current_id);
+                    let eval_name = format!("{current_id}-eval");
                     if let Ok(Some(eval_content)) =
                         kernel.state.load_markdown("evals", &eval_name).await
                     {
@@ -445,7 +449,7 @@ fn compact_path(path: &std::path::Path) -> String {
         let home_str = home.to_string_lossy();
         let path_str = path.to_string_lossy();
         if let Some(rest) = path_str.strip_prefix(home_str.as_ref()) {
-            return format!("~{}", rest);
+            return format!("~{rest}");
         }
     }
     path.to_string_lossy().into_owned()
@@ -466,12 +470,14 @@ fn skill_entry_to_json(entry: &SkillEntry) -> serde_json::Value {
     };
 
     let requirements = meta
-        .map(|m| serde_json::json!({
-            "bins": m.requires.bins,
-            "anyBins": m.requires.any_bins,
-            "env": m.requires.env,
-            "config": m.requires.config,
-        }))
+        .map(|m| {
+            serde_json::json!({
+                "bins": m.requires.bins,
+                "anyBins": m.requires.any_bins,
+                "env": m.requires.env,
+                "config": m.requires.config,
+            })
+        })
         .unwrap_or(serde_json::json!({
             "bins": [],
             "anyBins": [],
@@ -494,23 +500,21 @@ fn skill_entry_to_json(entry: &SkillEntry) -> serde_json::Value {
                     let label = match spec.kind {
                         oxios_kernel::InstallKind::Brew => {
                             let name = spec.formula.as_deref().unwrap_or("unknown");
-                            format!("Install {} (brew)", name)
+                            format!("Install {name} (brew)")
                         }
                         oxios_kernel::InstallKind::Node => {
                             let name = spec.package.as_deref().unwrap_or("unknown");
-                            format!("Install {} (npm)", name)
+                            format!("Install {name} (npm)")
                         }
                         oxios_kernel::InstallKind::Go => {
                             let name = spec.module.as_deref().unwrap_or("unknown");
-                            format!("Install {} (go)", name)
+                            format!("Install {name} (go)")
                         }
                         oxios_kernel::InstallKind::Uv => {
                             let name = spec.package.as_deref().unwrap_or("unknown");
-                            format!("Install {} (uv)", name)
+                            format!("Install {name} (uv)")
                         }
-                        oxios_kernel::InstallKind::Download => {
-                            "Download".to_string()
-                        }
+                        oxios_kernel::InstallKind::Download => "Download".to_string(),
                     };
                     let bins: Vec<String> = match spec.kind {
                         oxios_kernel::InstallKind::Brew => spec
@@ -545,9 +549,7 @@ fn skill_entry_to_json(entry: &SkillEntry) -> serde_json::Value {
         })
         .unwrap_or_default();
 
-    let os = meta
-        .map(|m| m.os.clone())
-        .unwrap_or_default();
+    let os = meta.map(|m| m.os.clone()).unwrap_or_default();
 
     let config_checks: Vec<serde_json::Value> = entry
         .eligibility
@@ -612,7 +614,9 @@ pub(crate) async fn handle_skill_enable(
         .await
         .map_err(|e| AppError::BadRequest(e.to_string()))?;
     tracing::info!(skill = %name, "Skill enabled via API");
-    Ok(Json(serde_json::json!({ "status": "enabled", "name": name })))
+    Ok(Json(
+        serde_json::json!({ "status": "enabled", "name": name }),
+    ))
 }
 
 /// POST /api/skills/:name/disable — Disable a skill.
@@ -627,7 +631,9 @@ pub(crate) async fn handle_skill_disable(
         .await
         .map_err(|e| AppError::BadRequest(e.to_string()))?;
     tracing::info!(skill = %name, "Skill disabled via API");
-    Ok(Json(serde_json::json!({ "status": "disabled", "name": name })))
+    Ok(Json(
+        serde_json::json!({ "status": "disabled", "name": name }),
+    ))
 }
 
 /// GET /api/skills/:name/content — Get SKILL.md content.
@@ -993,6 +999,7 @@ pub(crate) async fn handle_memory_semantic_search(
 // ---------------------------------------------------------------------------
 
 /// GET /api/memory/stats — Aggregate memory statistics.
+#[allow(dead_code)]
 pub(crate) async fn handle_memory_stats(
     state: State<Arc<AppState>>,
 ) -> Result<Json<serde_json::Value>, AppError> {
@@ -1009,7 +1016,10 @@ pub(crate) async fn handle_memory_stats(
     ] {
         if let Ok(names) = state.kernel.state.list_category(category).await {
             let cat = category.split('/').nth(1).unwrap_or("unknown");
-            by_type.insert(cat.to_string(), serde_json::Value::Number(names.len().into()));
+            by_type.insert(
+                cat.to_string(),
+                serde_json::Value::Number(names.len().into()),
+            );
             count += names.len();
         }
     }
@@ -1034,6 +1044,7 @@ pub(crate) struct PinRequest {
 }
 
 /// PUT /api/memory/{id}/pin — Toggle pin status on a memory entry.
+#[allow(dead_code)]
 pub(crate) async fn handle_memory_pin(
     state: State<Arc<AppState>>,
     Path(id): Path<String>,
@@ -1045,12 +1056,7 @@ pub(crate) async fn handle_memory_pin(
         "memory/knowledge",
         "memory/sessions",
     ] {
-        if let Ok(Some(mut entry)) = state
-            .kernel
-            .state
-            .load::<MemoryEntry>(category, &id)
-            .await
-        {
+        if let Ok(Some(mut entry)) = state.kernel.state.load::<MemoryEntry>(category, &id).await {
             entry.pinned = body.pinned;
             state
                 .kernel
@@ -1065,6 +1071,7 @@ pub(crate) async fn handle_memory_pin(
 }
 
 /// DELETE /api/memory/{id} — Delete a memory entry.
+#[allow(dead_code)]
 pub(crate) async fn handle_memory_delete(
     state: State<Arc<AppState>>,
     Path(id): Path<String>,
@@ -1094,17 +1101,15 @@ pub(crate) async fn handle_memory_delete(
 }
 
 /// GET /api/memory/dream/reports — List dream reports.
-pub(crate) async fn handle_dream_reports(
-    _state: State<Arc<AppState>>,
-) -> Json<serde_json::Value> {
+#[allow(dead_code)]
+pub(crate) async fn handle_dream_reports(_state: State<Arc<AppState>>) -> Json<serde_json::Value> {
     // Placeholder — return empty list until dream persistence is implemented
     Json(serde_json::json!({ "reports": [] }))
 }
 
 /// GET /api/memory/dream/status — Dream status.
-pub(crate) async fn handle_dream_status(
-    _state: State<Arc<AppState>>,
-) -> Json<serde_json::Value> {
+#[allow(dead_code)]
+pub(crate) async fn handle_dream_status(_state: State<Arc<AppState>>) -> Json<serde_json::Value> {
     Json(serde_json::json!({
         "status": "idle",
         "last_run": null,
@@ -1117,6 +1122,7 @@ pub(crate) async fn handle_dream_status(
 // ---------------------------------------------------------------------------
 
 /// GET /api/seeds/{id}/agents — List agents spawned from this seed.
+#[allow(dead_code)]
 pub(crate) async fn handle_seed_agents(
     state: State<Arc<AppState>>,
     Path(id): Path<String>,
@@ -1241,7 +1247,7 @@ mod tests {
                 "knowledge" => Some(MemoryType::Knowledge),
                 _ => None,
             };
-            assert!(mt.is_some(), "expected '{}' to be a valid memory type", t);
+            assert!(mt.is_some(), "expected '{t}' to be a valid memory type");
         }
 
         // Invalid types should not match any variant.
@@ -1253,7 +1259,7 @@ mod tests {
                 "knowledge" => Some(MemoryType::Knowledge),
                 _ => None,
             };
-            assert!(mt.is_none(), "expected '{}' to be rejected", t);
+            assert!(mt.is_none(), "expected '{t}' to be rejected");
         }
     }
 

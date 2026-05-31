@@ -9,7 +9,7 @@
 //!
 //! # Example
 //!
-//! ```ignore
+//! ```no_run
 //! use oxios_kernel::capability::resolve::resolve_cspace;
 //! use oxios_kernel::types::AgentId;
 //!

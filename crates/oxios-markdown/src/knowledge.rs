@@ -309,7 +309,7 @@ impl KnowledgeBase {
     pub fn chat_append(&self, message: &str) -> Result<()> {
         let header = today_chat_header();
         let timestamp = chrono::Local::now().format("`15:04`").to_string();
-        let entry = format!("{} {}", timestamp, message);
+        let entry = format!("{timestamp} {message}");
 
         let mut content = self.note_read(CHAT_FILENAME)?.unwrap_or_default();
         if !content.contains(&header) {

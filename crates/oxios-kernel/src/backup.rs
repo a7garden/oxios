@@ -150,8 +150,14 @@ mod tests {
     #[test]
     fn test_backup_section_ordering() {
         let sections = vec![
-            BackupSection { name: "a".into(), entry_count: 1 },
-            BackupSection { name: "b".into(), entry_count: 2 },
+            BackupSection {
+                name: "a".into(),
+                entry_count: 1,
+            },
+            BackupSection {
+                name: "b".into(),
+                entry_count: 2,
+            },
         ];
         let manifest = BackupManifest {
             version: 1,
@@ -184,9 +190,15 @@ mod tests {
         let dest_dir = tempfile::tempdir().unwrap();
 
         // Create source files
-        tokio::fs::write(src_dir.path().join("file1.txt"), "hello").await.unwrap();
-        tokio::fs::create_dir_all(src_dir.path().join("subdir")).await.unwrap();
-        tokio::fs::write(src_dir.path().join("subdir/file2.txt"), "world").await.unwrap();
+        tokio::fs::write(src_dir.path().join("file1.txt"), "hello")
+            .await
+            .unwrap();
+        tokio::fs::create_dir_all(src_dir.path().join("subdir"))
+            .await
+            .unwrap();
+        tokio::fs::write(src_dir.path().join("subdir/file2.txt"), "world")
+            .await
+            .unwrap();
 
         copy_dir_recursive(src_dir.path(), dest_dir.path())
             .await

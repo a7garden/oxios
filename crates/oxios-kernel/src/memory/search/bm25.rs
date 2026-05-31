@@ -33,7 +33,11 @@ pub fn search_bm25(db: &MemoryDatabase, query: &str, limit: usize) -> Result<Vec
 
     // Sanitize query: FTS5 expects specific syntax
     // For safety, split on spaces and join with OR
-    let fts_query = if query.contains('"') || query.contains("AND") || query.contains("OR") || query.contains("NOT") {
+    let fts_query = if query.contains('"')
+        || query.contains("AND")
+        || query.contains("OR")
+        || query.contains("NOT")
+    {
         // Advanced query — pass through
         query.to_string()
     } else {
@@ -47,21 +51,21 @@ pub fn search_bm25(db: &MemoryDatabase, query: &str, limit: usize) -> Result<Vec
                     tokens.push(word.to_string());
                 }
             } else {
-        // CJK or mixed: FTS5 unicode61 can't segment these,
-        // so we just use the full word. If it's all CJK,
-        // add each char separately for partial matching.
-        let has_cjk = !word.is_ascii();
-        if has_cjk {
-            // Add individual CJK chars for char-by-char matching
-            for ch in word.chars() {
-                if !ch.is_ascii() && ch.is_alphabetic() {
-                    tokens.push(ch.to_string());
+                // CJK or mixed: FTS5 unicode61 can't segment these,
+                // so we just use the full word. If it's all CJK,
+                // add each char separately for partial matching.
+                let has_cjk = !word.is_ascii();
+                if has_cjk {
+                    // Add individual CJK chars for char-by-char matching
+                    for ch in word.chars() {
+                        if !ch.is_ascii() && ch.is_alphabetic() {
+                            tokens.push(ch.to_string());
+                        }
+                    }
                 }
-            }
-        }
-        if word.len() >= 2 {
-            tokens.push(word.to_string());
-        }
+                if word.len() >= 2 {
+                    tokens.push(word.to_string());
+                }
             }
         }
         if tokens.is_empty() {
@@ -74,7 +78,8 @@ pub fn search_bm25(db: &MemoryDatabase, query: &str, limit: usize) -> Result<Vec
          FROM memories_fts
          WHERE memories_fts MATCH ?1
          ORDER BY score DESC
-         LIMIT ?2".to_string();
+         LIMIT ?2"
+        .to_string();
 
     let mut stmt = match conn.prepare(&sql) {
         Ok(s) => s,

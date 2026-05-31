@@ -1,6 +1,8 @@
 //! State API — data persistence, session management.
 
-use crate::state_store::{PruneConfig, PruneThrottle, Session, SessionId, SessionSummary, StateStore};
+use crate::state_store::{
+    PruneConfig, PruneThrottle, Session, SessionId, SessionSummary, StateStore,
+};
 use serde::{de::DeserializeOwned, Serialize};
 use std::sync::Arc;
 

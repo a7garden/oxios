@@ -92,7 +92,13 @@ mod tests {
     use super::*;
     use crate::Tier;
 
-    fn make_result(id: &str, suite: &str, passed: bool, score: f64, duration_ms: u64) -> TaskResult {
+    fn make_result(
+        id: &str,
+        suite: &str,
+        passed: bool,
+        score: f64,
+        duration_ms: u64,
+    ) -> TaskResult {
         TaskResult {
             task_id: id.to_string(),
             task_name: id.to_string(),

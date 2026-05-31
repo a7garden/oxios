@@ -90,7 +90,7 @@ pub(crate) async fn handle_cron_job_get(
         .infra
         .get_cron(id)
         .map(Json)
-        .ok_or_else(|| AppError::NotFound(format!("Cron job {} not found", id)))
+        .ok_or_else(|| AppError::NotFound(format!("Cron job {id} not found")))
 }
 
 /// DELETE /api/cron-jobs/:id — Delete a cron job.

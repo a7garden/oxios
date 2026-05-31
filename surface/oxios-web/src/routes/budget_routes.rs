@@ -126,7 +126,9 @@ pub(crate) async fn handle_budget_get(
                 "is_exhausted": b.is_exhausted,
             }
         }))),
-        None => Err(AppError::NotFound(format!("No budget configured for agent '{agent_id}'"))),
+        None => Err(AppError::NotFound(format!(
+            "No budget configured for agent '{agent_id}'"
+        ))),
     }
 }
 
@@ -143,7 +145,9 @@ pub(crate) async fn handle_budget_set(
         calls_budget: body.calls_budget,
         window_secs: body.window_secs,
     });
-    Ok(Json(serde_json::json!({ "set": true, "agent_id": agent_id })))
+    Ok(Json(
+        serde_json::json!({ "set": true, "agent_id": agent_id }),
+    ))
 }
 
 /// DELETE /api/budget/{agent_id}
@@ -153,7 +157,9 @@ pub(crate) async fn handle_budget_remove(
 ) -> Result<Json<serde_json::Value>, AppError> {
     let aid = parse_agent_id(&agent_id)?;
     state.kernel.agents.remove_budget(&aid);
-    Ok(Json(serde_json::json!({ "removed": true, "agent_id": agent_id })))
+    Ok(Json(
+        serde_json::json!({ "removed": true, "agent_id": agent_id }),
+    ))
 }
 
 /// POST /api/budget/{agent_id}/reserve
@@ -178,5 +184,7 @@ pub(crate) async fn handle_budget_reset(
 ) -> Result<Json<serde_json::Value>, AppError> {
     let aid = parse_agent_id(&agent_id)?;
     state.kernel.agents.reset_budget(&aid);
-    Ok(Json(serde_json::json!({ "reset": true, "agent_id": agent_id })))
+    Ok(Json(
+        serde_json::json!({ "reset": true, "agent_id": agent_id }),
+    ))
 }

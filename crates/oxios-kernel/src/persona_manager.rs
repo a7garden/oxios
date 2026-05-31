@@ -55,9 +55,9 @@ impl PersonaManager {
         let persona = self
             .store
             .get(id)
-            .ok_or_else(|| anyhow::anyhow!("Persona '{}' not found", id))?;
+            .ok_or_else(|| anyhow::anyhow!("Persona '{id}' not found"))?;
         if !persona.enabled {
-            anyhow::bail!("Persona '{}' is disabled", id);
+            anyhow::bail!("Persona '{id}' is disabled");
         }
         *self.active_persona_id.write() = Some(id.to_string());
         tracing::info!(persona_id = %id, name = %persona.name, "Active persona set");

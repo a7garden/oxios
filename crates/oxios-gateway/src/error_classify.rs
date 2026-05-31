@@ -39,25 +39,16 @@ fn infer_kind(e: &anyhow::Error) -> ErrorKind {
 
     // 3. Message-pattern matching (heuristic).
     let msg = e.to_string().to_lowercase();
-    if msg.contains("rate limit")
-        || msg.contains("api key")
-        || msg.contains("provider")
-    {
+    if msg.contains("rate limit") || msg.contains("api key") || msg.contains("provider") {
         return ErrorKind::ProviderError;
     }
-    if msg.contains("permission")
-        || msg.contains("unauthorized")
-        || msg.contains("access denied")
-    {
+    if msg.contains("permission") || msg.contains("unauthorized") || msg.contains("access denied") {
         return ErrorKind::PermissionDenied;
     }
     if msg.contains("timeout") || msg.contains("deadline exceeded") {
         return ErrorKind::Timeout;
     }
-    if msg.contains("validation")
-        || msg.contains("invalid")
-        || msg.contains("empty")
-    {
+    if msg.contains("validation") || msg.contains("invalid") || msg.contains("empty") {
         return ErrorKind::ValidationError;
     }
 
@@ -66,24 +57,14 @@ fn infer_kind(e: &anyhow::Error) -> ErrorKind {
 
 fn user_message(kind: &ErrorKind) -> String {
     match kind {
-        ErrorKind::ExecutionFailed => {
-            "요청을 처리하는 중 오류가 발생했습니다.".to_string()
-        }
+        ErrorKind::ExecutionFailed => "요청을 처리하는 중 오류가 발생했습니다.".to_string(),
         ErrorKind::ProviderError => {
             "AI 서비스에 일시적인 문제가 있습니다. 잠시 후 다시 시도해 주세요.".to_string()
         }
-        ErrorKind::Timeout => {
-            "요청 처리 시간이 초과되었습니다.".to_string()
-        }
-        ErrorKind::PermissionDenied => {
-            "이 작업을 수행할 권한이 없습니다.".to_string()
-        }
-        ErrorKind::ValidationError => {
-            "입력이 올바르지 않습니다.".to_string()
-        }
-        ErrorKind::Internal => {
-            "내부 오류가 발생했습니다.".to_string()
-        }
+        ErrorKind::Timeout => "요청 처리 시간이 초과되었습니다.".to_string(),
+        ErrorKind::PermissionDenied => "이 작업을 수행할 권한이 없습니다.".to_string(),
+        ErrorKind::ValidationError => "입력이 올바르지 않습니다.".to_string(),
+        ErrorKind::Internal => "내부 오류가 발생했습니다.".to_string(),
     }
 }
 
@@ -95,9 +76,7 @@ fn suggest(kind: &ErrorKind) -> Option<String> {
         ErrorKind::Timeout => {
             Some("더 간단한 요청으로 시도하거나 타임아웃을 늘리세요.".to_string())
         }
-        ErrorKind::PermissionDenied => {
-            Some("관리자에게 권한을 요청하세요.".to_string())
-        }
+        ErrorKind::PermissionDenied => Some("관리자에게 권한을 요청하세요.".to_string()),
         _ => None,
     }
 }
@@ -207,7 +186,11 @@ mod tests {
             ErrorKind::Internal,
         ] {
             let msg = user_message(kind);
-            assert!(!msg.is_empty(), "user_message should not be empty for {:?}", kind);
+            assert!(
+                !msg.is_empty(),
+                "user_message should not be empty for {:?}",
+                kind
+            );
         }
     }
 

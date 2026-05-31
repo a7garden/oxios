@@ -151,7 +151,7 @@ impl AuthManager {
             .map(|(hash, _)| hash.clone())
             .collect();
         if hashes_to_remove.is_empty() {
-            anyhow::bail!("Key '{}' not found", name);
+            anyhow::bail!("Key '{name}' not found");
         }
         for hash in hashes_to_remove {
             self.valid_hashes.remove(&hash);

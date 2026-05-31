@@ -26,8 +26,8 @@ pub enum DaemonStatus {
 impl std::fmt::Display for DaemonStatus {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            DaemonStatus::Running { pid } => write!(f, "running (PID {})", pid),
-            DaemonStatus::Stale { pid } => write!(f, "stale (PID {} dead)", pid),
+            DaemonStatus::Running { pid } => write!(f, "running (PID {pid})"),
+            DaemonStatus::Stale { pid } => write!(f, "stale (PID {pid} dead)"),
             DaemonStatus::Stopped => write!(f, "stopped"),
         }
     }
@@ -66,7 +66,7 @@ impl DaemonManager {
     pub fn start(&self, config_path: &Path) -> Result<()> {
         match self.status() {
             DaemonStatus::Running { pid } => {
-                anyhow::bail!("oxios is already running (PID {})", pid);
+                anyhow::bail!("oxios is already running (PID {pid})");
             }
             DaemonStatus::Stale { .. } => {
                 self.cleanup()?;
@@ -92,7 +92,7 @@ impl DaemonManager {
         let pid = child.id();
         self.write_pid(pid)?;
 
-        println!("⬡ oxios started (PID {})", pid);
+        println!("⬡ oxios started (PID {pid})");
         println!("  Logs: {}", log_file.display());
         println!("  Dashboard: http://127.0.0.1:4200");
         Ok(())
@@ -106,7 +106,7 @@ impl DaemonManager {
                 {
                     let ret = unsafe { libc::kill(pid as i32, libc::SIGTERM) };
                     if ret != 0 {
-                        anyhow::bail!("failed to send SIGTERM to PID {}", pid);
+                        anyhow::bail!("failed to send SIGTERM to PID {pid}");
                     }
                 }
                 #[cfg(not(unix))]

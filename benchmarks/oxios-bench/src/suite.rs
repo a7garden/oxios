@@ -42,11 +42,7 @@ impl Suite {
         entries.sort_by_key(|e| e.file_name());
 
         for entry in entries {
-            let suite_name = entry
-                .file_name()
-                .to_str()
-                .unwrap_or("unknown")
-                .to_string();
+            let suite_name = entry.file_name().to_str().unwrap_or("unknown").to_string();
             let suite = Suite::load(&entry.path(), &suite_name)?;
             if !suite.tasks.is_empty() {
                 suites.push(suite);

@@ -334,6 +334,34 @@ fn default_mode() -> String {
     "full".to_string()
 }
 
+impl Default for KnowledgeConfig {
+    fn default() -> Self {
+        Self {
+            language: default_language(),
+            timezone: default_timezone(),
+            move_to_commands: vec![],
+            pomodoro_duration_in_minutes: default_pomodoro_duration(),
+            schedules: vec![],
+            quick_commands: vec![],
+            two_emojis_enabled: false,
+            mode: default_mode(),
+            quick_habits_enabled: false,
+            channels: vec![],
+        }
+    }
+}
+
+/// Chat/Inbox mode constants.
+pub const MODE_CHAT: &str = "chat";
+/// Full mode constant.
+pub const MODE_FULL: &str = "full";
+/// Tasks-only mode constant.
+pub const MODE_TASKS: &str = "tasks";
+/// Notes-only mode constant.
+pub const MODE_NOTES: &str = "notes";
+/// Journal-only mode constant.
+pub const MODE_JOURNAL: &str = "journal";
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -371,15 +399,21 @@ mod tests {
         let json = serde_json::to_string(&entry).unwrap();
         let restored: FileEntry = serde_json::from_str(&json).unwrap();
         assert_eq!(restored.name, entry.name);
-        assert_eq!(restored.is_dir, true);
-        assert_eq!(restored.has_content, false);
+        assert!(restored.is_dir);
+        assert!(!restored.has_content);
     }
 
     #[test]
     fn test_fs_error_display() {
         assert_eq!(FsError::QuotaExceeded.to_string(), "storage quota exceeded");
-        assert_eq!(FsError::UnsafePath.to_string(), "unsafe path, possible security issue");
-        assert_eq!(FsError::CannotUnhash.to_string(), "cannot unhash, maybe the file is missing");
+        assert_eq!(
+            FsError::UnsafePath.to_string(),
+            "unsafe path, possible security issue"
+        );
+        assert_eq!(
+            FsError::CannotUnhash.to_string(),
+            "cannot unhash, maybe the file is missing"
+        );
     }
 
     #[test]
@@ -508,31 +542,3 @@ mod tests {
         assert_eq!(MOOD_EMOJIS.len(), 6);
     }
 }
-
-impl Default for KnowledgeConfig {
-    fn default() -> Self {
-        Self {
-            language: default_language(),
-            timezone: default_timezone(),
-            move_to_commands: vec![],
-            pomodoro_duration_in_minutes: default_pomodoro_duration(),
-            schedules: vec![],
-            quick_commands: vec![],
-            two_emojis_enabled: false,
-            mode: default_mode(),
-            quick_habits_enabled: false,
-            channels: vec![],
-        }
-    }
-}
-
-/// Chat/Inbox mode constants.
-pub const MODE_CHAT: &str = "chat";
-/// Full mode constant.
-pub const MODE_FULL: &str = "full";
-/// Tasks-only mode constant.
-pub const MODE_TASKS: &str = "tasks";
-/// Notes-only mode constant.
-pub const MODE_NOTES: &str = "notes";
-/// Journal-only mode constant.
-pub const MODE_JOURNAL: &str = "journal";

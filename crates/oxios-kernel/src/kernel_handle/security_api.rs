@@ -76,7 +76,7 @@ impl SecurityApi {
     pub fn verify_chain(&self) -> anyhow::Result<bool> {
         self.audit_trail
             .verify()
-            .map_err(|e| anyhow::anyhow!("audit verify failed: {:?}", e))
+            .map_err(|e| anyhow::anyhow!("audit verify failed: {e:?}"))
     }
 
     /// Query audit entries by sequence range.

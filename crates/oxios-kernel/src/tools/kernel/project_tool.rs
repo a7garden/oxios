@@ -142,7 +142,7 @@ impl AgentTool for ProjectTool {
             "get" => {
                 let project = if let Some(id_str) = params.get("id").and_then(|v| v.as_str()) {
                     let id = uuid::Uuid::parse_str(id_str)
-                        .map_err(|e| format!("Invalid project ID: {}", e))?;
+                        .map_err(|e| format!("Invalid project ID: {e}"))?;
                     pm.get_project(id)
                 } else if let Some(name) = params.get("name").and_then(|v| v.as_str()) {
                     pm.get_project_by_name(name)
@@ -185,7 +185,7 @@ impl AgentTool for ProjectTool {
                     .ok_or_else(|| "link_memory requires 'memory_id'".to_string())?;
 
                 let project_id = uuid::Uuid::parse_str(project_id_str)
-                    .map_err(|e| format!("Invalid project_id: {}", e))?;
+                    .map_err(|e| format!("Invalid project_id: {e}"))?;
 
                 match pm.link_memory(project_id, memory_id) {
                     Ok(()) => Ok(AgentToolResult::success(format!(
@@ -194,8 +194,7 @@ impl AgentTool for ProjectTool {
                         &project_id_str[..8.min(project_id_str.len())],
                     ))),
                     Err(e) => Ok(AgentToolResult::error(format!(
-                        "Failed to link memory: {}",
-                        e
+                        "Failed to link memory: {e}"
                     ))),
                 }
             }
@@ -211,7 +210,7 @@ impl AgentTool for ProjectTool {
                     .ok_or_else(|| "unlink_memory requires 'memory_id'".to_string())?;
 
                 let project_id = uuid::Uuid::parse_str(project_id_str)
-                    .map_err(|e| format!("Invalid project_id: {}", e))?;
+                    .map_err(|e| format!("Invalid project_id: {e}"))?;
 
                 match pm.unlink_memory(project_id, memory_id) {
                     Ok(()) => Ok(AgentToolResult::success(format!(
@@ -220,15 +219,13 @@ impl AgentTool for ProjectTool {
                         &project_id_str[..8.min(project_id_str.len())],
                     ))),
                     Err(e) => Ok(AgentToolResult::error(format!(
-                        "Failed to unlink memory: {}",
-                        e
+                        "Failed to unlink memory: {e}"
                     ))),
                 }
             }
 
             other => Err(format!(
-                "Unknown project action '{}'. Valid: list, get, link_memory, unlink_memory",
-                other
+                "Unknown project action '{other}'. Valid: list, get, link_memory, unlink_memory"
             )),
         }
     }

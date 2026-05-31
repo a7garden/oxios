@@ -38,7 +38,7 @@ impl McpToolWrapper {
         description: String,
         input_schema: Value,
     ) -> Self {
-        let full_name = format!("mcp:{}:{}", server_name, tool_name);
+        let full_name = format!("mcp:{server_name}:{tool_name}");
         Self {
             bridge,
             full_name,

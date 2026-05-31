@@ -131,8 +131,7 @@ const MANUAL_MODEL_DISPLAY: &str = "✎  Enter model ID manually";
 
 /// Check if the system is fully configured (model + credentials).
 pub fn has_credentials(config: &OxiosConfig) -> bool {
-    let Some(provider) = CredentialStore::provider_from_model(&config.engine.default_model)
-    else {
+    let Some(provider) = CredentialStore::provider_from_model(&config.engine.default_model) else {
         return false;
     };
     CredentialStore::has_credential(provider, config.api_key().as_deref())
@@ -218,7 +217,7 @@ pub fn run_onboarding(
             println!(
                 "  {} {} {}",
                 theme::accent("◇"),
-                theme::dim(format!("Found {} →", var_name)),
+                theme::dim(format!("Found {var_name} →")),
                 theme::accent(provider),
             );
             let use_it = Confirm::new("  Use this provider?")
@@ -257,7 +256,13 @@ fn run_provider_flow(
 
     // ── Save config (needed for embedding download path) ──
     with_spinner("Saving configuration...", "Configuration saved", || {
-        persist_config(oxios_home, config, provider, api_key.as_deref().unwrap_or(""), &model)
+        persist_config(
+            oxios_home,
+            config,
+            provider,
+            api_key.as_deref().unwrap_or(""),
+            &model,
+        )
     })?;
 
     // ── Embedding model ──
@@ -288,9 +293,7 @@ fn resolve_api_key(provider: &str) -> anyhow::Result<(Option<String>, &'static s
                 theme::step("API Key"),
                 theme::dim("~/.oxi/auth.json"),
             );
-            let use_it = Confirm::new("  Use them?")
-                .with_default(true)
-                .prompt()?;
+            let use_it = Confirm::new("  Use them?").with_default(true).prompt()?;
             if use_it {
                 return Ok((None, "auth.json"));
             }
@@ -311,10 +314,7 @@ fn resolve_api_key(provider: &str) -> anyhow::Result<(Option<String>, &'static s
     // Manual entry
     println!();
     println!("  {}", theme::step("API Key"));
-    println!(
-        "  {}",
-        theme::dim("Stored locally, never shared."),
-    );
+    println!("  {}", theme::dim("Stored locally, never shared."),);
 
     let key = CustomType::<String>::new("  →")
         .with_placeholder("sk-...")
@@ -352,10 +352,7 @@ fn prompt_provider<'a>(providers: &[&'a str]) -> anyhow::Result<&'a str> {
 
     println!();
     println!("  {}", theme::step("Provider"));
-    println!(
-        "  {}",
-        theme::dim("Which cloud hosts your LLM?"),
-    );
+    println!("  {}", theme::dim("Which cloud hosts your LLM?"),);
 
     let selected = Select::new("  →", entries)
         .with_starting_cursor(0)
@@ -380,7 +377,7 @@ fn prompt_model(provider: &str) -> anyhow::Result<String> {
         return Ok(if model.contains('/') {
             model
         } else {
-            format!("{}/{}", provider, model)
+            format!("{provider}/{model}")
         });
     }
 
@@ -405,7 +402,7 @@ fn prompt_model(provider: &str) -> anyhow::Result<String> {
             display: format!(
                 "  {}  {}{}",
                 style(&entry.name).bold(),
-                theme::muted(format!("{} ctx", ctx)),
+                theme::muted(format!("{ctx} ctx")),
                 reasoning,
             ),
         });
@@ -416,7 +413,7 @@ fn prompt_model(provider: &str) -> anyhow::Result<String> {
 
     entries.push(ModelEntry {
         full_id: String::new(),
-        display: format!("  {}", MANUAL_MODEL_DISPLAY),
+        display: format!("  {MANUAL_MODEL_DISPLAY}"),
     });
 
     let selected = Select::new("  →", entries)
@@ -431,7 +428,7 @@ fn prompt_model(provider: &str) -> anyhow::Result<String> {
         return Ok(if manual.contains('/') {
             manual
         } else {
-            format!("{}/{}", provider, manual)
+            format!("{provider}/{manual}")
         });
     }
 
@@ -484,15 +481,8 @@ fn setup_embedding(config: &OxiosConfig) -> anyhow::Result<String> {
                 Ok("downloaded".to_string())
             }
             Err(e) => {
-                println!(
-                    "  {} {}",
-                    theme::warn(theme::fail()),
-                    e,
-                );
-                println!(
-                    "  {} Will retry on first search.",
-                    theme::accent("→"),
-                );
+                println!("  {} {}", theme::warn(theme::fail()), e,);
+                println!("  {} Will retry on first search.", theme::accent("→"),);
                 Ok("failed".to_string())
             }
         }
@@ -552,7 +542,7 @@ fn persist_config(
 
     std::fs::create_dir_all(oxios_home)?;
     let toml_str = toml::to_string_pretty(config)
-        .map_err(|e| anyhow::anyhow!("Failed to serialize config: {}", e))?;
+        .map_err(|e| anyhow::anyhow!("Failed to serialize config: {e}"))?;
     std::fs::write(oxios_home.join("config.toml"), &toml_str)?;
 
     Ok(())
@@ -564,14 +554,8 @@ fn print_intro(is_first_run: bool) {
     println!();
 
     if is_first_run {
-        println!(
-            "  {}",
-            style("⬡ Oxios Agent OS").bold().cyan(),
-        );
-        println!(
-            "  {}",
-            theme::dim("Your AI agents, organized."),
-        );
+        println!("  {}", style("⬡ Oxios Agent OS").bold().cyan(),);
+        println!("  {}", theme::dim("Your AI agents, organized."),);
         println!();
         println!("  Let's get you set up. About 30 seconds.");
     } else {
@@ -593,23 +577,18 @@ fn print_summary(
     embed_status: &str,
 ) {
     println!();
-    println!("  {}", theme::dim("─────────────────────────────────────────"));
-
     println!(
-        "  {:<14} {}",
-        theme::dim("LLM:"),
-        theme::accent(model),
+        "  {}",
+        theme::dim("─────────────────────────────────────────")
     );
+
+    println!("  {:<14} {}", theme::dim("LLM:"), theme::accent(model),);
     println!(
         "  {:<14} {}",
         theme::dim("Provider:"),
         theme::muted(provider),
     );
-    println!(
-        "  {:<14} {}",
-        theme::dim("Key:"),
-        theme::muted(key_source),
-    );
+    println!("  {:<14} {}", theme::dim("Key:"), theme::muted(key_source),);
 
     let embed_label = match embed_status {
         "cached" | "downloaded" => {
@@ -646,6 +625,9 @@ fn print_summary(
         theme::muted(oxios_home.display()),
     );
 
-    println!("  {}", theme::dim("─────────────────────────────────────────"));
+    println!(
+        "  {}",
+        theme::dim("─────────────────────────────────────────")
+    );
     println!();
 }

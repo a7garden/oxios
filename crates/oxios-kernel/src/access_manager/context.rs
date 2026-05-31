@@ -41,25 +41,37 @@ impl AgentContext {
         // Grant standard capabilities for testing
         use crate::capability::{Capability, ResourceRef, Rights};
         cspace.insert(Capability::kernel(
-            ResourceRef::Exec { mode: "shell".into() },
+            ResourceRef::Exec {
+                mode: "shell".into(),
+            },
             Rights::ALL,
         ));
         cspace.insert(Capability::kernel(
-            ResourceRef::Exec { mode: "structured".into() },
+            ResourceRef::Exec {
+                mode: "structured".into(),
+            },
             Rights::ALL,
         ));
         cspace.insert(Capability::kernel(
-            ResourceRef::KernelDomain { domain: "fs".into() },
+            ResourceRef::KernelDomain {
+                domain: "fs".into(),
+            },
             Rights::ALL,
         ));
         cspace.insert(Capability::kernel(
-            ResourceRef::KernelDomain { domain: "agent".into() },
+            ResourceRef::KernelDomain {
+                domain: "agent".into(),
+            },
             Rights::ALL,
         ));
         // Grant all common tools
-        for tool in ["bash", "read", "write", "edit", "grep", "find", "ls", "exec"] {
+        for tool in [
+            "bash", "read", "write", "edit", "grep", "find", "ls", "exec",
+        ] {
             cspace.insert(Capability::kernel(
-                ResourceRef::KernelDomain { domain: tool.into() },
+                ResourceRef::KernelDomain {
+                    domain: tool.into(),
+                },
                 Rights::EXECUTE,
             ));
         }

@@ -491,7 +491,7 @@ impl AgentScheduler {
                 running.insert(task.id, task);
                 Ok(())
             }
-            None => Err(anyhow::anyhow!("task {} not found in queue", task_id)),
+            None => Err(anyhow::anyhow!("task {task_id} not found in queue")),
         }
     }
 

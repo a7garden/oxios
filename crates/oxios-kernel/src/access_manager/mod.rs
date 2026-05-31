@@ -15,9 +15,9 @@ mod gate;
 mod permissions;
 mod rbac;
 
-pub use audit_sink::{AuditEvent, AuditSink, TrailAuditSink, TracingAuditSink};
 #[cfg(test)]
 pub use audit_sink::NoOpAuditSink;
+pub use audit_sink::{AuditEvent, AuditSink, TracingAuditSink, TrailAuditSink};
 pub use context::AgentContext;
 pub use gate::{AccessDenied, AccessGate, CheckRequest, DenyLayer, PathMode};
 pub use permissions::{AgentPermissions, AuditEntry, PermissionUpdate};
@@ -31,30 +31,29 @@ use std::sync::Arc;
 
 use crate::types::AgentId;
 
-/// Access Manager.
+/// Access Manager — least-privilege security for agents.
 ///
-/// Manages agent permissions, enforces security boundaries, and maintains
-/// an audit log of all security-relevant actions.
+/// # Example
 ///
-/// # Usage
-/// ```rust,ignore
+/// ```no_run
+/// use oxios_kernel::access_manager::{AccessManager, AgentPermissions};
+///
 /// let mut access = AccessManager::new();
 ///
-/// // Create permissions for a new agent
-/// access.set_permissions(AgentPermissions::for_new_agent("code-agent"));
+/// // Create and configure permissions for a new agent
+/// let mut perms = AgentPermissions::for_new_agent("code-agent");
+/// perms.allow_tool("read");
+/// perms.allow_tool("write");
+/// perms.allow_path("/workspace/");
+/// access.set_permissions(perms);
 ///
-/// // Assign agent to a workspace
-/// access.assign_workspace("code-agent", "project-alpha");
+/// // Check tool access
+/// let can_exec = access.can_use_tool("code-agent", "exec");
+/// let can_read = access.can_use_tool("code-agent", "read");
 ///
-/// // Check permissions with sandbox enforcement
-/// if access.can_access_path_in_workspace(&agent_id, "code-agent", "/workspace/file.rs", Some("project-alpha")) {
-///     // allow file access within workspace
-/// }
-///
-/// // Check if agent can access a specific workspace
-/// if access.can_access_workspace("code-agent", "project-alpha") {
-///     // allow workspace access
-/// }
+/// // Check path access
+/// let can_read_workspace = access.can_access_path("code-agent", "/workspace/file.rs");
+/// let can_read_root = access.can_access_path("code-agent", "/etc/passwd");
 /// ```
 /// Access Manager — least-privilege security for agents.
 // NOTE: Clone is derived for ExecTool compatibility (Phase 1).
@@ -144,7 +143,7 @@ impl AccessManager {
                         .open(&audit_path)
                     {
                         use std::io::Write;
-                        let _ = writeln!(f, "{}", line);
+                        let _ = writeln!(f, "{line}");
                     }
                 }
             });
@@ -545,8 +544,7 @@ impl AccessManager {
                     path,
                     false,
                     Some(format!(
-                        "Path '{}' is outside workspace '{}' boundary",
-                        path, workspace_name
+                        "Path '{path}' is outside workspace '{workspace_name}' boundary"
                     )),
                 );
             }
@@ -564,8 +562,7 @@ impl AccessManager {
                         path,
                         false,
                         Some(format!(
-                            "Path '{}' is outside assigned workspace '{}' boundary",
-                            path, assigned_workspace
+                            "Path '{path}' is outside assigned workspace '{assigned_workspace}' boundary"
                         )),
                     );
                 }

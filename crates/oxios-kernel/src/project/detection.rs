@@ -38,7 +38,11 @@ pub fn detect_project(message: &str, projects: &[Project]) -> DetectionResult {
     // Layer 2: Path extraction
     if let Some(path) = extract_path(message) {
         for project in projects {
-            if project.paths.iter().any(|p| path.starts_with(p) || p.starts_with(&path)) {
+            if project
+                .paths
+                .iter()
+                .any(|p| path.starts_with(p) || p.starts_with(&path))
+            {
                 return DetectionResult::Found(project.id);
             }
         }
@@ -67,7 +71,9 @@ pub fn detect_project(message: &str, projects: &[Project]) -> DetectionResult {
 pub fn extract_path(message: &str) -> Option<PathBuf> {
     // Find substrings that look like absolute paths
     for word in message.split_whitespace() {
-        let cleaned = word.trim_matches(|c: char| !c.is_alphanumeric() && c != '/' && c != '.' && c != '-' && c != '_');
+        let cleaned = word.trim_matches(|c: char| {
+            !c.is_alphanumeric() && c != '/' && c != '.' && c != '-' && c != '_'
+        });
         if cleaned.starts_with('/') && cleaned.len() > 2 {
             let path = PathBuf::from(cleaned);
             // Check it looks like a real path (has at least one directory component)
@@ -79,7 +85,9 @@ pub fn extract_path(message: &str) -> Option<PathBuf> {
 
     // Check for ~-prefixed paths
     for word in message.split_whitespace() {
-        let cleaned = word.trim_matches(|c: char| !c.is_alphanumeric() && c != '/' && c != '.' && c != '-' && c != '_' && c != '~');
+        let cleaned = word.trim_matches(|c: char| {
+            !c.is_alphanumeric() && c != '/' && c != '.' && c != '-' && c != '_' && c != '~'
+        });
         if cleaned.starts_with("~/") && cleaned.len() > 2 {
             if let Some(home) = std::env::var_os("HOME") {
                 let expanded = cleaned.replacen("~", &home.to_string_lossy(), 1);
@@ -108,11 +116,14 @@ mod tests {
 
     fn make_projects() -> Vec<Project> {
         let mut oxios = Project::new("oxios", ProjectSource::Manual);
-        oxios.paths.push(PathBuf::from("/Volumes/MERCURY/PROJECTS/oxios"));
+        oxios
+            .paths
+            .push(PathBuf::from("/Volumes/MERCURY/PROJECTS/oxios"));
         oxios.add_tag("agent-os");
 
         let mut oxi = Project::new("oxi", ProjectSource::Manual);
-        oxi.paths.push(PathBuf::from("/Volumes/MERCURY/PROJECTS/oxi"));
+        oxi.paths
+            .push(PathBuf::from("/Volumes/MERCURY/PROJECTS/oxi"));
         oxi.add_tag("sdk");
 
         let mut blog = Project::new("my-blog", ProjectSource::Manual);
@@ -149,7 +160,9 @@ mod tests {
         let result = detect_project("/Volumes/MERCURY/PROJECTS/unknown 에서 작업", &projects);
         assert!(matches!(
             result,
-            DetectionResult::NoMatch { detected_path: Some(_) }
+            DetectionResult::NoMatch {
+                detected_path: Some(_)
+            }
         ));
     }
 
@@ -159,7 +172,9 @@ mod tests {
         let result = detect_project("오늘 점심 뭐 먹지?", &projects);
         assert!(matches!(
             result,
-            DetectionResult::NoMatch { detected_path: None }
+            DetectionResult::NoMatch {
+                detected_path: None
+            }
         ));
     }
 

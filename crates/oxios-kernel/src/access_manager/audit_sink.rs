@@ -99,20 +99,21 @@ impl AuditEvent {
     /// Convert to an AuditAction for the Merkle-chain AuditTrail.
     pub fn to_audit_action(&self) -> AuditAction {
         match self {
-            AuditEvent::ToolAccess {
-                tool, allowed, ..
-            } => AuditAction::Other {
-                detail: format!("tool_access:{}:allowed={}", tool, allowed),
+            AuditEvent::ToolAccess { tool, allowed, .. } => AuditAction::Other {
+                detail: format!("tool_access:{tool}:allowed={allowed}"),
             },
             AuditEvent::PathAccess {
-                path, mode, allowed, ..
+                path,
+                mode,
+                allowed,
+                ..
             } => AuditAction::Other {
-                detail: format!("path_access:{}:{}:allowed={}", path, mode, allowed),
+                detail: format!("path_access:{path}:{mode}:allowed={allowed}"),
             },
             AuditEvent::ExecAccess {
                 binary, allowed, ..
             } => AuditAction::Other {
-                detail: format!("exec_access:{}:allowed={}", binary, allowed),
+                detail: format!("exec_access:{binary}:allowed={allowed}"),
             },
             AuditEvent::RbacDecision {
                 subject,
@@ -120,19 +121,22 @@ impl AuditEvent {
                 allowed,
                 ..
             } => AuditAction::Other {
-                detail: format!("rbac:{}:{}:allowed={}", subject, action, allowed),
+                detail: format!("rbac:{subject}:{action}:allowed={allowed}"),
             },
             AuditEvent::SandboxViolation {
-                agent, path, workspace, ..
+                agent,
+                path,
+                workspace,
+                ..
             } => AuditAction::Other {
-                detail: format!("sandbox_violation:{}:{}:ws={}", agent, path, workspace),
+                detail: format!("sandbox_violation:{agent}:{path}:ws={workspace}"),
             },
             AuditEvent::Approval {
                 approval_id,
                 status,
                 ..
             } => AuditAction::Other {
-                detail: format!("approval:{}:{}", approval_id, status),
+                detail: format!("approval:{approval_id}:{status}"),
             },
         }
     }
@@ -194,10 +198,7 @@ impl TrailAuditSink {
             }
         });
 
-        Self {
-            trail,
-            file_tx: tx,
-        }
+        Self { trail, file_tx: tx }
     }
 }
 
@@ -239,7 +240,14 @@ pub struct TracingAuditSink;
 
 impl AuditSink for TracingAuditSink {
     fn record(&self, event: AuditEvent) {
-        if let AuditEvent::ToolAccess { agent, tool, allowed: false, layer, .. } = &event {
+        if let AuditEvent::ToolAccess {
+            agent,
+            tool,
+            allowed: false,
+            layer,
+            ..
+        } = &event
+        {
             tracing::warn!(
                 agent = %agent,
                 tool = %tool,

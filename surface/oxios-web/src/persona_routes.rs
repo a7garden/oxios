@@ -130,7 +130,7 @@ pub async fn handle_persona_update(
         .kernel
         .persona
         .get(&id)
-        .ok_or_else(|| (StatusCode::NOT_FOUND, format!("Persona '{}' not found", id)))?;
+        .ok_or_else(|| (StatusCode::NOT_FOUND, format!("Persona '{id}' not found")))?;
 
     let updated = Persona {
         id: existing.id,

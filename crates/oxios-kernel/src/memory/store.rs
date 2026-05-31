@@ -16,7 +16,9 @@ use crate::embedding::EmbeddingVector;
 
 use super::hnsw::HnswIndex;
 use super::normalizer::l2_normalize_f32;
-use super::{content_hash, dedup_by_id, extract_keywords, MemoryEntry, MemoryManager, MemoryTier, MemoryType};
+use super::{
+    content_hash, dedup_by_id, extract_keywords, MemoryEntry, MemoryManager, MemoryTier, MemoryType,
+};
 
 // ---------------------------------------------------------------------------
 // VectorIndexSnapshot
@@ -153,8 +155,8 @@ impl MemoryManager {
         self.state_store.save_json(category, &id, &entry).await?;
 
         self.git_commit(
-            &format!("{}/{}.json", category, id),
-            &format!("memory: store {}", id),
+            &format!("{category}/{id}.json"),
+            &format!("memory: store {id}"),
         );
 
         // Update vector index
@@ -505,15 +507,15 @@ impl MemoryManager {
             } else {
                 last_response.content.clone()
             };
-            summary_parts.push(format!("Agent: {}", truncated));
+            summary_parts.push(format!("Agent: {truncated}"));
         }
 
         // Include metadata
         if let Some(ref seed_id) = session.active_seed_id {
-            summary_parts.push(format!("Seed: {}", seed_id));
+            summary_parts.push(format!("Seed: {seed_id}"));
         }
         if let Some(ref persona_id) = session.active_persona_id {
-            summary_parts.push(format!("Persona: {}", persona_id));
+            summary_parts.push(format!("Persona: {persona_id}"));
         }
 
         let content = summary_parts.join("\n");
@@ -1025,11 +1027,7 @@ impl MemoryManager {
         }
         // Try as category/name format
         if let Some((cat, name)) = reference.split_once('/') {
-            if let Ok(Some(entry)) = self
-                .state_store
-                .load_json::<MemoryEntry>(cat, name)
-                .await
-            {
+            if let Ok(Some(entry)) = self.state_store.load_json::<MemoryEntry>(cat, name).await {
                 return Ok(Some(entry));
             }
         }
@@ -1039,11 +1037,7 @@ impl MemoryManager {
     /// Select memories by manifest (keyword matching against content).
     ///
     /// Used by proactive recall Step 2 for cross-domain keyword matching.
-    pub async fn select_by_manifest(
-        &self,
-        query: &str,
-        limit: usize,
-    ) -> Result<Vec<MemoryEntry>> {
+    pub async fn select_by_manifest(&self, query: &str, limit: usize) -> Result<Vec<MemoryEntry>> {
         self.keyword_search(query, None, limit).await
     }
 
@@ -1086,7 +1080,7 @@ impl MemoryManager {
             return Ok(system_prompt.to_string());
         }
 
-        Ok(format!("{}\n\n{}", system_prompt, hot_ctx))
+        Ok(format!("{system_prompt}\n\n{hot_ctx}"))
     }
 
     /// Shift a memory entry between tiers.
@@ -1164,11 +1158,10 @@ impl MemoryManager {
     ///
     /// Called after remember() to immediately demote entries when Hot
     /// exceeds its budget.
-    pub async fn immediate_hot_overflow(
-        &self,
-        hot_max: usize,
-    ) -> Result<usize> {
-        let hot_entries = self.list_by_tier(super::MemoryTier::Hot, hot_max * 2).await?;
+    pub async fn immediate_hot_overflow(&self, hot_max: usize) -> Result<usize> {
+        let hot_entries = self
+            .list_by_tier(super::MemoryTier::Hot, hot_max * 2)
+            .await?;
         if hot_entries.len() <= hot_max {
             return Ok(0);
         }
@@ -1180,13 +1173,11 @@ impl MemoryManager {
             .collect();
 
         candidates.sort_by(|a, b| {
-            a.protection
-                .cmp(&b.protection)
-                .then(
-                    a.decay_score
-                        .partial_cmp(&b.decay_score)
-                        .unwrap_or(std::cmp::Ordering::Equal),
-                )
+            a.protection.cmp(&b.protection).then(
+                a.decay_score
+                    .partial_cmp(&b.decay_score)
+                    .unwrap_or(std::cmp::Ordering::Equal),
+            )
         });
 
         let mut demoted = 0;

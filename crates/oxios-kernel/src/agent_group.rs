@@ -66,7 +66,7 @@ impl OxiosAgentGroup {
                     parent_seed_id: Some(parent_seed.id),
                     cspace_hint: parent_seed.cspace_hint.clone(),
                     original_request: parent_seed.original_request.clone(),
-            output_schema: None,
+                    output_schema: None,
                 };
                 OxiosGroupAgent {
                     id: child_seed.id,

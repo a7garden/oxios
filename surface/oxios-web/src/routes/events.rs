@@ -340,13 +340,13 @@ pub(crate) async fn handle_approvals_list(
         .iter()
         .map(|(p, s)| {
             let subject_str = match &p.subject {
-                oxios_kernel::access_manager::Subject::User(n) => format!("user:{}", n),
-                oxios_kernel::access_manager::Subject::Agent(id) => format!("agent:{}", id),
+                oxios_kernel::access_manager::Subject::User(n) => format!("user:{n}"),
+                oxios_kernel::access_manager::Subject::Agent(id) => format!("agent:{id}"),
                 oxios_kernel::access_manager::Subject::System => "system".into(),
             };
             let action_str = match &p.action {
-                oxios_kernel::access_manager::Action::UseTool(t) => format!("use_tool:{}", t),
-                oxios_kernel::access_manager::Action::AccessPath(p) => format!("access_path:{}", p),
+                oxios_kernel::access_manager::Action::UseTool(t) => format!("use_tool:{t}"),
+                oxios_kernel::access_manager::Action::AccessPath(p) => format!("access_path:{p}"),
                 oxios_kernel::access_manager::Action::ManageAgents => "manage_agents".into(),
                 oxios_kernel::access_manager::Action::ManagePrograms => "manage_programs".into(),
                 oxios_kernel::access_manager::Action::ManageWorkspaces => {

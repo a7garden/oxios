@@ -50,7 +50,12 @@ pub static PERSONAS: &[LateralPersona] = &[
             "If you inverted the goal, what would that look like?",
             "What would a critic say about this approach?",
         ],
-        affinities: &[StagnationPattern::Spinning, StagnationPattern::Oscillation, StagnationPattern::DiminishingReturns, StagnationPattern::NoDrift],
+        affinities: &[
+            StagnationPattern::Spinning,
+            StagnationPattern::Oscillation,
+            StagnationPattern::DiminishingReturns,
+            StagnationPattern::NoDrift,
+        ],
     },
     LateralPersona {
         name: "Hacker",
@@ -82,7 +87,10 @@ pub static PERSONAS: &[LateralPersona] = &[
             "Is there a simpler way to express the same thing?",
             "What would YAGNI (You Ain't Gonna Need It) cut?",
         ],
-        affinities: &[StagnationPattern::DiminishingReturns, StagnationPattern::Oscillation],
+        affinities: &[
+            StagnationPattern::DiminishingReturns,
+            StagnationPattern::Oscillation,
+        ],
     },
     LateralPersona {
         name: "Researcher",
@@ -98,7 +106,10 @@ pub static PERSONAS: &[LateralPersona] = &[
             "What does the error/failure pattern tell you?",
             "Has anyone solved a similar problem before?",
         ],
-        affinities: &[StagnationPattern::NoDrift, StagnationPattern::DiminishingReturns],
+        affinities: &[
+            StagnationPattern::NoDrift,
+            StagnationPattern::DiminishingReturns,
+        ],
     },
     LateralPersona {
         name: "Architect",
@@ -153,25 +164,27 @@ pub fn build_lateral_prompt(
         parts.push(String::new());
         parts.push("## Previous Failed Attempts".to_string());
         for attempt in failed_attempts {
-            parts.push(format!("- {}", attempt));
+            parts.push(format!("- {attempt}"));
         }
     }
 
     parts.push(String::new());
     parts.push("## Lateral Thinking Instructions".to_string());
     for step in persona.approach {
-        parts.push(format!("- {}", step));
+        parts.push(format!("- {step}"));
     }
 
     parts.push(String::new());
     parts.push("## Questions to Consider".to_string());
     for q in persona.questions {
-        parts.push(format!("- {}", q));
+        parts.push(format!("- {q}"));
     }
 
     parts.push(String::new());
     parts.push("## Your Alternative Approach".to_string());
-    parts.push("Propose a fundamentally different approach that addresses the root cause.".to_string());
+    parts.push(
+        "Propose a fundamentally different approach that addresses the root cause.".to_string(),
+    );
 
     parts.join("\n")
 }
@@ -204,12 +217,8 @@ mod tests {
     #[test]
     fn test_build_lateral_prompt_contains_persona() {
         let persona = &PERSONAS[0]; // Contrarian
-        let prompt = build_lateral_prompt(
-            persona,
-            "Fix the auth bug",
-            "Tried adding null checks",
-            &[],
-        );
+        let prompt =
+            build_lateral_prompt(persona, "Fix the auth bug", "Tried adding null checks", &[]);
         assert!(prompt.contains("Contrarian"));
         assert!(prompt.contains("auth bug"));
         assert!(prompt.contains("null checks"));

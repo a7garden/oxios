@@ -41,7 +41,7 @@ pub fn habits(fs: &VirtualFs, year: i32) -> Result<Habits, HabitsError> {
         habits.insert(entry.display_name.clone(), HashMap::new());
     }
 
-    let filename = format!("{} Habits.md", year);
+    let filename = format!("{year} Habits.md");
     if !fs.exists(DIR_INSIGHTS, &filename)? {
         return Ok(habits);
     }
@@ -87,10 +87,7 @@ pub fn habits(fs: &VirtualFs, year: i32) -> Result<Habits, HabitsError> {
             continue;
         }
 
-        let marker = format!(
-            "{}{}{}",
-            HABIT_SKIPPED, HABIT_COMPLETED_AT_WEEKEND, HABIT_COMPLETED
-        );
+        let marker = format!("{HABIT_SKIPPED}{HABIT_COMPLETED_AT_WEEKEND}{HABIT_COMPLETED}");
         if !days.contains(marker.chars().next().unwrap().to_string().as_str()) {
             continue;
         }
@@ -127,7 +124,7 @@ pub fn emoji_for_status(
 
 /// Get emoji for a habit from its definition file.
 pub fn habit_emoji(fs: &VirtualFs, habit_name: &str) -> String {
-    if let Ok(content) = fs.read(DIR_HABITS, &format!("{}{}", habit_name, MD_EXT)) {
+    if let Ok(content) = fs.read(DIR_HABITS, &format!("{habit_name}{MD_EXT}")) {
         let trimmed = content.trim();
         if !trimmed.is_empty() {
             return trimmed.to_string();
@@ -248,7 +245,7 @@ pub fn write_habits(fs: &VirtualFs, year: i32, habits: &Habits) -> Result<(), Ha
             }
 
             if at_least_one_completion {
-                habits_for_month.push_str(&format!("{} {}\n", statuses, habit_name));
+                habits_for_month.push_str(&format!("{statuses} {habit_name}\n"));
             }
         }
 
@@ -276,7 +273,7 @@ pub fn write_habits(fs: &VirtualFs, year: i32, habits: &Habits) -> Result<(), Ha
         .unwrap();
     }
 
-    let filename = format!("{} Habits.md", year);
+    let filename = format!("{year} Habits.md");
     fs.write(DIR_INSIGHTS, &filename, &content)?;
     Ok(())
 }

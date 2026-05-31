@@ -129,7 +129,7 @@ fn test_phase_serialization_roundtrip() {
     ] {
         let json = serde_json::to_string(&phase).unwrap();
         let restored: Phase = serde_json::from_str(&json).unwrap();
-        assert_eq!(format!("{:?}", phase), format!("{:?}", restored));
+        assert_eq!(format!("{phase:?}"), format!("{:?}", restored));
     }
 }
 
@@ -147,7 +147,7 @@ fn test_phase_ordering() {
     assert_eq!(displays.len(), 5);
     // All should be unique
     for i in 0..displays.len() {
-        for j in (i+1)..displays.len() {
+        for j in (i + 1)..displays.len() {
             assert_ne!(displays[i], displays[j]);
         }
     }
@@ -164,7 +164,10 @@ fn test_evaluation_result_with_notes() {
         semantic_pass: Some(true),
         consensus_pass: Some(true),
         score: 0.95,
-        notes: vec!["All checks passed".to_string(), "Performance OK".to_string()],
+        notes: vec![
+            "All checks passed".to_string(),
+            "Performance OK".to_string(),
+        ],
     };
     assert!(result.all_passed());
     assert_eq!(result.notes.len(), 2);
@@ -217,7 +220,7 @@ fn test_interview_result_serialization_roundtrip() {
     let mut result = InterviewResult::new();
     result.add_exchange("What?", "This");
     result.update_ambiguity(AmbiguityScore::new(0.8, 0.9, 0.7));
-    
+
     let json = serde_json::to_string(&result).unwrap();
     let restored: InterviewResult = serde_json::from_str(&json).unwrap();
     assert_eq!(restored.questions.len(), 1);

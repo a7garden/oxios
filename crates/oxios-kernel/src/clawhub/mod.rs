@@ -19,9 +19,11 @@
 //!
 //! # Example
 //!
-//! ```ignore
+//! ```no_run
 //! use oxios_kernel::clawhub::{ClawHubInstaller, InstallResult};
+//! use std::path::PathBuf;
 //!
+//! # async fn example() -> anyhow::Result<()> {
 //! let installer = ClawHubInstaller::new(
 //!     PathBuf::from("/home/user/.oxios/skills"),
 //!     PathBuf::from("/home/user/oxios-workspace"),
@@ -29,6 +31,8 @@
 //! );
 //!
 //! let result = installer.install("code-review-helper", None).await?;
+//! # Ok(())
+//! # }
 //! ```
 
 pub mod client;

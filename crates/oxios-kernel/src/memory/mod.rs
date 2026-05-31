@@ -340,7 +340,6 @@ impl ProtectionLevel {
     }
 }
 
-
 /// A single memory entry with lifecycle and auto-protection metadata.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MemoryEntry {
@@ -698,16 +697,16 @@ pub(crate) fn dedup_by_id(entries: &mut Vec<MemoryEntry>) {
 // ---------------------------------------------------------------------------
 
 pub mod auto_classify;
-mod auto_protect;
 pub mod auto_memory_bridge;
+mod auto_protect;
 mod budget;
 #[cfg(feature = "sqlite-memory")]
 pub mod cache;
 mod chunking;
 mod compaction;
-mod decay;
 #[cfg(feature = "sqlite-memory")]
 pub mod database;
+mod decay;
 pub mod dream;
 pub mod embedding_cache;
 pub mod flash_attention;
@@ -865,8 +864,16 @@ mod tests {
         let mgr = MemoryManager::new(store.clone());
 
         // Store some memories
-        let entry1 = make_entry_with_content("vec-test-1", MemoryType::Fact, "Rust is a systems programming language focused on safety");
-        let entry2 = make_entry_with_content("vec-test-2", MemoryType::Fact, "Python is great for machine learning and data science");
+        let entry1 = make_entry_with_content(
+            "vec-test-1",
+            MemoryType::Fact,
+            "Rust is a systems programming language focused on safety",
+        );
+        let entry2 = make_entry_with_content(
+            "vec-test-2",
+            MemoryType::Fact,
+            "Python is great for machine learning and data science",
+        );
 
         mgr.remember(entry1).await.unwrap();
         mgr.remember(entry2).await.unwrap();
@@ -890,7 +897,11 @@ mod tests {
         let mgr = MemoryManager::new(store.clone());
 
         // Store a memory directly via state_store (bypassing remember to test rebuild)
-        let entry = make_entry_with_content("rebuild-test-1", MemoryType::Fact, "memory for rebuild test");
+        let entry = make_entry_with_content(
+            "rebuild-test-1",
+            MemoryType::Fact,
+            "memory for rebuild test",
+        );
         store
             .save_json("memory/facts", "rebuild-test-1", &entry)
             .await

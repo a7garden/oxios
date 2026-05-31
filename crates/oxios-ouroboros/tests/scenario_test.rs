@@ -7,7 +7,7 @@
 
 use std::sync::Arc;
 
-use oxi_sdk::{OxiBuilder, OpenAiProvider, Provider};
+use oxi_sdk::{OxiBuilder, Provider};
 use oxios_ouroboros::{OuroborosEngine, OuroborosProtocol};
 
 /// auth.json에서 zai API 키 읽기.
@@ -35,8 +35,10 @@ async fn make_engine() -> Arc<dyn OuroborosProtocol> {
     let key_for_closure = api_key.clone();
     let builder = OxiBuilder::new().with_builtins();
     let builder = builder.provider_factory("zai", move || {
-        let provider =
-            oxi_sdk::OpenAiProvider::with_base_url_and_key(&base_url, Some(key_for_closure.clone()));
+        let provider = oxi_sdk::OpenAiProvider::with_base_url_and_key(
+            &base_url,
+            Some(key_for_closure.clone()),
+        );
         Ok(Arc::new(provider) as Arc<dyn Provider>)
     });
 
@@ -163,11 +165,11 @@ fn print_and_verify(
     let n_questions = result.questions.iter().filter(|q| !q.is_empty()).count();
 
     println!("─────────────────────────────────────────");
-    println!("📌 {}", name);
+    println!("📌 {name}");
     println!("   입력: \"{}\"", s.message);
 
     // is_task 검증
-    print!("   분류: {}", is_task_str);
+    print!("   분류: {is_task_str}");
     if let Some(exp) = s.expected_is_task {
         let ok = result.is_task == exp;
         print!(
@@ -236,7 +238,7 @@ fn print_and_verify(
 
     if !result.is_task && !result.chat_response.is_empty() {
         let truncated: String = result.chat_response.chars().take(120).collect();
-        println!("   챗 응답: \"{}\"", truncated);
+        println!("   챗 응답: \"{truncated}\"");
     }
 
     println!();
@@ -272,7 +274,7 @@ async fn test_interview_scenarios() {
     }
 
     println!("══════════════════════════════════════════════════════════════");
-    println!("  총 검증: ✅ {} 통과  ❌ {} 실패", total_pass, total_fail);
+    println!("  총 검증: ✅ {total_pass} 통과  ❌ {total_fail} 실패");
     println!("══════════════════════════════════════════════════════════════\n");
 
     if total_fail > 0 {

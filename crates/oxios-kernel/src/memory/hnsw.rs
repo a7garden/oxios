@@ -68,7 +68,7 @@ impl HnswIndex {
         if capacity > 0 {
             index
                 .reserve(capacity)
-                .map_err(|e| anyhow::anyhow!("Failed to reserve HNSW capacity: {}", e))?;
+                .map_err(|e| anyhow::anyhow!("Failed to reserve HNSW capacity: {e}"))?;
         }
 
         Ok(Self { index, dimensions })
@@ -92,7 +92,7 @@ impl HnswIndex {
         );
         self.index
             .add(key, vector)
-            .map_err(|e| anyhow::anyhow!("HNSW add failed for key {}: {}", key, e))?;
+            .map_err(|e| anyhow::anyhow!("HNSW add failed for key {key}: {e}"))?;
         Ok(())
     }
 
@@ -114,7 +114,7 @@ impl HnswIndex {
         let results = self
             .index
             .search(query, k)
-            .map_err(|e| anyhow::anyhow!("HNSW search failed: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("HNSW search failed: {e}"))?;
 
         Ok(results
             .keys
@@ -129,7 +129,7 @@ impl HnswIndex {
         self.index
             .remove(key)
             .map(|_| ())
-            .map_err(|e| anyhow::anyhow!("HNSW remove failed for key {}: {}", key, e))
+            .map_err(|e| anyhow::anyhow!("HNSW remove failed for key {key}: {e}"))
     }
 
     /// Check if a key exists in the index.
@@ -168,7 +168,7 @@ impl HnswIndex {
         })?;
         self.index
             .save(path_str)
-            .map_err(|e| anyhow::anyhow!("HNSW save failed: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("HNSW save failed: {e}"))?;
         Ok(())
     }
 
@@ -180,7 +180,7 @@ impl HnswIndex {
             anyhow::anyhow!("HNSW load path is not valid UTF-8: {}", path.display())
         })?;
         let index =
-            Index::restore(path_str).map_err(|e| anyhow::anyhow!("HNSW load failed: {}", e))?;
+            Index::restore(path_str).map_err(|e| anyhow::anyhow!("HNSW load failed: {e}"))?;
         let dimensions = index.dimensions();
         Ok(Self { index, dimensions })
     }
@@ -189,7 +189,7 @@ impl HnswIndex {
     pub fn reserve(&self, capacity: usize) -> Result<()> {
         self.index
             .reserve(capacity)
-            .map_err(|e| anyhow::anyhow!("HNSW reserve failed: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("HNSW reserve failed: {e}"))?;
         Ok(())
     }
 
@@ -198,7 +198,7 @@ impl HnswIndex {
         self.index
             .rename(from, to)
             .map(|_| ())
-            .map_err(|e| anyhow::anyhow!("HNSW rename failed: {} -> {}: {}", from, to, e))
+            .map_err(|e| anyhow::anyhow!("HNSW rename failed: {from} -> {to}: {e}"))
     }
 }
 

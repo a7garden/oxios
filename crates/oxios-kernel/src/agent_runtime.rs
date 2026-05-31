@@ -28,18 +28,20 @@
 //! and estimated costs.
 
 use anyhow::Result;
-use oxi_sdk::{Agent, AgentConfig, AgentEvent, CompactionEvent, CompactionStrategy, ProviderResolver};
+use oxi_sdk::{
+    Agent, AgentConfig, AgentEvent, CompactionEvent, CompactionStrategy, ProviderResolver,
+};
 use oxi_sdk::{SearchCache, ToolExecutionMode, ToolRegistry};
 use parking_lot::Mutex;
 use std::sync::Arc;
 
+use crate::access_manager::{AccessGate, AgentContext, TracingAuditSink, TrailAuditSink};
+use crate::audit_trail::AuditTrail;
 use crate::capability::resolve::resolve_cspace;
 use crate::engine::OxiosEngine;
 use crate::memory::{MemoryEntry, MemoryManager, MemoryType};
 use crate::persona_manager::PersonaManager;
 use crate::tools::registration::register_tools_from_cspace_gated;
-use crate::access_manager::{AccessGate, AgentContext, TrailAuditSink, TracingAuditSink};
-use crate::audit_trail::AuditTrail;
 
 use crate::session_context::SessionContext;
 use crate::types::AgentId;
@@ -197,7 +199,12 @@ impl AgentRuntime {
     /// 3. Recalls memories if available
     /// 4. Creates Agent via `Agent::new_with_resolver()`
     /// 5. Runs via `Agent::run_streaming()`
-    pub async fn execute(&self, agent_id: AgentId, seed: &Seed, session_ctx: &mut SessionContext) -> Result<ExecutionResult> {
+    pub async fn execute(
+        &self,
+        agent_id: AgentId,
+        seed: &Seed,
+        session_ctx: &mut SessionContext,
+    ) -> Result<ExecutionResult> {
         let prompt = build_user_prompt(seed);
 
         // Get active persona system prompt.
@@ -269,7 +276,10 @@ impl AgentRuntime {
 
         // Blend relevant memories into system prompt.
         let memory_manager = self.kernel_handle.agents.memory_manager();
-        match memory_manager.recall_with_proactive(&seed.goal, &mut session_ctx.recall_timing).await {
+        match memory_manager
+            .recall_with_proactive(&seed.goal, &mut session_ctx.recall_timing)
+            .await
+        {
             Ok(memories) if !memories.is_empty() => {
                 tracing::info!(count = memories.len(), "Recalled memories for seed");
                 system_prompt = memory_manager.blend_into_prompt(&memories, &system_prompt);
@@ -408,8 +418,10 @@ async fn run_agent(
     tracing::debug!(workspace = %workspace.display(), "Agent workspace scoped");
 
     // Start distributed trace span for this agent execution.
-    let _trace_guard = crate::observability::tracer()
-        .start(format!("seed-{}", &seed_id.to_string()[..8]).as_str(), oxi_sdk::SpanKind::Agent);
+    let _trace_guard = crate::observability::tracer().start(
+        format!("seed-{}", &seed_id.to_string()[..8]).as_str(),
+        oxi_sdk::SpanKind::Agent,
+    );
 
     // ── Register tools based on CSpace (with access gate) ──
     let registry = ToolRegistry::new();
@@ -418,23 +430,22 @@ async fn run_agent(
     // Build agent context for security
     let agent_context = AgentContext {
         agent_id,
-        agent_name: format!("agent-{}", agent_id),
+        agent_name: format!("agent-{agent_id}"),
         cspace: Arc::new(cspace.clone()),
     };
 
     // Build audit sink: TrailAuditSink (Merkle chain + JSONL) when audit_trail
     // is available, otherwise fall back to TracingAuditSink.
-    let audit_sink: Arc<dyn crate::access_manager::AuditSink> =
-        if let Some(trail) = audit_trail {
-            let audit_path = kernel_handle
-                .state
-                .workspace_path()
-                .join("audit")
-                .join("access.jsonl");
-            Arc::new(TrailAuditSink::new(trail, audit_path))
-        } else {
-            Arc::new(TracingAuditSink)
-        };
+    let audit_sink: Arc<dyn crate::access_manager::AuditSink> = if let Some(trail) = audit_trail {
+        let audit_path = kernel_handle
+            .state
+            .workspace_path()
+            .join("audit")
+            .join("access.jsonl");
+        Arc::new(TrailAuditSink::new(trail, audit_path))
+    } else {
+        Arc::new(TracingAuditSink)
+    };
 
     // Build access gate from kernel's security infrastructure
     let access_gate = Arc::new(AccessGate::new(
@@ -461,7 +472,7 @@ async fn run_agent(
 
     // ── Build AgentConfig ──
     let agent_config = AgentConfig {
-        name: format!("agent-{}", agent_id),
+        name: format!("agent-{agent_id}"),
         description: None,
         model_id: config.model_id.clone(),
         system_prompt: Some(system_prompt),
@@ -492,19 +503,19 @@ async fn run_agent(
     // Build middleware pipeline.
     let mut pipeline = oxi_sdk::MiddlewarePipeline::new();
     if config.rate_limit_per_minute > 0 {
-        pipeline = pipeline.push(
-            oxi_sdk::middleware::builtins::RateLimitMiddleware::new(config.rate_limit_per_minute)
-        );
+        pipeline = pipeline.push(oxi_sdk::middleware::builtins::RateLimitMiddleware::new(
+            config.rate_limit_per_minute,
+        ));
     }
     if config.token_budget > 0 {
-        pipeline = pipeline.push(
-            oxi_sdk::middleware::builtins::TokenBudgetMiddleware::new(config.token_budget)
-        );
+        pipeline = pipeline.push(oxi_sdk::middleware::builtins::TokenBudgetMiddleware::new(
+            config.token_budget,
+        ));
     }
     if config.audit_tool_calls {
-        pipeline = pipeline.push(
-            oxi_sdk::middleware::builtins::LoggingMiddleware::new(tracing::Level::INFO)
-        );
+        pipeline = pipeline.push(oxi_sdk::middleware::builtins::LoggingMiddleware::new(
+            tracing::Level::INFO,
+        ));
     }
 
     // Create Agent with CSpace tool registry and provider resolver.
@@ -548,18 +559,15 @@ async fn run_agent(
                 } => {
                     // Record start time and push a placeholder step.
                     let idx = s.trajectory_steps.len();
-                    s.pending_tools.insert(
-                        tool_call_id.clone(),
-                        (std::time::Instant::now(), idx),
-                    );
-                    s.trajectory_steps.push(
-                        crate::memory::sona::TrajectoryStep {
+                    s.pending_tools
+                        .insert(tool_call_id.clone(), (std::time::Instant::now(), idx));
+                    s.trajectory_steps
+                        .push(crate::memory::sona::TrajectoryStep {
                             input: tool_name.clone(),
                             output: String::new(),
                             duration_ms: 0,
                             confidence: 0.0,
-                        },
-                    );
+                        });
                 }
                 AgentEvent::ToolExecutionEnd {
                     tool_call_id,
@@ -599,7 +607,7 @@ async fn run_agent(
                     output_tokens,
                 } => {
                     // Record token usage to cost tracker (existing).
-                    let agent_label = format!("agent-{}", agent_id_for_callback);
+                    let agent_label = format!("agent-{agent_id_for_callback}");
                     crate::observability::cost_tracker().record(
                         &agent_label,
                         &oxi_sdk::Model::new(
@@ -645,16 +653,25 @@ async fn run_agent(
     let circuit = get_llm_circuit_breaker();
     if result.is_err() {
         circuit.record_failure();
-        crate::metrics::get_metrics().llm_circuit_breaker_state.set(1.0);
+        crate::metrics::get_metrics()
+            .llm_circuit_breaker_state
+            .set(1.0);
     } else {
         circuit.record_success();
-        crate::metrics::get_metrics().llm_circuit_breaker_state.set(0.0);
+        crate::metrics::get_metrics()
+            .llm_circuit_breaker_state
+            .set(0.0);
     }
 
     if let Err(e) = result {
         tracing::error!(seed_id = %seed_id, error = %e, "Agent failed");
         let s = exec_state.lock();
-        return Ok((format!("Agent failed: {e}"), s.steps_completed, false, agent));
+        return Ok((
+            format!("Agent failed: {e}"),
+            s.steps_completed,
+            false,
+            agent,
+        ));
     }
 
     let s = exec_state.lock();
@@ -705,7 +722,7 @@ fn summarize_tool_result(result: &str, max_len: usize) -> String {
         first_line.to_string()
     } else {
         let truncated: String = first_line.chars().take(max_len - 3).collect();
-        format!("{}...", truncated)
+        format!("{truncated}...")
     }
 }
 
@@ -718,28 +735,60 @@ fn infer_domain(goal: &str) -> String {
     let keywords: Vec<&str> = lower.split_whitespace().take(8).collect();
 
     // Check for known domain indicators.
-    if keywords.iter().any(|k| ["test", "tests", "spec", "testing", "assert", "unit test", "integration"].contains(k)) {
+    if keywords.iter().any(|k| {
+        [
+            "test",
+            "tests",
+            "spec",
+            "testing",
+            "assert",
+            "unit test",
+            "integration",
+        ]
+        .contains(k)
+    }) {
         return "testing".to_string();
     }
-    if keywords.iter().any(|k| ["deploy", "release", "publish", "ship"].contains(k)) {
+    if keywords
+        .iter()
+        .any(|k| ["deploy", "release", "publish", "ship"].contains(k))
+    {
         return "deployment".to_string();
     }
-    if keywords.iter().any(|k| ["fix", "bug", "patch", "repair", "debug"].contains(k)) {
+    if keywords
+        .iter()
+        .any(|k| ["fix", "bug", "patch", "repair", "debug"].contains(k))
+    {
         return "bugfix".to_string();
     }
-    if keywords.iter().any(|k| ["refactor", "restructure", "reorganize", "rewrite"].contains(k)) {
+    if keywords
+        .iter()
+        .any(|k| ["refactor", "restructure", "reorganize", "rewrite"].contains(k))
+    {
         return "refactoring".to_string();
     }
-    if keywords.iter().any(|k| ["doc", "document", "readme", "guide", "explain"].contains(k)) {
+    if keywords
+        .iter()
+        .any(|k| ["doc", "document", "readme", "guide", "explain"].contains(k))
+    {
         return "documentation".to_string();
     }
-    if keywords.iter().any(|k| ["build", "create", "implement", "add", "make", "new"].contains(k)) {
+    if keywords
+        .iter()
+        .any(|k| ["build", "create", "implement", "add", "make", "new"].contains(k))
+    {
         return "development".to_string();
     }
-    if keywords.iter().any(|k| ["analyze", "review", "audit", "inspect", "check"].contains(k)) {
+    if keywords
+        .iter()
+        .any(|k| ["analyze", "review", "audit", "inspect", "check"].contains(k))
+    {
         return "analysis".to_string();
     }
-    if keywords.iter().any(|k| ["config", "setup", "install", "configure", "init"].contains(k)) {
+    if keywords
+        .iter()
+        .any(|k| ["config", "setup", "install", "configure", "init"].contains(k))
+    {
         return "configuration".to_string();
     }
 
@@ -761,11 +810,7 @@ fn infer_domain(goal: &str) -> String {
 /// Extracts the compaction summary from the event and spawns a background
 /// task to persist it via MemoryManager. This replaces the inline 30-line
 /// block that was previously in the event callback.
-fn handle_compaction(
-    summary: String,
-    session_id: String,
-    memory_manager: Arc<MemoryManager>,
-) {
+fn handle_compaction(summary: String, session_id: String, memory_manager: Arc<MemoryManager>) {
     let entry = MemoryEntry {
         id: uuid::Uuid::new_v4().to_string(),
         memory_type: MemoryType::Conversation,
@@ -1062,7 +1107,10 @@ mod tests {
 
     #[test]
     fn test_infer_domain_deployment() {
-        assert_eq!(infer_domain("deploy the web service to production"), "deployment");
+        assert_eq!(
+            infer_domain("deploy the web service to production"),
+            "deployment"
+        );
     }
 
     #[test]
@@ -1072,12 +1120,18 @@ mod tests {
 
     #[test]
     fn test_infer_domain_development() {
-        assert_eq!(infer_domain("create a new REST API endpoint"), "development");
+        assert_eq!(
+            infer_domain("create a new REST API endpoint"),
+            "development"
+        );
     }
 
     #[test]
     fn test_infer_domain_analysis() {
-        assert_eq!(infer_domain("review the code for security issues"), "analysis");
+        assert_eq!(
+            infer_domain("review the code for security issues"),
+            "analysis"
+        );
     }
 
     #[test]

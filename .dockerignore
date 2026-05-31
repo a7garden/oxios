@@ -1,0 +1,34 @@
+# Build artifacts
+target/
+debug/
+
+# Version control
+.git/
+.gitignore
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# CI/CD
+.github/
+
+# Scripts (not needed in build context)
+scripts/
+
+# Benchmarks (not needed in Docker image)
+benchmarks/
+
+# Frontend dev dependencies (keep Rust sources & package.json for bun install)
+surface/oxios-web/web/node_modules/
+
+# Misc
+*.log
+.env
+.env.*

@@ -318,11 +318,15 @@ impl AutoMemoryBridge {
             .iter()
             .map(|r| GuidancePattern {
                 id: r.id.clone(),
-                category: r.domain
+                category: r
+                    .domain
                     .as_deref()
                     .map(InsightCategory::from_str_loose)
                     .unwrap_or(InsightCategory::General),
-                description: format!("[{}] quality={:.2} uses={}", r.strategy, r.quality, r.use_count),
+                description: format!(
+                    "[{}] quality={:.2} uses={}",
+                    r.strategy, r.quality, r.use_count
+                ),
                 confidence: r.quality,
                 usage_count: r.use_count,
             })

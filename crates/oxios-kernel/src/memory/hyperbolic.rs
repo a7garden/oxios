@@ -388,8 +388,12 @@ impl HyperbolicEmbedding {
     ///
     /// Stores as JSON blob under key `hyperbolic_embeddings`.
     #[cfg(feature = "sqlite-memory")]
-    pub fn persist_to_sqlite(&self, store: &crate::memory::sqlite_store::SqliteMemoryStore) -> anyhow::Result<()> {
-        let data: Vec<(&String, &Vec<f32>)> = self.embeddings.iter().map(|(id, v)| (id, v)).collect();
+    pub fn persist_to_sqlite(
+        &self,
+        store: &crate::memory::sqlite_store::SqliteMemoryStore,
+    ) -> anyhow::Result<()> {
+        let data: Vec<(&String, &Vec<f32>)> =
+            self.embeddings.iter().map(|(id, v)| (id, v)).collect();
         let json = serde_json::to_string(&data)?;
 
         let conn = store.db().conn();
@@ -398,7 +402,10 @@ impl HyperbolicEmbedding {
             rusqlite::params![json],
         )?;
 
-        tracing::debug!(count = self.len(), "Hyperbolic embeddings persisted to SQLite");
+        tracing::debug!(
+            count = self.len(),
+            "Hyperbolic embeddings persisted to SQLite"
+        );
         Ok(())
     }
 
@@ -424,7 +431,10 @@ impl HyperbolicEmbedding {
             }
         }
 
-        tracing::debug!(count = he.len(), "Hyperbolic embeddings restored from SQLite");
+        tracing::debug!(
+            count = he.len(),
+            "Hyperbolic embeddings restored from SQLite"
+        );
         Ok(he)
     }
 

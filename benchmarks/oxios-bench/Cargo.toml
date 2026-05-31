@@ -1,6 +1,6 @@
 [package]
 name = "oxios-bench"
-version = "0.5.0"
+version = "1.0.0"
 edition = "2021"
 description = "Benchmark system v2 for Oxios Agent OS evaluation"
 license = "MIT"

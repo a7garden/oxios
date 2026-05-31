@@ -42,7 +42,7 @@ pub fn replace_with_placeholders(
     let result = re
         .replace_all(s, |caps: &regex::Captures<'_>| {
             let full = caps.get(0).unwrap().as_str().to_string();
-            let ph = format!("#{}{}#", placeholder, counter);
+            let ph = format!("#{placeholder}{counter}#");
             counter += 1;
             placeholders.insert(ph.clone(), full);
             ph
@@ -331,7 +331,7 @@ pub fn markdown_to_html(md: &str) -> String {
     result = re_code_block
         .replace_all(&result, |caps: &regex::Captures<'_>| {
             let inner = caps.get(1).unwrap().as_str().trim();
-            format!("<pre>{}</pre>", inner)
+            format!("<pre>{inner}</pre>")
         })
         .to_string();
 

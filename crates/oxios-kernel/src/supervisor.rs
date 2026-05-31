@@ -456,14 +456,10 @@ mod tests {
             crate::kernel_handle::PersonaApi::new(Arc::new(
                 crate::persona_manager::PersonaManager::new(),
             )),
-            crate::kernel_handle::ExtensionApi::new(
-                Arc::new(
-                    crate::skill::SkillManager::new(
-                        tmp.join("skills"),
-                        tmp.join("share/skills"),
-                    ),
-                ),
-            ),
+            crate::kernel_handle::ExtensionApi::new(Arc::new(crate::skill::SkillManager::new(
+                tmp.join("skills"),
+                tmp.join("share/skills"),
+            ))),
             crate::kernel_handle::McpApi::new(Arc::new(crate::mcp::McpBridge::new())),
             crate::kernel_handle::InfraApi::new(
                 Arc::new(
@@ -493,7 +489,9 @@ mod tests {
                 EventBus::new(64),
             ))),
             crate::kernel_handle::EngineApi::new(
-                Arc::new(parking_lot::RwLock::new(crate::config::OxiosConfig::default())),
+                Arc::new(parking_lot::RwLock::new(
+                    crate::config::OxiosConfig::default(),
+                )),
                 tmp.join("config.toml"),
                 Arc::new(crate::kernel_handle::RoutingStats::new()),
             ),
@@ -514,7 +512,6 @@ mod tests {
                 Arc::new(crate::clawhub::ClawHubClient::new(None).expect("valid ClawHub client")),
             ),
         ));
-
 
         let engine = crate::OxiosEngine::new("mock/model");
         let runtime = AgentRuntime::new(Arc::new(engine), "mock/model", kernel_handle, None);

@@ -164,7 +164,7 @@ impl BudgetManager {
                 return Err(BudgetExceeded {
                     agent_id: *agent_id,
                     kind: BudgetKind::Token,
-                    message: format!("No budget configured for agent {}", agent_id),
+                    message: format!("No budget configured for agent {agent_id}"),
                 });
             }
         };
@@ -222,7 +222,7 @@ impl BudgetManager {
                 return Err(BudgetExceeded {
                     agent_id: *agent_id,
                     kind: BudgetKind::Call,
-                    message: format!("No budget configured for agent {}", agent_id),
+                    message: format!("No budget configured for agent {agent_id}"),
                 });
             }
         };

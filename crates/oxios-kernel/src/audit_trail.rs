@@ -49,15 +49,14 @@ impl std::fmt::Display for AuditError {
             } => {
                 write!(
                     f,
-                    "chain broken at seq {}: expected hash '{}', found '{}'",
-                    seq, expected, found
+                    "chain broken at seq {seq}: expected hash '{expected}', found '{found}'"
                 )
             }
             AuditError::InvalidTimestamp { seq } => {
-                write!(f, "invalid timestamp at seq {}", seq)
+                write!(f, "invalid timestamp at seq {seq}")
             }
             AuditError::ExportFailed(msg) => {
-                write!(f, "export failed: {}", msg)
+                write!(f, "export failed: {msg}")
             }
         }
     }

@@ -88,15 +88,15 @@ pub async fn cmd_run(kernel: &Kernel, prompt: &str, opts: &RunOptions) -> Result
         // Human-readable output
         println!("{}", result.response);
         if let Some(ref seed_id) = result.seed_id {
-            println!("\nSeed: {}", seed_id);
+            println!("\nSeed: {seed_id}");
         }
         if let Some(ref session_id) = result.session_id {
-            println!("Session: {}", session_id);
+            println!("Session: {session_id}");
         }
         if !result.evaluation_passed {
             eprintln!("\n⚠️  Evaluation did not fully pass.");
             if let Some(ref output) = result.output {
-                eprintln!("Notes: {}", output);
+                eprintln!("Notes: {output}");
             }
         }
     }
@@ -120,13 +120,12 @@ fn build_effective_prompt(prompt: &str, context_file: &Option<String>) -> Result
     } else {
         let expanded = oxios_kernel::config::expand_home(path);
         let content = std::fs::read_to_string(&expanded)
-            .map_err(|e| anyhow::anyhow!("failed to read context file '{}': {}", path, e))?;
+            .map_err(|e| anyhow::anyhow!("failed to read context file '{path}': {e}"))?;
         (path.clone(), content)
     };
 
     Ok(format!(
-        "--- Context ({}) ---\n{}\n--- End Context ---\n\n{}",
-        label, content, prompt
+        "--- Context ({label}) ---\n{content}\n--- End Context ---\n\n{prompt}"
     ))
 }
 

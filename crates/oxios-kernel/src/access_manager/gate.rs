@@ -89,7 +89,13 @@ pub struct AccessDenied {
 
 impl std::fmt::Display for AccessDenied {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "[{}] {} — {}", self.layer, self.reason, self.suggestion.as_deref().unwrap_or(""))
+        write!(
+            f,
+            "[{}] {} — {}",
+            self.layer,
+            self.reason,
+            self.suggestion.as_deref().unwrap_or("")
+        )
     }
 }
 
@@ -188,18 +194,19 @@ fn has_metacharacters(args: &[String]) -> bool {
 ///
 /// # Example
 ///
-/// ```rust,ignore
-/// let gate = AccessGate::new(access_manager, exec_config, audit_sink);
+/// ```no_run
+/// use oxios_kernel::access_manager::{AccessGate, CheckRequest, PathMode};
 ///
-/// // Tool check
-/// gate.check(CheckRequest::Tool { context: &ctx, tool_name: "exec" })?;
-///
-/// // Path check
-/// gate.check(CheckRequest::Path {
-///     context: &ctx,
-///     path: Path::new("/workspace/file.rs"),
-///     mode: PathMode::Read,
-/// })?;
+/// // AccessGate is constructed during kernel initialization with internal
+/// // parking_lot::Mutex<AccessManager>, ExecConfig, and an AuditSink.
+/// // Security checks use AgentContext (provided by the kernel's agent lifecycle).
+/// //
+/// // gate.check(CheckRequest::Tool { context: &ctx, tool_name: "exec" })?;
+/// // gate.check(CheckRequest::Path {
+/// //     context: &ctx,
+/// //     path: Path::new("/workspace/file.rs"),
+/// //     mode: PathMode::Read,
+/// // })?;
 /// ```
 pub struct AccessGate {
     /// Agent permission manager (includes RBAC internally).
@@ -237,9 +244,11 @@ impl AccessGate {
     pub fn check(&self, req: CheckRequest<'_>) -> Result<(), AccessDenied> {
         let result = match &req {
             CheckRequest::Tool { context, tool_name } => self.check_tool(context, tool_name),
-            CheckRequest::Path { context, path, mode } => {
-                self.check_path(context, path, *mode)
-            }
+            CheckRequest::Path {
+                context,
+                path,
+                mode,
+            } => self.check_path(context, path, *mode),
             CheckRequest::Exec {
                 context,
                 binary,
@@ -271,10 +280,9 @@ impl AccessGate {
                     agent: ctx.agent_name.clone(),
                     resource: tool.to_string(),
                     layer: DenyLayer::Capability,
-                    reason: format!("CSpace에 '{}' 도구에 대한 EXECUTE capability 없음", tool),
+                    reason: format!("CSpace에 '{tool}' 도구에 대한 EXECUTE capability 없음"),
                     suggestion: Some(format!(
-                        "에이전트의 Seed에 '{}' capability를 추가하세요.",
-                        tool
+                        "에이전트의 Seed에 '{tool}' capability를 추가하세요."
                     )),
                 });
             }
@@ -351,10 +359,7 @@ impl AccessGate {
                 agent: ctx.agent_name.clone(),
                 resource: path_str.to_string(),
                 layer: DenyLayer::Permission,
-                reason: format!(
-                    "경로 '{}'이(가) 허용 목록에 없거나 거부 목록에 포함됨",
-                    path_str
-                ),
+                reason: format!("경로 '{path_str}'이(가) 허용 목록에 없거나 거부 목록에 포함됨"),
                 suggestion: Some("allowed_paths / denied_paths 설정을 확인하세요.".into()),
             });
         }
@@ -373,10 +378,7 @@ impl AccessGate {
                     agent: ctx.agent_name.clone(),
                     resource: path_str.to_string(),
                     layer: DenyLayer::Permission,
-                    reason: format!(
-                        "경로 '{}'이(가) 워크스페이스 '{}' 경계를 벗어남",
-                        path_str, ws
-                    ),
+                    reason: format!("경로 '{path_str}'이(가) 워크스페이스 '{ws}' 경계를 벗어남"),
                     suggestion: None,
                 });
             }
@@ -424,7 +426,7 @@ impl AccessGate {
                     agent: ctx.agent_name.clone(),
                     resource: binary.to_string(),
                     layer: DenyLayer::Permission,
-                    reason: format!("에이전트가 '{}' 실행 권한 없음", binary),
+                    reason: format!("에이전트가 '{binary}' 실행 권한 없음"),
                     suggestion: None,
                 });
             }
@@ -436,7 +438,7 @@ impl AccessGate {
                 agent: ctx.agent_name.clone(),
                 resource: binary.to_string(),
                 layer: DenyLayer::ExecPolicy,
-                reason: format!("바이너리 '{}'이(가) 허용 목록에 없음", binary),
+                reason: format!("바이너리 '{binary}'이(가) 허용 목록에 없음"),
                 suggestion: Some("exec.allowed_commands에 추가하세요.".into()),
             });
         }
@@ -463,9 +465,7 @@ impl AccessGate {
                 resource: "<network>".into(),
                 layer: DenyLayer::Permission,
                 reason: "네트워크 접근이 비활성화됨".into(),
-                suggestion: Some(
-                    "permissions.network_access를 true로 설정하세요.".into(),
-                ),
+                suggestion: Some("permissions.network_access를 true로 설정하세요.".into()),
             });
         }
         Ok(())
@@ -494,9 +494,7 @@ impl AccessGate {
                 resource: "fork".into(),
                 layer: DenyLayer::Permission,
                 reason: "에이전트 fork 권한 없음".into(),
-                suggestion: Some(
-                    "permissions.can_fork를 true로 설정하세요.".into(),
-                ),
+                suggestion: Some("permissions.can_fork를 true로 설정하세요.".into()),
             });
         }
         Ok(())
@@ -640,7 +638,9 @@ mod tests {
 
         // Assign RBAC role using the same agent_id as the context
         let subject = Subject::Agent(ctx.agent_id);
-        access.rbac_manager_mut().assign_role(subject, crate::access_manager::Role::Superuser);
+        access
+            .rbac_manager_mut()
+            .assign_role(subject, crate::access_manager::Role::Superuser);
 
         let gate = AccessGate::new(
             Arc::new(Mutex::new(access)),
@@ -663,7 +663,9 @@ mod tests {
         access.set_permissions(perms);
 
         let subject = Subject::Agent(ctx.agent_id);
-        access.rbac_manager_mut().assign_role(subject, crate::access_manager::Role::Superuser);
+        access
+            .rbac_manager_mut()
+            .assign_role(subject, crate::access_manager::Role::Superuser);
 
         let config = ExecConfig {
             allowlist_mode: AllowlistMode::Enforced,

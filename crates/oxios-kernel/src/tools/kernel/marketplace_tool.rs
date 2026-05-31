@@ -142,8 +142,7 @@ impl AgentTool for MarketplaceTool {
                         ))
                     }
                     Err(e) => Ok(AgentToolResult::error(format!(
-                        "Marketplace search failed: {}",
-                        e
+                        "Marketplace search failed: {e}"
                     ))),
                 }
             }
@@ -175,8 +174,7 @@ impl AgentTool for MarketplaceTool {
                         ))
                     }
                     Err(e) => Ok(AgentToolResult::error(format!(
-                        "Failed to get skill '{}': {}",
-                        slug, e
+                        "Failed to get skill '{slug}': {e}"
                     ))),
                 }
             }
@@ -202,8 +200,7 @@ impl AgentTool for MarketplaceTool {
                         .unwrap_or_default(),
                     )),
                     Err(e) => Ok(AgentToolResult::error(format!(
-                        "Failed to install '{}': {}",
-                        slug, e
+                        "Failed to install '{slug}': {e}"
                     ))),
                 }
             }
@@ -226,8 +223,7 @@ impl AgentTool for MarketplaceTool {
                         .unwrap_or_default(),
                     )),
                     Err(e) => Ok(AgentToolResult::error(format!(
-                        "Failed to update '{}': {}",
-                        slug, e
+                        "Failed to update '{slug}': {e}"
                     ))),
                 }
             }
@@ -257,8 +253,7 @@ impl AgentTool for MarketplaceTool {
                         ))
                     }
                     Err(e) => Ok(AgentToolResult::error(format!(
-                        "Failed to update all skills: {}",
-                        e
+                        "Failed to update all skills: {e}"
                     ))),
                 }
             }
@@ -289,15 +284,13 @@ impl AgentTool for MarketplaceTool {
                         ))
                     }
                     Err(e) => Ok(AgentToolResult::error(format!(
-                        "Failed to check updates: {}",
-                        e
+                        "Failed to check updates: {e}"
                     ))),
                 }
             }
 
             other => Err(format!(
-                "Unknown marketplace action '{}'. Valid: search, get, install, update, update_all, check_updates",
-                other
+                "Unknown marketplace action '{other}'. Valid: search, get, install, update, update_all, check_updates"
             )),
         }
     }

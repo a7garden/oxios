@@ -39,7 +39,7 @@ pub fn emoji_for(keyword: &str) -> String {
     }
 
     // 2. Plural (add "s")
-    let plural = format!("{}s", lower);
+    let plural = format!("{lower}s");
     if let Some(e) = EMOJI_MAP.get(&plural) {
         return e.clone();
     }
@@ -68,7 +68,7 @@ pub fn add_emoji(s: &str) -> String {
     if e.is_empty() {
         s.to_string()
     } else {
-        format!("{} {}", e, s)
+        format!("{e} {s}")
     }
 }
 

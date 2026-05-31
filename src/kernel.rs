@@ -9,10 +9,9 @@ use oxios_gateway::Gateway;
 use oxios_kernel::{
     access_manager::AccessManager, auth::AuthManager, config::load_config, A2AProtocol,
     AgentRuntime, AgentScheduler, AuditTrail, BasicSupervisor, BudgetManager, ClawHubClient,
-    ClawHubInstaller, CronScheduler, EventBus, GitLayer,
-    McpBridge, McpServer, MarketplaceApi, MemoryManager,
-    Orchestrator, OxiosConfig, OxiosEngine, PersonaManager, ResourceMonitor,
-    RoutingStats, SkillManager, ProjectManager, Supervisor,
+    ClawHubInstaller, CronScheduler, EventBus, GitLayer, MarketplaceApi, McpBridge, McpServer,
+    MemoryManager, Orchestrator, OxiosConfig, OxiosEngine, PersonaManager, ProjectManager,
+    ResourceMonitor, SkillManager, Supervisor,
 };
 use oxios_markdown::knowledge::FileChange;
 use oxios_markdown::KnowledgeBase;
@@ -76,8 +75,7 @@ impl Kernel {
                 // Shared between KernelHandle.knowledge and KnowledgeLens.
                 let knowledge = Arc::new(
                     KnowledgeBase::new(
-                        std::path::PathBuf::from(&self.config.kernel.workspace)
-                            .join("knowledge"),
+                        std::path::PathBuf::from(&self.config.kernel.workspace).join("knowledge"),
                     )
                     .expect("KnowledgeBase init failed"),
                 );
@@ -118,13 +116,13 @@ impl Kernel {
                             if !git.is_enabled() {
                                 continue;
                             }
-                            let rel = format!("{}/{}", prefix, path);
+                            let rel = format!("{prefix}/{path}");
                             let msg = match &change {
-                                FileChange::Created(p) => format!("knowledge: create {}", p),
-                                FileChange::Updated(p) => format!("knowledge: update {}", p),
-                                FileChange::Deleted(p) => format!("knowledge: delete {}", p),
+                                FileChange::Created(p) => format!("knowledge: create {p}"),
+                                FileChange::Updated(p) => format!("knowledge: update {p}"),
+                                FileChange::Deleted(p) => format!("knowledge: delete {p}"),
                                 FileChange::Moved { old, new } => {
-                                    format!("knowledge: rename {} → {}", old, new)
+                                    format!("knowledge: rename {old} → {new}")
                                 }
                             };
                             match change {
@@ -134,7 +132,7 @@ impl Kernel {
                                     }
                                 }
                                 FileChange::Moved { old, .. } => {
-                                    let old_rel = format!("{}/{}", prefix, old);
+                                    let old_rel = format!("{prefix}/{old}");
                                     let _ = git.remove_file(&old_rel, &msg);
                                     let _ = git.commit_file(&rel, &msg);
                                 }
@@ -163,9 +161,7 @@ impl Kernel {
                         self.state_store.clone(),
                     ),
                     oxios_kernel::PersonaApi::new(Arc::new(self.persona_manager.clone())),
-                    oxios_kernel::ExtensionApi::new(
-                        Arc::clone(&self.skill_manager),
-                    ),
+                    oxios_kernel::ExtensionApi::new(Arc::clone(&self.skill_manager)),
                     oxios_kernel::McpApi::new(self.mcp_bridge.clone()),
                     oxios_kernel::InfraApi::new(
                         self.git_layer.clone(),
@@ -176,7 +172,9 @@ impl Kernel {
                         self.config.clone(),
                         self.start_time,
                     ),
-                    self.project_manager.clone().map(oxios_kernel::ProjectApi::new),
+                    self.project_manager
+                        .clone()
+                        .map(oxios_kernel::ProjectApi::new),
                     oxios_kernel::ExecApi::new(
                         Arc::new(self.config.exec.clone()),
                         self.access_manager.clone(),
@@ -240,11 +238,7 @@ impl Kernel {
             }
         };
 
-        let installer = ClawHubInstaller::new(
-            skills_dir,
-            workspace,
-            config.base_url.clone(),
-        );
+        let installer = ClawHubInstaller::new(skills_dir, workspace, config.base_url.clone());
 
         MarketplaceApi::new(Arc::new(installer), Arc::new(client))
     }
@@ -259,7 +253,7 @@ impl Kernel {
     pub fn flush_audit(&self) -> anyhow::Result<()> {
         self.audit_trail
             .flush(&self.state_store)
-            .map_err(|e| anyhow::anyhow!("audit flush failed: {}", e))
+            .map_err(|e| anyhow::anyhow!("audit flush failed: {e}"))
     }
 
     /// Execute a prompt with an optional session ID for multi-turn conversations.
@@ -272,12 +266,15 @@ impl Kernel {
         session_id: Option<&str>,
     ) -> Result<oxios_kernel::OrchestrationResult> {
         self.orchestrator
-            .handle_message("cli", prompt, session_id, None)
+            .handle_message("cli", prompt, session_id, None, "cli-direct")
             .await
     }
 
     /// Register a channel with the gateway.
-    pub async fn register_channel(&self, channel: Box<dyn oxios_gateway::Channel>) -> anyhow::Result<()> {
+    pub async fn register_channel(
+        &self,
+        channel: Box<dyn oxios_gateway::Channel>,
+    ) -> anyhow::Result<()> {
         self.gateway.register(channel).await
     }
 
@@ -386,7 +383,8 @@ impl Kernel {
     fn start_daily_health_check(&self) {
         tokio::spawn(async move {
             let now = chrono::Local::now();
-            let mut next = now.date_naive()
+            let mut next = now
+                .date_naive()
                 .and_hms_opt(3, 0, 0)
                 .unwrap()
                 .and_local_timezone(chrono::Local)
@@ -459,10 +457,8 @@ async fn daily_health_check() -> anyhow::Result<()> {
     );
 
     // Download web-dist.zip
-    let url = format!(
-        "https://github.com/a7garden/oxios/releases/download/{}/web-dist.zip",
-        latest_tag
-    );
+    let url =
+        format!("https://github.com/a7garden/oxios/releases/download/{latest_tag}/web-dist.zip");
     let bytes = client.get(&url).send().await?.bytes().await?;
 
     // Clear and extract
@@ -528,9 +524,9 @@ impl KernelBuilder {
                 {
                     use oxios_kernel::{EmbeddingDimension, GgufEmbeddingProvider};
 
-                    let model_dir = oxios_kernel::embedding::gguf::GgufModelLoader
-                        ::model_dir_for_workspace(
-                            Path::new(&config.kernel.workspace)
+                    let model_dir =
+                        oxios_kernel::embedding::gguf::GgufModelLoader::model_dir_for_workspace(
+                            Path::new(&config.kernel.workspace),
                         );
                     let dim = match emb_config.dimension {
                         128 => EmbeddingDimension::Dim128,
@@ -590,8 +586,7 @@ impl KernelBuilder {
         // Model comes from config, not hardcoded default
         let model_id = &config.engine.default_model;
         let engine = if config.engine.routing_enabled {
-            let engine_builder = OxiosEngine::builder()
-                .default_model(model_id);
+            let engine_builder = OxiosEngine::builder().default_model(model_id);
             let (engine, _routing_control) = engine_builder.build_with_routing();
             Arc::new(engine)
         } else {
@@ -602,7 +597,7 @@ impl KernelBuilder {
         };
         let model = engine
             .resolve_model(model_id)
-            .context(format!("Failed to resolve model: {}", model_id))?;
+            .context(format!("Failed to resolve model: {model_id}"))?;
         let provider = engine
             .create_provider(&model.provider)
             .context(format!("Failed to create provider: {}", model.provider))?;
@@ -726,7 +721,8 @@ impl KernelBuilder {
         {
             let consolidation = &config.memory.consolidation;
             if consolidation.dream_enabled {
-                let dream_config = oxios_kernel::memory::dream::DreamConfig::from_consolidation(consolidation);
+                let dream_config =
+                    oxios_kernel::memory::dream::DreamConfig::from_consolidation(consolidation);
                 let space_dir = PathBuf::from(&config.kernel.workspace);
                 let dream = Arc::new(oxios_kernel::DreamProcess::new(
                     memory_manager.clone(),
@@ -767,7 +763,6 @@ impl KernelBuilder {
             }
         }
 
-
         // Routing stats — shared between EngineApi and AgentRuntime
         let routing_stats = Arc::new(oxios_kernel::RoutingStats::new());
         let _engine_api = oxios_kernel::EngineApi::new(
@@ -797,9 +792,7 @@ impl KernelBuilder {
                     state_store.clone(),
                 ),
                 oxios_kernel::PersonaApi::new(Arc::new(persona_manager.clone())),
-                oxios_kernel::ExtensionApi::new(
-                    Arc::clone(&skill_manager),
-                ),
+                oxios_kernel::ExtensionApi::new(Arc::clone(&skill_manager)),
                 oxios_kernel::McpApi::new(mcp_bridge.clone()),
                 oxios_kernel::InfraApi::new(
                     git_layer.clone(),
@@ -844,25 +837,28 @@ impl KernelBuilder {
         // Build ToolRetriever for semantic capability discovery.
         let tool_retriever = build_tool_retriever(&skill_manager).await;
 
-        let agent_runtime = AgentRuntime::new(Arc::clone(&engine), model_id, kernel_handle.clone(),
-            Some(Arc::clone(&routing_stats)))
-            .with_persona_manager(Arc::new(persona_manager.clone()))
-            .with_tool_retriever(Arc::new(tool_retriever))
-            .with_config({
-                // Resolve API key from CredentialStore based on the model's provider.
-                let provider_name = model.provider.as_str();
-                let config_api_key = config.engine.api_key.as_deref();
-                let api_key =
-                    oxios_kernel::CredentialStore::resolve(provider_name, config_api_key)
-                        .map(|(key, _)| key);
+        let agent_runtime = AgentRuntime::new(
+            Arc::clone(&engine),
+            model_id,
+            kernel_handle.clone(),
+            Some(Arc::clone(&routing_stats)),
+        )
+        .with_persona_manager(Arc::new(persona_manager.clone()))
+        .with_tool_retriever(Arc::new(tool_retriever))
+        .with_config({
+            // Resolve API key from CredentialStore based on the model's provider.
+            let provider_name = model.provider.as_str();
+            let config_api_key = config.engine.api_key.as_deref();
+            let api_key = oxios_kernel::CredentialStore::resolve(provider_name, config_api_key)
+                .map(|(key, _)| key);
 
-                oxios_kernel::agent_runtime::AgentRuntimeConfig {
-                    model_id: model_id.clone(),
-                    api_key,
-                    provider_options: config.engine.provider_options.clone(),
-                    ..Default::default()
-                }
-            });
+            oxios_kernel::agent_runtime::AgentRuntimeConfig {
+                model_id: model_id.clone(),
+                api_key,
+                provider_options: config.engine.provider_options.clone(),
+                ..Default::default()
+            }
+        });
 
         let supervisor: Arc<dyn Supervisor> =
             Arc::new(BasicSupervisor::new(event_bus.clone(), agent_runtime));
@@ -895,7 +891,7 @@ impl KernelBuilder {
                         parent_seed_id: None,
                         cspace_hint: None,
                         original_request: String::new(),
-            output_schema: None,
+                        output_schema: None,
                     };
                     match lc
                         .spawn_and_run(&seed, oxios_kernel::scheduler::Priority::Normal)
@@ -930,6 +926,10 @@ impl KernelBuilder {
         let orchestrator = Arc::new(orchestrator);
 
         let gateway = Arc::new(Gateway::new(orchestrator.clone()));
+
+        // Initialize metrics and observability singletons.
+        oxios_kernel::register_builtin_metrics();
+        oxios_kernel::observability::init();
 
         Ok(Kernel {
             orchestrator,
@@ -979,10 +979,10 @@ async fn init_mcp_bridge(config: &OxiosConfig) -> Result<McpBridge> {
                 continue;
             }
             let mut server = McpServer::new(name, &value);
-            if let Ok(args_str) = std::env::var(format!("OXIOS_MCP_{}_ARGS", name)) {
+            if let Ok(args_str) = std::env::var(format!("OXIOS_MCP_{name}_ARGS")) {
                 server.args = args_str.split_whitespace().map(String::from).collect();
             }
-            if let Ok(env_str) = std::env::var(format!("OXIOS_MCP_{}_ENV", name)) {
+            if let Ok(env_str) = std::env::var(format!("OXIOS_MCP_{name}_ENV")) {
                 for pair in env_str.split(',') {
                     if let Some((k, v)) = pair.split_once('=') {
                         server
@@ -1000,9 +1000,7 @@ async fn init_mcp_bridge(config: &OxiosConfig) -> Result<McpBridge> {
 }
 
 /// Build a ToolRetriever with all OS tools and installed skills indexed.
-async fn build_tool_retriever(
-    sm: &SkillManager,
-) -> oxios_kernel::tools::retrieval::ToolRetriever {
+async fn build_tool_retriever(sm: &SkillManager) -> oxios_kernel::tools::retrieval::ToolRetriever {
     use oxios_kernel::embedding::TfIdfEmbeddingProvider;
     use oxios_kernel::tools::retrieval::ToolEntry;
 
@@ -1087,6 +1085,7 @@ fn build_marketplace_api_value(config: &OxiosConfig) -> MarketplaceApi {
         tracing::warn!("Invalid marketplace.base_url, using default");
         ClawHubClient::new(Some("https://clawhub.ai".to_string())).unwrap()
     });
-    let installer = ClawHubInstaller::new(skills_dir, workspace, config.marketplace.base_url.clone());
+    let installer =
+        ClawHubInstaller::new(skills_dir, workspace, config.marketplace.base_url.clone());
     MarketplaceApi::new(Arc::new(installer), Arc::new(client))
 }

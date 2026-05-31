@@ -90,8 +90,8 @@ pub enum Subject {
 impl std::fmt::Display for Subject {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Subject::User(name) => write!(f, "user:{}", name),
-            Subject::Agent(id) => write!(f, "agent:{}", id),
+            Subject::User(name) => write!(f, "user:{name}"),
+            Subject::Agent(id) => write!(f, "agent:{id}"),
             Subject::System => write!(f, "system"),
         }
     }
@@ -308,7 +308,7 @@ impl RbacManager {
             if allowed {
                 None
             } else {
-                Some(format!("role {:?} does not allow {:?}", role, action))
+                Some(format!("role {role:?} does not allow {action:?}"))
             },
         ));
         if self.audit_log.len() > self.max_audit_entries {

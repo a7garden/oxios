@@ -205,10 +205,10 @@ impl MemoryDatabase {
             .context("Initializing sqlite-vec virtual table")?;
 
         tracing::info!(
-            path = %db_path.display(),
-            dim = embedding_dim,
-            "Memory database opened"
-            );
+        path = %db_path.display(),
+        dim = embedding_dim,
+        "Memory database opened"
+        );
 
         Ok(Self {
             conn: Mutex::new(conn),
@@ -286,8 +286,9 @@ impl MemoryDatabase {
                 .ok_or_else(|| anyhow::anyhow!("Cannot backup in-memory database"))?
         };
 
-        std::fs::copy(&db_path, backup_path)
-            .with_context(|| format!("Copying {} to {}", db_path.display(), backup_path.display()))?;
+        std::fs::copy(&db_path, backup_path).with_context(|| {
+            format!("Copying {} to {}", db_path.display(), backup_path.display())
+        })?;
 
         tracing::info!(path = %backup_path.display(), "Memory database backed up");
         Ok(())
@@ -365,7 +366,10 @@ impl MemoryDatabase {
     pub fn delete_project(&self, id: &str) -> Result<()> {
         let conn = self.conn();
         // Delete junction entries first
-        conn.execute("DELETE FROM project_memory WHERE project_id = ?1", rusqlite::params![id])?;
+        conn.execute(
+            "DELETE FROM project_memory WHERE project_id = ?1",
+            rusqlite::params![id],
+        )?;
         conn.execute("DELETE FROM projects WHERE id = ?1", rusqlite::params![id])?;
         Ok(())
     }
@@ -432,16 +436,26 @@ fn row_to_project(row: &rusqlite::Row<'_>) -> rusqlite::Result<crate::project::P
     let id_str: String = row.get(0)?;
     let name: String = row.get(1)?;
     let description: String = row.get::<_, Option<String>>(2)?.unwrap_or_default();
-    let paths_str: String = row.get::<_, Option<String>>(3)?.unwrap_or_else(|| "[]".to_string());
-    let tags_str: String = row.get::<_, Option<String>>(4)?.unwrap_or_else(|| "[]".to_string());
-    let emoji: String = row.get::<_, Option<String>>(5)?.unwrap_or_else(|| "📦".to_string());
-    let source_str: String = row.get::<_, Option<String>>(6)?.unwrap_or_else(|| "manual".to_string());
+    let paths_str: String = row
+        .get::<_, Option<String>>(3)?
+        .unwrap_or_else(|| "[]".to_string());
+    let tags_str: String = row
+        .get::<_, Option<String>>(4)?
+        .unwrap_or_else(|| "[]".to_string());
+    let emoji: String = row
+        .get::<_, Option<String>>(5)?
+        .unwrap_or_else(|| "📦".to_string());
+    let source_str: String = row
+        .get::<_, Option<String>>(6)?
+        .unwrap_or_else(|| "manual".to_string());
     let memory_visible: bool = row.get::<_, Option<i32>>(7)?.unwrap_or(1) != 0;
     let created_at: String = row.get(8)?;
     let updated_at: String = row.get(9)?;
     let last_active_at: String = row.get(10)?;
 
-    let id = uuid::Uuid::parse_str(&id_str).map_err(|e| rusqlite::Error::FromSqlConversionFailure(0, rusqlite::types::Type::Text, Box::new(e)))?;
+    let id = uuid::Uuid::parse_str(&id_str).map_err(|e| {
+        rusqlite::Error::FromSqlConversionFailure(0, rusqlite::types::Type::Text, Box::new(e))
+    })?;
     let paths: Vec<PathBuf> = serde_json::from_str(&paths_str).unwrap_or_default();
     let tags: Vec<String> = serde_json::from_str(&tags_str).unwrap_or_default();
     let source = match source_str.as_str() {
@@ -458,9 +472,15 @@ fn row_to_project(row: &rusqlite::Row<'_>) -> rusqlite::Result<crate::project::P
         emoji,
         source,
         memory_visible,
-        created_at: created_at.parse::<DateTime<Utc>>().unwrap_or_else(|_| Utc::now()),
-        updated_at: updated_at.parse::<DateTime<Utc>>().unwrap_or_else(|_| Utc::now()),
-        last_active_at: last_active_at.parse::<DateTime<Utc>>().unwrap_or_else(|_| Utc::now()),
+        created_at: created_at
+            .parse::<DateTime<Utc>>()
+            .unwrap_or_else(|_| Utc::now()),
+        updated_at: updated_at
+            .parse::<DateTime<Utc>>()
+            .unwrap_or_else(|_| Utc::now()),
+        last_active_at: last_active_at
+            .parse::<DateTime<Utc>>()
+            .unwrap_or_else(|_| Utc::now()),
     })
 }
 
@@ -479,7 +499,9 @@ mod tests {
         // Verify all tables exist
         let conn = db.conn();
         let tables: Vec<String> = conn
-            .prepare("SELECT name FROM sqlite_master WHERE type='table' OR type='view' ORDER BY name")
+            .prepare(
+                "SELECT name FROM sqlite_master WHERE type='table' OR type='view' ORDER BY name",
+            )
             .unwrap()
             .query_map([], |row| row.get(0))
             .unwrap()
@@ -492,12 +514,30 @@ mod tests {
             })
             .collect();
 
-        assert!(tables.contains(&"memories".to_string()), "memories table missing");
-        assert!(tables.contains(&"embedding_cache".to_string()), "embedding_cache table missing");
-        assert!(tables.contains(&"dream_state".to_string()), "dream_state table missing");
-        assert!(tables.contains(&"patterns".to_string()), "patterns table missing");
-        assert!(tables.contains(&"projects".to_string()), "projects table missing");
-        assert!(tables.contains(&"project_memory".to_string()), "project_memory table missing");
+        assert!(
+            tables.contains(&"memories".to_string()),
+            "memories table missing"
+        );
+        assert!(
+            tables.contains(&"embedding_cache".to_string()),
+            "embedding_cache table missing"
+        );
+        assert!(
+            tables.contains(&"dream_state".to_string()),
+            "dream_state table missing"
+        );
+        assert!(
+            tables.contains(&"patterns".to_string()),
+            "patterns table missing"
+        );
+        assert!(
+            tables.contains(&"projects".to_string()),
+            "projects table missing"
+        );
+        assert!(
+            tables.contains(&"project_memory".to_string()),
+            "project_memory table missing"
+        );
     }
 
     #[test]
@@ -507,7 +547,9 @@ mod tests {
 
         // Verify FTS5 virtual table
         let tables: Vec<String> = conn
-            .prepare("SELECT name FROM sqlite_master WHERE type='table' OR type='view' ORDER BY name")
+            .prepare(
+                "SELECT name FROM sqlite_master WHERE type='table' OR type='view' ORDER BY name",
+            )
             .unwrap()
             .query_map([], |row| row.get(0))
             .unwrap()
@@ -520,7 +562,10 @@ mod tests {
             })
             .collect();
 
-        assert!(tables.contains(&"memories_fts".to_string()), "memories_fts missing");
+        assert!(
+            tables.contains(&"memories_fts".to_string()),
+            "memories_fts missing"
+        );
     }
 
     #[test]
@@ -529,10 +574,16 @@ mod tests {
         assert_eq!(db.get_dream_state("test_key").unwrap(), None);
 
         db.set_dream_state("test_key", "hello").unwrap();
-        assert_eq!(db.get_dream_state("test_key").unwrap(), Some("hello".to_string()));
+        assert_eq!(
+            db.get_dream_state("test_key").unwrap(),
+            Some("hello".to_string())
+        );
 
         db.set_dream_state("test_key", "updated").unwrap();
-        assert_eq!(db.get_dream_state("test_key").unwrap(), Some("updated".to_string()));
+        assert_eq!(
+            db.get_dream_state("test_key").unwrap(),
+            Some("updated".to_string())
+        );
     }
 
     #[test]
@@ -659,10 +710,12 @@ mod tests {
                  FROM memories_fts f
                  JOIN memories m ON m.id = f.id
                  WHERE memories_fts MATCH 'Rust'
-                 ORDER BY score DESC"
+                 ORDER BY score DESC",
             )
             .unwrap()
-            .query_map([], |row| Ok((row.get::<_, String>(0)?, row.get::<_, f64>(1)?)))
+            .query_map([], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, f64>(1)?))
+            })
             .unwrap()
             .filter_map(|r| match r {
                 Ok(v) => Some(v),

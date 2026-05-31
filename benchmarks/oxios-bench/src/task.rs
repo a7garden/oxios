@@ -87,10 +87,7 @@ pub enum Assertion {
 
     // ── Content (response text) ──
     /// Response must contain this text.
-    Contains {
-        text: String,
-        case_sensitive: bool,
-    },
+    Contains { text: String, case_sensitive: bool },
     /// Response must NOT contain this text.
     NotContains { text: String },
     /// Response must match this regex.
@@ -159,10 +156,7 @@ impl Assertion {
             Assertion::RequireSeedId => AssertionResult {
                 assertion: self.describe(),
                 passed: output.seed_id.is_some(),
-                actual: output
-                    .seed_id
-                    .clone()
-                    .unwrap_or_else(|| "None".to_string()),
+                actual: output.seed_id.clone().unwrap_or_else(|| "None".to_string()),
                 expected: "Some(...)".to_string(),
             },
             Assertion::RequireAgentId => AssertionResult {
@@ -196,7 +190,10 @@ impl Assertion {
                 let passed = if *case_sensitive {
                     output.response.contains(text.as_str())
                 } else {
-                    output.response.to_lowercase().contains(&text.to_lowercase())
+                    output
+                        .response
+                        .to_lowercase()
+                        .contains(&text.to_lowercase())
                 };
                 AssertionResult {
                     assertion: self.describe(),
@@ -369,7 +366,8 @@ impl TaskToml {
 
         // Build fixtures
         let fixtures = self
-            .setup.map(|s| s.files)
+            .setup
+            .map(|s| s.files)
             .unwrap_or_default()
             .into_iter()
             .map(|f| Fixture {
@@ -461,7 +459,10 @@ phase_reached = "Execute"
 evaluation_passed = true
 "#;
         let parsed = TaskToml::parse(toml_str).unwrap();
-        assert!(parsed.task.prompt.is_some(), "prompt field should parse as Some");
+        assert!(
+            parsed.task.prompt.is_some(),
+            "prompt field should parse as Some"
+        );
         let task = parsed.into_task(None).unwrap();
         assert_eq!(task.id, "test_simple");
         assert_eq!(task.tier, Tier::Integration);

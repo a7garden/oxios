@@ -148,8 +148,7 @@ impl AgentTool for BudgetTool {
                 self.budget_manager.set_budget(limit);
 
                 Ok(AgentToolResult::success(format!(
-                    "Budget set for agent '{}': {} tokens, 1000 calls, 1h window.",
-                    agent_id_str, token_limit,
+                    "Budget set for agent '{agent_id_str}': {token_limit} tokens, 1000 calls, 1h window.",
                 )))
             }
 
@@ -163,12 +162,10 @@ impl AgentTool for BudgetTool {
 
                 match self.budget_manager.reserve(&agent_id, tokens) {
                     Ok(()) => Ok(AgentToolResult::success(format!(
-                        "Reserved {} tokens for agent '{}'.",
-                        tokens, agent_id_str,
+                        "Reserved {tokens} tokens for agent '{agent_id_str}'.",
                     ))),
                     Err(exceeded) => Ok(AgentToolResult::error(format!(
-                        "Budget exceeded: {}",
-                        exceeded
+                        "Budget exceeded: {exceeded}"
                     ))),
                 }
             }
@@ -176,14 +173,12 @@ impl AgentTool for BudgetTool {
             "reset" => {
                 self.budget_manager.reset_window(&agent_id);
                 Ok(AgentToolResult::success(format!(
-                    "Budget window reset for agent '{}'.",
-                    agent_id_str,
+                    "Budget window reset for agent '{agent_id_str}'.",
                 )))
             }
 
             other => Err(format!(
-                "Unknown budget action '{}'. Valid: check, set, reserve, reset",
-                other
+                "Unknown budget action '{other}'. Valid: check, set, reserve, reset"
             )),
         }
     }

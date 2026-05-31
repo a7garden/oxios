@@ -12,10 +12,10 @@ use std::sync::Arc;
 use anyhow::Result;
 use chrono::Utc;
 
+use super::cache;
 use super::database::MemoryDatabase;
 use super::search::{self, RankedMemory};
-use super::cache;
-use super::{content_hash, dedup_by_id, MemoryEntry, MemoryType, MemoryTier};
+use super::{content_hash, dedup_by_id, MemoryEntry, MemoryTier, MemoryType};
 
 /// A learning pattern row from the `patterns` table.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -130,7 +130,8 @@ impl SqliteMemoryStore {
                 "SELECT rowid FROM memories WHERE id = ?1",
                 rusqlite::params![id],
                 |row| row.get(0),
-            ).unwrap_or(0)
+            )
+            .unwrap_or(0)
         }; // conn dropped here, before any .await
 
         // Compute and store dense embedding
@@ -173,10 +174,8 @@ impl SqliteMemoryStore {
             )
             .ok();
 
-        let deleted = conn.execute(
-            "DELETE FROM memories WHERE id = ?1",
-            rusqlite::params![id],
-        )? > 0;
+        let deleted =
+            conn.execute("DELETE FROM memories WHERE id = ?1", rusqlite::params![id])? > 0;
 
         drop(conn);
 
@@ -227,13 +226,7 @@ impl SqliteMemoryStore {
         // Compute query embedding (with caching)
         let query_vec = self.get_query_vector(query).await?;
 
-        let results = search::search(
-            &self.db,
-            query_vec.as_deref(),
-            query,
-            memory_type,
-            limit,
-        )?;
+        let results = search::search(&self.db, query_vec.as_deref(), query, memory_type, limit)?;
 
         Ok(results.into_iter().map(|r| r.entry).collect())
     }
@@ -258,7 +251,10 @@ impl SqliteMemoryStore {
         let sessions = self.list(MemoryType::Session, 2).unwrap_or_default();
 
         // 3. Search for relevant facts/episodes
-        let relevant = self.search(query, None, max_recall).await.unwrap_or_default();
+        let relevant = self
+            .search(query, None, max_recall)
+            .await
+            .unwrap_or_default();
 
         // 4. Combine and deduplicate
         let mut combined = recent;
@@ -336,8 +332,10 @@ impl SqliteMemoryStore {
     /// Count total entries in the database.
     pub fn total_entries(&self) -> usize {
         let conn = self.db.conn();
-        conn.query_row("SELECT COUNT(*) FROM memories", [], |row| row.get::<_, i64>(0))
-            .unwrap_or(0) as usize
+        conn.query_row("SELECT COUNT(*) FROM memories", [], |row| {
+            row.get::<_, i64>(0)
+        })
+        .unwrap_or(0) as usize
     }
 
     /// Count entries by type.
@@ -376,7 +374,8 @@ impl SqliteMemoryStore {
                 "SELECT 1 FROM memories WHERE content_hash = ?1 LIMIT 1",
                 rusqlite::params![hash as i64],
                 |row| row.get::<_, i64>(0),
-            ).is_ok()
+            )
+            .is_ok()
         }; // conn dropped
 
         if exists {
@@ -427,16 +426,16 @@ impl SqliteMemoryStore {
         let mut sessions: std::collections::HashMap<String, Vec<u64>> =
             std::collections::HashMap::new();
 
-        let mut stmt = match conn.prepare(
-            "SELECT rowid, session_id FROM memories WHERE session_id IS NOT NULL"
-        ) {
+        let mut stmt = match conn
+            .prepare("SELECT rowid, session_id FROM memories WHERE session_id IS NOT NULL")
+        {
             Ok(s) => s,
             Err(_) => return super::graph::MemoryGraph::new(),
         };
 
         let rows: Vec<(i64, String)> = match stmt.query_map([], |row| {
-                Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?))
-            }) {
+            Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?))
+        }) {
             Ok(mapped) => mapped
                 .filter_map(|r| match r {
                     Ok(v) => Some(v),
@@ -453,10 +452,7 @@ impl SqliteMemoryStore {
         drop(conn);
 
         for (rowid, session_id) in rows {
-            sessions
-                .entry(session_id)
-                .or_default()
-                .push(rowid as u64);
+            sessions.entry(session_id).or_default().push(rowid as u64);
         }
 
         let session_vecs: Vec<Vec<u64>> = sessions.into_values().collect();
@@ -484,7 +480,11 @@ impl SqliteMemoryStore {
     /// `new_importance = old_importance * (1 + pagerank_boost * pagerank_score)`
     ///
     /// Returns the number of entries updated.
-    pub fn apply_pagerank_boost(&self, pagerank_scores: &std::collections::HashMap<u64, f64>, boost_factor: f32) -> usize {
+    pub fn apply_pagerank_boost(
+        &self,
+        pagerank_scores: &std::collections::HashMap<u64, f64>,
+        boost_factor: f32,
+    ) -> usize {
         let conn = self.db.conn();
         let mut updated = 0;
 
@@ -499,13 +499,16 @@ impl SqliteMemoryStore {
                 .ok();
 
             if let Some(old_importance) = importance {
-                let new_importance = (old_importance * (1.0 + boost_factor * score as f32))
-                    .clamp(0.0, 1.0);
+                let new_importance =
+                    (old_importance * (1.0 + boost_factor * score as f32)).clamp(0.0, 1.0);
 
-                if conn.execute(
-                    "UPDATE memories SET importance = ?1 WHERE rowid = ?2",
-                    rusqlite::params![new_importance, rowid as i64],
-                ).is_ok() {
+                if conn
+                    .execute(
+                        "UPDATE memories SET importance = ?1 WHERE rowid = ?2",
+                        rusqlite::params![new_importance, rowid as i64],
+                    )
+                    .is_ok()
+                {
                     updated += 1;
                 }
             }
@@ -627,7 +630,7 @@ impl SqliteMemoryStore {
             "SELECT id, strategy, domain, quality, use_count, success_rate,
                     is_long_term, data, created_at, updated_at
              FROM patterns
-             ORDER BY quality DESC"
+             ORDER BY quality DESC",
         )?;
 
         let rows: Vec<PatternRow> = stmt
@@ -785,7 +788,11 @@ mod tests {
     async fn test_remember_and_get() {
         let store = make_store();
 
-        let entry = make_test_entry("sqlite-test-1", MemoryType::Fact, "Rust is a systems language");
+        let entry = make_test_entry(
+            "sqlite-test-1",
+            MemoryType::Fact,
+            "Rust is a systems language",
+        );
         store.remember(&entry).await.unwrap();
 
         let loaded = store.get("sqlite-test-1", MemoryType::Fact).unwrap();
@@ -801,20 +808,35 @@ mod tests {
 
         let entry = make_test_entry("forget-test-1", MemoryType::Fact, "to be deleted");
         store.remember(&entry).await.unwrap();
-        assert!(store.get("forget-test-1", MemoryType::Fact).unwrap().is_some());
+        assert!(store
+            .get("forget-test-1", MemoryType::Fact)
+            .unwrap()
+            .is_some());
 
         let deleted = store.forget("forget-test-1", MemoryType::Fact).unwrap();
         assert!(deleted);
-        assert!(store.get("forget-test-1", MemoryType::Fact).unwrap().is_none());
+        assert!(store
+            .get("forget-test-1", MemoryType::Fact)
+            .unwrap()
+            .is_none());
     }
 
     #[tokio::test]
     async fn test_list() {
         let store = make_store();
 
-        store.remember(&make_test_entry("list-1", MemoryType::Fact, "fact 1")).await.unwrap();
-        store.remember(&make_test_entry("list-2", MemoryType::Fact, "fact 2")).await.unwrap();
-        store.remember(&make_test_entry("list-3", MemoryType::Episode, "episode 1")).await.unwrap();
+        store
+            .remember(&make_test_entry("list-1", MemoryType::Fact, "fact 1"))
+            .await
+            .unwrap();
+        store
+            .remember(&make_test_entry("list-2", MemoryType::Fact, "fact 2"))
+            .await
+            .unwrap();
+        store
+            .remember(&make_test_entry("list-3", MemoryType::Episode, "episode 1"))
+            .await
+            .unwrap();
 
         let facts = store.list(MemoryType::Fact, 10).unwrap();
         assert_eq!(facts.len(), 2);
@@ -827,8 +849,22 @@ mod tests {
     async fn test_search_bm25() {
         let store = make_store();
 
-        store.remember(&make_test_entry("s-1", MemoryType::Fact, "Rust programming language safety")).await.unwrap();
-        store.remember(&make_test_entry("s-2", MemoryType::Fact, "Python data science machine learning")).await.unwrap();
+        store
+            .remember(&make_test_entry(
+                "s-1",
+                MemoryType::Fact,
+                "Rust programming language safety",
+            ))
+            .await
+            .unwrap();
+        store
+            .remember(&make_test_entry(
+                "s-2",
+                MemoryType::Fact,
+                "Python data science machine learning",
+            ))
+            .await
+            .unwrap();
 
         let results = store.search("Rust programming", None, 10).await.unwrap();
         assert!(!results.is_empty(), "BM25 search should find results");
@@ -839,10 +875,27 @@ mod tests {
     async fn test_search_with_type_filter() {
         let store = make_store();
 
-        store.remember(&make_test_entry("tf-1", MemoryType::Fact, "test content fact")).await.unwrap();
-        store.remember(&make_test_entry("tf-2", MemoryType::Episode, "test content episode")).await.unwrap();
+        store
+            .remember(&make_test_entry(
+                "tf-1",
+                MemoryType::Fact,
+                "test content fact",
+            ))
+            .await
+            .unwrap();
+        store
+            .remember(&make_test_entry(
+                "tf-2",
+                MemoryType::Episode,
+                "test content episode",
+            ))
+            .await
+            .unwrap();
 
-        let results = store.search("test", Some(MemoryType::Fact), 10).await.unwrap();
+        let results = store
+            .search("test", Some(MemoryType::Fact), 10)
+            .await
+            .unwrap();
         assert!(results.iter().all(|r| r.memory_type == MemoryType::Fact));
     }
 
@@ -850,8 +903,22 @@ mod tests {
     async fn test_recall() {
         let store = make_store();
 
-        store.remember(&make_test_entry("rc-1", MemoryType::Fact, "Rust memory safety")).await.unwrap();
-        store.remember(&make_test_entry("rc-2", MemoryType::Conversation, "User asked about Rust")).await.unwrap();
+        store
+            .remember(&make_test_entry(
+                "rc-1",
+                MemoryType::Fact,
+                "Rust memory safety",
+            ))
+            .await
+            .unwrap();
+        store
+            .remember(&make_test_entry(
+                "rc-2",
+                MemoryType::Conversation,
+                "User asked about Rust",
+            ))
+            .await
+            .unwrap();
 
         let results = store.recall("Rust safety", 10).await.unwrap();
         assert!(!results.is_empty());
@@ -878,8 +945,14 @@ mod tests {
         let store = make_store();
         assert_eq!(store.total_entries(), 0);
 
-        store.remember(&make_test_entry("cnt-1", MemoryType::Fact, "one")).await.unwrap();
-        store.remember(&make_test_entry("cnt-2", MemoryType::Episode, "two")).await.unwrap();
+        store
+            .remember(&make_test_entry("cnt-1", MemoryType::Fact, "one"))
+            .await
+            .unwrap();
+        store
+            .remember(&make_test_entry("cnt-2", MemoryType::Episode, "two"))
+            .await
+            .unwrap();
         assert_eq!(store.total_entries(), 2);
     }
 
@@ -902,7 +975,14 @@ mod tests {
     async fn test_is_duplicate() {
         let store = make_store();
 
-        store.remember(&make_test_entry("dup-1", MemoryType::Fact, "unique content here")).await.unwrap();
+        store
+            .remember(&make_test_entry(
+                "dup-1",
+                MemoryType::Fact,
+                "unique content here",
+            ))
+            .await
+            .unwrap();
 
         // Same content hash
         assert!(store.is_duplicate("unique content here").await);

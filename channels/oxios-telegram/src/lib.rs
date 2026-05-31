@@ -252,7 +252,8 @@ impl TelegramChannel {
             if let Some(msg_id) = reply_to {
                 body["reply_to_message_id"] = serde_json::Value::Number(msg_id.into());
             }
-            let resp = self.client
+            let resp = self
+                .client
                 .post(self.api_url("sendMessage"))
                 .json(&body)
                 .send()

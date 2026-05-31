@@ -32,10 +32,10 @@ pub async fn run_update(
     println!(
         "  {} {}",
         style("⬡ Oxios Updater").bold(),
-        style(format!("v{}", current)).dim()
+        style(format!("v{current}")).dim()
     );
     println!("  {}", "─".repeat(52));
-    println!("  Current version:  {}", current);
+    println!("  Current version:  {current}");
     println!(
         "  Update binary:    {}",
         if update_binary { "yes" } else { "no" }
@@ -45,7 +45,7 @@ pub async fn run_update(
         if update_web { "yes" } else { "no" }
     );
     if let Some(v) = version {
-        println!("  Target version:  {}", v);
+        println!("  Target version:  {v}");
     } else {
         println!("  Target version:  latest");
     }
@@ -54,17 +54,11 @@ pub async fn run_update(
     // ── Fetch release info from GitHub ──────────────────────────────────────
     let owner = "a7garden";
     let repo = "oxios";
-    let tag = version.map(|v| format!("v{}", v));
+    let tag = version.map(|v| format!("v{v}"));
 
     let api_url = match &tag {
-        Some(t) => format!(
-            "https://api.github.com/repos/{}/{}/releases/tags/{}",
-            owner, repo, t
-        ),
-        None => format!(
-            "https://api.github.com/repos/{}/{}/releases/latest",
-            owner, repo
-        ),
+        Some(t) => format!("https://api.github.com/repos/{owner}/{repo}/releases/tags/{t}"),
+        None => format!("https://api.github.com/repos/{owner}/{repo}/releases/latest"),
     };
 
     println!("  Fetching release info from GitHub...");
@@ -170,7 +164,7 @@ pub async fn run_update(
     if !yes {
         println!("  {} Release notes:\n", style("📋").cyan());
         for line in body.lines().take(10) {
-            println!("    {}", line);
+            println!("    {line}");
         }
         if body.lines().count() > 10 {
             println!("    ... ({} more lines)", body.lines().count() - 10);
@@ -190,17 +184,16 @@ pub async fn run_update(
     // ── Download and install web UI ────────────────────────────────────────
     if update_web {
         if let Some((name, url, size)) = web_asset {
-            print!("  Downloading {}... ", name);
+            print!("  Downloading {name}... ");
             std::io::stdout().flush().ok();
 
             let bytes = download_file(&client, url, *size).await?;
             println!("done ({}).", format_size(bytes.len() as u64));
 
             let dest_dir = dest_web_dir()?;
-            std::fs::create_dir_all(&dest_dir)
-                .context(format!("failed to create {:?}", dest_dir))?;
+            std::fs::create_dir_all(&dest_dir).context(format!("failed to create {dest_dir:?}"))?;
 
-            print!("  Extracting to {:?}... ", dest_dir);
+            print!("  Extracting to {dest_dir:?}... ");
             std::io::stdout().flush().ok();
 
             let cursor = std::io::Cursor::new(bytes);
@@ -239,7 +232,7 @@ pub async fn run_update(
     if update_binary {
         if let Some((name, url, size)) = binary_asset {
             let expected_checksum = if let Some((cs_name, cs_url, _)) = checksum_asset {
-                print!("  Verifying checksum from {}... ", cs_name);
+                print!("  Verifying checksum from {cs_name}... ");
                 std::io::stdout().flush().ok();
                 let cs_bytes = download_file(&client, cs_url, 256).await?;
                 String::from_utf8_lossy(&cs_bytes)
@@ -251,7 +244,7 @@ pub async fn run_update(
                 String::new()
             };
 
-            print!("  Downloading {}... ", name);
+            print!("  Downloading {name}... ");
             std::io::stdout().flush().ok();
 
             let bytes = download_file(&client, url, *size).await?;
@@ -259,12 +252,10 @@ pub async fn run_update(
 
             if !expected_checksum.is_empty() {
                 let digest = sha2::Sha256::digest(&bytes);
-                let actual = format!("{:x}", digest);
+                let actual = format!("{digest:x}");
                 if actual != expected_checksum {
                     anyhow::bail!(
-                        "Checksum mismatch!\n  Expected: {}\n  Actual:   {}",
-                        expected_checksum,
-                        actual
+                        "Checksum mismatch!\n  Expected: {expected_checksum}\n  Actual:   {actual}"
                     );
                 }
                 println!("  {} Checksum verified.", style("✓").green());
@@ -274,8 +265,7 @@ pub async fn run_update(
             if let Some(p) = dest.parent() {
                 std::fs::create_dir_all(p)?;
             }
-            std::fs::write(&dest, &bytes)
-                .context(format!("failed to write binary to {:?}", dest))?;
+            std::fs::write(&dest, &bytes).context(format!("failed to write binary to {dest:?}"))?;
 
             #[cfg(unix)]
             {
@@ -314,14 +304,8 @@ pub async fn run_changelog(version: Option<&str>) -> Result<()> {
     let owner = "a7garden";
     let repo = "oxios";
     let api_url = match version {
-        Some(v) => format!(
-            "https://api.github.com/repos/{}/{}/releases/tags/v{}",
-            owner, repo, v
-        ),
-        None => format!(
-            "https://api.github.com/repos/{}/{}/releases/latest",
-            owner, repo
-        ),
+        Some(v) => format!("https://api.github.com/repos/{owner}/{repo}/releases/tags/v{v}"),
+        None => format!("https://api.github.com/repos/{owner}/{repo}/releases/latest"),
     };
 
     let client = reqwest::Client::builder()
@@ -356,7 +340,7 @@ pub async fn run_changelog(version: Option<&str>) -> Result<()> {
     );
     println!("  {}", "─".repeat(55));
     println!();
-    println!("{}", body);
+    println!("{body}");
     Ok(())
 }
 
@@ -394,7 +378,7 @@ async fn download_file(
 
 fn format_size(bytes: u64) -> String {
     if bytes < 1024 {
-        format!("{} B", bytes)
+        format!("{bytes} B")
     } else if bytes < 1024 * 1024 {
         format!("{:.1} KB", bytes as f64 / 1024.0)
     } else {

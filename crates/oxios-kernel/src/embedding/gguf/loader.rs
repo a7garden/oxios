@@ -15,7 +15,7 @@ const MODEL_REPO: &str = "unsloth/embeddinggemma-300m-GGUF";
 const MODEL_FILE: &str = "embeddinggemma-300m-Q4_K_M.gguf";
 
 /// Approximate model file size in MB (for display purposes).
-const MODEL_SIZE_MB: u64 = 329;
+pub const MODEL_SIZE_MB: u64 = 329;
 
 /// Human-readable model name (for display purposes).
 pub const MODEL_DISPLAY_NAME: &str = "EmbeddingGemma-300m";
@@ -52,12 +52,7 @@ impl GgufModelLoader {
         let hf = HfClient::with_cache_dir(model_dir.to_path_buf());
         let downloaded = hf
             .download_file(MODEL_REPO, MODEL_FILE, true)
-            .with_context(|| {
-                format!(
-                    "Failed to download {} from {}",
-                    MODEL_FILE, MODEL_REPO
-                )
-            })?;
+            .with_context(|| format!("Failed to download {} from {}", MODEL_FILE, MODEL_REPO))?;
 
         // Copy to expected location if downloaded elsewhere
         if downloaded != gguf_path {
@@ -93,17 +88,15 @@ impl GgufModelLoader {
         }
 
         tracing::info!(dir = %model_dir.display(), "Spawning background model prefetch (~329MB)");
-        tokio::task::spawn_blocking(move || {
-            match Self::ensure_model(&model_dir) {
-                Ok(path) => {
-                    tracing::info!(path = %path.display(), "Model prefetch complete");
-                }
-                Err(e) => {
-                    tracing::warn!(
-                        error = %e,
-                        "Model prefetch failed — will retry on first search"
-                    );
-                }
+        tokio::task::spawn_blocking(move || match Self::ensure_model(&model_dir) {
+            Ok(path) => {
+                tracing::info!(path = %path.display(), "Model prefetch complete");
+            }
+            Err(e) => {
+                tracing::warn!(
+                    error = %e,
+                    "Model prefetch failed — will retry on first search"
+                );
             }
         });
     }
@@ -124,9 +117,8 @@ mod tests {
 
     #[test]
     fn test_model_dir_path() {
-        let dir = GgufModelLoader::model_dir_for_workspace(Path::new(
-            "/home/user/.oxios/workspace",
-        ));
+        let dir =
+            GgufModelLoader::model_dir_for_workspace(Path::new("/home/user/.oxios/workspace"));
         assert_eq!(
             dir,
             PathBuf::from("/home/user/.oxios/workspace/models/embeddinggemma-300m")

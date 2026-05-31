@@ -164,8 +164,7 @@ impl OxiAgentTool for AgentTool {
 
                 match self.supervisor.kill(agent_id).await {
                     Ok(()) => Ok(AgentToolResult::success(format!(
-                        "Agent '{}' killed.",
-                        id_str
+                        "Agent '{id_str}' killed."
                     ))),
                     Err(e) => Ok(AgentToolResult::error(format!("Failed to kill agent: {e}"))),
                 }
@@ -196,8 +195,7 @@ impl OxiAgentTool for AgentTool {
             }
 
             other => Err(format!(
-                "Unknown agent action '{}'. Valid: list, kill, budget",
-                other
+                "Unknown agent action '{other}'. Valid: list, kill, budget"
             )),
         }
     }

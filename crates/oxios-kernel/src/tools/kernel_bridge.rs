@@ -116,14 +116,10 @@ mod tests {
                 state_store.clone(),
             ),
             crate::PersonaApi::new(Arc::new(crate::persona_manager::PersonaManager::new())),
-            crate::ExtensionApi::new(
-                Arc::new(
-                    crate::skill::SkillManager::new(
-                        base.join("skills"),
-                        base.join("share/skills"),
-                    ),
-                ),
-            ),
+            crate::ExtensionApi::new(Arc::new(crate::skill::SkillManager::new(
+                base.join("skills"),
+                base.join("share/skills"),
+            ))),
             crate::McpApi::new(Arc::new(crate::mcp::McpBridge::new())),
             crate::InfraApi::new(
                 Arc::new(crate::git_layer::GitLayer::new(base.join("git"), false).unwrap()),

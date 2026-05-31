@@ -245,7 +245,8 @@ mod tests {
     #[test]
     fn test_default_personas_have_unique_roles() {
         let personas = default_personas();
-        let roles: std::collections::HashSet<&str> = personas.iter().map(|p| p.role.as_str()).collect();
+        let roles: std::collections::HashSet<&str> =
+            personas.iter().map(|p| p.role.as_str()).collect();
         assert_eq!(roles.len(), 3);
     }
 

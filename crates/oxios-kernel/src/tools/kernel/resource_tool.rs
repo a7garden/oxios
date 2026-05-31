@@ -170,8 +170,7 @@ impl AgentTool for ResourceTool {
             }
 
             other => Err(format!(
-                "Unknown resource action '{}'. Valid: snapshot, history, overloaded",
-                other
+                "Unknown resource action '{other}'. Valid: snapshot, history, overloaded"
             )),
         }
     }

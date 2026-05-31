@@ -110,7 +110,7 @@ pub(crate) async fn handle_audit_verify(
                     "found": "timestamp in the future",
                 })));
             }
-            Err(AppError::Internal(format!("audit verify failed: {}", msg)))
+            Err(AppError::Internal(format!("audit verify failed: {msg}")))
         }
     }
 }
@@ -149,7 +149,7 @@ pub(crate) async fn handle_audit_export(
     let entry_count = entries.len();
 
     let json = serde_json::to_string_pretty(&entries)
-        .map_err(|e| AppError::Internal(format!("failed to serialize entries: {}", e)))?;
+        .map_err(|e| AppError::Internal(format!("failed to serialize entries: {e}")))?;
 
     Ok(Json(json!({
         "json": json,

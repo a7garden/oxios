@@ -83,7 +83,7 @@ pub fn extract_text_imgs_links(text: &str) -> ExtractResult {
                 let content = m.as_str();
                 let (link_path, link_label) = split_link_content(content, false);
                 links.insert(link_label.clone(), link_path);
-                format!("`{}`", link_label)
+                format!("`{link_label}`")
             } else {
                 caps.get(0).unwrap().as_str().to_string()
             }
@@ -97,7 +97,7 @@ pub fn extract_text_imgs_links(text: &str) -> ExtractResult {
                 let content = m.as_str();
                 let (link_path, link_label) = split_link_content(content, true);
                 links.insert(link_label.clone(), link_path);
-                format!("`{}`", link_label)
+                format!("`{link_label}`")
             } else {
                 caps.get(0).unwrap().as_str().to_string()
             }

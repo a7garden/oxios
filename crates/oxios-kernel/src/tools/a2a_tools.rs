@@ -132,8 +132,7 @@ impl AgentTool for A2aDelegateTool {
         if candidates.is_empty() {
             // No agent available — guide the LLM to handle it itself.
             return Ok(AgentToolResult::success(format!(
-                "No agents currently available with capability '{}'. You should handle this task yourself.",
-                capability
+                "No agents currently available with capability '{capability}'. You should handle this task yourself."
             )));
         }
 
@@ -166,8 +165,7 @@ impl AgentTool for A2aDelegateTool {
                 .unwrap_or_default(),
             )),
             Some(Err(e)) => Ok(AgentToolResult::error(format!(
-                "A2A delegation failed: {}",
-                e
+                "A2A delegation failed: {e}"
             ))),
             None => {
                 // No handler registered — fall back to fire-and-forget.

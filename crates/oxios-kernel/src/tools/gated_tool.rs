@@ -194,7 +194,9 @@ mod tests {
         let subject = Subject::Agent(
             <crate::types::AgentId as std::convert::From<uuid::Uuid>>::from(uuid::Uuid::new_v4()),
         );
-        access.rbac_manager_mut().assign_role(subject, Role::Superuser);
+        access
+            .rbac_manager_mut()
+            .assign_role(subject, Role::Superuser);
 
         Arc::new(AccessGate::new(
             Arc::new(Mutex::new(access)),

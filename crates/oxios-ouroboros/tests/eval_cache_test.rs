@@ -9,8 +9,7 @@ use oxios_ouroboros::seed::Seed;
 
 /// Helper to create a seed with a fixed ID for deterministic testing.
 fn test_seed() -> Seed {
-    let seed = Seed::new("test goal");
-    seed
+    Seed::new("test goal")
 }
 
 fn test_execution(output: &str) -> ExecutionResult {

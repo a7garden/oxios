@@ -55,7 +55,7 @@ impl AgentLifecycleManager {
     pub async fn spawn_and_run(&self, seed: &Seed, priority: Priority) -> Result<ExecutionResult> {
         // 1. Fork
         let agent_id = self.supervisor.fork(seed).await?;
-        let agent_name = format!("agent-{}", agent_id);
+        let agent_name = format!("agent-{agent_id}");
         tracing::info!(agent_id = %agent_id, seed_id = %seed.id, "Agent forked");
 
         // 2. Register A2A card
@@ -93,7 +93,7 @@ impl AgentLifecycleManager {
                     let secs = exec_timeout.as_secs();
                     tracing::warn!(agent_id = %agent_id, secs, "Agent execution timed out after {}s", secs);
                     self.cleanup_on_failure(agent_id, task_id).await;
-                    bail!("Agent execution timed out after {} seconds", secs);
+                    bail!("Agent execution timed out after {secs} seconds");
                 }
             }
         } else {

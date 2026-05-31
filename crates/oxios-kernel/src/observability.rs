@@ -16,23 +16,29 @@
 //!
 //! # Usage
 //!
-//! ```ignore
-//! // Start a span for an agent execution
-//! let _span = observability::tracer().start("seed-execution", SpanKind::Agent);
+//! ```no_run
+//! use oxios_kernel::observability;
 //!
-//! // Record token usage
-//! observability::cost_tracker().record("agent-1", &model, TokenUsage { ... });
+//! // Start a span for an agent execution
+//! let _span = observability::tracer().start("seed-execution", observability::SpanKind::Agent);
 //!
 //! // Log audit entry
-//! observability::audit_log().log(AuditEntry::tool_call("agent-1", "exec", true));
+//! observability::audit_log()
+//!     .log(observability::AuditEntry::tool_execution(
+//!         "agent-1".into(),
+//!         "exec".into(),
+//!         "ls -la".into(),
+//!         true,
+//!         42,
+//!     ));
 //! ```
 
-pub use oxi_sdk::{
-    AuditEntry, AuditFilter, AuditLog, CostBreakdown, CostSnapshot, CostTracker,
-    CostTrackerConfig, GlobalCostSnapshot, Span, SpanContext, SpanGuard, SpanId, SpanKind,
-    SpanStatus, TokenUsage, TraceId, Tracer,
-};
 use oxi_sdk::ModelRegistry;
+pub use oxi_sdk::{
+    AuditEntry, AuditFilter, AuditLog, CostBreakdown, CostSnapshot, CostTracker, CostTrackerConfig,
+    GlobalCostSnapshot, Span, SpanContext, SpanGuard, SpanId, SpanKind, SpanStatus, TokenUsage,
+    TraceId, Tracer,
+};
 use std::sync::Arc;
 
 /// Global Tracer instance.

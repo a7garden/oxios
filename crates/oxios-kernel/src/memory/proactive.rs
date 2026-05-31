@@ -120,11 +120,13 @@ impl ProactiveRecall {
         current_context: &[MemoryEntry],
     ) -> Result<Vec<MemoryEntry>> {
         let mut results = Vec::new();
-        let mut seen_ids: HashSet<String> =
-            current_context.iter().map(|e| e.id.clone()).collect();
+        let mut seen_ids: HashSet<String> = current_context.iter().map(|e| e.id.clone()).collect();
 
         // Step 1: HOT tier memories (always included)
-        if let Ok(hot_entries) = mgr.list_by_tier(crate::memory::MemoryTier::Hot, self.limit).await {
+        if let Ok(hot_entries) = mgr
+            .list_by_tier(crate::memory::MemoryTier::Hot, self.limit)
+            .await
+        {
             for entry in hot_entries {
                 if !seen_ids.contains(&entry.id) {
                     seen_ids.insert(entry.id.clone());
@@ -136,7 +138,10 @@ impl ProactiveRecall {
         // Step 2: SQLite semantic + BM25 search
         if results.len() < self.limit {
             let remaining = self.limit - results.len();
-            let search_results = mgr.search(query, None, remaining * 2).await.unwrap_or_default();
+            let search_results = mgr
+                .search(query, None, remaining * 2)
+                .await
+                .unwrap_or_default();
             for entry in search_results {
                 if !seen_ids.contains(&entry.id) {
                     seen_ids.insert(entry.id.clone());

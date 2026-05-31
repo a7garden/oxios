@@ -85,11 +85,7 @@ pub fn delete_vector(db: &MemoryDatabase, rowid: i64) -> Result<()> {
 /// Count vectors in the index.
 pub fn vector_count(db: &MemoryDatabase) -> Result<usize> {
     let conn = db.conn();
-    let count: i64 = conn.query_row(
-        "SELECT COUNT(*) FROM memory_vectors",
-        [],
-        |row| row.get(0),
-    )?;
+    let count: i64 = conn.query_row("SELECT COUNT(*) FROM memory_vectors", [], |row| row.get(0))?;
     Ok(count as usize)
 }
 
@@ -122,7 +118,11 @@ mod tests {
         let results = search_vector(&db, &v, 10).unwrap();
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].rowid, rowid);
-        assert!(results[0].distance < 0.01, "Distance should be near 0, got {}", results[0].distance);
+        assert!(
+            results[0].distance < 0.01,
+            "Distance should be near 0, got {}",
+            results[0].distance
+        );
     }
 
     #[test]

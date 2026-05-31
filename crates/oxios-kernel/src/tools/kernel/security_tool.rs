@@ -113,8 +113,7 @@ impl AgentTool for SecurityTool {
                     .unwrap_or_default(),
                 )),
                 Err(e) => Ok(AgentToolResult::error(format!(
-                    "Chain verification failed: {:?}",
-                    e
+                    "Chain verification failed: {e:?}"
                 ))),
             },
 
@@ -160,8 +159,7 @@ impl AgentTool for SecurityTool {
             }
 
             other => Err(format!(
-                "Unknown security action '{}'. Valid: verify_chain, query_audit, audit_count",
-                other
+                "Unknown security action '{other}'. Valid: verify_chain, query_audit, audit_count"
             )),
         }
     }

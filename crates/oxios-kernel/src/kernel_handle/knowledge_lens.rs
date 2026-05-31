@@ -228,7 +228,7 @@ impl KnowledgeLens {
         if let Some(path) = context_path {
             if let Ok(Some(content)) = self.kb.note_read(path) {
                 let snippet: String = content.chars().take(2000).collect();
-                context_parts.push(format!("## Current: {}\n\n{}", path, snippet));
+                context_parts.push(format!("## Current: {path}\n\n{snippet}"));
                 referenced_notes.push(path.to_string());
             }
         }
@@ -301,7 +301,7 @@ impl KnowledgeLens {
                 oxi_sdk::ProviderEvent::TextDelta { delta, .. } => text.push_str(&delta),
                 oxi_sdk::ProviderEvent::Done { .. } => break,
                 oxi_sdk::ProviderEvent::Error { error, .. } => {
-                    return Err(anyhow::anyhow!("AI: {:?}", error));
+                    return Err(anyhow::anyhow!("AI: {error:?}"));
                 }
                 _ => {}
             }

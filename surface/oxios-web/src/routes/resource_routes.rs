@@ -39,7 +39,7 @@ pub(crate) async fn handle_resource_snapshot(
     let snapshot = state.kernel.infra.resource_snapshot();
     serde_json::to_value(&snapshot)
         .map(Json)
-        .map_err(|e| AppError::Internal(format!("failed to serialize snapshot: {}", e)))
+        .map_err(|e| AppError::Internal(format!("failed to serialize snapshot: {e}")))
 }
 
 /// GET /api/resources/history — Get historical snapshots.
@@ -54,7 +54,7 @@ pub(crate) async fn handle_resource_history(
         "count": count,
     }))
     .map(Json)
-    .map_err(|e| AppError::Internal(format!("failed to serialize history: {}", e)))
+    .map_err(|e| AppError::Internal(format!("failed to serialize history: {e}")))
 }
 
 /// GET /api/resources/overload — Check if system is overloaded.
@@ -73,5 +73,5 @@ pub(crate) async fn handle_resource_overload(
         },
     }))
     .map(Json)
-    .map_err(|e| AppError::Internal(format!("failed to serialize overload status: {}", e)))
+    .map_err(|e| AppError::Internal(format!("failed to serialize overload status: {e}")))
 }

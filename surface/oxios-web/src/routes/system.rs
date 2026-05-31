@@ -210,7 +210,12 @@ pub(crate) async fn handle_status(state: State<Arc<AppState>>) -> Json<StatusRes
         },
         memory: memory_health,
         agents: agent_health,
-        spaces_active: state.kernel.projects.as_ref().map(|p| p.list_projects().len()).unwrap_or(0),
+        spaces_active: state
+            .kernel
+            .projects
+            .as_ref()
+            .map(|p| p.list_projects().len())
+            .unwrap_or(0),
     });
 
     Json(StatusResponse {
@@ -296,6 +301,7 @@ pub(crate) async fn handle_agents_list(
 }
 
 /// GET /api/agents/{id} — Agent detail.
+#[allow(dead_code)]
 pub(crate) async fn handle_agent_get(
     state: State<Arc<AppState>>,
     Path(id): Path<String>,
@@ -330,6 +336,7 @@ pub(crate) async fn handle_agent_get(
 }
 
 /// GET /api/agents/{id}/trace — Agent execution trace.
+#[allow(dead_code)]
 pub(crate) async fn handle_agent_trace(
     state: State<Arc<AppState>>,
     Path(id): Path<String>,
@@ -356,6 +363,7 @@ pub(crate) async fn handle_agent_trace(
 }
 
 /// GET /api/agents/{id}/logs — Agent execution logs.
+#[allow(dead_code)]
 pub(crate) async fn handle_agent_logs(
     state: State<Arc<AppState>>,
     Path(id): Path<String>,

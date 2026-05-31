@@ -208,7 +208,7 @@ impl CronScheduler {
     fn normalize_expr(expr: &str) -> String {
         let fields: Vec<&str> = expr.split_whitespace().collect();
         match fields.len() {
-            5 => format!("0 {}", expr),
+            5 => format!("0 {expr}"),
             _ => expr.to_string(),
         }
     }
@@ -217,7 +217,7 @@ impl CronScheduler {
     fn parse_schedule(&self, expr: &str) -> Result<Schedule> {
         let normalized = Self::normalize_expr(expr);
         Schedule::from_str(&normalized)
-            .map_err(|e| anyhow::anyhow!("Invalid cron expression '{}': {}", expr, e))
+            .map_err(|e| anyhow::anyhow!("Invalid cron expression '{expr}': {e}"))
     }
 
     /// Compute the next fire time after `after`.
@@ -256,7 +256,7 @@ impl CronScheduler {
         self.jobs
             .write()
             .remove(&id)
-            .ok_or_else(|| anyhow::anyhow!("Job {} not found", id))?;
+            .ok_or_else(|| anyhow::anyhow!("Job {id} not found"))?;
         self.dirty.store(true, Ordering::Relaxed);
         self.persist_jobs().await;
         tracing::info!(%id, "Cron job removed");
@@ -271,7 +271,7 @@ impl CronScheduler {
             let mut jobs = self.jobs.write();
             let job = jobs
                 .get_mut(&id)
-                .ok_or_else(|| anyhow::anyhow!("Job {} not found", id))?;
+                .ok_or_else(|| anyhow::anyhow!("Job {id} not found"))?;
 
             if let Some(name) = update.name {
                 job.name = name;
@@ -351,7 +351,7 @@ impl CronScheduler {
             .read()
             .get(&id)
             .cloned()
-            .ok_or_else(|| anyhow::anyhow!("Job {} not found", id))?;
+            .ok_or_else(|| anyhow::anyhow!("Job {id} not found"))?;
 
         if self.running_jobs.lock().contains(&id) {
             bail!("Job '{}' is already running", job.name);
@@ -402,12 +402,19 @@ impl CronScheduler {
     ///
     /// # Example
     ///
-    /// ```ignore
+    /// ```no_run
+    /// use std::sync::Arc;
+    /// use oxios_kernel::state_store::StateStore;
+    /// use oxios_kernel::cron::CronScheduler;
+    ///
+    /// # async fn example() {
+    /// let state_store = Arc::new(StateStore::new("/tmp/state".into()).unwrap());
     /// let scheduler = Arc::new(CronScheduler::new(state_store, 60));
     /// scheduler.clone().start(|id, goal| async move {
     ///     // execute the agent...
     ///     (true, "Done".to_string())
     /// }).await;
+    /// # }
     /// ```
     pub async fn start<F, Fut>(self: Arc<Self>, executor: F)
     where
@@ -497,7 +504,7 @@ impl CronScheduler {
                     Ok((s, m)) => (s, m),
                     Err(_) => {
                         tracing::error!(%id, timeout_secs, "Cron job timed out");
-                        (false, format!("Timed out after {} seconds", timeout_secs))
+                        (false, format!("Timed out after {timeout_secs} seconds"))
                     }
                 };
                 tracing::info!(%id, success, "Cron job completed");

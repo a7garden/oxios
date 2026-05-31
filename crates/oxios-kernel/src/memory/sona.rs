@@ -35,7 +35,6 @@ pub enum SonaMode {
     Edge,
 }
 
-
 /// Verdict for a trajectory outcome.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -316,7 +315,10 @@ impl SonaEngine {
             }
         }
 
-        tracing::info!(new_patterns = new_patterns.len(), "SONA distillation complete");
+        tracing::info!(
+            new_patterns = new_patterns.len(),
+            "SONA distillation complete"
+        );
         Ok(new_patterns)
     }
 
@@ -340,13 +342,11 @@ impl SonaEngine {
             }
         }
 
-        Ok(best
-            .filter(|(_, sim)| *sim > 0.3)
-            .map(|(p, sim)| {
-                let mut adapted = p.clone();
-                adapted.confidence = (p.confidence * sim as f32).min(1.0);
-                adapted
-            }))
+        Ok(best.filter(|(_, sim)| *sim > 0.3).map(|(p, sim)| {
+            let mut adapted = p.clone();
+            adapted.confidence = (p.confidence * sim as f32).min(1.0);
+            adapted
+        }))
     }
 
     /// Return counts of trajectories and patterns.
@@ -409,10 +409,7 @@ impl SonaEngine {
         store: &crate::memory::sqlite_store::SqliteMemoryStore,
     ) -> anyhow::Result<()> {
         let rows = store.load_patterns()?;
-        let sona_rows: Vec<_> = rows
-            .into_iter()
-            .filter(|r| r.strategy == "sona")
-            .collect();
+        let sona_rows: Vec<_> = rows.into_iter().filter(|r| r.strategy == "sona").collect();
 
         let mut patterns = Vec::new();
         for row in &sona_rows {
@@ -422,7 +419,10 @@ impl SonaEngine {
         }
 
         *self.learned_patterns.write() = patterns;
-        tracing::debug!(count = sona_rows.len(), "SONA patterns restored from SQLite");
+        tracing::debug!(
+            count = sona_rows.len(),
+            "SONA patterns restored from SQLite"
+        );
         Ok(())
     }
 }
@@ -458,7 +458,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_record_trajectory() {
-        let engine = SonaEngine::new(SonaMode::Balanced, std::sync::Arc::new(TfIdfEmbeddingProvider));
+        let engine = SonaEngine::new(
+            SonaMode::Balanced,
+            std::sync::Arc::new(TfIdfEmbeddingProvider),
+        );
         let traj = make_trajectory("testing", Verdict::Success);
 
         let id = engine.record(traj).await.unwrap();
@@ -470,7 +473,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_distill_patterns() {
-        let engine = SonaEngine::new(SonaMode::Balanced, std::sync::Arc::new(TfIdfEmbeddingProvider));
+        let engine = SonaEngine::new(
+            SonaMode::Balanced,
+            std::sync::Arc::new(TfIdfEmbeddingProvider),
+        );
 
         // Record multiple successful trajectories in the same domain
         for _ in 0..3 {
@@ -479,7 +485,10 @@ mod tests {
         }
 
         let patterns = engine.distill().await.unwrap();
-        assert!(!patterns.is_empty(), "Should distill patterns from 3+ successful trajectories");
+        assert!(
+            !patterns.is_empty(),
+            "Should distill patterns from 3+ successful trajectories"
+        );
 
         let (_, pattern_count) = engine.counts();
         assert!(pattern_count > 0);
@@ -487,19 +496,34 @@ mod tests {
 
     #[tokio::test]
     async fn test_distill_needs_multiple_successes() {
-        let engine = SonaEngine::new(SonaMode::Balanced, std::sync::Arc::new(TfIdfEmbeddingProvider));
+        let engine = SonaEngine::new(
+            SonaMode::Balanced,
+            std::sync::Arc::new(TfIdfEmbeddingProvider),
+        );
 
-        engine.record(make_trajectory("testing", Verdict::Success)).await.unwrap();
+        engine
+            .record(make_trajectory("testing", Verdict::Success))
+            .await
+            .unwrap();
         let patterns = engine.distill().await.unwrap();
         assert!(patterns.is_empty(), "Need 2+ trajectories to distill");
     }
 
     #[tokio::test]
     async fn test_distill_ignores_failures() {
-        let engine = SonaEngine::new(SonaMode::Balanced, std::sync::Arc::new(TfIdfEmbeddingProvider));
+        let engine = SonaEngine::new(
+            SonaMode::Balanced,
+            std::sync::Arc::new(TfIdfEmbeddingProvider),
+        );
 
-        engine.record(make_trajectory("testing", Verdict::Failure)).await.unwrap();
-        engine.record(make_trajectory("testing", Verdict::Failure)).await.unwrap();
+        engine
+            .record(make_trajectory("testing", Verdict::Failure))
+            .await
+            .unwrap();
+        engine
+            .record(make_trajectory("testing", Verdict::Failure))
+            .await
+            .unwrap();
 
         let patterns = engine.distill().await.unwrap();
         assert!(patterns.is_empty(), "Failures should not produce patterns");
@@ -507,18 +531,25 @@ mod tests {
 
     #[tokio::test]
     async fn test_adapt_finds_similar_pattern() {
-        let engine = SonaEngine::new(SonaMode::Balanced, std::sync::Arc::new(TfIdfEmbeddingProvider));
+        let engine = SonaEngine::new(
+            SonaMode::Balanced,
+            std::sync::Arc::new(TfIdfEmbeddingProvider),
+        );
 
         // Record and distill
         for _ in 0..3 {
             let mut traj = make_trajectory("security", Verdict::Success);
-            traj.steps[0].input = "scan for SQL injection vulnerabilities in the codebase".to_string();
+            traj.steps[0].input =
+                "scan for SQL injection vulnerabilities in the codebase".to_string();
             engine.record(traj).await.unwrap();
         }
         engine.distill().await.unwrap();
 
         // Adapt should find the pattern
-        let result = engine.adapt("check for SQL injection security issues").await.unwrap();
+        let result = engine
+            .adapt("check for SQL injection security issues")
+            .await
+            .unwrap();
         assert!(result.is_some(), "Should find a matching pattern");
         let pattern = result.unwrap();
         assert_eq!(pattern.domain, "security");
@@ -527,10 +558,16 @@ mod tests {
 
     #[tokio::test]
     async fn test_adapt_no_match_below_threshold() {
-        let engine = SonaEngine::new(SonaMode::Balanced, std::sync::Arc::new(TfIdfEmbeddingProvider));
+        let engine = SonaEngine::new(
+            SonaMode::Balanced,
+            std::sync::Arc::new(TfIdfEmbeddingProvider),
+        );
 
         // No patterns learned
-        let result = engine.adapt("completely unrelated query about cooking").await.unwrap();
+        let result = engine
+            .adapt("completely unrelated query about cooking")
+            .await
+            .unwrap();
         assert!(result.is_none());
     }
 
@@ -552,10 +589,7 @@ mod tests {
     #[test]
     fn test_trajectory_total_duration() {
         let traj = Trajectory::new(
-            vec![
-                make_step("a", "b"),
-                make_step("c", "d"),
-            ],
+            vec![make_step("a", "b"), make_step("c", "d")],
             Verdict::Success,
             "testing",
         );
@@ -566,8 +600,18 @@ mod tests {
     fn test_trajectory_avg_confidence() {
         let traj = Trajectory::new(
             vec![
-                TrajectoryStep { input: "a".into(), output: "b".into(), duration_ms: 10, confidence: 0.8 },
-                TrajectoryStep { input: "c".into(), output: "d".into(), duration_ms: 10, confidence: 0.6 },
+                TrajectoryStep {
+                    input: "a".into(),
+                    output: "b".into(),
+                    duration_ms: 10,
+                    confidence: 0.8,
+                },
+                TrajectoryStep {
+                    input: "c".into(),
+                    output: "d".into(),
+                    duration_ms: 10,
+                    confidence: 0.6,
+                },
             ],
             Verdict::Success,
             "testing",

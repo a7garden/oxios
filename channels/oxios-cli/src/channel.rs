@@ -13,8 +13,8 @@ use oxios_gateway::channel::Channel;
 use oxios_gateway::format::ChannelFormatter;
 use oxios_gateway::message::{IncomingMessage, OutgoingMessage};
 use oxios_gateway::GatewayInbox;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use tokio::sync::{mpsc, watch, Mutex};
 
 use crate::format::CliFormatter;
@@ -120,7 +120,7 @@ impl Channel for CliChannel {
             Some(_) => self.formatter.format_success(&msg),
             None => msg.content.clone(),
         };
-        println!("{}", output);
+        println!("{output}");
         self.processing.store(false, Ordering::Relaxed);
         Ok(())
     }

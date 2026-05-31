@@ -27,8 +27,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use tokio::sync::oneshot;
 
-use crate::access_manager::{AccessGate, AgentContext};
 use crate::access_manager::AccessManager;
+use crate::access_manager::{AccessGate, AgentContext};
 use crate::config::ExecConfig;
 
 // ─── Shell metacharacter blocklist ──────────
@@ -155,10 +155,7 @@ impl ExecTool {
     ///
     /// **Warning:** This bypasses the new `AgentContext` / `AccessGate` path.
     /// Use only for migration or testing.
-    pub fn new_unrestricted(
-        config: Arc<ExecConfig>,
-        access: Arc<Mutex<AccessManager>>,
-    ) -> Self {
+    pub fn new_unrestricted(config: Arc<ExecConfig>, access: Arc<Mutex<AccessManager>>) -> Self {
         Self {
             config,
             access,
@@ -204,8 +201,7 @@ impl ExecTool {
             let mut access = self.access.lock();
             if !access.can_use_tool(name, "bash") {
                 return Err(format!(
-                    "shell_exec: agent '{}' is not allowed to execute 'bash'",
-                    name
+                    "shell_exec: agent '{name}' is not allowed to execute 'bash'"
                 ));
             }
             tracing::info!(
@@ -315,8 +311,7 @@ impl ExecTool {
             let mut access = self.access.lock();
             if !access.can_use_tool(name, binary) {
                 return Err(format!(
-                    "structured_exec: agent '{}' is not allowed to execute '{}'",
-                    name, binary
+                    "structured_exec: agent '{name}' is not allowed to execute '{binary}'"
                 ));
             }
         }
@@ -636,7 +631,10 @@ impl AgentTool for ExecTool {
                     })
                     .unwrap_or_default();
 
-                match self.structured_exec(binary, args, timeout_ms, shutdown).await {
+                match self
+                    .structured_exec(binary, args, timeout_ms, shutdown)
+                    .await
+                {
                     Ok(result) => {
                         let output = format_exec_output(&result);
                         if result.exit_code == 0 {
@@ -748,7 +746,9 @@ mod tests {
     #[tokio::test]
     async fn test_structured_exec_path_binary() {
         let tool = make_tool(vec![]);
-        let result = tool.structured_exec("/usr/bin/echo", vec![], 5_000, None).await;
+        let result = tool
+            .structured_exec("/usr/bin/echo", vec![], 5_000, None)
+            .await;
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("bare name"));
     }
@@ -756,7 +756,9 @@ mod tests {
     #[tokio::test]
     async fn test_structured_exec_traversal_binary() {
         let tool = make_tool(vec![]);
-        let result = tool.structured_exec("../bin/evil", vec![], 5_000, None).await;
+        let result = tool
+            .structured_exec("../bin/evil", vec![], 5_000, None)
+            .await;
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("path traversal"));
     }
@@ -1048,11 +1050,7 @@ mod tests {
             }
         }
         let ctx = crate::access_manager::AgentContext::test_fixture(agent_name);
-        ExecTool::new(
-            Arc::new(config),
-            Arc::new(Mutex::new(access)),
-            ctx,
-        )
+        ExecTool::new(Arc::new(config), Arc::new(Mutex::new(access)), ctx)
     }
 
     #[tokio::test]

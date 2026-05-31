@@ -154,7 +154,10 @@ impl AutoProtector {
         entry.accessed_at = Utc::now();
 
         // Update session_appearances with dedup
-        if !entry.seen_in_sessions.contains(&current_session_id.to_string()) {
+        if !entry
+            .seen_in_sessions
+            .contains(&current_session_id.to_string())
+        {
             entry.session_appearances += 1;
             entry.seen_in_sessions.push(current_session_id.to_string());
             // Cap at 100 entries
@@ -234,14 +237,20 @@ mod tests {
     fn test_protection_medium_access() {
         let protector = AutoProtector::default_protector();
         let entry = make_entry_with_access(3, 0);
-        assert_eq!(protector.compute_protection(&entry), ProtectionLevel::Medium);
+        assert_eq!(
+            protector.compute_protection(&entry),
+            ProtectionLevel::Medium
+        );
     }
 
     #[test]
     fn test_protection_medium_sessions() {
         let protector = AutoProtector::default_protector();
         let entry = make_entry_with_access(0, 2);
-        assert_eq!(protector.compute_protection(&entry), ProtectionLevel::Medium);
+        assert_eq!(
+            protector.compute_protection(&entry),
+            ProtectionLevel::Medium
+        );
     }
 
     #[test]
@@ -363,6 +372,9 @@ mod tests {
         AutoProtector::record_access(&mut entry, "session-1");
         AutoProtector::record_access(&mut entry, "session-1");
         assert_eq!(entry.access_count, 2);
-        assert_eq!(entry.session_appearances, 1, "Same session should not increment appearances");
+        assert_eq!(
+            entry.session_appearances, 1,
+            "Same session should not increment appearances"
+        );
     }
 }

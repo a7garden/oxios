@@ -259,10 +259,10 @@ impl FlashAttention {
         // Weighted sum: output = attention_weights × values
         let mut outputs = vec![vec![0.0f32; dim]; num_queries];
         for qi in 0..num_queries {
-            for ki in 0..num_keys {
+            for (ki, value_row) in values.iter().enumerate() {
                 let w = attention_weights[qi][ki];
-                for d in 0..dim {
-                    outputs[qi][d] += w * values[ki][d];
+                for (d, val) in value_row.iter().enumerate().take(dim) {
+                    outputs[qi][d] += w * val;
                 }
             }
         }

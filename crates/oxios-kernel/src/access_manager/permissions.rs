@@ -282,11 +282,25 @@ mod tests {
         let mut perms = AgentPermissions::for_new_agent("a");
         perms.allow_path("/data/**");
         perms.allow_path("/data/**"); // duplicate
-        assert_eq!(perms.allowed_paths.iter().filter(|p| **p == "/data/**").count(), 1);
+        assert_eq!(
+            perms
+                .allowed_paths
+                .iter()
+                .filter(|p| **p == "/data/**")
+                .count(),
+            1
+        );
 
         perms.deny_path("/secret/**");
         perms.deny_path("/secret/**"); // duplicate
-        assert_eq!(perms.denied_paths.iter().filter(|p| **p == "/secret/**").count(), 1);
+        assert_eq!(
+            perms
+                .denied_paths
+                .iter()
+                .filter(|p| **p == "/secret/**")
+                .count(),
+            1
+        );
     }
 
     #[test]
@@ -430,7 +444,10 @@ mod tests {
         assert_eq!(perms.allowed_paths, snapshot.allowed_paths);
         assert_eq!(perms.denied_paths, snapshot.denied_paths);
         assert_eq!(perms.network_access, snapshot.network_access);
-        assert_eq!(perms.max_execution_time_secs, snapshot.max_execution_time_secs);
+        assert_eq!(
+            perms.max_execution_time_secs,
+            snapshot.max_execution_time_secs
+        );
         assert_eq!(perms.max_memory_mb, snapshot.max_memory_mb);
         assert_eq!(perms.can_fork, snapshot.can_fork);
     }

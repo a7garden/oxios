@@ -35,7 +35,9 @@ impl ClawHubClient {
         let base = base_url
             .map(|s| Url::parse(&s))
             .unwrap_or_else(|| Url::parse(DEFAULT_BASE_URL))?;
-        let base = base.join("/").map_err(|e| anyhow::anyhow!("invalid base URL: {}", e))?;
+        let base = base
+            .join("/")
+            .map_err(|e| anyhow::anyhow!("invalid base URL: {e}"))?;
 
         Ok(Self {
             base_url: base,
@@ -62,7 +64,7 @@ impl ClawHubClient {
         let mut req = self.client.get(url);
         if let Ok(token) = std::env::var("CLAWHUB_TOKEN") {
             if !token.is_empty() {
-                req = req.header("Authorization", format!("Bearer {}", token));
+                req = req.header("Authorization", format!("Bearer {token}"));
             }
         }
 
@@ -70,11 +72,7 @@ impl ClawHubClient {
         let status = resp.status();
         if !status.is_success() {
             let body = resp.text().await.unwrap_or_default();
-            anyhow::bail!(
-                "ClawHub search failed ({}): {}",
-                status,
-                body
-            );
+            anyhow::bail!("ClawHub search failed ({status}): {body}");
         }
 
         let body: SearchResponse = resp.json().await?;
@@ -83,12 +81,12 @@ impl ClawHubClient {
 
     /// Fetch full detail for a skill by slug.
     pub async fn get_skill(&self, slug: &str) -> Result<ClawHubSkillDetail> {
-        let url = self.base_url.join(&format!("/api/v1/skills/{}", slug))?;
+        let url = self.base_url.join(&format!("/api/v1/skills/{slug}"))?;
 
         let mut req = self.client.get(url);
         if let Ok(token) = std::env::var("CLAWHUB_TOKEN") {
             if !token.is_empty() {
-                req = req.header("Authorization", format!("Bearer {}", token));
+                req = req.header("Authorization", format!("Bearer {token}"));
             }
         }
 
@@ -96,12 +94,7 @@ impl ClawHubClient {
         let status = resp.status();
         if !status.is_success() {
             let body = resp.text().await.unwrap_or_default();
-            anyhow::bail!(
-                "ClawHub get_skill {} failed ({}): {}",
-                slug,
-                status,
-                body
-            );
+            anyhow::bail!("ClawHub get_skill {slug} failed ({status}): {body}");
         }
 
         let detail: ClawHubSkillDetail = resp.json().await?;
@@ -115,8 +108,7 @@ impl ClawHubClient {
         version: Option<&str>,
     ) -> Result<DownloadedArchive> {
         let mut url = self.base_url.join("/api/v1/download")?;
-        url.query_pairs_mut()
-            .append_pair("slug", slug);
+        url.query_pairs_mut().append_pair("slug", slug);
         if let Some(v) = version {
             url.query_pairs_mut().append_pair("version", v);
         }
@@ -124,7 +116,7 @@ impl ClawHubClient {
         let mut req = self.client.get(url);
         if let Ok(token) = std::env::var("CLAWHUB_TOKEN") {
             if !token.is_empty() {
-                req = req.header("Authorization", format!("Bearer {}", token));
+                req = req.header("Authorization", format!("Bearer {token}"));
             }
         }
 
@@ -132,18 +124,13 @@ impl ClawHubClient {
         let status = resp.status();
         if !status.is_success() {
             let body = resp.text().await.unwrap_or_default();
-            anyhow::bail!(
-                "ClawHub download {} failed ({}): {}",
-                slug,
-                status,
-                body
-            );
+            anyhow::bail!("ClawHub download {slug} failed ({status}): {body}");
         }
 
         let bytes = resp.bytes().await?;
         let sha256 = sha2::Sha256::digest(&bytes)
             .iter()
-            .map(|b| format!("{:02x}", b))
+            .map(|b| format!("{b:02x}"))
             .collect::<String>();
 
         // Write to a temp file (deleted when dropped)
@@ -153,9 +140,10 @@ impl ClawHubClient {
             .tempfile()?;
         std::io::Write::write_all(&mut tmp, &bytes)?;
 
-        let path = tmp.into_temp_path().keep().map_err(|e| {
-            anyhow::anyhow!("failed to persist temp file: {}", e)
-        })?;
+        let path = tmp
+            .into_temp_path()
+            .keep()
+            .map_err(|e| anyhow::anyhow!("failed to persist temp file: {e}"))?;
 
         Ok(DownloadedArchive { path, sha256 })
     }
@@ -175,8 +163,7 @@ mod tests {
 
     #[test]
     fn test_client_new_custom_url() {
-        let client =
-            ClawHubClient::new(Some("https://staging.clawhub.ai".to_string())).unwrap();
+        let client = ClawHubClient::new(Some("https://staging.clawhub.ai".to_string())).unwrap();
         assert_eq!(client.base_url.as_str(), "https://staging.clawhub.ai/");
     }
 

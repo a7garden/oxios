@@ -110,6 +110,7 @@ impl ProjectApi {
     }
 
     /// Update a project. Only non-None fields are changed.
+    #[allow(clippy::too_many_arguments)]
     pub fn update_project(
         &self,
         id: &str,
