@@ -41,6 +41,12 @@ pub struct SurfaceContext {
     pub config: Arc<parking_lot::RwLock<oxios_kernel::OxiosConfig>>,
     /// Path to the config file.
     pub config_path: PathBuf,
+    /// Pre-resolved web UI dist directory.
+    ///
+    /// If `Some(path)`, the web UI has already been verified/downloaded
+    /// before the surface starts. Surfaces should use this directly
+    /// instead of re-running the download logic.
+    pub web_dist: Option<PathBuf>,
 }
 
 /// Handle returned by a surface after initialization.

@@ -5325,6 +5325,7 @@ dependencies = [
  "criterion",
  "dirs 6.0.0",
  "hex",
+ "indicatif",
  "inquire",
  "libc",
  "mockall",

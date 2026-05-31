@@ -85,8 +85,7 @@ pub(crate) use knowledge_routes::{
     handle_knowledge_checklist_complete, handle_knowledge_checklist_items,
     handle_knowledge_checklist_remove, handle_knowledge_config_get, handle_knowledge_config_put,
     handle_knowledge_convert_html, handle_knowledge_copilot, handle_knowledge_emoji,
-    handle_knowledge_file_delete, handle_knowledge_file_get, handle_knowledge_file_history,
-    handle_knowledge_file_put, handle_knowledge_file_restore, handle_knowledge_graph,
+    handle_knowledge_file_or_sub, handle_knowledge_graph,
     handle_knowledge_habits, handle_knowledge_habits_last_week, handle_knowledge_journal_add,
     handle_knowledge_journal_emoji, handle_knowledge_journal_today, handle_knowledge_search,
     handle_knowledge_stats_done_today, handle_knowledge_stats_today, handle_knowledge_tree,
@@ -375,17 +374,24 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         .route("/api/budget/{agent_id}/reset", post(handle_budget_reset))
         // Knowledge
         .route("/api/knowledge/tree", get(handle_knowledge_tree))
+        // Knowledge — file CRUD + git sub-paths unified under one catch-all.
+        // axum 0.8: `{*path}` MUST be the last segment, so we dispatch on method/path
+        // in a single handler rather than registering separate sub-path routes.
         .route(
             "/api/knowledge/file/{*path}",
-            get(handle_knowledge_file_get),
+            get(handle_knowledge_file_or_sub),
         )
         .route(
             "/api/knowledge/file/{*path}",
-            put(handle_knowledge_file_put),
+            put(handle_knowledge_file_or_sub),
         )
         .route(
             "/api/knowledge/file/{*path}",
-            delete(handle_knowledge_file_delete),
+            delete(handle_knowledge_file_or_sub),
+        )
+        .route(
+            "/api/knowledge/file/{*path}",
+            post(handle_knowledge_file_or_sub),
         )
         .route("/api/knowledge/search", post(handle_knowledge_search))
         .route("/api/knowledge/backlinks", get(handle_knowledge_backlinks))
@@ -468,15 +474,6 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
             post(handle_knowledge_convert_html),
         )
         .route("/api/knowledge/emoji", get(handle_knowledge_emoji))
-        // Knowledge — Git version history
-        .route(
-            "/api/knowledge/file/{*path}/history",
-            get(handle_knowledge_file_history),
-        )
-        .route(
-            "/api/knowledge/file/{*path}/restore",
-            post(handle_knowledge_file_restore),
-        )
         // Marketplace (ClawHub) — install requires auth
         .route(
             "/api/marketplace/skills/{slug}/install",

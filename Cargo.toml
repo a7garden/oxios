@@ -124,6 +124,7 @@ chrono = { workspace = true }
 inquire = { workspace = true }
 libc = { workspace = true }
 console = { workspace = true }
+indicatif = "0.17"
 clap_complete = "4"
 webbrowser = "1.0"
 reqwest = { workspace = true }

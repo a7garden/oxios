@@ -6,7 +6,7 @@
 pub use oxios_gateway::{Surface, SurfaceContext};
 
 use anyhow::Result;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use crate::kernel::Kernel;
@@ -27,6 +27,7 @@ pub fn build_surfaces() -> Vec<Box<dyn Surface>> {
 pub async fn activate_surfaces(
     kernel: &Kernel,
     config_path: &Path,
+    web_dist: Option<PathBuf>,
 ) -> Result<Vec<tokio::task::JoinHandle<()>>> {
     let surfaces = build_surfaces();
     let config = kernel.config();
@@ -59,6 +60,7 @@ pub async fn activate_surfaces(
                     kernel: kernel.handle(),
                     config: Arc::new(parking_lot::RwLock::new(config.clone())),
                     config_path: config_path.to_path_buf(),
+                    web_dist: web_dist.clone(),
                 };
                 match surface.start(ctx).await {
                     Ok(handle) => {

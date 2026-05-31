@@ -491,8 +491,167 @@ pub(crate) async fn handle_knowledge_file_delete(
         .note_delete(&path)
         .map_err(|e| AppError::Internal(e.to_string()))?;
 
+
     tracing::info!(path = %path, "Knowledge file deleted");
     Ok(StatusCode::NO_CONTENT)
+}
+
+/// Unified handler for /api/knowledge/file/{*path} sub-paths.
+///
+/// axum 0.8: `{*path}` MUST be the last segment of any route, so we can't
+/// register `/file/{*path}/history` as a separate route. Instead, this
+/// single handler dispatches based on the HTTP method and the sub-path suffix.
+///
+/// - `GET  /file/some/path/history`  → git log for that file
+/// - `POST /file/some/path/restore`  → restore from git commit
+pub(crate) async fn handle_knowledge_file_or_sub(
+    state: State<Arc<AppState>>,
+    axum::extract::Path(path): axum::extract::Path<String>,
+    method: axum::http::Method,
+    axum::extract::Json(body): axum::extract::Json<serde_json::Value>,
+) -> Result<axum::response::Response<axum::body::Body>, AppError> {
+    // Strip trailing slash if present
+    let path = path.trim_end_matches('/');
+
+    // Detect sub-path suffix after the last slash
+    if let Some(suffix) = path.rsplit('/').next() {
+        match (method.as_str(), suffix) {
+            // GET /file/{path}/history → git log
+            ("GET", "history") => {
+                return handle_knowledge_file_history_impl(&state, &path[..path.len() - suffix.len() - 1]).await;
+            }
+            // POST /file/{path}/restore → git restore
+            ("POST", "restore") => {
+                let hash = body
+                    .get("hash")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or_default();
+                return handle_knowledge_file_restore_impl(&state, &path[..path.len() - suffix.len() - 1], hash).await;
+            }
+            _ => {}
+        }
+    }
+
+    // No known sub-path suffix — inline the file CRUD operations
+    match method.as_str() {
+        "GET" => {
+            let content = state
+                .kernel
+                .knowledge
+                .note_read(path)
+                .map_err(|e| AppError::Internal(e.to_string()))?
+                .ok_or_else(|| AppError::NotFound("file not found".into()))?;
+            let mime = guess_knowledge_mime(path);
+            Ok(axum::response::Response::builder()
+                .status(StatusCode::OK)
+                .header(axum::http::header::CONTENT_TYPE, mime)
+                .body(axum::body::Body::from(content))
+                .unwrap())
+        }
+        "PUT" => {
+            let value = serde_json::to_string_pretty(&body)
+                .map_err(|e| AppError::Internal(e.to_string()))?;
+            state
+                .kernel
+                .knowledge
+                .note_write(path, &value)
+                .map_err(|e| AppError::Internal(e.to_string()))?;
+            tracing::info!(path = %path, "Knowledge file written");
+            Ok(axum::response::Response::builder()
+                .status(StatusCode::NO_CONTENT)
+                .body(axum::body::Body::empty())
+                .unwrap())
+        }
+        "DELETE" => {
+            state
+                .kernel
+                .knowledge
+                .note_delete(path)
+                .map_err(|e| AppError::Internal(e.to_string()))?;
+            tracing::info!(path = %path, "Knowledge file deleted");
+            Ok(axum::response::Response::builder()
+                .status(StatusCode::NO_CONTENT)
+                .body(axum::body::Body::empty())
+                .unwrap())
+        }
+        _ => Err(AppError::BadRequest("method not allowed on this path".into())),
+    }
+}
+
+/// Internal implementation of git history (path WITHOUT /history suffix).
+async fn handle_knowledge_file_history_impl(
+    state: &Arc<AppState>,
+    file_path: &str,
+) -> Result<axum::response::Response<axum::body::Body>, AppError> {
+    let git = state.kernel.infra.git();
+    let kb_root = state.kernel.knowledge.root();
+    let prefix = kb_root
+        .strip_prefix(git.root())
+        .map(|p| p.to_string_lossy().to_string())
+        .unwrap_or_else(|_| "knowledge".to_string());
+    let git_rel = format!("{prefix}/{file_path}");
+
+    let log = git
+        .log(100)
+        .map_err(|e| AppError::Internal(e.to_string()))?;
+
+    let entries: Vec<KnowledgeHistoryEntry> = log
+        .into_iter()
+        .filter(|e| e.message.contains(&git_rel) || e.message.contains(file_path))
+        .map(|e| KnowledgeHistoryEntry {
+            hash: e.hash,
+            short_hash: e.short_hash,
+            message: e.message,
+            timestamp: e.timestamp,
+            author: e.author,
+        })
+        .collect();
+
+    Ok(axum::response::Response::builder()
+        .status(StatusCode::OK)
+        .header(axum::http::header::CONTENT_TYPE, "application/json")
+        .body(axum::body::Body::from(serde_json::to_string(&serde_json::json!({
+            "history": entries,
+            "count": entries.len(),
+        })).unwrap()))
+        .unwrap())
+}
+
+/// Internal implementation of git restore (path WITHOUT /restore suffix).
+async fn handle_knowledge_file_restore_impl(
+    state: &Arc<AppState>,
+    file_path: &str,
+    hash: &str,
+) -> Result<axum::response::Response<axum::body::Body>, AppError> {
+    let git = state.kernel.infra.git();
+    let kb_root = state.kernel.knowledge.root();
+    let prefix = kb_root
+        .strip_prefix(git.root())
+        .map(|p| p.to_string_lossy().to_string())
+        .unwrap_or_else(|_| "knowledge".to_string());
+    let git_rel = format!("{prefix}/{file_path}");
+
+
+    git.restore_file(&git_rel, hash)
+        .map_err(|e| AppError::Internal(e.to_string()))?;
+
+    if let Some(content) = state
+        .kernel
+        .knowledge
+        .note_read(file_path)
+        .map_err(|e| AppError::Internal(e.to_string()))? {
+        state
+            .kernel
+            .knowledge
+            .note_restore(file_path, &content)
+            .map_err(|e| AppError::Internal(e.to_string()))?;
+    }
+
+    tracing::info!(path = %file_path, hash = %hash, "Knowledge file restored from git");
+    Ok(axum::response::Response::builder()
+        .status(StatusCode::OK)
+        .body(axum::body::Body::empty())
+        .unwrap())
 }
 
 /// POST /api/knowledge/search — Search knowledge files.
