@@ -1,7 +1,7 @@
 {
   "name": "web",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.2",
   "type": "module",
   "trustedDependencies": ["@biomejs/biome"],
   "scripts": {
@@ -45,7 +45,6 @@
     "hypermd": "^0.3.11",
     "i18next": "^26.2.0",
     "i18next-browser-languagedetector": "^8.2.1",
-    "i18next-http-backend": "^4.0.0",
     "lucide-react": "^1.16.0",
     "md5": "^2.3.0",
     "react": "^19.2.6",
