@@ -141,6 +141,16 @@ oxios run --json --session "$SID" "follow-up"
 | `~/.oxios/workspace/skills/` | Unified skill definitions (replaces Programs + Skills) |
 | `~/.oxi/auth.json` | oxi-cli credentials (separate from Oxios) |
 
+## Release & Distribution
+
+| Artifact | Target | Notes |
+|----------|--------|-------|
+| Rust crates (`oxios-kernel`, `oxios-markdown`, `oxios-ouroboros`, `oxios-gateway`, `oxios-mcp`, `oxios-cli`, `oxios-telegram`) | **crates.io** | Pure Rust libraries/binaries. Published via `cargo publish` for dependency reuse. |
+| Main binary (`oxios`) | **crates.io** | `cargo install oxios` or `cargo publish --manifest-path oxios/Cargo.toml` |
+| Web UI (`surface/oxios-web/web/dist/`) | **GitHub Release** | Pre-built frontend assets. Upload as tarball/zip artifact in release workflow. |
+
+> **Important:** Do NOT upload Rust binaries to GitHub Releases. Rust code is distributed via crates.io. Only the TypeScript/web frontend dist goes to GitHub Releases.
+
 ## Conventions
 
 - **Language:** Code, comments, docs, commits — English. User-facing messages — Korean.
