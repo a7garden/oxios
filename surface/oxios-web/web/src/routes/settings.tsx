@@ -20,6 +20,8 @@ import { ModelSelect } from '@/components/engine/model-select'
 import { ApiKeyInput } from '@/components/engine/api-key-input'
 import { ProviderOptionsPanel } from '@/components/engine/provider-options'
 import { RoutingSection } from '@/components/engine/routing-section'
+import { SystemUpdateCard } from '@/components/system/system-update'
+import { SystemToolsPanel } from '@/components/system/system-tools'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -119,6 +121,8 @@ const tKeys = {
   autoPruneDescription: 'settings.autoPruneDescription',
   logging: 'settings.logging',
   loggingDescription: 'settings.loggingDescription',
+  update: 'settings.update',
+  updateDescription: 'settings.updateDescription',
   format: 'settings.format',
   formatDescription: 'settings.formatDescription',
   prettyDefault: 'settings.prettyDefault',
@@ -690,6 +694,15 @@ function SettingsPage() {
               <span>{t(s.labelKey)}</span>
             </TabsTrigger>
           ))}
+          {/* Update tab */}
+          <TabsTrigger
+            data-state={activeTab === 'update' ? 'active' : 'inactive'}
+            onClick={() => setActiveTab('update')}
+            className="gap-1.5"
+          >
+            <Zap className="h-4 w-4" />
+            <span>{t(tKeys.update)}</span>
+          </TabsTrigger>
         </TabsList>
 
         {/* Engine tab content */}
@@ -729,6 +742,12 @@ function SettingsPage() {
             </TabsContent>
           )
         })}
+        {/* Update tab content */}
+        <TabsContent value="update">
+          <SystemUpdateCard />
+          <Separator className="my-6" />
+          <SystemToolsPanel />
+        </TabsContent>
       </Tabs>
     </div>
   )

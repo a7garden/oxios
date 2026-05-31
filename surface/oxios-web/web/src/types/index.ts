@@ -355,3 +355,63 @@ export interface ClawHubSkillDetail {
     image?: string
   }
 }
+
+// System Update
+export interface UpdateCheckResponse {
+  current_version: string
+  latest_version: string
+  update_available: boolean
+  tag_name: string
+  html_url: string
+  release_notes: string
+  published_at: string
+  assets: { name: string; size: number; download_url: string }[]
+}
+
+export interface UpdateRunResponse {
+  success: boolean
+  updated_to: string
+  binary_updated: boolean
+  web_updated: boolean
+  message: string
+}
+
+export interface ChangelogResponse {
+  tag_name: string
+  version: string
+  published_at: string
+  body: string
+  html_url: string
+}
+
+// System Tools
+export interface DoctorCheck {
+  name: string
+  status: 'pass' | 'warn' | 'fail'
+  message: string
+}
+
+export interface DoctorResponse {
+  checks: number
+  issues: number
+  results: DoctorCheck[]
+  action_items: string[]
+}
+
+export interface AuditVerifyResponse {
+  valid: boolean
+  entries_checked: number
+  message: string
+}
+
+export interface BackupResponse {
+  success: boolean
+  path: string
+  size_bytes: number
+  message: string
+}
+
+export interface LogResponse {
+  lines: string[]
+  total: number
+}

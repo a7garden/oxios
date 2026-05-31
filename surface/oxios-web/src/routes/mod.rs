@@ -105,8 +105,10 @@ pub(crate) use resource_routes::{
     handle_resource_history, handle_resource_overload, handle_resource_snapshot,
 };
 pub(crate) use system::{
-    handle_agent_kill, handle_agents_list, handle_config_get, handle_config_put, handle_health,
-    handle_readiness, handle_status,
+    handle_agent_kill, handle_agents_list, handle_audit_verify_api, handle_backup,
+    handle_config_get, handle_config_put, handle_doctor, handle_health, handle_log,
+    handle_readiness, handle_status, handle_update_changelog, handle_update_check,
+    handle_update_run,
 };
 pub(crate) use workspace::{
     handle_memory_create, handle_memory_get, handle_memory_list, handle_memory_search,
@@ -480,6 +482,15 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
             "/api/marketplace/skills/{slug}/install",
             post(handle_marketplace_install),
         )
+        // System Update
+        .route("/api/update/check", get(handle_update_check))
+        .route("/api/update/changelog", get(handle_update_changelog))
+        .route("/api/update/run", post(handle_update_run))
+        // System Tools
+        .route("/api/system/doctor", post(handle_doctor))
+        .route("/api/system/audit-verify", post(handle_audit_verify_api))
+        .route("/api/system/backup", post(handle_backup))
+        .route("/api/system/log", get(handle_log))
         .layer(axum::middleware::from_fn_with_state(
             state.clone(),
             require_auth,

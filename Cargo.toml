@@ -1,6 +1,6 @@
 [package]
 name = "oxios"
-version = "1.0.0"
+version = "1.0.1"
 edition = "2021"
 description = "Oxios Agent OS — Agent Operating System powered by oxi-sdk"
 license = "MIT"
@@ -100,14 +100,14 @@ embedding-gguf = ["oxios-kernel/embedding-gguf"]
 otel = ["oxios-kernel/otel", "dep:opentelemetry", "dep:opentelemetry_sdk"]
 
 [dependencies]
-oxios-kernel = { version = "1.0.0", path = "crates/oxios-kernel", default-features = false }
-oxios-markdown = { version = "1.0.0", path = "crates/oxios-markdown" }
-oxios-ouroboros = { version = "1.0.0", path = "crates/oxios-ouroboros" }
-oxios-gateway = { version = "1.0.0", path = "crates/oxios-gateway" }
+oxios-kernel = { version = "1.0.1", path = "crates/oxios-kernel", default-features = false }
+oxios-markdown = { version = "1.0.1", path = "crates/oxios-markdown" }
+oxios-ouroboros = { version = "1.0.1", path = "crates/oxios-ouroboros" }
+oxios-gateway = { version = "1.0.1", path = "crates/oxios-gateway" }
 oxi-sdk = { workspace = true }
-oxios-web = { version = "1.0.0", path = "surface/oxios-web", optional = true }
-oxios-cli = { version = "1.0.0", path = "channels/oxios-cli", optional = true }
-oxios-telegram = { version = "1.0.0", path = "channels/oxios-telegram", optional = true }
+oxios-web = { version = "1.0.1", path = "surface/oxios-web", optional = true }
+oxios-cli = { version = "1.0.1", path = "channels/oxios-cli", optional = true }
+oxios-telegram = { version = "1.0.1", path = "channels/oxios-telegram", optional = true }
 hex = { workspace = true }
 uuid = { workspace = true }
 tokio = { workspace = true }
@@ -135,7 +135,7 @@ sha2 = { workspace = true }
 toml_edit = "0.22"
 
 [dev-dependencies]
-oxios-ouroboros = { version = "1.0.0", path = "crates/oxios-ouroboros" }
+oxios-ouroboros = { version = "1.0.1", path = "crates/oxios-ouroboros" }
 oxi-sdk = { workspace = true }
 uuid = { workspace = true }
 chrono = { workspace = true }

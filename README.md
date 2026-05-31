@@ -394,7 +394,8 @@ oxios models             List available LLM models
 oxios backup             Backup workspace
 oxios restore            Restore from backup
 oxios onboard            Re-run setup wizard
-oxios reset              Reset workspace to defaults
+oxios reset              Reset all Oxios data (config, workspace, credentials, services)
+                            Prompts for confirmation and shows what will be deleted before proceeding
 oxios completion         Generate shell completions
 ```
 

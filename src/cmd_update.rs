@@ -1,20 +1,14 @@
-//! `oxios update` — fetch binary and/or web UI from GitHub Releases.
+//! `oxios update` — update binary via cargo, web UI from GitHub Releases.
 //!
-//! Release assets:
-//!   - Binary: `oxios-macos-arm64` (macOS ARM64) with `.sha256` checksum
-//!   - Web UI:  `web-dist.zip` (contains index.html + assets/)
-//!
-//! Installation paths:
-//!   - Binary: `~/.cargo/bin/oxios` (overwrites current binary)
-//!   - Web UI: `~/.oxios/web/dist/` (extracted over existing)
+//! Binary update: `cargo install oxios` (optionally with `--version`)
+//! Web UI:       `web-dist.zip` from GitHub Releases → `~/.oxios/web/dist/`
 
 use anyhow::{Context, Result};
 use console::style;
-use sha2::Digest;
 use std::io::Write;
 use std::path::PathBuf;
 
-/// Update oxios binary and/or web UI from GitHub Releases.
+/// Update oxios binary (via cargo) and/or web UI (from GitHub Releases).
 pub async fn run_update(
     web_only: bool,
     binary_only: bool,
@@ -38,7 +32,11 @@ pub async fn run_update(
     println!("  Current version:  {current}");
     println!(
         "  Update binary:    {}",
-        if update_binary { "yes" } else { "no" }
+        if update_binary {
+            "yes (cargo install)"
+        } else {
+            "no"
+        }
     );
     println!(
         "  Update web UI:   {}",
@@ -51,7 +49,7 @@ pub async fn run_update(
     }
     println!();
 
-    // ── Fetch release info from GitHub ──────────────────────────────────────
+    // ── Fetch release info from GitHub (for version check + web UI) ─────────
     let owner = "a7garden";
     let repo = "oxios";
     let tag = version.map(|v| format!("v{v}"));
@@ -107,7 +105,7 @@ pub async fn run_update(
         return Ok(());
     }
 
-    // ── Parse assets ─────────────────────────────────────────────────────────
+    // ── Parse assets (web UI only) ──────────────────────────────────────────
     let assets: Vec<(String, String, u64)> = release["assets"]
         .as_array()
         .unwrap_or(&vec![])
@@ -122,18 +120,6 @@ pub async fn run_update(
         .collect();
 
     let web_asset = assets.iter().find(|(name, _, _)| name == "web-dist.zip");
-    let binary_asset = assets
-        .iter()
-        .find(|(name, _, _)| name == "oxios-macos-arm64");
-    let checksum_asset = assets
-        .iter()
-        .find(|(name, _, _)| name == "oxios-macos-arm64.sha256");
-
-    println!("  Available assets:");
-    for (name, _, size) in &assets {
-        println!("    {}  ({} bytes)", name, format_size(*size));
-    }
-    println!();
 
     // ── Dry run ──────────────────────────────────────────────────────────────
     if dry_run {
@@ -147,15 +133,11 @@ pub async fn run_update(
             }
         }
         if update_binary {
-            if let Some((name, _, size)) = binary_asset {
-                println!("  Would download: {} ({})", name, format_size(*size));
-                println!("  Would install to: ~/.cargo/bin/oxios");
-            } else {
-                println!(
-                    "  {} oxios-macos-arm64 not found in release.",
-                    style("✗").red()
-                );
+            let mut cmd = "cargo install oxios".to_string();
+            if let Some(v) = version {
+                cmd.push_str(&format!(" --version {v}"));
             }
+            println!("  Would run: {cmd}");
         }
         return Ok(());
     }
@@ -179,6 +161,52 @@ pub async fn run_update(
             println!("  Update cancelled.");
             return Ok(());
         }
+    }
+
+    // ── Update binary via cargo ─────────────────────────────────────────────
+    if update_binary {
+        let mut args = vec!["install", "oxios", "--locked"];
+        if let Some(v) = version {
+            args.push("--version");
+            args.push(v);
+        }
+
+        print!(
+            "  Running cargo install oxios{}... ",
+            version
+                .map(|v| format!(" --version {v}"))
+                .unwrap_or_default()
+        );
+        std::io::stdout().flush().ok();
+
+        let output = std::process::Command::new("cargo")
+            .args(&args)
+            .output()
+            .context("failed to run cargo — is it installed and in PATH?")?;
+
+        if output.status.success() {
+            println!("done.");
+            println!(
+                "  {} Binary updated to {} via cargo.",
+                style("✓").green(),
+                tag_name
+            );
+        } else {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            // cargo install outputs compilation progress to stderr
+            println!();
+            for line in stderr.lines().take(5) {
+                println!("    {line}");
+            }
+            anyhow::bail!("cargo install failed (see above)");
+        }
+
+        println!();
+        println!(
+            "  {} Run `{}` to restart with the new binary.",
+            style("ℹ").cyan(),
+            style("oxios restart").bold()
+        );
     }
 
     // ── Download and install web UI ────────────────────────────────────────
@@ -223,73 +251,6 @@ pub async fn run_update(
         } else {
             println!(
                 "  {} web-dist.zip not found — skipping.",
-                style("⚠").yellow()
-            );
-        }
-    }
-
-    // ── Download and install binary ─────────────────────────────────────────
-    if update_binary {
-        if let Some((name, url, size)) = binary_asset {
-            let expected_checksum = if let Some((cs_name, cs_url, _)) = checksum_asset {
-                print!("  Verifying checksum from {cs_name}... ");
-                std::io::stdout().flush().ok();
-                let cs_bytes = download_file(&client, cs_url, 256).await?;
-                String::from_utf8_lossy(&cs_bytes)
-                    .split_whitespace()
-                    .next()
-                    .unwrap_or("")
-                    .to_string()
-            } else {
-                String::new()
-            };
-
-            print!("  Downloading {name}... ");
-            std::io::stdout().flush().ok();
-
-            let bytes = download_file(&client, url, *size).await?;
-            println!("done ({}).", format_size(bytes.len() as u64));
-
-            if !expected_checksum.is_empty() {
-                let digest = sha2::Sha256::digest(&bytes);
-                let actual = format!("{digest:x}");
-                if actual != expected_checksum {
-                    anyhow::bail!(
-                        "Checksum mismatch!\n  Expected: {expected_checksum}\n  Actual:   {actual}"
-                    );
-                }
-                println!("  {} Checksum verified.", style("✓").green());
-            }
-
-            let dest = dest_binary_path()?;
-            if let Some(p) = dest.parent() {
-                std::fs::create_dir_all(p)?;
-            }
-            std::fs::write(&dest, &bytes).context(format!("failed to write binary to {dest:?}"))?;
-
-            #[cfg(unix)]
-            {
-                use std::os::unix::fs::PermissionsExt;
-                let mut perms = std::fs::metadata(&dest)?.permissions();
-                perms.set_mode(0o755);
-                std::fs::set_permissions(&dest, perms)?;
-            }
-
-            println!(
-                "  {} Binary updated to {} at {:?}",
-                style("✓").green(),
-                tag_name,
-                dest
-            );
-            println!();
-            println!(
-                "  {} Run `{}` to restart with the new binary.",
-                style("ℹ").cyan(),
-                style("oxios restart").bold()
-            );
-        } else {
-            println!(
-                "  {} oxios-macos-arm64 not found — skipping.",
                 style("⚠").yellow()
             );
         }
@@ -349,11 +310,6 @@ pub async fn run_changelog(version: Option<&str>) -> Result<()> {
 fn dest_web_dir() -> Result<PathBuf> {
     let home = dirs::home_dir().context("cannot determine home directory")?;
     Ok(home.join(".oxios").join("web").join("dist"))
-}
-
-fn dest_binary_path() -> Result<PathBuf> {
-    let home = dirs::home_dir().context("cannot determine home directory")?;
-    Ok(home.join(".cargo").join("bin").join("oxios"))
 }
 
 async fn download_file(

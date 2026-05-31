@@ -97,9 +97,11 @@ impl AgentTool for MemoryWriteTool {
             "fact" => MemoryType::Fact,
             "episode" => MemoryType::Episode,
             "knowledge" => MemoryType::Knowledge,
-            _ => return Ok(AgentToolResult::error(format!(
+            _ => {
+                return Ok(AgentToolResult::error(format!(
                 "Invalid memory_type '{memory_type_str}'. Must be one of: fact, episode, knowledge"
-            ))),
+            )))
+            }
         };
 
         let tags: Vec<String> = params["tags"]

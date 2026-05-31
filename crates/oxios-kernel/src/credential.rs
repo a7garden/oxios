@@ -94,9 +94,7 @@ impl CredentialStore {
             // `{"type":"api_key","key":"..."}`), `save_token` fails because
             // it can't deserialize them as `TokenBundle`.  Migrate and retry.
             if is_legacy_auth_error(&e) {
-                tracing::info!(
-                    "auth.json has legacy format, migrating to TokenBundle"
-                );
+                tracing::info!("auth.json has legacy format, migrating to TokenBundle");
                 migrate_legacy_auth_store(provider, &token)?;
             } else {
                 return Err(e.into());
@@ -195,9 +193,7 @@ fn migrate_legacy_auth_store(provider: &str, new_token: &oxi_sdk::TokenBundle) -
     migrated.insert(provider.to_string(), new_token.clone());
 
     // Write back as proper AuthStore.
-    let store = oxi_sdk::AuthStore {
-        tokens: migrated,
-    };
+    let store = oxi_sdk::AuthStore { tokens: migrated };
     oxi_sdk::save_auth_store(&store)?;
     Ok(())
 }

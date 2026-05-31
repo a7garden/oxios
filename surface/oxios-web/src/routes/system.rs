@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use axum::extract::{Path, Query, State};
 use axum::Json;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::error::AppError;
 use crate::routes::{paginate, PageParams};
@@ -226,6 +226,342 @@ pub(crate) async fn handle_status(state: State<Arc<AppState>>) -> Json<StatusRes
         uptime: uptime_str,
         components,
     })
+}
+
+// ---------------------------------------------------------------------------
+// Update
+// ---------------------------------------------------------------------------
+
+/// Query params for update check.
+#[derive(Debug, Deserialize)]
+pub(crate) struct UpdateCheckParams {
+    /// Check a specific version instead of latest.
+    #[serde(default)]
+    pub version: Option<String>,
+}
+
+/// Response for `GET /api/update/check`.
+#[derive(Debug, Serialize, Clone)]
+pub(crate) struct UpdateCheckResponse {
+    /// Currently running version.
+    pub current_version: String,
+    /// Latest available version on GitHub.
+    pub latest_version: String,
+    /// Whether an update is available.
+    pub update_available: bool,
+    /// Release tag name (e.g. "v1.0.0").
+    pub tag_name: String,
+    /// URL to the release page.
+    pub html_url: String,
+    /// Short body / release notes excerpt.
+    pub release_notes: String,
+    /// Publication date.
+    pub published_at: String,
+    /// Available download assets.
+    pub assets: Vec<AssetInfo>,
+}
+
+/// Info about a release asset.
+#[derive(Debug, Serialize, Clone)]
+pub(crate) struct AssetInfo {
+    pub name: String,
+    pub size: u64,
+    pub download_url: String,
+}
+
+/// Body for `POST /api/update/run`.
+#[derive(Debug, Deserialize)]
+pub(crate) struct UpdateRunBody {
+    /// Update binary (default: true).
+    #[serde(default = "default_true")]
+    pub binary: bool,
+    /// Update web UI (default: true).
+    #[serde(default = "default_true")]
+    pub web: bool,
+    /// Target version (default: latest).
+    pub version: Option<String>,
+}
+
+fn default_true() -> bool {
+    true
+}
+
+/// Response for `POST /api/update/run`.
+#[derive(Debug, Serialize, Clone)]
+pub(crate) struct UpdateRunResponse {
+    /// Whether the update succeeded.
+    pub success: bool,
+    /// Version we updated to.
+    pub updated_to: String,
+    /// What was updated.
+    pub binary_updated: bool,
+    pub web_updated: bool,
+    /// Human-readable message.
+    pub message: String,
+}
+
+/// Response for `GET /api/update/changelog`.
+#[derive(Debug, Serialize, Clone)]
+pub(crate) struct ChangelogResponse {
+    pub tag_name: String,
+    pub version: String,
+    pub published_at: String,
+    pub body: String,
+    pub html_url: String,
+}
+
+/// GET /api/update/check — Check for available updates from GitHub Releases.
+pub(crate) async fn handle_update_check(
+    Query(params): Query<UpdateCheckParams>,
+) -> Result<Json<UpdateCheckResponse>, AppError> {
+    let current = env!("CARGO_PKG_VERSION");
+
+    let release = fetch_github_release(params.version.as_deref()).await?;
+
+    let tag_name = release["tag_name"]
+        .as_str()
+        .unwrap_or("unknown")
+        .to_string();
+    let latest_version = tag_name.trim_start_matches('v').to_string();
+    let html_url = release["html_url"].as_str().unwrap_or("").to_string();
+    let body_text = release["body"]
+        .as_str()
+        .unwrap_or("No release notes.")
+        .to_string();
+    let published_at = release["published_at"].as_str().unwrap_or("").to_string();
+
+    let assets: Vec<AssetInfo> = release["assets"]
+        .as_array()
+        .unwrap_or(&vec![])
+        .iter()
+        .filter_map(|a| {
+            Some(AssetInfo {
+                name: a["name"].as_str()?.to_string(),
+                size: a["size"].as_u64()?,
+                download_url: a["browser_download_url"].as_str()?.to_string(),
+            })
+        })
+        .collect();
+
+    Ok(Json(UpdateCheckResponse {
+        current_version: current.to_string(),
+        latest_version: latest_version.clone(),
+        update_available: latest_version != current,
+        tag_name,
+        html_url,
+        release_notes: body_text,
+        published_at,
+        assets,
+    }))
+}
+
+/// POST /api/update/run — Execute the update (download + install binary/web).
+pub(crate) async fn handle_update_run(
+    Json(body): Json<UpdateRunBody>,
+) -> Result<Json<UpdateRunResponse>, AppError> {
+    let current = env!("CARGO_PKG_VERSION");
+
+    let release = fetch_github_release(body.version.as_deref()).await?;
+
+    let tag_name = release["tag_name"]
+        .as_str()
+        .unwrap_or("unknown")
+        .to_string();
+    let target_version = tag_name.trim_start_matches('v').to_string();
+
+    let assets: Vec<(String, String, u64)> = release["assets"]
+        .as_array()
+        .unwrap_or(&vec![])
+        .iter()
+        .filter_map(|a| {
+            Some((
+                a["name"].as_str()?.to_string(),
+                a["browser_download_url"].as_str()?.to_string(),
+                a["size"].as_u64()?,
+            ))
+        })
+        .collect();
+
+    let client = reqwest::Client::builder()
+        .user_agent(format!("oxios/{current}"))
+        .build()
+        .map_err(|e| AppError::Internal(format!("failed to create HTTP client: {e}")))?;
+
+    let mut binary_updated = false;
+    let mut web_updated = false;
+    let mut messages: Vec<String> = Vec::new();
+
+    // Update web UI
+    if body.web {
+        if let Some((name, url, size)) = assets.iter().find(|(n, _, _)| n == "web-dist.zip") {
+            tracing::info!(name, size, "Downloading web UI for update");
+            let bytes = download_bytes(&client, url).await?;
+
+            let dest_dir = dirs::home_dir()
+                .ok_or_else(|| AppError::Internal("cannot determine home directory".into()))?
+                .join(".oxios")
+                .join("web")
+                .join("dist");
+            std::fs::create_dir_all(&dest_dir)
+                .map_err(|e| AppError::Internal(format!("failed to create web dir: {e}")))?;
+
+            let cursor = std::io::Cursor::new(&bytes);
+            let mut archive = zip::ZipArchive::new(cursor)
+                .map_err(|e| AppError::Internal(format!("invalid zip: {e}")))?;
+
+            for i in 0..archive.len() {
+                let mut file = archive
+                    .by_index(i)
+                    .map_err(|e| AppError::Internal(format!("zip read error: {e}")))?;
+                let out_path = dest_dir.join(file.name());
+                if file.name().ends_with('/') {
+                    std::fs::create_dir_all(&out_path).ok();
+                } else {
+                    if let Some(p) = out_path.parent() {
+                        std::fs::create_dir_all(p).ok();
+                    }
+                    let mut out_file = std::fs::File::create(&out_path)
+                        .map_err(|e| AppError::Internal(format!("write error: {e}")))?;
+                    std::io::copy(&mut file, &mut out_file)
+                        .map_err(|e| AppError::Internal(format!("write error: {e}")))?;
+                }
+            }
+            web_updated = true;
+            messages.push(format!("Web UI updated to {target_version}"));
+        } else {
+            messages.push("web-dist.zip not found in release, skipped".to_string());
+        }
+    }
+
+    // Update binary via cargo
+    if body.binary {
+        let mut args = vec!["install", "oxios", "locked"];
+        if let Some(ref v) = body.version {
+            args.push("--version");
+            args.push(v.as_str());
+        }
+
+        tracing::info!(?args, "Running cargo install for binary update");
+
+        let output = tokio::process::Command::new("cargo")
+            .args(&args)
+            .output()
+            .await
+            .map_err(|e| AppError::Internal(format!("failed to run cargo: {e}")))?;
+
+        if output.status.success() {
+            binary_updated = true;
+            messages.push(format!("Binary updated to {target_version} via cargo"));
+        } else {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            tracing::error!(%stderr, "cargo install failed");
+            messages.push(format!(
+                "Binary update failed: {}",
+                stderr.lines().take(3).collect::<Vec<_>>().join("; ")
+            ));
+        }
+    }
+
+    tracing::info!(
+        binary_updated,
+        web_updated,
+        target_version,
+        "Update completed"
+    );
+
+    Ok(Json(UpdateRunResponse {
+        success: true,
+        updated_to: target_version,
+        binary_updated,
+        web_updated,
+        message: messages.join("; "),
+    }))
+}
+
+/// GET /api/update/changelog — Show release notes for a version.
+pub(crate) async fn handle_update_changelog(
+    Query(params): Query<UpdateCheckParams>,
+) -> Result<Json<ChangelogResponse>, AppError> {
+    let release = fetch_github_release(params.version.as_deref()).await?;
+
+    let tag_name = release["tag_name"]
+        .as_str()
+        .unwrap_or("unknown")
+        .to_string();
+    let version = tag_name.trim_start_matches('v').to_string();
+    let published_at = release["published_at"].as_str().unwrap_or("").to_string();
+    let body = release["body"]
+        .as_str()
+        .unwrap_or("No release notes.")
+        .to_string();
+    let html_url = release["html_url"].as_str().unwrap_or("").to_string();
+
+    Ok(Json(ChangelogResponse {
+        tag_name,
+        version,
+        published_at,
+        body,
+        html_url,
+    }))
+}
+
+// ---------------------------------------------------------------------------
+// Update helpers
+// ---------------------------------------------------------------------------
+
+const GITHUB_OWNER: &str = "a7garden";
+const GITHUB_REPO: &str = "oxios";
+
+async fn fetch_github_release(version: Option<&str>) -> Result<serde_json::Value, AppError> {
+    let api_url = match version {
+        Some(v) => {
+            format!("https://api.github.com/repos/{GITHUB_OWNER}/{GITHUB_REPO}/releases/tags/v{v}")
+        }
+        None => {
+            format!("https://api.github.com/repos/{GITHUB_OWNER}/{GITHUB_REPO}/releases/latest")
+        }
+    };
+
+    let client = reqwest::Client::builder()
+        .user_agent(format!("oxios/{}", env!("CARGO_PKG_VERSION")))
+        .build()
+        .map_err(|e| AppError::Internal(format!("HTTP client error: {e}")))?;
+
+    let resp = client
+        .get(&api_url)
+        .send()
+        .await
+        .map_err(|e| AppError::Internal(format!("GitHub API request failed: {e}")))?;
+
+    if !resp.status().is_success() {
+        let status = resp.status();
+        let body = resp.text().await.unwrap_or_default();
+        return Err(AppError::Internal(format!(
+            "GitHub API error {status}: {body}"
+        )));
+    }
+
+    resp.json()
+        .await
+        .map_err(|e| AppError::Internal(format!("Failed to parse GitHub response: {e}")))
+}
+
+async fn download_bytes(client: &reqwest::Client, url: &str) -> Result<Vec<u8>, AppError> {
+    let resp = client
+        .get(url)
+        .send()
+        .await
+        .map_err(|e| AppError::Internal(format!("Download request failed: {e}")))?;
+
+    let status = resp.status();
+    if !status.is_success() {
+        return Err(AppError::Internal(format!("Download failed: {status}")));
+    }
+
+    resp.bytes()
+        .await
+        .map(|b| b.to_vec())
+        .map_err(|e| AppError::Internal(format!("Failed to read download body: {e}")))
 }
 
 /// Parse agent metrics from the Prometheus export text.
@@ -463,4 +799,401 @@ pub(crate) async fn handle_config_put(
 
     tracing::info!("Config hot-reloaded from {}", state.config_path.display());
     Ok(Json(body))
+}
+
+// ---------------------------------------------------------------------------
+// System Tools (Doctor, Audit Verify, Backup, Log)
+// ---------------------------------------------------------------------------
+
+/// A single diagnostic check result.
+#[derive(Debug, Serialize, Clone)]
+pub(crate) struct DoctorCheck {
+    /// Check name.
+    pub name: String,
+    /// Status: pass, warn, fail.
+    pub status: String,
+    /// Human-readable detail.
+    pub message: String,
+}
+
+/// Response for `POST /api/system/doctor`.
+#[derive(Debug, Serialize, Clone)]
+pub(crate) struct DoctorResponse {
+    /// Total checks performed.
+    pub checks: u32,
+    /// Number of issues found.
+    pub issues: u32,
+    /// Per-check results.
+    pub results: Vec<DoctorCheck>,
+    /// List of actionable issues.
+    pub action_items: Vec<String>,
+}
+
+/// POST /api/system/doctor — Run system diagnostics.
+pub(crate) async fn handle_doctor(state: State<Arc<AppState>>) -> Json<DoctorResponse> {
+    // Clone what we need from config, don't hold the lock across await points
+    let (default_model, api_key, workspace, daemon_log_dir) = {
+        let config = state.config.read();
+        (
+            config.engine.default_model.clone(),
+            config.api_key(),
+            config.kernel.workspace.clone(),
+            config.daemon.log_dir.clone(),
+        )
+    };
+    let mut results = Vec::new();
+    let mut action_items = Vec::new();
+
+    // 1. Config file
+    if state.config_path.exists() {
+        results.push(DoctorCheck {
+            name: "config_file".into(),
+            status: "pass".into(),
+            message: format!("Config file present ({})", state.config_path.display()),
+        });
+    } else {
+        results.push(DoctorCheck {
+            name: "config_file".into(),
+            status: "fail".into(),
+            message: "Config file missing".into(),
+        });
+        action_items.push("Config file not found. Run `oxios onboard` to create it.".into());
+    }
+
+    // 2. Credentials
+    let provider = oxios_kernel::CredentialStore::provider_from_model(&default_model);
+    match provider {
+        Some(p) => match oxios_kernel::CredentialStore::resolve(p, api_key.as_deref()) {
+            Some((key, source)) => {
+                let preview = if key.len() > 8 {
+                    format!("{}...{}", &key[..4], &key[key.len() - 4..])
+                } else {
+                    "(set)".to_string()
+                };
+                results.push(DoctorCheck {
+                    name: "credentials".into(),
+                    status: "pass".into(),
+                    message: format!("Credentials found ({}, via {:?})", preview, source),
+                });
+            }
+            None => {
+                results.push(DoctorCheck {
+                    name: "credentials".into(),
+                    status: "fail".into(),
+                    message: format!("No credentials for provider '{p}'"),
+                });
+                action_items.push(format!(
+                    "No API key for '{p}'. Configure in Settings → Engine."
+                ));
+            }
+        },
+        None => {
+            results.push(DoctorCheck {
+                name: "credentials".into(),
+                status: "fail".into(),
+                message: "No model configured".into(),
+            });
+            action_items.push("No model set. Configure in Settings → Engine.".into());
+        }
+    }
+
+    // 3. Workspace directory
+    let workspace = oxios_kernel::config::expand_home(&workspace);
+    if workspace.exists() {
+        results.push(DoctorCheck {
+            name: "workspace".into(),
+            status: "pass".into(),
+            message: format!("Workspace directory ({})", workspace.display()),
+        });
+    } else {
+        results.push(DoctorCheck {
+            name: "workspace".into(),
+            status: "warn".into(),
+            message: format!("Workspace directory missing ({})", workspace.display()),
+        });
+        action_items.push("Workspace directory not found. It will be created on first run.".into());
+    }
+
+    // 4. Default model
+    if !default_model.is_empty() {
+        results.push(DoctorCheck {
+            name: "model".into(),
+            status: "pass".into(),
+            message: format!("Default model: {default_model}"),
+        });
+    } else {
+        results.push(DoctorCheck {
+            name: "model".into(),
+            status: "fail".into(),
+            message: "No default model set".into(),
+        });
+        action_items.push("No default model configured.".into());
+    }
+
+    // 5. MCP servers
+    let mcp_count = state.kernel.mcp.server_count();
+    if mcp_count > 0 {
+        results.push(DoctorCheck {
+            name: "mcp_servers".into(),
+            status: "pass".into(),
+            message: format!("{mcp_count} MCP server(s) connected"),
+        });
+    } else {
+        results.push(DoctorCheck {
+            name: "mcp_servers".into(),
+            status: "warn".into(),
+            message: "No MCP servers configured".into(),
+        });
+    }
+
+    // 6. Git repository
+    let git_ok = state.kernel.infra.git_verify().unwrap_or(false);
+    if git_ok {
+        results.push(DoctorCheck {
+            name: "git".into(),
+            status: "pass".into(),
+            message: "Git repository intact".into(),
+        });
+    } else {
+        results.push(DoctorCheck {
+            name: "git".into(),
+            status: "warn".into(),
+            message: "Git repository verification failed".into(),
+        });
+    }
+
+    // 7. State store
+    let ws_path = state.kernel.state.workspace_path();
+    if ws_path.exists() {
+        results.push(DoctorCheck {
+            name: "state_store".into(),
+            status: "pass".into(),
+            message: format!("State store path exists ({})", ws_path.display()),
+        });
+    } else {
+        results.push(DoctorCheck {
+            name: "state_store".into(),
+            status: "warn".into(),
+            message: "State store path not found".into(),
+        });
+    }
+
+    // 8. Memory subsystem
+    let (index_size, total) = state.kernel.agents.memory_stats().await;
+    results.push(DoctorCheck {
+        name: "memory".into(),
+        status: "pass".into(),
+        message: format!("Memory: {index_size} indexed, {total} total entries"),
+    });
+
+    // 9. Web dist directory
+    if let Some(ref web_dist) = state.web_dist {
+        if web_dist.exists() {
+            results.push(DoctorCheck {
+                name: "web_dist".into(),
+                status: "pass".into(),
+                message: format!("Web UI dist ({})", web_dist.display()),
+            });
+        } else {
+            results.push(DoctorCheck {
+                name: "web_dist".into(),
+                status: "warn".into(),
+                message: "Web UI dist directory not found".into(),
+            });
+        }
+    } else {
+        results.push(DoctorCheck {
+            name: "web_dist".into(),
+            status: "pass".into(),
+            message: "Web UI served from embedded assets".into(),
+        });
+    }
+
+    let checks = results.len() as u32;
+    let issues = action_items.len() as u32;
+
+    Json(DoctorResponse {
+        checks,
+        issues,
+        results,
+        action_items,
+    })
+}
+
+/// Response for `POST /api/system/audit-verify`.
+#[derive(Debug, Serialize, Clone)]
+pub(crate) struct AuditVerifyResponse {
+    pub valid: bool,
+    pub entries_checked: u64,
+    pub message: String,
+}
+
+/// POST /api/system/audit-verify — Verify audit trail integrity.
+pub(crate) async fn handle_audit_verify_api(
+    state: State<Arc<AppState>>,
+) -> Json<AuditVerifyResponse> {
+    let audit = &state.kernel.security;
+    match audit.verify_chain() {
+        Ok(valid) => Json(AuditVerifyResponse {
+            valid,
+            entries_checked: 0,
+            message: if valid {
+                "Audit trail verified successfully.".into()
+            } else {
+                "Audit trail verification failed.".into()
+            },
+        }),
+        Err(e) => Json(AuditVerifyResponse {
+            valid: false,
+            entries_checked: 0,
+            message: format!("Audit trail verification failed: {e}"),
+        }),
+    }
+}
+
+/// Response for `POST /api/system/backup`.
+#[derive(Debug, Serialize, Clone)]
+pub(crate) struct BackupResponse {
+    pub success: bool,
+    pub path: String,
+    pub size_bytes: u64,
+    pub message: String,
+}
+
+/// POST /api/system/backup — Create a backup of Oxios state.
+pub(crate) async fn handle_backup(state: State<Arc<AppState>>) -> Json<BackupResponse> {
+    let home = match dirs::home_dir() {
+        Some(h) => h,
+        None => {
+            return Json(BackupResponse {
+                success: false,
+                path: String::new(),
+                size_bytes: 0,
+                message: "Cannot determine home directory.".into(),
+            })
+        }
+    };
+    let oxios_home = home.join(".oxios");
+
+    let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S");
+    let backup_name = format!("oxios-backup-{timestamp}.tar.gz");
+    let backup_path = oxios_home.join(&backup_name);
+
+    tracing::info!(path = %backup_path.display(), "Creating backup");
+
+    // Use tar command for simplicity
+    let output = match tokio::process::Command::new("tar")
+        .args([
+            "-czf",
+            match backup_path.to_str() {
+                Some(s) => s,
+                None => {
+                    return Json(BackupResponse {
+                        success: false,
+                        path: String::new(),
+                        size_bytes: 0,
+                        message: "Invalid backup path.".into(),
+                    })
+                }
+            },
+            "-C",
+            oxios_home.to_str().unwrap_or("."),
+            "config.toml",
+            "workspace",
+            "knowledge",
+        ])
+        .output()
+        .await
+    {
+        Ok(o) => o,
+        Err(e) => {
+            return Json(BackupResponse {
+                success: false,
+                path: String::new(),
+                size_bytes: 0,
+                message: format!("tar failed: {e}"),
+            })
+        }
+    };
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Json(BackupResponse {
+            success: false,
+            path: String::new(),
+            size_bytes: 0,
+            message: format!("Backup failed: {stderr}"),
+        });
+    }
+
+    let size = std::fs::metadata(&backup_path)
+        .map(|m| m.len())
+        .unwrap_or(0);
+
+    tracing::info!(
+        path = %backup_path.display(),
+        size,
+        "Backup created"
+    );
+
+    Json(BackupResponse {
+        success: true,
+        path: backup_path.display().to_string(),
+        size_bytes: size,
+        message: format!(
+            "Backup created: {backup_name} ({})",
+            format_size_helper(size)
+        ),
+    })
+}
+
+/// Response for `GET /api/system/log`.
+#[derive(Debug, Serialize, Clone)]
+pub(crate) struct LogResponse {
+    pub lines: Vec<String>,
+    pub total: usize,
+}
+
+/// GET /api/system/log — Read recent daemon log entries.
+pub(crate) async fn handle_log(state: State<Arc<AppState>>) -> Json<LogResponse> {
+    let log_dir = {
+        let config = state.config.read();
+        oxios_kernel::config::expand_home(&config.daemon.log_dir)
+    };
+    let log_file = log_dir.join("oxios.log");
+
+    if !log_file.exists() {
+        return Json(LogResponse {
+            lines: vec!["No log file found.".into()],
+            total: 1,
+        });
+    }
+
+    // Read last N lines efficiently
+    let content = tokio::fs::read_to_string(&log_file)
+        .await
+        .unwrap_or_default();
+
+    let all_lines: Vec<String> = content.lines().map(|l| l.to_string()).collect();
+    let total = all_lines.len();
+    let lines: Vec<String> = all_lines
+        .into_iter()
+        .rev()
+        .take(50)
+        .collect::<Vec<_>>()
+        .into_iter()
+        .rev()
+        .collect();
+
+    Json(LogResponse { lines, total })
+}
+
+fn format_size_helper(bytes: u64) -> String {
+    if bytes < 1024 {
+        format!("{bytes} B")
+    } else if bytes < 1024 * 1024 {
+        format!("{:.1} KB", bytes as f64 / 1024.0)
+    } else {
+        format!("{:.1} MB", bytes as f64 / (1024.0 * 1024.0))
+    }
 }

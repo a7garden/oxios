@@ -1,6 +1,6 @@
 [package]
 name = "oxios-telegram"
-version = "1.0.0"
+version = "1.0.1"
 edition = "2021"
 description = "Telegram channel for Oxios Agent OS"
 license = "MIT"

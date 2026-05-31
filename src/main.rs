@@ -814,55 +814,314 @@ async fn cmd_status(kernel: &Kernel) -> Result<()> {
 
 // ─── Reset command ───────────────────────────────────────────────────────────
 
+/// Collect all paths and items that `oxios reset` would delete.
+struct ResetTargets {
+    /// `~/.oxi/auth.json` — shared credential store with oxi CLI
+    oxi_auth: PathBuf,
+    /// `~/Library/LaunchAgents/com.a7garden.oxios.plist` — macOS launchd
+    launchd_plist: Option<PathBuf>,
+    /// Items that actually exist on disk (for display)
+    existing: Vec<ResetItem>,
+}
+
+struct ResetItem {
+    label: String,
+    path: PathBuf,
+    /// Size in bytes (0 if unknown or not a file/dir)
+    size: u64,
+}
+
+fn collect_reset_targets(oxios_home: &Path) -> ResetTargets {
+    let home = std::env::var("HOME")
+        .or_else(|_| std::env::var("USERPROFILE"))
+        .unwrap_or_default();
+
+    let oxi_auth = PathBuf::from(&home).join(".oxi").join("auth.json");
+
+    let launchd_plist = if cfg!(target_os = "macos") {
+        Some(
+            dirs::home_dir()
+                .map(|h| h.join("Library/LaunchAgents/com.a7garden.oxios.plist"))
+                .unwrap_or_else(|| {
+                    PathBuf::from(&home).join("Library/LaunchAgents/com.a7garden.oxios.plist")
+                }),
+        )
+    } else {
+        None
+    };
+
+    let mut existing = Vec::new();
+
+    // 1. ~/.oxios/
+    if oxios_home.exists() {
+        let size = dir_size(oxios_home);
+        existing.push(ResetItem {
+            label: "Oxios home (config, workspace, logs, memory, sessions, skills)".to_string(),
+            path: oxios_home.to_path_buf(),
+            size,
+        });
+    }
+
+    // 2. ~/.oxi/auth.json
+    if oxi_auth.exists() {
+        let size = oxi_auth.metadata().map(|m| m.len()).unwrap_or(0);
+        existing.push(ResetItem {
+            label: "oxi CLI credentials (shared with other oxi tools)".to_string(),
+            path: oxi_auth.clone(),
+            size,
+        });
+    }
+
+    // 3. launchd plist
+    if let Some(ref plist) = launchd_plist {
+        if plist.exists() {
+            let size = plist.metadata().map(|m| m.len()).unwrap_or(0);
+            existing.push(ResetItem {
+                label: "macOS launchd service registration".to_string(),
+                path: plist.clone(),
+                size,
+            });
+        }
+    }
+
+    ResetTargets {
+        oxi_auth,
+        launchd_plist,
+        existing,
+    }
+}
+
+/// Recursively calculate directory size using std::fs.
+fn dir_size(path: &Path) -> u64 {
+    fn acc(p: &Path, total: &mut u64) {
+        if let Ok(entries) = std::fs::read_dir(p) {
+            for entry in entries.flatten() {
+                if let Ok(meta) = entry.metadata() {
+                    if meta.is_file() {
+                        *total += meta.len();
+                    } else if meta.is_dir() {
+                        acc(&entry.path(), total);
+                    }
+                }
+            }
+        }
+    }
+    let mut total = 0u64;
+    acc(path, &mut total);
+    total
+}
+
+/// Format bytes into human-readable string.
+fn format_bytes(bytes: u64) -> String {
+    const KB: u64 = 1024;
+    const MB: u64 = 1024 * KB;
+    const GB: u64 = 1024 * MB;
+    if bytes >= GB {
+        format!("{:.1} GB", bytes as f64 / GB as f64)
+    } else if bytes >= MB {
+        format!("{:.1} MB", bytes as f64 / MB as f64)
+    } else if bytes >= KB {
+        format!("{:.1} KB", bytes as f64 / KB as f64)
+    } else {
+        format!("{} B", bytes)
+    }
+}
+
 fn cmd_reset(oxios_home: &Path, skip_confirm: bool, pid_file: &Path) -> Result<()> {
-    if !oxios_home.exists() {
-        println!(
-            "  {} does not exist — nothing to reset.",
-            oxios_home.display()
-        );
+    let targets = collect_reset_targets(oxios_home);
+
+    if targets.existing.is_empty() {
+        println!();
+        println!("  {} No Oxios data to reset.", style("✓").green().bold());
+        println!();
         return Ok(());
+    }
+
+    // ── Phase 1: Show targets ──
+    println!();
+    println!(
+        "  {} The following will be permanently deleted:",
+        style("⚠ WARNING:").yellow().bold()
+    );
+    println!();
+
+    let total_size: u64 = targets.existing.iter().map(|i| i.size).sum();
+
+    for (i, item) in targets.existing.iter().enumerate() {
+        let size_str = if item.size > 0 {
+            format!(" ({})", format_bytes(item.size))
+        } else {
+            String::new()
+        };
+        println!(
+            "    {}. {}{}",
+            i + 1,
+            style(&item.path.display()).cyan(),
+            style(&size_str).dim()
+        );
+        println!("       {}", style(&item.label).dim());
     }
 
     println!();
     println!(
-        "  {}  This will delete all Oxios configuration and data:",
-        style("⚠").yellow().bold()
+        "  {} item(s), {}",
+        targets.existing.len(),
+        style(format_bytes(total_size)).yellow().bold()
     );
-    println!("     {}", oxios_home.display());
     println!();
+    println!(
+        "  {}",
+        style("This cannot be undone. All agents, memory, skills, sessions, and settings will be deleted.").red()
+    );
 
+    // ── Phase 2: Safety confirmation ──
     if !skip_confirm {
-        let confirm = inquire::Confirm::new("  Are you sure?")
-            .with_default(false)
-            .prompt()?;
-        if !confirm {
-            println!("  Reset cancelled.");
+        println!();
+        let answer = inquire::Text::new("  Type RESET to confirm:").prompt()?;
+
+        if answer.trim() != "RESET" {
+            println!();
+            println!("  {} Reset cancelled.", style("✗").yellow().bold());
+            println!();
             return Ok(());
         }
     }
 
-    // Stop daemon first if running
+    println!();
+
+    // ── Phase 3: Stop daemon ──
     if pid_file.exists() {
         let pid_str = std::fs::read_to_string(pid_file).unwrap_or_default();
         if let Ok(pid) = pid_str.trim().parse::<u32>() {
+            print!("  {} Stopping daemon...", style("●").cyan());
             unsafe {
                 libc::kill(pid as i32, libc::SIGTERM);
             }
             std::thread::sleep(std::time::Duration::from_millis(500));
+            println!(" {}", style("done").green());
         }
     }
 
-    std::fs::remove_dir_all(oxios_home)?;
+    // ── Phase 4: Remove launchd service ──
+    if let Some(ref plist) = targets.launchd_plist {
+        if plist.exists() {
+            // Unload first
+            let _ = std::process::Command::new("launchctl")
+                .args(["unload", &plist.to_string_lossy()])
+                .output();
+            match std::fs::remove_file(plist) {
+                Ok(()) => println!("  {} launchd service removed", style("✓").green()),
+                Err(e) => println!("  {} launchd removal failed: {}", style("⚠").yellow(), e),
+            }
+        }
+    }
 
+    // ── Phase 5: Delete ~/.oxios/ ──
+    if oxios_home.exists() {
+        print!(
+            "  {} Deleting {}...",
+            style("●").cyan(),
+            oxios_home.display()
+        );
+        match std::fs::remove_dir_all(oxios_home) {
+            Ok(()) => println!(" {}", style("done").green()),
+            Err(e) => {
+                println!();
+                println!(
+                    "  {} {} failed to delete: {}",
+                    style("✗").red().bold(),
+                    oxios_home.display(),
+                    e
+                );
+            }
+        }
+    }
+
+    // ── Phase 6: Clean ~/.oxi/auth.json ──
+    if targets.oxi_auth.exists() {
+        // auth.json is shared with oxi CLI — try to remove only oxios-related
+        // provider entries first. If that fails, delete the whole file.
+        let removed = try_remove_oxios_providers_from_auth_json(&targets.oxi_auth);
+        if removed {
+            println!(
+                "  {} {} (oxios credentials removed, others preserved)",
+                style("✓").green(),
+                targets.oxi_auth.display()
+            );
+        } else {
+            match std::fs::remove_file(&targets.oxi_auth) {
+                Ok(()) => println!(
+                    "  {} {} deleted",
+                    style("✓").green(),
+                    targets.oxi_auth.display()
+                ),
+                Err(e) => println!(
+                    "  {} {} failed to delete: {}",
+                    style("⚠").yellow(),
+                    targets.oxi_auth.display(),
+                    e
+                ),
+            }
+        }
+    }
+
+    // ── Done ──
     println!();
     println!(
-        "  {} {} removed.",
-        style("✓").green().bold(),
-        oxios_home.display()
+        "  {} All Oxios data has been reset.",
+        style("✓").green().bold()
     );
-    println!("  Run {} to set up again.", style("`oxios onboard`").cyan());
+    println!(
+        "  {} Run {} to set up again.",
+        style("→").cyan(),
+        style("oxios").cyan().bold()
+    );
     println!();
     Ok(())
+}
+
+/// Try to remove Oxios-related provider entries from ~/.oxi/auth.json
+/// without destroying other oxi CLI entries. Returns true if selective removal succeeded.
+fn try_remove_oxios_providers_from_auth_json(path: &Path) -> bool {
+    let raw = match std::fs::read_to_string(path) {
+        Ok(r) => r,
+        Err(_) => return false,
+    };
+
+    let mut map: serde_json::Map<String, serde_json::Value> = match serde_json::from_str(&raw) {
+        Ok(m) => m,
+        Err(_) => return false,
+    };
+
+    // Known providers that Oxios uses
+    let providers = [
+        "anthropic",
+        "openai",
+        "google",
+        "groq",
+        "mistral",
+        "deepseek",
+    ];
+    let mut removed_any = false;
+    for p in &providers {
+        if map.remove(*p).is_some() {
+            removed_any = true;
+        }
+    }
+
+    if !removed_any {
+        return false;
+    }
+
+    // If auth.json is now empty, just delete the file
+    if map.is_empty() {
+        let _ = std::fs::remove_file(path);
+        return true;
+    }
+
+    // Write back the remaining entries
+    let new_json = serde_json::to_string_pretty(&map).unwrap_or_default();
+    std::fs::write(path, new_json).is_ok()
 }
 
 // ─── Doctor command ──────────────────────────────────────────────────────────
