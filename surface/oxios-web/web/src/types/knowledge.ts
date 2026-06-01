@@ -68,13 +68,21 @@ export interface TodayReport {
   [key: string]: unknown
 }
 
+// Schedule config for knowledge module
+export interface ScheduleConfig {
+  name: string
+  cron?: string
+  command?: string
+  enabled?: boolean
+}
+
 // Config
 export interface KnowledgeConfig {
   language?: string
   timezone?: string
   move_to_commands?: string[]
   pomodoro_duration_in_minutes?: number
-  schedules?: unknown[]
+  schedules?: ScheduleConfig[]
   quick_commands?: string[]
   two_emojis_enabled?: boolean
   mode?: string

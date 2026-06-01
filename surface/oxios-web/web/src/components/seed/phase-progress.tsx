@@ -9,7 +9,7 @@ export function PhaseProgress({ phaseReached }: { phaseReached: OuroborosPhase }
   const currentIdx = PHASES.indexOf(phaseReached)
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-2 overflow-x-auto">
       {PHASES.map((phase, idx) => {
         const isComplete = idx < currentIdx
         const isCurrent = idx === currentIdx

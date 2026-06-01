@@ -53,8 +53,8 @@ export function EvaluationCard({ evaluation }: { evaluation?: EvaluationResult }
         </div>
         <div className="flex items-center gap-2">
           <span className="text-sm text-muted-foreground">{t('seeds.score')}:</span>
-          <div className="flex items-center gap-2">
-            <div className="h-2 w-32 overflow-hidden rounded-full bg-muted">
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="h-2 w-32 min-w-[80px] overflow-hidden rounded-full bg-muted">
               <div
                 className="h-full rounded-full bg-primary"
                 style={{ width: `${(evaluation.score || 0) * 100}%` }}

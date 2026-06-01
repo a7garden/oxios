@@ -101,14 +101,14 @@ export function ProviderSelect({
                     <span className="flex-1 text-left">{p.name}</span>
 
                     {/* Model count badge */}
-                    {p.model_count > 0 && (
+                    {p.modelCount > 0 && (
                       <span className="text-xs text-muted-foreground">
-                        {p.model_count}
+                        {p.modelCount}
                       </span>
                     )}
 
                     {/* API key indicator */}
-                    {p.has_key ? (
+                    {p.hasKey ? (
                       <Key className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
                     ) : (
                       <Key className="h-3.5 w-3.5 text-muted-foreground/40 shrink-0" />

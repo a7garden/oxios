@@ -14,6 +14,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::embedding::EmbeddingVector;
 
+use super::auto_protect::AutoProtector;
 use super::hnsw::HnswIndex;
 use super::normalizer::l2_normalize_f32;
 use super::{
@@ -180,12 +181,20 @@ impl MemoryManager {
     }
 
     /// Retrieve a single memory by ID.
+    ///
+    /// Records access for auto-protection tracking.
     pub async fn get(&self, id: &str, memory_type: MemoryType) -> Result<Option<MemoryEntry>> {
         #[cfg(feature = "sqlite-memory")]
         if let Some(ref sqlite) = self.sqlite_store {
             return sqlite.get(id, memory_type);
         }
-        self.state_store.load_json(memory_type.category(), id).await
+        let result: Option<MemoryEntry> = self.state_store.load_json(memory_type.category(), id).await?;
+        if let Some(mut entry) = result {
+            AutoProtector::record_access(&mut entry, "");
+            Ok(Some(entry))
+        } else {
+            Ok(None)
+        }
     }
 
     /// Delete a memory entry.
@@ -288,8 +297,7 @@ impl MemoryManager {
                     .load_json::<MemoryEntry>(mt.category(), &id)
                     .await
                 {
-                    entry.access_count += 1;
-                    entry.accessed_at = chrono::Utc::now();
+                    AutoProtector::record_access(&mut entry, "");
                     tracing::debug!(id = %id, score, "Vector search hit");
                     results.push(entry);
                     break;
@@ -891,9 +899,7 @@ impl MemoryManager {
                     .load_json::<MemoryEntry>(mt.category(), &id)
                     .await
                 {
-                    // Update access stats
-                    entry.access_count += 1;
-                    entry.accessed_at = chrono::Utc::now();
+                    AutoProtector::record_access(&mut entry, "");
 
                     let similarity = 1.0 - distance;
                     results.push(SemanticHit {

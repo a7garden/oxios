@@ -357,12 +357,12 @@ export const useChatStore = create<ChatStore>()(
           set((s) => {
             const updated = [...s.messages]
             const toolMessages: ChatMessage[] = (Array.isArray(toolCalls) ? toolCalls : []).map(
-              (tc: any) => ({
+              (tc: ToolCallSummary) => ({
                 id: crypto.randomUUID(),
                 role: 'tool' as const,
                 content: '',
                 toolName: tc.tool_name,
-                toolArgs: typeof tc.input === 'string' ? undefined : tc.input,
+                toolArgs: typeof tc.input === 'string' ? undefined : JSON.parse(tc.input),
                 toolResult: tc.output,
                 toolDurationMs: tc.duration_ms,
                 timestamp: new Date().toISOString(),
@@ -409,12 +409,12 @@ export const useChatStore = create<ChatStore>()(
       }),
       onRehydrateStorage: () => (state) => {
         if (!state) return
-        // After rehydration, if there's an active session, load its history
+        // After rehydration, if there's an active session, load its history.
+        // Note: WS auto-connect moved to ChatPage component — don't connect
+        // from every page load, only when the chat route is active.
         if (state.activeSessionId) {
           state.loadSession(state.activeSessionId)
         }
-        // Auto-connect on page load
-        state.connect()
       },
     },
   ),

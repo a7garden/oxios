@@ -115,7 +115,7 @@ mod tests {
                 )),
                 state_store.clone(),
             ),
-            crate::PersonaApi::new(Arc::new(crate::persona_manager::PersonaManager::new())),
+            crate::PersonaApi::new(Arc::new(crate::persona::PersonaManager::new())),
             crate::ExtensionApi::new(Arc::new(crate::skill::SkillManager::new(
                 base.join("skills"),
                 base.join("share/skills"),
@@ -145,6 +145,9 @@ mod tests {
                 Arc::new(parking_lot::RwLock::new(crate::OxiosConfig::default())),
                 base.join("config.toml"),
                 Arc::new(crate::RoutingStats::new()),
+                Arc::new(crate::engine::EngineHandle::new(Arc::new(
+                    crate::OxiosEngine::new("anthropic/claude-sonnet-4-20250514"),
+                ))),
             ),
             Arc::new(oxios_markdown::KnowledgeBase::new(base.join("knowledge")).unwrap()),
             Arc::new(
@@ -157,12 +160,18 @@ mod tests {
                 .unwrap(),
             ),
             crate::MarketplaceApi::new(
-                Arc::new(crate::clawhub::ClawHubInstaller::new(
+                Arc::new(crate::skill::clawhub::ClawHubInstaller::new(
                     base.join("skills"),
                     base.join("workspace"),
                     None,
                 )),
-                Arc::new(crate::clawhub::ClawHubClient::new(None).expect("valid ClawHub client")),
+                Arc::new(crate::skill::clawhub::ClawHubClient::new(None).expect("valid ClawHub client")),
+                Arc::new(crate::skill::skills_sh::SkillsShInstaller::new(
+                    base.join("skills"),
+                    None,
+                    None,
+                )),
+                Arc::new(crate::skill::skills_sh::SkillsShClient::new(None, None).expect("valid Skills.sh client")),
             ),
         ));
 

@@ -19,8 +19,9 @@ pub use a2a_api::A2aApi;
 pub use agent_api::AgentApi;
 pub use browser_api::BrowserApi;
 pub use engine_api::{
-    EngineApi, EngineConfigResponse, FallbackEvent, ModelInfo, ProviderInfo, RoutingConfigSnapshot,
-    RoutingStats, RoutingStatsSnapshot, RoutingUpdate, ValidateKeyResult,
+    EngineApi, EngineConfigResponse, FallbackEvent, InputModality, ModelInfo, ProviderCategory,
+    ProviderInfo, RoutingConfigSnapshot, RoutingStats, RoutingStatsSnapshot, RoutingUpdate,
+    ValidateKeyResult,
 };
 pub use exec_api::ExecApi;
 pub use extension_api::ExtensionApi;
@@ -40,7 +41,8 @@ use crate::access_manager::AccessManager;
 use crate::audit_trail::AuditTrail;
 use crate::auth::AuthManager;
 use crate::budget::BudgetManager;
-use crate::clawhub::{ClawHubClient, ClawHubInstaller};
+use crate::skill::clawhub::{ClawHubClient, ClawHubInstaller};
+use crate::skill::skills_sh::{SkillsShClient, SkillsShInstaller};
 use crate::config::OxiosConfig;
 use crate::cron::CronScheduler;
 use crate::event_bus::EventBus;
@@ -48,7 +50,7 @@ use crate::git_layer::CommitInfo;
 use crate::git_layer::GitLayer;
 use crate::mcp::McpBridge;
 use crate::memory::MemoryManager;
-use crate::persona_manager::PersonaManager;
+use crate::persona::PersonaManager;
 use crate::resource_monitor::ResourceMonitor;
 use crate::scheduler::AgentScheduler;
 use crate::skill::SkillManager;
@@ -216,6 +218,9 @@ impl KernelHandle {
                 Arc::new(parking_lot::RwLock::new(config.clone())),
                 std::path::PathBuf::from("~/.oxios/config.toml"),
                 Arc::new(RoutingStats::new()),
+                Arc::new(crate::engine::EngineHandle::new(Arc::new(
+                    crate::engine::OxiosEngine::new("anthropic/claude-sonnet-4-20250514"),
+                ))),
             ),
             knowledge,
             knowledge_lens,
@@ -229,6 +234,12 @@ impl KernelHandle {
                     ClawHubClient::new(config.marketplace.base_url.clone())
                         .expect("valid ClawHub client"),
                 ),
+                Arc::new(SkillsShInstaller::new(
+                    state_store.base_path.join("skills"),
+                    None,
+                    None,
+                )),
+                Arc::new(SkillsShClient::new(None, None).expect("valid Skills.sh client")),
             ),
         }
     }

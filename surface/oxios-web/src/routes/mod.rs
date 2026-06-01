@@ -94,6 +94,8 @@ pub(crate) use knowledge_routes::{
 pub(crate) use marketplace::{
     handle_marketplace_install, handle_marketplace_search, handle_marketplace_skill_detail,
     handle_marketplace_updates,
+    handle_skills_sh_install, handle_skills_sh_list, handle_skills_sh_search,
+    handle_skills_sh_skill_detail, handle_skills_sh_skill_audit,
 };
 pub(crate) use project_routes::{
     handle_project_create, handle_project_delete, handle_project_get, handle_project_link_memory,
@@ -173,6 +175,17 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         .route(
             "/api/marketplace/skills/{slug}",
             get(handle_marketplace_skill_detail),
+        )
+        // Marketplace (Skills.sh) — read-only routes, public
+        .route("/api/marketplace/skills-sh/search", get(handle_skills_sh_search))
+        .route("/api/marketplace/skills-sh/list", get(handle_skills_sh_list))
+        .route(
+            "/api/marketplace/skills-sh/skill/{id}",
+            get(handle_skills_sh_skill_detail),
+        )
+        .route(
+            "/api/marketplace/skills-sh/skill/{id}/audit",
+            get(handle_skills_sh_skill_audit),
         );
 
     // Protected API routes (auth middleware applied)
@@ -478,6 +491,11 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         .route(
             "/api/marketplace/skills/{slug}/install",
             post(handle_marketplace_install),
+        )
+        // Marketplace (Skills.sh) — install requires auth
+        .route(
+            "/api/marketplace/skills-sh/skill/{id}/install",
+            post(handle_skills_sh_install),
         )
         // System Update
         .route("/api/update/check", get(handle_update_check))

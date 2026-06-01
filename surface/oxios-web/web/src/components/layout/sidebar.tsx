@@ -144,7 +144,7 @@ export function Sidebar() {
       )}
     >
       {/* Header */}
-      <div className="flex h-14 items-center justify-between px-3">
+      <div className={cn('flex h-14 items-center px-3', collapsed ? 'justify-center' : 'justify-between')}>
         {!collapsed && (
           <div className="flex items-center gap-2">
             <Zap className="h-5 w-5 text-primary" />

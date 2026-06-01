@@ -2,6 +2,7 @@ import { Select } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
 import { Label } from '@/components/ui/label'
+import { Button } from '@/components/ui/button'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -217,14 +218,12 @@ export function ProviderOptionsPanel({
     <div className={className}>
       <ProviderOptions provider={provider} values={localValues} onChange={handleChange} />
       <div className="mt-4 flex justify-end">
-        <button
-          type="button"
+        <Button
           onClick={handleSave}
           disabled={isPending}
-          className="inline-flex items-center justify-center rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground shadow hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isPending ? t('engine.saving') : t('engine.saveOptions')}
-        </button>
+        </Button>
       </div>
     </div>
   )

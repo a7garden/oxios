@@ -18,6 +18,7 @@ Read it before modifying kernel structure, adding modules, or onboarding onto th
 7. [Security Model](#7-security-model)
 8. [Unix Philosophy Mapping](#8-unix-philosophy-mapping)
 9. [Dependency Rules](#9-dependency-rules)
+10. [Kernel Crate Architecture](#10-kernel-crate-architecture)
 
 ---
 
@@ -1500,6 +1501,93 @@ The construction order solves the `KernelHandle → AgentRuntime → Supervisor 
 | Temp directories | Use `tempfile::tempdir()` for state store tests |
 | Must pass | `cargo test --workspace` at every commit |
 | CI check | `a7garden/oxi` at `v0.4.4` checked out alongside for oxi-related tests |
+
+---
+
+## 10. Kernel Crate Architecture
+
+### Why `oxios-kernel` Is a Single Crate
+
+`oxios-kernel` is ~50K lines across 137 source files. This is **intentionally monolithic** — not a code smell that needs fixing.
+
+#### The dependency topology is a star, not a web
+
+Real-world code review shows that kernel subsystems depend on each other in a clean star pattern:
+
+```
+                     types::AgentId
+                    ╱      │       ╲
+      EventBus   StateStore   Config
+          │          │          │
+     Supervisor ── Scheduler ── BudgetManager
+          │
+     AgentRuntime ── Engine (→ oxi-sdk)
+          │
+     KernelHandle (facade: references all subsystems)
+```
+
+There are **zero circular dependencies** between modules. The only module that references everything is `KernelHandle` — and that is its explicit purpose as a Facade.
+
+#### Internal boundaries are already clean
+
+The kernel uses directory-level modules with `pub(crate)` encapsulation:
+
+| Directory | Lines | External deps from kernel | Self-contained? |
+|-----------|-------|---------------------------|----------------|
+| `memory/` | 12,277 | `state_store`, `git_layer` (2) | ✅ Nearly isolated |
+| `tools/` | 7,047 | `KernelHandle` (facade pattern) | ✅ Goes through facade |
+| `access_manager/` | 3,681 | `types`, `capability`, `config` (3) | ✅ Nearly isolated |
+| `kernel_handle/` | 3,063 | All subsystems (by design) | — This IS the facade |
+| `capability/` | 958 | `types` (1) | ✅ Fully isolated |
+| `skill/` | 1,580 | None | ✅ Fully isolated |
+
+Each directory already has its own `mod.rs` controlling visibility. The `lib.rs` organizes modules into logical sections with explicit Korean comments:
+
+- Lifecycle: `supervisor`, `agent_lifecycle`, `agent_runtime`, `daemon`
+- Orchestration: `scheduler`, `budget`, `cron`, `orchestrator`
+- Security: `access_manager`, `audit_trail`, `auth`, `capability`, `credential`
+- Communication: `a2a`, `event_bus`, `mcp`, `coordination`
+- Intelligence: `memory`, `embedding`, `persona`, `onboarding`
+- Tools & Skills: `tools`, `skill`, `clawhub`, `skills_sh`
+- State & Config: `config`, `state_store`, `git_layer`, `project`, `backup`
+- Infrastructure: `engine`, `error`, `types`, `metrics`, `telemetry`
+- API Surface: `kernel_handle`
+
+#### Why not split into separate crates?
+
+Every past attempt to extract a subsystem was cancelled because:
+
+| Cost of extraction | Impact |
+|-------------------|--------|
+| `pub(crate)` → `pub` everywhere | Leaks internal types, widens API surface |
+| Circular dependency risk | Extracted crates need kernel types → kernel needs extracted crate |
+| Version synchronization | N crates × version bumps = coordination overhead |
+| Build time regression | More crate boundaries = more compilation units = worse cache |
+| No reuse benefit | Nobody consumes `oxios-kernel-memory` or `oxios-kernel-security` independently |
+| Trait abstraction overhead | To break cycles, you'd need traits → dynamic dispatch → complexity |
+
+The Linux kernel is 30M+ lines in a single tree. It uses directories (`mm/`, `fs/`, `net/`, `drivers/`) for organization, not separate libraries. Same principle applies here at a different scale.
+
+#### When WOULD splitting make sense?
+
+Splitting would be justified if and only if:
+
+1. **Independent reuse** — Another project wants to use a subsystem without the whole kernel
+2. **Independent versioning** — A subsystem changes at a fundamentally different cadence
+3. **Build isolation** — A subsystem has dramatically different compile-time dependencies (e.g., heavy C FFI)
+4. **Team boundary** — Different teams own different subsystems with different release cycles
+
+None of these conditions hold today.
+
+#### How to manage the kernel's size
+
+Instead of crate splitting, the kernel manages complexity through:
+
+- **Feature gates**: `sqlite-memory`, `embedding-gguf`, `otel`, `wasm-sandbox`, `browser` — only compile what you need
+- **`pub(crate)` encapsulation**: Module internals stay internal
+- **Directory-level mod.rs**: Each subsystem controls its own visibility
+- **lib.rs section organization**: Clear logical grouping with labeled sections
+- **KernelHandle facade**: Single entry point for all 13 APIs, preventing direct subsystem coupling in consumers
 
 ---
 

@@ -299,6 +299,72 @@ impl std::fmt::Debug for OxiosEngine {
 }
 
 // ---------------------------------------------------------------------------
+// EngineHandle — hot-swappable engine reference
+// ---------------------------------------------------------------------------
+
+/// Shared, hot-swappable reference to the active [`OxiosEngine`].
+///
+/// Wraps `RwLock<Arc<OxiosEngine>>` so that:
+/// - **Writers** (`EngineApi`) can atomically replace the engine on config change
+/// - **Readers** (`AgentRuntime`) always get the current engine at execution time
+///
+/// # Cost
+///
+/// Rebuilding `OxiosEngine` is cheap: `OxiBuilder::new().with_builtins().build()`
+/// populates registries from static `model_db` data (~1μs, no I/O, no network).
+///
+/// # Concurrency
+///
+/// - `parking_lot::RwLock` is not async-aware, but engine swap only occurs on
+///   explicit user action (Web UI / CLI config change) — never in a hot path.
+/// - Agent execution reads the engine once at the start of `execute()` and
+///   uses the same `Arc<OxiosEngine>` for the entire run (consistent within one execution).
+pub struct EngineHandle {
+    inner: parking_lot::RwLock<Arc<OxiosEngine>>,
+}
+
+impl EngineHandle {
+    /// Create a new handle wrapping the given engine.
+    pub fn new(engine: Arc<OxiosEngine>) -> Self {
+        Self {
+            inner: parking_lot::RwLock::new(engine),
+        }
+    }
+
+    /// Get a snapshot of the current engine.
+    ///
+    /// The returned `Arc` is stable — it won't change even if another thread
+    /// calls `swap()` concurrently.
+    pub fn get(&self) -> Arc<OxiosEngine> {
+        Arc::clone(&self.inner.read())
+    }
+
+    /// Atomically replace the engine with a new one.
+    ///
+    /// Callers should rebuild `OxiosEngine` with updated credentials/model
+    /// before calling this.
+    pub fn swap(&self, new_engine: OxiosEngine) {
+        let mut guard = self.inner.write();
+        let old_id = guard.default_model_id().to_string();
+        *guard = Arc::new(new_engine);
+        tracing::info!(
+            old_model = %old_id,
+            new_model = %guard.default_model_id(),
+            "Engine hot-swapped"
+        );
+    }
+}
+
+impl std::fmt::Debug for EngineHandle {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let engine = self.inner.read();
+        f.debug_struct("EngineHandle")
+            .field("current_model", &engine.default_model_id())
+            .finish()
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -366,5 +432,46 @@ mod tests {
         let provider: &dyn EngineProvider = &engine;
         assert!(provider.create_provider("anthropic").is_ok());
         assert!(provider.resolve_model("openai/gpt-4o").is_ok());
+    }
+
+    // ── EngineHandle tests ──
+
+    #[test]
+    fn test_engine_handle_get_returns_current() {
+        let engine = OxiosEngine::new("anthropic/claude-sonnet-4-20250514");
+        let handle = EngineHandle::new(Arc::new(engine));
+        let e = handle.get();
+        assert_eq!(e.default_model_id(), "anthropic/claude-sonnet-4-20250514");
+    }
+
+    #[test]
+    fn test_engine_handle_swap_updates() {
+        let engine = OxiosEngine::new("anthropic/claude-sonnet-4-20250514");
+        let handle = EngineHandle::new(Arc::new(engine));
+
+        let new_engine = OxiosEngine::new("openai/gpt-4o");
+        handle.swap(new_engine);
+
+        let e = handle.get();
+        assert_eq!(e.default_model_id(), "openai/gpt-4o");
+    }
+
+    #[test]
+    fn test_engine_handle_swap_preserves_old_arc() {
+        // An Arc obtained before swap should remain valid.
+        let engine = OxiosEngine::new("anthropic/claude-sonnet-4-20250514");
+        let handle = EngineHandle::new(Arc::new(engine));
+
+        let old = handle.get();
+        assert_eq!(old.default_model_id(), "anthropic/claude-sonnet-4-20250514");
+
+        handle.swap(OxiosEngine::new("openai/gpt-4o"));
+
+        // `old` still points to the pre-swap engine.
+        assert_eq!(old.default_model_id(), "anthropic/claude-sonnet-4-20250514");
+
+        // New get() returns the swapped engine.
+        let current = handle.get();
+        assert_eq!(current.default_model_id(), "openai/gpt-4o");
     }
 }

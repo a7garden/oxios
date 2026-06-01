@@ -25,8 +25,8 @@
 //! // queue.complete("task-1", WorkResult { output: "...".into(), success: true });
 //! ```
 
-pub use oxi_sdk::{
-    Consensus, CoordinatedGroup, CoordinatedGroupBuilder, GroupResult, MemoryEntry, MemoryEvent,
-    MemoryKey, SharedMemory, VoteResult, WorkEvent, WorkItem, WorkQueue, WorkQueueConfig,
-    WorkQueueStats, WorkResult, WorkStatus,
-};
+// Re-exports removed (#11) — use `oxi_sdk::` directly for coordination primitives.
+// The types available: Consensus, CoordinatedGroup, CoordinatedGroupBuilder,
+// GroupResult, MemoryEntry, MemoryEvent, MemoryKey, SharedMemory, VoteResult,
+// WorkEvent, WorkItem, WorkQueue, WorkQueueConfig, WorkQueueStats, WorkResult,
+// WorkStatus.

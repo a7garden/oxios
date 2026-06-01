@@ -26,7 +26,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
   if (isTool) {
     return (
       <div className="flex gap-3 my-1">
-        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted">
           <span className="text-xs">🔧</span>
         </div>
         <div className="flex-1">
@@ -46,7 +46,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
   }
 
   return (
-    <div className={`flex gap-3 ${isUser ? 'justify-end' : ''}`}>
+    <div className={`flex gap-3 my-1.5 ${isUser ? 'justify-end' : ''}`}>
       {!isUser && (
         <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
           <Bot className="h-4 w-4" />
@@ -68,7 +68,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
             </div>
           )}
         </div>
-        <div className="flex items-center gap-2 mt-0.5">
+        <div className="flex items-center gap-2 mt-1.5">
           {relTime && <span className="text-[10px] text-muted-foreground">{relTime}</span>}
           {!isUser && <ChatMetadata message={message} />}
         </div>

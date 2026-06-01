@@ -2,6 +2,7 @@ import { Search, X } from 'lucide-react'
 import { useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Input } from '@/components/ui/input'
+import { cn } from '@/lib/utils'
 
 interface SearchBarProps {
   value: string
@@ -15,7 +16,7 @@ export function SearchBar({ value, onChange, placeholder, className }: SearchBar
   const inputRef = useRef<HTMLInputElement>(null)
 
   return (
-    <div className={`relative flex-1 max-w-sm ${className ?? ''}`}>
+    <div className={cn('relative flex-1 max-w-sm', className)}>
       <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
       <Input
         ref={inputRef}

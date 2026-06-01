@@ -32,7 +32,7 @@ export function DreamPanel() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 flex-wrap">
             <Badge variant={status?.running ? 'default' : 'secondary'}>
               {status?.running
                 ? t('memory.dreamRunning')

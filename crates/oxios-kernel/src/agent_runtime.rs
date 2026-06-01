@@ -40,7 +40,7 @@ use crate::audit_trail::AuditTrail;
 use crate::capability::resolve::resolve_cspace;
 use crate::engine::OxiosEngine;
 use crate::memory::{MemoryEntry, MemoryManager, MemoryType};
-use crate::persona_manager::PersonaManager;
+use crate::persona::PersonaManager;
 use crate::tools::registration::register_tools_from_cspace_gated;
 
 use crate::session_context::SessionContext;
@@ -133,9 +133,10 @@ struct ExecuteState {
 /// builds a ToolRegistry based on the agent's CSpace, and runs it to completion.
 ///
 /// All OS-level access goes through `KernelHandle` — the single syscall table
-/// for agent control. Provider/model resolution goes through `OxiosEngine`.
+/// for agent control. Provider/model resolution goes through `EngineHandle`,
+/// which returns the latest `OxiosEngine` (hot-swapped on config change).
 pub struct AgentRuntime {
-    engine: Arc<OxiosEngine>,
+    engine_handle: Arc<crate::engine::EngineHandle>,
     config: AgentRuntimeConfig,
     /// Single path to all kernel services.
     kernel_handle: Arc<KernelHandle>,
@@ -148,18 +149,18 @@ pub struct AgentRuntime {
 }
 
 impl AgentRuntime {
-    /// Creates a new agent runtime with engine and kernel access.
+    /// Creates a new agent runtime with engine handle and kernel access.
     ///
-    /// Provider/model resolution goes through `engine`.
+    /// Provider/model resolution goes through `engine_handle` (hot-swapped on config change).
     /// Tool access goes through `kernel_handle`.
     pub fn new(
-        engine: Arc<OxiosEngine>,
+        engine_handle: Arc<crate::engine::EngineHandle>,
         model_id: impl Into<String>,
         kernel_handle: Arc<KernelHandle>,
         routing_stats: Option<Arc<crate::kernel_handle::RoutingStats>>,
     ) -> Self {
         Self {
-            engine,
+            engine_handle,
             config: AgentRuntimeConfig {
                 model_id: model_id.into(),
                 ..Default::default()
@@ -336,7 +337,9 @@ impl AgentRuntime {
         }
 
         // Resolve model from engine (provider resolution happens inside AgentBuilder).
-        let _model = self.engine.resolve_model(&self.config.model_id)?;
+        // Get the latest engine — may have been hot-swapped via Web UI config change.
+        let engine = self.engine_handle.get();
+        let _model = engine.resolve_model(&self.config.model_id)?;
         let seed_id = seed.id;
 
         // Build the agent.
@@ -350,7 +353,7 @@ impl AgentRuntime {
         let (final_content, steps_completed, success, _agent) = {
             run_agent(
                 &config,
-                &self.engine,
+                &engine,
                 kernel_handle,
                 system_prompt,
                 prompt,

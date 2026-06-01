@@ -948,12 +948,42 @@ pub struct MarketplaceConfig {
     /// Whether the marketplace is enabled.
     #[serde(default = "default_true")]
     pub enabled: bool,
+    /// Skills.sh (Vercel Labs ecosystem) configuration.
+    #[serde(default)]
+    pub skills_sh: SkillsShConfig,
+}
+
+/// Skills.sh registry configuration.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct SkillsShConfig {
+    /// Base URL for the Skills.sh API.
+    /// Defaults to `https://skills.sh`.
+    #[serde(default)]
+    pub base_url: Option<String>,
+    /// API key for Skills.sh authentication.
+    /// Falls back to `SKILLS_SH_TOKEN` env var if not set.
+    #[serde(default)]
+    pub api_key: Option<String>,
+    /// Whether Skills.sh integration is enabled.
+    #[serde(default = "default_true")]
+    pub enabled: bool,
 }
 
 impl Default for MarketplaceConfig {
     fn default() -> Self {
         Self {
             base_url: Some("https://clawhub.ai".to_string()),
+            enabled: true,
+            skills_sh: SkillsShConfig::default(),
+        }
+    }
+}
+
+impl Default for SkillsShConfig {
+    fn default() -> Self {
+        Self {
+            base_url: None,
+            api_key: None,
             enabled: true,
         }
     }

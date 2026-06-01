@@ -27,7 +27,7 @@ export function MemoryCard({ memory, onClick }: MemoryCardProps) {
             <Pin className="h-3 w-3 text-muted-foreground" />
           )}
         </div>
-        <p className="text-sm line-clamp-2">
+        <p className="text-sm line-clamp-2 break-words">
           {memory.content?.slice(0, 120) || memory.key}
         </p>
         <div className="flex items-center justify-between text-xs text-muted-foreground">

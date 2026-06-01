@@ -99,7 +99,7 @@ pub struct Orchestrator {
     /// Orchestrator configuration (Ouroboros protocol settings).
     delegation_config: DelegationConfig,
     /// A2A circuit breaker for delegation reliability.
-    a2a_breaker: Arc<crate::a2a_circuit_breaker::A2ACircuitBreaker>,
+    a2a_breaker: Arc<crate::a2a::circuit_breaker::A2ACircuitBreaker>,
     /// Evolution loop settings.
     evolution_config: EvolutionConfig,
 }
@@ -196,7 +196,7 @@ impl Orchestrator {
             project_manager: RwLock::new(None),
             conversation_buffer: RwLock::new(ConversationBuffer::default()),
             delegation_config: DelegationConfig::default(),
-            a2a_breaker: Arc::new(crate::a2a_circuit_breaker::A2ACircuitBreaker::new(5, 30)),
+            a2a_breaker: Arc::new(crate::a2a::circuit_breaker::A2ACircuitBreaker::new(5, 30)),
             evolution_config,
         }
     }
@@ -233,11 +233,86 @@ impl Orchestrator {
         self.git_layer = Some(git_layer);
     }
 
-    /// Restore sessions from persisted state (stub).
+    /// Restore sessions from persisted state.
     ///
-    /// TODO: Implement session persistence restoration.
+    /// Loads sessions from the `StateStore` that have an `active_seed_id`
+    /// (meaning they are mid-orchestration) and repopulates the in-memory
+    /// interview session map so that follow-up messages can continue
+    /// the conversation.
     pub async fn restore_sessions(&self) {
-        // Stub — not yet implemented
+        let summaries = match self.state_store.list_sessions().await {
+            Ok(s) => s,
+            Err(e) => {
+                tracing::warn!(error = %e, "Failed to list sessions for restore");
+                return;
+            }
+        };
+
+        let mut restored = 0usize;
+        for summary in &summaries {
+            // Only restore sessions that are mid-orchestration (have an active seed).
+            let Some(ref seed_id_str) = summary.active_seed_id else {
+                continue;
+            };
+
+            let session_id = crate::state_store::SessionId(summary.id.clone());
+            let session = match self.state_store.load_session(&session_id).await {
+                Ok(Some(s)) => s,
+                Ok(None) => continue,
+                Err(e) => {
+                    tracing::warn!(
+                        session_id = %summary.id,
+                        error = %e,
+                        "Failed to load session for restore"
+                    );
+                    continue;
+                }
+            };
+
+            // Reconstruct an InterviewSession from the persisted data.
+            // The interview result is rebuilt from conversation history so
+            // that multi-turn context is available on follow-up messages.
+            let mut interview = oxios_ouroboros::InterviewResult::new();
+            interview.is_task = true; // Has active seed → was a task.
+            interview.original_message = session
+                .user_messages
+                .last()
+                .map(|m| m.content.clone())
+                .unwrap_or_default();
+
+            // Rebuild conversation history from user/agent exchanges.
+            let history: Vec<oxios_ouroboros::interview::Exchange> = session
+                .user_messages
+                .iter()
+                .zip(session.agent_responses.iter())
+                .map(|(user, agent)| oxios_ouroboros::interview::Exchange {
+                    user: user.content.clone(),
+                    agent: agent.content.clone(),
+                })
+                .collect();
+            interview.conversation_history = history;
+
+            let seed_id = seed_id_str.parse::<Uuid>().ok();
+
+            let interview_session = InterviewSession {
+                id: session.id.0.clone(),
+                interview,
+                phase: Phase::Execute,
+                seed_id,
+                agent_id: None,
+            };
+
+            {
+                let mut sessions = self.sessions.write();
+                sessions.insert(session.id.0.clone(), interview_session);
+            }
+
+            restored += 1;
+        }
+
+        if restored > 0 {
+            tracing::info!(restored, total = summaries.len(), "Sessions restored");
+        }
     }
 
     /// Commit a file to git if GitLayer is configured and enabled.

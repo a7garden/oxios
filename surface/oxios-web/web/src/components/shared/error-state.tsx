@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next'
+import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
 interface ErrorStateProps {
@@ -25,13 +26,13 @@ export function ErrorState({
       <h3 className="text-lg font-semibold text-destructive">{resolvedTitle}</h3>
       <p className="mt-1 text-sm text-muted-foreground max-w-md">{resolvedMessage}</p>
       {onRetry && (
-        <button
-          type="button"
+        <Button
+          variant="default"
           onClick={onRetry}
-          className="mt-4 rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground hover:bg-primary/90"
+          className="mt-4"
         >
           {t('common.retry')}
-        </button>
+        </Button>
       )}
     </div>
   )

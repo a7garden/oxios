@@ -57,7 +57,7 @@ export function ToolList() {
       ) : (
         Object.entries(grouped).map(([server, serverTools]) => (
           <div key={server} className="space-y-1">
-            <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider px-1">
+            <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider px-2">
               {server} ({serverTools.length})
             </h3>
             <div className="space-y-1">
@@ -81,7 +81,7 @@ export function ToolList() {
                       </span>
                     </button>
                     {isExpanded && (
-                      <div className="border-t px-3 pb-3">
+                      <div className="border-t px-3 pt-3 pb-3">
                         <ToolDetail tool={tool} />
                       </div>
                     )}

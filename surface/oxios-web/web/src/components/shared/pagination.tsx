@@ -1,6 +1,7 @@
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
+import { Select } from '@/components/ui/select'
 
 interface PaginationProps {
   page: number
@@ -44,15 +45,13 @@ export function Pagination({ page, limit, total, onPageChange, onLimitChange, ma
     <div className="flex items-center justify-between px-2 py-2 text-sm text-muted-foreground">
       <div className="flex items-center gap-2">
         {onLimitChange && (
-          <select
-            value={limit}
-            onChange={(e) => onLimitChange(Number(e.target.value))}
-            className="h-8 rounded border bg-transparent px-1 text-xs"
-          >
-            {[10, 20, 50, 100].map((n) => (
-              <option key={n} value={n}>{n} / page</option>
-            ))}
-          </select>
+          <Select
+            value={String(limit)}
+            onValueChange={(v) => onLimitChange(Number(v))}
+            placeholder={String(limit)}
+            options={[10, 20, 50, 100].map((n) => ({ label: `${n} / page`, value: String(n) }))}
+            className="h-8 w-24"
+          />
         )}
         <span>
           {t('dataTable.showing', 'Showing')} {start}–{end} {t('dataTable.of', 'of')} {total}

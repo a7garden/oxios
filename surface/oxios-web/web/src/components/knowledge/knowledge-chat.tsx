@@ -124,10 +124,10 @@ export async function msgHash(raw: string): Promise<string> {
 // ── Checklist targets ─────────────────────────────────────────
 
 const CHECKLIST_TARGETS = [
-  { label: 'Later', icon: Clock, path: 'Later.md' },
-  { label: 'Read', icon: Newspaper, path: 'Read.md' },
-  { label: 'Shop', icon: ShoppingCart, path: 'Shop.md' },
-  { label: 'Watch', icon: Tv, path: 'Watch.md' },
+  { labelKey: 'knowledge.later', icon: Clock, path: 'Later.md' },
+  { labelKey: 'knowledge.read', icon: Newspaper, path: 'Read.md' },
+  { labelKey: 'knowledge.shop', icon: ShoppingCart, path: 'Shop.md' },
+  { labelKey: 'knowledge.watch', icon: Tv, path: 'Watch.md' },
 ] as const
 
 // ── Component ─────────────────────────────────────────────────
@@ -173,7 +173,7 @@ export function KnowledgeChat() {
     if (!el) return
     el.style.height = 'auto'
     el.style.height = `${Math.min(el.scrollHeight, 160)}px`
-  }, [])
+  }, [input])
 
   // ── Send / shortcuts ──────────────────────────────────────
 
@@ -351,18 +351,18 @@ export function KnowledgeChat() {
             onClick={bulkMoveToJournal}
           >
             <BookOpen className="h-3 w-3 mr-1" />
-            Journal
+            {t('knowledge.toJournal')}
           </Button>
-          {CHECKLIST_TARGETS.map((t) => (
+          {CHECKLIST_TARGETS.map((ct) => (
             <Button
-              key={t.path}
+              key={ct.path}
               variant="ghost"
               size="sm"
               className="h-7 px-2 text-xs shrink-0"
-              onClick={() => bulkMoveToChecklist(t.path)}
+              onClick={() => bulkMoveToChecklist(ct.path)}
             >
-              <t.icon className="h-3 w-3 mr-1" />
-              {t.label}
+              <ct.icon className="h-3 w-3 mr-1" />
+              {t(ct.labelKey)}
             </Button>
           ))}
           <div className="flex-1 min-w-4" />
@@ -373,7 +373,7 @@ export function KnowledgeChat() {
             onClick={bulkDelete}
           >
             <Trash2 className="h-3 w-3 mr-1" />
-            Delete
+            {t('common.delete')}
           </Button>
         </div>
       )}
@@ -386,7 +386,7 @@ export function KnowledgeChat() {
           <div className="flex flex-col items-center text-muted-foreground py-16">
             <MessageSquare className="h-10 w-10 opacity-20 mb-4" />
             <p className="font-medium text-foreground">{t('knowledge.noFilesYet')}</p>
-            <p className="text-sm mt-1">Drop whatever's on your mind here</p>
+            <p className="text-sm mt-1">{t('knowledge.dropMindHint')}</p>
           </div>
         ) : (
           <div className="space-y-6">
@@ -482,19 +482,19 @@ export function KnowledgeChat() {
                             </Button>
 
                             {/* Checklist targets */}
-                            {CHECKLIST_TARGETS.map((t) => (
+                            {CHECKLIST_TARGETS.map((ct) => (
                               <Button
-                                key={t.path}
+                                key={ct.path}
                                 variant="ghost"
                                 size="icon"
                                 className="h-6 w-6"
-                                title={`To ${t.label}`}
+                                title={t(ct.labelKey)}
                                 onClick={(e) => {
                                   e.stopPropagation()
-                                  moveToChecklist(t.path, msg)
+                                  moveToChecklist(ct.path, msg)
                                 }}
                               >
-                                <t.icon className="h-3.5 w-3.5" />
+                                <ct.icon className="h-3.5 w-3.5" />
                               </Button>
                             ))}
 

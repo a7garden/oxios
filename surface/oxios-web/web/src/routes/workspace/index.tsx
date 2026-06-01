@@ -240,7 +240,7 @@ function WorkspacePage() {
   if (rootError) return <ErrorState onRetry={() => refetchRoot()} />
 
   return (
-    <div className="flex flex-col h-[calc(100vh-4rem)] gap-4">
+    <div className="flex flex-col h-full gap-4">
       {/* Header */}
       <div className="flex items-center justify-between shrink-0">
         <div>

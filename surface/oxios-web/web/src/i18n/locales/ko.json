@@ -222,6 +222,11 @@
     "saveOptions": "옵션 저장",
     "update": "업데이트",
     "updateDescription": "Oxios 바이너리 및 웹 UI 버전 관리",
+    "groupCore": "코어",
+    "groupAi": "AI",
+    "groupAiRuntime": "AI 런타임",
+    "groupInfra": "인프라",
+    "groupSystem": "시스템",
     "routing": {
       "title": "라우팅",
       "desc": "자동 모델 선택 및 fallback 설정",
@@ -371,7 +376,18 @@
     "selected": "선택됨",
     "linkGraphTitle": "링크 그래프",
     "habitsTitle": "습관",
-    "knowledgeSettings": "지식 설정"
+    "knowledgeSettings": "지식 설정",
+    "itemsCompleted": "완료된 항목",
+    "nothingCompletedToday": "아직 완료한 항목이 없습니다",
+    "rawReport": "원시 보고서",
+    "dropMindHint": "머릿속 생각을 자유롭게 적어보세요",
+    "later": "나중에",
+    "read": "읽기",
+    "shop": "쇼핑",
+    "watch": "시청",
+    "habitSkipped": "건너뜀",
+    "habitCompleted": "완료",
+    "habitWeekend": "주말 완료"
   },
   "chat": {
     "title": "채팅",

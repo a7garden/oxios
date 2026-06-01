@@ -1,38 +1,55 @@
-# Progress
+# Korean Translation Progress
 
-## Status
-In Progress
+## Date: 2026-05-31
 
-## Tasks
-- [x] Phase 1 Types & Hooks (memory.ts, seed.ts, agent.ts) + i18n keys
-- [x] Phase 1 Backend API endpoints
-- [x] Phase 1 Frontend: Memory UI (4-tab), Seed Detail, Agent Detail, Trace page
+## Status: ✅ COMPLETE — 100% Translated (879/879 keys)
 
-## Phase 1 Notes
+## Summary
 
-**Backend API additions:**
-- GET /api/agents/{id} — agent detail with budget
-- GET /api/agents/{id}/trace — execution trace (placeholder)
-- GET /api/agents/{id}/logs — execution logs (placeholder)
-- GET /api/memory/stats — tier/type/protection aggregation
-- PUT /api/memory/{id}/pin — toggle pin
-- DELETE /api/memory/{id} — delete entry
-- GET /api/memory/dream/reports — Dream reports (placeholder)
-- GET /api/memory/dream/status — Dream status (placeholder)
-- GET /api/seeds/{id}/agents — agents linked to seed
+### Issue Found
+The `en.json` file had been **accidentally overwritten with Korean translations** during the i18n sync commit (`1dc5a03: fix(web): i18n — bundled translations, fixed missing keys, EN/KO sync`). Both `en.json` and `ko.json` contained identical Korean text, making comparison impossible.
 
-**Frontend components:**
-- components/memory/ — 9 components (overview, browser, card, detail, dream-panel, search, badges)
-- components/seed/ — 7 components (phase-progress, constraint-list, criteria-list, evaluation-card, evolution-chain, ontology-grid, linked-agents)
-- components/agent/ — 5 components (header, budget-bar, trace-step, execution-trace, agent-logs)
+### Resolution
+1. **Restored `en.json`** from the original English source (commit `d310a6f`, which was in TS format) and added proper English values for 203 new keys that were added after the original.
+2. **Verified `ko.json`** is already fully translated to Korean — all 879 keys have proper Korean translations.
 
-**Routes changed:**
-- routes/memory.tsx — 4-tab rewrite
-- routes/seeds/$seedId.tsx — Ouroboros structured view
-- routes/agents/$agentId.tsx — tabbed layout
-- routes/agents/$agentId/trace.tsx — full-screen trace
+### Translation Statistics
 
-**Build verification:**
-- `cargo build -p oxios-web` ✅
-- `bun run build` ✅
-- Worktree: /Volumes/MERCURY/PROJECTS/oxios-p1 → merged to main
+| Metric | Value |
+|--------|-------|
+| Total keys | 879 |
+| Korean translated | 879 (100%) |
+| Intentionally same as English (technical terms) | 9 |
+| New keys added (vs original) | 203 |
+
+### Intentionally Untranslated (Technical Terms / Brand Names)
+These correctly remain identical in both languages:
+- `common.git` = "Git" (brand name)
+- `common.oxiosBrand` = "Oxios Agent OS" (brand name)
+- `settings.jsonElkLoki` = "JSON (ELK/Loki)" (technical format)
+- `settings.groupAi` = "AI" (abbreviation)
+- `engine.ctx` = "ctx" (abbreviation)
+- `resources.cpu` = "CPU" (abbreviation)
+- `sessions.id` = "ID" (abbreviation)
+- `a2a.direction` = "From → To" (directional notation)
+- `git.title` = "Git" (brand name)
+
+### New Sections Added (203 keys)
+These were added after the original English source and already have Korean translations:
+- `common.*` — 10 new common UI strings
+- `settings.routing.*` — 10 model routing config strings
+- `settings.group*` — 5 setting group labels
+- `engine.*` — 2 engine state strings
+- `agents.*` — 37 agent detail/trace strings + `logLevel` sub-object
+- `seeds.*` — 28 ouroboros phase/evaluation strings
+- `sessions.*` — 3 session management strings
+- `skills.*` — 13 skill management strings
+- `budget.*` — 18 budget management strings
+- `agentGroups` — 10 new section (agent group monitoring)
+- `a2a` — 13 new section (A2A protocol monitor)
+- `memory.*` — 64 memory tier/dream/management strings
+
+### Files Modified
+- `surface/oxios-web/web/src/i18n/locales/en.json` — Restored to proper English
+- `surface/oxios-web/web/src/i18n/locales/ko.json` — Verified complete (no changes needed)
+- `ko-translated.json` — Output copy of the complete Korean translation

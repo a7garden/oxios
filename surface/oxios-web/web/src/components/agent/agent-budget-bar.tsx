@@ -13,7 +13,7 @@ export function AgentBudgetBar({ agent }: BudgetBarProps) {
   const costUsed = agent.cost_usd ?? 0
 
   return (
-    <div className="flex gap-4 text-xs text-muted-foreground">
+    <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
       <span>
         {t('agents.tokens')}: {tokensUsed.toLocaleString()}
       </span>

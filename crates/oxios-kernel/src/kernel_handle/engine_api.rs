@@ -163,28 +163,123 @@ pub fn estimate_cost(model_id: &str, input_tokens: u64, output_tokens: u64) -> f
 
 // ── Provider/Model response types ──────────────────────────────────────────
 
+/// Provider category for UI grouping.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ProviderCategory {
+    /// Major providers (Anthropic, OpenAI, Google).
+    Major,
+    /// Open / specialty providers (Groq, OpenRouter, DeepSeek, etc.).
+    Open,
+    /// Regional providers.
+    Regional,
+    /// Local / self-hosted providers.
+    Local,
+}
+
+/// Known provider categories.
+const PROVIDER_CATEGORIES: &[(&str, ProviderCategory)] = &[
+    ("anthropic", ProviderCategory::Major),
+    ("openai", ProviderCategory::Major),
+    ("google", ProviderCategory::Major),
+    ("groq", ProviderCategory::Open),
+    ("openrouter", ProviderCategory::Open),
+    ("deepseek", ProviderCategory::Open),
+    ("mistral", ProviderCategory::Open),
+    ("xai", ProviderCategory::Open),
+    ("cerebras", ProviderCategory::Open),
+    ("fireworks", ProviderCategory::Open),
+    ("github-copilot", ProviderCategory::Open),
+    ("huggingface", ProviderCategory::Open),
+    ("together", ProviderCategory::Open),
+    ("perplexity", ProviderCategory::Open),
+    ("cohere", ProviderCategory::Open),
+];
+
+fn provider_category(id: &str) -> ProviderCategory {
+    PROVIDER_CATEGORIES
+        .iter()
+        .find(|(name, _)| *name == id)
+        .map(|(_, cat)| *cat)
+            .unwrap_or(ProviderCategory::Open)
+}
+
+/// Known provider display names.
+const PROVIDER_DISPLAY_NAMES: &[(&str, &str)] = &[
+    ("anthropic", "Anthropic"),
+    ("openai", "OpenAI"),
+    ("google", "Google Gemini"),
+    ("groq", "Groq"),
+    ("openrouter", "OpenRouter"),
+    ("deepseek", "DeepSeek"),
+    ("mistral", "Mistral"),
+    ("xai", "xAI (Grok)"),
+    ("cerebras", "Cerebras"),
+    ("fireworks", "Fireworks"),
+    ("github-copilot", "GitHub Copilot"),
+    ("huggingface", "Hugging Face"),
+    ("together", "Together AI"),
+    ("perplexity", "Perplexity"),
+    ("cohere", "Cohere"),
+];
+
+fn provider_display_name(id: &str) -> String {
+    PROVIDER_DISPLAY_NAMES
+        .iter()
+        .find(|(name, _)| *name == id)
+        .map(|(_, display)| display.to_string())
+        .unwrap_or_else(|| {
+            // Title-case the ID as fallback
+            let mut s = id.to_string();
+            if let Some(first) = s.get_mut(0..1) {
+                first.make_ascii_uppercase();
+            }
+            s
+        })
+}
+
 /// Summary of an LLM provider.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ProviderInfo {
     /// Provider identifier (e.g. "anthropic", "openai").
     pub id: String,
+    /// Human-readable display name.
+    pub name: String,
+    /// Category for UI grouping.
+    pub category: ProviderCategory,
     /// Number of models available for this provider.
     pub model_count: usize,
     /// Whether an API key is currently configured.
     pub has_key: bool,
 }
 
+/// Input modality for a model.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum InputModality {
+    /// Text input.
+    Text,
+    /// Image input (vision).
+    Image,
+}
+
 /// Summary of a model from the catalog.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ModelInfo {
     /// Full model ID: "provider/model-id".
     pub id: String,
     /// Human-readable model name.
     pub name: String,
+    /// API protocol used by the model's provider.
+    pub api: String,
     /// Provider name.
     pub provider: String,
     /// Whether this model supports reasoning/thinking.
     pub reasoning: bool,
+    /// Supported input modalities.
+    pub input: Vec<InputModality>,
     /// Maximum context window in tokens.
     pub context_window: u32,
     /// Maximum output tokens.
@@ -193,6 +288,10 @@ pub struct ModelInfo {
     pub cost_input: f64,
     /// Cost per million output tokens (USD).
     pub cost_output: f64,
+    /// Cost per million cached read tokens (USD).
+    pub cost_cache_read: f64,
+    /// Cost per million cached write tokens (USD).
+    pub cost_cache_write: f64,
 }
 
 impl From<&oxi_sdk::ModelEntry> for ModelInfo {
@@ -200,12 +299,24 @@ impl From<&oxi_sdk::ModelEntry> for ModelInfo {
         Self {
             id: format!("{}/{}", entry.provider, entry.id),
             name: entry.name.to_string(),
+            api: entry.api.to_string(),
             provider: entry.provider.to_string(),
             reasoning: entry.reasoning,
+            input: entry
+                .input
+                .iter()
+                .map(|m| match m {
+                    oxi_sdk::InputModality::Text => InputModality::Text,
+                    oxi_sdk::InputModality::Image => InputModality::Image,
+                    _ => InputModality::Text,
+                })
+                .collect(),
             context_window: entry.context_window,
             max_tokens: entry.max_tokens,
             cost_input: entry.cost_input,
             cost_output: entry.cost_output,
+            cost_cache_read: entry.cost_cache_read,
+            cost_cache_write: entry.cost_cache_write,
         }
     }
 }
@@ -243,10 +354,16 @@ pub struct ValidateKeyResult {
 /// Holds a shared reference to the live config (behind `RwLock`) and the
 /// path to config.toml so write operations can persist to disk.
 /// Routing stats are shared with `AgentRuntime` via `Arc<RoutingStats>`.
+///
+/// When config writes change the model or API key, `EngineApi` rebuilds
+/// `OxiosEngine` via [`EngineHandle`] so the runtime picks up the change
+/// on the next agent execution (hot-swap, no restart required).
 pub struct EngineApi {
     config: Arc<RwLock<OxiosConfig>>,
     config_path: PathBuf,
     routing_stats: Arc<RoutingStats>,
+    /// Hot-swap handle — config writes rebuild `OxiosEngine` and swap it in.
+    engine_handle: Arc<crate::engine::EngineHandle>,
 }
 
 impl EngineApi {
@@ -255,21 +372,29 @@ impl EngineApi {
     /// - `config` — shared config store (backed by RwLock)
     /// - `config_path` — path to config.toml for persistence
     /// - `routing_stats` — shared stats tracker (shared with AgentRuntime)
+    /// - `engine_handle` — hot-swap handle for live engine replacement
     pub fn new(
         config: Arc<RwLock<OxiosConfig>>,
         config_path: PathBuf,
         routing_stats: Arc<RoutingStats>,
+        engine_handle: Arc<crate::engine::EngineHandle>,
     ) -> Self {
         Self {
             config,
             config_path,
             routing_stats,
+            engine_handle,
         }
     }
 
     /// Get the shared `RoutingStats` reference (for `AgentRuntime` wiring).
     pub fn routing_stats(&self) -> Arc<RoutingStats> {
         Arc::clone(&self.routing_stats)
+    }
+
+    /// Get a reference to the engine handle.
+    pub fn engine_handle(&self) -> &Arc<crate::engine::EngineHandle> {
+        &self.engine_handle
     }
 
     // ── Read operations ────────────────────────────────────────────────
@@ -309,6 +434,8 @@ impl EngineApi {
                 );
                 ProviderInfo {
                     id: p.to_string(),
+                    name: provider_display_name(p),
+                    category: provider_category(p),
                     model_count,
                     has_key,
                 }
@@ -395,8 +522,8 @@ impl EngineApi {
 
     /// Set the default model in config.toml.
     ///
-    /// Updates both the in-memory config and the on-disk file.
-    /// No runtime hot-swap — the model change takes effect on next request.
+    /// Updates both the in-memory config and the on-disk file, then
+    /// hot-swaps the runtime engine so the next agent execution uses the new model.
     pub fn set_model(&self, model_id: &str) -> anyhow::Result<()> {
         {
             let mut cfg = self.config.write();
@@ -404,6 +531,7 @@ impl EngineApi {
             self.persist(&cfg)?;
         }
         tracing::info!(model = %model_id, "Default model updated in config");
+        self.rebuild_and_swap();
         Ok(())
     }
 
@@ -411,7 +539,7 @@ impl EngineApi {
     ///
     /// Stores the key via CredentialStore (→ ~/.oxi/auth.json) and also
     /// updates config.toml's `[engine].api_key` when the provider matches
-    /// the current default model.
+    /// the current default model. Hot-swaps the runtime engine afterward.
     pub fn set_api_key(&self, provider: &str, key: &str) -> anyhow::Result<()> {
         CredentialStore::store(provider, key)?;
 
@@ -428,6 +556,7 @@ impl EngineApi {
             }
         }
         tracing::info!(provider = %provider, "API key stored");
+        self.rebuild_and_swap();
         Ok(())
     }
 
@@ -464,6 +593,7 @@ impl EngineApi {
             self.persist(&cfg)?;
         }
         tracing::info!("Routing configuration updated via API");
+        self.rebuild_and_swap();
         Ok(())
     }
 
@@ -540,6 +670,19 @@ impl EngineApi {
         std::fs::write(&self.config_path, content)?;
         Ok(())
     }
+
+    /// Rebuild `OxiosEngine` from current config and swap into the handle.
+    ///
+    /// This is cheap (~3μs): `OxiBuilder` populates registries from static
+    /// `model_db` data. No network calls, no I/O beyond what `CredentialStore`
+    /// already caches in memory.
+    fn rebuild_and_swap(&self) {
+        let cfg = self.config.read();
+        let model_id = &cfg.engine.default_model;
+        let new_engine = crate::engine::OxiosEngine::from_config(model_id, cfg.api_key().as_deref());
+        drop(cfg);
+        self.engine_handle.swap(new_engine);
+    }
 }
 
 impl std::fmt::Debug for EngineApi {
@@ -572,12 +715,15 @@ mod tests {
     fn test_provider_info_serialization() {
         let info = ProviderInfo {
             id: "anthropic".to_string(),
+            name: "Anthropic".to_string(),
+            category: ProviderCategory::Major,
             model_count: 15,
             has_key: true,
         };
         let json = serde_json::to_string(&info).unwrap();
         let restored: ProviderInfo = serde_json::from_str(&json).unwrap();
         assert_eq!(restored.id, "anthropic");
+        assert_eq!(restored.name, "Anthropic");
         assert_eq!(restored.model_count, 15);
         assert!(restored.has_key);
     }
@@ -587,18 +733,24 @@ mod tests {
         let info = ModelInfo {
             id: "anthropic/claude-sonnet-4".to_string(),
             name: "Claude Sonnet 4".to_string(),
+            api: "anthropic-messages".to_string(),
             provider: "anthropic".to_string(),
             reasoning: true,
+            input: vec![InputModality::Text, InputModality::Image],
             context_window: 200000,
             max_tokens: 16000,
             cost_input: 3.0,
             cost_output: 15.0,
+            cost_cache_read: 0.3,
+            cost_cache_write: 3.75,
         };
         let json = serde_json::to_string(&info).unwrap();
         let restored: ModelInfo = serde_json::from_str(&json).unwrap();
         assert_eq!(restored.id, "anthropic/claude-sonnet-4");
         assert!(restored.reasoning);
         assert_eq!(restored.context_window, 200000);
+        assert!(restored.input.contains(&InputModality::Image));
+        assert_eq!(restored.api, "anthropic-messages");
     }
 
     #[test]

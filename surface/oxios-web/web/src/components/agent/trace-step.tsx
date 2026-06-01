@@ -29,7 +29,7 @@ export function TraceStepCard({ step }: TraceStepProps) {
         }}
       >
         <div className={`w-2 h-2 rounded-full ${statusColor}`} />
-        <Badge variant="outline" className="text-xs font-mono">
+        <Badge variant="outline" className="text-xs font-mono truncate min-w-0 max-w-[180px]">
           {step.tool_name || step.action}
         </Badge>
         <span className="text-xs text-muted-foreground flex items-center gap-1">
@@ -42,7 +42,7 @@ export function TraceStepCard({ step }: TraceStepProps) {
         <div className="border-t px-3 py-2 space-y-2 bg-muted/30">
           <div>
             <p className="text-xs font-medium text-muted-foreground mb-1">Input</p>
-            <pre className="text-xs bg-muted rounded p-2 overflow-x-auto whitespace-pre-wrap">
+            <pre className="text-xs bg-muted rounded p-2 overflow-x-auto whitespace-pre-wrap max-h-48 overflow-y-auto">
               {typeof step.input === 'string' ? step.input : JSON.stringify(step.input, null, 2)}
             </pre>
           </div>

@@ -20,7 +20,7 @@ export function ChatMetadata({ message, className }: ChatMetadataProps) {
     : null
 
   return (
-    <div className={cn('flex items-center gap-2 text-xs text-muted-foreground mt-1', className)}>
+    <div className={cn('flex items-center gap-2 text-xs text-muted-foreground mt-1 flex-wrap', className)}>
       {phase && <span className="px-1.5 py-0.5 rounded bg-muted font-medium">{phase}</span>}
       {evaluation_passed !== undefined && (
         evaluation_passed

@@ -12,7 +12,7 @@ export function AiDetectionBadge({ project, onApply, onDismiss }: AiDetectionBad
   const { t } = useTranslation()
 
   return (
-    <div className="flex items-center gap-2 px-3 py-2 rounded-lg border bg-amber-50 border-amber-300 text-amber-800 text-xs animate-in slide-in-from-top-2 fade-in duration-200">
+    <div className="flex items-center gap-2 px-3 py-2 rounded-lg border bg-amber-50 dark:bg-amber-950/50 border-amber-300 dark:border-amber-700 text-amber-800 dark:text-amber-300 text-xs animate-in slide-in-from-top-2 fade-in duration-200">
       <span className="shrink-0">{project.emoji ?? '📦'}</span>
       <span className="font-medium">{project.name}</span>
       <span className="text-amber-600 text-[10px] shrink-0">Detected</span>

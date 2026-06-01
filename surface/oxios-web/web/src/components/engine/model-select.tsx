@@ -151,9 +151,9 @@ function ModelRow({
           <span className="font-medium truncate">{model.name}</span>
         </div>
         <div className="flex items-center gap-3 mt-0.5 text-xs text-muted-foreground">
-          <span>{formatContextWindow(model.context_window)} {t('engine.ctx')}</span>
-          <span>{t('engine.input')} {formatCost(model.cost_input, t)}/M</span>
-          <span>{t('engine.output')} {formatCost(model.cost_output, t)}/M</span>
+          <span>{formatContextWindow(model.contextWindow)} {t('engine.ctx')}</span>
+          <span>{t('engine.input')} {formatCost(model.costInput, t)}/M</span>
+          <span>{t('engine.output')} {formatCost(model.costOutput, t)}/M</span>
         </div>
       </div>
     </button>

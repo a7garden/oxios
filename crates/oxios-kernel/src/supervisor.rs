@@ -454,7 +454,7 @@ mod tests {
                 ),
             ),
             crate::kernel_handle::PersonaApi::new(Arc::new(
-                crate::persona_manager::PersonaManager::new(),
+                                crate::persona::PersonaManager::new(),
             )),
             crate::kernel_handle::ExtensionApi::new(Arc::new(crate::skill::SkillManager::new(
                 tmp.join("skills"),
@@ -494,6 +494,9 @@ mod tests {
                 )),
                 tmp.join("config.toml"),
                 Arc::new(crate::kernel_handle::RoutingStats::new()),
+                Arc::new(crate::engine::EngineHandle::new(Arc::new(
+                    crate::OxiosEngine::new("anthropic/claude-sonnet-4-20250514"),
+                ))),
             ),
             Arc::new(oxios_markdown::KnowledgeBase::new(tmp.join("knowledge")).unwrap()),
             Arc::new(
@@ -504,17 +507,24 @@ mod tests {
                 .unwrap(),
             ),
             crate::kernel_handle::MarketplaceApi::new(
-                Arc::new(crate::clawhub::ClawHubInstaller::new(
+                Arc::new(crate::skill::clawhub::ClawHubInstaller::new(
                     tmp.join("skills"),
                     tmp.join("state"),
                     None,
                 )),
-                Arc::new(crate::clawhub::ClawHubClient::new(None).expect("valid ClawHub client")),
+                Arc::new(crate::skill::clawhub::ClawHubClient::new(None).expect("valid ClawHub client")),
+                Arc::new(crate::skill::skills_sh::SkillsShInstaller::new(
+                    tmp.join("skills"),
+                    None,
+                    None,
+                )),
+                Arc::new(crate::skill::skills_sh::SkillsShClient::new(None, None).expect("valid Skills.sh client")),
             ),
         ));
 
         let engine = crate::OxiosEngine::new("mock/model");
-        let runtime = AgentRuntime::new(Arc::new(engine), "mock/model", kernel_handle, None);
+        let engine_handle = Arc::new(crate::engine::EngineHandle::new(Arc::new(engine)));
+        let runtime = AgentRuntime::new(engine_handle, "mock/model", kernel_handle, None);
         BasicSupervisor::new(event_bus, runtime)
     }
 

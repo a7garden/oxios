@@ -15,6 +15,8 @@ import {
 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { SettingsLayout } from '@/components/layout/settings-layout'
+import type { SubNavGroup } from '@/components/layout/settings-layout'
 import { ProviderSelect } from '@/components/engine/provider-select'
 import { ModelSelect } from '@/components/engine/model-select'
 import { ApiKeyInput } from '@/components/engine/api-key-input'
@@ -27,15 +29,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
 import { Switch } from '@/components/ui/switch'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import {
-  useProviders,
-  useModels,
-  useEngineConfig,
-  useSetModel,
-  useSetApiKey,
-  useSetProviderOptions,
-} from '@/hooks/use-engine'
+import { useProviders, useModels, useEngineConfig, useSetModel, useSetApiKey, useSetProviderOptions } from '@/hooks/use-engine'
+import { Select } from '@/components/ui/select'
+import { LoadingCards } from '@/components/shared/loading'
+import { ErrorState } from '@/components/shared/error-state'
 import { api } from '@/lib/api-client'
 
 export const Route = createFileRoute('/settings')({ component: SettingsPage })
@@ -128,14 +125,142 @@ const tKeys = {
   prettyDefault: 'settings.prettyDefault',
   jsonElkLoki: 'settings.jsonElkLoki',
   compact: 'settings.compact',
+  title: 'settings.title',
+  subtitle: 'settings.subtitle',
 } as const
+
+// ─── Types ────────────────────────────────────────────────────
+
+type FieldType = 'text' | 'number' | 'password' | 'toggle' | 'select'
+
+interface SettingsField {
+  key: string
+  labelKey: string
+  descriptionKey: string
+  type: FieldType
+  placeholder?: string
+  options?: { value: string; labelKey: string }[]
+}
+
+// ─── Field definitions (matches config.toml schema) ───────────
+
+const fieldDefs: [string, string, SettingsField[]][] = [
+  ['kernel', tKeys.kernelDescription, [
+    { key: 'workspace', labelKey: tKeys.workspacePath, descriptionKey: tKeys.workspacePathDescription, type: 'text', placeholder: '~/.oxios/workspace' },
+    { key: 'max_agents', labelKey: tKeys.maxConcurrentAgents, descriptionKey: tKeys.maxConcurrentAgentsDescription, type: 'number', placeholder: '10' },
+    { key: 'event_bus_capacity', labelKey: tKeys.eventBusCapacity, descriptionKey: tKeys.eventBusCapacityDescription, type: 'number', placeholder: '256' },
+  ]],
+  ['exec', tKeys.executionDescription, [
+    { key: 'default_mode', labelKey: tKeys.defaultMode, descriptionKey: tKeys.defaultModeDescription, type: 'select', options: [
+      { value: 'structured', labelKey: tKeys.structuredRecommended },
+      { value: 'shell', labelKey: tKeys.shellDangerous },
+    ]},
+    { key: 'allow_shell_mode', labelKey: tKeys.allowShellMode, descriptionKey: tKeys.allowShellModeDescription, type: 'toggle' },
+    { key: 'default_timeout_secs', labelKey: tKeys.defaultTimeoutS, descriptionKey: tKeys.defaultTimeoutSDescription, type: 'number', placeholder: '120' },
+    { key: 'max_timeout_secs', labelKey: tKeys.maxTimeoutS, descriptionKey: tKeys.maxTimeoutSDescription, type: 'number', placeholder: '600' },
+  ]],
+  ['security', tKeys.securityDescription, [
+    { key: 'auth_enabled', labelKey: tKeys.apiKeyAuthentication, descriptionKey: tKeys.apiKeyAuthenticationDescription, type: 'toggle' },
+    { key: 'network_access', labelKey: tKeys.networkAccess, descriptionKey: tKeys.networkAccessDescription, type: 'toggle' },
+    { key: 'can_fork', labelKey: tKeys.allowForking, descriptionKey: tKeys.allowForkingDescription, type: 'toggle' },
+    { key: 'max_execution_time_secs', labelKey: tKeys.maxExecutionTimeS, descriptionKey: tKeys.maxExecutionTimeSDescription, type: 'number', placeholder: '300' },
+    { key: 'max_memory_mb', labelKey: tKeys.maxMemoryMB, descriptionKey: tKeys.maxMemoryMBDescription, type: 'number', placeholder: '512' },
+  ]],
+  ['scheduler', tKeys.schedulerDescription, [
+    { key: 'max_concurrent', labelKey: tKeys.maxConcurrentTasks, descriptionKey: tKeys.maxConcurrentTasksDescription, type: 'number', placeholder: '5' },
+    { key: 'rate_limit_per_minute', labelKey: tKeys.rateLimitPerMin, descriptionKey: tKeys.rateLimitPerMinDescription, type: 'number', placeholder: '60' },
+    { key: 'zombie_timeout_secs', labelKey: tKeys.zombieTimeoutS, descriptionKey: tKeys.zombieTimeoutSDescription, type: 'number', placeholder: '300' },
+  ]],
+  ['orchestrator', tKeys.orchestratorDescription, [
+    { key: 'max_evolution_iterations', labelKey: tKeys.maxEvolutionIterations, descriptionKey: tKeys.maxEvolutionIterationsDescription, type: 'number', placeholder: '3' },
+    { key: 'min_evaluation_score', labelKey: tKeys.minEvaluationScore, descriptionKey: tKeys.minEvaluationScoreDescription, type: 'number', placeholder: '0.8' },
+  ]],
+  ['context', tKeys.contextDescription, [
+    { key: 'active_limit_tokens', labelKey: tKeys.activeTokenLimit, descriptionKey: tKeys.activeTokenLimitDescription, type: 'number', placeholder: '100000' },
+    { key: 'cache_limit_entries', labelKey: tKeys.cacheEntryLimit, descriptionKey: tKeys.cacheEntryLimitDescription, type: 'number', placeholder: '50' },
+  ]],
+  ['gateway', tKeys.gatewayDescription, [
+    { key: 'host', labelKey: tKeys.host, descriptionKey: tKeys.hostDescription, type: 'text', placeholder: '0.0.0.0' },
+    { key: 'port', labelKey: tKeys.port, descriptionKey: tKeys.portDescription, type: 'number', placeholder: '4200' },
+  ]],
+  ['session', tKeys.sessionDescription, [
+    { key: 'max_sessions', labelKey: tKeys.maxSessions, descriptionKey: tKeys.maxSessionsDescription, type: 'number', placeholder: '100' },
+    { key: 'ttl_hours', labelKey: tKeys.sessionTTLHours, descriptionKey: tKeys.sessionTTLHoursDescription, type: 'number', placeholder: '168' },
+    { key: 'auto_prune', labelKey: tKeys.autoPrune, descriptionKey: tKeys.autoPruneDescription, type: 'toggle' },
+  ]],
+  ['logging', tKeys.loggingDescription, [
+    { key: 'format', labelKey: tKeys.format, descriptionKey: tKeys.formatDescription, type: 'select', options: [
+      { value: 'pretty', labelKey: tKeys.prettyDefault },
+      { value: 'json', labelKey: tKeys.jsonElkLoki },
+      { value: 'compact', labelKey: tKeys.compact },
+    ]},
+  ]],
+]
+
+// Lookup: section key → fields
+const fieldsBySection = new Map(fieldDefs.map(([key, _, fields]) => [key, fields]))
+
+// Section key → i18n label key
+const sectionLabelKeys: Record<string, string> = {
+  kernel: tKeys.kernel,
+  exec: tKeys.execution,
+  security: tKeys.security,
+  scheduler: tKeys.scheduler,
+  orchestrator: tKeys.orchestrator,
+  context: tKeys.context,
+  gateway: tKeys.gateway,
+  session: tKeys.session,
+  logging: tKeys.logging,
+}
+
+// ─── Navigation structure ─────────────────────────────────────
+
+const navGroups: SubNavGroup[] = [
+  {
+    id: 'ai',
+    labelKey: 'settings.groupAi',
+    items: [
+      { id: 'engine', labelKey: tKeys.engine, icon: <Bot className="h-4 w-4" /> },
+    ],
+  },
+  {
+    id: 'core',
+    labelKey: 'settings.groupCore',
+    items: [
+      { id: 'kernel', labelKey: tKeys.kernel, icon: <Cpu className="h-4 w-4" /> },
+      { id: 'exec', labelKey: tKeys.execution, icon: <Terminal className="h-4 w-4" /> },
+      { id: 'security', labelKey: tKeys.security, icon: <Shield className="h-4 w-4" /> },
+    ],
+  },
+  {
+    id: 'runtime',
+    labelKey: 'settings.groupAiRuntime',
+    items: [
+      { id: 'scheduler', labelKey: tKeys.scheduler, icon: <Timer className="h-4 w-4" /> },
+      { id: 'orchestrator', labelKey: tKeys.orchestrator, icon: <Zap className="h-4 w-4" /> },
+      { id: 'context', labelKey: tKeys.context, icon: <Brain className="h-4 w-4" /> },
+    ],
+  },
+  {
+    id: 'infra',
+    labelKey: 'settings.groupInfra',
+    items: [
+      { id: 'gateway', labelKey: tKeys.gateway, icon: <Globe className="h-4 w-4" /> },
+      { id: 'session', labelKey: tKeys.session, icon: <Monitor className="h-4 w-4" /> },
+      { id: 'logging', labelKey: tKeys.logging, icon: <Server className="h-4 w-4" /> },
+    ],
+  },
+  {
+    id: 'system',
+    labelKey: 'settings.groupSystem',
+    items: [
+      { id: 'update', labelKey: tKeys.update, icon: <Zap className="h-4 w-4" /> },
+    ],
+  },
+]
 
 // ─── Engine Panel ────────────────────────────────────────────
 
-/**
- * Dedicated Engine settings panel with rich provider/model selection.
- * Replaces the old raw-text fields with interactive components.
- */
 function EnginePanel() {
   const { t } = useTranslation()
   const { data: providers = [] } = useProviders()
@@ -146,7 +271,6 @@ function EnginePanel() {
   const setApiKey = useSetApiKey()
   const setProviderOptions = useSetProviderOptions()
 
-  // Derive provider from current default_model on load
   const currentModel = engineConfig?.default_model ?? ''
   const resolvedProvider = useMemo((): string | null => {
     if (selectedProvider) return selectedProvider
@@ -154,7 +278,6 @@ function EnginePanel() {
     return null
   }, [selectedProvider, currentModel])
 
-  // Current model ID (without provider prefix)
   const currentModelId = useMemo(() => {
     if (!currentModel.includes('/')) return null
     return currentModel.split('/').slice(1).join('/')
@@ -178,7 +301,6 @@ function EnginePanel() {
     setProviderOptions.mutate({ provider: resolvedProvider ?? 'unknown', options })
   }
 
-  // Determine API key source for display
   const apiKeySource = engineConfig?.api_key_set ? 'config' : 'none'
 
   return (
@@ -218,9 +340,7 @@ function EnginePanel() {
             <label className="text-sm font-medium">{t(tKeys.model)}</label>
             <p className="text-xs text-muted-foreground mt-0.5">
               {currentModel ? (
-                <span>
-                  {t(tKeys.modelDescription, { model: currentModel })}
-                </span>
+                <span>{t(tKeys.modelDescription, { model: currentModel })}</span>
               ) : (
                 t(tKeys.modelSelectProviderFirst)
               )}
@@ -278,287 +398,62 @@ function EnginePanel() {
           )}
       </CardContent>
 
-      {/* Routing section — model routing configuration (RFC-011) */}
       <RoutingSection />
     </Card>
   )
 }
 
-// ─── Field types ─────────────────────────────────────────────
+// ─── Generic Config Section Card ──────────────────────────────
 
-type FieldType = 'text' | 'number' | 'password' | 'toggle' | 'select'
-
-interface SettingsField {
-  key: string
-  labelKey: string
+function ConfigSectionCard({
+  sectionKey,
+  descriptionKey,
+  labelKey,
+  icon,
+  fields,
+  formValues,
+  onFieldChange,
+  config,
+}: {
+  sectionKey: string
   descriptionKey: string
-  type: FieldType
-  placeholder?: string
-  /** For select type */
-  options?: { value: string; labelKey: string }[]
-}
-
-interface SettingsSection {
-  key: string
   labelKey: string
-  descriptionKey: string
   icon: React.ReactNode
   fields: SettingsField[]
+  formValues: Record<string, Record<string, string | boolean>>
+  onFieldChange: (sectionKey: string, fieldKey: string, value: string | boolean) => void
+  config: Record<string, unknown> | undefined
+}) {
+  const { t } = useTranslation()
+  const sectionConfig = config?.[sectionKey] as Record<string, unknown> | undefined
+
+  if (!sectionConfig && !formValues[sectionKey]) return null
+
+  return (
+    <Card>
+      <CardHeader className="pb-4">
+        <CardTitle className="flex items-center gap-2 text-base">
+          {icon}
+          {t(labelKey)}
+        </CardTitle>
+        <p className="text-xs text-muted-foreground">{t(descriptionKey)}</p>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {fields.map((field, i) => (
+          <div key={field.key}>
+            {i > 0 && <Separator className="mb-4" />}
+            <FieldRow
+              sectionKey={sectionKey}
+              field={field}
+              value={formValues[sectionKey]?.[field.key]}
+              onChange={(val) => onFieldChange(sectionKey, field.key, val)}
+            />
+          </div>
+        ))}
+      </CardContent>
+    </Card>
+  )
 }
-
-// ─── Section definitions (matches config.toml schema) ────────
-
-const sections: SettingsSection[] = [
-  {
-    key: 'kernel',
-    labelKey: tKeys.kernel,
-    descriptionKey: tKeys.kernelDescription,
-    icon: <Cpu className="h-4 w-4" />,
-    fields: [
-      {
-        key: 'workspace',
-        labelKey: tKeys.workspacePath,
-        descriptionKey: tKeys.workspacePathDescription,
-        type: 'text',
-        placeholder: '~/.oxios/workspace',
-      },
-      {
-        key: 'max_agents',
-        labelKey: tKeys.maxConcurrentAgents,
-        descriptionKey: tKeys.maxConcurrentAgentsDescription,
-        type: 'number',
-        placeholder: '10',
-      },
-      {
-        key: 'event_bus_capacity',
-        labelKey: tKeys.eventBusCapacity,
-        descriptionKey: tKeys.eventBusCapacityDescription,
-        type: 'number',
-        placeholder: '256',
-      },
-    ],
-  },
-  {
-    key: 'exec',
-    labelKey: tKeys.execution,
-    descriptionKey: tKeys.executionDescription,
-    icon: <Terminal className="h-4 w-4" />,
-    fields: [
-      {
-        key: 'default_mode',
-        labelKey: tKeys.defaultMode,
-        descriptionKey: tKeys.defaultModeDescription,
-        type: 'select',
-        options: [
-          { value: 'structured', labelKey: tKeys.structuredRecommended },
-          { value: 'shell', labelKey: tKeys.shellDangerous },
-        ],
-      },
-      {
-        key: 'allow_shell_mode',
-        labelKey: tKeys.allowShellMode,
-        descriptionKey: tKeys.allowShellModeDescription,
-        type: 'toggle',
-      },
-      {
-        key: 'default_timeout_secs',
-        labelKey: tKeys.defaultTimeoutS,
-        descriptionKey: tKeys.defaultTimeoutSDescription,
-        type: 'number',
-        placeholder: '120',
-      },
-      {
-        key: 'max_timeout_secs',
-        labelKey: tKeys.maxTimeoutS,
-        descriptionKey: tKeys.maxTimeoutSDescription,
-        type: 'number',
-        placeholder: '600',
-      },
-    ],
-  },
-  {
-    key: 'security',
-    labelKey: tKeys.security,
-    descriptionKey: tKeys.securityDescription,
-    icon: <Shield className="h-4 w-4" />,
-    fields: [
-      {
-        key: 'auth_enabled',
-        labelKey: tKeys.apiKeyAuthentication,
-        descriptionKey: tKeys.apiKeyAuthenticationDescription,
-        type: 'toggle',
-      },
-      {
-        key: 'network_access',
-        labelKey: tKeys.networkAccess,
-        descriptionKey: tKeys.networkAccessDescription,
-        type: 'toggle',
-      },
-      {
-        key: 'can_fork',
-        labelKey: tKeys.allowForking,
-        descriptionKey: tKeys.allowForkingDescription,
-        type: 'toggle',
-      },
-      {
-        key: 'max_execution_time_secs',
-        labelKey: tKeys.maxExecutionTimeS,
-        descriptionKey: tKeys.maxExecutionTimeSDescription,
-        type: 'number',
-        placeholder: '300',
-      },
-      {
-        key: 'max_memory_mb',
-        labelKey: tKeys.maxMemoryMB,
-        descriptionKey: tKeys.maxMemoryMBDescription,
-        type: 'number',
-        placeholder: '512',
-      },
-    ],
-  },
-  {
-    key: 'scheduler',
-    labelKey: tKeys.scheduler,
-    descriptionKey: tKeys.schedulerDescription,
-    icon: <Timer className="h-4 w-4" />,
-    fields: [
-      {
-        key: 'max_concurrent',
-        labelKey: tKeys.maxConcurrentTasks,
-        descriptionKey: tKeys.maxConcurrentTasksDescription,
-        type: 'number',
-        placeholder: '5',
-      },
-      {
-        key: 'rate_limit_per_minute',
-        labelKey: tKeys.rateLimitPerMin,
-        descriptionKey: tKeys.rateLimitPerMinDescription,
-        type: 'number',
-        placeholder: '60',
-      },
-      {
-        key: 'zombie_timeout_secs',
-        labelKey: tKeys.zombieTimeoutS,
-        descriptionKey: tKeys.zombieTimeoutSDescription,
-        type: 'number',
-        placeholder: '300',
-      },
-    ],
-  },
-  {
-    key: 'orchestrator',
-    labelKey: tKeys.orchestrator,
-    descriptionKey: tKeys.orchestratorDescription,
-    icon: <Zap className="h-4 w-4" />,
-    fields: [
-      {
-        key: 'max_evolution_iterations',
-        labelKey: tKeys.maxEvolutionIterations,
-        descriptionKey: tKeys.maxEvolutionIterationsDescription,
-        type: 'number',
-        placeholder: '3',
-      },
-      {
-        key: 'min_evaluation_score',
-        labelKey: tKeys.minEvaluationScore,
-        descriptionKey: tKeys.minEvaluationScoreDescription,
-        type: 'number',
-        placeholder: '0.8',
-      },
-    ],
-  },
-  {
-    key: 'context',
-    labelKey: tKeys.context,
-    descriptionKey: tKeys.contextDescription,
-    icon: <Brain className="h-4 w-4" />,
-    fields: [
-      {
-        key: 'active_limit_tokens',
-        labelKey: tKeys.activeTokenLimit,
-        descriptionKey: tKeys.activeTokenLimitDescription,
-        type: 'number',
-        placeholder: '100000',
-      },
-      {
-        key: 'cache_limit_entries',
-        labelKey: tKeys.cacheEntryLimit,
-        descriptionKey: tKeys.cacheEntryLimitDescription,
-        type: 'number',
-        placeholder: '50',
-      },
-    ],
-  },
-  {
-    key: 'gateway',
-    labelKey: tKeys.gateway,
-    descriptionKey: tKeys.gatewayDescription,
-    icon: <Globe className="h-4 w-4" />,
-    fields: [
-      {
-        key: 'host',
-        labelKey: tKeys.host,
-        descriptionKey: tKeys.hostDescription,
-        type: 'text',
-        placeholder: '0.0.0.0',
-      },
-      {
-        key: 'port',
-        labelKey: tKeys.port,
-        descriptionKey: tKeys.portDescription,
-        type: 'number',
-        placeholder: '4200',
-      },
-    ],
-  },
-  {
-    key: 'session',
-    labelKey: tKeys.session,
-    descriptionKey: tKeys.sessionDescription,
-    icon: <Monitor className="h-4 w-4" />,
-    fields: [
-      {
-        key: 'max_sessions',
-        labelKey: tKeys.maxSessions,
-        descriptionKey: tKeys.maxSessionsDescription,
-        type: 'number',
-        placeholder: '100',
-      },
-      {
-        key: 'ttl_hours',
-        labelKey: tKeys.sessionTTLHours,
-        descriptionKey: tKeys.sessionTTLHoursDescription,
-        type: 'number',
-        placeholder: '168',
-      },
-      {
-        key: 'auto_prune',
-        labelKey: tKeys.autoPrune,
-        descriptionKey: tKeys.autoPruneDescription,
-        type: 'toggle',
-      },
-    ],
-  },
-  {
-    key: 'logging',
-    labelKey: tKeys.logging,
-    descriptionKey: tKeys.loggingDescription,
-    icon: <Server className="h-4 w-4" />,
-    fields: [
-      {
-        key: 'format',
-        labelKey: tKeys.format,
-        descriptionKey: tKeys.formatDescription,
-        type: 'select',
-        options: [
-          { value: 'pretty', labelKey: tKeys.prettyDefault },
-          { value: 'json', labelKey: tKeys.jsonElkLoki },
-          { value: 'compact', labelKey: tKeys.compact },
-        ],
-      },
-    ],
-  },
-]
 
 // ─── Settings page ───────────────────────────────────────────
 
@@ -566,7 +461,7 @@ function SettingsPage() {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
   const [formValues, setFormValues] = useState<Record<string, Record<string, string | boolean>>>({})
-  const [activeTab, setActiveTab] = useState('kernel')
+  const [activeSection, setActiveSection] = useState('engine')
   const [saveNotice, setSaveNotice] = useState<'success' | 'error' | null>(null)
 
   const {
@@ -596,16 +491,16 @@ function SettingsPage() {
   useEffect(() => {
     if (!config) return
     const values: Record<string, Record<string, string | boolean>> = {}
-    for (const section of sections) {
-      const sectionConfig = config[section.key] as Record<string, unknown> | undefined
+    for (const [sectionKey, , fields] of fieldDefs) {
+      const sectionConfig = config[sectionKey] as Record<string, unknown> | undefined
       if (!sectionConfig) continue
-      values[section.key] = {}
-      for (const field of section.fields) {
+      values[sectionKey] = {}
+      for (const field of fields) {
         const raw = sectionConfig[field.key]
         if (field.type === 'toggle') {
-          values[section.key]![field.key] = raw === true || raw === 'true'
+          values[sectionKey]![field.key] = raw === true || raw === 'true'
         } else {
-          values[section.key]![field.key] = String(raw ?? '')
+          values[sectionKey]![field.key] = String(raw ?? '')
         }
       }
     }
@@ -614,10 +509,10 @@ function SettingsPage() {
 
   const handleSave = () => {
     const updated: Record<string, unknown> = {}
-    for (const section of sections) {
+    for (const [sectionKey, , fields] of fieldDefs) {
       const sectionValues: Record<string, unknown> = {}
-      for (const field of section.fields) {
-        const val = formValues[section.key]?.[field.key]
+      for (const field of fields) {
+        const val = formValues[sectionKey]?.[field.key]
         if (val === undefined) continue
         if (field.type === 'toggle') {
           sectionValues[field.key] = Boolean(val)
@@ -628,7 +523,7 @@ function SettingsPage() {
           if (val !== '') sectionValues[field.key] = val
         }
       }
-      updated[section.key] = sectionValues
+      updated[sectionKey] = sectionValues
     }
     saveMutation.mutate(updated)
   }
@@ -643,13 +538,47 @@ function SettingsPage() {
   if (isLoading) return <LoadingCards count={4} />
   if (isError) return <ErrorState onRetry={() => refetch()} />
 
+  // Render active panel content
+  const renderContent = () => {
+    if (activeSection === 'engine') return <EnginePanel />
+
+    if (activeSection === 'update') {
+      return (
+        <div className="space-y-6">
+          <SystemUpdateCard />
+          <SystemToolsPanel />
+        </div>
+      )
+    }
+
+    // Generic config section
+    const fields = fieldsBySection.get(activeSection)
+    if (!fields) return null
+
+    const def = fieldDefs.find(([key]) => key === activeSection)
+    if (!def) return null
+
+    return (
+      <ConfigSectionCard
+        sectionKey={activeSection}
+        labelKey={sectionLabelKeys[activeSection] ?? activeSection}
+        descriptionKey={def[1]}
+        icon={navGroups.flatMap((g) => g.items).find((i) => i.id === activeSection)?.icon}
+        fields={fields}
+        formValues={formValues}
+        onFieldChange={setField}
+        config={config}
+      />
+    )
+  }
+
   return (
-    <div className="space-y-6 max-w-4xl">
+    <div>
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold">{t(tKeys.title)}</h1>
-          <p className="text-muted-foreground">
+          <p className="text-muted-foreground text-sm">
             {t(tKeys.subtitle)}
           </p>
         </div>
@@ -661,94 +590,24 @@ function SettingsPage() {
 
       {/* Save notice */}
       {saveNotice === 'success' && (
-        <div className="rounded-lg border border-emerald-200 bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-950 p-3 text-sm text-emerald-700 dark:text-emerald-400">
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-950 p-3 text-sm text-emerald-700 dark:text-emerald-400 mb-4">
           {t('settings.settingsSavedSuccessfully')}
         </div>
       )}
       {saveNotice === 'error' && (
-        <div className="rounded-lg border border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950 p-3 text-sm text-red-700 dark:text-red-400">
+        <div className="rounded-lg border border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950 p-3 text-sm text-red-700 dark:text-red-400 mb-4">
           {t('settings.failedToSaveSettings')}
         </div>
       )}
 
-      {/* Tabs */}
-      <Tabs>
-        <TabsList className="flex-wrap h-auto gap-1">
-          {/* Engine tab (always first) */}
-          <TabsTrigger
-            data-state={activeTab === 'engine' ? 'active' : 'inactive'}
-            onClick={() => setActiveTab('engine')}
-            className="gap-1.5"
-          >
-            <Bot className="h-4 w-4" />
-            <span>{t(tKeys.engine)}</span>
-          </TabsTrigger>
-          {sections.map((s) => (
-            <TabsTrigger
-              key={s.key}
-              data-state={activeTab === s.key ? 'active' : 'inactive'}
-              onClick={() => setActiveTab(s.key)}
-              className="gap-1.5"
-            >
-              {s.icon}
-              <span>{t(s.labelKey)}</span>
-            </TabsTrigger>
-          ))}
-          {/* Update tab */}
-          <TabsTrigger
-            data-state={activeTab === 'update' ? 'active' : 'inactive'}
-            onClick={() => setActiveTab('update')}
-            className="gap-1.5"
-          >
-            <Zap className="h-4 w-4" />
-            <span>{t(tKeys.update)}</span>
-          </TabsTrigger>
-        </TabsList>
-
-        {/* Engine tab content */}
-        <TabsContent value="engine">
-          <EnginePanel />
-        </TabsContent>
-
-        {/* Generic section tabs */}
-        {sections.map((section) => {
-          const sectionConfig = config?.[section.key] as Record<string, unknown> | undefined
-          if (!sectionConfig && !formValues[section.key]) return null
-
-          return (
-            <TabsContent key={section.key} value={section.key}>
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    {section.icon}
-                    {t(section.labelKey)}
-                  </CardTitle>
-                  <p className="text-sm text-muted-foreground">{t(section.descriptionKey)}</p>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  {section.fields.map((field, i) => (
-                    <div key={field.key}>
-                      {i > 0 && <Separator className="mb-6" />}
-                      <FieldRow
-                        sectionKey={section.key}
-                        field={field}
-                        value={formValues[section.key]?.[field.key]}
-                        onChange={(val) => setField(section.key, field.key, val)}
-                      />
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-            </TabsContent>
-          )
-        })}
-        {/* Update tab content */}
-        <TabsContent value="update">
-          <SystemUpdateCard />
-          <Separator className="my-6" />
-          <SystemToolsPanel />
-        </TabsContent>
-      </Tabs>
+      {/* Two-pane layout: sidebar nav on desktop, dropdown on mobile */}
+      <SettingsLayout
+        groups={navGroups}
+        activeId={activeSection}
+        onNavigate={setActiveSection}
+      >
+        {renderContent()}
+      </SettingsLayout>
     </div>
   )
 }
@@ -770,7 +629,7 @@ function FieldRow({
   const id = `${sectionKey}-${field.key}`
 
   return (
-    <div className="flex items-start justify-between gap-6">
+    <div className="flex items-start justify-between gap-4 sm:gap-6">
       {/* Label + description */}
       <div className="flex-1 min-w-0 pt-0.5">
         <label htmlFor={id} className="text-sm font-medium">
@@ -779,8 +638,8 @@ function FieldRow({
         <p className="text-xs text-muted-foreground mt-0.5">{t(field.descriptionKey)}</p>
       </div>
 
-      {/* Control */}
-      <div className="shrink-0 w-56">
+      {/* Control — responsive width */}
+      <div className="shrink-0 w-40 sm:w-56">
         {field.type === 'toggle' ? (
           <div className="flex items-center justify-end gap-2">
             <span className="text-xs text-muted-foreground">
@@ -793,18 +652,18 @@ function FieldRow({
             />
           </div>
         ) : field.type === 'select' ? (
-          <select
-            id={id}
-            value={String(value ?? '')}
-            onChange={(e) => onChange(e.target.value)}
-            className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-          >
-            {field.options?.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {t(opt.labelKey)}
-              </option>
-            ))}
-          </select>
+          <div className="shrink-0 w-40 sm:w-56">
+            <Select
+              value={String(value ?? '')}
+              onValueChange={(v) => onChange(v)}
+              placeholder={t(field.labelKey)}
+              options={field.options?.map((opt) => ({
+                label: t(opt.labelKey),
+                value: opt.value,
+              })) ?? []}
+              className="w-full"
+            />
+          </div>
         ) : (
           <Input
             id={id}

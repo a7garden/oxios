@@ -20,7 +20,7 @@ export function TopologyGraph({ nodes }: Props) {
   // Arrange nodes in a circle
   const cx = 300
   const cy = 200
-  const radius = Math.min(150, 50 + nodes.length * 20)
+  const radius = Math.min(150, cx - 30, cy - 30, 50 + nodes.length * 20)
   const positioned = nodes.map((node, i) => {
     const angle = (2 * Math.PI * i) / nodes.length - Math.PI / 2
     return {

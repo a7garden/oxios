@@ -1,10 +1,13 @@
-//! Skill system: multi-format SKILL.md parsing with format detection.
+//! Skill system: multi-format SKILL.md parsing with format detection,
+//! plus multi-registry marketplace sources (ClawHub, Skills.sh).
 
+pub mod clawhub;
 pub mod format;
 pub mod frontmatter;
 pub mod manager;
 pub mod prompt;
 pub mod requirements;
+pub mod skills_sh;
 pub mod types;
 
 pub use format::SkillFormat;

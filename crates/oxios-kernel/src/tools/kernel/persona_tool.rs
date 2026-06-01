@@ -19,7 +19,7 @@ use serde_json::{json, Value};
 use tokio::sync::oneshot;
 
 use crate::kernel_handle::KernelHandle;
-use crate::persona_manager::PersonaManager;
+use crate::persona::PersonaManager;
 
 /// Agent tool for persona management.
 ///

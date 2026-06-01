@@ -356,6 +356,66 @@ export interface ClawHubSkillDetail {
   }
 }
 
+// Skills.sh (Vercel Labs ecosystem)
+
+export interface SkillsShSkill {
+  id: string
+  slug: string
+  name: string
+  source: string
+  installs: number
+  sourceType: string
+  installUrl?: string
+  url: string
+  isDuplicate?: boolean
+}
+
+export interface SkillsShSearchResponse {
+  data: SkillsShSkill[]
+  query: string
+  searchType: string
+  count: number
+  durationMs?: number
+}
+
+export interface SkillsShListResponse {
+  data: SkillsShSkill[]
+  pagination: {
+    page: number
+    perPage: number
+    total: number
+    hasMore: boolean
+  }
+}
+
+export interface SkillsShSkillDetail {
+  id: string
+  source: string
+  slug: string
+  installs: number
+  hash?: string
+  files?: Array<{
+    path: string
+    contents: string
+  }>
+}
+
+export interface SkillsShAuditEntry {
+  provider: string
+  slug: string
+  status: string
+  summary: string
+  auditedAt: string
+  riskLevel?: string
+}
+
+export interface SkillsShAuditResponse {
+  id: string
+  source: string
+  slug: string
+  audits: SkillsShAuditEntry[]
+}
+
 // System Update
 export interface UpdateCheckResponse {
   current_version: string
