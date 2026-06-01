@@ -485,6 +485,7 @@ impl OuroborosProtocol for OuroborosEngine {
             output: format!("Execution of seed {} delegated to agent runtime", seed.id),
             steps_completed: 0,
             success: false, // Caller should replace with actual result
+            tool_calls: vec![],
         })
     }
 

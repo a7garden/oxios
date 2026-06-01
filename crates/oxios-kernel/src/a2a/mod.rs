@@ -448,6 +448,25 @@ pub type DelegationHandler = Arc<
         + Sync,
 >;
 
+/// A single entry in the A2A message log.
+///
+/// Records every message that passes through the protocol for
+/// observability and debugging. The log is append-only and bounded
+/// to [`A2AProtocol::MAX_LOG_ENTRIES`] entries (oldest are pruned).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct A2AMessageLogEntry {
+    /// Sending agent's ID.
+    pub from: AgentId,
+    /// Receiving agent's ID.
+    pub to: AgentId,
+    /// Message type name (e.g. "task_delegation", "handshake").
+    pub message_type: String,
+    /// When this message was logged.
+    pub timestamp: DateTime<Utc>,
+    /// Short human-readable content summary.
+    pub content: String,
+}
+
 /// A2A Protocol handler for inter-agent communication.
 #[derive(Clone)]
 pub struct A2AProtocol {
@@ -459,9 +478,14 @@ pub struct A2AProtocol {
     event_bus: EventBus,
     /// Optional handler invoked when a TaskDelegation message is received.
     delegation_handler: Arc<RwLock<Option<DelegationHandler>>>,
+    /// Append-only message log for observability.
+    message_log: Arc<parking_lot::RwLock<Vec<A2AMessageLogEntry>>>,
 }
 
 impl A2AProtocol {
+    /// Maximum number of log entries retained before pruning.
+    pub const MAX_LOG_ENTRIES: usize = 10_000;
+
     /// Creates a new A2A protocol handler.
     pub fn new(event_bus: EventBus) -> Self {
         let registry = AgentCardRegistry::new(event_bus.clone());
@@ -470,6 +494,7 @@ impl A2AProtocol {
             queues: Arc::new(RwLock::new(HashMap::new())),
             event_bus,
             delegation_handler: Arc::new(RwLock::new(None)),
+            message_log: Arc::new(parking_lot::RwLock::new(Vec::with_capacity(256))),
         }
     }
 
@@ -481,6 +506,27 @@ impl A2AProtocol {
     pub async fn set_delegation_handler(&self, handler: DelegationHandler) {
         let mut h = self.delegation_handler.write().await;
         *h = Some(handler);
+    }
+
+    /// Append an entry to the message log, pruning if over capacity.
+    fn append_log(&self, entry: A2AMessageLogEntry) {
+        let mut log = self.message_log.write();
+        log.push(entry);
+        if log.len() > Self::MAX_LOG_ENTRIES {
+            let excess = log.len() - Self::MAX_LOG_ENTRIES;
+            log.drain(..excess);
+        }
+    }
+
+    /// Returns recent message log entries, most recent last.
+    ///
+    /// If `limit` is `Some(n)`, returns at most the last `n` entries.
+    pub fn get_message_log(&self, limit: Option<usize>) -> Vec<A2AMessageLogEntry> {
+        let log = self.message_log.read();
+        match limit {
+            Some(n) => log.iter().rev().take(n).cloned().collect::<Vec<_>>().into_iter().rev().collect(),
+            None => log.clone(),
+        }
     }
 
     /// Get or create a queue for the given agent.
@@ -518,6 +564,15 @@ impl A2AProtocol {
             content: format!("[task_delegation] {:?}", task.task_id),
         });
 
+        // Log for observability.
+        self.append_log(A2AMessageLogEntry {
+            from,
+            to,
+            message_type: "task_delegation".to_string(),
+            timestamp: Utc::now(),
+            content: task.description.clone(),
+        });
+
         tracing::info!(
             from = %from,
             to = %to,
@@ -545,8 +600,24 @@ impl A2AProtocol {
         message: A2AMessage,
     ) -> Result<Uuid> {
         let msg_type = message.type_name();
-        let request = A2ARequest::new(from, to, message);
+        let request = A2ARequest::new(from, to, message.clone());
         let request_id = request.request_id;
+
+        // Log the message for observability.
+        let content_summary = match &request.message {
+            A2AMessage::TaskDelegation { description, .. } => description.clone(),
+            A2AMessage::StatusUpdate { message, .. } => message.clone(),
+            A2AMessage::ResultSharing { summary, .. } => summary.clone(),
+            A2AMessage::CapabilityQuery { query, .. } => query.clone(),
+            A2AMessage::Handshake { name, .. } => format!("handshake from {name}"),
+        };
+        self.append_log(A2AMessageLogEntry {
+            from,
+            to,
+            message_type: msg_type.to_string(),
+            timestamp: Utc::now(),
+            content: content_summary,
+        });
 
         // Push to the target agent's queue and notify.
         let queue = self.get_or_create_queue(to).await;

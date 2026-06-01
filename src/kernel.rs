@@ -795,6 +795,16 @@ impl KernelBuilder {
         // AgentRuntime reads the latest engine on each execute().
         let engine_handle = Arc::new(EngineHandle::new(engine));
 
+        // ── Gateway APIs — Arc-wrapped for sharing with Gateway and KernelHandle ──
+        let engine_api = Arc::new(oxios_kernel::EngineApi::new(
+            Arc::new(parking_lot::RwLock::new(config.clone())),
+            config_path.clone(),
+            Arc::clone(&routing_stats),
+            Arc::clone(&engine_handle),
+        ));
+        let persona_api =
+            Arc::new(oxios_kernel::PersonaApi::new(Arc::new(persona_manager.clone())));
+
         // ── KernelHandle — the syscall table for agent OS control ──
         // Created inline here because AgentRuntime needs it.
         // Will be cached again in the Kernel instance.
@@ -950,7 +960,11 @@ impl KernelBuilder {
         }
         let orchestrator = Arc::new(orchestrator);
 
-        let gateway = Arc::new(Gateway::new(orchestrator.clone()));
+        let gateway = Arc::new(Gateway::with_apis(
+            orchestrator.clone(),
+            engine_api,
+            persona_api,
+        ));
 
         // Initialize metrics and observability singletons.
         oxios_kernel::register_builtin_metrics();

@@ -512,6 +512,7 @@ impl Orchestrator {
                 phase_reached: Phase::Interview,
                 evaluation_passed: false,
                 output: None,
+                tool_calls: vec![],
             });
         }
 
@@ -568,6 +569,7 @@ impl Orchestrator {
                 phase_reached: Phase::Interview,
                 evaluation_passed: false,
                 output: None,
+                tool_calls: vec![],
             });
         }
 
@@ -665,6 +667,7 @@ impl Orchestrator {
                     phase_reached: Phase::Execute,
                     evaluation_passed: all_passed,
                     output: Some(combined),
+                    tool_calls: vec![],
                 });
             }
         }
@@ -785,6 +788,7 @@ impl Orchestrator {
             phase_reached,
             evaluation_passed: passed,
             output: Some(final_result.output.clone()),
+            tool_calls: final_result.tool_calls.clone(),
         })
     }
 
@@ -1352,6 +1356,9 @@ pub struct OrchestrationResult {
     /// Output or notes from evaluation.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub output: Option<String>,
+    /// Tool calls recorded during execution.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tool_calls: Vec<oxios_ouroboros::ToolCallRecord>,
 }
 
 /// Format clarifying questions for display.

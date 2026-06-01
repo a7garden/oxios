@@ -266,6 +266,7 @@ impl Supervisor for BasicSupervisor {
                     output: "Agent cancelled before execution".into(),
                     steps_completed: 0,
                     success: false,
+                    tool_calls: vec![],
                 });
             }
             let mut ctx = session_ctx.write().await;
@@ -302,6 +303,7 @@ impl Supervisor for BasicSupervisor {
                             output: format!("Agent task aborted: {join_err}"),
                             steps_completed: 0,
                             success: false,
+                            tool_calls: vec![],
                         })
                     }
                 },
@@ -357,6 +359,7 @@ impl Supervisor for BasicSupervisor {
                     output: format!("Agent failed: {e}"),
                     steps_completed: 0,
                     success: false,
+                    tool_calls: vec![],
                 })
             }
         }

@@ -350,7 +350,7 @@ impl AgentRuntime {
         let audit_trail: Option<Arc<AuditTrail>> =
             Some(Arc::clone(&self.kernel_handle.security.audit_trail));
 
-        let (final_content, steps_completed, success, _agent) = {
+        let (final_content, steps_completed, success, trajectory_steps, _agent) = {
             run_agent(
                 &config,
                 &engine,
@@ -367,10 +367,22 @@ impl AgentRuntime {
             .await?
         };
 
+        // Map trajectory steps to tool call records for the execution result.
+        let tool_calls: Vec<oxios_ouroboros::ToolCallRecord> = trajectory_steps
+            .iter()
+            .map(|s| oxios_ouroboros::ToolCallRecord {
+                tool: s.input.clone(),
+                input: String::new(), // Input is summarized in the trajectory step's input field
+                output: s.output.clone(),
+                duration_ms: s.duration_ms,
+            })
+            .collect();
+
         tracing::info!(
             seed_id = %seed_id,
             steps = steps_completed,
             success,
+            tool_calls = tool_calls.len(),
             "AgentRuntime finished"
         );
 
@@ -382,6 +394,7 @@ impl AgentRuntime {
             },
             steps_completed,
             success,
+            tool_calls,
         })
     }
 }
@@ -403,7 +416,7 @@ async fn run_agent(
     cspace: crate::capability::CSpace,
     audit_trail: Option<Arc<AuditTrail>>,
     routing_stats: Option<Arc<crate::kernel_handle::RoutingStats>>,
-) -> Result<(String, usize, bool, Arc<Agent>)> {
+) -> Result<(String, usize, bool, Vec<crate::memory::sona::TrajectoryStep>, Arc<Agent>)> {
     // Extract workspace.
     let workspace = if !config.project_paths.is_empty() {
         config.project_paths[0].clone()
@@ -673,6 +686,7 @@ async fn run_agent(
             format!("Agent failed: {e}"),
             s.steps_completed,
             false,
+            s.trajectory_steps.clone(),
             agent,
         ));
     }
@@ -707,7 +721,7 @@ async fn run_agent(
         }
     }
 
-    Ok((s.final_content.clone(), s.steps_completed, s.success, agent))
+    Ok((s.final_content.clone(), s.steps_completed, s.success, s.trajectory_steps.clone(), agent))
 }
 
 /// Summarize a tool result string to fit within `max_len` characters.

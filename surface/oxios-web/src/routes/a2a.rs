@@ -3,6 +3,7 @@
 //! Read-only endpoints for monitoring the A2A protocol:
 //! agent discovery, message log, and communication topology.
 
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use axum::extract::{Path, State};
@@ -59,24 +60,39 @@ pub(crate) async fn handle_a2a_agent_detail(
 
 /// GET /api/a2a/messages — Recent A2A message log.
 ///
-/// Returns an empty list until kernel message logging is implemented.
+/// Returns the most recent 100 messages from the kernel's A2A message log.
 pub(crate) async fn handle_a2a_messages(
-    _state: State<Arc<AppState>>,
+    state: State<Arc<AppState>>,
 ) -> Result<Json<serde_json::Value>, AppError> {
-    // TODO: Implement message logging in kernel A2AProtocol
-    Ok(Json(serde_json::json!({
-        "messages": Vec::<serde_json::Value>::new()
-    })))
+    let entries = state.kernel.a2a.get_message_log(Some(100));
+    let messages: Vec<serde_json::Value> = entries
+        .iter()
+        .map(|e| {
+            serde_json::json!({
+                "from": e.from.to_string(),
+                "to": e.to.to_string(),
+                "message_type": e.message_type,
+                "timestamp": e.timestamp.to_rfc3339(),
+                "content": e.content,
+            })
+        })
+        .collect();
+    Ok(Json(serde_json::json!({ "messages": messages })))
 }
 
 /// GET /api/a2a/topology — Agent communication topology.
 ///
 /// Returns nodes from the agent card registry. Edges are derived
-/// from the message log when available.
+/// from the message log — each unique (from, to) pair becomes an edge.
 pub(crate) async fn handle_a2a_topology(
     state: State<Arc<AppState>>,
 ) -> Result<Json<serde_json::Value>, AppError> {
     let agents = state.kernel.a2a.protocol().registry().list_agents().await;
+    let name_map: HashMap<uuid::Uuid, &str> = agents
+        .iter()
+        .map(|a| (a.agent_id, a.name.as_str()))
+        .collect();
+
     let nodes: Vec<serde_json::Value> = agents
         .iter()
         .map(|a| {
@@ -88,9 +104,26 @@ pub(crate) async fn handle_a2a_topology(
         })
         .collect();
 
-    // Edges will be populated from message log when available
+    // Derive edges from message log: unique (from, to) pairs.
+    let log_entries = state.kernel.a2a.get_message_log(None);
+    let mut edge_set = HashSet::new();
+    for entry in &log_entries {
+        edge_set.insert((entry.from, entry.to));
+    }
+    let edges: Vec<serde_json::Value> = edge_set
+        .iter()
+        .map(|(from, to)| {
+            let from_label = name_map.get(from).copied().unwrap_or("unknown");
+            let to_label = name_map.get(to).copied().unwrap_or("unknown");
+            serde_json::json!({
+                "source": from_label,
+                "target": to_label,
+            })
+        })
+        .collect();
+
     Ok(Json(serde_json::json!({
         "nodes": nodes,
-        "edges": Vec::<serde_json::Value>::new(),
+        "edges": edges,
     })))
 }
