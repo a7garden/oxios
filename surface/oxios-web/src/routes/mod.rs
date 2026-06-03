@@ -28,7 +28,7 @@ mod workspace;
 use std::sync::Arc;
 
 use axum::{
-    routing::{delete, get, post, put},
+    routing::{delete, get, patch, post, put},
     Router,
 };
 use serde::Deserialize;
@@ -107,8 +107,8 @@ pub(crate) use resource_routes::{
 };
 pub(crate) use system::{
     handle_agent_kill, handle_agents_list, handle_audit_verify_api, handle_backup,
-    handle_config_get, handle_config_put, handle_doctor, handle_health, handle_log,
-    handle_readiness, handle_status, handle_update_changelog, handle_update_check,
+    handle_config_get, handle_config_patch, handle_config_put, handle_doctor, handle_health,
+    handle_log, handle_readiness, handle_status, handle_update_changelog, handle_update_check,
     handle_update_run,
 };
 pub(crate) use workspace::{
@@ -201,6 +201,7 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         // Config
         .route("/api/config", get(handle_config_get))
         .route("/api/config", put(handle_config_put))
+        .route("/api/config", patch(handle_config_patch))
         // Engine
         .route("/api/engine/providers", get(handle_engine_providers))
         .route("/api/engine/models", get(handle_engine_models))

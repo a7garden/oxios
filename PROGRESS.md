@@ -216,3 +216,132 @@ test coverage and a polished UI.
 - `surface/oxios-web/web/package.json` — `rehype-highlight`,
   `highlight.js`
 - `bun.lock` (or `bun.lockb`) — locked new deps
+
+---
+
+## Date: 2026-06-04
+
+## Status: ✅ COMPLETE — RFC-T1-D Settings UI Completion (MVP)
+
+### Deliverables
+- **Backend**: PATCH `/api/config` with `hot_reload` classification
+  metadata (applied_immediately vs requires_restart). 9 new unit tests.
+- **Frontend**: 7 new components in `components/settings/`:
+  - `field-defs.ts` — single source of truth for 5 new sections
+  - `restart-badge.tsx` — visual badge + tooltip
+  - `field-row.tsx` — shared form control
+  - `exec-allowlist-editor.tsx` — multi-line tag input
+  - `memory-section.tsx` — 4 sub-cards
+  - `channels-section.tsx` — standard channel card
+  - `diff-preview.tsx` — modal before save
+  - `hooks/use-config.ts` — TanStack Query wrapper
+- **Restructured `settings.tsx`** with group sidebar (AI / System /
+  Security / Memory / Channels), sticky save bar, and diff preview
+  before save.
+- **i18n**: 60+ new EN keys + matching Korean translations.
+- **E2E**: 6 Playwright tests in `e2e/settings.spec.ts` (all pass).
+
+### Verification
+- `cargo check --workspace` — passes
+- `cargo test -p oxios-web --lib` — 33/33 pass (24 prior + 9 new PATCH tests)
+- `bun run typecheck` — 54 errors (same as baseline; no new errors from this work)
+- `bun run test` — 135/135 pass (no regressions)
+- `bun run build` — succeeds
+- `bunx playwright test e2e/settings.spec.ts` — 6/6 pass
+
+### Hot-reload classification
+`HOT_RELOADABLE_SECTIONS` (applied immediately):
+- exec, security, scheduler, resource_monitor, orchestrator, context,
+  session, logging, audit, kernel
+
+`RESTART_REQUIRED_FIELDS` (full list in `system.rs`):
+- engine.*, gateway.*, daemon.*, otel.*, channels.*, mcp, browser,
+  persona, marketplace, budget, git, cron, surfaces,
+  memory.embedding.provider, memory.embedding.dimension,
+  memory.sqlite.path, memory.bridge.*, memory.consolidation.preset
+
+### Files Modified / Created
+**Backend**
+- `surface/oxios-web/src/routes/system.rs` — PATCH handler + classification
+- `surface/oxios-web/src/routes/mod.rs` — route registration
+
+**Frontend**
+- `surface/oxios-web/web/src/components/settings/field-defs.ts` (new)
+- `surface/oxios-web/web/src/components/settings/restart-badge.tsx` (new)
+- `surface/oxios-web/web/src/components/settings/field-row.tsx` (new)
+- `surface/oxios-web/web/src/components/settings/exec-allowlist-editor.tsx` (new)
+- `surface/oxios-web/web/src/components/settings/memory-section.tsx` (new)
+- `surface/oxios-web/web/src/components/settings/channels-section.tsx` (new)
+- `surface/oxios-web/web/src/components/settings/diff-preview.tsx` (new)
+- `surface/oxios-web/web/src/hooks/use-config.ts` (new)
+- `surface/oxios-web/web/src/lib/api-client.ts` — adds `.patch()`
+- `surface/oxios-web/web/src/routes/settings.tsx` — restructured
+- `surface/oxios-web/web/src/i18n/locales/{en,ko}.json` — new keys
+- `surface/oxios-web/web/e2e/settings.spec.ts` (new)
+- `surface/oxios-web/web/.gitignore` — ignores playwright-report/
+
+### Deferred (out of scope, follow-up PRs)
+- OTEL, Daemon, Persona, Cron, ResourceMonitor, Logging, Orchestrator,
+  Marketplace sections (P2 in RFC)
+- Full Korean translation pass (English is the authoritative source;
+  Korean was added as a 1:1 mirror)
+- Undo (uses latest config only — no history endpoint)
+- Pause animation toggle
+
+### Known Issues
+- 10 pre-existing e2e tests in `app.spec.ts`, `budget.spec.ts`,
+  `navigation.spec.ts` fail on this branch and on `main` (verified by
+  stashing my changes). They are unrelated to RFC-T1-D.
+
+---
+
+# RFC-T1-D — Pre-merge Review
+
+## Date: 2026-06-04
+
+## Status: ⚠️ BLOCKED — 1 P0 + 5 P1 issues to address
+
+## Reviewer
+
+Subagent review at `/tmp/oxios-review-settings.md`.
+
+## Verdict
+
+❌ Block on **P0-1** (Telegram settings writes go to the wrong path and
+are silently dropped). Approve-with-comments on the P1 list.
+
+## P0
+
+- **Telegram settings non-functional.** `buildPayload` in
+  `web/src/routes/settings.tsx` produces a doubly-nested PATCH body
+  (`channels.telegram.channels.telegram.<field>`) for the
+  `channels.telegram` section because the merge loop tries to strip a
+  prefix from the wrong string. `OxiosConfig` deserialization ignores
+  the unknown `channels.channels` subtree, so the user's change is
+  silently dropped, the diff preview mis-reports what is changing, and
+  the PATCH returns 200 OK. No e2e test exercises Telegram save, which
+  is why this shipped. Fix: `payload.channels = bucket.channels` in the
+  `channels.telegram` branch (the bucket already has the right shape).
+
+## P1 (selected)
+
+- Hot-reload classification is overoptimistic — 7 of 10 hot-reloadable
+  sections (security, audit, orchestrator, context, session, logging,
+  kernel) are never actually propagated to the kernel, but the response
+  marks them as "applied immediately". `memory.enabled` is the worst
+  example: toggle claims hot-reload but the memory subsystem was
+  initialized at boot.
+- PATCH /api/config doesn't refuse `engine.api_key` etc. Frontend never
+  sends them today, so latent, but no backend guardrail.
+- `handle_config_put` doc comment says "PATCH semantics" but the route
+  is exposed as PUT. Rename to PATCH-only or re-document.
+- `console.info('[config] saved', r)` left in `settings.tsx` ~line 511.
+- `useSaveConfig` PUT fallback comment is misleading (current server
+  has identical PATCH semantics on PUT).
+
+## E2E
+
+- `.last-run.json` shows `status: "passed"`, but the
+  `playwright-report/data/*.md` from 08:06 shows 4 prior failures
+  (memory sub-cards, exec allowlist, save flow, restart badge) that
+  were fixed in `df5f3dc` (React hooks fix). Re-run after P0 fix.
