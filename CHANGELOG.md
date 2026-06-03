@@ -5,6 +5,19 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+- **Release profile applied** — `Cargo.toml` now defines `[profile.release]` with `lto = "thin"`, `codegen-units = 1`, `strip = true`, `panic = "abort"`, `opt-level = 3`. Binary size reduced from ~66 MB → ~50 MB. See `docs/production-audit/07-infra/RELEASE-PROFILE.md`.
+- **CI workflow hardened** — Workflow-level `permissions: contents: read`; `cargo-audit` switched to `taiki-e/install-action` (saves ~30-60s/run); target cache key now includes `${{ github.sha }}` for better partial hits; frontend job now runs `typecheck`, `test`, and `lint` (was build-only).
+- **Release workflow permissions** — Workflow-level read-only default; release job keeps `contents: write`.
+
+### Removed
+- **Legacy `share/default-programs/`** — Superseded by `share/default-skills/` per RFC-009. The three legacy skills (`code-review`, `refactor`, `debug`) had been duplicated to the skills directory; the program.toml manifests are gone.
+
+### Fixed
+- **Dead-code warning** — `WebDistResult::Embedded` marked `#[allow(dead_code)]` with a doc comment explaining it is a public-API variant reserved for future `rust-embed` use.
+
 ## [1.0.2] - 2026-05-31
 
 ### Changed

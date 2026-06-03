@@ -34,6 +34,11 @@ pub enum WebDistResult {
     /// Downloaded from GitHub Releases.
     Downloaded { path: PathBuf, version: String },
     /// No filesystem web UI — embedded assets will be used.
+    ///
+    /// Reserved for future use when the binary is built with `rust-embed`.
+    /// Currently not constructed by `ensure_web_dist` (downloaded dist is preferred)
+    /// but exposed so callers can match exhaustively.
+    #[allow(dead_code)]
     Embedded,
     /// Download failed — embedded assets will be used as fallback.
     DownloadFailed { reason: String },

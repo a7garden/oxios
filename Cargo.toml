@@ -15,6 +15,19 @@ categories = ["command-line-utilities", "asynchronous"]
 [profile.dev.package."*"]
 opt-level = 2
 
+# Release profile: balance between binary size, compile time, and runtime speed.
+#   lto            — cross-crate optimization at link time (~15-25% size reduction)
+#   codegen-units  — single translation unit for better inlining
+#   strip          — remove debug symbols (huge binary size win)
+#   panic          — abort (smaller binary; we don't use catch_unwind)
+# See docs/production-audit/07-infra/RELEASE-PROFILE.md for trade-off analysis.
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = true
+panic = "abort"
+opt-level = 3
+
 [workspace]
 resolver = "2"
 members = [

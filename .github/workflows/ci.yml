@@ -5,6 +5,10 @@ on:
     branches: [main, develop]
   pull_request:
 
+# Restrict default token permissions; jobs that need more (e.g. release) override.
+permissions:
+  contents: read
+
 env:
   CARGO_TERM_COLOR: always
 
@@ -15,10 +19,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          repository: a7garden/oxi
-          path: oxi
-          ref: v0.4.4
 
       - name: Read rust-toolchain channel
         id: rust-channel
@@ -35,8 +35,6 @@ jobs:
           toolchain: ${{ steps.rust-channel.outputs.channel }}
           components: rustfmt, clippy
 
-      - uses: actions/checkout@v4
-
       - name: Check formatting
         run: cargo fmt --all -- --check
 
@@ -50,6 +48,8 @@ jobs:
             -D warnings
 
   # ─── Frontend ─────────────────────────────────────────────────────
+  # Verifies web app: install deps, typecheck, run unit tests, build.
+  # E2E (Playwright) is intentionally not run in CI — slow and flaky in container.
   frontend:
     name: frontend
     runs-on: ubuntu-latest
@@ -58,9 +58,25 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
 
-      - name: Build web assets
+      - name: Install deps
         working-directory: surface/oxios-web/web
-        run: bun install && bun run build
+        run: bun install --frozen-lockfile
+
+      - name: Type check
+        working-directory: surface/oxios-web/web
+        run: bun run typecheck
+
+      - name: Unit tests
+        working-directory: surface/oxios-web/web
+        run: bun run test
+
+      - name: Lint
+        working-directory: surface/oxios-web/web
+        run: bun run lint
+
+      - name: Build
+        working-directory: surface/oxios-web/web
+        run: bun run build
 
   # ─── Test Suite ────────────────────────────────────────────────────
   test:
@@ -77,10 +93,6 @@ jobs:
           - [4/4, 1]
     steps:
       - uses: actions/checkout@v4
-        with:
-          repository: a7garden/oxi
-          path: oxi
-          ref: v0.4.4
 
       - name: Read rust-toolchain channel
         id: rust-channel
@@ -99,8 +111,6 @@ jobs:
       - name: Install nextest
         uses: taiki-e/install-action@nextest
 
-      - uses: actions/checkout@v4
-
       - name: Cache cargo registry
         uses: actions/cache@v4
         with:
@@ -116,10 +126,12 @@ jobs:
       - name: Cache target directory
         uses: actions/cache@v4
         with:
+          # Include github.sha so identical Cargo.lock state across commits
+          # still produces a primary hit; restore-keys fall back to shared state.
           path: target
-          key: ${{ runner.os }}-target-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-target-${{ hashFiles('**/Cargo.lock') }}-${{ github.sha }}
           restore-keys: |
-            ${{ runner.os }}-target-
+            ${{ runner.os }}-target-${{ hashFiles('**/Cargo.lock') }}-
 
       - name: Run unit tests (partitioned)
         run: |
@@ -151,11 +163,14 @@ jobs:
         with:
           toolchain: ${{ steps.rust-channel.outputs.channel }}
 
+      - name: Install cargo-audit
+        uses: taiki-e/install-action@cargo-audit
+
       - name: Security audit
+        # Audit failures are non-blocking by policy — see audit.toml for ignored
+        # advisories. Review the run log and open an issue for any new RUSTSEC.
         continue-on-error: true
-        run: |
-          cargo install cargo-audit --locked
-          cargo audit
+        run: cargo audit
 
   # ─── Summary ───────────────────────────────────────────────────────
   summary:
