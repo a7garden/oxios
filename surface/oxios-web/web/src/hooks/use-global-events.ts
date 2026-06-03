@@ -1,19 +1,22 @@
-import { useEffect, useRef } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { useNotificationStore } from '@/stores/notifications'
+import { useEffect, useRef } from 'react'
 import { useEvents } from '@/hooks/use-events'
 import { api } from '@/lib/api-client'
+import { useNotificationStore } from '@/stores/notifications'
 import type { OxiosEvent } from '@/types'
 
 /**
  * Global event listener that converts backend events into notifications.
  *
- * Rules:
- * - approval.requested → warning notification, link /approvals
- * - agent.failed → error notification
- * - agent.completed → success notification (only if it was running)
- * - agent.started → info notification
+ * Rules (matching the snake_case wire format emitted by `sanitize_event`):
+ * - approval_requested → warning notification, link /approvals
+ * - agent_failed → error notification
+ * - agent_started → info notification
  * - Duplicate suppression: same (type, agent_id) within 30s is ignored.
+ *
+ * NOTE: there is no `agent_completed` event on the wire — the backend only
+ * emits `agent_stopped`. Successful completion is a `stopped` event with no
+ * error payload. Notification rules here intentionally omit it.
  */
 export function useGlobalEvents() {
   const add = useNotificationStore((s) => s.add)
@@ -51,9 +54,7 @@ export function useApprovalWatcher() {
   const { data } = useQuery({
     queryKey: ['approvals-pending-count'],
     queryFn: async () => {
-      const res = await api.get<
-        { id: string; status: string }[]
-      >('/api/approvals')
+      const res = await api.get<{ id: string; status: string }[]>('/api/approvals')
       const items = Array.isArray(res) ? res : []
       return items.filter((a) => a.status === 'pending').length
     },
@@ -81,13 +82,11 @@ export function useApprovalWatcher() {
 
 function eventTitle(e: OxiosEvent): string | null {
   switch (e.type) {
-    case 'approval.requested':
+    case 'approval_requested':
       return 'Approval Required'
-    case 'agent.failed':
+    case 'agent_failed':
       return 'Agent Failed'
-    case 'agent.completed':
-      return 'Agent Completed'
-    case 'agent.started':
+    case 'agent_started':
       return 'Agent Started'
     default:
       return null
@@ -102,12 +101,10 @@ function eventMessage(e: OxiosEvent): string {
 
 function eventSeverity(e: OxiosEvent): 'info' | 'warning' | 'error' | 'success' {
   switch (e.type) {
-    case 'approval.requested':
+    case 'approval_requested':
       return 'warning'
-    case 'agent.failed':
+    case 'agent_failed':
       return 'error'
-    case 'agent.completed':
-      return 'success'
     default:
       return 'info'
   }
@@ -115,11 +112,10 @@ function eventSeverity(e: OxiosEvent): 'info' | 'warning' | 'error' | 'success' 
 
 function eventLink(e: OxiosEvent): string | undefined {
   switch (e.type) {
-    case 'approval.requested':
+    case 'approval_requested':
       return '/approvals'
-    case 'agent.failed':
-    case 'agent.completed':
-    case 'agent.started':
+    case 'agent_failed':
+    case 'agent_started':
       return e.agent_id ? `/agents` : undefined
     default:
       return undefined
