@@ -216,3 +216,74 @@ test coverage and a polished UI.
 - `surface/oxios-web/web/package.json` — `rehype-highlight`,
   `highlight.js`
 - `bun.lock` (or `bun.lockb`) — locked new deps
+
+# RFC-T1-C: Live Operations Dashboard
+
+## Date: 2026-06-04
+
+## Status: ✅ COMPLETE — MVP delivered (3 of 6 widgets; 3 deferred per scope)
+
+## Summary
+
+Rewrote the home dashboard from a static 4-card overview into a
+"Live Operations Center" pattern (TweetDeck/Grafana-lite). The MVP
+ships the 3 most impactful widgets per RFC §Scope; the remaining 3
+(Resource Trends, Active Agents with traces, Scheduler Next) are
+deferred to RFC-T1-D.
+
+### Widgets delivered (3)
+1. **5 KPI cards with sparkline + delta** (`components/dashboard/stat-card.tsx`)
+   - Total Agents · Running Agents · Tokens/min · CPU · Pending Approvals
+   - Sparkline driven by `useResourceHistory(30)` for CPU and a new
+     `useTokenRate` hook for tokens/min (derived from SSE `token_usage_update`).
+2. **Live Activity Feed** (`components/dashboard/live-activity-feed.tsx`)
+   - Subscribes to the existing singleton SSE store via `useEvents`.
+   - Filters to ~20 interesting event types (agent.fork/kill/done,
+     tool.start/end, memory.recall, approval.requested/resolved, etc.)
+   - 200-item cap, event-type filter dropdown, ⏸ Pause toggle that
+     snapshots the list for analysis.
+3. **Approvals Queue (inline actions)** (`components/dashboard/approvals-queue.tsx`)
+   - Uses `useApprovals` with optimistic TanStack Query mutations.
+   - Hides the entire card when there are 0 pending.
+
+### Supporting infrastructure
+- `lib/event-formatter.ts` — central mapping of SSE event types to
+  icon / color / one-line summary + click-routing. Reusable beyond
+  the dashboard (e.g. the existing `/events` page or notifications).
+- `hooks/use-approvals.ts` — shared approvals hook with optimistic
+  approve/reject (also used by the `/approvals` page).
+- `hooks/use-resource-history.ts` — `useResourceHistory(lastN)` +
+  `seriesFromSnapshots` + `computeDelta` helpers.
+- `hooks/use-token-rate.ts` — derives tokens/min from the SSE stream.
+- `routes/index.tsx` — DashboardLayout rewrite. Layout: stat row →
+  (Live Activity Feed | Active Agents preview) → Approvals Queue →
+  System Health → Model Usage → Quick Links.
+
+### i18n
+- ~15 new keys added under `dashboard.*` in `en.json` and `ko.json`
+  (e.g. `tokensPerMin`, `liveActivity`, `pause`, `resume`,
+  `pendingApprovals`, `needsAttention`, `moreEvents`, …).
+
+### Tests
+- 3 Playwright smoke tests in `e2e/dashboard.spec.ts` — all 3 pass
+  against a running oxios daemon. The CI workflow intentionally does
+  NOT run Playwright (per `.github/workflows/ci.yml`); e2e is for
+  local dev only.
+- 135/135 unit tests still pass.
+- `bun run typecheck` — 0 new errors introduced (baseline 54
+  pre-existing, unchanged after my changes).
+- `bun run build` — succeeds.
+
+### Deferred to follow-up (per RFC scope, RFC-T1-D)
+- **Resource Trends area chart** (3-series CPU/MEM/TOK with threshold
+  lines) — slot reserved at top-right of the activity row.
+- **Active Agents list with traces** (per-agent elapsed time, tokens,
+  click-through to trace view).
+- **Scheduler Next widget** (next 3 cron jobs with countdown).
+- Widget on/off customization, animated transitions.
+
+### Files Modified
+- `surface/oxios-web/web/src/routes/index.tsx` — DashboardLayout
+  rewrite (replaces static 4-card view)
+- `surface/oxios-web/web/src/i18n/locales/en.json` — +15 keys
+- `surface/oxios-web/web/src/i18n/locales/ko.json` — +15 keys
