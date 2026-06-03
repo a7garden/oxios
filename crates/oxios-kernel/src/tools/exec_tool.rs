@@ -31,7 +31,6 @@ use crate::access_manager::AccessManager;
 use crate::access_manager::{AccessGate, AgentContext};
 use crate::config::ExecConfig;
 
-
 // ─── Shell metacharacter blocklist ──────────
 
 /// Characters that are rejected in structured-mode arguments.
@@ -157,7 +156,10 @@ impl ExecTool {
     ///
     /// **Warning:** This bypasses the new `AgentContext` / `AccessGate` path.
     /// Use only for migration or testing.
-    pub fn new_unrestricted(config: crate::kernel_handle::SharedExecConfig, access: Arc<Mutex<AccessManager>>) -> Self {
+    pub fn new_unrestricted(
+        config: crate::kernel_handle::SharedExecConfig,
+        access: Arc<Mutex<AccessManager>>,
+    ) -> Self {
         Self {
             config,
             access,
@@ -345,7 +347,8 @@ impl ExecTool {
             );
         }
 
-        let effective_timeout = timeout_ms.clamp(1_000, self.config.read().max_timeout_secs * 1_000);
+        let effective_timeout =
+            timeout_ms.clamp(1_000, self.config.read().max_timeout_secs * 1_000);
 
         let start = std::time::Instant::now();
 
@@ -672,7 +675,10 @@ mod tests {
             ..Default::default()
         };
         config.allowed_commands = allowed_commands.into_iter().map(String::from).collect();
-        ExecTool::new_unrestricted(Arc::new(parking_lot::RwLock::new(config)), Arc::new(Mutex::new(AccessManager::new())))
+        ExecTool::new_unrestricted(
+            Arc::new(parking_lot::RwLock::new(config)),
+            Arc::new(Mutex::new(AccessManager::new())),
+        )
     }
 
     // ─── shell_exec ──────────────────────────────────────────────────
@@ -1053,7 +1059,11 @@ mod tests {
             }
         }
         let ctx = crate::access_manager::AgentContext::test_fixture(agent_name);
-        ExecTool::new(Arc::new(parking_lot::RwLock::new(config)), Arc::new(Mutex::new(access)), ctx)
+        ExecTool::new(
+            Arc::new(parking_lot::RwLock::new(config)),
+            Arc::new(Mutex::new(access)),
+            ctx,
+        )
     }
 
     #[tokio::test]
@@ -1117,7 +1127,10 @@ mod tests {
         let mut config = ExecConfig::default();
         config.allow_shell_mode = true; // Enable shell mode for this test
         let access = AccessManager::new(); // empty — no permissions for anyone
-        let tool = ExecTool::new_unrestricted(Arc::new(parking_lot::RwLock::new(config)), Arc::new(Mutex::new(access)));
+        let tool = ExecTool::new_unrestricted(
+            Arc::new(parking_lot::RwLock::new(config)),
+            Arc::new(Mutex::new(access)),
+        );
         let result = tool.shell_exec("echo unrestricted", 5_000, None).await;
         assert!(
             result.is_ok(),

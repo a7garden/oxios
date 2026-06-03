@@ -41,9 +41,6 @@ use crate::a2a::A2AProtocol;
 use crate::access_manager::AccessManager;
 use crate::auth::AuthManager;
 use crate::budget::BudgetManager;
-use oxi_sdk::observability::AuditTrail;
-use crate::skill::clawhub::{ClawHubClient, ClawHubInstaller};
-use crate::skill::skills_sh::{SkillsShClient, SkillsShInstaller};
 use crate::config::OxiosConfig;
 use crate::cron::CronScheduler;
 use crate::event_bus::EventBus;
@@ -54,9 +51,12 @@ use crate::memory::MemoryManager;
 use crate::persona::PersonaManager;
 use crate::resource_monitor::ResourceMonitor;
 use crate::scheduler::AgentScheduler;
+use crate::skill::clawhub::{ClawHubClient, ClawHubInstaller};
+use crate::skill::skills_sh::{SkillsShClient, SkillsShInstaller};
 use crate::skill::SkillManager;
 use crate::state_store::StateStore;
 use crate::supervisor::Supervisor;
+use oxi_sdk::observability::AuditTrail;
 use serde::Serialize;
 use std::sync::Arc;
 use std::time::Instant;
@@ -211,7 +211,10 @@ impl KernelHandle {
                 start_time,
             ),
             projects: None,
-            exec: ExecApi::new(Arc::new(parking_lot::RwLock::new(config.exec.clone())), access_manager),
+            exec: ExecApi::new(
+                Arc::new(parking_lot::RwLock::new(config.exec.clone())),
+                access_manager,
+            ),
             #[allow(clippy::default_trait_access)]
             browser: BrowserApi::default(),
             a2a: A2aApi::new(Arc::new(A2AProtocol::new(crate::EventBus::new(0)))),

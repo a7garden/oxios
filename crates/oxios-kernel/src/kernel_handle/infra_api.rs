@@ -41,7 +41,9 @@ impl InfraApi {
             event_bus,
             config,
             start_time,
-            orchestrator_config: parking_lot::RwLock::new(crate::config::OrchestratorConfig::default()),
+            orchestrator_config: parking_lot::RwLock::new(
+                crate::config::OrchestratorConfig::default(),
+            ),
         }
     }
     /// Get a reference to the GitLayer.

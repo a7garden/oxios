@@ -109,11 +109,11 @@ impl CompactionLevel {
     /// compress more aggressively because the source data is more verbose.
     fn compression_ratio(&self) -> f64 {
         match self {
-            CompactionLevel::Raw => 0.30,   // Keep 30% of raw lines
-            CompactionLevel::Daily => 0.40, // Keep 40% of daily lines
-            CompactionLevel::Weekly => 0.50, // Keep 50% of weekly lines
+            CompactionLevel::Raw => 0.30,     // Keep 30% of raw lines
+            CompactionLevel::Daily => 0.40,   // Keep 40% of daily lines
+            CompactionLevel::Weekly => 0.50,  // Keep 50% of weekly lines
             CompactionLevel::Monthly => 0.60, // Keep 60% of monthly lines
-            CompactionLevel::Root => 1.0,   // Root is never compressed further
+            CompactionLevel::Root => 1.0,     // Root is never compressed further
         }
     }
 
@@ -250,7 +250,11 @@ impl CompactionTree {
 
         // Add header indicating promotion
         let header = match level.next() {
-            Some(next) => format!("[{} summary from {} entries]", next.dir_name(), entries.len()),
+            Some(next) => format!(
+                "[{} summary from {} entries]",
+                next.dir_name(),
+                entries.len()
+            ),
             None => format!("[Root summary from {} entries]", entries.len()),
         };
 
@@ -491,7 +495,10 @@ mod tests {
         let tree = CompactionTree::default_tree();
         let content = "line 1\nline 2\nline 3";
         let result = tree.compact_to_level(content, CompactionLevel::Daily, CompactionLevel::Raw);
-        assert_eq!(result, content, "Compacting to lower level should return unchanged");
+        assert_eq!(
+            result, content,
+            "Compacting to lower level should return unchanged"
+        );
     }
 
     #[test]
@@ -507,10 +514,7 @@ mod tests {
             result.lines().count() < content.lines().count(),
             "Should be compacted"
         );
-        assert!(
-            result.contains("line 0"),
-            "Should preserve first line"
-        );
+        assert!(result.contains("line 0"), "Should preserve first line");
     }
 
     #[test]
@@ -595,7 +599,10 @@ mod tests {
         let tree = CompactionTree::default_tree();
         let content = "line 1\nline 2";
         let result = tree.compact_single_level(content, CompactionLevel::Raw);
-        assert_eq!(result, content, "Very short content should not be compacted");
+        assert_eq!(
+            result, content,
+            "Very short content should not be compacted"
+        );
     }
 
     #[test]

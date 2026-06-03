@@ -734,7 +734,8 @@ impl Orchestrator {
                 .run_evolution_loop(&session_id, &seed, exec_result)
                 .await?;
 
-            let passed = eval.all_passed() && eval.score >= self.evolution_config.read().score_threshold;
+            let passed =
+                eval.all_passed() && eval.score >= self.evolution_config.read().score_threshold;
 
             self.publish_phase_completed(
                 &session_id,

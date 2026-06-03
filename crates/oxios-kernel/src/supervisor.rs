@@ -456,9 +456,7 @@ mod tests {
                     crate::state_store::StateStore::new(tmp.join("state2")).expect("state store 2"),
                 ),
             ),
-            crate::kernel_handle::PersonaApi::new(Arc::new(
-                                crate::persona::PersonaManager::new(),
-            )),
+            crate::kernel_handle::PersonaApi::new(Arc::new(crate::persona::PersonaManager::new())),
             crate::kernel_handle::ExtensionApi::new(Arc::new(crate::skill::SkillManager::new(
                 tmp.join("skills"),
                 tmp.join("share/skills"),
@@ -482,7 +480,9 @@ mod tests {
             ),
             None,
             crate::kernel_handle::ExecApi::new(
-                Arc::new(parking_lot::RwLock::new(crate::config::ExecConfig::default())),
+                Arc::new(parking_lot::RwLock::new(
+                    crate::config::ExecConfig::default(),
+                )),
                 Arc::new(parking_lot::Mutex::new(
                     crate::access_manager::AccessManager::new(),
                 )),
@@ -515,13 +515,18 @@ mod tests {
                     tmp.join("state"),
                     None,
                 )),
-                Arc::new(crate::skill::clawhub::ClawHubClient::new(None).expect("valid ClawHub client")),
+                Arc::new(
+                    crate::skill::clawhub::ClawHubClient::new(None).expect("valid ClawHub client"),
+                ),
                 Arc::new(crate::skill::skills_sh::SkillsShInstaller::new(
                     tmp.join("skills"),
                     None,
                     None,
                 )),
-                Arc::new(crate::skill::skills_sh::SkillsShClient::new(None, None).expect("valid Skills.sh client")),
+                Arc::new(
+                    crate::skill::skills_sh::SkillsShClient::new(None, None)
+                        .expect("valid Skills.sh client"),
+                ),
             ),
         ));
 

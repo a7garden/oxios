@@ -272,6 +272,11 @@ impl Kernel {
         &self.config
     }
 
+    /// Orchestrator reference — for hot-reload config propagation.
+    pub fn orchestrator(&self) -> &Arc<Orchestrator> {
+        &self.orchestrator
+    }
+
     /// Flush audit trail entries to persistent storage.
     /// Call during graceful shutdown to ensure no entries are lost.
     pub fn flush_audit(&self) -> anyhow::Result<()> {

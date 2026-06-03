@@ -188,7 +188,10 @@ impl MemoryManager {
         if let Some(ref sqlite) = self.sqlite_store {
             return sqlite.get(id, memory_type);
         }
-        let result: Option<MemoryEntry> = self.state_store.load_json(memory_type.category(), id).await?;
+        let result: Option<MemoryEntry> = self
+            .state_store
+            .load_json(memory_type.category(), id)
+            .await?;
         if let Some(mut entry) = result {
             AutoProtector::record_access(&mut entry, "");
             Ok(Some(entry))

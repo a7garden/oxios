@@ -53,6 +53,6 @@ pub use client::SkillsShClient;
 pub use installer::{SkillsShInstallResult, SkillsShInstaller, SkillsShOrigin};
 pub use types::{
     SkillsShAuditEntry, SkillsShAuditResponse, SkillsShCuratedOwner, SkillsShCuratedResponse,
-    SkillsShFile, SkillsShListResponse, SkillsShPagination, SkillsShSearchResponse,
-    SkillsShSkill, SkillsShSkillDetail,
+    SkillsShFile, SkillsShListResponse, SkillsShPagination, SkillsShSearchResponse, SkillsShSkill,
+    SkillsShSkillDetail,
 };

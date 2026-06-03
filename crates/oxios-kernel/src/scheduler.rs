@@ -256,8 +256,10 @@ impl AgentScheduler {
             let mut limiter = self.rate_limiter.lock();
             *limiter = RateLimiter::new(60, rate_limit_per_minute);
         }
-        self.max_concurrent.store(max_concurrent, std::sync::atomic::Ordering::Relaxed);
-        self.zombie_timeout_secs.store(zombie_timeout_secs, std::sync::atomic::Ordering::Relaxed);
+        self.max_concurrent
+            .store(max_concurrent, std::sync::atomic::Ordering::Relaxed);
+        self.zombie_timeout_secs
+            .store(zombie_timeout_secs, std::sync::atomic::Ordering::Relaxed);
         tracing::info!(
             max_concurrent,
             rate_limit_per_minute,
@@ -295,10 +297,16 @@ impl AgentScheduler {
         // Check if we can start a new task.
         {
             let running = self.running.lock();
-            if running.len() >= self.max_concurrent.load(std::sync::atomic::Ordering::Relaxed) {
+            if running.len()
+                >= self
+                    .max_concurrent
+                    .load(std::sync::atomic::Ordering::Relaxed)
+            {
                 tracing::debug!(
                     running = running.len(),
-                    max = self.max_concurrent.load(std::sync::atomic::Ordering::Relaxed),
+                    max = self
+                        .max_concurrent
+                        .load(std::sync::atomic::Ordering::Relaxed),
                     "Max concurrent limit reached"
                 );
                 return None;
@@ -450,7 +458,10 @@ impl AgentScheduler {
     /// Returns the IDs of tasks that were reaped.
     pub fn reap_zombies(&self) -> Vec<Uuid> {
         let now = Utc::now();
-        let timeout = chrono::Duration::seconds(self.zombie_timeout_secs.load(std::sync::atomic::Ordering::Relaxed) as i64);
+        let timeout = chrono::Duration::seconds(
+            self.zombie_timeout_secs
+                .load(std::sync::atomic::Ordering::Relaxed) as i64,
+        );
         let mut start_times = self.task_start_times.lock();
         let mut running = self.running.lock();
         let mut reaped = Vec::new();
@@ -466,7 +477,8 @@ impl AgentScheduler {
                 task.status = TaskStatus::Failed;
                 task.error = Some(format!(
                     "zombie: ran for >{} seconds",
-                    self.zombie_timeout_secs.load(std::sync::atomic::Ordering::Relaxed)
+                    self.zombie_timeout_secs
+                        .load(std::sync::atomic::Ordering::Relaxed)
                 ));
                 reaped.push(id);
                 tracing::warn!(
@@ -562,7 +574,9 @@ impl AgentScheduler {
             running: running.len(),
             completed: _completed,
             failed: _failed,
-            max_concurrent: self.max_concurrent.load(std::sync::atomic::Ordering::Relaxed),
+            max_concurrent: self
+                .max_concurrent
+                .load(std::sync::atomic::Ordering::Relaxed),
             rate_limit_per_minute: rate_limiter.max_requests,
             rate_remaining: rate_limiter.remaining(),
         }

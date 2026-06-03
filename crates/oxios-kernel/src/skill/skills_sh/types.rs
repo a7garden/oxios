@@ -26,7 +26,11 @@ pub struct SkillsShSkill {
     /// Direct link on skills.sh.
     pub url: String,
     /// Present and true if this skill is a detected fork/copy.
-    #[serde(rename = "isDuplicate", default, skip_serializing_if = "std::ops::Not::not")]
+    #[serde(
+        rename = "isDuplicate",
+        default,
+        skip_serializing_if = "std::ops::Not::not"
+    )]
     pub is_duplicate: bool,
 }
 

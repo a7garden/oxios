@@ -104,10 +104,7 @@ impl MarketplaceApi {
     }
 
     /// Get detailed info for a skills.sh skill (including file contents).
-    pub async fn get_skills_sh_skill(
-        &self,
-        id: &str,
-    ) -> anyhow::Result<SkillsShSkillDetail> {
+    pub async fn get_skills_sh_skill(&self, id: &str) -> anyhow::Result<SkillsShSkillDetail> {
         self.skills_sh_client.get_skill(id).await
     }
 
@@ -117,10 +114,7 @@ impl MarketplaceApi {
     }
 
     /// Update a skill from skills.sh.
-    pub async fn update_skills_sh(
-        &self,
-        skill_id: &str,
-    ) -> anyhow::Result<SkillsShInstallResult> {
+    pub async fn update_skills_sh(&self, skill_id: &str) -> anyhow::Result<SkillsShInstallResult> {
         self.skills_sh_installer.update(skill_id).await
     }
 

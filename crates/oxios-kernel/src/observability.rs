@@ -42,16 +42,30 @@ use oxi_sdk::ModelRegistry;
 // intentionally NOT re-exported here: they live in the dormant `audit_trail`
 // module of oxi-sdk and will be activated in Phase F (RFC-014).
 pub use oxi_sdk::{
-    // ── Tracing ────────────────────────────────────────────────────────
-    // Distributed spans for agent/tool/kernel operations.
-    Span, SpanContext, SpanGuard, SpanId, SpanKind, SpanStatus, TraceId, Tracer,
-    // ── Cost ───────────────────────────────────────────────────────────
-    // Per-agent token usage and cost accounting.
-    CostBreakdown, CostSnapshot, CostTracker, CostTrackerConfig, GlobalCostSnapshot, TokenUsage,
     // ── Audit (in-memory) ──────────────────────────────────────────────
     // Simple structured audit log. Replaced by `audit_trail` (blake3 chain)
     // in Phase F.
-    AuditEntry, AuditFilter, AuditLog,
+    AuditEntry,
+    AuditFilter,
+    AuditLog,
+    // ── Cost ───────────────────────────────────────────────────────────
+    // Per-agent token usage and cost accounting.
+    CostBreakdown,
+    CostSnapshot,
+    CostTracker,
+    CostTrackerConfig,
+    GlobalCostSnapshot,
+    // ── Tracing ────────────────────────────────────────────────────────
+    // Distributed spans for agent/tool/kernel operations.
+    Span,
+    SpanContext,
+    SpanGuard,
+    SpanId,
+    SpanKind,
+    SpanStatus,
+    TokenUsage,
+    TraceId,
+    Tracer,
 };
 use std::sync::Arc;
 

@@ -6,8 +6,8 @@
 use anyhow::Result;
 use parking_lot::RwLock;
 
-use super::{default_personas, Persona};
 use super::store::PersonaStore;
+use super::{default_personas, Persona};
 
 /// Manages persona lifecycle and coordinates persona-aware execution.
 #[derive(Debug)]

@@ -132,7 +132,9 @@ mod tests {
             ),
             None,
             crate::ExecApi::new(
-                Arc::new(parking_lot::RwLock::new(crate::config::ExecConfig::default())),
+                Arc::new(parking_lot::RwLock::new(
+                    crate::config::ExecConfig::default(),
+                )),
                 Arc::new(parking_lot::Mutex::new(
                     crate::access_manager::AccessManager::new(),
                 )),
@@ -165,13 +167,18 @@ mod tests {
                     base.join("workspace"),
                     None,
                 )),
-                Arc::new(crate::skill::clawhub::ClawHubClient::new(None).expect("valid ClawHub client")),
+                Arc::new(
+                    crate::skill::clawhub::ClawHubClient::new(None).expect("valid ClawHub client"),
+                ),
                 Arc::new(crate::skill::skills_sh::SkillsShInstaller::new(
                     base.join("skills"),
                     None,
                     None,
                 )),
-                Arc::new(crate::skill::skills_sh::SkillsShClient::new(None, None).expect("valid Skills.sh client")),
+                Arc::new(
+                    crate::skill::skills_sh::SkillsShClient::new(None, None)
+                        .expect("valid Skills.sh client"),
+                ),
             ),
         ));
 

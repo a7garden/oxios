@@ -524,7 +524,15 @@ impl A2AProtocol {
     pub fn get_message_log(&self, limit: Option<usize>) -> Vec<A2AMessageLogEntry> {
         let log = self.message_log.read();
         match limit {
-            Some(n) => log.iter().rev().take(n).cloned().collect::<Vec<_>>().into_iter().rev().collect(),
+            Some(n) => log
+                .iter()
+                .rev()
+                .take(n)
+                .cloned()
+                .collect::<Vec<_>>()
+                .into_iter()
+                .rev()
+                .collect(),
             None => log.clone(),
         }
     }

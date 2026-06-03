@@ -54,9 +54,9 @@ pub mod persona;
 // 에이전트가 사용하는 도구, 스킬.
 pub mod skill;
 pub mod tools;
-pub mod workers;
 #[cfg(feature = "wasm-sandbox")]
 pub mod wasm_sandbox;
+pub mod workers;
 
 // ─── State & Config ─────────────────────────────────────────────────
 // 영속 상태, 설정, 백업, 리소스 모니터링.
@@ -117,14 +117,14 @@ pub use access_manager::{
 // AuditTrail types are re-exported from oxi-sdk (Phase F: removed
 // 1134-line duplicate). `AgentId as AuditAgentId` preserves the
 // historical kernel-level type alias.
-pub use oxi_sdk::observability::audit_trail::AgentId as AuditAgentId;
-pub use oxi_sdk::observability::{
-    AuditAction, AuditError, AuditPersistence, AuditTrail, HashDigest, TrailEntry,
-};
 pub use auth::{AuthManager, KeyMeta};
 pub use capability::template::CapabilityTemplate;
 pub use capability::{CSpace, Capability, CapabilityId, Issuer, ResourceRef, Rights};
 pub use credential::CredentialStore;
+pub use oxi_sdk::observability::audit_trail::AgentId as AuditAgentId;
+pub use oxi_sdk::observability::{
+    AuditAction, AuditError, AuditPersistence, AuditTrail, HashDigest, TrailEntry,
+};
 
 // ─── Communication ──────────────────────────────────────────────────
 pub use a2a::{
@@ -183,15 +183,14 @@ pub use skill::clawhub::{
     ClawHubSearchResult, ClawHubSkillDetail, ClawHubSkillMeta, ClawHubVersion, DownloadedArchive,
     InstallResult, UpdateAvailable, UpdateResult,
 };
+pub use skill::skills_sh::{
+    SkillsShAuditEntry, SkillsShAuditResponse, SkillsShClient, SkillsShFile, SkillsShInstallResult,
+    SkillsShInstaller, SkillsShOrigin, SkillsShSearchResponse, SkillsShSkill, SkillsShSkillDetail,
+};
 pub use skill::{
     InstallKind, Requirements, RequirementsCheck, Skill, SkillConfig, SkillEntry, SkillFormat,
     SkillInstallSpec, SkillInvocationPolicy, SkillManager, SkillMeta, SkillMetadata, SkillRef,
     SkillSnapshot, SkillSource, SkillState, SkillStatus,
-};
-pub use skill::skills_sh::{
-    SkillsShClient, SkillsShInstallResult, SkillsShInstaller, SkillsShOrigin,
-    SkillsShAuditEntry, SkillsShAuditResponse, SkillsShFile,
-    SkillsShSearchResponse, SkillsShSkill, SkillsShSkillDetail,
 };
 pub use tools::tool_types::{ArgumentDef, ToolDef};
 #[cfg(feature = "browser")]
@@ -204,9 +203,9 @@ pub use wasm_sandbox::{ResourceKind, WasmConfig, WasmError, WasmSandbox};
 pub use backup::{BackupManifest, BackupSection};
 pub use config::{
     BrowserConfig, ChannelsConfig, CronConfig, DaemonConfig, EmbeddingConfig, EngineConfig,
-    ExecConfig, ExecMode, GitConfig, InlineCronJob, LoggingConfig, MarketplaceConfig,
-    McpConfig, SkillsShConfig,
-    McpServerDef, MemoryConfig, OrchestratorConfig, OxiosConfig, PersonaConfig, SqliteMemoryConfig,
+    ExecConfig, ExecMode, GitConfig, InlineCronJob, LoggingConfig, MarketplaceConfig, McpConfig,
+    McpServerDef, MemoryConfig, OrchestratorConfig, OxiosConfig, PersonaConfig, SkillsShConfig,
+    SqliteMemoryConfig,
 };
 pub use git_layer::{
     CommitContext, CommitDiff, CommitInfo, DiffKind, DiffStats, FileDiff, GitLayer, LogEntry,
@@ -237,11 +236,11 @@ pub use kernel_handle::KernelHandle;
 pub use kernel_handle::MarketplaceApi;
 pub use kernel_handle::{
     A2aApi, AgentApi, BrowserApi, CopilotResponse, EngineApi, EngineConfigResponse, ExecApi,
-    ExtensionApi, FallbackEvent, InfraApi, InputModality as EngineInputModality,
-    KnowledgeContext, KnowledgeLens, KnowledgeNote, McpApi,
-    MemoryNote, ModelInfo, PersonaApi, ProjectApi, ProjectInfo, ProviderCategory, ProviderInfo,
-    RoutingConfigSnapshot, RoutingStats, RoutingStatsSnapshot, RoutingUpdate, SecurityApi,
-    SharedExecConfig, StateApi, ValidateKeyResult,
+    ExtensionApi, FallbackEvent, InfraApi, InputModality as EngineInputModality, KnowledgeContext,
+    KnowledgeLens, KnowledgeNote, McpApi, MemoryNote, ModelInfo, PersonaApi, ProjectApi,
+    ProjectInfo, ProviderCategory, ProviderInfo, RoutingConfigSnapshot, RoutingStats,
+    RoutingStatsSnapshot, RoutingUpdate, SecurityApi, SharedExecConfig, StateApi,
+    ValidateKeyResult,
 };
 pub use session_context::SessionContext;
 

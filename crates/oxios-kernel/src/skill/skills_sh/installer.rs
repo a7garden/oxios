@@ -66,8 +66,7 @@ impl SkillsShInstaller {
     /// Create a new installer.
     pub fn new(skills_dir: PathBuf, base_url: Option<String>, api_key: Option<String>) -> Self {
         Self {
-            client: SkillsShClient::new(base_url, api_key)
-                .expect("valid skills.sh base URL"),
+            client: SkillsShClient::new(base_url, api_key).expect("valid skills.sh base URL"),
             skills_dir,
         }
     }
@@ -76,10 +75,9 @@ impl SkillsShInstaller {
     pub async fn install(&self, skill_id: &str) -> Result<SkillsShInstallResult> {
         let detail = self.client.get_skill(skill_id).await?;
 
-        let files = detail
-            .files
-            .as_ref()
-            .ok_or_else(|| anyhow::anyhow!("skill {skill_id} has no files available (no snapshot)"))?;
+        let files = detail.files.as_ref().ok_or_else(|| {
+            anyhow::anyhow!("skill {skill_id} has no files available (no snapshot)")
+        })?;
 
         if files.is_empty() {
             anyhow::bail!("skill {skill_id} has no files");

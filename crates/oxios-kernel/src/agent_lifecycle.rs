@@ -38,7 +38,8 @@ impl Clone for AgentLifecycleManager {
             a2a: self.a2a.clone(),
             event_bus: self.event_bus.clone(),
             max_execution_time_secs: std::sync::atomic::AtomicU64::new(
-                self.max_execution_time_secs.load(std::sync::atomic::Ordering::Relaxed),
+                self.max_execution_time_secs
+                    .load(std::sync::atomic::Ordering::Relaxed),
             ),
         }
     }
@@ -66,8 +67,12 @@ impl AgentLifecycleManager {
 
     /// Hot-reload max execution time without restart.
     pub fn set_max_execution_time(&self, secs: u64) {
-        self.max_execution_time_secs.store(secs, std::sync::atomic::Ordering::Relaxed);
-        tracing::info!(max_execution_time_secs = secs, "Lifecycle config hot-reloaded");
+        self.max_execution_time_secs
+            .store(secs, std::sync::atomic::Ordering::Relaxed);
+        tracing::info!(
+            max_execution_time_secs = secs,
+            "Lifecycle config hot-reloaded"
+        );
     }
 
     /// Fork an agent, register it in A2A and access control, submit to
@@ -100,7 +105,9 @@ impl AgentLifecycleManager {
         self.scheduler.start_task(task_id)?;
 
         // 5. Run — always cleanup even on failure
-        let max_secs = self.max_execution_time_secs.load(std::sync::atomic::Ordering::Relaxed);
+        let max_secs = self
+            .max_execution_time_secs
+            .load(std::sync::atomic::Ordering::Relaxed);
         let result = if max_secs > 0 {
             let exec_timeout = Duration::from_secs(max_secs);
             match timeout(exec_timeout, self.supervisor.run_with_seed(agent_id, seed)).await {

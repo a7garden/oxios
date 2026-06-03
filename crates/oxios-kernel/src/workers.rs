@@ -100,18 +100,18 @@ impl WorkerType {
     /// Default interval in milliseconds.
     pub fn default_interval_ms(&self) -> u64 {
         match self {
-            WorkerType::Audit => 600_000,       // 10 min
-            WorkerType::Optimize => 300_000,    // 5 min
+            WorkerType::Audit => 600_000,         // 10 min
+            WorkerType::Optimize => 300_000,      // 5 min
             WorkerType::Consolidate => 1_800_000, // 30 min
-            WorkerType::Ultralearn => 60_000,   // 1 min
-            WorkerType::Predict => 300_000,     // 5 min
-            WorkerType::Map => 600_000,         // 10 min
-            WorkerType::Deepdive => 600_000,    // 10 min
-            WorkerType::Document => 1_800_000,  // 30 min
-            WorkerType::Refactor => 600_000,    // 10 min
-            WorkerType::Benchmark => 600_000,   // 10 min
-            WorkerType::Testgaps => 600_000,    // 10 min
-            WorkerType::Learning => 900_000,    // 15 min
+            WorkerType::Ultralearn => 60_000,     // 1 min
+            WorkerType::Predict => 300_000,       // 5 min
+            WorkerType::Map => 600_000,           // 10 min
+            WorkerType::Deepdive => 600_000,      // 10 min
+            WorkerType::Document => 1_800_000,    // 30 min
+            WorkerType::Refactor => 600_000,      // 10 min
+            WorkerType::Benchmark => 600_000,     // 10 min
+            WorkerType::Testgaps => 600_000,      // 10 min
+            WorkerType::Learning => 900_000,      // 15 min
         }
     }
 }
@@ -270,8 +270,14 @@ impl WorkerManager {
     /// The implementation's `execute()` method will be called when the
     /// worker is dispatched. If no implementation is registered for a
     /// worker type, dispatching that worker will return an error.
-    pub fn register_implementation(&self, worker_type: WorkerType, implementation: Box<dyn Worker>) {
-        self.implementations.write().insert(worker_type, implementation);
+    pub fn register_implementation(
+        &self,
+        worker_type: WorkerType,
+        implementation: Box<dyn Worker>,
+    ) {
+        self.implementations
+            .write()
+            .insert(worker_type, implementation);
         tracing::debug!(worker = %worker_type.name(), "Worker implementation registered");
     }
 
@@ -304,9 +310,9 @@ impl WorkerManager {
         // Check if registered and enabled
         {
             let configs = self.configs.read();
-            let config = configs.get(&worker_type).ok_or_else(|| {
-                format!("Worker '{}' not registered", worker_type.name())
-            })?;
+            let config = configs
+                .get(&worker_type)
+                .ok_or_else(|| format!("Worker '{}' not registered", worker_type.name()))?;
             if !config.enabled {
                 return Err(format!("Worker '{}' is disabled", worker_type.name()));
             }
@@ -316,7 +322,10 @@ impl WorkerManager {
         {
             let mut running = self.running.write();
             if running.contains(&worker_type) {
-                return Err(format!("Worker '{}' is already running", worker_type.name()));
+                return Err(format!(
+                    "Worker '{}' is already running",
+                    worker_type.name()
+                ));
             }
             running.insert(worker_type);
         }
@@ -437,14 +446,12 @@ impl WorkerManager {
     /// given worker type.
     fn execute_worker(&self, worker_type: WorkerType) -> Result<String, String> {
         let impls = self.implementations.read();
-        let worker = impls
-            .get(&worker_type)
-            .ok_or_else(|| {
-                format!(
-                    "No implementation registered for worker '{}'",
-                    worker_type.name()
-                )
-            })?;
+        let worker = impls.get(&worker_type).ok_or_else(|| {
+            format!(
+                "No implementation registered for worker '{}'",
+                worker_type.name()
+            )
+        })?;
         worker.execute()
     }
 }
@@ -531,7 +538,10 @@ mod tests {
     #[test]
     fn test_register_and_dispatch() {
         let mgr = WorkerManager::new();
-        mgr.register(WorkerType::Audit, WorkerConfig::default_for(WorkerType::Audit));
+        mgr.register(
+            WorkerType::Audit,
+            WorkerConfig::default_for(WorkerType::Audit),
+        );
         mgr.register_implementation(WorkerType::Audit, Box::new(EchoWorker));
 
         let result = mgr.dispatch(WorkerType::Audit).unwrap();
@@ -542,7 +552,10 @@ mod tests {
     #[test]
     fn test_dispatch_no_implementation() {
         let mgr = WorkerManager::new();
-        mgr.register(WorkerType::Audit, WorkerConfig::default_for(WorkerType::Audit));
+        mgr.register(
+            WorkerType::Audit,
+            WorkerConfig::default_for(WorkerType::Audit),
+        );
 
         let result = mgr.dispatch(WorkerType::Audit).unwrap();
         assert!(!result.success);
@@ -610,7 +623,10 @@ mod tests {
     #[test]
     fn test_status_last_results() {
         let mgr = WorkerManager::new();
-        mgr.register(WorkerType::Learning, WorkerConfig::default_for(WorkerType::Learning));
+        mgr.register(
+            WorkerType::Learning,
+            WorkerConfig::default_for(WorkerType::Learning),
+        );
         mgr.register_implementation(WorkerType::Learning, Box::new(EchoWorker));
         mgr.dispatch(WorkerType::Learning).unwrap();
 
@@ -622,7 +638,10 @@ mod tests {
     fn test_is_registered() {
         let mgr = WorkerManager::new();
         assert!(!mgr.is_registered(WorkerType::Audit));
-        mgr.register(WorkerType::Audit, WorkerConfig::default_for(WorkerType::Audit));
+        mgr.register(
+            WorkerType::Audit,
+            WorkerConfig::default_for(WorkerType::Audit),
+        );
         assert!(mgr.is_registered(WorkerType::Audit));
     }
 
