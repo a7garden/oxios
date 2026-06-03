@@ -1,8 +1,8 @@
 # RFC-014: oxi-sdk 0.24.0 → 0.26.0 마이그레이션
 
-> **상태**: ✅ Phase A, B, D, F 완료. Phase C, E, G 대기.
+> **상태**: ✅ Phase A, B, C, D, F, G 완료. Phase E (skip).
 > **날짜**: 2026-06-03
-> **커밋**: 4aace84 (HEAD)
+> **커밋**: 52dcbb3 (HEAD)
 > **범위**: SDK 대폭 업그레이드, 중복 코드 제거, 보안 계층 통합
 > **영향 크레이트**: oxios-kernel (핵심), oxios-ouroboros (경미)
 > **이전 RFC**: RFC-011 (0.22→0.24 마이그레이션)
@@ -299,24 +299,19 @@ oxios/Cargo.toml: oxi-sdk = "0.24.0" → "0.26.2"
 
 **Phase B~G는 다음 마일스톤으로 연기. Phase A (0.26.2 업그레이드) 완료로 의존성 해소 완료.**
 
-## 8. 완료된 Phase
+## 9. 완료된 Phase
 
 | Phase | 커밋 | 변경 파일 | 효과 |
 |-------|------|----------|------|
 | **A** (Upgrade) | 12c9990 | 11 | oxi-sdk 0.24.0 → 0.26.2 |
 | **B** (Observability) | 71a5301 | 1 | re-export 그룹화, 문서화 |
+| **C** (EventBus) | 52dcbb3 | 6 | **-260줄**, SDK EventBus<KernelEvent> 타입 alias |
 | **D** (AgentBuilder) | 5c96a00 | 2 | authorizer/tracer/cost_tracker engine 통합 |
-| **F** (AuditTrail) | a1ee2ad | 11 | **-1104줄** (audit_trail 중복 제거) |
-| hotfix | 4aace84 | 3 | binary crate 및 테스트 적응 |
+| **E** (AgentPool) | skip | — | 키 타입 불일치(Uuid/String), 내부 전용 → 유지 |
+| **F** (AuditTrail) | a1ee2ad | 11 | **-1104줄**, SDK audit_trail로 중복 제거 |
+| **G** (Cleanup) | 52dcbb3 | 6 | clippy 경고 0개, 포맷 정리 |
 
-**상쇄**: Phase F에서 audit_trail.rs (1134줄) 삭제, audit_persistence.rs (30줄) 추가.
--1134 + 30 = **-1104줄 순감** (95% 중복 제거).
-
-## 9. 남은 Phase
-
-- **Phase C** (EventBus 재작성) — 10파일 임팩트. SDK의 `EventBus<E>`로 전환.
-- **Phase E** (AgentPool SDK 도입) — supervisor.rs 단일 파일.
-- **Phase G** (Cleanup) — 미사용 import, dead code 정리.
+**총 절감**: ~1364줄 (audit_trail 1104 + event_bus 260)
 
 ## 10. 위험 및 완화
 
