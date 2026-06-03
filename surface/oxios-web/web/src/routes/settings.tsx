@@ -738,7 +738,7 @@ function SettingsPage() {
     // New sections.
     const newSection = NEW_SECTIONS.find((s) => s.key === activeSection)
     if (newSection) {
-      return renderNewSection(newSection, formValues, setField)
+      return renderNewSection(newSection, formValues, setField, t)
     }
 
     // Legacy sections.
@@ -846,8 +846,8 @@ function renderNewSection(
   section: SettingsSectionDef,
   formValues: Record<string, Record<string, unknown>>,
   setField: (sectionKey: string, fieldKey: string, value: unknown) => void,
+  t: (key: string) => string,
 ) {
-  const { t } = useTranslation()
 
   // Memory gets sub-cards.
   if (section.key === 'memory') {
