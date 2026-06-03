@@ -28,6 +28,7 @@
 //! and estimated costs.
 
 use anyhow::Result;
+use oxi_sdk::observability::AuditTrail;
 use oxi_sdk::{
     Agent, AgentConfig, AgentEvent, CompactionEvent, CompactionStrategy, ProviderResolver,
 };
@@ -38,7 +39,6 @@ use std::sync::Arc;
 // path to attach CSpace tools after `builder.build()` returns.
 
 use crate::access_manager::{AccessGate, AgentContext, TracingAuditSink, TrailAuditSink};
-use crate::audit_trail::AuditTrail;
 use crate::capability::resolve::resolve_cspace;
 use crate::engine::OxiosEngine;
 use crate::memory::{MemoryEntry, MemoryManager, MemoryType};

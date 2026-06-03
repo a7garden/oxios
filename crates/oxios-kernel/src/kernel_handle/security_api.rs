@@ -3,9 +3,9 @@
 use crate::access_manager::{
     AccessManager, AgentPermissions, ApprovalStatus, PendingApproval, PermissionUpdate,
 };
-use crate::audit_trail::{AuditAction, AuditEntry, AuditTrail};
 use crate::auth::AuthManager;
 use crate::state_store::StateStore;
+use oxi_sdk::observability::{AuditAction, AuditTrail, TrailEntry};
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -80,12 +80,12 @@ impl SecurityApi {
     }
 
     /// Query audit entries by sequence range.
-    pub fn query_audit(&self, from_seq: u64, to_seq: u64) -> Vec<AuditEntry> {
+    pub fn query_audit(&self, from_seq: u64, to_seq: u64) -> Vec<TrailEntry> {
         self.audit_trail.entries(from_seq, to_seq)
     }
 
     /// Query audit by agent.
-    pub fn query_audit_by_agent(&self, agent_id: &str) -> Vec<AuditEntry> {
+    pub fn query_audit_by_agent(&self, agent_id: &str) -> Vec<TrailEntry> {
         self.audit_trail.by_agent(agent_id)
     }
 
@@ -99,8 +99,8 @@ impl SecurityApi {
     /// Persists all in-memory audit entries to the state store,
     /// then commits the audit file to git for versioning.
     pub fn flush(&self, git: &crate::git_layer::GitLayer) -> anyhow::Result<()> {
-        // 1. Persist entries to state store
-        self.audit_trail.flush(&self.state_store)?;
+        // 1. Persist entries to state store via AuditPersistence trait
+        self.audit_trail.flush_to(self.state_store.as_ref())?;
         // 2. Commit to git
         if git.is_enabled() {
             let _ = git.commit_file("audit", "audit trail flush");

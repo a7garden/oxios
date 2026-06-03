@@ -24,10 +24,17 @@ pub mod scheduler;
 // ─── Security ───────────────────────────────────────────────────────
 // 접근 제어, 인증, 권한, 감사.
 pub mod access_manager;
-pub mod audit_trail;
 pub mod auth;
 pub mod capability;
 pub mod credential;
+
+// ─── Audit Persistence ───────────────────────────────────────────────
+//
+// `audit_persistence` wires `oxi_sdk::observability::AuditPersistence`
+// to the kernel's filesystem-based `StateStore`. The trail itself
+// lives in `oxi_sdk::observability::AuditTrail` and is re-exported
+// below — RFC-014 Phase F.
+mod audit_persistence;
 
 // ─── Communication ──────────────────────────────────────────────────
 // 이벤트, 메시징, 외부 프로토콜, 멀티 에이전트 조정.
@@ -107,8 +114,12 @@ pub use access_manager::{
     AccessManager, Action, AgentPermissions, ApprovalStatus, PendingApproval, RbacAuditEntry,
     RbacManager, RbacPolicy, Role, Subject,
 };
-pub use audit_trail::{
-    AgentId as AuditAgentId, AuditAction, AuditEntry, AuditError, AuditTrail, HashDigest,
+// AuditTrail types are re-exported from oxi-sdk (Phase F: removed
+// 1134-line duplicate). `AgentId as AuditAgentId` preserves the
+// historical kernel-level type alias.
+pub use oxi_sdk::observability::audit_trail::AgentId as AuditAgentId;
+pub use oxi_sdk::observability::{
+    AuditAction, AuditError, AuditPersistence, AuditTrail, HashDigest, TrailEntry,
 };
 pub use auth::{AuthManager, KeyMeta};
 pub use capability::template::CapabilityTemplate;
