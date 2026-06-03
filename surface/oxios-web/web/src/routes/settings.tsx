@@ -32,6 +32,7 @@ import { SystemToolsPanel } from '@/components/system/system-tools'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
+import { useToast } from '@/components/ui/sonner'
 import { LoadingCards } from '@/components/shared/loading'
 import { ErrorState } from '@/components/shared/error-state'
 import { useProviders, useModels, useEngineConfig, useSetModel, useSetApiKey, useSetProviderOptions } from '@/hooks/use-engine'
@@ -98,6 +99,16 @@ interface LegacyField {
   type: FieldType
   placeholder?: string
   options?: { value: string; labelKey: string }[]
+  /**
+   * Mirrors `SettingsFieldDef.hotReload`. False means the field requires
+   * a daemon restart to take effect (the subsystem is constructed at
+   * boot). Used by the diff preview badges and the `annotatedDiff`
+   * classifier. The two MUST stay in sync with
+   * `system.rs::HOT_RELOADABLE_SECTIONS`.
+   */
+  hotReload: boolean
+  /** Sub-system that consumes this value (used in tooltips). */
+  restartScope?: 'kernel' | 'gateway' | 'logging' | 'memory' | 'engine' | 'audit'
 }
 
 const tKeys = {
@@ -193,38 +204,47 @@ const tKeys = {
 
 const legacyFieldDefs: [string, string, LegacyField[]][] = [
   ['kernel', tKeys.kernelDescription, [
-    { key: 'workspace', labelKey: tKeys.workspacePath, descriptionKey: tKeys.workspacePathDescription, type: 'text', placeholder: '~/.oxios/workspace' },
-    { key: 'max_agents', labelKey: tKeys.maxConcurrentAgents, descriptionKey: tKeys.maxConcurrentAgentsDescription, type: 'number', placeholder: '10' },
-    { key: 'event_bus_capacity', labelKey: tKeys.eventBusCapacity, descriptionKey: tKeys.eventBusCapacityDescription, type: 'number', placeholder: '256' },
+    // Kernel is constructed at boot; PATCH persists but the running
+    // daemon keeps the boot-time values. Restart required.
+    { key: 'workspace', labelKey: tKeys.workspacePath, descriptionKey: tKeys.workspacePathDescription, type: 'text', placeholder: '~/.oxios/workspace', hotReload: false, restartScope: 'kernel' },
+    { key: 'max_agents', labelKey: tKeys.maxConcurrentAgents, descriptionKey: tKeys.maxConcurrentAgentsDescription, type: 'number', placeholder: '10', hotReload: false, restartScope: 'kernel' },
+    { key: 'event_bus_capacity', labelKey: tKeys.eventBusCapacity, descriptionKey: tKeys.eventBusCapacityDescription, type: 'number', placeholder: '256', hotReload: false, restartScope: 'kernel' },
   ]],
   ['scheduler', tKeys.schedulerDescription, [
-    { key: 'max_concurrent', labelKey: tKeys.maxConcurrentTasks, descriptionKey: tKeys.maxConcurrentTasksDescription, type: 'number', placeholder: '5' },
-    { key: 'rate_limit_per_minute', labelKey: tKeys.rateLimitPerMin, descriptionKey: tKeys.rateLimitPerMinDescription, type: 'number', placeholder: '60' },
-    { key: 'zombie_timeout_secs', labelKey: tKeys.zombieTimeoutS, descriptionKey: tKeys.zombieTimeoutSDescription, type: 'number', placeholder: '300' },
+    // Scheduler is propagated at runtime via `scheduler().update_config()`.
+    { key: 'max_concurrent', labelKey: tKeys.maxConcurrentTasks, descriptionKey: tKeys.maxConcurrentTasksDescription, type: 'number', placeholder: '5', hotReload: true, restartScope: 'kernel' },
+    { key: 'rate_limit_per_minute', labelKey: tKeys.rateLimitPerMin, descriptionKey: tKeys.rateLimitPerMinDescription, type: 'number', placeholder: '60', hotReload: true, restartScope: 'kernel' },
+    { key: 'zombie_timeout_secs', labelKey: tKeys.zombieTimeoutS, descriptionKey: tKeys.zombieTimeoutSDescription, type: 'number', placeholder: '300', hotReload: true, restartScope: 'kernel' },
   ]],
   ['orchestrator', tKeys.orchestratorDescription, [
-    { key: 'max_evolution_iterations', labelKey: tKeys.maxEvolutionIterations, descriptionKey: tKeys.maxEvolutionIterationsDescription, type: 'number', placeholder: '3' },
-    { key: 'min_evaluation_score', labelKey: tKeys.minEvaluationScore, descriptionKey: tKeys.minEvaluationScoreDescription, type: 'number', placeholder: '0.8' },
+    // Orchestrator is constructed at boot; PATCH persists but does not
+    // re-create it. Restart required.
+    { key: 'max_evolution_iterations', labelKey: tKeys.maxEvolutionIterations, descriptionKey: tKeys.maxEvolutionIterationsDescription, type: 'number', placeholder: '3', hotReload: false, restartScope: 'kernel' },
+    { key: 'min_evaluation_score', labelKey: tKeys.minEvaluationScore, descriptionKey: tKeys.minEvaluationScoreDescription, type: 'number', placeholder: '0.8', hotReload: false, restartScope: 'kernel' },
   ]],
   ['context', tKeys.contextDescription, [
-    { key: 'active_limit_tokens', labelKey: tKeys.activeTokenLimit, descriptionKey: tKeys.activeTokenLimitDescription, type: 'number', placeholder: '100000' },
-    { key: 'cache_limit_entries', labelKey: tKeys.cacheEntryLimit, descriptionKey: tKeys.cacheEntryLimitDescription, type: 'number', placeholder: '50' },
+    // Context manager is constructed at boot; restart required.
+    { key: 'active_limit_tokens', labelKey: tKeys.activeTokenLimit, descriptionKey: tKeys.activeTokenLimitDescription, type: 'number', placeholder: '100000', hotReload: false, restartScope: 'kernel' },
+    { key: 'cache_limit_entries', labelKey: tKeys.cacheEntryLimit, descriptionKey: tKeys.cacheEntryLimitDescription, type: 'number', placeholder: '50', hotReload: false, restartScope: 'kernel' },
   ]],
   ['gateway', tKeys.gatewayDescription, [
-    { key: 'host', labelKey: tKeys.host, descriptionKey: tKeys.hostDescription, type: 'text', placeholder: '0.0.0.0' },
-    { key: 'port', labelKey: tKeys.port, descriptionKey: tKeys.portDescription, type: 'number', placeholder: '4200' },
+    // gateway host/port are bound at boot; restart required.
+    { key: 'host', labelKey: tKeys.host, descriptionKey: tKeys.hostDescription, type: 'text', placeholder: '0.0.0.0', hotReload: false, restartScope: 'gateway' },
+    { key: 'port', labelKey: tKeys.port, descriptionKey: tKeys.portDescription, type: 'number', placeholder: '4200', hotReload: false, restartScope: 'gateway' },
   ]],
   ['session', tKeys.sessionDescription, [
-    { key: 'max_sessions', labelKey: tKeys.maxSessions, descriptionKey: tKeys.maxSessionsDescription, type: 'number', placeholder: '100' },
-    { key: 'ttl_hours', labelKey: tKeys.sessionTTLHours, descriptionKey: tKeys.sessionTTLHoursDescription, type: 'number', placeholder: '168' },
-    { key: 'auto_prune', labelKey: tKeys.autoPrune, descriptionKey: tKeys.autoPruneDescription, type: 'toggle' },
+    // Session manager is constructed at boot; restart required.
+    { key: 'max_sessions', labelKey: tKeys.maxSessions, descriptionKey: tKeys.maxSessionsDescription, type: 'number', placeholder: '100', hotReload: false, restartScope: 'kernel' },
+    { key: 'ttl_hours', labelKey: tKeys.sessionTTLHours, descriptionKey: tKeys.sessionTTLHoursDescription, type: 'number', placeholder: '168', hotReload: false, restartScope: 'kernel' },
+    { key: 'auto_prune', labelKey: tKeys.autoPrune, descriptionKey: tKeys.autoPruneDescription, type: 'toggle', hotReload: false, restartScope: 'kernel' },
   ]],
   ['logging', tKeys.loggingDescription, [
+    // Logging format is set on the global subscriber at boot; restart required.
     { key: 'format', labelKey: tKeys.format, descriptionKey: tKeys.formatDescription, type: 'select', options: [
       { value: 'pretty', labelKey: tKeys.prettyDefault },
       { value: 'json', labelKey: tKeys.jsonElkLoki },
       { value: 'compact', labelKey: tKeys.compact },
-    ]},
+    ], hotReload: false, restartScope: 'logging' },
   ]],
 ]
 
@@ -544,8 +564,10 @@ function SettingsPage() {
     for (const section of NEW_SECTIONS) {
       const bucket: Record<string, unknown> = {}
       for (const field of section.fields) {
-        // `memory.*` and `channels.telegram.*` keys are dotted.
-        // Resolve them against the right sub-object.
+        // `memory.*` keys (and other nested sections) are dotted.
+        // Resolve them against the right sub-object. `channels.telegram`
+        // uses a flat key under the `telegram` sub-object — the section
+        // key is prepended at payload-build time.
         const dottedKey = field.key
         let container: Record<string, unknown> | undefined
         if (section.key === 'memory') {
@@ -565,10 +587,12 @@ function SettingsPage() {
             bucket[dottedKey] = field.type === 'toggle' ? v === true : String(v ?? '')
           }
         } else if (section.key === 'channels.telegram') {
+          // The field key is the path *below* `channels.telegram`. The
+          // section key is prepended at payload-build time, so we read
+          // from `config.channels.telegram.<key>` directly.
           const tg = (config.channels as Record<string, unknown> | undefined)?.telegram as Record<string, unknown> | undefined
           if (tg) {
-            const stripped = dottedKey.replace(/^channels\.telegram\./, '')
-            const v = getNestedValue(tg, stripped)
+            const v = getNestedValue(tg, dottedKey)
             bucket[dottedKey] = field.type === 'toggle' ? v === true : String(v ?? '')
           }
         } else {
@@ -603,7 +627,10 @@ function SettingsPage() {
       payload[sectionKey] = sectionValues
     }
 
-    // New sections.
+    // New sections. Each section's `field.key` is the path *below* the
+    // section key, so we collect values into `bucket` and assign once
+    // to `payload[section.key]`. This matches how `memory` and
+    // `channels.telegram` are encoded in `OxiosConfig`.
     for (const section of NEW_SECTIONS) {
       const bucket: Record<string, unknown> = {}
       for (const field of section.fields) {
@@ -634,20 +661,14 @@ function SettingsPage() {
           setNestedValue(bucket, field.key, String(raw))
         }
       }
-      // Merge into payload.
-      for (const [k, v] of Object.entries(bucket)) {
-        if (section.key === 'channels.telegram') {
-          // Put under `channels.telegram.*`
-          const channels = (payload.channels as Record<string, unknown>) ?? {}
-          const tg = (channels.telegram as Record<string, unknown>) ?? {}
-          const stripped = k.replace(/^channels\.telegram\./, '')
-          setNestedValue(tg, stripped, v)
-          channels.telegram = tg
-          payload.channels = channels
-        } else {
-          payload[section.key] = bucket
-        }
-      }
+      // Assign bucket under the section key. We use `setNestedValue` so
+      // section keys that contain dots (e.g. `channels.telegram`)
+      // become a nested object literal, not a flat key with a dot in
+      // its name. `obj['channels.telegram'] = x` would otherwise set
+      // `obj["channels.telegram"]` and the server would receive a
+      // payload whose top-level key is `"channels.telegram"` instead
+      // of `obj.channels.telegram`.
+      setNestedValue(payload, section.key, bucket)
     }
 
     return payload
@@ -665,26 +686,31 @@ function SettingsPage() {
   // field-defs (this is local & instant; the backend re-checks authoritatively).
   const annotatedDiff: ConfigDiffEntry[] = useMemo(() => {
     return diff.map((entry) => {
-      // Try to find the matching field def.
+      // Try to find the matching field def in the new sections.
       for (const section of NEW_SECTIONS) {
         const f = section.fields.find((field) => field.key === entry.path || `${section.key}.${field.key}` === entry.path)
         if (f) {
           return { ...entry, hotReload: f.hotReload, scope: f.restartScope }
         }
       }
-      // Also try legacy fields.
+      // Also try legacy fields. They declare their own hotReload and
+      // restartScope so the diff badges and tooltips match the backend.
       for (const [sectionKey, , fields] of legacyFieldDefs) {
         const f = (fields as LegacyField[]).find((field) => `${sectionKey}.${field.key}` === entry.path)
         if (f) {
-          return { ...entry, hotReload: true, scope: undefined }
+          return { ...entry, hotReload: f.hotReload, scope: f.restartScope }
         }
       }
-      return entry
+      // Unknown path — let the backend classification in the response
+      // handle it. Mark hotReload: false to err on the safe side.
+      return { ...entry, hotReload: false }
     })
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [diff])
 
   const hasUnsaved = annotatedDiff.length > 0
+
+  const { toast } = useToast()
 
   const handleSaveClick = () => {
     if (annotatedDiff.length === 0) return
@@ -700,8 +726,27 @@ function SettingsPage() {
         setTimeout(() => setSaveNotice(null), 3000)
         if (res && 'hot_reload' in res) {
           const r = (res as ConfigPatchResponse).hot_reload
-          // eslint-disable-next-line no-console
-          console.info('[config] saved', r)
+          // Surface the hot-reload breakdown as a toast so the user
+          // gets a visible confirmation of what was applied and what
+          // needs a restart.
+          if (r.requires_restart.length > 0) {
+            toast(
+              t('settings.savedWithRestart', {
+                applied: r.applied_immediately.length,
+                restart: r.requires_restart.length,
+              }),
+              'default',
+            )
+          } else if (r.applied_immediately.length > 0) {
+            toast(
+              t('settings.savedApplied', { count: r.applied_immediately.length }),
+              'success',
+            )
+          } else {
+            toast(t('settings.settingsSaved'), 'success')
+          }
+        } else {
+          toast(t('settings.settingsSaved'), 'success')
         }
         queryClient.invalidateQueries({ queryKey: ['config'] })
       },
@@ -709,6 +754,7 @@ function SettingsPage() {
         setShowDiff(false)
         setSaveNotice('error')
         setTimeout(() => setSaveNotice(null), 5000)
+        toast(t('settings.settingsSaveFailed'), 'destructive')
       },
     })
   }

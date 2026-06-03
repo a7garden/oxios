@@ -149,7 +149,10 @@ const securitySection: SettingsSectionDef = {
       labelKey: 'settings.apiKeyAuthentication',
       descriptionKey: 'settings.apiKeyAuthenticationDescription',
       type: 'toggle',
-      hotReload: true,
+      // The security subsystem is constructed at boot. PATCH on this
+      // section persists the new value but the running AccessManager
+      // keeps using the boot-time value. Restart is required to apply.
+      hotReload: false,
       restartScope: 'gateway',
     },
     {
@@ -158,7 +161,8 @@ const securitySection: SettingsSectionDef = {
       descriptionKey: 'settings.allowedToolsDescription',
       type: 'csv',
       placeholder: 'read, write, edit, bash',
-      hotReload: true,
+      hotReload: false,
+      restartScope: 'gateway',
     },
     {
       key: 'cors_origins',
@@ -166,21 +170,24 @@ const securitySection: SettingsSectionDef = {
       descriptionKey: 'settings.corsOriginsDescription',
       type: 'csv',
       placeholder: 'http://localhost:4200, http://localhost:3000',
-      hotReload: true,
+      hotReload: false,
+      restartScope: 'gateway',
     },
     {
       key: 'network_access',
       labelKey: 'settings.networkAccess',
       descriptionKey: 'settings.networkAccessDescription',
       type: 'toggle',
-      hotReload: true,
+      hotReload: false,
+      restartScope: 'gateway',
     },
     {
       key: 'can_fork',
       labelKey: 'settings.allowForking',
       descriptionKey: 'settings.allowForkingDescription',
       type: 'toggle',
-      hotReload: true,
+      hotReload: false,
+      restartScope: 'gateway',
     },
     {
       key: 'max_execution_time_secs',
@@ -188,7 +195,8 @@ const securitySection: SettingsSectionDef = {
       descriptionKey: 'settings.maxExecutionTimeSDescription',
       type: 'number',
       placeholder: '300',
-      hotReload: true,
+      hotReload: false,
+      restartScope: 'gateway',
     },
     {
       key: 'max_memory_mb',
@@ -196,7 +204,8 @@ const securitySection: SettingsSectionDef = {
       descriptionKey: 'settings.maxMemoryMBDescription',
       type: 'number',
       placeholder: '512',
-      hotReload: true,
+      hotReload: false,
+      restartScope: 'gateway',
     },
     {
       key: 'max_audit_entries',
@@ -204,7 +213,8 @@ const securitySection: SettingsSectionDef = {
       descriptionKey: 'settings.maxAuditEntriesDescription',
       type: 'number',
       placeholder: '10000',
-      hotReload: true,
+      hotReload: false,
+      restartScope: 'audit',
     },
     {
       key: 'audit_log_path',
@@ -212,7 +222,8 @@ const securitySection: SettingsSectionDef = {
       descriptionKey: 'settings.auditLogPathDescription',
       type: 'text',
       placeholder: '~/.oxios/audit.log',
-      hotReload: true,
+      hotReload: false,
+      restartScope: 'audit',
     },
     {
       key: 'rate_limit_per_minute',
@@ -220,7 +231,8 @@ const securitySection: SettingsSectionDef = {
       descriptionKey: 'settings.rateLimitPerMinuteDescription',
       type: 'number',
       placeholder: '120',
-      hotReload: true,
+      hotReload: false,
+      restartScope: 'gateway',
     },
   ],
 }
@@ -236,7 +248,11 @@ const memorySection: SettingsSectionDef = {
   iconKey: 'memory',
   groupId: 'memory',
   fields: [
-    { key: 'enabled', labelKey: 'settings.memoryEnabled', descriptionKey: 'settings.memoryEnabledDescription', type: 'toggle', hotReload: true },
+    // The memory subsystem is constructed at boot (SQLite handle,
+    // embedding model, SONA state). Toggling `enabled` via PATCH
+    // persists the new value but does not construct/teardown the
+    // subsystem at runtime. Restart is required to apply.
+    { key: 'enabled', labelKey: 'settings.memoryEnabled', descriptionKey: 'settings.memoryEnabledDescription', type: 'toggle', hotReload: false, restartScope: 'memory' },
     {
       key: 'sqlite.path',
       labelKey: 'settings.memoryStoragePath',
@@ -264,7 +280,8 @@ const memorySection: SettingsSectionDef = {
       labelKey: 'settings.sonaEnabled',
       descriptionKey: 'settings.sonaEnabledDescription',
       type: 'toggle',
-      hotReload: true,
+      hotReload: false,
+      restartScope: 'memory',
     },
     {
       key: 'consolidation.preset',
@@ -285,7 +302,8 @@ const memorySection: SettingsSectionDef = {
       labelKey: 'settings.dreamEnabled',
       descriptionKey: 'settings.dreamEnabledDescription',
       type: 'toggle',
-      hotReload: true,
+      hotReload: false,
+      restartScope: 'memory',
     },
     {
       key: 'consolidation.dream_interval_hours',
@@ -293,7 +311,8 @@ const memorySection: SettingsSectionDef = {
       descriptionKey: 'settings.dreamIntervalHoursDescription',
       type: 'number',
       placeholder: '24',
-      hotReload: true,
+      hotReload: false,
+      restartScope: 'memory',
     },
   ],
 }
@@ -302,6 +321,14 @@ const memorySection: SettingsSectionDef = {
 // 4. channels.telegram — Telegram channel
 // ---------------------------------------------------------------------------
 
+// Field keys here are the path *below* `channels.telegram`. The section
+// key (`channels.telegram`) is prepended by `buildPayload` (see
+// `routes/settings.tsx`), matching how the `memory` section encodes
+// sub-paths like `embedding.provider` under the `memory` section key.
+// Do not include the `channels.telegram.` prefix in `field.key` — the
+// payload builder would double-nest the change and the user's edit
+// would land at `config.channels.telegram.channels.telegram.*`, which
+// `OxiosConfig` deserialization silently drops.
 const telegramSection: SettingsSectionDef = {
   key: 'channels.telegram',
   labelKey: 'settings.telegram',
@@ -310,7 +337,7 @@ const telegramSection: SettingsSectionDef = {
   groupId: 'channels',
   fields: [
     {
-      key: 'channels.telegram.bot_token_env',
+      key: 'bot_token_env',
       labelKey: 'settings.telegramBotTokenEnv',
       descriptionKey: 'settings.telegramBotTokenEnvDescription',
       type: 'text',
@@ -319,7 +346,7 @@ const telegramSection: SettingsSectionDef = {
       restartScope: 'gateway',
     },
     {
-      key: 'channels.telegram.allowed_users',
+      key: 'allowed_users',
       labelKey: 'settings.telegramAllowedUsers',
       descriptionKey: 'settings.telegramAllowedUsersDescription',
       type: 'numbers',
@@ -328,7 +355,7 @@ const telegramSection: SettingsSectionDef = {
       restartScope: 'gateway',
     },
     {
-      key: 'channels.telegram.session.rotation_hours',
+      key: 'session.rotation_hours',
       labelKey: 'settings.telegramSessionRotationHours',
       descriptionKey: 'settings.telegramSessionRotationHoursDescription',
       type: 'number',
@@ -337,7 +364,7 @@ const telegramSection: SettingsSectionDef = {
       restartScope: 'gateway',
     },
     {
-      key: 'channels.telegram.session.max_messages',
+      key: 'session.max_messages',
       labelKey: 'settings.telegramSessionMaxMessages',
       descriptionKey: 'settings.telegramSessionMaxMessagesDescription',
       type: 'number',
@@ -352,6 +379,9 @@ const telegramSection: SettingsSectionDef = {
 // 5. audit — Audit trail
 // ---------------------------------------------------------------------------
 
+// Audit trail writer is constructed at boot with its rotating file
+// handle and ring-buffer capacity. Changing `enabled` or `max_entries`
+// persists but does not re-open the writer; restart is required.
 const auditSection: SettingsSectionDef = {
   key: 'audit',
   labelKey: 'settings.audit',
@@ -364,7 +394,8 @@ const auditSection: SettingsSectionDef = {
       labelKey: 'settings.auditEnabled',
       descriptionKey: 'settings.auditEnabledDescription',
       type: 'toggle',
-      hotReload: true,
+      hotReload: false,
+      restartScope: 'audit',
     },
     {
       key: 'max_entries',
@@ -372,7 +403,8 @@ const auditSection: SettingsSectionDef = {
       descriptionKey: 'settings.auditMaxEntriesDescription',
       type: 'number',
       placeholder: '100000',
-      hotReload: true,
+      hotReload: false,
+      restartScope: 'audit',
     },
   ],
 }
