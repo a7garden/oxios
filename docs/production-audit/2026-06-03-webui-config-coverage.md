@@ -196,14 +196,17 @@ crates/oxios-kernel/src/kernel_handle/exec_api.rs:11
 ```
 
 ### 커널 핫리로드 지원 현황
-| 서브시스템 | 핫리로드 | 경로 |
+| 서브시스템 | 핫리로드 | 비고 |
 |-----------|---------|------|
 | EngineApi | ✅ | `/api/engine/*` → `rebuild_and_swap()` |
-| ExecApi | ❌ | `Arc<ExecConfig>` (불변) |
-| SecurityApi | ❌ | AuthManager만 내부 상태 관리 |
-| InfraApi | ❌ | Scheduler/ResourceMonitor 고정 |
-| PersonaApi | ❌ | PersonaManager 내부 상태 |
-| SessionConfig | ❌ | 이벤트 라우트에서 config.read() 사용 |
+| ExecApi | ✅ | `SharedExecConfig` (`Arc<RwLock>`) |
+| AgentScheduler | ✅ | `AtomicUsize/AtomicU64` |
+| ResourceMonitor | ✅ | `RwLock<OverloadThreshold>` |
+| Orchestrator | ✅ | `RwLock<EvolutionConfig>` |
+| AgentLifecycle | ✅ | `AtomicU64` |
+| MemoryManager | N/A | config 값을 시작 시에만 읽음. 런타임에 재읽기 없음 |
+| Gateway (port) | ❌ | TCP 리스너 재바인딩 필요 |
+| Logging | ❌ | tracing subscriber 재초기화 필요 |
 
 ### 영향
 - WebUI에서 `exec.allowed_commands`, `security.auth_enabled`, `scheduler.max_concurrent` 등을 변경해도 **데몬 재시작 전까지 아무 효과 없음**
