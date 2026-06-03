@@ -301,7 +301,7 @@ function EnginePanel() {
     setProviderOptions.mutate({ provider: resolvedProvider ?? 'unknown', options })
   }
 
-  const apiKeySource = engineConfig?.api_key_set ? 'config' : 'none'
+  const apiKeySource = engineConfig?.api_key_source ?? (engineConfig?.api_key_set ? 'config' : 'none')
 
   return (
     <Card>

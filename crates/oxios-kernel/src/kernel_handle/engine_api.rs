@@ -562,12 +562,17 @@ impl EngineApi {
 
     /// Update provider options in config.toml.
     ///
-    /// This is a placeholder for per-provider option persistence.
-    /// Currently stores the serialized options as a TOML section.
-    pub fn set_provider_options(&self, _opts: &oxi_sdk::ProviderOptions) -> anyhow::Result<()> {
-        // ProviderOptions are currently per-request, not persisted in config.toml.
-        // Future: add [engine.provider_options] section to OxiosConfig.
-        tracing::info!("Provider options update requested (no-op for now)");
+    /// Persists the options and makes them available for the next agent run.
+    /// They are passed through to `AgentLoopConfig::provider_options`.
+    pub fn set_provider_options(&self, opts: &oxi_sdk::ProviderOptions) -> anyhow::Result<()> {
+        {
+            let mut cfg = self.config.write();
+            cfg.engine.provider_options = Some(opts.clone());
+            self.persist(&cfg)?;
+        }
+        tracing::info!("Provider options updated and persisted");
+        // No engine rebuild needed — provider_options are per-request,
+        // picked up from config on the next agent run.
         Ok(())
     }
 
