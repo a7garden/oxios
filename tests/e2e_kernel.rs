@@ -7,8 +7,8 @@
 use std::path::PathBuf;
 use tempfile::TempDir;
 
+use oxi_sdk::{AuditAction, AuditTrail};
 use oxios_kernel::{
-    audit_trail::{AuditAction, AuditTrail},
     budget::{BudgetLimit, BudgetManager},
     git_layer::GitLayer,
     resource_monitor::ResourceMonitor,

@@ -8,7 +8,7 @@ use anyhow::{Context, Result};
 use oxios_gateway::Gateway;
 use oxios_kernel::{
     access_manager::AccessManager, auth::AuthManager, config::load_config, A2AProtocol,
-    AgentRuntime, AgentScheduler, AuditTrail, BasicSupervisor, BudgetManager, ClawHubClient,
+    AgentRuntime, AgentScheduler, AuditPersistence, AuditTrail, BasicSupervisor, BudgetManager, ClawHubClient,
     ClawHubInstaller, CronScheduler, EngineHandle, EventBus, GitLayer, MarketplaceApi, McpBridge, McpServer,
     MemoryManager, Orchestrator, OxiosConfig, OxiosEngine, PersonaManager, ProjectManager,
     ResourceMonitor, SkillManager, SkillsShClient, SkillsShInstaller, Supervisor,
@@ -276,7 +276,7 @@ impl Kernel {
     /// Call during graceful shutdown to ensure no entries are lost.
     pub fn flush_audit(&self) -> anyhow::Result<()> {
         self.audit_trail
-            .flush(&self.state_store)
+            .flush_to(&*self.state_store)
             .map_err(|e| anyhow::anyhow!("audit flush failed: {e}"))
     }
 
@@ -351,7 +351,7 @@ impl Kernel {
 
     /// Start the guardian daemon (background integrity checks).
     pub fn start_guardian(&self) {
-        use oxios_kernel::audit_trail::AuditAction;
+        use oxi_sdk::AuditAction;
         let handle = self.handle();
         tokio::spawn(async move {
             loop {
@@ -780,7 +780,7 @@ impl KernelBuilder {
         event_bus.attach_audit_trail(audit_trail.clone());
 
         // Restore persisted audit entries.
-        if let Ok(entries) = state_store.load_audit_entries() {
+        if let Ok(entries) = state_store.load() {
             if !entries.is_empty() {
                 tracing::info!(count = entries.len(), "Restored audit trail entries");
                 audit_trail.restore_from(entries);

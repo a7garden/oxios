@@ -43,7 +43,7 @@ pub async fn cmd_run(kernel: &Kernel, prompt: &str, opts: &RunOptions) -> Result
     // ── Audit ──
     kernel.handle().security.audit(
         "cli",
-        oxios_kernel::audit_trail::AuditAction::Other {
+        oxi_sdk::AuditAction::Other {
             detail: format!(
                 "run: {}",
                 effective_prompt.chars().take(100).collect::<String>()
