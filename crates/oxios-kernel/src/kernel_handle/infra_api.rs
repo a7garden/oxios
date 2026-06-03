@@ -18,6 +18,8 @@ pub struct InfraApi {
     pub(crate) event_bus: EventBus,
     pub(crate) config: OxiosConfig,
     pub(crate) start_time: Instant,
+    /// Hot-reloadable orchestrator config (evolution iterations, score threshold).
+    pub(crate) orchestrator_config: parking_lot::RwLock<crate::config::OrchestratorConfig>,
 }
 
 impl InfraApi {
@@ -39,6 +41,7 @@ impl InfraApi {
             event_bus,
             config,
             start_time,
+            orchestrator_config: parking_lot::RwLock::new(crate::config::OrchestratorConfig::default()),
         }
     }
     /// Get a reference to the GitLayer.
@@ -153,6 +156,21 @@ impl InfraApi {
     /// Get config reference.
     pub fn config(&self) -> &OxiosConfig {
         &self.config
+    }
+
+    /// Scheduler reference — for hot-reload config propagation.
+    pub fn scheduler(&self) -> &Arc<AgentScheduler> {
+        &self.scheduler
+    }
+
+    /// Resource monitor reference — for hot-reload config propagation.
+    pub fn resource_monitor(&self) -> &Arc<ResourceMonitor> {
+        &self.resource_monitor
+    }
+
+    /// Hot-reload orchestrator config (stored in InfraApi for propagation).
+    pub fn update_orchestrator_config(&self, config: crate::config::OrchestratorConfig) {
+        *self.orchestrator_config.write() = config;
     }
 
     /// Get system uptime.

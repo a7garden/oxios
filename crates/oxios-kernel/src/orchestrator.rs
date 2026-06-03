@@ -101,7 +101,7 @@ pub struct Orchestrator {
     /// A2A circuit breaker for delegation reliability.
     a2a_breaker: Arc<crate::a2a::circuit_breaker::A2ACircuitBreaker>,
     /// Evolution loop settings.
-    evolution_config: EvolutionConfig,
+    evolution_config: RwLock<EvolutionConfig>,
 }
 
 /// Configuration for A2A delegation retries.
@@ -184,7 +184,7 @@ impl Orchestrator {
         lifecycle: AgentLifecycleManager,
         config: crate::config::OrchestratorConfig,
     ) -> Self {
-        let evolution_config = EvolutionConfig::from(config);
+        let evolution_config = EvolutionConfig::from(config.clone());
         Self {
             ouroboros,
             event_bus,
@@ -197,7 +197,7 @@ impl Orchestrator {
             conversation_buffer: RwLock::new(ConversationBuffer::default()),
             delegation_config: DelegationConfig::default(),
             a2a_breaker: Arc::new(crate::a2a::circuit_breaker::A2ACircuitBreaker::new(5, 30)),
-            evolution_config,
+            evolution_config: RwLock::new(evolution_config),
         }
     }
 
@@ -231,6 +231,14 @@ impl Orchestrator {
     /// Set the GitLayer for auto-commits after state saves.
     pub fn set_git_layer(&mut self, git_layer: Arc<GitLayer>) {
         self.git_layer = Some(git_layer);
+    }
+
+    /// Hot-reload evolution config without restart.
+    ///
+    /// Takes effect on the next orchestration run.
+    pub fn update_evolution_config(&self, config: crate::config::OrchestratorConfig) {
+        *self.evolution_config.write() = EvolutionConfig::from(config);
+        tracing::info!("Orchestrator evolution config hot-reloaded");
     }
 
     /// Restore sessions from persisted state.
@@ -726,7 +734,7 @@ impl Orchestrator {
                 .run_evolution_loop(&session_id, &seed, exec_result)
                 .await?;
 
-            let passed = eval.all_passed() && eval.score >= self.evolution_config.score_threshold;
+            let passed = eval.all_passed() && eval.score >= self.evolution_config.read().score_threshold;
 
             self.publish_phase_completed(
                 &session_id,
@@ -815,8 +823,8 @@ impl Orchestrator {
         seed: &Seed,
         initial_result: ExecutionResult,
     ) -> Result<(ExecutionResult, EvaluationResult, Seed)> {
-        let max_iterations = self.evolution_config.max_iterations;
-        let threshold = self.evolution_config.score_threshold;
+        let max_iterations = self.evolution_config.read().max_iterations;
+        let threshold = self.evolution_config.read().score_threshold;
 
         let mut current_seed = seed.clone();
         let mut current_result = initial_result;

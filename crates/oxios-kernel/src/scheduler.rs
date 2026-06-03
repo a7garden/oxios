@@ -197,11 +197,11 @@ pub struct AgentScheduler {
     /// Currently running tasks.
     running: Arc<Mutex<HashMap<Uuid, ScheduledTask>>>,
     /// Maximum concurrent tasks allowed.
-    max_concurrent: usize,
+    max_concurrent: std::sync::atomic::AtomicUsize,
     /// Rate limiter for LLM API calls.
     rate_limiter: Arc<Mutex<RateLimiter>>,
     /// Timeout for zombie detection (seconds).
-    zombie_timeout_secs: u64,
+    zombie_timeout_secs: std::sync::atomic::AtomicU64,
     /// Track when each running task started (for zombie detection).
     task_start_times: Arc<Mutex<HashMap<Uuid, DateTime<Utc>>>>,
     /// Optional budget manager for scheduling checks.
@@ -223,9 +223,9 @@ impl AgentScheduler {
         Self {
             queue: Arc::new(Mutex::new(BinaryHeap::new())),
             running: Arc::new(Mutex::new(HashMap::new())),
-            max_concurrent,
+            max_concurrent: std::sync::atomic::AtomicUsize::new(max_concurrent),
             rate_limiter: Arc::new(Mutex::new(RateLimiter::new(60, rate_limit_per_minute))),
-            zombie_timeout_secs,
+            zombie_timeout_secs: std::sync::atomic::AtomicU64::new(zombie_timeout_secs),
             task_start_times: Arc::new(Mutex::new(HashMap::new())),
             budget_manager: None,
         }
@@ -240,6 +240,30 @@ impl AgentScheduler {
     /// If no budget manager is set, tasks proceed normally.
     pub fn set_budget_manager(&mut self, bm: Arc<BudgetManager>) {
         self.budget_manager = Some(bm);
+    }
+
+    /// Hot-reload scheduler config without restart.
+    ///
+    /// Updates concurrency limit, rate limit, and zombie timeout.
+    /// Takes effect on the next `next_task()` / `reap_zombies()` call.
+    pub fn update_config(
+        &self,
+        max_concurrent: usize,
+        rate_limit_per_minute: u32,
+        zombie_timeout_secs: u64,
+    ) {
+        {
+            let mut limiter = self.rate_limiter.lock();
+            *limiter = RateLimiter::new(60, rate_limit_per_minute);
+        }
+        self.max_concurrent.store(max_concurrent, std::sync::atomic::Ordering::Relaxed);
+        self.zombie_timeout_secs.store(zombie_timeout_secs, std::sync::atomic::Ordering::Relaxed);
+        tracing::info!(
+            max_concurrent,
+            rate_limit_per_minute,
+            zombie_timeout_secs,
+            "Scheduler config hot-reloaded"
+        );
     }
 
     /// Submits a task to the scheduler queue.
@@ -271,10 +295,10 @@ impl AgentScheduler {
         // Check if we can start a new task.
         {
             let running = self.running.lock();
-            if running.len() >= self.max_concurrent {
+            if running.len() >= self.max_concurrent.load(std::sync::atomic::Ordering::Relaxed) {
                 tracing::debug!(
                     running = running.len(),
-                    max = self.max_concurrent,
+                    max = self.max_concurrent.load(std::sync::atomic::Ordering::Relaxed),
                     "Max concurrent limit reached"
                 );
                 return None;
@@ -426,7 +450,7 @@ impl AgentScheduler {
     /// Returns the IDs of tasks that were reaped.
     pub fn reap_zombies(&self) -> Vec<Uuid> {
         let now = Utc::now();
-        let timeout = chrono::Duration::seconds(self.zombie_timeout_secs as i64);
+        let timeout = chrono::Duration::seconds(self.zombie_timeout_secs.load(std::sync::atomic::Ordering::Relaxed) as i64);
         let mut start_times = self.task_start_times.lock();
         let mut running = self.running.lock();
         let mut reaped = Vec::new();
@@ -442,12 +466,12 @@ impl AgentScheduler {
                 task.status = TaskStatus::Failed;
                 task.error = Some(format!(
                     "zombie: ran for >{} seconds",
-                    self.zombie_timeout_secs
+                    self.zombie_timeout_secs.load(std::sync::atomic::Ordering::Relaxed)
                 ));
                 reaped.push(id);
                 tracing::warn!(
                     task_id = %id,
-                    duration_secs = self.zombie_timeout_secs,
+                    duration_secs = self.zombie_timeout_secs.load(std::sync::atomic::Ordering::Relaxed),
                     "Zombie task reaped"
                 );
             }
@@ -538,7 +562,7 @@ impl AgentScheduler {
             running: running.len(),
             completed: _completed,
             failed: _failed,
-            max_concurrent: self.max_concurrent,
+            max_concurrent: self.max_concurrent.load(std::sync::atomic::Ordering::Relaxed),
             rate_limit_per_minute: rate_limiter.max_requests,
             rate_remaining: rate_limiter.remaining(),
         }

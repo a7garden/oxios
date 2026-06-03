@@ -69,7 +69,7 @@ pub struct ResourceMonitor {
     total_token_usage: AtomicU64,
     active_agents: AtomicUsize,
     pending_tasks: AtomicUsize,
-    overload_threshold: OverloadThreshold,
+    overload_threshold: RwLock<OverloadThreshold>,
     /// Shared `sysinfo::System` instance to avoid recreating on every snapshot.
     sys: parking_lot::Mutex<System>,
 }
@@ -90,7 +90,7 @@ impl ResourceMonitor {
             total_token_usage: AtomicU64::new(0),
             active_agents: AtomicUsize::new(0),
             pending_tasks: AtomicUsize::new(0),
-            overload_threshold: OverloadThreshold::default(),
+            overload_threshold: RwLock::new(OverloadThreshold::default()),
             sys: parking_lot::Mutex::new(System::new_all()),
         }
     }
@@ -174,9 +174,10 @@ impl ResourceMonitor {
             0.0
         };
 
-        snap.cpu_percent >= self.overload_threshold.cpu_percent
-            || memory_percent >= self.overload_threshold.memory_percent
-            || snap.load_avg_1m >= self.overload_threshold.load_avg
+        let t = self.overload_threshold.read();
+        snap.cpu_percent >= t.cpu_percent
+            || memory_percent >= t.memory_percent
+            || snap.load_avg_1m >= t.load_avg
     }
 
     /// Update the active agent count.
@@ -196,7 +197,13 @@ impl ResourceMonitor {
 
     /// Returns a copy of the current overload threshold.
     pub fn overload_threshold(&self) -> OverloadThreshold {
-        self.overload_threshold
+        self.overload_threshold.read().clone()
+    }
+
+    /// Hot-reload overload thresholds without restart.
+    pub fn set_overload_threshold(&self, threshold: OverloadThreshold) {
+        *self.overload_threshold.write() = threshold;
+        tracing::info!("ResourceMonitor thresholds hot-reloaded");
     }
 }
 

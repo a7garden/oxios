@@ -854,10 +854,28 @@ pub(crate) async fn handle_config_put(
     *state.config.write() = updated_config.clone();
 
     // Propagate hot-reloadable config to kernel subsystems.
-    // ExecApi holds a SharedExecConfig (Arc<RwLock<ExecConfig>>).
+    // Each subsystem gets its relevant slice of the config.
+
+    // ExecApi — allowlist, shell mode, timeouts
     *state.kernel.exec.shared_config().write() = updated_config.exec.clone();
+
+    // AgentScheduler — concurrency, rate limit, zombie timeout
+    state.kernel.infra.scheduler().update_config(
+        updated_config.scheduler.max_concurrent,
+        updated_config.scheduler.rate_limit_per_minute,
+        updated_config.scheduler.zombie_timeout_secs,
+    );
+
+    // ResourceMonitor — CPU/memory/load thresholds
+    use oxios_kernel::resource_monitor::OverloadThreshold;
+    state.kernel.infra.resource_monitor().set_overload_threshold(OverloadThreshold {
+        cpu_percent: updated_config.resource_monitor.cpu_threshold,
+        memory_percent: updated_config.resource_monitor.memory_threshold,
+        load_avg: updated_config.resource_monitor.load_threshold,
+    });
+
     tracing::info!(
-        "Config hot-reloaded (web + exec) from {}",
+        "Config hot-reloaded (web + kernel subsystems) from {}",
         state.config_path.display()
     );
     Ok(Json(body))

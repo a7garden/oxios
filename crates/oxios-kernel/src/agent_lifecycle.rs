@@ -19,7 +19,6 @@ use crate::types::{AgentId, AgentStatus};
 use oxios_ouroboros::{ExecutionResult, Seed};
 
 /// Manages the full lifecycle of a single agent from fork to cleanup.
-#[derive(Clone)]
 pub struct AgentLifecycleManager {
     supervisor: Arc<dyn Supervisor>,
     scheduler: Arc<AgentScheduler>,
@@ -27,7 +26,22 @@ pub struct AgentLifecycleManager {
     a2a: Arc<A2AProtocol>,
     event_bus: EventBus,
     /// Maximum execution time in seconds for agent tasks (0 = no limit).
-    max_execution_time_secs: u64,
+    max_execution_time_secs: std::sync::atomic::AtomicU64,
+}
+
+impl Clone for AgentLifecycleManager {
+    fn clone(&self) -> Self {
+        Self {
+            supervisor: self.supervisor.clone(),
+            scheduler: self.scheduler.clone(),
+            access_manager: self.access_manager.clone(),
+            a2a: self.a2a.clone(),
+            event_bus: self.event_bus.clone(),
+            max_execution_time_secs: std::sync::atomic::AtomicU64::new(
+                self.max_execution_time_secs.load(std::sync::atomic::Ordering::Relaxed),
+            ),
+        }
+    }
 }
 
 impl AgentLifecycleManager {
@@ -46,8 +60,14 @@ impl AgentLifecycleManager {
             access_manager,
             a2a,
             event_bus,
-            max_execution_time_secs,
+            max_execution_time_secs: std::sync::atomic::AtomicU64::new(max_execution_time_secs),
         }
+    }
+
+    /// Hot-reload max execution time without restart.
+    pub fn set_max_execution_time(&self, secs: u64) {
+        self.max_execution_time_secs.store(secs, std::sync::atomic::Ordering::Relaxed);
+        tracing::info!(max_execution_time_secs = secs, "Lifecycle config hot-reloaded");
     }
 
     /// Fork an agent, register it in A2A and access control, submit to
@@ -80,8 +100,9 @@ impl AgentLifecycleManager {
         self.scheduler.start_task(task_id)?;
 
         // 5. Run — always cleanup even on failure
-        let result = if self.max_execution_time_secs > 0 {
-            let exec_timeout = Duration::from_secs(self.max_execution_time_secs);
+        let max_secs = self.max_execution_time_secs.load(std::sync::atomic::Ordering::Relaxed);
+        let result = if max_secs > 0 {
+            let exec_timeout = Duration::from_secs(max_secs);
             match timeout(exec_timeout, self.supervisor.run_with_seed(agent_id, seed)).await {
                 Ok(Ok(r)) => r,
                 Ok(Err(e)) => {
