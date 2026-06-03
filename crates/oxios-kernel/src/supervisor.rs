@@ -448,7 +448,7 @@ mod tests {
             ),
             crate::kernel_handle::SecurityApi::new(
                 Arc::new(parking_lot::Mutex::new(crate::auth::AuthManager::new())),
-                Arc::new(crate::audit_trail::AuditTrail::new(100)),
+                Arc::new(oxi_sdk::observability::AuditTrail::new(100)),
                 Arc::new(parking_lot::Mutex::new(
                     crate::access_manager::AccessManager::new(),
                 )),

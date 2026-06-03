@@ -38,9 +38,9 @@ pub use state_api::StateApi;
 
 use crate::a2a::A2AProtocol;
 use crate::access_manager::AccessManager;
-use crate::audit_trail::AuditTrail;
 use crate::auth::AuthManager;
 use crate::budget::BudgetManager;
+use oxi_sdk::observability::AuditTrail;
 use crate::skill::clawhub::{ClawHubClient, ClawHubInstaller};
 use crate::skill::skills_sh::{SkillsShClient, SkillsShInstaller};
 use crate::config::OxiosConfig;

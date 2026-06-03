@@ -4,11 +4,11 @@
 //! through kernel events published on the bus.
 
 use anyhow::Result;
+use oxi_sdk::observability::{AuditAction, AuditTrail};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::broadcast;
 
-use crate::audit_trail::{AuditAction, AuditTrail};
 use crate::types::AgentId;
 
 /// Events that flow through the kernel event bus.
