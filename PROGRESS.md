@@ -53,3 +53,166 @@ These were added after the original English source and already have Korean trans
 - `surface/oxios-web/web/src/i18n/locales/en.json` — Restored to proper English
 - `surface/oxios-web/web/src/i18n/locales/ko.json` — Verified complete (no changes needed)
 - `ko-translated.json` — Output copy of the complete Korean translation
+
+---
+
+# RFC-015 Chat Transparency
+
+## Date: 2026-06-03
+
+## Status: ✅ COMPLETE — Backend wire format + frontend UI + persistence
+
+## Summary
+
+The Web chat UI previously showed a spinner during agent execution and
+revealed the final response only at the end. RFC-015 streams real-time
+agent activity (tool calls, memory recall, reasoning, token usage) into
+the chat as collapsible cards, with full persistence so the timeline
+survives page reloads.
+
+### Implementation Phases
+
+#### Phase 1: Backend wire format
+- 5 new `KernelEvent` variants: `ToolExecutionStarted`,
+  `ToolExecutionFinished`, `MemoryRecallUsed`, `TokenUsageUpdate`,
+  `ReasoningFragment`. Mapped to audit actions and `extract_agent_id`.
+- `agent_runtime.rs` `run_streaming` callback publishes events; session
+  ID is derived from `seed.id` and threaded through a new
+  `execute_with_session` entry point.
+- `events.rs` `sanitize_event` covers the new variants so they appear on
+  the global `/api/events` SSE channel.
+- `chat.rs` WS handler subscribes to the kernel event bus alongside
+  `outgoing_rx`, biases `tokio::select!` toward gateway messages, and
+  filters kernel events by `active_session_id` so unrelated agents do
+  not leak.
+
+#### Phase 2: Session persistence
+- `Session.trajectory_steps: Vec<TrajectoryStepRecord>` + helper
+  `extend_trajectory()`. `TrajectoryStepRecord` duplicates the relevant
+  fields of `memory::sona::TrajectoryStep` to avoid a kernel → memory
+  dependency cycle.
+- Both POST `/api/chat` and WS `persist_session` now extract
+  `tool_calls` from the response metadata and append as
+  `TrajectoryStepRecord`s.
+- `GET /api/sessions/:id` returns `trajectory_steps` in the JSON
+  response.
+
+#### Phase 3: Frontend
+- `StreamChunk` extended with 6 new chunk types; new `ChatActivity`
+  type (phase, tool_call, memory, reasoning, usage).
+- `chat.ts` `handleChunk` rewritten as a `switch` statement;
+  `chunkToActivity` and `trajectoryToActivity` helpers bridge backend
+  chunks → frontend activity entries.
+- `loadSession` reconstructs the timeline from `trajectory_steps` so the
+  replay view matches the live view.
+- New components:
+  - `ActivityCard` — single collapsed card (icon, label, duration, error
+    badge). Expands to show tool I/O, memory details, reasoning text,
+    or token counts.
+  - `ActivityTimeline` — wrapper that summarises N activities and a
+    tool/token count in the header, then renders the cards. Collapses
+    automatically when >8 activities.
+
+#### Phase 4: Polish
+- 20 new i18n keys under `chat.transparency.*` in both `en.json` and
+  `ko.json` (16 base + 4 plural variants).
+- 2 new unit tests in `event_bus::tests` for the new variants:
+  `test_rfc015_event_round_trip_json` (round-trip stability) and
+  `test_rfc015_extract_agent_id` (audit mapping).
+
+### Files Modified
+- `crates/oxios-kernel/src/event_bus.rs` — 5 new variants + audit map
+- `crates/oxios-kernel/src/agent_runtime.rs` — `execute_with_session`, run_agent signature
+- `crates/oxios-kernel/src/state_store.rs` — `TrajectoryStepRecord`, `Session::extend_trajectory`
+- `surface/oxios-web/src/routes/chat.rs` — WS event subscription, kernel_event_to_ws_chunk
+- `surface/oxios-web/src/routes/events.rs` — sanitize_event RFC-015 entries, GET session trajectory
+- `surface/oxios-web/web/src/types/index.ts` — ChatActivity, StreamChunk extensions
+- `surface/oxios-web/web/src/stores/chat.ts` — handleChunk switch, helpers
+- `surface/oxios-web/web/src/components/chat/activity-card.tsx` — new
+- `surface/oxios-web/web/src/components/chat/activity-timeline.tsx` — new
+- `surface/oxios-web/web/src/components/chat/message-bubble.tsx` — embed timeline
+- `surface/oxios-web/web/src/i18n/locales/{en,ko}.json` — 20 new keys
+- `docs/rfc-015-chat-transparency.md` — design doc
+
+### Verification
+- `cargo check --workspace` — passes
+- `cargo test -p oxios-kernel --lib event_bus` — 7/7 pass
+- `bun run typecheck` — no new errors
+- `bun run build` — succeeds
+
+### Design Doc
+- `docs/rfc-015-chat-transparency.md` — full design rationale,
+  protocol shapes, and migration plan
+
+---
+
+# RFC-015 Chat Transparency — Polish & Test Pass
+
+## Date: 2026-06-03 (continued)
+
+## Status: ✅ COMPLETE — markdown highlighting, i18n, unit tests
+
+## Summary
+
+Follow-up pass on RFC-015. Closes out the "optional" work items with full
+test coverage and a polished UI.
+
+### Phase 5: Markdown syntax highlighting
+- Added `rehype-highlight` + `highlight.js` (github-dark theme).
+- `message-bubble.tsx` renders fenced code blocks with the language tag
+  detected by `rehype-highlight`. Theme CSS imported in `index.css`.
+- `rehype-highlight` runs alongside `remark-gfm` in the ReactMarkdown
+  pipeline; no other code changes required.
+
+### Phase 6: i18n on chat transparency components
+- `ActivityCard` and `ActivityTimeline` switched from hardcoded English
+  to `t('chat.transparency.*')` calls. The 20 keys added in Phase 4 are
+  now actually consumed; plural variants (`_one` / `_other`) wired up
+  via i18next's automatic count-based selection.
+- Korean translations live in `ko.json`; the rest of the UI already
+  follows the same `t()` convention.
+
+### Phase 7: Unit tests
+- `crates/oxios-kernel/src/event_bus.rs` (already in Phase 4):
+  `test_rfc015_event_round_trip_json` and
+  `test_rfc015_extract_agent_id` — 7/7 pass.
+- `crates/oxios-web/src/routes/chat.rs`: 8 new tests in
+  `rfc015_tests` module covering:
+  - `tool_started_emits_tool_start` — wire format
+  - `tool_finished_emits_tool_end` — wire format
+  - `memory_recall_emits_memory_chunk` — wire format
+  - `token_usage_emits_usage_chunk` — wire format
+  - `reasoning_emits_reasoning_chunk` — wire format
+  - `foreign_session_is_filtered` — security/correctness
+  - `no_active_session_passes_session_scoped_events` — behaviour
+  - `lifecycle_events_are_skipped` — keeps WS stream clean
+- `surface/oxios-web/web/src/__tests__/stores.test.ts`: 7 new tests for
+  `useChatStore.handleChunk` covering every chunk type and the
+  tool_start/tool_end merge behaviour. Also fixed a behavioural bug in
+  the merge logic uncovered by the test (tool_start + tool_end with the
+  same `toolCallId` now correctly merge into a single activity, rather
+  than the second being silently dropped).
+
+### Verification
+- `cargo check --workspace` — passes
+- `cargo test -p oxios-kernel --lib event_bus` — 7/7 pass
+- `cargo test -p oxios-web --lib rfc015_tests` — 8/8 pass
+- `bun run typecheck` — no new errors (pre-existing
+  `AiDetectionState`/`err` warnings belong to other sessions)
+- `bun run test` — 135/135 pass (was 122; +13 RFC-015 tests)
+- `bun run build` — succeeds
+
+### Files Modified
+- `crates/oxios-kernel/src/event_bus.rs` (already in Phase 4; tests in
+  Phase 7 verified the wire format is stable)
+- `surface/oxios-web/src/routes/chat.rs` — 8 new tests
+- `surface/oxios-web/web/src/components/chat/activity-card.tsx` — i18n
+- `surface/oxios-web/web/src/components/chat/activity-timeline.tsx` — i18n
+- `surface/oxios-web/web/src/components/chat/message-bubble.tsx` —
+  rehype-highlight
+- `surface/oxios-web/web/src/index.css` — highlight.js theme import
+- `surface/oxios-web/web/src/stores/chat.ts` — tool_start/tool_end merge
+- `surface/oxios-web/web/src/__tests__/stores.test.ts` — 7 new tests
+- `surface/oxios-web/web/package.json` — `rehype-highlight`,
+  `highlight.js`
+- `bun.lock` (or `bun.lockb`) — locked new deps
