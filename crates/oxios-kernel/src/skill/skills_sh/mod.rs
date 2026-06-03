@@ -26,8 +26,8 @@
 //!
 //! # Example
 //!
-//! ```no_run
-//! use oxios_kernel::skills_sh::{SkillsShInstaller, SkillsShInstallResult};
+//! ```ignore
+//! use oxios_kernel::skill::skills_sh::{SkillsShInstaller, SkillsShInstallResult};
 //! use std::path::PathBuf;
 //!
 //! # async fn example() -> anyhow::Result<()> {

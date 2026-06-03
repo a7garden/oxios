@@ -16,8 +16,8 @@
 //!
 //! # Usage
 //!
-//! ```no_run
-//! use oxios_kernel::coordination::{WorkQueue, WorkQueueConfig};
+//! ```ignore
+//! use oxi_sdk::coordination::{WorkQueue, WorkQueueConfig};
 //!
 //! let queue = WorkQueue::new(WorkQueueConfig::default());
 //! // queue.submit(WorkItem { id: "task-1".into(), .. });

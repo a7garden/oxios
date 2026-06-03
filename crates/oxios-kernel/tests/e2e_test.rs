@@ -91,6 +91,7 @@ impl OuroborosProtocol for MockOuroboros {
             output: format!("Executed seed: {}", seed.goal),
             steps_completed: 3,
             success: true,
+            tool_calls: vec![],
         })
     }
 
@@ -181,6 +182,7 @@ impl Supervisor for MockSupervisor {
             output: "Mock agent completed successfully".into(),
             steps_completed: 5,
             success: true,
+            tool_calls: vec![],
         })
     }
 

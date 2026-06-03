@@ -17,6 +17,7 @@ fn test_execution(output: &str) -> ExecutionResult {
         output: output.to_string(),
         steps_completed: 1,
         success: true,
+        tool_calls: vec![],
     }
 }
 

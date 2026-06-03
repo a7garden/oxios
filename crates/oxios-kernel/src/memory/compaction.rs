@@ -465,14 +465,14 @@ mod tests {
     #[test]
     fn test_rule_based_compact_long() {
         let tree = CompactionTree::new(10);
-        let content = (0..20)
+        let content = (0..50)
             .map(|i| format!("line {}", i))
             .collect::<Vec<_>>()
             .join("\n");
         let result = tree.rule_based_compact(&content);
-        assert!(result.lines().count() < 20, "Should be compacted");
+        assert!(result.lines().count() < 50, "Should be compacted");
         assert!(result.contains("line 0"), "Should preserve first line");
-        assert!(result.contains("line 19"), "Should preserve last line");
+        assert!(result.contains("line 49"), "Should preserve last line");
         assert!(
             result.contains("omitted"),
             "Should indicate omitted content"

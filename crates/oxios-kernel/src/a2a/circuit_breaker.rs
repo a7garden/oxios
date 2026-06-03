@@ -5,7 +5,7 @@
 //! # Example
 //!
 //! ```
-//! use oxios_kernel::a2a_circuit_breaker::{A2ACircuitBreaker, CircuitState};
+//! use oxios_kernel::a2a::circuit_breaker::{A2ACircuitBreaker, CircuitState};
 //!
 //! let cb = A2ACircuitBreaker::new(3, 30);  // 3 failures, 30s reset
 //! assert_eq!(cb.state(), CircuitState::Closed);

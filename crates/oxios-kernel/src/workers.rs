@@ -544,9 +544,9 @@ mod tests {
         let mgr = WorkerManager::new();
         mgr.register(WorkerType::Audit, WorkerConfig::default_for(WorkerType::Audit));
 
-        let result = mgr.dispatch(WorkerType::Audit);
-        assert!(result.is_err());
-        assert!(result.unwrap_err().contains("No implementation registered"));
+        let result = mgr.dispatch(WorkerType::Audit).unwrap();
+        assert!(!result.success);
+        assert!(result.output.contains("No implementation registered"));
     }
 
     #[test]

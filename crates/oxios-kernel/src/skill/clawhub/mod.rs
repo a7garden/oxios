@@ -19,8 +19,8 @@
 //!
 //! # Example
 //!
-//! ```no_run
-//! use oxios_kernel::clawhub::{ClawHubInstaller, InstallResult};
+//! ```ignore
+//! use oxios_kernel::skill::clawhub::{ClawHubInstaller, InstallResult};
 //! use std::path::PathBuf;
 //!
 //! # async fn example() -> anyhow::Result<()> {

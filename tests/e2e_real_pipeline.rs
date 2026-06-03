@@ -87,6 +87,7 @@ mod tests {
             output: "Hello, World!\n".into(),
             steps_completed: 1,
             success: true,
+            tool_calls: vec![],
         };
 
         // First call: mechanical pass → skip LLM
