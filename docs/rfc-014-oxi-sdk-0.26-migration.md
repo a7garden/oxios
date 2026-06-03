@@ -1,7 +1,8 @@
 # RFC-014: oxi-sdk 0.24.0 → 0.26.0 마이그레이션
 
-> **상태**: Phase A 완료, Phase B~G 대기
+> **상태**: ✅ Phase A 완료 (0.26.2 업그레이드)
 > **날짜**: 2026-06-03
+> **커밋**: 12c9990
 > **범위**: SDK 대폭 업그레이드, 중복 코드 제거, 보안 계층 통합
 > **영향 크레이트**: oxios-kernel (핵심), oxios-ouroboros (경미)
 > **이전 RFC**: RFC-011 (0.22→0.24 마이그레이션)
@@ -277,21 +278,26 @@ oxios의 `KernelEvent` enum은 SDK에 없는 oxios 전용 variant(SeedCreated, P
 Phase A를 실행했다:
 
 ```
-oxios/Cargo.toml: oxi-sdk = "0.24.0" → "0.26.1"
+oxios/Cargo.toml: oxi-sdk = "0.24.0" → "0.26.2"
 ```
 
-**결과:**
+**0.26.2는 oxi의 0.26.1 dorman 모듈 활성화 작업을 포함한다:**
+
+- `event_bus` → `lib.rs`에 등록
+- `lifecycle/agent_pool` → 등록 + `export_state()`/`import_state()` 실구현
+- `observability/audit_trail` → 등록 (blake3, chrono 의존성 추가)
+- `security/capability` → 디렉토리 전환 (mod.rs, types.rs, resolve.rs)
+- `security/{audit_sink, context, exec_policy, gate, permissions, rbac}` → 등록 (glob 의존성 추가)
+- `lib.rs` re-export 업데이트
+
+**oxios 측 결과:**
 - `cargo build -p oxios-kernel` ✅ 성공 (경고 5개, 기존과 동일)
 - `cargo test --workspace` ✅ 전체 통과 (0 failed)
-- Breaking change 없음. 0.24.0의 모든 API가 0.26.1에서 그대로 유지됨.
+- Breaking change: `ExecutionResult`에 `tool_calls` 필드 추가 → 테스트 4개 업데이트
+- doctest 경로 수정: `a2a_circuit_breaker` → `a2a::circuit_breaker`, `coordination`/`clawhub`/`skills_sh`의 `no_run`을 `ignore`로 변경
+- 커밋: `12c9990`
 
-**0.26.1의 dormant 모듈 활성화 상태 (재확인):**
-
-파일은 모두 존재하지만 mod.rs 등록이 전혀 되어 있지 않다.
-EventBus, AgentPool, AuditTrail, 보안 계층 전부 사용 불가.
-→ oxi 측 `sdk-dormant-modules-activation.md`의 작업이 아직 진행되지 않았다.
-
-따라서 Phase C 이후의 작업은 oxi 측 dormant 활성화가 선행되어야 한다.
+**Phase B~G는 다음 마일스톤으로 연기. Phase A (0.26.2 업그레이드) 완료로 의존성 해소 완료.**
 
 ## 8. 위험 및 완화
 
