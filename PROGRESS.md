@@ -292,3 +292,56 @@ test coverage and a polished UI.
 - 10 pre-existing e2e tests in `app.spec.ts`, `budget.spec.ts`,
   `navigation.spec.ts` fail on this branch and on `main` (verified by
   stashing my changes). They are unrelated to RFC-T1-D.
+
+---
+
+# RFC-T1-D — Pre-merge Review
+
+## Date: 2026-06-04
+
+## Status: ⚠️ BLOCKED — 1 P0 + 5 P1 issues to address
+
+## Reviewer
+
+Subagent review at `/tmp/oxios-review-settings.md`.
+
+## Verdict
+
+❌ Block on **P0-1** (Telegram settings writes go to the wrong path and
+are silently dropped). Approve-with-comments on the P1 list.
+
+## P0
+
+- **Telegram settings non-functional.** `buildPayload` in
+  `web/src/routes/settings.tsx` produces a doubly-nested PATCH body
+  (`channels.telegram.channels.telegram.<field>`) for the
+  `channels.telegram` section because the merge loop tries to strip a
+  prefix from the wrong string. `OxiosConfig` deserialization ignores
+  the unknown `channels.channels` subtree, so the user's change is
+  silently dropped, the diff preview mis-reports what is changing, and
+  the PATCH returns 200 OK. No e2e test exercises Telegram save, which
+  is why this shipped. Fix: `payload.channels = bucket.channels` in the
+  `channels.telegram` branch (the bucket already has the right shape).
+
+## P1 (selected)
+
+- Hot-reload classification is overoptimistic — 7 of 10 hot-reloadable
+  sections (security, audit, orchestrator, context, session, logging,
+  kernel) are never actually propagated to the kernel, but the response
+  marks them as "applied immediately". `memory.enabled` is the worst
+  example: toggle claims hot-reload but the memory subsystem was
+  initialized at boot.
+- PATCH /api/config doesn't refuse `engine.api_key` etc. Frontend never
+  sends them today, so latent, but no backend guardrail.
+- `handle_config_put` doc comment says "PATCH semantics" but the route
+  is exposed as PUT. Rename to PATCH-only or re-document.
+- `console.info('[config] saved', r)` left in `settings.tsx` ~line 511.
+- `useSaveConfig` PUT fallback comment is misleading (current server
+  has identical PATCH semantics on PUT).
+
+## E2E
+
+- `.last-run.json` shows `status: "passed"`, but the
+  `playwright-report/data/*.md` from 08:06 shows 4 prior failures
+  (memory sub-cards, exec allowlist, save flow, restart badge) that
+  were fixed in `df5f3dc` (React hooks fix). Re-run after P0 fix.
