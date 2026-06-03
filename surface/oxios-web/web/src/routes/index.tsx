@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import {
   Activity,
+  AlertTriangle,
   Bot,
   Brain,
   Calendar,
@@ -11,13 +12,19 @@ import {
   MessageSquare,
   NotebookPen,
   Shield,
+  Zap,
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { ApprovalsQueue } from '@/components/dashboard/approvals-queue'
+import { LiveActivityFeed } from '@/components/dashboard/live-activity-feed'
+import { ModelUsageCard } from '@/components/dashboard/model-usage-card'
+import { StatCard } from '@/components/dashboard/stat-card'
 import { ErrorState } from '@/components/shared/error-state'
 import { LoadingCards } from '@/components/shared/loading'
-import { ModelUsageCard } from '@/components/dashboard/model-usage-card'
-import { Badge } from '@/components/ui/badge'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardHeader, CardTitle } from '@/components/ui/card'
+import { useApprovals } from '@/hooks/use-approvals'
+import { computeDelta, seriesFromSnapshots, useResourceHistory } from '@/hooks/use-resource-history'
+import { useTokenRate } from '@/hooks/use-token-rate'
 import { api } from '@/lib/api-client'
 import type { Agent, SystemStatus } from '@/types'
 
@@ -36,7 +43,7 @@ function DashboardPage() {
   } = useQuery({
     queryKey: ['status'],
     queryFn: () => api.get<SystemStatus>('/api/status'),
-    refetchInterval: 10000,
+    refetchInterval: 10_000,
   })
 
   const {
@@ -46,50 +53,78 @@ function DashboardPage() {
   } = useQuery({
     queryKey: ['agents'],
     queryFn: () => api.get<{ items: Agent[] }>('/api/agents'),
-    refetchInterval: 5000,
+    refetchInterval: 5_000,
   })
 
-  if (statusLoading) return <LoadingCards count={4} />
+  // Resource history (last 30 samples) → used for sparkline + CPU card
+  const { data: snapshots } = useResourceHistory(30, 10_000)
+  const cpuSeries = seriesFromSnapshots(snapshots ?? [], 'cpu_percent')
+  const cpuDelta = computeDelta(cpuSeries)
+
+  // Token rate from the SSE stream
+  const { tokensPerMin, history: tokenHistory } = useTokenRate()
+  const tokenDelta = computeDelta(tokenHistory)
+
+  // Pending approvals (for KPI count)
+  const { data: approvals } = useApprovals()
+  const pendingApprovals = (approvals?.items ?? []).filter((a) => a.status === 'pending')
+
+  if (statusLoading) return <LoadingCards count={5} />
   if (statusError) return <ErrorState onRetry={() => refetchStatus()} />
 
-  const runningAgents = agents?.items?.filter((a) => a.status?.toLowerCase() === 'running') ?? []
-
-  const stats = [
-    {
-      labelKey: 'dashboard.runningAgents',
-      value: status?.components?.agents?.active_count ?? 0,
-      icon: <Bot className="h-4 w-4" />,
-      color: 'text-emerald-500',
-    },
-    {
-      labelKey: 'dashboard.totalAgents',
-      value: status?.components?.agents?.total_forked ?? 0,
-      icon: <Cpu className="h-4 w-4" />,
-      color: 'text-blue-500',
-    },
-    {
-      labelKey: 'dashboard.activeSpaces',
-      value: status?.components?.spaces_active ?? 0,
-      icon: <LayoutDashboard className="h-4 w-4" />,
-      color: 'text-purple-500',
-    },
-    {
-      labelKey: 'dashboard.uptime',
-      value: status?.uptime ?? '-',
-      icon: <Clock className="h-4 w-4" />,
-      color: 'text-amber-500',
-    },
-  ]
+  const allAgents = agents?.items ?? []
+  const runningAgents = allAgents.filter((a) => a.status?.toLowerCase() === 'running')
+  const totalAgents = status?.components?.agents?.total_forked ?? allAgents.length
 
   const quickLinks = [
-    { labelKey: 'common.chat', href: '/chat', icon: <MessageSquare className="h-5 w-5 text-blue-500" />, descKey: 'dashboard.startConversation' },
-    { labelKey: 'common.knowledge', href: '/knowledge', icon: <NotebookPen className="h-5 w-5 text-violet-500" />, descKey: 'dashboard.markdownNotesJournal' },
-    { labelKey: 'common.agents', href: '/agents', icon: <Bot className="h-5 w-5 text-emerald-500" />, descKey: 'dashboard.manageRunningAgents' },
-    { labelKey: 'common.sessions', href: '/sessions', icon: <Clock className="h-5 w-5 text-blue-500" />, descKey: 'dashboard.viewSessionHistory' },
-    { labelKey: 'common.resources', href: '/resources', icon: <Activity className="h-5 w-5 text-amber-500" />, descKey: 'dashboard.systemResourceUsage' },
-    { labelKey: 'common.memory', href: '/memory', icon: <Brain className="h-5 w-5 text-purple-500" />, descKey: 'dashboard.agentMemoryStore' },
-    { labelKey: 'common.security', href: '/security', icon: <Shield className="h-5 w-5 text-red-500" />, descKey: 'dashboard.auditTrailAccessControl' },
-    { labelKey: 'common.scheduler', href: '/scheduler', icon: <Calendar className="h-5 w-5 text-teal-500" />, descKey: 'dashboard.taskQueueManagement' },
+    {
+      labelKey: 'common.chat',
+      href: '/chat',
+      icon: <MessageSquare className="h-5 w-5 text-blue-500" />,
+      descKey: 'dashboard.startConversation',
+    },
+    {
+      labelKey: 'common.knowledge',
+      href: '/knowledge',
+      icon: <NotebookPen className="h-5 w-5 text-violet-500" />,
+      descKey: 'dashboard.markdownNotesJournal',
+    },
+    {
+      labelKey: 'common.agents',
+      href: '/agents',
+      icon: <Bot className="h-5 w-5 text-emerald-500" />,
+      descKey: 'dashboard.manageRunningAgents',
+    },
+    {
+      labelKey: 'common.sessions',
+      href: '/sessions',
+      icon: <Clock className="h-5 w-5 text-blue-500" />,
+      descKey: 'dashboard.viewSessionHistory',
+    },
+    {
+      labelKey: 'common.resources',
+      href: '/resources',
+      icon: <Activity className="h-5 w-5 text-amber-500" />,
+      descKey: 'dashboard.systemResourceUsage',
+    },
+    {
+      labelKey: 'common.memory',
+      href: '/memory',
+      icon: <Brain className="h-5 w-5 text-purple-500" />,
+      descKey: 'dashboard.agentMemoryStore',
+    },
+    {
+      labelKey: 'common.security',
+      href: '/security',
+      icon: <Shield className="h-5 w-5 text-red-500" />,
+      descKey: 'dashboard.auditTrailAccessControl',
+    },
+    {
+      labelKey: 'common.scheduler',
+      href: '/scheduler',
+      icon: <Calendar className="h-5 w-5 text-teal-500" />,
+      descKey: 'dashboard.taskQueueManagement',
+    },
   ]
 
   return (
@@ -99,104 +134,80 @@ function DashboardPage() {
         <p className="text-muted-foreground">{t('dashboard.subtitle')}</p>
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {stats.map((stat) => (
-          <Card key={stat.labelKey}>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                {t(stat.labelKey)}
-              </CardTitle>
-              <div className={stat.color}>{stat.icon}</div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stat.value}</div>
-            </CardContent>
-          </Card>
-        ))}
+      {/* KPI stat row (5 cards) */}
+      <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
+        <StatCard
+          label={t('dashboard.totalAgents')}
+          value={totalAgents}
+          icon={<Bot className="h-4 w-4" />}
+          iconClassName="text-blue-500"
+          sparkline={cpuSeries.map((_v, i) => runningAgents.length + (i % 2))}
+          sparkColor="blue"
+          hint={t('dashboard.forkedTotal')}
+        />
+        <StatCard
+          label={t('dashboard.runningAgents')}
+          value={runningAgents.length}
+          icon={<Activity className="h-4 w-4" />}
+          iconClassName="text-emerald-500"
+          sparkline={cpuSeries.map(() => runningAgents.length)}
+          sparkColor="emerald"
+          href="/agents"
+        />
+        <StatCard
+          label={t('dashboard.tokensPerMin')}
+          value={formatTokensPerMin(tokensPerMin)}
+          icon={<Zap className="h-4 w-4" />}
+          iconClassName="text-violet-500"
+          delta={tokenHistory.length > 1 ? tokenDelta : undefined}
+          sparkline={tokenHistory}
+          sparkColor="violet"
+          hint={t('dashboard.lastWindow')}
+        />
+        <StatCard
+          label={t('dashboard.cpu')}
+          value={
+            cpuSeries.length > 0 ? `${(cpuSeries[cpuSeries.length - 1] ?? 0).toFixed(0)}%` : '—'
+          }
+          icon={<Cpu className="h-4 w-4" />}
+          iconClassName="text-amber-500"
+          delta={cpuSeries.length > 1 ? cpuDelta : undefined}
+          sparkline={cpuSeries}
+          sparkColor="amber"
+          href="/resources"
+        />
+        <StatCard
+          label={t('dashboard.pendingApprovals')}
+          value={pendingApprovals.length}
+          icon={<AlertTriangle className="h-4 w-4" />}
+          iconClassName={pendingApprovals.length > 0 ? 'text-red-500' : 'text-muted-foreground'}
+          sparkColor={pendingApprovals.length > 0 ? 'red' : 'cyan'}
+          hint={
+            pendingApprovals.length > 0 ? t('dashboard.needsAttention') : t('dashboard.allClear')
+          }
+          href="/approvals"
+        />
       </div>
 
-      {/* Two-column: Active Agents + System Health */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* Active Agents */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Activity className="h-4 w-4" /> {t('dashboard.activeAgents')}
-              {runningAgents.length > 0 && (
-                <Badge variant="success" className="ml-1">{runningAgents.length}</Badge>
-              )}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {agentsError ? (
-              <ErrorState onRetry={() => refetchAgents()} />
-            ) : runningAgents.length > 0 ? (
-              <div className="space-y-2">
-                {runningAgents.map((agent) => (
-                  <Link
-                    key={agent.id}
-                    to="/agents/$agentId"
-                    params={{ agentId: agent.id }}
-                    className="flex items-center justify-between rounded-lg border p-3 hover:bg-accent/50 transition-colors"
-                  >
-                    <div className="flex items-center gap-3">
-                      <Bot className="h-4 w-4 text-muted-foreground" />
-                      <div>
-                        <p className="font-medium text-sm">{agent.name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          ID: {agent.id.slice(0, 8)}...
-                        </p>
-                      </div>
-                    </div>
-                    <Badge variant="success">{t('common.running')}</Badge>
-                  </Link>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground py-2">{t('dashboard.noActiveAgents')}</p>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* System Health Summary */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Shield className="h-4 w-4" /> {t('dashboard.systemHealth')}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {status?.components?.state_store && (
-                <HealthRow
-                  labelKey="dashboard.stateStore"
-                  healthy={status.components.state_store.healthy}
-                  detail={status.components.state_store.detail}
-                />
-              )}
-              {status?.components?.event_bus && (
-                <HealthRow
-                  labelKey="dashboard.eventBus"
-                  healthy={status.components.event_bus.healthy}
-                  detail={status.components.event_bus.detail}
-                />
-              )}
-              {status?.components?.memory && (
-                <HealthRow
-                  labelKey="dashboard.memory"
-                  healthy={status.components.memory.enabled}
-                  detail={t('dashboard.entriesIndexed', { count: status.components.memory.index_size })}
-                />
-              )}
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">{t('dashboard.version')}</span>
-                <span className="font-mono">{status?.version ?? 'unknown'}</span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      {/* Two-column row: Live Activity Feed + Active Agents list */}
+      <div className="grid gap-4 lg:grid-cols-3">
+        <div className="lg:col-span-2">
+          <LiveActivityFeed />
+        </div>
+        <div>
+          <ActiveAgentsCard
+            agents={runningAgents}
+            isError={agentsError}
+            onRetry={() => refetchAgents()}
+          />
+        </div>
       </div>
+
+      {/* Approvals Queue (hidden when 0 pending) */}
+      <ApprovalsQueue />
+
+      {/* System Health (lightweight, secondary) */}
+      <SystemHealthCard status={status} />
 
       {/* Model Usage — routing stats (RFC-011) */}
       <ModelUsageCard />
@@ -224,16 +235,131 @@ function DashboardPage() {
   )
 }
 
-function HealthRow({ labelKey, healthy, detail }: { labelKey: string; healthy: boolean; detail?: string | null }) {
+function ActiveAgentsCard({
+  agents,
+  isError,
+  onRetry,
+}: {
+  agents: Agent[]
+  isError: boolean
+  onRetry: () => void
+}) {
   const { t } = useTranslation()
-
   return (
-    <div className="flex items-center justify-between text-sm">
-      <div className="flex items-center gap-2">
-        <div className={`h-2 w-2 rounded-full ${healthy ? 'bg-emerald-500' : 'bg-red-500'}`} />
-        <span>{t(labelKey)}</span>
+    <Card className="h-full">
+      <CardHeader className="flex flex-row items-center justify-between pb-2">
+        <CardTitle className="flex items-center gap-2 text-base">
+          <LayoutDashboard className="h-4 w-4" />
+          {t('dashboard.activeAgents')}
+        </CardTitle>
+        <span className="text-xs text-muted-foreground">{agents.length}</span>
+      </CardHeader>
+      <div className="px-6 pb-6 pt-0">
+        {isError ? (
+          <ErrorState onRetry={onRetry} />
+        ) : agents.length === 0 ? (
+          <p className="text-sm text-muted-foreground py-3">{t('dashboard.noActiveAgents')}</p>
+        ) : (
+          <div className="space-y-1.5">
+            {agents.slice(0, 5).map((agent) => (
+              <Link
+                key={agent.id}
+                to="/agents/$agentId"
+                params={{ agentId: agent.id }}
+                className="flex items-center justify-between rounded-md border px-3 py-2 hover:bg-accent/40 transition-colors"
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <Bot className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                  <span className="text-sm font-medium truncate">{agent.name}</span>
+                </div>
+                <span className="text-[10px] text-muted-foreground font-mono">
+                  {agent.id.slice(0, 6)}
+                </span>
+              </Link>
+            ))}
+            {agents.length > 5 && (
+              <Link
+                to="/agents"
+                className="block text-center text-xs text-muted-foreground hover:text-foreground pt-1"
+              >
+                {t('dashboard.viewAllCount', { count: agents.length })}
+              </Link>
+            )}
+          </div>
+        )}
       </div>
-      <span className="text-xs text-muted-foreground">{detail ?? (healthy ? t('common.healthy') : t('common.unhealthy'))}</span>
+    </Card>
+  )
+}
+
+function SystemHealthCard({ status }: { status: SystemStatus | undefined }) {
+  const { t } = useTranslation()
+  if (!status) return null
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between pb-2">
+        <CardTitle className="flex items-center gap-2 text-base">
+          <Shield className="h-4 w-4" />
+          {t('dashboard.systemHealth')}
+        </CardTitle>
+        <span className="text-xs font-mono text-muted-foreground">{status.version}</span>
+      </CardHeader>
+      <div className="px-6 pb-6 pt-0">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 text-sm">
+          {status.components?.state_store && (
+            <HealthRow
+              labelKey="dashboard.stateStore"
+              healthy={status.components.state_store.healthy}
+              detail={status.components.state_store.detail}
+            />
+          )}
+          {status.components?.event_bus && (
+            <HealthRow
+              labelKey="dashboard.eventBus"
+              healthy={status.components.event_bus.healthy}
+              detail={status.components.event_bus.detail}
+            />
+          )}
+          {status.components?.memory && (
+            <HealthRow
+              labelKey="dashboard.memory"
+              healthy={status.components.memory.enabled}
+              detail={t('dashboard.entriesIndexed', { count: status.components.memory.index_size })}
+            />
+          )}
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <Clock className="h-3.5 w-3.5" />
+            <span className="truncate">{status.uptime}</span>
+          </div>
+        </div>
+      </div>
+    </Card>
+  )
+}
+
+function HealthRow({
+  labelKey,
+  healthy,
+  detail,
+}: {
+  labelKey: string
+  healthy: boolean
+  detail?: string | null
+}) {
+  const { t } = useTranslation()
+  return (
+    <div className="flex items-center gap-2 text-muted-foreground">
+      <div className={`h-2 w-2 rounded-full ${healthy ? 'bg-emerald-500' : 'bg-red-500'}`} />
+      <span className="text-foreground">{t(labelKey)}</span>
+      {detail && <span className="text-xs truncate">· {detail}</span>}
     </div>
   )
+}
+
+function formatTokensPerMin(n: number): string {
+  if (n <= 0) return '0'
+  if (n < 1000) return `${Math.round(n)}`
+  if (n < 10_000) return `${(n / 1000).toFixed(1)}k`
+  if (n < 1_000_000) return `${Math.round(n / 1000)}k`
+  return `${(n / 1_000_000).toFixed(1)}M`
 }
