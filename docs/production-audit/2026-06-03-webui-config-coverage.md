@@ -10,12 +10,13 @@
 
 | # | 발견 | 등급 | 상태 |
 |---|------|------|------|
-| F-1 | WebUI "Save"가 폼에 없는 섹션을 기본값으로 리셋 | **P0 안전** | 라이브 검증 완료 |
+| F-1 | WebUI "Save"가 폼에 없는 섹션을 기본값으로 리셋 | **P0 안전** | ✅ 수정 (커밋 b451c2c) |
 | F-2 | `exec.allowed_commands` / `exec.allowlist_mode`가 폼에 없음 | **P0 안전** | F-1에 의해 증폭 |
 | F-3 | `security` 섹션 5개 필드 누락 (`allowed_tools`, `cors_origins`, …) | P1 | F-1에 의해 증폭 |
 | F-4 | 14개 섹션 통째로 폼에 없음 (memory/audit/budget/otel/…) | P1 | F-1에 의해 증폭 |
 | F-5 | `logging.level` 등 부분 필드 누락 | P2 | F-1에 의해 증폭 |
 | F-6 | `mcp` / `cron` / `persona` 런타임 UI와 설정 UI 중복 | P2 | 설계 결정 필요 |
+| F-7 | Web config 변경이 커널 런타임에 반영되지 않음 | **P0 아키텍처** | 라이브 검증 완료 |
 
 ---
 
@@ -166,12 +167,63 @@ allowlist_mode = "enforced"
 
 ---
 
+## F-7. (P0) Web config 변경이 커널 런타임에 반영되지 않음
+
+### 현상
+`handle_config_put`은 `state.config` (web layer)를 갱신하고 디스크에 기록하지만, **커널 서브시스템은 시작 시 복제한 config 스냅샷을 계속 사용**한다.
+
+### 원인
+```text
+src/surface.rs:61
+  config: Arc::new(RwLock::new(config.clone()))  ← web 전용 RwLock
+
+crates/oxios-kernel/src/kernel_handle/engine_api.rs:362
+  config: Arc<RwLock<OxiosConfig>>              ← EngineApi 전용 RwLock
+
+crates/oxios-kernel/src/kernel_handle/exec_api.rs:11
+  config: Arc<ExecConfig>                        ← ExecApi (RwLock 없음!)
+```
+
+각 API 퍼사드가 **시작 시 복제**한 독립 config 사본을 보유. Web의 PUT 변경은 web layer만 갱신.
+
+### 라이브 검증 (실 데몬)
+```
+1. PUT /api/config {"gateway": {"port": 8000}}
+2. GET /api/config → port: 8000 ✓ (web layer 갱신 확인)
+3. 디스크 config.toml → port = 8000 ✓
+4. curl http://127.0.0.1:8000/ → Connection refused ✗
+5. curl http://127.0.0.1:4200/ → 200 OK (구 포트로 계속 리스닝)
+```
+
+### 커널 핫리로드 지원 현황
+| 서브시스템 | 핫리로드 | 경로 |
+|-----------|---------|------|
+| EngineApi | ✅ | `/api/engine/*` → `rebuild_and_swap()` |
+| ExecApi | ❌ | `Arc<ExecConfig>` (불변) |
+| SecurityApi | ❌ | AuthManager만 내부 상태 관리 |
+| InfraApi | ❌ | Scheduler/ResourceMonitor 고정 |
+| PersonaApi | ❌ | PersonaManager 내부 상태 |
+| SessionConfig | ❌ | 이벤트 라우트에서 config.read() 사용 |
+
+### 영향
+- WebUI에서 `exec.allowed_commands`, `security.auth_enabled`, `scheduler.max_concurrent` 등을 변경해도 **데몬 재시작 전까지 아무 효과 없음**
+- 사용자에게 "Settings saved successfully" 메시지가 표시되지만 실제로는 효과가 없어 혼란 유발
+
+### 권장 수정
+1. **단기 (방어):** 핫리로드 미지원 섹션 변경 시 UI에 "재시작 필요" 경고 표시
+2. **중기 (아키텍처):** `AppState.config`를 커널과 공유 (단일 `Arc<RwLock<OxiosConfig>>` 참조)
+3. **장기 (서브시스템):** ExecApi, Scheduler 등이 `RwLock<ExecConfig>`를 읽도록 전환
+
+---
+
 ## 권장 작업 순서
 
-1. **즉시 (F-1 백엔드 방어):** `handle_config_put`에서 현재 config 베이스로 deep merge. merge 로직은 `serde_json::Value` 단계에서 수행 후 최종 `OxiosConfig`으로 deserialize.
-2. **단기 (F-2, F-3):** exec.allowlist, security 나머지 5필드, logging.level, orchestrator.eval_cache_enabled를 폼에 추가.
-3. **중기 (F-4):** memory/channels/audit/otel/daemon 섹션을 별도 settings 페이지 또는 "Advanced" 그룹으로 추가.
-4. **장기 (F-6):** 런타임 UI와 폼의 책임 경계 문서화.
+1. **완료 (F-1 백엔드 방어):** `handle_config_put`에서 PATCH 시맨틱 적용 (커밋 `b451c2c`)
+2. **즉시 (F-7):** 핫리로드 미지원 섹션에 "재시작 필요" UI 경고 추가
+3. **단기 (F-2, F-3):** exec.allowlist, security 나머지 5필드, logging.level, orchestrator.eval_cache_enabled를 폼에 추가.
+4. **중기 (F-4):** memory/channels/audit/otel/daemon 섹션을 별도 settings 페이지 또는 "Advanced" 그룹으로 추가.
+5. **중기 (F-7 아키텍처):** `AppState.config`를 커널과 공유 (단일 `Arc<RwLock<OxiosConfig>>` 참조)
+6. **장기 (F-6):** 런타임 UI와 폼의 책임 경계 문서화.
 
 ---
 
