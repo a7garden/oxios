@@ -24,6 +24,7 @@ pub use engine_api::{
     ValidateKeyResult,
 };
 pub use exec_api::ExecApi;
+pub use exec_api::SharedExecConfig;
 pub use extension_api::ExtensionApi;
 pub use infra_api::InfraApi;
 pub use knowledge_lens::{
@@ -210,7 +211,7 @@ impl KernelHandle {
                 start_time,
             ),
             projects: None,
-            exec: ExecApi::new(Arc::new(config.exec.clone()), access_manager),
+            exec: ExecApi::new(Arc::new(parking_lot::RwLock::new(config.exec.clone())), access_manager),
             #[allow(clippy::default_trait_access)]
             browser: BrowserApi::default(),
             a2a: A2aApi::new(Arc::new(A2AProtocol::new(crate::EventBus::new(0)))),

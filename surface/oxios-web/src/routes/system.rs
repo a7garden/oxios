@@ -850,9 +850,16 @@ pub(crate) async fn handle_config_put(
     tracing::info!(path = %state.config_path.display(), "Config persisted");
 
     // Hot-reload: update in-memory config.
-    *state.config.write() = updated;
+    let updated_config = updated;
+    *state.config.write() = updated_config.clone();
 
-    tracing::info!("Config hot-reloaded from {}", state.config_path.display());
+    // Propagate hot-reloadable config to kernel subsystems.
+    // ExecApi holds a SharedExecConfig (Arc<RwLock<ExecConfig>>).
+    *state.kernel.exec.shared_config().write() = updated_config.exec.clone();
+    tracing::info!(
+        "Config hot-reloaded (web + exec) from {}",
+        state.config_path.display()
+    );
     Ok(Json(body))
 }
 

@@ -178,7 +178,7 @@ impl Kernel {
                         .clone()
                         .map(oxios_kernel::ProjectApi::new),
                     oxios_kernel::ExecApi::new(
-                        Arc::new(self.config.exec.clone()),
+                        Arc::new(parking_lot::RwLock::new(self.config.exec.clone())),
                         self.access_manager.clone(),
                     ),
                     self.build_browser_api(),
@@ -838,7 +838,7 @@ impl KernelBuilder {
                     std::time::Instant::now(),
                 ),
                 project_manager.clone().map(oxios_kernel::ProjectApi::new),
-                oxios_kernel::ExecApi::new(Arc::new(config.exec.clone()), access_manager.clone()),
+                oxios_kernel::ExecApi::new(Arc::new(parking_lot::RwLock::new(config.exec.clone())), access_manager.clone()),
                 build_browser_api_value(&config),
                 oxios_kernel::A2aApi::new(a2a_protocol.clone()),
                 // EngineApi — routing stats shared between EngineApi and AgentRuntime + engine hot-swap

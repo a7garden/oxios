@@ -241,7 +241,7 @@ pub use kernel_handle::{
     KnowledgeContext, KnowledgeLens, KnowledgeNote, McpApi,
     MemoryNote, ModelInfo, PersonaApi, ProjectApi, ProjectInfo, ProviderCategory, ProviderInfo,
     RoutingConfigSnapshot, RoutingStats, RoutingStatsSnapshot, RoutingUpdate, SecurityApi,
-    StateApi, ValidateKeyResult,
+    SharedExecConfig, StateApi, ValidateKeyResult,
 };
 pub use session_context::SessionContext;
 

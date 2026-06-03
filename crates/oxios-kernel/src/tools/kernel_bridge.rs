@@ -132,7 +132,7 @@ mod tests {
             ),
             None,
             crate::ExecApi::new(
-                Arc::new(crate::config::ExecConfig::default()),
+                Arc::new(parking_lot::RwLock::new(crate::config::ExecConfig::default())),
                 Arc::new(parking_lot::Mutex::new(
                     crate::access_manager::AccessManager::new(),
                 )),
