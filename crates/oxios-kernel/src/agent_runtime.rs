@@ -34,6 +34,8 @@ use oxi_sdk::{
 use oxi_sdk::{SearchCache, ToolExecutionMode, ToolRegistry};
 use parking_lot::Mutex;
 use std::sync::Arc;
+// RFC-014 Phase D: `ToolRegistry::register_arc` is used in the AgentBuilder
+// path to attach CSpace tools after `builder.build()` returns.
 
 use crate::access_manager::{AccessGate, AgentContext, TracingAuditSink, TrailAuditSink};
 use crate::audit_trail::AuditTrail;
@@ -487,11 +489,17 @@ async fn run_agent(
     );
 
     // ── Build AgentConfig ──
+    //
+    // RFC-014 Phase D: `system_prompt` is also passed to the new
+    // `AgentBuilder::system_prompt()` (which overrides the value embedded
+    // in `AgentConfig` at build time). We clone here so the builder path
+    // can consume the value while the legacy `Agent::new_with_resolver`
+    // path still sees it in the config.
     let agent_config = AgentConfig {
         name: format!("agent-{agent_id}"),
         description: None,
         model_id: config.model_id.clone(),
-        system_prompt: Some(system_prompt),
+        system_prompt: Some(system_prompt.clone()),
         max_iterations: config.max_iterations,
         timeout_seconds: 300,
         temperature: Some(0.7),
@@ -505,54 +513,128 @@ async fn run_agent(
         provider_options: config.provider_options.clone(),
     };
 
-    // ── Build Agent with middleware pipeline ──
-    // Create provider and resolver from engine.
-    // Use pooled provider when provider_rpm is set for rate-limited access.
-    let resolver: Arc<dyn ProviderResolver> = Arc::new(engine.oxi().clone());
-    let provider_name = engine.resolve_model(&config.model_id)?.provider;
-    let provider = if config.provider_rpm > 0 {
-        engine.pooled_provider(&provider_name, config.provider_rpm)?
+    // ── Build Agent (RFC-014 Phase D) ──
+    //
+    // Two paths:
+    //   1. `provider_rpm == 0` (common): use oxi-sdk 0.26.2's new
+    //      `AgentBuilder` API. The builder unifies model resolution, provider
+    //      creation, and (optionally) middleware wiring. Engine-level
+    //      `authorizer` / `tracer` / `cost_tracker` are propagated through
+    //      the new builder methods.
+    //   2. `provider_rpm > 0` (rare): keep the legacy
+    //      `Agent::new_with_resolver` + `set_hooks` path because the
+    //      AgentBuilder does not expose a way to inject a pre-built
+    //      `ProviderPool` for rate-limited access. This is a deliberate
+    //      scope-limit per RFC-014/phase-d-agentbuilder.md §2 "Provider
+    //      선택 로직은 보존".
+    let agent = if config.provider_rpm > 0 {
+        // ── Legacy path: rate-limited provider pool ──
+        let resolver: Arc<dyn ProviderResolver> = Arc::new(engine.oxi().clone());
+        let provider_name = engine.resolve_model(&config.model_id)?.provider;
+        let provider = engine.pooled_provider(&provider_name, config.provider_rpm)?;
+
+        // Build middleware pipeline.
+        let mut pipeline = oxi_sdk::MiddlewarePipeline::new();
+        if config.rate_limit_per_minute > 0 {
+            pipeline =
+                pipeline.push(oxi_sdk::middleware::builtins::RateLimitMiddleware::new(
+                    config.rate_limit_per_minute,
+                ));
+        }
+        if config.token_budget > 0 {
+            pipeline =
+                pipeline.push(oxi_sdk::middleware::builtins::TokenBudgetMiddleware::new(
+                    config.token_budget,
+                ));
+        }
+        if config.audit_tool_calls {
+            pipeline =
+                pipeline.push(oxi_sdk::middleware::builtins::LoggingMiddleware::new(
+                    tracing::Level::INFO,
+                ));
+        }
+
+        // Create Agent with CSpace tool registry and provider resolver.
+        let agent = Arc::new(Agent::new_with_resolver(
+            provider,
+            agent_config,
+            Arc::new(registry),
+            resolver,
+        ));
+
+        // Wire middleware pipeline → AgentHooks.
+        if !pipeline.is_empty() {
+            let terminate_flag = Arc::new(std::sync::atomic::AtomicBool::new(false));
+            let agent_id_for_hooks = agent_id.to_string();
+            let hooks = oxi_sdk::middleware::build_hooks(
+                Arc::new(pipeline),
+                agent_id_for_hooks,
+                terminate_flag,
+            );
+            agent.set_hooks(hooks);
+        }
+
+        agent
     } else {
-        engine.create_provider(&provider_name)?
+        // ── New path: AgentBuilder (RFC-014 Phase D) ──
+        let mut builder = engine
+            .oxi()
+            .agent(agent_config)
+            .workspace(&workspace)
+            .system_prompt(system_prompt);
+
+        // CSpace-based tool registration is oxios-specific and is preserved.
+        //
+        // The builder's `.tool()` method takes `impl AgentTool + 'static`
+        // (a concrete value), but oxios' CSpace tools are `Arc<dyn AgentTool>`.
+        // The SDK does not expose a way to inject a pre-built `ToolRegistry`
+        // into the builder, so we register them on the agent's tool registry
+        // after `build()` returns. This keeps CSpace semantics intact.
+        //
+        // We capture the tool names now and apply them once the agent exists.
+        let cspace_tool_arcs: Vec<Arc<dyn oxi_sdk::AgentTool>> = registry
+            .names()
+            .into_iter()
+            .filter_map(|name| registry.get(&name))
+            .collect();
+
+        // Engine-level observability/security → AgentBuilder (new API).
+        if let Some(auth) = engine.authorizer() {
+            builder = builder.authorizer(auth.clone());
+        }
+        if let Some(tracer) = engine.tracer() {
+            builder = builder.tracer(tracer.clone());
+        }
+        if let Some(ct) = engine.cost_tracker() {
+            builder = builder.cost_tracker(ct.clone());
+        }
+
+        // Middleware: AgentBuilder convenience helpers replace the manual
+        // `MiddlewarePipeline` + `build_hooks()` + `set_hooks()` triple.
+        if config.rate_limit_per_minute > 0 {
+            builder = builder.with_rate_limit(config.rate_limit_per_minute);
+        }
+        if config.token_budget > 0 {
+            builder = builder.with_token_budget(config.token_budget);
+        }
+        if config.audit_tool_calls {
+            builder = builder.with_logging();
+        }
+
+        let built = builder.build()?;
+        let agent = Arc::new(built);
+
+        // Attach CSpace tools to the agent's tool registry.
+        // `Agent::tools()` returns the same `Arc<ToolRegistry>` that
+        // `AgentBuilder` populated, so `register_arc` is the canonical
+        // extension point for `Arc<dyn AgentTool>` values.
+        let agent_tools = agent.tools();
+        for tool in cspace_tool_arcs {
+            agent_tools.register_arc(tool);
+        }
+
+        agent
     };
-
-    // Build middleware pipeline.
-    let mut pipeline = oxi_sdk::MiddlewarePipeline::new();
-    if config.rate_limit_per_minute > 0 {
-        pipeline = pipeline.push(oxi_sdk::middleware::builtins::RateLimitMiddleware::new(
-            config.rate_limit_per_minute,
-        ));
-    }
-    if config.token_budget > 0 {
-        pipeline = pipeline.push(oxi_sdk::middleware::builtins::TokenBudgetMiddleware::new(
-            config.token_budget,
-        ));
-    }
-    if config.audit_tool_calls {
-        pipeline = pipeline.push(oxi_sdk::middleware::builtins::LoggingMiddleware::new(
-            tracing::Level::INFO,
-        ));
-    }
-
-    // Create Agent with CSpace tool registry and provider resolver.
-    let agent = Arc::new(Agent::new_with_resolver(
-        provider,
-        agent_config,
-        Arc::new(registry),
-        resolver,
-    ));
-
-    // Wire middleware pipeline → AgentHooks.
-    if !pipeline.is_empty() {
-        let terminate_flag = Arc::new(std::sync::atomic::AtomicBool::new(false));
-        let agent_id_for_hooks = agent_id.to_string();
-        let hooks = oxi_sdk::middleware::build_hooks(
-            Arc::new(pipeline),
-            agent_id_for_hooks,
-            terminate_flag,
-        );
-        agent.set_hooks(hooks);
-    }
 
     // Shared mutable state for the event callback.
     let exec_state = Arc::new(Mutex::new(ExecuteState::default()));
