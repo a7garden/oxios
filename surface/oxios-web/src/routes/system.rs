@@ -766,18 +766,61 @@ pub(crate) async fn handle_config_get(
     }
 }
 
+/// Deep-merge a patch into a base `serde_json::Value` (both must be objects).
+///
+/// Sections and fields present in `patch` override those in `base`.
+/// Sections and fields absent from `patch` are preserved from `base`.
+/// This implements PATCH semantics so that a partial config update does not
+/// reset fields the caller did not intend to change.
+///
+/// Conflict policy:
+/// - If both sides have a non-null object at the same path, recurse.
+/// - Otherwise `patch` wins.
+fn deep_merge_json(base: &mut serde_json::Value, patch: serde_json::Value) {
+    use serde_json::Value;
+    if let Value::Object(patch_map) = patch {
+        if !base.is_object() {
+            *base = Value::Object(serde_json::Map::new());
+        }
+        let base_map = base.as_object_mut().expect("just ensured object");
+        for (key, patch_val) in patch_map {
+            match base_map.get_mut(&key) {
+                Some(existing) if existing.is_object() && patch_val.is_object() => {
+                    deep_merge_json(existing, patch_val);
+                }
+                _ => {
+                    base_map.insert(key, patch_val);
+                }
+            }
+        }
+    }
+}
+
 /// PUT /api/config — Update configuration.
 ///
-/// Validates the incoming JSON against the config schema, persists
-/// changes to the config file on disk, and hot-reloads the in-memory config.
+/// PATCH semantics: the request body is deep-merged into the current
+/// in-memory config so that sections and fields the caller omits are
+/// preserved rather than reset to defaults. The merged result is
+/// validated against the `OxiosConfig` schema, persisted to disk, and
+/// hot-reloaded in memory.
 pub(crate) async fn handle_config_put(
     state: State<Arc<AppState>>,
     Json(body): Json<serde_json::Value>,
 ) -> Result<Json<serde_json::Value>, AppError> {
     tracing::info!("Config update requested");
 
-    // Validate: parse as OxiosConfig to ensure the shape is correct.
-    let updated: oxios_kernel::OxiosConfig = match serde_json::from_value(body.clone()) {
+    // Deep-merge the patch into the current config so omitted fields are preserved.
+    let mut current_value = {
+        let cfg = state.config.read();
+        serde_json::to_value(&*cfg).map_err(|e| {
+            tracing::error!(error = %e, "Failed to serialize current config");
+            AppError::Internal("failed to serialize current config".into())
+        })?
+    };
+    deep_merge_json(&mut current_value, body.clone());
+
+    // Validate the merged result by parsing as OxiosConfig.
+    let updated: oxios_kernel::OxiosConfig = match serde_json::from_value(current_value.clone()) {
         Ok(cfg) => cfg,
         Err(e) => {
             tracing::warn!(error = %e, "Invalid config shape");
@@ -785,7 +828,19 @@ pub(crate) async fn handle_config_put(
         }
     };
 
-    // Persist to the config file.
+    // Run the kernel validator too (catches semantic errors like
+    // default_timeout > max_timeout) before we touch disk.
+    let (errors, warnings) = updated.validate();
+    for w in &warnings {
+        tracing::warn!(config_warning = %w, "Config validation warning");
+    }
+    if !errors.is_empty() {
+        let msg = errors.join("; ");
+        tracing::warn!(error = %msg, "Config validation failed");
+        return Err(AppError::BadRequest(format!("Invalid config: {msg}")));
+    }
+
+    // Persist the merged config to disk.
     let content = toml::to_string_pretty(&updated)
         .map_err(|e: toml::ser::Error| AppError::Internal(e.to_string()))?;
     if let Err(e) = tokio::fs::write(&state.config_path, content).await {
@@ -799,6 +854,54 @@ pub(crate) async fn handle_config_put(
 
     tracing::info!("Config hot-reloaded from {}", state.config_path.display());
     Ok(Json(body))
+}
+
+#[cfg(test)]
+mod deep_merge_tests {
+    use super::deep_merge_json;
+    use serde_json::json;
+
+    #[test]
+    fn preserves_omitted_top_level_sections() {
+        let mut base = json!({
+            "kernel": {"workspace": "~/.oxios/workspace", "max_agents": 10},
+            "exec": {"allowed_commands": ["ls", "cat"], "allowlist_mode": "enforced"},
+        });
+        let patch = json!({
+            "kernel": {"max_agents": 20},
+        });
+        deep_merge_json(&mut base, patch);
+        assert_eq!(base["kernel"]["workspace"], "~/.oxios/workspace");
+        assert_eq!(base["kernel"]["max_agents"], 20);
+        assert_eq!(base["exec"]["allowed_commands"][0], "ls");
+        assert_eq!(base["exec"]["allowlist_mode"], "enforced");
+    }
+
+    #[test]
+    fn patch_value_replaces_scalar() {
+        let mut base = json!({"engine": {"default_model": "old/model"}});
+        deep_merge_json(
+            &mut base,
+            json!({"engine": {"default_model": "new/model"}}),
+        );
+        assert_eq!(base["engine"]["default_model"], "new/model");
+    }
+
+    #[test]
+    fn patch_object_replaces_object() {
+        let mut base = json!({"security": {"auth_enabled": false, "cors_origins": ["http://a"]}});
+        deep_merge_json(&mut base, json!({"security": {"auth_enabled": true}}));
+        assert_eq!(base["security"]["auth_enabled"], true);
+        assert_eq!(base["security"]["cors_origins"][0], "http://a");
+    }
+
+    #[test]
+    fn empty_patch_is_noop() {
+        let mut base = json!({"exec": {"allowed_commands": ["ls"]}});
+        let original = base.clone();
+        deep_merge_json(&mut base, json!({}));
+        assert_eq!(base, original);
+    }
 }
 
 // ---------------------------------------------------------------------------
