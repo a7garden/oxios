@@ -796,13 +796,24 @@ fn deep_merge_json(base: &mut serde_json::Value, patch: serde_json::Value) {
     }
 }
 
-/// PUT /api/config — Update configuration.
+/// PUT /api/config — Update configuration (alias of PATCH).
 ///
-/// PATCH semantics: the request body is deep-merged into the current
-/// in-memory config so that sections and fields the caller omits are
-/// preserved rather than reset to defaults. The merged result is
-/// validated against the `OxiosConfig` schema, persisted to disk, and
-/// hot-reloaded in memory.
+/// Like the PATCH handler, the request body is **deep-merged** into the
+/// current in-memory config. Sections and fields the caller omits are
+/// preserved, not reset to defaults. Despite the HTTP verb, this is
+/// NOT a full-config replacement — it has the same semantics as
+/// `PATCH /api/config`.
+///
+/// Why is PUT exposed at all? Some HTTP clients, automation tooling,
+/// and older Oxios versions send PUT instead of PATCH. The handler
+/// is kept so that those callers still work; new code should prefer
+/// `PATCH /api/config`, which also returns the hot-reload
+/// classification report (`ConfigPatchResponse`) that PUT does not.
+///
+/// Engine configuration (`engine.*`) is rejected by PATCH with 400;
+/// PUT keeps the same restriction. Use the typed engine endpoints
+/// (`/api/engine/api-key`, `/api/engine/model`,
+/// `/api/engine/provider-options`) for those.
 pub(crate) async fn handle_config_put(
     state: State<Arc<AppState>>,
     Json(body): Json<serde_json::Value>,
@@ -885,23 +896,24 @@ pub(crate) async fn handle_config_put(
 // PATCH /api/config — Partial config update with hot-reload metadata
 // ---------------------------------------------------------------------------
 
-/// List of top-level config sections whose fields are **fully hot-reloadable**
-/// (every field in the section can be applied without restarting the daemon).
+/// List of top-level config sections whose fields are propagated to the
+/// running kernel at PATCH time (no daemon restart required).
 ///
 /// Each entry is `(section_name, restart_scope)`. `restart_scope` describes
 /// the runtime subsystem that needs to pick up the change (used in logs and
 /// tooltips on the frontend).
+///
+/// IMPORTANT: this list MUST match what `handle_config_patch` actually
+/// propagates. Sections not listed here (security, audit, orchestrator,
+/// context, session, logging, kernel, memory, …) are persisted to disk
+/// but the running daemon keeps the boot-time values, so they are
+/// classified as `requires_restart`. Adding a section to this list
+/// without wiring the propagation in `handle_config_patch` would lie
+/// to the user about whether the change took effect.
 const HOT_RELOADABLE_SECTIONS: &[(&str, &str)] = &[
     ("exec", "exec_api"),
-    ("security", "security"),
     ("scheduler", "scheduler"),
     ("resource_monitor", "resource_monitor"),
-    ("orchestrator", "orchestrator"),
-    ("context", "context"),
-    ("session", "session"),
-    ("logging", "logging"),
-    ("audit", "audit"),
-    ("kernel", "kernel"),
 ];
 
 /// Subset of fields that always require a restart even inside a
@@ -1017,11 +1029,46 @@ fn is_restart_required(path: &str) -> bool {
     !HOT_RELOADABLE_SECTIONS.iter().any(|(s, _)| *s == top)
 }
 
+/// Top-level config keys that the PATCH endpoint must refuse, even
+/// though they exist in `OxiosConfig`. The engine subsystem manages
+/// its own typed endpoints (`/api/engine/api-key`, `/api/engine/model`,
+/// `/api/engine/provider-options`) which handle encryption, masking,
+/// and provider-scoped semantics. A bulk PATCH that overwrites
+/// `engine.api_key: ""` would silently wipe the stored key.
+const PATCH_FORBIDDEN_TOP_LEVEL_KEYS: &[&str] = &["engine"];
+
+/// Walk a PATCH body and return the first forbidden top-level key it
+/// contains, or `None` if the body is acceptable. Used by
+/// `handle_config_patch` to reject engine.* writes before they reach
+/// the deep-merge step.
+fn find_forbidden_patch_key(
+    body: &serde_json::Value,
+    forbidden: &[&str],
+) -> Option<String> {
+    use serde_json::Value;
+    let Value::Object(map) = body else {
+        return None;
+    };
+    for key in map.keys() {
+        if forbidden.iter().any(|f| *f == key) {
+            return Some(key.clone());
+        }
+    }
+    None
+}
+
 /// `PATCH /api/config` — Partial config update.
 ///
 /// Body: a subset of `OxiosConfig` (e.g. `{"exec": {"allowlist_mode":
 /// "enforced"}}`). The patch is deep-merged into the current config so
 /// sections and fields the caller omits are preserved.
+///
+/// Engine configuration (`engine.api_key`, `engine.provider_options`,
+/// `engine.default_model`, …) MUST NOT be sent via this endpoint.
+/// Use the typed engine endpoints (`/api/engine/api-key`,
+/// `/api/engine/model`, `/api/engine/provider-options`) instead — they
+/// handle encryption, masking, and provider scoping correctly. A PATCH
+/// containing engine.* fields is rejected with HTTP 400.
 ///
 /// Response includes a `hot_reload` object classifying which changed
 /// fields were applied immediately and which require a daemon restart.
@@ -1035,6 +1082,19 @@ pub(crate) async fn handle_config_patch(
         return Err(AppError::BadRequest(
             "PATCH body must be a JSON object".into(),
         ));
+    }
+
+    // Reject engine.* fields. They are managed by the typed engine
+    // endpoints; sending them here risks wiping the encrypted api_key
+    // (the bulk path does not mask or encrypt).
+    if let Some(forbidden) = find_forbidden_patch_key(&body, PATCH_FORBIDDEN_TOP_LEVEL_KEYS) {
+        tracing::warn!(key = %forbidden, "PATCH /api/config rejected forbidden key");
+        return Err(AppError::BadRequest(format!(
+            "PATCH /api/config does not accept '{forbidden}' fields. \
+             Use the typed endpoint instead: \
+             /api/engine/api-key (POST), /api/engine/model (PUT), \
+             /api/engine/provider-options (PUT)."
+        )));
     }
 
     // Snapshot the current config as JSON for both merging and classification.
@@ -1206,10 +1266,44 @@ mod patch_tests {
 
     #[test]
     fn hot_reloadable_sections_are_immediate() {
+        // Only sections that `handle_config_patch` actually propagates
+        // to the running kernel are marked hot-reloadable. security,
+        // audit, etc. are NOT propagated (subsystem constructed at
+        // boot) so they must be classified as restart-required.
         assert!(!is_restart_required("exec.allowed_commands"));
-        assert!(!is_restart_required("security.cors_origins"));
         assert!(!is_restart_required("scheduler.max_concurrent"));
-        assert!(!is_restart_required("audit.max_entries"));
+        assert!(!is_restart_required("resource_monitor.cpu_threshold"));
+    }
+
+    #[test]
+    fn security_section_is_restart_required() {
+        // security.cors_origins used to be classified hot-reloadable,
+        // but AccessManager is constructed at boot. PATCH persists
+        // the new value but the running subsystem keeps the boot
+        // configuration until restart. Must be classified as
+        // restart-required to avoid lying to the user.
+        assert!(is_restart_required("security.cors_origins"));
+        assert!(is_restart_required("security.auth_enabled"));
+        assert!(is_restart_required("security.rate_limit_per_minute"));
+    }
+
+    #[test]
+    fn audit_section_is_restart_required() {
+        // Audit writer is constructed at boot with its rotating file
+        // handle. PATCH persists but does not reopen the writer.
+        assert!(is_restart_required("audit.max_entries"));
+        assert!(is_restart_required("audit.enabled"));
+    }
+
+    #[test]
+    fn memory_section_is_restart_required() {
+        // Memory subsystem is constructed at boot (SQLite handle,
+        // embedding model, SONA). Toggling `enabled` or any sub-field
+        // is restart-only.
+        assert!(is_restart_required("memory.enabled"));
+        assert!(is_restart_required("memory.embedding.provider"));
+        assert!(is_restart_required("memory.consolidation.dream_enabled"));
+        assert!(is_restart_required("memory.learning.sona_enabled"));
     }
 
     #[test]
@@ -1223,6 +1317,65 @@ mod patch_tests {
     fn memory_consolidation_preset_requires_restart() {
         // Preset triggers `apply_preset()` which mutates many sibling fields.
         assert!(is_restart_required("memory.consolidation.preset"));
+    }
+}
+
+#[cfg(test)]
+mod patch_rejection_tests {
+    //! Engine.* fields must be rejected by PATCH /api/config. They are
+    //! managed by the typed engine endpoints (which handle encryption,
+    //! masking, and provider-scoped semantics) and sending them via the
+    //! bulk PATCH would risk wiping the encrypted api_key.
+
+    use super::{find_forbidden_patch_key, PATCH_FORBIDDEN_TOP_LEVEL_KEYS};
+    use serde_json::json;
+
+    #[test]
+    fn rejects_engine_api_key() {
+        let body = json!({"engine": {"api_key": "sk-secret"}});
+        let found = find_forbidden_patch_key(&body, PATCH_FORBIDDEN_TOP_LEVEL_KEYS);
+        assert_eq!(found.as_deref(), Some("engine"));
+    }
+
+    #[test]
+    fn rejects_engine_provider_options() {
+        let body = json!({"engine": {"provider_options": {"temperature": 0.7}}});
+        let found = find_forbidden_patch_key(&body, PATCH_FORBIDDEN_TOP_LEVEL_KEYS);
+        assert_eq!(found.as_deref(), Some("engine"));
+    }
+
+    #[test]
+    fn rejects_engine_default_model() {
+        let body = json!({"engine": {"default_model": "anthropic/claude-3"}});
+        let found = find_forbidden_patch_key(&body, PATCH_FORBIDDEN_TOP_LEVEL_KEYS);
+        assert_eq!(found.as_deref(), Some("engine"));
+    }
+
+    #[test]
+    fn accepts_non_engine_sections() {
+        let body = json!({
+            "exec": {"allowlist_mode": "enforced"},
+            "scheduler": {"max_concurrent": 5},
+        });
+        let found = find_forbidden_patch_key(&body, PATCH_FORBIDDEN_TOP_LEVEL_KEYS);
+        assert!(found.is_none());
+    }
+
+    #[test]
+    fn accepts_mixed_payload_without_engine() {
+        // The check is for the *top-level* `engine` key, not a field
+        // anywhere in the body. A nested object containing the word
+        // "engine" elsewhere is fine.
+        let body = json!({"exec": {"allowed_commands": ["engine-status"]}});
+        let found = find_forbidden_patch_key(&body, PATCH_FORBIDDEN_TOP_LEVEL_KEYS);
+        assert!(found.is_none());
+    }
+
+    #[test]
+    fn empty_body_is_acceptable() {
+        let body = json!({});
+        let found = find_forbidden_patch_key(&body, PATCH_FORBIDDEN_TOP_LEVEL_KEYS);
+        assert!(found.is_none());
     }
 }
 
