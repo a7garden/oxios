@@ -325,6 +325,8 @@
     "unsavedChanges": "Unsaved changes",
     "settingsSaved": "Settings saved successfully.",
     "settingsSaveFailed": "Failed to save settings. Check the server logs.",
+    "savedApplied": "Saved — {{count}} change(s) applied immediately.",
+    "savedWithRestart": "Saved — {{applied}} applied, {{restart}} require a restart.",
     "groups": "Groups",
     "sectionEngine": "Engine",
     "sectionKernel": "Kernel",

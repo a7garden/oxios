@@ -325,6 +325,8 @@
     "unsavedChanges": "저장되지 않은 변경 사항",
     "settingsSaved": "설정이 성공적으로 저장되었습니다.",
     "settingsSaveFailed": "설정 저장에 실패했습니다. 서버 로그를 확인하세요.",
+    "savedApplied": "저장됨 — {{count}}개 변경이 즉시 적용되었습니다.",
+    "savedWithRestart": "저장됨 — {{applied}}개 즉시 적용, {{restart}}개는 재시작 필요.",
     "groups": "그룹",
     "sectionEngine": "엔진",
     "sectionKernel": "커널",

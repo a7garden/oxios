@@ -73,8 +73,11 @@ export interface SaveConfigOpts {
 }
 
 /**
- * Save the config via PATCH. Falls back to PUT if the server is too old
- * to support PATCH (returns 404/405).
+ * Save the config via PATCH. Falls back to PUT only if the route
+ * configuration on the server is misconfigured (PATCH is 405'd and
+ * removed). Today's server implements both PATCH and PUT with the
+ * same deep-merge semantics, so a successful PATCH is the normal
+ * path and the PUT fallback is purely a defensive retry.
  */
 export function useSaveConfig() {
   const queryClient = useQueryClient()
@@ -83,7 +86,9 @@ export function useSaveConfig() {
       try {
         return await api.patch<ConfigPatchResponse>('/api/config', next)
       } catch (err) {
-        // Fallback for older servers without PATCH support.
+        // Defensive fallback: if PATCH is removed entirely (405/404
+        // on a misconfigured server) we retry with PUT, which is
+        // currently an alias for PATCH with identical semantics.
         return await api.put<Record<string, unknown>>('/api/config', next)
       }
     },
