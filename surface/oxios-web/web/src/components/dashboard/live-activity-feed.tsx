@@ -1,6 +1,6 @@
 import { Link } from '@tanstack/react-router'
 import { Pause, Play, Radio, Trash2 } from 'lucide-react'
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -13,12 +13,39 @@ import type { OxiosEvent } from '@/types'
 /** Cap the rendered list — beyond this we just count and show "more". */
 const MAX_VISIBLE = 200
 
+/** Pixel distance from the bottom that still counts as "auto-scroll on". */
+const AUTO_SCROLL_THRESHOLD = 24
+
+/**
+ * Map the dashboard filter value to a list of event-type prefixes.
+ * The single-prefix `startsWith` check can't model "matches several
+ * prefixes" (the old "Seeds" option's value was `phase_,evaluation_,seed_`
+ * which matched nothing), so each filter maps to one or more prefixes.
+ */
+const FILTER_PREFIXES: Record<string, string[]> = {
+  all: [],
+  agent_: ['agent_'],
+  tool_: ['tool_'],
+  memory_: ['memory_'],
+  approval_: ['approval_'],
+  // The "Seeds" filter is intentionally broad — it covers the full
+  // seed/phase/evaluation pipeline as called out in the RFC.
+  seeds: ['phase_', 'evaluation_', 'seed_'],
+}
+
+function matchesFilter(type: string, filter: string): boolean {
+  const prefixes = FILTER_PREFIXES[filter] ?? []
+  if (prefixes.length === 0) return true
+  return prefixes.some((p) => type.startsWith(p))
+}
+
 /**
  * Live activity feed.
  *
  * Subscribes to the singleton SSE event store and shows a filtered,
  * capped list of "interesting" events. Supports a Pause toggle so the
- * user can stop the list from scrolling while investigating.
+ * user can stop the list from scrolling while investigating. Auto-
+ * scroll is disabled when the user scrolls up (Step 4 of the RFC).
  */
 export function LiveActivityFeed() {
   const { t } = useTranslation()
@@ -27,24 +54,53 @@ export function LiveActivityFeed() {
   const [frozenEvents, setFrozenEvents] = useState<OxiosEvent[] | null>(null)
   const [filter, setFilter] = useState<string>('all')
   const scrollRef = useRef<HTMLDivElement>(null)
+  const [autoScroll, setAutoScroll] = useState(true)
+
+  // Freeze the event list on the transition into `paused`. This runs
+  // in an effect (not in render) to avoid the setState-during-render
+  // anti-pattern: the previous version called setFrozenEvents directly
+  // in the function body, which works only because it's guarded by an
+  // idempotency check. The effect form is the correct idiom.
+  useEffect(() => {
+    if (paused) {
+      setFrozenEvents((current) => current ?? events)
+    }
+  }, [paused, events])
 
   // When the user pauses, snapshot the current event list and stop
   // updating the visible list. Resume picks up from the live stream.
   const sourceEvents = paused ? (frozenEvents ?? events) : events
 
-  // If we just transitioned to paused, freeze the current events.
-  if (paused && frozenEvents === null) {
-    setFrozenEvents(events)
-  }
-
   const filtered = useMemo(() => {
-    const filtered = sourceEvents.filter(isInterestingEvent)
-    if (filter === 'all') return filtered.slice(0, MAX_VISIBLE)
-    return filtered.filter((e) => e.type.startsWith(filter)).slice(0, MAX_VISIBLE)
+    const interesting = sourceEvents.filter(isInterestingEvent)
+    const total = interesting.length
+    const matched = interesting.filter((e) => matchesFilter(e.type, filter))
+    return { visible: matched.slice(0, MAX_VISIBLE), total }
   }, [sourceEvents, filter])
 
-  const total = sourceEvents.filter(isInterestingEvent).length
-  const overflow = Math.max(0, total - filtered.length)
+  const overflow = Math.max(0, filtered.total - filtered.visible.length)
+
+  // Auto-scroll: when the list grows, snap to the bottom IF the user
+  // hasn't scrolled up. We detect "scrolled up" by checking if the
+  // scroll position is within `AUTO_SCROLL_THRESHOLD` of the bottom on
+  // every scroll event. This implements the RFC §5 step 4.
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    const onScroll = () => {
+      const distance = el.scrollHeight - el.scrollTop - el.clientHeight
+      setAutoScroll(distance < AUTO_SCROLL_THRESHOLD)
+    }
+    el.addEventListener('scroll', onScroll, { passive: true })
+    return () => el.removeEventListener('scroll', onScroll)
+  }, [])
+
+  useEffect(() => {
+    if (!autoScroll) return
+    const el = scrollRef.current
+    if (!el) return
+    el.scrollTop = el.scrollHeight
+  }, [filtered.visible, autoScroll])
 
   return (
     <Card className="flex h-full flex-col">
@@ -53,7 +109,7 @@ export function LiveActivityFeed() {
           <Radio className="h-4 w-4" />
           {t('dashboard.liveActivity')}
           <Badge variant="secondary" className="ml-1" aria-live="polite">
-            {total}
+            {filtered.total}
           </Badge>
           {isConnected && !connectionError && (
             <span
@@ -79,7 +135,7 @@ export function LiveActivityFeed() {
             <option value="tool_">{t('dashboard.filterTools')}</option>
             <option value="memory_">{t('dashboard.filterMemory')}</option>
             <option value="approval_">{t('dashboard.filterApprovals')}</option>
-            <option value="phase_,evaluation_,seed_">{t('dashboard.filterSeeds')}</option>
+            <option value="seeds">{t('dashboard.filterSeeds')}</option>
           </select>
           <Button
             variant="ghost"
@@ -108,7 +164,7 @@ export function LiveActivityFeed() {
           role="log"
           aria-label={t('dashboard.liveActivity')}
         >
-          {filtered.length === 0 ? (
+          {filtered.visible.length === 0 ? (
             <div className="flex h-full flex-col items-center justify-center gap-2 text-center text-muted-foreground">
               {paused ? (
                 <>
@@ -134,7 +190,7 @@ export function LiveActivityFeed() {
             </div>
           ) : (
             <ul className="space-y-1">
-              {filtered.map((event, i) => {
+              {filtered.visible.map((event, i) => {
                 const fmt = formatEvent(event)
                 const Icon = fmt.icon
                 const key = (event.id as string | undefined) ?? `evt-${i}-${event.timestamp ?? ''}`

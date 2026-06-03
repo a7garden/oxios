@@ -152,7 +152,9 @@
     "moreEvents": "+{{count}} more",
     "viewAll": "View all",
     "viewAllCount": "View all {{count}}",
-    "risk": "Risk"
+    "risk": "Risk",
+    "totalForkedUnavailable": "Total forked count is not reported by the /api/status endpoint — backend field missing.",
+    "approvalsAllClear": "No pending approvals. The system is healthy."
   },
   "settings": {
     "title": "Settings",
@@ -917,7 +919,10 @@
     "approve": "Approve",
     "reject": "Reject",
     "deny": "Deny",
-    "noApprovals": "No pending approvals"
+    "noApprovals": "No pending approvals",
+    "approveSuccess": "Approved",
+    "rejectSuccess": "Denied",
+    "mutationError": "Action failed: {{error}}"
   },
   "notifications": {
     "title": "Notifications",

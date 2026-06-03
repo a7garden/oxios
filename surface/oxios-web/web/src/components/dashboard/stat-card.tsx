@@ -38,6 +38,8 @@ export interface StatCardProps {
   href?: string
   /** Click handler. Either `href` or `onClick` may be set. */
   onClick?: () => void
+  /** Optional native `title` attribute — rendered on the outer card. */
+  title?: string
 }
 
 /**
@@ -57,6 +59,7 @@ export function StatCard({
   hint,
   href,
   onClick,
+  title,
 }: StatCardProps) {
   const colors = COLOR_MAP[sparkColor]
   const hasSparkline = Array.isArray(sparkline) && sparkline.length > 1
@@ -74,6 +77,7 @@ export function StatCard({
           'cursor-pointer transition-colors hover:bg-accent/40 focus-visible:ring-2 focus-visible:ring-ring',
       )}
       onClick={onClick}
+      title={title}
     >
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-xs font-medium text-muted-foreground uppercase tracking-wide">

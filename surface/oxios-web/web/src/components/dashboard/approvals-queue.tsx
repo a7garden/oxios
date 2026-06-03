@@ -4,34 +4,49 @@ import { useTranslation } from 'react-i18next'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { useToast } from '@/components/ui/sonner'
 import { useApproveApproval, usePendingApprovals, useRejectApproval } from '@/hooks/use-approvals'
 import type { Approval } from '@/types'
 
 /**
- * Approvals queue — full-width, shown on the dashboard only when there
- * is at least one pending approval.
+ * Approvals queue — full-width, shown on the dashboard.
  *
  * Each row offers inline Approve / Deny buttons that use optimistic
- * mutations. The card hides itself entirely when the pending list is
- * empty so it doesn't add visual noise on a quiet system.
+ * mutations. The card stays visible even when the queue is empty,
+ * surfacing a positive "all clear" message so a user landing on the
+ * dashboard can distinguish a healthy system from a failed query.
+ * (RFC §5 originally called for hide-when-empty; the reviewer brief
+ * explicitly flagged that as confusing.)
  */
 export function ApprovalsQueue() {
   const { t } = useTranslation()
   const { items: pending, isLoading } = usePendingApprovals()
   const approve = useApproveApproval()
   const reject = useRejectApproval()
+  const { toast } = useToast()
 
-  // Hide the whole card when there's nothing pending AND we're not in
-  // the initial loading state — empty state is implicit.
-  if (!isLoading && pending.length === 0) return null
+  const handleApprove = (id: string) => {
+    approve.mutate(id, {
+      onSuccess: () => toast(t('approvals.approveSuccess'), 'success'),
+      onError: (err) => toast(t('approvals.mutationError', { error: String(err) }), 'destructive'),
+    })
+  }
+  const handleDeny = (id: string) => {
+    reject.mutate(id, {
+      onSuccess: () => toast(t('approvals.rejectSuccess'), 'success'),
+      onError: (err) => toast(t('approvals.mutationError', { error: String(err) }), 'destructive'),
+    })
+  }
+
+  const empty = !isLoading && pending.length === 0
 
   return (
-    <Card className="border-amber-500/40">
+    <Card className={empty ? 'border-emerald-500/30' : 'border-amber-500/40'}>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="flex items-center gap-2 text-base">
-          <Bell className="h-4 w-4 text-amber-500" />
+          <Bell className={`h-4 w-4 ${empty ? 'text-emerald-500' : 'text-amber-500'}`} />
           {t('approvals.title')}
-          <Badge variant="warning" className="ml-1">
+          <Badge variant={empty ? 'secondary' : 'warning'} className="ml-1">
             {pending.length}
           </Badge>
         </CardTitle>
@@ -45,14 +60,19 @@ export function ApprovalsQueue() {
       <CardContent className="pt-2">
         {isLoading ? (
           <p className="text-sm text-muted-foreground py-2">{t('common.loading')}</p>
+        ) : empty ? (
+          <div className="flex items-center gap-2 py-2 text-sm text-muted-foreground">
+            <CheckCircle className="h-4 w-4 text-emerald-500" aria-hidden="true" />
+            <span>{t('dashboard.approvalsAllClear')}</span>
+          </div>
         ) : (
           <ul className="space-y-2">
             {pending.map((approval) => (
               <ApprovalRow
                 key={approval.id}
                 approval={approval}
-                onApprove={(id) => approve.mutate(id)}
-                onDeny={(id) => reject.mutate(id)}
+                onApprove={handleApprove}
+                onDeny={handleDeny}
                 busy={approve.isPending || reject.isPending}
                 approveLabel={t('approvals.approve')}
                 denyLabel={t('approvals.deny')}

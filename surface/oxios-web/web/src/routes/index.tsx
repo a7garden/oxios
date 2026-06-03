@@ -22,6 +22,7 @@ import { StatCard } from '@/components/dashboard/stat-card'
 import { ErrorState } from '@/components/shared/error-state'
 import { LoadingCards } from '@/components/shared/loading'
 import { Card, CardHeader, CardTitle } from '@/components/ui/card'
+import { useAgentCountHistory } from '@/hooks/use-agent-count-history'
 import { useApprovals } from '@/hooks/use-approvals'
 import { computeDelta, seriesFromSnapshots, useResourceHistory } from '@/hooks/use-resource-history'
 import { useTokenRate } from '@/hooks/use-token-rate'
@@ -69,12 +70,23 @@ function DashboardPage() {
   const { data: approvals } = useApprovals()
   const pendingApprovals = (approvals?.items ?? []).filter((a) => a.status === 'pending')
 
-  if (statusLoading) return <LoadingCards count={5} />
-  if (statusError) return <ErrorState onRetry={() => refetchStatus()} />
-
+  // Derived data for KPI cards. Computed before the early returns so
+  // hook order is stable (React requires hooks to be called in the
+  // same order on every render).
   const allAgents = agents?.items ?? []
   const runningAgents = allAgents.filter((a) => a.status?.toLowerCase() === 'running')
-  const totalAgents = status?.components?.agents?.total_forked ?? allAgents.length
+  // `total_forked` is the authoritative total from the status endpoint.
+  // If the field is missing, fall back to null (UI shows "?" with a
+  // tooltip) instead of silently using the polled running-agents list,
+  // which would be misleading.
+  const totalForked: number | null =
+    typeof status?.components?.agents?.total_forked === 'number'
+      ? status.components.agents.total_forked
+      : null
+  const { totalSeries, runningSeries } = useAgentCountHistory(totalForked, runningAgents.length)
+
+  if (statusLoading) return <LoadingCards count={5} />
+  if (statusError) return <ErrorState onRetry={() => refetchStatus()} />
 
   const quickLinks = [
     {
@@ -138,19 +150,24 @@ function DashboardPage() {
       <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
         <StatCard
           label={t('dashboard.totalAgents')}
-          value={totalAgents}
+          value={totalForked ?? '?'}
           icon={<Bot className="h-4 w-4" />}
           iconClassName="text-blue-500"
-          sparkline={cpuSeries.map((_v, i) => runningAgents.length + (i % 2))}
+          sparkline={totalSeries}
           sparkColor="blue"
           hint={t('dashboard.forkedTotal')}
+          {...(totalForked === null
+            ? {
+                title: t('dashboard.totalForkedUnavailable'),
+              }
+            : {})}
         />
         <StatCard
           label={t('dashboard.runningAgents')}
           value={runningAgents.length}
           icon={<Activity className="h-4 w-4" />}
           iconClassName="text-emerald-500"
-          sparkline={cpuSeries.map(() => runningAgents.length)}
+          sparkline={runningSeries}
           sparkColor="emerald"
           href="/agents"
         />

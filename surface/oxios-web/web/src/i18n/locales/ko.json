@@ -152,7 +152,9 @@
     "moreEvents": "+{{count}}개 더",
     "viewAll": "전체 보기",
     "viewAllCount": "{{count}}개 전체 보기",
-    "risk": "위험도"
+    "risk": "위험도",
+    "totalForkedUnavailable": "/api/status 엔드포인트에서 누적 포크 수를 보고하지 않습니다 — 백엔드 필드 누락.",
+    "approvalsAllClear": "대기 중인 승인이 없습니다. 시스템이 정상입니다."
   },
   "settings": {
     "title": "설정",
@@ -917,7 +919,10 @@
     "approve": "승인",
     "reject": "거부",
     "deny": "거부",
-    "noApprovals": "대기 중인 승인 없음"
+    "noApprovals": "대기 중인 승인 없음",
+    "approveSuccess": "승인되었습니다",
+    "rejectSuccess": "거부되었습니다",
+    "mutationError": "작업 실패: {{error}}"
   },
   "notifications": {
     "title": "알림",
