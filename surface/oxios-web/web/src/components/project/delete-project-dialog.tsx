@@ -1,3 +1,4 @@
+import { AlertTriangle } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useDeleteProject } from '@/hooks/use-projects'
 import type { Project } from '@/types'
@@ -53,7 +54,7 @@ export function DeleteProjectDialog({ project, open, onOpenChange }: DeleteProje
         </ul>
 
         <p className="text-xs text-destructive font-medium">
-          ⚠️ {t('projects.undoWarning', 'This action cannot be undone.')}
+          <AlertTriangle className="h-4 w-4 shrink-0" /> {t('projects.undoWarning', 'This action cannot be undone.')}
         </p>
 
         <DialogFooter>

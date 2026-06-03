@@ -18,7 +18,7 @@ interface EditProjectDialogProps {
   onSuccess?: () => void
 }
 
-const EMOJI_OPTIONS = ['📦', '🔧', '📝', '🎮', '🌐', '📚', '🎨', '⚡', '🎯', '🚀', '💡', '🔒', '📊', '🎪']
+import { ICON_OPTIONS } from './create-project-dialog'
 
 export function EditProjectDialog({ project, open, onOpenChange, onSuccess }: EditProjectDialogProps) {
   const { t } = useTranslation()
@@ -26,7 +26,7 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess }: Ed
   const { toast } = useToast()
 
   const [name, setName] = useState('')
-  const [emoji, setEmoji] = useState('📦')
+  const [icon, setIcon] = useState('package')
   const [description, setDescription] = useState('')
   const [tags, setTags] = useState('')
   const [paths, setPaths] = useState('')
@@ -35,7 +35,7 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess }: Ed
   // Sync state when project prop changes
   if (project && open) {
     if (name !== project.name) setName(project.name)
-    if (emoji !== (project.emoji ?? '📦')) setEmoji(project.emoji ?? '📦')
+    if (icon !== (project.emoji ?? 'package')) setIcon(project.emoji ?? 'package')
     if (description !== (project.description ?? '')) setDescription(project.description ?? '')
     if (tags !== (project.tags ?? []).join(', ')) setTags((project.tags ?? []).join(', '))
     if (paths !== ((project.paths ?? []).join('\n'))) setPaths((project.paths ?? []).join('\n'))
@@ -58,7 +58,7 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess }: Ed
           .split('\n')
           .map((p) => p.trim())
           .filter(Boolean),
-        emoji,
+        emoji: icon,
         memory_visible: memoryVisible,
       },
       {
@@ -93,17 +93,18 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess }: Ed
           </div>
 
           <div className="space-y-1">
-            <label className="text-sm font-medium">{t('projects.emoji', 'Emoji')}</label>
+            <label className="text-sm font-medium">{t('projects.icon', 'Icon')}</label>
             <div className="flex flex-wrap gap-1">
-              {EMOJI_OPTIONS.map((e) => (
+              {ICON_OPTIONS.map((opt) => (
                 <button
-                  key={e}
-                  onClick={() => setEmoji(e)}
-                  className={`w-8 h-8 rounded text-sm flex items-center justify-center border transition-colors ${
-                    emoji === e ? 'border-primary bg-primary/10' : 'border-transparent hover:bg-muted'
+                  key={opt.name}
+                  type="button"
+                  onClick={() => setIcon(opt.name)}
+                  className={`w-8 h-8 rounded flex items-center justify-center border transition-colors ${
+                    icon === opt.name ? 'border-primary bg-primary/10' : 'border-transparent hover:bg-muted'
                   }`}
                 >
-                  {e}
+                  {opt.icon}
                 </button>
               ))}
             </div>

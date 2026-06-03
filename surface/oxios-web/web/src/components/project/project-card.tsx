@@ -1,5 +1,7 @@
+import { Pencil, Trash2, FolderOpen } from 'lucide-react'
 import { Link } from '@tanstack/react-router'
 import type { Project } from '@/types'
+import { getProjectIcon } from './project-icon'
 
 interface ProjectCardProps {
   project: Project
@@ -31,7 +33,7 @@ export function ProjectCard({ project, onEdit, onDelete }: ProjectCardProps) {
       {/* Header */}
       <div className="flex items-start justify-between gap-2 mb-2">
         <div className="flex items-center gap-2 min-w-0">
-          <span className="text-lg shrink-0">{project.emoji ?? '📦'}</span>
+          {getProjectIcon(project.emoji, 'h-5 w-5')}
           <Link
             to="/projects/$projectId"
             params={{ projectId: project.id }}
@@ -49,14 +51,14 @@ export function ProjectCard({ project, onEdit, onDelete }: ProjectCardProps) {
             className="p-1 rounded hover:bg-muted text-xs text-muted-foreground"
             title="Edit"
           >
-            ✏️
+            <Pencil className="h-3.5 w-3.5" />
           </button>
           <button
             onClick={() => onDelete(project)}
             className="p-1 rounded hover:bg-muted text-xs text-destructive"
             title="Delete"
           >
-            🗑️
+            <Trash2 className="h-3.5 w-3.5" />
           </button>
         </div>
       </div>
@@ -71,7 +73,7 @@ export function ProjectCard({ project, onEdit, onDelete }: ProjectCardProps) {
       {/* Paths */}
       {project.paths && project.paths.length > 0 && (
         <p className="text-[11px] text-muted-foreground font-mono truncate mb-2">
-          📁 {project.paths[0]}
+          <FolderOpen className="h-3 w-3 shrink-0" /> {project.paths[0]}
         </p>
       )}
 

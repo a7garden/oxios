@@ -1,16 +1,17 @@
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import type { GroupAgent } from '@/types/agent-group'
+import { Clock, Play, CheckCircle2, XCircle } from 'lucide-react'
 
 interface Props {
   agents: GroupAgent[]
 }
 
-const STATUS_META: Record<string, { emoji: string; variant: 'success' | 'warning' | 'destructive' | 'secondary' }> = {
-  Pending: { emoji: '⏳', variant: 'secondary' },
-  Running: { emoji: '🟢', variant: 'success' },
-  Completed: { emoji: '✅', variant: 'success' },
-  Failed: { emoji: '🔴', variant: 'destructive' },
+const STATUS_META: Record<string, { icon: React.ReactNode; variant: 'success' | 'warning' | 'destructive' | 'secondary' }> = {
+  Pending: { icon: <Clock className="h-3 w-3" />, variant: 'secondary' },
+  Running: { icon: <Play className="h-3 w-3" />, variant: 'success' },
+  Completed: { icon: <CheckCircle2 className="h-3 w-3" />, variant: 'success' },
+  Failed: { icon: <XCircle className="h-3 w-3" />, variant: 'destructive' },
 }
 
 export function SubAgentList({ agents }: Props) {
@@ -24,7 +25,7 @@ export function SubAgentList({ agents }: Props) {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Badge variant={meta.variant} className="gap-1">
-                    <span>{meta.emoji}</span> {agent.status}
+                    {meta.icon} {agent.status}
                   </Badge>
                   <span className="font-mono text-sm">{agent.id.slice(0, 8)}...</span>
                 </div>

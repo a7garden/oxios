@@ -1,3 +1,4 @@
+import { CheckCircle2, Clock } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { A2AMessage } from '@/types/a2a'
 
@@ -45,9 +46,9 @@ export function MessageLog({ messages }: Props) {
               </td>
               <td className="px-3 py-2">
                 {msg.accepted ? (
-                  <span className="text-emerald-600">✅ Accepted</span>
+                  <span className="text-emerald-600 flex items-center gap-1"><CheckCircle2 className="h-3.5 w-3.5" /> Accepted</span>
                 ) : (
-                  <span className="text-amber-500">⏳ Pending</span>
+                  <span className="text-amber-500 flex items-center gap-1"><Clock className="h-3.5 w-3.5" /> Pending</span>
                 )}
               </td>
             </tr>

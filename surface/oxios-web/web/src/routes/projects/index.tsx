@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
-import { Plus, RefreshCw } from 'lucide-react'
+import { Plus, RefreshCw, Package } from 'lucide-react'
 import { EmptyState } from '@/components/shared/empty-state'
 import { ErrorState } from '@/components/shared/error-state'
 import { LoadingCards } from '@/components/shared/loading'
@@ -75,7 +75,7 @@ function ProjectsPage() {
         <ErrorState onRetry={() => refetch()} />
       ) : projects.length === 0 ? (
         <EmptyState
-          icon={<span className="text-4xl">📦</span>}
+          icon={<Package className="h-10 w-10" />}
           title={search ? t('projects.noResults', 'No projects found') : t('projects.empty', 'No projects yet')}
           description={
             search

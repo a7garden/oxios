@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
-import { Check, PackagePlus, Power, Search, Store, Trash2, X, Zap } from 'lucide-react'
+import {Check, PackagePlus, Power, Search, Store, Trash2, X, Zap, CircleCheck, CircleAlert, CircleX, Globe} from 'lucide-react'
 import { useCallback, useDeferredValue, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { EmptyState } from '@/components/shared/empty-state'
@@ -30,10 +30,10 @@ export const Route = createFileRoute('/skills')({
 type Tab = 'installed' | 'marketplace'
 type MarketplaceSource = 'clawhub' | 'skills-sh'
 
-const STATUS_DISPLAY: Record<SkillStatus, { emoji: string; label: string; variant: 'success' | 'warning' | 'destructive' }> = {
-  ready: { emoji: '🟢', label: 'ready', variant: 'success' },
-  needs_setup: { emoji: '🟡', label: 'needs-setup', variant: 'warning' },
-  disabled: { emoji: '🔴', label: 'disabled', variant: 'destructive' },
+const STATUS_DISPLAY: Record<SkillStatus, { icon: React.ReactNode; label: string; variant: 'success' | 'warning' | 'destructive' }> = {
+  ready: { icon: <CircleCheck className="h-3 w-3" />, label: 'ready', variant: 'success' },
+  needs_setup: { icon: <CircleAlert className="h-3 w-3" />, label: 'needs-setup', variant: 'warning' },
+  disabled: { icon: <CircleX className="h-3 w-3" />, label: 'disabled', variant: 'destructive' },
 }
 
 const SOURCE_VARIANT: Record<string, 'outline' | 'secondary' | 'default'> = {
@@ -60,8 +60,8 @@ function SkillsPage() {
   const [tab, setTab] = useState<Tab>(search.tab === 'marketplace' ? 'marketplace' : 'installed')
   const [mktSource, setMktSource] = useState<MarketplaceSource>('clawhub')
   const [filter, setFilter] = useState<'all' | SkillStatus>('all')
-  const [searchQuery, setSearchQuery] = useState('')
-  const [mktQuery, setMktQuery] = useState('')
+  const [searchQuery, setSearchQuery] = useState('' /* icon fallback */)
+  const [mktQuery, setMktQuery] = useState('' /* icon fallback */)
   const deferredQuery = useDeferredValue(mktQuery)
 
   // Selected skill for detail panel
@@ -289,7 +289,7 @@ function InstalledTab({ filtered, allSkills, counts, filter, setFilter, search, 
         <DialogHeader>
           <DialogTitle>{t('skills.deleteConfirm')}</DialogTitle>
           <DialogDescription>
-            {t('skills.deleteDescription', { name: deleteTarget?.name ?? '' })}
+            {t('skills.deleteDescription', { name: deleteTarget?.name ?? '' /* icon fallback */ })}
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>
@@ -422,7 +422,7 @@ function SkillCard({ skill, isSelected, hasUpdate, onSelect, onToggle, onDelete,
       <CardContent className="p-5 space-y-3">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-start gap-2 min-w-0" onClick={onSelect}>
-            <span className="text-lg leading-none mt-0.5 shrink-0">{skill.emoji || '⚡'}</span>
+            <span className="text-lg leading-none mt-0.5 shrink-0">'' /* icon fallback */</span>
             <div className="min-w-0">
               <h3 className="font-semibold text-base leading-tight">{skill.name}</h3>
               {skill.description && <p className="text-sm text-muted-foreground mt-0.5 line-clamp-2">{skill.description}</p>}
@@ -436,7 +436,7 @@ function SkillCard({ skill, isSelected, hasUpdate, onSelect, onToggle, onDelete,
             )}
             <FormatBadge format={skill.format} />
             {skill.always && <Badge variant="outline" className="text-xs">{t('skills.always')}</Badge>}
-            <Badge variant={sd.variant} className="text-xs gap-1"><span>{sd.emoji}</span> {sd.label}</Badge>
+            <Badge variant={sd.variant} className="text-xs gap-1">{sd.icon} {sd.label}</Badge>
           </div>
         </div>
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -514,7 +514,7 @@ function MarketplaceCard({ skill, isSelected, isInstalling, onSelect, onInstall 
       <CardContent className="p-5 space-y-3">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-start gap-2 min-w-0" onClick={onSelect}>
-            <span className="text-lg leading-none mt-0.5 shrink-0">🔍</span>
+            <Search className="h-4 w-4 shrink-0" />
             <div className="min-w-0">
               <h3 className="font-semibold text-base leading-tight">{dn}</h3>
               {skill.summary && <p className="text-sm text-muted-foreground mt-0.5 line-clamp-2">{skill.summary}</p>}
@@ -544,7 +544,7 @@ function SkillsShCard({ skill, isSelected, isInstalling, onSelect, onInstall }: 
       <CardContent className="p-5 space-y-3">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-start gap-2 min-w-0" onClick={onSelect}>
-            <span className="text-lg leading-none mt-0.5 shrink-0">🌐</span>
+            <Globe className="h-4 w-4 shrink-0" />
             <div className="min-w-0">
               <h3 className="font-semibold text-base leading-tight">{skill.name}</h3>
               <p className="text-sm text-muted-foreground mt-0.5 line-clamp-2">{skill.source}</p>
@@ -631,7 +631,7 @@ function SkillsShDetail({ id, onClose }: { id: string; onClose: () => void }) {
       {skillMd && (
         <div className="space-y-1">
           <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">SKILL.md Preview</p>
-          <pre className="text-xs bg-muted p-3 rounded-md overflow-auto max-h-64 whitespace-pre-wrap">{skillMd.contents.slice(0, 2000)}{skillMd.contents.length > 2000 ? '\n...' : ''}</pre>
+          <pre className="text-xs bg-muted p-3 rounded-md overflow-auto max-h-64 whitespace-pre-wrap">{skillMd.contents.slice(0, 2000)}{skillMd.contents.length > 2000 ? '\n...' : '' /* icon fallback */}</pre>
         </div>
       )}
 

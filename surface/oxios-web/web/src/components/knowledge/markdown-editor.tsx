@@ -100,50 +100,25 @@ export function MarkdownEditor({
             return createLinkHintFn(autocompleteEntries)(cm)
           }
           if (pos > 0 && line[pos - 1] === ':') {
-            // Return emoji hint
-            const word = line.slice(pos, pos + 3).replace(/[^\p{L}\p{N}_]/u, '')
-            const emojis = [
-              '✅',
-              '❌',
-              '⚠️',
-              '🔥',
-              '💡',
-              '⭐',
-              '🌟',
-              '💫',
-              '🎯',
-              '🚀',
-              '📝',
-              '📌',
-              '🔗',
-              '💬',
-              '📊',
-              '🛠️',
-              '🎨',
-              '🎵',
-              '🏆',
-              '📦',
-              '📈',
-              '💰',
-              '🌱',
-              '🌍',
-              '🧠',
-              '💡',
-              '🔍',
-              '✅',
-              '☑️',
-              '❎',
-              '⬜',
-              '🟩',
-            ]
-            const filtered = word ? emojis.filter((e) => e.includes(word.slice(1))) : emojis
+            // Return emoji hint (using icon dict from emoji.ts)
+            const unicodeWordRegex = /[\p{L}\p{N}_\s:-]/u
+            let start = pos
+            while (start < line.length && unicodeWordRegex.test(line[start] ?? '')) start++
+            const word = line.slice(pos, start).toLowerCase()
+
+            const list: Array<{ text: string; displayText: string }> = []
+            for (const [key, icon] of Object.entries(emojiDict)) {
+              if (word.length === 0 || key.toLowerCase().includes(word)) {
+                list.push({ text: `${icon} `, displayText: `${icon} :${key}:` })
+                if (list.length >= 20) break
+              }
+            }
+            if (list.length === 0) return null
+
             return {
-              list: filtered.map((emoji) => ({
-                text: `${emoji} `,
-                displayText: emoji,
-              })),
+              list,
               from: { line: cursor.line, ch: pos - 1 },
-              to: { line: cursor.line, ch: pos },
+              to: { line: cursor.line, ch: start },
             }
           }
           return null
@@ -299,7 +274,7 @@ function toggleItalic(cm: CodeMirror.Editor) {
 
 function insertCheckmark(cm: CodeMirror.Editor) {
   const cursor = cm.getCursor()
-  cm.replaceRange('✅ ', { line: cursor.line, ch: 0 })
+  cm.replaceRange('- [x] ', { line: cursor.line, ch: 0 })
   cm.focus()
 }
 

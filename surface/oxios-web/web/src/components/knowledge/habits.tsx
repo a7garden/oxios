@@ -1,4 +1,4 @@
-import { BarChart3, ChevronLeft, ChevronRight, Dumbbell } from 'lucide-react'
+import { BarChart3, ChevronLeft, ChevronRight, Dumbbell, Smile } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
@@ -10,7 +10,7 @@ import { cn } from '@/lib/utils'
 /** Backend: habit name → { dayOfYear → status } */
 type HabitMap = Record<string, Record<string, number>>
 
-const MOOD_EMOJIS = ['⚪️', '🤕', '😔', '😐', '🙂', '😊']
+const MOOD_COLORS = ['bg-zinc-300', 'bg-red-400', 'bg-amber-400', 'bg-yellow-400', 'bg-lime-400', 'bg-emerald-400']
 
 // ─── Helpers ──────────────────────────────────────────────────
 
@@ -117,7 +117,7 @@ function HabitYearGrid({
     if (status === -1) return `${dateStr}`
     if (status === 0) return `${dateStr}: 미완료`
     if (isMood) {
-      return `${dateStr}: ${MOOD_EMOJIS[Math.min(status, 5)] ?? '⚪️'}`
+      return `${dateStr}: ●`
     }
     return `${dateStr}: 완료`
   }
@@ -130,7 +130,7 @@ function HabitYearGrid({
     <div className="space-y-2">
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-medium flex items-center gap-1.5">
-          {isMood && <span>😊</span>}
+          {isMood && <Smile className="h-4 w-4" />}
           {habitName}
         </h3>
         <span className="text-xs text-muted-foreground">
@@ -177,7 +177,7 @@ function HabitYearGrid({
         const dateStr = date.toLocaleDateString(undefined, { month: 'long', day: 'numeric', weekday: 'short' })
         return (
           <div className="text-xs text-muted-foreground">
-            {dateStr}: {status === undefined ? '—' : status === 0 ? '⚪️' : isMood ? (MOOD_EMOJIS[status] ?? '⚪️') : '🟢'}
+            {dateStr}:{' '}{status === undefined ? '—' : <StatusDot status={status} isMood={isMood ?? false} />}
           </div>
         )
       })()}
