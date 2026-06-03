@@ -45,6 +45,7 @@ use crate::memory::{MemoryEntry, MemoryManager, MemoryType};
 use crate::persona::PersonaManager;
 use crate::tools::registration::register_tools_from_cspace_gated;
 
+use crate::event_bus::KernelEvent;
 use crate::session_context::SessionContext;
 use crate::types::AgentId;
 use crate::KernelHandle;
@@ -208,6 +209,23 @@ impl AgentRuntime {
         seed: &Seed,
         session_ctx: &mut SessionContext,
     ) -> Result<ExecutionResult> {
+        // RFC-015: session_id is derived from seed.id for chat transparency
+        // event publishing. Most callers run one Seed per session turn, so
+        // seed.id is a usable session identifier.
+        let session_id: Option<String> = Some(seed.id.to_string());
+        self.execute_with_session(agent_id, seed, session_ctx, session_id)
+            .await
+    }
+
+    /// Like [`execute`](Self::execute) but with an explicit session_id for
+    /// RFC-015 chat transparency event publishing.
+    pub async fn execute_with_session(
+        &self,
+        agent_id: AgentId,
+        seed: &Seed,
+        session_ctx: &mut SessionContext,
+        session_id: Option<String>,
+    ) -> Result<ExecutionResult> {
         let prompt = build_user_prompt(seed);
 
         // Get active persona system prompt.
@@ -365,6 +383,7 @@ impl AgentRuntime {
                 cspace,
                 audit_trail,
                 self.routing_stats.clone(),
+                session_id.clone(),
             )
             .await?
         };
@@ -418,7 +437,14 @@ async fn run_agent(
     cspace: crate::capability::CSpace,
     audit_trail: Option<Arc<AuditTrail>>,
     routing_stats: Option<Arc<crate::kernel_handle::RoutingStats>>,
-) -> Result<(String, usize, bool, Vec<crate::memory::sona::TrajectoryStep>, Arc<Agent>)> {
+    session_id: Option<String>,
+) -> Result<(
+    String,
+    usize,
+    bool,
+    Vec<crate::memory::sona::TrajectoryStep>,
+    Arc<Agent>,
+)> {
     // Extract workspace.
     let workspace = if !config.project_paths.is_empty() {
         config.project_paths[0].clone()
@@ -468,7 +494,7 @@ async fn run_agent(
     // Build access gate from kernel's security infrastructure
     let access_gate = Arc::new(AccessGate::new(
         kernel_handle.exec.access_manager().clone(),
-        Arc::new(kernel_handle.exec.config().clone()),
+        Arc::new(kernel_handle.exec.config_snapshot()),
         audit_sink,
     ));
 
@@ -536,22 +562,19 @@ async fn run_agent(
         // Build middleware pipeline.
         let mut pipeline = oxi_sdk::MiddlewarePipeline::new();
         if config.rate_limit_per_minute > 0 {
-            pipeline =
-                pipeline.push(oxi_sdk::middleware::builtins::RateLimitMiddleware::new(
-                    config.rate_limit_per_minute,
-                ));
+            pipeline = pipeline.push(oxi_sdk::middleware::builtins::RateLimitMiddleware::new(
+                config.rate_limit_per_minute,
+            ));
         }
         if config.token_budget > 0 {
-            pipeline =
-                pipeline.push(oxi_sdk::middleware::builtins::TokenBudgetMiddleware::new(
-                    config.token_budget,
-                ));
+            pipeline = pipeline.push(oxi_sdk::middleware::builtins::TokenBudgetMiddleware::new(
+                config.token_budget,
+            ));
         }
         if config.audit_tool_calls {
-            pipeline =
-                pipeline.push(oxi_sdk::middleware::builtins::LoggingMiddleware::new(
-                    tracing::Level::INFO,
-                ));
+            pipeline = pipeline.push(oxi_sdk::middleware::builtins::LoggingMiddleware::new(
+                tracing::Level::INFO,
+            ));
         }
 
         // Create Agent with CSpace tool registry and provider resolver.
@@ -644,6 +667,10 @@ async fn run_agent(
     let model_id_for_callback = config.model_id.clone();
     let agent_id_for_callback = agent_id.to_string();
     let routing_stats_for_cb = routing_stats.clone();
+    // RFC-015: real-time event publishing for chat transparency.
+    // Falls back to None when the caller did not opt in.
+    let transparency_session: Option<String> = session_id.clone();
+    let kernel_handle_for_cb: Arc<KernelHandle> = Arc::clone(&kernel_handle);
 
     // Run the agent with streaming events.
     let result = agent
@@ -666,8 +693,21 @@ async fn run_agent(
                             duration_ms: 0,
                             confidence: 0.0,
                         });
+                    // RFC-015: broadcast tool start so Web UI can show progress.
+                    if let Some(ref sid) = transparency_session {
+                        let _ =
+                            kernel_handle_for_cb
+                                .infra
+                                .publish(KernelEvent::ToolExecutionStarted {
+                                    session_id: sid.clone(),
+                                    tool_name: tool_name.clone(),
+                                    tool_call_id: tool_call_id.clone(),
+                                    tool_args: serde_json::Value::Null,
+                                });
+                    }
                 }
                 AgentEvent::ToolExecutionEnd {
+                    tool_name,
                     tool_call_id,
                     is_error,
                     result,
@@ -677,13 +717,29 @@ async fn run_agent(
                         s.steps_completed += 1;
                     }
                     // Look up the exact step by tool_call_id.
+                    let mut duration_ms: u64 = 0;
+                    let mut summary = String::new();
                     if let Some((start, idx)) = s.pending_tools.remove(tool_call_id.as_str()) {
-                        let duration_ms = start.elapsed().as_millis() as u64;
+                        duration_ms = start.elapsed().as_millis() as u64;
                         if let Some(step) = s.trajectory_steps.get_mut(idx) {
-                            step.output = summarize_tool_result(&result.content, 200);
+                            summary = summarize_tool_result(&result.content, 200);
+                            step.output = summary.clone();
                             step.duration_ms = duration_ms;
                             step.confidence = if is_error { 0.3 } else { 0.8 };
                         }
+                    }
+                    // RFC-015: broadcast tool completion.
+                    if let Some(ref sid) = transparency_session {
+                        let _ = kernel_handle_for_cb.infra.publish(
+                            KernelEvent::ToolExecutionFinished {
+                                session_id: sid.clone(),
+                                tool_call_id: tool_call_id.clone(),
+                                tool_name: tool_name.clone(),
+                                duration_ms,
+                                is_error,
+                                output_summary: summary,
+                            },
+                        );
                     }
                 }
                 AgentEvent::AgentEnd {
@@ -732,6 +788,16 @@ async fn run_agent(
                         );
                         stats.record_model_usage(&model_id_for_callback, cost);
                     }
+                    // RFC-015: publish cumulative token usage.
+                    if let Some(ref sid) = transparency_session {
+                        let _ = kernel_handle_for_cb
+                            .infra
+                            .publish(KernelEvent::TokenUsageUpdate {
+                                session_id: sid.clone(),
+                                input_tokens: input_tokens as u64,
+                                output_tokens: output_tokens as u64,
+                            });
+                    }
                 }
                 AgentEvent::Compaction {
                     event: CompactionEvent::Completed { result, .. },
@@ -741,6 +807,17 @@ async fn run_agent(
                         session_id_for_callback.clone(),
                         memory_for_callback.clone(),
                     );
+                    // RFC-015: compaction is a form of reasoning — expose it.
+                    if let Some(ref sid) = transparency_session {
+                        let _ =
+                            kernel_handle_for_cb
+                                .infra
+                                .publish(KernelEvent::ReasoningFragment {
+                                    session_id: sid.clone(),
+                                    content: result.summary.clone(),
+                                    source: "compaction".to_string(),
+                                });
+                    }
                 }
                 _ => {}
             }
@@ -803,7 +880,13 @@ async fn run_agent(
         }
     }
 
-    Ok((s.final_content.clone(), s.steps_completed, s.success, s.trajectory_steps.clone(), agent))
+    Ok((
+        s.final_content.clone(),
+        s.steps_completed,
+        s.success,
+        s.trajectory_steps.clone(),
+        agent,
+    ))
 }
 
 /// Summarize a tool result string to fit within `max_len` characters.

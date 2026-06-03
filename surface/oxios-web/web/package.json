@@ -42,6 +42,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "codemirror": "5",
+    "highlight.js": "^11.11.1",
     "hypermd": "^0.3.11",
     "i18next": "^26.2.0",
     "i18next-browser-languagedetector": "^8.2.1",
@@ -52,6 +53,7 @@
     "react-i18next": "^17.0.8",
     "react-markdown": "^10.1.0",
     "recharts": "^3.8.1",
+    "rehype-highlight": "^7.0.2",
     "remark-gfm": "^4.0.1",
     "tailwind-merge": "^3.6.0",
     "zustand": "^5.0.13"

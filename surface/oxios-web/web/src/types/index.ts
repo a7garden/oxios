@@ -164,6 +164,50 @@ export interface ChatMessage {
     duration_ms?: number
     tool_calls?: ToolCallSummary[]
   }
+  // RFC-015: real-time activity timeline attached to an assistant turn.
+  // Populated as the agent executes tools, recalls memories, emits reasoning
+  // fragments, and reports token usage. Also restored from the persisted
+  // trajectory_steps when a session is re-opened.
+  activities?: ChatActivity[]
+  // RFC-015: cumulative token usage for the turn.
+  totalInputTokens?: number
+  totalOutputTokens?: number
+}
+
+// RFC-015: a single transparency activity entry shown in the chat timeline.
+export type ChatActivityType =
+  | 'phase'
+  | 'tool_call'
+  | 'memory'
+  | 'reasoning'
+  | 'usage'
+
+export interface ChatActivity {
+  id: string
+  type: ChatActivityType
+  timestamp: string
+  // phase
+  phase?: string
+  status?: 'started' | 'completed'
+  summary?: string
+  // tool_call
+  toolName?: string
+  toolCallId?: string
+  toolArgs?: Record<string, unknown>
+  outputSummary?: string
+  durationMs?: number
+  isError?: boolean
+  // memory
+  memoryAction?: 'recall' | 'store'
+  query?: string
+  count?: number
+  memorySource?: string
+  // reasoning
+  content?: string
+  reasoningSource?: string
+  // usage
+  inputTokens?: number
+  outputTokens?: number
 }
 
 export interface ToolCallSummary {
@@ -192,7 +236,19 @@ export interface ChatResponse {
 }
 
 export interface StreamChunk {
-  type: 'token' | 'tool_call' | 'tool_result' | 'done' | 'error'
+  type:
+    | 'token'
+    | 'tool_call'
+    | 'tool_result'
+    | 'done'
+    | 'error'
+    // RFC-015 chat transparency chunks
+    | 'phase'
+    | 'tool_start'
+    | 'tool_end'
+    | 'memory'
+    | 'reasoning'
+    | 'usage'
   content?: string
   tool_name?: string
   tool_args?: Record<string, unknown>
@@ -205,6 +261,18 @@ export interface StreamChunk {
   seed_id?: string
   duration_ms?: number
   tool_calls?: ToolCallSummary[]
+  // RFC-015 chunk fields
+  tool_call_id?: string
+  status?: 'started' | 'completed'
+  summary?: string
+  output_summary?: string
+  is_error?: boolean
+  action?: 'recall' | 'store'
+  query?: string
+  count?: number
+  source?: string
+  input_tokens?: number
+  output_tokens?: number
 }
 
 // Event (SSE)

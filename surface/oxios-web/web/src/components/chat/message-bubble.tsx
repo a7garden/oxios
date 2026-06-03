@@ -1,9 +1,11 @@
-import { Bot, User } from 'lucide-react'
+import { Bot, User, Wrench } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import rehypeHighlight from 'rehype-highlight'
 import type { ChatMessage } from '@/types'
 import { ChatMetadata } from './chat-metadata'
 import { ToolCallCard } from './tool-call-card'
+import { ActivityTimeline } from './activity-timeline'
 
 interface MessageBubbleProps {
   message: ChatMessage
@@ -27,7 +29,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
     return (
       <div className="flex gap-3 my-1">
         <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted">
-          <span className="text-xs">🔧</span>
+          <span className="text-xs"><Wrench className="h-3.5 w-3.5" /></span>
         </div>
         <div className="flex-1">
           {message.toolName && (
@@ -64,10 +66,20 @@ export function MessageBubble({ message }: MessageBubbleProps) {
             <p className="text-sm whitespace-pre-wrap">{message.content}</p>
           ) : (
             <div className="text-sm prose prose-sm dark:prose-invert max-w-none [&>p:first-child]:mt-0 [&>p:last-child]:mb-0">
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown>
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                rehypePlugins={[rehypeHighlight]}
+              >
+                {message.content}
+              </ReactMarkdown>
             </div>
           )}
         </div>
+        {/* RFC-015: real-time activity timeline (tool calls, memory,
+            reasoning, token usage). Hidden for user messages. */}
+        {!isUser && message.activities && message.activities.length > 0 && (
+          <ActivityTimeline activities={message.activities} />
+        )}
         <div className="flex items-center gap-2 mt-1.5">
           {relTime && <span className="text-[10px] text-muted-foreground">{relTime}</span>}
           {!isUser && <ChatMetadata message={message} />}

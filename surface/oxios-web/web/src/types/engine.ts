@@ -56,6 +56,12 @@ export interface ProviderInfo {
   hasKey: boolean
   /** Number of available models */
   modelCount: number
+  /** Short description for tooltips / help text. Optional for
+   *  forward-compatibility with older backends. */
+  description?: string
+  /** Primary environment variable name for the API key. Optional
+   *  for forward-compatibility with older backends. */
+  envKey?: string
 }
 
 /** API key source detection. */

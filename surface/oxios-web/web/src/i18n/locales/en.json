@@ -425,7 +425,28 @@
     "spacesLabel": "Spaces",
     "sessionsLabel": "Sessions",
     "serverConnecting": "Connecting to server...",
-    "sendHint": "Send a message to start a conversation."
+    "sendHint": "Send a message to start a conversation.",
+    "transparency": {
+      "timelineHeader_one": "{{count}} activity",
+      "timelineHeader_other": "{{count}} activities",
+      "toolCallCount_one": "{{count}} tool call",
+      "toolCallCount_other": "{{count}} tool calls",
+      "tokenCount": "{{count}} tokens",
+      "expandAll": "Expand all",
+      "collapseAll": "Collapse all",
+      "phaseLabel": "Phase: {{phase}}",
+      "memoryRecall": "Recalled {{count}} memor{{y}}",
+      "memoryRecallFor": "Recalled {{count}} memor{{y}} for \"{{query}}\"",
+      "memorySource": " from {{source}}",
+      "reasoning": "Reasoning",
+      "usage": "Token usage",
+      "inputTokens": "Input tokens: {{count}}",
+      "outputTokens": "Output tokens: {{count}}",
+      "inputOutputTokens": "Input: {{in}}, Output: {{out}}",
+      "error": "error",
+      "input": "Input",
+      "output": "Output"
+    }
   },
   "agents": {
     "title": "Agents",

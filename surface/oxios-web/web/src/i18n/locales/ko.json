@@ -425,7 +425,28 @@
     "spacesLabel": "공간",
     "sessionsLabel": "세션",
     "serverConnecting": "서버에 연결 중...",
-    "sendHint": "메시지를 보내 대화를 시작하세요."
+    "sendHint": "메시지를 보내 대화를 시작하세요.",
+    "transparency": {
+      "timelineHeader_one": "활동 {{count}}개",
+      "timelineHeader_other": "활동 {{count}}개",
+      "toolCallCount_one": "도구 호출 {{count}}회",
+      "toolCallCount_other": "도구 호출 {{count}}회",
+      "tokenCount": "토큰 {{count}}개",
+      "expandAll": "모두 펼치기",
+      "collapseAll": "모두 접기",
+      "phaseLabel": "단계: {{phase}}",
+      "memoryRecall": "메모리 {{count}}개 회상",
+      "memoryRecallFor": "\"{{query}}\" 관련 메모리 {{count}}개 회상",
+      "memorySource": " ({{source}}에서)",
+      "reasoning": "추론",
+      "usage": "토큰 사용량",
+      "inputTokens": "입력 토큰: {{count}}",
+      "outputTokens": "출력 토큰: {{count}}",
+      "inputOutputTokens": "입력: {{in}}, 출력: {{out}}",
+      "error": "오류",
+      "input": "입력",
+      "output": "출력"
+    }
   },
   "agents": {
     "title": "에이전트",

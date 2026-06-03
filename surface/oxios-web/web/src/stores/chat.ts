@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { ChatMessage, StreamChunk } from '@/types'
+import type { ChatActivity, ChatMessage, StreamChunk, ToolCallSummary } from '@/types'
 import { useAuthStore } from './auth'
 
 // ---------------------------------------------------------------------------
@@ -81,6 +81,97 @@ function parseChunk(raw: unknown): StreamChunk {
     return raw as StreamChunk
   }
   return { type: 'error', error: 'Malformed chunk' }
+}
+
+// Convert an RFC-015 transparency chunk into a ChatActivity entry. Returns
+// null for chunk types that should not be persisted on the message (the
+// phase chunk is currently informational and grouped via metadata instead).
+function chunkToActivity(chunk: StreamChunk): ChatActivity | null {
+  const ts = new Date().toISOString()
+  const baseId = (id?: string) => `${id ?? crypto.randomUUID()}`
+  switch (chunk.type) {
+    case 'phase':
+      return {
+        id: baseId(chunk.phase),
+        type: 'phase',
+        timestamp: ts,
+        phase: chunk.phase,
+        status: chunk.status,
+        summary: chunk.summary,
+      }
+    case 'tool_start':
+      return {
+        id: baseId(chunk.tool_call_id),
+        type: 'tool_call',
+        timestamp: ts,
+        toolName: chunk.tool_name,
+        toolCallId: chunk.tool_call_id,
+        toolArgs: chunk.tool_args,
+      }
+    case 'tool_end':
+      return {
+        id: baseId(chunk.tool_call_id),
+        type: 'tool_call',
+        timestamp: ts,
+        toolName: chunk.tool_name,
+        toolCallId: chunk.tool_call_id,
+        outputSummary: chunk.output_summary,
+        durationMs: chunk.duration_ms,
+        isError: chunk.is_error,
+      }
+    case 'memory':
+      return {
+        id: baseId(`${chunk.action}-${chunk.query}`),
+        type: 'memory',
+        timestamp: ts,
+        memoryAction: chunk.action,
+        query: chunk.query,
+        count: chunk.count,
+        memorySource: chunk.source,
+      }
+    case 'reasoning':
+      return {
+        id: baseId(`reason-${chunk.content?.slice(0, 16)}`),
+        type: 'reasoning',
+        timestamp: ts,
+        content: chunk.content,
+        reasoningSource: chunk.source,
+      }
+    case 'usage':
+      return {
+        id: baseId(`usage-${Date.now()}`),
+        type: 'usage',
+        timestamp: ts,
+        inputTokens: chunk.input_tokens,
+        outputTokens: chunk.output_tokens,
+      }
+    default:
+      return null
+  }
+}
+
+// Convert a persisted TrajectoryStepRecord (from /api/sessions/:id) into a
+// ChatActivity, so the timeline is rendered the same way after reload.
+function trajectoryToActivity(step: {
+  tool_name: string
+  tool_args: unknown
+  output_summary: string
+  duration_ms: number
+  is_error: boolean
+  tool_call_id: string
+  timestamp: string
+}): ChatActivity {
+  return {
+    id: step.tool_call_id,
+    type: 'tool_call',
+    timestamp: step.timestamp,
+    toolName: step.tool_name,
+    toolCallId: step.tool_call_id,
+    toolArgs: (step.tool_args as Record<string, unknown> | undefined) ?? undefined,
+    outputSummary: step.output_summary,
+    durationMs: step.duration_ms,
+    isError: step.is_error,
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -254,6 +345,18 @@ export const useChatStore = create<ChatStore>()(
           const messages: ChatMessage[] = []
           const userMsgs: { content: string; timestamp?: string }[] = data.user_messages ?? []
           const agentMsgs: { content: string; timestamp?: string }[] = data.agent_responses ?? []
+          // RFC-015: persisted trajectory for chat transparency replay.
+          const trajectorySteps: Array<{
+            tool_name: string
+            tool_args: unknown
+            output_summary: string
+            duration_ms: number
+            is_error: boolean
+            tool_call_id: string
+            timestamp: string
+          }> = data.trajectory_steps ?? []
+          const trajectoryActivities = trajectorySteps.map(trajectoryToActivity)
+
           const maxLen = Math.max(userMsgs.length, agentMsgs.length)
           for (let i = 0; i < maxLen; i++) {
             const userMsg = userMsgs[i]
@@ -267,11 +370,19 @@ export const useChatStore = create<ChatStore>()(
               })
             }
             if (agentMsg) {
+              // Attach the trajectory to the LAST agent response in the
+              // session. Per-turn slicing would need timestamps; full-session
+              // attachment is a good enough approximation for the replay view
+              // and avoids a more expensive join.
+              const isLast = i === maxLen - 1
               messages.push({
                 id: crypto.randomUUID(),
                 role: 'assistant',
                 content: agentMsg.content ?? '',
                 timestamp: agentMsg.timestamp ?? data.updated_at,
+                ...(isLast && trajectoryActivities.length > 0
+                  ? { activities: trajectoryActivities }
+                  : null),
               })
             }
           }
@@ -328,76 +439,159 @@ export const useChatStore = create<ChatStore>()(
       },
 
       handleChunk(chunk) {
-        if (chunk.type === 'token' && chunk.content) {
-          set((s) => {
-            const updated = [...s.messages]
-            const last = updated[updated.length - 1]
-            if (last?.role === 'assistant') {
+        switch (chunk.type) {
+          case 'token': {
+            if (!chunk.content) break
+            set((s) => {
+              const updated = [...s.messages]
+              const last = updated[updated.length - 1]
+              if (last?.role === 'assistant') {
+                return {
+                  messages: [...updated.slice(0, -1), { ...last, content: last.content + chunk.content }],
+                }
+              }
               return {
-                messages: [...updated.slice(0, -1), { ...last, content: last.content + chunk.content }],
+                messages: [
+                  ...updated,
+                  { id: crypto.randomUUID(), role: 'assistant' as const, content: chunk.content ?? '', timestamp: new Date().toISOString() },
+                ],
               }
-            }
-            return {
-              messages: [
-                ...updated,
-                { id: crypto.randomUUID(), role: 'assistant' as const, content: chunk.content ?? '', timestamp: new Date().toISOString() },
-              ],
-            }
-          })
-        } else if (chunk.type === 'done') {
-          const sid = chunk.session_id ?? null
-          const vid = chunk.project_ids ?? null
-          const toolCalls = chunk.tool_calls ?? []
-          const phase = chunk.phase
-          const evaluationPassed = chunk.evaluation_passed === 'true' || chunk.evaluation_passed === true
-          const seedId = chunk.seed_id
-          const durationMs = chunk.duration_ms
+            })
+            break
+          }
 
-          // Insert tool call messages and attach metadata
-          set((s) => {
-            const updated = [...s.messages]
-            const toolMessages: ChatMessage[] = (Array.isArray(toolCalls) ? toolCalls : []).map(
-              (tc: ToolCallSummary) => ({
-                id: crypto.randomUUID(),
-                role: 'tool' as const,
-                content: '',
-                toolName: tc.tool_name,
-                toolArgs: typeof tc.input === 'string' ? undefined : JSON.parse(tc.input),
-                toolResult: tc.output,
-                toolDurationMs: tc.duration_ms,
-                timestamp: new Date().toISOString(),
-              })
-            )
+          // ── RFC-015 chat transparency chunks ──
+          // These are attached to the most recent assistant message as
+          // activity entries. Pre-streaming events (sent before any token)
+          // are dropped — they have no message to attach to.
+          case 'phase':
+          case 'tool_start':
+          case 'tool_end':
+          case 'memory':
+          case 'reasoning':
+          case 'usage': {
+            const activity = chunkToActivity(chunk)
+            if (!activity) break
+            set((s) => {
+              const updated = [...s.messages]
+              const last = updated[updated.length - 1]
+              if (last?.role !== 'assistant') return s
+              const existing = last.activities ?? []
 
-            // Find last assistant message and attach metadata
-            const lastAssistantIdx = [...updated].reverse().findIndex((m) => m.role === 'assistant')
-            if (lastAssistantIdx >= 0) {
-              const idx = updated.length - 1 - lastAssistantIdx
-              updated[idx] = {
-                ...updated[idx],
-                metadata: {
-                  phase,
-                  evaluation_passed: evaluationPassed,
-                  seed_id: seedId,
-                  duration_ms: durationMs,
-                  tool_calls: Array.isArray(toolCalls) ? toolCalls : [],
-                },
+              // For tool_call activities, merge into the matching toolCallId
+              // entry instead of appending. `tool_start` creates the
+              // placeholder; `tool_end` fills in duration/output/isError.
+              if (
+                activity.type === 'tool_call' &&
+                activity.toolCallId
+              ) {
+                const idx = existing.findIndex(
+                  (a) => a.type === 'tool_call' && a.toolCallId === activity.toolCallId,
+                )
+                if (idx >= 0) {
+                  const prior = existing[idx]!
+                  const merged: ChatActivity = {
+                    ...prior,
+                    ...activity,
+                    // Preserve tool_name from the start event — tool_end
+                    // re-asserts the same value but be defensive in case
+                    // the provider omits it.
+                    toolName: prior.toolName ?? activity.toolName,
+                  }
+                  const newActivities = [...existing]
+                  newActivities[idx] = merged
+                  return {
+                    messages: [
+                      ...updated.slice(0, -1),
+                      {
+                        ...last,
+                        activities: newActivities,
+                        totalInputTokens: (last.totalInputTokens ?? 0) + (activity.inputTokens ?? 0),
+                        totalOutputTokens: (last.totalOutputTokens ?? 0) + (activity.outputTokens ?? 0),
+                      },
+                    ],
+                  }
+                }
               }
+              // All non-tool_call activities (and unmatched tool_call with
+              // a fresh toolCallId) get appended.
+              return {
+                messages: [
+                  ...updated.slice(0, -1),
+                  {
+                    ...last,
+                    activities: [...existing, activity],
+                    totalInputTokens: (last.totalInputTokens ?? 0) + (activity.inputTokens ?? 0),
+                    totalOutputTokens: (last.totalOutputTokens ?? 0) + (activity.outputTokens ?? 0),
+                  },
+                ],
+              }
+            })
+            break
+          }
+
+          case 'done': {
+            const sid = chunk.session_id ?? null
+            const vid = chunk.project_id ?? null
+            const toolCalls = chunk.tool_calls ?? []
+            const phase = chunk.phase
+            const evaluationPassed = chunk.evaluation_passed === 'true' || chunk.evaluation_passed === 'True'
+            const seedId = chunk.seed_id
+            const durationMs = chunk.duration_ms
+
+            // Insert tool call messages and attach metadata
+            set((s) => {
+              const updated = [...s.messages]
+              const toolMessages: ChatMessage[] = (Array.isArray(toolCalls) ? toolCalls : []).map(
+                (tc: ToolCallSummary) => ({
+                  id: crypto.randomUUID(),
+                  role: 'tool' as const,
+                  content: '',
+                  toolName: tc.tool_name,
+                  toolArgs: typeof tc.input === 'string' ? undefined : JSON.parse(tc.input),
+                  toolResult: tc.output,
+                  toolDurationMs: tc.duration_ms,
+                  timestamp: new Date().toISOString(),
+                })
+              )
+
+              // Find last assistant message and attach metadata
+              const lastAssistantIdx = [...updated].reverse().findIndex((m) => m.role === 'assistant')
+              if (lastAssistantIdx >= 0) {
+                const idx = updated.length - 1 - lastAssistantIdx
+                const target = updated[idx]
+                if (target) {
+                  updated[idx] = {
+                    ...target,
+                    id: target.id ?? crypto.randomUUID(),
+                    metadata: {
+                      phase,
+                      evaluation_passed: evaluationPassed,
+                      seed_id: seedId,
+                      duration_ms: durationMs,
+                      tool_calls: Array.isArray(toolCalls) ? toolCalls : [],
+                    },
+                  }
+                }
+              }
+
+              return { messages: [...updated, ...toolMessages], isStreaming: false }
+            })
+
+            if (sid) {
+              set({ _lastDoneSessionId: sid, activeSessionId: sid })
             }
-
-            return { messages: [...updated, ...toolMessages], isStreaming: false }
-          })
-
-          if (sid) {
-            set({ _lastDoneSessionId: sid, activeSessionId: sid })
+            if (vid) {
+              set({ activeProjectId: vid, _lastDoneProjectId: vid })
+            }
+            break
           }
-          if (vid) {
-            set({ activeProjectId: vid, _lastDoneProjectId: vid })
+          case 'error': {
+            const err = chunk.error ?? 'Unknown error'
+            set({ isStreaming: false })
+            // Don't inline error into message — will be shown as toast
+            break
           }
-        } else if (chunk.type === 'error') {
-          const err = chunk.error ?? 'Unknown error'
-          set({ isStreaming: false })
-          // Don't inline error into message — will be shown as toast
         }
       },
     }),
