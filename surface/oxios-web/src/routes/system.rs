@@ -881,6 +881,351 @@ pub(crate) async fn handle_config_put(
     Ok(Json(body))
 }
 
+// ---------------------------------------------------------------------------
+// PATCH /api/config — Partial config update with hot-reload metadata
+// ---------------------------------------------------------------------------
+
+/// List of top-level config sections whose fields are **fully hot-reloadable**
+/// (every field in the section can be applied without restarting the daemon).
+///
+/// Each entry is `(section_name, restart_scope)`. `restart_scope` describes
+/// the runtime subsystem that needs to pick up the change (used in logs and
+/// tooltips on the frontend).
+const HOT_RELOADABLE_SECTIONS: &[(&str, &str)] = &[
+    ("exec", "exec_api"),
+    ("security", "security"),
+    ("scheduler", "scheduler"),
+    ("resource_monitor", "resource_monitor"),
+    ("orchestrator", "orchestrator"),
+    ("context", "context"),
+    ("session", "session"),
+    ("logging", "logging"),
+    ("audit", "audit"),
+    ("kernel", "kernel"),
+];
+
+/// Subset of fields that always require a restart even inside a
+/// hot-reloadable section (e.g. `memory.embedding.provider` swaps a
+/// model that was loaded at boot).
+const RESTART_REQUIRED_FIELDS: &[&str] = &[
+    "memory.embedding.provider",
+    "memory.embedding.dimension",
+    "memory.sqlite.path",
+    "memory.sqlite.embedding_dim",
+    "memory.bridge.sync_enabled",
+    "memory.bridge.interval_secs",
+    "engine.default_model",
+    "engine.api_key",
+    "engine.provider_options",
+    "engine.routing_enabled",
+    "engine.prefer_cost_efficient",
+    "engine.fallback_models",
+    "engine.excluded_models",
+    "gateway.host",
+    "gateway.port",
+    "daemon.pid_file",
+    "daemon.log_dir",
+    "channels.enabled",
+    "channels.telegram.bot_token_env",
+    "channels.telegram.allowed_users",
+    "channels.telegram.session.rotation_hours",
+    "channels.telegram.session.max_messages",
+    "surfaces",
+    "otel.enabled",
+    "otel.endpoint",
+    "otel.service_name",
+    "otel.sampling_ratio",
+    "cron",
+    "mcp",
+    "browser",
+    "persona",
+    "marketplace",
+    "budget",
+    "git",
+    "memory.consolidation.preset",
+];
+
+/// Response body for `PATCH /api/config`.
+#[derive(Debug, Serialize, Clone)]
+pub(crate) struct ConfigPatchResponse {
+    /// Echo of the saved patch (deep-merged view of the modified config).
+    pub config: serde_json::Value,
+    /// Hot-reload classification of the changes that were applied.
+    pub hot_reload: HotReloadReport,
+}
+
+/// Hot-reload classification of a config patch.
+#[derive(Debug, Serialize, Clone)]
+pub(crate) struct HotReloadReport {
+    /// Dotted field paths that were applied to running subsystems immediately.
+    pub applied_immediately: Vec<String>,
+    /// Dotted field paths that require a daemon restart to take full effect.
+    pub requires_restart: Vec<String>,
+    /// Total number of changed fields (sum of both lists).
+    pub total_changed: usize,
+}
+
+/// Classify a JSON patch against the current config into hot-reloadable vs
+/// restart-required field paths. Walks both `base` and `patch` recursively,
+/// emitting the dotted path of every key whose value actually changed.
+fn classify_patch(
+    base: &serde_json::Value,
+    patch: &serde_json::Value,
+    prefix: &str,
+    applied: &mut Vec<String>,
+    restart: &mut Vec<String>,
+) {
+    use serde_json::Value;
+    let Value::Object(patch_map) = patch else {
+        return;
+    };
+    for (key, patch_val) in patch_map {
+        let path = if prefix.is_empty() {
+            key.clone()
+        } else {
+            format!("{prefix}.{key}")
+        };
+
+        // Recurse into nested objects so we report the exact changed field.
+        if patch_val.is_object() {
+            let base_child = base.get(key).cloned().unwrap_or(Value::Null);
+            classify_patch(&base_child, patch_val, &path, applied, restart);
+            continue;
+        }
+
+        // Scalar / array — compare for actual change.
+        let base_val = base.get(key);
+        if base_val == Some(patch_val) {
+            continue;
+        }
+
+        if is_restart_required(&path) {
+            restart.push(path);
+        } else {
+            applied.push(path);
+        }
+    }
+}
+
+/// Returns true if a dotted config path requires a daemon restart to apply.
+fn is_restart_required(path: &str) -> bool {
+    if RESTART_REQUIRED_FIELDS.iter().any(|p| *p == path) {
+        return true;
+    }
+    // Top-level sections not in HOT_RELOADABLE_SECTIONS are restart-only.
+    let top = path.split('.').next().unwrap_or(path);
+    !HOT_RELOADABLE_SECTIONS.iter().any(|(s, _)| *s == top)
+}
+
+/// `PATCH /api/config` — Partial config update.
+///
+/// Body: a subset of `OxiosConfig` (e.g. `{"exec": {"allowlist_mode":
+/// "enforced"}}`). The patch is deep-merged into the current config so
+/// sections and fields the caller omits are preserved.
+///
+/// Response includes a `hot_reload` object classifying which changed
+/// fields were applied immediately and which require a daemon restart.
+pub(crate) async fn handle_config_patch(
+    state: State<Arc<AppState>>,
+    Json(body): Json<serde_json::Value>,
+) -> Result<Json<ConfigPatchResponse>, AppError> {
+    tracing::info!("Config PATCH requested");
+
+    if !body.is_object() {
+        return Err(AppError::BadRequest(
+            "PATCH body must be a JSON object".into(),
+        ));
+    }
+
+    // Snapshot the current config as JSON for both merging and classification.
+    let mut current_value = {
+        let cfg = state.config.read();
+        serde_json::to_value(&*cfg).map_err(|e| {
+            tracing::error!(error = %e, "Failed to serialize current config");
+            AppError::Internal("failed to serialize current config".into())
+        })?
+    };
+
+    // Capture the pre-merge value so we can detect which fields actually changed.
+    let before_patch = current_value.clone();
+
+    // Deep-merge the patch into the current config.
+    deep_merge_json(&mut current_value, body.clone());
+
+    // Classify every changed field into hot-reloadable vs restart-required.
+    let mut applied: Vec<String> = Vec::new();
+    let mut restart: Vec<String> = Vec::new();
+    classify_patch(&before_patch, &body, "", &mut applied, &mut restart);
+    applied.sort();
+    restart.sort();
+
+    // Validate the merged result.
+    let updated: oxios_kernel::OxiosConfig = match serde_json::from_value(current_value.clone()) {
+        Ok(cfg) => cfg,
+        Err(e) => {
+            tracing::warn!(error = %e, "Invalid config shape");
+            return Err(AppError::BadRequest(format!("Invalid config: {e}")));
+        }
+    };
+    let (errors, warnings) = updated.validate();
+    for w in &warnings {
+        tracing::warn!(config_warning = %w, "Config validation warning");
+    }
+    if !errors.is_empty() {
+        let msg = errors.join("; ");
+        tracing::warn!(error = %msg, "Config validation failed");
+        return Err(AppError::BadRequest(format!("Invalid config: {msg}")));
+    }
+
+    // Persist merged config to disk.
+    let content = toml::to_string_pretty(&updated)
+        .map_err(|e: toml::ser::Error| AppError::Internal(e.to_string()))?;
+    if let Err(e) = tokio::fs::write(&state.config_path, content).await {
+        tracing::error!(error = %e, "Failed to persist config");
+        return Err(AppError::Internal(e.to_string()));
+    }
+    tracing::info!(path = %state.config_path.display(), "Config persisted");
+
+    // Hot-reload in-memory config.
+    *state.config.write() = updated.clone();
+
+    // Propagate hot-reloadable slices to kernel subsystems.
+    *state.kernel.exec.shared_config().write() = updated.exec.clone();
+    state.kernel.infra.scheduler().update_config(
+        updated.scheduler.max_concurrent,
+        updated.scheduler.rate_limit_per_minute,
+        updated.scheduler.zombie_timeout_secs,
+    );
+    use oxios_kernel::resource_monitor::OverloadThreshold;
+    state.kernel.infra.resource_monitor().set_overload_threshold(OverloadThreshold {
+        cpu_percent: updated.resource_monitor.cpu_threshold,
+        memory_percent: updated.resource_monitor.memory_threshold,
+        load_avg: updated.resource_monitor.load_threshold,
+    });
+
+    let total = applied.len() + restart.len();
+    tracing::info!(
+        applied = applied.len(),
+        restart = restart.len(),
+        "Config PATCH applied"
+    );
+
+    Ok(Json(ConfigPatchResponse {
+        config: body,
+        hot_reload: HotReloadReport {
+            applied_immediately: applied,
+            requires_restart: restart,
+            total_changed: total,
+        },
+    }))
+}
+
+#[cfg(test)]
+mod patch_tests {
+    //! Unit tests for the PATCH /api/config hot-reload classification.
+
+    use super::{classify_patch, is_restart_required};
+    use serde_json::json;
+
+    #[test]
+    fn classify_hot_reloadable_field() {
+        let base = json!({"exec": {"allowed_commands": ["ls", "cat"]}});
+        let patch = json!({"exec": {"allowed_commands": ["ls", "cat", "rg"]}});
+        let mut applied = Vec::new();
+        let mut restart = Vec::new();
+        classify_patch(&base, &patch, "", &mut applied, &mut restart);
+        assert_eq!(applied, vec!["exec.allowed_commands"]);
+        assert!(restart.is_empty());
+    }
+
+    #[test]
+    fn classify_restart_required_field() {
+        let base = json!({"gateway": {"port": 4200}});
+        let patch = json!({"gateway": {"port": 4300}});
+        let mut applied = Vec::new();
+        let mut restart = Vec::new();
+        classify_patch(&base, &patch, "", &mut applied, &mut restart);
+        assert!(applied.is_empty());
+        assert_eq!(restart, vec!["gateway.port"]);
+    }
+
+    #[test]
+    fn classify_mixed_changes() {
+        // `exec.allowed_commands` is hot-reloadable, `gateway.port` is not.
+        let base = json!({
+            "exec": {"allowed_commands": ["ls"]},
+            "gateway": {"port": 4200},
+        });
+        let patch = json!({
+            "exec": {"allowed_commands": ["ls", "rg"]},
+            "gateway": {"port": 4300},
+        });
+        let mut applied = Vec::new();
+        let mut restart = Vec::new();
+        classify_patch(&base, &patch, "", &mut applied, &mut restart);
+        applied.sort();
+        restart.sort();
+        assert_eq!(applied, vec!["exec.allowed_commands"]);
+        assert_eq!(restart, vec!["gateway.port"]);
+    }
+
+    #[test]
+    fn classify_skips_unchanged_fields() {
+        // Patch contains a value equal to the base — should not be reported.
+        let base = json!({"exec": {"allowed_commands": ["ls"]}});
+        let patch = json!({"exec": {"allowed_commands": ["ls"]}});
+        let mut applied = Vec::new();
+        let mut restart = Vec::new();
+        classify_patch(&base, &patch, "", &mut applied, &mut restart);
+        assert!(applied.is_empty());
+        assert!(restart.is_empty());
+    }
+
+    #[test]
+    fn classify_recurses_into_nested_objects() {
+        // Memory embedding provider change → restart-required.
+        let base = json!({
+            "memory": {"embedding": {"provider": "gguf", "dimension": 256}}
+        });
+        let patch = json!({
+            "memory": {"embedding": {"provider": "mlx", "dimension": 256}}
+        });
+        let mut applied = Vec::new();
+        let mut restart = Vec::new();
+        classify_patch(&base, &patch, "", &mut applied, &mut restart);
+        assert!(applied.is_empty());
+        assert_eq!(restart, vec!["memory.embedding.provider"]);
+    }
+
+    #[test]
+    fn unknown_top_level_section_is_restart_required() {
+        // `otel` is not in HOT_RELOADABLE_SECTIONS.
+        assert!(is_restart_required("otel.enabled"));
+        assert!(is_restart_required("otel.endpoint"));
+    }
+
+    #[test]
+    fn hot_reloadable_sections_are_immediate() {
+        assert!(!is_restart_required("exec.allowed_commands"));
+        assert!(!is_restart_required("security.cors_origins"));
+        assert!(!is_restart_required("scheduler.max_concurrent"));
+        assert!(!is_restart_required("audit.max_entries"));
+    }
+
+    #[test]
+    fn channels_telegram_session_requires_restart() {
+        // Telegram channel is launched at boot — session changes need restart.
+        assert!(is_restart_required("channels.telegram.session.rotation_hours"));
+        assert!(is_restart_required("channels.telegram.allowed_users"));
+    }
+
+    #[test]
+    fn memory_consolidation_preset_requires_restart() {
+        // Preset triggers `apply_preset()` which mutates many sibling fields.
+        assert!(is_restart_required("memory.consolidation.preset"));
+    }
+}
+
 #[cfg(test)]
 mod deep_merge_tests {
     use super::deep_merge_json;

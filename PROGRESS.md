@@ -216,3 +216,27 @@ test coverage and a polished UI.
 - `surface/oxios-web/web/package.json` — `rehype-highlight`,
   `highlight.js`
 - `bun.lock` (or `bun.lockb`) — locked new deps
+
+---
+
+## Date: 2026-06-04
+
+## Status: 🚧 IN PROGRESS — RFC-T1-D Settings UI Completion (MVP)
+
+### Baseline
+- `cargo check --workspace` — passes (after `bun run build` so
+  `web/dist/` exists for `rust-embed`)
+- `cargo test -p oxios-web --lib` — 24/24 pass (includes 4 pre-existing
+  `deep_merge_tests`)
+- `bun run typecheck` — **54 pre-existing errors** (none in our target
+  files; pre-existing baseline for this session)
+- `bun run build` — succeeds (after `bun install`)
+
+### Plan
+- Track 1: PATCH `/api/config` + `hot_reload` metadata + unit tests
+- Track 2: `field-defs.ts` + `restart-badge.tsx` + `diff-preview.tsx`
+- Track 3: Restructure `settings.tsx` with group sidebar + sticky save bar
+- Track 4: 5 new section groups (exec.allowlist, security.*, memory.*,
+  channels.telegram, audit.*)
+- Track 5: i18n (~40 EN keys; Korean deferred)
+- Track 6: E2E test in `e2e/settings.spec.ts`
