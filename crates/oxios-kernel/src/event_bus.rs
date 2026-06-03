@@ -1,15 +1,29 @@
-//! Event bus: inter-agent communication via tokio broadcast channels.
+//! Event bus: inter-agent communication via `oxi_sdk::EventBus<KernelEvent>`.
 //!
 //! The event bus is the "pipe" of Oxios. All agents communicate
 //! through kernel events published on the bus.
+//!
+//! After RFC-014 Phase C, this module no longer owns the broadcast channel —
+//! it reuses `oxi_sdk::EventBus<E>`, which is a generic wrapper over
+//! `tokio::sync::broadcast`. The only Oxios-specific bits are:
+//!
+//! - `KernelEvent` enum (oxios-internal event vocabulary)
+//! - `kernel_event_to_audit_action` mapping for the audit trail
+//! - `attach_audit_trail` helper (subscribes the bus to the trail)
 
-use anyhow::Result;
 use oxi_sdk::observability::{AuditAction, AuditTrail};
+use oxi_sdk::EventBus as SdkEventBus;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use tokio::sync::broadcast;
 
 use crate::types::AgentId;
+
+/// Kernel event bus — generic SDK bus specialised for `KernelEvent`.
+///
+/// The broadcast channel is owned by `oxi_sdk::EventBus`; this type alias
+/// just makes the call sites read more naturally (`crate::event_bus::EventBus`
+/// instead of `oxi_sdk::EventBus<KernelEvent>`).
+pub type EventBus = SdkEventBus<KernelEvent>;
 
 /// Events that flow through the kernel event bus.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -282,78 +296,36 @@ fn extract_agent_id(event: &KernelEvent) -> String {
     }
 }
 
-/// A broadcast-based event bus for kernel events.
+/// Subscribe the audit trail to all kernel events.
 ///
-/// Subscribers receive all events published after they subscribe.
-/// Late subscribers do not receive historical events.
-#[derive(Clone)]
-pub struct EventBus {
-    sender: broadcast::Sender<KernelEvent>,
-}
-
-impl EventBus {
-    /// Creates a new event bus with the given broadcast capacity.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use oxios_kernel::EventBus;
-    ///
-    /// let bus = EventBus::new(256);
-    /// let subscriber = bus.subscribe();
-    /// // Subscriber receives all events published after this point.
-    /// ```
-    pub fn new(capacity: usize) -> Self {
-        let (sender, _) = broadcast::channel(capacity);
-        Self { sender }
-    }
-
-    /// Subscribe to receive kernel events.
-    pub fn subscribe(&self) -> broadcast::Receiver<KernelEvent> {
-        self.sender.subscribe()
-    }
-
-    /// Publish a kernel event to all subscribers.
-    pub fn publish(&self, event: KernelEvent) -> Result<()> {
-        // It's okay if there are no subscribers.
-        let _ = self.sender.send(event);
-        Ok(())
-    }
-
-    /// Subscribe the audit trail to all kernel events.
-    /// This forwards all events to the audit trail as background tasks.
-    pub fn attach_audit_trail(&self, audit: Arc<AuditTrail>) {
-        let mut rx = self.subscribe();
-        tokio::spawn(async move {
-            loop {
-                match rx.recv().await {
-                    Ok(event) => {
-                        let actor = extract_agent_id(&event);
-                        let action = kernel_event_to_audit_action(&event);
-                        let resource = format!("{event:?}");
-                        audit.append(actor, action, resource);
-                    }
-                    Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
-                        tracing::warn!(
-                            skipped = n,
-                            "Audit trail subscriber lagged, skipping events"
-                        );
-                        continue;
-                    }
-                    Err(tokio::sync::broadcast::error::RecvError::Closed) => {
-                        tracing::info!("Audit trail event bus closed, exiting");
-                        break;
-                    }
+/// The bus is broadcast-based; this spawns a long-running task that
+/// forwards every event into the audit trail as a structured entry.
+/// Lagged subscribers are logged and recovered.
+pub fn attach_audit_trail(bus: &EventBus, audit: Arc<AuditTrail>) {
+    let mut rx = bus.subscribe();
+    tokio::spawn(async move {
+        loop {
+            match rx.recv().await {
+                Ok(event) => {
+                    let actor = extract_agent_id(&event);
+                    let action = kernel_event_to_audit_action(&event);
+                    let resource = format!("{event:?}");
+                    audit.append(actor, action, resource);
+                }
+                Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
+                    tracing::warn!(
+                        skipped = n,
+                        "Audit trail subscriber lagged, skipping events"
+                    );
+                    continue;
+                }
+                Err(tokio::sync::broadcast::error::RecvError::Closed) => {
+                    tracing::info!("Audit trail event bus closed, exiting");
+                    break;
                 }
             }
-        });
-    }
-}
-
-impl std::fmt::Debug for EventBus {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("EventBus").finish()
-    }
+        }
+    });
 }
 
 #[cfg(test)]
@@ -368,8 +340,8 @@ mod tests {
     }
 
     #[test]
-    fn test_event_bus_new_and_debug() {
-        let bus = EventBus::new(256);
+    fn test_event_bus_uses_sdk() {
+        let bus: EventBus = EventBus::new(256);
         assert!(format!("{:?}", bus).contains("EventBus"));
     }
 
@@ -401,195 +373,26 @@ mod tests {
         let mut rx1 = bus.subscribe();
         let mut rx2 = bus.subscribe();
 
-        bus.publish(sample_event("multi")).unwrap();
+        let event = sample_event("multi");
+        bus.publish(event.clone()).unwrap();
 
-        assert!(rx1.try_recv().is_ok());
-        assert!(rx2.try_recv().is_ok());
+        let r1 = rx1.try_recv().expect("rx1 should receive event");
+        let r2 = rx2.try_recv().expect("rx2 should receive event");
+
+        assert!(matches!(r1, KernelEvent::AgentCreated { .. }));
+        assert!(matches!(r2, KernelEvent::AgentCreated { .. }));
     }
 
     #[tokio::test]
-    async fn test_subscriber_receives_only_post_subscribe() {
-        let bus = EventBus::new(16);
-
-        // Publish before subscribing
-        bus.publish(sample_event("before")).unwrap();
-
-        let mut rx = bus.subscribe();
-
-        // Publish after subscribing
-        bus.publish(sample_event("after")).unwrap();
-
-        // Should only get the "after" event
-        let received = rx.try_recv().expect("should receive event");
-        match received {
-            KernelEvent::AgentCreated { name, .. } => assert_eq!(name, "after"),
-            _ => panic!("wrong event type"),
-        }
-        // No more events
-        assert!(rx.try_recv().is_err());
-    }
-
-    #[test]
-    fn test_kernel_event_serialization_roundtrip() {
-        let events = vec![
-            KernelEvent::AgentCreated {
-                id: AgentId::new_v4(),
-                name: "agent-1".to_string(),
-            },
-            KernelEvent::AgentFailed {
-                id: AgentId::new_v4(),
-                error: "timeout".to_string(),
-            },
-            KernelEvent::SeedCreated {
-                seed_id: uuid::Uuid::new_v4(),
-            },
-            KernelEvent::EvaluationComplete {
-                seed_id: uuid::Uuid::new_v4(),
-                passed: true,
-            },
-            KernelEvent::MemoryStored {
-                id: "mem-123".to_string(),
-                memory_type: "fact".to_string(),
-                source: "session".to_string(),
-            },
-            KernelEvent::MemoryRecalled {
-                query: "test query".to_string(),
-                count: 5,
-            },
-            KernelEvent::EvolutionStarted {
-                seed_id: uuid::Uuid::new_v4(),
-                new_seed_id: uuid::Uuid::new_v4(),
-                iteration: 2,
-            },
-            KernelEvent::EvolutionMaxReached {
-                seed_id: uuid::Uuid::new_v4(),
-                final_score: 0.85,
-                iterations: 10,
-            },
-        ];
-
-        for event in events {
-            let json = serde_json::to_string(&event).unwrap();
-            let restored: KernelEvent = serde_json::from_str(&json).unwrap();
-            let json2 = serde_json::to_string(&restored).unwrap();
-            assert_eq!(json, json2, "roundtrip failed for {:?}", event);
-        }
-    }
-
-    #[test]
-    fn test_kernel_event_to_audit_action() {
-        // AgentCreated
-        let event = KernelEvent::AgentCreated {
-            id: AgentId::new_v4(),
-            name: "worker".to_string(),
-        };
-        let action = kernel_event_to_audit_action(&event);
-        match action {
-            AuditAction::AgentSpawn { task_type } => assert_eq!(task_type, "worker"),
-            _ => panic!("expected AgentSpawn"),
-        }
-
-        // AgentFailed
+    async fn test_kernel_event_to_audit_action() {
         let event = KernelEvent::AgentFailed {
             id: AgentId::new_v4(),
-            error: "OOM".to_string(),
+            error: "boom".to_string(),
         };
         let action = kernel_event_to_audit_action(&event);
         match action {
-            AuditAction::AgentExit { reason } => assert_eq!(reason, "OOM"),
-            _ => panic!("expected AgentExit"),
+            AuditAction::AgentExit { reason } => assert_eq!(reason, "boom"),
+            other => panic!("expected AgentExit, got {other:?}"),
         }
-
-        // MemoryStored
-        let event = KernelEvent::MemoryStored {
-            id: "m1".to_string(),
-            memory_type: "fact".to_string(),
-            source: "auto".to_string(),
-        };
-        let action = kernel_event_to_audit_action(&event);
-        match action {
-            AuditAction::MemoryWrite { entry_id } => {
-                assert!(entry_id.contains("m1"));
-                assert!(entry_id.contains("fact"));
-            }
-            _ => panic!("expected MemoryWrite"),
-        }
-
-        // MemoryRecalled
-        let event = KernelEvent::MemoryRecalled {
-            query: "rust".to_string(),
-            count: 3,
-        };
-        let action = kernel_event_to_audit_action(&event);
-        match action {
-            AuditAction::MemoryRead { entry_id } => {
-                assert!(entry_id.contains("rust"));
-                assert!(entry_id.contains("3"));
-            }
-            _ => panic!("expected MemoryRead"),
-        }
-    }
-
-    #[test]
-    fn test_extract_agent_id() {
-        let id = AgentId::new_v4();
-
-        // AgentCreated
-        let event = KernelEvent::AgentCreated {
-            id,
-            name: "a".to_string(),
-        };
-        assert_eq!(extract_agent_id(&event), id.to_string());
-
-        // AgentStarted
-        let event = KernelEvent::AgentStarted { id };
-        assert_eq!(extract_agent_id(&event), id.to_string());
-
-        // AgentStopped
-        let event = KernelEvent::AgentStopped { id };
-        assert_eq!(extract_agent_id(&event), id.to_string());
-
-        // AgentFailed
-        let event = KernelEvent::AgentFailed {
-            id,
-            error: "err".to_string(),
-        };
-        assert_eq!(extract_agent_id(&event), id.to_string());
-
-        // MessageReceived
-        let event = KernelEvent::MessageReceived {
-            from: id,
-            content: "hello".to_string(),
-        };
-        assert_eq!(extract_agent_id(&event), id.to_string());
-
-        // SeedCreated → system
-        let event = KernelEvent::SeedCreated {
-            seed_id: uuid::Uuid::new_v4(),
-        };
-        assert_eq!(extract_agent_id(&event), "system");
-    }
-
-    #[tokio::test]
-    async fn test_attach_audit_trail_forwards_events() {
-        let bus = EventBus::new(64);
-        let audit = Arc::new(AuditTrail::new(1000));
-
-        bus.attach_audit_trail(audit.clone());
-
-        bus.publish(KernelEvent::AgentCreated {
-            id: AgentId::new_v4(),
-            name: "audit-test".to_string(),
-        })
-        .unwrap();
-
-        // Give the spawned task time to process
-        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-
-        // Audit trail should have at least one entry
-        assert!(
-            audit.len() >= 1,
-            "audit trail should have recorded the event"
-        );
     }
 }

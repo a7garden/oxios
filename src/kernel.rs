@@ -777,7 +777,7 @@ impl KernelBuilder {
             config.resource_monitor.history_max,
         ));
 
-        event_bus.attach_audit_trail(audit_trail.clone());
+        oxios_kernel::event_bus::attach_audit_trail(&event_bus, audit_trail.clone());
 
         // Restore persisted audit entries.
         if let Ok(entries) = state_store.load() {

@@ -63,6 +63,7 @@ impl HyperbolicConfig {
     /// so this accessor is not needed by callers of those functions.
     /// It remains available for code that needs the positive curvature
     /// value directly (e.g., computing ball radius `1/√c`).
+    #[allow(dead_code)]
     fn c(&self) -> f32 {
         self.curvature.abs()
     }

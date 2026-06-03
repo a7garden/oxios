@@ -9,7 +9,9 @@
 
 use std::path::PathBuf;
 
-use super::{Project, ProjectId, ProjectSource};
+use super::{Project, ProjectId};
+#[cfg(test)]
+use super::ProjectSource;
 
 /// Result of a project lookup attempt.
 #[derive(Debug)]

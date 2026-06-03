@@ -254,7 +254,7 @@ impl CompactionTree {
             None => format!("[Root summary from {} entries]", entries.len()),
         };
 
-        format!("{}\n{}", header, compacted)
+        format!("{header}\n{compacted}")
     }
 
     /// Simple rule-based compaction: preserve first/last sentences of each
@@ -295,7 +295,6 @@ impl CompactionTree {
         }
 
         // Strategy: keep structural lines + head + tail
-        let mut kept: Vec<String> = Vec::new();
         let mut kept_indices = std::collections::HashSet::new();
 
         // 1. Always preserve section markers (lines starting with # or ---)
@@ -366,7 +365,7 @@ impl CompactionTree {
             if last_idx >= 0 && (idx as isize) > last_idx + 1 {
                 // Gap detected — add omission marker
                 let omitted = idx - (last_idx as usize) - 1;
-                result.push(format!("... ({} lines omitted) ...", omitted));
+                result.push(format!("... ({omitted} lines omitted) ..."));
             }
             result.push(lines[idx].to_string());
             last_idx = idx as isize;
@@ -375,7 +374,7 @@ impl CompactionTree {
         // Trailing omitted lines
         if (last_idx as usize) < lines.len() - 1 {
             let omitted = lines.len() - 1 - (last_idx as usize);
-            result.push(format!("... ({} lines omitted) ...", omitted));
+            result.push(format!("... ({omitted} lines omitted) ..."));
         }
 
         result.join("\n")
