@@ -747,3 +747,99 @@ ce79b43 refactor(web): rename channel to bridge in web surface
 3. **Phase E 완료**: oxi-sdk `native-browser` 활성화 (upstream PR 머지 후)
 
 4. **CHANGELOG 업데이트**: `MemoryApi` (Phase C) breaking change 명시
+
+---
+
+## 11. RFC-017 청사진: Memory Extraction Strategy (남은 작업)
+
+본 RFC-016은 Phase A/C/D(부분)/E(부분) 완료 후 *막혔습니다*. Phase B의 *코드 추출*은 본질적으로 1-2주 작업이며 한 세션에 완성 불가능했습니다 (시도 1, 2, 3 모두 82→0→다시 깨짐의 동일 패턴 반복).
+
+남은 작업을 위한 **RFC-017 (memory-extraction-strategy)** 발행이 필요합니다. 그 청사진:
+
+### 11.1 blocker 정리
+
+| Blocker | 원인 | 의존성 |
+|------|------|------|
+| `MemoryManager.state_store: Arc<StateStore>` | `StateStore`가 50+ 곳에서 kernel 내부 사용 | trait 추상화 또는 types-only 분리 |
+| `MemoryManager.git_layer: Option<Arc<GitLayer>>` | `GitLayer`도 kernel 핵심 컴포넌트 | trait 추상화 |
+| `with_config(&MemoryConfig)` | `MemoryConfig`가 kernel::config에 정의 | config 이동 |
+| `database.rs: save_project/list_projects` | `Project` 타입이 kernel | sqlite_store.rs 분할 |
+| `migrate.rs: #[cfg(test)] StateStore::new` | 테스트가 kernel 타입 직접 사용 | trait mocks |
+
+### 11.2 옵션 (a): Trait 추상화 (1-2주)
+
+```rust
+// oxios-memory에 정의
+#[async_trait]
+pub trait MemoryStorage: Send + Sync {
+    async fn save_json_value(&self, ...) -> Result<()>;
+    async fn load_json_value(&self, ...) -> Result<Option<Value>>;
+    async fn list_category(&self, ...) -> Result<Vec<String>>;
+}
+
+#[async_trait]
+pub trait MemoryGit: Send + Sync {
+    async fn commit_file(&self, ...) -> Result<()>;
+    fn is_enabled(&self) -> bool;
+}
+
+// oxios-kernel에서 구현
+impl MemoryStorage for StateStore { ... }
+impl MemoryGit for GitLayer { ... }
+```
+
+**장점**: 정식 분리, type-safe. **단점**: dyn-trait 한계 (generic 메서드 불가 → `serde_json::Value` 변환 필요).
+
+### 11.3 옵션 (b): Types-only 단계적 (3-4주) — *권장*
+
+이미 main에 머지된 facade 패턴 확장:
+
+| 단계 | 내용 | 예상 작업량 |
+|------|------|------|
+| 11.3.1 | types-only oxios-memory (현재 facade) | 완료 |
+| 11.3.2 | `chunking`, `hyperbolic`, `normalizer` 모듈 이동 | 2-3일 |
+| 11.3.3 | `embedding` 모듈 이동 (TfIdfEmbeddingProvider) | 2-3일 |
+| 11.3.4 | `root_index`, `quota` 모듈 이동 | 1일 |
+| 11.3.5 | `decay`, `auto_classify`, `auto_protect` 모듈 이동 | 2-3일 |
+| 11.3.6 | `compaction`, `flash_attention`, `graph` 모듈 이동 | 2-3일 |
+| 11.3.7 | `MemoryStorage` trait + `StateStore` impl (kernel 잔류) | 3-4일 |
+| 11.3.8 | `MemoryManager` 이동 (impl trait) | 3-5일 |
+| 11.3.9 | sqlite backend 이동 (`SqliteMemoryStore`) | 2-3일 |
+| 11.3.10 | `migrate`, `dream` 이동 (orchestration) | 3-5일 |
+
+각 단계가 *독립적으로 컴파일 가능*하고 *테스트 통과*하는 상태를 유지.
+
+**장점**: 매 단계가 PR 가능, 회귀 없음. **단점**: 더 많은 PR, 더 오래.
+
+### 11.4 옵션 (c): 점진 추출 (4-6주)
+
+옵션 (b)와 유사하지만 *의존성 그래프*의 leaf부터 시작:
+1. 의존성 0: `chunking`, `cosine_similarity_f32` — pure math
+2. 의존성 1: `MemoryType`, `MemoryTier`, `ProtectionLevel` — 단순 enum
+3. 의존성 2: `MemoryEntry` — 다른 type들을 가짐
+4. ... 단계적 확장
+
+### 11.5 권장 순서 (사용자 결정 대기)
+
+| 항목 | 결정 |
+|------|------|
+| 옵션 (a) 채택? | trait 추상화 = 1-2주 |
+| 옵션 (b) 채택? | types-only 단계적 = 3-4주 (각 단계 PR 가능) |
+| 옵션 (c) 채택? | leaf부터 점진 = 4-6주 |
+| **권장** | **(b) — 11.3.2부터 시작** |
+
+### 11.6 Phase E 완성
+
+`oxi-sdk` v0.26.2 → v0.25.x 다운그레이드로 upstream `browse_session_tool` 중복 정의 회피. 또는 `oxi-agent` PR:
+
+```rust
+// oxi-agent/src/tools/browse/mod.rs 수정:
+// line 19: #[cfg(feature = "native-browser")] pub mod browse_session_tool;
+// 의 line 19는 duplicate. line 8이 line 19의 superset이 되도록 정리.
+```
+
+### 11.7 즉시 다음 작업
+
+1. **RFC-017 발행**: 본 §11을 기반으로 별도 RFC 작성
+2. **11.3.2 시작**: `chunking`, `normalizer`, `hyperbolic` 모듈을 oxios-memory로 이동
+3. **oxi-sdk 다운그레이드 시도**: `Cargo.toml`에서 `oxi-sdk = "0.25.8"` 등으로 변경하여 browser 일원화 완성
