@@ -152,6 +152,7 @@ describe('useChatStore handleChunk (RFC-015)', () => {
       tool_name: 'browse',
       tool_call_id: 'c1',
       progress: 'navigating to example.com',
+      tab_id: 'tab-abc-123',
     })
     const last = useChatStore.getState().messages.at(-1)!
     // Progress must merge into the existing tool_call (not append a new one).
@@ -163,9 +164,34 @@ describe('useChatStore handleChunk (RFC-015)', () => {
       toolCallId: 'c1',
       progress: 'navigating to example.com',
       isRunning: true,
+      tabId: 'tab-abc-123',
     })
     // Original toolArgs from tool_start are preserved across the merge.
     expect(toolActivities[0]!.toolArgs).toEqual({ url: 'https://example.com' })
+  })
+
+  it('tool_progress chunk without tab_id omits tabId on the activity', () => {
+    // Legacy oxi-agent versions don't emit tab_id; the resulting activity
+    // must not have tabId at all (not tabId: undefined), so the frontend
+    // ActivityCard doesn't render a badge.
+    useChatStore.getState().handleChunk({
+      type: 'tool_start',
+      tool_name: 'browse',
+      tool_call_id: 'c1',
+      tool_args: {},
+    })
+    useChatStore.getState().handleChunk({
+      type: 'tool_progress',
+      tool_name: 'browse',
+      tool_call_id: 'c1',
+      progress: 'step 1',
+    })
+    const last = useChatStore.getState().messages.at(-1)!
+    const toolActivities = last.activities!.filter((a) => a.type === 'tool_call')
+    expect(toolActivities).toHaveLength(1)
+    expect(toolActivities[0]!.tabId).toBeUndefined()
+    // Defensive: the key should not even be present on the object literal.
+    expect('tabId' in toolActivities[0]!).toBe(false)
   })
 
   it('subsequent tool_progress replaces the prior progress text', () => {

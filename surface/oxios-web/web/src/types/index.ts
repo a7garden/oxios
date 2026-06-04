@@ -203,6 +203,10 @@ export interface ChatActivity {
   /// True while a tool is still running. Drives the spinner in
   /// `ActivityCard` and is cleared on `tool_end`.
   isRunning?: boolean
+  /// Browser tab id that produced this tool call (when the upstream tool
+  /// is tab-aware, e.g. browser). Rendered as a short badge in
+  /// `ActivityCard` so users can distinguish concurrent tab activity.
+  tabId?: string
   // memory
   memoryAction?: 'recall' | 'store'
   query?: string
@@ -276,6 +280,10 @@ export interface StreamChunk {
   is_error?: boolean
   /// Human-readable progress text (RFC-015 v0.12).
   progress?: string
+  /// Browser tab id (when the upstream tool is tab-aware, e.g. browser).
+  /// Absent on legacy oxi-agent versions; the frontend treats absence
+  /// as "no badge".
+  tab_id?: string
   action?: 'recall' | 'store'
   query?: string
   count?: number

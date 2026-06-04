@@ -14,14 +14,6 @@ interface PersistedState {
   activeProjectId: string | null
 }
 
-/** Stub for Phase 2 AI detection. Currently always null. */
-interface AiDetectionState {
-  /** Project detected from user message (Phase 2: populated by backend detection). */
-  detectedProject: import('@/types').Project | null
-  /** Dismissed project IDs (don't show badge again for these). */
-  dismissedProjectIds: string[]
-}
-
 const PERSIST_KEY = 'oxios-chat-persist'
 
 // ---------------------------------------------------------------------------
@@ -118,6 +110,7 @@ function chunkToActivity(chunk: StreamChunk): ChatActivity | null {
         toolCallId: chunk.tool_call_id,
         progress: chunk.progress,
         isRunning: true,
+        ...(chunk.tab_id ? { tabId: chunk.tab_id } : {}),
       }
     case 'tool_end':
       return {
@@ -600,7 +593,6 @@ export const useChatStore = create<ChatStore>()(
             break
           }
           case 'error': {
-            const err = chunk.error ?? 'Unknown error'
             set({ isStreaming: false })
             // Don't inline error into message — will be shown as toast
             break

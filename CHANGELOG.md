@@ -19,10 +19,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Audit-action detail string appends `:tab=<id>` when the tab is known.
 - **OxiBrowser Observability v0.12 — Phase 5 (tab-id propagation, web backend)** — The oxios-web chat transparency timeline now distinguishes concurrent tabs by id.
   - The `tool_progress` WS chunk (and `/api/events` SSE event) include `tab_id` when the upstream `KernelEvent::ToolExecutionProgress` carries it. The field is omitted from the JSON payload when the upstream is `None` so older oxi-agent versions still round-trip cleanly.
+- **OxiBrowser Observability v0.12 — Phase 5 (tab-id propagation, frontend)** — The `ActivityCard` header now shows a short tab-id badge for tool_call activities that carry a `tabId`.
+  - `StreamChunk.tool_progress.tab_id?` and `ChatActivity.tool_call.tabId?` (omitted from the activity object when `tab_id` is missing, so the spread doesn't introduce `tabId: undefined`).
+  - `ActivityCard` renders a monospace, muted `tabId.slice(0, 8)` span with a `title` attribute holding the full id.
 
 ### Changed
 - **Version bump to 1.0.4 (kernel)** — `oxios-kernel` bumped. Additive (new optional `tab_id` field on `KernelEvent::ToolExecutionProgress`); no API breaks.
 - **Version bump to 1.0.4 (web)** — `oxios-web` bumped. Additive (new optional `tab_id` on the `tool_progress` WS chunk and SSE event); no API breaks.
+
+### Fixed
+- **TSC error cleanup continued** — 3 remaining errors in v0.12-scope files removed: `chat-input.tsx` (unused `Loader2` import), `stores/chat.ts` (unused `AiDetectionState` interface, unused `err` local in the `error` chunk handler). Brings the tsc count to **0 errors** (down from 3 in v0.12-scope files).
 
 ### Changed
 - **Memory extraction (RFC-018 b.1)** — `chunking`, `normalizer`, `hyperbolic` modules moved from `oxios-kernel::memory` to `oxios-memory::memory`. The pure-math core is now a leaf crate; the cfg-gated SQLite persistence methods for hyperbolic embeddings are kept in `oxios-kernel::memory::hyperbolic_persist` as a kernel-side adapter. See `docs/rfc-018-memory-extraction-strategy.md` §3.

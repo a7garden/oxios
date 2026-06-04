@@ -47,6 +47,14 @@ export function ActivityCard({ activity, className }: ActivityCardProps) {
         {activity.type === 'tool_call' && activity.isRunning && (
           <Loader2 className="h-3 w-3 animate-spin text-muted-foreground shrink-0" />
         )}
+        {activity.type === 'tool_call' && activity.tabId && (
+          <span
+            className="text-[10px] text-muted-foreground/70 font-mono shrink-0"
+            title={`Browser tab ${activity.tabId}`}
+          >
+            {activity.tabId.slice(0, 8)}
+          </span>
+        )}
         {activity.type === 'tool_call' && activity.progress && (
           <span className="text-[10px] text-muted-foreground truncate max-w-[40ch]">
             {activity.progress}
