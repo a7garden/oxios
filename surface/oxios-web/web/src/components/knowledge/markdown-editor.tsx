@@ -33,6 +33,7 @@ import { wikilinkExtension } from '@/lib/wikilink-extension'
 import { EditorSelection } from '@codemirror/state'
 import { useKnowledgeTree } from '@/hooks/use-knowledge'
 import { buildAutocompleteDict, type FileEntry } from '@/lib/autocomplete-link'
+import { EMOJI_SHORTCODES } from '@/lib/emoji-shortcodes'
 import { cn } from '@/lib/utils'
 import { useKnowledgeStore } from '@/stores/knowledge'
 
@@ -90,15 +91,20 @@ function insertCheckmark(view: EditorView): boolean {
 
 // ─────────────────────────────────────────────────────────────────────────
 // Heading enforcement — keep first line as `# ` even after edit.
-// Gated by a module-level flag set by the parent component so the
-// enforcer does NOT fire while we're programmatically replacing the
-// document content (which would cause an infinite loop: the enforcer
-// dispatches a change → enforcer fires again → …).
+// Gated by a per-EditorView flag so the enforcer does NOT fire while
+// we're programmatically replacing the document content (which would
+// cause an infinite loop: the enforcer dispatches a change → enforcer
+// fires again → …).
+//
+// Per-view state is tracked via a WeakSet<EditorView>. Using a
+// module-level boolean (the previous design) was unsafe if more than
+// one MarkdownEditor ever mounted simultaneously — a programmatic
+// replacement on view A would suppress the enforcer for view B.
 // ─────────────────────────────────────────────────────────────────────────
-let _headingEnforcerSuspended = false
+const _headingEnforcerSuspended = new WeakSet<EditorView>()
 const headingEnforcer = EditorView.updateListener.of((update) => {
   if (!update.docChanged) return
-  if (_headingEnforcerSuspended) return
+  if (_headingEnforcerSuspended.has(update.view)) return
   const firstLine = update.state.doc.line(1)
   const text = firstLine.text
   if (!text.startsWith('# ')) {
@@ -169,18 +175,6 @@ function makeCompletionSource(
 }
 
 // Simple emoji dict (subset — extended in lib/emoji.ts)
-const EMOJI_DICT: Record<string, string> = {
-  heart: '❤️',
-  smile: '😄',
-  tada: '🎉',
-  '+1': '👍',
-  rocket: '🚀',
-  fire: '🔥',
-  check: '✅',
-  x: '❌',
-  warning: '⚠️',
-  bulb: '💡',
-}
 
 // ─────────────────────────────────────────────────────────────────────────
 // Link / wiki click handler — same semantics as HyperMD's hmdClick
@@ -270,7 +264,7 @@ export function MarkdownEditor({
   }, [treeEntries, currentFilePath])
 
   const completionSource = useMemo(
-    () => makeCompletionSource(autocompleteEntries, EMOJI_DICT),
+    () => makeCompletionSource(autocompleteEntries, EMOJI_SHORTCODES),
     [autocompleteEntries],
   )
 
@@ -327,7 +321,7 @@ export function MarkdownEditor({
     // cursor at the end of the old content) and producing unwanted
     // headings or selection drift.
     isSettingContent.current = true
-    _headingEnforcerSuspended = true
+    _headingEnforcerSuspended.add(view)
     view.dispatch({
       changes: { from: 0, to: current.length, insert: initialContent },
       selection: { anchor: 0 },
@@ -339,14 +333,14 @@ export function MarkdownEditor({
     // gate stay in place until the editor has fully settled.
     const releaseTimer = setTimeout(() => {
       isSettingContent.current = false
-      _headingEnforcerSuspended = false
+      _headingEnforcerSuspended.delete(view)
     }, 0)
     return () => {
       // Cleanup: if a new effect run supersedes us (e.g. fast file
       // switching), cancel the pending release and release now.
       clearTimeout(releaseTimer)
       isSettingContent.current = false
-      _headingEnforcerSuspended = false
+      _headingEnforcerSuspended.delete(view)
     }
   }, [initialContent])
 

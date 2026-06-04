@@ -39,11 +39,15 @@ import {
 } from '@codemirror/view'
 
 /**
- * Match `[[PageName]]` or `[[PageName|alias]]`.
- * The target is the part before `|` (or the whole inner text).
- * The display label is the part after `|` (or the target if no alias).
+ * Match `[[PageName]]` or `[[PageName|alias1|alias2|...]]`.
+ * The target is the part before the first `|`.
+ * The display label is the LAST pipe-separated segment.
+ * Multiple pipe-separated parts are all consumed (so `[[Foo|Bar|Baz]]`
+ * links to "Foo" but displays "Baz"). This is a small extension over
+ * HyperMD's `[[X|alias]]` two-part form — see the test plan in
+ * `e2e/knowledge-editor.spec.ts`.
  */
-const WIKILINK_RE = /\[\[([^\[\]\n|]+)(?:\|([^\[\]\n]+))?\]\]/g
+const WIKILINK_RE = /\[\[([^\[\]\n|]+)(?:\|([^\[\]\n]+))*\]\]/g
 
 class WikiLinkWidget extends WidgetType {
   constructor(
@@ -108,6 +112,8 @@ function buildDecorations(view: EditorView): DecorationSet {
       const crossesActive = startLine <= maxActive && endLine >= minActive
       if (crossesActive) continue
       const target = m[1].trim()
+      // m[2] is the LAST alias group (regex backreference holds the last
+      // iteration of the `*` group). If absent, fall back to target.
       const display = (m[2] ?? m[1]).trim()
       if (!target) continue
       builder.push(
