@@ -22,7 +22,7 @@ use super::auto_classify::AutoClassifier;
 use super::auto_protect::AutoProtector;
 use super::compaction::CompactionTree;
 use super::decay::DecayEngine;
-use super::root_index::RootIndex;
+use oxios_memory::memory::root_index::RootIndex;
 use super::{MemoryEntry, MemoryManager, MemoryTier, MemoryType, ProtectionLevel};
 
 // ---------------------------------------------------------------------------
@@ -1062,7 +1062,7 @@ impl DreamProcess {
         recent.truncate(20);
 
         for entry in &recent {
-            root.active_context.push(super::root_index::RootEntry {
+            root.active_context.push(oxios_memory::memory::root_index::RootEntry {
                 topic: entry.content.split('.').next().unwrap_or("").to_string(),
                 memory_type: entry.memory_type,
                 protection: entry.protection,
@@ -1079,7 +1079,7 @@ impl DreamProcess {
                 .next()
                 .unwrap_or(&entry.content)
                 .to_string();
-            root.topics.push(super::root_index::TopicEntry {
+            root.topics.push(oxios_memory::memory::root_index::TopicEntry {
                 name: first_sentence.clone(),
                 category: entry.memory_type.label().to_string(),
                 age_days: (now - entry.created_at).num_days() as u32,

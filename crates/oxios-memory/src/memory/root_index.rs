@@ -7,7 +7,7 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-use super::{MemoryType, ProtectionLevel};
+use super::types::{MemoryType, ProtectionLevel};
 
 // ---------------------------------------------------------------------------
 // RootIndex

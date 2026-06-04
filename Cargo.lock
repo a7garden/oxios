@@ -5470,6 +5470,7 @@ version = "1.0.2"
 dependencies = [
  "anyhow",
  "async-trait",
+ "chrono",
  "dirs 6.0.0",
  "hf-hub",
  "llama-gguf",
