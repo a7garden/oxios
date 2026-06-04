@@ -467,6 +467,52 @@ pub struct A2AMessageLogEntry {
     pub content: String,
 }
 
+/// A node in the A2A communication topology.
+///
+/// Represents a single agent, derived from the agent card registry.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TopologyNode {
+    /// Stable identifier (the agent name, used by the frontend as a node id).
+    pub id: String,
+    /// Display label.
+    pub label: String,
+    /// Lowercased status (e.g. "running", "idle", "stopped", "starting").
+    pub status: String,
+    /// Agent capabilities (e.g. ["code-review"]).
+    pub capabilities: Vec<String>,
+    /// Agent skills (e.g. ["rust", "python"]).
+    pub skills: Vec<String>,
+    /// ISO-8601 timestamp of the last observed message involving this
+    /// agent, or `None` if no recent activity.
+    pub last_seen: Option<String>,
+}
+
+/// An edge in the A2A communication topology.
+///
+/// Aggregates messages between a pair of agents over a recent
+/// time window. The `last_kind` is the type of the most recent
+/// message along this edge — useful for color-coding the edge.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TopologyEdge {
+    /// Source agent identifier (matches `TopologyNode.id`).
+    pub from: String,
+    /// Target agent identifier (matches `TopologyNode.id`).
+    pub to: String,
+    /// Number of messages between `from` and `to` in the window.
+    pub message_count_5m: u32,
+    /// Type of the most recent message along this edge.
+    pub last_kind: String,
+}
+
+/// Response shape for `/api/a2a/topology`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TopologyResponse {
+    /// Agents in the topology (nodes).
+    pub nodes: Vec<TopologyNode>,
+    /// Communication edges aggregated from the recent message log.
+    pub edges: Vec<TopologyEdge>,
+}
+
 /// A2A Protocol handler for inter-agent communication.
 #[derive(Clone)]
 pub struct A2AProtocol {
@@ -535,6 +581,21 @@ impl A2AProtocol {
                 .collect(),
             None => log.clone(),
         }
+    }
+
+    /// Returns message-log entries whose timestamp is within the last
+    /// `secs` seconds, most recent last.
+    ///
+    /// Used by the topology endpoint to derive edges from a sliding
+    /// window of recent activity.
+    pub fn recent_messages(&self, secs: u64) -> Vec<A2AMessageLogEntry> {
+        let now = Utc::now();
+        let cutoff = now - chrono::Duration::seconds(secs as i64);
+        let log = self.message_log.read();
+        log.iter()
+            .filter(|entry| entry.timestamp >= cutoff)
+            .cloned()
+            .collect()
     }
 
     /// Get or create a queue for the given agent.
@@ -955,5 +1016,147 @@ mod tests {
 
         let messages = a2a.receive_messages(to).await;
         assert_eq!(messages.len(), 1);
+    }
+
+    #[test]
+    fn test_recent_messages_filters_by_window() {
+        let bus = create_test_event_bus();
+        let a2a = A2AProtocol::new(bus);
+
+        // Append a recent log entry directly.
+        let recent_ts = Utc::now();
+        a2a.append_log(A2AMessageLogEntry {
+            from: Uuid::new_v4(),
+            to: Uuid::new_v4(),
+            message_type: "task_delegation".into(),
+            timestamp: recent_ts,
+            content: "recent".into(),
+        });
+
+        // Append an old log entry (10 minutes ago).
+        let old_ts = Utc::now() - chrono::Duration::seconds(600);
+        a2a.append_log(A2AMessageLogEntry {
+            from: Uuid::new_v4(),
+            to: Uuid::new_v4(),
+            message_type: "handshake".into(),
+            timestamp: old_ts,
+            content: "old".into(),
+        });
+
+        // 5-minute window should include only the recent entry.
+        let window = a2a.recent_messages(300);
+        assert_eq!(window.len(), 1);
+        assert_eq!(window[0].content, "recent");
+        assert_eq!(window[0].message_type, "task_delegation");
+
+        // 15-minute window should include both.
+        let wider = a2a.recent_messages(900);
+        assert_eq!(wider.len(), 2);
+
+        // 1-second window should include only very recent entries.
+        let narrow = a2a.recent_messages(1);
+        assert_eq!(narrow.len(), 1);
+        assert_eq!(narrow[0].content, "recent");
+    }
+
+    #[tokio::test]
+    async fn test_recent_messages_aggregates_fan_in_fan_out() {
+        // Mixed message kinds, multi-agent fan-in / fan-out aggregation.
+        let bus = create_test_event_bus();
+        let a2a = A2AProtocol::new(bus);
+
+        // Register three agents so the registry has names.
+        let orch = Uuid::new_v4();
+        let worker_a = Uuid::new_v4();
+        let worker_b = Uuid::new_v4();
+        for (id, name) in [
+            (orch, "orchestrator"),
+            (worker_a, "worker-a"),
+            (worker_b, "worker-b"),
+        ] {
+            a2a.registry
+                .register_agent(
+                    AgentCard::new(id, name, "test").with_status(AgentStatus::Running),
+                )
+                .await
+                .unwrap();
+        }
+
+        // orchestrator -> worker-a: 2x TaskDelegation
+        for _ in 0..2 {
+            a2a.append_log(A2AMessageLogEntry {
+                from: orch,
+                to: worker_a,
+                message_type: "task_delegation".into(),
+                timestamp: Utc::now(),
+                content: "do work".into(),
+            });
+        }
+
+        // orchestrator -> worker-b: 1x TaskDelegation, 1x StatusUpdate
+        a2a.append_log(A2AMessageLogEntry {
+            from: orch,
+            to: worker_b,
+            message_type: "task_delegation".into(),
+            timestamp: Utc::now(),
+            content: "do work b".into(),
+        });
+        a2a.append_log(A2AMessageLogEntry {
+            from: worker_b,
+            to: orch,
+            message_type: "status_update".into(),
+            timestamp: Utc::now(),
+            content: "50%".into(),
+        });
+
+        // worker-a -> orchestrator: 1x ResultSharing (fan-in)
+        a2a.append_log(A2AMessageLogEntry {
+            from: worker_a,
+            to: orch,
+            message_type: "result_sharing".into(),
+            timestamp: Utc::now(),
+            content: "done".into(),
+        });
+
+        // Now aggregate: 3 distinct (from,to) pairs, with the expected counts
+        // and the most-recent message_type for each edge.
+        let entries = a2a.recent_messages(300);
+        let mut aggregates: HashMap<(AgentId, AgentId), (u32, String)> = HashMap::new();
+        for entry in &entries {
+            let agg = aggregates
+                .entry((entry.from, entry.to))
+                .or_insert((0, String::new()));
+            agg.0 = agg.0.saturating_add(1);
+            agg.1 = entry.message_type.clone();
+        }
+
+        // orchestrator -> worker-a: count=2, last_kind=task_delegation
+        let e1 = aggregates.get(&(orch, worker_a)).expect("edge 1 missing");
+        assert_eq!(e1.0, 2, "orch->worker_a count");
+        assert_eq!(e1.1, "task_delegation", "orch->worker_a last_kind");
+
+        // orchestrator -> worker-b: count=1, last_kind=task_delegation
+        let e2 = aggregates
+            .get(&(orch, worker_b))
+            .expect("edge 2 missing");
+        assert_eq!(e2.0, 1, "orch->worker_b count");
+        assert_eq!(e2.1, "task_delegation", "orch->worker_b last_kind");
+
+        // worker-b -> orchestrator: count=1, last_kind=status_update
+        let e3 = aggregates
+            .get(&(worker_b, orch))
+            .expect("edge 3 missing");
+        assert_eq!(e3.0, 1, "worker_b->orch count");
+        assert_eq!(e3.1, "status_update", "worker_b->orch last_kind");
+
+        // worker-a -> orchestrator: count=1, last_kind=result_sharing (fan-in)
+        let e4 = aggregates
+            .get(&(worker_a, orch))
+            .expect("edge 4 missing");
+        assert_eq!(e4.0, 1, "worker_a->orch count");
+        assert_eq!(e4.1, "result_sharing", "worker_a->orch last_kind");
+
+        // Total of 4 distinct edges.
+        assert_eq!(aggregates.len(), 4);
     }
 }
