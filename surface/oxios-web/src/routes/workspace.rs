@@ -762,6 +762,21 @@ pub(crate) async fn handle_memory_list(
     Json(paginate(&entries, &params))
 }
 
+/// All memory categories the web UI may need to look up. Kept in sync
+/// with the iteration order used by `handle_memory_map` and the
+/// `MemoryType::category()` map in the kernel.
+const MEMORY_CATEGORIES: &[&str] = &[
+    "memory/facts",
+    "memory/episodes",
+    "memory/knowledge",
+    "memory/sessions",
+    "memory/conversations",
+    "memory/skills",
+    "memory/preferences",
+    "memory/decisions",
+    "memory/profiles",
+];
+
 /// GET /api/memory/:name — Get a specific memory entry.
 pub(crate) async fn handle_memory_get(
     state: State<Arc<AppState>>,
@@ -769,12 +784,7 @@ pub(crate) async fn handle_memory_get(
 ) -> Result<impl IntoResponse, AppError> {
     // Memory entries are stored as JSON, not markdown.
     // Try all known memory categories to find the entry.
-    for category in [
-        "memory/facts",
-        "memory/episodes",
-        "memory/knowledge",
-        "memory/sessions",
-    ] {
+    for category in MEMORY_CATEGORIES {
         if let Ok(Some(entry)) = state
             .kernel
             .state
@@ -817,20 +827,33 @@ struct MemoryMapCacheEntry {
     epoch: u64,
     /// Sorted ID list that was used to compute the projection.
     ids: Vec<String>,
+    /// 64-bit content hash over (id, content_hash, tier, mem_type) for
+    /// every entry in the projection. Detects content edits that do not
+    /// change the id-set (the projection depends on the actual TF-IDF
+    /// vectors, not just the set of entries).
+    content_signature: u64,
     /// Pre-computed map entries (coords_2d + neighbors).
     entries: Vec<oxios_kernel::memory::MemoryMapEntry>,
 }
 
 impl MemoryMapCache {
-    /// Try to get a cached entry. Returns `None` if the epoch is stale
-    /// or the ID set has changed.
-    fn get(&self, epoch: u64, ids: &[String]) -> Option<Vec<oxios_kernel::memory::MemoryMapEntry>> {
+    /// Try to get a cached entry. Returns `None` if the epoch is stale,
+    /// the ID set has changed, or the per-entry content signature differs.
+    fn get(
+        &self,
+        epoch: u64,
+        ids: &[String],
+        content_signature: u64,
+    ) -> Option<Vec<oxios_kernel::memory::MemoryMapEntry>> {
         let guard = self.inner.lock().ok()?;
         let entry = guard.as_ref()?;
         if entry.epoch != epoch {
             return None;
         }
         if entry.ids != ids {
+            return None;
+        }
+        if entry.content_signature != content_signature {
             return None;
         }
         Some(entry.entries.clone())
@@ -841,16 +864,45 @@ impl MemoryMapCache {
         &self,
         epoch: u64,
         ids: Vec<String>,
+        content_signature: u64,
         entries: Vec<oxios_kernel::memory::MemoryMapEntry>,
     ) {
         if let Ok(mut guard) = self.inner.lock() {
             *guard = Some(MemoryMapCacheEntry {
                 epoch,
                 ids,
+                content_signature,
                 entries,
             });
         }
     }
+}
+
+/// Compute a stable signature over the projection-relevant fields of
+/// each entry. Used as part of the memory-map cache key so that an
+/// edit to a memory's `content` (which does not change the id set)
+/// still invalidates the cache.
+fn memory_map_content_signature(entries: &[MemoryEntry]) -> u64 {
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::{Hash, Hasher};
+    let mut hasher = DefaultHasher::new();
+    // Sort by id for a stable hash independent of iteration order.
+    let mut sorted: Vec<&MemoryEntry> = entries.iter().collect();
+    sorted.sort_by(|a, b| a.id.cmp(&b.id));
+    for e in sorted {
+        e.id.hash(&mut hasher);
+        e.content.hash(&mut hasher);
+        // tier is a Copy enum; convert to a stable string for hashing.
+        let tier_str = match e.tier {
+            oxios_kernel::memory::MemoryTier::Hot => "hot",
+            oxios_kernel::memory::MemoryTier::Warm => "warm",
+            oxios_kernel::memory::MemoryTier::Cold => "cold",
+        };
+        tier_str.hash(&mut hasher);
+        // Use the singular label for parity with `mem_type` filtering.
+        e.memory_type.label().hash(&mut hasher);
+    }
+    hasher.finish()
 }
 
 /// Query parameters for the memory map endpoint.
@@ -897,13 +949,6 @@ pub(crate) async fn handle_memory_map(
         "memory/decisions",
         "memory/profiles",
     ] {
-        // Apply mem_type filter by category match.
-        if let Some(ref want) = params.mem_type {
-            let cat_short = category.split('/').nth(1).unwrap_or("");
-            if cat_short != want.as_str() {
-                continue;
-            }
-        }
         let Ok(names) = state.kernel.state.list_category(category).await else {
             continue;
         };
@@ -919,6 +964,15 @@ pub(crate) async fn handle_memory_map(
             else {
                 continue;
             };
+            // Per-entry filters: `mem_type` matches the singular label()
+            // (e.g. "fact") returned by the frontend, NOT the plural
+            // category short name ("facts"). The `tier` filter is
+            // matched in the same place for symmetry.
+            if let Some(ref want) = params.mem_type {
+                if entry.memory_type.label() != want.as_str() {
+                    continue;
+                }
+            }
             if let Some(ref want_tier) = params.tier {
                 let tier_str = match entry.tier {
                     oxios_kernel::memory::MemoryTier::Hot => "hot",
@@ -964,9 +1018,13 @@ async fn compute_memory_map_entries(
 
     let ids: Vec<String> = entries.iter().map(|e| e.id.clone()).collect();
     let epoch = current_epoch_secs() / MEMORY_MAP_EPOCH_SECS;
+    let content_signature = memory_map_content_signature(entries);
 
     // Cache lookup.
-    if let Some(cached) = state.memory_map_cache.get(epoch, &ids) {
+    if let Some(cached) = state
+        .memory_map_cache
+        .get(epoch, &ids, content_signature)
+    {
         return cached;
     }
 
@@ -1041,7 +1099,7 @@ async fn compute_memory_map_entries(
 
     state
         .memory_map_cache
-        .put(epoch, ids, map_entries.clone());
+        .put(epoch, ids, content_signature, map_entries.clone());
 
     map_entries
 }
@@ -1567,10 +1625,57 @@ mod tests {
     // MemoryMapCache (RFC-T1-B)
     // -----------------------------------------------------------------------
 
+    fn make_entry(id: &str) -> oxios_kernel::memory::MemoryMapEntry {
+        oxios_kernel::memory::MemoryMapEntry {
+            id: id.into(),
+            tier: "hot".into(),
+            mem_type: "fact".into(),
+            content_preview: "x".into(),
+            created_at: "2026-06-04T00:00:00Z".into(),
+            access_count: 0,
+            coords_2d: (0.0, 0.0),
+            top_neighbors: vec![],
+        }
+    }
+
+    fn make_memory_entry(
+        id: &str,
+        content: &str,
+        tier: oxios_kernel::memory::MemoryTier,
+        mem_type: oxios_kernel::memory::MemoryType,
+    ) -> MemoryEntry {
+        MemoryEntry {
+            id: id.into(),
+            memory_type: mem_type,
+            tier,
+            content: content.into(),
+            content_hash: oxios_kernel::memory::content_hash(content),
+            source: "test".into(),
+            session_id: None,
+            tags: vec![],
+            importance: 0.5,
+            pinned: false,
+            protection: oxios_kernel::memory::ProtectionLevel::None,
+            auto_classified: false,
+            session_appearances: 0,
+            user_corrected: false,
+            seen_in_sessions: vec![],
+            created_at: chrono::Utc::now(),
+            accessed_at: chrono::Utc::now(),
+            modified_at: chrono::Utc::now(),
+            access_count: 0,
+            decay_score: 1.0,
+            compaction_level: 0,
+            compacted_from: vec![],
+            related_ids: vec![],
+            contradicts: None,
+        }
+    }
+
     #[test]
     fn test_memory_map_cache_misses_on_empty() {
         let cache = MemoryMapCache::default();
-        assert!(cache.get(0, &[]).is_none());
+        assert!(cache.get(0, &[], 0).is_none());
     }
 
     #[test]
@@ -1602,8 +1707,23 @@ mod tests {
                 }],
             },
         ];
-        cache.put(42, ids.clone(), entries.clone());
-        let got = cache.get(42, &ids).expect("hit");
+        let entries_for_sig = vec![
+            make_memory_entry(
+                "a",
+                "alpha",
+                oxios_kernel::memory::MemoryTier::Hot,
+                oxios_kernel::memory::MemoryType::Fact,
+            ),
+            make_memory_entry(
+                "b",
+                "beta",
+                oxios_kernel::memory::MemoryTier::Warm,
+                oxios_kernel::memory::MemoryType::Episode,
+            ),
+        ];
+        let sig = memory_map_content_signature(&entries_for_sig);
+        cache.put(42, ids.clone(), sig, entries.clone());
+        let got = cache.get(42, &ids, sig).expect("hit");
         assert_eq!(got.len(), 2);
         assert_eq!(got[0].id, "a");
         assert_eq!(got[1].top_neighbors[0].similarity, 0.81);
@@ -1613,44 +1733,71 @@ mod tests {
     fn test_memory_map_cache_stale_epoch_misses() {
         let cache = MemoryMapCache::default();
         let ids = vec!["a".to_string()];
-        cache.put(
-            1,
-            ids.clone(),
-            vec![oxios_kernel::memory::MemoryMapEntry {
-                id: "a".into(),
-                tier: "hot".into(),
-                mem_type: "fact".into(),
-                content_preview: "x".into(),
-                created_at: "2026-06-04T00:00:00Z".into(),
-                access_count: 0,
-                coords_2d: (0.0, 0.0),
-                top_neighbors: vec![],
-            }],
-        );
-        assert!(cache.get(2, &ids).is_none());
+        cache.put(1, ids.clone(), 0, vec![make_entry("a")]);
+        assert!(cache.get(2, &ids, 0).is_none());
     }
 
     #[test]
     fn test_memory_map_cache_id_change_misses() {
         let cache = MemoryMapCache::default();
         let ids_a = vec!["a".to_string()];
-        cache.put(
-            1,
-            ids_a.clone(),
-            vec![oxios_kernel::memory::MemoryMapEntry {
-                id: "a".into(),
-                tier: "hot".into(),
-                mem_type: "fact".into(),
-                content_preview: "x".into(),
-                created_at: "2026-06-04T00:00:00Z".into(),
-                access_count: 0,
-                coords_2d: (0.0, 0.0),
-                top_neighbors: vec![],
-            }],
-        );
+        cache.put(1, ids_a.clone(), 0, vec![make_entry("a")]);
         // Same epoch, different id set => miss.
         let ids_b = vec!["a".to_string(), "b".to_string()];
-        assert!(cache.get(1, &ids_b).is_none());
+        assert!(cache.get(1, &ids_b, 0).is_none());
+    }
+
+    #[test]
+    fn test_memory_map_cache_content_change_misses() {
+        // P1-1: editing a memory's `content` (which does not change the
+        // id-set) must invalidate the cache. The signature is computed
+        // from the content text, so any content edit changes the hash.
+        let cache = MemoryMapCache::default();
+        let ids = vec!["a".to_string()];
+        let original = make_memory_entry(
+            "a",
+            "original content",
+            oxios_kernel::memory::MemoryTier::Hot,
+            oxios_kernel::memory::MemoryType::Fact,
+        );
+        let edited = make_memory_entry(
+            "a",
+            "edited content",
+            oxios_kernel::memory::MemoryTier::Hot,
+            oxios_kernel::memory::MemoryType::Fact,
+        );
+        let sig_original = memory_map_content_signature(&[original]);
+        let sig_edited = memory_map_content_signature(&[edited]);
+        assert_ne!(
+            sig_original, sig_edited,
+            "signature must differ when only the content changes"
+        );
+        cache.put(1, ids.clone(), sig_original, vec![make_entry("a")]);
+        // Same epoch, same id-set, but content changed => miss.
+        assert!(cache.get(1, &ids, sig_edited).is_none());
+        // Original signature still hits (defensive).
+        assert!(cache.get(1, &ids, sig_original).is_some());
+    }
+
+    #[test]
+    fn test_memory_map_content_signature_is_stable_under_reorder() {
+        // The signature is order-independent so iteration order from
+        // StateStore does not flip the cache key.
+        let a = make_memory_entry(
+            "a",
+            "alpha",
+            oxios_kernel::memory::MemoryTier::Hot,
+            oxios_kernel::memory::MemoryType::Fact,
+        );
+        let b = make_memory_entry(
+            "b",
+            "beta",
+            oxios_kernel::memory::MemoryTier::Warm,
+            oxios_kernel::memory::MemoryType::Episode,
+        );
+        let s1 = memory_map_content_signature(&[a.clone(), b.clone()]);
+        let s2 = memory_map_content_signature(&[b, a]);
+        assert_eq!(s1, s2);
     }
 
     #[test]
@@ -1671,5 +1818,55 @@ mod tests {
     fn test_content_preview_handles_empty() {
         let preview = content_preview("", 120);
         assert_eq!(preview, "");
+    }
+
+    // -----------------------------------------------------------------------
+    // handle_memory_map filter (P0-1)
+    // -----------------------------------------------------------------------
+    //
+    // The per-entry mem_type filter must compare against
+    // `MemoryType::label()` (singular: "fact", "episode", "knowledge", …),
+    // NOT the plural category short name ("facts", "episodes", …).
+    // The category short name is "memory/facts" → "facts" (plural), so
+    // a `params.mem_type = "fact"` filter must NOT match it.
+    //
+    // The 4-category vs 9-category scoping is tested at the route level
+    // (would require a full AppState harness); here we pin the label()
+    // values that the filter must use.
+
+    #[test]
+    fn test_memory_type_labels_match_filter_strings() {
+        // Every singular label here is what the frontend `<Select>`
+        // submits as `params.mem_type`. The filter must accept all of
+        // these against entries of the corresponding type.
+        let cases = [
+            (MemoryType::Fact, "fact"),
+            (MemoryType::Episode, "episode"),
+            (MemoryType::Knowledge, "knowledge"),
+            (MemoryType::Skill, "skill"),
+            (MemoryType::Preference, "preference"),
+            (MemoryType::Decision, "decision"),
+            (MemoryType::Conversation, "conversation"),
+            (MemoryType::Session, "session"),
+            (MemoryType::UserProfile, "user_profile"),
+        ];
+        for (mt, label) in cases {
+            assert_eq!(
+                mt.label(),
+                label,
+                "{mt:?} label must be the singular {label} (not the plural category)"
+            );
+            // Category short name is the plural — confirm they differ
+            // for every type except `Knowledge` (where they accidentally
+            // coincide; that is the only case the old, broken code
+            // happened to handle correctly).
+            let cat_short = mt.category().split('/').nth(1).unwrap_or("");
+            if mt != MemoryType::Knowledge {
+                assert_ne!(
+                    cat_short, label,
+                    "category short name ({cat_short}) must not equal label ({label})"
+                );
+            }
+        }
     }
 }

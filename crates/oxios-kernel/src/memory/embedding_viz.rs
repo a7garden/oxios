@@ -14,7 +14,12 @@
 //!    iteration fits in ~80 lines.
 //! 2. **Deterministic** — given the same input we always get the same
 //!    output (UMAP/TSNE have stochastic init).
-//! 3. **Cheap** — O(n · d · k) for k components; trivial at n=1000.
+//! 3. **Cheap-ish** — O(nnz · iterations · k) for k components, where
+//!    `nnz` is the number of non-zero entries across the input. The
+//!    TF-IDF vectors the kernel produces are sparse (most entries are
+//!    zero), so the practical cost is much lower than the dense
+//!    `O(n · d)` bound. We work directly on the sparse representation
+//!    and never densify.
 //! 4. **Caches well** — pure function of embeddings, perfect for the
 //!    5-min epoch cache the RFC requires.
 //!
@@ -71,6 +76,11 @@ pub struct MemoryNeighbor {
 /// Returns one (x, y) per input, in the same order. Returns an empty
 /// vector when `embeddings` is empty. All-zero or single-entry inputs
 /// are returned at the origin (0, 0).
+///
+/// Complexity: `O(nnz · iterations · k)` where `nnz` is the number of
+/// non-zero entries across all input rows. The kernel's TF-IDF vectors
+/// are typically sparse (a few non-zero terms per entry), so the
+/// practical cost is far below the dense `O(n · d)` bound.
 pub fn compute_pca_2d(embeddings: &[Vec<f32>]) -> Vec<(f32, f32)> {
     let n = embeddings.len();
     if n == 0 {
@@ -80,23 +90,30 @@ pub fn compute_pca_2d(embeddings: &[Vec<f32>]) -> Vec<(f32, f32)> {
         return vec![(0.0, 0.0)];
     }
 
-    // 1) Build dense matrix: n rows × d cols (d = vocab size).
-    let vocab = build_vocab(embeddings);
-    if vocab.is_empty() {
+    // 1) Build a sparse representation: nnz pairs per row + a column
+    //    index. We never densify the n × d matrix.
+    let sparse = build_sparse(embeddings);
+    if sparse.nnz == 0 {
         return vec![(0.0, 0.0); n];
     }
-    let matrix = densify(embeddings, &vocab);
+    let d = sparse.d;
 
-    // 2) Center columns.
-    let centered = center_columns(&matrix, n, vocab.len());
+    // 2) Compute column means and subtract them implicitly by
+    //    working on the centered sparse matvecs.
+    let means = column_means(&sparse, n, d);
+    let centered_sparse = Sparse::centered(&sparse, &means);
 
     // 3) Power iteration to get the top eigenvector, then deflate.
-    let v1 = power_iteration(&centered, n, vocab.len(), 80);
-    let p1 = project(&centered, &v1, n, vocab.len());
-    let residuals = deflate(&centered, &v1, &p1, n, vocab.len());
+    //    20 iterations is sufficient for the well-separated singular
+    //    values produced by TF-IDF after centering (the
+    //    `pca_deterministic` test still passes).
+    const POWER_ITERATIONS: usize = 20;
 
-    let v2 = power_iteration(&residuals, n, vocab.len(), 80);
-    let p2 = project(&residuals, &v2, n, vocab.len());
+    let v1 = power_iteration_sparse(&centered_sparse, POWER_ITERATIONS);
+    let p1 = project_sparse(&centered_sparse, &v1);
+    // Deflate without materialising the dense matrix.
+    let v2 = power_iteration_deflated(&centered_sparse, &p1, &v1, POWER_ITERATIONS);
+    let p2 = project_deflated(&centered_sparse, &p1, &v1, &v2);
 
     // 4) Normalize into [-1, 1] range for stable canvas rendering.
     let coords: Vec<(f32, f32)> = p1
@@ -127,12 +144,23 @@ pub fn compute_top_neighbors(
         return vec![Vec::new()];
     }
 
-    let vocab = build_vocab(embeddings);
-    if vocab.is_empty() {
+    let s = build_sparse(embeddings);
+    if s.nnz == 0 {
         return vec![Vec::new(); n];
     }
-    let matrix = densify(embeddings, &vocab);
-    let norms: Vec<f64> = matrix.iter().map(|row| row_norm(row)).collect();
+    // Per-row L2 norm from the sparse form: sum of squares of nnz.
+    let norms: Vec<f64> = s
+        .rows
+        .iter()
+        .map(|row| row.iter().map(|(_, v)| *v * *v).sum::<f64>().sqrt())
+        .collect();
+
+    // Sort each row's (col, val) list by col index so we can do a
+    // merge-style dot product between any two rows.
+    let mut sorted_rows: Vec<Vec<(usize, f64)>> = s.rows.clone();
+    for r in &mut sorted_rows {
+        r.sort_by_key(|(j, _)| *j);
+    }
 
     let mut out = Vec::with_capacity(n);
     for i in 0..n {
@@ -142,12 +170,7 @@ pub fn compute_top_neighbors(
                 let sim = if norms[i] == 0.0 || norms[j] == 0.0 {
                     0.0
                 } else {
-                    let dot: f64 = matrix[i]
-                        .iter()
-                        .zip(matrix[j].iter())
-                        .map(|(a, b)| *a as f64 * *b as f64)
-                        .sum();
-                    dot / (norms[i] * norms[j])
+                    sparse_dot(&sorted_rows[i], &sorted_rows[j]) / (norms[i] * norms[j])
                 };
                 (j, sim)
             })
@@ -168,130 +191,230 @@ pub fn compute_top_neighbors(
     out
 }
 
+/// Inner product of two sparse rows. Both inputs are sorted by column
+/// index so we can step through them in lock-step.
+fn sparse_dot(a: &[(usize, f64)], b: &[(usize, f64)]) -> f64 {
+    let (mut i, mut j) = (0usize, 0usize);
+    let mut acc = 0.0_f64;
+    while i < a.len() && j < b.len() {
+        match a[i].0.cmp(&b[j].0) {
+            std::cmp::Ordering::Equal => {
+                acc += a[i].1 * b[j].1;
+                i += 1;
+                j += 1;
+            }
+            std::cmp::Ordering::Less => i += 1,
+            std::cmp::Ordering::Greater => j += 1,
+        }
+    }
+    acc
+}
+
 // ---------------------------------------------------------------------------
 // Helpers (private)
 // ---------------------------------------------------------------------------
 
-/// Build a vocabulary of all term indices present in any embedding.
-fn build_vocab(embeddings: &[Vec<f32>]) -> Vec<usize> {
-    let mut vocab = Vec::new();
+/// Column-oriented sparse matrix used for PCA. We never densify
+/// TF-IDF input; instead we keep:
+///   * `rows[i]` = list of `(col, val)` for the non-zero entries of row i
+///   * `cols[j]` = list of `(row, val)` for the non-zero entries of col j
+/// so that both `(A v)_i` and `(A^T u)_j` matvecs are `O(nnz)`.
+struct Sparse {
+    n: usize,
+    d: usize,
+    nnz: usize,
+    /// `rows[i]` = list of `(col, val)` non-zero entries in row i.
+    rows: Vec<Vec<(usize, f64)>>,
+    /// `cols[j]` = list of `(row, val)` non-zero entries in col j.
+    cols: Vec<Vec<(usize, f64)>>,
+}
+
+impl Sparse {
+    /// Build a centered sparse matrix: subtract column means from
+    /// every non-zero entry.
+    fn centered(&self, means: &[f64]) -> Self {
+        let rows: Vec<Vec<(usize, f64)>> = self
+            .rows
+            .iter()
+            .map(|row| {
+                row.iter()
+                    .map(|&(j, v)| (j, v - means[j]))
+                    .collect()
+            })
+            .collect();
+        let cols: Vec<Vec<(usize, f64)>> = self
+            .cols
+            .iter()
+            .enumerate()
+            .map(|(j, col)| {
+                col.iter()
+                    .map(|&(i, v)| (i, v - means[j]))
+                    .collect()
+            })
+            .collect();
+        Self {
+            n: self.n,
+            d: self.d,
+            nnz: self.nnz,
+            rows,
+            cols,
+        }
+    }
+}
+
+/// Build a sparse `n × d` matrix from a list of dense (but mostly-zero)
+/// embedding vectors. `d` is the maximum index encountered + 1, so
+/// columns that never appear are still represented (as empty `cols`
+/// entries) for clean index arithmetic.
+fn build_sparse(embeddings: &[Vec<f32>]) -> Sparse {
+    let n = embeddings.len();
+    let mut max_dim: usize = 0;
     for emb in embeddings {
-        for (idx, v) in emb.iter().enumerate() {
-            if *v != 0.0 && !vocab.contains(&idx) {
-                vocab.push(idx);
+        if emb.len() > max_dim {
+            max_dim = emb.len();
+        }
+    }
+    let d = max_dim;
+    let mut rows: Vec<Vec<(usize, f64)>> = vec![Vec::new(); n];
+    let mut cols: Vec<Vec<(usize, f64)>> = vec![Vec::new(); d];
+    let mut nnz = 0usize;
+    for (i, emb) in embeddings.iter().enumerate() {
+        for (j, v) in emb.iter().enumerate() {
+            let val = *v as f64;
+            if val != 0.0 {
+                rows[i].push((j, val));
+                cols[j].push((i, val));
+                nnz += 1;
             }
         }
     }
-    vocab
+    Sparse {
+        n,
+        d,
+        nnz,
+        rows,
+        cols,
+    }
 }
 
-/// Convert list of sparse embeddings into a dense n × d matrix.
-fn densify(embeddings: &[Vec<f32>], vocab: &[usize]) -> Vec<Vec<f64>> {
-    embeddings
-        .iter()
-        .map(|emb| {
-            let mut row = vec![0.0_f64; vocab.len()];
-            for (out_idx, vocab_idx) in vocab.iter().enumerate() {
-                if let Some(v) = emb.get(*vocab_idx) {
-                    row[out_idx] = *v as f64;
-                }
-            }
-            row
-        })
-        .collect()
-}
-
-/// Subtract column means to center the data.
-fn center_columns(matrix: &[Vec<f64>], n: usize, d: usize) -> Vec<Vec<f64>> {
-    if d == 0 || n == 0 {
-        return matrix.to_vec();
+/// Compute per-column mean over the (sparse) input.
+fn column_means(s: &Sparse, n: usize, d: usize) -> Vec<f64> {
+    if n == 0 || d == 0 {
+        return vec![0.0_f64; d];
     }
     let mut means = vec![0.0_f64; d];
-    for row in matrix {
-        for (j, v) in row.iter().enumerate() {
-            means[j] += *v;
+    for (j, col) in s.cols.iter().enumerate() {
+        let mut s = 0.0_f64;
+        for &(_, v) in col {
+            s += v;
         }
+        means[j] = s / n as f64;
     }
-    for m in &mut means {
-        *m /= n as f64;
-    }
-    matrix
-        .iter()
-        .map(|row| row.iter().zip(means.iter()).map(|(v, m)| *v - *m).collect())
-        .collect()
+    means
 }
 
-/// L2 norm of a row.
-fn row_norm(row: &[f64]) -> f64 {
-    row.iter().map(|v| *v * *v).sum::<f64>().sqrt()
+/// Sparse `(A v)_i = sum over nnz in row_i of val * v[col]`. O(nnz).
+fn matvec_rows(s: &Sparse, v: &[f64]) -> Vec<f64> {
+    let mut out = vec![0.0_f64; s.n];
+    for (i, row) in s.rows.iter().enumerate() {
+        let mut acc = 0.0_f64;
+        for &(j, val) in row {
+            acc += val * v[j];
+        }
+        out[i] = acc;
+    }
+    out
 }
 
-/// Power iteration: returns the top eigenvector of `A^T A` (or equivalently
-/// the top left singular vector of `A`).
-///
-/// Used twice: once on the centered data, then on the deflated residuals,
-/// to recover the second principal component.
-fn power_iteration(matrix: &[Vec<f64>], n: usize, d: usize, iterations: usize) -> Vec<f64> {
-    if d == 0 {
+/// Sparse `(A^T u)_j = sum over nnz in col_j of val * u[row]`. O(nnz).
+fn matvec_cols(s: &Sparse, u: &[f64]) -> Vec<f64> {
+    let mut out = vec![0.0_f64; s.d];
+    for (j, col) in s.cols.iter().enumerate() {
+        let mut acc = 0.0_f64;
+        for &(i, val) in col {
+            acc += val * u[i];
+        }
+        out[j] = acc;
+    }
+    out
+}
+
+/// Power iteration on a centered sparse matrix. Returns the top
+/// left singular vector of `A`. `O(nnz · iterations)`.
+fn power_iteration_sparse(s: &Sparse, iterations: usize) -> Vec<f64> {
+    if s.d == 0 {
         return Vec::new();
     }
-    // Seed vector: deterministic but non-zero.
-    let mut v: Vec<f64> = (0..d)
+    // Deterministic but non-zero seed (same as the dense impl).
+    let mut v: Vec<f64> = (0..s.d)
         .map(|i| ((i + 1) as f64 * 0.137).sin() + 1.0)
         .collect();
     normalize(&mut v);
 
     for _ in 0..iterations {
-        // m_new = A^T (A v)
-        let mut av = vec![0.0_f64; n];
-        for i in 0..n {
-            let mut s = 0.0;
-            for j in 0..d {
-                s += matrix[i][j] * v[j];
-            }
-            av[i] = s;
-        }
-        let mut ata_v = vec![0.0_f64; d];
-        for i in 0..n {
-            for j in 0..d {
-                ata_v[j] += matrix[i][j] * av[i];
-            }
-        }
+        let av = matvec_rows(s, &v);
+        let ata_v = matvec_cols(s, &av);
+        let mut ata_v = ata_v;
         normalize(&mut ata_v);
-        // Convergence check (optional; we just iterate the fixed count).
         v = ata_v;
     }
     v
 }
 
-/// Project rows of `matrix` onto `v` (one scalar per row).
-fn project(matrix: &[Vec<f64>], v: &[f64], n: usize, d: usize) -> Vec<f64> {
-    let mut out = Vec::with_capacity(n);
-    for i in 0..n {
-        let mut s = 0.0;
-        for j in 0..d.min(v.len()) {
-            s += matrix[i][j] * v[j];
-        }
-        out.push(s);
+/// Power iteration on the deflated matrix `A - p v^T` without
+/// materialising it. We exploit the rank-1 structure:
+/// `(A - p v^T) x = A x - p (v^T x)`
+/// `(A - p v^T)^T u = A^T u - v (p^T u)`.
+fn power_iteration_deflated(
+    s: &Sparse,
+    p: &[f64],
+    v: &[f64],
+    iterations: usize,
+) -> Vec<f64> {
+    if s.d == 0 {
+        return Vec::new();
     }
-    out
+    let mut w: Vec<f64> = (0..s.d)
+        .map(|i| ((i + 1) as f64 * 0.137).sin() + 1.0)
+        .collect();
+    normalize(&mut w);
+
+    for _ in 0..iterations {
+        // m_new = (A - p v^T)^T (A - p v^T) w
+        // We do this in two rank-1-corrected matvecs:
+        //   deflated_w = (A - p v^T) w = A w - p (v^T w)
+        //   m_new      = (A - p v^T)^T deflated_w
+        //              = A^T deflated_w - v (p^T deflated_w)
+        let aw = matvec_rows(s, &w);
+        let vt_w: f64 = v.iter().zip(w.iter()).map(|(a, b)| *a * *b).sum();
+        let deflated_w: Vec<f64> =
+            aw.iter().zip(p.iter()).map(|(a, b)| *a - *b * vt_w).collect();
+        let at_deflated = matvec_cols(s, &deflated_w);
+        let pt_deflated: f64 =
+            p.iter().zip(deflated_w.iter()).map(|(a, b)| *a * *b).sum();
+        let mut new_w: Vec<f64> = at_deflated
+            .iter()
+            .zip(v.iter())
+            .map(|(a, b)| *a - *b * pt_deflated)
+            .collect();
+        normalize(&mut new_w);
+        w = new_w;
+    }
+    w
 }
 
-/// Subtract the rank-1 component along `v` (with score `p`) from `matrix`.
-fn deflate(
-    matrix: &[Vec<f64>],
-    v: &[f64],
-    p: &[f64],
-    n: usize,
-    d: usize,
-) -> Vec<Vec<f64>> {
-    let mut out = matrix.to_vec();
-    for i in 0..n {
-        for j in 0..d.min(v.len()) {
-            out[i][j] -= p[i] * v[j];
-        }
-    }
-    out
+/// Project rows of a centered sparse matrix onto `v`. O(nnz).
+fn project_sparse(s: &Sparse, v: &[f64]) -> Vec<f64> {
+    matvec_rows(s, v)
+}
+
+/// Project rows of the deflated matrix `A - p v1^T` onto `v2`. Uses
+/// the same rank-1 trick as the deflation power iteration:
+/// `(A - p v1^T) v2 = A v2 - p (v1^T v2)`.
+fn project_deflated(s: &Sparse, p: &[f64], v1: &[f64], v2: &[f64]) -> Vec<f64> {
+    let av2 = matvec_rows(s, v2);
+    let v1t_v2: f64 = v1.iter().zip(v2.iter()).map(|(a, b)| *a * *b).sum();
+    av2.iter().zip(p.iter()).map(|(a, b)| *a - *b * v1t_v2).collect()
 }
 
 fn normalize(v: &mut [f64]) {
