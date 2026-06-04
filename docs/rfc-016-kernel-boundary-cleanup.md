@@ -78,7 +78,6 @@ crates/oxios-kernel/src/memory/         29 files / 13,360 LoC
 2. **KernelHandle에 `MemoryApi` 신설** — memory 관련 13개 API에 14번째 추가.
 3. **명칭/잔재 6건 정리**.
 4. **Default feature 단순화** — `sqlite-memory`를 oxios-kernel에서 oxios-memory로 이동.
-5. **Browser 일원화 (Phase E)** — oxi-sdk의 `native_browser_tools()`로 browser 도구 *일원화*. kernel의 `BrowserTool`/`BrowserApi` *제거*. **AGENTS.md "oxi-sdk 재구현 금지" 위반 해소**.
 
 ### 비목표 (의식적 보류)
 
@@ -87,7 +86,6 @@ crates/oxios-kernel/src/memory/         29 files / 13,360 LoC
 - `oxios-mcp` 흡수하지 않는다. 1,458 LoC, 3 files로 크기는 작지만 흡수는 별도 결정이 필요.
 - `oxios-kernel`을 "`oxios-kernel-core` + `oxios-kernel`"로 쪼개지 않는다. 이름이 분리가 아닌 분장(扮裝)이 된다.
 - kernel이 큰 것 자체는 정상으로 간주한다 ("the core"는 큰 법이다).
-- oxi-sdk의 browser 도구(browse/browse_extract/browse_session)를 *oxios의 커스텀 도구로 재구현*하지 않는다. 커스터마이즈가 필요하면 oxi-sdk에 PR을 올리는 것을 원칙으로 한다.
 
 ---
 
@@ -366,81 +364,6 @@ otel      = ["oxios-kernel/otel", "dep:opentelemetry", "dep:opentelemetry_sdk"]
 - 사용자가 `--features oxios-memory/gguf` 같은 *per-crate* 기능 게이트를 명시할 수 있다.
 - binary(`oxios`)의 default는 web+cli+browser로 줄여 임베디드/서버 빌드를 명확히 한다.
 
-### 3.5 Browser 일원화 (Phase E)
-
-#### 3.5.1 결정
-
-> **oxi-sdk의 `native_browser_tools()`로 browser 도구를 *일원화*한다.** `oxios-kernel`의 `BrowserTool`/`BrowserApi`는 *완전히 제거*한다. 이로써 AGENTS.md의 "oxi-sdk 재구현 금지" 위반을 해소한다.
-
-#### 3.5.2 제거 대상
-
-```
-crates/oxios-kernel/src/tools/browser/                          (전체 디렉터리)
-    mod.rs
-    browser_tool.rs
-
-crates/oxios-kernel/src/kernel_handle/browser_api.rs           (단일 파일)
-
-crates/oxios-kernel/src/lib.rs                                 (BrowserTool, BrowserApi re-export 제거)
-crates/oxios-kernel/src/tools/mod.rs                            (pub mod browser; 제거)
-crates/oxios-kernel/src/tools/kernel_bridge.rs                   ("browser" in tool_names; browser 등록 코드 제거)
-crates/oxios-kernel/src/tools/registration.rs                   (browser 등록 로직 제거)
-crates/oxios-kernel/Cargo.toml                                 (oxibrowser-core direct dep 제거; browser feature 제거)
-
-src/kernel.rs                                                   (build_browser_api() / build_browser_api_value() 제거)
-```
-
-**`oxibrowser-core` direct 의존도 제거.** oxi-sdk가 transitive하게 가져오므로, oxios가 *직접* 의존할 이유가 없다.
-
-#### 3.5.3 추가 대상 (binary에서 oxi-sdk 호출)
-
-```
-src/kernel.rs:
-    fn build_browser_tool_registry(config: &OxiosConfig) -> Option<Arc<ToolRegistry>> {
-        if !config.browser.enabled {
-            return None;
-        }
-        // oxi-sdk의 BrowseConfig와 OxiosConfig::BrowserConfig를 매핑
-        let browse_config = map_browser_config(&config.browser);
-        Some(oxi_sdk::native_browser_tools_with_config(browse_config).await?)
-    }
-
-    // KernelBuilder가 ToolRegistry를 받아 agent builder에 전달
-    let agent_builder = oxi_sdk::AgentBuilder::new()
-        .kernel_tools(bridge)
-        .with_optional_browser(build_browser_tool_registry(&config));
-```
-
-핵심: **binary가 `KernelBuilder` 단계가 아니라 `AgentBuilder` 단계에서 browser를 등록**한다. kernel은 browser state를 *모름*.
-
-#### 3.5.4 config 매핑
-
-`OxiosConfig::BrowserConfig`는 *유지* (사용자 노출 config 보존). binary의 `map_browser_config()`가 우리 `BrowserConfig` → oxi-sdk의 `BrowseConfig`로 변환한다. 사용자 facing config schema는 *안 바뀜* (breaking change 아님).
-
-필드 매핑은 *구현 시* 세부 결정. RFC는 *방향*만 명시.
-
-#### 3.5.5 BrowserApi shutdown 처리
-
-kernel의 `BrowserApi`는 `shutdown()` 메서드를 가진다 (graceful cleanup). oxi-sdk의 `native_browser_tools()`는 shutdown hook을 *명시 제공하지 않는다* — oxi-agent의 `OxiBrowserEngine`이 `oxibrowser_core::Browser`를 소유하므로, 마지막 `ToolRegistry` 참조가 drop될 때 자동으로 `close()`가 호출된다 (Drop impl 가정, 검증 필요). binary에 명시적 shutdown hook이 필요하면 oxi-sdk에 *PR을 올려 추가*하는 것을 원칙으로 한다 (AGENTS.md "oxi-sdk 재구현 금지" 준수).
-
-#### 3.5.6 영향
-
-- **`oxios_kernel::BrowserApi` 타입 *제거*** — public surface 깨짐. binary는 내부 consumer였으므로 직접 영향.
-- **`oxios_kernel::BrowserTool` 타입 *제거*** — `kernel_bridge.rs::tool_names()`에서 "browser" 사라짐. agent 입장에서는 *도구 이름이 바뀜*:
-  - 이전: 단일 `"browser"` tool
-  - 이후: `oxi-sdk`의 `"browse"`, `"browse_extract"`, `"browse_session"`, `"browse_script"` (4개)
-  - **에이전트의 tool 선택 행동이 바뀜** — 단일 generic 도구 대신 4개의 specialized 도구. prompt에 따라 자동으로 더 적합한 도구 선택. 단, *에이전트가 기존 `browser` 도구를 호출하던 prompt는 깨짐*.
-- **`oxios-kernel` features에서 `browser` 제거** — root의 `browser = ["oxios-kernel/browser"]`는 `browser = ["oxi-sdk/native-browser"]`로 재정의.
-- **`OxiosConfig::BrowserConfig`는 유지** — 사용자 config schema 보존. 필드 의미가 oxi-sdk 의미로 자동 매핑됨.
-
-#### 3.5.7 CHANGELOG 항목 (breaking)
-
-- `oxios_kernel::BrowserApi` *removed*. Use `oxi_sdk::native_browser_tools()` instead.
-- `oxios_kernel::BrowserTool` *removed*. Browser capability now provided by `oxi-sdk`.
-- `oxios-kernel` feature `browser` *removed*. Use root feature `browser` (which now enables `oxi-sdk/native-browser`).
-- `oxios-kernel` direct dependency on `oxibrowser-core` *removed* (now transitive via `oxi-sdk`).
-- Tool name migration: `browser` → `browse` / `browse_extract` / `browse_session` / `browse_script` (4 separate tools).
-
 ---
 
 ## 4. 마이그레이션 순서
@@ -573,59 +496,6 @@ tools/retrieval.rs
 
 **→ 테스트 코드 추가 수정 불필요.**
 
-### 5.5 Browser 일원화 (Phase E) 영향
-
-**제거되는 public 표면:**
-
-```rust
-// 다음 타입들이 oxios-kernel에서 사라진다:
-oxios_kernel::BrowserApi                // kernel_handle::BrowserApi
-oxios_kernel::BrowserTool               // tools::browser::BrowserTool
-oxios_kernel::features::browser         // Cargo feature
-oxios_kernel::BrowserConfig             // config::BrowserConfig → oxi-sdk의 BrowseConfig로 대체
-oxios_kernel::BrowserApi::from_config   // factory
-oxios_kernel::BrowserApi::browser       // accessor
-oxios_kernel::BrowserApi::shutdown      // graceful cleanup
-```
-
-**추가되는 호출 surface (binary → oxi-sdk):**
-
-```rust
-// binary의 src/kernel.rs에서:
-oxi_sdk::native_browser_tools_with_config(browse_config)  // 도구 세트 생성
-oxi_sdk::AgentBuilder::native_browser()                   // agent builder에 등록
-```
-
-**도구 이름 변경 (breaking for agents):**
-
-| 이전 | 이후 |
-|------|------|
-| `browser` (단일, 다목적) | `browse` (단순 read) |
-|                          | `browse_extract` (구조화 추출) |
-|                          | `browse_session` (영구 세션) |
-|                          | `browse_script` (YAML 스크립트) |
-
-**config schema:** 변경 없음 (사용자 facing `~/.oxios/config.toml`의 `[browser]` 섹션은 그대로). 단, `browser.engine.*` 필드명이 oxi-sdk의 `BrowseConfig`로 자동 매핑됨. *구현 시* 매핑 테이블 명세.
-
-**의존성 그래프 변화:**
-
-```diff
-  oxios-kernel:
--   oxibrowser-core = "0.9.1"  # direct
--   [features]
--   browser = []
--   native-browser = ["oxi-sdk/native-browser"]
-+   # browser 관련 모든 의존성 제거
-+
-+  루트 oxios:
-+   [features]
-+   browser = ["oxi-sdk/native-browser"]  # 의미 변경: kernel의 것이 아니라 oxi-sdk의 것
-```
-
-**AGENTS.md 위반 해소:**
-- "oxi-sdk 재구현 금지" 위반 → 해소.
-- oxios의 browser 코드는 *설정 매핑 함수*와 *config 스키마 유지*만 남는다. 실제 browser 로직은 oxi-sdk가 *유일한* 소유자.
-
 ---
 
 ## 6. 리스크
@@ -694,70 +564,9 @@ Ouroboros는 *leaf crate*다 (kernel이 ouroboros를 호출). 이름은 "the bra
 - Phase B (oxios-memory 추출): 2일
 - Phase C (MemoryApi): 1일
 - Phase D (default feature): 0.5일
-- Phase E (Browser 일원화): 1.5일 (제거 + oxi-sdk 통합 + config 매핑 + e2e 검증)
-- **합계: ~6일** (테스트/CI 디버깅 포함)
+- **합계: ~4.5일** (테스트/CI 디버깅 포함)
 
 각 Phase는 독립 PR로 머지 가능. 순서대로 머지하지 않아도 되지만, **Phase A는 Phase B 이전에** 끝내야 *경로 일관성*이 보장된다.
-
-### 7.5 *삭제됨* — §7.6으로 대체
-
-(이전 진단에서 §7.5는 "`browser` feature의 no-op이 bug이므로 `oxi-sdk/native-browser`로 연결하면 silent fix가 된다"고 주장했으나, 사용자 질문과 코드 검증으로 이 가정이 *틀렸음*이 확인되어 §7.6 *Browser 일원화 (Phase E)* 으로 대체한다.)
-
-### 7.6 Browser 일원화 (Phase E) — 결정 기록
-
-> **이 섹션은 *본 RFC의 일부* (Phase E, §3.5)의 결정 근거를 적는다.** 이전 섹션(§7.5)에서는 "browser는 별도 RFC로" 제안했으나, 본 RFC에 *흡수*하는 것으로 결정이 *역전*되었다 (2026-06-04 사용자 결정).
-
-#### 검증된 사실 (코드 재검증, 2026-06-04)
-
-**oxi-sdk는 자체 browser 도구 세트를 가지고 있다:**
-
-```
-oxi-sdk/src/agent_builder.rs
-    native_browser(self) -> Self
-    native_browser_tools_with_config(...)
-oxi-sdk/src/tool_factory.rs
-    native_browser_tools() -> Arc<ToolRegistry>
-    native_browser_tools_with_config(...)
-oxi-agent/src/tools/browse/
-    browse_tool.rs           → "browse"
-    browse_extract_tool.rs   → "browse_extract"
-    browse_session_tool.rs   → "browse_session"
-    oxibrowser_backend.rs    → OxiBrowserEngine (oxibrowser-core 래퍼)
-```
-
-**oxios-kernel은 *별도의* browser 도구를 가진다:**
-
-```
-oxios-kernel/src/tools/browser/browser_tool.rs   → 단일 "browser" tool
-oxios-kernel/src/kernel_handle/browser_api.rs    → BrowserApi (lazy init, lifecycle)
-```
-
-**둘 다 `oxibrowser-core`를 백엔드로 사용한다.** 차이:
-
-| 측면 | oxi-sdk의 native browser | oxios-kernel의 BrowserTool |
-|------|--------------------------|----------------------------|
-| 등록 tool 이름 | `browse`, `browse_extract`, `browse_session` (다수) | `browser` (단일, 다목적) |
-| 백엔드 엔진 | `OxiBrowserEngine` (oxi-agent) | `oxibrowser_core::Browser` (직접) |
-| 게이트 feature | `oxi-sdk/native-browser` | `oxios-kernel/browser` (현재 no-op) |
-| lifecycle 관리 | oxi-agent 내부 | kernel의 `BrowserApi` |
-| 설정 노출 | `oxi_sdk::BrowseConfig` | `oxios_kernel::BrowserConfig` |
-
-**현재 상태:** `kernel_bridge.rs::tool_names()`는 `"browser"` (kernel 버전) *하나만* 등록. `oxi-sdk::native_browser_tools()`는 *어디에서도 호출되지 않는다* (rg 확인). oxi-sdk의 browse/browse_extract/browse_session은 *dead path*.
-
-#### AGENTS.md 위반
-
-AGENTS.md는 "oxi-sdk 재구현 금지"라고 못 박는다. oxios-kernel의 `BrowserTool`/`BrowserApi`는 oxi-sdk의 `native_browser_tools()`를 우회하고 *자체 구현*한다. **이는 위반**.
-
-#### 결정 (사용자 결정, 2026-06-04)
-
-> **옵션 (a) 채택: oxi-sdk의 browser 도구로 일원화.**
-> - kernel의 `BrowserTool`/`BrowserApi`/`tools/browser/`/`kernel_handle/browser_api.rs`를 *완전히 제거*한다.
-> - binary의 `KernelBuilder::build_browser_api()`는 oxi-sdk의 `native_browser_tools()` / `AgentBuilder::native_browser()` 호출로 대체한다.
-> - `oxibrowser-core`는 *transitive* 의존성으로만 남는다 (oxi-sdk 경유).
-> - root의 `browser` feature는 `["oxi-sdk/native-browser"]`로 *재정의*.
-> - **AGENTS.md 위반 해소**.
-
-옵션 (b)/(c)는 *기각* — (b)는 위반 해소 안 됨, (c)는 분담 정당화 비용이 (a)의 이점보다 큼.
 
 ---
 
@@ -812,33 +621,63 @@ AGENTS.md는 "oxi-sdk 재구현 금지"라고 못 박는다. oxios-kernel의 `Br
 - [ ] `AGENTS.md` "Quick Facts" 표 업데이트
 - [ ] `README.md`의 빌드 명령어 섹션 업데이트
 
-> **Phase D + E는 같은 PR로 묶을 것을 *권장*.** root의 `browser` feature 재정의는 *두 Phase가 동시에* 적용되어야 default가 깨지는 사이 시간이 없다 (§3.5 / §3.4).
-
-### Phase E
-- [ ] `crates/oxios-kernel/src/tools/browser/` 디렉터리 삭제 (mod.rs, browser_tool.rs)
-- [ ] `crates/oxios-kernel/src/kernel_handle/browser_api.rs` 삭제
-- [ ] `crates/oxios-kernel/src/lib.rs`에서 `BrowserTool`, `BrowserApi` re-export 제거
-- [ ] `crates/oxios-kernel/src/tools/mod.rs`에서 `pub mod browser;` 제거
-- [ ] `crates/oxios-kernel/src/tools/kernel_bridge.rs`에서 `"browser"` in `tool_names()` 제거 + register_tools에서 browser 등록 코드 제거
-- [ ] `crates/oxios-kernel/src/tools/registration.rs`에서 browser 관련 제거
-- [ ] `crates/oxios-kernel/Cargo.toml`에서 `oxibrowser-core` direct dep 제거
-- [ ] `crates/oxios-kernel/Cargo.toml`에서 `browser` feature 제거
-- [ ] `src/kernel.rs`의 `build_browser_api()` / `build_browser_api_value()` 제거
-- [ ] `src/kernel.rs`에 `oxi_sdk::native_browser_tools_with_config()` 또는 `AgentBuilder::native_browser()` 호출 추가
-- [ ] `OxiosConfig::BrowserConfig` → `oxi_sdk::BrowseConfig` 매핑 함수 작성
-- [ ] `kernel_handle/mod.rs`에서 browser 관련 accessor 제거 (있을 경우)
-- [ ] 루트 `Cargo.toml`의 `browser = ["oxi-sdk/native-browser"]` 재정의
-- [ ] `cargo build && cargo test --workspace` 통과
-- [ ] e2e: agent가 `browse`/`browse_extract` 도구 호출 검증 (config.browser.enabled true/false 양쪽)
-- [ ] `config.toml`의 `browser.engine.*` 필드 매핑이 정상 동작 확인
-- [ ] `CHANGELOG.md`에 breaking change 4건 추가
-
 ### 문서
 - [ ] `docs/ARCHITECTURE.md`에 새 의존 그래프 반영
 - [ ] `DESIGN.md`에 "memory는 독립 crate" 명시
 - [ ] `CHANGELOG.md`에 항목 추가
-- [ ] **CHANGELOG 항목:**
-  - `oxios-kernel` 1.1.0: `sqlite-memory`, `embedding-gguf` features removed; use `oxios-memory`'s `sqlite`, `gguf`
-  - `oxios-kernel` 1.1.0: `MemoryManager`, `EmbeddingProvider` 등 re-export 형태로 유지 (외부 호환)
-  - `oxios-kernel` 1.1.0 (Phase C): `kernel_handle::AgentApi::memory_manager()` accessor *removed* (breaking)
-  - `oxios-kernel` 1.1.0 (Phase E): `BrowserApi`, `BrowserTool` types *removed* (breaking). Browser now provided by `oxi-sdk::native_browser_tools()`. Tool name migration: `browser` → `browse` / `browse_extract` / `browse_session` / `browse_script`. `oxibrowser-core` direct dep removed.
+
+---
+
+## 9. 실행 현황 (2026-06-04)
+
+본 RFC는 *부분적으로* 실행되었다. 현재 작업 트리 `rfc-016-kernel-boundary-cleanup` 브랜치 상태:
+
+### 완료된 Phase
+
+#### ✅ Phase A (cleanup) — 2개 커밋으로 완료
+- `2459cae`: `tools/kernel/` → `tools/builtin/`, `cmd_*` → `commands/`, `*.md` 삭제, benches 이동
+- `ce79b43`: web `WebChannel` → `WebBridge`, `channel.rs` → `bridge.rs`
+
+#### 🟡 Phase E (Browser 일원화) — 부분 완료, upstream blocker
+- `ffec07e`: kernel의 `BrowserApi`/`BrowserTool`/`oxibrowser-core` 제거, binary의 `build_browser_api()` 제거, `BrowserConfig.engine`을 `serde_json::Value`로 변경
+- **Blocked:** oxi-sdk의 `native-browser` feature 활성화 시 oxi-agent upstream 코드가 컴파일 실패 (`browse_session_tool` 중복 정의, `BrowserTabTrait` 메서드 누락)
+- **완료 시점:** oxi-agent upstream bug 수정 후 root `Cargo.toml`의 `browser = ["oxi-sdk/native-browser"]` 변경
+
+### 시도했으나 revert한 Phase
+
+#### 🔴 Phase B (oxios-memory 추출) — *Trait 추상화 부분 성공 후 revert*
+
+memory/ 모듈이 kernel의 다음 타입들에 깊이 의존:
+- `crate::state_store::StateStore` — `MemoryManager`의 `Arc<StateStore>` 필드
+- `crate::git_layer::GitLayer` — `Option<Arc<GitLayer>>` 필드
+- `crate::config::MemoryConfig`, `ConsolidationConfig` — `with_config()` 메서드 인자
+
+`MemoryStorage` trait + `MemoryGit` trait + async-trait dyn-compat 패턴으로 30+ 컴파일 에러를 17로 줄였으나, 다음이 남음:
+- `MemoryConfig` 의존 (`with_config(&crate::config::MemoryConfig)`)
+- `HnswMemoryIndex` cross-module 참조
+- `serde_json::Value` ↔ typed 변환 누락
+- `migrate.rs` test code가 `StateStore` 직접 사용
+
+**해결하려면 RFC-017 (memory 추출 전략) 발행이 필요.** 옵션:
+- (a) StateStore/GitLayer/Config를 trait으로 추상화 + MemoryConfig 이동 — 1-2주
+- (b) memory의 *data types only* 추출 (`MemoryEntry`, `MemoryTier` 등), `MemoryManager`는 kernel에 남김 — 3-5일
+- (c) 점진 추출 (chunking/hyperbolic/embedding부터) — 2-3주
+
+### 시도 안 한 Phase
+
+#### ⏸ Phase C (MemoryApi) — Phase B 결과에 의존. 보류.
+#### ⏸ Phase D (default feature 단순화) — `sqlite-memory`가 oxios-memory로 이동하는 것이 전제. Phase B 완료 후 진행 가능.
+
+### 검증
+- `cargo test -p oxios-kernel --lib`: **739 passed, 0 failed**
+- `cargo build -p oxios-kernel`: **clean**
+- `cargo build --no-default-features --bin oxios`: **clean**
+- `cargo build` (default features): `oxios-web` pre-existing build error (EmbeddedAssets::get), kernel은 clean
+
+### 커밋 히스토리
+```
+ffec07e refactor(kernel): remove BrowserApi/BrowserTool, oxi-agent blocked
+ce79b43 refactor(web): rename channel to bridge in web surface
+2459cae refactor(tools): rename tools/kernel/ to tools/builtin/, cleanup worktree
+c1d692c (main) polish(knowledge): per-view enforcer state, full emoji shortcode dict, multi-alias wikilinks (#12)
+```
