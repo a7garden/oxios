@@ -29,4 +29,13 @@ export const handlers = [
   http.get('/api/skills', () =>
     HttpResponse.json({ skills: [] })
   ),
+  // Memory map (RFC-T1-B) — default empty response. Tests that need
+  // a populated map should override this handler in their setup.
+  http.get('/api/memory/map', () =>
+    HttpResponse.json({
+      count: 0,
+      epoch: 0,
+      entries: [],
+    })
+  ),
 ]

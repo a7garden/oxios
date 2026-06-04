@@ -709,6 +709,7 @@ pub mod database;
 mod decay;
 pub mod dream;
 pub mod embedding_cache;
+pub mod embedding_viz;
 pub mod flash_attention;
 mod graph;
 mod hnsw;
@@ -734,6 +735,7 @@ pub use proactive::RecallTiming;
 pub use root_index::{HistoricalPeriod, RootEntry, RootIndex, TopicEntry};
 
 pub use embedding_cache::{CacheStats, EmbeddingCache};
+pub use embedding_viz::{compute_pca_2d, compute_top_neighbors, MemoryMapEntry, MemoryNeighbor};
 pub use store::SemanticHit;
 
 // Re-export key types from sub-modules.
