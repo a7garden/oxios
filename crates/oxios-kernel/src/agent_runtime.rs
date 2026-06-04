@@ -706,6 +706,26 @@ async fn run_agent(
                                 });
                     }
                 }
+                AgentEvent::ToolExecutionUpdate {
+                    tool_call_id,
+                    tool_name,
+                    partial_result,
+                } => {
+                    // RFC-015: forward real-time progress to the event bus
+                    // so the Web UI can show a spinner and progress text
+                    // while the tool is still executing. Best-effort —
+                    // publish failures (e.g. lagged subscribers) are ignored.
+                    if let Some(ref sid) = transparency_session {
+                        let _ = kernel_handle_for_cb
+                            .infra
+                            .publish(KernelEvent::ToolExecutionProgress {
+                                session_id: sid.clone(),
+                                tool_call_id: tool_call_id.clone(),
+                                tool_name: tool_name.clone(),
+                                progress: partial_result,
+                            });
+                    }
+                }
                 AgentEvent::ToolExecutionEnd {
                     tool_name,
                     tool_call_id,

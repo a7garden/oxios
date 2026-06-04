@@ -210,6 +210,17 @@ pub enum KernelEvent {
         /// Truncated output (max ~500 chars) for streaming.
         output_summary: String,
     },
+    /// A tool execution emitted a progress update (real-time, RFC-015).
+    ToolExecutionProgress {
+        /// Session this tool call belongs to.
+        session_id: String,
+        /// Provider-specific tool call ID.
+        tool_call_id: String,
+        /// Name of the tool.
+        tool_name: String,
+        /// Human-readable progress text (already-formatted by the tool).
+        progress: String,
+    },
     /// Memory was recalled during agent execution (RFC-015).
     MemoryRecallUsed {
         /// Session this recall belongs to.
@@ -351,6 +362,9 @@ pub fn kernel_event_to_audit_action(event: &KernelEvent) -> AuditAction {
                 if *is_error { "error" } else { "ok" }
             ),
         },
+        KernelEvent::ToolExecutionProgress { tool_name, .. } => AuditAction::Other {
+            detail: format!("tool_progress:{tool_name}"),
+        },
         KernelEvent::MemoryRecallUsed { query, count, .. } => AuditAction::MemoryRead {
             entry_id: format!("recall:{query}:{count}results"),
         },
@@ -381,6 +395,7 @@ fn extract_agent_id(event: &KernelEvent) -> String {
         // RFC-015: session-scoped events use session_id as the subject
         KernelEvent::ToolExecutionStarted { session_id, .. } => format!("session:{session_id}"),
         KernelEvent::ToolExecutionFinished { session_id, .. } => format!("session:{session_id}"),
+        KernelEvent::ToolExecutionProgress { session_id, .. } => format!("session:{session_id}"),
         KernelEvent::MemoryRecallUsed { session_id, .. } => format!("session:{session_id}"),
         KernelEvent::TokenUsageUpdate { session_id, .. } => format!("session:{session_id}"),
         KernelEvent::ReasoningFragment { session_id, .. } => format!("session:{session_id}"),
@@ -510,6 +525,12 @@ mod tests {
                 is_error: false,
                 output_summary: "fn main() {}".into(),
             },
+            KernelEvent::ToolExecutionProgress {
+                session_id: "s1".into(),
+                tool_call_id: "call_1".into(),
+                tool_name: "read_file".into(),
+                progress: "reading line 42/100".into(),
+            },
             KernelEvent::MemoryRecallUsed {
                 session_id: "s1".into(),
                 query: "rust errors".into(),
@@ -532,6 +553,54 @@ mod tests {
             let back: KernelEvent = serde_json::from_str(&json).expect("deserialize");
             let json2 = serde_json::to_string(&back).expect("serialize round-trip");
             assert_eq!(json, json2, "round-trip should be stable");
+        }
+    }
+
+    /// Tool progress events serialize/deserialize cleanly and round-trip
+    /// stable JSON, matching the wire format the WS layer expects.
+    #[test]
+    fn test_tool_execution_progress_serde_round_trip() {
+        let event = KernelEvent::ToolExecutionProgress {
+            session_id: "s-abc".into(),
+            tool_call_id: "call_42".into(),
+            tool_name: "browse".into(),
+            progress: "loading https://example.com".into(),
+        };
+        let json = serde_json::to_string(&event).expect("serialize");
+        let back: KernelEvent = serde_json::from_str(&json).expect("deserialize");
+        match back {
+            KernelEvent::ToolExecutionProgress {
+                ref session_id,
+                ref tool_call_id,
+                ref tool_name,
+                ref progress,
+            } => {
+                assert_eq!(session_id, "s-abc");
+                assert_eq!(tool_call_id, "call_42");
+                assert_eq!(tool_name, "browse");
+                assert_eq!(progress, "loading https://example.com");
+            }
+            other => panic!("expected ToolExecutionProgress, got {other:?}"),
+        }
+    }
+
+    /// The audit-action mapping for tool progress should produce a stable,
+    /// searchable detail string (used by the audit-trail UI to filter).
+    #[test]
+    fn test_tool_execution_progress_audit_action() {
+        let event = KernelEvent::ToolExecutionProgress {
+            session_id: "s1".into(),
+            tool_call_id: "c1".into(),
+            tool_name: "browse".into(),
+            progress: "navigating".into(),
+        };
+        let action = kernel_event_to_audit_action(&event);
+        match action {
+            AuditAction::Other { detail } => {
+                assert!(detail.contains("tool_progress"), "detail: {detail}");
+                assert!(detail.contains("browse"), "detail: {detail}");
+            }
+            other => panic!("expected Other, got {other:?}"),
         }
     }
 
