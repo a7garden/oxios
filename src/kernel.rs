@@ -181,7 +181,6 @@ impl Kernel {
                         Arc::new(parking_lot::RwLock::new(self.config.exec.clone())),
                         self.access_manager.clone(),
                     ),
-                    self.build_browser_api(),
                     oxios_kernel::A2aApi::new(self.a2a_protocol.clone()),
                     // EngineApi — LLM providers, models, config + routing stats + engine hot-swap
                     oxios_kernel::EngineApi::new(
@@ -211,21 +210,7 @@ impl Kernel {
             .expect("ProjectManager not available — SQLite must be enabled")
     }
 
-    /// Build a BrowserApi facade based on feature flag and config.
-    #[cfg(feature = "browser")]
-    fn build_browser_api(&self) -> oxios_kernel::BrowserApi {
-        if self.config.browser.enabled {
-            oxios_kernel::BrowserApi::from_config(&self.config.browser.engine)
-        } else {
-            oxios_kernel::BrowserApi::default()
-        }
-    }
 
-    /// Build a BrowserApi facade (no-op when browser feature is disabled).
-    #[cfg(not(feature = "browser"))]
-    fn build_browser_api(&self) -> oxios_kernel::BrowserApi {
-        oxios_kernel::BrowserApi::default()
-    }
 
     /// Build a MarketplaceApi (ClawHub + Skills.sh) from config.
     fn build_marketplace_api(&self) -> MarketplaceApi {
@@ -844,7 +829,6 @@ impl KernelBuilder {
                 ),
                 project_manager.clone().map(oxios_kernel::ProjectApi::new),
                 oxios_kernel::ExecApi::new(Arc::new(parking_lot::RwLock::new(config.exec.clone())), access_manager.clone()),
-                build_browser_api_value(&config),
                 oxios_kernel::A2aApi::new(a2a_protocol.clone()),
                 // EngineApi — routing stats shared between EngineApi and AgentRuntime + engine hot-swap
                 oxios_kernel::EngineApi::new(
@@ -1107,20 +1091,8 @@ async fn build_tool_retriever(sm: &SkillManager) -> oxios_kernel::tools::retriev
     retriever
 }
 
-/// Build a BrowserApi from config (standalone, for use during KernelBuilder::build).
-#[cfg(feature = "browser")]
-fn build_browser_api_value(config: &OxiosConfig) -> oxios_kernel::BrowserApi {
-    if config.browser.enabled {
-        oxios_kernel::BrowserApi::from_config(&config.browser.engine)
-    } else {
-        oxios_kernel::BrowserApi::default()
-    }
-}
 
 #[cfg(not(feature = "browser"))]
-fn build_browser_api_value(_config: &OxiosConfig) -> oxios_kernel::BrowserApi {
-    oxios_kernel::BrowserApi::default()
-}
 
 /// Build a MarketplaceApi from the Kernel instance (used after Kernel construction).
 fn build_marketplace_api_value(config: &OxiosConfig) -> MarketplaceApi {

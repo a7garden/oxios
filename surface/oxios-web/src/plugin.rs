@@ -21,7 +21,7 @@ use std::sync::Arc;
 use oxios_gateway::surface::{Surface, SurfaceContext, SurfaceHandle};
 
 use crate::api_docs;
-use crate::channel::{WebChannel, WebChannelHandle};
+use crate::bridge::{WebBridge, WebBridgeHandle};
 use crate::middleware::RateLimiter;
 use crate::routes;
 use crate::server::AppState;
@@ -190,14 +190,14 @@ impl Surface for WebSurface {
         let web_dist = ctx.web_dist;
 
         // Create web channel for gateway message routing
-        let web_channel = WebChannel::new(256);
-        let channel_handle = WebChannelHandle::from_channel(&web_channel);
+        let web_channel = WebBridge::new(256);
+        let bridge_handle = WebBridgeHandle::from_bridge(&web_channel);
 
         // Build app state — all knowledge access goes through kernel.knowledge
         let state = Arc::new(AppState {
             base_url: format!("http://{host}:{port}"),
             kernel: ctx.kernel.clone(),
-            channel: channel_handle,
+            bridge: bridge_handle,
             config: ctx.config.clone(),
             config_path: ctx.config_path.clone(),
             start_time: ctx.kernel.start_time(),

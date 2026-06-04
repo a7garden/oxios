@@ -8,7 +8,7 @@
 #![warn(missing_docs)]
 
 pub mod api_docs;
-pub mod channel;
+pub mod bridge;
 pub mod error;
 pub mod format;
 pub mod middleware;
@@ -17,6 +17,6 @@ pub mod plugin;
 pub mod routes;
 pub mod server;
 
-pub use channel::{WebChannel, WebChannelHandle};
+pub use bridge::{WebBridge, WebBridgeHandle};
 pub use plugin::WebSurface;
 pub use server::AppState;

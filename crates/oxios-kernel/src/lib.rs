@@ -194,7 +194,6 @@ pub use skill::{
 };
 pub use tools::tool_types::{ArgumentDef, ToolDef};
 #[cfg(feature = "browser")]
-pub use tools::BrowserTool;
 pub use tools::{ExecTool, KnowledgeTool};
 #[cfg(feature = "wasm-sandbox")]
 pub use wasm_sandbox::{ResourceKind, WasmConfig, WasmError, WasmSandbox};
@@ -235,7 +234,7 @@ pub use types::{AgentId, AgentInfo, AgentStatus};
 pub use kernel_handle::KernelHandle;
 pub use kernel_handle::MarketplaceApi;
 pub use kernel_handle::{
-    A2aApi, AgentApi, BrowserApi, CopilotResponse, EngineApi, EngineConfigResponse, ExecApi,
+    A2aApi, AgentApi, CopilotResponse, EngineApi, EngineConfigResponse, ExecApi,
     ExtensionApi, FallbackEvent, InfraApi, InputModality as EngineInputModality, KnowledgeContext,
     KnowledgeLens, KnowledgeNote, McpApi, MemoryNote, ModelInfo, PersonaApi, ProjectApi,
     ProjectInfo, ProviderCategory, ProviderInfo, RoutingConfigSnapshot, RoutingStats,

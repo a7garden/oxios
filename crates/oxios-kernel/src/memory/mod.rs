@@ -36,7 +36,7 @@ use crate::git_layer::GitLayer;
 use crate::state_store::StateStore;
 
 // Re-export budget types so external `use crate::memory::X` paths still work.
-pub use budget::{CurationCandidate, CurationReport, MemoryBudget};
+pub use quota::{CurationCandidate, CurationReport, MemoryBudget};
 pub use store::HnswMemoryIndex;
 
 // ---------------------------------------------------------------------------
@@ -699,7 +699,7 @@ pub(crate) fn dedup_by_id(entries: &mut Vec<MemoryEntry>) {
 pub mod auto_classify;
 pub mod auto_memory_bridge;
 mod auto_protect;
-mod budget;
+mod quota;
 #[cfg(feature = "sqlite-memory")]
 pub mod cache;
 mod chunking;

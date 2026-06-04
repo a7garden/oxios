@@ -625,3 +625,59 @@ Ouroboros는 *leaf crate*다 (kernel이 ouroboros를 호출). 이름은 "the bra
 - [ ] `docs/ARCHITECTURE.md`에 새 의존 그래프 반영
 - [ ] `DESIGN.md`에 "memory는 독립 crate" 명시
 - [ ] `CHANGELOG.md`에 항목 추가
+
+---
+
+## 9. 실행 현황 (2026-06-04)
+
+본 RFC는 *부분적으로* 실행되었다. 현재 작업 트리 `rfc-016-kernel-boundary-cleanup` 브랜치 상태:
+
+### 완료된 Phase
+
+#### ✅ Phase A (cleanup) — 2개 커밋으로 완료
+- `2459cae`: `tools/kernel/` → `tools/builtin/`, `cmd_*` → `commands/`, `*.md` 삭제, benches 이동
+- `ce79b43`: web `WebChannel` → `WebBridge`, `channel.rs` → `bridge.rs`
+
+#### 🟡 Phase E (Browser 일원화) — 부분 완료, upstream blocker
+- `ffec07e`: kernel의 `BrowserApi`/`BrowserTool`/`oxibrowser-core` 제거, binary의 `build_browser_api()` 제거, `BrowserConfig.engine`을 `serde_json::Value`로 변경
+- **Blocked:** oxi-sdk의 `native-browser` feature 활성화 시 oxi-agent upstream 코드가 컴파일 실패 (`browse_session_tool` 중복 정의, `BrowserTabTrait` 메서드 누락)
+- **완료 시점:** oxi-agent upstream bug 수정 후 root `Cargo.toml`의 `browser = ["oxi-sdk/native-browser"]` 변경
+
+### 시도했으나 revert한 Phase
+
+#### 🔴 Phase B (oxios-memory 추출) — *Trait 추상화 부분 성공 후 revert*
+
+memory/ 모듈이 kernel의 다음 타입들에 깊이 의존:
+- `crate::state_store::StateStore` — `MemoryManager`의 `Arc<StateStore>` 필드
+- `crate::git_layer::GitLayer` — `Option<Arc<GitLayer>>` 필드
+- `crate::config::MemoryConfig`, `ConsolidationConfig` — `with_config()` 메서드 인자
+
+`MemoryStorage` trait + `MemoryGit` trait + async-trait dyn-compat 패턴으로 30+ 컴파일 에러를 17로 줄였으나, 다음이 남음:
+- `MemoryConfig` 의존 (`with_config(&crate::config::MemoryConfig)`)
+- `HnswMemoryIndex` cross-module 참조
+- `serde_json::Value` ↔ typed 변환 누락
+- `migrate.rs` test code가 `StateStore` 직접 사용
+
+**해결하려면 RFC-017 (memory 추출 전략) 발행이 필요.** 옵션:
+- (a) StateStore/GitLayer/Config를 trait으로 추상화 + MemoryConfig 이동 — 1-2주
+- (b) memory의 *data types only* 추출 (`MemoryEntry`, `MemoryTier` 등), `MemoryManager`는 kernel에 남김 — 3-5일
+- (c) 점진 추출 (chunking/hyperbolic/embedding부터) — 2-3주
+
+### 시도 안 한 Phase
+
+#### ⏸ Phase C (MemoryApi) — Phase B 결과에 의존. 보류.
+#### ⏸ Phase D (default feature 단순화) — `sqlite-memory`가 oxios-memory로 이동하는 것이 전제. Phase B 완료 후 진행 가능.
+
+### 검증
+- `cargo test -p oxios-kernel --lib`: **739 passed, 0 failed**
+- `cargo build -p oxios-kernel`: **clean**
+- `cargo build --no-default-features --bin oxios`: **clean**
+- `cargo build` (default features): `oxios-web` pre-existing build error (EmbeddedAssets::get), kernel은 clean
+
+### 커밋 히스토리
+```
+ffec07e refactor(kernel): remove BrowserApi/BrowserTool, oxi-agent blocked
+ce79b43 refactor(web): rename channel to bridge in web surface
+2459cae refactor(tools): rename tools/kernel/ to tools/builtin/, cleanup worktree
+c1d692c (main) polish(knowledge): per-view enforcer state, full emoji shortcode dict, multi-alias wikilinks (#12)
+```

@@ -28,7 +28,7 @@ pub struct RunOptions {
 /// Execute the `oxios run` subcommand.
 ///
 /// Returns the process exit code (0 = success, 1 = evaluation failed).
-pub async fn cmd_run(kernel: &Kernel, prompt: &str, opts: &RunOptions) -> Result<i32> {
+pub async fn run(kernel: &Kernel, prompt: &str, opts: &RunOptions) -> Result<i32> {
     let start = std::time::Instant::now();
 
     // ── Build effective prompt ──

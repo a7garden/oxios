@@ -664,6 +664,7 @@ impl AgentTool for ExecTool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::ExecConfig;
 
     /// Helper: build an `ExecTool` with default config and empty access manager.
     /// Shell mode is enabled for testing purposes. No agent context.

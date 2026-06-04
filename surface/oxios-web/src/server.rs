@@ -8,7 +8,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Instant;
 
-use crate::channel::WebChannelHandle;
+use crate::bridge::WebBridgeHandle;
 use crate::error::AppError;
 use crate::middleware::RateLimiter;
 use oxios_kernel::{config, KernelHandle, OxiosConfig};
@@ -23,7 +23,7 @@ pub struct AppState {
     /// Handle to the kernel subsystem (provides access to all kernel components).
     pub kernel: Arc<KernelHandle>,
     /// Handle to the web channel for message passing.
-    pub channel: WebChannelHandle,
+    pub bridge: WebBridgeHandle,
     /// Loaded configuration (hot-reloadable via RwLock).
     pub config: Arc<RwLock<OxiosConfig>>,
     /// Path to the config file (for persistence on PUT /api/config).

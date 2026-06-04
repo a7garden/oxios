@@ -34,7 +34,7 @@ use oxi_sdk::{
 use crate::access_manager::{AccessGate, AgentContext};
 use crate::capability::{CSpace, ResourceRef, Rights};
 use crate::tools::gated_tool::GatedTool;
-use crate::tools::kernel::*;
+use crate::tools::builtin::*;
 use crate::tools::{
     A2aDelegateTool, A2aQueryTool, A2aSendTool, ExecTool, KnowledgeTool, MemoryReadTool,
     MemorySearchTool, MemoryWriteTool,
@@ -42,8 +42,6 @@ use crate::tools::{
 use crate::types::AgentId;
 use crate::KernelHandle;
 
-#[cfg(feature = "browser")]
-use crate::tools::BrowserTool;
 
 /// Register the always-on tool set into a [`ToolRegistry`].
 ///
@@ -131,7 +129,6 @@ pub fn register_always_on_gated(
 /// | ResourceRef | Required rights | Registered tools |
 /// |-------------|----------------|-----------------|
 /// | `Exec { .. }` | `EXECUTE` | `ExecTool` |
-/// | `Browser` | `EXECUTE` | `BrowserTool` *(browser feature)* |
 /// | `KernelDomain { "memory" }` | `READ` | `MemoryReadTool`, `MemorySearchTool` |
 /// | `KernelDomain { "memory" }` | `WRITE` | `MemoryWriteTool` |
 /// | `KernelDomain { "project" }` | any | `ProjectTool` |
@@ -167,8 +164,7 @@ pub fn register_tools_from_cspace(
             ResourceRef::Browser if cap.rights.contains(Rights::EXECUTE) => {
                 #[cfg(feature = "browser")]
                 {
-                    registry.register(BrowserTool::from_kernel(kernel));
-                }
+                                    }
             }
 
             // Kernel domain tools
@@ -255,8 +251,7 @@ pub fn register_tools_from_cspace_gated(
             ResourceRef::Browser if cap.rights.contains(Rights::EXECUTE) => {
                 #[cfg(feature = "browser")]
                 {
-                    registry.register(BrowserTool::from_kernel(kernel));
-                }
+                                    }
             }
 
             // Kernel domain tools (same as ungated — these already use KernelHandle internally)

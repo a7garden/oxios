@@ -38,8 +38,8 @@ fn bench_git_commit(c: &mut Criterion) {
 }
 
 fn bench_audit_append(c: &mut Criterion) {
-    use oxios_kernel::audit_trail::AuditAction;
-    let audit = oxios_kernel::audit_trail::AuditTrail::new(100_000);
+    use oxi_sdk::observability::audit_trail::AuditAction;
+    let audit = oxi_sdk::observability::audit_trail::AuditTrail::new(100_000);
 
     c.bench_function("audit_append", |b| {
         let mut i = 0u64;

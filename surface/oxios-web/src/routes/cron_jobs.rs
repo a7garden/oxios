@@ -142,8 +142,7 @@ pub(crate) async fn handle_cron_job_trigger(
     msg.metadata
         .insert("toolchain".to_string(), job.toolchain.clone());
 
-    let response = state
-        .channel
+    let response = state.bridge
         .send_and_wait(msg)
         .await
         .map_err(|e| AppError::Internal(e.to_string()))?;

@@ -108,7 +108,7 @@ pub(crate) async fn handle_chat(
 
     // Send and wait for response from the gateway pipeline.
     tracing::info!("Sending message to gateway...");
-    match state.channel.send_and_wait(msg).await {
+    match state.bridge.send_and_wait(msg).await {
         Ok(response) => {
             tracing::info!(reply_len = response.content.len(), "Chat response received");
 
@@ -309,14 +309,14 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
     // Subscribe to outgoing messages from the web channel (not kernel event bus).
     // WebChannel::send() broadcasts OutgoingMessage here; the kernel event bus
     // carries KernelEvents which are a different type entirely.
-    let mut outgoing_rx = state.channel.subscribe();
+    let mut outgoing_rx = state.bridge.subscribe();
     // RFC-015: subscribe to kernel event bus for real-time chat transparency
     // events (tool execution, token usage, memory recall, reasoning fragments).
     // Filtered by session_id in the recv loop to avoid leaking other agents' events.
     let mut kernel_event_rx = state.kernel.infra.subscribe();
 
     // Clone handles for the spawned tasks.
-    let incoming_tx = state.channel.incoming_tx.clone();
+    let incoming_tx = state.bridge.incoming_tx.clone();
     let state_store = state.kernel.state.store().clone();
 
     // Read session prune config
