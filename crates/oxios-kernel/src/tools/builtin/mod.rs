@@ -84,7 +84,6 @@ pub fn register_all_kernel_tools(registry: &ToolRegistry, kernel: &KernelHandle,
     // Browser (optional feature, stores Arc<KernelHandle>)
     #[cfg(feature = "browser")]
     {
-        registry.register(crate::tools::BrowserTool::from_kernel(kernel));
     }
 
     // Marketplace (ClawHub — search, install, update)

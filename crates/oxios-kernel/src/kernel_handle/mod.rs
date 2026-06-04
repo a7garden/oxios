@@ -2,7 +2,6 @@
 
 pub mod a2a_api;
 pub mod agent_api;
-pub mod browser_api;
 pub mod engine_api;
 pub mod exec_api;
 pub mod extension_api;
@@ -17,7 +16,6 @@ pub mod state_api;
 
 pub use a2a_api::A2aApi;
 pub use agent_api::AgentApi;
-pub use browser_api::BrowserApi;
 pub use engine_api::{
     EngineApi, EngineConfigResponse, FallbackEvent, InputModality, ModelInfo, ProviderCategory,
     ProviderInfo, RoutingConfigSnapshot, RoutingStats, RoutingStatsSnapshot, RoutingUpdate,
@@ -72,7 +70,6 @@ use std::time::Instant;
 /// - [`McpApi`]       — MCP server bridge
 /// - [`ProjectApi`]    — Project management, memory linking
 /// - [`ExecApi`]      — execution config, access management
-/// - [`BrowserApi`]   — browser backend
 /// - [`A2aApi`]       — agent-to-agent communication
 /// - [`EngineApi`]    — LLM engine providers, models, config
 /// - [`KnowledgeBase`] — markdown note management (kernel-free, via oxios-markdown)
@@ -95,8 +92,6 @@ pub struct KernelHandle {
     pub projects: Option<ProjectApi>,
     /// Execution: config + access management.
     pub exec: ExecApi,
-    /// Browser backend (zero-sized when `browser` feature is disabled).
-    pub browser: BrowserApi,
     /// Agent-to-agent communication.
     pub a2a: A2aApi,
     /// Engine: LLM providers, models, config.
@@ -125,7 +120,6 @@ impl KernelHandle {
         infra: InfraApi,
         projects: Option<ProjectApi>,
         exec: ExecApi,
-        browser: BrowserApi,
         a2a: A2aApi,
         engine: EngineApi,
         knowledge: Arc<oxios_markdown::KnowledgeBase>,
@@ -142,7 +136,6 @@ impl KernelHandle {
             infra,
             projects,
             exec,
-            browser,
             a2a,
             engine,
             knowledge,
@@ -216,7 +209,6 @@ impl KernelHandle {
                 access_manager,
             ),
             #[allow(clippy::default_trait_access)]
-            browser: BrowserApi::default(),
             a2a: A2aApi::new(Arc::new(A2AProtocol::new(crate::EventBus::new(0)))),
             engine: EngineApi::new(
                 Arc::new(parking_lot::RwLock::new(config.clone())),

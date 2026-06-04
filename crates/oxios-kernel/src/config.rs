@@ -1559,7 +1559,7 @@ impl Default for LoggingConfig {
 
 /// Headless browser configuration.
 ///
-/// Wraps `oxibrowser_core::BrowserConfig` (Deserialize/Serialize supported)
+/// Engine configuration. Passes through to `oxi-sdk` browser tools.
 /// with an `enabled` toggle. The engine config is passed through directly
 /// to the browser — no field-by-field duplication.
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -1568,7 +1568,7 @@ pub struct BrowserConfig {
     #[serde(default = "default_browser_enabled")]
     pub enabled: bool,
 
-    /// Engine configuration — passed directly to `oxibrowser_core::Browser::new()`.
+    /// Engine configuration — passed to oxi-sdk's `native_browser_tools_with_config()`.
     ///
     /// All fields have sensible defaults; override only what you need:
     ///
@@ -1579,7 +1579,7 @@ pub struct BrowserConfig {
     /// js_timeout_ms = 10000
     /// ```
     #[serde(default)]
-    pub engine: oxibrowser_core::BrowserConfig,
+    pub engine: serde_json::Value,
 }
 
 fn default_browser_enabled() -> bool {
@@ -1590,7 +1590,7 @@ impl Default for BrowserConfig {
     fn default() -> Self {
         Self {
             enabled: true,
-            engine: oxibrowser_core::BrowserConfig::headless(),
+            engine: serde_json::json!({}),
         }
     }
 }

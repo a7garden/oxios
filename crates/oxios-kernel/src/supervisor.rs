@@ -487,7 +487,6 @@ mod tests {
                     crate::access_manager::AccessManager::new(),
                 )),
             ),
-            crate::kernel_handle::BrowserApi::default(),
             crate::kernel_handle::A2aApi::new(Arc::new(crate::a2a::A2AProtocol::new(
                 EventBus::new(64),
             ))),

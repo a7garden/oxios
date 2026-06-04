@@ -14,8 +14,6 @@ pub mod registration;
 pub mod retrieval;
 pub mod tool_types;
 
-#[cfg(feature = "browser")]
-pub mod browser;
 
 pub use a2a_tools::{A2aDelegateTool, A2aQueryTool, A2aSendTool};
 pub use exec_tool::ExecTool;
@@ -26,7 +24,5 @@ pub use builtin::{
 pub use mcp_tool::McpToolWrapper;
 pub use memory_tools::{MemoryReadTool, MemorySearchTool, MemoryWriteTool};
 
-#[cfg(feature = "browser")]
-pub use browser::BrowserTool;
 
 pub use kernel_bridge::OxiosKernelBridge;

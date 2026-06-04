@@ -7,10 +7,9 @@ license = "MIT"
 repository = "https://github.com/a7garden/oxios"
 
 [features]
-default = ["browser", "sqlite-memory"]
+default = ["sqlite-memory"]
 otel = ["tracing-opentelemetry", "opentelemetry", "opentelemetry_sdk", "opentelemetry-otlp", "opentelemetry-stdout"]
 wasm-sandbox = ["dep:wasmtime", "dep:wasmtime-wasi"]
-browser = []
 native-browser = ["oxi-sdk/native-browser"]
 sqlite-memory = ["dep:rusqlite", "dep:sqlite-vec"]
 
@@ -81,8 +80,6 @@ sqlite-vec = { version = "0.1", optional = true }
 llama-gguf = { version = "0.14", optional = true, features = ["cpu", "huggingface"] }
 hf-hub = { version = "0.4", optional = true }
 
-# Headless browser (built-in)
-oxibrowser-core = "0.9.1"
 
 # OpenTelemetry (optional)
 tracing-opentelemetry = { version = "0.28", optional = true }
