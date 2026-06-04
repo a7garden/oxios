@@ -1,4 +1,3 @@
-import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import {
   forceCenter,
   forceCollide,
@@ -8,11 +7,12 @@ import {
   forceX,
   forceY,
   type Simulation,
-  type SimulationNodeDatum,
   type SimulationLinkDatum,
+  type SimulationNodeDatum,
 } from 'd3-force'
 import { select } from 'd3-selection'
-import { zoom, zoomIdentity, type ZoomBehavior } from 'd3-zoom'
+import { type ZoomBehavior, zoom, zoomIdentity } from 'd3-zoom'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { MemoryMapEntry, MemoryMapNeighbor } from '@/types/memory'
 
 /**
@@ -116,6 +116,14 @@ function nodeRadius(entry: MemoryMapEntry): number {
   return 5 + recencyBoost * 5
 }
 
+/**
+ * Invisible padded hit-test ring (CSS px). WCAG 2.5.5 requires a touch
+ * target of at least 24×24 CSS px. The visual node radius is 5–10 px,
+ * so we extend the hit area by `HIT_TEST_PADDING` without changing
+ * the visual size.
+ */
+const HIT_TEST_PADDING = 12
+
 export function EmbeddingCanvas({
   entries,
   selectedId = null,
@@ -140,6 +148,13 @@ export function EmbeddingCanvas({
   const hasFittedRef = useRef(false)
 
   const [size, setSize] = useState({ width: 600, height: 400 })
+
+  // Hold the d3-zoom behavior in a ref so resize/edge-threshold changes
+  // do not detach and re-attach the gesture handler (which would reset
+  // d3-zoom's internal transform). The handler is attached once in the
+  // mount-only effect below; subsequent resize/zoom changes just update
+  // the behaviour's extent or call `.transform` on it.
+  const zoomRef = useRef<ZoomBehavior<HTMLCanvasElement, unknown> | null>(null)
 
   // Build the d3-force graph whenever entries change. The simulation
   // is anchored to the backend's PCA coordinates via `fx`/`fy` so the
@@ -228,9 +243,33 @@ export function EmbeddingCanvas({
       sim.stop()
     }
     // We intentionally re-build the graph when the entries identity
-    // changes; animate/edgeThreshold affect the simulation params only.
+    // changes; the `animate` flag is handled in a separate effect
+    // below so toggling it does not rebuild the graph. The
+    // `edgeThreshold` filter is also part of the graph build so it is
+    // intentionally in the dep array.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [entries, edgeThreshold])
+
+  // P0-2: Animate toggle. Restart or stop the running simulation
+  // without rebuilding the graph. The `animate` flag was previously
+  // only read at graph-build time, so flipping the switch was a no-op.
+  useEffect(() => {
+    const sim = simRef.current
+    if (!sim) return
+    if (animate) {
+      sim.alpha(0.6).restart()
+    } else {
+      sim.stop()
+    }
+  }, [animate])
+
+  // P1-4: Reset the initial-fit flag whenever the entries identity
+  // changes (filter, data refresh, etc). Without this, a filter change
+  // re-builds the graph but leaves the camera at the old fit, so the
+  // new node positions may be off-screen.
+  useEffect(() => {
+    hasFittedRef.current = false
+  }, [entries])
 
   // Resize observer — keep canvas crisp on container resize.
   useEffect(() => {
@@ -245,7 +284,10 @@ export function EmbeddingCanvas({
     return () => ro.disconnect()
   }, [])
 
-  // Wheel + drag zoom/pan via d3-zoom on the underlying canvas.
+  // P1-5: Wheel + drag zoom/pan via d3-zoom, attached ONCE on mount.
+  // We keep the zoom behavior stable across resizes so d3-zoom's
+  // internal transform is preserved; subsequent size changes only
+  // update the scale extent / transform through the existing behavior.
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
@@ -259,63 +301,79 @@ export function EmbeddingCanvas({
     sel.call(z)
     // Disable d3's default double-click zoom — we use dblclick for node open.
     sel.on('dblclick.zoom', null)
+    zoomRef.current = z
     return () => {
       sel.on('.zoom', null)
+      zoomRef.current = null
     }
+  }, [])
+
+  // P1-5 (cont): When the canvas size changes and the camera is still
+  // at the default identity (i.e. the user has not panned/zoomed),
+  // re-fit the view. If the user has already moved the camera, leave
+  // it alone so we do not stomp their transform.
+  useEffect(() => {
+    const z = zoomRef.current
+    const canvas = canvasRef.current
+    if (!z || !canvas) return
+    if (size.width < 2 || size.height < 2) return
+    // Has the user pan/zoomed away from identity?
+    const t = transformRef.current
+    const isIdentity = t.k === 1 && t.x === 0 && t.y === 0
+    if (!isIdentity) return
+    hasFittedRef.current = false
   }, [size.width, size.height])
 
-  // Fit-to-view on first entries arrival.
+  // Fit-to-view on first entries arrival (and again after the entries
+  // identity changes if the camera is still at identity — see above).
   useEffect(() => {
     if (hasFittedRef.current) return
     if (entries.length === 0) return
     if (size.width < 2 || size.height < 2) return
+    const z = zoomRef.current
+    const canvas = canvasRef.current
+    if (!z || !canvas) return
     // Reserve a margin so nodes are not flush against the edges.
     const margin = 40
-    const scale = Math.min(
-      (size.width - margin * 2) / 2,
-      (size.height - margin * 2) / 2,
-    )
+    const scale = Math.min((size.width - margin * 2) / 2, (size.height - margin * 2) / 2)
     const cx = size.width / 2
     const cy = size.height / 2
-    const sel = select(canvasRef.current!)
-    sel
-      .call(
-        zoom<HTMLCanvasElement, unknown>().transform,
-        zoomIdentity.translate(cx, cy).scale(scale),
-      )
+    select(canvas).call(z.transform, zoomIdentity.translate(cx, cy).scale(scale))
     transformRef.current = { k: scale, x: cx, y: cy }
     hasFittedRef.current = true
     requestDraw()
-  }, [entries.length, size.width, size.height])
+  }, [entries, size.width, size.height])
 
-  // Fly-to a specific node when the parent asks (e.g. search).
+  // P0-3: Fly-to a specific node when the parent asks (e.g. search).
+  //
+  // The previous version called `sel.call(z.transform, ...)` before
+  // capturing the start transform, which fired d3-zoom's `zoom` event
+  // and updated `transformRef.current` to the destination — so the
+  // rAF interpolation became a no-op (start = end). The fix is to
+  // capture the start *first*, then drive the transform solely from
+  // the rAF tick, with no synchronous zoom call.
   useEffect(() => {
     if (!flyToId) return
     const node = nodesRef.current.find((n) => n.id === flyToId)
     if (!node || node.x == null || node.y == null) return
     const targetScale = Math.max(transformRef.current.k, 2.5)
-    const k = targetScale
-    const x = size.width / 2 - node.x * k
-    const y = size.height / 2 - node.y * k
-    const sel = select(canvasRef.current!)
-    sel.call(
-      zoom<HTMLCanvasElement, unknown>().transform,
-      zoomIdentity.translate(x, y).scale(k),
-    )
-    // Simple JS-side easing for the fly-to. d3-transition is not
-    // imported by default (it is a separate package) so we interpolate
-    // from the previous transform.
+    const endK = targetScale
+    const endX = size.width / 2 - node.x * endK
+    const endY = size.height / 2 - node.y * endK
+    // Capture the previous transform BEFORE any zoom call. This is
+    // the start of the easing curve.
     const startK = transformRef.current.k
     const startX = transformRef.current.x
     const startY = transformRef.current.y
     const t0 = performance.now()
-    const ease = (t: number) => 1 - Math.pow(1 - t, 3)
+    // Ease-out cubic: 1 - (1 - t)^3.
+    const ease = (t: number) => 1 - (1 - t) ** 3
     const tick = (now: number) => {
       const p = Math.min(1, (now - t0) / 450)
       const e = ease(p)
-      const kk = startK + (k - startK) * e
-      const xx = startX + (x - startX) * e
-      const yy = startY + (y - startY) * e
+      const kk = startK + (endK - startK) * e
+      const xx = startX + (endX - startX) * e
+      const yy = startY + (endY - startY) * e
       transformRef.current = { k: kk, x: xx, y: yy }
       requestDraw()
       if (p < 1) requestAnimationFrame(tick)
@@ -366,8 +424,7 @@ export function EmbeddingCanvas({
     const nodes = nodesRef.current
     const links = linksRef.current
     const sel = selectedId
-    const neighbourSet =
-      sel != null ? new Set(neighboursRef.current.get(sel) ?? []) : null
+    const neighbourSet = sel != null ? new Set(neighboursRef.current.get(sel) ?? []) : null
 
     // Edges first so they sit under the nodes.
     if (links.length > 0) {
@@ -380,8 +437,7 @@ export function EmbeddingCanvas({
         let opacity = 0.05 + (sim - 0.7) * 0.5
         if (neighbourSet) {
           const isHighlighted =
-            (s.id === sel && neighbourSet.has(t.id)) ||
-            (t.id === sel && neighbourSet.has(s.id))
+            (s.id === sel && neighbourSet.has(t.id)) || (t.id === sel && neighbourSet.has(s.id))
           opacity = isHighlighted ? Math.min(0.85, opacity * 4) : 0.02
         }
         ctx.strokeStyle = `rgba(120, 120, 140, ${Math.max(0.02, opacity)})`
@@ -438,7 +494,9 @@ export function EmbeddingCanvas({
       let bestD = Infinity
       for (const n of nodesRef.current) {
         if (n.x == null || n.y == null) continue
-        const r = nodeRadius(n) / k + 2
+        // Hit area = visual radius + HIT_TEST_PADDING, converted to
+        // world units by dividing by the current zoom scale `k`.
+        const r = (nodeRadius(n) + HIT_TEST_PADDING) / k
         const dx = n.x - wx
         const dy = n.y - wy
         const d2 = dx * dx + dy * dy
@@ -469,7 +527,8 @@ export function EmbeddingCanvas({
       let bestD = Infinity
       for (const n of nodesRef.current) {
         if (n.x == null || n.y == null) continue
-        const r = nodeRadius(n) / k + 2
+        // Hit area = visual radius + HIT_TEST_PADDING (world units).
+        const r = (nodeRadius(n) + HIT_TEST_PADDING) / k
         const dx = n.x - wx
         const dy = n.y - wy
         const d2 = dx * dx + dy * dy

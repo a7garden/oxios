@@ -1,10 +1,10 @@
-import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
-import { renderHook, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { http, HttpResponse } from 'msw'
-import { server } from '../msw/server'
+import { renderHook, waitFor } from '@testing-library/react'
+import { HttpResponse, http } from 'msw'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useMemoryMap } from '@/hooks/use-memory'
 import type { MemoryMapResponse } from '@/types/memory'
+import { server } from '../msw/server'
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -97,6 +97,33 @@ describe('useMemoryMap', () => {
     await waitFor(() => expect(result.current.isSuccess).toBe(true))
     expect(result.current.data?.count).toBe(1)
     expect(result.current.data?.entries?.[0]?.tier).toBe('hot')
+  })
+
+  it('passes mem_type filter to the query string', async () => {
+    // Regression for P0-1: the filter must reach the server as a
+    // singular label (e.g. "fact", "episode"). The previous backend
+    // compared the singular label to the plural category name and
+    // silently returned 0 entries for every non-knowledge type.
+    const lastQuery: { value: URL | null } = { value: null }
+    server.use(
+      http.get('/api/memory/map', ({ request }) => {
+        const url = new URL(request.url)
+        lastQuery.value = url
+        const memType = url.searchParams.get('mem_type')
+        return HttpResponse.json({
+          count: memType === 'episode' ? 1 : 0,
+          epoch: 12345,
+          entries: memType === 'episode' ? [sampleResponse.entries[1]] : [],
+        })
+      }),
+    )
+    const { result } = renderHook(() => useMemoryMap({ mem_type: 'episode' }), {
+      wrapper: createWrapper(),
+    })
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+    expect(lastQuery.value?.searchParams.get('mem_type')).toBe('episode')
+    expect(result.current.data?.count).toBe(1)
+    expect(result.current.data?.entries?.[0]?.mem_type).toBe('episode')
   })
 
   it('exposes 2D coordinates for each entry', async () => {
