@@ -1,6 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api-client'
-import type { MemoryStats, MemoryDetail, DreamReport, DreamStatus, SemanticSearchResult } from '@/types/memory'
+import type {
+  MemoryStats,
+  MemoryDetail,
+  DreamReport,
+  DreamStatus,
+  SemanticSearchResult,
+  MemoryMapResponse,
+} from '@/types/memory'
 
 // ── Stats ──
 export function useMemoryStats() {
@@ -97,5 +104,31 @@ export function useMemorySemanticSearch() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['memory', 'search'] })
     },
+  })
+}
+
+// ── Map (RFC-T1-B) ──
+export interface MemoryMapFilters {
+  tier?: string
+  mem_type?: string
+  limit?: number
+}
+
+/**
+ * Fetch 2D coordinates + top neighbors for the memory map.
+ *
+ * The backend caches per (5-minute epoch, id-set) and falls back to
+ * a recompute if either changes, so we keep `staleTime` short but
+ * accept the cache hit on the server.
+ */
+export function useMemoryMap(filters: MemoryMapFilters = {}) {
+  const params: Record<string, string> = {}
+  if (filters.tier) params.tier = filters.tier
+  if (filters.mem_type) params.mem_type = filters.mem_type
+  if (filters.limit) params.limit = String(filters.limit)
+  return useQuery({
+    queryKey: ['memory', 'map', filters.tier ?? '', filters.mem_type ?? '', filters.limit ?? 500],
+    queryFn: () => api.get<MemoryMapResponse>('/api/memory/map', params),
+    staleTime: 30_000,
   })
 }

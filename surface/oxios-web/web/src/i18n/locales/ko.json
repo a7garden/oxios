@@ -1008,7 +1008,21 @@
     "noData": "메모리 데이터가 없습니다.",
     "deleteMemory": "삭제",
     "noResults": "검색 결과가 없습니다.",
-    "unknown": "알 수 없음"
+    "unknown": "알 수 없음",
+    "map": "맵",
+    "mapNodeCount": "노드 {{count}}개",
+    "mapSearchActive": "검색어: \"{{query}}\"",
+    "mapSearchPlaceholder": "노드 검색 (⌘F)",
+    "mapAnimate": "애니메이션",
+    "mapSelectPrompt": "노드를 클릭해 세부 정보를 확인하세요.",
+    "mapRelated": "관련 기억 ({{count}})",
+    "mapNoRelated": "임계값 이상의 유사 기억이 없습니다.",
+    "mapOpenDetail": "상세 보기",
+    "mapEmpty": "표시할 기억이 없습니다",
+    "mapEmptyDescription": "커널에 기억이 저장되면 여기에 표시됩니다.",
+    "noPreview": "(미리보기 없음)",
+    "id": "ID",
+    "createdAt": "생성일"
   },
   "approvals": {
     "title": "승인",

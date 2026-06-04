@@ -1008,7 +1008,21 @@
     "noData": "No memory data.",
     "deleteMemory": "Delete",
     "noResults": "No results for your search.",
-    "unknown": "Unknown"
+    "unknown": "Unknown",
+    "map": "Map",
+    "mapNodeCount": "{{count}} nodes",
+    "mapSearchActive": "search: \"{{query}}\"",
+    "mapSearchPlaceholder": "Search nodes (⌘F)",
+    "mapAnimate": "Animate",
+    "mapSelectPrompt": "Click a node to inspect it.",
+    "mapRelated": "Related ({{count}})",
+    "mapNoRelated": "No similar memories above the threshold.",
+    "mapOpenDetail": "Open detail",
+    "mapEmpty": "No memories to map",
+    "mapEmptyDescription": "Memories will appear here once the kernel stores them.",
+    "noPreview": "(no preview)",
+    "id": "ID",
+    "createdAt": "Created"
   },
   "approvals": {
     "title": "Approvals",
