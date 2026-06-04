@@ -29,6 +29,7 @@ import { keymap } from '@codemirror/view'
 import { oneDark } from '@codemirror/theme-one-dark'
 import { mermaidExtension, mermaidDarkObserver } from '@/lib/mermaid-extension'
 import { tokenHideExtension } from '@/lib/token-hide-extension'
+import { wikilinkExtension } from '@/lib/wikilink-extension'
 import { EditorSelection } from '@codemirror/state'
 import { useKnowledgeTree } from '@/hooks/use-knowledge'
 import { buildAutocompleteDict, type FileEntry } from '@/lib/autocomplete-link'
@@ -390,6 +391,7 @@ export function MarkdownEditor({
           mermaidExtension,
           mermaidDarkObserver,
           tokenHideExtension,
+          wikilinkExtension,
           ...(isDark ? [oneDark, darkTheme] : []),
         ]}
         theme={isDark ? 'dark' : 'light'}
