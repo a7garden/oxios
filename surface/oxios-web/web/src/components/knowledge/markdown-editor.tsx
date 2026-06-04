@@ -88,10 +88,16 @@ function insertCheckmark(view: EditorView): boolean {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// Heading enforcement — keep first line as `# ` even after edit
+// Heading enforcement — keep first line as `# ` even after edit.
+// Gated by a module-level flag set by the parent component so the
+// enforcer does NOT fire while we're programmatically replacing the
+// document content (which would cause an infinite loop: the enforcer
+// dispatches a change → enforcer fires again → …).
 // ─────────────────────────────────────────────────────────────────────────
+let _headingEnforcerSuspended = false
 const headingEnforcer = EditorView.updateListener.of((update) => {
   if (!update.docChanged) return
+  if (_headingEnforcerSuspended) return
   const firstLine = update.state.doc.line(1)
   const text = firstLine.text
   if (!text.startsWith('# ')) {
@@ -304,14 +310,25 @@ export function MarkdownEditor({
     const view = viewRef.current
     if (!view) return
     const current = view.state.doc.toString()
-    if (current !== initialContent) {
-      isSettingContent.current = true
-      view.dispatch({
-        changes: { from: 0, to: current.length, insert: initialContent },
-      })
-      view.dispatch({ selection: { anchor: 0 } })
-      isSettingContent.current = false
-    }
+    if (current === initialContent) return
+    // Suspend the heading enforcer and onChange-driven autosave while
+    // we programmatically replace the document. Combining the change
+    // and the selection reset into a SINGLE dispatch avoids the
+    // enforcer firing on the intermediate state (which has the
+    // cursor at the end of the old content) and producing unwanted
+    // headings or selection drift.
+    isSettingContent.current = true
+    _headingEnforcerSuspended = true
+    view.dispatch({
+      changes: { from: 0, to: current.length, insert: initialContent },
+      selection: { anchor: 0 },
+    })
+    isSettingContent.current = false
+    // Release the enforcer on the next microtask, after all update
+    // listeners have processed the dispatch above.
+    queueMicrotask(() => {
+      _headingEnforcerSuspended = false
+    })
   }, [initialContent])
 
   return (
