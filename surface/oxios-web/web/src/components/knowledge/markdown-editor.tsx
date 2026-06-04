@@ -283,7 +283,15 @@ export function MarkdownEditor({
       setIsDirty(false)
     }
     document.addEventListener('knowledge:save', handler)
-    return () => document.removeEventListener('knowledge:save', handler)
+    return () => {
+      // Cancel any pending debounce save on unmount so we don't
+      // call onSave on a stale editor instance.
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current)
+        saveTimerRef.current = undefined
+      }
+      document.removeEventListener('knowledge:save', handler)
+    }
   }, [])
 
   // External open-file listener (from link click)
@@ -323,12 +331,22 @@ export function MarkdownEditor({
       changes: { from: 0, to: current.length, insert: initialContent },
       selection: { anchor: 0 },
     })
-    isSettingContent.current = false
-    // Release the enforcer on the next microtask, after all update
-    // listeners have processed the dispatch above.
-    queueMicrotask(() => {
+    // Release on the next macrotask. `queueMicrotask` is too soon:
+    // CM6 update listeners that schedule React state updates can
+    // resolve on the next macrotask, and onChange can fire AFTER the
+    // microtask. `setTimeout(0)` ensures the enforcer and onChange
+    // gate stay in place until the editor has fully settled.
+    const releaseTimer = setTimeout(() => {
+      isSettingContent.current = false
       _headingEnforcerSuspended = false
-    })
+    }, 0)
+    return () => {
+      // Cleanup: if a new effect run supersedes us (e.g. fast file
+      // switching), cancel the pending release and release now.
+      clearTimeout(releaseTimer)
+      isSettingContent.current = false
+      _headingEnforcerSuspended = false
+    }
   }, [initialContent])
 
   return (
