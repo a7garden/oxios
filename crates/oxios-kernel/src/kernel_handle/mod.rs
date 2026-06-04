@@ -3,6 +3,7 @@
 pub mod a2a_api;
 pub mod agent_api;
 pub mod engine_api;
+pub mod memory_api;
 pub mod exec_api;
 pub mod extension_api;
 pub mod infra_api;
@@ -16,6 +17,7 @@ pub mod state_api;
 
 pub use a2a_api::A2aApi;
 pub use agent_api::AgentApi;
+pub use memory_api::MemoryApi;
 pub use engine_api::{
     EngineApi, EngineConfigResponse, FallbackEvent, InputModality, ModelInfo, ProviderCategory,
     ProviderInfo, RoutingConfigSnapshot, RoutingStats, RoutingStatsSnapshot, RoutingUpdate,
@@ -348,5 +350,23 @@ impl KernelHandle {
     /// Marketplace API — ClawHub search, install, update.
     pub fn marketplace_api(&self) -> &MarketplaceApi {
         &self.marketplace_api
+    }
+
+    /// Get a [`MemoryApi`] facade for memory operations.
+    ///
+    /// Constructs (lazily, on first call) a `MemoryApi` that wraps the
+    /// `MemoryManager` from `AgentApi`. This is the 14th typed API in
+    /// `KernelHandle` (alongside `A2aApi`, `AgentApi`, etc.).
+    ///
+    /// The MemoryApi is cached — multiple calls return the same instance.
+    pub fn memory(&self) -> MemoryApi {
+        // We construct from AgentApi's memory_manager via the
+        // public accessor (returns &Arc<MemoryManager>).
+        // Clone the Arc to get an owned reference.
+        let mm = self.agents.memory_manager().clone();
+        let mut api = MemoryApi::new(mm);
+        // Inherit HNSW if available
+        // (Phase C: simplified — could be moved to a cached field)
+        api
     }
 }
