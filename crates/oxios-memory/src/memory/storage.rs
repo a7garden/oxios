@@ -1,8 +1,12 @@
 //! Storage abstraction for the memory subsystem.
 //!
 //! The memory crate does not depend on `oxios-kernel`. Instead, it
-//! operates against abstract traits. `oxios-kernel` (will) implement
-//! these traits for its `StateStore` and `GitLayer`.
+//! operates against abstract traits. `oxios-kernel` implements
+//! these traits for its `StateStore` and `GitLayer` (RFC-018 b.6).
+//!
+//! Methods take/return `serde_json::Value` so the trait stays
+//! object-safe. Typed helpers (e.g., `load_typed<T>`) are provided
+//! as extensions on the trait in [`storage_ext`].
 
 use anyhow::Result;
 use async_trait::async_trait;

@@ -13,6 +13,7 @@ use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 
 use oxios_memory::EmbeddingVector;
+use oxios_memory::MemoryStorageExt;
 
 use super::hnsw::HnswIndex;
 use oxios_memory::memory::auto_protect::AutoProtector;
@@ -64,8 +65,7 @@ impl MemoryManager {
             if let Ok(names) = self.state_store.list_category(mt.category()).await {
                 for name in names {
                     if let Ok(Some(entry)) = self
-                        .state_store
-                        .load_json::<MemoryEntry>(mt.category(), &name)
+                        .state_store.load_typed::<MemoryEntry>(mt.category(), &name)
                         .await
                     {
                         let vector = self.embedding.embed(&entry.content).await?;
@@ -103,7 +103,7 @@ impl MemoryManager {
         };
 
         self.state_store
-            .save_json("memory", "vector_index_snapshot", &snapshot)
+            .save_typed("memory", "vector_index_snapshot", &snapshot)
             .await?;
 
         self.git_commit("memory/vector_index_snapshot.json", "memory: snapshot save");
@@ -118,8 +118,7 @@ impl MemoryManager {
     /// Load a previously saved vector index snapshot from disk.
     pub async fn load_index_snapshot(&self) -> Result<usize> {
         let snapshot: Option<VectorIndexSnapshot> = self
-            .state_store
-            .load_json("memory", "vector_index_snapshot")
+            .state_store.load_typed("memory", "vector_index_snapshot")
             .await?;
 
         match snapshot {
@@ -153,7 +152,7 @@ impl MemoryManager {
         let id = entry.id.clone();
         let vector = self.embedding.embed(&entry.content).await?;
         let category = entry.memory_type.category();
-        self.state_store.save_json(category, &id, &entry).await?;
+        self.state_store.save_typed(category, &id, &entry).await?;
 
         self.git_commit(
             &format!("{category}/{id}.json"),
@@ -189,8 +188,7 @@ impl MemoryManager {
             return sqlite.get(id, memory_type);
         }
         let result: Option<MemoryEntry> = self
-            .state_store
-            .load_json(memory_type.category(), id)
+            .state_store.load_typed(memory_type.category(), id)
             .await?;
         if let Some(mut entry) = result {
             AutoProtector::record_access(&mut entry, "");
@@ -201,14 +199,19 @@ impl MemoryManager {
     }
 
     /// Delete a memory entry.
-    pub async fn forget(&self, id: &str, memory_type: MemoryType) -> Result<bool> {
+    ///
+    /// Returns `Ok(())` on success regardless of whether the entry existed.
+    /// (Previously returned `Result<bool>`; the bool was a "was it there"
+    /// signal. After RFC-018 b.6 the storage trait doesn't expose that,
+    /// and the only caller that used it was a sqlite-path test.)
+    pub async fn forget(&self, id: &str, memory_type: MemoryType) -> Result<()> {
         #[cfg(feature = "sqlite-memory")]
         if let Some(ref sqlite) = self.sqlite_store {
-            return sqlite.forget(id, memory_type);
+            let _ = sqlite.forget(id, memory_type);
+            return Ok(());
         }
-        let result = self
-            .state_store
-            .delete_file(memory_type.category(), id)
+        self.state_store
+            .delete_file_value(memory_type.category(), id)
             .await?;
 
         // Remove from HNSW index if attached
@@ -221,7 +224,7 @@ impl MemoryManager {
             }
         }
 
-        Ok(result)
+        Ok(())
     }
 
     /// List memories of a given type, most recent first.
@@ -235,8 +238,7 @@ impl MemoryManager {
         let mut entries = Vec::new();
         for name in names.into_iter().take(limit.saturating_mul(2)) {
             if let Ok(Some(entry)) = self
-                .state_store
-                .load_json::<MemoryEntry>(category, &name)
+                .state_store.load_typed::<MemoryEntry>(category, &name)
                 .await
             {
                 entries.push(entry);
@@ -296,8 +298,7 @@ impl MemoryManager {
         for (id, score) in scored {
             for mt in types {
                 if let Ok(Some(mut entry)) = self
-                    .state_store
-                    .load_json::<MemoryEntry>(mt.category(), &id)
+                    .state_store.load_typed::<MemoryEntry>(mt.category(), &id)
                     .await
                 {
                     AutoProtector::record_access(&mut entry, "");
@@ -898,8 +899,7 @@ impl MemoryManager {
         for (id, distance) in raw_hits {
             for mt in types {
                 if let Ok(Some(mut entry)) = self
-                    .state_store
-                    .load_json::<MemoryEntry>(mt.category(), &id)
+                    .state_store.load_typed::<MemoryEntry>(mt.category(), &id)
                     .await
                 {
                     AutoProtector::record_access(&mut entry, "");
@@ -961,8 +961,7 @@ impl MemoryManager {
             if let Ok(names) = self.state_store.list_category(mt.category()).await {
                 for name in names {
                     if let Ok(Some(entry)) = self
-                        .state_store
-                        .load_json::<MemoryEntry>(mt.category(), &name)
+                        .state_store.load_typed::<MemoryEntry>(mt.category(), &name)
                         .await
                     {
                         let vector = self.embedding.embed(&entry.content).await?;
@@ -1036,7 +1035,7 @@ impl MemoryManager {
         }
         // Try as category/name format
         if let Some((cat, name)) = reference.split_once('/') {
-            if let Ok(Some(entry)) = self.state_store.load_json::<MemoryEntry>(cat, name).await {
+            if let Ok(Some(entry)) = self.state_store.load_typed::<MemoryEntry>(cat, name).await {
                 return Ok(Some(entry));
             }
         }

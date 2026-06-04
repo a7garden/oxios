@@ -813,8 +813,8 @@ mod tests {
             .unwrap()
             .is_some());
 
-        let deleted = store.forget("forget-test-1", MemoryType::Fact).unwrap();
-        assert!(deleted);
+        let deleted = store.forget("forget-test-1", MemoryType::Fact);
+        assert!(deleted.is_ok());
         assert!(store
             .get("forget-test-1", MemoryType::Fact)
             .unwrap()

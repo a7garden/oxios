@@ -66,7 +66,10 @@ impl MemoryApi {
     }
 
     /// Forget (delete) a memory entry.
-    pub async fn forget(&self, id: &str, memory_type: MemoryType) -> anyhow::Result<bool> {
+    ///
+    /// Returns `Ok(())` on success. (Previously returned `Result<bool>`;
+    /// the bool was discarded by all callers.)
+    pub async fn forget(&self, id: &str, memory_type: MemoryType) -> anyhow::Result<()> {
         self.memory_manager.forget(id, memory_type).await
     }
 

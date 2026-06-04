@@ -1238,3 +1238,22 @@ mod tests {
         assert_eq!(content, b"{\"v\":1}");
     }
 }
+
+// ---------------------------------------------------------------------------
+// MemoryGit trait impl (RFC-018 b.6)
+// ---------------------------------------------------------------------------
+
+#[async_trait::async_trait]
+impl oxios_memory::MemoryGit for GitLayer {
+    async fn commit_file(&self, path: &str, message: &str) -> anyhow::Result<()> {
+        // GitLayer::commit_file is synchronous (no internal I/O await).
+        // Running it inline on the current task is fine — the work is bounded
+        // by git CLI invocation which blocks briefly but is acceptable here.
+        // The returned CommitInfo is discarded for the trait impl.
+        self.commit_file(path, message).map(|_| ())
+    }
+
+    fn is_enabled(&self) -> bool {
+        self.is_enabled()
+    }
+}

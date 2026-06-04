@@ -39,3 +39,4 @@ pub use crate::memory::{
     ChunkConfig, EmbeddingProvider, EmbeddingVector, MemoryGit, MemoryStorage, TextChunk,
     TextVector, TfIdfEmbeddingProvider,
 };
+pub use crate::memory::storage_ext::MemoryStorageExt;

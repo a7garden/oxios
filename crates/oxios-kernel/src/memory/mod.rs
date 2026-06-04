@@ -69,18 +69,18 @@ pub fn content_hash(content: &str) -> u64 {
 
 /// Agent memory manager.
 ///
-/// Stores and retrieves memory entries using the file-based StateStore.
-/// Supports embedding-based vector search via an in-memory TF-IDF index
-/// that is rebuilt on startup.
+/// Stores and retrieves memory entries using a [`oxios_memory::MemoryStorage`]
+/// backend (concretely, `oxios-kernel::StateStore`). Supports embedding-based
+/// vector search via an in-memory TF-IDF index that is rebuilt on startup.
 pub struct MemoryManager {
-    state_store: Arc<StateStore>,
+    state_store: Arc<dyn oxios_memory::MemoryStorage>,
     max_recall: usize,
     /// Vector index for semantic search (id → EmbeddingVector).
     vector_index: RwLock<HashMap<String, EmbeddingVector>>,
     /// Embedding provider for generating vectors.
     embedding: Arc<dyn EmbeddingProvider>,
     /// Optional git layer for version-controlled memory.
-    git_layer: Option<Arc<GitLayer>>,
+    git_layer: Option<Arc<dyn oxios_memory::MemoryGit>>,
     /// Optional HNSW index for fast ANN search.
     hnsw_index: RwLock<Option<Arc<HnswMemoryIndex>>>,
     /// Optional SONA learning engine (RFC-020 Phase 2).
@@ -177,7 +177,18 @@ impl MemoryManager {
     fn git_commit(&self, rel_path: &str, message: &str) {
         if let Some(ref gl) = self.git_layer {
             if gl.is_enabled() {
-                let _ = gl.commit_file(rel_path, message);
+                // Fire-and-forget: the commit happens in a background task.
+                // Before RFC-018 b.6 this was a sync call; now `commit_file`
+                // returns a future (via the MemoryGit trait) so we spawn it
+                // to keep the surrounding MemoryManager methods sync.
+                let gl = gl.clone();
+                let rel_path = rel_path.to_string();
+                let message = message.to_string();
+                tokio::spawn(async move {
+                    if let Err(e) = gl.commit_file(&rel_path, &message).await {
+                        tracing::warn!(error = %e, path = %rel_path, "git commit failed (non-fatal)");
+                    }
+                });
             }
         }
     }

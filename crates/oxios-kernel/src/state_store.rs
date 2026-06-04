@@ -791,3 +791,36 @@ mod tests {
         assert_eq!(remaining[0].user_id, "recent-user");
     }
 }
+
+// ---------------------------------------------------------------------------
+// MemoryStorage trait impl (RFC-018 b.6)
+// ---------------------------------------------------------------------------
+
+#[async_trait::async_trait]
+impl oxios_memory::MemoryStorage for StateStore {
+    async fn save_json_value(
+        &self,
+        category: &str,
+        key: &str,
+        value: &serde_json::Value,
+    ) -> anyhow::Result<()> {
+        self.save_json(category, key, value).await
+    }
+
+    async fn load_json_value(
+        &self,
+        category: &str,
+        key: &str,
+    ) -> anyhow::Result<Option<serde_json::Value>> {
+        self.load_json::<serde_json::Value>(category, key).await
+    }
+
+    async fn list_category(&self, category: &str) -> anyhow::Result<Vec<String>> {
+        self.list_category(category).await
+    }
+
+    async fn delete_file_value(&self, category: &str, key: &str) -> anyhow::Result<()> {
+        self.delete_file(category, key).await?;
+        Ok(())
+    }
+}

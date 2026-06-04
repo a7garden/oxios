@@ -29,6 +29,7 @@ pub mod normalizer;
 pub mod quota;
 pub mod root_index;
 pub mod storage;
+pub mod storage_ext;
 pub mod text_vector;
 pub mod types;
 
