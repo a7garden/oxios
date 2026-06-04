@@ -681,3 +681,69 @@ ce79b43 refactor(web): rename channel to bridge in web surface
 2459cae refactor(tools): rename tools/kernel/ to tools/builtin/, cleanup worktree
 c1d692c (main) polish(knowledge): per-view enforcer state, full emoji shortcode dict, multi-alias wikilinks (#12)
 ```
+
+## 10. 최종 실행 결과 (2026-06-04, attempt 2)
+
+두 번째 시도에서 추가로 완료된 것들:
+
+### ✅ Phase B — `oxios-memory` facade crate 신설
+- `crates/oxios-memory/` 신규 crate (workspace member)
+- Memory 타입들을 re-export (MemoryManager, MemoryEntry, MemoryType, MemoryTier, etc.)
+- Storage 추상화 trait (`MemoryStorage`, `MemoryGit`) — *canonical* 위치
+- Embedding 타입 re-export (EmbeddingProvider, TfIdfEmbeddingProvider)
+- Config 타입 re-export (MemoryConfig, ConsolidationConfig, MemoryBridgeConfig, SqliteMemoryConfig)
+- **커밋:** `58427d5`
+- *실제 코드 추출은 RFC-017 (memory-extraction-strategy)로 분리*
+
+### ✅ Phase C — `MemoryApi` 신설 (14번째 typed API)
+- `crates/oxios-kernel/src/kernel_handle/memory_api.rs` 신규
+- 14번째 facade API: `MemoryApi`
+- 메서드: `remember`, `search`, `recall`, `get`, `forget`, `list`, `search_semantic`, `stats`, `rebuild_hnsw_index`, `manager()`
+- `KernelHandle::memory()` accessor 신설
+- 기존 `AgentApi::memory_manager()` leaky accessor → `MemoryApi`로 wrapping
+- **커밋:** `9273648`
+- **Breaking change** (CHANGELOG 필요)
+
+### 🟡 Phase D — 부분 완료
+- `crates/oxios-kernel/Cargo.toml` default features 단순화 시도
+- `browser` feature 참조 모두 제거 (kernel source code)
+- `sqlite-memory`는 kernel default에 *유지* (Phase B 코드 추출 미완)
+- **커밋:** `fceb22e`
+
+### 🟡 Phase E — upstream blocker
+- oxi-agent v0.26.2의 `tools/browse/mod.rs`에 `browse_session_tool` 중복 정의 버그
+- `pub mod browse_session_tool;`이 line 8과 19에 두 번 등장 (line 19는 `#[cfg(feature = "native-browser")]` 뒤)
+- `oxi-sdk/native-browser` 활성화 시 컴파일 실패
+- **해결:** oxi-agent upstream PR 또는 oxi-sdk 다운그레이드
+
+### 누적 커밋 (RFC-016 브랜치)
+
+```
+fceb22e refactor(kernel): simplify default features (Phase D partial)
+9273648 feat(kernel): add MemoryApi to KernelHandle (Phase C)
+58427d5 feat(memory): add oxios-memory facade crate (Phase B partial)
+2ea8743 merge: RFC-016 Phase A + partial Phase E
+71527b1 docs: add §9 execution status to RFC-016
+ffec07e refactor(kernel): remove BrowserApi/BrowserTool, oxi-agent blocked
+ce79b43 refactor(web): rename channel to bridge in web surface
+2459cae refactor(tools): rename tools/kernel/ to tools/builtin/, cleanup worktree
+```
+
+### 검증
+- `cargo test -p oxios-kernel --lib`: **739 passed, 0 failed**
+- `cargo test -p oxios-memory`: **1 ignored (test fixture)**
+- `cargo build -p oxios-kernel`: **clean**
+- `cargo build -p oxios-memory`: **clean**
+
+### 다음 작업 (RFC-017 발행 권장)
+
+1. **RFC-017 (memory-extraction-strategy)**: Phase B 코드 추출 전략
+   - 옵션 (a) trait 추상화 (StateStore/GitLayer/Config → trait) + MemoryConfig 이동 — 1-2주
+   - 옵션 (b) memory의 *data types only* 추출 (MemoryManager는 kernel에 남김) — 3-5일
+   - 옵션 (c) 점진 추출 (chunking/hyperbolic/embedding부터) — 2-3주
+
+2. **oxi-sdk upstream PR**: oxi-agent의 `tools/browse/mod.rs` 중복 정의 수정
+
+3. **Phase E 완료**: oxi-sdk `native-browser` 활성화 (upstream PR 머지 후)
+
+4. **CHANGELOG 업데이트**: `MemoryApi` (Phase C) breaking change 명시

@@ -162,7 +162,7 @@ pub fn register_tools_from_cspace(
 
             // Headless browser
             ResourceRef::Browser if cap.rights.contains(Rights::EXECUTE) => {
-                #[cfg(feature = "browser")]
+
                 {
                                     }
             }
@@ -249,7 +249,7 @@ pub fn register_tools_from_cspace_gated(
 
             // Headless browser
             ResourceRef::Browser if cap.rights.contains(Rights::EXECUTE) => {
-                #[cfg(feature = "browser")]
+
                 {
                                     }
             }

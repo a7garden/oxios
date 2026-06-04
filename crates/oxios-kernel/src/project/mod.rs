@@ -1,3 +1,4 @@
+
 //! Project module: work context management.
 //!
 //! Replaces the Space system with a project-centric model:
@@ -13,7 +14,7 @@
 
 pub mod conversation_buffer;
 pub mod detection;
-#[cfg(feature = "sqlite-memory")]
+
 pub mod manager;
 
 use chrono::{DateTime, Utc};
@@ -24,7 +25,7 @@ use uuid::Uuid;
 // ── Re-exports ──────────────────────────────────────────────
 pub use conversation_buffer::{ConversationBuffer, ConversationTurn};
 pub use detection::{detect_project, extract_path, find_by_id, find_by_name, DetectionResult};
-#[cfg(feature = "sqlite-memory")]
+
 pub use manager::{ProjectManager, ProjectManagerError};
 
 /// Unique identifier for a Project.
