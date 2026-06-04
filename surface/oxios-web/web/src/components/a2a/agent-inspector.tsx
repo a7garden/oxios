@@ -1,6 +1,6 @@
+import { Bot, ExternalLink, Power, Square, X } from 'lucide-react'
 import { useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { X, Bot, Power, ExternalLink, Square } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -94,11 +94,7 @@ export function AgentInspector({
       )}
     >
       {/* Backdrop */}
-      <div
-        className="absolute inset-0 bg-black/30"
-        onClick={onClose}
-        aria-hidden="true"
-      />
+      <div className="absolute inset-0 bg-black/30" onClick={onClose} aria-hidden="true" />
       {/* Panel */}
       <aside
         ref={panelRef}
@@ -181,9 +177,7 @@ export function AgentInspector({
               {isMessagesLoading ? (
                 <p className="text-sm text-muted-foreground mt-2">{t('a2a.inspectorLoading')}</p>
               ) : recentMessages.length === 0 ? (
-                <p className="text-sm text-muted-foreground mt-2">
-                  {t('a2a.inspectorNoMessages')}
-                </p>
+                <p className="text-sm text-muted-foreground mt-2">{t('a2a.inspectorNoMessages')}</p>
               ) : (
                 <ul className="mt-2 space-y-2" data-testid="a2a-inspector-messages">
                   {recentMessages.slice(0, 5).map((m) => (

@@ -36,7 +36,9 @@ export function AgentCardList({ agents }: Props) {
                 <p className="text-sm text-muted-foreground">{agent.description}</p>
               </div>
               <div className="flex items-center gap-1.5">
-                <span className={`h-2.5 w-2.5 rounded-full ${STATUS_COLOR[agent.status] ?? 'bg-gray-400'}`} />
+                <span
+                  className={`h-2.5 w-2.5 rounded-full ${STATUS_COLOR[agent.status] ?? 'bg-gray-400'}`}
+                />
                 <span className="text-xs capitalize">{agent.status}</span>
               </div>
             </div>
@@ -44,7 +46,9 @@ export function AgentCardList({ agents }: Props) {
             {agent.capabilities.length > 0 && (
               <div className="flex flex-wrap gap-1">
                 {agent.capabilities.map((cap) => (
-                  <Badge key={cap} variant="outline" className="text-xs">{cap}</Badge>
+                  <Badge key={cap} variant="outline" className="text-xs">
+                    {cap}
+                  </Badge>
                 ))}
               </div>
             )}
@@ -52,7 +56,9 @@ export function AgentCardList({ agents }: Props) {
             {agent.skills.length > 0 && (
               <div className="flex flex-wrap gap-1">
                 {agent.skills.map((skill) => (
-                  <Badge key={skill} variant="secondary" className="text-xs">{skill}</Badge>
+                  <Badge key={skill} variant="secondary" className="text-xs">
+                    {skill}
+                  </Badge>
                 ))}
               </div>
             )}

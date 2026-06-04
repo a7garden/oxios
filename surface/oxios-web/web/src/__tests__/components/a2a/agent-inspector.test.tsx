@@ -1,5 +1,5 @@
+import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
 import { AgentInspector } from '@/components/a2a/agent-inspector'
 import type { A2AAgentCard, A2AMessage, TopologyNode } from '@/types/a2a'
 

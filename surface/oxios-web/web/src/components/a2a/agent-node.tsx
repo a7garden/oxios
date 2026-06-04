@@ -1,6 +1,6 @@
-import { Handle, Position, type NodeProps } from 'reactflow'
 import { Bot, Power } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { Handle, type NodeProps, Position } from 'reactflow'
 import { cn } from '@/lib/utils'
 import type { TopologyNode } from '@/types/a2a'
 
@@ -48,7 +48,10 @@ function statusDot(status: string): string {
 }
 
 /** Human-readable "X seconds ago" / "X minutes ago" formatter. */
-function formatLastSeen(iso: string | null, t: (k: string, opts?: { count?: number }) => string): string {
+function formatLastSeen(
+  iso: string | null,
+  t: (k: string, opts?: { count?: number }) => string,
+): string {
   if (!iso) return t('a2a.neverSeen')
   const ts = new Date(iso).getTime()
   if (Number.isNaN(ts)) return t('a2a.neverSeen')
@@ -82,14 +85,13 @@ export function AgentNode({ data, id }: NodeProps<AgentNodeData>) {
   const dotClass = statusDot(data.status)
 
   return (
-    <div
+    <button
+      type="button"
       className={cn(
-        'min-w-[200px] max-w-[260px] rounded-lg border-2 bg-card p-3 shadow-sm transition focus:outline-none focus:ring-2 focus:ring-ring',
+        'min-w-[200px] max-w-[260px] rounded-lg border-2 bg-card p-3 shadow-sm transition focus:outline-none focus:ring-2 focus:ring-ring text-left',
         borderClass,
         data.selected && 'ring-2 ring-ring',
       )}
-      role="button"
-      tabIndex={0}
       aria-label={t('a2a.nodeAriaLabel', { name: data.label, status: data.status })}
       onKeyDown={(e) => {
         if ((e.key === 'Enter' || e.key === ' ') && data.onSelect) {
@@ -111,9 +113,7 @@ export function AgentNode({ data, id }: NodeProps<AgentNodeData>) {
       </div>
 
       <div className="text-xs text-muted-foreground mt-1.5">
-        <span>
-          {t('a2a.capabilitiesCount', { count: data.capabilities?.length ?? 0 })}
-        </span>
+        <span>{t('a2a.capabilitiesCount', { count: data.capabilities?.length ?? 0 })}</span>
         <span className="mx-1.5">·</span>
         <span>{t('a2a.skillsCount', { count: data.skills?.length ?? 0 })}</span>
       </div>
@@ -123,6 +123,6 @@ export function AgentNode({ data, id }: NodeProps<AgentNodeData>) {
         {formatLastSeen(data.last_seen, t)}
       </div>
       <Handle type="source" position={Position.Right} className="!bg-muted-foreground" />
-    </div>
+    </button>
   )
 }

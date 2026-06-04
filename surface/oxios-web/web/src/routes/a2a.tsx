@@ -2,13 +2,13 @@ import { createFileRoute } from '@tanstack/react-router'
 import { Network } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { RefreshButton } from '@/components/shared/refresh-button'
-import { cn } from '@/lib/utils'
-import { useA2AAgents, useA2AMessages, useA2ATopology } from '@/hooks/use-a2a'
-import { InteractiveTopology } from '@/components/a2a/interactive-topology'
-import { MessageLog } from '@/components/a2a/message-log'
 import { AgentCardList } from '@/components/a2a/agent-card-list'
 import { AgentInspector } from '@/components/a2a/agent-inspector'
+import { InteractiveTopology } from '@/components/a2a/interactive-topology'
+import { MessageLog } from '@/components/a2a/message-log'
+import { RefreshButton } from '@/components/shared/refresh-button'
+import { useA2AAgents, useA2AMessages, useA2ATopology } from '@/hooks/use-a2a'
+import { cn } from '@/lib/utils'
 import type { A2AMessage } from '@/types/a2a'
 
 export const Route = createFileRoute('/a2a')({ component: A2APage })
@@ -77,6 +77,7 @@ function A2APage() {
       <div className="inline-flex h-9 items-center rounded-lg bg-muted p-1 text-muted-foreground gap-0.5">
         {tabs.map((tb) => (
           <button
+            type="button"
             key={tb.key}
             onClick={() => setTab(tb.key)}
             className={cn(

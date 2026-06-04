@@ -4,8 +4,8 @@ import ReactFlow, {
   Background,
   BackgroundVariant,
   Controls,
-  MiniMap,
   type Edge,
+  MiniMap,
   type Node,
   type NodeMouseHandler,
   type ReactFlowInstance,
@@ -13,12 +13,12 @@ import ReactFlow, {
   ReactFlowProvider,
 } from 'reactflow'
 import 'reactflow/dist/style.css'
-import { AgentNode, type AgentNodeData } from './agent-node'
-import type { TopologyEdge, TopologyNode } from '@/types/a2a'
-import { LoadingCards } from '@/components/shared/loading'
-import { ErrorState } from '@/components/shared/error-state'
-import { EmptyState } from '@/components/shared/empty-state'
 import { Network } from 'lucide-react'
+import { EmptyState } from '@/components/shared/empty-state'
+import { ErrorState } from '@/components/shared/error-state'
+import { LoadingCards } from '@/components/shared/loading'
+import type { TopologyEdge, TopologyNode } from '@/types/a2a'
+import { AgentNode, type AgentNodeData } from './agent-node'
 
 interface Props {
   nodes: TopologyNode[]
@@ -97,8 +97,7 @@ export function InteractiveTopology({
 
   const flowNodes: Node<AgentNodeData>[] = useMemo(() => {
     return nodes.map((n, i) => {
-      const existing = rfInstanceRef.current
-        ?.getNode(n.id)
+      const existing = rfInstanceRef.current?.getNode(n.id)
       return {
         id: n.id,
         type: 'agent',

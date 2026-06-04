@@ -1,6 +1,6 @@
-import { describe, expect, it, vi } from 'vitest'
-import { createElement, type ReactNode } from 'react'
 import { render, screen } from '@testing-library/react'
+import { createElement, type ReactNode } from 'react'
+import { describe, expect, it, vi } from 'vitest'
 import { InteractiveTopology } from '@/components/a2a/interactive-topology'
 import type { TopologyEdge, TopologyNode } from '@/types/a2a'
 
@@ -38,7 +38,13 @@ vi.mock('reactflow', () => ({
         `${e.source}->${e.target}`,
       ),
     )
-    return createElement('div', { 'data-testid': 'rf-mock' }, ...nodeEls, ...edgeEls, children as ReactNode)
+    return createElement(
+      'div',
+      { 'data-testid': 'rf-mock' },
+      ...nodeEls,
+      ...edgeEls,
+      children as ReactNode,
+    )
   },
   ReactFlowProvider: ({ children }: any) => children,
   Background: () => null,
@@ -79,7 +85,9 @@ describe('InteractiveTopology', () => {
   it('renders a loading skeleton when isLoading is true', () => {
     const { container } = render(<InteractiveTopology nodes={[]} edges={[]} isLoading />)
     // Skeletons render with the loading class
-    expect(container.querySelectorAll('.animate-pulse, [data-slot="skeleton"]').length).toBeGreaterThanOrEqual(0)
+    expect(
+      container.querySelectorAll('.animate-pulse, [data-slot="skeleton"]').length,
+    ).toBeGreaterThanOrEqual(0)
     // Empty state should NOT show
     expect(screen.queryByText('a2a.noTopology')).not.toBeInTheDocument()
   })
