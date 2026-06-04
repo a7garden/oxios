@@ -5288,6 +5288,7 @@ dependencies = [
  "oxios-gateway",
  "oxios-kernel",
  "oxios-markdown",
+ "oxios-memory",
  "oxios-ouroboros",
  "oxios-telegram",
  "oxios-web",
@@ -5382,11 +5383,9 @@ dependencies = [
  "gix",
  "glob",
  "hex",
- "hf-hub",
  "indicatif",
  "inquire",
  "libc",
- "llama-gguf",
  "lru",
  "once_cell",
  "opentelemetry",
@@ -5471,8 +5470,15 @@ version = "1.0.2"
 dependencies = [
  "anyhow",
  "async-trait",
+ "dirs 6.0.0",
+ "hf-hub",
+ "llama-gguf",
+ "parking_lot",
  "serde",
  "serde_json",
+ "tempfile",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]

@@ -13,7 +13,7 @@ use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::embedding::{EmbeddingProvider, EmbeddingVector};
+use oxios_memory::{EmbeddingProvider, EmbeddingVector};
 
 // ---------------------------------------------------------------------------
 // Data types
@@ -434,7 +434,7 @@ impl SonaEngine {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::embedding::TfIdfEmbeddingProvider;
+    use oxios_memory::TfIdfEmbeddingProvider;
 
     fn make_step(input: &str, output: &str) -> TrajectoryStep {
         TrajectoryStep {

@@ -45,7 +45,9 @@ pub mod mcp;
 
 // ─── Intelligence ───────────────────────────────────────────────────
 // 메모리, 임베딩, 페르소나, 온보딩.
-pub mod embedding;
+//
+// `embedding` moved to `oxios-memory` in RFC-018 b.2. The kernel
+// re-exports its items below for back-compat.
 pub mod memory;
 pub mod onboarding;
 pub mod persona;
@@ -137,11 +139,9 @@ pub use mcp::{
 };
 
 // ─── Intelligence ───────────────────────────────────────────────────
-pub use embedding::{EmbeddingProvider, EmbeddingVector, TfIdfEmbeddingProvider};
-
-// ─── GGUF Embedding (RFC-012) ──────────────────────────────────────
-#[cfg(feature = "embedding-gguf")]
-pub use embedding::gguf::{EmbeddingDimension, GgufEmbeddingProvider, GgufModelLoader};
+// Embedding types moved to oxios-memory (RFC-018 b.2). Re-exported below
+// for back-compat — existing `use oxios_kernel::TfIdfEmbeddingProvider;`
+// paths continue to work.
 
 pub use memory::auto_memory_bridge::{
     AutoMemoryBridge, ExportResult, GuidancePattern, ImportResult, InsightCategory, MemoryInsight,
@@ -155,7 +155,7 @@ pub use memory::{
     content_hash, AutoClassifier, CompactionTree, CurationCandidate, CurationReport, DecayEngine,
     DreamCheckpoint, DreamProcess, DreamReport, HistoricalPeriod, HnswIndex, HnswMemoryIndex,
     MemoryBudget, MemoryEntry, MemoryGraph, MemoryManager, MemoryTier, MemoryType, ProactiveRecall,
-    ProtectionLevel, RootEntry, RootIndex, SemanticHit, TextVector, TopicEntry,
+    ProtectionLevel, RootEntry, RootIndex, SemanticHit, TopicEntry,
 };
 
 // ─── Memory core types (extracted to oxios-memory, RFC-018 b.1) ───
@@ -164,8 +164,12 @@ pub use memory::{
 pub use oxios_memory::{
     batch_euclidean_to_poincare, chunk_fixed, chunk_paragraphs, cosine_similarity_f32,
     euclidean_to_poincare, hyperbolic_distance, l2_normalize_f32, l2_normalize_f64, mobius_add,
-    mobius_scalar_mul, ChunkConfig, HyperbolicConfig, HyperbolicEmbedding, TextChunk,
+    mobius_scalar_mul, ChunkConfig, HyperbolicConfig, HyperbolicEmbedding, TextChunk, TextVector,
 };
+// ─── Embedding providers (RFC-018 b.2) ─────────────────────────────
+#[cfg(feature = "embedding-gguf")]
+pub use oxios_memory::memory::embedding::gguf::{EmbeddingDimension, GgufEmbeddingProvider, GgufModelLoader};
+pub use oxios_memory::{EmbeddingProvider, EmbeddingVector, TfIdfEmbeddingProvider};
 
 // ─── SQLite Memory (RFC-012) ────────────────────────────────────────
 #[cfg(feature = "sqlite-memory")]

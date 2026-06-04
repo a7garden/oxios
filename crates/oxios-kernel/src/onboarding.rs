@@ -442,15 +442,14 @@ fn setup_embedding(config: &OxiosConfig) -> anyhow::Result<String> {
 
     #[cfg(feature = "embedding-gguf")]
     {
-        let model_dir =
-            crate::embedding::gguf::GgufModelLoader::model_dir_for_workspace(&workspace);
+        let model_dir = oxios_memory::GgufModelLoader::model_dir_for_workspace(&workspace);
 
-        if crate::embedding::gguf::GgufModelLoader::is_model_cached(&model_dir) {
+        if oxios_memory::GgufModelLoader::is_model_cached(&model_dir) {
             return Ok("cached".to_string());
         }
 
-        let display_name = crate::embedding::gguf::MODEL_DISPLAY_NAME;
-        let size_mb = crate::embedding::gguf::MODEL_SIZE_MB;
+        let display_name = oxios_memory::MODEL_DISPLAY_NAME;
+        let size_mb = oxios_memory::MODEL_SIZE_MB;
 
         println!();
         println!(
@@ -467,7 +466,7 @@ fn setup_embedding(config: &OxiosConfig) -> anyhow::Result<String> {
         let result = with_spinner(
             &format!("Downloading {}...", display_name),
             &format!("{} Downloaded", theme::success(theme::ok()).to_string()),
-            || crate::embedding::gguf::GgufModelLoader::ensure_model(&model_dir),
+            || oxios_memory::GgufModelLoader::ensure_model(&model_dir),
         );
 
         match result {
@@ -594,7 +593,7 @@ fn print_summary(
         "cached" | "downloaded" => {
             #[cfg(feature = "embedding-gguf")]
             {
-                let name = crate::embedding::gguf::MODEL_DISPLAY_NAME;
+                let name = oxios_memory::MODEL_DISPLAY_NAME;
                 Some(if embed_status == "downloaded" {
                     format!("{} ✓", name)
                 } else {

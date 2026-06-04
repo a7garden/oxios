@@ -109,11 +109,12 @@ cli = ["dep:oxios-cli"]
 telegram = ["dep:oxios-telegram"]
 browser = []
 sqlite-memory = ["oxios-kernel/sqlite-memory"]
-embedding-gguf = ["oxios-kernel/embedding-gguf"]
+embedding-gguf = ["oxios-memory/embedding-gguf"]
 otel = ["oxios-kernel/otel", "dep:opentelemetry", "dep:opentelemetry_sdk"]
 
 [dependencies]
 oxios-kernel = { version = "1.0.2", path = "crates/oxios-kernel", default-features = false }
+oxios-memory = { version = "1.0.2", path = "crates/oxios-memory" }
 oxios-markdown = { version = "1.0.2", path = "crates/oxios-markdown" }
 oxios-ouroboros = { version = "1.0.2", path = "crates/oxios-ouroboros" }
 oxios-gateway = { version = "1.0.2", path = "crates/oxios-gateway" }

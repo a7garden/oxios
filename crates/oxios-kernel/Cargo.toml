@@ -13,10 +13,14 @@ wasm-sandbox = ["dep:wasmtime", "dep:wasmtime-wasi"]
 native-browser = ["oxi-sdk/native-browser"]
 sqlite-memory = ["dep:rusqlite", "dep:sqlite-vec"]
 
-# MLX embedding provider (Apple Silicon only)
-# Provides EmbeddingGemma-300m dense vectors for semantic search.
-# When disabled, falls back to TF-IDF sparse embeddings.
-embedding-gguf = ["dep:llama-gguf", "dep:hf-hub"]
+# `embedding-gguf` feature lives on `oxios-memory` (RFC-018 b.2). Re-declared
+# here so the kernel can gate `#[cfg(feature = "embedding-gguf")]` blocks.
+# Activating this feature enables the corresponding feature on the dep.
+embedding-gguf = ["oxios-memory/embedding-gguf"]
+
+# `embedding-gguf` feature moved to `oxios-memory` in RFC-018 b.2.
+# The root `oxios` binary and other workspace crates can gate on
+# `oxios-memory/embedding-gguf` directly (no passthrough needed).
 
 [dependencies]
 oxios-memory = { version = "1.0.2", path = "../oxios-memory" }
@@ -76,10 +80,7 @@ usearch = "2.25"
 rusqlite = { version = "0.34", features = ["bundled"], optional = true }
 sqlite-vec = { version = "0.1", optional = true }
 
-# MLX embedding (Apple Silicon, optional)
-[target.'cfg(target_arch = "aarch64")'.dependencies]
-llama-gguf = { version = "0.14", optional = true, features = ["cpu", "huggingface"] }
-hf-hub = { version = "0.4", optional = true }
+# `llama-gguf` and `hf-hub` moved to `oxios-memory` in RFC-018 b.2.
 
 
 # OpenTelemetry (optional)

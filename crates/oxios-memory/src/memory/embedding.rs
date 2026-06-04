@@ -43,7 +43,7 @@ impl EmbeddingVector {
                 dot / (na * nb)
             }
             (EmbeddingVector::DenseF32(a), EmbeddingVector::DenseF32(b)) => {
-                oxios_memory::cosine_similarity_f32(a, b) as f64
+                super::cosine_similarity_f32(a, b) as f64
             }
             (EmbeddingVector::Dense(a), EmbeddingVector::DenseF32(b))
             | (EmbeddingVector::DenseF32(b), EmbeddingVector::Dense(a)) => {
@@ -133,7 +133,7 @@ pub struct TfIdfEmbeddingProvider;
 #[async_trait::async_trait]
 impl EmbeddingProvider for TfIdfEmbeddingProvider {
     async fn embed(&self, text: &str) -> Result<EmbeddingVector> {
-        let tv = crate::memory::TextVector::from_text(text);
+        let tv = super::text_vector::TextVector::from_text(text);
         Ok(EmbeddingVector::Sparse(tv.tf_map().clone()))
     }
     fn name(&self) -> &str {

@@ -29,7 +29,7 @@ use llama_gguf::{
 };
 use parking_lot::Mutex;
 
-use crate::embedding::{EmbeddingProvider, EmbeddingVector};
+use super::{EmbeddingProvider, EmbeddingVector};
 
 pub use self::loader::GgufModelLoader;
 pub use self::loader::{MODEL_DISPLAY_NAME, MODEL_SIZE_MB};

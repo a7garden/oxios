@@ -30,7 +30,7 @@ use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
-use crate::embedding::{EmbeddingProvider, EmbeddingVector};
+use oxios_memory::{EmbeddingProvider, EmbeddingVector};
 
 // ---------------------------------------------------------------------------
 // Types
@@ -588,7 +588,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_with_tfidf_embedder() {
-        use crate::embedding::TfIdfEmbeddingProvider;
+        use oxios_memory::TfIdfEmbeddingProvider;
 
         let embedder = Arc::new(TfIdfEmbeddingProvider);
         let mut retriever = ToolRetriever::new(embedder);

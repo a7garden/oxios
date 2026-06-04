@@ -30,14 +30,12 @@ pub use crate::memory::hyperbolic::{
     batch_euclidean_to_poincare, euclidean_to_poincare, hyperbolic_distance, mobius_add,
     mobius_scalar_mul, HyperbolicConfig, HyperbolicEmbedding,
 };
+#[cfg(feature = "embedding-gguf")]
+pub use crate::memory::embedding::gguf::{
+    EmbeddingDimension, GgufEmbeddingProvider, GgufModelLoader, MODEL_DISPLAY_NAME, MODEL_SIZE_MB,
+};
 pub use crate::memory::{
-    chunk_fixed,
-    chunk_paragraphs,
-    cosine_similarity_f32,
-    l2_normalize_f32,
-    l2_normalize_f64, // normalizer
-    ChunkConfig,
-    MemoryGit,
-    MemoryStorage, // storage traits
-    TextChunk,     // chunking
+    chunk_fixed, chunk_paragraphs, cosine_similarity_f32, l2_normalize_f32, l2_normalize_f64,
+    ChunkConfig, EmbeddingProvider, EmbeddingVector, MemoryGit, MemoryStorage, TextChunk,
+    TextVector, TfIdfEmbeddingProvider,
 };

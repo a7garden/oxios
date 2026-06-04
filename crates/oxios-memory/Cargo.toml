@@ -2,11 +2,29 @@
 name = "oxios-memory"
 version = "1.0.2"
 edition = "2021"
-description = "Tiered agent memory — math/text utilities and storage traits extracted from oxios-kernel"
+description = "Tiered agent memory — math/text utilities, embedding providers, and storage traits extracted from oxios-kernel"
 license = "MIT"
+
+[features]
+# GGUF-based dense embedding provider (Apple Silicon, EmbeddingGemma-300m).
+# When disabled, only TF-IDF (sparse) embedding is available.
+embedding-gguf = ["dep:llama-gguf", "dep:hf-hub"]
 
 [dependencies]
 serde = { workspace = true }
 async-trait = { workspace = true }
 serde_json = { workspace = true }
 anyhow = { workspace = true }
+parking_lot = { workspace = true }
+tracing = { workspace = true }
+tokio = { workspace = true }
+
+# GGUF embedding (Apple Silicon only, optional)
+[target.'cfg(target_arch = "aarch64")'.dependencies]
+llama-gguf = { version = "0.14", optional = true, features = ["cpu", "huggingface"] }
+hf-hub = { version = "0.4", optional = true }
+
+[dev-dependencies]
+tokio = { workspace = true }
+dirs = { workspace = true }
+tempfile = { workspace = true }

@@ -12,7 +12,7 @@ use chrono::{DateTime, Utc};
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 
-use crate::embedding::EmbeddingVector;
+use oxios_memory::EmbeddingVector;
 
 use super::auto_protect::AutoProtector;
 use super::hnsw::HnswIndex;

@@ -717,7 +717,7 @@ impl SqliteMemoryStore {
 // Re-export search helper functions from sub-modules
 // ---------------------------------------------------------------------------
 
-use crate::embedding::EmbeddingProvider;
+use oxios_memory::EmbeddingProvider;
 
 /// Cosine similarity between two vectors.
 fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
@@ -746,8 +746,8 @@ fn memory_delete_vector(db: &MemoryDatabase, rowid: i64) -> anyhow::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::embedding::TfIdfEmbeddingProvider;
     use crate::memory::{MemoryTier, ProtectionLevel};
+    use oxios_memory::TfIdfEmbeddingProvider;
 
     fn make_test_entry(id: &str, ty: MemoryType, content: &str) -> MemoryEntry {
         MemoryEntry {
