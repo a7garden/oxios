@@ -221,13 +221,11 @@ impl Surface for WebSurface {
             .allow_methods(tower_http::cors::Any)
             .allow_headers(tower_http::cors::Any);
 
-        // OpenAPI / Swagger UI
-        let openapi = api_docs::build_openapi();
-        let swagger: Router<()> = utoipa_swagger_ui::SwaggerUi::new("/api-docs")
-            .url("/openapi.json", openapi)
-            .into();
+        // OpenAPI / Swagger UI — gated by `gateway.expose_api_docs` AND
+        // a loopback bind. See `GatewayConfig::should_expose_api_docs`.
+        let should_expose_docs = state.config.read().gateway.should_expose_api_docs();
 
-        // SPA routes
+        // SPA routes (defined first so we can merge them into `app`).
         let spa_routes: Router<Arc<AppState>> = Router::new()
             .route("/assets/{*path}", get(static_handler))
             .route("/favicon.svg", get(static_handler))
@@ -235,12 +233,25 @@ impl Surface for WebSurface {
             .route("/{*path}", get(spa_handler))
             .route("/", get(spa_handler));
 
-        let app = Router::new()
+        let mut app = Router::new()
             .merge(api_routes)
             .merge(spa_routes)
-            .layer(cors)
-            .nest_service("/api-docs", swagger)
-            .with_state(state);
+            .layer(cors);
+
+        if should_expose_docs {
+            let openapi = api_docs::build_openapi();
+            let swagger: Router<()> = utoipa_swagger_ui::SwaggerUi::new("/api-docs")
+                .url("/openapi.json", openapi)
+                .into();
+            app = app.nest_service("/api-docs", swagger);
+            tracing::info!("API docs exposed at /api-docs and /openapi.json");
+        } else {
+            tracing::info!(
+                "API docs disabled (set gateway.expose_api_docs=true on a loopback bind to enable)"
+            );
+        }
+
+        let app = app.with_state(state);
 
         // Bind listener
         let addr = format!("{host}:{port}");

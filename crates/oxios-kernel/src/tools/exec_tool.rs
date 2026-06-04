@@ -29,7 +29,6 @@ use tokio::sync::oneshot;
 
 use crate::access_manager::AccessManager;
 use crate::access_manager::{AccessGate, AgentContext};
-use crate::config::ExecConfig;
 
 // ─── Shell metacharacter blocklist ──────────
 
