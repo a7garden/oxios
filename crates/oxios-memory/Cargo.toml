@@ -1,0 +1,12 @@
+[package]
+name = "oxios-memory"
+version = "1.0.2"
+edition = "2021"
+description = "Tiered agent memory — re-export facade for oxios-kernel's memory subsystem"
+license = "MIT"
+
+[dependencies]
+oxios-kernel = { path = "../oxios-kernel", version = "1.0.2" }
+async-trait = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
