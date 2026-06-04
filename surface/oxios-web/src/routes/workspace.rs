@@ -1562,4 +1562,114 @@ mod tests {
         let big_memory = "m".repeat(MAX_MEMORY_ENTRY + 1);
         assert!(big_memory.len() > MAX_MEMORY_ENTRY);
     }
+
+    // -----------------------------------------------------------------------
+    // MemoryMapCache (RFC-T1-B)
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_memory_map_cache_misses_on_empty() {
+        let cache = MemoryMapCache::default();
+        assert!(cache.get(0, &[]).is_none());
+    }
+
+    #[test]
+    fn test_memory_map_cache_round_trip() {
+        let cache = MemoryMapCache::default();
+        let ids = vec!["a".to_string(), "b".to_string()];
+        let entries = vec![
+            oxios_kernel::memory::MemoryMapEntry {
+                id: "a".into(),
+                tier: "hot".into(),
+                mem_type: "fact".into(),
+                content_preview: "alpha".into(),
+                created_at: "2026-06-04T00:00:00Z".into(),
+                access_count: 1,
+                coords_2d: (0.0, 0.0),
+                top_neighbors: vec![],
+            },
+            oxios_kernel::memory::MemoryMapEntry {
+                id: "b".into(),
+                tier: "warm".into(),
+                mem_type: "episode".into(),
+                content_preview: "beta".into(),
+                created_at: "2026-06-04T00:00:00Z".into(),
+                access_count: 2,
+                coords_2d: (0.5, -0.5),
+                top_neighbors: vec![oxios_kernel::memory::MemoryNeighbor {
+                    id: "a".into(),
+                    similarity: 0.81,
+                }],
+            },
+        ];
+        cache.put(42, ids.clone(), entries.clone());
+        let got = cache.get(42, &ids).expect("hit");
+        assert_eq!(got.len(), 2);
+        assert_eq!(got[0].id, "a");
+        assert_eq!(got[1].top_neighbors[0].similarity, 0.81);
+    }
+
+    #[test]
+    fn test_memory_map_cache_stale_epoch_misses() {
+        let cache = MemoryMapCache::default();
+        let ids = vec!["a".to_string()];
+        cache.put(
+            1,
+            ids.clone(),
+            vec![oxios_kernel::memory::MemoryMapEntry {
+                id: "a".into(),
+                tier: "hot".into(),
+                mem_type: "fact".into(),
+                content_preview: "x".into(),
+                created_at: "2026-06-04T00:00:00Z".into(),
+                access_count: 0,
+                coords_2d: (0.0, 0.0),
+                top_neighbors: vec![],
+            }],
+        );
+        assert!(cache.get(2, &ids).is_none());
+    }
+
+    #[test]
+    fn test_memory_map_cache_id_change_misses() {
+        let cache = MemoryMapCache::default();
+        let ids_a = vec!["a".to_string()];
+        cache.put(
+            1,
+            ids_a.clone(),
+            vec![oxios_kernel::memory::MemoryMapEntry {
+                id: "a".into(),
+                tier: "hot".into(),
+                mem_type: "fact".into(),
+                content_preview: "x".into(),
+                created_at: "2026-06-04T00:00:00Z".into(),
+                access_count: 0,
+                coords_2d: (0.0, 0.0),
+                top_neighbors: vec![],
+            }],
+        );
+        // Same epoch, different id set => miss.
+        let ids_b = vec!["a".to_string(), "b".to_string()];
+        assert!(cache.get(1, &ids_b).is_none());
+    }
+
+    #[test]
+    fn test_content_preview_truncates_with_ellipsis() {
+        let long = "x".repeat(200);
+        let preview = content_preview(&long, 120);
+        assert_eq!(preview.chars().count(), 121); // 120 + ellipsis
+        assert!(preview.ends_with('\u{2026}'));
+    }
+
+    #[test]
+    fn test_content_preview_keeps_short_content() {
+        let preview = content_preview("hello", 120);
+        assert_eq!(preview, "hello");
+    }
+
+    #[test]
+    fn test_content_preview_handles_empty() {
+        let preview = content_preview("", 120);
+        assert_eq!(preview, "");
+    }
 }
