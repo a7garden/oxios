@@ -1,4 +1,4 @@
-//! Web channel implementation.
+//! Web bridge implementation.
 //!
 //! Implements the [`Channel`] trait for the web interface, allowing
 //! the gateway to route messages to and from the HTTP API.
@@ -16,11 +16,11 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::{broadcast, mpsc, oneshot, watch, Mutex, RwLock};
 
-/// The web channel adapter.
+/// The web bridge adapter.
 ///
 /// Bridges the axum HTTP server with the gateway's channel interface
 /// using mpsc channels for message passing.
-pub struct WebChannel {
+pub struct WebBridge {
     /// Receiver for incoming messages from the HTTP layer.
     /// `Option` so `start()` can take ownership via `take()`.
     incoming_rx: Mutex<Option<mpsc::Receiver<IncomingMessage>>>,
@@ -32,8 +32,8 @@ pub struct WebChannel {
     responses: Arc<RwLock<HashMap<uuid::Uuid, oneshot::Sender<OutgoingMessage>>>>,
 }
 
-impl WebChannel {
-    /// Creates a new web channel with a bounded message buffer.
+impl WebBridge {
+    /// Creates a new web bridge with a bounded message buffer.
     pub fn new(buffer: usize) -> Self {
         let (incoming_tx, incoming_rx) = mpsc::channel(buffer);
         let (outgoing_tx, _) = broadcast::channel(buffer);
@@ -83,7 +83,7 @@ impl WebChannel {
 }
 
 #[async_trait]
-impl Channel for WebChannel {
+impl Channel for WebBridge {
     fn name(&self) -> &str {
         "web"
     }
@@ -95,7 +95,7 @@ impl Channel for WebChannel {
     ) -> Result<tokio::task::JoinHandle<()>> {
         let internal_rx = self.incoming_rx.lock().await.take();
         let Some(mut internal_rx) = internal_rx else {
-            anyhow::bail!("Web channel already started (no receiver)");
+            anyhow::bail!("Web bridge already started (no receiver)");
         };
         let channel_name = self.name().to_owned();
 
@@ -115,7 +115,7 @@ impl Channel for WebChannel {
                     _ = shutdown.changed() => break,
                 }
             }
-            tracing::info!(channel = %channel_name, "Web channel stopped");
+            tracing::info!(channel = %channel_name, "Web bridge stopped");
         });
 
         Ok(handle)
@@ -139,15 +139,15 @@ impl Channel for WebChannel {
     }
 }
 
-impl std::fmt::Debug for WebChannel {
+impl std::fmt::Debug for WebBridge {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("WebChannel").finish()
+        f.debug_struct("WebBridge").finish()
     }
 }
 
-/// Shared handle to the web channel, used by route handlers.
+/// Shared handle to the web bridge, used by route handlers.
 #[derive(Debug, Clone)]
-pub struct WebChannelHandle {
+pub struct WebBridgeHandle {
     /// Sender for injecting incoming messages into the gateway pipeline.
     pub incoming_tx: mpsc::Sender<IncomingMessage>,
     /// Broadcast sender for pushing outgoing messages to WebSocket/SSE.
@@ -156,9 +156,9 @@ pub struct WebChannelHandle {
     responses: Arc<RwLock<HashMap<uuid::Uuid, oneshot::Sender<OutgoingMessage>>>>,
 }
 
-impl WebChannelHandle {
-    /// Creates a new handle from a WebChannel.
-    pub fn from_channel(channel: &WebChannel) -> Self {
+impl WebBridgeHandle {
+    /// Creates a new handle from a WebBridge.
+    pub fn from_bridge(channel: &WebBridge) -> Self {
         Self {
             incoming_tx: channel.sender(),
             outgoing_tx: channel.outgoing_tx.clone(),
