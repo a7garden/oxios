@@ -21,6 +21,7 @@ import CodeMirror, {
   type ReactCodeMirrorRef,
 } from '@uiw/react-codemirror'
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown'
+import { languages } from '@codemirror/language-data'
 import { autocompletion, type Completion, type CompletionContext, type CompletionResult } from '@codemirror/autocomplete'
 import { history, indentWithTab } from '@codemirror/commands'
 import { bracketMatching, defaultHighlightStyle, syntaxHighlighting } from '@codemirror/language'
@@ -325,7 +326,8 @@ export function MarkdownEditor({
           lineNumbers: false,
           highlightActiveLine: true,
           highlightActiveLineGutter: false,
-          foldGutter: false,
+          foldGutter: true,
+          foldKeymap: true,
           autocompletion: false, // we provide our own
           syntaxHighlighting: true,
           bracketMatching: true,
@@ -345,7 +347,7 @@ export function MarkdownEditor({
             activateOnTyping: true,
             closeOnBlur: true,
           }),
-          markdown({ base: markdownLanguage }),
+          markdown({ base: markdownLanguage, codeLanguages: languages }),
           baseTheme,
           ...(isDark ? [darkTheme] : []),
         ]}
