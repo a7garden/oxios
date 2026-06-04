@@ -4,8 +4,7 @@
 //! Use `oxios --foreground` to run in the foreground (for debugging).
 //! First run without credentials triggers an interactive setup wizard.
 
-mod cmd_run;
-mod cmd_update;
+mod commands;
 mod kernel;
 mod otel;
 mod surface;
@@ -1488,7 +1487,7 @@ async fn run() -> Result<()> {
             dry_run,
             yes,
         }) => {
-            return cmd_update::run_update(
+            return commands::update::run_update(
                 *web_only,
                 *binary_only,
                 version.as_deref(),
@@ -1498,7 +1497,7 @@ async fn run() -> Result<()> {
             .await;
         }
         Some(Command::Changelog { version }) => {
-            return cmd_update::run_changelog(version.as_deref()).await;
+            return commands::update::run_changelog(version.as_deref()).await;
         }
         Some(Command::Completion { shell }) => {
             let mut cmd = Cli::command();
@@ -1577,13 +1576,13 @@ async fn run() -> Result<()> {
             context_file,
             exit_code,
         }) => {
-            let opts = cmd_run::RunOptions {
+            let opts = commands::run::RunOptions {
                 json: *json,
                 session_id: session.clone(),
                 context_file: context_file.clone(),
                 exit_code: *exit_code,
             };
-            let code = cmd_run::cmd_run(&kernel, prompt, &opts).await?;
+            let code = commands::run::run(&kernel, prompt, &opts).await?;
             std::process::exit(code);
         }
 

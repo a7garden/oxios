@@ -77,7 +77,7 @@ impl SdkKernelToolProvider for OxiosKernelBridge {
         register_always_on(registry, Arc::clone(&self.search_cache));
 
         // 2. Kernel domain tools via KernelHandle
-        crate::tools::kernel::register_all_kernel_tools(
+        crate::tools::builtin::register_all_kernel_tools(
             registry,
             &self.kernel_handle,
             &context.agent_id,

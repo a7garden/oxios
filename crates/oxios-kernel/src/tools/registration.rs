@@ -34,7 +34,7 @@ use oxi_sdk::{
 use crate::access_manager::{AccessGate, AgentContext};
 use crate::capability::{CSpace, ResourceRef, Rights};
 use crate::tools::gated_tool::GatedTool;
-use crate::tools::kernel::*;
+use crate::tools::builtin::*;
 use crate::tools::{
     A2aDelegateTool, A2aQueryTool, A2aSendTool, ExecTool, KnowledgeTool, MemoryReadTool,
     MemorySearchTool, MemoryWriteTool,

@@ -96,3 +96,4 @@ tempfile = { workspace = true }
 oxios-ouroboros = { version = "1.0.2", path = "../oxios-ouroboros" }
 oxios-gateway = { path = "../oxios-gateway" }
 async-trait = { workspace = true }
+criterion = { version = "0.5", features = ["async"] }
