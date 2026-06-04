@@ -1,12 +1,13 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { Network } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { AgentCardList } from '@/components/a2a/agent-card-list'
 import { AgentInspector } from '@/components/a2a/agent-inspector'
 import { InteractiveTopology } from '@/components/a2a/interactive-topology'
 import { MessageLog } from '@/components/a2a/message-log'
 import { RefreshButton } from '@/components/shared/refresh-button'
+import { useToast } from '@/components/ui/sonner'
 import { useA2AAgents, useA2AMessages, useA2ATopology } from '@/hooks/use-a2a'
 import { cn } from '@/lib/utils'
 import type { A2AMessage } from '@/types/a2a'
@@ -17,6 +18,7 @@ type Tab = 'topology' | 'messages' | 'agents'
 
 function A2APage() {
   const { t } = useTranslation()
+  const { toast } = useToast()
   const [tab, setTab] = useState<Tab>('topology')
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
 
@@ -26,11 +28,11 @@ function A2APage() {
 
   const isFetching = agentsQ.isFetching || messagesQ.isFetching || topologyQ.isFetching
 
-  const refetchAll = () => {
+  const refetchAll = useCallback(() => {
     agentsQ.refetch()
     messagesQ.refetch()
     topologyQ.refetch()
-  }
+  }, [agentsQ, messagesQ, topologyQ])
 
   const tabs: { key: Tab; labelKey: string }[] = [
     { key: 'topology', labelKey: 'a2a.topology' },
@@ -57,9 +59,34 @@ function A2APage() {
       .slice(0, 5)
   }, [messagesQ.data, selectedNodeId])
 
-  const handleNodeSelect = (id: string) => {
+  const handleNodeSelect = useCallback((id: string) => {
     setSelectedNodeId(id)
-  }
+  }, [])
+
+  const handleViewTrace = useCallback(
+    (id: string) => {
+      // Trace view is not yet implemented — surface the gap with a toast
+      // rather than a silent console.info (which made the destructive
+      // [Stop agent] button look broken).
+      toast(t('a2a.traceNotImplemented'), 'default')
+      // `id` is captured for the future router hook-up:
+      //   navigate({ to: '/agents/$id/trace', params: { id } })
+      void id
+    },
+    [toast, t],
+  )
+
+  const handleStopAgent = useCallback(
+    (id: string) => {
+      // Stop-agent endpoint is not yet implemented. Honest UX: tell the
+      // user via toast instead of logging to the console.
+      toast(t('a2a.stopNotImplemented'), 'destructive')
+      // `id` is captured for the future mutation hook-up:
+      //   api.stopAgent(id)
+      void id
+    },
+    [toast, t],
+  )
 
   return (
     <div className="space-y-6">
@@ -112,17 +139,8 @@ function A2APage() {
         agentCard={selectedAgentCard}
         recentMessages={selectedMessages}
         isMessagesLoading={messagesQ.isLoading}
-        onViewTrace={(id) => {
-          // Future: route to /agents/{id}/trace
-          // For now, log to the console for traceability.
-          // eslint-disable-next-line no-console
-          console.info('[a2a] view trace', id)
-        }}
-        onStopAgent={(id) => {
-          // Future: POST /api/agents/{id}/stop
-          // eslint-disable-next-line no-console
-          console.info('[a2a] stop agent', id)
-        }}
+        onViewTrace={handleViewTrace}
+        onStopAgent={handleStopAgent}
       />
     </div>
   )

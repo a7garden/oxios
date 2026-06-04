@@ -930,7 +930,9 @@
     "inspectorNoSkills": "등록된 스킬이 없습니다.",
     "inspectorViewTrace": "추적 보기",
     "inspectorStopAgent": "에이전트 중지",
-    "inspectorLastSeen": "마지막 활동"
+    "inspectorLastSeen": "마지막 활동",
+    "traceNotImplemented": "추적 보기는 아직 구현되지 않았습니다.",
+    "stopNotImplemented": "에이전트 중지는 아직 구현되지 않았습니다."
   },
   "cronJobs": {
     "title": "Cron 작업",

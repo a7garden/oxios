@@ -930,7 +930,9 @@
     "inspectorNoSkills": "No skills registered.",
     "inspectorViewTrace": "View trace",
     "inspectorStopAgent": "Stop agent",
-    "inspectorLastSeen": "Last seen"
+    "inspectorLastSeen": "Last seen",
+    "traceNotImplemented": "Trace view is not yet implemented.",
+    "stopNotImplemented": "Agent stop is not yet implemented."
   },
   "cronJobs": {
     "title": "Cron Jobs",
