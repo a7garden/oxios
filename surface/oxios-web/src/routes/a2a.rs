@@ -142,8 +142,14 @@ pub(crate) async fn handle_a2a_topology(
     let edges: Vec<serde_json::Value> = edge_aggregates
         .iter()
         .map(|((from, to), (count, last_kind))| {
-            let from_label = name_map.get(from).cloned().unwrap_or_else(|| "unknown".into());
-            let to_label = name_map.get(to).cloned().unwrap_or_else(|| "unknown".into());
+            let from_label = name_map
+                .get(from)
+                .cloned()
+                .unwrap_or_else(|| "unknown".into());
+            let to_label = name_map
+                .get(to)
+                .cloned()
+                .unwrap_or_else(|| "unknown".into());
             serde_json::json!({
                 "from": from_label,
                 "to": to_label,

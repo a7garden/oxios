@@ -1075,9 +1075,7 @@ mod tests {
             (worker_b, "worker-b"),
         ] {
             a2a.registry
-                .register_agent(
-                    AgentCard::new(id, name, "test").with_status(AgentStatus::Running),
-                )
+                .register_agent(AgentCard::new(id, name, "test").with_status(AgentStatus::Running))
                 .await
                 .unwrap();
         }
@@ -1136,23 +1134,17 @@ mod tests {
         assert_eq!(e1.1, "task_delegation", "orch->worker_a last_kind");
 
         // orchestrator -> worker-b: count=1, last_kind=task_delegation
-        let e2 = aggregates
-            .get(&(orch, worker_b))
-            .expect("edge 2 missing");
+        let e2 = aggregates.get(&(orch, worker_b)).expect("edge 2 missing");
         assert_eq!(e2.0, 1, "orch->worker_b count");
         assert_eq!(e2.1, "task_delegation", "orch->worker_b last_kind");
 
         // worker-b -> orchestrator: count=1, last_kind=status_update
-        let e3 = aggregates
-            .get(&(worker_b, orch))
-            .expect("edge 3 missing");
+        let e3 = aggregates.get(&(worker_b, orch)).expect("edge 3 missing");
         assert_eq!(e3.0, 1, "worker_b->orch count");
         assert_eq!(e3.1, "status_update", "worker_b->orch last_kind");
 
         // worker-a -> orchestrator: count=1, last_kind=result_sharing (fan-in)
-        let e4 = aggregates
-            .get(&(worker_a, orch))
-            .expect("edge 4 missing");
+        let e4 = aggregates.get(&(worker_a, orch)).expect("edge 4 missing");
         assert_eq!(e4.0, 1, "worker_a->orch count");
         assert_eq!(e4.1, "result_sharing", "worker_a->orch last_kind");
 
