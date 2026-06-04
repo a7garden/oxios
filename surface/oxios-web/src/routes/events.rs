@@ -333,6 +333,18 @@ pub(crate) fn sanitize_event(event: &oxios_kernel::event_bus::KernelEvent) -> se
             "is_error": is_error,
             "output_summary": output_summary,
         }),
+        KernelEvent::ToolExecutionProgress {
+            session_id,
+            tool_call_id,
+            tool_name,
+            progress,
+        } => serde_json::json!({
+            "type": "tool_progress",
+            "session_id": session_id,
+            "tool_call_id": tool_call_id,
+            "tool_name": tool_name,
+            "progress": progress,
+        }),
         KernelEvent::MemoryRecallUsed {
             session_id,
             query,

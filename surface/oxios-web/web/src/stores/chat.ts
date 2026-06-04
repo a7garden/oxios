@@ -107,6 +107,17 @@ function chunkToActivity(chunk: StreamChunk): ChatActivity | null {
         toolName: chunk.tool_name,
         toolCallId: chunk.tool_call_id,
         toolArgs: chunk.tool_args,
+        isRunning: true,
+      }
+    case 'tool_progress':
+      return {
+        id: baseId(chunk.tool_call_id),
+        type: 'tool_call',
+        timestamp: ts,
+        toolName: chunk.tool_name,
+        toolCallId: chunk.tool_call_id,
+        progress: chunk.progress,
+        isRunning: true,
       }
     case 'tool_end':
       return {
@@ -118,6 +129,7 @@ function chunkToActivity(chunk: StreamChunk): ChatActivity | null {
         outputSummary: chunk.output_summary,
         durationMs: chunk.duration_ms,
         isError: chunk.is_error,
+        isRunning: false,
       }
     case 'memory':
       return {
@@ -466,6 +478,7 @@ export const useChatStore = create<ChatStore>()(
           // are dropped — they have no message to attach to.
           case 'phase':
           case 'tool_start':
+          case 'tool_progress':
           case 'tool_end':
           case 'memory':
           case 'reasoning':

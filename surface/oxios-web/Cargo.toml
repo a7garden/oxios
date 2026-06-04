@@ -1,6 +1,6 @@
 [package]
 name = "oxios-web"
-version = "1.0.2"
+version = "1.0.3"
 edition = "2021"
 description = "Web dashboard channel for Oxios"
 license = "MIT"

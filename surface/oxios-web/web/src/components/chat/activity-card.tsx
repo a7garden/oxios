@@ -5,6 +5,7 @@ import {
   ChevronRight,
   Clock,
   Cpu,
+  Loader2,
   Sparkles,
   Wrench,
 } from 'lucide-react'
@@ -43,6 +44,14 @@ export function ActivityCard({ activity, className }: ActivityCardProps) {
         )}
         <span className="shrink-0 text-muted-foreground">{icon}</span>
         <span className="font-medium truncate">{label}</span>
+        {activity.type === 'tool_call' && activity.isRunning && (
+          <Loader2 className="h-3 w-3 animate-spin text-muted-foreground shrink-0" />
+        )}
+        {activity.type === 'tool_call' && activity.progress && (
+          <span className="text-[10px] text-muted-foreground truncate max-w-[40ch]">
+            {activity.progress}
+          </span>
+        )}
         {badge}
         {durationStr && (
           <span className="ml-auto flex items-center gap-1 text-muted-foreground">

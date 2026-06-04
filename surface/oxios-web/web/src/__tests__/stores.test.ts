@@ -123,6 +123,101 @@ describe('useChatStore handleChunk (RFC-015)', () => {
     })
   })
 
+  it('tool_start marks the tool_call as running', () => {
+    useChatStore.getState().handleChunk({
+      type: 'tool_start',
+      tool_name: 'browse',
+      tool_call_id: 'c1',
+      tool_args: {},
+    })
+    const last = useChatStore.getState().messages.at(-1)!
+    expect(last.activities![0]).toMatchObject({
+      type: 'tool_call',
+      toolName: 'browse',
+      toolCallId: 'c1',
+      isRunning: true,
+    })
+  })
+
+  it('tool_progress updates the existing tool_call in place (RFC-015 v0.12)', () => {
+    // Start a tool, then stream a progress update.
+    useChatStore.getState().handleChunk({
+      type: 'tool_start',
+      tool_name: 'browse',
+      tool_call_id: 'c1',
+      tool_args: { url: 'https://example.com' },
+    })
+    useChatStore.getState().handleChunk({
+      type: 'tool_progress',
+      tool_name: 'browse',
+      tool_call_id: 'c1',
+      progress: 'navigating to example.com',
+    })
+    const last = useChatStore.getState().messages.at(-1)!
+    // Progress must merge into the existing tool_call (not append a new one).
+    const toolActivities = last.activities!.filter((a) => a.type === 'tool_call')
+    expect(toolActivities).toHaveLength(1)
+    expect(toolActivities[0]).toMatchObject({
+      type: 'tool_call',
+      toolName: 'browse',
+      toolCallId: 'c1',
+      progress: 'navigating to example.com',
+      isRunning: true,
+    })
+    // Original toolArgs from tool_start are preserved across the merge.
+    expect(toolActivities[0]!.toolArgs).toEqual({ url: 'https://example.com' })
+  })
+
+  it('subsequent tool_progress replaces the prior progress text', () => {
+    useChatStore.getState().handleChunk({
+      type: 'tool_start',
+      tool_name: 'browse',
+      tool_call_id: 'c1',
+      tool_args: {},
+    })
+    useChatStore.getState().handleChunk({
+      type: 'tool_progress',
+      tool_name: 'browse',
+      tool_call_id: 'c1',
+      progress: 'step 1',
+    })
+    useChatStore.getState().handleChunk({
+      type: 'tool_progress',
+      tool_name: 'browse',
+      tool_call_id: 'c1',
+      progress: 'step 2',
+    })
+    const last = useChatStore.getState().messages.at(-1)!
+    const toolActivities = last.activities!.filter((a) => a.type === 'tool_call')
+    expect(toolActivities).toHaveLength(1)
+    expect(toolActivities[0]!.progress).toBe('step 2')
+  })
+
+  it('tool_end clears isRunning on the matching tool_call', () => {
+    useChatStore.getState().handleChunk({
+      type: 'tool_start',
+      tool_name: 'browse',
+      tool_call_id: 'c1',
+      tool_args: {},
+    })
+    useChatStore.getState().handleChunk({
+      type: 'tool_end',
+      tool_name: 'browse',
+      tool_call_id: 'c1',
+      duration_ms: 100,
+      is_error: false,
+      output_summary: 'done',
+    })
+    const last = useChatStore.getState().messages.at(-1)!
+    const toolActivities = last.activities!.filter((a) => a.type === 'tool_call')
+    expect(toolActivities).toHaveLength(1)
+    expect(toolActivities[0]).toMatchObject({
+      type: 'tool_call',
+      toolCallId: 'c1',
+      isRunning: false,
+    })
+  })
+
   it('memory recall appends a memory activity', () => {
     useChatStore.getState().handleChunk({
       type: 'memory',

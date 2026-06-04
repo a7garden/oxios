@@ -197,6 +197,12 @@ export interface ChatActivity {
   outputSummary?: string
   durationMs?: number
   isError?: boolean
+  /// Latest progress text from a running tool (RFC-015 v0.12). Replaced
+  /// in place as the tool emits new updates.
+  progress?: string
+  /// True while a tool is still running. Drives the spinner in
+  /// `ActivityCard` and is cleared on `tool_end`.
+  isRunning?: boolean
   // memory
   memoryAction?: 'recall' | 'store'
   query?: string
@@ -246,6 +252,7 @@ export interface StreamChunk {
     | 'phase'
     | 'tool_start'
     | 'tool_end'
+    | 'tool_progress'
     | 'memory'
     | 'reasoning'
     | 'usage'
@@ -267,6 +274,8 @@ export interface StreamChunk {
   summary?: string
   output_summary?: string
   is_error?: boolean
+  /// Human-readable progress text (RFC-015 v0.12).
+  progress?: string
   action?: 'recall' | 'store'
   query?: string
   count?: number

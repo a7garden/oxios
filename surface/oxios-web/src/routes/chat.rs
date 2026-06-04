@@ -704,6 +704,7 @@ fn kernel_event_to_ws_chunk(
     let event_session_id: Option<&str> = match event {
         KernelEvent::ToolExecutionStarted { session_id, .. } => Some(session_id),
         KernelEvent::ToolExecutionFinished { session_id, .. } => Some(session_id),
+        KernelEvent::ToolExecutionProgress { session_id, .. } => Some(session_id),
         KernelEvent::MemoryRecallUsed { session_id, .. } => Some(session_id),
         KernelEvent::TokenUsageUpdate { session_id, .. } => Some(session_id),
         KernelEvent::ReasoningFragment { session_id, .. } => Some(session_id),
@@ -741,6 +742,17 @@ fn kernel_event_to_ws_chunk(
             "duration_ms": duration_ms,
             "is_error": is_error,
             "output_summary": output_summary,
+        })),
+        KernelEvent::ToolExecutionProgress {
+            tool_call_id,
+            tool_name,
+            progress,
+            ..
+        } => Some(serde_json::json!({
+            "type": "tool_progress",
+            "tool_call_id": tool_call_id,
+            "tool_name": tool_name,
+            "progress": progress,
         })),
         KernelEvent::MemoryRecallUsed {
             query,
@@ -829,6 +841,37 @@ mod rfc015_tests {
         assert_eq!(chunk["type"], "tool_end");
         assert_eq!(chunk["duration_ms"], 123);
         assert_eq!(chunk["is_error"], false);
+    }
+
+    /// Real-time tool progress (RFC-015 v0.12) must be forwarded as a
+    /// `tool_progress` chunk so the Web UI can show a spinner and the
+    /// latest progress text while the tool is still running.
+    #[test]
+    fn tool_progress_emits_tool_progress_chunk() {
+        let event = KernelEvent::ToolExecutionProgress {
+            session_id: "s1".into(),
+            tool_call_id: "c1".into(),
+            tool_name: "browse".into(),
+            progress: "loading https://example.com".into(),
+        };
+        let chunk = kernel_event_to_ws_chunk(&event, &Some("s1".into())).unwrap();
+        assert_eq!(chunk["type"], "tool_progress");
+        assert_eq!(chunk["tool_call_id"], "c1");
+        assert_eq!(chunk["tool_name"], "browse");
+        assert_eq!(chunk["progress"], "loading https://example.com");
+    }
+
+    /// Progress events must be filtered by session_id, same as start/end.
+    #[test]
+    fn tool_progress_foreign_session_is_filtered() {
+        let event = KernelEvent::ToolExecutionProgress {
+            session_id: "other".into(),
+            tool_call_id: "c1".into(),
+            tool_name: "browse".into(),
+            progress: "leak me".into(),
+        };
+        let chunk = kernel_event_to_ws_chunk(&event, &Some("s1".into()));
+        assert!(chunk.is_none(), "foreign progress should be filtered");
     }
 
     #[test]

@@ -7,7 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **OxiBrowser Observability v0.12 — Phases 3 & 4** — Real-time tool progress flows from the oxi-agent loop through oxios-kernel → oxios-web → frontend.
+  - `KernelEvent::ToolExecutionProgress` variant + `agent_runtime` forwarding of `AgentEvent::ToolExecutionUpdate { partial_result }`
+  - oxios-web converts the new event into a `tool_progress` WS chunk (and SSE event)
+  - Frontend: `StreamChunk.tool_progress` → `ChatActivity.tool_call` with `progress` and `isRunning: true`; `tool_start` sets `isRunning: true`, `tool_end` clears it
+  - `ActivityCard` renders a `Loader2` spinner for running tool calls and shows the latest progress text inline
+
 ### Changed
+- **Version bump to 1.0.3** — `oxios-kernel` and `oxios-web` bumped. Additive (new enum variant, new optional TS fields); no API breaks.
 - **Release profile applied** — `Cargo.toml` now defines `[profile.release]` with `lto = "thin"`, `codegen-units = 1`, `strip = true`, `panic = "abort"`, `opt-level = 3`. Binary size reduced from ~66 MB → ~50 MB. See `docs/production-audit/07-infra/RELEASE-PROFILE.md`.
 - **CI workflow hardened** — Workflow-level `permissions: contents: read`; `cargo-audit` switched to `taiki-e/install-action` (saves ~30-60s/run); target cache key now includes `${{ github.sha }}` for better partial hits; frontend job now runs `typecheck`, `test`, and `lint` (was build-only).
 - **Release workflow permissions** — Workflow-level read-only default; release job keeps `contents: write`.
