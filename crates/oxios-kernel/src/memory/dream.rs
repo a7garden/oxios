@@ -18,7 +18,7 @@ use serde::{Deserialize, Serialize};
 use tokio::fs;
 use uuid::Uuid;
 
-use super::compaction::CompactionTree;
+use oxios_memory::memory::compaction::CompactionTree;
 use oxios_memory::memory::auto_classify::AutoClassifier;
 use oxios_memory::memory::auto_protect::AutoProtector;
 use oxios_memory::memory::decay::DecayEngine;

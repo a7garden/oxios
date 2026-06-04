@@ -147,15 +147,11 @@ pub use memory::auto_memory_bridge::{
     AutoMemoryBridge, ExportResult, GuidancePattern, ImportResult, InsightCategory, MemoryInsight,
     SyncDirection, SyncResult,
 };
-pub use memory::flash_attention::{
-    BenchmarkResult as AttentionBenchmarkResult, FlashAttention, FlashAttentionConfig,
-    MemoryEstimate,
-};
+// flash_attention + compaction + graph moved to oxios-memory in RFC-018 b.5.
+// Re-exported below from oxios_memory for back-compat.
 pub use memory::{
-    content_hash, CompactionTree,
-    DreamCheckpoint, DreamProcess, DreamReport, HistoricalPeriod, HnswIndex, HnswMemoryIndex,
-    MemoryBudget, MemoryEntry, MemoryGraph, MemoryManager, MemoryTier, MemoryType, ProactiveRecall,
-    ProtectionLevel, RootEntry, RootIndex, SemanticHit, TopicEntry,
+    content_hash, DreamCheckpoint, DreamProcess, DreamReport, HnswIndex, HnswMemoryIndex,
+    MemoryManager, ProactiveRecall, SemanticHit,
 };
 
 // ─── Memory core types (extracted to oxios-memory, RFC-018 b.1) ───

@@ -332,14 +332,11 @@ pub(crate) fn dedup_by_id(entries: &mut Vec<MemoryEntry>) {
 pub mod auto_memory_bridge;
 #[cfg(feature = "sqlite-memory")]
 pub mod cache;
-mod compaction;
 #[cfg(feature = "sqlite-memory")]
 pub mod database;
 pub mod dream;
 pub mod embedding_cache;
 pub mod embedding_viz;
-pub mod flash_attention;
-mod graph;
 mod hnsw;
 #[cfg(feature = "sqlite-memory")]
 pub mod migration;
@@ -351,7 +348,6 @@ pub mod sona;
 pub mod sqlite_store;
 pub(crate) mod store;
 
-pub use compaction::CompactionTree;
 pub use dream::{DreamCheckpoint, DreamProcess, DreamReport};
 pub use proactive::ProactiveRecall;
 pub use proactive::RecallTiming;
@@ -361,7 +357,6 @@ pub use embedding_viz::{compute_pca_2d, compute_top_neighbors, MemoryMapEntry, M
 pub use store::SemanticHit;
 
 // Re-export key types from sub-modules.
-pub use graph::MemoryGraph;
 pub use hnsw::HnswIndex;
 
 // ---------------------------------------------------------------------------
