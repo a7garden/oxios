@@ -24,13 +24,16 @@ export interface TopologyNode {
   id: string
   label: string
   status: string
+  capabilities: string[]
+  skills: string[]
+  last_seen: string | null
 }
 
 export interface TopologyEdge {
   from: string
   to: string
-  type: string
-  count: number
+  message_count_5m: number
+  last_kind: string
 }
 
 export interface A2ATopology {
