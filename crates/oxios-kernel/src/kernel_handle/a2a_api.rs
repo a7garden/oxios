@@ -43,4 +43,11 @@ impl A2aApi {
     pub fn get_message_log(&self, limit: Option<usize>) -> Vec<A2AMessageLogEntry> {
         self.protocol.get_message_log(limit)
     }
+
+    /// Returns message-log entries whose timestamp is within the last
+    /// `secs` seconds. Used by the topology endpoint to derive edges
+    /// from a sliding window of recent activity.
+    pub fn recent_messages(&self, secs: u64) -> Vec<A2AMessageLogEntry> {
+        self.protocol.recent_messages(secs)
+    }
 }

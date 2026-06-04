@@ -1,13 +1,16 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { Network } from 'lucide-react'
-import { useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { RefreshButton } from '@/components/shared/refresh-button'
-import { cn } from '@/lib/utils'
-import { useA2AAgents, useA2AMessages, useA2ATopology } from '@/hooks/use-a2a'
-import { TopologyGraph } from '@/components/a2a/topology-graph'
-import { MessageLog } from '@/components/a2a/message-log'
 import { AgentCardList } from '@/components/a2a/agent-card-list'
+import { AgentInspector } from '@/components/a2a/agent-inspector'
+import { InteractiveTopology } from '@/components/a2a/interactive-topology'
+import { MessageLog } from '@/components/a2a/message-log'
+import { RefreshButton } from '@/components/shared/refresh-button'
+import { useToast } from '@/components/ui/sonner'
+import { useA2AAgents, useA2AMessages, useA2ATopology } from '@/hooks/use-a2a'
+import { cn } from '@/lib/utils'
+import type { A2AMessage } from '@/types/a2a'
 
 export const Route = createFileRoute('/a2a')({ component: A2APage })
 
@@ -15,7 +18,9 @@ type Tab = 'topology' | 'messages' | 'agents'
 
 function A2APage() {
   const { t } = useTranslation()
+  const { toast } = useToast()
   const [tab, setTab] = useState<Tab>('topology')
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
 
   const agentsQ = useA2AAgents()
   const messagesQ = useA2AMessages()
@@ -23,17 +28,65 @@ function A2APage() {
 
   const isFetching = agentsQ.isFetching || messagesQ.isFetching || topologyQ.isFetching
 
-  const refetchAll = () => {
+  const refetchAll = useCallback(() => {
     agentsQ.refetch()
     messagesQ.refetch()
     topologyQ.refetch()
-  }
+  }, [agentsQ, messagesQ, topologyQ])
 
   const tabs: { key: Tab; labelKey: string }[] = [
     { key: 'topology', labelKey: 'a2a.topology' },
     { key: 'messages', labelKey: 'a2a.messages' },
     { key: 'agents', labelKey: 'a2a.agents' },
   ]
+
+  // Find the selected node + matching agent card.
+  const selectedNode = useMemo(
+    () => topologyQ.data?.nodes.find((n) => n.id === selectedNodeId) ?? null,
+    [topologyQ.data?.nodes, selectedNodeId],
+  )
+
+  const selectedAgentCard = useMemo(() => {
+    if (!selectedNodeId) return null
+    return agentsQ.data?.find((a) => a.name === selectedNodeId) ?? null
+  }, [agentsQ.data, selectedNodeId])
+
+  // Most recent 5 messages involving the selected agent.
+  const selectedMessages: A2AMessage[] = useMemo(() => {
+    if (!selectedNodeId) return []
+    return (messagesQ.data ?? [])
+      .filter((m) => m.from_agent === selectedNodeId || m.to_agent === selectedNodeId)
+      .slice(0, 5)
+  }, [messagesQ.data, selectedNodeId])
+
+  const handleNodeSelect = useCallback((id: string) => {
+    setSelectedNodeId(id)
+  }, [])
+
+  const handleViewTrace = useCallback(
+    (id: string) => {
+      // Trace view is not yet implemented — surface the gap with a toast
+      // rather than a silent console.info (which made the destructive
+      // [Stop agent] button look broken).
+      toast(t('a2a.traceNotImplemented'), 'default')
+      // `id` is captured for the future router hook-up:
+      //   navigate({ to: '/agents/$id/trace', params: { id } })
+      void id
+    },
+    [toast, t],
+  )
+
+  const handleStopAgent = useCallback(
+    (id: string) => {
+      // Stop-agent endpoint is not yet implemented. Honest UX: tell the
+      // user via toast instead of logging to the console.
+      toast(t('a2a.stopNotImplemented'), 'destructive')
+      // `id` is captured for the future mutation hook-up:
+      //   api.stopAgent(id)
+      void id
+    },
+    [toast, t],
+  )
 
   return (
     <div className="space-y-6">
@@ -51,6 +104,7 @@ function A2APage() {
       <div className="inline-flex h-9 items-center rounded-lg bg-muted p-1 text-muted-foreground gap-0.5">
         {tabs.map((tb) => (
           <button
+            type="button"
             key={tb.key}
             onClick={() => setTab(tb.key)}
             className={cn(
@@ -65,14 +119,29 @@ function A2APage() {
 
       {/* Content */}
       {tab === 'topology' && (
-        <TopologyGraph nodes={topologyQ.data?.nodes ?? []} />
+        <InteractiveTopology
+          nodes={topologyQ.data?.nodes ?? []}
+          edges={topologyQ.data?.edges ?? []}
+          isLoading={topologyQ.isLoading}
+          isError={topologyQ.isError}
+          onRetry={() => topologyQ.refetch()}
+          onNodeSelect={handleNodeSelect}
+          selectedNodeId={selectedNodeId}
+        />
       )}
-      {tab === 'messages' && (
-        <MessageLog messages={messagesQ.data ?? []} />
-      )}
-      {tab === 'agents' && (
-        <AgentCardList agents={agentsQ.data ?? []} />
-      )}
+      {tab === 'messages' && <MessageLog messages={messagesQ.data ?? []} />}
+      {tab === 'agents' && <AgentCardList agents={agentsQ.data ?? []} />}
+
+      <AgentInspector
+        node={selectedNode}
+        open={selectedNode != null}
+        onClose={() => setSelectedNodeId(null)}
+        agentCard={selectedAgentCard}
+        recentMessages={selectedMessages}
+        isMessagesLoading={messagesQ.isLoading}
+        onViewTrace={handleViewTrace}
+        onStopAgent={handleStopAgent}
+      />
     </div>
   )
 }
