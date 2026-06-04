@@ -1,6 +1,6 @@
 [package]
 name = "oxios-web"
-version = "1.0.1"
+version = "1.0.2"
 edition = "2021"
 description = "Web dashboard channel for Oxios"
 license = "MIT"
@@ -9,10 +9,10 @@ exclude = ["frontend/target/*", "static/wasm/*.wasm", "static/assets/*.wasm"]
 include = ["src/**", "web/dist/**", "static/**", "Cargo.toml", "LICENSE", "README.md"]
 
 [dependencies]
-oxios-gateway = { version = "1.0.0", path = "../../crates/oxios-gateway" }
-oxios-kernel = { version = "1.0.0", path = "../../crates/oxios-kernel", default-features = false, features = ["sqlite-memory"] }
-oxios-markdown = { version = "1.0.0", path = "../../crates/oxios-markdown" }
-oxios-ouroboros = { version = "1.0.0", path = "../../crates/oxios-ouroboros" }
+oxios-gateway = { version = "1.0.2", path = "../../crates/oxios-gateway" }
+oxios-kernel = { version = "1.0.2", path = "../../crates/oxios-kernel", default-features = false, features = ["sqlite-memory"] }
+oxios-markdown = { version = "1.0.2", path = "../../crates/oxios-markdown" }
+oxios-ouroboros = { version = "1.0.2", path = "../../crates/oxios-ouroboros" }
 # oxi-ai re-exported via oxi-sdk — no direct dependency needed
 oxi-sdk = { workspace = true }
 tokio = { workspace = true }

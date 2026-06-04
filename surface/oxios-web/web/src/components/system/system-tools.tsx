@@ -53,7 +53,7 @@ function ActionCard({
           {onRun && (
             <Button size="sm" onClick={onRun} disabled={isRunning}>
               {isRunning ? (
-                <><Loader2 className="h-3 w-3 animate-spin mr-1" /> {''}</>
+                <><Loader2 className="h-3 w-3 animate-spin mr-1" /></>
               ) : (
                 <RotateCcw className="h-3 w-3 mr-1" />
               )}

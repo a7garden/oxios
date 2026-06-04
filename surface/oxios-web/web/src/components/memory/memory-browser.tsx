@@ -53,20 +53,20 @@ export function MemoryBrowser({ onSelect }: MemoryBrowserProps) {
 
   return (
     <div className="space-y-4">
-      <div className="flex gap-3">
+      <div className="flex gap-3 flex-wrap">
         <Select
           value={tier}
           onValueChange={setTier}
           options={tierOptions}
           placeholder={t('memory.filterByTier')}
-          className="w-40"
+          className="w-full sm:w-40"
         />
         <Select
           value={type}
           onValueChange={setType}
           options={typeOptions}
           placeholder={t('memory.filterByType')}
-          className="w-40"
+          className="w-full sm:w-40"
         />
       </div>
       {isLoading ? (

@@ -23,10 +23,23 @@ export function FileTree({ entries, onFileSelect, currentPath, parentPath = '' }
           parentPath={parentPath}
           onFileSelect={onFileSelect}
           currentPath={currentPath}
+          expandedDirs={expandedDirs}
+          toggleDir={toggleDir}
         />
       ))}
     </ul>
   )
+}
+
+// Global expanded dirs state shared across the tree
+const expandedDirs = new Set<string>()
+
+function toggleDir(path: string) {
+  if (expandedDirs.has(path)) {
+    expandedDirs.delete(path)
+  } else {
+    expandedDirs.add(path)
+  }
 }
 
 interface FileTreeItemProps {
@@ -34,12 +47,21 @@ interface FileTreeItemProps {
   parentPath: string
   onFileSelect: (path: string) => void
   currentPath: string | null
+  expandedDirs: Set<string>
+  toggleDir: (path: string) => void
 }
 
-function FileTreeItem({ entry, parentPath, onFileSelect, currentPath }: FileTreeItemProps) {
-  const [expanded, setExpanded] = useState(false)
+function FileTreeItem({ entry, parentPath, onFileSelect, currentPath, expandedDirs, toggleDir }: FileTreeItemProps) {
   const fullPath = parentPath ? `${parentPath}/${entry.name}` : entry.name
   const isActive = currentPath === fullPath
+  const expanded = expandedDirs.has(fullPath)
+
+  // Force re-render when expanded changes
+  const [, forceUpdate] = useState(0)
+  const toggle = () => {
+    toggleDir(fullPath)
+    forceUpdate((n) => n + 1)
+  }
 
   if (entry.is_dir) {
     // Don't show hidden/system dirs
@@ -48,7 +70,7 @@ function FileTreeItem({ entry, parentPath, onFileSelect, currentPath }: FileTree
       <li>
         <button
           type="button"
-          onClick={() => setExpanded(!expanded)}
+          onClick={toggle}
           className="flex items-center gap-1.5 w-full px-2.5 py-1.5 text-sm rounded hover:bg-accent/50 transition-colors text-left"
         >
           <ChevronRight
@@ -62,7 +84,7 @@ function FileTreeItem({ entry, parentPath, onFileSelect, currentPath }: FileTree
           <span className="truncate">{entry.name}</span>
         </button>
         {expanded && (
-          <SubDirectory dir={fullPath} onFileSelect={onFileSelect} currentPath={currentPath} />
+          <SubDirectory dir={fullPath} onFileSelect={onFileSelect} currentPath={currentPath} expandedDirs={expandedDirs} toggleDir={toggleDir} />
         )}
       </li>
     )
@@ -94,10 +116,14 @@ function SubDirectory({
   dir,
   onFileSelect,
   currentPath,
+  expandedDirs,
+  toggleDir,
 }: {
   dir: string
   onFileSelect: (path: string) => void
   currentPath: string | null
+  expandedDirs: Set<string>
+  toggleDir: (path: string) => void
 }) {
   const { data: entries, isLoading } = useKnowledgeTree(dir)
   const { t } = useTranslation()

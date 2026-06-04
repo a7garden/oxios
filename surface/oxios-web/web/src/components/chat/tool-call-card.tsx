@@ -23,14 +23,14 @@ export function ToolCallCard({ call, className }: ToolCallCardProps) {
       >
         {expanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
         <Wrench className="h-3.5 w-3.5 text-muted-foreground" />
-        <span className="font-medium">{call.tool_name}</span>
+        <span className="font-medium truncate">{call.tool_name}</span>
         <span className="ml-auto text-xs text-muted-foreground">{durationStr}</span>
       </button>
       {expanded && (
         <div className="border-t px-3 py-2 space-y-2">
           <div>
             <p className="text-xs font-medium text-muted-foreground mb-1">Input</p>
-            <pre className="text-xs bg-background rounded p-2 overflow-x-auto whitespace-pre-wrap">{call.input}</pre>
+            <pre className="text-xs bg-background rounded p-2 overflow-x-auto whitespace-pre-wrap max-h-48 overflow-y-auto">{call.input}</pre>
           </div>
           <div>
             <p className="text-xs font-medium text-muted-foreground mb-1">Output</p>

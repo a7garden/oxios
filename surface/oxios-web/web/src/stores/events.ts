@@ -36,7 +36,7 @@ export const useEventStore = create<EventState>((set, get) => ({
 
     const sse = new SseClient()
     client = sse
-    set({ isConnected: true, error: null })
+    set({ error: null })
 
     sse.connect(
       '/api/events',
@@ -47,6 +47,10 @@ export const useEventStore = create<EventState>((set, get) => ({
       (err) => {
         set({ error: err, isConnected: false })
         client = null
+      },
+      () => {
+        // onOpen callback — connected successfully
+        set({ isConnected: true })
       },
     )
   },

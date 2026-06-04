@@ -29,7 +29,6 @@ use tokio::sync::oneshot;
 
 use crate::access_manager::AccessManager;
 use crate::access_manager::{AccessGate, AgentContext};
-use crate::config::ExecConfig;
 
 // ─── Shell metacharacter blocklist ──────────
 
@@ -65,8 +64,9 @@ pub struct ExecResult {
 /// - **shell_exec**: audit logging (cannot sandbox arbitrary shell).
 /// - **structured_exec**: pre-flight permission check via `AccessManager`.
 pub struct ExecTool {
-    /// Execution configuration (allowlist, timeouts).
-    config: Arc<ExecConfig>,
+    /// Hot-reloadable execution configuration (allowlist, timeouts).
+    /// Read via `.read()` on each call so `PUT /api/config` takes effect immediately.
+    config: crate::kernel_handle::SharedExecConfig,
     /// Access manager for direct permission checks (legacy path).
     access: Arc<Mutex<AccessManager>>,
     /// Agent security context — always present in production.
@@ -81,7 +81,7 @@ impl ExecTool {
     ///
     /// All executions are attributed to the agent and pass through access checks.
     pub fn new(
-        config: Arc<ExecConfig>,
+        config: crate::kernel_handle::SharedExecConfig,
         access: Arc<Mutex<AccessManager>>,
         context: AgentContext,
     ) -> Self {
@@ -95,7 +95,7 @@ impl ExecTool {
 
     /// Create a gated `ExecTool` with both context and access gate.
     pub fn new_gated(
-        config: Arc<ExecConfig>,
+        config: crate::kernel_handle::SharedExecConfig,
         context: AgentContext,
         gate: Arc<AccessGate>,
     ) -> Self {
@@ -116,7 +116,7 @@ impl ExecTool {
         context: AgentContext,
     ) -> Self {
         Self::new(
-            Arc::new(kernel.exec.config().clone()),
+            Arc::new(parking_lot::RwLock::new(kernel.exec.config_snapshot())),
             kernel.exec.access_manager().clone(),
             context,
         )
@@ -128,7 +128,7 @@ impl ExecTool {
     /// Prefer `from_kernel_with_context` for full security.
     pub fn from_kernel(kernel: &crate::kernel_handle::KernelHandle) -> Self {
         Self {
-            config: Arc::new(kernel.exec.config().clone()),
+            config: Arc::new(parking_lot::RwLock::new(kernel.exec.config_snapshot())),
             access: kernel.exec.access_manager().clone(),
             context: None,
             gate: None,
@@ -139,7 +139,7 @@ impl ExecTool {
     ///
     /// Prefer `new()` with `AgentContext` for full security.
     pub fn for_agent(
-        config: Arc<ExecConfig>,
+        config: crate::kernel_handle::SharedExecConfig,
         access: Arc<Mutex<AccessManager>>,
         _agent_name: String,
     ) -> Self {
@@ -155,7 +155,10 @@ impl ExecTool {
     ///
     /// **Warning:** This bypasses the new `AgentContext` / `AccessGate` path.
     /// Use only for migration or testing.
-    pub fn new_unrestricted(config: Arc<ExecConfig>, access: Arc<Mutex<AccessManager>>) -> Self {
+    pub fn new_unrestricted(
+        config: crate::kernel_handle::SharedExecConfig,
+        access: Arc<Mutex<AccessManager>>,
+    ) -> Self {
         Self {
             config,
             access,
@@ -184,7 +187,8 @@ impl ExecTool {
         shutdown: Option<oneshot::Receiver<()>>,
     ) -> Result<ExecResult, String> {
         // Check if shell mode is allowed
-        if !self.config.allow_shell_mode {
+        let cfg = self.config.read().clone();
+        if !cfg.allow_shell_mode {
             return Err(
                 "shell_exec: shell mode is disabled by configuration (allow_shell_mode = false). \
                  Use mode='structured' instead, or set allow_shell_mode=true in config.toml"
@@ -218,7 +222,7 @@ impl ExecTool {
             );
         }
 
-        let effective_timeout = timeout_ms.clamp(1_000, self.config.max_timeout_secs * 1_000);
+        let effective_timeout = timeout_ms.clamp(1_000, cfg.max_timeout_secs * 1_000);
 
         let start = std::time::Instant::now();
 
@@ -327,7 +331,7 @@ impl ExecTool {
         if binary.contains('/') {
             return Err("structured_exec: binary must be a bare name, not a path".to_string());
         }
-        if !self.config.is_binary_allowed(binary) {
+        if !self.config.read().is_binary_allowed(binary) {
             return Err(format!(
                 "structured_exec: binary '{binary}' is not in the allowlist"
             ));
@@ -342,7 +346,8 @@ impl ExecTool {
             );
         }
 
-        let effective_timeout = timeout_ms.clamp(1_000, self.config.max_timeout_secs * 1_000);
+        let effective_timeout =
+            timeout_ms.clamp(1_000, self.config.read().max_timeout_secs * 1_000);
 
         let start = std::time::Instant::now();
 
@@ -584,8 +589,8 @@ impl AgentTool for ExecTool {
         let timeout_secs = params
             .get("timeout")
             .and_then(|v| v.as_u64())
-            .unwrap_or(self.config.default_timeout_secs);
-        let timeout_ms = (timeout_secs * 1000).min(self.config.max_timeout_secs * 1000);
+            .unwrap_or(self.config.read().default_timeout_secs);
+        let timeout_ms = (timeout_secs * 1000).min(self.config.read().max_timeout_secs * 1000);
 
         match mode {
             "shell" => {
@@ -669,7 +674,10 @@ mod tests {
             ..Default::default()
         };
         config.allowed_commands = allowed_commands.into_iter().map(String::from).collect();
-        ExecTool::new_unrestricted(Arc::new(config), Arc::new(Mutex::new(AccessManager::new())))
+        ExecTool::new_unrestricted(
+            Arc::new(parking_lot::RwLock::new(config)),
+            Arc::new(Mutex::new(AccessManager::new())),
+        )
     }
 
     // ─── shell_exec ──────────────────────────────────────────────────
@@ -1050,7 +1058,11 @@ mod tests {
             }
         }
         let ctx = crate::access_manager::AgentContext::test_fixture(agent_name);
-        ExecTool::new(Arc::new(config), Arc::new(Mutex::new(access)), ctx)
+        ExecTool::new(
+            Arc::new(parking_lot::RwLock::new(config)),
+            Arc::new(Mutex::new(access)),
+            ctx,
+        )
     }
 
     #[tokio::test]
@@ -1114,7 +1126,10 @@ mod tests {
         let mut config = ExecConfig::default();
         config.allow_shell_mode = true; // Enable shell mode for this test
         let access = AccessManager::new(); // empty — no permissions for anyone
-        let tool = ExecTool::new_unrestricted(Arc::new(config), Arc::new(Mutex::new(access)));
+        let tool = ExecTool::new_unrestricted(
+            Arc::new(parking_lot::RwLock::new(config)),
+            Arc::new(Mutex::new(access)),
+        );
         let result = tool.shell_exec("echo unrestricted", 5_000, None).await;
         assert!(
             result.is_ok(),

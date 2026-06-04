@@ -28,21 +28,24 @@
 //! and estimated costs.
 
 use anyhow::Result;
+use oxi_sdk::observability::AuditTrail;
 use oxi_sdk::{
     Agent, AgentConfig, AgentEvent, CompactionEvent, CompactionStrategy, ProviderResolver,
 };
 use oxi_sdk::{SearchCache, ToolExecutionMode, ToolRegistry};
 use parking_lot::Mutex;
 use std::sync::Arc;
+// RFC-014 Phase D: `ToolRegistry::register_arc` is used in the AgentBuilder
+// path to attach CSpace tools after `builder.build()` returns.
 
 use crate::access_manager::{AccessGate, AgentContext, TracingAuditSink, TrailAuditSink};
-use crate::audit_trail::AuditTrail;
 use crate::capability::resolve::resolve_cspace;
 use crate::engine::OxiosEngine;
 use crate::memory::{MemoryEntry, MemoryManager, MemoryType};
-use crate::persona_manager::PersonaManager;
+use crate::persona::PersonaManager;
 use crate::tools::registration::register_tools_from_cspace_gated;
 
+use crate::event_bus::KernelEvent;
 use crate::session_context::SessionContext;
 use crate::types::AgentId;
 use crate::KernelHandle;
@@ -133,9 +136,10 @@ struct ExecuteState {
 /// builds a ToolRegistry based on the agent's CSpace, and runs it to completion.
 ///
 /// All OS-level access goes through `KernelHandle` — the single syscall table
-/// for agent control. Provider/model resolution goes through `OxiosEngine`.
+/// for agent control. Provider/model resolution goes through `EngineHandle`,
+/// which returns the latest `OxiosEngine` (hot-swapped on config change).
 pub struct AgentRuntime {
-    engine: Arc<OxiosEngine>,
+    engine_handle: Arc<crate::engine::EngineHandle>,
     config: AgentRuntimeConfig,
     /// Single path to all kernel services.
     kernel_handle: Arc<KernelHandle>,
@@ -148,18 +152,18 @@ pub struct AgentRuntime {
 }
 
 impl AgentRuntime {
-    /// Creates a new agent runtime with engine and kernel access.
+    /// Creates a new agent runtime with engine handle and kernel access.
     ///
-    /// Provider/model resolution goes through `engine`.
+    /// Provider/model resolution goes through `engine_handle` (hot-swapped on config change).
     /// Tool access goes through `kernel_handle`.
     pub fn new(
-        engine: Arc<OxiosEngine>,
+        engine_handle: Arc<crate::engine::EngineHandle>,
         model_id: impl Into<String>,
         kernel_handle: Arc<KernelHandle>,
         routing_stats: Option<Arc<crate::kernel_handle::RoutingStats>>,
     ) -> Self {
         Self {
-            engine,
+            engine_handle,
             config: AgentRuntimeConfig {
                 model_id: model_id.into(),
                 ..Default::default()
@@ -204,6 +208,23 @@ impl AgentRuntime {
         agent_id: AgentId,
         seed: &Seed,
         session_ctx: &mut SessionContext,
+    ) -> Result<ExecutionResult> {
+        // RFC-015: session_id is derived from seed.id for chat transparency
+        // event publishing. Most callers run one Seed per session turn, so
+        // seed.id is a usable session identifier.
+        let session_id: Option<String> = Some(seed.id.to_string());
+        self.execute_with_session(agent_id, seed, session_ctx, session_id)
+            .await
+    }
+
+    /// Like [`execute`](Self::execute) but with an explicit session_id for
+    /// RFC-015 chat transparency event publishing.
+    pub async fn execute_with_session(
+        &self,
+        agent_id: AgentId,
+        seed: &Seed,
+        session_ctx: &mut SessionContext,
+        session_id: Option<String>,
     ) -> Result<ExecutionResult> {
         let prompt = build_user_prompt(seed);
 
@@ -336,7 +357,9 @@ impl AgentRuntime {
         }
 
         // Resolve model from engine (provider resolution happens inside AgentBuilder).
-        let _model = self.engine.resolve_model(&self.config.model_id)?;
+        // Get the latest engine — may have been hot-swapped via Web UI config change.
+        let engine = self.engine_handle.get();
+        let _model = engine.resolve_model(&self.config.model_id)?;
         let seed_id = seed.id;
 
         // Build the agent.
@@ -347,10 +370,10 @@ impl AgentRuntime {
         let audit_trail: Option<Arc<AuditTrail>> =
             Some(Arc::clone(&self.kernel_handle.security.audit_trail));
 
-        let (final_content, steps_completed, success, _agent) = {
+        let (final_content, steps_completed, success, trajectory_steps, _agent) = {
             run_agent(
                 &config,
-                &self.engine,
+                &engine,
                 kernel_handle,
                 system_prompt,
                 prompt,
@@ -360,14 +383,27 @@ impl AgentRuntime {
                 cspace,
                 audit_trail,
                 self.routing_stats.clone(),
+                session_id.clone(),
             )
             .await?
         };
+
+        // Map trajectory steps to tool call records for the execution result.
+        let tool_calls: Vec<oxios_ouroboros::ToolCallRecord> = trajectory_steps
+            .iter()
+            .map(|s| oxios_ouroboros::ToolCallRecord {
+                tool: s.input.clone(),
+                input: String::new(), // Input is summarized in the trajectory step's input field
+                output: s.output.clone(),
+                duration_ms: s.duration_ms,
+            })
+            .collect();
 
         tracing::info!(
             seed_id = %seed_id,
             steps = steps_completed,
             success,
+            tool_calls = tool_calls.len(),
             "AgentRuntime finished"
         );
 
@@ -379,6 +415,7 @@ impl AgentRuntime {
             },
             steps_completed,
             success,
+            tool_calls,
         })
     }
 }
@@ -400,7 +437,14 @@ async fn run_agent(
     cspace: crate::capability::CSpace,
     audit_trail: Option<Arc<AuditTrail>>,
     routing_stats: Option<Arc<crate::kernel_handle::RoutingStats>>,
-) -> Result<(String, usize, bool, Arc<Agent>)> {
+    session_id: Option<String>,
+) -> Result<(
+    String,
+    usize,
+    bool,
+    Vec<crate::memory::sona::TrajectoryStep>,
+    Arc<Agent>,
+)> {
     // Extract workspace.
     let workspace = if !config.project_paths.is_empty() {
         config.project_paths[0].clone()
@@ -450,7 +494,7 @@ async fn run_agent(
     // Build access gate from kernel's security infrastructure
     let access_gate = Arc::new(AccessGate::new(
         kernel_handle.exec.access_manager().clone(),
-        Arc::new(kernel_handle.exec.config().clone()),
+        Arc::new(kernel_handle.exec.config_snapshot()),
         audit_sink,
     ));
 
@@ -471,11 +515,17 @@ async fn run_agent(
     );
 
     // ── Build AgentConfig ──
+    //
+    // RFC-014 Phase D: `system_prompt` is also passed to the new
+    // `AgentBuilder::system_prompt()` (which overrides the value embedded
+    // in `AgentConfig` at build time). We clone here so the builder path
+    // can consume the value while the legacy `Agent::new_with_resolver`
+    // path still sees it in the config.
     let agent_config = AgentConfig {
         name: format!("agent-{agent_id}"),
         description: None,
         model_id: config.model_id.clone(),
-        system_prompt: Some(system_prompt),
+        system_prompt: Some(system_prompt.clone()),
         max_iterations: config.max_iterations,
         timeout_seconds: 300,
         temperature: Some(0.7),
@@ -489,54 +539,125 @@ async fn run_agent(
         provider_options: config.provider_options.clone(),
     };
 
-    // ── Build Agent with middleware pipeline ──
-    // Create provider and resolver from engine.
-    // Use pooled provider when provider_rpm is set for rate-limited access.
-    let resolver: Arc<dyn ProviderResolver> = Arc::new(engine.oxi().clone());
-    let provider_name = engine.resolve_model(&config.model_id)?.provider;
-    let provider = if config.provider_rpm > 0 {
-        engine.pooled_provider(&provider_name, config.provider_rpm)?
+    // ── Build Agent (RFC-014 Phase D) ──
+    //
+    // Two paths:
+    //   1. `provider_rpm == 0` (common): use oxi-sdk 0.26.2's new
+    //      `AgentBuilder` API. The builder unifies model resolution, provider
+    //      creation, and (optionally) middleware wiring. Engine-level
+    //      `authorizer` / `tracer` / `cost_tracker` are propagated through
+    //      the new builder methods.
+    //   2. `provider_rpm > 0` (rare): keep the legacy
+    //      `Agent::new_with_resolver` + `set_hooks` path because the
+    //      AgentBuilder does not expose a way to inject a pre-built
+    //      `ProviderPool` for rate-limited access. This is a deliberate
+    //      scope-limit per RFC-014/phase-d-agentbuilder.md §2 "Provider
+    //      선택 로직은 보존".
+    let agent = if config.provider_rpm > 0 {
+        // ── Legacy path: rate-limited provider pool ──
+        let resolver: Arc<dyn ProviderResolver> = Arc::new(engine.oxi().clone());
+        let provider_name = engine.resolve_model(&config.model_id)?.provider;
+        let provider = engine.pooled_provider(&provider_name, config.provider_rpm)?;
+
+        // Build middleware pipeline.
+        let mut pipeline = oxi_sdk::MiddlewarePipeline::new();
+        if config.rate_limit_per_minute > 0 {
+            pipeline = pipeline.push(oxi_sdk::middleware::builtins::RateLimitMiddleware::new(
+                config.rate_limit_per_minute,
+            ));
+        }
+        if config.token_budget > 0 {
+            pipeline = pipeline.push(oxi_sdk::middleware::builtins::TokenBudgetMiddleware::new(
+                config.token_budget,
+            ));
+        }
+        if config.audit_tool_calls {
+            pipeline = pipeline.push(oxi_sdk::middleware::builtins::LoggingMiddleware::new(
+                tracing::Level::INFO,
+            ));
+        }
+
+        // Create Agent with CSpace tool registry and provider resolver.
+        let agent = Arc::new(Agent::new_with_resolver(
+            provider,
+            agent_config,
+            Arc::new(registry),
+            resolver,
+        ));
+
+        // Wire middleware pipeline → AgentHooks.
+        if !pipeline.is_empty() {
+            let terminate_flag = Arc::new(std::sync::atomic::AtomicBool::new(false));
+            let agent_id_for_hooks = agent_id.to_string();
+            let hooks = oxi_sdk::middleware::build_hooks(
+                Arc::new(pipeline),
+                agent_id_for_hooks,
+                terminate_flag,
+            );
+            agent.set_hooks(hooks);
+        }
+
+        agent
     } else {
-        engine.create_provider(&provider_name)?
+        // ── New path: AgentBuilder (RFC-014 Phase D) ──
+        let mut builder = engine
+            .oxi()
+            .agent(agent_config)
+            .workspace(&workspace)
+            .system_prompt(system_prompt);
+
+        // CSpace-based tool registration is oxios-specific and is preserved.
+        //
+        // The builder's `.tool()` method takes `impl AgentTool + 'static`
+        // (a concrete value), but oxios' CSpace tools are `Arc<dyn AgentTool>`.
+        // The SDK does not expose a way to inject a pre-built `ToolRegistry`
+        // into the builder, so we register them on the agent's tool registry
+        // after `build()` returns. This keeps CSpace semantics intact.
+        //
+        // We capture the tool names now and apply them once the agent exists.
+        let cspace_tool_arcs: Vec<Arc<dyn oxi_sdk::AgentTool>> = registry
+            .names()
+            .into_iter()
+            .filter_map(|name| registry.get(&name))
+            .collect();
+
+        // Engine-level observability/security → AgentBuilder (new API).
+        if let Some(auth) = engine.authorizer() {
+            builder = builder.authorizer(auth.clone());
+        }
+        if let Some(tracer) = engine.tracer() {
+            builder = builder.tracer(tracer.clone());
+        }
+        if let Some(ct) = engine.cost_tracker() {
+            builder = builder.cost_tracker(ct.clone());
+        }
+
+        // Middleware: AgentBuilder convenience helpers replace the manual
+        // `MiddlewarePipeline` + `build_hooks()` + `set_hooks()` triple.
+        if config.rate_limit_per_minute > 0 {
+            builder = builder.with_rate_limit(config.rate_limit_per_minute);
+        }
+        if config.token_budget > 0 {
+            builder = builder.with_token_budget(config.token_budget);
+        }
+        if config.audit_tool_calls {
+            builder = builder.with_logging();
+        }
+
+        let built = builder.build()?;
+        let agent = Arc::new(built);
+
+        // Attach CSpace tools to the agent's tool registry.
+        // `Agent::tools()` returns the same `Arc<ToolRegistry>` that
+        // `AgentBuilder` populated, so `register_arc` is the canonical
+        // extension point for `Arc<dyn AgentTool>` values.
+        let agent_tools = agent.tools();
+        for tool in cspace_tool_arcs {
+            agent_tools.register_arc(tool);
+        }
+
+        agent
     };
-
-    // Build middleware pipeline.
-    let mut pipeline = oxi_sdk::MiddlewarePipeline::new();
-    if config.rate_limit_per_minute > 0 {
-        pipeline = pipeline.push(oxi_sdk::middleware::builtins::RateLimitMiddleware::new(
-            config.rate_limit_per_minute,
-        ));
-    }
-    if config.token_budget > 0 {
-        pipeline = pipeline.push(oxi_sdk::middleware::builtins::TokenBudgetMiddleware::new(
-            config.token_budget,
-        ));
-    }
-    if config.audit_tool_calls {
-        pipeline = pipeline.push(oxi_sdk::middleware::builtins::LoggingMiddleware::new(
-            tracing::Level::INFO,
-        ));
-    }
-
-    // Create Agent with CSpace tool registry and provider resolver.
-    let agent = Arc::new(Agent::new_with_resolver(
-        provider,
-        agent_config,
-        Arc::new(registry),
-        resolver,
-    ));
-
-    // Wire middleware pipeline → AgentHooks.
-    if !pipeline.is_empty() {
-        let terminate_flag = Arc::new(std::sync::atomic::AtomicBool::new(false));
-        let agent_id_for_hooks = agent_id.to_string();
-        let hooks = oxi_sdk::middleware::build_hooks(
-            Arc::new(pipeline),
-            agent_id_for_hooks,
-            terminate_flag,
-        );
-        agent.set_hooks(hooks);
-    }
 
     // Shared mutable state for the event callback.
     let exec_state = Arc::new(Mutex::new(ExecuteState::default()));
@@ -546,6 +667,10 @@ async fn run_agent(
     let model_id_for_callback = config.model_id.clone();
     let agent_id_for_callback = agent_id.to_string();
     let routing_stats_for_cb = routing_stats.clone();
+    // RFC-015: real-time event publishing for chat transparency.
+    // Falls back to None when the caller did not opt in.
+    let transparency_session: Option<String> = session_id.clone();
+    let kernel_handle_for_cb: Arc<KernelHandle> = Arc::clone(&kernel_handle);
 
     // Run the agent with streaming events.
     let result = agent
@@ -568,8 +693,21 @@ async fn run_agent(
                             duration_ms: 0,
                             confidence: 0.0,
                         });
+                    // RFC-015: broadcast tool start so Web UI can show progress.
+                    if let Some(ref sid) = transparency_session {
+                        let _ =
+                            kernel_handle_for_cb
+                                .infra
+                                .publish(KernelEvent::ToolExecutionStarted {
+                                    session_id: sid.clone(),
+                                    tool_name: tool_name.clone(),
+                                    tool_call_id: tool_call_id.clone(),
+                                    tool_args: serde_json::Value::Null,
+                                });
+                    }
                 }
                 AgentEvent::ToolExecutionEnd {
+                    tool_name,
                     tool_call_id,
                     is_error,
                     result,
@@ -579,13 +717,29 @@ async fn run_agent(
                         s.steps_completed += 1;
                     }
                     // Look up the exact step by tool_call_id.
+                    let mut duration_ms: u64 = 0;
+                    let mut summary = String::new();
                     if let Some((start, idx)) = s.pending_tools.remove(tool_call_id.as_str()) {
-                        let duration_ms = start.elapsed().as_millis() as u64;
+                        duration_ms = start.elapsed().as_millis() as u64;
                         if let Some(step) = s.trajectory_steps.get_mut(idx) {
-                            step.output = summarize_tool_result(&result.content, 200);
+                            summary = summarize_tool_result(&result.content, 200);
+                            step.output = summary.clone();
                             step.duration_ms = duration_ms;
                             step.confidence = if is_error { 0.3 } else { 0.8 };
                         }
+                    }
+                    // RFC-015: broadcast tool completion.
+                    if let Some(ref sid) = transparency_session {
+                        let _ = kernel_handle_for_cb.infra.publish(
+                            KernelEvent::ToolExecutionFinished {
+                                session_id: sid.clone(),
+                                tool_call_id: tool_call_id.clone(),
+                                tool_name: tool_name.clone(),
+                                duration_ms,
+                                is_error,
+                                output_summary: summary,
+                            },
+                        );
                     }
                 }
                 AgentEvent::AgentEnd {
@@ -634,6 +788,16 @@ async fn run_agent(
                         );
                         stats.record_model_usage(&model_id_for_callback, cost);
                     }
+                    // RFC-015: publish cumulative token usage.
+                    if let Some(ref sid) = transparency_session {
+                        let _ = kernel_handle_for_cb
+                            .infra
+                            .publish(KernelEvent::TokenUsageUpdate {
+                                session_id: sid.clone(),
+                                input_tokens: input_tokens as u64,
+                                output_tokens: output_tokens as u64,
+                            });
+                    }
                 }
                 AgentEvent::Compaction {
                     event: CompactionEvent::Completed { result, .. },
@@ -643,6 +807,17 @@ async fn run_agent(
                         session_id_for_callback.clone(),
                         memory_for_callback.clone(),
                     );
+                    // RFC-015: compaction is a form of reasoning — expose it.
+                    if let Some(ref sid) = transparency_session {
+                        let _ =
+                            kernel_handle_for_cb
+                                .infra
+                                .publish(KernelEvent::ReasoningFragment {
+                                    session_id: sid.clone(),
+                                    content: result.summary.clone(),
+                                    source: "compaction".to_string(),
+                                });
+                    }
                 }
                 _ => {}
             }
@@ -670,6 +845,7 @@ async fn run_agent(
             format!("Agent failed: {e}"),
             s.steps_completed,
             false,
+            s.trajectory_steps.clone(),
             agent,
         ));
     }
@@ -704,7 +880,13 @@ async fn run_agent(
         }
     }
 
-    Ok((s.final_content.clone(), s.steps_completed, s.success, agent))
+    Ok((
+        s.final_content.clone(),
+        s.steps_completed,
+        s.success,
+        s.trajectory_steps.clone(),
+        agent,
+    ))
 }
 
 /// Summarize a tool result string to fit within `max_len` characters.

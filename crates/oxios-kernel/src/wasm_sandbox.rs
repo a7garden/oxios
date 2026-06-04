@@ -2,6 +2,8 @@
 //!
 //! This module provides a WASM-based sandbox using wasmtime for safely
 //! executing tool code with resource limits.
+//!
+//! Entire module is behind the `wasm-sandbox` feature gate.
 
 #[cfg(feature = "wasm-sandbox")]
 use std::path::Path;
@@ -12,10 +14,14 @@ use std::collections::HashMap;
 #[cfg(feature = "wasm-sandbox")]
 use parking_lot::RwLock;
 
+#[cfg(feature = "wasm-sandbox")]
 use serde::{Deserialize, Serialize};
+
+#[cfg(feature = "wasm-sandbox")]
 use thiserror::Error;
 
 /// Resource exhaustion kind for WASM execution.
+#[cfg(feature = "wasm-sandbox")]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ResourceKind {
     /// Memory limit exceeded.
@@ -27,6 +33,7 @@ pub enum ResourceKind {
 }
 
 /// Error types for WASM sandbox operations.
+#[cfg(feature = "wasm-sandbox")]
 #[derive(Debug, Clone, Error)]
 pub enum WasmError {
     /// The requested module is not loaded.
@@ -64,6 +71,7 @@ pub enum WasmError {
 }
 
 /// Configuration for WASM sandbox limits.
+#[cfg(feature = "wasm-sandbox")]
 #[derive(Debug, Clone)]
 pub struct WasmConfig {
     /// Maximum memory in bytes (default: 50MB).
@@ -74,6 +82,7 @@ pub struct WasmConfig {
     pub max_module_size_bytes: u64,
 }
 
+#[cfg(feature = "wasm-sandbox")]
 impl Default for WasmConfig {
     fn default() -> Self {
         Self {
@@ -94,10 +103,6 @@ pub struct WasmSandbox {
     config: WasmConfig,
     modules: RwLock<HashMap<String, wasmtime::Module>>,
 }
-
-/// Stub type when wasm-sandbox feature is disabled.
-#[cfg(not(feature = "wasm-sandbox"))]
-pub struct WasmSandbox;
 
 #[cfg(feature = "wasm-sandbox")]
 impl WasmSandbox {
@@ -259,44 +264,7 @@ impl WasmSandbox {
     }
 }
 
-#[cfg(not(feature = "wasm-sandbox"))]
-impl WasmSandbox {
-    /// Create a new stub sandbox (always fails).
-    pub fn new(_config: WasmConfig) -> Result<Self, WasmError> {
-        Ok(Self)
-    }
-
-    /// Load module stub (always fails).
-    pub fn load_module(&self, _name: &str, _wasm: &[u8]) -> Result<(), WasmError> {
-        Err(WasmError::FeatureDisabled)
-    }
-
-    /// Load module from file stub (always fails).
-    pub fn load_module_from_file(&self, _name: &str, _path: &Path) -> Result<(), WasmError> {
-        Err(WasmError::FeatureDisabled)
-    }
-
-    /// Execute tool stub (always fails).
-    pub async fn execute_tool(
-        &self,
-        _module_name: &str,
-        _func_name: &str,
-        _input_json: serde_json::Value,
-    ) -> Result<serde_json::Value, WasmError> {
-        Err(WasmError::FeatureDisabled)
-    }
-
-    /// List modules stub (always returns empty).
-    pub fn list_modules(&self) -> Vec<String> {
-        vec![]
-    }
-
-    /// Unload module stub (always returns false).
-    pub fn unload_module(&self, _name: &str) -> bool {
-        false
-    }
-}
-
+#[cfg(feature = "wasm-sandbox")]
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -333,53 +301,5 @@ mod tests {
         assert_eq!(memory, "\"Memory\"");
         assert_eq!(instructions, "\"Instructions\"");
         assert_eq!(module_size, "\"ModuleSize\"");
-    }
-
-    #[cfg(not(feature = "wasm-sandbox"))]
-    mod stub_tests {
-        use super::*;
-
-        #[test]
-        fn test_stub_new() {
-            let config = WasmConfig::default();
-            let sandbox = WasmSandbox::new(config);
-            assert!(sandbox.is_ok());
-        }
-
-        #[test]
-        fn test_stub_load_module() {
-            let config = WasmConfig::default();
-            let sandbox = WasmSandbox::new(config).unwrap();
-            let result = sandbox.load_module("test", &[0, 1, 2]);
-            assert!(result.is_err());
-            assert!(matches!(result.unwrap_err(), WasmError::FeatureDisabled));
-        }
-
-        #[test]
-        fn test_stub_list_modules() {
-            let config = WasmConfig::default();
-            let sandbox = WasmSandbox::new(config).unwrap();
-            let modules = sandbox.list_modules();
-            assert!(modules.is_empty());
-        }
-
-        #[test]
-        fn test_stub_unload_module() {
-            let config = WasmConfig::default();
-            let sandbox = WasmSandbox::new(config).unwrap();
-            let result = sandbox.unload_module("test");
-            assert!(!result);
-        }
-
-        #[tokio::test]
-        async fn test_stub_execute_tool() {
-            let config = WasmConfig::default();
-            let sandbox = WasmSandbox::new(config).unwrap();
-            let result = sandbox
-                .execute_tool("test", "func", serde_json::json!({}))
-                .await;
-            assert!(result.is_err());
-            assert!(matches!(result.unwrap_err(), WasmError::FeatureDisabled));
-        }
     }
 }

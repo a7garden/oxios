@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
-import { Check, ExternalLink, X } from 'lucide-react'
+import { Check, ExternalLink, X, Zap, CircleCheck, CircleAlert, CircleX } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Skill, SkillFormat } from '@/types'
 
@@ -13,10 +13,10 @@ const FORMAT_META: Record<SkillFormat, { label: string; variant: 'default' | 'se
   agent_skills: { label: 'Standard', variant: 'outline', description: 'Agent Skills standard' },
 }
 
-const STATUS_DISPLAY: Record<string, { emoji: string; label: string; variant: 'success' | 'warning' | 'destructive' }> = {
-  ready: { emoji: '🟢', label: 'ready', variant: 'success' },
-  needs_setup: { emoji: '🟡', label: 'needs-setup', variant: 'warning' },
-  disabled: { emoji: '🔴', label: 'disabled', variant: 'destructive' },
+const STATUS_DISPLAY: Record<string, {  icon: React.ReactNode ; label: string; variant: 'success' | 'warning' | 'destructive' }> = {
+  ready: { icon: <CircleCheck className="h-3 w-3" />, label: 'ready', variant: 'success' },
+  needs_setup: { icon: <CircleAlert className="h-3 w-3" />, label: 'needs-setup', variant: 'warning' },
+  disabled: { icon: <CircleX className="h-3 w-3" />, label: 'disabled', variant: 'destructive' },
 }
 
 // ─── Skill Detail side panel ────────────────────────────────
@@ -33,7 +33,7 @@ export function SkillDetail({ skill, onClose }: { skill: Skill; onClose: () => v
       {/* Header */}
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">
-          <span className="text-xl">{skill.emoji || '⚡'}</span>
+          <Zap className="h-5 w-5 shrink-0" />
           <div className="min-w-0">
             <h2 className="font-semibold text-lg leading-tight truncate">{skill.name}</h2>
             <Badge variant={fm.variant} className="text-xs mt-1">{fm.label}</Badge>
@@ -47,7 +47,7 @@ export function SkillDetail({ skill, onClose }: { skill: Skill; onClose: () => v
       {/* Status */}
       <div className="flex items-center gap-2">
         <Badge variant={sd.variant} className="text-xs gap-1">
-          <span>{sd.emoji}</span> {sd.label}
+          sd.icon {sd.label}
         </Badge>
         {skill.version && <span className="text-xs font-mono text-muted-foreground">v{skill.version}</span>}
         <Badge variant="outline" className="text-xs">{skill.source}</Badge>

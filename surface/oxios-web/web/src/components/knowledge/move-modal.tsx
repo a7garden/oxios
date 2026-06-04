@@ -26,13 +26,19 @@ export function MoveModal() {
   const writeFile = useWriteFile()
   const deleteFile = useDeleteFile()
 
-  // Extract directories from tree
+  // Extract directories from tree (root level only — user can type paths for deeper dirs)
   const allDirs = extractDirectories(treeEntries)
+
+  // Also allow manual path input by the user — the query field doubles as a path entry
+  // If the query looks like a path (contains /), add it as a suggestion
+  const manualDir = query.trim().startsWith('/') ? query.trim() : query.trim() && query.includes('/') ? query.trim() : null
+  const extraDirs = manualDir && !allDirs.includes(manualDir) ? [manualDir] : []
+  const allDirsWithManual = [...allDirs, ...extraDirs]
 
   // Filter by query
   const filteredDirs = query.trim()
-    ? allDirs.filter((d) => d.toLowerCase().includes(query.toLowerCase()))
-    : allDirs
+    ? allDirsWithManual.filter((d) => d.toLowerCase().includes(query.toLowerCase()))
+    : allDirsWithManual
 
   // Global ⌘M listener (M5: pathname via ref)
   const router = useRouterState()
@@ -115,7 +121,7 @@ export function MoveModal() {
   if (!open) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center pt-[30vh]">
+    <div className="fixed inset-0 z-50 flex items-start justify-center pt-[20vh]">
       {/* Backdrop — click outside to close */}
       <div className="fixed inset-0 bg-black/50" onClick={close} />
 
@@ -135,7 +141,7 @@ export function MoveModal() {
         </div>
 
         {/* Directory list */}
-        <ul className="max-h-80 overflow-y-auto">
+        <ul className="max-h-80 overflow-y-auto p-1">
           {filteredDirs.length > 0 ? (
             filteredDirs.map((dir, i) => (
               <li
@@ -163,8 +169,10 @@ export function MoveModal() {
 }
 
 /**
- * Extract a flat directory list from root-level tree entries.
- * Returns `['/', ...dirNames]` sorted with underscore-prefixed dirs last.
+ * Recursively extract all directories from root-level tree entries.
+ * Each directory is fetched lazily — sub-directories are discovered as
+ * the user navigates (not pre-fetched).
+ * Returns `['/', ...dirPaths]` sorted with underscore-prefixed dirs last.
  */
 function extractDirectories(entries?: KnowledgeTreeEntry[]): string[] {
   if (!entries) return ['/']

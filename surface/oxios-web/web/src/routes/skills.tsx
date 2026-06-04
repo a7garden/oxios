@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
-import { Check, PackagePlus, Power, Search, Store, Trash2, X, Zap } from 'lucide-react'
+import {Check, PackagePlus, Power, Search, Store, Trash2, X, Zap, CircleCheck, CircleAlert, CircleX, Globe} from 'lucide-react'
 import { useCallback, useDeferredValue, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { EmptyState } from '@/components/shared/empty-state'
@@ -18,7 +18,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from '@/components/ui/input'
 import { api } from '@/lib/api-client'
 import { cn } from '@/lib/utils'
-import type { ClawHubSearchResult, Skill, SkillFormat, SkillStatus } from '@/types'
+import type { ClawHubSearchResult, Skill, SkillFormat, SkillStatus, SkillsShSkill } from '@/types'
 
 export const Route = createFileRoute('/skills')({
   component: SkillsPage,
@@ -28,11 +28,12 @@ export const Route = createFileRoute('/skills')({
 })
 
 type Tab = 'installed' | 'marketplace'
+type MarketplaceSource = 'clawhub' | 'skills-sh'
 
-const STATUS_DISPLAY: Record<SkillStatus, { emoji: string; label: string; variant: 'success' | 'warning' | 'destructive' }> = {
-  ready: { emoji: '🟢', label: 'ready', variant: 'success' },
-  needs_setup: { emoji: '🟡', label: 'needs-setup', variant: 'warning' },
-  disabled: { emoji: '🔴', label: 'disabled', variant: 'destructive' },
+const STATUS_DISPLAY: Record<SkillStatus, { icon: React.ReactNode; label: string; variant: 'success' | 'warning' | 'destructive' }> = {
+  ready: { icon: <CircleCheck className="h-3 w-3" />, label: 'ready', variant: 'success' },
+  needs_setup: { icon: <CircleAlert className="h-3 w-3" />, label: 'needs-setup', variant: 'warning' },
+  disabled: { icon: <CircleX className="h-3 w-3" />, label: 'disabled', variant: 'destructive' },
 }
 
 const SOURCE_VARIANT: Record<string, 'outline' | 'secondary' | 'default'> = {
@@ -57,14 +58,16 @@ function SkillsPage() {
   const { t } = useTranslation()
   const search = Route.useSearch()
   const [tab, setTab] = useState<Tab>(search.tab === 'marketplace' ? 'marketplace' : 'installed')
+  const [mktSource, setMktSource] = useState<MarketplaceSource>('clawhub')
   const [filter, setFilter] = useState<'all' | SkillStatus>('all')
-  const [searchQuery, setSearchQuery] = useState('')
-  const [mktQuery, setMktQuery] = useState('')
+  const [searchQuery, setSearchQuery] = useState('' /* icon fallback */)
+  const [mktQuery, setMktQuery] = useState('' /* icon fallback */)
   const deferredQuery = useDeferredValue(mktQuery)
 
   // Selected skill for detail panel
   const [selectedSkill, setSelectedSkill] = useState<Skill | null>(null)
   const [selectedMktSlug, setSelectedMktSlug] = useState<string | null>(null)
+  const [selectedSkillsShId, setSelectedSkillsShId] = useState<string | null>(null)
 
   const { data: skills, isLoading: sl, isError: se, refetch: sr, isFetching: sf } = useQuery({
     queryKey: ['skills'],
@@ -74,8 +77,23 @@ function SkillsPage() {
   const { data: mktResults, isLoading: ml, isError: me, refetch: mr } = useQuery({
     queryKey: ['marketplace', 'search', deferredQuery],
     queryFn: async () => { const r = await api.get<ClawHubSearchResult[]>('/api/marketplace/search', { q: deferredQuery }); return r ?? [] },
-    enabled: tab === 'marketplace' && deferredQuery.trim().length > 0,
+    enabled: tab === 'marketplace' && mktSource === 'clawhub' && deferredQuery.trim().length > 0,
     refetchOnWindowFocus: false,
+  })
+  // Skills.sh search
+  const { data: skillsShResults, isLoading: ssl, isError: sse, refetch: ssr } = useQuery({
+    queryKey: ['skills-sh', 'search', deferredQuery],
+    queryFn: async () => { const r = await api.get<{ data: SkillsShSkill[] }>('/api/marketplace/skills-sh/search', { q: deferredQuery }); return r?.data ?? [] },
+    enabled: tab === 'marketplace' && mktSource === 'skills-sh' && deferredQuery.trim().length > 0,
+    refetchOnWindowFocus: false,
+  })
+  // Skills.sh trending list (loaded when tab is open and source is skills-sh)
+  const { data: skillsShTrending } = useQuery({
+    queryKey: ['skills-sh', 'trending'],
+    queryFn: async () => { const r = await api.get<{ data: SkillsShSkill[] }>('/api/marketplace/skills-sh/list', { view: 'trending', per_page: 20 }); return r?.data ?? [] },
+    enabled: tab === 'marketplace' && mktSource === 'skills-sh',
+    refetchOnWindowFocus: false,
+    staleTime: 60_000,
   })
 
   // Updates check
@@ -99,6 +117,7 @@ function SkillsPage() {
     setTab(newTab)
     setSelectedSkill(null)
     setSelectedMktSlug(null)
+    setSelectedSkillsShId(null)
   }, [])
 
   return (
@@ -123,7 +142,7 @@ function SkillsPage() {
       </div>
 
       {/* Main content area with optional side panel */}
-      <div className={cn('grid gap-6', (selectedSkill || selectedMktSlug) ? 'grid-cols-1 lg:grid-cols-[1fr_380px]' : 'grid-cols-1')}>
+      <div className={cn('grid gap-6', (selectedSkill || selectedMktSlug || selectedSkillsShId) ? 'grid-cols-1 lg:grid-cols-[1fr_380px]' : 'grid-cols-1')}>
         <div>
           {tab === 'installed' ? (
             <InstalledTab
@@ -143,15 +162,20 @@ function SkillsPage() {
             />
           ) : (
             <MarketplaceTab
-              results={mktResults}
+              source={mktSource}
+              onSourceChange={setMktSource}
+              clawhubResults={mktResults}
+              skillsShResults={deferredQuery.trim() ? skillsShResults : skillsShTrending}
               query={mktQuery}
               setQuery={setMktQuery}
               deferredQuery={deferredQuery}
-              isLoading={ml}
-              isError={me}
-              refetch={mr}
-              selectedSlug={selectedMktSlug}
-              onSelectSlug={setSelectedMktSlug}
+              isLoading={mktSource === 'clawhub' ? ml : ssl}
+              isError={mktSource === 'clawhub' ? me : sse}
+              refetch={() => { mr(); ssr() }}
+              selectedClawhubSlug={selectedMktSlug}
+              onSelectClawhubSlug={setSelectedMktSlug}
+              selectedSkillsShId={selectedSkillsShId}
+              onSelectSkillsShId={setSelectedSkillsShId}
             />
           )}
         </div>
@@ -165,6 +189,11 @@ function SkillsPage() {
         {selectedMktSlug && (
           <div className="border rounded-lg p-4 h-fit sticky top-6">
             <MarketplaceDetail slug={selectedMktSlug} onClose={() => setSelectedMktSlug(null)} />
+          </div>
+        )}
+        {selectedSkillsShId && (
+          <div className="border rounded-lg p-4 h-fit sticky top-6">
+            <SkillsShDetail id={selectedSkillsShId} onClose={() => setSelectedSkillsShId(null)} />
           </div>
         )}
       </div>
@@ -260,7 +289,7 @@ function InstalledTab({ filtered, allSkills, counts, filter, setFilter, search, 
         <DialogHeader>
           <DialogTitle>{t('skills.deleteConfirm')}</DialogTitle>
           <DialogDescription>
-            {t('skills.deleteDescription', { name: deleteTarget?.name ?? '' })}
+            {t('skills.deleteDescription', { name: deleteTarget?.name ?? '' /* icon fallback */ })}
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>
@@ -283,39 +312,96 @@ function InstalledTab({ filtered, allSkills, counts, filter, setFilter, search, 
 
 // ─── Marketplace Tab ──────────────────────────────────────────
 
-function MarketplaceTab({ results, query, setQuery, deferredQuery, isLoading, isError, refetch, selectedSlug, onSelectSlug }: {
-  results?: ClawHubSearchResult[]; query: string; setQuery: (s: string) => void; deferredQuery: string; isLoading: boolean; isError: boolean; refetch: () => void; selectedSlug: string | null; onSelectSlug: (s: string | null) => void
+function MarketplaceTab({ source, onSourceChange, clawhubResults, skillsShResults, query, setQuery, deferredQuery, isLoading, isError, refetch, selectedClawhubSlug, onSelectClawhubSlug, selectedSkillsShId, onSelectSkillsShId }: {
+  source: MarketplaceSource
+  onSourceChange: (s: MarketplaceSource) => void
+  clawhubResults?: ClawHubSearchResult[]
+  skillsShResults?: SkillsShSkill[]
+  query: string
+  setQuery: (s: string) => void
+  deferredQuery: string
+  isLoading: boolean
+  isError: boolean
+  refetch: () => void
+  selectedClawhubSlug: string | null
+  onSelectClawhubSlug: (s: string | null) => void
+  selectedSkillsShId: string | null
+  onSelectSkillsShId: (s: string | null) => void
 }) {
   const { t } = useTranslation()
   const qc = useQueryClient()
   const { toast } = useToast()
-  const mut = useMutation({
+
+  // ClawHub install mutation
+  const clawhubMut = useMutation({
     mutationFn: ({ slug, version }: { slug: string; version?: string }) => api.post('/api/marketplace/skills/' + slug + '/install', { version }),
     onSuccess: (_: unknown, v: { slug: string; version?: string }) => { toast(t('skills.installSuccess', { slug: v.slug }), 'success'); qc.invalidateQueries({ queryKey: ['skills'] }) },
     onError: (e: unknown) => { toast(e instanceof Error ? e.message : t('skills.installFailed'), 'destructive') },
   })
+
+  // Skills.sh install mutation
+  const skillsShMut = useMutation({
+    mutationFn: (id: string) => api.post('/api/marketplace/skills-sh/skill/' + encodeURIComponent(id) + '/install'),
+    onSuccess: (_: unknown, id: string) => { toast(t('skills.installSuccess', { slug: id }), 'success'); qc.invalidateQueries({ queryKey: ['skills'] }) },
+    onError: (e: unknown) => { toast(e instanceof Error ? e.message : t('skills.installFailed'), 'destructive') },
+  })
+
   const hasQ = deferredQuery.trim().length > 0
 
   return (<>
-    <div className="relative">
-      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-      <Input placeholder={t('skills.searchMarketplace')} value={query} onChange={e => setQuery(e.target.value)} className="pl-10" autoFocus />
+    {/* Source toggle */}
+    <div className="flex items-center gap-3">
+      <div className="relative flex-1">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+        <Input placeholder={t('skills.searchMarketplace')} value={query} onChange={e => setQuery(e.target.value)} className="pl-10" autoFocus />
+      </div>
+      <div className="inline-flex h-9 items-center rounded-lg bg-muted p-1 text-muted-foreground gap-0.5">
+        <button onClick={() => onSourceChange('clawhub')} className={cn('inline-flex items-center justify-center whitespace-nowrap rounded-md px-2.5 py-1 text-xs font-medium transition-all gap-1', source === 'clawhub' ? 'bg-background text-foreground shadow' : 'hover:bg-background/50')}>
+          ClawHub
+        </button>
+        <button onClick={() => onSourceChange('skills-sh')} className={cn('inline-flex items-center justify-center whitespace-nowrap rounded-md px-2.5 py-1 text-xs font-medium transition-all gap-1', source === 'skills-sh' ? 'bg-background text-foreground shadow' : 'hover:bg-background/50')}>
+          Skills.sh
+          <span className="text-[10px] text-muted-foreground">npx</span>
+        </button>
+      </div>
     </div>
-    {!hasQ ? (
-      <EmptyState icon={<PackagePlus className="h-10 w-10" />} title={t('skills.discover')} description={t('skills.discoverDescription')} />
-    ) : isLoading ? <LoadingCards count={4} /> : isError ? <ErrorState onRetry={() => refetch()} /> : results?.length === 0 ? (
-      <EmptyState icon={<Search className="h-10 w-10" />} title={t('skills.noResults')} description={t('skills.noResultsFor', { query: deferredQuery })} />
+
+    {/* Results */}
+    {source === 'clawhub' ? (
+      !hasQ ? (
+        <EmptyState icon={<PackagePlus className="h-10 w-10" />} title={t('skills.discover')} description={t('skills.discoverDescription')} />
+      ) : isLoading ? <LoadingCards count={4} /> : isError ? <ErrorState onRetry={() => refetch()} /> : clawhubResults?.length === 0 ? (
+        <EmptyState icon={<Search className="h-10 w-10" />} title={t('skills.noResults')} description={t('skills.noResultsFor', { query: deferredQuery })} />
+      ) : (
+        <div className="grid gap-4">{clawhubResults!.map(s => (
+          <MarketplaceCard
+            key={s.slug}
+            skill={s}
+            isSelected={selectedClawhubSlug === s.slug}
+            isInstalling={clawhubMut.isPending}
+            onSelect={() => onSelectClawhubSlug(selectedClawhubSlug === s.slug ? null : s.slug)}
+            onInstall={(sl, v) => clawhubMut.mutate({ slug: sl, version: v })}
+          />
+        ))}</div>
+      )
     ) : (
-      <div className="grid gap-4">{results!.map(s => (
-        <MarketplaceCard
-          key={s.slug}
-          skill={s}
-          isSelected={selectedSlug === s.slug}
-          isInstalling={mut.isPending}
-          onSelect={() => onSelectSlug(selectedSlug === s.slug ? null : s.slug)}
-          onInstall={(sl, v) => mut.mutate({ slug: sl, version: v })}
-        />
-      ))}</div>
+      // Skills.sh
+      !hasQ && !skillsShResults?.length ? (
+        <EmptyState icon={<PackagePlus className="h-10 w-10" />} title={t('skills.discover')} description={t('skills.discoverDescription')} />
+      ) : isLoading ? <LoadingCards count={4} /> : isError ? <ErrorState onRetry={() => refetch()} /> : skillsShResults?.length === 0 ? (
+        <EmptyState icon={<Search className="h-10 w-10" />} title={t('skills.noResults')} description={t('skills.noResultsFor', { query: deferredQuery })} />
+      ) : (
+        <div className="grid gap-4">{skillsShResults!.map(s => (
+          <SkillsShCard
+            key={s.id}
+            skill={s}
+            isSelected={selectedSkillsShId === s.id}
+            isInstalling={skillsShMut.isPending}
+            onSelect={() => onSelectSkillsShId(selectedSkillsShId === s.id ? null : s.id)}
+            onInstall={(id) => skillsShMut.mutate(id)}
+          />
+        ))}</div>
+      )
     )}
   </>)
 }
@@ -336,7 +422,7 @@ function SkillCard({ skill, isSelected, hasUpdate, onSelect, onToggle, onDelete,
       <CardContent className="p-5 space-y-3">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-start gap-2 min-w-0" onClick={onSelect}>
-            <span className="text-lg leading-none mt-0.5 shrink-0">{skill.emoji || '⚡'}</span>
+            <span className="text-lg leading-none mt-0.5 shrink-0">'' /* icon fallback */</span>
             <div className="min-w-0">
               <h3 className="font-semibold text-base leading-tight">{skill.name}</h3>
               {skill.description && <p className="text-sm text-muted-foreground mt-0.5 line-clamp-2">{skill.description}</p>}
@@ -350,7 +436,7 @@ function SkillCard({ skill, isSelected, hasUpdate, onSelect, onToggle, onDelete,
             )}
             <FormatBadge format={skill.format} />
             {skill.always && <Badge variant="outline" className="text-xs">{t('skills.always')}</Badge>}
-            <Badge variant={sd.variant} className="text-xs gap-1"><span>{sd.emoji}</span> {sd.label}</Badge>
+            <Badge variant={sd.variant} className="text-xs gap-1">{sd.icon} {sd.label}</Badge>
           </div>
         </div>
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -428,7 +514,7 @@ function MarketplaceCard({ skill, isSelected, isInstalling, onSelect, onInstall 
       <CardContent className="p-5 space-y-3">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-start gap-2 min-w-0" onClick={onSelect}>
-            <span className="text-lg leading-none mt-0.5 shrink-0">🔍</span>
+            <Search className="h-4 w-4 shrink-0" />
             <div className="min-w-0">
               <h3 className="font-semibold text-base leading-tight">{dn}</h3>
               {skill.summary && <p className="text-sm text-muted-foreground mt-0.5 line-clamp-2">{skill.summary}</p>}
@@ -446,6 +532,113 @@ function MarketplaceCard({ skill, isSelected, isInstalling, onSelect, onInstall 
         </div>
       </CardContent>
     </Card>
+  )
+}
+
+// ─── Skills.sh Card ────────────────────────────────────────────
+
+function SkillsShCard({ skill, isSelected, isInstalling, onSelect, onInstall }: { skill: SkillsShSkill; isSelected: boolean; isInstalling: boolean; onSelect: () => void; onInstall: (id: string) => void }) {
+  const { t } = useTranslation()
+  return (
+    <Card className={cn('transition-shadow hover:shadow-md cursor-pointer', isSelected && 'ring-2 ring-primary')}>
+      <CardContent className="p-5 space-y-3">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-start gap-2 min-w-0" onClick={onSelect}>
+            <Globe className="h-4 w-4 shrink-0" />
+            <div className="min-w-0">
+              <h3 className="font-semibold text-base leading-tight">{skill.name}</h3>
+              <p className="text-sm text-muted-foreground mt-0.5 line-clamp-2">{skill.source}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <Badge variant="secondary" className="text-xs">Skills.sh</Badge>
+            <Badge variant="outline" className="text-xs font-mono">{skill.installs.toLocaleString()}</Badge>
+            <Button size="sm" onClick={(e) => { e.stopPropagation(); onInstall(skill.id) }} disabled={isInstalling} className="gap-1.5">{t('skills.install')}</Button>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <span className="font-mono text-muted-foreground/80">{skill.slug}</span>
+          <span>·</span>
+          <span>{skill.source}</span>
+          {skill.sourceType === 'github' && <Badge variant="outline" className="text-[10px] px-1 py-0">GitHub</Badge>}
+          {skill.isDuplicate && <Badge variant="outline" className="text-[10px] px-1 py-0 border-amber-500/50 text-amber-600">fork</Badge>}
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+// ─── Skills.sh Detail Panel ────────────────────────────────────────
+
+function SkillsShDetail({ id, onClose }: { id: string; onClose: () => void }) {
+  const { t } = useTranslation()
+  const { toast } = useToast()
+  const qc = useQueryClient()
+
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ['skills-sh', 'detail', id],
+    queryFn: async () => {
+      const r = await api.get<{ id: string; source: string; slug: string; installs: number; hash?: string; files?: Array<{ path: string; contents: string }> }>(
+        '/api/marketplace/skills-sh/skill/' + encodeURIComponent(id)
+      )
+      return r
+    },
+    refetchOnWindowFocus: false,
+  })
+
+  const installMut = useMutation({
+    mutationFn: () => api.post('/api/marketplace/skills-sh/skill/' + encodeURIComponent(id) + '/install'),
+    onSuccess: () => { toast(t('skills.installSuccess', { slug: id }), 'success'); qc.invalidateQueries({ queryKey: ['skills'] }) },
+    onError: (e: unknown) => { toast(e instanceof Error ? e.message : t('skills.installFailed'), 'destructive') },
+  })
+
+  if (isLoading) return <div className="text-sm text-muted-foreground">Loading...</div>
+  if (isError || !data) return <div className="text-sm text-destructive">Failed to load skill detail</div>
+
+  const skillMd = data.files?.find(f => f.path === 'SKILL.md' || f.path.toLowerCase() === 'skill.md')
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h3 className="font-semibold text-lg">{data.slug}</h3>
+        <Button variant="ghost" size="sm" onClick={onClose}>✕</Button>
+      </div>
+
+      <div className="space-y-2">
+        <div className="flex items-center gap-2 text-sm">
+          <Badge variant="secondary">Skills.sh</Badge>
+          <span className="text-muted-foreground">{data.source}</span>
+        </div>
+        <div className="text-sm text-muted-foreground">
+          {data.installs.toLocaleString()} installs
+          {data.hash && <span className="ml-2 font-mono text-xs">({data.hash.slice(0, 8)}...)</span>}
+        </div>
+      </div>
+
+      {data.files && data.files.length > 0 && (
+        <div className="space-y-1">
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Files</p>
+          <div className="space-y-1">
+            {data.files.map(f => (
+              <div key={f.path} className="text-xs font-mono bg-muted px-2 py-1 rounded">
+                {f.path} <span className="text-muted-foreground">({f.contents.length} chars)</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {skillMd && (
+        <div className="space-y-1">
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">SKILL.md Preview</p>
+          <pre className="text-xs bg-muted p-3 rounded-md overflow-auto max-h-64 whitespace-pre-wrap">{skillMd.contents.slice(0, 2000)}{skillMd.contents.length > 2000 ? '\n...' : '' /* icon fallback */}</pre>
+        </div>
+      )}
+
+      <Button className="w-full" onClick={() => installMut.mutate()} disabled={installMut.isPending}>
+        {t('skills.install')}
+      </Button>
+    </div>
   )
 }
 

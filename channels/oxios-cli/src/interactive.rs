@@ -129,7 +129,7 @@ impl InteractiveLoop {
             }
             MetaCommand::Model(Some(name)) => {
                 println!("Switching model to: {name}");
-                // TODO: wire to kernel model switching
+                self.handle.send_switch_model(&name).await?;
                 Ok(false)
             }
             MetaCommand::Model(None) => {
@@ -138,7 +138,7 @@ impl InteractiveLoop {
             }
             MetaCommand::Persona(Some(name)) => {
                 println!("Switching persona to: {name}");
-                // TODO: wire to kernel persona switching
+                self.handle.send_switch_persona(&name).await?;
                 Ok(false)
             }
             MetaCommand::Persona(None) => {

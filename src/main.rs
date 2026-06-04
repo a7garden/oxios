@@ -9,6 +9,7 @@ mod cmd_update;
 mod kernel;
 mod otel;
 mod surface;
+mod web_dist;
 
 use anyhow::{Context, Result};
 use clap::{CommandFactory, Parser, Subcommand};
@@ -816,8 +817,6 @@ async fn cmd_status(kernel: &Kernel) -> Result<()> {
 
 /// Collect all paths and items that `oxios reset` would delete.
 struct ResetTargets {
-    /// `~/.oxi/auth.json` — shared credential store with oxi CLI
-    oxi_auth: PathBuf,
     /// `~/Library/LaunchAgents/com.a7garden.oxios.plist` — macOS launchd
     launchd_plist: Option<PathBuf>,
     /// Items that actually exist on disk (for display)
@@ -835,8 +834,6 @@ fn collect_reset_targets(oxios_home: &Path) -> ResetTargets {
     let home = std::env::var("HOME")
         .or_else(|_| std::env::var("USERPROFILE"))
         .unwrap_or_default();
-
-    let oxi_auth = PathBuf::from(&home).join(".oxi").join("auth.json");
 
     let launchd_plist = if cfg!(target_os = "macos") {
         Some(
@@ -862,17 +859,7 @@ fn collect_reset_targets(oxios_home: &Path) -> ResetTargets {
         });
     }
 
-    // 2. ~/.oxi/auth.json
-    if oxi_auth.exists() {
-        let size = oxi_auth.metadata().map(|m| m.len()).unwrap_or(0);
-        existing.push(ResetItem {
-            label: "oxi CLI credentials (shared with other oxi tools)".to_string(),
-            path: oxi_auth.clone(),
-            size,
-        });
-    }
-
-    // 3. launchd plist
+    // 2. launchd plist
     if let Some(ref plist) = launchd_plist {
         if plist.exists() {
             let size = plist.metadata().map(|m| m.len()).unwrap_or(0);
@@ -885,7 +872,6 @@ fn collect_reset_targets(oxios_home: &Path) -> ResetTargets {
     }
 
     ResetTargets {
-        oxi_auth,
         launchd_plist,
         existing,
     }
@@ -1037,34 +1023,6 @@ fn cmd_reset(oxios_home: &Path, skip_confirm: bool, pid_file: &Path) -> Result<(
         }
     }
 
-    // ── Phase 6: Clean ~/.oxi/auth.json ──
-    if targets.oxi_auth.exists() {
-        // auth.json is shared with oxi CLI — try to remove only oxios-related
-        // provider entries first. If that fails, delete the whole file.
-        let removed = try_remove_oxios_providers_from_auth_json(&targets.oxi_auth);
-        if removed {
-            println!(
-                "  {} {} (oxios credentials removed, others preserved)",
-                style("✓").green(),
-                targets.oxi_auth.display()
-            );
-        } else {
-            match std::fs::remove_file(&targets.oxi_auth) {
-                Ok(()) => println!(
-                    "  {} {} deleted",
-                    style("✓").green(),
-                    targets.oxi_auth.display()
-                ),
-                Err(e) => println!(
-                    "  {} {} failed to delete: {}",
-                    style("⚠").yellow(),
-                    targets.oxi_auth.display(),
-                    e
-                ),
-            }
-        }
-    }
-
     // ── Done ──
     println!();
     println!(
@@ -1078,50 +1036,6 @@ fn cmd_reset(oxios_home: &Path, skip_confirm: bool, pid_file: &Path) -> Result<(
     );
     println!();
     Ok(())
-}
-
-/// Try to remove Oxios-related provider entries from ~/.oxi/auth.json
-/// without destroying other oxi CLI entries. Returns true if selective removal succeeded.
-fn try_remove_oxios_providers_from_auth_json(path: &Path) -> bool {
-    let raw = match std::fs::read_to_string(path) {
-        Ok(r) => r,
-        Err(_) => return false,
-    };
-
-    let mut map: serde_json::Map<String, serde_json::Value> = match serde_json::from_str(&raw) {
-        Ok(m) => m,
-        Err(_) => return false,
-    };
-
-    // Known providers that Oxios uses
-    let providers = [
-        "anthropic",
-        "openai",
-        "google",
-        "groq",
-        "mistral",
-        "deepseek",
-    ];
-    let mut removed_any = false;
-    for p in &providers {
-        if map.remove(*p).is_some() {
-            removed_any = true;
-        }
-    }
-
-    if !removed_any {
-        return false;
-    }
-
-    // If auth.json is now empty, just delete the file
-    if map.is_empty() {
-        let _ = std::fs::remove_file(path);
-        return true;
-    }
-
-    // Write back the remaining entries
-    let new_json = serde_json::to_string_pretty(&map).unwrap_or_default();
-    std::fs::write(path, new_json).is_ok()
 }
 
 // ─── Doctor command ──────────────────────────────────────────────────────────
@@ -2164,8 +2078,55 @@ async fn cmd_serve(kernel: &Kernel, config_path: &Path) -> Result<()> {
         tracing::warn!(error = %e, "Failed to initialize default skills");
     }
 
+    // ── Ensure web UI is available before starting the server ─────────────
+    // This is a blocking check on every start (not just first run) so that:
+    //   1. No "web UI not found" on first `oxios start`
+    //   2. Users who `cargo install oxios` without building web get it auto-downloaded
+    //   3. Server binding is delayed until web UI is ready — no 404 on startup
+    let workspace = PathBuf::from(&kernel.config().kernel.workspace);
+    let web_result = web_dist::ensure_web_dist(&workspace).await;
+
+
+    // Extract path for surface activation
+    let web_dist_path: Option<PathBuf> = match &web_result {
+        web_dist::WebDistResult::UserDir(p) => Some(p.clone()),
+        web_dist::WebDistResult::WorkspaceDir(p) => Some(p.clone()),
+        web_dist::WebDistResult::Downloaded { path, .. } => Some(path.clone()),
+        web_dist::WebDistResult::Embedded => None,
+        web_dist::WebDistResult::DownloadFailed { .. } => None,
+    };
+
+    // Print user-facing status (only show download step, not cached/workspace hits)
+    match &web_result {
+        web_dist::WebDistResult::Downloaded { .. } => {
+            if let Some(tag) = web_result.version_display() {
+                println!();
+                println!(
+                    "  {} Web UI downloaded (v{})",
+                    style("✓").green(),
+                    style(tag).cyan()
+                );
+            }
+        }
+        web_dist::WebDistResult::DownloadFailed { reason } => {
+            println!();
+            println!(
+                "  {} Web UI download failed: {}",
+                style("⚠").yellow(),
+                style(reason).dim()
+            );
+            println!(
+                "  {} Run {} to restore later.",
+                style("→").cyan(),
+                style("oxios update --web-only").cyan()
+            );
+        }
+        _ => {}
+    }
+
+
     // Activate channels
-    let surface_tasks = surface::activate_surfaces(kernel, config_path).await?;
+    let surface_tasks = surface::activate_surfaces(kernel, config_path, web_dist_path).await?;
     let channel_tasks = activate_channels(kernel, config_path).await?;
 
     // Start guardian

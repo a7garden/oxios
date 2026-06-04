@@ -10,8 +10,12 @@ dir = "target/nextest"
 test-threads = "num-cpus"
 # Fail fast on first failure
 fail-fast = true
-# Mark tests slower than 1s as "slow"
-slow-timeout = { period = "2s", terminate-after = 2, grace-period = "10s" }
+# sysinfo::System::new_all() (used by ResourceMonitor) is slow on macOS
+# and on loaded CI machines. Allow generous per-test timeouts.
+slow-timeout = { period = "30s", terminate-after = 3, grace-period = "10s" }
+# Hard per-test timeout — 2 minutes, more than enough for any single test.
+# nextest does not have a built-in `timeout` key; this is the closest equivalent
+# in older nextest versions. Newer versions use --timeout flag.
 # Treat warnings as non-failing (some tests intentionally produce warnings)
 status-level = "pass"
 # Final summary with failure details

@@ -1,4 +1,5 @@
 @import 'tailwindcss';
+@import 'highlight.js/styles/github-dark.css';
 @plugin '@tailwindcss/typography';
 
 @custom-variant dark (&:is(.dark *));
@@ -28,6 +29,12 @@
   --color-chart-3: var(--chart-3);
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
+  --color-message-task: var(--message-task);
+  --color-message-status: var(--message-status);
+  --color-message-result: var(--message-result);
+  --color-message-query: var(--message-query);
+  --color-message-handshake: var(--message-handshake);
+  --color-message-default: var(--message-default);
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
@@ -72,6 +79,16 @@
   --chart-3: oklch(0.398 0.07 227.392);
   --chart-4: oklch(0.828 0.189 84.429);
   --chart-5: oklch(0.769 0.188 70.08);
+  /* A2A message-kind edge colors. The OkLCH values mirror the Tailwind
+   * v3 palette (blue-500, gray-400, green-500, purple-500, amber-500,
+   * slate-400) so the topology edges stay readable in both light and
+   * dark mode. Used via `var(--color-message-...)` in inline styles. */
+  --message-task: oklch(0.623 0.214 259.815); /* blue-500 */
+  --message-status: oklch(0.707 0.022 261.325); /* gray-400 */
+  --message-result: oklch(0.723 0.219 149.579); /* green-500 */
+  --message-query: oklch(0.627 0.265 303.9); /* purple-500 */
+  --message-handshake: oklch(0.769 0.188 70.08); /* amber-500 */
+  --message-default: oklch(0.704 0.04 256.788); /* slate-400 */
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.141 0.005 285.823);
   --sidebar-primary: oklch(0.21 0.006 285.885);

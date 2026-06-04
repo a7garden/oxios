@@ -72,6 +72,8 @@ pub(crate) async fn handle_session_get(
             "created_at": session.created_at.to_rfc3339(),
             "updated_at": session.updated_at.to_rfc3339(),
             "metadata": session.metadata,
+            // RFC-015: trajectory for chat transparency replay.
+            "trajectory_steps": session.trajectory_steps,
         }))),
         Ok(None) => Err(StatusCode::NOT_FOUND),
         Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
@@ -301,6 +303,67 @@ pub(crate) fn sanitize_event(event: &oxios_kernel::event_bus::KernelEvent) -> se
             "seed_id": seed_id.to_string(),
             "final_score": final_score,
             "iterations": iterations,
+        }),
+        // ── RFC-015: chat transparency events (forwarded to /api/events too) ──
+        KernelEvent::ToolExecutionStarted {
+            session_id,
+            tool_name,
+            tool_call_id,
+            tool_args,
+        } => serde_json::json!({
+            "type": "tool_started",
+            "session_id": session_id,
+            "tool_name": tool_name,
+            "tool_call_id": tool_call_id,
+            "tool_args": tool_args,
+        }),
+        KernelEvent::ToolExecutionFinished {
+            session_id,
+            tool_call_id,
+            tool_name,
+            duration_ms,
+            is_error,
+            output_summary,
+        } => serde_json::json!({
+            "type": "tool_finished",
+            "session_id": session_id,
+            "tool_call_id": tool_call_id,
+            "tool_name": tool_name,
+            "duration_ms": duration_ms,
+            "is_error": is_error,
+            "output_summary": output_summary,
+        }),
+        KernelEvent::MemoryRecallUsed {
+            session_id,
+            query,
+            count,
+            source,
+        } => serde_json::json!({
+            "type": "memory_recall_used",
+            "session_id": session_id,
+            "query": query,
+            "count": count,
+            "source": source,
+        }),
+        KernelEvent::TokenUsageUpdate {
+            session_id,
+            input_tokens,
+            output_tokens,
+        } => serde_json::json!({
+            "type": "token_usage_update",
+            "session_id": session_id,
+            "input_tokens": input_tokens,
+            "output_tokens": output_tokens,
+        }),
+        KernelEvent::ReasoningFragment {
+            session_id,
+            content,
+            source,
+        } => serde_json::json!({
+            "type": "reasoning_fragment",
+            "session_id": session_id,
+            "content": content,
+            "source": source,
         }),
     };
     // Merge payload into base

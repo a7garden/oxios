@@ -29,7 +29,7 @@ export function KnowledgeSettings() {
   }
 
   return (
-    <div className="p-4 sm:p-6 space-y-6 max-w-2xl">
+    <div className="p-4 sm:p-6 space-y-6 max-w-2xl mx-auto">
       <h2 className="text-lg font-semibold flex items-center gap-2">
         <Settings className="h-5 w-5" />
         {t('knowledge.title')} {t('common.settings')}

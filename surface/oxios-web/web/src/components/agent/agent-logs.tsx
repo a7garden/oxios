@@ -28,7 +28,7 @@ export function AgentLogs({ logs }: { logs: AgentLogsType | null | undefined }) 
           >
             {entry.level}
           </Badge>
-          <span className="text-muted-foreground shrink-0">
+          <span className="text-muted-foreground shrink-0 tabular-nums">
             {entry.timestamp ? new Date(entry.timestamp).toLocaleTimeString() : ''}
           </span>
           <span className="break-all">{entry.message}</span>

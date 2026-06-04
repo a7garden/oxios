@@ -18,3 +18,14 @@ channels/oxios-web/static/dioxus/assets/
 #   oxi-ai = { path = "../oxi/oxi-ai" }
 #   oxi-agent = { path = "../oxi/oxi-agent" }
 Cargo.toml.local
+
+# AI agent temporary analysis files — generated during sessions,
+# never committed. Use docs/ for persistent documents.
+*-analysis.md
+analysis-*.md
+fix-*.md
+*-output.md
+*-result.md
+*-audit.txt
+calculation_result.md
+page_snapshot.md

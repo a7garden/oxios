@@ -28,7 +28,7 @@ mod workspace;
 use std::sync::Arc;
 
 use axum::{
-    routing::{delete, get, post, put},
+    routing::{delete, get, patch, post, put},
     Router,
 };
 use serde::Deserialize;
@@ -85,8 +85,7 @@ pub(crate) use knowledge_routes::{
     handle_knowledge_checklist_complete, handle_knowledge_checklist_items,
     handle_knowledge_checklist_remove, handle_knowledge_config_get, handle_knowledge_config_put,
     handle_knowledge_convert_html, handle_knowledge_copilot, handle_knowledge_emoji,
-    handle_knowledge_file_delete, handle_knowledge_file_get, handle_knowledge_file_history,
-    handle_knowledge_file_put, handle_knowledge_file_restore, handle_knowledge_graph,
+    handle_knowledge_file_or_sub, handle_knowledge_graph,
     handle_knowledge_habits, handle_knowledge_habits_last_week, handle_knowledge_journal_add,
     handle_knowledge_journal_emoji, handle_knowledge_journal_today, handle_knowledge_search,
     handle_knowledge_stats_done_today, handle_knowledge_stats_today, handle_knowledge_tree,
@@ -95,6 +94,8 @@ pub(crate) use knowledge_routes::{
 pub(crate) use marketplace::{
     handle_marketplace_install, handle_marketplace_search, handle_marketplace_skill_detail,
     handle_marketplace_updates,
+    handle_skills_sh_install, handle_skills_sh_list, handle_skills_sh_search,
+    handle_skills_sh_skill_detail, handle_skills_sh_skill_audit,
 };
 pub(crate) use project_routes::{
     handle_project_create, handle_project_delete, handle_project_get, handle_project_link_memory,
@@ -106,17 +107,17 @@ pub(crate) use resource_routes::{
 };
 pub(crate) use system::{
     handle_agent_kill, handle_agents_list, handle_audit_verify_api, handle_backup,
-    handle_config_get, handle_config_put, handle_doctor, handle_health, handle_log,
-    handle_readiness, handle_status, handle_update_changelog, handle_update_check,
+    handle_config_get, handle_config_patch, handle_config_put, handle_doctor, handle_health,
+    handle_log, handle_readiness, handle_status, handle_update_changelog, handle_update_check,
     handle_update_run,
 };
 pub(crate) use workspace::{
-    handle_memory_create, handle_memory_get, handle_memory_list, handle_memory_search,
-    handle_memory_semantic_search, handle_seed_evolution, handle_seed_get, handle_seeds_list,
-    handle_skill_content, handle_skill_create, handle_skill_delete, handle_skill_disable,
-    handle_skill_enable, handle_skill_get, handle_skills_list, handle_workspace_file_create,
-    handle_workspace_file_delete, handle_workspace_file_get, handle_workspace_file_put,
-    handle_workspace_tree,
+    handle_memory_create, handle_memory_get, handle_memory_list, handle_memory_map,
+    handle_memory_search, handle_memory_semantic_search, handle_seed_evolution, handle_seed_get,
+    handle_seeds_list, handle_skill_content, handle_skill_create, handle_skill_delete,
+    handle_skill_disable, handle_skill_enable, handle_skill_get, handle_skills_list,
+    handle_workspace_file_create, handle_workspace_file_delete, handle_workspace_file_get,
+    handle_workspace_file_put, handle_workspace_tree, MemoryMapCache,
 };
 
 // ---------------------------------------------------------------------------
@@ -174,6 +175,17 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         .route(
             "/api/marketplace/skills/{slug}",
             get(handle_marketplace_skill_detail),
+        )
+        // Marketplace (Skills.sh) — read-only routes, public
+        .route("/api/marketplace/skills-sh/search", get(handle_skills_sh_search))
+        .route("/api/marketplace/skills-sh/list", get(handle_skills_sh_list))
+        .route(
+            "/api/marketplace/skills-sh/skill/{id}",
+            get(handle_skills_sh_skill_detail),
+        )
+        .route(
+            "/api/marketplace/skills-sh/skill/{id}/audit",
+            get(handle_skills_sh_skill_audit),
         );
 
     // Protected API routes (auth middleware applied)
@@ -189,6 +201,7 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         // Config
         .route("/api/config", get(handle_config_get))
         .route("/api/config", put(handle_config_put))
+        .route("/api/config", patch(handle_config_patch))
         // Engine
         .route("/api/engine/providers", get(handle_engine_providers))
         .route("/api/engine/models", get(handle_engine_models))
@@ -244,6 +257,7 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         .route("/api/memory", post(handle_memory_create))
         .route("/api/memory/search", post(handle_memory_search))
         .route("/api/memory/semantic", post(handle_memory_semantic_search))
+        .route("/api/memory/map", get(handle_memory_map))
         .route("/api/memory/{name}", get(handle_memory_get))
         // Scheduler stats & tasks
         .route("/api/scheduler/stats", get(handle_scheduler_stats))
@@ -375,17 +389,24 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         .route("/api/budget/{agent_id}/reset", post(handle_budget_reset))
         // Knowledge
         .route("/api/knowledge/tree", get(handle_knowledge_tree))
+        // Knowledge — file CRUD + git sub-paths unified under one catch-all.
+        // axum 0.8: `{*path}` MUST be the last segment, so we dispatch on method/path
+        // in a single handler rather than registering separate sub-path routes.
         .route(
             "/api/knowledge/file/{*path}",
-            get(handle_knowledge_file_get),
+            get(handle_knowledge_file_or_sub),
         )
         .route(
             "/api/knowledge/file/{*path}",
-            put(handle_knowledge_file_put),
+            put(handle_knowledge_file_or_sub),
         )
         .route(
             "/api/knowledge/file/{*path}",
-            delete(handle_knowledge_file_delete),
+            delete(handle_knowledge_file_or_sub),
+        )
+        .route(
+            "/api/knowledge/file/{*path}",
+            post(handle_knowledge_file_or_sub),
         )
         .route("/api/knowledge/search", post(handle_knowledge_search))
         .route("/api/knowledge/backlinks", get(handle_knowledge_backlinks))
@@ -468,19 +489,15 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
             post(handle_knowledge_convert_html),
         )
         .route("/api/knowledge/emoji", get(handle_knowledge_emoji))
-        // Knowledge — Git version history
-        .route(
-            "/api/knowledge/file/{*path}/history",
-            get(handle_knowledge_file_history),
-        )
-        .route(
-            "/api/knowledge/file/{*path}/restore",
-            post(handle_knowledge_file_restore),
-        )
         // Marketplace (ClawHub) — install requires auth
         .route(
             "/api/marketplace/skills/{slug}/install",
             post(handle_marketplace_install),
+        )
+        // Marketplace (Skills.sh) — install requires auth
+        .route(
+            "/api/marketplace/skills-sh/skill/{id}/install",
+            post(handle_skills_sh_install),
         )
         // System Update
         .route("/api/update/check", get(handle_update_check))

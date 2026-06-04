@@ -1,5 +1,9 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import {
+  Package, Wrench, FileText, Gamepad2, Globe, BookOpen, Palette,
+  Zap, Target, Rocket, Lightbulb, Lock, BarChart3, Tent,
+} from 'lucide-react'
 import { useCreateProject } from '@/hooks/use-projects'
 import type { CreateProjectInput } from '@/hooks/use-projects'
 import { Button } from '@/components/ui/button'
@@ -16,7 +20,25 @@ interface CreateProjectDialogProps {
   onOpenChange: (open: boolean) => void
 }
 
-const EMOJI_OPTIONS = ['📦', '🔧', '📝', '🎮', '🌐', '📚', '🎨', '⚡', '🎯', '🚀', '💡', '🔒', '📊', '🎪']
+/** Icon name → component mapping for project icons. */
+const ICON_OPTIONS: Array<{ name: string; icon: React.ReactNode }> = [
+  { name: 'package', icon: <Package className="h-4 w-4" /> },
+  { name: 'wrench', icon: <Wrench className="h-4 w-4" /> },
+  { name: 'file-text', icon: <FileText className="h-4 w-4" /> },
+  { name: 'gamepad', icon: <Gamepad2 className="h-4 w-4" /> },
+  { name: 'globe', icon: <Globe className="h-4 w-4" /> },
+  { name: 'book-open', icon: <BookOpen className="h-4 w-4" /> },
+  { name: 'palette', icon: <Palette className="h-4 w-4" /> },
+  { name: 'zap', icon: <Zap className="h-4 w-4" /> },
+  { name: 'target', icon: <Target className="h-4 w-4" /> },
+  { name: 'rocket', icon: <Rocket className="h-4 w-4" /> },
+  { name: 'lightbulb', icon: <Lightbulb className="h-4 w-4" /> },
+  { name: 'lock', icon: <Lock className="h-4 w-4" /> },
+  { name: 'bar-chart', icon: <BarChart3 className="h-4 w-4" /> },
+  { name: 'tent', icon: <Tent className="h-4 w-4" /> },
+]
+
+export { ICON_OPTIONS }
 
 export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogProps) {
   const { t } = useTranslation()
@@ -24,7 +46,7 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
   const { toast } = useToast()
 
   const [name, setName] = useState('')
-  const [emoji, setEmoji] = useState('📦')
+  const [icon, setIcon] = useState('package')
   const [description, setDescription] = useState('')
   const [tags, setTags] = useState('')
   const [paths, setPaths] = useState('')
@@ -32,7 +54,7 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
 
   const reset = () => {
     setName('')
-    setEmoji('📦')
+    setIcon('package')
     setDescription('')
     setTags('')
     setPaths('')
@@ -53,7 +75,7 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
         .split(',')
         .map((p) => p.trim())
         .filter(Boolean),
-      emoji,
+      emoji: icon,
       memory_visible: memoryVisible,
     }
 
@@ -91,19 +113,20 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
             />
           </div>
 
-          {/* Emoji */}
+          {/* Icon */}
           <div className="space-y-1">
-            <label className="text-sm font-medium">{t('projects.emoji', 'Emoji')}</label>
+            <label className="text-sm font-medium">{t('projects.icon', 'Icon')}</label>
             <div className="flex flex-wrap gap-1">
-              {EMOJI_OPTIONS.map((e) => (
+              {ICON_OPTIONS.map((opt) => (
                 <button
-                  key={e}
-                  onClick={() => setEmoji(e)}
-                  className={`w-8 h-8 rounded text-sm flex items-center justify-center border transition-colors ${
-                    emoji === e ? 'border-primary bg-primary/10' : 'border-transparent hover:bg-muted'
+                  key={opt.name}
+                  type="button"
+                  onClick={() => setIcon(opt.name)}
+                  className={`w-8 h-8 rounded flex items-center justify-center border transition-colors ${
+                    icon === opt.name ? 'border-primary bg-primary/10' : 'border-transparent hover:bg-muted'
                   }`}
                 >
-                  {e}
+                  {opt.icon}
                 </button>
               ))}
             </div>

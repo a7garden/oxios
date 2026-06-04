@@ -77,6 +77,30 @@ pub struct AgentResponse {
     pub timestamp: DateTime<Utc>,
 }
 
+/// A single tool execution step recorded in a session (RFC-015).
+///
+/// Persisted alongside the agent response so that the Web UI can render the
+/// execution timeline (tool calls, durations, errors) when the user
+/// re-opens the session later. Mirrors `memory::sona::TrajectoryStep` but
+/// is duplicated here to avoid a kernel-state → memory dependency cycle.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TrajectoryStepRecord {
+    /// Name of the tool that was called.
+    pub tool_name: String,
+    /// Tool input arguments (JSON).
+    pub tool_args: serde_json::Value,
+    /// Truncated output (max ~500 chars).
+    pub output_summary: String,
+    /// Wall-clock duration in milliseconds.
+    pub duration_ms: u64,
+    /// Whether the tool returned an error.
+    pub is_error: bool,
+    /// Provider-specific tool call ID (for start/end correlation).
+    pub tool_call_id: String,
+    /// Timestamp when the step started.
+    pub timestamp: DateTime<Utc>,
+}
+
 /// Arbitrary key-value metadata for a session.
 pub type SessionMetadata = std::collections::HashMap<String, serde_json::Value>;
 
@@ -97,6 +121,11 @@ pub struct Session {
     /// All agent responses in this session.
     #[serde(default)]
     pub agent_responses: Vec<AgentResponse>,
+    /// RFC-015: tool execution trajectory accumulated for this session.
+    /// Appended on each orchestrator run; consumed by the Web UI to render
+    /// the execution timeline when the session is re-opened.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub trajectory_steps: Vec<TrajectoryStepRecord>,
     /// Currently active seed ID (if any).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub active_seed_id: Option<String>,
@@ -121,6 +150,7 @@ impl Session {
             user_id: user_id.into(),
             user_messages: Vec::new(),
             agent_responses: Vec::new(),
+            trajectory_steps: Vec::new(),
             active_seed_id: None,
             active_persona_id: None,
             created_at: now,
@@ -137,6 +167,7 @@ impl Session {
             user_id: user_id.into(),
             user_messages: Vec::new(),
             agent_responses: Vec::new(),
+            trajectory_steps: Vec::new(),
             active_seed_id: None,
             active_persona_id: None,
             created_at: now,
@@ -158,6 +189,23 @@ impl Session {
     pub fn add_agent_response(&mut self, response: AgentResponse) {
         self.agent_responses.push(response);
         self.updated_at = Utc::now();
+    }
+
+    /// Appends trajectory steps to the session (RFC-015).
+    ///
+    /// Called by the orchestrator after each run so the Web UI can
+    /// re-render the execution timeline when the user re-opens the session.
+    pub fn extend_trajectory(&mut self, steps: Vec<TrajectoryStepRecord>) {
+        if steps.is_empty() {
+            return;
+        }
+        self.trajectory_steps.extend(steps);
+        self.updated_at = Utc::now();
+    }
+
+    /// Returns the trajectory steps recorded in this session.
+    pub fn trajectory(&self) -> &[TrajectoryStepRecord] {
+        &self.trajectory_steps
     }
 
     /// Sets the active seed ID.

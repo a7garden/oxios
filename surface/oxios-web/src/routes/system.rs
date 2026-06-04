@@ -766,18 +766,72 @@ pub(crate) async fn handle_config_get(
     }
 }
 
-/// PUT /api/config — Update configuration.
+/// Deep-merge a patch into a base `serde_json::Value` (both must be objects).
 ///
-/// Validates the incoming JSON against the config schema, persists
-/// changes to the config file on disk, and hot-reloads the in-memory config.
+/// Sections and fields present in `patch` override those in `base`.
+/// Sections and fields absent from `patch` are preserved from `base`.
+/// This implements PATCH semantics so that a partial config update does not
+/// reset fields the caller did not intend to change.
+///
+/// Conflict policy:
+/// - If both sides have a non-null object at the same path, recurse.
+/// - Otherwise `patch` wins.
+fn deep_merge_json(base: &mut serde_json::Value, patch: serde_json::Value) {
+    use serde_json::Value;
+    if let Value::Object(patch_map) = patch {
+        if !base.is_object() {
+            *base = Value::Object(serde_json::Map::new());
+        }
+        let base_map = base.as_object_mut().expect("just ensured object");
+        for (key, patch_val) in patch_map {
+            match base_map.get_mut(&key) {
+                Some(existing) if existing.is_object() && patch_val.is_object() => {
+                    deep_merge_json(existing, patch_val);
+                }
+                _ => {
+                    base_map.insert(key, patch_val);
+                }
+            }
+        }
+    }
+}
+
+/// PUT /api/config — Update configuration (alias of PATCH).
+///
+/// Like the PATCH handler, the request body is **deep-merged** into the
+/// current in-memory config. Sections and fields the caller omits are
+/// preserved, not reset to defaults. Despite the HTTP verb, this is
+/// NOT a full-config replacement — it has the same semantics as
+/// `PATCH /api/config`.
+///
+/// Why is PUT exposed at all? Some HTTP clients, automation tooling,
+/// and older Oxios versions send PUT instead of PATCH. The handler
+/// is kept so that those callers still work; new code should prefer
+/// `PATCH /api/config`, which also returns the hot-reload
+/// classification report (`ConfigPatchResponse`) that PUT does not.
+///
+/// Engine configuration (`engine.*`) is rejected by PATCH with 400;
+/// PUT keeps the same restriction. Use the typed engine endpoints
+/// (`/api/engine/api-key`, `/api/engine/model`,
+/// `/api/engine/provider-options`) for those.
 pub(crate) async fn handle_config_put(
     state: State<Arc<AppState>>,
     Json(body): Json<serde_json::Value>,
 ) -> Result<Json<serde_json::Value>, AppError> {
     tracing::info!("Config update requested");
 
-    // Validate: parse as OxiosConfig to ensure the shape is correct.
-    let updated: oxios_kernel::OxiosConfig = match serde_json::from_value(body.clone()) {
+    // Deep-merge the patch into the current config so omitted fields are preserved.
+    let mut current_value = {
+        let cfg = state.config.read();
+        serde_json::to_value(&*cfg).map_err(|e| {
+            tracing::error!(error = %e, "Failed to serialize current config");
+            AppError::Internal("failed to serialize current config".into())
+        })?
+    };
+    deep_merge_json(&mut current_value, body.clone());
+
+    // Validate the merged result by parsing as OxiosConfig.
+    let updated: oxios_kernel::OxiosConfig = match serde_json::from_value(current_value.clone()) {
         Ok(cfg) => cfg,
         Err(e) => {
             tracing::warn!(error = %e, "Invalid config shape");
@@ -785,7 +839,19 @@ pub(crate) async fn handle_config_put(
         }
     };
 
-    // Persist to the config file.
+    // Run the kernel validator too (catches semantic errors like
+    // default_timeout > max_timeout) before we touch disk.
+    let (errors, warnings) = updated.validate();
+    for w in &warnings {
+        tracing::warn!(config_warning = %w, "Config validation warning");
+    }
+    if !errors.is_empty() {
+        let msg = errors.join("; ");
+        tracing::warn!(error = %msg, "Config validation failed");
+        return Err(AppError::BadRequest(format!("Invalid config: {msg}")));
+    }
+
+    // Persist the merged config to disk.
     let content = toml::to_string_pretty(&updated)
         .map_err(|e: toml::ser::Error| AppError::Internal(e.to_string()))?;
     if let Err(e) = tokio::fs::write(&state.config_path, content).await {
@@ -795,10 +861,570 @@ pub(crate) async fn handle_config_put(
     tracing::info!(path = %state.config_path.display(), "Config persisted");
 
     // Hot-reload: update in-memory config.
-    *state.config.write() = updated;
+    let updated_config = updated;
+    *state.config.write() = updated_config.clone();
 
-    tracing::info!("Config hot-reloaded from {}", state.config_path.display());
+    // Propagate hot-reloadable config to kernel subsystems.
+    // Each subsystem gets its relevant slice of the config.
+
+    // ExecApi — allowlist, shell mode, timeouts
+    *state.kernel.exec.shared_config().write() = updated_config.exec.clone();
+
+    // AgentScheduler — concurrency, rate limit, zombie timeout
+    state.kernel.infra.scheduler().update_config(
+        updated_config.scheduler.max_concurrent,
+        updated_config.scheduler.rate_limit_per_minute,
+        updated_config.scheduler.zombie_timeout_secs,
+    );
+
+    // ResourceMonitor — CPU/memory/load thresholds
+    use oxios_kernel::resource_monitor::OverloadThreshold;
+    state.kernel.infra.resource_monitor().set_overload_threshold(OverloadThreshold {
+        cpu_percent: updated_config.resource_monitor.cpu_threshold,
+        memory_percent: updated_config.resource_monitor.memory_threshold,
+        load_avg: updated_config.resource_monitor.load_threshold,
+    });
+
+    tracing::info!(
+        "Config hot-reloaded (web + kernel subsystems) from {}",
+        state.config_path.display()
+    );
     Ok(Json(body))
+}
+
+// ---------------------------------------------------------------------------
+// PATCH /api/config — Partial config update with hot-reload metadata
+// ---------------------------------------------------------------------------
+
+/// List of top-level config sections whose fields are propagated to the
+/// running kernel at PATCH time (no daemon restart required).
+///
+/// Each entry is `(section_name, restart_scope)`. `restart_scope` describes
+/// the runtime subsystem that needs to pick up the change (used in logs and
+/// tooltips on the frontend).
+///
+/// IMPORTANT: this list MUST match what `handle_config_patch` actually
+/// propagates. Sections not listed here (security, audit, orchestrator,
+/// context, session, logging, kernel, memory, …) are persisted to disk
+/// but the running daemon keeps the boot-time values, so they are
+/// classified as `requires_restart`. Adding a section to this list
+/// without wiring the propagation in `handle_config_patch` would lie
+/// to the user about whether the change took effect.
+const HOT_RELOADABLE_SECTIONS: &[(&str, &str)] = &[
+    ("exec", "exec_api"),
+    ("scheduler", "scheduler"),
+    ("resource_monitor", "resource_monitor"),
+];
+
+/// Subset of fields that always require a restart even inside a
+/// hot-reloadable section (e.g. `memory.embedding.provider` swaps a
+/// model that was loaded at boot).
+const RESTART_REQUIRED_FIELDS: &[&str] = &[
+    "memory.embedding.provider",
+    "memory.embedding.dimension",
+    "memory.sqlite.path",
+    "memory.sqlite.embedding_dim",
+    "memory.bridge.sync_enabled",
+    "memory.bridge.interval_secs",
+    "engine.default_model",
+    "engine.api_key",
+    "engine.provider_options",
+    "engine.routing_enabled",
+    "engine.prefer_cost_efficient",
+    "engine.fallback_models",
+    "engine.excluded_models",
+    "gateway.host",
+    "gateway.port",
+    "daemon.pid_file",
+    "daemon.log_dir",
+    "channels.enabled",
+    "channels.telegram.bot_token_env",
+    "channels.telegram.allowed_users",
+    "channels.telegram.session.rotation_hours",
+    "channels.telegram.session.max_messages",
+    "surfaces",
+    "otel.enabled",
+    "otel.endpoint",
+    "otel.service_name",
+    "otel.sampling_ratio",
+    "cron",
+    "mcp",
+    "browser",
+    "persona",
+    "marketplace",
+    "budget",
+    "git",
+    "memory.consolidation.preset",
+];
+
+/// Response body for `PATCH /api/config`.
+#[derive(Debug, Serialize, Clone)]
+pub(crate) struct ConfigPatchResponse {
+    /// Echo of the saved patch (deep-merged view of the modified config).
+    pub config: serde_json::Value,
+    /// Hot-reload classification of the changes that were applied.
+    pub hot_reload: HotReloadReport,
+}
+
+/// Hot-reload classification of a config patch.
+#[derive(Debug, Serialize, Clone)]
+pub(crate) struct HotReloadReport {
+    /// Dotted field paths that were applied to running subsystems immediately.
+    pub applied_immediately: Vec<String>,
+    /// Dotted field paths that require a daemon restart to take full effect.
+    pub requires_restart: Vec<String>,
+    /// Total number of changed fields (sum of both lists).
+    pub total_changed: usize,
+}
+
+/// Classify a JSON patch against the current config into hot-reloadable vs
+/// restart-required field paths. Walks both `base` and `patch` recursively,
+/// emitting the dotted path of every key whose value actually changed.
+fn classify_patch(
+    base: &serde_json::Value,
+    patch: &serde_json::Value,
+    prefix: &str,
+    applied: &mut Vec<String>,
+    restart: &mut Vec<String>,
+) {
+    use serde_json::Value;
+    let Value::Object(patch_map) = patch else {
+        return;
+    };
+    for (key, patch_val) in patch_map {
+        let path = if prefix.is_empty() {
+            key.clone()
+        } else {
+            format!("{prefix}.{key}")
+        };
+
+        // Recurse into nested objects so we report the exact changed field.
+        if patch_val.is_object() {
+            let base_child = base.get(key).cloned().unwrap_or(Value::Null);
+            classify_patch(&base_child, patch_val, &path, applied, restart);
+            continue;
+        }
+
+        // Scalar / array — compare for actual change.
+        let base_val = base.get(key);
+        if base_val == Some(patch_val) {
+            continue;
+        }
+
+        if is_restart_required(&path) {
+            restart.push(path);
+        } else {
+            applied.push(path);
+        }
+    }
+}
+
+/// Returns true if a dotted config path requires a daemon restart to apply.
+fn is_restart_required(path: &str) -> bool {
+    if RESTART_REQUIRED_FIELDS.iter().any(|p| *p == path) {
+        return true;
+    }
+    // Top-level sections not in HOT_RELOADABLE_SECTIONS are restart-only.
+    let top = path.split('.').next().unwrap_or(path);
+    !HOT_RELOADABLE_SECTIONS.iter().any(|(s, _)| *s == top)
+}
+
+/// Top-level config keys that the PATCH endpoint must refuse, even
+/// though they exist in `OxiosConfig`. The engine subsystem manages
+/// its own typed endpoints (`/api/engine/api-key`, `/api/engine/model`,
+/// `/api/engine/provider-options`) which handle encryption, masking,
+/// and provider-scoped semantics. A bulk PATCH that overwrites
+/// `engine.api_key: ""` would silently wipe the stored key.
+const PATCH_FORBIDDEN_TOP_LEVEL_KEYS: &[&str] = &["engine"];
+
+/// Walk a PATCH body and return the first forbidden top-level key it
+/// contains, or `None` if the body is acceptable. Used by
+/// `handle_config_patch` to reject engine.* writes before they reach
+/// the deep-merge step.
+fn find_forbidden_patch_key(
+    body: &serde_json::Value,
+    forbidden: &[&str],
+) -> Option<String> {
+    use serde_json::Value;
+    let Value::Object(map) = body else {
+        return None;
+    };
+    for key in map.keys() {
+        if forbidden.iter().any(|f| *f == key) {
+            return Some(key.clone());
+        }
+    }
+    None
+}
+
+/// `PATCH /api/config` — Partial config update.
+///
+/// Body: a subset of `OxiosConfig` (e.g. `{"exec": {"allowlist_mode":
+/// "enforced"}}`). The patch is deep-merged into the current config so
+/// sections and fields the caller omits are preserved.
+///
+/// Engine configuration (`engine.api_key`, `engine.provider_options`,
+/// `engine.default_model`, …) MUST NOT be sent via this endpoint.
+/// Use the typed engine endpoints (`/api/engine/api-key`,
+/// `/api/engine/model`, `/api/engine/provider-options`) instead — they
+/// handle encryption, masking, and provider scoping correctly. A PATCH
+/// containing engine.* fields is rejected with HTTP 400.
+///
+/// Response includes a `hot_reload` object classifying which changed
+/// fields were applied immediately and which require a daemon restart.
+pub(crate) async fn handle_config_patch(
+    state: State<Arc<AppState>>,
+    Json(body): Json<serde_json::Value>,
+) -> Result<Json<ConfigPatchResponse>, AppError> {
+    tracing::info!("Config PATCH requested");
+
+    if !body.is_object() {
+        return Err(AppError::BadRequest(
+            "PATCH body must be a JSON object".into(),
+        ));
+    }
+
+    // Reject engine.* fields. They are managed by the typed engine
+    // endpoints; sending them here risks wiping the encrypted api_key
+    // (the bulk path does not mask or encrypt).
+    if let Some(forbidden) = find_forbidden_patch_key(&body, PATCH_FORBIDDEN_TOP_LEVEL_KEYS) {
+        tracing::warn!(key = %forbidden, "PATCH /api/config rejected forbidden key");
+        return Err(AppError::BadRequest(format!(
+            "PATCH /api/config does not accept '{forbidden}' fields. \
+             Use the typed endpoint instead: \
+             /api/engine/api-key (POST), /api/engine/model (PUT), \
+             /api/engine/provider-options (PUT)."
+        )));
+    }
+
+    // Snapshot the current config as JSON for both merging and classification.
+    let mut current_value = {
+        let cfg = state.config.read();
+        serde_json::to_value(&*cfg).map_err(|e| {
+            tracing::error!(error = %e, "Failed to serialize current config");
+            AppError::Internal("failed to serialize current config".into())
+        })?
+    };
+
+    // Capture the pre-merge value so we can detect which fields actually changed.
+    let before_patch = current_value.clone();
+
+    // Deep-merge the patch into the current config.
+    deep_merge_json(&mut current_value, body.clone());
+
+    // Classify every changed field into hot-reloadable vs restart-required.
+    let mut applied: Vec<String> = Vec::new();
+    let mut restart: Vec<String> = Vec::new();
+    classify_patch(&before_patch, &body, "", &mut applied, &mut restart);
+    applied.sort();
+    restart.sort();
+
+    // Validate the merged result.
+    let updated: oxios_kernel::OxiosConfig = match serde_json::from_value(current_value.clone()) {
+        Ok(cfg) => cfg,
+        Err(e) => {
+            tracing::warn!(error = %e, "Invalid config shape");
+            return Err(AppError::BadRequest(format!("Invalid config: {e}")));
+        }
+    };
+    let (errors, warnings) = updated.validate();
+    for w in &warnings {
+        tracing::warn!(config_warning = %w, "Config validation warning");
+    }
+    if !errors.is_empty() {
+        let msg = errors.join("; ");
+        tracing::warn!(error = %msg, "Config validation failed");
+        return Err(AppError::BadRequest(format!("Invalid config: {msg}")));
+    }
+
+    // Persist merged config to disk.
+    let content = toml::to_string_pretty(&updated)
+        .map_err(|e: toml::ser::Error| AppError::Internal(e.to_string()))?;
+    if let Err(e) = tokio::fs::write(&state.config_path, content).await {
+        tracing::error!(error = %e, "Failed to persist config");
+        return Err(AppError::Internal(e.to_string()));
+    }
+    tracing::info!(path = %state.config_path.display(), "Config persisted");
+
+    // Hot-reload in-memory config.
+    *state.config.write() = updated.clone();
+
+    // Propagate hot-reloadable slices to kernel subsystems.
+    *state.kernel.exec.shared_config().write() = updated.exec.clone();
+    state.kernel.infra.scheduler().update_config(
+        updated.scheduler.max_concurrent,
+        updated.scheduler.rate_limit_per_minute,
+        updated.scheduler.zombie_timeout_secs,
+    );
+    use oxios_kernel::resource_monitor::OverloadThreshold;
+    state.kernel.infra.resource_monitor().set_overload_threshold(OverloadThreshold {
+        cpu_percent: updated.resource_monitor.cpu_threshold,
+        memory_percent: updated.resource_monitor.memory_threshold,
+        load_avg: updated.resource_monitor.load_threshold,
+    });
+
+    let total = applied.len() + restart.len();
+    tracing::info!(
+        applied = applied.len(),
+        restart = restart.len(),
+        "Config PATCH applied"
+    );
+
+    Ok(Json(ConfigPatchResponse {
+        config: body,
+        hot_reload: HotReloadReport {
+            applied_immediately: applied,
+            requires_restart: restart,
+            total_changed: total,
+        },
+    }))
+}
+
+#[cfg(test)]
+mod patch_tests {
+    //! Unit tests for the PATCH /api/config hot-reload classification.
+
+    use super::{classify_patch, is_restart_required};
+    use serde_json::json;
+
+    #[test]
+    fn classify_hot_reloadable_field() {
+        let base = json!({"exec": {"allowed_commands": ["ls", "cat"]}});
+        let patch = json!({"exec": {"allowed_commands": ["ls", "cat", "rg"]}});
+        let mut applied = Vec::new();
+        let mut restart = Vec::new();
+        classify_patch(&base, &patch, "", &mut applied, &mut restart);
+        assert_eq!(applied, vec!["exec.allowed_commands"]);
+        assert!(restart.is_empty());
+    }
+
+    #[test]
+    fn classify_restart_required_field() {
+        let base = json!({"gateway": {"port": 4200}});
+        let patch = json!({"gateway": {"port": 4300}});
+        let mut applied = Vec::new();
+        let mut restart = Vec::new();
+        classify_patch(&base, &patch, "", &mut applied, &mut restart);
+        assert!(applied.is_empty());
+        assert_eq!(restart, vec!["gateway.port"]);
+    }
+
+    #[test]
+    fn classify_mixed_changes() {
+        // `exec.allowed_commands` is hot-reloadable, `gateway.port` is not.
+        let base = json!({
+            "exec": {"allowed_commands": ["ls"]},
+            "gateway": {"port": 4200},
+        });
+        let patch = json!({
+            "exec": {"allowed_commands": ["ls", "rg"]},
+            "gateway": {"port": 4300},
+        });
+        let mut applied = Vec::new();
+        let mut restart = Vec::new();
+        classify_patch(&base, &patch, "", &mut applied, &mut restart);
+        applied.sort();
+        restart.sort();
+        assert_eq!(applied, vec!["exec.allowed_commands"]);
+        assert_eq!(restart, vec!["gateway.port"]);
+    }
+
+    #[test]
+    fn classify_skips_unchanged_fields() {
+        // Patch contains a value equal to the base — should not be reported.
+        let base = json!({"exec": {"allowed_commands": ["ls"]}});
+        let patch = json!({"exec": {"allowed_commands": ["ls"]}});
+        let mut applied = Vec::new();
+        let mut restart = Vec::new();
+        classify_patch(&base, &patch, "", &mut applied, &mut restart);
+        assert!(applied.is_empty());
+        assert!(restart.is_empty());
+    }
+
+    #[test]
+    fn classify_recurses_into_nested_objects() {
+        // Memory embedding provider change → restart-required.
+        let base = json!({
+            "memory": {"embedding": {"provider": "gguf", "dimension": 256}}
+        });
+        let patch = json!({
+            "memory": {"embedding": {"provider": "mlx", "dimension": 256}}
+        });
+        let mut applied = Vec::new();
+        let mut restart = Vec::new();
+        classify_patch(&base, &patch, "", &mut applied, &mut restart);
+        assert!(applied.is_empty());
+        assert_eq!(restart, vec!["memory.embedding.provider"]);
+    }
+
+    #[test]
+    fn unknown_top_level_section_is_restart_required() {
+        // `otel` is not in HOT_RELOADABLE_SECTIONS.
+        assert!(is_restart_required("otel.enabled"));
+        assert!(is_restart_required("otel.endpoint"));
+    }
+
+    #[test]
+    fn hot_reloadable_sections_are_immediate() {
+        // Only sections that `handle_config_patch` actually propagates
+        // to the running kernel are marked hot-reloadable. security,
+        // audit, etc. are NOT propagated (subsystem constructed at
+        // boot) so they must be classified as restart-required.
+        assert!(!is_restart_required("exec.allowed_commands"));
+        assert!(!is_restart_required("scheduler.max_concurrent"));
+        assert!(!is_restart_required("resource_monitor.cpu_threshold"));
+    }
+
+    #[test]
+    fn security_section_is_restart_required() {
+        // security.cors_origins used to be classified hot-reloadable,
+        // but AccessManager is constructed at boot. PATCH persists
+        // the new value but the running subsystem keeps the boot
+        // configuration until restart. Must be classified as
+        // restart-required to avoid lying to the user.
+        assert!(is_restart_required("security.cors_origins"));
+        assert!(is_restart_required("security.auth_enabled"));
+        assert!(is_restart_required("security.rate_limit_per_minute"));
+    }
+
+    #[test]
+    fn audit_section_is_restart_required() {
+        // Audit writer is constructed at boot with its rotating file
+        // handle. PATCH persists but does not reopen the writer.
+        assert!(is_restart_required("audit.max_entries"));
+        assert!(is_restart_required("audit.enabled"));
+    }
+
+    #[test]
+    fn memory_section_is_restart_required() {
+        // Memory subsystem is constructed at boot (SQLite handle,
+        // embedding model, SONA). Toggling `enabled` or any sub-field
+        // is restart-only.
+        assert!(is_restart_required("memory.enabled"));
+        assert!(is_restart_required("memory.embedding.provider"));
+        assert!(is_restart_required("memory.consolidation.dream_enabled"));
+        assert!(is_restart_required("memory.learning.sona_enabled"));
+    }
+
+    #[test]
+    fn channels_telegram_session_requires_restart() {
+        // Telegram channel is launched at boot — session changes need restart.
+        assert!(is_restart_required("channels.telegram.session.rotation_hours"));
+        assert!(is_restart_required("channels.telegram.allowed_users"));
+    }
+
+    #[test]
+    fn memory_consolidation_preset_requires_restart() {
+        // Preset triggers `apply_preset()` which mutates many sibling fields.
+        assert!(is_restart_required("memory.consolidation.preset"));
+    }
+}
+
+#[cfg(test)]
+mod patch_rejection_tests {
+    //! Engine.* fields must be rejected by PATCH /api/config. They are
+    //! managed by the typed engine endpoints (which handle encryption,
+    //! masking, and provider-scoped semantics) and sending them via the
+    //! bulk PATCH would risk wiping the encrypted api_key.
+
+    use super::{find_forbidden_patch_key, PATCH_FORBIDDEN_TOP_LEVEL_KEYS};
+    use serde_json::json;
+
+    #[test]
+    fn rejects_engine_api_key() {
+        let body = json!({"engine": {"api_key": "sk-secret"}});
+        let found = find_forbidden_patch_key(&body, PATCH_FORBIDDEN_TOP_LEVEL_KEYS);
+        assert_eq!(found.as_deref(), Some("engine"));
+    }
+
+    #[test]
+    fn rejects_engine_provider_options() {
+        let body = json!({"engine": {"provider_options": {"temperature": 0.7}}});
+        let found = find_forbidden_patch_key(&body, PATCH_FORBIDDEN_TOP_LEVEL_KEYS);
+        assert_eq!(found.as_deref(), Some("engine"));
+    }
+
+    #[test]
+    fn rejects_engine_default_model() {
+        let body = json!({"engine": {"default_model": "anthropic/claude-3"}});
+        let found = find_forbidden_patch_key(&body, PATCH_FORBIDDEN_TOP_LEVEL_KEYS);
+        assert_eq!(found.as_deref(), Some("engine"));
+    }
+
+    #[test]
+    fn accepts_non_engine_sections() {
+        let body = json!({
+            "exec": {"allowlist_mode": "enforced"},
+            "scheduler": {"max_concurrent": 5},
+        });
+        let found = find_forbidden_patch_key(&body, PATCH_FORBIDDEN_TOP_LEVEL_KEYS);
+        assert!(found.is_none());
+    }
+
+    #[test]
+    fn accepts_mixed_payload_without_engine() {
+        // The check is for the *top-level* `engine` key, not a field
+        // anywhere in the body. A nested object containing the word
+        // "engine" elsewhere is fine.
+        let body = json!({"exec": {"allowed_commands": ["engine-status"]}});
+        let found = find_forbidden_patch_key(&body, PATCH_FORBIDDEN_TOP_LEVEL_KEYS);
+        assert!(found.is_none());
+    }
+
+    #[test]
+    fn empty_body_is_acceptable() {
+        let body = json!({});
+        let found = find_forbidden_patch_key(&body, PATCH_FORBIDDEN_TOP_LEVEL_KEYS);
+        assert!(found.is_none());
+    }
+}
+
+#[cfg(test)]
+mod deep_merge_tests {
+    use super::deep_merge_json;
+    use serde_json::json;
+
+    #[test]
+    fn preserves_omitted_top_level_sections() {
+        let mut base = json!({
+            "kernel": {"workspace": "~/.oxios/workspace", "max_agents": 10},
+            "exec": {"allowed_commands": ["ls", "cat"], "allowlist_mode": "enforced"},
+        });
+        let patch = json!({
+            "kernel": {"max_agents": 20},
+        });
+        deep_merge_json(&mut base, patch);
+        assert_eq!(base["kernel"]["workspace"], "~/.oxios/workspace");
+        assert_eq!(base["kernel"]["max_agents"], 20);
+        assert_eq!(base["exec"]["allowed_commands"][0], "ls");
+        assert_eq!(base["exec"]["allowlist_mode"], "enforced");
+    }
+
+    #[test]
+    fn patch_value_replaces_scalar() {
+        let mut base = json!({"engine": {"default_model": "old/model"}});
+        deep_merge_json(
+            &mut base,
+            json!({"engine": {"default_model": "new/model"}}),
+        );
+        assert_eq!(base["engine"]["default_model"], "new/model");
+    }
+
+    #[test]
+    fn patch_object_replaces_object() {
+        let mut base = json!({"security": {"auth_enabled": false, "cors_origins": ["http://a"]}});
+        deep_merge_json(&mut base, json!({"security": {"auth_enabled": true}}));
+        assert_eq!(base["security"]["auth_enabled"], true);
+        assert_eq!(base["security"]["cors_origins"][0], "http://a");
+    }
+
+    #[test]
+    fn empty_patch_is_noop() {
+        let mut base = json!({"exec": {"allowed_commands": ["ls"]}});
+        let original = base.clone();
+        deep_merge_json(&mut base, json!({}));
+        assert_eq!(base, original);
+    }
 }
 
 // ---------------------------------------------------------------------------

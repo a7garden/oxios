@@ -25,5 +25,5 @@ pub mod seed;
 pub use evaluation::EvaluationResult;
 pub use interview::InterviewResult;
 pub use ouroboros_engine::OuroborosEngine;
-pub use protocol::{ExecutionResult, OuroborosProtocol, Phase};
+pub use protocol::{ExecutionResult, OuroborosProtocol, Phase, ToolCallRecord};
 pub use seed::{AmbiguityScore, Entity, Seed};

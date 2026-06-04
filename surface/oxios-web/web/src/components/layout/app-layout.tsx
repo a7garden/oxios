@@ -103,7 +103,7 @@ export function AppLayout() {
               }}
             />
           )}
-          <div className={cn('hidden lg:flex', mobileOpen && 'fixed inset-y-0 left-0 z-50 flex w-60 bg-sidebar')}>
+          <div className={cn('hidden lg:flex', mobileOpen && 'fixed inset-y-0 left-0 z-50 flex flex-col w-60 bg-sidebar')}>
             <Sidebar />
           </div>
         </>
@@ -122,7 +122,7 @@ export function AppLayout() {
             {!isKnowledgeSubRoute && infoPanelOpen && <InfoPanel />}
           </div>
         ) : (
-          <main className="flex-1 overflow-y-auto p-4 lg:p-6">
+          <main className="flex-1 overflow-y-auto p-4 lg:p-6 min-h-0">
             <Outlet />
           </main>
         )}

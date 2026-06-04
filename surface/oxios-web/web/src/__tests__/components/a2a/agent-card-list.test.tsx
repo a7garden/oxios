@@ -1,9 +1,9 @@
-import { describe, expect, it } from 'vitest'
 import { render, screen } from '@testing-library/react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { StatusIndicator } from '@/components/shared/status-indicator'
-import { EmptyState } from '@/components/shared/empty-state'
 import { Bot } from 'lucide-react'
+import { describe, expect, it } from 'vitest'
+import { EmptyState } from '@/components/shared/empty-state'
+import { StatusIndicator } from '@/components/shared/status-indicator'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 // Mock i18next
 vi.mock('react-i18next', () => ({
@@ -35,7 +35,7 @@ describe('AgentCardList - Rendering patterns', () => {
             </CardContent>
           </Card>
         ))}
-      </div>
+      </div>,
     )
 
     expect(screen.getByText('Agent Alpha')).toBeInTheDocument()
@@ -49,7 +49,7 @@ describe('AgentCardList - Rendering patterns', () => {
         icon={<Bot className="h-10 w-10" />}
         title="No agents"
         description="No agents found. Start a new agent to see it here."
-      />
+      />,
     )
 
     expect(screen.getByText('No agents')).toBeInTheDocument()
@@ -68,7 +68,7 @@ describe('AgentCardList - Rendering patterns', () => {
         <CardContent>
           <StatusIndicator status="Running" />
         </CardContent>
-      </Card>
+      </Card>,
     )
 
     expect(screen.getByText('Single Agent')).toBeInTheDocument()

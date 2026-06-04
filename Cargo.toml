@@ -1,6 +1,6 @@
 [package]
 name = "oxios"
-version = "1.0.1"
+version = "1.0.2"
 edition = "2021"
 description = "Oxios Agent OS — Agent Operating System powered by oxi-sdk"
 license = "MIT"
@@ -14,6 +14,19 @@ categories = ["command-line-utilities", "asynchronous"]
 # This dramatically speeds up incremental compiles and linking.
 [profile.dev.package."*"]
 opt-level = 2
+
+# Release profile: balance between binary size, compile time, and runtime speed.
+#   lto            — cross-crate optimization at link time (~15-25% size reduction)
+#   codegen-units  — single translation unit for better inlining
+#   strip          — remove debug symbols (huge binary size win)
+#   panic          — abort (smaller binary; we don't use catch_unwind)
+# See docs/production-audit/07-infra/RELEASE-PROFILE.md for trade-off analysis.
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = true
+panic = "abort"
+opt-level = 3
 
 [workspace]
 resolver = "2"
@@ -66,7 +79,7 @@ regex = "1"
 parking_lot = "0.12"
 
 # oxi engine — single dependency for everything (oxi-ai re-exported via oxi-sdk)
-oxi-sdk = "0.24.0"
+oxi-sdk = "0.26.2"
 
 # HTTP client
 reqwest = { version = "0.12", features = ["json", "rustls-tls"] }
@@ -100,14 +113,14 @@ embedding-gguf = ["oxios-kernel/embedding-gguf"]
 otel = ["oxios-kernel/otel", "dep:opentelemetry", "dep:opentelemetry_sdk"]
 
 [dependencies]
-oxios-kernel = { version = "1.0.1", path = "crates/oxios-kernel", default-features = false }
-oxios-markdown = { version = "1.0.1", path = "crates/oxios-markdown" }
-oxios-ouroboros = { version = "1.0.1", path = "crates/oxios-ouroboros" }
-oxios-gateway = { version = "1.0.1", path = "crates/oxios-gateway" }
+oxios-kernel = { version = "1.0.2", path = "crates/oxios-kernel", default-features = false }
+oxios-markdown = { version = "1.0.2", path = "crates/oxios-markdown" }
+oxios-ouroboros = { version = "1.0.2", path = "crates/oxios-ouroboros" }
+oxios-gateway = { version = "1.0.2", path = "crates/oxios-gateway" }
 oxi-sdk = { workspace = true }
-oxios-web = { version = "1.0.1", path = "surface/oxios-web", optional = true }
-oxios-cli = { version = "1.0.1", path = "channels/oxios-cli", optional = true }
-oxios-telegram = { version = "1.0.1", path = "channels/oxios-telegram", optional = true }
+oxios-web = { version = "1.0.2", path = "surface/oxios-web", optional = true }
+oxios-cli = { version = "1.0.2", path = "channels/oxios-cli", optional = true }
+oxios-telegram = { version = "1.0.2", path = "channels/oxios-telegram", optional = true }
 hex = { workspace = true }
 uuid = { workspace = true }
 tokio = { workspace = true }
@@ -124,6 +137,7 @@ chrono = { workspace = true }
 inquire = { workspace = true }
 libc = { workspace = true }
 console = { workspace = true }
+indicatif = "0.17"
 clap_complete = "4"
 webbrowser = "1.0"
 reqwest = { workspace = true }
@@ -135,7 +149,7 @@ sha2 = { workspace = true }
 toml_edit = "0.22"
 
 [dev-dependencies]
-oxios-ouroboros = { version = "1.0.1", path = "crates/oxios-ouroboros" }
+oxios-ouroboros = { version = "1.0.2", path = "crates/oxios-ouroboros" }
 oxi-sdk = { workspace = true }
 uuid = { workspace = true }
 chrono = { workspace = true }

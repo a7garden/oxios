@@ -1,9 +1,33 @@
-import type CodeMirror from 'codemirror'
-import { useCallback, useEffect, useRef, useState } from 'react'
-import '@/lib/hypermd-setup' // side-effect: registers all CM5/HyperMD modules
-import { createHyperMDEditor } from '@/lib/hypermd-setup'
+/**
+ * Oxios knowledge-base markdown editor — CodeMirror 6 (Phase 1).
+ *
+ * Replaces HyperMD/CodeMirror 5 (deprecated, unmaintained since 2019)
+ * with @uiw/react-codemirror + custom extensions.
+ *
+ * Phase 1 preserves the Obsidian/Logseq editing UX:
+ *   - Plain markdown source view (not pure WYSIWYG)
+ *   - Active-line-only markup visibility (default CM6)
+ *   - All 5+ preserved features: auto-save, heading enforcement,
+ *     ⌘B/⌘I/⌘Y, wiki/emoji autocomplete, Mod-S, dark/light, link click
+ *
+ * Phase 2 will add: image/code inline fold, wikilink click handler
+ * Phase 3 will add: token hiding on inactive lines, mermaid widget, dark theme
+ *
+ * Why not Tiptap? See worktree exp/frontend-markdown-editor-poc/DECISION.md
+ */
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import CodeMirror, {
+  EditorView,
+  type ReactCodeMirrorRef,
+} from '@uiw/react-codemirror'
+import { markdown, markdownLanguage } from '@codemirror/lang-markdown'
+import { autocompletion, type Completion, type CompletionContext, type CompletionResult } from '@codemirror/autocomplete'
+import { history, indentWithTab } from '@codemirror/commands'
+import { bracketMatching, defaultHighlightStyle, syntaxHighlighting } from '@codemirror/language'
+import { keymap } from '@codemirror/view'
+import { EditorSelection } from '@codemirror/state'
 import { useKnowledgeTree } from '@/hooks/use-knowledge'
-import { buildAutocompleteDict, createLinkHintFn } from '@/lib/autocomplete-link'
+import { buildAutocompleteDict, type FileEntry } from '@/lib/autocomplete-link'
 import { cn } from '@/lib/utils'
 import { useKnowledgeStore } from '@/stores/knowledge'
 
@@ -14,305 +38,330 @@ interface MarkdownEditorProps {
   className?: string
 }
 
+// ─────────────────────────────────────────────────────────────────────────
+// Custom keymap: ⌘B / Ctrl-B (bold), ⌘I / Ctrl-I (italic), ⌘Y (checklist),
+// ⌘S / Ctrl-S (manual save via global 'knowledge:save' event)
+// ─────────────────────────────────────────────────────────────────────────
+const customKeymap = keymap.of([
+  { key: 'Mod-b', run: wrapSelection('**', '**') },
+  { key: 'Mod-i', run: wrapSelection('*', '*') },
+  { key: 'Mod-y', run: insertCheckmark },
+  { key: 'Mod-s', run: () => {
+    document.dispatchEvent(new Event('knowledge:save'))
+    return true
+  } },
+  indentWithTab,
+])
+
+function wrapSelection(before: string, after: string) {
+  return (view: EditorView): boolean => {
+    const { state } = view
+    const changes = state.selection.ranges.map((range) => {
+      const text = state.sliceDoc(range.from, range.to)
+      return { from: range.from, to: range.to, insert: before + text + after }
+    })
+    if (changes.length === 0) return false
+    view.dispatch({
+      changes,
+      selection: EditorSelection.create(
+        changes.map((c) =>
+          EditorSelection.range(c.from + before.length, c.to + before.length),
+        ),
+        1,
+      ),
+    })
+    return true
+  }
+}
+
+function insertCheckmark(view: EditorView): boolean {
+  const { state } = view
+  const line = state.doc.lineAt(state.selection.main.head)
+  view.dispatch({
+    changes: { from: line.from, insert: '- [x] ' },
+  })
+  return true
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Heading enforcement — keep first line as `# ` even after edit
+// ─────────────────────────────────────────────────────────────────────────
+const headingEnforcer = EditorView.updateListener.of((update) => {
+  if (!update.docChanged) return
+  const firstLine = update.state.doc.line(1)
+  const text = firstLine.text
+  if (!text.startsWith('# ')) {
+    const content = text.replace(/^#*\s*/, '')
+    update.view.dispatch({
+      changes: { from: firstLine.from, to: firstLine.to, insert: `# ${content}` },
+    })
+  }
+})
+
+// ─────────────────────────────────────────────────────────────────────────
+// Wiki link + emoji completion source
+// ─────────────────────────────────────────────────────────────────────────
+function makeCompletionSource(
+  getEntries: () => FileEntry[],
+  emojiDict: Record<string, string>,
+) {
+  return (ctx: CompletionContext): CompletionResult | null => {
+    // Word range: alphanumeric + some markdown-safe chars
+    const word = ctx.matchBefore(/[\p{L}\p{N}_\s:-]*/u)
+    if (!word) return null
+    if (word.from === word.to && !ctx.explicit) return null
+
+    const before = ctx.state.sliceDoc(Math.max(0, word.from - 1), word.from)
+    const fullText = ctx.state.sliceDoc(word.from, word.to)
+    const lower = fullText.toLowerCase()
+
+    const options: Completion[] = []
+
+    // Wiki link: triggered by `[`
+    if (before === '[') {
+      const entries = getEntries()
+      for (const e of entries) {
+        if (!lower || e.key.toLowerCase().includes(lower)) {
+          options.push({
+            label: e.key,
+            detail: e.filePath,
+            apply: `${e.key}](${e.filePath.replace(/ /g, '%20')})`,
+          })
+          if (options.length >= 20) break
+        }
+      }
+    }
+
+    // Emoji: triggered by `:` at end
+    if (before === ':' || lower.startsWith(':')) {
+      const search = lower.replace(/^:/, '')
+      for (const [key, icon] of Object.entries(emojiDict)) {
+        if (!search || key.toLowerCase().includes(search)) {
+          options.push({
+            label: key,
+            detail: icon,
+            apply: `${icon} `,
+          })
+          if (options.length >= 20) break
+        }
+      }
+    }
+
+    if (options.length === 0) return null
+    return {
+      from: before === '[' || before === ':' ? word.from - 1 : word.from,
+      to: word.to,
+      options,
+      validFor: /[\p{L}\p{N}_\s:-]*/u,
+    }
+  }
+}
+
+// Simple emoji dict (subset — extended in lib/emoji.ts)
+const EMOJI_DICT: Record<string, string> = {
+  heart: '❤️',
+  smile: '😄',
+  tada: '🎉',
+  '+1': '👍',
+  rocket: '🚀',
+  fire: '🔥',
+  check: '✅',
+  x: '❌',
+  warning: '⚠️',
+  bulb: '💡',
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Link / wiki click handler — same semantics as HyperMD's hmdClick
+// ─────────────────────────────────────────────────────────────────────────
+const linkClickHandler = EditorView.domEventHandlers({
+  click(event, _view) {
+    const target = event.target as HTMLElement | null
+    if (!target || target.tagName !== 'A') return false
+    if (!(target instanceof HTMLAnchorElement)) return false
+    const href = target.getAttribute('href') ?? ''
+    if (!href) return false
+    if (href.startsWith('http://') || href.startsWith('https://')) {
+      window.open(href, '_blank', 'noopener')
+      return true
+    }
+    if (href.startsWith('cmd:')) return true
+    const path = href.endsWith('.md') ? href : `${href}.md`
+    document.dispatchEvent(
+      new CustomEvent('knowledge:open-file', { detail: { path } }),
+    )
+    return true
+  },
+})
+
+// ─────────────────────────────────────────────────────────────────────────
+// Editor base theme
+// ─────────────────────────────────────────────────────────────────────────
+const baseTheme = EditorView.theme({
+  '&': {
+    fontSize: '14px',
+    height: '100%',
+  },
+  '.cm-scroller': {
+    fontFamily:
+      'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+  },
+  '.cm-content': {
+    padding: '12px 8px',
+  },
+  '.cm-gutters': {
+    display: 'none',
+  },
+})
+
+const darkTheme = EditorView.theme(
+  {
+    '&': { colorScheme: 'dark' },
+  },
+  { dark: true },
+)
+
+// ─────────────────────────────────────────────────────────────────────────
+// Component
+// ─────────────────────────────────────────────────────────────────────────
 export function MarkdownEditor({
   filePath: _filePath,
   initialContent,
   onSave,
   className,
 }: MarkdownEditorProps) {
-  const containerRef = useRef<HTMLDivElement>(null)
-  const editorRef = useRef<CodeMirror.Editor | null>(null)
+  const ref = useRef<ReactCodeMirrorRef | null>(null)
+  const viewRef = useRef<EditorView | null>(null)
   const [isDirty, setIsDirty] = useState(false)
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const isSettingContent = useRef(false)
   const openFile = useKnowledgeStore((s) => s.openFile)
-  const { data: treeEntries } = useKnowledgeTree()
   const currentFilePath = useKnowledgeStore((s) => s.currentFilePath)
+  const { data: treeEntries } = useKnowledgeTree()
+  const [isDark, setIsDark] = useState(false)
 
-  // Stabilize onSave via ref so the editor effect doesn't re-run on every parent render
+  // Track dark mode via document class
+  useEffect(() => {
+    const obs = new MutationObserver(() => {
+      setIsDark(document.documentElement.classList.contains('dark'))
+    })
+    obs.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
+    setIsDark(document.documentElement.classList.contains('dark'))
+    return () => obs.disconnect()
+  }, [])
+
   const onSaveRef = useRef(onSave)
   onSaveRef.current = onSave
 
-  // Build autocomplete entries from tree
   const autocompleteEntries = useCallback(() => {
     if (!treeEntries) return []
     return buildAutocompleteDict(treeEntries, undefined, currentFilePath ?? undefined)
   }, [treeEntries, currentFilePath])
 
-  // Create editor instance — only re-creates when file changes (initialContent)
-  // or when autocomplete entries change (treeEntries, currentFilePath).
-  // onSave is accessed via ref to avoid re-creating the editor on every parent render.
-  useEffect(() => {
-    const container = containerRef.current
-    if (!container) return
+  const completionSource = useMemo(
+    () => makeCompletionSource(autocompleteEntries, EMOJI_DICT),
+    [autocompleteEntries],
+  )
 
-    // Nuke everything in the container — removes old CM wrappers and any orphan textareas
-    container.innerHTML = ''
-    editorRef.current = null
-
-    const textarea = document.createElement('textarea')
-    textarea.value = initialContent
-    container.appendChild(textarea)
-
-    // Custom link reader (handles wiki-style click)
-    const readLink = (text: string, _line: number) => {
-      text = text.replace(/\|.*]$/, '').replace(/[[\]]/g, '')
-
-      // Action links
-      if (text === 'cmd:openDir' || text === 'cmd:openChat') return undefined
-
-      // External URLs
-      if (/^https?:\/\//.test(text)) {
-        window.open(text, '_blank')
-        return
-      }
-
-      // Internal .md links
-      const path = text.endsWith('.md') ? text : `${text}.md`
-      setTimeout(() => openFile(path), 0)
-      return
-    }
-
-    const cm = createHyperMDEditor(textarea, {
-      // Our overrides — everything else comes from suggestedEditorConfig
-      mode: { name: 'hypermd', math: false },
-      lineNumbers: false,
-      dragDrop: false,
-      viewportMargin: 10,
-      styleActiveLine: true,
-      foldGutter: false,
-      autoCloseBrackets: false,
-      extraKeys: {
-        'Cmd-B': toggleBold,
-        'Ctrl-B': toggleBold,
-        'Cmd-I': toggleItalic,
-        'Ctrl-I': toggleItalic,
-        'Cmd-Y': insertCheckmark,
-        'Ctrl-Y': insertCheckmark,
-      },
-      hintOptions: {
-        hint: (cm: any) => {
-          const cursor = cm.getCursor()
-          const line = cm.getLine(cursor.line) ?? ''
-          const pos = cursor.ch
-          // Determine trigger: `[` = link hint, `:` = emoji hint
-          if (pos > 0 && line[pos - 1] === '[') {
-            return createLinkHintFn(autocompleteEntries)(cm)
-          }
-          if (pos > 0 && line[pos - 1] === ':') {
-            // Return emoji hint
-            const word = line.slice(pos, pos + 3).replace(/[^\p{L}\p{N}_]/u, '')
-            const emojis = [
-              '✅',
-              '❌',
-              '⚠️',
-              '🔥',
-              '💡',
-              '⭐',
-              '🌟',
-              '💫',
-              '🎯',
-              '🚀',
-              '📝',
-              '📌',
-              '🔗',
-              '💬',
-              '📊',
-              '🛠️',
-              '🎨',
-              '🎵',
-              '🏆',
-              '📦',
-              '📈',
-              '💰',
-              '🌱',
-              '🌍',
-              '🧠',
-              '💡',
-              '🔍',
-              '✅',
-              '☑️',
-              '❎',
-              '⬜',
-              '🟩',
-            ]
-            const filtered = word ? emojis.filter((e) => e.includes(word.slice(1))) : emojis
-            return {
-              list: filtered.map((emoji) => ({
-                text: `${emoji} `,
-                displayText: emoji,
-              })),
-              from: { line: cursor.line, ch: pos - 1 },
-              to: { line: cursor.line, ch: pos },
-            }
-          }
-          return null
-        },
-        closeCharacters: /[$^]/,
-        closeOnUnfocus: false,
-        completeSingle: false,
-        alignWithWord: false,
-      },
-    } as any)
-
-    // Save original resolver before overriding
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const originalResolveURL = (cm as any).hmdResolveURL?.bind(cm)
-
-    // Custom link resolver — only intercepts .md navigation
-    // Image paths and external URLs pass through to HyperMD's default resolver
-    const resolveURL = (url: string | undefined): string | undefined => {
-      if (!url) return url
-      const decoded = url.replace(/%20/g, ' ')
-      const cleaned = decoded.startsWith('../') ? decoded.replace('../', '') : decoded
-
-      // External URLs — let HyperMD handle
-      if (/^https?:\/\//i.test(url)) return originalResolveURL?.(url) ?? url
-
-      // Image files — let HyperMD fold-image handle
-      if (/\.(png|jpe?g|gif|svg|webp|bmp)$/i.test(url)) return originalResolveURL?.(url) ?? url
-
-      // .md files → open in editor
-      if (/\.md$/i.test(cleaned)) {
-        setTimeout(() => openFile(cleaned), 0)
-        return cleaned
-      }
-
-      // Everything else — pass through
-      return originalResolveURL?.(url) ?? url
-    }
-
-    // Override URL resolution and link reading
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ;(cm as any).hmdResolveURL = resolveURL
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ;(cm as any).hmdReadLink = readLink
-
-    // Auto-show hints on `[` (link) or `:` (emoji)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    cm.on('inputRead', (_cm: any, change: any) => {
-      if (change.text.length !== 1) return
-      const ch = change.text[0]
-
-      if (ch === '[' || ch === ':') {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        ;(cm as any).showHint({
-          completeSingle: false,
-          updateOnCursorActivity: true,
-        })
-      }
-    })
-
-    // Force `# ` on first line
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    cm.on('change', (instance: any, change: any) => {
-      if (change.from.line === 0) {
-        const line = instance.getLine(0)
-        if (line && !line.startsWith('# ')) {
-          const content = line.replace(/^#*\s*/, '')
-          instance.replaceRange(`# ${content}`, { line: 0, ch: 0 }, { line: 0, ch: line.length })
-        }
-      }
-    })
-
-    // Change handler for auto-save (uses ref to avoid stale closure)
-    cm.on('change', () => {
-      if (isSettingContent.current) return
-      setIsDirty(true)
-
-      if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
-      saveTimerRef.current = setTimeout(() => {
-        const content = cm.getValue()
-        onSaveRef.current(content)
-        setIsDirty(false)
-      }, 1000)
-    })
-
-    // Size
-    cm.setSize(null, '100%')
-    editorRef.current = cm
-
-    return () => {
-      if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
-      // Destroy CM instance properly (getWrapperElement removes from DOM)
-      const wrapper = cm.getWrapperElement()
-      wrapper?.parentNode?.removeChild(wrapper)
-      editorRef.current = null
-    }
-  }, [initialContent, openFile, autocompleteEntries]) // Re-create on file change
-
-  // Update content when initialContent changes (file loaded from API)
-  useEffect(() => {
-    const cm = editorRef.current
-    if (!cm) return
-    const current = cm.getValue()
-    if (current !== initialContent) {
-      isSettingContent.current = true
-      cm.setValue(initialContent)
-      isSettingContent.current = false
-      cm.clearHistory()
-      cm.setCursor({ line: 0, ch: 0 })
-    }
-  }, [initialContent])
-
-  // Save on blur
-  const handleBlur = useCallback(() => {
-    const cm = editorRef.current
-    if (!cm || !isDirty) return
-    if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
-    onSaveRef.current(cm.getValue())
-    setIsDirty(false)
-  }, [isDirty])
-
-  // Listen for manual save event from toolbar (⌘S / save button)
+  // Manual save handler (toolbar / ⌘S)
   useEffect(() => {
     const handler = () => {
-      const cm = editorRef.current
-      if (!cm) return
+      const view = viewRef.current
+      if (!view) return
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
-      onSaveRef.current(cm.getValue())
+      onSaveRef.current(view.state.doc.toString())
       setIsDirty(false)
     }
     document.addEventListener('knowledge:save', handler)
     return () => document.removeEventListener('knowledge:save', handler)
   }, [])
 
+  // External open-file listener (from link click)
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<{ path: string }>).detail
+      if (detail?.path) openFile(detail.path)
+    }
+    document.addEventListener('knowledge:open-file', handler)
+    return () => document.removeEventListener('knowledge:open-file', handler)
+  }, [openFile])
+
+  // Save on blur
+  const handleBlur = useCallback(() => {
+    const view = viewRef.current
+    if (!view || !isDirty) return
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
+    onSaveRef.current(view.state.doc.toString())
+    setIsDirty(false)
+  }, [isDirty])
+
+  // Update content when initialContent changes (file loaded from API)
+  useEffect(() => {
+    const view = viewRef.current
+    if (!view) return
+    const current = view.state.doc.toString()
+    if (current !== initialContent) {
+      isSettingContent.current = true
+      view.dispatch({
+        changes: { from: 0, to: current.length, insert: initialContent },
+      })
+      view.dispatch({ selection: { anchor: 0 } })
+      isSettingContent.current = false
+    }
+  }, [initialContent])
+
   return (
     <div className={cn('h-full relative', className)} onBlur={handleBlur}>
       {isDirty && (
         <span className="absolute top-2 right-3 text-xs text-muted-foreground z-10">Unsaved</span>
       )}
-      <div ref={containerRef} className="h-full hypermd-container" />
+      <CodeMirror
+        ref={(instance) => {
+          ref.current = instance
+          viewRef.current = instance?.view ?? null
+        }}
+        value={initialContent}
+        basicSetup={{
+          lineNumbers: false,
+          highlightActiveLine: true,
+          highlightActiveLineGutter: false,
+          foldGutter: false,
+          autocompletion: false, // we provide our own
+          syntaxHighlighting: true,
+          bracketMatching: true,
+          closeBrackets: false,
+          defaultKeymap: true,
+          history: true,
+        }}
+        extensions={[
+          history(),
+          bracketMatching(),
+          syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
+          customKeymap,
+          headingEnforcer,
+          linkClickHandler,
+          autocompletion({
+            override: [completionSource],
+            activateOnTyping: true,
+            closeOnBlur: true,
+          }),
+          markdown({ base: markdownLanguage }),
+          baseTheme,
+          ...(isDark ? [darkTheme] : []),
+        ]}
+        theme={isDark ? 'dark' : 'light'}
+        onChange={(value) => {
+          if (isSettingContent.current) return
+          setIsDirty(true)
+          if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
+          saveTimerRef.current = setTimeout(() => {
+            onSaveRef.current(value)
+            setIsDirty(false)
+          }, 1000)
+        }}
+        height="100%"
+        className="h-full hypermd-container"
+      />
     </div>
   )
-}
-
-// ── Formatting helpers ────────────────────────────────────────
-
-function toggleBold(cm: CodeMirror.Editor) {
-  wrapSelection(cm, '**', '**')
-}
-
-function toggleItalic(cm: CodeMirror.Editor) {
-  wrapSelection(cm, '*', '*')
-}
-
-function insertCheckmark(cm: CodeMirror.Editor) {
-  const cursor = cm.getCursor()
-  cm.replaceRange('✅ ', { line: cursor.line, ch: 0 })
-  cm.focus()
-}
-
-function wrapSelection(cm: CodeMirror.Editor, before: string, after: string) {
-  const selections = cm.listSelections()
-  if (selections.length === 0) return
-
-  cm.replaceSelections(
-    selections.map((sel) => {
-      const text = cm.getRange(sel.anchor, sel.head)
-      return before + text + after
-    }),
-    'around',
-  )
-  cm.focus()
 }

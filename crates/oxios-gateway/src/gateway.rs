@@ -28,6 +28,7 @@
 //! ```
 
 use anyhow::Result;
+use serde_json;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::{mpsc, watch, Mutex, RwLock, Semaphore};
@@ -36,7 +37,7 @@ use tokio::time::Duration;
 
 use crate::channel::Channel;
 use crate::error_classify::classify_error;
-use crate::message::{IncomingMessage, OutgoingMessage, ResponseMeta};
+use crate::message::{IncomingMessage, OutgoingMessage, ResponseMeta, UserFacingError, ErrorKind};
 use crate::meta::meta;
 use crate::GatewayInbox;
 
@@ -78,6 +79,12 @@ pub struct Gateway {
     /// Orchestrator reference for message dispatch.
     orchestrator: Arc<oxios_kernel::Orchestrator>,
 
+    /// Engine API for model switching (action-based routing).
+    engine_api: Option<Arc<oxios_kernel::EngineApi>>,
+
+    /// Persona API for persona switching (action-based routing).
+    persona_api: Option<Arc<oxios_kernel::PersonaApi>>,
+
     /// Gateway-wide shutdown signal.
     shutdown: watch::Sender<bool>,
 
@@ -95,6 +102,28 @@ impl Gateway {
             rx: Mutex::new(rx),
             tx,
             orchestrator,
+            engine_api: None,
+            persona_api: None,
+            shutdown,
+            concurrency: Arc::new(Semaphore::new(MAX_CONCURRENT_ROUTES)),
+        }
+    }
+
+    /// Creates a new gateway with engine and persona APIs for action-based routing.
+    pub fn with_apis(
+        orchestrator: Arc<oxios_kernel::Orchestrator>,
+        engine_api: Arc<oxios_kernel::EngineApi>,
+        persona_api: Arc<oxios_kernel::PersonaApi>,
+    ) -> Self {
+        let (tx, rx) = mpsc::channel(GATEWAY_BUFFER);
+        let (shutdown, _) = watch::channel(false);
+        Self {
+            channels: Arc::new(RwLock::new(HashMap::new())),
+            rx: Mutex::new(rx),
+            tx,
+            orchestrator,
+            engine_api: Some(engine_api),
+            persona_api: Some(persona_api),
             shutdown,
             concurrency: Arc::new(Semaphore::new(MAX_CONCURRENT_ROUTES)),
         }
@@ -198,7 +227,31 @@ impl Gateway {
     ///
     /// The event loop is not blocked — it can immediately receive the next message.
     /// Semaphore limits concurrency to MAX_CONCURRENT_ROUTES.
+    ///
+    /// If the message contains an `action` metadata key, it is routed to the
+    /// appropriate API handler instead of the orchestrator.
     fn dispatch(&self, channel_name: String, msg: IncomingMessage) {
+        // ── Action-based routing ───────────────────────────────────
+        // Check if the message is an action command (e.g., switch_model, switch_persona)
+        // rather than a regular user message.
+        if let Some(action) = msg.metadata.get(meta::ACTION).cloned() {
+            match action.as_str() {
+                "switch_model" => {
+                    self.dispatch_switch_model(channel_name, msg);
+                    return;
+                }
+                "switch_persona" => {
+                    self.dispatch_switch_persona(channel_name, msg);
+                    return;
+                }
+                _ => {
+                    tracing::warn!(action = %action, "Unknown action metadata, forwarding to orchestrator");
+                    // Fall through to normal routing
+                }
+            }
+        }
+
+        // ── Normal orchestrator routing ────────────────────────────
         let orchestrator = self.orchestrator.clone();
         let channels = self.channels.clone();
         let semaphore = self.concurrency.clone();
@@ -259,6 +312,12 @@ impl Gateway {
                     if let Some(ref pid) = orchestration.primary_project_id {
                         channel_meta.insert(meta::PROJECT_IDS.to_owned(), pid.to_string());
                     }
+                    // Serialize tool_calls into metadata so web routes can read them.
+                    if !orchestration.tool_calls.is_empty() {
+                        if let Ok(json) = serde_json::to_string(&orchestration.tool_calls) {
+                            channel_meta.insert("tool_calls".to_owned(), json);
+                        }
+                    }
 
                     // Typed orchestration metadata (RFC-014)
                     let response_meta = ResponseMeta {
@@ -317,6 +376,146 @@ impl Gateway {
             tracing::warn!(channel = %channel_name, "No such channel registered");
         }
         Ok(())
+    }
+
+    // ── Action dispatch handlers ───────────────────────────
+
+    /// Handle a `switch_model` action by calling EngineApi::set_model().
+    fn dispatch_switch_model(&self, channel_name: String, msg: IncomingMessage) {
+        let engine_api = self.engine_api.clone();
+        let channels = self.channels.clone();
+
+        tokio::spawn(async move {
+            let model_id = msg.metadata.get(meta::MODEL_ID).cloned().unwrap_or_default();
+
+            tracing::info!(
+                channel = %msg.channel,
+                model_id = %model_id,
+                request_id = %msg.id,
+                "Routing switch_model action"
+            );
+
+            let guard = channels.read().await;
+            let entry = guard.get(&channel_name);
+
+            match (engine_api, entry) {
+                (Some(api), Some(entry)) => {
+                    match api.set_model(&model_id) {
+                        Ok(()) => {
+                            let response = format!("✅ 모델이 {model_id}(으)로 전환되었습니다.");
+                            let outgoing = OutgoingMessage::success(
+                                msg.id,
+                                &msg.channel,
+                                &msg.user_id,
+                                &response,
+                                HashMap::new(),
+                                ResponseMeta {
+                                    session_id: None,
+                                    project_id: None,
+                                    project_tag: None,
+                                    seed_id: None,
+                                    phase: "action".to_string(),
+                                    evaluation_passed: true,
+                                    duration_ms: None,
+                                    error: None,
+                                },
+                            );
+                            if let Err(e) = entry.channel.send(outgoing).await {
+                                tracing::error!(error = %e, "Failed to send switch_model response");
+                            }
+                        }
+                        Err(e) => {
+                            tracing::error!(error = %e, "switch_model failed");
+                            let user_err = UserFacingError {
+                                message: format!("❌ 모델 전환 실패: {e}"),
+                                kind: ErrorKind::Internal,
+                                suggestion: Some("모델 ID가 올바른지 확인하세요. (예: anthropic/claude-sonnet-4)".to_string()),
+                            };
+                            let outgoing =
+                                OutgoingMessage::error(msg.id, &msg.channel, &msg.user_id, user_err);
+                            if let Err(e) = entry.channel.send(outgoing).await {
+                                tracing::error!(error = %e, "Failed to send switch_model error");
+                            }
+                        }
+                    }
+                }
+                (None, _) => {
+                    tracing::warn!("switch_model action received but no EngineApi configured");
+                }
+                (_, None) => {
+                    tracing::warn!(channel = %channel_name, "Channel no longer registered");
+                }
+            }
+        });
+    }
+
+    /// Handle a `switch_persona` action by calling PersonaApi::set_active().
+    fn dispatch_switch_persona(&self, channel_name: String, msg: IncomingMessage) {
+        let persona_api = self.persona_api.clone();
+        let channels = self.channels.clone();
+
+        tokio::spawn(async move {
+            let persona_id = msg.metadata.get(meta::PERSONA_ID).cloned().unwrap_or_default();
+
+            tracing::info!(
+                channel = %msg.channel,
+                persona_id = %persona_id,
+                request_id = %msg.id,
+                "Routing switch_persona action"
+            );
+
+            let guard = channels.read().await;
+            let entry = guard.get(&channel_name);
+
+            match (persona_api, entry) {
+                (Some(api), Some(entry)) => {
+                    match api.set_active(&persona_id) {
+                        Ok(()) => {
+                            let response = format!("✅ 페르소나가 '{persona_id}'(으)로 전환되었습니다.");
+                            let outgoing = OutgoingMessage::success(
+                                msg.id,
+                                &msg.channel,
+                                &msg.user_id,
+                                &response,
+                                HashMap::new(),
+                                ResponseMeta {
+                                    session_id: None,
+                                    project_id: None,
+                                    project_tag: None,
+                                    seed_id: None,
+                                    phase: "action".to_string(),
+                                    evaluation_passed: true,
+                                    duration_ms: None,
+                                    error: None,
+                                },
+                            );
+                            if let Err(e) = entry.channel.send(outgoing).await {
+                                tracing::error!(error = %e, "Failed to send switch_persona response");
+                            }
+                        }
+                        Err(e) => {
+                            tracing::error!(error = %e, "switch_persona failed");
+                            let user_err = UserFacingError {
+                                message: format!("❌ 페르소나 전환 실패: {e}"),
+                                kind: ErrorKind::Internal,
+                                suggestion: Some("페르소나 ID가 올바른지 확인하세요. (.help를 입력하여 명령어를 확인하세요.)".to_string()),
+                            };
+                            let outgoing =
+                                OutgoingMessage::error(msg.id, &msg.channel, &msg.user_id, user_err);
+                            if let Err(e) = entry.channel.send(outgoing).await {
+                                tracing::error!(error = %e, "Failed to send switch_persona error");
+                            }
+                        }
+                    }
+                }
+                (None, _) => {
+                    tracing::warn!("switch_persona action received but no PersonaApi configured");
+                }
+                (_, None) => {
+                    tracing::warn!(channel = %channel_name, "Channel no longer registered");
+                }
+            }
+        });
     }
 }
 

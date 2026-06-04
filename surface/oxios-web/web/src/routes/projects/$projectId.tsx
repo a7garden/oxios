@@ -233,7 +233,7 @@ function ProjectDetailPage() {
 
       {/* Description */}
       {project.description && (
-        <p className="text-muted-foreground text-sm -mt-2">{project.description}</p>
+        <p className="text-muted-foreground text-sm mt-1">{project.description}</p>
       )}
 
       {/* Tabs */}

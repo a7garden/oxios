@@ -1,8 +1,18 @@
-import type CodeMirror from 'codemirror'
+/**
+ * Wiki link autocomplete data — shared between editor and code completers.
+ *
+ * No direct CodeMirror dependency. The data shape is consumed by:
+ *   - markdown-editor.tsx (CM6 CompletionSource)
+ *   - any future custom UI
+ *
+ * The original CM5 `CodeMirror.Hint` interface has been replaced by a
+ * simple data structure (FileEntry) and the consumer is responsible
+ * for adapting it to the active editor's completion API.
+ */
 import type { KnowledgeTreeEntry } from '@/types/knowledge'
 
 /** A file entry with computed autocomplete key. */
-interface FileEntry {
+export interface FileEntry {
   key: string // filename without .md
   filePath: string // full path for insertion
 }
@@ -25,7 +35,6 @@ export function buildAutocompleteDict(
 
       if (item.is_dir) {
         if (systemDirs.has(item.name)) continue
-        // Try to get subdirectory entries if available
         const subEntries = subDirEntries?.get(item.name)
         if (subEntries) {
           walk(subEntries, item.name)
@@ -33,7 +42,6 @@ export function buildAutocompleteDict(
         continue
       }
 
-      // File
       if (item.name === 'config.json') continue
       if (!item.name.endsWith('.md')) continue
 
@@ -46,53 +54,6 @@ export function buildAutocompleteDict(
       })
     }
   }
-
   walk(rootEntries, '')
   return entries
-}
-
-/**
- * Create a CodeMirror hint function for file link autocompletion.
- * Call this once and pass to CM editor options.
- */
-export function createLinkHintFn(
-  getEntries: () => FileEntry[],
-): (cm: CodeMirror.Editor) => CodeMirror.Hints | null {
-  return (cm) => {
-    const cursor = cm.getCursor()
-    const line = cm.getLine(cursor.line) ?? ''
-    const pos = cursor.ch
-
-    // Only trigger after '['
-    if (pos === 0 || line[pos - 1] !== '[') return null
-
-    // Don't trigger inside checkboxes or code blocks
-    if (/^\s*-\s\[/.test(line)) return null
-
-    // Get the word being typed after '['
-    const unicodeWordRegex = /[\p{L}\p{N}_\s:-]/u
-    let start = pos
-    while (start < line.length && unicodeWordRegex.test(line[start] ?? '')) start++
-
-    const word = line.slice(pos, start).toLowerCase()
-    const entries = getEntries()
-
-    const list: CodeMirror.Hint[] = []
-    for (const entry of entries) {
-      if (word.length === 0 || entry.key.toLowerCase().includes(word)) {
-        const displayText = entry.key
-        const text = `${entry.key}](${entry.filePath.replace(/ /g, '%20')})`
-        list.push({ text, displayText })
-        if (list.length >= 20) break
-      }
-    }
-
-    if (list.length === 0) return null
-
-    return {
-      list,
-      from: { line: cursor.line, ch: pos },
-      to: { line: cursor.line, ch: start },
-    }
-  }
 }

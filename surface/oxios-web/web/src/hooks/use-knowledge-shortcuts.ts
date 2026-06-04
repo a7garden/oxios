@@ -1,12 +1,15 @@
 import { useRouterState } from '@tanstack/react-router'
 import { useEffect, useRef } from 'react'
-import { useDeleteFile, useWriteFile } from '@/hooks/use-knowledge'
 import { useKnowledgeStore } from '@/stores/knowledge'
+import { useMutation } from '@tanstack/react-query'
+import { api } from '@/lib/api-client'
 
 /**
  * Register global keyboard shortcuts for the Knowledge UI.
  * Only active when the current route is within /knowledge.
- * Uses router state (via ref) instead of window.location for accuracy (M5).
+ *
+ * Uses individual store selectors and ref-based mutation handles to avoid
+ * stale closures and unnecessary re-registrations.
  *
  * Shortcuts:
  * ⌘N        → New file
@@ -18,12 +21,45 @@ import { useKnowledgeStore } from '@/stores/knowledge'
  * ⌘W        → Close split editor
  * Escape    → Close split / deselect all
  */
-export function useKnowledgeShortcuts() {
-  const store = useKnowledgeStore()
-  const writeFile = useWriteFile()
-  const deleteFile = useDeleteFile()
 
-  // Keep a ref to the latest pathname so the event handler is never stale (M5)
+/** Stable write-file helper that doesn't change reference */
+function useStableWriteFile() {
+  const mutateRef = useRef<(path: string, content: string) => Promise<void>>()
+
+  // Recreate the mutator on each render (it's only called from the event handler via ref)
+  mutateRef.current = async (path: string, content: string) => {
+    await api.put('/api/knowledge/files', { path, content }, { rawBody: content })
+  }
+
+  return mutateRef
+}
+
+/** Stable delete-file helper */
+function useStableDeleteFile() {
+  const mutateRef = useRef<(path: string) => Promise<void>>()
+
+  mutateRef.current = async (path: string) => {
+    await api.delete(`/api/knowledge/files/${encodeURIComponent(path)}`)
+  }
+
+  return mutateRef
+}
+
+export function useKnowledgeShortcuts() {
+  // Individual selectors — each returns a stable reference (zustand guarantees this)
+  const openFile = useKnowledgeStore((s) => s.openFile)
+  const mode = useKnowledgeStore((s) => s.mode)
+  const currentFilePath = useKnowledgeStore((s) => s.currentFilePath)
+  const openChat = useKnowledgeStore((s) => s.openChat)
+  const toggleSidebar = useKnowledgeStore((s) => s.toggleSidebar)
+  const splitEditorOpen = useKnowledgeStore((s) => s.splitEditorOpen)
+  const closeSplit = useKnowledgeStore((s) => s.closeSplit)
+
+  // Stable mutation refs (avoid effect re-registration on mutation state change)
+  const writeFileRef = useStableWriteFile()
+  const deleteFileRef = useStableDeleteFile()
+
+  // Keep a ref to the latest pathname so the event handler is never stale
   const router = useRouterState()
   const pathnameRef = useRef(router.location.pathname)
   pathnameRef.current = router.location.pathname
@@ -40,8 +76,8 @@ export function useKnowledgeShortcuts() {
         e.preventDefault()
         e.stopPropagation()
         try {
-          await writeFile.mutateAsync({ path: 'New file.md', content: '# New file\n\n' })
-          store.openFile('New file.md')
+          await writeFileRef.current?.('New file.md', '# New file\n\n')
+          openFile('New file.md')
         } catch {
           /* ignore */
         }
@@ -55,7 +91,7 @@ export function useKnowledgeShortcuts() {
         const name = prompt('Enter folder name:', 'New Folder')
         if (name?.trim()) {
           try {
-            await writeFile.mutateAsync({ path: `${name.trim()}/.keep`, content: '' })
+            await writeFileRef.current?.(`${name.trim()}/.keep`, '')
           } catch {
             /* ignore */
           }
@@ -67,10 +103,10 @@ export function useKnowledgeShortcuts() {
       if (isMeta && e.key === 'd') {
         e.preventDefault()
         e.stopPropagation()
-        if (store.mode === 'editor' && store.currentFilePath) {
-          if (confirm(`Delete ${store.currentFilePath}?`)) {
+        if (mode === 'editor' && currentFilePath) {
+          if (confirm(`Delete ${currentFilePath}?`)) {
             try {
-              await deleteFile.mutateAsync(store.currentFilePath)
+              await deleteFileRef.current?.(currentFilePath)
             } catch {
               /* ignore */
             }
@@ -83,7 +119,7 @@ export function useKnowledgeShortcuts() {
       if (isMeta && e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault()
         e.stopPropagation()
-        store.openChat()
+        openChat()
         return
       }
 
@@ -91,7 +127,7 @@ export function useKnowledgeShortcuts() {
       if (isMeta && e.key === 'Enter' && e.shiftKey) {
         e.preventDefault()
         e.stopPropagation()
-        store.openChat()
+        openChat()
         return
       }
 
@@ -99,7 +135,7 @@ export function useKnowledgeShortcuts() {
       if (isMeta && (e.key === '~' || e.key === '§')) {
         e.preventDefault()
         e.stopPropagation()
-        store.toggleSidebar()
+        toggleSidebar()
         return
       }
 
@@ -107,16 +143,16 @@ export function useKnowledgeShortcuts() {
       if (isMeta && e.key === 'w') {
         e.preventDefault()
         e.stopPropagation()
-        if (store.splitEditorOpen) {
-          store.closeSplit()
+        if (splitEditorOpen) {
+          closeSplit()
         }
         return
       }
 
       // Escape — close split or deselect
       if (e.key === 'Escape') {
-        if (store.splitEditorOpen) {
-          store.closeSplit()
+        if (splitEditorOpen) {
+          closeSplit()
         }
         return
       }
@@ -124,5 +160,6 @@ export function useKnowledgeShortcuts() {
 
     window.addEventListener('keydown', handler, true)
     return () => window.removeEventListener('keydown', handler, true)
-  }, [store, writeFile, deleteFile])
+    // These selectors are stable references from zustand — the effect only runs once
+  }, [openFile, mode, currentFilePath, openChat, toggleSidebar, splitEditorOpen, closeSplit, writeFileRef, deleteFileRef])
 }

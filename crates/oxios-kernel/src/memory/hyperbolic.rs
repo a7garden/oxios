@@ -57,6 +57,12 @@ impl HyperbolicConfig {
     }
 
     /// Returns the absolute value of curvature (c = |K|).
+    ///
+    /// All free functions in this module (e.g., `euclidean_to_poincare`,
+    /// `hyperbolic_distance`) already compute `curvature.abs()` internally,
+    /// so this accessor is not needed by callers of those functions.
+    /// It remains available for code that needs the positive curvature
+    /// value directly (e.g., computing ball radius `1/√c`).
     #[allow(dead_code)]
     fn c(&self) -> f32 {
         self.curvature.abs()

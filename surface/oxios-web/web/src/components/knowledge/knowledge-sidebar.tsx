@@ -155,7 +155,7 @@ export function KnowledgeSidebar() {
       <ResizeHandle width={sidebarWidth} onResize={setSidebarWidth} />
 
       {/* Keyboard shortcuts legend */}
-      <div className="px-4 py-3 border-t border-sidebar-border text-[11px] text-sidebar-foreground/40 space-y-1">
+      <div className="px-3 py-3 border-t border-sidebar-border text-[11px] text-sidebar-foreground/40 space-y-1">
         <div className="flex items-center gap-2">
           <kbd className="font-mono border rounded px-1.5 py-0.5">⌘K</kbd>
           <span>{t('knowledge.search')}</span>

@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest'
 import { render, screen } from '@testing-library/react'
+import { describe, expect, it } from 'vitest'
 import { StatusIndicator } from '@/components/shared/status-indicator'
 
 describe('StatusIndicator', () => {
@@ -20,11 +20,11 @@ describe('StatusIndicator', () => {
     expect(dot).toBeInTheDocument()
   })
 
-  it('renders stopped status with gray dot', () => {
+  it('renders stopped status with red dot', () => {
     render(<StatusIndicator status="stopped" />)
 
     expect(screen.getByText('stopped')).toBeInTheDocument()
-    const dot = document.querySelector('.bg-zinc-400')
+    const dot = document.querySelector('.bg-red-500')
     expect(dot).toBeInTheDocument()
   })
 

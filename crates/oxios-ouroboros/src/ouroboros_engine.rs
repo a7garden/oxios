@@ -445,17 +445,13 @@ impl OuroborosProtocol for OuroborosEngine {
         let raw = self.llm_complete(system_prompt, &user_message).await?;
         let parsed: SeedResponse = Self::parse_json(&raw).unwrap_or_else(|e| {
             tracing::warn!(error = %e, "Failed to parse seed LLM response, using degraded fallback");
-            // Preserve user intent instead of generic "Task from user input"
-            let goal = if !interview.original_message.is_empty() {
-                interview.original_message.clone()
-            } else {
-                "Task from user input".to_string()
-            };
+            // Use degraded_seed() to preserve user intent from the interview
+            let degraded = crate::degraded::degraded_seed(interview);
             SeedResponse {
-                goal,
-                constraints: vec!["Requires human clarification: Seed generation failed, spec may be incomplete".into()],
-                acceptance_criteria: vec!["Task completes without errors".into()],
-                ontology: vec![],
+                goal: degraded.goal,
+                constraints: degraded.constraints,
+                acceptance_criteria: degraded.acceptance_criteria,
+                ontology: degraded.ontology,
             }
         });
 
@@ -489,6 +485,7 @@ impl OuroborosProtocol for OuroborosEngine {
             output: format!("Execution of seed {} delegated to agent runtime", seed.id),
             steps_completed: 0,
             success: false, // Caller should replace with actual result
+            tool_calls: vec![],
         })
     }
 

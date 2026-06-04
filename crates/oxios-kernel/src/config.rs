@@ -936,6 +936,32 @@ pub struct GatewayConfig {
     /// Port for the gateway server.
     #[serde(default = "default_gateway_port")]
     pub port: u16,
+    /// Expose `/api-docs` (Swagger UI) and `/openapi.json`.
+    ///
+    /// For safety this is gated to localhost-only binds (127.0.0.0/8, ::1,
+    /// "localhost"). Setting this to `true` while binding to a public address
+    /// is a no-op. Default: `false`.
+    ///
+    /// Why: Swagger UI + the full OpenAPI schema expand the attack surface
+    /// (route discovery, parameter names, security scheme details). Local
+    /// dev typically wants them; production typically does not.
+    #[serde(default)]
+    pub expose_api_docs: bool,
+}
+
+impl GatewayConfig {
+    /// Whether the gateway may expose `/api-docs` and `/openapi.json`.
+    ///
+    /// Returns `true` only when both:
+    /// - `expose_api_docs` is explicitly enabled, AND
+    /// - the bind address is a loopback address.
+    pub fn should_expose_api_docs(&self) -> bool {
+        if !self.expose_api_docs {
+            return false;
+        }
+        let h = self.host.trim();
+        h == "127.0.0.1" || h == "::1" || h == "localhost" || h.starts_with("127.")
+    }
 }
 
 /// ClawHub marketplace configuration.
@@ -948,12 +974,42 @@ pub struct MarketplaceConfig {
     /// Whether the marketplace is enabled.
     #[serde(default = "default_true")]
     pub enabled: bool,
+    /// Skills.sh (Vercel Labs ecosystem) configuration.
+    #[serde(default)]
+    pub skills_sh: SkillsShConfig,
+}
+
+/// Skills.sh registry configuration.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct SkillsShConfig {
+    /// Base URL for the Skills.sh API.
+    /// Defaults to `https://skills.sh`.
+    #[serde(default)]
+    pub base_url: Option<String>,
+    /// API key for Skills.sh authentication.
+    /// Falls back to `SKILLS_SH_TOKEN` env var if not set.
+    #[serde(default)]
+    pub api_key: Option<String>,
+    /// Whether Skills.sh integration is enabled.
+    #[serde(default = "default_true")]
+    pub enabled: bool,
 }
 
 impl Default for MarketplaceConfig {
     fn default() -> Self {
         Self {
             base_url: Some("https://clawhub.ai".to_string()),
+            enabled: true,
+            skills_sh: SkillsShConfig::default(),
+        }
+    }
+}
+
+impl Default for SkillsShConfig {
+    fn default() -> Self {
+        Self {
+            base_url: None,
+            api_key: None,
             enabled: true,
         }
     }
@@ -972,6 +1028,7 @@ impl Default for GatewayConfig {
         Self {
             host: default_gateway_host(),
             port: default_gateway_port(),
+            expose_api_docs: false,
         }
     }
 }
@@ -1888,5 +1945,57 @@ mod tests {
         for w in &warnings {
             eprintln!("default-config.toml 경고: {}", w);
         }
+    }
+
+    /// `gateway.expose_api_docs` is gated to loopback binds for safety.
+    /// Verifies all four cases: opt-out, opt-in + public, opt-in + loopback.
+    #[test]
+    fn test_gateway_should_expose_api_docs() {
+        // Default: opt-out — never expose.
+        let cfg = GatewayConfig::default();
+        assert!(!cfg.should_expose_api_docs());
+
+        // Opt-in + public bind (0.0.0.0) — still NOT exposed.
+        let cfg = GatewayConfig {
+            host: "0.0.0.0".into(),
+            port: 4200,
+            expose_api_docs: true,
+        };
+        assert!(
+            !cfg.should_expose_api_docs(),
+            "public bind must not expose api docs even when opt-in is true"
+        );
+
+        // Opt-in + loopback (127.0.0.1) — exposed.
+        let cfg = GatewayConfig {
+            host: "127.0.0.1".into(),
+            port: 4200,
+            expose_api_docs: true,
+        };
+        assert!(cfg.should_expose_api_docs());
+
+        // Opt-in + ::1 — exposed.
+        let cfg = GatewayConfig {
+            host: "::1".into(),
+            port: 4200,
+            expose_api_docs: true,
+        };
+        assert!(cfg.should_expose_api_docs());
+
+        // Opt-in + "localhost" — exposed.
+        let cfg = GatewayConfig {
+            host: "localhost".into(),
+            port: 4200,
+            expose_api_docs: true,
+        };
+        assert!(cfg.should_expose_api_docs());
+
+        // Opt-out (explicit false) + loopback — NOT exposed.
+        let cfg = GatewayConfig {
+            host: "127.0.0.1".into(),
+            port: 4200,
+            expose_api_docs: false,
+        };
+        assert!(!cfg.should_expose_api_docs());
     }
 }

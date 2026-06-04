@@ -46,7 +46,7 @@ export function ServerCard({ server, onToggle, onRefresh, onDelete, isToggling, 
         </div>
       </div>
 
-      <div className="flex items-center gap-1 shrink-0">
+      <div className="flex items-center gap-1.5 shrink-0">
         <Button
           variant="ghost"
           size="icon"

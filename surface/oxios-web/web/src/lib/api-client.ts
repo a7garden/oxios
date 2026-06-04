@@ -67,5 +67,6 @@ export const api = {
   post: <T>(path: string, body?: unknown) => apiClient<T>(path, { method: 'POST', body }),
   put: <T>(path: string, body?: unknown, rawBody?: boolean) =>
     apiClient<T>(path, { method: 'PUT', body, rawBody }),
+  patch: <T>(path: string, body?: unknown) => apiClient<T>(path, { method: 'PATCH', body }),
   delete: <T>(path: string) => apiClient<T>(path, { method: 'DELETE' }),
 }

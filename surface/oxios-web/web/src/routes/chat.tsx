@@ -9,7 +9,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { AiDetectionBadge } from '@/components/project/ai-detection-badge'
 import { useChatStore } from '@/stores/chat'
 import { api } from '@/lib/api-client'
-import type { Session } from '@/types'
+import type { Session, Project } from '@/types'
 import { MessageBubble } from '@/components/chat/message-bubble'
 import { ChatInput } from '@/components/chat/chat-input'
 import { ConnectionStatus } from '@/components/chat/connection-status'
@@ -49,6 +49,12 @@ function ChatPage() {
     if (userScrolledUp) return
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, isStreaming, userScrolledUp])
+
+  // Auto-connect WebSocket on mount (moved from store rehydrate to avoid
+  // connecting on every page load — only when chat route is active)
+  useEffect(() => {
+    connect()
+  }, [connect])
 
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const el = e.currentTarget

@@ -8,10 +8,10 @@ use anyhow::{Context, Result};
 use oxios_gateway::Gateway;
 use oxios_kernel::{
     access_manager::AccessManager, auth::AuthManager, config::load_config, A2AProtocol,
-    AgentRuntime, AgentScheduler, AuditTrail, BasicSupervisor, BudgetManager, ClawHubClient,
-    ClawHubInstaller, CronScheduler, EventBus, GitLayer, MarketplaceApi, McpBridge, McpServer,
+    AgentRuntime, AgentScheduler, AuditPersistence, AuditTrail, BasicSupervisor, BudgetManager, ClawHubClient,
+    ClawHubInstaller, CronScheduler, EngineHandle, EventBus, GitLayer, MarketplaceApi, McpBridge, McpServer,
     MemoryManager, Orchestrator, OxiosConfig, OxiosEngine, PersonaManager, ProjectManager,
-    ResourceMonitor, SkillManager, Supervisor,
+    ResourceMonitor, SkillManager, SkillsShClient, SkillsShInstaller, Supervisor,
 };
 use oxios_markdown::knowledge::FileChange;
 use oxios_markdown::KnowledgeBase;
@@ -53,6 +53,8 @@ pub struct Kernel {
     handle_cache: OnceLock<Arc<oxios_kernel::KernelHandle>>,
     /// A2A protocol for inter-agent communication.
     a2a_protocol: Arc<A2AProtocol>,
+    /// Hot-swappable engine reference — shared between EngineApi and AgentRuntime.
+    engine_handle: Arc<EngineHandle>,
 }
 
 impl Kernel {
@@ -176,16 +178,17 @@ impl Kernel {
                         .clone()
                         .map(oxios_kernel::ProjectApi::new),
                     oxios_kernel::ExecApi::new(
-                        Arc::new(self.config.exec.clone()),
+                        Arc::new(parking_lot::RwLock::new(self.config.exec.clone())),
                         self.access_manager.clone(),
                     ),
                     self.build_browser_api(),
                     oxios_kernel::A2aApi::new(self.a2a_protocol.clone()),
-                    // EngineApi — LLM providers, models, config + routing stats
+                    // EngineApi — LLM providers, models, config + routing stats + engine hot-swap
                     oxios_kernel::EngineApi::new(
                         Arc::new(parking_lot::RwLock::new(self.config.clone())),
                         self.config_path.clone(),
                         Arc::new(oxios_kernel::RoutingStats::new()),
+                        Arc::clone(&self.engine_handle),
                     ),
                     knowledge,
                     knowledge_lens,
@@ -224,23 +227,44 @@ impl Kernel {
         oxios_kernel::BrowserApi::default()
     }
 
-    /// Build a MarketplaceApi (ClawHub) from config.
+    /// Build a MarketplaceApi (ClawHub + Skills.sh) from config.
     fn build_marketplace_api(&self) -> MarketplaceApi {
         let workspace = PathBuf::from(&self.config.kernel.workspace);
         let skills_dir = workspace.join("skills");
         let config = &self.config.marketplace;
 
-        let client = match ClawHubClient::new(config.base_url.clone()) {
+        // ClawHub
+        let clawhub_client = match ClawHubClient::new(config.base_url.clone()) {
             Ok(c) => c,
             Err(e) => {
                 tracing::warn!(error = %e, "Invalid marketplace.base_url, using default");
                 ClawHubClient::new(Some("https://clawhub.ai".to_string())).unwrap()
             }
         };
+        let clawhub_installer =
+            ClawHubInstaller::new(skills_dir.clone(), workspace.clone(), config.base_url.clone());
 
-        let installer = ClawHubInstaller::new(skills_dir, workspace, config.base_url.clone());
+        // Skills.sh
+        let ss_config = &config.skills_sh;
+        let skills_sh_client = SkillsShClient::new(
+            ss_config.base_url.clone(),
+            ss_config.api_key.clone(),
+        ).unwrap_or_else(|e| {
+            tracing::warn!(error = %e, "Failed to create Skills.sh client, using default");
+            SkillsShClient::new(None, None).unwrap()
+        });
+        let skills_sh_installer = SkillsShInstaller::new(
+            skills_dir,
+            ss_config.base_url.clone(),
+            ss_config.api_key.clone(),
+        );
 
-        MarketplaceApi::new(Arc::new(installer), Arc::new(client))
+        MarketplaceApi::new(
+            Arc::new(clawhub_installer),
+            Arc::new(clawhub_client),
+            Arc::new(skills_sh_installer),
+            Arc::new(skills_sh_client),
+        )
     }
 
     /// Configuration reference.
@@ -248,11 +272,16 @@ impl Kernel {
         &self.config
     }
 
+    /// Orchestrator reference — for hot-reload config propagation.
+    pub fn orchestrator(&self) -> &Arc<Orchestrator> {
+        &self.orchestrator
+    }
+
     /// Flush audit trail entries to persistent storage.
     /// Call during graceful shutdown to ensure no entries are lost.
     pub fn flush_audit(&self) -> anyhow::Result<()> {
         self.audit_trail
-            .flush(&self.state_store)
+            .flush_to(&*self.state_store)
             .map_err(|e| anyhow::anyhow!("audit flush failed: {e}"))
     }
 
@@ -327,7 +356,7 @@ impl Kernel {
 
     /// Start the guardian daemon (background integrity checks).
     pub fn start_guardian(&self) {
-        use oxios_kernel::audit_trail::AuditAction;
+        use oxi_sdk::AuditAction;
         let handle = self.handle();
         tokio::spawn(async move {
             loop {
@@ -753,10 +782,10 @@ impl KernelBuilder {
             config.resource_monitor.history_max,
         ));
 
-        event_bus.attach_audit_trail(audit_trail.clone());
+        oxios_kernel::event_bus::attach_audit_trail(&event_bus, audit_trail.clone());
 
         // Restore persisted audit entries.
-        if let Ok(entries) = state_store.load_audit_entries() {
+        if let Ok(entries) = state_store.load() {
             if !entries.is_empty() {
                 tracing::info!(count = entries.len(), "Restored audit trail entries");
                 audit_trail.restore_from(entries);
@@ -765,11 +794,21 @@ impl KernelBuilder {
 
         // Routing stats — shared between EngineApi and AgentRuntime
         let routing_stats = Arc::new(oxios_kernel::RoutingStats::new());
-        let _engine_api = oxios_kernel::EngineApi::new(
+
+        // EngineHandle — hot-swappable engine reference.
+        // EngineApi writes (set_model / set_api_key) rebuild and swap.
+        // AgentRuntime reads the latest engine on each execute().
+        let engine_handle = Arc::new(EngineHandle::new(engine));
+
+        // ── Gateway APIs — Arc-wrapped for sharing with Gateway and KernelHandle ──
+        let engine_api = Arc::new(oxios_kernel::EngineApi::new(
             Arc::new(parking_lot::RwLock::new(config.clone())),
             config_path.clone(),
             Arc::clone(&routing_stats),
-        );
+            Arc::clone(&engine_handle),
+        ));
+        let persona_api =
+            Arc::new(oxios_kernel::PersonaApi::new(Arc::new(persona_manager.clone())));
 
         // ── KernelHandle — the syscall table for agent OS control ──
         // Created inline here because AgentRuntime needs it.
@@ -804,14 +843,15 @@ impl KernelBuilder {
                     std::time::Instant::now(),
                 ),
                 project_manager.clone().map(oxios_kernel::ProjectApi::new),
-                oxios_kernel::ExecApi::new(Arc::new(config.exec.clone()), access_manager.clone()),
+                oxios_kernel::ExecApi::new(Arc::new(parking_lot::RwLock::new(config.exec.clone())), access_manager.clone()),
                 build_browser_api_value(&config),
                 oxios_kernel::A2aApi::new(a2a_protocol.clone()),
-                // EngineApi — routing stats shared between EngineApi and AgentRuntime
+                // EngineApi — routing stats shared between EngineApi and AgentRuntime + engine hot-swap
                 oxios_kernel::EngineApi::new(
                     Arc::new(parking_lot::RwLock::new(config.clone())),
                     config_path.clone(),
                     Arc::clone(&routing_stats),
+                    Arc::clone(&engine_handle),
                 ),
                 // KnowledgeBase — single source of truth (RFC-003)
                 Arc::new(
@@ -838,7 +878,7 @@ impl KernelBuilder {
         let tool_retriever = build_tool_retriever(&skill_manager).await;
 
         let agent_runtime = AgentRuntime::new(
-            Arc::clone(&engine),
+            Arc::clone(&engine_handle),
             model_id,
             kernel_handle.clone(),
             Some(Arc::clone(&routing_stats)),
@@ -925,7 +965,11 @@ impl KernelBuilder {
         }
         let orchestrator = Arc::new(orchestrator);
 
-        let gateway = Arc::new(Gateway::new(orchestrator.clone()));
+        let gateway = Arc::new(Gateway::with_apis(
+            orchestrator.clone(),
+            engine_api,
+            persona_api,
+        ));
 
         // Initialize metrics and observability singletons.
         oxios_kernel::register_builtin_metrics();
@@ -955,6 +999,7 @@ impl KernelBuilder {
             config_path,
             handle_cache: OnceLock::new(),
             a2a_protocol,
+            engine_handle,
         })
     }
 }
@@ -1081,11 +1126,24 @@ fn build_browser_api_value(_config: &OxiosConfig) -> oxios_kernel::BrowserApi {
 fn build_marketplace_api_value(config: &OxiosConfig) -> MarketplaceApi {
     let workspace = PathBuf::from(&config.kernel.workspace);
     let skills_dir = workspace.join("skills");
-    let client = ClawHubClient::new(config.marketplace.base_url.clone()).unwrap_or_else(|_| {
+
+    // ClawHub
+    let clawhub_client = ClawHubClient::new(config.marketplace.base_url.clone()).unwrap_or_else(|_| {
         tracing::warn!("Invalid marketplace.base_url, using default");
         ClawHubClient::new(Some("https://clawhub.ai".to_string())).unwrap()
     });
-    let installer =
-        ClawHubInstaller::new(skills_dir, workspace, config.marketplace.base_url.clone());
-    MarketplaceApi::new(Arc::new(installer), Arc::new(client))
+    let clawhub_installer =
+        ClawHubInstaller::new(skills_dir.clone(), workspace.clone(), config.marketplace.base_url.clone());
+
+    // Skills.sh
+    let ss = &config.marketplace.skills_sh;
+    let skills_sh_client = SkillsShClient::new(ss.base_url.clone(), ss.api_key.clone()).unwrap();
+    let skills_sh_installer = SkillsShInstaller::new(skills_dir, ss.base_url.clone(), ss.api_key.clone());
+
+    MarketplaceApi::new(
+        Arc::new(clawhub_installer),
+        Arc::new(clawhub_client),
+        Arc::new(skills_sh_installer),
+        Arc::new(skills_sh_client),
+    )
 }

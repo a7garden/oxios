@@ -14,11 +14,11 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use oxi_sdk::observability::AuditTrail;
 use oxi_sdk::{AgentTool, AgentToolResult, ToolContext};
 use serde_json::{json, Value};
 use tokio::sync::oneshot;
 
-use crate::audit_trail::AuditTrail;
 use crate::kernel_handle::KernelHandle;
 
 /// Agent tool for security audit operations.

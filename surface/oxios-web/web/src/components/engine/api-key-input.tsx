@@ -55,6 +55,7 @@ export function ApiKeyInput({
   isPending,
   className,
 }: ApiKeyInputProps) {
+  const { t } = useTranslation()
   const [inputValue, setInputValue] = useState('')
   const [visible, setVisible] = useState(false)
 

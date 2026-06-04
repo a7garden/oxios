@@ -266,6 +266,7 @@ impl Supervisor for BasicSupervisor {
                     output: "Agent cancelled before execution".into(),
                     steps_completed: 0,
                     success: false,
+                    tool_calls: vec![],
                 });
             }
             let mut ctx = session_ctx.write().await;
@@ -302,6 +303,7 @@ impl Supervisor for BasicSupervisor {
                             output: format!("Agent task aborted: {join_err}"),
                             steps_completed: 0,
                             success: false,
+                            tool_calls: vec![],
                         })
                     }
                 },
@@ -357,6 +359,7 @@ impl Supervisor for BasicSupervisor {
                     output: format!("Agent failed: {e}"),
                     steps_completed: 0,
                     success: false,
+                    tool_calls: vec![],
                 })
             }
         }
@@ -445,7 +448,7 @@ mod tests {
             ),
             crate::kernel_handle::SecurityApi::new(
                 Arc::new(parking_lot::Mutex::new(crate::auth::AuthManager::new())),
-                Arc::new(crate::audit_trail::AuditTrail::new(100)),
+                Arc::new(oxi_sdk::observability::AuditTrail::new(100)),
                 Arc::new(parking_lot::Mutex::new(
                     crate::access_manager::AccessManager::new(),
                 )),
@@ -453,9 +456,7 @@ mod tests {
                     crate::state_store::StateStore::new(tmp.join("state2")).expect("state store 2"),
                 ),
             ),
-            crate::kernel_handle::PersonaApi::new(Arc::new(
-                crate::persona_manager::PersonaManager::new(),
-            )),
+            crate::kernel_handle::PersonaApi::new(Arc::new(crate::persona::PersonaManager::new())),
             crate::kernel_handle::ExtensionApi::new(Arc::new(crate::skill::SkillManager::new(
                 tmp.join("skills"),
                 tmp.join("share/skills"),
@@ -479,7 +480,9 @@ mod tests {
             ),
             None,
             crate::kernel_handle::ExecApi::new(
-                Arc::new(crate::config::ExecConfig::default()),
+                Arc::new(parking_lot::RwLock::new(
+                    crate::config::ExecConfig::default(),
+                )),
                 Arc::new(parking_lot::Mutex::new(
                     crate::access_manager::AccessManager::new(),
                 )),
@@ -494,6 +497,9 @@ mod tests {
                 )),
                 tmp.join("config.toml"),
                 Arc::new(crate::kernel_handle::RoutingStats::new()),
+                Arc::new(crate::engine::EngineHandle::new(Arc::new(
+                    crate::OxiosEngine::new("anthropic/claude-sonnet-4-20250514"),
+                ))),
             ),
             Arc::new(oxios_markdown::KnowledgeBase::new(tmp.join("knowledge")).unwrap()),
             Arc::new(
@@ -504,17 +510,29 @@ mod tests {
                 .unwrap(),
             ),
             crate::kernel_handle::MarketplaceApi::new(
-                Arc::new(crate::clawhub::ClawHubInstaller::new(
+                Arc::new(crate::skill::clawhub::ClawHubInstaller::new(
                     tmp.join("skills"),
                     tmp.join("state"),
                     None,
                 )),
-                Arc::new(crate::clawhub::ClawHubClient::new(None).expect("valid ClawHub client")),
+                Arc::new(
+                    crate::skill::clawhub::ClawHubClient::new(None).expect("valid ClawHub client"),
+                ),
+                Arc::new(crate::skill::skills_sh::SkillsShInstaller::new(
+                    tmp.join("skills"),
+                    None,
+                    None,
+                )),
+                Arc::new(
+                    crate::skill::skills_sh::SkillsShClient::new(None, None)
+                        .expect("valid Skills.sh client"),
+                ),
             ),
         ));
 
         let engine = crate::OxiosEngine::new("mock/model");
-        let runtime = AgentRuntime::new(Arc::new(engine), "mock/model", kernel_handle, None);
+        let engine_handle = Arc::new(crate::engine::EngineHandle::new(Arc::new(engine)));
+        let runtime = AgentRuntime::new(engine_handle, "mock/model", kernel_handle, None);
         BasicSupervisor::new(event_bus, runtime)
     }
 

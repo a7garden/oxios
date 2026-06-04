@@ -25,6 +25,15 @@ use crate::credential::CredentialStore;
 ///
 /// Created via [`OxiosEngine::new()`] or [`OxiosEngine::builder()`].
 /// Provides access to providers, models, routing, pooling, and agent construction.
+///
+/// # RFC-014 Phase D
+///
+/// `authorizer` / `tracer` / `cost_tracker` are optional, engine-level
+/// observability and security handles. When set, they are propagated to
+/// every agent built via [`OxiosEngine::oxi().agent()`][Oxi::agent] using
+/// the new `AgentBuilder::authorizer()` / `.tracer()` / `.cost_tracker()`
+/// API. All three are `None` by default, keeping the existing call sites
+/// fully backward compatible.
 pub struct OxiosEngine {
     oxi: Oxi,
     default_model_id: String,
@@ -33,6 +42,13 @@ pub struct OxiosEngine {
     /// Pooled providers with rate limiting.
     /// Key: provider name (e.g. "anthropic"), Value: ProviderPool wrapper.
     pools: parking_lot::RwLock<std::collections::HashMap<String, Arc<dyn oxi_sdk::Provider>>>,
+    /// ── RFC-014 Phase D: engine-level observability/security handles ──
+    /// When `Some`, these are attached to every `Agent` built via the
+    /// `AgentBuilder` API in `agent_runtime.rs::run_agent()`.
+    /// Default: `None` (preserves pre-Phase-D behavior).
+    authorizer: Option<Arc<oxi_sdk::Authorizer>>,
+    tracer: Option<Arc<oxi_sdk::Tracer>>,
+    cost_tracker: Option<Arc<oxi_sdk::CostTracker>>,
 }
 
 impl OxiosEngine {
@@ -48,6 +64,10 @@ impl OxiosEngine {
             default_model_id: model_id,
             routing_control: None,
             pools: parking_lot::RwLock::new(std::collections::HashMap::new()),
+            // RFC-014 Phase D: optional, off by default
+            authorizer: None,
+            tracer: None,
+            cost_tracker: None,
         }
     }
 
@@ -97,6 +117,10 @@ impl OxiosEngine {
             default_model_id: model_id,
             routing_control: None,
             pools: parking_lot::RwLock::new(std::collections::HashMap::new()),
+            // RFC-014 Phase D: optional, off by default
+            authorizer: None,
+            tracer: None,
+            cost_tracker: None,
         }
     }
 
@@ -104,6 +128,12 @@ impl OxiosEngine {
     ///
     /// Use this when you need credential injection, routing, or
     /// custom provider registration.
+    ///
+    /// # RFC-014 Phase D
+    ///
+    /// The builder also exposes `.with_authorizer()` / `.with_tracer()` /
+    /// `.with_cost_tracker()` for attaching engine-level observability
+    /// and security handles. All three are `None` by default.
     ///
     /// # Example
     ///
@@ -119,6 +149,10 @@ impl OxiosEngine {
         OxiosEngineBuilder {
             inner: OxiBuilder::new().with_builtins(),
             default_model_id: "anthropic/claude-sonnet-4-20250514".to_string(),
+            // RFC-014 Phase D: optional, off by default
+            authorizer: None,
+            tracer: None,
+            cost_tracker: None,
         }
     }
 
@@ -128,6 +162,30 @@ impl OxiosEngine {
     /// (e.g., `AgentBuilder`, `MessageBus`, `AgentGroup`).
     pub fn oxi(&self) -> &Oxi {
         &self.oxi
+    }
+
+    /// RFC-014 Phase D: get the engine-level `Authorizer`, if any.
+    ///
+    /// When `Some`, the authorizer is attached to every `Agent` built via
+    /// `Oxi::agent().authorizer(...)` in `agent_runtime.rs::run_agent()`.
+    pub fn authorizer(&self) -> Option<&Arc<oxi_sdk::Authorizer>> {
+        self.authorizer.as_ref()
+    }
+
+    /// RFC-014 Phase D: get the engine-level `Tracer`, if any.
+    ///
+    /// When `Some`, the tracer is attached to every `Agent` built via
+    /// `Oxi::agent().tracer(...)` in `agent_runtime.rs::run_agent()`.
+    pub fn tracer(&self) -> Option<&Arc<oxi_sdk::Tracer>> {
+        self.tracer.as_ref()
+    }
+
+    /// RFC-014 Phase D: get the engine-level `CostTracker`, if any.
+    ///
+    /// When `Some`, the cost tracker is attached to every `Agent` built via
+    /// `Oxi::agent().cost_tracker(...)` in `agent_runtime.rs::run_agent()`.
+    pub fn cost_tracker(&self) -> Option<&Arc<oxi_sdk::CostTracker>> {
+        self.cost_tracker.as_ref()
     }
 
     /// Resolve a model ID to a Model.
@@ -191,6 +249,11 @@ impl OxiosEngine {
 pub struct OxiosEngineBuilder {
     inner: OxiBuilder,
     default_model_id: String,
+    // ── RFC-014 Phase D: optional engine-level observability/security handles ──
+    // All default to `None` so existing builder chains remain unchanged.
+    authorizer: Option<Arc<oxi_sdk::Authorizer>>,
+    tracer: Option<Arc<oxi_sdk::Tracer>>,
+    cost_tracker: Option<Arc<oxi_sdk::CostTracker>>,
 }
 
 impl OxiosEngineBuilder {
@@ -205,6 +268,9 @@ impl OxiosEngineBuilder {
         Self {
             inner: self.inner.api_key(provider, key),
             default_model_id: self.default_model_id,
+            authorizer: self.authorizer,
+            tracer: self.tracer,
+            cost_tracker: self.cost_tracker,
         }
     }
 
@@ -218,6 +284,9 @@ impl OxiosEngineBuilder {
         Self {
             inner: self.inner.credential(provider, api_key, base_url),
             default_model_id: self.default_model_id,
+            authorizer: self.authorizer,
+            tracer: self.tracer,
+            cost_tracker: self.cost_tracker,
         }
     }
 
@@ -226,6 +295,9 @@ impl OxiosEngineBuilder {
         Self {
             inner: self.inner.provider(name, p),
             default_model_id: self.default_model_id,
+            authorizer: self.authorizer,
+            tracer: self.tracer,
+            cost_tracker: self.cost_tracker,
         }
     }
 
@@ -236,6 +308,10 @@ impl OxiosEngineBuilder {
             default_model_id: self.default_model_id,
             routing_control: None,
             pools: parking_lot::RwLock::new(std::collections::HashMap::new()),
+            // RFC-014 Phase D: optional, off by default
+            authorizer: self.authorizer,
+            tracer: self.tracer,
+            cost_tracker: self.cost_tracker,
         }
     }
 
@@ -252,8 +328,42 @@ impl OxiosEngineBuilder {
             default_model_id: self.default_model_id,
             routing_control: Some(routing_control.clone()),
             pools: parking_lot::RwLock::new(std::collections::HashMap::new()),
+            // RFC-014 Phase D: optional, off by default
+            authorizer: self.authorizer,
+            tracer: self.tracer,
+            cost_tracker: self.cost_tracker,
         };
         (engine, routing_control)
+    }
+
+    // ── RFC-014 Phase D: engine-level observability/security handles ──
+    //
+    // These methods let callers attach shared `Authorizer` / `Tracer` /
+    // `CostTracker` instances to the engine. `agent_runtime.rs::run_agent()`
+    // reads them via `OxiosEngine::authorizer()` / `.tracer()` /
+    // `.cost_tracker()` and propagates them to the new `AgentBuilder` API.
+    //
+    // Backward compatible: all three are `None` by default.
+
+    /// Attach an `Authorizer` to the engine. Agents built via `Oxi::agent()`
+    /// will receive this authorizer through the new `AgentBuilder::authorizer()` API.
+    pub fn with_authorizer(mut self, authorizer: Arc<oxi_sdk::Authorizer>) -> Self {
+        self.authorizer = Some(authorizer);
+        self
+    }
+
+    /// Attach a `Tracer` to the engine. Agents built via `Oxi::agent()`
+    /// will receive this tracer through the new `AgentBuilder::tracer()` API.
+    pub fn with_tracer(mut self, tracer: Arc<oxi_sdk::Tracer>) -> Self {
+        self.tracer = Some(tracer);
+        self
+    }
+
+    /// Attach a `CostTracker` to the engine. Agents built via `Oxi::agent()`
+    /// will receive this cost tracker through the new `AgentBuilder::cost_tracker()` API.
+    pub fn with_cost_tracker(mut self, cost_tracker: Arc<oxi_sdk::CostTracker>) -> Self {
+        self.cost_tracker = Some(cost_tracker);
+        self
     }
 }
 
@@ -294,6 +404,72 @@ impl std::fmt::Debug for OxiosEngine {
         f.debug_struct("OxiosEngine")
             .field("default_model_id", &self.default_model_id)
             .field("routing_enabled", &self.routing_control.is_some())
+            .finish()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// EngineHandle — hot-swappable engine reference
+// ---------------------------------------------------------------------------
+
+/// Shared, hot-swappable reference to the active [`OxiosEngine`].
+///
+/// Wraps `RwLock<Arc<OxiosEngine>>` so that:
+/// - **Writers** (`EngineApi`) can atomically replace the engine on config change
+/// - **Readers** (`AgentRuntime`) always get the current engine at execution time
+///
+/// # Cost
+///
+/// Rebuilding `OxiosEngine` is cheap: `OxiBuilder::new().with_builtins().build()`
+/// populates registries from static `model_db` data (~1μs, no I/O, no network).
+///
+/// # Concurrency
+///
+/// - `parking_lot::RwLock` is not async-aware, but engine swap only occurs on
+///   explicit user action (Web UI / CLI config change) — never in a hot path.
+/// - Agent execution reads the engine once at the start of `execute()` and
+///   uses the same `Arc<OxiosEngine>` for the entire run (consistent within one execution).
+pub struct EngineHandle {
+    inner: parking_lot::RwLock<Arc<OxiosEngine>>,
+}
+
+impl EngineHandle {
+    /// Create a new handle wrapping the given engine.
+    pub fn new(engine: Arc<OxiosEngine>) -> Self {
+        Self {
+            inner: parking_lot::RwLock::new(engine),
+        }
+    }
+
+    /// Get a snapshot of the current engine.
+    ///
+    /// The returned `Arc` is stable — it won't change even if another thread
+    /// calls `swap()` concurrently.
+    pub fn get(&self) -> Arc<OxiosEngine> {
+        Arc::clone(&self.inner.read())
+    }
+
+    /// Atomically replace the engine with a new one.
+    ///
+    /// Callers should rebuild `OxiosEngine` with updated credentials/model
+    /// before calling this.
+    pub fn swap(&self, new_engine: OxiosEngine) {
+        let mut guard = self.inner.write();
+        let old_id = guard.default_model_id().to_string();
+        *guard = Arc::new(new_engine);
+        tracing::info!(
+            old_model = %old_id,
+            new_model = %guard.default_model_id(),
+            "Engine hot-swapped"
+        );
+    }
+}
+
+impl std::fmt::Debug for EngineHandle {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let engine = self.inner.read();
+        f.debug_struct("EngineHandle")
+            .field("current_model", &engine.default_model_id())
             .finish()
     }
 }
@@ -366,5 +542,155 @@ mod tests {
         let provider: &dyn EngineProvider = &engine;
         assert!(provider.create_provider("anthropic").is_ok());
         assert!(provider.resolve_model("openai/gpt-4o").is_ok());
+    }
+
+    // ── EngineHandle tests ──
+
+    #[test]
+    fn test_engine_handle_get_returns_current() {
+        let engine = OxiosEngine::new("anthropic/claude-sonnet-4-20250514");
+        let handle = EngineHandle::new(Arc::new(engine));
+        let e = handle.get();
+        assert_eq!(e.default_model_id(), "anthropic/claude-sonnet-4-20250514");
+    }
+
+    #[test]
+    fn test_engine_handle_swap_updates() {
+        let engine = OxiosEngine::new("anthropic/claude-sonnet-4-20250514");
+        let handle = EngineHandle::new(Arc::new(engine));
+
+        let new_engine = OxiosEngine::new("openai/gpt-4o");
+        handle.swap(new_engine);
+
+        let e = handle.get();
+        assert_eq!(e.default_model_id(), "openai/gpt-4o");
+    }
+
+    #[test]
+    fn test_engine_handle_swap_preserves_old_arc() {
+        // An Arc obtained before swap should remain valid.
+        let engine = OxiosEngine::new("anthropic/claude-sonnet-4-20250514");
+        let handle = EngineHandle::new(Arc::new(engine));
+
+        let old = handle.get();
+        assert_eq!(old.default_model_id(), "anthropic/claude-sonnet-4-20250514");
+
+        handle.swap(OxiosEngine::new("openai/gpt-4o"));
+
+        // `old` still points to the pre-swap engine.
+        assert_eq!(old.default_model_id(), "anthropic/claude-sonnet-4-20250514");
+
+        // New get() returns the swapped engine.
+        let current = handle.get();
+        assert_eq!(current.default_model_id(), "openai/gpt-4o");
+    }
+
+    // ── RFC-014 Phase D: engine-level observability/security handles ──
+
+    #[test]
+    fn test_rfc014_phase_d_default_fields_are_none() {
+        // Backward compatibility: `OxiosEngine::new()` / `from_config()` /
+        // `builder().build()` must all leave the new optional fields as
+        // `None` so existing call sites are unaffected.
+        let engine = OxiosEngine::new("anthropic/claude-sonnet-4-20250514");
+        assert!(engine.authorizer().is_none());
+        assert!(engine.tracer().is_none());
+        assert!(engine.cost_tracker().is_none());
+
+        let engine = OxiosEngine::from_config("anthropic/claude-sonnet-4-20250514", None);
+        assert!(engine.authorizer().is_none());
+        assert!(engine.tracer().is_none());
+        assert!(engine.cost_tracker().is_none());
+
+        let engine = OxiosEngine::builder()
+            .default_model("openai/gpt-4o")
+            .build();
+        assert!(engine.authorizer().is_none());
+        assert!(engine.tracer().is_none());
+        assert!(engine.cost_tracker().is_none());
+
+        let (engine, _rc) = OxiosEngine::builder()
+            .default_model("openai/gpt-4o")
+            .build_with_routing();
+        assert!(engine.authorizer().is_none());
+        assert!(engine.tracer().is_none());
+        assert!(engine.cost_tracker().is_none());
+    }
+
+    #[test]
+    fn test_rfc014_phase_d_with_tracer() {
+        // `with_tracer` attaches a `Tracer`; accessor returns `Some`.
+        let tracer = Arc::new(oxi_sdk::Tracer::new());
+        let engine = OxiosEngine::builder()
+            .default_model("openai/gpt-4o")
+            .with_tracer(tracer.clone())
+            .build();
+        assert!(engine.tracer().is_some());
+        assert!(engine.authorizer().is_none());
+        assert!(engine.cost_tracker().is_none());
+    }
+
+    #[test]
+    fn test_rfc014_phase_d_with_cost_tracker() {
+        // `with_cost_tracker` attaches a `CostTracker`; accessor returns `Some`.
+        // `CostTracker::new` needs an `Arc<ModelRegistry>`; the engine's
+        // own registry (via `models_arc`) is fine for construction-only
+        // assertions like this one.
+        let oxi_for_registry = oxi_sdk::OxiBuilder::new().with_builtins().build();
+        let model_registry = oxi_for_registry.models_arc();
+        let cost_tracker = Arc::new(oxi_sdk::CostTracker::new(
+            model_registry,
+            oxi_sdk::CostTrackerConfig::default(),
+        ));
+        let engine = OxiosEngine::builder()
+            .default_model("openai/gpt-4o")
+            .with_cost_tracker(cost_tracker)
+            .build();
+        assert!(engine.cost_tracker().is_some());
+        assert!(engine.authorizer().is_none());
+        assert!(engine.tracer().is_none());
+    }
+
+    #[test]
+    fn test_rfc014_phase_d_with_authorizer() {
+        // `with_authorizer` attaches an `Authorizer`; accessor returns `Some`.
+        let audit = Arc::new(oxi_sdk::AuditLog::new(16));
+        let authorizer = Arc::new(oxi_sdk::Authorizer::new(audit));
+        let engine = OxiosEngine::builder()
+            .default_model("openai/gpt-4o")
+            .with_authorizer(authorizer)
+            .build();
+        assert!(engine.authorizer().is_some());
+        assert!(engine.tracer().is_none());
+        assert!(engine.cost_tracker().is_none());
+    }
+
+    #[test]
+    fn test_rfc014_phase_d_all_three_handles() {
+        // All three handles can be set at once. The build chain must
+        // preserve them through `api_key` / `credential` / `provider`
+        // builder methods (they should be no-ops for the new fields).
+        let audit = Arc::new(oxi_sdk::AuditLog::new(16));
+        let authorizer = Arc::new(oxi_sdk::Authorizer::new(audit));
+        let tracer = Arc::new(oxi_sdk::Tracer::new());
+        let oxi_for_registry = oxi_sdk::OxiBuilder::new().with_builtins().build();
+        let model_registry = oxi_for_registry.models_arc();
+        let cost_tracker = Arc::new(oxi_sdk::CostTracker::new(
+            model_registry,
+            oxi_sdk::CostTrackerConfig::default(),
+        ));
+
+        let engine = OxiosEngine::builder()
+            .default_model("openai/gpt-4o")
+            .api_key("openai", "sk-test")
+            .with_authorizer(authorizer)
+            .with_tracer(tracer)
+            .with_cost_tracker(cost_tracker)
+            .build();
+
+        assert!(engine.authorizer().is_some());
+        assert!(engine.tracer().is_some());
+        assert!(engine.cost_tracker().is_some());
+        assert_eq!(engine.default_model_id(), "openai/gpt-4o");
     }
 }

@@ -1,13 +1,13 @@
 [package]
 name = "oxios-gateway"
-version = "1.0.1"
+version = "1.0.2"
 edition = "2021"
 description = "Channel-agnostic message gateway for Oxios"
 license = "MIT"
 repository = "https://github.com/a7garden/oxios"
 
 [dependencies]
-oxios-kernel = { version = "1.0.0", path = "../oxios-kernel", default-features = false, features = ["sqlite-memory"] }
+oxios-kernel = { version = "1.0.2", path = "../oxios-kernel", default-features = false, features = ["sqlite-memory"] }
 tokio = { workspace = true }
 async-trait = { workspace = true }
 serde = { workspace = true }

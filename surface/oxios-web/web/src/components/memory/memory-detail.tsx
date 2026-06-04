@@ -49,14 +49,14 @@ export function MemoryDetail({ memory, open, onClose }: MemoryDetailProps) {
         </DialogHeader>
         <div className="mt-4 space-y-4">
           <div className="grid gap-2 text-sm">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">ID</span>
-              <span className="font-mono text-xs">{memory.id}</span>
+            <div className="flex justify-between gap-2">
+              <span className="text-muted-foreground shrink-0">ID</span>
+              <span className="font-mono text-xs truncate">{memory.id}</span>
             </div>
             {memory.key && (
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Key</span>
-                <span className="font-mono text-xs">{memory.key}</span>
+              <div className="flex justify-between gap-2">
+                <span className="text-muted-foreground shrink-0">Key</span>
+                <span className="font-mono text-xs truncate">{memory.key}</span>
               </div>
             )}
             {memory.project_ids && (
@@ -106,8 +106,8 @@ export function MemoryDetail({ memory, open, onClose }: MemoryDetailProps) {
               </div>
             )}
           </div>
-          <div className="rounded-lg bg-muted p-3">
-            <p className="text-sm whitespace-pre-wrap">
+          <div className="rounded-lg bg-muted p-3 overflow-x-auto">
+            <p className="text-sm whitespace-pre-wrap break-words">
               {memory.content}
             </p>
           </div>

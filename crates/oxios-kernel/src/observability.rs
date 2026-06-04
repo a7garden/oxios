@@ -1,4 +1,4 @@
-//! Observability — oxi-sdk 0.23.0 tracing, cost tracking, and audit.
+//! Observability — oxi-sdk 0.26.2 tracing, cost tracking, and audit.
 //!
 //! Provides global instances of oxi-sdk's `Tracer`, `CostTracker`, and `AuditLog`
 //! for use across the kernel. These complement the existing `metrics` module
@@ -34,10 +34,38 @@
 //! ```
 
 use oxi_sdk::ModelRegistry;
+// Re-exports grouped by concern. All names are part of the kernel's public
+// surface (re-exported via `lib.rs`) — do not remove or rename without
+// auditing downstream consumers.
+//
+// `audit_trail::*` types (AuditTrail, AuditAction, HashDigest, ...) are
+// intentionally NOT re-exported here: they live in the dormant `audit_trail`
+// module of oxi-sdk and will be activated in Phase F (RFC-014).
 pub use oxi_sdk::{
-    AuditEntry, AuditFilter, AuditLog, CostBreakdown, CostSnapshot, CostTracker, CostTrackerConfig,
-    GlobalCostSnapshot, Span, SpanContext, SpanGuard, SpanId, SpanKind, SpanStatus, TokenUsage,
-    TraceId, Tracer,
+    // ── Audit (in-memory) ──────────────────────────────────────────────
+    // Simple structured audit log. Replaced by `audit_trail` (blake3 chain)
+    // in Phase F.
+    AuditEntry,
+    AuditFilter,
+    AuditLog,
+    // ── Cost ───────────────────────────────────────────────────────────
+    // Per-agent token usage and cost accounting.
+    CostBreakdown,
+    CostSnapshot,
+    CostTracker,
+    CostTrackerConfig,
+    GlobalCostSnapshot,
+    // ── Tracing ────────────────────────────────────────────────────────
+    // Distributed spans for agent/tool/kernel operations.
+    Span,
+    SpanContext,
+    SpanGuard,
+    SpanId,
+    SpanKind,
+    SpanStatus,
+    TokenUsage,
+    TraceId,
+    Tracer,
 };
 use std::sync::Arc;
 

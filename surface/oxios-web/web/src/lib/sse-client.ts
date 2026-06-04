@@ -15,16 +15,17 @@ export class SseClient {
     path: string,
     onEvent: (event: string, data: unknown) => void,
     onError?: (error: Error) => void,
+    onOpen?: () => void,
   ) {
     this.disconnect()
     this.currentPath = path
     this.currentOnEvent = onEvent
     this.currentOnError = onError ?? null
     this.reconnectAttempts = 0
-    await this.doConnect()
+    await this.doConnect(undefined, onOpen)
   }
 
-  private async doConnect() {
+  private async doConnect(_unused?: undefined, onOpen?: () => void) {
     this.controller = new AbortController()
     const token = useAuthStore.getState().token
     const protocol = window.location.protocol
@@ -38,6 +39,9 @@ export class SseClient {
 
       const reader = response.body?.getReader()
       if (!reader) return
+
+      // Connection established — notify caller
+      onOpen?.()
 
       const decoder = new TextDecoder()
       let buffer = ''

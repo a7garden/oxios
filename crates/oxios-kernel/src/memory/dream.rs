@@ -373,7 +373,7 @@ pub struct DreamProcess {
     /// Auto-protector.
     auto_protector: AutoProtector,
     /// Compaction tree.
-    #[allow(dead_code)]
+    #[allow(dead_code)] // Reserved for future dream-compaction integration
     compaction_tree: CompactionTree,
     /// Configuration.
     config: DreamConfig,

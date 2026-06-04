@@ -163,28 +163,445 @@ pub fn estimate_cost(model_id: &str, input_tokens: u64, output_tokens: u64) -> f
 
 // ── Provider/Model response types ──────────────────────────────────────────
 
+/// Provider category for UI grouping.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ProviderCategory {
+    /// Major providers (Anthropic, OpenAI, Google).
+    Major,
+    /// Open / specialty providers (Groq, OpenRouter, DeepSeek, etc.).
+    Open,
+    /// Regional providers.
+    Regional,
+    /// Local / self-hosted providers.
+    Local,
+}
+
+/// Static metadata for an LLM provider.
+///
+/// This table is the **single source of truth** for provider-facing
+/// metadata in the Web UI. It enriches the dynamic list returned by
+/// `oxi_sdk::get_providers()` with human-friendly labels, UI grouping,
+/// and a flag for providers that should not be exposed to the Web
+/// dashboard (e.g. those requiring non-API-key auth like AWS SigV4 or
+/// OAuth, or region-specific endpoints).
+///
+/// New providers added to `oxi-sdk` automatically appear in the UI
+/// with sensible fallbacks (`Open` category, derived display name)
+/// even before they get an entry here.
+#[derive(Debug, Clone, Copy)]
+struct ProviderMeta {
+    /// Canonical provider id (matches `oxi_sdk::get_providers()`).
+    id: &'static str,
+    /// Human-readable name shown in dropdowns and badges.
+    display_name: &'static str,
+    /// UI grouping for the provider selector.
+    category: ProviderCategory,
+    /// Whether to exclude from the Web UI providers list.
+    /// Used for providers with non-standard auth (AWS SigV4, OAuth,
+    /// account-scoped URLs) or that are region-specific duplicates.
+    hidden: bool,
+    /// Short description for tooltips / help text.
+    description: &'static str,
+    /// Primary environment variable name holding the API key.
+    /// Empty string when the provider does not use a single env var
+    /// (e.g. AWS Bedrock uses a credential chain).
+    env_key: &'static str,
+    /// Alternative ids that should resolve to this provider.
+    /// Used so that an alias such as `aws-bedrock` matches the
+    /// canonical `amazon-bedrock` entry.
+    aliases: &'static [&'static str],
+}
+
+/// All provider metadata, in a single static table.
+///
+/// Order is for human readability only — the runtime lookup is O(n)
+/// linear scan, which is fine for ~30 entries. If the table grows
+/// past ~100 entries, swap to a `phf` or `once_cell` hash map.
+const PROVIDER_META: &[ProviderMeta] = &[
+    // ── Major (top 3) ──────────────────────────────────────────────
+    ProviderMeta {
+        id: "anthropic",
+        display_name: "Anthropic",
+        category: ProviderCategory::Major,
+        hidden: false,
+        description: "Claude models with extended thinking",
+        env_key: "ANTHROPIC_API_KEY",
+        aliases: &["anthropic"],
+    },
+    ProviderMeta {
+        id: "openai",
+        display_name: "OpenAI",
+        category: ProviderCategory::Major,
+        hidden: false,
+        description: "GPT, o-series, and Codex models",
+        env_key: "OPENAI_API_KEY",
+        aliases: &["openai"],
+    },
+    ProviderMeta {
+        id: "google",
+        display_name: "Google Gemini",
+        category: ProviderCategory::Major,
+        hidden: false,
+        description: "Gemini models with thinking and tool use",
+        env_key: "GOOGLE_API_KEY",
+        aliases: &["google"],
+    },
+    // ── Open / specialty (gateways + open-weight hosts) ────────────
+    ProviderMeta {
+        id: "groq",
+        display_name: "Groq",
+        category: ProviderCategory::Open,
+        hidden: false,
+        description: "Fast Llama, Mixtral, and Gemma inference",
+        env_key: "GROQ_API_KEY",
+        aliases: &["groq"],
+    },
+    ProviderMeta {
+        id: "openrouter",
+        display_name: "OpenRouter",
+        category: ProviderCategory::Open,
+        hidden: false,
+        description: "Unified gateway to 200+ models",
+        env_key: "OPENROUTER_API_KEY",
+        aliases: &["openrouter"],
+    },
+    ProviderMeta {
+        id: "deepseek",
+        display_name: "DeepSeek",
+        category: ProviderCategory::Open,
+        hidden: false,
+        description: "DeepSeek-V3 and DeepSeek-R1",
+        env_key: "DEEPSEEK_API_KEY",
+        aliases: &["deepseek"],
+    },
+    ProviderMeta {
+        id: "mistral",
+        display_name: "Mistral",
+        category: ProviderCategory::Open,
+        hidden: false,
+        description: "Mistral and Codestral models",
+        env_key: "MISTRAL_API_KEY",
+        aliases: &["mistral"],
+    },
+    ProviderMeta {
+        id: "xai",
+        display_name: "xAI (Grok)",
+        category: ProviderCategory::Open,
+        hidden: false,
+        description: "Grok models from xAI",
+        env_key: "XAI_API_KEY",
+        aliases: &["xai", "grok"],
+    },
+    ProviderMeta {
+        id: "cerebras",
+        display_name: "Cerebras",
+        category: ProviderCategory::Open,
+        hidden: false,
+        description: "Ultra-fast open model inference",
+        env_key: "CEREBRAS_API_KEY",
+        aliases: &["cerebras"],
+    },
+    ProviderMeta {
+        id: "fireworks",
+        display_name: "Fireworks",
+        category: ProviderCategory::Open,
+        hidden: false,
+        description: "Fast open-source model serving",
+        env_key: "FIREWORKS_API_KEY",
+        aliases: &["fireworks"],
+    },
+    ProviderMeta {
+        id: "github-copilot",
+        display_name: "GitHub Copilot",
+        category: ProviderCategory::Open,
+        hidden: false,
+        description: "GitHub Copilot models (GPT-4, Claude)",
+        env_key: "GITHUB_COPILOT_TOKEN",
+        aliases: &["github-copilot", "copilot"],
+    },
+    ProviderMeta {
+        id: "huggingface",
+        display_name: "Hugging Face",
+        category: ProviderCategory::Open,
+        hidden: false,
+        description: "Open model inference hub",
+        env_key: "HUGGINGFACE_API_KEY",
+        aliases: &["huggingface", "hf"],
+    },
+    ProviderMeta {
+        id: "together",
+        display_name: "Together AI",
+        category: ProviderCategory::Open,
+        hidden: false,
+        description: "Open-source model hosting (Llama, Mixtral, ...)",
+        env_key: "TOGETHER_API_KEY",
+        aliases: &["together", "togetherai"],
+    },
+    ProviderMeta {
+        id: "opencode",
+        display_name: "OpenCode",
+        category: ProviderCategory::Open,
+        hidden: false,
+        description: "OpenCode coding agent gateway",
+        env_key: "",
+        aliases: &["opencode"],
+    },
+    ProviderMeta {
+        id: "perplexity",
+        display_name: "Perplexity",
+        category: ProviderCategory::Open,
+        hidden: false,
+        description: "Search-augmented answer models",
+        env_key: "PERPLEXITY_API_KEY",
+        aliases: &["perplexity"],
+    },
+    ProviderMeta {
+        id: "cohere",
+        display_name: "Cohere",
+        category: ProviderCategory::Open,
+        hidden: false,
+        description: "Cohere Command and Embed models",
+        env_key: "COHERE_API_KEY",
+        aliases: &["cohere"],
+    },
+    // ── Regional (Chinese / Asian providers) ───────────────────────
+    ProviderMeta {
+        id: "minimax",
+        display_name: "MiniMax",
+        category: ProviderCategory::Regional,
+        hidden: false,
+        description: "MiniMax-M2.7, abab models",
+        env_key: "MINIMAX_API_KEY",
+        aliases: &["minimax"],
+    },
+    ProviderMeta {
+        id: "moonshotai",
+        display_name: "Moonshot AI (Kimi)",
+        category: ProviderCategory::Regional,
+        hidden: false,
+        description: "Kimi models from Moonshot AI",
+        env_key: "MOONSHOT_API_KEY",
+        aliases: &["moonshotai", "moonshot", "kimi"],
+    },
+    ProviderMeta {
+        id: "kimi-coding",
+        display_name: "Kimi Coding",
+        category: ProviderCategory::Regional,
+        hidden: false,
+        description: "Kimi Coding Plan — optimized for coding",
+        env_key: "KIMI_CODING_API_KEY",
+        aliases: &["kimi-coding"],
+    },
+    ProviderMeta {
+        id: "zai",
+        display_name: "Z.AI (GLM)",
+        category: ProviderCategory::Regional,
+        hidden: false,
+        description: "Z.AI GLM models (coding plan)",
+        env_key: "ZAI_API_KEY",
+        aliases: &["zai"],
+    },
+    // ── Hidden in Web UI today; mapped for forward-compatibility ───
+    // These providers are not exposed by `EngineHandle::providers()`
+    // because they require non-standard auth or region-specific setup,
+    // but listing them here means the metadata is already wired up if
+    // a future change decides to surface them.
+    ProviderMeta {
+        id: "amazon-bedrock",
+        display_name: "Amazon Bedrock",
+        category: ProviderCategory::Open,
+        hidden: true,
+        description: "Multi-model via AWS Bedrock ConverseStream",
+        env_key: "AWS_ACCESS_KEY_ID",
+        aliases: &["amazon-bedrock", "aws-bedrock", "bedrock"],
+    },
+    ProviderMeta {
+        id: "azure-openai-responses",
+        display_name: "Azure OpenAI (Responses)",
+        category: ProviderCategory::Open,
+        hidden: true,
+        description: "OpenAI models via Azure Cognitive Services",
+        env_key: "AZURE_OPENAI_API_KEY",
+        aliases: &["azure-openai-responses", "azure"],
+    },
+    ProviderMeta {
+        id: "cloudflare-ai-gateway",
+        display_name: "Cloudflare AI Gateway",
+        category: ProviderCategory::Open,
+        hidden: true,
+        description: "Serverless AI via Cloudflare AI Gateway",
+        env_key: "CLOUDFLARE_API_TOKEN",
+        aliases: &["cloudflare-ai-gateway", "cf-ai-gateway"],
+    },
+    ProviderMeta {
+        id: "cloudflare-workers-ai",
+        display_name: "Cloudflare Workers AI",
+        category: ProviderCategory::Open,
+        hidden: true,
+        description: "Serverless AI via Cloudflare Workers",
+        env_key: "CLOUDFLARE_API_KEY",
+        aliases: &["cloudflare-workers-ai", "cloudflare", "workers-ai"],
+    },
+    ProviderMeta {
+        id: "google-vertex",
+        display_name: "Google Vertex AI",
+        category: ProviderCategory::Open,
+        hidden: true,
+        description: "Gemini via Google Cloud Vertex AI",
+        env_key: "GOOGLE_APPLICATION_CREDENTIALS",
+        aliases: &["google-vertex", "vertex"],
+    },
+    ProviderMeta {
+        id: "minimax-cn",
+        display_name: "MiniMax (China)",
+        category: ProviderCategory::Regional,
+        hidden: true,
+        description: "MiniMax China region endpoint",
+        env_key: "MINIMAX_CN_API_KEY",
+        aliases: &["minimax-cn"],
+    },
+    ProviderMeta {
+        id: "moonshotai-cn",
+        display_name: "Moonshot AI (China)",
+        category: ProviderCategory::Regional,
+        hidden: true,
+        description: "Kimi models — China region endpoint",
+        env_key: "MOONSHOT_CN_API_KEY",
+        aliases: &["moonshotai-cn", "moonshot-cn"],
+    },
+    ProviderMeta {
+        id: "openai-codex",
+        display_name: "OpenAI Codex",
+        category: ProviderCategory::Open,
+        hidden: true,
+        description: "OpenAI Codex coding agent (Responses API)",
+        env_key: "OPENAI_API_KEY",
+        aliases: &["openai-codex"],
+    },
+    ProviderMeta {
+        id: "opencode-go",
+        display_name: "OpenCode Go",
+        category: ProviderCategory::Open,
+        hidden: true,
+        description: "OpenCode Go Gateway",
+        env_key: "OPENCODE_GO_API_KEY",
+        aliases: &["opencode-go"],
+    },
+    ProviderMeta {
+        id: "vercel-ai-gateway",
+        display_name: "Vercel AI Gateway",
+        category: ProviderCategory::Open,
+        hidden: true,
+        description: "Vercel AI Gateway",
+        env_key: "VERCEL_API_KEY",
+        aliases: &["vercel-ai-gateway", "vercel"],
+    },
+    ProviderMeta {
+        id: "xiaomi",
+        display_name: "Xiaomi MiMo",
+        category: ProviderCategory::Regional,
+        hidden: true,
+        description: "Xiaomi MiMo models",
+        env_key: "XIAOMI_API_KEY",
+        aliases: &["xiaomi"],
+    },
+];
+
+/// Look up metadata by canonical id or alias.
+fn provider_meta(id: &str) -> Option<&'static ProviderMeta> {
+    PROVIDER_META
+        .iter()
+        .find(|m| m.id == id || m.aliases.contains(&id))
+}
+
+fn provider_category(id: &str) -> ProviderCategory {
+    provider_meta(id)
+        .map(|m| m.category)
+        .unwrap_or(ProviderCategory::Open)
+}
+
+/// Resolve a display name for a provider id.
+///
+/// Falls back to a Title-Cased id for unknown providers so that
+/// newly added `oxi-sdk` providers still render acceptably until a
+/// real entry lands in [`PROVIDER_META`].
+fn provider_display_name(id: &str) -> String {
+    provider_meta(id)
+        .map(|m| m.display_name.to_string())
+        .unwrap_or_else(|| fallback_display_name(id))
+}
+
+/// Render a fallback display name by splitting on `-` / `_` and
+/// Title-Casing each segment. Examples:
+///   `"kimi-coding"`   → `"Kimi Coding"`
+///   `"some_id"`       → `"Some Id"`
+///   `"openai"`        → `"Openai"`
+fn fallback_display_name(id: &str) -> String {
+    id.split(['-', '_'])
+        .filter(|s| !s.is_empty())
+        .map(|segment| {
+            let mut chars = segment.chars();
+            match chars.next() {
+                Some(c) => c.to_uppercase().collect::<String>() + chars.as_str(),
+                None => String::new(),
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
 /// Summary of an LLM provider.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ProviderInfo {
     /// Provider identifier (e.g. "anthropic", "openai").
     pub id: String,
+    /// Human-readable display name.
+    pub name: String,
+    /// Category for UI grouping.
+    pub category: ProviderCategory,
     /// Number of models available for this provider.
     pub model_count: usize,
     /// Whether an API key is currently configured.
     pub has_key: bool,
+    /// Short description for tooltips / help text. Empty for unknown
+    /// providers that have no entry in [`PROVIDER_META`].
+    #[serde(default)]
+    pub description: String,
+    /// Primary environment variable name for the API key. Empty for
+    /// providers that do not use a single env var (e.g. AWS Bedrock
+    /// uses a credential chain rather than a single API key var).
+    #[serde(default)]
+    pub env_key: String,
+}
+
+/// Input modality for a model.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum InputModality {
+    /// Text input.
+    Text,
+    /// Image input (vision).
+    Image,
 }
 
 /// Summary of a model from the catalog.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ModelInfo {
     /// Full model ID: "provider/model-id".
     pub id: String,
     /// Human-readable model name.
     pub name: String,
+    /// API protocol used by the model's provider.
+    pub api: String,
     /// Provider name.
     pub provider: String,
     /// Whether this model supports reasoning/thinking.
     pub reasoning: bool,
+    /// Supported input modalities.
+    pub input: Vec<InputModality>,
     /// Maximum context window in tokens.
     pub context_window: u32,
     /// Maximum output tokens.
@@ -193,6 +610,10 @@ pub struct ModelInfo {
     pub cost_input: f64,
     /// Cost per million output tokens (USD).
     pub cost_output: f64,
+    /// Cost per million cached read tokens (USD).
+    pub cost_cache_read: f64,
+    /// Cost per million cached write tokens (USD).
+    pub cost_cache_write: f64,
 }
 
 impl From<&oxi_sdk::ModelEntry> for ModelInfo {
@@ -200,12 +621,24 @@ impl From<&oxi_sdk::ModelEntry> for ModelInfo {
         Self {
             id: format!("{}/{}", entry.provider, entry.id),
             name: entry.name.to_string(),
+            api: entry.api.to_string(),
             provider: entry.provider.to_string(),
             reasoning: entry.reasoning,
+            input: entry
+                .input
+                .iter()
+                .map(|m| match m {
+                    oxi_sdk::InputModality::Text => InputModality::Text,
+                    oxi_sdk::InputModality::Image => InputModality::Image,
+                    _ => InputModality::Text,
+                })
+                .collect(),
             context_window: entry.context_window,
             max_tokens: entry.max_tokens,
             cost_input: entry.cost_input,
             cost_output: entry.cost_output,
+            cost_cache_read: entry.cost_cache_read,
+            cost_cache_write: entry.cost_cache_write,
         }
     }
 }
@@ -243,10 +676,16 @@ pub struct ValidateKeyResult {
 /// Holds a shared reference to the live config (behind `RwLock`) and the
 /// path to config.toml so write operations can persist to disk.
 /// Routing stats are shared with `AgentRuntime` via `Arc<RoutingStats>`.
+///
+/// When config writes change the model or API key, `EngineApi` rebuilds
+/// `OxiosEngine` via [`EngineHandle`] so the runtime picks up the change
+/// on the next agent execution (hot-swap, no restart required).
 pub struct EngineApi {
     config: Arc<RwLock<OxiosConfig>>,
     config_path: PathBuf,
     routing_stats: Arc<RoutingStats>,
+    /// Hot-swap handle — config writes rebuild `OxiosEngine` and swap it in.
+    engine_handle: Arc<crate::engine::EngineHandle>,
 }
 
 impl EngineApi {
@@ -255,15 +694,18 @@ impl EngineApi {
     /// - `config` — shared config store (backed by RwLock)
     /// - `config_path` — path to config.toml for persistence
     /// - `routing_stats` — shared stats tracker (shared with AgentRuntime)
+    /// - `engine_handle` — hot-swap handle for live engine replacement
     pub fn new(
         config: Arc<RwLock<OxiosConfig>>,
         config_path: PathBuf,
         routing_stats: Arc<RoutingStats>,
+        engine_handle: Arc<crate::engine::EngineHandle>,
     ) -> Self {
         Self {
             config,
             config_path,
             routing_stats,
+            engine_handle,
         }
     }
 
@@ -272,30 +714,27 @@ impl EngineApi {
         Arc::clone(&self.routing_stats)
     }
 
+    /// Get a reference to the engine handle.
+    pub fn engine_handle(&self) -> &Arc<crate::engine::EngineHandle> {
+        &self.engine_handle
+    }
+
     // ── Read operations ────────────────────────────────────────────────
 
     /// List all available providers from the oxi-sdk catalog.
     ///
-    /// Filters out hidden/internal providers (amazon-bedrock, azure-*, etc.)
-    /// and augments each entry with credential status.
+    /// Filters out hidden/internal providers (those flagged with
+    /// `hidden: true` in [`PROVIDER_META`]) and augments each entry
+    /// with credential status, display name, and description.
+    ///
+    /// Providers without a [`PROVIDER_META`] entry are shown by
+    /// default — a new provider landing in `oxi-sdk` should be
+    /// available to users even before its metadata is added here.
     pub fn providers(&self) -> Vec<ProviderInfo> {
         let all = oxi_sdk::get_providers();
-        let hidden: &[&str] = &[
-            "amazon-bedrock",
-            "azure-openai-responses",
-            "cloudflare-ai-gateway",
-            "cloudflare-workers-ai",
-            "google-vertex",
-            "minimax-cn",
-            "moonshotai-cn",
-            "openai-codex",
-            "opencode-go",
-            "vercel-ai-gateway",
-            "xiaomi",
-        ];
 
         all.into_iter()
-            .filter(|p| !hidden.contains(p))
+            .filter(|p| provider_meta(p).map(|m| !m.hidden).unwrap_or(true))
             .map(|p| {
                 let model_count = oxi_sdk::get_provider_models(p).len();
                 let has_key = CredentialStore::has_credential(
@@ -307,10 +746,15 @@ impl EngineApi {
                         .as_deref()
                         .filter(|k| !k.is_empty()),
                 );
+                let meta = provider_meta(p);
                 ProviderInfo {
                     id: p.to_string(),
+                    name: provider_display_name(p),
+                    category: provider_category(p),
                     model_count,
                     has_key,
+                    description: meta.map(|m| m.description.to_string()).unwrap_or_default(),
+                    env_key: meta.map(|m| m.env_key.to_string()).unwrap_or_default(),
                 }
             })
             .collect()
@@ -395,8 +839,8 @@ impl EngineApi {
 
     /// Set the default model in config.toml.
     ///
-    /// Updates both the in-memory config and the on-disk file.
-    /// No runtime hot-swap — the model change takes effect on next request.
+    /// Updates both the in-memory config and the on-disk file, then
+    /// hot-swaps the runtime engine so the next agent execution uses the new model.
     pub fn set_model(&self, model_id: &str) -> anyhow::Result<()> {
         {
             let mut cfg = self.config.write();
@@ -404,6 +848,7 @@ impl EngineApi {
             self.persist(&cfg)?;
         }
         tracing::info!(model = %model_id, "Default model updated in config");
+        self.rebuild_and_swap();
         Ok(())
     }
 
@@ -411,7 +856,7 @@ impl EngineApi {
     ///
     /// Stores the key via CredentialStore (→ ~/.oxi/auth.json) and also
     /// updates config.toml's `[engine].api_key` when the provider matches
-    /// the current default model.
+    /// the current default model. Hot-swaps the runtime engine afterward.
     pub fn set_api_key(&self, provider: &str, key: &str) -> anyhow::Result<()> {
         CredentialStore::store(provider, key)?;
 
@@ -428,17 +873,23 @@ impl EngineApi {
             }
         }
         tracing::info!(provider = %provider, "API key stored");
+        self.rebuild_and_swap();
         Ok(())
     }
 
     /// Update provider options in config.toml.
     ///
-    /// This is a placeholder for per-provider option persistence.
-    /// Currently stores the serialized options as a TOML section.
-    pub fn set_provider_options(&self, _opts: &oxi_sdk::ProviderOptions) -> anyhow::Result<()> {
-        // ProviderOptions are currently per-request, not persisted in config.toml.
-        // Future: add [engine.provider_options] section to OxiosConfig.
-        tracing::info!("Provider options update requested (no-op for now)");
+    /// Persists the options and makes them available for the next agent run.
+    /// They are passed through to `AgentLoopConfig::provider_options`.
+    pub fn set_provider_options(&self, opts: &oxi_sdk::ProviderOptions) -> anyhow::Result<()> {
+        {
+            let mut cfg = self.config.write();
+            cfg.engine.provider_options = Some(opts.clone());
+            self.persist(&cfg)?;
+        }
+        tracing::info!("Provider options updated and persisted");
+        // No engine rebuild needed — provider_options are per-request,
+        // picked up from config on the next agent run.
         Ok(())
     }
 
@@ -464,6 +915,7 @@ impl EngineApi {
             self.persist(&cfg)?;
         }
         tracing::info!("Routing configuration updated via API");
+        self.rebuild_and_swap();
         Ok(())
     }
 
@@ -540,6 +992,20 @@ impl EngineApi {
         std::fs::write(&self.config_path, content)?;
         Ok(())
     }
+
+    /// Rebuild `OxiosEngine` from current config and swap into the handle.
+    ///
+    /// This is cheap (~3μs): `OxiBuilder` populates registries from static
+    /// `model_db` data. No network calls, no I/O beyond what `CredentialStore`
+    /// already caches in memory.
+    fn rebuild_and_swap(&self) {
+        let cfg = self.config.read();
+        let model_id = &cfg.engine.default_model;
+        let new_engine =
+            crate::engine::OxiosEngine::from_config(model_id, cfg.api_key().as_deref());
+        drop(cfg);
+        self.engine_handle.swap(new_engine);
+    }
 }
 
 impl std::fmt::Debug for EngineApi {
@@ -569,17 +1035,116 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_provider_category_known() {
+        // Major
+        assert_eq!(provider_category("anthropic"), ProviderCategory::Major);
+        assert_eq!(provider_category("openai"), ProviderCategory::Major);
+        assert_eq!(provider_category("google"), ProviderCategory::Major);
+        // Open / specialty
+        assert_eq!(provider_category("groq"), ProviderCategory::Open);
+        assert_eq!(provider_category("opencode"), ProviderCategory::Open);
+        // Regional
+        assert_eq!(provider_category("minimax"), ProviderCategory::Regional);
+        assert_eq!(provider_category("moonshotai"), ProviderCategory::Regional);
+        assert_eq!(provider_category("kimi-coding"), ProviderCategory::Regional);
+        assert_eq!(provider_category("zai"), ProviderCategory::Regional);
+        assert_eq!(provider_category("minimax-cn"), ProviderCategory::Regional);
+        assert_eq!(provider_category("xiaomi"), ProviderCategory::Regional);
+    }
+
+    #[test]
+    fn test_provider_category_fallback() {
+        // Unknown ids fall back to Open, not panic.
+        assert_eq!(
+            provider_category("not-a-real-provider"),
+            ProviderCategory::Open
+        );
+        assert_eq!(provider_category(""), ProviderCategory::Open);
+    }
+
+    #[test]
+    fn test_provider_display_name_known() {
+        assert_eq!(provider_display_name("anthropic"), "Anthropic");
+        assert_eq!(provider_display_name("minimax"), "MiniMax");
+        assert_eq!(provider_display_name("moonshotai"), "Moonshot AI (Kimi)");
+        assert_eq!(provider_display_name("kimi-coding"), "Kimi Coding");
+        assert_eq!(provider_display_name("zai"), "Z.AI (GLM)");
+        assert_eq!(provider_display_name("opencode"), "OpenCode");
+        assert_eq!(provider_display_name("amazon-bedrock"), "Amazon Bedrock");
+    }
+
+    #[test]
+    fn test_provider_display_name_fallback() {
+        // Unknown ids get Title-Cased per segment as a fallback.
+        assert_eq!(
+            provider_display_name("some-new-provider"),
+            "Some New Provider"
+        );
+        assert_eq!(provider_display_name("kimi-coding"), "Kimi Coding");
+        assert_eq!(provider_display_name("some_id"), "Some Id");
+        // Empty string stays empty.
+        assert_eq!(provider_display_name(""), "");
+    }
+
+    #[test]
+    fn test_provider_meta_lookup_by_alias() {
+        // Aliases resolve to the same meta entry as the canonical id.
+        let by_id = provider_meta("github-copilot").unwrap();
+        let by_alias = provider_meta("copilot").unwrap();
+        assert_eq!(by_id.id, by_alias.id);
+
+        let bedrock_id = provider_meta("amazon-bedrock").unwrap();
+        let bedrock_alias = provider_meta("aws-bedrock").unwrap();
+        let bedrock_canonical = provider_meta("bedrock").unwrap();
+        assert_eq!(bedrock_id.id, bedrock_alias.id);
+        assert_eq!(bedrock_id.id, bedrock_canonical.id);
+    }
+
+    #[test]
+    fn test_provider_meta_unknown_is_none() {
+        assert!(provider_meta("not-a-real-provider").is_none());
+        assert!(provider_meta("").is_none());
+    }
+
+    #[test]
     fn test_provider_info_serialization() {
         let info = ProviderInfo {
             id: "anthropic".to_string(),
+            name: "Anthropic".to_string(),
+            category: ProviderCategory::Major,
             model_count: 15,
             has_key: true,
+            description: "Claude models with extended thinking".to_string(),
+            env_key: "ANTHROPIC_API_KEY".to_string(),
         };
         let json = serde_json::to_string(&info).unwrap();
+        // camelCase serialization
+        assert!(json.contains("\"modelCount\":15"));
+        assert!(json.contains("\"hasKey\":true"));
+        assert!(json.contains("\"envKey\":\"ANTHROPIC_API_KEY\""));
         let restored: ProviderInfo = serde_json::from_str(&json).unwrap();
         assert_eq!(restored.id, "anthropic");
+        assert_eq!(restored.name, "Anthropic");
         assert_eq!(restored.model_count, 15);
         assert!(restored.has_key);
+        assert_eq!(restored.env_key, "ANTHROPIC_API_KEY");
+    }
+
+    #[test]
+    fn test_provider_info_serialization_missing_optional() {
+        // description / env_key have serde(default) so old clients that
+        // omit them still deserialize cleanly.
+        let json = r#"{
+            "id": "anthropic",
+            "name": "Anthropic",
+            "category": "major",
+            "modelCount": 15,
+            "hasKey": true
+        }"#;
+        let info: ProviderInfo = serde_json::from_str(json).unwrap();
+        assert_eq!(info.id, "anthropic");
+        assert_eq!(info.description, "");
+        assert_eq!(info.env_key, "");
     }
 
     #[test]
@@ -587,18 +1152,24 @@ mod tests {
         let info = ModelInfo {
             id: "anthropic/claude-sonnet-4".to_string(),
             name: "Claude Sonnet 4".to_string(),
+            api: "anthropic-messages".to_string(),
             provider: "anthropic".to_string(),
             reasoning: true,
+            input: vec![InputModality::Text, InputModality::Image],
             context_window: 200000,
             max_tokens: 16000,
             cost_input: 3.0,
             cost_output: 15.0,
+            cost_cache_read: 0.3,
+            cost_cache_write: 3.75,
         };
         let json = serde_json::to_string(&info).unwrap();
         let restored: ModelInfo = serde_json::from_str(&json).unwrap();
         assert_eq!(restored.id, "anthropic/claude-sonnet-4");
         assert!(restored.reasoning);
         assert_eq!(restored.context_window, 200000);
+        assert!(restored.input.contains(&InputModality::Image));
+        assert_eq!(restored.api, "anthropic-messages");
     }
 
     #[test]

@@ -37,6 +37,19 @@ impl std::fmt::Display for Phase {
     }
 }
 
+/// Record of a single tool call during execution.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ToolCallRecord {
+    /// Tool name (e.g. "read", "bash", "grep").
+    pub tool: String,
+    /// Input parameters or invocation summary.
+    pub input: String,
+    /// Output or result summary.
+    pub output: String,
+    /// Duration of the tool call in milliseconds.
+    pub duration_ms: u64,
+}
+
 /// Result of executing a seed.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExecutionResult {
@@ -46,6 +59,9 @@ pub struct ExecutionResult {
     pub steps_completed: usize,
     /// Whether execution completed successfully.
     pub success: bool,
+    /// Tool calls recorded during execution.
+    #[serde(default)]
+    pub tool_calls: Vec<ToolCallRecord>,
 }
 
 /// The Ouroboros protocol trait.

@@ -28,17 +28,17 @@ export interface ModelInfo {
   /** Supported input modalities */
   input: InputModality[]
   /** Cost per million input tokens (USD) */
-  cost_input: number
+  costInput: number
   /** Cost per million output tokens (USD) */
-  cost_output: number
+  costOutput: number
   /** Cost per million cached read tokens (USD) */
-  cost_cache_read: number
+  costCacheRead: number
   /** Cost per million cached write tokens (USD) */
-  cost_cache_write: number
+  costCacheWrite: number
   /** Maximum context window in tokens */
-  context_window: number
+  contextWindow: number
   /** Maximum output tokens */
-  max_tokens: number
+  maxTokens: number
 }
 
 /** Provider category for grouping in the UI. */
@@ -53,9 +53,15 @@ export interface ProviderInfo {
   /** Category for grouping */
   category: ProviderCategory
   /** Whether an API key is detected (env or auth store) */
-  has_key: boolean
+  hasKey: boolean
   /** Number of available models */
-  model_count: number
+  modelCount: number
+  /** Short description for tooltips / help text. Optional for
+   *  forward-compatibility with older backends. */
+  description?: string
+  /** Primary environment variable name for the API key. Optional
+   *  for forward-compatibility with older backends. */
+  envKey?: string
 }
 
 /** API key source detection. */

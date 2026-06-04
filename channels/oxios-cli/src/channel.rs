@@ -201,4 +201,50 @@ impl CliChannelHandle {
     pub fn is_processing(&self) -> bool {
         self.processing.load(Ordering::Relaxed)
     }
+
+    /// Send a switch_model action to the gateway.
+    ///
+    /// The gateway detects the `action` metadata and routes to `EngineApi::set_model()`
+    /// instead of the orchestrator.
+    pub async fn send_switch_model(&self, model_id: &str) -> Result<()> {
+        let mut msg = IncomingMessage::new("cli", "cli-user", &format!("switch_model: {model_id}"));
+        msg.metadata.insert("action".to_owned(), "switch_model".to_owned());
+        msg.metadata.insert("model_id".to_owned(), model_id.to_owned());
+        {
+            let session = self.session.lock().unwrap_or_else(|e| {
+                tracing::error!("Mutex poisoned: {e}");
+                e.into_inner()
+            });
+            msg.metadata
+                .insert("session_id".to_owned(), session.id.to_string());
+        }
+        self.incoming_tx
+            .send(msg)
+            .await
+            .map_err(|e| anyhow::anyhow!("{e}"))?;
+        Ok(())
+    }
+
+    /// Send a switch_persona action to the gateway.
+    ///
+    /// The gateway detects the `action` metadata and routes to `PersonaApi::set_active()`
+    /// instead of the orchestrator.
+    pub async fn send_switch_persona(&self, persona_id: &str) -> Result<()> {
+        let mut msg = IncomingMessage::new("cli", "cli-user", &format!("switch_persona: {persona_id}"));
+        msg.metadata.insert("action".to_owned(), "switch_persona".to_owned());
+        msg.metadata.insert("persona_id".to_owned(), persona_id.to_owned());
+        {
+            let session = self.session.lock().unwrap_or_else(|e| {
+                tracing::error!("Mutex poisoned: {e}");
+                e.into_inner()
+            });
+            msg.metadata
+                .insert("session_id".to_owned(), session.id.to_string());
+        }
+        self.incoming_tx
+            .send(msg)
+            .await
+            .map_err(|e| anyhow::anyhow!("{e}"))?;
+        Ok(())
+    }
 }

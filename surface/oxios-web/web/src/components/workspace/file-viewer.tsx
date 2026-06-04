@@ -65,7 +65,7 @@ export function FileViewer({ path, content }: FileViewerProps) {
   return (
     <div
       ref={containerRef}
-      className="h-full w-full overflow-hidden rounded-md border"
+      className="h-full w-full overflow-hidden"
     />
   )
 }

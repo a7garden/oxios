@@ -10,7 +10,7 @@ export function SplitEditor({ filePath }: SplitEditorProps) {
   const writeFile = useWriteFile()
 
   return (
-    <div className="w-1/2 border-l flex flex-col">
+    <div className="w-1/2 min-w-[200px] border-l flex flex-col">
       <div className="px-4 py-2 text-sm font-medium border-b bg-muted/30 truncate">
         {filePath.split('/').pop()?.replace(/\.md$/, '')}
       </div>

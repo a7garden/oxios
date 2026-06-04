@@ -19,10 +19,12 @@ pub use a2a_api::A2aApi;
 pub use agent_api::AgentApi;
 pub use browser_api::BrowserApi;
 pub use engine_api::{
-    EngineApi, EngineConfigResponse, FallbackEvent, ModelInfo, ProviderInfo, RoutingConfigSnapshot,
-    RoutingStats, RoutingStatsSnapshot, RoutingUpdate, ValidateKeyResult,
+    EngineApi, EngineConfigResponse, FallbackEvent, InputModality, ModelInfo, ProviderCategory,
+    ProviderInfo, RoutingConfigSnapshot, RoutingStats, RoutingStatsSnapshot, RoutingUpdate,
+    ValidateKeyResult,
 };
 pub use exec_api::ExecApi;
+pub use exec_api::SharedExecConfig;
 pub use extension_api::ExtensionApi;
 pub use infra_api::InfraApi;
 pub use knowledge_lens::{
@@ -37,10 +39,8 @@ pub use state_api::StateApi;
 
 use crate::a2a::A2AProtocol;
 use crate::access_manager::AccessManager;
-use crate::audit_trail::AuditTrail;
 use crate::auth::AuthManager;
 use crate::budget::BudgetManager;
-use crate::clawhub::{ClawHubClient, ClawHubInstaller};
 use crate::config::OxiosConfig;
 use crate::cron::CronScheduler;
 use crate::event_bus::EventBus;
@@ -48,12 +48,15 @@ use crate::git_layer::CommitInfo;
 use crate::git_layer::GitLayer;
 use crate::mcp::McpBridge;
 use crate::memory::MemoryManager;
-use crate::persona_manager::PersonaManager;
+use crate::persona::PersonaManager;
 use crate::resource_monitor::ResourceMonitor;
 use crate::scheduler::AgentScheduler;
+use crate::skill::clawhub::{ClawHubClient, ClawHubInstaller};
+use crate::skill::skills_sh::{SkillsShClient, SkillsShInstaller};
 use crate::skill::SkillManager;
 use crate::state_store::StateStore;
 use crate::supervisor::Supervisor;
+use oxi_sdk::observability::AuditTrail;
 use serde::Serialize;
 use std::sync::Arc;
 use std::time::Instant;
@@ -208,7 +211,10 @@ impl KernelHandle {
                 start_time,
             ),
             projects: None,
-            exec: ExecApi::new(Arc::new(config.exec.clone()), access_manager),
+            exec: ExecApi::new(
+                Arc::new(parking_lot::RwLock::new(config.exec.clone())),
+                access_manager,
+            ),
             #[allow(clippy::default_trait_access)]
             browser: BrowserApi::default(),
             a2a: A2aApi::new(Arc::new(A2AProtocol::new(crate::EventBus::new(0)))),
@@ -216,6 +222,9 @@ impl KernelHandle {
                 Arc::new(parking_lot::RwLock::new(config.clone())),
                 std::path::PathBuf::from("~/.oxios/config.toml"),
                 Arc::new(RoutingStats::new()),
+                Arc::new(crate::engine::EngineHandle::new(Arc::new(
+                    crate::engine::OxiosEngine::new("anthropic/claude-sonnet-4-20250514"),
+                ))),
             ),
             knowledge,
             knowledge_lens,
@@ -229,6 +238,12 @@ impl KernelHandle {
                     ClawHubClient::new(config.marketplace.base_url.clone())
                         .expect("valid ClawHub client"),
                 ),
+                Arc::new(SkillsShInstaller::new(
+                    state_store.base_path.join("skills"),
+                    None,
+                    None,
+                )),
+                Arc::new(SkillsShClient::new(None, None).expect("valid Skills.sh client")),
             ),
         }
     }

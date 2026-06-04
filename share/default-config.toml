@@ -33,6 +33,11 @@ max_agents = 10
 host = "127.0.0.1"
 # Port for the web dashboard.
 port = 4200
+# Expose /api-docs (Swagger UI) and /openapi.json.
+# Gated to loopback binds (127.0.0.0/8, ::1, "localhost") for safety.
+# Set to true during local dev to inspect the OpenAPI schema.
+# Default: false (production-safe).
+# expose_api_docs = false
 
 [exec]
 # Default execution mode: "structured" (recommended) or "shell".

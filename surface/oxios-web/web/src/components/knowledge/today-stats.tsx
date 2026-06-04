@@ -20,14 +20,14 @@ export function TodayStats() {
       <CardHeader className="pb-2">
         <CardTitle className="text-sm flex items-center gap-2">
           <Activity className="h-4 w-4" />
-          Today
+          {t('knowledge.todayStats')}
         </CardTitle>
       </CardHeader>
       <CardContent>
         {doneCount > 0 ? (
           <div className="space-y-1">
             <p className="text-2xl font-bold">{doneCount}</p>
-            <p className="text-xs text-muted-foreground">items completed</p>
+            <p className="text-xs text-muted-foreground">{t('knowledge.itemsCompleted')}</p>
             {doneItems.length > 0 && (
               <ul className="mt-2 space-y-0.5">
                 {doneItems.slice(0, 5).map((item: unknown, i: number) => (
@@ -39,11 +39,11 @@ export function TodayStats() {
             )}
           </div>
         ) : (
-          <p className="text-sm text-muted-foreground">Nothing completed yet today</p>
+          <p className="text-sm text-muted-foreground">{t('knowledge.nothingCompletedToday')}</p>
         )}
         {report && Object.keys(report).length > 0 && (
           <details className="mt-3">
-            <summary className="text-xs text-muted-foreground cursor-pointer">Raw report</summary>
+            <summary className="text-xs text-muted-foreground cursor-pointer">{t('knowledge.rawReport')}</summary>
             <pre className="text-xs bg-muted p-2 rounded mt-1 overflow-x-auto">
               {JSON.stringify(report, null, 2)}
             </pre>

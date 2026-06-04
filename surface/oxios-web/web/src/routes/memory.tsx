@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { MemoryOverview } from '@/components/memory/memory-overview'
 import { MemoryBrowser } from '@/components/memory/memory-browser'
+import { MemoryMap } from '@/components/memory/memory-map'
 import { DreamPanel } from '@/components/memory/dream-panel'
 import { MemorySearch } from '@/components/memory/memory-search'
 import { MemoryDetail } from '@/components/memory/memory-detail'
@@ -40,6 +41,13 @@ function MemoryPage() {
             {t('memory.browse')}
           </TabsTrigger>
           <TabsTrigger
+            data-state={activeTab === 'map' ? 'active' : 'inactive'}
+            onClick={() => setActiveTab('map')}
+            data-testid="memory-tab-map"
+          >
+            {t('memory.map')}
+          </TabsTrigger>
+          <TabsTrigger
             data-state={activeTab === 'dream' ? 'active' : 'inactive'}
             onClick={() => setActiveTab('dream')}
           >
@@ -65,6 +73,11 @@ function MemoryPage() {
                 setDetailOpen(true)
               }}
             />
+          </TabsContent>
+        )}
+        {activeTab === 'map' && (
+          <TabsContent value="map">
+            <MemoryMap />
           </TabsContent>
         )}
         {activeTab === 'dream' && (

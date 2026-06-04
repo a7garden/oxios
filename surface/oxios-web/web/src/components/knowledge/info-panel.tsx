@@ -18,6 +18,9 @@ export function InfoPanel() {
 
   return (
     <div className="w-80 border-l bg-sidebar text-sidebar-foreground flex flex-col shrink-0 max-md:fixed max-md:inset-0 max-md:z-50 max-md:w-full max-md:border-l-0">
+      {/* Mobile backdrop */}
+      <div className="md:hidden fixed inset-0 bg-black/50 -z-10" onClick={toggleInfoPanel} />
+
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-2.5 border-b">
         <span className="text-sm font-medium">Info</span>

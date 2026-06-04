@@ -60,3 +60,30 @@ export interface SemanticSearchResult {
   score: number
   distance: number
 }
+
+// ── Map (RFC-T1-B) ──
+/** One memory neighbour edge on the map. */
+export interface MemoryMapNeighbor {
+  id: string
+  similarity: number
+}
+
+/** One node on the memory map (RFC-T1-B). */
+export interface MemoryMapEntry {
+  id: string
+  tier: string
+  mem_type: string
+  content_preview: string
+  created_at: string
+  access_count: number
+  coords_2d: [number, number]
+  top_neighbors: MemoryMapNeighbor[]
+}
+
+/** Response from GET /api/memory/map. */
+export interface MemoryMapResponse {
+  count: number
+  /** Cache epoch in 5-minute resolution. */
+  epoch: number
+  entries: MemoryMapEntry[]
+}

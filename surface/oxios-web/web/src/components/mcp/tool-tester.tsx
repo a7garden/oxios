@@ -3,6 +3,7 @@ import { useState, useMemo } from 'react'
 import { Play } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
+import { Select } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { useMcpServers, useMcpTools, useMcpCallTool } from '@/hooks/use-mcp'
 import type { McpTool } from '@/types/mcp'
@@ -65,39 +66,31 @@ export function ToolTester() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 max-w-3xl">
       {/* Server selector */}
       <div className="space-y-2">
         <Label>{t('mcp.servers', 'Server')}</Label>
-        <select
+        <Select
           value={selectedServer}
-          onChange={(e) => {
-            setSelectedServer(e.target.value)
+          onValueChange={(v) => {
+            setSelectedServer(v)
             setSelectedTool('')
           }}
-          className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-        >
-          <option value="">{t('common.selectPlaceholder', 'Select...')}</option>
-          {enabledServers.map((s) => (
-            <option key={s.name} value={s.name}>{s.name}</option>
-          ))}
-        </select>
+          placeholder={t('common.selectPlaceholder', 'Select...')}
+          options={enabledServers.map((s) => ({ label: s.name, value: s.name }))}
+        />
       </div>
 
       {/* Tool selector */}
       <div className="space-y-2">
         <Label>{t('mcp.tools', 'Tool')}</Label>
-        <select
+        <Select
           value={selectedTool}
-          onChange={(e) => setSelectedTool(e.target.value)}
-          disabled={!selectedServer}
-          className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50"
-        >
-          <option value="">{t('common.selectPlaceholder', 'Select...')}</option>
-          {serverTools.map((tool) => (
-            <option key={tool.name} value={tool.name}>{tool.name}</option>
-          ))}
-        </select>
+          onValueChange={setSelectedTool}
+          placeholder={t('common.selectPlaceholder', 'Select...')}
+          options={serverTools.map((tool) => ({ label: tool.name, value: tool.name }))}
+          className={!selectedServer ? 'pointer-events-none opacity-50' : ''}
+        />
       </div>
 
       {/* Tool description */}

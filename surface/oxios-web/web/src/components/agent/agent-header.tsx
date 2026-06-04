@@ -18,11 +18,11 @@ export function AgentHeader({ agent, onBack, children }: AgentHeaderProps) {
         <Button variant="ghost" size="icon" onClick={onBack} aria-label={t('common.back')}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <div className="flex-1">
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Bot className="h-6 w-6" /> {agent.name}
+        <div className="flex-1 min-w-0">
+          <h1 className="text-2xl font-bold flex items-center gap-2 truncate">
+            <Bot className="h-6 w-6 shrink-0" /> {agent.name}
           </h1>
-          <p className="text-muted-foreground font-mono text-xs">{agent.id}</p>
+          <p className="text-muted-foreground font-mono text-xs truncate">{agent.id}</p>
         </div>
         <StatusIndicator status={agent.status?.toLowerCase() ?? 'unknown'} />
         {children}
