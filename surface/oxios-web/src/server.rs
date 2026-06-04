@@ -33,6 +33,8 @@ pub struct AppState {
     /// Rate limiter for API endpoints.
     #[allow(dead_code)]
     pub rate_limiter: RateLimiter,
+    /// In-process cache for `/api/memory/map` 2D projections.
+    pub memory_map_cache: crate::routes::MemoryMapCache,
     /// Override web dist directory for auto-update UI. `None` = embedded only.
     pub web_dist: Option<PathBuf>,
 }

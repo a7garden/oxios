@@ -112,12 +112,12 @@ pub(crate) use system::{
     handle_update_run,
 };
 pub(crate) use workspace::{
-    handle_memory_create, handle_memory_get, handle_memory_list, handle_memory_search,
-    handle_memory_semantic_search, handle_seed_evolution, handle_seed_get, handle_seeds_list,
-    handle_skill_content, handle_skill_create, handle_skill_delete, handle_skill_disable,
-    handle_skill_enable, handle_skill_get, handle_skills_list, handle_workspace_file_create,
-    handle_workspace_file_delete, handle_workspace_file_get, handle_workspace_file_put,
-    handle_workspace_tree,
+    handle_memory_create, handle_memory_get, handle_memory_list, handle_memory_map,
+    handle_memory_search, handle_memory_semantic_search, handle_seed_evolution, handle_seed_get,
+    handle_seeds_list, handle_skill_content, handle_skill_create, handle_skill_delete,
+    handle_skill_disable, handle_skill_enable, handle_skill_get, handle_skills_list,
+    handle_workspace_file_create, handle_workspace_file_delete, handle_workspace_file_get,
+    handle_workspace_file_put, handle_workspace_tree, MemoryMapCache,
 };
 
 // ---------------------------------------------------------------------------
@@ -257,6 +257,7 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         .route("/api/memory", post(handle_memory_create))
         .route("/api/memory/search", post(handle_memory_search))
         .route("/api/memory/semantic", post(handle_memory_semantic_search))
+        .route("/api/memory/map", get(handle_memory_map))
         .route("/api/memory/{name}", get(handle_memory_get))
         // Scheduler stats & tasks
         .route("/api/scheduler/stats", get(handle_scheduler_stats))

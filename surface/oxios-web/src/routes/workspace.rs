@@ -798,6 +798,273 @@ pub(crate) async fn handle_memory_get(
 }
 
 // ---------------------------------------------------------------------------
+// Memory map (RFC-T1-B): 2D projection + neighbor edges
+// ---------------------------------------------------------------------------
+
+/// Cache for memory map projections. Keyed by a coarse epoch (5 minutes)
+/// plus the set of memory IDs, so a small memory mutation does not
+/// invalidate the cache for every call. The full cache is held in-process
+/// (no disk writes); the per-key TTL is short and the projection is
+/// cheap enough that we are happy to recompute on TTL expiry.
+#[derive(Default, Clone)]
+pub(crate) struct MemoryMapCache {
+    inner: std::sync::Arc<std::sync::Mutex<Option<MemoryMapCacheEntry>>>,
+}
+
+#[derive(Clone)]
+struct MemoryMapCacheEntry {
+    /// Epoch seconds (5-minute resolution).
+    epoch: u64,
+    /// Sorted ID list that was used to compute the projection.
+    ids: Vec<String>,
+    /// Pre-computed map entries (coords_2d + neighbors).
+    entries: Vec<oxios_kernel::memory::MemoryMapEntry>,
+}
+
+impl MemoryMapCache {
+    /// Try to get a cached entry. Returns `None` if the epoch is stale
+    /// or the ID set has changed.
+    fn get(&self, epoch: u64, ids: &[String]) -> Option<Vec<oxios_kernel::memory::MemoryMapEntry>> {
+        let guard = self.inner.lock().ok()?;
+        let entry = guard.as_ref()?;
+        if entry.epoch != epoch {
+            return None;
+        }
+        if entry.ids != ids {
+            return None;
+        }
+        Some(entry.entries.clone())
+    }
+
+    /// Store a fresh entry.
+    fn put(
+        &self,
+        epoch: u64,
+        ids: Vec<String>,
+        entries: Vec<oxios_kernel::memory::MemoryMapEntry>,
+    ) {
+        if let Ok(mut guard) = self.inner.lock() {
+            *guard = Some(MemoryMapCacheEntry {
+                epoch,
+                ids,
+                entries,
+            });
+        }
+    }
+}
+
+/// Query parameters for the memory map endpoint.
+#[derive(Debug, Deserialize)]
+pub(crate) struct MemoryMapQuery {
+    /// Optional tier filter.
+    #[serde(default)]
+    pub tier: Option<String>,
+    /// Optional memory type filter.
+    #[serde(default)]
+    pub mem_type: Option<String>,
+    /// Max entries to include (default 500, hard cap 2000).
+    #[serde(default)]
+    pub limit: Option<usize>,
+}
+
+/// 5-minute epoch for the memory map cache.
+const MEMORY_MAP_EPOCH_SECS: u64 = 300;
+
+/// GET /api/memory/map — 2D projection of memory entries for the Web UI map.
+///
+/// Returns one [`MemoryMapEntry`] per matching memory, with pre-computed
+/// 2D coordinates and top similar neighbors. The projection uses PCA
+/// over the in-memory TF-IDF vectors (see `embedding_viz`); results are
+/// cached in-process for 5 minutes per (epoch, id-set) tuple.
+pub(crate) async fn handle_memory_map(
+    state: State<Arc<AppState>>,
+    Query(params): Query<MemoryMapQuery>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    let limit = params.limit.unwrap_or(500).clamp(1, 2000);
+
+    // Load matching entries from state store. We deliberately bypass the
+    // in-memory vector index here because the index may not include
+    // entries that were stored by other channels (e.g. compaction).
+    let mut entries: Vec<MemoryEntry> = Vec::new();
+    for category in [
+        "memory/facts",
+        "memory/episodes",
+        "memory/knowledge",
+        "memory/sessions",
+        "memory/conversations",
+        "memory/skills",
+        "memory/preferences",
+        "memory/decisions",
+        "memory/profiles",
+    ] {
+        // Apply mem_type filter by category match.
+        if let Some(ref want) = params.mem_type {
+            let cat_short = category.split('/').nth(1).unwrap_or("");
+            if cat_short != want.as_str() {
+                continue;
+            }
+        }
+        let Ok(names) = state.kernel.state.list_category(category).await else {
+            continue;
+        };
+        for name in names {
+            if entries.len() >= limit {
+                break;
+            }
+            let Ok(Some(entry)) = state
+                .kernel
+                .state
+                .load::<MemoryEntry>(category, &name)
+                .await
+            else {
+                continue;
+            };
+            if let Some(ref want_tier) = params.tier {
+                let tier_str = match entry.tier {
+                    oxios_kernel::memory::MemoryTier::Hot => "hot",
+                    oxios_kernel::memory::MemoryTier::Warm => "warm",
+                    oxios_kernel::memory::MemoryTier::Cold => "cold",
+                };
+                if tier_str != want_tier.as_str() {
+                    continue;
+                }
+            }
+            entries.push(entry);
+        }
+        if entries.len() >= limit {
+            break;
+        }
+    }
+
+    // Cap again (in case we broke out of the inner loop early).
+    entries.truncate(limit);
+
+    // Compute 2D projection + neighbors.
+    let map_entries = compute_memory_map_entries(&state, &entries).await;
+
+    Ok(Json(serde_json::json!({
+        "count": map_entries.len(),
+        "epoch": current_epoch_secs() / MEMORY_MAP_EPOCH_SECS,
+        "entries": map_entries,
+    })))
+}
+
+/// Compute (or fetch from cache) the MemoryMapEntry list for a given
+/// set of MemoryEntry values.
+async fn compute_memory_map_entries(
+    state: &Arc<AppState>,
+    entries: &[MemoryEntry],
+) -> Vec<oxios_kernel::memory::MemoryMapEntry> {
+    use oxios_kernel::embedding::EmbeddingProvider;
+    use oxios_kernel::memory::{compute_pca_2d, compute_top_neighbors, MemoryMapEntry};
+
+    if entries.is_empty() {
+        return Vec::new();
+    }
+
+    let ids: Vec<String> = entries.iter().map(|e| e.id.clone()).collect();
+    let epoch = current_epoch_secs() / MEMORY_MAP_EPOCH_SECS;
+
+    // Cache lookup.
+    if let Some(cached) = state.memory_map_cache.get(epoch, &ids) {
+        return cached;
+    }
+
+    // Build embeddings via the kernel's TF-IDF provider. We collapse
+    // the term-frequency map to a sorted (term, weight) list, then
+    // encode as a sparse f32 vector keyed by term index for PCA.
+    let provider = oxios_kernel::embedding::TfIdfEmbeddingProvider;
+    let mut term_index: std::collections::HashMap<String, u32> =
+        std::collections::HashMap::new();
+    let mut tf_vecs: Vec<Vec<(u32, f32)>> = Vec::with_capacity(entries.len());
+    for entry in entries {
+        let Ok(emb) = provider.embed(&entry.content).await else {
+            tf_vecs.push(Vec::new());
+            continue;
+        };
+        let oxios_kernel::embedding::EmbeddingVector::Sparse(tf) = emb else {
+            // Dense vectors are also fine, but rare on the TF-IDF path.
+            tf_vecs.push(Vec::new());
+            continue;
+        };
+        let mut pairs: Vec<(u32, f32)> = tf
+            .into_iter()
+            .map(|(term, w)| {
+                let next = term_index.len() as u32;
+                let idx = *term_index.entry(term).or_insert(next);
+                (idx, w as f32)
+            })
+            .collect();
+        pairs.sort_by_key(|(idx, _)| *idx);
+        // De-duplicate by index (sum weights if a term somehow appears twice).
+        pairs.dedup_by_key(|(idx, _)| *idx);
+        tf_vecs.push(pairs);
+    }
+
+    // Convert sparse pairs to dense f32 vectors aligned to `term_index`.
+    let dim = term_index.len();
+    let dense: Vec<Vec<f32>> = tf_vecs
+        .iter()
+        .map(|pairs| {
+            let mut v = vec![0.0_f32; dim];
+            for (idx, w) in pairs {
+                if let Some(slot) = v.get_mut(*idx as usize) {
+                    *slot = *w;
+                }
+            }
+            v
+        })
+        .collect();
+
+    // Project to 2D and compute neighbor lists.
+    let coords = compute_pca_2d(&dense);
+    let top_n = compute_top_neighbors(&dense, &ids, 5, 0.7);
+
+    let map_entries: Vec<MemoryMapEntry> = entries
+        .iter()
+        .zip(coords.iter().zip(top_n.iter()))
+        .map(|(entry, (xy, nbrs))| MemoryMapEntry {
+            id: entry.id.clone(),
+            tier: match entry.tier {
+                oxios_kernel::memory::MemoryTier::Hot => "hot".into(),
+                oxios_kernel::memory::MemoryTier::Warm => "warm".into(),
+                oxios_kernel::memory::MemoryTier::Cold => "cold".into(),
+            },
+            mem_type: entry.memory_type.label().to_string(),
+            content_preview: content_preview(&entry.content, 120),
+            created_at: entry.created_at.to_rfc3339(),
+            access_count: entry.access_count,
+            coords_2d: *xy,
+            top_neighbors: nbrs.clone(),
+        })
+        .collect();
+
+    state
+        .memory_map_cache
+        .put(epoch, ids, map_entries.clone());
+
+    map_entries
+}
+
+/// Truncate content to a short preview suitable for hover tooltips.
+fn content_preview(content: &str, max_chars: usize) -> String {
+    let trimmed: String = content.chars().take(max_chars).collect();
+    if content.chars().count() > max_chars {
+        format!("{trimmed}\u{2026}")
+    } else {
+        trimmed
+    }
+}
+
+/// Current wall-clock time as Unix seconds.
+fn current_epoch_secs() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0)
+}
+
+// ---------------------------------------------------------------------------
 // Memory CRUD
 // ---------------------------------------------------------------------------
 
