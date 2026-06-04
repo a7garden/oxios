@@ -1,4 +1,4 @@
-# RFC-017: Memory Extraction Strategy — RFC-016 Phase B 완료
+# RFC-018: Memory Extraction Strategy — RFC-016 Phase B 완료
 
 > **날짜**: 2026-06-04
 > **상태**: ✅ 결정됨 — **옵션 (B) 단계적 추출, 9 sub-phases (b.1-b.9)**
@@ -149,8 +149,8 @@ git commit -m "refactor(memory): move chunking/normalizer/hyperbolic to oxios-me
 
 # 8. push + PR
 git push origin rfc-017-b1-chunking
-gh pr create --title "RFC-017 b.1: Move chunking/normalizer/hyperbolic to oxios-memory" \
-              --body "Implements RFC-017 §3 (b.1). See docs/rfc-017-memory-extraction-strategy.md"
+gh pr create --title "RFC-018 b.1: Move chunking/normalizer/hyperbolic to oxios-memory" \
+              --body "Implements RFC-018 §3 (b.1). See docs/rfc-018-memory-extraction-strategy.md"
 ```
 
 ### 3.4 검증 체크리스트 (PR 머지 전)
@@ -497,8 +497,8 @@ cargo test -p oxios-kernel --lib
 git add -A
 git commit -m "refactor(memory): move chunking/normalizer/hyperbolic to oxios-memory (b.1)"
 git push origin rfc-017-b1-chunking
-gh pr create --title "RFC-017 b.1: Move chunking/normalizer/hyperbolic to oxios-memory" \
-              --body "Implements RFC-017 §3 (b.1)"
+gh pr create --title "RFC-018 b.1: Move chunking/normalizer/hyperbolic to oxios-memory" \
+              --body "Implements RFC-018 §3 (b.1)"
 
 # 7. PR 머지 후 다음 단계로
 # b.1 → b.2 (embedding) → b.3 (root_index/quota) → ...
