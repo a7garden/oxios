@@ -219,6 +219,20 @@ impl HyperbolicEmbedding {
         }
     }
 
+    /// Build a `HyperbolicEmbedding` from pre-existing (id, vector) pairs.
+    ///
+    /// Useful for restoring from a serialized source (e.g. SQLite `dream_state`).
+    /// The vectors are stored as-is — call sites must ensure they were
+    /// previously projected to the Poincaré ball.
+    pub fn from_pairs(pairs: Vec<(String, Vec<f32>)>) -> Self {
+        // Default config; the actual curvature is encoded in the vectors
+        // themselves (they were projected to a specific ball).
+        Self {
+            config: HyperbolicConfig::default(),
+            embeddings: pairs,
+        }
+    }
+
     /// Create with default configuration.
     pub fn with_dimensions(dimensions: usize) -> Self {
         let config = HyperbolicConfig {
@@ -361,88 +375,11 @@ impl HyperbolicEmbedding {
     }
 
     // ── Phase 5: SQLite Persistence ────────────────────────────────
-
-    /// Build a HyperbolicEmbedding from memory entries in SQLite.
-    ///
-    /// Takes all memories, generates Euclidean embeddings via the
-    /// embedding provider, and converts to Poincaré ball coordinates.
-    /// Parent-child relationships are inferred from `related_ids`.
-    #[cfg(feature = "sqlite-memory")]
-    pub async fn build_from_sqlite(
-        store: &crate::memory::sqlite_store::SqliteMemoryStore,
-        config: HyperbolicConfig,
-    ) -> Self {
-        let mut he = Self::new(config);
-
-        // Load all memories
-        for mt in super::MemoryType::all() {
-            if let Ok(entries) = store.list(*mt, 10_000) {
-                for entry in entries {
-                    // Get the dense embedding from cache or compute
-                    if let Ok(Some(vec)) = store.get_query_vector(&entry.content).await {
-                        he.add(&entry.id, &vec);
-                    }
-                }
-            }
-        }
-
-        tracing::debug!(count = he.len(), "Built hyperbolic embedding from SQLite");
-        he
-    }
-
-    /// Persist hyperbolic embeddings to SQLite dream_state.
-    ///
-    /// Stores as JSON blob under key `hyperbolic_embeddings`.
-    #[cfg(feature = "sqlite-memory")]
-    pub fn persist_to_sqlite(
-        &self,
-        store: &crate::memory::sqlite_store::SqliteMemoryStore,
-    ) -> anyhow::Result<()> {
-        let data: Vec<(&String, &Vec<f32>)> =
-            self.embeddings.iter().map(|(id, v)| (id, v)).collect();
-        let json = serde_json::to_string(&data)?;
-
-        let conn = store.db().conn();
-        conn.execute(
-            "INSERT OR REPLACE INTO dream_state (key, value) VALUES ('hyperbolic_embeddings', ?1)",
-            rusqlite::params![json],
-        )?;
-
-        tracing::debug!(
-            count = self.len(),
-            "Hyperbolic embeddings persisted to SQLite"
-        );
-        Ok(())
-    }
-
-    /// Restore hyperbolic embeddings from SQLite dream_state.
-    #[cfg(feature = "sqlite-memory")]
-    pub fn restore_from_sqlite(
-        store: &crate::memory::sqlite_store::SqliteMemoryStore,
-        config: HyperbolicConfig,
-    ) -> anyhow::Result<Self> {
-        let conn = store.db().conn();
-        let json: Option<String> = conn
-            .query_row(
-                "SELECT value FROM dream_state WHERE key = 'hyperbolic_embeddings'",
-                [],
-                |row| row.get(0),
-            )
-            .ok();
-
-        let mut he = Self::new(config);
-        if let Some(data) = json {
-            if let Ok(pairs) = serde_json::from_str::<Vec<(String, Vec<f32>)>>(&data) {
-                he.embeddings = pairs;
-            }
-        }
-
-        tracing::debug!(
-            count = he.len(),
-            "Hyperbolic embeddings restored from SQLite"
-        );
-        Ok(he)
-    }
+    // *Moved to oxios-kernel::memory::hyperbolic_persist* (RFC-018 b.1).
+    // The cfg-gated sqlite-specific methods stay in kernel because they
+    // depend on `SqliteMemoryStore` (a kernel type). The pure-math core
+    // is in oxios-memory. See `oxios-kernel/src/memory/hyperbolic_persist.rs`
+    // for the kernel-side adapter with the same method signatures.
 
     /// Find memories near a query in hyperbolic space.
     ///

@@ -32,6 +32,7 @@ opt-level = 3
 resolver = "2"
 members = [
     "crates/oxios-mcp",
+    "crates/oxios-memory",
     "crates/oxios-kernel",
     "crates/oxios-markdown",
     "crates/oxios-ouroboros",
