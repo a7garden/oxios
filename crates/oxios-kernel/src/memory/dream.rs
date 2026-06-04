@@ -957,10 +957,12 @@ impl DreamProcess {
         self.rebuild_root_index().await?;
 
         // 8. Rebuild Hyperbolic Embeddings (Phase 5)
+        // RFC-018 b.1: hyperbolic core moved to oxios-memory; SQLite persistence
+        // is a kernel-side adapter (`hyperbolic_persist`).
         #[cfg(feature = "sqlite-memory")]
         if let Some(ref sqlite) = self.memory_manager.sqlite_store() {
-            let config = super::hyperbolic::HyperbolicConfig::default();
-            match super::hyperbolic::HyperbolicEmbedding::restore_from_sqlite(sqlite, config) {
+            let config = oxios_memory::memory::hyperbolic::HyperbolicConfig::default();
+            match super::hyperbolic_persist::restore_from_sqlite(sqlite, config) {
                 Ok(he) => {
                     let count = he.len();
                     if count < 10 {

@@ -702,7 +702,6 @@ mod auto_protect;
 mod quota;
 #[cfg(feature = "sqlite-memory")]
 pub mod cache;
-mod chunking;
 mod compaction;
 #[cfg(feature = "sqlite-memory")]
 pub mod database;
@@ -713,10 +712,10 @@ pub mod embedding_viz;
 pub mod flash_attention;
 mod graph;
 mod hnsw;
-pub mod hyperbolic;
+#[cfg(feature = "sqlite-memory")]
+pub mod hyperbolic_persist;
 #[cfg(feature = "sqlite-memory")]
 pub mod migration;
-pub mod normalizer;
 mod proactive;
 mod root_index;
 #[cfg(feature = "sqlite-memory")]
@@ -739,10 +738,8 @@ pub use embedding_viz::{compute_pca_2d, compute_top_neighbors, MemoryMapEntry, M
 pub use store::SemanticHit;
 
 // Re-export key types from sub-modules.
-pub use chunking::{chunk_fixed, chunk_paragraphs, ChunkConfig, TextChunk};
 pub use graph::MemoryGraph;
 pub use hnsw::HnswIndex;
-pub use normalizer::{cosine_similarity_f32, l2_normalize_f32, l2_normalize_f64};
 
 // ---------------------------------------------------------------------------
 // Tests
