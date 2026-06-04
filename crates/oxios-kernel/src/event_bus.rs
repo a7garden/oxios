@@ -15,6 +15,7 @@ use oxi_sdk::observability::{AuditAction, AuditTrail};
 use oxi_sdk::EventBus as SdkEventBus;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+use uuid::Uuid;
 
 use crate::types::AgentId;
 
@@ -220,6 +221,11 @@ pub enum KernelEvent {
         tool_name: String,
         /// Human-readable progress text (already-formatted by the tool).
         progress: String,
+        /// Tab that emitted this progress event, if the upstream tool tracks
+        /// tabs. `None` for tools that don't have a tab concept (e.g. legacy
+        /// oxi-agent versions that don't propagate `tab_id`).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        tab_id: Option<Uuid>,
     },
     /// Memory was recalled during agent execution (RFC-015).
     MemoryRecallUsed {
@@ -362,8 +368,11 @@ pub fn kernel_event_to_audit_action(event: &KernelEvent) -> AuditAction {
                 if *is_error { "error" } else { "ok" }
             ),
         },
-        KernelEvent::ToolExecutionProgress { tool_name, .. } => AuditAction::Other {
-            detail: format!("tool_progress:{tool_name}"),
+        KernelEvent::ToolExecutionProgress { tool_name, tab_id, .. } => AuditAction::Other {
+            detail: match tab_id {
+                Some(id) => format!("tool_progress:{tool_name}:tab={id}"),
+                None => format!("tool_progress:{tool_name}"),
+            },
         },
         KernelEvent::MemoryRecallUsed { query, count, .. } => AuditAction::MemoryRead {
             entry_id: format!("recall:{query}:{count}results"),
@@ -530,6 +539,7 @@ mod tests {
                 tool_call_id: "call_1".into(),
                 tool_name: "read_file".into(),
                 progress: "reading line 42/100".into(),
+                tab_id: None,
             },
             KernelEvent::MemoryRecallUsed {
                 session_id: "s1".into(),
@@ -565,6 +575,7 @@ mod tests {
             tool_call_id: "call_42".into(),
             tool_name: "browse".into(),
             progress: "loading https://example.com".into(),
+            tab_id: Some(Uuid::new_v4()),
         };
         let json = serde_json::to_string(&event).expect("serialize");
         let back: KernelEvent = serde_json::from_str(&json).expect("deserialize");
@@ -574,11 +585,13 @@ mod tests {
                 ref tool_call_id,
                 ref tool_name,
                 ref progress,
+                tab_id,
             } => {
                 assert_eq!(session_id, "s-abc");
                 assert_eq!(tool_call_id, "call_42");
                 assert_eq!(tool_name, "browse");
                 assert_eq!(progress, "loading https://example.com");
+                assert!(tab_id.is_some(), "tab_id should round-trip when present");
             }
             other => panic!("expected ToolExecutionProgress, got {other:?}"),
         }
@@ -586,22 +599,80 @@ mod tests {
 
     /// The audit-action mapping for tool progress should produce a stable,
     /// searchable detail string (used by the audit-trail UI to filter).
+    /// When `tab_id` is set, the detail includes `:tab=<id>`; when absent,
+    /// the original `tool_progress:<tool>` form is preserved (back-compat
+    /// for older oxi-agent versions that don't propagate tabs).
     #[test]
     fn test_tool_execution_progress_audit_action() {
-        let event = KernelEvent::ToolExecutionProgress {
+        let with_tab = KernelEvent::ToolExecutionProgress {
             session_id: "s1".into(),
             tool_call_id: "c1".into(),
             tool_name: "browse".into(),
             progress: "navigating".into(),
+            tab_id: Some(Uuid::new_v4()),
         };
-        let action = kernel_event_to_audit_action(&event);
-        match action {
+        match kernel_event_to_audit_action(&with_tab) {
             AuditAction::Other { detail } => {
                 assert!(detail.contains("tool_progress"), "detail: {detail}");
                 assert!(detail.contains("browse"), "detail: {detail}");
+                assert!(detail.contains(":tab="), "detail should include tab id: {detail}");
             }
             other => panic!("expected Other, got {other:?}"),
         }
+        let without_tab = KernelEvent::ToolExecutionProgress {
+            session_id: "s1".into(),
+            tool_call_id: "c1".into(),
+            tool_name: "browse".into(),
+            progress: "navigating".into(),
+            tab_id: None,
+        };
+        match kernel_event_to_audit_action(&without_tab) {
+            AuditAction::Other { detail } => {
+                assert_eq!(detail, "tool_progress:browse");
+            }
+            other => panic!("expected Other, got {other:?}"),
+        }
+    }
+
+    /// `tab_id` is optional in serde (`#[serde(default)]`) so older oxi-agent
+    /// versions that don't emit it still round-trip cleanly. This guards the
+    /// backwards-compat contract explicitly.
+    #[test]
+    fn test_tool_execution_progress_tab_id_optional_in_serde() {
+        // Simulate a payload from a legacy oxi-agent (no tab_id key).
+        // KernelEvent is externally tagged, so the variant is the JSON key.
+        let legacy_json = r#"{
+            "ToolExecutionProgress": {
+                "session_id": "s-old",
+                "tool_call_id": "call_legacy",
+                "tool_name": "browse",
+                "progress": "step 1"
+            }
+        }"#;
+        let event: KernelEvent = serde_json::from_str(legacy_json).expect("deserialize legacy");
+        match &event {
+            KernelEvent::ToolExecutionProgress {
+                session_id,
+                tool_call_id,
+                tool_name,
+                progress,
+                tab_id,
+            } => {
+                assert_eq!(session_id, "s-old");
+                assert_eq!(tool_call_id, "call_legacy");
+                assert_eq!(tool_name, "browse");
+                assert_eq!(progress, "step 1");
+                assert!(tab_id.is_none(), "missing field should default to None");
+            }
+            other => panic!("expected ToolExecutionProgress, got {other:?}"),
+        }
+        // And re-serialise — `skip_serializing_if = "Option::is_none"` keeps
+        // the wire format clean when downstream tools don't set tab_id.
+        let json = serde_json::to_string(&event).expect("serialize");
+        assert!(
+            !json.contains("tab_id"),
+            "tab_id should be omitted when None: {json}"
+        );
     }
 
     /// The agent_id extractor should map session-scoped RFC-015 events to
