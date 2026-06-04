@@ -26,6 +26,8 @@ import { autocompletion, type Completion, type CompletionContext, type Completio
 import { history, indentWithTab } from '@codemirror/commands'
 import { bracketMatching, defaultHighlightStyle, syntaxHighlighting } from '@codemirror/language'
 import { keymap } from '@codemirror/view'
+import { oneDark } from '@codemirror/theme-one-dark'
+import { mermaidExtension, mermaidDarkObserver } from '@/lib/mermaid-extension'
 import { EditorSelection } from '@codemirror/state'
 import { useKnowledgeTree } from '@/hooks/use-knowledge'
 import { buildAutocompleteDict, type FileEntry } from '@/lib/autocomplete-link'
@@ -349,7 +351,9 @@ export function MarkdownEditor({
           }),
           markdown({ base: markdownLanguage, codeLanguages: languages }),
           baseTheme,
-          ...(isDark ? [darkTheme] : []),
+          mermaidExtension,
+          mermaidDarkObserver,
+          ...(isDark ? [oneDark, darkTheme] : []),
         ]}
         theme={isDark ? 'dark' : 'light'}
         onChange={(value) => {
