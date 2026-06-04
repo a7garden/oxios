@@ -17,9 +17,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `KernelEvent::ToolExecutionProgress` gains `tab_id: Option<Uuid>` (optional in serde for back-compat with older oxi-agent that don't propagate `tab_id`).
   - `agent_runtime` forwards the `tab_id` from `AgentEvent::ToolExecutionUpdate` into the kernel event.
   - Audit-action detail string appends `:tab=<id>` when the tab is known.
+- **OxiBrowser Observability v0.12 — Phase 5 (tab-id propagation, web backend)** — The oxios-web chat transparency timeline now distinguishes concurrent tabs by id.
+  - The `tool_progress` WS chunk (and `/api/events` SSE event) include `tab_id` when the upstream `KernelEvent::ToolExecutionProgress` carries it. The field is omitted from the JSON payload when the upstream is `None` so older oxi-agent versions still round-trip cleanly.
 
 ### Changed
 - **Version bump to 1.0.4 (kernel)** — `oxios-kernel` bumped. Additive (new optional `tab_id` field on `KernelEvent::ToolExecutionProgress`); no API breaks.
+- **Version bump to 1.0.4 (web)** — `oxios-web` bumped. Additive (new optional `tab_id` on the `tool_progress` WS chunk and SSE event); no API breaks.
 
 ### Changed
 - **Memory extraction (RFC-018 b.1)** — `chunking`, `normalizer`, `hyperbolic` modules moved from `oxios-kernel::memory` to `oxios-memory::memory`. The pure-math core is now a leaf crate; the cfg-gated SQLite persistence methods for hyperbolic embeddings are kept in `oxios-kernel::memory::hyperbolic_persist` as a kernel-side adapter. See `docs/rfc-018-memory-extraction-strategy.md` §3.

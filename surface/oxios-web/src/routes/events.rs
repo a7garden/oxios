@@ -338,13 +338,20 @@ pub(crate) fn sanitize_event(event: &oxios_kernel::event_bus::KernelEvent) -> se
             tool_call_id,
             tool_name,
             progress,
-        } => serde_json::json!({
-            "type": "tool_progress",
-            "session_id": session_id,
-            "tool_call_id": tool_call_id,
-            "tool_name": tool_name,
-            "progress": progress,
-        }),
+            tab_id,
+        } => {
+            let mut obj = serde_json::json!({
+                "type": "tool_progress",
+                "session_id": session_id,
+                "tool_call_id": tool_call_id,
+                "tool_name": tool_name,
+                "progress": progress,
+            });
+            if let Some(id) = tab_id {
+                obj["tab_id"] = serde_json::json!(id.to_string());
+            }
+            obj
+        }
         KernelEvent::MemoryRecallUsed {
             session_id,
             query,

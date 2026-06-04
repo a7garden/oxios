@@ -747,13 +747,20 @@ fn kernel_event_to_ws_chunk(
             tool_call_id,
             tool_name,
             progress,
+            tab_id,
             ..
-        } => Some(serde_json::json!({
-            "type": "tool_progress",
-            "tool_call_id": tool_call_id,
-            "tool_name": tool_name,
-            "progress": progress,
-        })),
+        } => {
+            let mut obj = serde_json::json!({
+                "type": "tool_progress",
+                "tool_call_id": tool_call_id,
+                "tool_name": tool_name,
+                "progress": progress,
+            });
+            if let Some(id) = tab_id {
+                obj["tab_id"] = serde_json::json!(id.to_string());
+            }
+            Some(obj)
+        }
         KernelEvent::MemoryRecallUsed {
             query,
             count,
@@ -845,20 +852,25 @@ mod rfc015_tests {
 
     /// Real-time tool progress (RFC-015 v0.12) must be forwarded as a
     /// `tool_progress` chunk so the Web UI can show a spinner and the
-    /// latest progress text while the tool is still running.
+    /// latest progress text while the tool is still running. When the
+    /// upstream event carries a `tab_id`, it must be included in the
+    /// chunk so the frontend can badge concurrent tab activity.
     #[test]
     fn tool_progress_emits_tool_progress_chunk() {
+        let tab_id = uuid::Uuid::new_v4();
         let event = KernelEvent::ToolExecutionProgress {
             session_id: "s1".into(),
             tool_call_id: "c1".into(),
             tool_name: "browse".into(),
             progress: "loading https://example.com".into(),
+            tab_id: Some(tab_id),
         };
         let chunk = kernel_event_to_ws_chunk(&event, &Some("s1".into())).unwrap();
         assert_eq!(chunk["type"], "tool_progress");
         assert_eq!(chunk["tool_call_id"], "c1");
         assert_eq!(chunk["tool_name"], "browse");
         assert_eq!(chunk["progress"], "loading https://example.com");
+        assert_eq!(chunk["tab_id"], tab_id.to_string());
     }
 
     /// Progress events must be filtered by session_id, same as start/end.
@@ -869,9 +881,29 @@ mod rfc015_tests {
             tool_call_id: "c1".into(),
             tool_name: "browse".into(),
             progress: "leak me".into(),
+            tab_id: None,
         };
         let chunk = kernel_event_to_ws_chunk(&event, &Some("s1".into()));
         assert!(chunk.is_none(), "foreign progress should be filtered");
+    }
+
+    /// When `tab_id` is `None` (legacy oxi-agent versions), the chunk must
+    /// omit the `tab_id` key entirely so the frontend treats it as
+    /// "no badge" rather than rendering `null`.
+    #[test]
+    fn tool_progress_chunk_omits_tab_id_when_none() {
+        let event = KernelEvent::ToolExecutionProgress {
+            session_id: "s1".into(),
+            tool_call_id: "c1".into(),
+            tool_name: "browse".into(),
+            progress: "step 1".into(),
+            tab_id: None,
+        };
+        let chunk = kernel_event_to_ws_chunk(&event, &Some("s1".into())).unwrap();
+        assert!(
+            chunk.get("tab_id").is_none(),
+            "tab_id key should be absent when None; got: {chunk}"
+        );
     }
 
     #[test]
