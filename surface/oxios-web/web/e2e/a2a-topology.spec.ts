@@ -57,27 +57,50 @@ const TOPOLOGY = {
   ],
 }
 
+// Mirror the kernel's `A2AMessageLogEntry.from/to` storage: the log
+// records AgentId (UUID), not agent name. The backend's
+// `/api/a2a/messages` route transforms UUIDs to names via its
+// `name_map` before responding. The mock must do the same
+// transformation so the response shape mirrors the real wire format.
+const NAME_MAP: Record<string, string> = {
+  [AGENT_A.agent_id]: AGENT_A.name,
+  [AGENT_B.agent_id]: AGENT_B.name,
+}
+
+function nameOf(uuid: string): string {
+  return NAME_MAP[uuid] ?? uuid
+}
+
+const RAW_LOG_ENTRIES: Array<{
+  from: string
+  to: string
+  message_type: string
+  content: string
+}> = [
+  {
+    from: AGENT_A.agent_id,
+    to: AGENT_B.agent_id,
+    message_type: 'task_delegation',
+    content: 'Review the PR',
+  },
+  {
+    from: AGENT_B.agent_id,
+    to: AGENT_A.agent_id,
+    message_type: 'status_update',
+    content: '50% complete',
+  },
+]
+
 const MESSAGES = {
-  messages: [
-    {
-      request_id: 'req-1',
-      from_agent: 'agent-alpha',
-      to_agent: 'agent-beta',
-      message_type: 'task_delegation',
-      payload_summary: 'Review the PR',
-      accepted: true,
-      timestamp: new Date().toISOString(),
-    },
-    {
-      request_id: 'req-2',
-      from_agent: 'agent-beta',
-      to_agent: 'agent-alpha',
-      message_type: 'status_update',
-      payload_summary: '50% complete',
-      accepted: true,
-      timestamp: new Date().toISOString(),
-    },
-  ],
+  messages: RAW_LOG_ENTRIES.map((entry, i) => ({
+    request_id: `req-${i + 1}`,
+    from_agent: nameOf(entry.from),
+    to_agent: nameOf(entry.to),
+    message_type: entry.message_type,
+    payload_summary: entry.content,
+    accepted: true,
+    timestamp: new Date().toISOString(),
+  })),
 }
 
 async function mockA2aApi(page: Page) {
