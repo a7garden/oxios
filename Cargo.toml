@@ -34,7 +34,6 @@ members = [
     "crates/oxios-mcp",
     "crates/oxios-kernel",
     "crates/oxios-markdown",
-    "crates/oxios-memory",
     "crates/oxios-ouroboros",
     "crates/oxios-gateway",
     "surface/oxios-web",

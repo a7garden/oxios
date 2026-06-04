@@ -5465,16 +5465,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "oxios-memory"
-version = "1.0.2"
-dependencies = [
- "anyhow",
- "async-trait",
- "oxios-kernel",
- "serde_json",
-]
-
-[[package]]
 name = "oxios-ouroboros"
 version = "1.0.2"
 dependencies = [
