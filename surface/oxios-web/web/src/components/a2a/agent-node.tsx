@@ -1,51 +1,9 @@
 import { Bot, Power } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Handle, type NodeProps, Position } from 'reactflow'
+import { statusBorder, statusDot } from '@/components/shared/status-palette'
 import { cn } from '@/lib/utils'
 import type { TopologyNode } from '@/types/a2a'
-
-/** Color tone for the node border / pulse by agent status. */
-function statusBorder(status: string): string {
-  switch (status) {
-    case 'running':
-      return 'border-emerald-500'
-    case 'active':
-      return 'border-emerald-500'
-    case 'idle':
-      return 'border-amber-500'
-    case 'pending':
-      return 'border-amber-500'
-    case 'stopped':
-      return 'border-red-500'
-    case 'failed':
-      return 'border-destructive'
-    case 'error':
-      return 'border-destructive'
-    case 'starting':
-      return 'border-blue-500'
-    default:
-      return 'border-border'
-  }
-}
-
-function statusDot(status: string): string {
-  switch (status) {
-    case 'running':
-    case 'active':
-      return 'bg-emerald-500 animate-pulse'
-    case 'idle':
-    case 'pending':
-      return 'bg-amber-500'
-    case 'stopped':
-    case 'failed':
-    case 'error':
-      return 'bg-red-500'
-    case 'starting':
-      return 'bg-blue-500'
-    default:
-      return 'bg-zinc-400'
-  }
-}
 
 /** Human-readable "X seconds ago" / "X minutes ago" formatter. */
 function formatLastSeen(

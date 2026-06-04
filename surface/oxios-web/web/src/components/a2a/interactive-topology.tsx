@@ -17,6 +17,7 @@ import { Network } from 'lucide-react'
 import { EmptyState } from '@/components/shared/empty-state'
 import { ErrorState } from '@/components/shared/error-state'
 import { LoadingCards } from '@/components/shared/loading'
+import { statusColor } from '@/components/shared/status-palette'
 import type { TopologyEdge, TopologyNode } from '@/types/a2a'
 import { AgentNode, type AgentNodeData } from './agent-node'
 
@@ -32,26 +33,30 @@ interface Props {
   className?: string
 }
 
+// reactflow v11.11.4 chosen for React 19 compat (v12 / @xyflow/react not yet validated).
+// See RFC-T1-A §6.
 const nodeTypes = { agent: AgentNode }
 
 /**
- * Map message type to an OKLCH-friendly edge color.
- * These are stable across light/dark themes.
+ * Map message type to an OKLCH edge color via the `--color-message-*`
+ * CSS variables defined in `index.css`. Inline styles accept `var(...)`
+ * directly, so this stays in sync with the design system's OKLCH tokens
+ * (no raw hex, no Tailwind-class dynamic composition needed).
  */
 function edgeColor(kind: string): string {
   switch (kind) {
     case 'task_delegation':
-      return '#3b82f6' // blue
+      return 'var(--color-message-task)'
     case 'status_update':
-      return '#9ca3af' // gray
+      return 'var(--color-message-status)'
     case 'result_sharing':
-      return '#22c55e' // green
+      return 'var(--color-message-result)'
     case 'capability_query':
-      return '#a855f7' // purple
+      return 'var(--color-message-query)'
     case 'handshake':
-      return '#f59e0b' // amber
+      return 'var(--color-message-handshake)'
     default:
-      return '#94a3b8'
+      return 'var(--color-message-default)'
   }
 }
 
@@ -198,8 +203,8 @@ export function InteractiveTopology({
           <MiniMap
             pannable
             zoomable
-            nodeStrokeColor={(n) => edgeColor(String(n.data?.status ?? 'default'))}
-            nodeColor={(n) => edgeColor(String(n.data?.status ?? 'default'))}
+            nodeStrokeColor={(n) => statusColor(String(n.data?.status ?? 'default'))}
+            nodeColor={(n) => statusColor(String(n.data?.status ?? 'default'))}
             maskColor="rgba(0,0,0,0.08)"
             aria-label={t('a2a.graphMinimap')}
           />

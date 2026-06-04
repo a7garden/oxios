@@ -1,6 +1,7 @@
 import { Bot, ExternalLink, Power, Square, X } from 'lucide-react'
 import { useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
+import { statusDot } from '@/components/shared/status-palette'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -23,17 +24,6 @@ interface Props {
   onStopAgent?: (id: string) => void
   /** View-trace handler (placeholder — wired in a follow-up). */
   onViewTrace?: (id: string) => void
-}
-
-const STATUS_COLOR: Record<string, string> = {
-  running: 'bg-emerald-500',
-  active: 'bg-emerald-500',
-  idle: 'bg-amber-500',
-  pending: 'bg-amber-500',
-  stopped: 'bg-red-500',
-  failed: 'bg-destructive',
-  error: 'bg-destructive',
-  starting: 'bg-blue-500',
 }
 
 /**
@@ -70,18 +60,47 @@ export function AgentInspector({
     return () => document.removeEventListener('keydown', onKey)
   }, [open, onClose])
 
-  // Focus close button when opened
+  // Focus trap: apply `inert` to the rest of the page so Tab cycles
+  // inside the dialog instead of leaking out. The inspector is a
+  // fixed-position overlay (sibling of <main>), so toggling `inert`
+  // on <main> is sufficient — React 19's types support it natively.
   useEffect(() => {
+    const main = document.querySelector('main')
+    if (!main) return
     if (open) {
-      // Defer to allow the panel to mount/transition
-      const id = requestAnimationFrame(() => closeButtonRef.current?.focus())
-      return () => cancelAnimationFrame(id)
+      // Save the previous value so we can restore on close.
+      const prev = main.getAttribute('inert')
+      main.setAttribute('inert', '')
+      return () => {
+        if (prev === null) {
+          main.removeAttribute('inert')
+        } else {
+          main.setAttribute('inert', prev)
+        }
+      }
     }
+    return undefined
+  }, [open])
+
+  // Focus close button when opened.
+  // Skip if focus is already inside the panel (e.g. user clicked
+  // a tab in the tab switcher) to avoid stealing focus mid-task.
+  useEffect(() => {
+    if (!open) return
+    const id = requestAnimationFrame(() => {
+      const panel = panelRef.current
+      if (!panel) return
+      const alreadyInside = panel.contains(document.activeElement)
+      if (!alreadyInside) {
+        closeButtonRef.current?.focus()
+      }
+    })
+    return () => cancelAnimationFrame(id)
   }, [open])
 
   if (!node) return null
 
-  const dot = STATUS_COLOR[node.status] ?? 'bg-zinc-400'
+  const dot = statusDot(node.status)
   const capList = agentCard?.capabilities ?? node.capabilities ?? []
   const skillList = agentCard?.skills ?? node.skills ?? []
 
