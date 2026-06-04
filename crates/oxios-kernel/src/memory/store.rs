@@ -16,10 +16,10 @@ use crate::embedding::EmbeddingVector;
 
 use super::auto_protect::AutoProtector;
 use super::hnsw::HnswIndex;
-use super::normalizer::l2_normalize_f32;
 use super::{
     content_hash, dedup_by_id, extract_keywords, MemoryEntry, MemoryManager, MemoryTier, MemoryType,
 };
+use oxios_memory::l2_normalize_f32;
 
 // ---------------------------------------------------------------------------
 // VectorIndexSnapshot

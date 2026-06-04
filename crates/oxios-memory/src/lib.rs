@@ -1,54 +1,43 @@
-//! Oxios Memory — *facade* crate for the memory subsystem.
+//! Oxios Memory — math/text utilities and storage traits for agent memory.
 //!
-//! ## Status (2026-06-04)
+//! ## Status (RFC-018 b.1)
 //!
-//! This crate is a *facade* that:
-//! - **Re-exports** memory types from `oxios-kernel` (Phase B pending)
-//! - **Defines** storage abstraction traits (`MemoryStorage`, `MemoryGit`)
-//!   that `oxios-kernel` *will* implement when extraction is complete
+//! This crate holds memory-related modules extracted from `oxios-kernel`:
 //!
-//! The actual code still lives in `oxios-kernel`. Progressive extraction
-//! is tracked in [RFC-016].
+//! - **b.1 (current)**: `chunking`, `normalizer`, `hyperbolic` (math/text
+//!   utilities) and `storage` (storage abstraction traits).
+//! - **b.2+**: `embedding`, `root_index`, `quota`, `decay`, etc.
 //!
-//! [RFC-016]: https://github.com/a7garden/oxios/blob/main/docs/rfc-016-kernel-boundary-cleanup.md
+//! `oxios-kernel` depends on this crate (not the other way around) for
+//! the extracted modules. Remaining memory types (`MemoryManager`, etc.)
+//! stay in `oxios-kernel` until b.7.
 //!
 //! ## Usage
 //!
-//! Code that wants to use memory should depend on this crate rather
-//! than `oxios-kernel` directly:
-//!
 //! ```rust,ignore
-//! use oxios_memory::MemoryManager;  // re-exported from oxios-kernel
-//! use oxios_memory::MemoryStorage;   // defined here
+//! use oxios_memory::chunk_fixed;          // moved from oxios_kernel (b.1)
+//! use oxios_memory::HyperbolicEmbedding;   // moved from oxios_kernel (b.1)
+//! use oxios_memory::MemoryStorage;         // defined here
 //! ```
 
 #![warn(missing_docs)]
 
-// ─── Storage abstraction traits (canonical, in this crate) ──
+// ─── Memory subsystem modules (extracted from oxios-kernel) ──
 pub mod memory;
 
-// ─── Memory core types (re-exported from oxios-kernel) ───────
-pub use oxios_kernel::memory::{
-    AutoClassifier, ChunkConfig, CompactionTree, CurationCandidate, CurationReport,
-    DecayEngine, DreamCheckpoint, DreamProcess, DreamReport, HistoricalPeriod,
-    HnswIndex, HnswMemoryIndex, MemoryEntry, MemoryGraph, MemoryManager, MemoryTier,
-    MemoryType, ProactiveRecall, ProtectionLevel, RootEntry, RootIndex, SemanticHit,
-    TextChunk, TextVector, TopicEntry,
-    chunk_fixed, chunk_paragraphs, content_hash, cosine_similarity_f32,
-    l2_normalize_f32, l2_normalize_f64,
+// ─── Memory math/text utilities (RFC-018 b.1) ────────────────
+pub use crate::memory::hyperbolic::{
+    batch_euclidean_to_poincare, euclidean_to_poincare, hyperbolic_distance, mobius_add,
+    mobius_scalar_mul, HyperbolicConfig, HyperbolicEmbedding,
 };
-
-pub use oxios_kernel::memory::MemoryBudget;
-
-// Re-export storage traits from this crate's memory module
-pub use crate::memory::{MemoryGit, MemoryStorage};
-
-// ─── Embedding providers (re-exported) ────────────────────────
-pub use oxios_kernel::embedding::{
-    EmbeddingProvider, EmbeddingVector, TfIdfEmbeddingProvider,
-};
-
-// ─── Configuration types (re-exported) ───────────────────────
-pub use oxios_kernel::config::{
-    ConsolidationConfig, MemoryBridgeConfig, MemoryConfig, SqliteMemoryConfig,
+pub use crate::memory::{
+    chunk_fixed,
+    chunk_paragraphs,
+    cosine_similarity_f32,
+    l2_normalize_f32,
+    l2_normalize_f64, // normalizer
+    ChunkConfig,
+    MemoryGit,
+    MemoryStorage, // storage traits
+    TextChunk,     // chunking
 };

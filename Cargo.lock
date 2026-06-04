@@ -5397,6 +5397,7 @@ dependencies = [
  "oxios-gateway",
  "oxios-markdown",
  "oxios-mcp",
+ "oxios-memory",
  "oxios-ouroboros",
  "parking_lot",
  "regex",
@@ -5462,6 +5463,16 @@ dependencies = [
  "serde_json",
  "tokio",
  "tracing",
+]
+
+[[package]]
+name = "oxios-memory"
+version = "1.0.2"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

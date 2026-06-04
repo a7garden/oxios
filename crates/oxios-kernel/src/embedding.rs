@@ -43,7 +43,7 @@ impl EmbeddingVector {
                 dot / (na * nb)
             }
             (EmbeddingVector::DenseF32(a), EmbeddingVector::DenseF32(b)) => {
-                crate::memory::normalizer::cosine_similarity_f32(a, b) as f64
+                oxios_memory::cosine_similarity_f32(a, b) as f64
             }
             (EmbeddingVector::Dense(a), EmbeddingVector::DenseF32(b))
             | (EmbeddingVector::DenseF32(b), EmbeddingVector::Dense(a)) => {

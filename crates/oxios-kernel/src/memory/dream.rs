@@ -957,21 +957,16 @@ impl DreamProcess {
         self.rebuild_root_index().await?;
 
         // 8. Rebuild Hyperbolic Embeddings (Phase 5)
+        //
+        // TODO(oxios, rfc-018-b.8): Hyperbolic persistence/restore was
+        // removed from `oxios_memory::HyperbolicEmbedding` in b.1 because
+        // the methods took `SqliteMemoryStore` (a kernel type), which
+        // would create a cyclic dependency. The functionality returns
+        // in b.8 when `SqliteMemoryStore` itself moves. Until then,
+        // hyperbolic embeddings are rebuilt lazily on first use.
         #[cfg(feature = "sqlite-memory")]
-        if let Some(ref sqlite) = self.memory_manager.sqlite_store() {
-            let config = super::hyperbolic::HyperbolicConfig::default();
-            match super::hyperbolic::HyperbolicEmbedding::restore_from_sqlite(sqlite, config) {
-                Ok(he) => {
-                    let count = he.len();
-                    if count < 10 {
-                        tracing::debug!("Hyperbolic embeddings need rebuild (count < 10)");
-                    }
-                    tracing::debug!(count, "Hyperbolic embeddings loaded");
-                }
-                Err(e) => {
-                    tracing::debug!(error = %e, "Failed to restore hyperbolic embeddings (non-fatal)");
-                }
-            }
+        if self.memory_manager.sqlite_store().is_some() {
+            tracing::debug!("Hyperbolic embeddings persistence deferred to RFC-018 b.8");
         }
 
         // 9. Persist & auto-promote learning patterns (Phase 4: SONA)

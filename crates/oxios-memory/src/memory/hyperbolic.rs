@@ -361,88 +361,15 @@ impl HyperbolicEmbedding {
     }
 
     // ── Phase 5: SQLite Persistence ────────────────────────────────
-
-    /// Build a HyperbolicEmbedding from memory entries in SQLite.
-    ///
-    /// Takes all memories, generates Euclidean embeddings via the
-    /// embedding provider, and converts to Poincaré ball coordinates.
-    /// Parent-child relationships are inferred from `related_ids`.
-    #[cfg(feature = "sqlite-memory")]
-    pub async fn build_from_sqlite(
-        store: &crate::memory::sqlite_store::SqliteMemoryStore,
-        config: HyperbolicConfig,
-    ) -> Self {
-        let mut he = Self::new(config);
-
-        // Load all memories
-        for mt in super::MemoryType::all() {
-            if let Ok(entries) = store.list(*mt, 10_000) {
-                for entry in entries {
-                    // Get the dense embedding from cache or compute
-                    if let Ok(Some(vec)) = store.get_query_vector(&entry.content).await {
-                        he.add(&entry.id, &vec);
-                    }
-                }
-            }
-        }
-
-        tracing::debug!(count = he.len(), "Built hyperbolic embedding from SQLite");
-        he
-    }
-
-    /// Persist hyperbolic embeddings to SQLite dream_state.
-    ///
-    /// Stores as JSON blob under key `hyperbolic_embeddings`.
-    #[cfg(feature = "sqlite-memory")]
-    pub fn persist_to_sqlite(
-        &self,
-        store: &crate::memory::sqlite_store::SqliteMemoryStore,
-    ) -> anyhow::Result<()> {
-        let data: Vec<(&String, &Vec<f32>)> =
-            self.embeddings.iter().map(|(id, v)| (id, v)).collect();
-        let json = serde_json::to_string(&data)?;
-
-        let conn = store.db().conn();
-        conn.execute(
-            "INSERT OR REPLACE INTO dream_state (key, value) VALUES ('hyperbolic_embeddings', ?1)",
-            rusqlite::params![json],
-        )?;
-
-        tracing::debug!(
-            count = self.len(),
-            "Hyperbolic embeddings persisted to SQLite"
-        );
-        Ok(())
-    }
-
-    /// Restore hyperbolic embeddings from SQLite dream_state.
-    #[cfg(feature = "sqlite-memory")]
-    pub fn restore_from_sqlite(
-        store: &crate::memory::sqlite_store::SqliteMemoryStore,
-        config: HyperbolicConfig,
-    ) -> anyhow::Result<Self> {
-        let conn = store.db().conn();
-        let json: Option<String> = conn
-            .query_row(
-                "SELECT value FROM dream_state WHERE key = 'hyperbolic_embeddings'",
-                [],
-                |row| row.get(0),
-            )
-            .ok();
-
-        let mut he = Self::new(config);
-        if let Some(data) = json {
-            if let Ok(pairs) = serde_json::from_str::<Vec<(String, Vec<f32>)>>(&data) {
-                he.embeddings = pairs;
-            }
-        }
-
-        tracing::debug!(
-            count = he.len(),
-            "Hyperbolic embeddings restored from SQLite"
-        );
-        Ok(he)
-    }
+    //
+    // TODO(oxios, rfc-018-b.8): The `build_from_sqlite`, `persist_to_sqlite`,
+    // and `restore_from_sqlite` methods previously lived here. They have
+    // been removed in b.1 because they take `SqliteMemoryStore` (an
+    // oxios-kernel type) by reference, which would create a cyclic
+    // dependency. The functionality will be re-introduced in b.8 when
+    // `SqliteMemoryStore` itself moves to `oxios-memory`. Dream's call
+    // site in `oxios-kernel/src/memory/dream.rs` has been replaced with
+    // a no-op (see `// 8. Rebuild Hyperbolic Embeddings`).
 
     /// Find memories near a query in hyperbolic space.
     ///
