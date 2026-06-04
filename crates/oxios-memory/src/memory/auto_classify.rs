@@ -4,7 +4,7 @@
 //! Used when memories are stored without explicit type, and by
 //! Dream Phase 2 for re-classification.
 
-use super::MemoryType;
+use super::types::MemoryType;
 
 // ---------------------------------------------------------------------------
 // Pattern constants

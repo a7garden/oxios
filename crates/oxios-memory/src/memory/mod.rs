@@ -1,16 +1,22 @@
 //! Memory subsystem modules — extracted from `oxios-kernel` per RFC-018.
 //!
-//! - `chunking`     — Text splitting utilities (b.1)
-//! - `embedding`    — Embedding providers (TfIdf, GGUF) (b.2)
-//! - `hyperbolic`   — Poincaré ball model embeddings (b.1)
-//! - `normalizer`   — L2 normalization, cosine similarity (b.1)
-//! - `quota`        — Curation budgets and reports (b.3)
-//! - `root_index`   — ROOT index for O(1) topic lookup (b.3)
-//! - `storage`      — Storage abstraction traits (`MemoryStorage`, `MemoryGit`) (b.0)
-//! - `text_vector`  — TF-IDF text vector (b.2, supports embedding)
-//! - `types`        — Core data types (MemoryType, MemoryEntry, etc.) (b.3)
+//! - `auto_classify` — Auto memory type classification (b.4)
+//! - `auto_protect`  — Auto protection level computation (b.4)
+//! - `chunking`      — Text splitting utilities (b.1)
+//! - `decay`         — Ebbinghaus-inspired decay engine (b.4)
+//! - `embedding`     — Embedding providers (TfIdf, GGUF) (b.2)
+//! - `hyperbolic`    — Poincaré ball model embeddings (b.1)
+//! - `normalizer`    — L2 normalization, cosine similarity (b.1)
+//! - `quota`         — Curation budgets and reports (b.3)
+//! - `root_index`    — ROOT index for O(1) topic lookup (b.3)
+//! - `storage`       — Storage abstraction traits (`MemoryStorage`, `MemoryGit`) (b.0)
+//! - `text_vector`   — TF-IDF text vector (b.2, supports embedding)
+//! - `types`         — Core data types (MemoryType, MemoryEntry, etc.) (b.3)
 
+pub mod auto_classify;
+pub mod auto_protect;
 pub mod chunking;
+pub mod decay;
 pub mod embedding;
 pub mod hyperbolic;
 pub mod normalizer;
@@ -20,7 +26,10 @@ pub mod storage;
 pub mod text_vector;
 pub mod types;
 
+pub use auto_classify::AutoClassifier;
+pub use auto_protect::AutoProtector;
 pub use chunking::{chunk_fixed, chunk_paragraphs, ChunkConfig, TextChunk};
+pub use decay::DecayEngine;
 pub use embedding::{EmbeddingProvider, EmbeddingVector, TfIdfEmbeddingProvider};
 #[cfg(feature = "embedding-gguf")]
 pub use embedding::gguf::{EmbeddingDimension, GgufEmbeddingProvider, GgufModelLoader};

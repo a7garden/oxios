@@ -325,16 +325,16 @@ pub(crate) fn dedup_by_id(entries: &mut Vec<MemoryEntry>) {
 // ---------------------------------------------------------------------------
 // Sub-modules
 // ---------------------------------------------------------------------------
+//
+// `auto_classify`, `auto_protect`, `decay` moved to oxios-memory in
+// RFC-018 b.4. Re-exported below for back-compat.
 
-pub mod auto_classify;
 pub mod auto_memory_bridge;
-mod auto_protect;
 #[cfg(feature = "sqlite-memory")]
 pub mod cache;
 mod compaction;
 #[cfg(feature = "sqlite-memory")]
 pub mod database;
-mod decay;
 pub mod dream;
 pub mod embedding_cache;
 pub mod embedding_viz;
@@ -351,9 +351,7 @@ pub mod sona;
 pub mod sqlite_store;
 pub(crate) mod store;
 
-pub use auto_classify::AutoClassifier;
 pub use compaction::CompactionTree;
-pub use decay::DecayEngine;
 pub use dream::{DreamCheckpoint, DreamProcess, DreamReport};
 pub use proactive::ProactiveRecall;
 pub use proactive::RecallTiming;

@@ -152,7 +152,7 @@ pub use memory::flash_attention::{
     MemoryEstimate,
 };
 pub use memory::{
-    content_hash, AutoClassifier, CompactionTree, CurationCandidate, CurationReport, DecayEngine,
+    content_hash, CompactionTree,
     DreamCheckpoint, DreamProcess, DreamReport, HistoricalPeriod, HnswIndex, HnswMemoryIndex,
     MemoryBudget, MemoryEntry, MemoryGraph, MemoryManager, MemoryTier, MemoryType, ProactiveRecall,
     ProtectionLevel, RootEntry, RootIndex, SemanticHit, TopicEntry,

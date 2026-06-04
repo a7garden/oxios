@@ -18,10 +18,10 @@ use serde::{Deserialize, Serialize};
 use tokio::fs;
 use uuid::Uuid;
 
-use super::auto_classify::AutoClassifier;
-use super::auto_protect::AutoProtector;
 use super::compaction::CompactionTree;
-use super::decay::DecayEngine;
+use oxios_memory::memory::auto_classify::AutoClassifier;
+use oxios_memory::memory::auto_protect::AutoProtector;
+use oxios_memory::memory::decay::DecayEngine;
 use oxios_memory::memory::root_index::RootIndex;
 use super::{MemoryEntry, MemoryManager, MemoryTier, MemoryType, ProtectionLevel};
 
