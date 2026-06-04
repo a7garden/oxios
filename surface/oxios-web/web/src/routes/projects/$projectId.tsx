@@ -2,14 +2,13 @@ import { useState } from 'react'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import { ArrowLeft, Edit, Trash2 } from 'lucide-react'
-import { EmptyState } from '@/components/shared/empty-state'
 import { ErrorState } from '@/components/shared/error-state'
 import { LoadingCards } from '@/components/shared/loading'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
-import { useProject, useProjectMemories, useDeleteProject } from '@/hooks/use-projects'
+import { useProject, useProjectMemories } from '@/hooks/use-projects'
 import { EditProjectDialog } from '@/components/project/edit-project-dialog'
 import { DeleteProjectDialog } from '@/components/project/delete-project-dialog'
 import type { Project } from '@/types'
@@ -194,7 +193,6 @@ function ProjectDetailPage() {
   const { projectId } = Route.useParams()
 
   const { data: project, isLoading, isError, refetch } = useProject(projectId)
-  const deleteProject = useDeleteProject()
 
   const [showEdit, setShowEdit] = useState(false)
   const [showDelete, setShowDelete] = useState(false)

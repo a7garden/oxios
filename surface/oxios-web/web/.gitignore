@@ -2,7 +2,6 @@ node_modules/
 dist/
 *.local
 .routify/
-src/routeTree.gen.ts
 node_modules/hypermd
 playwright-report/
 test-results/

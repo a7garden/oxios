@@ -31,7 +31,7 @@ export function DeleteProjectDialog({ project, open, onOpenChange }: DeleteProje
         navigate({ to: '/projects' })
       },
       onError: (err) => {
-        toast(t('projects.deleteError', `Failed to delete: ${err}`), { variant: 'destructive' })
+        toast(t('projects.deleteError', `Failed to delete: ${err}`), 'destructive')
       },
     })
   }

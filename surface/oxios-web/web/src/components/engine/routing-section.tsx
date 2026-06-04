@@ -1,15 +1,12 @@
-import { Route } from '@tanstack/react-router'
 import { CircleX, Plus, RouteIcon, Zap } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import { Switch } from '@/components/ui/switch'
 import { useRoutingConfig, useSetRouting } from '@/hooks/use-engine'
-import { cn } from '@/lib/utils'
 import type { RoutingConfig } from '@/types/routing'
 
 // ─── Translation keys ─────────────────────────────────────────

@@ -10,13 +10,11 @@ import { cn } from '@/lib/utils'
 /** Backend: habit name → { dayOfYear → status } */
 type HabitMap = Record<string, Record<string, number>>
 
-const MOOD_COLORS = ['bg-zinc-300', 'bg-red-400', 'bg-amber-400', 'bg-yellow-400', 'bg-lime-400', 'bg-emerald-400']
-
 // ─── Helpers ──────────────────────────────────────────────────
 
 /** Get number of days in a year */
 function daysInYear(year: number): number {
-  return (year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0)) ? 366 : 365
+  return year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0) ? 366 : 365
 }
 
 /** Get day-of-year for a date */
@@ -28,7 +26,6 @@ function dayOfYear(date: Date): number {
 
 /** Get the ISO week number for a day-of-year */
 function weekOfYear(year: number, doy: number): number {
-  const date = new Date(year, 0, doy)
   const jan1 = new Date(year, 0, 1)
   const dayNum = jan1.getDay() // 0=Sun
   // Adjust: Monday = start of week
@@ -38,6 +35,28 @@ function weekOfYear(year: number, doy: number): number {
 
 /** Total weeks in the grid (53 covers all years) */
 const TOTAL_WEEKS = 53
+
+/** Colored dot representing a habit/mood status. */
+function StatusDot({ status, isMood }: { status: number; isMood: boolean }) {
+  let color = 'bg-muted/40'
+  if (status !== -1 && status !== undefined) {
+    if (isMood) {
+      const moodColors = [
+        'bg-zinc-300',
+        'bg-red-400',
+        'bg-amber-400',
+        'bg-yellow-400',
+        'bg-lime-400',
+        'bg-emerald-400',
+      ]
+      const level = Math.min(Math.max(status, 0), 5)
+      color = moodColors[level] ?? color
+    } else if (status > 0) {
+      color = 'bg-emerald-500/80'
+    }
+  }
+  return <span className={cn('inline-block h-2 w-2 rounded-full align-middle', color)} />
+}
 
 // ─── Year Grid (GitHub contribution graph style) ──────────────
 
@@ -105,7 +124,6 @@ function HabitYearGrid({
     }
 
     // Regular habit: completed
-    const date = new Date(year, 0, 1)
     // Check if weekend (simplified: we use the status from backend)
     return 'bg-emerald-500/80'
   }
@@ -171,16 +189,22 @@ function HabitYearGrid({
       </div>
 
       {/* Tooltip */}
-      {hoveredDay !== null && (() => {
-        const date = new Date(year, 0, hoveredDay)
-        const status = yearData[String(hoveredDay)]
-        const dateStr = date.toLocaleDateString(undefined, { month: 'long', day: 'numeric', weekday: 'short' })
-        return (
-          <div className="text-xs text-muted-foreground">
-            {dateStr}:{' '}{status === undefined ? '—' : <StatusDot status={status} isMood={isMood ?? false} />}
-          </div>
-        )
-      })()}
+      {hoveredDay !== null &&
+        (() => {
+          const date = new Date(year, 0, hoveredDay)
+          const status = yearData[String(hoveredDay)]
+          const dateStr = date.toLocaleDateString(undefined, {
+            month: 'long',
+            day: 'numeric',
+            weekday: 'short',
+          })
+          return (
+            <div className="text-xs text-muted-foreground">
+              {dateStr}:{' '}
+              {status === undefined ? '—' : <StatusDot status={status} isMood={isMood ?? false} />}
+            </div>
+          )
+        })()}
 
       {/* Month labels */}
       <div
@@ -196,10 +220,7 @@ function HabitYearGrid({
           const doy = dayOfYear(firstDay)
           const week = weekOfYear(year, doy)
           return (
-            <span
-              key={m}
-              style={{ gridColumn: `${week + 1} / span 3` }}
-            >
+            <span key={m} style={{ gridColumn: `${week + 1} / span 3` }}>
               {firstDay.toLocaleDateString(undefined, { month: 'short' })}
             </span>
           )
@@ -294,9 +315,7 @@ export function Habits() {
         <div className="text-center py-12">
           <BarChart3 className="h-8 w-8 text-muted-foreground mx-auto mb-3" />
           <p className="text-muted-foreground">{t('knowledge.noHabitData', { year })}</p>
-          <p className="text-xs text-muted-foreground mt-1">
-            {t('knowledge.trackHabitsHint')}
-          </p>
+          <p className="text-xs text-muted-foreground mt-1">{t('knowledge.trackHabitsHint')}</p>
         </div>
       )}
     </div>

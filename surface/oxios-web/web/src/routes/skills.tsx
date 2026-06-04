@@ -90,7 +90,7 @@ function SkillsPage() {
   // Skills.sh trending list (loaded when tab is open and source is skills-sh)
   const { data: skillsShTrending } = useQuery({
     queryKey: ['skills-sh', 'trending'],
-    queryFn: async () => { const r = await api.get<{ data: SkillsShSkill[] }>('/api/marketplace/skills-sh/list', { view: 'trending', per_page: 20 }); return r?.data ?? [] },
+    queryFn: async () => { const r = await api.get<{ data: SkillsShSkill[] }>('/api/marketplace/skills-sh/list', { view: 'trending', per_page: '20' }); return r?.data ?? [] },
     enabled: tab === 'marketplace' && mktSource === 'skills-sh',
     refetchOnWindowFocus: false,
     staleTime: 60_000,

@@ -1,7 +1,6 @@
 import { useRouterState } from '@tanstack/react-router'
 import { useEffect, useRef } from 'react'
 import { useKnowledgeStore } from '@/stores/knowledge'
-import { useMutation } from '@tanstack/react-query'
 import { api } from '@/lib/api-client'
 
 /**
@@ -24,11 +23,11 @@ import { api } from '@/lib/api-client'
 
 /** Stable write-file helper that doesn't change reference */
 function useStableWriteFile() {
-  const mutateRef = useRef<(path: string, content: string) => Promise<void>>()
+  const mutateRef = useRef<((path: string, content: string) => Promise<void>) | undefined>(undefined)
 
   // Recreate the mutator on each render (it's only called from the event handler via ref)
   mutateRef.current = async (path: string, content: string) => {
-    await api.put('/api/knowledge/files', { path, content }, { rawBody: content })
+    await api.put('/api/knowledge/files', { path, content })
   }
 
   return mutateRef
@@ -36,7 +35,7 @@ function useStableWriteFile() {
 
 /** Stable delete-file helper */
 function useStableDeleteFile() {
-  const mutateRef = useRef<(path: string) => Promise<void>>()
+  const mutateRef = useRef<((path: string) => Promise<void>) | undefined>(undefined)
 
   mutateRef.current = async (path: string) => {
     await api.delete(`/api/knowledge/files/${encodeURIComponent(path)}`)

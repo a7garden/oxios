@@ -28,10 +28,10 @@
  *    source the user typed. This is the same round-trip invariant
  *    HyperMD provided.
  */
+import type { Range } from '@codemirror/state'
 import {
   Decoration,
   EditorView,
-  MatchDecorator,
   ViewPlugin,
   type DecorationSet,
   type ViewUpdate,
@@ -94,7 +94,7 @@ class WikiLinkWidget extends WidgetType {
  * a clickable link.
  */
 function buildDecorations(view: EditorView): DecorationSet {
-  const builder: Decoration[] = []
+  const builder: Range<Decoration>[] = []
   const cursorLine = view.state.doc.lineAt(view.state.selection.main.head).number
   const minActive = Math.max(1, cursorLine - 1)
   const maxActive = Math.min(view.state.doc.lines, cursorLine + 1)
@@ -111,10 +111,10 @@ function buildDecorations(view: EditorView): DecorationSet {
       const endLine = view.state.doc.lineAt(matchEnd).number
       const crossesActive = startLine <= maxActive && endLine >= minActive
       if (crossesActive) continue
-      const target = m[1].trim()
+      const target = m[1]!.trim()
       // m[2] is the LAST alias group (regex backreference holds the last
       // iteration of the `*` group). If absent, fall back to target.
-      const display = (m[2] ?? m[1]).trim()
+      const display = (m[2] ?? m[1]!).trim()
       if (!target) continue
       builder.push(
         Decoration.replace({ widget: new WikiLinkWidget(target, display) }).range(

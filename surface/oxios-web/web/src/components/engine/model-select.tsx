@@ -12,7 +12,7 @@ function formatContextWindow(tokens: number): string {
   return String(tokens)
 }
 
-function formatCost(cost: number, t: (key: string) => string): string {
+function formatCost(cost: number): string {
   if (cost === 0) return 'Free'
   if (cost < 0.01) return '<$0.01'
   return `$${cost.toFixed(2)}`
@@ -152,8 +152,8 @@ function ModelRow({
         </div>
         <div className="flex items-center gap-3 mt-0.5 text-xs text-muted-foreground">
           <span>{formatContextWindow(model.contextWindow)} {t('engine.ctx')}</span>
-          <span>{t('engine.input')} {formatCost(model.costInput, t)}/M</span>
-          <span>{t('engine.output')} {formatCost(model.costOutput, t)}/M</span>
+          <span>{t('engine.input')} {formatCost(model.costInput)}/M</span>
+          <span>{t('engine.output')} {formatCost(model.costOutput)}/M</span>
         </div>
       </div>
     </button>

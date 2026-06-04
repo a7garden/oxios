@@ -224,7 +224,7 @@ export function DataTable<T>({
           {filterable?.map((f) => (
             <ColumnFilter
               key={String(f.key)}
-              columnKey={f.key}
+              columnKey={String(f.key)}
               label={columns.find((c) => {
                 const acc = c.accessor
                 return typeof acc !== 'function' && acc === f.key

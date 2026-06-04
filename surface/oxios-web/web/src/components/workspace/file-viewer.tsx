@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { EditorView, lineNumbers, highlightActiveLineGutter, highlightSpecialChars, drawSelection, highlightActiveLine } from '@codemirror/view'
+import { EditorView, lineNumbers, highlightActiveLineGutter, highlightSpecialChars, drawSelection } from '@codemirror/view'
 import { EditorState } from '@codemirror/state'
 import { syntaxHighlighting, defaultHighlightStyle, bracketMatching, foldGutter, indentOnInput } from '@codemirror/language'
 import { oneDark } from '@codemirror/theme-one-dark'

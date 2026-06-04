@@ -26,6 +26,7 @@
  *    show its own tokens until the next cursor move.
  */
 import { syntaxTree } from '@codemirror/language'
+import type { Range } from '@codemirror/state'
 import {
   Decoration,
   EditorView,
@@ -49,7 +50,7 @@ const MARKUP_NODE_NAMES = new Set([
 ])
 
 function buildDecorations(view: EditorView): DecorationSet {
-  const builder: Decoration[] = []
+  const builder: Range<Decoration>[] = []
   const tree = syntaxTree(view.state)
 
   // Determine the active region: the cursor's line and its neighbors.

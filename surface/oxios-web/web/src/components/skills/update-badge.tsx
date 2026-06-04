@@ -1,6 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
 import { ArrowUpCircle } from 'lucide-react'
-import { useTranslation } from 'react-i18next'
 import { Badge } from '@/components/ui/badge'
 import { api } from '@/lib/api-client'
 

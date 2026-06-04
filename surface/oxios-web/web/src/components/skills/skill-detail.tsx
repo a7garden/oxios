@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { Check, ExternalLink, X, Zap, CircleCheck, CircleAlert, CircleX } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import type { Skill, SkillFormat } from '@/types'
+import type { Skill, SkillFormat, SkillStatus } from '@/types'
 
 const FORMAT_META: Record<SkillFormat, { label: string; variant: 'default' | 'secondary' | 'outline'; description: string }> = {
   oxios: { label: 'Oxios', variant: 'default', description: 'Oxios native skill' },
@@ -13,7 +13,7 @@ const FORMAT_META: Record<SkillFormat, { label: string; variant: 'default' | 'se
   agent_skills: { label: 'Standard', variant: 'outline', description: 'Agent Skills standard' },
 }
 
-const STATUS_DISPLAY: Record<string, {  icon: React.ReactNode ; label: string; variant: 'success' | 'warning' | 'destructive' }> = {
+const STATUS_DISPLAY: Record<SkillStatus, {  icon: React.ReactNode ; label: string; variant: 'success' | 'warning' | 'destructive' }> = {
   ready: { icon: <CircleCheck className="h-3 w-3" />, label: 'ready', variant: 'success' },
   needs_setup: { icon: <CircleAlert className="h-3 w-3" />, label: 'needs-setup', variant: 'warning' },
   disabled: { icon: <CircleX className="h-3 w-3" />, label: 'disabled', variant: 'destructive' },

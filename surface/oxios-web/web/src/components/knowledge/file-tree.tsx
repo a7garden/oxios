@@ -13,7 +13,6 @@ interface FileTreeProps {
 }
 
 export function FileTree({ entries, onFileSelect, currentPath, parentPath = '' }: FileTreeProps) {
-  const { t } = useTranslation()
   return (
     <ul className="space-y-0.5">
       {entries.map((entry) => (
@@ -84,7 +83,7 @@ function FileTreeItem({ entry, parentPath, onFileSelect, currentPath, expandedDi
           <span className="truncate">{entry.name}</span>
         </button>
         {expanded && (
-          <SubDirectory dir={fullPath} onFileSelect={onFileSelect} currentPath={currentPath} expandedDirs={expandedDirs} toggleDir={toggleDir} />
+          <SubDirectory dir={fullPath} onFileSelect={onFileSelect} currentPath={currentPath} />
         )}
       </li>
     )
@@ -116,14 +115,10 @@ function SubDirectory({
   dir,
   onFileSelect,
   currentPath,
-  expandedDirs,
-  toggleDir,
 }: {
   dir: string
   onFileSelect: (path: string) => void
   currentPath: string | null
-  expandedDirs: Set<string>
-  toggleDir: (path: string) => void
 }) {
   const { data: entries, isLoading } = useKnowledgeTree(dir)
   const { t } = useTranslation()

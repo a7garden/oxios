@@ -8,7 +8,7 @@ interface FilterOption {
   value: string
 }
 
-interface ColumnFilterProps<T> {
+interface ColumnFilterProps {
   columnKey: string
   label: string
   options: FilterOption[]
@@ -16,12 +16,12 @@ interface ColumnFilterProps<T> {
   onChange: (selected: string[]) => void
 }
 
-export function ColumnFilter<T>({
+export function ColumnFilter({
   label,
   options,
   selected,
   onChange,
-}: ColumnFilterProps<T>) {
+}: ColumnFilterProps) {
   const { t } = useTranslation()
 
   return (

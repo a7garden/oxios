@@ -1,4 +1,4 @@
-import { Package, Check } from 'lucide-react'
+import { Check } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { Project } from '@/types'
 import { Button } from '@/components/ui/button'

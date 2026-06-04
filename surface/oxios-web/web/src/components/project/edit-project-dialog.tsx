@@ -68,7 +68,7 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess }: Ed
           onSuccess?.()
         },
         onError: (err) => {
-          toast(t('projects.updateError', `Failed to update: ${err}`), { variant: 'destructive' })
+          toast(t('projects.updateError', `Failed to update: ${err}`), 'destructive')
         },
       },
     )

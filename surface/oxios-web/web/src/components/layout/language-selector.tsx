@@ -3,8 +3,8 @@ import { Globe } from 'lucide-react'
 import { Select } from '@/components/ui/select'
 
 const languages = [
-  { code: 'en', label: 'English' },
-  { code: 'ko', label: '한국어' },
+  { value: 'en', label: 'English' },
+  { value: 'ko', label: '한국어' },
 ]
 
 export function LanguageSelector() {

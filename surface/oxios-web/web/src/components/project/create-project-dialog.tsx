@@ -86,7 +86,7 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
         onOpenChange(false)
       },
       onError: (err) => {
-        toast(t('projects.createError', `Failed to create project: ${err}`), { variant: 'destructive' })
+        toast(t('projects.createError', `Failed to create project: ${err}`), 'destructive')
       },
     })
   }
