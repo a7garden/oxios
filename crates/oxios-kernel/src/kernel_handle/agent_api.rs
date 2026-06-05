@@ -2,7 +2,7 @@
 
 use crate::budget::{BudgetExceeded, BudgetInfo, BudgetLimit, BudgetManager};
 use crate::event_bus::{EventBus, KernelEvent};
-use crate::memory::store::{HnswMemoryIndex, SemanticHit};
+use crate::{HnswMemoryIndex, SemanticHit};
 use crate::memory::{MemoryEntry, MemoryManager, MemoryType};
 use crate::supervisor::Supervisor;
 use crate::types::AgentId;

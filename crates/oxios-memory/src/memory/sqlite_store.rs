@@ -14,8 +14,9 @@ use chrono::Utc;
 
 use super::cache;
 use super::database::MemoryDatabase;
+use super::helpers::{content_hash, dedup_by_id};
 use super::search::{self, RankedMemory};
-use super::{content_hash, dedup_by_id, MemoryEntry, MemoryTier, MemoryType};
+use super::types::{MemoryEntry, MemoryTier, MemoryType};
 
 /// A learning pattern row from the `patterns` table.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -301,7 +302,7 @@ impl SqliteMemoryStore {
         }
 
         // Flash Attention re-ranking
-        let fa = oxios_memory::memory::flash_attention::FlashAttention::with_dimensions(query_vec.len());
+        let fa = crate::memory::flash_attention::FlashAttention::with_dimensions(query_vec.len());
 
         let queries = vec![query_vec.clone()];
         let keys: Vec<Vec<f32>> = candidate_vecs.iter().map(|(_, v)| v.clone()).collect();
@@ -385,7 +386,9 @@ impl SqliteMemoryStore {
         // Then check semantic similarity
         if let Ok(vec) = self.embedding.embed(content).await {
             if let Some(f32_vec) = vec.to_f32_dense() {
-                if let Ok(hits) = super::search::vector::search_vector(&self.db, &f32_vec, 5) {
+                if let Ok(hits) =
+                    crate::memory::search::vector::search_vector(&self.db, &f32_vec, 5)
+                {
                     for hit in hits {
                         if hit.distance < 0.05 {
                             return true;
@@ -409,7 +412,7 @@ impl SqliteMemoryStore {
 
     /// Run JSON → SQLite migration if needed.
     pub fn migrate_if_needed(&self, workspace_dir: &std::path::Path) -> Result<()> {
-        super::migration::migrate_json_to_sqlite(workspace_dir, &self.db)?;
+        crate::memory::migration::migrate_json_to_sqlite(workspace_dir, &self.db)?;
         Ok(())
     }
 
@@ -419,7 +422,7 @@ impl SqliteMemoryStore {
     ///
     /// Groups memories by `session_id` and links all co-accessed pairs.
     /// Returns a `MemoryGraph` ready for PageRank computation.
-    pub fn build_co_access_graph(&self) -> oxios_memory::memory::graph::MemoryGraph {
+    pub fn build_co_access_graph(&self) -> crate::memory::graph::MemoryGraph {
         let conn = self.db.conn();
 
         // Collect session_id -> [rowid] mappings
@@ -430,7 +433,7 @@ impl SqliteMemoryStore {
             .prepare("SELECT rowid, session_id FROM memories WHERE session_id IS NOT NULL")
         {
             Ok(s) => s,
-            Err(_) => return oxios_memory::memory::graph::MemoryGraph::new(),
+            Err(_) => return crate::memory::graph::MemoryGraph::new(),
         };
 
         let rows: Vec<(i64, String)> = match stmt.query_map([], |row| {
@@ -456,7 +459,7 @@ impl SqliteMemoryStore {
         }
 
         let session_vecs: Vec<Vec<u64>> = sessions.into_values().collect();
-        oxios_memory::memory::graph::MemoryGraph::from_co_access(&session_vecs)
+        crate::memory::graph::MemoryGraph::from_co_access(&session_vecs)
     }
 
     /// Compute PageRank-based importance scores for all memories.
@@ -717,7 +720,7 @@ impl SqliteMemoryStore {
 // Re-export search helper functions from sub-modules
 // ---------------------------------------------------------------------------
 
-use oxios_memory::EmbeddingProvider;
+use crate::EmbeddingProvider;
 
 /// Cosine similarity between two vectors.
 fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
@@ -732,11 +735,11 @@ fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
 }
 
 fn memory_insert_vector(db: &MemoryDatabase, rowid: i64, vector: &[f32]) -> anyhow::Result<()> {
-    super::search::vector::insert_vector(db, rowid, vector)
+    crate::memory::search::vector::insert_vector(db, rowid, vector)
 }
 
 fn memory_delete_vector(db: &MemoryDatabase, rowid: i64) -> anyhow::Result<()> {
-    super::search::vector::delete_vector(db, rowid)
+    crate::memory::search::vector::delete_vector(db, rowid)
 }
 
 // ---------------------------------------------------------------------------
@@ -747,7 +750,7 @@ fn memory_delete_vector(db: &MemoryDatabase, rowid: i64) -> anyhow::Result<()> {
 mod tests {
     use super::*;
     use crate::memory::{MemoryTier, ProtectionLevel};
-    use oxios_memory::TfIdfEmbeddingProvider;
+    use crate::TfIdfEmbeddingProvider;
 
     fn make_test_entry(id: &str, ty: MemoryType, content: &str) -> MemoryEntry {
         MemoryEntry {

@@ -13,7 +13,7 @@ use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use oxios_memory::{EmbeddingProvider, EmbeddingVector};
+use crate::{EmbeddingProvider, EmbeddingVector};
 
 // ---------------------------------------------------------------------------
 // Data types
@@ -383,7 +383,7 @@ impl SonaEngine {
     #[cfg(feature = "sqlite-memory")]
     pub fn persist_to_sqlite(
         &self,
-        store: &crate::SqliteMemoryStore as _;SqliteMemoryStore,
+        store: &crate::memory::sqlite_store::SqliteMemoryStore,
     ) -> anyhow::Result<()> {
         let patterns = self.learned_patterns.read();
         for pattern in patterns.iter() {
@@ -406,7 +406,7 @@ impl SonaEngine {
     #[cfg(feature = "sqlite-memory")]
     pub fn restore_from_sqlite(
         &self,
-        store: &crate::SqliteMemoryStore as _;SqliteMemoryStore,
+        store: &crate::memory::sqlite_store::SqliteMemoryStore,
     ) -> anyhow::Result<()> {
         let rows = store.load_patterns()?;
         let sona_rows: Vec<_> = rows.into_iter().filter(|r| r.strategy == "sona").collect();
@@ -434,7 +434,7 @@ impl SonaEngine {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use oxios_memory::TfIdfEmbeddingProvider;
+    use crate::TfIdfEmbeddingProvider;
 
     fn make_step(input: &str, output: &str) -> TrajectoryStep {
         TrajectoryStep {

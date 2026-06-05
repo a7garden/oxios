@@ -123,7 +123,7 @@ struct ExecuteState {
     /// Collected trajectory steps for SONA learning (RFC-020 Phase 2).
     /// Ordered by insertion — parallel tools get their final position
     /// resolved when they complete, preserving approximate execution order.
-    trajectory_steps: Vec<crate::memory::sona::TrajectoryStep>,
+    trajectory_steps: Vec<oxios_memory::memory::sona::TrajectoryStep>,
     /// Map of tool_call_id → (start instant, index into trajectory_steps).
     /// Used to correlate ToolExecutionEnd with the correct step when
     /// parallel tool calls complete out of order.
@@ -442,7 +442,7 @@ async fn run_agent(
     String,
     usize,
     bool,
-    Vec<crate::memory::sona::TrajectoryStep>,
+    Vec<oxios_memory::memory::sona::TrajectoryStep>,
     Arc<Agent>,
 )> {
     // Extract workspace.
@@ -687,7 +687,7 @@ async fn run_agent(
                     s.pending_tools
                         .insert(tool_call_id.clone(), (std::time::Instant::now(), idx));
                     s.trajectory_steps
-                        .push(crate::memory::sona::TrajectoryStep {
+                        .push(oxios_memory::memory::sona::TrajectoryStep {
                             input: tool_name.clone(),
                             output: String::new(),
                             duration_ms: 0,
@@ -868,11 +868,11 @@ async fn run_agent(
             let domain = infer_domain(&seed_goal);
             tokio::spawn(async move {
                 let verdict = if success {
-                    crate::memory::sona::Verdict::Success
+                    oxios_memory::memory::sona::Verdict::Success
                 } else {
-                    crate::memory::sona::Verdict::Failure
+                    oxios_memory::memory::sona::Verdict::Failure
                 };
-                let trajectory = crate::memory::sona::Trajectory::new(steps, verdict, &domain);
+                let trajectory = oxios_memory::memory::sona::Trajectory::new(steps, verdict, &domain);
                 if let Err(e) = sona.record(trajectory).await {
                     tracing::debug!(error = %e, "SONA trajectory recording failed (non-fatal)");
                 }

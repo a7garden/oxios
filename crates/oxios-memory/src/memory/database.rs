@@ -324,56 +324,6 @@ impl MemoryDatabase {
             .unwrap_or(false)
     }
 
-    // ── Project operations (RFC-011) ──────────────────────────
-
-    /// Save a project (insert or replace).
-    pub fn save_project(&self, project: &crate::project::Project) -> Result<()> {
-        let conn = self.conn();
-        conn.execute(
-            "INSERT OR REPLACE INTO projects
-             (id, name, description, paths, tags, emoji, source, memory_visible, created_at, updated_at, last_active_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
-            rusqlite::params![
-                project.id.to_string(),
-                project.name,
-                project.description,
-                serde_json::to_string(&project.paths)?,
-                serde_json::to_string(&project.tags)?,
-                project.emoji,
-                project.source.to_string(),
-                project.memory_visible as i32,
-                project.created_at.to_rfc3339(),
-                project.updated_at.to_rfc3339(),
-                project.last_active_at.to_rfc3339(),
-            ],
-        )?;
-        Ok(())
-    }
-
-    /// List all projects.
-    pub fn list_projects(&self) -> Result<Vec<crate::project::Project>> {
-        let conn = self.conn();
-        let mut stmt = conn.prepare(
-            "SELECT id, name, description, paths, tags, emoji, source, memory_visible,
-                    created_at, updated_at, last_active_at
-             FROM projects ORDER BY name",
-        )?;
-        let rows = stmt.query_map([], row_to_project)?;
-        rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
-    }
-
-    /// Delete a project by ID.
-    pub fn delete_project(&self, id: &str) -> Result<()> {
-        let conn = self.conn();
-        // Delete junction entries first
-        conn.execute(
-            "DELETE FROM project_memory WHERE project_id = ?1",
-            rusqlite::params![id],
-        )?;
-        conn.execute("DELETE FROM projects WHERE id = ?1", rusqlite::params![id])?;
-        Ok(())
-    }
-
     /// Link a memory to a project.
     pub fn link_project_memory(&self, project_id: &str, memory_id: &str) -> Result<()> {
         let conn = self.conn();
@@ -425,63 +375,6 @@ pub fn bytes_to_f32_slice(bytes: &[u8]) -> Vec<f32> {
             f32::from_le_bytes(arr)
         })
         .collect()
-}
-
-/// Convert a SQLite row into a Project struct.
-fn row_to_project(row: &rusqlite::Row<'_>) -> rusqlite::Result<crate::project::Project> {
-    use crate::project::{Project, ProjectSource};
-    use chrono::{DateTime, Utc};
-    use std::path::PathBuf;
-
-    let id_str: String = row.get(0)?;
-    let name: String = row.get(1)?;
-    let description: String = row.get::<_, Option<String>>(2)?.unwrap_or_default();
-    let paths_str: String = row
-        .get::<_, Option<String>>(3)?
-        .unwrap_or_else(|| "[]".to_string());
-    let tags_str: String = row
-        .get::<_, Option<String>>(4)?
-        .unwrap_or_else(|| "[]".to_string());
-    let emoji: String = row
-        .get::<_, Option<String>>(5)?
-        .unwrap_or_else(|| "📦".to_string());
-    let source_str: String = row
-        .get::<_, Option<String>>(6)?
-        .unwrap_or_else(|| "manual".to_string());
-    let memory_visible: bool = row.get::<_, Option<i32>>(7)?.unwrap_or(1) != 0;
-    let created_at: String = row.get(8)?;
-    let updated_at: String = row.get(9)?;
-    let last_active_at: String = row.get(10)?;
-
-    let id = uuid::Uuid::parse_str(&id_str).map_err(|e| {
-        rusqlite::Error::FromSqlConversionFailure(0, rusqlite::types::Type::Text, Box::new(e))
-    })?;
-    let paths: Vec<PathBuf> = serde_json::from_str(&paths_str).unwrap_or_default();
-    let tags: Vec<String> = serde_json::from_str(&tags_str).unwrap_or_default();
-    let source = match source_str.as_str() {
-        "auto_detected" => ProjectSource::AutoDetected,
-        _ => ProjectSource::Manual,
-    };
-
-    Ok(Project {
-        id,
-        name,
-        description,
-        paths,
-        tags,
-        emoji,
-        source,
-        memory_visible,
-        created_at: created_at
-            .parse::<DateTime<Utc>>()
-            .unwrap_or_else(|_| Utc::now()),
-        updated_at: updated_at
-            .parse::<DateTime<Utc>>()
-            .unwrap_or_else(|_| Utc::now()),
-        last_active_at: last_active_at
-            .parse::<DateTime<Utc>>()
-            .unwrap_or_else(|_| Utc::now()),
-    })
 }
 
 // ---------------------------------------------------------------------------
@@ -739,5 +632,34 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let backup_path = dir.path().join("backup.db");
         assert!(db.backup(&backup_path).is_err());
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// Project-Memory junction (RFC-011) — DEFERRED to a later PR
+//
+// `Project` is a kernel-side type that cannot be referenced from
+// `oxios-memory` (would create a cyclic dep). The methods below
+// are stubs that return errors. The kernel's project manager
+// should fall back to using the JSON StateStore for Project
+// persistence until a follow-up PR re-implements the junction.
+// ─────────────────────────────────────────────────────────────────
+
+impl MemoryDatabase {
+    /// Save a project — DEFERRED. Returns an error.
+    pub fn save_project(&self, _project_json: &serde_json::Value) -> Result<()> {
+        Err(anyhow::anyhow!(
+            "Project-Memory junction is deferred; use JSON StateStore for now"
+        ))
+    }
+
+    /// List projects — DEFERRED. Returns an empty list.
+    pub fn list_projects(&self) -> Result<Vec<serde_json::Value>> {
+        Ok(Vec::new())
+    }
+
+    /// Delete a project — DEFERRED. Returns Ok.
+    pub fn delete_project(&self, _id: &str) -> Result<()> {
+        Ok(())
     }
 }

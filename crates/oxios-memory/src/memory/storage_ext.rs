@@ -6,8 +6,8 @@
 //! `storage.save_typed(&entry).await?` without manual JSON conversion.
 
 use anyhow::Result;
-use serde::Serialize;
 use serde::de::DeserializeOwned;
+use serde::Serialize;
 
 use crate::memory::storage::MemoryStorage;
 
@@ -23,11 +23,8 @@ pub trait MemoryStorageExt {
     ) -> Result<()>;
 
     /// Load a typed value from storage.
-    async fn load_typed<T: DeserializeOwned>(
-        &self,
-        category: &str,
-        key: &str,
-    ) -> Result<Option<T>>;
+    async fn load_typed<T: DeserializeOwned>(&self, category: &str, key: &str)
+        -> Result<Option<T>>;
 }
 
 impl<T: MemoryStorage + ?Sized> MemoryStorageExt for T {

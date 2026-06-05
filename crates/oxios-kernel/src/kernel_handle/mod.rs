@@ -3,13 +3,13 @@
 pub mod a2a_api;
 pub mod agent_api;
 pub mod engine_api;
-pub mod memory_api;
 pub mod exec_api;
 pub mod extension_api;
 pub mod infra_api;
 pub mod knowledge_lens;
 pub mod marketplace_api;
 pub mod mcp_api;
+pub mod memory_api;
 pub mod persona_api;
 pub mod project_api;
 pub mod security_api;
@@ -17,7 +17,6 @@ pub mod state_api;
 
 pub use a2a_api::A2aApi;
 pub use agent_api::AgentApi;
-pub use memory_api::MemoryApi;
 pub use engine_api::{
     EngineApi, EngineConfigResponse, FallbackEvent, InputModality, ModelInfo, ProviderCategory,
     ProviderInfo, RoutingConfigSnapshot, RoutingStats, RoutingStatsSnapshot, RoutingUpdate,
@@ -32,6 +31,7 @@ pub use knowledge_lens::{
 };
 pub use marketplace_api::MarketplaceApi;
 pub use mcp_api::McpApi;
+pub use memory_api::MemoryApi;
 pub use persona_api::PersonaApi;
 pub use project_api::{ProjectApi, ProjectInfo};
 pub use security_api::SecurityApi;

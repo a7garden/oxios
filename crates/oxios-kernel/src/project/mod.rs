@@ -1,4 +1,3 @@
-
 //! Project module: work context management.
 //!
 //! Replaces the Space system with a project-centric model:

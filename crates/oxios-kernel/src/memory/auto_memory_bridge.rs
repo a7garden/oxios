@@ -307,7 +307,7 @@ impl AutoMemoryBridge {
     #[cfg(feature = "sqlite-memory")]
     pub async fn sync_sqlite_to_auto(
         &self,
-        store: &crate::memory::sqlite_store::SqliteMemoryStore,
+        store: &oxios_memory::memory::sqlite_store::SqliteMemoryStore,
     ) -> Result<ExportResult> {
         let rows = store.load_patterns()?;
         if rows.is_empty() {
@@ -341,7 +341,7 @@ impl AutoMemoryBridge {
     #[cfg(feature = "sqlite-memory")]
     pub async fn sync_auto_to_sqlite(
         &self,
-        store: &crate::memory::sqlite_store::SqliteMemoryStore,
+        store: &oxios_memory::memory::sqlite_store::SqliteMemoryStore,
     ) -> Result<ImportResult> {
         let import_result = self.import_from_auto().await?;
 

@@ -150,8 +150,7 @@ pub use memory::auto_memory_bridge::{
 // flash_attention + compaction + graph moved to oxios-memory in RFC-018 b.5.
 // Re-exported below from oxios_memory for back-compat.
 pub use memory::{
-    content_hash, DreamCheckpoint, DreamProcess, DreamReport, HnswIndex, HnswMemoryIndex,
-    MemoryManager, ProactiveRecall, SemanticHit,
+    content_hash, DreamCheckpoint, DreamProcess, DreamReport,
 };
 
 // ─── Memory core types (extracted to oxios-memory, RFC-018 b.1) ───
@@ -162,22 +161,29 @@ pub use oxios_memory::{
     euclidean_to_poincare, hyperbolic_distance, l2_normalize_f32, l2_normalize_f64, mobius_add,
     mobius_scalar_mul, ChunkConfig, HyperbolicConfig, HyperbolicEmbedding, TextChunk, TextVector,
 };
+pub use oxios_memory::memory::{
+    AutoClassifier, AutoProtector, CompactionTree, CurationCandidate, CurationReport,
+    DecayEngine, HnswIndex, HnswMemoryIndex, MemoryBudget, MemoryEntry, MemoryManager, MemoryTier,
+    MemoryType, ProtectionLevel, RecallTiming, RootEntry, RootIndex, SemanticHit, SonaEngine,
+    TopicEntry,
+};
 // ─── Embedding providers (RFC-018 b.2) ─────────────────────────────
 #[cfg(feature = "embedding-gguf")]
 pub use oxios_memory::memory::embedding::gguf::{EmbeddingDimension, GgufEmbeddingProvider, GgufModelLoader};
 pub use oxios_memory::{EmbeddingProvider, EmbeddingVector, TfIdfEmbeddingProvider};
 
 // ─── SQLite Memory (RFC-012) ────────────────────────────────────────
+// All SQLite types moved to oxios-memory in RFC-018 b.7.
 #[cfg(feature = "sqlite-memory")]
-pub use memory::cache::{self as sqlite_cache};
+pub use oxios_memory::memory::cache as sqlite_cache;
 #[cfg(feature = "sqlite-memory")]
-pub use memory::database::{bytes_to_f32_slice, f32_slice_to_bytes, MemoryDatabase};
+pub use oxios_memory::memory::database::{bytes_to_f32_slice, f32_slice_to_bytes, MemoryDatabase};
 #[cfg(feature = "sqlite-memory")]
-pub use memory::migration::{self as sqlite_migration, MigrationReport};
+pub use oxios_memory::memory::migration::{self as sqlite_migration, MigrationReport};
 #[cfg(feature = "sqlite-memory")]
-pub use memory::search::{reciprocal_rank_fusion, Bm25Hit, RankedMemory, VectorHit};
+pub use oxios_memory::memory::search::{reciprocal_rank_fusion, Bm25Hit, RankedMemory, VectorHit};
 #[cfg(feature = "sqlite-memory")]
-pub use memory::sqlite_store::SqliteMemoryStore;
+pub use oxios_memory::memory::sqlite_store::SqliteMemoryStore;
 pub use persona::{default_personas, Persona, PersonaManager, PersonaStore};
 
 // ─── Tools & Skills ────────────────────────────────────────────────

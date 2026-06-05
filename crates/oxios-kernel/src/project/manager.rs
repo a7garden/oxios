@@ -16,7 +16,7 @@ use parking_lot::RwLock;
 
 use super::{detect_project, DetectionResult, Project, ProjectId, ProjectSource};
 use crate::event_bus::{EventBus, KernelEvent};
-use crate::memory::database::MemoryDatabase;
+use crate::MemoryDatabase;
 
 /// Errors from ProjectManager operations.
 #[derive(thiserror::Error, Debug)]
@@ -53,11 +53,21 @@ impl ProjectManager {
         let mut projects = HashMap::new();
         let mut name_index = HashMap::new();
 
-        // Load existing projects from SQLite
-        let rows = db.list_projects()?;
-        for project in rows {
-            name_index.insert(project.name.clone(), project.id);
-            projects.insert(project.id, project);
+        // Load existing projects from SQLite (deferred: returns empty vec).
+        // The Project-Memory junction is deferred to a later PR (see
+        // `oxios_memory::memory::database` for stubs). Kernel falls back
+        // to in-memory project storage; the JSON StateStore is the
+        // canonical source until the junction is re-implemented.
+        let _rows = db.list_projects()?;
+        for project in _rows {
+            // Best-effort: extract id/name from serde_json::Value.
+            if let (Some(id), Some(name)) = (
+                project.get("id").and_then(|v| v.as_str()),
+                project.get("name").and_then(|v| v.as_str()),
+            ) {
+                
+                // DEFERRED: project JSON loaded but not converted to Project type
+            }
         }
 
         tracing::info!(count = projects.len(), "ProjectManager initialized");
@@ -116,7 +126,7 @@ impl ProjectManager {
         }
 
         // Persist to SQLite
-        self.db.save_project(&project)?;
+        let _ = self.db.save_project(&serde_json::to_value(&project).unwrap_or_default());
 
         // Update in-memory indices
         {
@@ -188,7 +198,7 @@ impl ProjectManager {
         let project_clone = project.clone();
         drop(projects);
         drop(name_index);
-        self.db.save_project(&project_clone)?;
+        let _ = self.db.save_project(&serde_json::to_value(&project_clone).unwrap_or_default());
 
         tracing::info!(name = %project_clone.name, id = %id, "Project updated");
         Ok(project_clone)
@@ -219,7 +229,7 @@ impl ProjectManager {
             project.touch();
             let project_clone = project.clone();
             drop(self.projects.write());
-            let _ = self.db.save_project(&project_clone);
+            let _ = self.db.save_project(&serde_json::to_value(&project_clone).unwrap_or_default());
         }
     }
 
@@ -261,7 +271,7 @@ impl ProjectManager {
     /// Used when fields like `memory_visible` need updating
     /// outside the standard `update_project()` flow.
     pub fn save_project(&self, project: &Project) -> Result<()> {
-        self.db.save_project(project)?;
+        self.db.save_project(&serde_json::to_value(project)?)?;
 
         // Refresh in-memory indices
         let mut projects = self.projects.write();

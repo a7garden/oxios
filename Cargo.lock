@@ -5474,12 +5474,17 @@ dependencies = [
  "dirs 6.0.0",
  "hf-hub",
  "llama-gguf",
+ "lru",
  "parking_lot",
+ "rusqlite",
  "serde",
  "serde_json",
+ "sqlite-vec",
  "tempfile",
  "tokio",
  "tracing",
+ "usearch",
+ "uuid",
 ]
 
 [[package]]

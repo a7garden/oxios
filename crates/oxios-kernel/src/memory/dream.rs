@@ -18,12 +18,12 @@ use serde::{Deserialize, Serialize};
 use tokio::fs;
 use uuid::Uuid;
 
-use oxios_memory::memory::compaction::CompactionTree;
+use super::{MemoryEntry, MemoryManager, MemoryTier, MemoryType, ProtectionLevel};
 use oxios_memory::memory::auto_classify::AutoClassifier;
 use oxios_memory::memory::auto_protect::AutoProtector;
+use oxios_memory::memory::compaction::CompactionTree;
 use oxios_memory::memory::decay::DecayEngine;
 use oxios_memory::memory::root_index::RootIndex;
-use super::{MemoryEntry, MemoryManager, MemoryTier, MemoryType, ProtectionLevel};
 
 // ---------------------------------------------------------------------------
 // DreamCheckpoint
@@ -1062,13 +1062,14 @@ impl DreamProcess {
         recent.truncate(20);
 
         for entry in &recent {
-            root.active_context.push(oxios_memory::memory::root_index::RootEntry {
-                topic: entry.content.split('.').next().unwrap_or("").to_string(),
-                memory_type: entry.memory_type,
-                protection: entry.protection,
-                age_days: (now - entry.created_at).num_days() as u32,
-                reference: entry.id.clone(),
-            });
+            root.active_context
+                .push(oxios_memory::memory::root_index::RootEntry {
+                    topic: entry.content.split('.').next().unwrap_or("").to_string(),
+                    memory_type: entry.memory_type,
+                    protection: entry.protection,
+                    age_days: (now - entry.created_at).num_days() as u32,
+                    reference: entry.id.clone(),
+                });
         }
 
         // Build topic index
@@ -1079,13 +1080,14 @@ impl DreamProcess {
                 .next()
                 .unwrap_or(&entry.content)
                 .to_string();
-            root.topics.push(oxios_memory::memory::root_index::TopicEntry {
-                name: first_sentence.clone(),
-                category: entry.memory_type.label().to_string(),
-                age_days: (now - entry.created_at).num_days() as u32,
-                description: entry.content.chars().take(100).collect(),
-                reference: entry.id.clone(),
-            });
+            root.topics
+                .push(oxios_memory::memory::root_index::TopicEntry {
+                    name: first_sentence.clone(),
+                    category: entry.memory_type.label().to_string(),
+                    age_days: (now - entry.created_at).num_days() as u32,
+                    description: entry.content.chars().take(100).collect(),
+                    reference: entry.id.clone(),
+                });
         }
 
         *self.root_index.write() = root;

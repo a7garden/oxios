@@ -1,26 +1,246 @@
-//! Memory store operations: save/load, index management, search.
+//! `MemoryManager` runtime — central coordinator for the memory subsystem.
 //!
-//! Integrates HNSW index (usearch) for fast approximate nearest neighbor search
+//! Moved from `oxios-kernel::memory` in RFC-018 b.7. The manager coordinates
+//! a [`oxios_memory::MemoryStorage`] backend (file-based `StateStore` or
+//! SQLite via `sqlite_store`), an embedding provider, an optional HNSW
+//! index, an optional SONA learning engine, and an optional git layer.
+//!
+//! HNSW index (usearch) for fast approximate nearest neighbor search
 //! alongside the existing file-based state store for persistence.
 
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
 
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 
-use oxios_memory::EmbeddingVector;
-use oxios_memory::MemoryStorageExt;
+use crate::l2_normalize_f32;
+use crate::EmbeddingProvider;
+use crate::EmbeddingVector;
+use crate::MemoryStorageExt;
+use crate::TfIdfEmbeddingProvider;
 
+use super::auto_protect::AutoProtector;
+use super::helpers::{content_hash, dedup_by_id, extract_keywords};
 use super::hnsw::HnswIndex;
-use oxios_memory::memory::auto_protect::AutoProtector;
-use super::{
-    content_hash, dedup_by_id, extract_keywords, MemoryEntry, MemoryManager, MemoryTier, MemoryType,
-};
-use oxios_memory::l2_normalize_f32;
+use super::sona::SonaEngine;
+use super::types::{MemoryEntry, MemoryTier, MemoryType, ProtectionLevel};
+
+#[cfg(feature = "sqlite-memory")]
+use super::sqlite_store::SqliteMemoryStore;
+
+// ---------------------------------------------------------------------------
+// MemoryManager (moved from oxios-kernel in RFC-018 b.7)
+// ---------------------------------------------------------------------------
+
+/// Agent memory manager.
+///
+/// Coordinates a [`oxios_memory::MemoryStorage`] backend (file-based
+/// `StateStore` or SQLite via `sqlite_store`), an embedding provider,
+/// an optional HNSW index, an optional SONA learning engine, and an
+/// optional git layer.
+pub struct MemoryManager {
+    state_store: Arc<dyn crate::MemoryStorage>,
+    max_recall: usize,
+    /// Vector index for semantic search (id → EmbeddingVector).
+    vector_index: RwLock<HashMap<String, EmbeddingVector>>,
+    /// Embedding provider for generating vectors.
+    embedding: Arc<dyn EmbeddingProvider>,
+    /// Optional git layer for version-controlled memory.
+    git_layer: Option<Arc<dyn crate::MemoryGit>>,
+    /// Optional HNSW index for fast ANN search.
+    hnsw_index: RwLock<Option<Arc<HnswMemoryIndex>>>,
+    /// Optional SONA learning engine (RFC-020 Phase 2).
+    sona_engine: Option<Arc<SonaEngine>>,
+    /// Optional SQLite-backed store (RFC-012).
+    #[cfg(feature = "sqlite-memory")]
+    sqlite_store: Option<Arc<SqliteMemoryStore>>,
+}
+
+impl std::fmt::Debug for MemoryManager {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("MemoryManager")
+            .field("max_recall", &self.max_recall)
+            .field("index_size", &self.vector_index.read().len())
+            .field("sona_enabled", &self.sona_engine.is_some())
+            .finish()
+    }
+}
+
+impl MemoryManager {
+    /// Create a new MemoryManager.
+    ///
+    /// Accepts any type that implements [`oxios_memory::MemoryStorage`]
+    /// (concretely, `oxios-kernel::StateStore`).
+    pub fn new<S: crate::MemoryStorage + 'static>(state_store: Arc<S>) -> Self {
+        Self {
+            state_store: state_store as Arc<dyn crate::MemoryStorage>,
+            max_recall: 10,
+            vector_index: RwLock::new(HashMap::new()),
+            embedding: Arc::new(TfIdfEmbeddingProvider),
+            git_layer: None,
+            hnsw_index: RwLock::new(None),
+            sona_engine: None,
+            #[cfg(feature = "sqlite-memory")]
+            sqlite_store: None,
+        }
+    }
+
+    /// Attach a git layer for version-controlled saves.
+    pub fn set_git_layer<G: crate::MemoryGit + 'static>(&mut self, gl: Arc<G>) {
+        self.git_layer = Some(gl as Arc<dyn crate::MemoryGit>);
+    }
+
+    /// Attach a SQLite-backed memory store (RFC-012).
+    #[cfg(feature = "sqlite-memory")]
+    pub fn set_sqlite_store(&mut self, store: Arc<SqliteMemoryStore>) {
+        self.sqlite_store = Some(store);
+    }
+
+    /// Get a reference to the SQLite store (if configured).
+    #[cfg(feature = "sqlite-memory")]
+    pub fn sqlite_store(&self) -> &Option<Arc<SqliteMemoryStore>> {
+        &self.sqlite_store
+    }
+
+    /// Attach a SONA learning engine (RFC-020 Phase 2).
+    pub fn set_sona_engine(&mut self, engine: Arc<SonaEngine>) {
+        self.sona_engine = Some(engine);
+    }
+
+    /// Get a reference to the SONA engine (if configured).
+    pub fn sona_engine(&self) -> Option<&Arc<SonaEngine>> {
+        self.sona_engine.as_ref()
+    }
+
+    /// Create a Space-scoped MemoryManager using a file-based StateStore.
+    ///
+    /// Each Space gets its own StateStore under the given directory.
+    /// This is the kernel's responsibility (the kernel constructs
+    /// `Arc<StateStore>` and passes it in).
+    pub fn for_space_with_store(
+        space_dir: PathBuf,
+        state_store: Arc<dyn crate::MemoryStorage>,
+    ) -> Self {
+        let _ = space_dir; // kept for API symmetry; state_store is passed in
+        Self::new_dyn(state_store)
+    }
+
+    /// Create a MemoryManager from a `dyn MemoryStorage`.
+    pub fn new_dyn(state_store: Arc<dyn crate::MemoryStorage>) -> Self {
+        Self {
+            state_store,
+            max_recall: 10,
+            vector_index: RwLock::new(HashMap::new()),
+            embedding: Arc::new(TfIdfEmbeddingProvider),
+            git_layer: None,
+            hnsw_index: RwLock::new(None),
+            sona_engine: None,
+            #[cfg(feature = "sqlite-memory")]
+            sqlite_store: None,
+        }
+    }
+
+    /// Attach an HNSW index for fast semantic search.
+    pub fn set_hnsw_index(&self, index: Arc<HnswMemoryIndex>) {
+        *self.hnsw_index.write() = Some(index);
+    }
+
+    /// Commit a file to git if git_layer is available.
+    fn git_commit(&self, rel_path: &str, message: &str) {
+        if let Some(ref gl) = self.git_layer {
+            if gl.is_enabled() {
+                let gl = gl.clone();
+                let rel_path = rel_path.to_string();
+                let message = message.to_string();
+                tokio::spawn(async move {
+                    if let Err(e) = gl.commit_file(&rel_path, &message).await {
+                        tracing::warn!(error = %e, path = %rel_path, "git commit failed (non-fatal)");
+                    }
+                });
+            }
+        }
+    }
+
+    /// Set max memories returned by recall.
+    pub fn with_max_recall(mut self, n: usize) -> Self {
+        self.max_recall = n;
+        self
+    }
+
+    /// Apply MemoryConfig settings.
+    pub fn with_max_recall_value(mut self, n: usize) -> Self {
+        self.max_recall = n;
+        self
+    }
+
+    /// Returns the number of entries in the vector index.
+    pub fn vector_index_size(&self) -> usize {
+        self.vector_index.read().len()
+    }
+
+    /// Compute effective importance of a memory entry.
+    pub fn effective_importance(entry: &MemoryEntry) -> f32 {
+        let access_boost = (1.0_f32 + entry.access_count as f32).ln();
+        entry.importance * (1.0 + access_boost)
+    }
+
+    /// Curate memories: identify candidates for removal based on budget.
+    pub async fn curate(
+        &self,
+        budget: &super::quota::MemoryBudget,
+    ) -> Result<super::quota::CurationReport> {
+        use super::quota::{CurationCandidate, CurationReport};
+        let mut report = CurationReport::default();
+
+        for mt in &[
+            MemoryType::Conversation,
+            MemoryType::Session,
+            MemoryType::Fact,
+            MemoryType::Episode,
+            MemoryType::Knowledge,
+        ] {
+            let entries = self.list(*mt, budget.max_per_type * 2).await?;
+            if entries.len() <= budget.max_per_type {
+                continue;
+            }
+
+            let total_count = entries.len();
+            let mut scored: Vec<_> = entries
+                .into_iter()
+                .map(|e| (e.id.clone(), e.memory_type, Self::effective_importance(&e)))
+                .collect();
+            scored.sort_by(|a, b| a.2.partial_cmp(&b.2).unwrap_or(std::cmp::Ordering::Equal));
+
+            let to_remove = scored.len() - budget.max_per_type;
+            for (id, memory_type, score) in scored.into_iter().take(to_remove) {
+                report.candidates_for_removal.push(CurationCandidate {
+                    id,
+                    memory_type,
+                    effective_importance: score,
+                });
+            }
+            report.total_before += total_count;
+        }
+
+        for candidate in &report.candidates_for_removal {
+            if self
+                .forget(&candidate.id, candidate.memory_type)
+                .await
+                .is_ok()
+            {
+                report.removed += 1;
+            }
+        }
+
+        report.total_after = report.total_before - report.removed;
+        Ok(report)
+    }
+}
 
 // ---------------------------------------------------------------------------
 // VectorIndexSnapshot
@@ -65,7 +285,8 @@ impl MemoryManager {
             if let Ok(names) = self.state_store.list_category(mt.category()).await {
                 for name in names {
                     if let Ok(Some(entry)) = self
-                        .state_store.load_typed::<MemoryEntry>(mt.category(), &name)
+                        .state_store
+                        .load_typed::<MemoryEntry>(mt.category(), &name)
                         .await
                     {
                         let vector = self.embedding.embed(&entry.content).await?;
@@ -118,7 +339,8 @@ impl MemoryManager {
     /// Load a previously saved vector index snapshot from disk.
     pub async fn load_index_snapshot(&self) -> Result<usize> {
         let snapshot: Option<VectorIndexSnapshot> = self
-            .state_store.load_typed("memory", "vector_index_snapshot")
+            .state_store
+            .load_typed("memory", "vector_index_snapshot")
             .await?;
 
         match snapshot {
@@ -188,7 +410,8 @@ impl MemoryManager {
             return sqlite.get(id, memory_type);
         }
         let result: Option<MemoryEntry> = self
-            .state_store.load_typed(memory_type.category(), id)
+            .state_store
+            .load_typed(memory_type.category(), id)
             .await?;
         if let Some(mut entry) = result {
             AutoProtector::record_access(&mut entry, "");
@@ -238,7 +461,8 @@ impl MemoryManager {
         let mut entries = Vec::new();
         for name in names.into_iter().take(limit.saturating_mul(2)) {
             if let Ok(Some(entry)) = self
-                .state_store.load_typed::<MemoryEntry>(category, &name)
+                .state_store
+                .load_typed::<MemoryEntry>(category, &name)
                 .await
             {
                 entries.push(entry);
@@ -298,7 +522,8 @@ impl MemoryManager {
         for (id, score) in scored {
             for mt in types {
                 if let Ok(Some(mut entry)) = self
-                    .state_store.load_typed::<MemoryEntry>(mt.category(), &id)
+                    .state_store
+                    .load_typed::<MemoryEntry>(mt.category(), &id)
                     .await
                 {
                     AutoProtector::record_access(&mut entry, "");
@@ -494,59 +719,34 @@ impl MemoryManager {
 
     /// Create a session summary memory entry from a completed session.
     ///
-    /// This does NOT use LLM — it records key metadata from the session
-    /// as a structured memory entry for future reference.
-    pub async fn summarize_session(
-        &self,
-        session: &crate::state_store::Session,
-    ) -> Result<Option<String>> {
-        if session.user_messages.is_empty() {
+    /// Takes the user messages (as strings) rather than the kernel's
+    /// `Session` type. The kernel-side wrapper at the `MemoryApi` layer
+    /// extracts the strings and calls this.
+    pub async fn summarize_session(&self, user_messages: &[String]) -> Result<Option<String>> {
+        if user_messages.is_empty() {
             return Ok(None);
         }
 
-        // Build a summary from the session metadata
-        let mut summary_parts = Vec::new();
+        // Build a brief summary from the first user message.
+        let first_msg = &user_messages[0];
+        let content = if first_msg.len() > 500 {
+            format!("{}...", &first_msg[..500])
+        } else {
+            first_msg.clone()
+        };
 
-        // Include the first user message as context
-        if let Some(first_msg) = session.user_messages.first() {
-            summary_parts.push(format!("User: {}", first_msg.content));
-        }
-
-        // Include the last agent response
-        if let Some(last_response) = session.agent_responses.last() {
-            let truncated = if last_response.content.len() > 500 {
-                format!("{}...", &last_response.content[..500])
-            } else {
-                last_response.content.clone()
-            };
-            summary_parts.push(format!("Agent: {truncated}"));
-        }
-
-        // Include metadata
-        if let Some(ref seed_id) = session.active_seed_id {
-            summary_parts.push(format!("Seed: {seed_id}"));
-        }
-        if let Some(ref persona_id) = session.active_persona_id {
-            summary_parts.push(format!("Persona: {persona_id}"));
-        }
-
-        let content = summary_parts.join("\n");
         let entry = MemoryEntry {
-            id: format!(
-                "session-{}-{}",
-                session.id.0,
-                chrono::Utc::now().timestamp()
-            ),
+            id: format!("session-{}", chrono::Utc::now().timestamp()),
             memory_type: MemoryType::Session,
-            tier: super::MemoryTier::Warm,
+            tier: MemoryTier::Warm,
             content,
             content_hash: 0,
             source: "session_summary".to_string(),
-            session_id: Some(session.id.0.clone()),
+            session_id: None,
             tags: vec![],
             importance: 0.6,
             pinned: false,
-            protection: super::ProtectionLevel::None,
+            protection: ProtectionLevel::None,
             auto_classified: false,
             session_appearances: 0,
             user_corrected: false,
@@ -899,7 +1099,8 @@ impl MemoryManager {
         for (id, distance) in raw_hits {
             for mt in types {
                 if let Ok(Some(mut entry)) = self
-                    .state_store.load_typed::<MemoryEntry>(mt.category(), &id)
+                    .state_store
+                    .load_typed::<MemoryEntry>(mt.category(), &id)
                     .await
                 {
                     AutoProtector::record_access(&mut entry, "");
@@ -961,7 +1162,8 @@ impl MemoryManager {
             if let Ok(names) = self.state_store.list_category(mt.category()).await {
                 for name in names {
                     if let Ok(Some(entry)) = self
-                        .state_store.load_typed::<MemoryEntry>(mt.category(), &name)
+                        .state_store
+                        .load_typed::<MemoryEntry>(mt.category(), &name)
                         .await
                     {
                         let vector = self.embedding.embed(&entry.content).await?;
@@ -1122,7 +1324,7 @@ impl MemoryManager {
         if let Ok(Some(mut entry)) = self.get_by_id(id).await {
             entry.pinned = false;
             // Recompute protection
-            let protector = oxios_memory::memory::auto_protect::AutoProtector::default_protector();
+            let protector = crate::memory::auto_protect::AutoProtector::default_protector();
             entry.protection = protector.compute_protection(&entry);
             self.remember(entry).await?;
         }
@@ -1142,7 +1344,7 @@ impl MemoryManager {
     ///
     /// Returns the number of entries updated.
     pub async fn recompute_all_decay(&self, multiplier: f32) -> Result<usize> {
-        let engine = oxios_memory::memory::decay::DecayEngine::new(multiplier);
+        let engine = crate::memory::decay::DecayEngine::new(multiplier);
         let now = chrono::Utc::now();
         let mut count = 0;
 

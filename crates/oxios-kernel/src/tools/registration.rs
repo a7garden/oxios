@@ -33,15 +33,14 @@ use oxi_sdk::{
 
 use crate::access_manager::{AccessGate, AgentContext};
 use crate::capability::{CSpace, ResourceRef, Rights};
-use crate::tools::gated_tool::GatedTool;
 use crate::tools::builtin::*;
+use crate::tools::gated_tool::GatedTool;
 use crate::tools::{
     A2aDelegateTool, A2aQueryTool, A2aSendTool, ExecTool, KnowledgeTool, MemoryReadTool,
     MemorySearchTool, MemoryWriteTool,
 };
 use crate::types::AgentId;
 use crate::KernelHandle;
-
 
 /// Register the always-on tool set into a [`ToolRegistry`].
 ///
@@ -161,11 +160,7 @@ pub fn register_tools_from_cspace(
             }
 
             // Headless browser
-            ResourceRef::Browser if cap.rights.contains(Rights::EXECUTE) => {
-
-                {
-                                    }
-            }
+            ResourceRef::Browser if cap.rights.contains(Rights::EXECUTE) => {}
 
             // Kernel domain tools
             ResourceRef::KernelDomain { domain } => match domain.as_str() {
@@ -248,11 +243,7 @@ pub fn register_tools_from_cspace_gated(
             }
 
             // Headless browser
-            ResourceRef::Browser if cap.rights.contains(Rights::EXECUTE) => {
-
-                {
-                                    }
-            }
+            ResourceRef::Browser if cap.rights.contains(Rights::EXECUTE) => {}
 
             // Kernel domain tools (same as ungated — these already use KernelHandle internally)
             ResourceRef::KernelDomain { domain } => match domain.as_str() {
