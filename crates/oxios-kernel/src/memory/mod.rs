@@ -4,434 +4,49 @@
 //! Memory entries are stored as JSON files via StateStore.
 //! Supports embedding-based vector search using TF-IDF + cosine similarity.
 //!
-//! ## Module Activity Status (RFC-017, 2026-05)
+//! ## Module Activity Status (RFC-018)
 //!
-//! 모든 모듈은 활성 경로에서 사용된다:
-//!
-//! | 범주 | 모듈 | 핵심 역할 |
-//! |------|------|----------|
-//! | **핵심** | store, sqlite_store, search | CRUD + 영속화 + 검색 |
-//! | **통합** | dream | 4-phase 백그라운드 통합 |
-//! | **분석** | graph, hnsw, flash_attention | PageRank, ANN, re-ranking |
-//! | **생명주기** | decay, auto_protect, auto_classify, compaction | 감쇠/보호/분류/압축 |
-//! | **인프라** | cache, embedding_cache, database, migration, migrate | 캐시/스키마/마이그레이션 |
-//! | **유틸** | budget, normalizer, chunking, root_index | 예산/정규화/청킹/인덱스 |
-//! | **학습** | sona, proactive | ⚠️ 구현됨, RFC-020에서 활성화 예정 |
-//!
-//! 삭제된 모듈 (git history에 보존):
-//! - `reasoning_bank` (RFC-017): Ouroboros가 동일 역할 담당
-//! - `rvf_store` (RFC-017): LLM 에이전트에 부적합한 RL/EWC 개념
+//! Core types and leaf modules live in `oxios-memory`. This module
+//! re-exports them for back-compat and keeps kernel-coupled modules
+//! (store, dream, sqlite, etc.) here.
 
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 
 use anyhow::Result;
-use chrono::{DateTime, Utc};
+#[cfg(test)]
+use chrono::Utc;
 use parking_lot::RwLock;
-use serde::{Deserialize, Serialize};
 
 use crate::embedding::{EmbeddingProvider, EmbeddingVector, TfIdfEmbeddingProvider};
 use crate::git_layer::GitLayer;
 use crate::state_store::StateStore;
 
-// Re-export budget types so external `use crate::memory::X` paths still work.
-pub use quota::{CurationCandidate, CurationReport, MemoryBudget};
+// Re-export all types from oxios-memory (RFC-018 back-compat)
+pub use oxios_memory::memory::types::{
+    content_hash, dedup_by_id, extract_keywords, MemoryEntry, MemoryTier, MemoryType,
+    ProtectionLevel, TextVector,
+};
+
+// Re-export leaf modules from oxios-memory
+pub use oxios_memory::memory::{
+    auto_classify::AutoClassifier,
+    auto_protect::AutoProtector,
+    compaction::CompactionTree,
+    decay::DecayEngine,
+    embedding_cache::{CacheStats, EmbeddingCache},
+    embedding_viz::{compute_pca_2d, compute_top_neighbors, MemoryMapEntry, MemoryNeighbor},
+    flash_attention::{BenchmarkResult, FlashAttention, FlashAttentionConfig, MemoryEstimate},
+    graph::MemoryGraph,
+    hnsw::HnswIndex,
+    quota::{CurationCandidate, CurationReport, MemoryBudget},
+    root_index::{HistoricalPeriod, RootEntry, RootIndex, TopicEntry},
+};
+
+// Re-export from store (still in kernel)
 pub use store::HnswMemoryIndex;
-
-// ---------------------------------------------------------------------------
-// Content hashing
-// ---------------------------------------------------------------------------
-
-use std::collections::hash_map::DefaultHasher;
-use std::hash::{Hash, Hasher};
-
-/// Compute a stable hash of content for deduplication.
-pub fn content_hash(content: &str) -> u64 {
-    let mut hasher = DefaultHasher::new();
-    content.hash(&mut hasher);
-    hasher.finish()
-}
-
-// ---------------------------------------------------------------------------
-// TextVector (TF-IDF vector for semantic similarity)
-// ---------------------------------------------------------------------------
-
-/// Simple TF-IDF vector for text similarity.
-///
-/// Tokenizes text into terms, computes normalized term frequency,
-/// and supports cosine similarity comparison. No external embedding
-/// model needed — language-agnostic.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TextVector {
-    /// Term frequencies (normalized).
-    tf: HashMap<String, f64>,
-}
-
-impl TextVector {
-    /// Create a text vector from input text.
-    pub fn from_text(text: &str) -> Self {
-        let mut tf: HashMap<String, f64> = HashMap::new();
-        let terms = Self::tokenize(text);
-        let total = terms.len() as f64;
-
-        for term in terms {
-            *tf.entry(term).or_insert(0.0) += 1.0;
-        }
-
-        // Normalize by total term count
-        if total > 0.0 {
-            for v in tf.values_mut() {
-                *v /= total;
-            }
-        }
-
-        Self { tf }
-    }
-
-    /// Tokenize text into terms (language-agnostic).
-    /// Splits on whitespace and punctuation, lowercases.
-    /// Preserves non-ASCII alphanumeric runs (CJK, Hangul, etc.) within tokens.
-    pub fn tokenize(text: &str) -> Vec<String> {
-        text.to_lowercase()
-            .split(|c: char| !c.is_alphanumeric() && !('\u{AC00}'..='\u{D7A3}').contains(&c))
-            .filter(|s| !s.is_empty() && s.len() > 1)
-            .map(|s| s.to_string())
-            .collect()
-    }
-
-    /// Returns a reference to the term-frequency map.
-    pub fn tf_map(&self) -> &HashMap<String, f64> {
-        &self.tf
-    }
-
-    /// Compute cosine similarity between two vectors.
-    pub fn cosine_similarity(&self, other: &TextVector) -> f64 {
-        let mut dot = 0.0;
-        let mut norm_a = 0.0;
-        let mut norm_b = 0.0;
-
-        for (term, &a) in &self.tf {
-            norm_a += a * a;
-            if let Some(&b) = other.tf.get(term) {
-                dot += a * b;
-            }
-        }
-        for &b in other.tf.values() {
-            norm_b += b * b;
-        }
-
-        if norm_a == 0.0 || norm_b == 0.0 {
-            return 0.0;
-        }
-
-        dot / (norm_a.sqrt() * norm_b.sqrt())
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
-/// Memory entry type — 9 types derived from the SOAR/ACT-R cognitive model.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum MemoryType {
-    /// Conversation compaction summary (auto-generated).
-    Conversation,
-    /// Session-end summary (auto-generated).
-    Session,
-    /// A factual statement (e.g., "API uses port 3000").
-    Fact,
-    /// An event or experience (e.g., "deployed v0.2.0").
-    Episode,
-    /// Static knowledge (knowledge-base synced, user/program-provided).
-    Knowledge,
-    /// A learned procedure or pattern (e.g., "run cargo test before commit").
-    Skill,
-    /// A user preference (e.g., "always use dark mode").
-    Preference,
-    /// A recorded decision with rationale (e.g., "chose HNSW over FAISS").
-    Decision,
-    /// User identity and expertise profile.
-    UserProfile,
-}
-
-impl MemoryType {
-    /// Category name used in StateStore.
-    pub fn category(&self) -> &'static str {
-        match self {
-            MemoryType::Conversation => "memory/conversations",
-            MemoryType::Session => "memory/sessions",
-            MemoryType::Fact => "memory/facts",
-            MemoryType::Episode => "memory/episodes",
-            MemoryType::Knowledge => "memory/knowledge",
-            MemoryType::Skill => "memory/skills",
-            MemoryType::Preference => "memory/preferences",
-            MemoryType::Decision => "memory/decisions",
-            MemoryType::UserProfile => "memory/profiles",
-        }
-    }
-
-    /// Human-readable label.
-    pub fn label(&self) -> &'static str {
-        match self {
-            MemoryType::Conversation => "conversation",
-            MemoryType::Session => "session",
-            MemoryType::Fact => "fact",
-            MemoryType::Episode => "episode",
-            MemoryType::Knowledge => "knowledge",
-            MemoryType::Skill => "skill",
-            MemoryType::Preference => "preference",
-            MemoryType::Decision => "decision",
-            MemoryType::UserProfile => "user_profile",
-        }
-    }
-
-    /// Base importance for each type.
-    pub fn base_importance(&self) -> f32 {
-        match self {
-            MemoryType::UserProfile => 0.95,
-            MemoryType::Preference => 0.90,
-            MemoryType::Decision => 0.80,
-            MemoryType::Knowledge => 0.75,
-            MemoryType::Skill => 0.75,
-            MemoryType::Fact => 0.60,
-            MemoryType::Episode => 0.50,
-            MemoryType::Session => 0.40,
-            MemoryType::Conversation => 0.35,
-        }
-    }
-
-    /// Base decay rate for each type.
-    pub fn base_decay_rate(&self) -> f32 {
-        match self {
-            MemoryType::UserProfile => 0.001,
-            MemoryType::Preference => 0.002,
-            MemoryType::Decision => 0.005,
-            MemoryType::Knowledge => 0.006,
-            MemoryType::Skill => 0.008,
-            MemoryType::Fact => 0.015,
-            MemoryType::Episode => 0.025,
-            MemoryType::Session => 0.040,
-            MemoryType::Conversation => 0.060,
-        }
-    }
-
-    /// Initial tier for new entries of this type.
-    pub fn initial_tier(&self) -> MemoryTier {
-        match self {
-            // Hot: immediately needed in context
-            MemoryType::UserProfile
-            | MemoryType::Preference
-            | MemoryType::Decision
-            | MemoryType::Fact => MemoryTier::Hot,
-            // Warm: on-demand access
-            MemoryType::Knowledge
-            | MemoryType::Skill
-            | MemoryType::Episode
-            | MemoryType::Session
-            | MemoryType::Conversation => MemoryTier::Warm,
-        }
-    }
-
-    /// Whether this type is automatically protected from deletion.
-    pub fn is_auto_protected(&self) -> bool {
-        matches!(self, MemoryType::UserProfile | MemoryType::Preference)
-    }
-
-    /// Whether this type is stored globally (cross-Space).
-    pub fn is_global(&self) -> bool {
-        matches!(self, MemoryType::UserProfile | MemoryType::Preference)
-    }
-
-    /// All memory type variants.
-    pub fn all() -> &'static [MemoryType] {
-        &[
-            MemoryType::Conversation,
-            MemoryType::Session,
-            MemoryType::Fact,
-            MemoryType::Episode,
-            MemoryType::Knowledge,
-            MemoryType::Skill,
-            MemoryType::Preference,
-            MemoryType::Decision,
-            MemoryType::UserProfile,
-        ]
-    }
-}
-
-// ---------------------------------------------------------------------------
-// MemoryTier
-// ---------------------------------------------------------------------------
-
-/// Memory tier classification.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum MemoryTier {
-    /// Always loaded into agent context (~3K tokens).
-    Hot,
-    /// Loaded on demand (recent sessions, knowledge).
-    Warm,
-    /// Compressed archive (long-term storage).
-    Cold,
-}
-
-impl MemoryTier {
-    /// Maximum entries per tier (configurable).
-    pub fn default_max_entries(&self) -> usize {
-        match self {
-            MemoryTier::Hot => 50,
-            MemoryTier::Warm => 500,
-            MemoryTier::Cold => 10_000,
-        }
-    }
-
-    /// Maximum token budget per tier.
-    pub fn default_token_budget(&self) -> usize {
-        match self {
-            MemoryTier::Hot => 3_000,
-            MemoryTier::Warm => 50_000,
-            MemoryTier::Cold => usize::MAX,
-        }
-    }
-}
-
-fn default_tier() -> MemoryTier {
-    MemoryTier::Warm
-}
-
-// ---------------------------------------------------------------------------
-// ProtectionLevel
-// ---------------------------------------------------------------------------
-
-/// Auto-protection level. Users never need to know about this.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-#[derive(Default)]
-pub enum ProtectionLevel {
-    /// No protection. Normal decay + deletion.
-    #[default]
-    None = 0,
-    /// Slow decay, deletion possible.
-    /// Trigger: 2+ accesses.
-    Low = 1,
-    /// Very slow decay. Deletion only after retention_days × 2.
-    /// Trigger: 3+ accesses or 2+ session appearances.
-    Medium = 2,
-    /// Near-permanent. Preserved in LLM compaction.
-    /// Trigger: 5+ accesses, 3+ sessions, or user "remember this".
-    High = 3,
-    /// Absolute protection. Never deleted or compressed.
-    /// Trigger: UserProfile/Preference type, or explicit user pin.
-    Permanent = 4,
-}
-
-impl ProtectionLevel {
-    /// Decay multiplier based on protection level.
-    pub fn decay_multiplier(&self) -> f32 {
-        match self {
-            ProtectionLevel::None => 1.0,
-            ProtectionLevel::Low => 0.5,
-            ProtectionLevel::Medium => 0.2,
-            ProtectionLevel::High => 0.05,
-            ProtectionLevel::Permanent => 0.0,
-        }
-    }
-}
-
-/// A single memory entry with lifecycle and auto-protection metadata.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct MemoryEntry {
-    // ── Identity ──────────────────────────────────────
-    /// Unique ID.
-    pub id: String,
-    /// Memory type (auto-classified if not explicitly set).
-    pub memory_type: MemoryType,
-    /// Current tier (auto-managed by Dream).
-    #[serde(default = "default_tier")]
-    pub tier: MemoryTier,
-
-    // ── Content ───────────────────────────────────────
-    /// Content (Markdown).
-    pub content: String,
-    /// Content hash for deduplication.
-    #[serde(default)]
-    pub content_hash: u64,
-    /// Tags (auto-extracted from content).
-    #[serde(default)]
-    pub tags: Vec<String>,
-
-    // ── Source ────────────────────────────────────────
-    /// Creator (agent name, "compaction", "system", "dream", "auto-classify").
-    pub source: String,
-    /// Related session ID.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub session_id: Option<String>,
-
-    // ── Importance ────────────────────────────────────
-    /// Base importance (0.0–1.0), set by type or auto-computed.
-    #[serde(default = "default_importance")]
-    pub importance: f32,
-    /// Whether user explicitly pinned (optional override).
-    #[serde(default)]
-    pub pinned: bool,
-
-    // ── Auto-Protection ───────────────────────────────
-    /// Auto-computed protection level. Dream recomputes each run.
-    #[serde(default)]
-    pub protection: ProtectionLevel,
-    /// Whether the type was auto-classified (vs explicit).
-    #[serde(default)]
-    pub auto_classified: bool,
-    /// Number of distinct sessions this entry appeared in.
-    #[serde(default)]
-    pub session_appearances: u32,
-    /// Whether the user has corrected/contradicted this entry's topic.
-    #[serde(default)]
-    pub user_corrected: bool,
-    /// Session IDs that have accessed this entry (for dedup of session_appearances).
-    /// Max 100 entries; oldest evicted first.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub seen_in_sessions: Vec<String>,
-
-    // ── Lifecycle ─────────────────────────────────────
-    /// Creation timestamp.
-    pub created_at: DateTime<Utc>,
-    /// Last access timestamp.
-    pub accessed_at: DateTime<Utc>,
-    /// Last modification timestamp.
-    #[serde(default = "default_now")]
-    pub modified_at: DateTime<Utc>,
-    /// Access count.
-    #[serde(default)]
-    pub access_count: u32,
-    /// Current decay score (0.0–1.0), computed by DecayEngine.
-    #[serde(default = "default_importance")]
-    pub decay_score: f32,
-    /// Compaction level (0 = raw, 1 = daily, 2 = weekly, 3 = monthly, 4 = root).
-    #[serde(default)]
-    pub compaction_level: u8,
-    /// IDs of entries this was compacted from.
-    #[serde(default)]
-    pub compacted_from: Vec<String>,
-
-    // ── Relationships ─────────────────────────────────
-    /// IDs of related memory entries.
-    #[serde(default)]
-    pub related_ids: Vec<String>,
-    /// Contradicts a previous entry (ID of the contradicted entry).
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub contradicts: Option<String>,
-}
-
-fn default_importance() -> f32 {
-    0.5
-}
-
-fn default_now() -> DateTime<Utc> {
-    Utc::now()
-}
+pub use store::SemanticHit;
 
 // ---------------------------------------------------------------------------
 // MemoryManager
@@ -494,10 +109,6 @@ impl MemoryManager {
     }
 
     /// Attach a SQLite-backed memory store (RFC-012).
-    ///
-    /// When present, `remember()`, `search()`, `recall()`, and other
-    /// operations will delegate to the SQLite store instead of the
-    /// file-based StateStore.
     #[cfg(feature = "sqlite-memory")]
     pub fn set_sqlite_store(&mut self, store: Arc<crate::memory::sqlite_store::SqliteMemoryStore>) {
         self.sqlite_store = Some(store);
@@ -510,9 +121,6 @@ impl MemoryManager {
     }
 
     /// Attach a SONA learning engine (RFC-020 Phase 2).
-    ///
-    /// Once attached, `sona_engine()` returns the engine for
-    /// trajectory recording, pattern distillation, and adaptation.
     pub fn set_sona_engine(&mut self, engine: Arc<sona::SonaEngine>) {
         self.sona_engine = Some(engine);
     }
@@ -523,22 +131,15 @@ impl MemoryManager {
     }
 
     /// Create a Space-scoped MemoryManager.
-    ///
-    /// Each Space gets its own StateStore under the given directory,
-    /// providing natural memory isolation between Spaces.
     pub fn for_space(space_dir: PathBuf) -> Self {
         let memory_dir = space_dir.join("memory");
         let state_store = Arc::new(StateStore::new(memory_dir).unwrap_or_else(|_| {
-            // Fallback: create in temp dir
             StateStore::new(std::env::temp_dir().join("oxios-memory")).unwrap()
         }));
         Self::new(state_store)
     }
 
     /// Attach an HNSW index for fast semantic search.
-    ///
-    /// Once attached, `remember()` and `forget()` automatically keep
-    /// the HNSW index in sync with the state store.
     pub fn set_hnsw_index(&self, index: Arc<HnswMemoryIndex>) {
         *self.hnsw_index.write() = Some(index);
     }
@@ -570,17 +171,12 @@ impl MemoryManager {
     }
 
     /// Compute effective importance of a memory entry.
-    ///
-    /// Effective importance = base_importance * (1 + log(1 + access_count))
-    /// Memories accessed frequently get a boost.
     pub fn effective_importance(entry: &MemoryEntry) -> f32 {
         let access_boost = (1.0_f32 + entry.access_count as f32).ln();
         entry.importance * (1.0 + access_boost)
     }
 
     /// Curate memories: identify candidates for removal based on budget.
-    ///
-    /// Returns a report of how many entries would be pruned per type.
     pub async fn curate(&self, budget: &MemoryBudget) -> Result<CurationReport> {
         let mut report = CurationReport::default();
 
@@ -596,7 +192,6 @@ impl MemoryManager {
                 continue;
             }
 
-            // Sort by effective importance ascending (least important first)
             let total_count = entries.len();
             let mut scored: Vec<_> = entries
                 .into_iter()
@@ -615,7 +210,6 @@ impl MemoryManager {
             report.total_before += total_count;
         }
 
-        // Actually remove candidates
         for candidate in &report.candidates_for_removal {
             if self
                 .forget(&candidate.id, candidate.memory_type)
@@ -631,8 +225,6 @@ impl MemoryManager {
     }
 
     /// Spawn a background curation task.
-    ///
-    /// Returns immediately; curation runs asynchronously.
     pub fn spawn_curation_task(self: &Arc<Self>, budget: MemoryBudget) {
         let mgr = Arc::clone(self);
         tokio::spawn(async move {
@@ -655,69 +247,21 @@ impl MemoryManager {
 }
 
 // ---------------------------------------------------------------------------
-// Helpers
+// Sub-modules (still in kernel — coupled to StateStore/KernelHandle)
 // ---------------------------------------------------------------------------
 
-/// Extract search keywords from a query string.
-///
-/// Simple implementation: split on whitespace, lowercase, filter stop words.
-pub(crate) fn extract_keywords(query: &str) -> Vec<String> {
-    const STOP_WORDS: &[&str] = &[
-        "a", "an", "the", "is", "are", "was", "were", "be", "been", "being", "have", "has", "had",
-        "do", "does", "did", "will", "would", "could", "should", "may", "might", "can", "shall",
-        "to", "of", "in", "for", "on", "with", "at", "by", "from", "as", "into", "through",
-        "during", "before", "after", "above", "below", "between", "out", "off", "over", "under",
-        "again", "further", "then", "once", "and", "but", "or", "nor", "not", "so", "yet", "both",
-        "either", "neither", "each", "every", "all", "any", "few", "more", "most", "other", "some",
-        "such", "no", "only", "own", "same", "than", "too", "very", "just", "because", "if",
-        "when", "where", "how", "what", "which", "who", "whom", "this", "that", "these", "those",
-        "i", "me", "my", "we", "our", "you", "your", "he", "him", "his", "she", "her", "it", "its",
-        "they", "them", "their",
-    ];
-
-    query
-        .split_whitespace()
-        .map(|w| {
-            // Strip trailing punctuation
-            let w = w.trim_end_matches(|c: char| c.is_ascii_punctuation());
-            w.to_lowercase()
-        })
-        .filter(|w| w.len() > 2 && !STOP_WORDS.contains(&w.as_str()))
-        .collect()
-}
-
-/// Remove duplicate entries by ID, keeping the first occurrence.
-pub(crate) fn dedup_by_id(entries: &mut Vec<MemoryEntry>) {
-    let mut seen = std::collections::HashSet::new();
-    entries.retain(|e| seen.insert(e.id.clone()));
-}
-
-// ---------------------------------------------------------------------------
-// Sub-modules
-// ---------------------------------------------------------------------------
-
-pub mod auto_classify;
+// Kernel-coupled sub-modules
 pub mod auto_memory_bridge;
-mod auto_protect;
-mod quota;
 #[cfg(feature = "sqlite-memory")]
 pub mod cache;
-mod compaction;
 #[cfg(feature = "sqlite-memory")]
 pub mod database;
-mod decay;
 pub mod dream;
-pub mod embedding_cache;
-pub mod embedding_viz;
-pub mod flash_attention;
-mod graph;
-mod hnsw;
 #[cfg(feature = "sqlite-memory")]
 pub mod hyperbolic_persist;
 #[cfg(feature = "sqlite-memory")]
 pub mod migration;
-mod proactive;
-mod root_index;
+pub mod proactive;
 #[cfg(feature = "sqlite-memory")]
 pub mod search;
 pub mod sona;
@@ -725,21 +269,9 @@ pub mod sona;
 pub mod sqlite_store;
 pub(crate) mod store;
 
-pub use auto_classify::AutoClassifier;
-pub use compaction::CompactionTree;
-pub use decay::DecayEngine;
+// Re-export dream types
 pub use dream::{DreamCheckpoint, DreamProcess, DreamReport};
-pub use proactive::ProactiveRecall;
-pub use proactive::RecallTiming;
-pub use root_index::{HistoricalPeriod, RootEntry, RootIndex, TopicEntry};
-
-pub use embedding_cache::{CacheStats, EmbeddingCache};
-pub use embedding_viz::{compute_pca_2d, compute_top_neighbors, MemoryMapEntry, MemoryNeighbor};
-pub use store::SemanticHit;
-
-// Re-export key types from sub-modules.
-pub use graph::MemoryGraph;
-pub use hnsw::HnswIndex;
+pub use proactive::{ProactiveRecall, RecallTiming};
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -763,7 +295,6 @@ mod tests {
         assert!(kw.contains(&"rust".to_string()));
         assert!(kw.contains(&"agent".to_string()));
         assert!(kw.contains(&"system".to_string()));
-        // stop words filtered
         assert!(!kw.contains(&"how".to_string()));
         assert!(!kw.contains(&"do".to_string()));
     }
@@ -773,7 +304,7 @@ mod tests {
         let mut entries = vec![
             make_entry("a", MemoryType::Fact),
             make_entry("b", MemoryType::Fact),
-            make_entry("a", MemoryType::Episode), // duplicate id
+            make_entry("a", MemoryType::Episode),
         ];
         dedup_by_id(&mut entries);
         assert_eq!(entries.len(), 2);
@@ -799,25 +330,14 @@ mod tests {
         assert!(result.contains("[fact]"));
     }
 
-    // ---- Vector search tests ----
-
     #[test]
     fn test_text_vector_cosine_similarity() {
         let v1 = TextVector::from_text("fix the null pointer error in main.rs");
         let v2 = TextVector::from_text("null pointer error found in rust code");
         let v3 = TextVector::from_text("update the documentation for deployment");
 
-        // Similar texts should have high similarity
-        assert!(
-            v1.cosine_similarity(&v2) > 0.3,
-            "Similar texts should have > 0.3 similarity"
-        );
-
-        // Different texts should have low similarity
-        assert!(
-            v1.cosine_similarity(&v3) < 0.2,
-            "Different texts should have < 0.2 similarity"
-        );
+        assert!(v1.cosine_similarity(&v2) > 0.3);
+        assert!(v1.cosine_similarity(&v3) < 0.2);
     }
 
     #[test]
@@ -826,8 +346,8 @@ mod tests {
         let v2 = TextVector::from_text("null pointer 오류를 수정했습니다");
         let v3 = TextVector::from_text("문서 업데이트 배포 가이드");
 
-        assert!(v1.cosine_similarity(&v2) > 0.1, "Mixed script similarity");
-        assert!(v1.cosine_similarity(&v3) < 0.1, "Different topics");
+        assert!(v1.cosine_similarity(&v2) > 0.1);
+        assert!(v1.cosine_similarity(&v3) < 0.1);
     }
 
     #[test]
@@ -842,18 +362,13 @@ mod tests {
         let v1 = TextVector::from_text("rust programming language");
         let v2 = TextVector::from_text("rust programming language");
         let sim = v1.cosine_similarity(&v2);
-        assert!(
-            (sim - 1.0).abs() < 1e-9,
-            "Identical texts should have similarity ~1.0, got {}",
-            sim
-        );
+        assert!((sim - 1.0).abs() < 1e-9);
     }
 
     #[test]
     fn test_tokenize_multilingual() {
         let terms = TextVector::tokenize("main.rs 파일의 버그를 수정");
-        // Should contain at least some meaningful tokens
-        assert!(!terms.is_empty(), "Non-ASCII text should produce tokens");
+        assert!(!terms.is_empty());
     }
 
     #[tokio::test]
@@ -862,7 +377,6 @@ mod tests {
         let store = Arc::new(StateStore::new(temp_dir.path().to_path_buf()).unwrap());
         let mgr = MemoryManager::new(store.clone());
 
-        // Store some memories
         let entry1 = make_entry_with_content(
             "vec-test-1",
             MemoryType::Fact,
@@ -877,16 +391,12 @@ mod tests {
         mgr.remember(entry1).await.unwrap();
         mgr.remember(entry2).await.unwrap();
 
-        // Vector search should find the Rust entry for a Rust-related query
         let results = mgr
             .search("systems programming with rust", None, 5)
             .await
             .unwrap();
-        assert!(!results.is_empty(), "Vector search should find results");
-        assert_eq!(
-            results[0].id, "vec-test-1",
-            "Should find the Rust entry first"
-        );
+        assert!(!results.is_empty());
+        assert_eq!(results[0].id, "vec-test-1");
     }
 
     #[tokio::test]
@@ -895,7 +405,6 @@ mod tests {
         let store = Arc::new(StateStore::new(temp_dir.path().to_path_buf()).unwrap());
         let mgr = MemoryManager::new(store.clone());
 
-        // Store a memory directly via state_store (bypassing remember to test rebuild)
         let entry = make_entry_with_content(
             "rebuild-test-1",
             MemoryType::Fact,
@@ -906,13 +415,10 @@ mod tests {
             .await
             .unwrap();
 
-        // Index should be empty before rebuild
         assert_eq!(mgr.vector_index.read().len(), 0);
 
-        // Rebuild
         mgr.rebuild_index().await.unwrap();
 
-        // Index should now contain the entry
         assert_eq!(mgr.vector_index.read().len(), 1);
         assert!(mgr.vector_index.read().contains_key("rebuild-test-1"));
     }

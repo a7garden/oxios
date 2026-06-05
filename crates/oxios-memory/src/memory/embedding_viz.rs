@@ -179,8 +179,7 @@ pub fn compute_top_neighbors(
         sims.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
         sims.truncate(top_k);
         out.push(
-            sims
-                .into_iter()
+            sims.into_iter()
                 .map(|(j, s)| MemoryNeighbor {
                     id: ids[j].clone(),
                     similarity: s as f32,
@@ -218,6 +217,7 @@ fn sparse_dot(a: &[(usize, f64)], b: &[(usize, f64)]) -> f64 {
 /// TF-IDF input; instead we keep:
 ///   * `rows[i]` = list of `(col, val)` for the non-zero entries of row i
 ///   * `cols[j]` = list of `(row, val)` for the non-zero entries of col j
+///
 /// so that both `(A v)_i` and `(A^T u)_j` matvecs are `O(nnz)`.
 struct Sparse {
     n: usize,
@@ -236,21 +236,13 @@ impl Sparse {
         let rows: Vec<Vec<(usize, f64)>> = self
             .rows
             .iter()
-            .map(|row| {
-                row.iter()
-                    .map(|&(j, v)| (j, v - means[j]))
-                    .collect()
-            })
+            .map(|row| row.iter().map(|&(j, v)| (j, v - means[j])).collect())
             .collect();
         let cols: Vec<Vec<(usize, f64)>> = self
             .cols
             .iter()
             .enumerate()
-            .map(|(j, col)| {
-                col.iter()
-                    .map(|&(i, v)| (i, v - means[j]))
-                    .collect()
-            })
+            .map(|(j, col)| col.iter().map(|&(i, v)| (i, v - means[j])).collect())
             .collect();
         Self {
             n: self.n,
@@ -365,12 +357,7 @@ fn power_iteration_sparse(s: &Sparse, iterations: usize) -> Vec<f64> {
 /// materialising it. We exploit the rank-1 structure:
 /// `(A - p v^T) x = A x - p (v^T x)`
 /// `(A - p v^T)^T u = A^T u - v (p^T u)`.
-fn power_iteration_deflated(
-    s: &Sparse,
-    p: &[f64],
-    v: &[f64],
-    iterations: usize,
-) -> Vec<f64> {
+fn power_iteration_deflated(s: &Sparse, p: &[f64], v: &[f64], iterations: usize) -> Vec<f64> {
     if s.d == 0 {
         return Vec::new();
     }
@@ -387,11 +374,13 @@ fn power_iteration_deflated(
         //              = A^T deflated_w - v (p^T deflated_w)
         let aw = matvec_rows(s, &w);
         let vt_w: f64 = v.iter().zip(w.iter()).map(|(a, b)| *a * *b).sum();
-        let deflated_w: Vec<f64> =
-            aw.iter().zip(p.iter()).map(|(a, b)| *a - *b * vt_w).collect();
+        let deflated_w: Vec<f64> = aw
+            .iter()
+            .zip(p.iter())
+            .map(|(a, b)| *a - *b * vt_w)
+            .collect();
         let at_deflated = matvec_cols(s, &deflated_w);
-        let pt_deflated: f64 =
-            p.iter().zip(deflated_w.iter()).map(|(a, b)| *a * *b).sum();
+        let pt_deflated: f64 = p.iter().zip(deflated_w.iter()).map(|(a, b)| *a * *b).sum();
         let mut new_w: Vec<f64> = at_deflated
             .iter()
             .zip(v.iter())
@@ -414,7 +403,10 @@ fn project_sparse(s: &Sparse, v: &[f64]) -> Vec<f64> {
 fn project_deflated(s: &Sparse, p: &[f64], v1: &[f64], v2: &[f64]) -> Vec<f64> {
     let av2 = matvec_rows(s, v2);
     let v1t_v2: f64 = v1.iter().zip(v2.iter()).map(|(a, b)| *a * *b).sum();
-    av2.iter().zip(p.iter()).map(|(a, b)| *a - *b * v1t_v2).collect()
+    av2.iter()
+        .zip(p.iter())
+        .map(|(a, b)| *a - *b * v1t_v2)
+        .collect()
 }
 
 fn normalize(v: &mut [f64]) {
@@ -459,7 +451,7 @@ fn normalize_to_unit_square(coords: &[(f32, f32)]) -> Vec<(f32, f32)> {
     let cy = (min_y + max_y) / 2.0;
     coords
         .iter()
-        .map(|(x, y)| (((x - cx) / span) as f32, ((y - cy) / span) as f32))
+        .map(|(x, y)| (((x - cx) / span), ((y - cy) / span)))
         .collect()
 }
 

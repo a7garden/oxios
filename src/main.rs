@@ -2085,7 +2085,6 @@ async fn cmd_serve(kernel: &Kernel, config_path: &Path) -> Result<()> {
     let workspace = PathBuf::from(&kernel.config().kernel.workspace);
     let web_result = web_dist::ensure_web_dist(&workspace).await;
 
-
     // Extract path for surface activation
     let web_dist_path: Option<PathBuf> = match &web_result {
         web_dist::WebDistResult::UserDir(p) => Some(p.clone()),
@@ -2122,7 +2121,6 @@ async fn cmd_serve(kernel: &Kernel, config_path: &Path) -> Result<()> {
         }
         _ => {}
     }
-
 
     // Activate channels
     let surface_tasks = surface::activate_surfaces(kernel, config_path, web_dist_path).await?;

@@ -5367,7 +5367,7 @@ dependencies = [
 
 [[package]]
 name = "oxios-kernel"
-version = "1.0.3"
+version = "1.0.4"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5467,12 +5467,23 @@ dependencies = [
 
 [[package]]
 name = "oxios-memory"
-version = "1.0.2"
+version = "2.0.0"
 dependencies = [
  "anyhow",
  "async-trait",
+ "chrono",
+ "hf-hub",
+ "llama-gguf",
+ "lru",
+ "parking_lot",
+ "rusqlite",
  "serde",
  "serde_json",
+ "sqlite-vec",
+ "tempfile",
+ "tracing",
+ "usearch",
+ "uuid",
 ]
 
 [[package]]
@@ -5511,7 +5522,7 @@ dependencies = [
 
 [[package]]
 name = "oxios-web"
-version = "1.0.3"
+version = "1.0.4"
 dependencies = [
  "anyhow",
  "async-trait",

@@ -37,7 +37,7 @@ use tokio::time::Duration;
 
 use crate::channel::Channel;
 use crate::error_classify::classify_error;
-use crate::message::{IncomingMessage, OutgoingMessage, ResponseMeta, UserFacingError, ErrorKind};
+use crate::message::{ErrorKind, IncomingMessage, OutgoingMessage, ResponseMeta, UserFacingError};
 use crate::meta::meta;
 use crate::GatewayInbox;
 
@@ -386,7 +386,11 @@ impl Gateway {
         let channels = self.channels.clone();
 
         tokio::spawn(async move {
-            let model_id = msg.metadata.get(meta::MODEL_ID).cloned().unwrap_or_default();
+            let model_id = msg
+                .metadata
+                .get(meta::MODEL_ID)
+                .cloned()
+                .unwrap_or_default();
 
             tracing::info!(
                 channel = %msg.channel,
@@ -399,46 +403,47 @@ impl Gateway {
             let entry = guard.get(&channel_name);
 
             match (engine_api, entry) {
-                (Some(api), Some(entry)) => {
-                    match api.set_model(&model_id) {
-                        Ok(()) => {
-                            let response = format!("✅ 모델이 {model_id}(으)로 전환되었습니다.");
-                            let outgoing = OutgoingMessage::success(
-                                msg.id,
-                                &msg.channel,
-                                &msg.user_id,
-                                &response,
-                                HashMap::new(),
-                                ResponseMeta {
-                                    session_id: None,
-                                    project_id: None,
-                                    project_tag: None,
-                                    seed_id: None,
-                                    phase: "action".to_string(),
-                                    evaluation_passed: true,
-                                    duration_ms: None,
-                                    error: None,
-                                },
-                            );
-                            if let Err(e) = entry.channel.send(outgoing).await {
-                                tracing::error!(error = %e, "Failed to send switch_model response");
-                            }
-                        }
-                        Err(e) => {
-                            tracing::error!(error = %e, "switch_model failed");
-                            let user_err = UserFacingError {
-                                message: format!("❌ 모델 전환 실패: {e}"),
-                                kind: ErrorKind::Internal,
-                                suggestion: Some("모델 ID가 올바른지 확인하세요. (예: anthropic/claude-sonnet-4)".to_string()),
-                            };
-                            let outgoing =
-                                OutgoingMessage::error(msg.id, &msg.channel, &msg.user_id, user_err);
-                            if let Err(e) = entry.channel.send(outgoing).await {
-                                tracing::error!(error = %e, "Failed to send switch_model error");
-                            }
+                (Some(api), Some(entry)) => match api.set_model(&model_id) {
+                    Ok(()) => {
+                        let response = format!("✅ 모델이 {model_id}(으)로 전환되었습니다.");
+                        let outgoing = OutgoingMessage::success(
+                            msg.id,
+                            &msg.channel,
+                            &msg.user_id,
+                            &response,
+                            HashMap::new(),
+                            ResponseMeta {
+                                session_id: None,
+                                project_id: None,
+                                project_tag: None,
+                                seed_id: None,
+                                phase: "action".to_string(),
+                                evaluation_passed: true,
+                                duration_ms: None,
+                                error: None,
+                            },
+                        );
+                        if let Err(e) = entry.channel.send(outgoing).await {
+                            tracing::error!(error = %e, "Failed to send switch_model response");
                         }
                     }
-                }
+                    Err(e) => {
+                        tracing::error!(error = %e, "switch_model failed");
+                        let user_err = UserFacingError {
+                            message: format!("❌ 모델 전환 실패: {e}"),
+                            kind: ErrorKind::Internal,
+                            suggestion: Some(
+                                "모델 ID가 올바른지 확인하세요. (예: anthropic/claude-sonnet-4)"
+                                    .to_string(),
+                            ),
+                        };
+                        let outgoing =
+                            OutgoingMessage::error(msg.id, &msg.channel, &msg.user_id, user_err);
+                        if let Err(e) = entry.channel.send(outgoing).await {
+                            tracing::error!(error = %e, "Failed to send switch_model error");
+                        }
+                    }
+                },
                 (None, _) => {
                     tracing::warn!("switch_model action received but no EngineApi configured");
                 }
@@ -455,7 +460,11 @@ impl Gateway {
         let channels = self.channels.clone();
 
         tokio::spawn(async move {
-            let persona_id = msg.metadata.get(meta::PERSONA_ID).cloned().unwrap_or_default();
+            let persona_id = msg
+                .metadata
+                .get(meta::PERSONA_ID)
+                .cloned()
+                .unwrap_or_default();
 
             tracing::info!(
                 channel = %msg.channel,
@@ -468,46 +477,45 @@ impl Gateway {
             let entry = guard.get(&channel_name);
 
             match (persona_api, entry) {
-                (Some(api), Some(entry)) => {
-                    match api.set_active(&persona_id) {
-                        Ok(()) => {
-                            let response = format!("✅ 페르소나가 '{persona_id}'(으)로 전환되었습니다.");
-                            let outgoing = OutgoingMessage::success(
-                                msg.id,
-                                &msg.channel,
-                                &msg.user_id,
-                                &response,
-                                HashMap::new(),
-                                ResponseMeta {
-                                    session_id: None,
-                                    project_id: None,
-                                    project_tag: None,
-                                    seed_id: None,
-                                    phase: "action".to_string(),
-                                    evaluation_passed: true,
-                                    duration_ms: None,
-                                    error: None,
-                                },
-                            );
-                            if let Err(e) = entry.channel.send(outgoing).await {
-                                tracing::error!(error = %e, "Failed to send switch_persona response");
-                            }
+                (Some(api), Some(entry)) => match api.set_active(&persona_id) {
+                    Ok(()) => {
+                        let response =
+                            format!("✅ 페르소나가 '{persona_id}'(으)로 전환되었습니다.");
+                        let outgoing = OutgoingMessage::success(
+                            msg.id,
+                            &msg.channel,
+                            &msg.user_id,
+                            &response,
+                            HashMap::new(),
+                            ResponseMeta {
+                                session_id: None,
+                                project_id: None,
+                                project_tag: None,
+                                seed_id: None,
+                                phase: "action".to_string(),
+                                evaluation_passed: true,
+                                duration_ms: None,
+                                error: None,
+                            },
+                        );
+                        if let Err(e) = entry.channel.send(outgoing).await {
+                            tracing::error!(error = %e, "Failed to send switch_persona response");
                         }
-                        Err(e) => {
-                            tracing::error!(error = %e, "switch_persona failed");
-                            let user_err = UserFacingError {
+                    }
+                    Err(e) => {
+                        tracing::error!(error = %e, "switch_persona failed");
+                        let user_err = UserFacingError {
                                 message: format!("❌ 페르소나 전환 실패: {e}"),
                                 kind: ErrorKind::Internal,
                                 suggestion: Some("페르소나 ID가 올바른지 확인하세요. (.help를 입력하여 명령어를 확인하세요.)".to_string()),
                             };
-                            let outgoing =
-                                OutgoingMessage::error(msg.id, &msg.channel, &msg.user_id, user_err);
-                            if let Err(e) = entry.channel.send(outgoing).await {
-                                tracing::error!(error = %e, "Failed to send switch_persona error");
-                            }
+                        let outgoing =
+                            OutgoingMessage::error(msg.id, &msg.channel, &msg.user_id, user_err);
+                        if let Err(e) = entry.channel.send(outgoing).await {
+                            tracing::error!(error = %e, "Failed to send switch_persona error");
                         }
                     }
-                }
+                },
                 (None, _) => {
                     tracing::warn!("switch_persona action received but no PersonaApi configured");
                 }

@@ -18,12 +18,12 @@ use serde::{Deserialize, Serialize};
 use tokio::fs;
 use uuid::Uuid;
 
-use super::auto_classify::AutoClassifier;
-use super::auto_protect::AutoProtector;
-use super::compaction::CompactionTree;
-use super::decay::DecayEngine;
-use super::root_index::RootIndex;
 use super::{MemoryEntry, MemoryManager, MemoryTier, MemoryType, ProtectionLevel};
+use oxios_memory::memory::auto_classify::AutoClassifier;
+use oxios_memory::memory::auto_protect::AutoProtector;
+use oxios_memory::memory::compaction::CompactionTree;
+use oxios_memory::memory::decay::DecayEngine;
+use oxios_memory::memory::root_index::{RootEntry, RootIndex, TopicEntry};
 
 // ---------------------------------------------------------------------------
 // DreamCheckpoint
@@ -1069,7 +1069,7 @@ impl DreamProcess {
         recent.truncate(20);
 
         for entry in &recent {
-            root.active_context.push(super::root_index::RootEntry {
+            root.active_context.push(RootEntry {
                 topic: entry.content.split('.').next().unwrap_or("").to_string(),
                 memory_type: entry.memory_type,
                 protection: entry.protection,
@@ -1086,7 +1086,7 @@ impl DreamProcess {
                 .next()
                 .unwrap_or(&entry.content)
                 .to_string();
-            root.topics.push(super::root_index::TopicEntry {
+            root.topics.push(TopicEntry {
                 name: first_sentence.clone(),
                 category: entry.memory_type.label().to_string(),
                 age_days: (now - entry.created_at).num_days() as u32,

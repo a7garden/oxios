@@ -147,19 +147,19 @@ pub use memory::auto_memory_bridge::{
     AutoMemoryBridge, ExportResult, GuidancePattern, ImportResult, InsightCategory, MemoryInsight,
     SyncDirection, SyncResult,
 };
-pub use memory::flash_attention::{
+pub use memory::{
+    content_hash, AutoClassifier, CompactionTree, CurationCandidate, CurationReport, DecayEngine,
+    DreamCheckpoint, DreamProcess, DreamReport, HistoricalPeriod, HnswIndex, HnswMemoryIndex,
+    MemoryBudget, MemoryEntry, MemoryGraph, MemoryManager, MemoryTier, MemoryType, ProactiveRecall,
+    ProtectionLevel, RootEntry, RootIndex, SemanticHit, TextVector, TopicEntry,
+};
+pub use oxios_memory::memory::flash_attention::{
     BenchmarkResult as AttentionBenchmarkResult, FlashAttention, FlashAttentionConfig,
     MemoryEstimate,
 };
 pub use oxios_memory::memory::{
     batch_euclidean_to_poincare, euclidean_to_poincare, hyperbolic_distance, mobius_add,
     mobius_scalar_mul, HyperbolicConfig, HyperbolicEmbedding,
-};
-pub use memory::{
-    content_hash, AutoClassifier, CompactionTree, CurationCandidate, CurationReport, DecayEngine,
-    DreamCheckpoint, DreamProcess, DreamReport, HistoricalPeriod, HnswIndex, HnswMemoryIndex,
-    MemoryBudget, MemoryEntry, MemoryGraph, MemoryManager, MemoryTier, MemoryType, ProactiveRecall,
-    ProtectionLevel, RootEntry, RootIndex, SemanticHit, TextVector, TopicEntry,
 };
 
 // ─── Memory core types (extracted to oxios-memory, RFC-018 b.1) ───
@@ -239,12 +239,11 @@ pub use types::{AgentId, AgentInfo, AgentStatus};
 pub use kernel_handle::KernelHandle;
 pub use kernel_handle::MarketplaceApi;
 pub use kernel_handle::{
-    A2aApi, AgentApi, CopilotResponse, EngineApi, EngineConfigResponse, ExecApi,
-    ExtensionApi, FallbackEvent, InfraApi, InputModality as EngineInputModality, KnowledgeContext,
-    KnowledgeLens, KnowledgeNote, McpApi, MemoryNote, ModelInfo, PersonaApi, ProjectApi,
-    ProjectInfo, ProviderCategory, ProviderInfo, RoutingConfigSnapshot, RoutingStats,
-    RoutingStatsSnapshot, RoutingUpdate, SecurityApi, SharedExecConfig, StateApi,
-    ValidateKeyResult,
+    A2aApi, AgentApi, CopilotResponse, EngineApi, EngineConfigResponse, ExecApi, ExtensionApi,
+    FallbackEvent, InfraApi, InputModality as EngineInputModality, KnowledgeContext, KnowledgeLens,
+    KnowledgeNote, McpApi, MemoryNote, ModelInfo, PersonaApi, ProjectApi, ProjectInfo,
+    ProviderCategory, ProviderInfo, RoutingConfigSnapshot, RoutingStats, RoutingStatsSnapshot,
+    RoutingUpdate, SecurityApi, SharedExecConfig, StateApi, ValidateKeyResult,
 };
 pub use session_context::SessionContext;
 

@@ -14,12 +14,12 @@ use serde::{Deserialize, Serialize};
 
 use crate::embedding::EmbeddingVector;
 
-use super::auto_protect::AutoProtector;
-use super::hnsw::HnswIndex;
-use oxios_memory::l2_normalize_f32;
 use super::{
     content_hash, dedup_by_id, extract_keywords, MemoryEntry, MemoryManager, MemoryTier, MemoryType,
 };
+use oxios_memory::l2_normalize_f32;
+use oxios_memory::memory::auto_protect::AutoProtector;
+use oxios_memory::memory::hnsw::HnswIndex;
 
 // ---------------------------------------------------------------------------
 // VectorIndexSnapshot
@@ -1123,7 +1123,7 @@ impl MemoryManager {
         if let Ok(Some(mut entry)) = self.get_by_id(id).await {
             entry.pinned = false;
             // Recompute protection
-            let protector = super::auto_protect::AutoProtector::default_protector();
+            let protector = oxios_memory::memory::auto_protect::AutoProtector::default_protector();
             entry.protection = protector.compute_protection(&entry);
             self.remember(entry).await?;
         }
@@ -1143,7 +1143,7 @@ impl MemoryManager {
     ///
     /// Returns the number of entries updated.
     pub async fn recompute_all_decay(&self, multiplier: f32) -> Result<usize> {
-        let engine = super::decay::DecayEngine::new(multiplier);
+        let engine = oxios_memory::memory::decay::DecayEngine::new(multiplier);
         let now = chrono::Utc::now();
         let mut count = 0;
 

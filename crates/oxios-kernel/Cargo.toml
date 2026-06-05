@@ -22,7 +22,7 @@ embedding-gguf = ["dep:llama-gguf", "dep:hf-hub"]
 oxios-ouroboros = { version = "1.0.2", path = "../oxios-ouroboros" }
 oxios-markdown = { version = "1.0.2", path = "../oxios-markdown" }
 oxios-mcp = { version = "1.0.2", path = "../oxios-mcp" }
-oxios-memory = { version = "1.0.2", path = "../oxios-memory" }
+oxios-memory = { version = "2.0.0", path = "../oxios-memory" }
 oxi-sdk = { workspace = true }
 # oxi-ai no longer needed directly — all types re-exported via oxi-sdk
 tokio = { workspace = true }

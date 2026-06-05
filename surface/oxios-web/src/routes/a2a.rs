@@ -70,7 +70,10 @@ pub(crate) async fn handle_a2a_agent_detail(
 /// `request_id` is freshly synthesized (the kernel log entry does not
 /// yet persist the original A2A request UUID) and `accepted` is
 /// `true` for every entry — presence in the log means acceptance.
-fn message_entry_to_json(name_map: &HashMap<uuid::Uuid, String>, entry: &A2AMessageLogEntry) -> serde_json::Value {
+fn message_entry_to_json(
+    name_map: &HashMap<uuid::Uuid, String>,
+    entry: &A2AMessageLogEntry,
+) -> serde_json::Value {
     let from_agent = name_map
         .get(&entry.from)
         .cloned()

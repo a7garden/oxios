@@ -368,7 +368,9 @@ pub fn kernel_event_to_audit_action(event: &KernelEvent) -> AuditAction {
                 if *is_error { "error" } else { "ok" }
             ),
         },
-        KernelEvent::ToolExecutionProgress { tool_name, tab_id, .. } => AuditAction::Other {
+        KernelEvent::ToolExecutionProgress {
+            tool_name, tab_id, ..
+        } => AuditAction::Other {
             detail: match tab_id {
                 Some(id) => format!("tool_progress:{tool_name}:tab={id}"),
                 None => format!("tool_progress:{tool_name}"),
@@ -615,7 +617,10 @@ mod tests {
             AuditAction::Other { detail } => {
                 assert!(detail.contains("tool_progress"), "detail: {detail}");
                 assert!(detail.contains("browse"), "detail: {detail}");
-                assert!(detail.contains(":tab="), "detail should include tab id: {detail}");
+                assert!(
+                    detail.contains(":tab="),
+                    "detail should include tab id: {detail}"
+                );
             }
             other => panic!("expected Other, got {other:?}"),
         }

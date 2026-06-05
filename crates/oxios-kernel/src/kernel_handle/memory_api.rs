@@ -81,16 +81,34 @@ impl MemoryApi {
 
     /// Search memory using semantic similarity (returns SemanticHits).
     /// Falls back to keyword search if no HNSW index.
-    pub async fn search_semantic(&self, query: &str, limit: usize) -> anyhow::Result<Vec<SemanticHit>> {
+    pub async fn search_semantic(
+        &self,
+        query: &str,
+        limit: usize,
+    ) -> anyhow::Result<Vec<SemanticHit>> {
         if let Some(hnsw) = &self.hnsw_index {
             let _ = hnsw; // hnsw available, would use it here
-            // For now, delegate to regular search and convert
+                          // For now, delegate to regular search and convert
             let entries = self.memory_manager.search(query, None, limit).await?;
-            Ok(entries.into_iter().map(|e| SemanticHit { entry: e, distance: 0.0, similarity: 1.0 }).collect())
+            Ok(entries
+                .into_iter()
+                .map(|e| SemanticHit {
+                    entry: e,
+                    distance: 0.0,
+                    similarity: 1.0,
+                })
+                .collect())
         } else {
             // Fallback: use keyword search
             let entries = self.memory_manager.search(query, None, limit).await?;
-            Ok(entries.into_iter().map(|e| SemanticHit { entry: e, distance: 0.0, similarity: 1.0 }).collect())
+            Ok(entries
+                .into_iter()
+                .map(|e| SemanticHit {
+                    entry: e,
+                    distance: 0.0,
+                    similarity: 1.0,
+                })
+                .collect())
         }
     }
 
@@ -107,7 +125,7 @@ impl MemoryApi {
     pub async fn rebuild_hnsw_index(&self) -> anyhow::Result<usize> {
         if let Some(hnsw) = &self.hnsw_index {
             // Try to rebuild
-            let _ = self.memory_manager.rebuild_index().await?;
+            self.memory_manager.rebuild_index().await?;
             Ok(hnsw.len())
         } else {
             Ok(0)

@@ -301,7 +301,8 @@ impl SqliteMemoryStore {
         }
 
         // Flash Attention re-ranking
-        let fa = super::flash_attention::FlashAttention::with_dimensions(query_vec.len());
+        let fa =
+            oxios_memory::memory::flash_attention::FlashAttention::with_dimensions(query_vec.len());
 
         let queries = vec![query_vec.clone()];
         let keys: Vec<Vec<f32>> = candidate_vecs.iter().map(|(_, v)| v.clone()).collect();
@@ -419,7 +420,7 @@ impl SqliteMemoryStore {
     ///
     /// Groups memories by `session_id` and links all co-accessed pairs.
     /// Returns a `MemoryGraph` ready for PageRank computation.
-    pub fn build_co_access_graph(&self) -> super::graph::MemoryGraph {
+    pub fn build_co_access_graph(&self) -> oxios_memory::memory::graph::MemoryGraph {
         let conn = self.db.conn();
 
         // Collect session_id -> [rowid] mappings
@@ -430,7 +431,7 @@ impl SqliteMemoryStore {
             .prepare("SELECT rowid, session_id FROM memories WHERE session_id IS NOT NULL")
         {
             Ok(s) => s,
-            Err(_) => return super::graph::MemoryGraph::new(),
+            Err(_) => return oxios_memory::memory::graph::MemoryGraph::new(),
         };
 
         let rows: Vec<(i64, String)> = match stmt.query_map([], |row| {
@@ -456,7 +457,7 @@ impl SqliteMemoryStore {
         }
 
         let session_vecs: Vec<Vec<u64>> = sessions.into_values().collect();
-        super::graph::MemoryGraph::from_co_access(&session_vecs)
+        oxios_memory::memory::graph::MemoryGraph::from_co_access(&session_vecs)
     }
 
     /// Compute PageRank-based importance scores for all memories.

@@ -197,7 +197,7 @@ impl ResourceMonitor {
 
     /// Returns a copy of the current overload threshold.
     pub fn overload_threshold(&self) -> OverloadThreshold {
-        self.overload_threshold.read().clone()
+        *self.overload_threshold.read()
     }
 
     /// Hot-reload overload thresholds without restart.

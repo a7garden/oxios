@@ -48,9 +48,7 @@ impl WebDistResult {
     /// Returns the version tag without the leading 'v' prefix (for display).
     pub fn version_display(&self) -> Option<&str> {
         match self {
-            WebDistResult::Downloaded { version, .. } => {
-                Some(version.trim_start_matches('v'))
-            }
+            WebDistResult::Downloaded { version, .. } => Some(version.trim_start_matches('v')),
             _ => None,
         }
     }
@@ -90,14 +88,13 @@ async fn fetch_latest_release_tag() -> Result<String> {
 
 /// Downloads `web-dist.zip` from a GitHub release and extracts to `~/.oxios/web/dist/`.
 async fn download_and_extract_web_dist(version_tag: &str) -> Result<PathBuf> {
-    let dist_dir = user_web_dist_dir()
-        .ok_or_else(|| anyhow::anyhow!("cannot determine home directory"))?;
+    let dist_dir =
+        user_web_dist_dir().ok_or_else(|| anyhow::anyhow!("cannot determine home directory"))?;
     let version_file = user_web_version_file()
         .ok_or_else(|| anyhow::anyhow!("cannot determine home directory"))?;
 
-    let url = format!(
-        "https://github.com/{GITHUB_REPO}/releases/download/{version_tag}/web-dist.zip"
-    );
+    let url =
+        format!("https://github.com/{GITHUB_REPO}/releases/download/{version_tag}/web-dist.zip");
 
     let client = reqwest::Client::builder()
         .user_agent("oxios-web")
@@ -105,7 +102,11 @@ async fn download_and_extract_web_dist(version_tag: &str) -> Result<PathBuf> {
         .context("failed to create HTTP client")?;
 
     // ── Download with progress bar ─────────────────────────────────────────
-    let resp = client.get(&url).send().await.context("download request failed")?;
+    let resp = client
+        .get(&url)
+        .send()
+        .await
+        .context("download request failed")?;
 
     if !resp.status().is_success() {
         anyhow::bail!("Failed to download web-dist.zip: HTTP {}", resp.status());
@@ -122,10 +123,7 @@ async fn download_and_extract_web_dist(version_tag: &str) -> Result<PathBuf> {
     let tag_label = style(version_tag).cyan().to_string();
     pb.set_message(format!("Downloading web UI {tag_label}"));
 
-    let bytes = resp
-        .bytes()
-        .await
-        .context("failed to read response body")?;
+    let bytes = resp.bytes().await.context("failed to read response body")?;
 
     let ok = style("✓").green().to_string();
     let downloaded = style("Downloaded").green().to_string();
@@ -225,7 +223,12 @@ pub async fn ensure_web_dist(workspace: &Path) -> WebDistResult {
     tracing::info!("No web UI found locally, downloading from GitHub Releases...");
     match fetch_latest_release_tag().await {
         Ok(tag) => match download_and_extract_web_dist(&tag).await {
-            Ok(p) => return WebDistResult::Downloaded { path: p, version: tag },
+            Ok(p) => {
+                return WebDistResult::Downloaded {
+                    path: p,
+                    version: tag,
+                }
+            }
             Err(e) => {
                 tracing::warn!(error = %e, "Failed to auto-download web UI");
                 return WebDistResult::DownloadFailed {

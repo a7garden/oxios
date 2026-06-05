@@ -75,7 +75,7 @@ fn serve_file(dist: Option<&std::path::Path>, path: &str) -> Response {
                 .unwrap();
         }
         // Try without assets/ prefix
-        if let Some(data) = fs_read(d,&format!("assets/{clean}")) {
+        if let Some(data) = fs_read(d, &format!("assets/{clean}")) {
             return Response::builder()
                 .status(200)
                 .header("Content-Type", mime_type(clean))

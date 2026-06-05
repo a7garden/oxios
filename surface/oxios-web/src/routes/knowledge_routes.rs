@@ -491,7 +491,6 @@ pub(crate) async fn handle_knowledge_file_delete(
         .note_delete(&path)
         .map_err(|e| AppError::Internal(e.to_string()))?;
 
-
     tracing::info!(path = %path, "Knowledge file deleted");
     Ok(StatusCode::NO_CONTENT)
 }
@@ -518,7 +517,11 @@ pub(crate) async fn handle_knowledge_file_or_sub(
         match (method.as_str(), suffix) {
             // GET /file/{path}/history → git log
             ("GET", "history") => {
-                return handle_knowledge_file_history_impl(&state, &path[..path.len() - suffix.len() - 1]).await;
+                return handle_knowledge_file_history_impl(
+                    &state,
+                    &path[..path.len() - suffix.len() - 1],
+                )
+                .await;
             }
             // POST /file/{path}/restore → git restore
             ("POST", "restore") => {
@@ -526,7 +529,12 @@ pub(crate) async fn handle_knowledge_file_or_sub(
                     .get("hash")
                     .and_then(|v| v.as_str())
                     .unwrap_or_default();
-                return handle_knowledge_file_restore_impl(&state, &path[..path.len() - suffix.len() - 1], hash).await;
+                return handle_knowledge_file_restore_impl(
+                    &state,
+                    &path[..path.len() - suffix.len() - 1],
+                    hash,
+                )
+                .await;
             }
             _ => {}
         }
@@ -574,7 +582,9 @@ pub(crate) async fn handle_knowledge_file_or_sub(
                 .body(axum::body::Body::empty())
                 .unwrap())
         }
-        _ => Err(AppError::BadRequest("method not allowed on this path".into())),
+        _ => Err(AppError::BadRequest(
+            "method not allowed on this path".into(),
+        )),
     }
 }
 
@@ -610,10 +620,13 @@ async fn handle_knowledge_file_history_impl(
     Ok(axum::response::Response::builder()
         .status(StatusCode::OK)
         .header(axum::http::header::CONTENT_TYPE, "application/json")
-        .body(axum::body::Body::from(serde_json::to_string(&serde_json::json!({
-            "history": entries,
-            "count": entries.len(),
-        })).unwrap()))
+        .body(axum::body::Body::from(
+            serde_json::to_string(&serde_json::json!({
+                "history": entries,
+                "count": entries.len(),
+            }))
+            .unwrap(),
+        ))
         .unwrap())
 }
 
@@ -631,7 +644,6 @@ async fn handle_knowledge_file_restore_impl(
         .unwrap_or_else(|_| "knowledge".to_string());
     let git_rel = format!("{prefix}/{file_path}");
 
-
     git.restore_file(&git_rel, hash)
         .map_err(|e| AppError::Internal(e.to_string()))?;
 
@@ -639,7 +651,8 @@ async fn handle_knowledge_file_restore_impl(
         .kernel
         .knowledge
         .note_read(file_path)
-        .map_err(|e| AppError::Internal(e.to_string()))? {
+        .map_err(|e| AppError::Internal(e.to_string()))?
+    {
         state
             .kernel
             .knowledge

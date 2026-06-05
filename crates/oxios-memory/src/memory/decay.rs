@@ -5,7 +5,7 @@
 
 use chrono::{DateTime, Utc};
 
-use super::{MemoryEntry, ProtectionLevel};
+use crate::memory::types::{MemoryEntry, ProtectionLevel};
 
 // ---------------------------------------------------------------------------
 // DecayEngine

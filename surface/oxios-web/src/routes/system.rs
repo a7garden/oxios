@@ -879,11 +879,15 @@ pub(crate) async fn handle_config_put(
 
     // ResourceMonitor — CPU/memory/load thresholds
     use oxios_kernel::resource_monitor::OverloadThreshold;
-    state.kernel.infra.resource_monitor().set_overload_threshold(OverloadThreshold {
-        cpu_percent: updated_config.resource_monitor.cpu_threshold,
-        memory_percent: updated_config.resource_monitor.memory_threshold,
-        load_avg: updated_config.resource_monitor.load_threshold,
-    });
+    state
+        .kernel
+        .infra
+        .resource_monitor()
+        .set_overload_threshold(OverloadThreshold {
+            cpu_percent: updated_config.resource_monitor.cpu_threshold,
+            memory_percent: updated_config.resource_monitor.memory_threshold,
+            load_avg: updated_config.resource_monitor.load_threshold,
+        });
 
     tracing::info!(
         "Config hot-reloaded (web + kernel subsystems) from {}",
@@ -1041,10 +1045,7 @@ const PATCH_FORBIDDEN_TOP_LEVEL_KEYS: &[&str] = &["engine"];
 /// contains, or `None` if the body is acceptable. Used by
 /// `handle_config_patch` to reject engine.* writes before they reach
 /// the deep-merge step.
-fn find_forbidden_patch_key(
-    body: &serde_json::Value,
-    forbidden: &[&str],
-) -> Option<String> {
+fn find_forbidden_patch_key(body: &serde_json::Value, forbidden: &[&str]) -> Option<String> {
     use serde_json::Value;
     let Value::Object(map) = body else {
         return None;
@@ -1157,11 +1158,15 @@ pub(crate) async fn handle_config_patch(
         updated.scheduler.zombie_timeout_secs,
     );
     use oxios_kernel::resource_monitor::OverloadThreshold;
-    state.kernel.infra.resource_monitor().set_overload_threshold(OverloadThreshold {
-        cpu_percent: updated.resource_monitor.cpu_threshold,
-        memory_percent: updated.resource_monitor.memory_threshold,
-        load_avg: updated.resource_monitor.load_threshold,
-    });
+    state
+        .kernel
+        .infra
+        .resource_monitor()
+        .set_overload_threshold(OverloadThreshold {
+            cpu_percent: updated.resource_monitor.cpu_threshold,
+            memory_percent: updated.resource_monitor.memory_threshold,
+            load_avg: updated.resource_monitor.load_threshold,
+        });
 
     let total = applied.len() + restart.len();
     tracing::info!(
@@ -1309,7 +1314,9 @@ mod patch_tests {
     #[test]
     fn channels_telegram_session_requires_restart() {
         // Telegram channel is launched at boot — session changes need restart.
-        assert!(is_restart_required("channels.telegram.session.rotation_hours"));
+        assert!(is_restart_required(
+            "channels.telegram.session.rotation_hours"
+        ));
         assert!(is_restart_required("channels.telegram.allowed_users"));
     }
 
@@ -1403,10 +1410,7 @@ mod deep_merge_tests {
     #[test]
     fn patch_value_replaces_scalar() {
         let mut base = json!({"engine": {"default_model": "old/model"}});
-        deep_merge_json(
-            &mut base,
-            json!({"engine": {"default_model": "new/model"}}),
-        );
+        deep_merge_json(&mut base, json!({"engine": {"default_model": "new/model"}}));
         assert_eq!(base["engine"]["default_model"], "new/model");
     }
 

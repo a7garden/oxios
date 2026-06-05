@@ -132,7 +132,8 @@ pub(crate) async fn handle_chat(
             {
                 // RFC-015: parse tool_calls into trajectory step records.
                 let trajectory_steps: Vec<oxios_kernel::state_store::TrajectoryStepRecord> =
-                    response.metadata
+                    response
+                        .metadata
                         .get("tool_calls")
                         .and_then(|v| serde_json::from_str::<Vec<serde_json::Value>>(v).ok())
                         .map(|calls| {
@@ -592,19 +593,13 @@ async fn persist_session(
                         .and_then(|v| v.as_str())
                         .unwrap_or("")
                         .to_string(),
-                    tool_args: c
-                        .get("input")
-                        .cloned()
-                        .unwrap_or(serde_json::Value::Null),
+                    tool_args: c.get("input").cloned().unwrap_or(serde_json::Value::Null),
                     output_summary: c
                         .get("output")
                         .and_then(|v| v.as_str())
                         .unwrap_or("")
                         .to_string(),
-                    duration_ms: c
-                        .get("duration_ms")
-                        .and_then(|v| v.as_u64())
-                        .unwrap_or(0),
+                    duration_ms: c.get("duration_ms").and_then(|v| v.as_u64()).unwrap_or(0),
                     is_error: false,
                     tool_call_id: format!("legacy-{i}"),
                     timestamp: chrono::Utc::now(),
@@ -782,7 +777,9 @@ fn kernel_event_to_ws_chunk(
             "input_tokens": input_tokens,
             "output_tokens": output_tokens,
         })),
-        KernelEvent::ReasoningFragment { content, source, .. } => Some(serde_json::json!({
+        KernelEvent::ReasoningFragment {
+            content, source, ..
+        } => Some(serde_json::json!({
             "type": "reasoning",
             "content": content,
             "source": source,
@@ -974,7 +971,10 @@ mod rfc015_tests {
             output_tokens: 1,
         };
         let chunk = kernel_event_to_ws_chunk(&event, &None);
-        assert!(chunk.is_some(), "filter is inactive without an active session");
+        assert!(
+            chunk.is_some(),
+            "filter is inactive without an active session"
+        );
         assert_eq!(chunk.unwrap()["type"], "usage");
     }
 
@@ -983,7 +983,9 @@ mod rfc015_tests {
     /// them. Returning None keeps the WS stream clean.
     #[test]
     fn lifecycle_events_are_skipped() {
-        let event = KernelEvent::AgentStarted { id: AgentId::new_v4() };
+        let event = KernelEvent::AgentStarted {
+            id: AgentId::new_v4(),
+        };
         let chunk = kernel_event_to_ws_chunk(&event, &None);
         assert!(chunk.is_none());
     }

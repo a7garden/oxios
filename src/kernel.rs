@@ -8,10 +8,11 @@ use anyhow::{Context, Result};
 use oxios_gateway::Gateway;
 use oxios_kernel::{
     access_manager::AccessManager, auth::AuthManager, config::load_config, A2AProtocol,
-    AgentRuntime, AgentScheduler, AuditPersistence, AuditTrail, BasicSupervisor, BudgetManager, ClawHubClient,
-    ClawHubInstaller, CronScheduler, EngineHandle, EventBus, GitLayer, MarketplaceApi, McpBridge, McpServer,
-    MemoryManager, Orchestrator, OxiosConfig, OxiosEngine, PersonaManager, ProjectManager,
-    ResourceMonitor, SkillManager, SkillsShClient, SkillsShInstaller, Supervisor,
+    AgentRuntime, AgentScheduler, AuditPersistence, AuditTrail, BasicSupervisor, BudgetManager,
+    ClawHubClient, ClawHubInstaller, CronScheduler, EngineHandle, EventBus, GitLayer,
+    MarketplaceApi, McpBridge, McpServer, MemoryManager, Orchestrator, OxiosConfig, OxiosEngine,
+    PersonaManager, ProjectManager, ResourceMonitor, SkillManager, SkillsShClient,
+    SkillsShInstaller, Supervisor,
 };
 use oxios_markdown::knowledge::FileChange;
 use oxios_markdown::KnowledgeBase;
@@ -210,8 +211,6 @@ impl Kernel {
             .expect("ProjectManager not available — SQLite must be enabled")
     }
 
-
-
     /// Build a MarketplaceApi (ClawHub + Skills.sh) from config.
     fn build_marketplace_api(&self) -> MarketplaceApi {
         let workspace = PathBuf::from(&self.config.kernel.workspace);
@@ -226,18 +225,20 @@ impl Kernel {
                 ClawHubClient::new(Some("https://clawhub.ai".to_string())).unwrap()
             }
         };
-        let clawhub_installer =
-            ClawHubInstaller::new(skills_dir.clone(), workspace.clone(), config.base_url.clone());
+        let clawhub_installer = ClawHubInstaller::new(
+            skills_dir.clone(),
+            workspace.clone(),
+            config.base_url.clone(),
+        );
 
         // Skills.sh
         let ss_config = &config.skills_sh;
-        let skills_sh_client = SkillsShClient::new(
-            ss_config.base_url.clone(),
-            ss_config.api_key.clone(),
-        ).unwrap_or_else(|e| {
-            tracing::warn!(error = %e, "Failed to create Skills.sh client, using default");
-            SkillsShClient::new(None, None).unwrap()
-        });
+        let skills_sh_client =
+            SkillsShClient::new(ss_config.base_url.clone(), ss_config.api_key.clone())
+                .unwrap_or_else(|e| {
+                    tracing::warn!(error = %e, "Failed to create Skills.sh client, using default");
+                    SkillsShClient::new(None, None).unwrap()
+                });
         let skills_sh_installer = SkillsShInstaller::new(
             skills_dir,
             ss_config.base_url.clone(),
@@ -792,8 +793,9 @@ impl KernelBuilder {
             Arc::clone(&routing_stats),
             Arc::clone(&engine_handle),
         ));
-        let persona_api =
-            Arc::new(oxios_kernel::PersonaApi::new(Arc::new(persona_manager.clone())));
+        let persona_api = Arc::new(oxios_kernel::PersonaApi::new(Arc::new(
+            persona_manager.clone(),
+        )));
 
         // ── KernelHandle — the syscall table for agent OS control ──
         // Created inline here because AgentRuntime needs it.
@@ -828,7 +830,10 @@ impl KernelBuilder {
                     std::time::Instant::now(),
                 ),
                 project_manager.clone().map(oxios_kernel::ProjectApi::new),
-                oxios_kernel::ExecApi::new(Arc::new(parking_lot::RwLock::new(config.exec.clone())), access_manager.clone()),
+                oxios_kernel::ExecApi::new(
+                    Arc::new(parking_lot::RwLock::new(config.exec.clone())),
+                    access_manager.clone(),
+                ),
                 oxios_kernel::A2aApi::new(a2a_protocol.clone()),
                 // EngineApi — routing stats shared between EngineApi and AgentRuntime + engine hot-swap
                 oxios_kernel::EngineApi::new(
@@ -1091,7 +1096,6 @@ async fn build_tool_retriever(sm: &SkillManager) -> oxios_kernel::tools::retriev
     retriever
 }
 
-
 #[cfg(not(feature = "browser"))]
 
 /// Build a MarketplaceApi from the Kernel instance (used after Kernel construction).
@@ -1100,17 +1104,22 @@ fn build_marketplace_api_value(config: &OxiosConfig) -> MarketplaceApi {
     let skills_dir = workspace.join("skills");
 
     // ClawHub
-    let clawhub_client = ClawHubClient::new(config.marketplace.base_url.clone()).unwrap_or_else(|_| {
-        tracing::warn!("Invalid marketplace.base_url, using default");
-        ClawHubClient::new(Some("https://clawhub.ai".to_string())).unwrap()
-    });
-    let clawhub_installer =
-        ClawHubInstaller::new(skills_dir.clone(), workspace.clone(), config.marketplace.base_url.clone());
+    let clawhub_client =
+        ClawHubClient::new(config.marketplace.base_url.clone()).unwrap_or_else(|_| {
+            tracing::warn!("Invalid marketplace.base_url, using default");
+            ClawHubClient::new(Some("https://clawhub.ai".to_string())).unwrap()
+        });
+    let clawhub_installer = ClawHubInstaller::new(
+        skills_dir.clone(),
+        workspace.clone(),
+        config.marketplace.base_url.clone(),
+    );
 
     // Skills.sh
     let ss = &config.marketplace.skills_sh;
     let skills_sh_client = SkillsShClient::new(ss.base_url.clone(), ss.api_key.clone()).unwrap();
-    let skills_sh_installer = SkillsShInstaller::new(skills_dir, ss.base_url.clone(), ss.api_key.clone());
+    let skills_sh_installer =
+        SkillsShInstaller::new(skills_dir, ss.base_url.clone(), ss.api_key.clone());
 
     MarketplaceApi::new(
         Arc::new(clawhub_installer),

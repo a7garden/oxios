@@ -5,7 +5,7 @@
 //! # Example
 //!
 //! ```
-//! use oxios_kernel::memory::EmbeddingCache;
+//! use oxios_memory::EmbeddingCache;
 //!
 //! let cache = EmbeddingCache::new(3600, 10000);  // 1 hour TTL, 10k max
 //! cache.insert("hello", vec![1.0, 2.0, 3.0]);

@@ -1021,10 +1021,7 @@ async fn compute_memory_map_entries(
     let content_signature = memory_map_content_signature(entries);
 
     // Cache lookup.
-    if let Some(cached) = state
-        .memory_map_cache
-        .get(epoch, &ids, content_signature)
-    {
+    if let Some(cached) = state.memory_map_cache.get(epoch, &ids, content_signature) {
         return cached;
     }
 
@@ -1032,8 +1029,7 @@ async fn compute_memory_map_entries(
     // the term-frequency map to a sorted (term, weight) list, then
     // encode as a sparse f32 vector keyed by term index for PCA.
     let provider = oxios_kernel::embedding::TfIdfEmbeddingProvider;
-    let mut term_index: std::collections::HashMap<String, u32> =
-        std::collections::HashMap::new();
+    let mut term_index: std::collections::HashMap<String, u32> = std::collections::HashMap::new();
     let mut tf_vecs: Vec<Vec<(u32, f32)>> = Vec::with_capacity(entries.len());
     for entry in entries {
         let Ok(emb) = provider.embed(&entry.content).await else {

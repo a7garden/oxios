@@ -14,15 +14,13 @@ pub mod registration;
 pub mod retrieval;
 pub mod tool_types;
 
-
 pub use a2a_tools::{A2aDelegateTool, A2aQueryTool, A2aSendTool};
-pub use exec_tool::ExecTool;
 pub use builtin::{
     BudgetTool, CronTool, KernelAgentTool, KnowledgeTool, PersonaTool, ProjectTool, ResourceTool,
     SecurityTool,
 };
+pub use exec_tool::ExecTool;
 pub use mcp_tool::McpToolWrapper;
 pub use memory_tools::{MemoryReadTool, MemorySearchTool, MemoryWriteTool};
-
 
 pub use kernel_bridge::OxiosKernelBridge;

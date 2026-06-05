@@ -3,7 +3,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::MemoryType;
+use crate::memory::types::MemoryType;
 
 /// Budget for memory curation — limits per type.
 #[derive(Debug, Clone, Serialize, Deserialize)]
