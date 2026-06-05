@@ -154,9 +154,7 @@ impl ProactiveRecall {
         }
 
         // Filter by importance threshold
-        results.retain(|e| {
-            oxios_memory::memory::decay::DecayEngine::effective_importance(e) >= self.threshold
-        });
+        results.retain(|e| super::DecayEngine::effective_importance(e) >= self.threshold);
 
         Ok(results)
     }

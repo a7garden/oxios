@@ -18,12 +18,10 @@ use serde::{Deserialize, Serialize};
 use tokio::fs;
 use uuid::Uuid;
 
-use super::{MemoryEntry, MemoryManager, MemoryTier, MemoryType, ProtectionLevel};
-use oxios_memory::memory::auto_classify::AutoClassifier;
-use oxios_memory::memory::auto_protect::AutoProtector;
-use oxios_memory::memory::compaction::CompactionTree;
-use oxios_memory::memory::decay::DecayEngine;
-use oxios_memory::memory::root_index::{RootEntry, RootIndex, TopicEntry};
+use super::{
+    AutoClassifier, AutoProtector, CompactionTree, DecayEngine, MemoryEntry, MemoryManager,
+    MemoryTier, MemoryType, ProtectionLevel, RootEntry, RootIndex, TopicEntry,
+};
 
 // ---------------------------------------------------------------------------
 // DreamCheckpoint

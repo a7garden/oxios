@@ -8,9 +8,6 @@
 //! Dense vectors are used by the HNSW index for fast ANN search.
 //! Sparse vectors serve as a fallback when no embedding model is available.
 
-#[cfg(feature = "embedding-gguf")]
-pub mod gguf;
-
 use std::collections::HashMap;
 
 use anyhow::Result;

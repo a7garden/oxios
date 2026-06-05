@@ -30,18 +30,14 @@ pub use oxios_memory::memory::types::{
 };
 
 // Re-export leaf modules from oxios-memory
-pub use oxios_memory::memory::{
-    auto_classify::AutoClassifier,
-    auto_protect::AutoProtector,
-    compaction::CompactionTree,
-    decay::DecayEngine,
-    embedding_cache::{CacheStats, EmbeddingCache},
-    embedding_viz::{compute_pca_2d, compute_top_neighbors, MemoryMapEntry, MemoryNeighbor},
-    flash_attention::{BenchmarkResult, FlashAttention, FlashAttentionConfig, MemoryEstimate},
-    graph::MemoryGraph,
-    hnsw::HnswIndex,
-    quota::{CurationCandidate, CurationReport, MemoryBudget},
-    root_index::{HistoricalPeriod, RootEntry, RootIndex, TopicEntry},
+pub use oxios_memory::l2_normalize_f32;
+pub use oxios_memory::memory::embedding_viz::{compute_pca_2d, compute_top_neighbors};
+pub use oxios_memory::HnswIndex;
+pub use oxios_memory::{
+    AutoClassifier, AutoProtector, CacheStats, CompactionTree, CurationCandidate, CurationReport,
+    DecayEngine, EmbeddingCache, FlashAttention, FlashAttentionConfig, HistoricalPeriod,
+    MemoryBudget, MemoryEstimate, MemoryGraph, MemoryMapEntry, MemoryNeighbor, RootEntry,
+    RootIndex, TopicEntry,
 };
 
 // Re-export from store (still in kernel)

@@ -14,12 +14,11 @@ use serde::{Deserialize, Serialize};
 
 use crate::embedding::EmbeddingVector;
 
+use super::l2_normalize_f32;
 use super::{
-    content_hash, dedup_by_id, extract_keywords, MemoryEntry, MemoryManager, MemoryTier, MemoryType,
+    content_hash, dedup_by_id, extract_keywords, AutoProtector, HnswIndex, MemoryEntry,
+    MemoryManager, MemoryTier, MemoryType,
 };
-use oxios_memory::l2_normalize_f32;
-use oxios_memory::memory::auto_protect::AutoProtector;
-use oxios_memory::memory::hnsw::HnswIndex;
 
 // ---------------------------------------------------------------------------
 // VectorIndexSnapshot
