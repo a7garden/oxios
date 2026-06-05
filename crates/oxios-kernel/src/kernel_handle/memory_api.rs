@@ -6,7 +6,7 @@
 //!
 //! Consumers should use [`KernelHandle::memory()`] to access this API.
 
-use crate::memory::store::HnswMemoryIndex;
+use crate::memory::hnsw_memory_index::HnswMemoryIndex;
 use crate::memory::{MemoryEntry, MemoryManager, MemoryType, SemanticHit};
 use std::sync::Arc;
 
