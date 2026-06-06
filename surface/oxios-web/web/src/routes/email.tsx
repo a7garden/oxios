@@ -421,7 +421,6 @@ function SetupPanel({
   }
 
   const isPending = setupMutation.isPending || testMutation.isPending
-  const dashboardUrl = providerDashboardUrl(status?.provider ?? provider)
 
   // ── Already configured state ────────────────────────────
   if (status?.configured) {
