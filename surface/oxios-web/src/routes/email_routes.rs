@@ -362,6 +362,7 @@ pub(crate) async fn handle_email_setup(
 ) -> Result<Json<serde_json::Value>, AppError> {
     // Validate we can connect with these credentials
     let provider = match body.provider.as_str() {
+        "resend" => oxios_kernel::email::SmtpProvider::Resend,
         "gmail" => oxios_kernel::email::SmtpProvider::Gmail,
         "icloud" => oxios_kernel::email::SmtpProvider::Icloud,
         "fastmail" => oxios_kernel::email::SmtpProvider::Fastmail,
@@ -430,6 +431,7 @@ fn append_email_section_to_config(
         return Ok(());
     }
     let provider_str = match config.provider {
+        oxios_kernel::email::SmtpProvider::Resend => "resend",
         oxios_kernel::email::SmtpProvider::Gmail => "gmail",
         oxios_kernel::email::SmtpProvider::Icloud => "icloud",
         oxios_kernel::email::SmtpProvider::Fastmail => "fastmail",

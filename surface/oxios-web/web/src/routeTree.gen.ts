@@ -20,6 +20,7 @@ import { Route as McpRouteImport } from './routes/mcp'
 import { Route as MarketplaceRouteImport } from './routes/marketplace'
 import { Route as GitRouteImport } from './routes/git'
 import { Route as EventsRouteImport } from './routes/events'
+import { Route as EmailRouteImport } from './routes/email'
 import { Route as CronJobsRouteImport } from './routes/cron-jobs'
 import { Route as ChatRouteImport } from './routes/chat'
 import { Route as CalendarRouteImport } from './routes/calendar'
@@ -97,6 +98,11 @@ const GitRoute = GitRouteImport.update({
 const EventsRoute = EventsRouteImport.update({
   id: '/events',
   path: '/events',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EmailRoute = EmailRouteImport.update({
+  id: '/email',
+  path: '/email',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CronJobsRoute = CronJobsRouteImport.update({
@@ -223,6 +229,7 @@ export interface FileRoutesByFullPath {
   '/calendar': typeof CalendarRoute
   '/chat': typeof ChatRoute
   '/cron-jobs': typeof CronJobsRoute
+  '/email': typeof EmailRoute
   '/events': typeof EventsRoute
   '/git': typeof GitRoute
   '/marketplace': typeof MarketplaceRoute
@@ -259,6 +266,7 @@ export interface FileRoutesByTo {
   '/calendar': typeof CalendarRoute
   '/chat': typeof ChatRoute
   '/cron-jobs': typeof CronJobsRoute
+  '/email': typeof EmailRoute
   '/events': typeof EventsRoute
   '/git': typeof GitRoute
   '/marketplace': typeof MarketplaceRoute
@@ -296,6 +304,7 @@ export interface FileRoutesById {
   '/calendar': typeof CalendarRoute
   '/chat': typeof ChatRoute
   '/cron-jobs': typeof CronJobsRoute
+  '/email': typeof EmailRoute
   '/events': typeof EventsRoute
   '/git': typeof GitRoute
   '/marketplace': typeof MarketplaceRoute
@@ -334,6 +343,7 @@ export interface FileRouteTypes {
     | '/calendar'
     | '/chat'
     | '/cron-jobs'
+    | '/email'
     | '/events'
     | '/git'
     | '/marketplace'
@@ -370,6 +380,7 @@ export interface FileRouteTypes {
     | '/calendar'
     | '/chat'
     | '/cron-jobs'
+    | '/email'
     | '/events'
     | '/git'
     | '/marketplace'
@@ -406,6 +417,7 @@ export interface FileRouteTypes {
     | '/calendar'
     | '/chat'
     | '/cron-jobs'
+    | '/email'
     | '/events'
     | '/git'
     | '/marketplace'
@@ -443,6 +455,7 @@ export interface RootRouteChildren {
   CalendarRoute: typeof CalendarRoute
   ChatRoute: typeof ChatRoute
   CronJobsRoute: typeof CronJobsRoute
+  EmailRoute: typeof EmailRoute
   EventsRoute: typeof EventsRoute
   GitRoute: typeof GitRoute
   MarketplaceRoute: typeof MarketplaceRoute
@@ -548,6 +561,13 @@ declare module '@tanstack/react-router' {
       path: '/events'
       fullPath: '/events'
       preLoaderRoute: typeof EventsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/email': {
+      id: '/email'
+      path: '/email'
+      fullPath: '/email'
+      preLoaderRoute: typeof EmailRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/cron-jobs': {
@@ -734,6 +754,7 @@ const rootRouteChildren: RootRouteChildren = {
   CalendarRoute: CalendarRoute,
   ChatRoute: ChatRoute,
   CronJobsRoute: CronJobsRoute,
+  EmailRoute: EmailRoute,
   EventsRoute: EventsRoute,
   GitRoute: GitRoute,
   MarketplaceRoute: MarketplaceRoute,

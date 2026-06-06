@@ -299,20 +299,23 @@ impl Kernel {
             return None;
         }
 
-        // Resolve SMTP password: OXIOS_EMAIL_PASSWORD env → credential store
-        let password = std::env::var("OXIOS_EMAIL_PASSWORD").ok().or_else(|| {
-            // Try credential store
-            oxi_sdk::load_token(&self.config.email.secret_ref)
-                .ok()
-                .flatten()
-                .map(|t| t.access_token)
-        });
+        // Resolve SMTP password: OXIOS_EMAIL_PASSWORD env → RESEND_API_KEY → credential store
+        let password = std::env::var("OXIOS_EMAIL_PASSWORD")
+            .ok()
+            .or_else(|| std::env::var("RESEND_API_KEY").ok())
+            .or_else(|| {
+                // Try credential store
+                oxi_sdk::load_token(&self.config.email.secret_ref)
+                    .ok()
+                    .flatten()
+                    .map(|t| t.access_token)
+            });
 
         let password = match password {
             Some(p) => p,
             None => {
                 tracing::warn!(
-                    "Email enabled but no SMTP password found. Set OXIOS_EMAIL_PASSWORD env var or run 'oxios email setup'."
+                    "Email enabled but no SMTP password found. Set OXIOS_EMAIL_PASSWORD / RESEND_API_KEY env var or run 'oxios email setup'."
                 );
                 return None;
             }

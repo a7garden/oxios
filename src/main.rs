@@ -1523,18 +1523,28 @@ async fn cmd_email_setup(kernel: &Kernel) {
     // Step 2: Provider
     let provider = Select::new(
         "SMTP provider:",
-        vec!["gmail", "icloud", "fastmail", "custom"],
+        vec!["resend", "gmail", "icloud", "fastmail", "custom"],
     )
     .prompt()
-    .unwrap_or("gmail")
+    .unwrap_or("resend")
     .to_string();
 
     // Step 3: Password
-    println!("\n  For Gmail: use an App Password (not your regular password).");
-    println!("  Create one at: https://myaccount.google.com/apppasswords");
-    let password = Text::new("SMTP password / app password:")
-        .prompt()
-        .unwrap_or_default();
+    if provider == "resend" {
+        println!("\n  Get your Resend API key at: https://resend.com/api-keys");
+        println!("  The API key starts with 're_' and is used as the SMTP password.");
+    } else if provider == "gmail" {
+        println!("\n  For Gmail: use an App Password (not your regular password).");
+        println!("  Create one at: https://myaccount.google.com/apppasswords");
+    } else if provider == "icloud" {
+        println!("\n  For iCloud: use an App-Specific Password (not your regular password).");
+        println!("  Create one at: https://appleid.apple.com");
+    }
+    let password_label = match provider.as_str() {
+        "resend" => "Resend API key:",
+        _ => "SMTP password / app password:",
+    };
+    let password = Text::new(password_label).prompt().unwrap_or_default();
     if password.is_empty() {
         eprintln!("{} Password is required.", style("✗").red().bold());
         return;
@@ -1542,6 +1552,7 @@ async fn cmd_email_setup(kernel: &Kernel) {
 
     // Step 4: Build config and test
     let smtp_provider = match provider.as_str() {
+        "resend" => oxios_kernel::email::SmtpProvider::Resend,
         "gmail" => oxios_kernel::email::SmtpProvider::Gmail,
         "icloud" => oxios_kernel::email::SmtpProvider::Icloud,
         "fastmail" => oxios_kernel::email::SmtpProvider::Fastmail,
@@ -1623,6 +1634,7 @@ fn append_email_to_config(
         return Ok(());
     }
     let provider_str = match config.provider {
+        oxios_kernel::email::SmtpProvider::Resend => "resend",
         oxios_kernel::email::SmtpProvider::Gmail => "gmail",
         oxios_kernel::email::SmtpProvider::Icloud => "icloud",
         oxios_kernel::email::SmtpProvider::Fastmail => "fastmail",

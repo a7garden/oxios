@@ -223,12 +223,10 @@ pub async fn ensure_web_dist(workspace: &Path) -> WebDistResult {
     tracing::info!("No web UI found locally, downloading from GitHub Releases...");
     match fetch_latest_release_tag().await {
         Ok(tag) => match download_and_extract_web_dist(&tag).await {
-            Ok(p) => {
-                WebDistResult::Downloaded {
-                    path: p,
-                    version: tag,
-                }
-            }
+            Ok(p) => WebDistResult::Downloaded {
+                path: p,
+                version: tag,
+            },
             Err(e) => {
                 tracing::warn!(error = %e, "Failed to auto-download web UI");
                 WebDistResult::DownloadFailed {

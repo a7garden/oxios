@@ -9,6 +9,7 @@
 //! - `gmail` → smtp.gmail.com:465 / TLS
 //! - `icloud` → smtp.mail.me.com:587 / STARTTLS
 //! - `fastmail` → smtp.fastmail.com:465 / TLS
+//! - `resend` → smtp.resend.com:587 / STARTTLS (API key as password)
 //! - `custom` → manual host/port/tls required
 
 use std::sync::Arc;
@@ -45,6 +46,9 @@ pub enum SmtpProvider {
     Icloud,
     /// Fastmail (smtp.fastmail.com:465, TLS).
     Fastmail,
+    /// Resend (smtp.resend.com:587, STARTTLS).
+    /// Uses API key as SMTP password; username is always `resend`.
+    Resend,
     /// Custom SMTP server (manual host/port/tls).
     Custom,
 }
@@ -56,6 +60,7 @@ impl SmtpProvider {
             SmtpProvider::Gmail => ("smtp.gmail.com", 465, SmtpTls::Tls),
             SmtpProvider::Icloud => ("smtp.mail.me.com", 587, SmtpTls::StartTls),
             SmtpProvider::Fastmail => ("smtp.fastmail.com", 465, SmtpTls::Tls),
+            SmtpProvider::Resend => ("smtp.resend.com", 587, SmtpTls::StartTls),
             SmtpProvider::Custom => ("", 0, SmtpTls::Tls),
         }
     }
@@ -112,10 +117,15 @@ impl SmtpClient {
         };
         let tls_mode = config.tls.unwrap_or(default_tls);
 
-        let user = if config.user.is_empty() {
-            config.my_email.clone()
-        } else {
-            config.user.clone()
+        let user = match config.provider {
+            SmtpProvider::Resend => "resend".to_string(),
+            _ => {
+                if config.user.is_empty() {
+                    config.my_email.clone()
+                } else {
+                    config.user.clone()
+                }
+            }
         };
 
         anyhow::ensure!(!host.is_empty(), "SMTP host is required");
@@ -232,6 +242,11 @@ mod tests {
         assert_eq!(host, "smtp.fastmail.com");
         assert_eq!(port, 465);
         assert_eq!(tls, SmtpTls::Tls);
+
+        let (host, port, tls) = SmtpProvider::Resend.defaults();
+        assert_eq!(host, "smtp.resend.com");
+        assert_eq!(port, 587);
+        assert_eq!(tls, SmtpTls::StartTls);
 
         let (host, port, _) = SmtpProvider::Custom.defaults();
         assert!(host.is_empty());
