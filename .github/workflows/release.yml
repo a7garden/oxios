@@ -1,11 +1,10 @@
-name: Release
+name: Release (Web UI)
 
 on:
   push:
     tags:
       - 'v*'
 
-# Default to read-only; release job overrides with contents: write.
 permissions:
   contents: read
 
@@ -17,68 +16,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Read rust-toolchain channel
-        id: rust-channel
-        run: |
-          if grep -q 'channel = "' rust-toolchain.toml 2>/dev/null; then
-            CHANNEL=$(grep 'channel = "' rust-toolchain.toml | sed 's/.*= "\([^"]*\)".*/\1/')
-            echo "channel=$CHANNEL" >> $GITHUB_OUTPUT
-          else
-            echo "channel=stable" >> $GITHUB_OUTPUT
-          fi
-
-      - uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: ${{ steps.rust-channel.outputs.channel }}
-
       - uses: oven-sh/setup-bun@v2
 
-      # ─── 1. Build web assets ────────────────────────────────────────
+      # ─── Build web assets ────────────────────────────────────────────
       - name: Build web assets
         working-directory: surface/oxios-web/web
         run: bun install && bun run build
 
-      # ─── 2. Publish crates to crates.io in dependency order ─────────
-      # Leaf crates first, then kernel, then consumers, then binary.
-      # Each crate is published with --allow-dirty because web-dist.zip
-      # is generated at runtime and not checked into git.
-      - name: Publish oxios-memory
-        run: cargo publish -p oxios-memory --token "${{ secrets.CARGO_REGISTRY_TOKEN }}" --allow-dirty
-
-      - name: Publish oxios-markdown
-        run: cargo publish -p oxios-markdown --token "${{ secrets.CARGO_REGISTRY_TOKEN }}" --allow-dirty
-
-      - name: Publish oxios-ouroboros
-        run: cargo publish -p oxios-ouroboros --token "${{ secrets.CARGO_REGISTRY_TOKEN }}" --allow-dirty
-
-      - name: Publish oxios-mcp
-        run: cargo publish -p oxios-mcp --token "${{ secrets.CARGO_REGISTRY_TOKEN }}" --allow-dirty
-
-      - name: Publish oxios-calendar
-        run: cargo publish -p oxios-calendar --token "${{ secrets.CARGO_REGISTRY_TOKEN }}" --allow-dirty
-
-      - name: Publish oxios-kernel
-        run: cargo publish -p oxios-kernel --token "${{ secrets.CARGO_REGISTRY_TOKEN }}" --allow-dirty
-
-      - name: Publish oxios-gateway
-        run: cargo publish -p oxios-gateway --token "${{ secrets.CARGO_REGISTRY_TOKEN }}" --allow-dirty
-
-      - name: Publish oxios-cli
-        run: cargo publish -p oxios-cli --token "${{ secrets.CARGO_REGISTRY_TOKEN }}" --allow-dirty
-
-      - name: Publish oxios-telegram
-        run: cargo publish -p oxios-telegram --token "${{ secrets.CARGO_REGISTRY_TOKEN }}" --allow-dirty
-
-      - name: Publish oxios-bench
-        run: cargo publish -p oxios-bench --token "${{ secrets.CARGO_REGISTRY_TOKEN }}" --allow-dirty
-
-      - name: Publish oxios-web
-        run: cargo publish -p oxios-web --token "${{ secrets.CARGO_REGISTRY_TOKEN }}" --allow-dirty
-
-      - name: Publish oxios (binary)
-        run: cargo publish --token "${{ secrets.CARGO_REGISTRY_TOKEN }}" --allow-dirty
-
-      # ─── 3. GitHub Release ──────────────────────────────────────────
+      # ─── Package and create GitHub Release ───────────────────────────
       - name: Package web assets
         run: |
           cd surface/oxios-web/web/dist
