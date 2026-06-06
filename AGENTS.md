@@ -127,6 +127,41 @@ See `docs/ARCHITECTURE.md` for the full reference (subsystems, data flow, depend
 | `docs/USER-GUIDE.md` | Changing user-facing features or CLI behavior |
 | `share/default-config.toml` | Changing configuration options |
 
+## Release
+
+Two separate pipelines, two different triggers.
+
+### Web UI — GitHub Actions (automatic)
+
+Tag push (`v*`) triggers `.github/workflows/release.yml`. Builds `surface/oxios-web/web` with Bun, zips `dist/`, uploads as GitHub Release asset. No local action needed.
+
+```bash
+git tag v1.2.0 && git push --tags   # → CI builds & publishes web-dist.zip
+```
+
+### crates.io — Local (manual)
+
+No CI. Publish from local in **dependency order** — crates.io resolves versions at publish time, so dependencies must exist before dependents.
+
+```
+① oxios-markdown      (no oxios deps)
+   oxios-mcp           (no oxios deps)
+   oxios-ouroboros     (no oxios deps)
+   oxios-memory        (no oxios deps)
+② oxios-calendar      → oxios-markdown
+③ oxios-kernel        → {oxios-ouroboros, oxios-markdown, oxios-calendar, oxios-mcp, oxios-memory}
+④ oxios-gateway       → oxios-kernel
+⑤ oxios               → oxios-kernel (binary crate, not published)
+```
+
+**Steps per crate:**
+1. Bump `version` in `Cargo.toml`
+2. `cargo publish -p <crate> --dry-run` — verify
+3. `cargo publish -p <crate>` — publish
+4. Commit version bump, push
+
+**Before starting:** `cargo test --workspace` must pass. CI green is not enough — local tests catch feature-gated paths.
+
 ## Pitfalls
 
 - **Kernel is intentionally monolithic.** See ARCHITECTURE.md §10. Do not propose splitting.
