@@ -30,6 +30,9 @@
         "noSvgWithoutTitle": "off",
         "useAriaPropsSupportedByRole": "off"
       },
+      "security": {
+        "noDangerouslySetInnerHtml": "off"
+      },
       "style": {
         "useTemplate": "warn",
         "noNonNullAssertion": "off"

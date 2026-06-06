@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/utils'
 
 interface SelectProps {
+  id?: string
   value?: string
   onValueChange?: (value: string) => void
   placeholder?: string
@@ -11,7 +12,7 @@ interface SelectProps {
   className?: string
 }
 
-function Select({ value, onValueChange, placeholder, options, className }: SelectProps) {
+function Select({ id, value, onValueChange, placeholder, options, className }: SelectProps) {
   const { t } = useTranslation()
   const [open, setOpen] = React.useState(false)
   const ref = React.useRef<HTMLDivElement>(null)
@@ -27,7 +28,7 @@ function Select({ value, onValueChange, placeholder, options, className }: Selec
   const selected = options.find((o) => o.value === value)
 
   return (
-    <div className={cn('relative', className)} ref={ref}>
+    <div id={id} className={cn('relative', className)} ref={ref}>
       <button
         type="button"
         onClick={() => setOpen(!open)}

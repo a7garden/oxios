@@ -114,7 +114,7 @@ pub struct EmailConfigRequest {
 }
 
 fn default_provider() -> String {
-    "gmail".to_string()
+    "resend".to_string()
 }
 
 // ---------------------------------------------------------------------------
@@ -230,12 +230,20 @@ fn load_sent_record(
 pub(crate) async fn handle_email_status(
     state: State<Arc<AppState>>,
 ) -> Result<Json<EmailStatusResponse>, AppError> {
+    let provider_name = match state.config.read().email.provider {
+        oxios_kernel::email::SmtpProvider::Resend => "resend",
+        oxios_kernel::email::SmtpProvider::Gmail => "gmail",
+        oxios_kernel::email::SmtpProvider::Icloud => "icloud",
+        oxios_kernel::email::SmtpProvider::Fastmail => "fastmail",
+        oxios_kernel::email::SmtpProvider::Custom => "custom",
+    }.to_string();
+
     let configured = state.kernel.email.is_some();
     let (email, provider, template_count) = if let Some(api) = &state.kernel.email {
         let templates = api.list_templates().unwrap_or_default();
         (
             Some(api.default_to().to_string()),
-            Some("configured".to_string()),
+            Some(provider_name),
             templates.len(),
         )
     } else {

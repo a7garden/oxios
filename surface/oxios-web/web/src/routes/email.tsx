@@ -3,8 +3,11 @@ import { createFileRoute } from '@tanstack/react-router'
 import {
   CheckCircle2,
   ExternalLink,
+  Eye,
+  EyeOff,
   History,
   LayoutTemplate,
+  Loader2,
   Mail,
   MailCheck,
   MailWarning,
@@ -12,9 +15,6 @@ import {
   Send,
   Settings,
   Wrench,
-  Eye,
-  EyeOff,
-  Loader2,
 } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -26,8 +26,8 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/componen
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Separator } from '@/components/ui/separator'
 import { Select } from '@/components/ui/select'
+import { Separator } from '@/components/ui/separator'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { api } from '@/lib/api-client'
 import { cn } from '@/lib/utils'
@@ -124,7 +124,9 @@ function EmailPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">{t('email.title', 'Email')}</h1>
-          <p className="text-muted-foreground">{t('email.subtitle', 'Configure and manage email sending')}</p>
+          <p className="text-muted-foreground">
+            {t('email.subtitle', 'Configure and manage email sending')}
+          </p>
         </div>
         <div className="flex items-center gap-2">
           {status?.configured && (
@@ -171,7 +173,13 @@ function EmailPage() {
           <OverviewPanel status={status} refetch={refetch} />
         </TabsContent>
         <TabsContent value="setup">
-          <SetupPanel status={status} onComplete={() => { refetch(); setActiveTab('overview') }} />
+          <SetupPanel
+            status={status}
+            onComplete={() => {
+              refetch()
+              setActiveTab('overview')
+            }}
+          />
         </TabsContent>
         <TabsContent value="history">
           <HistoryPanel />
@@ -186,7 +194,13 @@ function EmailPage() {
 
 // ─── Overview Panel ────────────────────────────────────────
 
-function OverviewPanel({ status, refetch }: { status?: EmailStatus; refetch: () => void }) {
+function OverviewPanel({
+  status,
+  refetch: _refetch,
+}: {
+  status?: EmailStatus
+  refetch: () => void
+}) {
   const { t } = useTranslation()
 
   if (!status) return null
@@ -221,9 +235,7 @@ function OverviewPanel({ status, refetch }: { status?: EmailStatus; refetch: () 
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="font-semibold truncate">
-            {status.email ?? t('email.noAddress', '—')}
-          </p>
+          <p className="font-semibold truncate">{status.email ?? t('email.noAddress', '—')}</p>
           {status.provider && (
             <p className="text-xs text-muted-foreground mt-1 capitalize">{status.provider}</p>
           )}
@@ -276,10 +288,22 @@ function SetupPanel({ status, onComplete }: { status?: EmailStatus; onComplete: 
   const isCustom = provider === 'custom'
 
   const setupMutation = useMutation({
-    mutationFn: (body: { my_email: string; provider: string; password: string; host?: string; port?: number; user?: string }) =>
-      api.post<SetupResponse>('/api/email/setup', body),
+    mutationFn: (body: {
+      my_email: string
+      provider: string
+      password: string
+      host?: string
+      port?: number
+      user?: string
+    }) => api.post<SetupResponse>('/api/email/setup', body),
     onSuccess: () => {
-      setTestResult({ ok: true, message: t('email.setupSuccess', 'Email configured successfully. Restart oxios to activate.') })
+      setTestResult({
+        ok: true,
+        message: t(
+          'email.setupSuccess',
+          'Email configured successfully. Restart oxios to activate.',
+        ),
+      })
       queryClient.invalidateQueries({ queryKey: ['email-status'] })
       onComplete()
     },
@@ -308,7 +332,7 @@ function SetupPanel({ status, onComplete }: { status?: EmailStatus; onComplete: 
     }
     if (isCustom) {
       body.host = host
-      body.port = parseInt(port) || 587
+      body.port = parseInt(port, 10) || 587
       if (user) body.user = user
     }
     setupMutation.mutate(body as Parameters<typeof setupMutation.mutate>[0])
@@ -337,19 +361,31 @@ function SetupPanel({ status, onComplete }: { status?: EmailStatus; onComplete: 
           </p>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={handleTest} disabled={isPending}>
-              {isPending ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Send className="h-4 w-4 mr-1" />}
+              {isPending ? (
+                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+              ) : (
+                <Send className="h-4 w-4 mr-1" />
+              )}
               {t('email.sendTest', 'Send Test')}
             </Button>
-            <Button variant="outline" size="sm" onClick={() => window.open('https://resend.com/emails', '_blank')}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => window.open('https://resend.com/emails', '_blank')}
+            >
               <ExternalLink className="h-4 w-4 mr-1" />
               {t('email.openDashboard', 'Dashboard')}
             </Button>
           </div>
           {testResult && (
-            <div className={cn(
-              'text-sm p-3 rounded-md border',
-              testResult.ok ? 'border-success-subtle text-success' : 'border-destructive/50 text-destructive',
-            )}>
+            <div
+              className={cn(
+                'text-sm p-3 rounded-md border',
+                testResult.ok
+                  ? 'border-success-subtle text-success'
+                  : 'border-destructive/50 text-destructive',
+              )}
+            >
               {testResult.message}
             </div>
           )}
@@ -369,7 +405,10 @@ function SetupPanel({ status, onComplete }: { status?: EmailStatus; onComplete: 
           {t('email.setupTitle', 'Email Setup')}
         </CardTitle>
         <p className="text-sm text-muted-foreground">
-          {t('email.setupDescription', 'Connect an SMTP provider to enable email sending for agents.')}
+          {t(
+            'email.setupDescription',
+            'Connect an SMTP provider to enable email sending for agents.',
+          )}
         </p>
       </CardHeader>
       <CardContent>
@@ -400,7 +439,10 @@ function SetupPanel({ status, onComplete }: { status?: EmailStatus; onComplete: 
             />
             {isResend && (
               <p className="text-xs text-muted-foreground">
-                {t('email.resendDomainHint', 'Must use a domain verified in your Resend dashboard.')}
+                {t(
+                  'email.resendDomainHint',
+                  'Must use a domain verified in your Resend dashboard.',
+                )}
               </p>
             )}
           </div>
@@ -408,7 +450,9 @@ function SetupPanel({ status, onComplete }: { status?: EmailStatus; onComplete: 
           {/* Password / API Key */}
           <div className="space-y-2">
             <Label htmlFor="password">
-              {isResend ? t('email.apiKeyLabel', 'Resend API key') : t('email.passwordLabel', 'SMTP password / app password')}
+              {isResend
+                ? t('email.apiKeyLabel', 'Resend API key')
+                : t('email.passwordLabel', 'SMTP password / app password')}
             </Label>
             <div className="flex gap-2 max-w-sm">
               <div className="relative flex-1">
@@ -447,7 +491,10 @@ function SetupPanel({ status, onComplete }: { status?: EmailStatus; onComplete: 
             )}
             {provider === 'gmail' && (
               <p className="text-xs text-muted-foreground">
-                {t('email.gmailHint', 'Use an App Password (not your regular password). Create one at')}{' '}
+                {t(
+                  'email.gmailHint',
+                  'Use an App Password (not your regular password). Create one at',
+                )}{' '}
                 <a
                   href="https://myaccount.google.com/apppasswords"
                   target="_blank"
@@ -520,16 +567,24 @@ function SetupPanel({ status, onComplete }: { status?: EmailStatus; onComplete: 
           {/* Submit */}
           <div className="flex gap-2 pt-2">
             <Button type="submit" disabled={!myEmail || !password || isPending}>
-              {isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Settings className="h-4 w-4 mr-2" />}
+              {isPending ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Settings className="h-4 w-4 mr-2" />
+              )}
               {isPending ? t('email.saving', 'Saving...') : t('email.saveAndTest', 'Save & Test')}
             </Button>
           </div>
 
           {testResult && (
-            <div className={cn(
-              'text-sm p-3 rounded-md border',
-              testResult.ok ? 'border-success-subtle text-success bg-success/5' : 'border-destructive/50 text-destructive bg-destructive/5',
-            )}>
+            <div
+              className={cn(
+                'text-sm p-3 rounded-md border',
+                testResult.ok
+                  ? 'border-success-subtle text-success bg-success/5'
+                  : 'border-destructive/50 text-destructive bg-destructive/5',
+              )}
+            >
               {testResult.message}
             </div>
           )}
@@ -543,7 +598,7 @@ function SetupPanel({ status, onComplete }: { status?: EmailStatus; onComplete: 
 
 function HistoryPanel() {
   const { t } = useTranslation()
-  const { data, isLoading, isError, refetch, isFetching } = useEmailHistory(100)
+  const { data, refetch, isFetching } = useEmailHistory(100)
 
   const emails = data?.emails ?? []
 
@@ -566,12 +621,16 @@ function HistoryPanel() {
         ) : (
           <div className="space-y-3">
             {emails.map((email) => (
-              <div key={email.id} className="flex items-start justify-between gap-4 rounded-lg border p-3">
+              <div
+                key={email.id}
+                className="flex items-start justify-between gap-4 rounded-lg border p-3"
+              >
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-medium truncate">{email.subject}</p>
                   <p className="text-xs text-muted-foreground">
                     {t('email.to', 'To')}: {email.to}
-                    {email.template_used && ` · ${t('email.template', 'template')}: ${email.template_used}`}
+                    {email.template_used &&
+                      ` · ${t('email.template', 'template')}: ${email.template_used}`}
                   </p>
                 </div>
                 <div className="shrink-0 text-right">
@@ -603,43 +662,43 @@ function SentEmailDialog({ email }: { email: SentEmail }) {
         {t('email.viewDetails', 'View')}
       </Button>
       <Dialog open={open} onOpenChange={setOpen}>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Mail className="h-4 w-4" />
-            {email.subject}
-          </DialogTitle>
-        </DialogHeader>
-        <div className="space-y-3 text-sm">
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <span className="text-muted-foreground">{t('email.to', 'To')}:</span> {email.to}
-            </div>
-            <div>
-              <span className="text-muted-foreground">{t('email.sentAt', 'Sent at')}:</span>{' '}
-              {new Date(email.sent_at).toLocaleString()}
-            </div>
-            <div>
-              <span className="text-muted-foreground">ID:</span>{' '}
-              <code className="text-xs">{email.id}</code>
-            </div>
-            {email.template_used && (
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Mail className="h-4 w-4" />
+              {email.subject}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 text-sm">
+            <div className="grid grid-cols-2 gap-2">
               <div>
-                <span className="text-muted-foreground">{t('email.template', 'Template')}:</span>{' '}
-                {email.template_used}
+                <span className="text-muted-foreground">{t('email.to', 'To')}:</span> {email.to}
               </div>
-            )}
+              <div>
+                <span className="text-muted-foreground">{t('email.sentAt', 'Sent at')}:</span>{' '}
+                {new Date(email.sent_at).toLocaleString()}
+              </div>
+              <div>
+                <span className="text-muted-foreground">ID:</span>{' '}
+                <code className="text-xs">{email.id}</code>
+              </div>
+              {email.template_used && (
+                <div>
+                  <span className="text-muted-foreground">{t('email.template', 'Template')}:</span>{' '}
+                  {email.template_used}
+                </div>
+              )}
+            </div>
+            <Separator />
+            <div className="max-h-96 overflow-auto border rounded-md p-3 bg-muted/30">
+              <div
+                className="prose prose-sm dark:prose-invert max-w-none"
+                dangerouslySetInnerHTML={{ __html: email.html_preview }}
+              />
+            </div>
           </div>
-          <Separator />
-          <div className="max-h-96 overflow-auto border rounded-md p-3 bg-muted/30">
-            <div
-              className="prose prose-sm dark:prose-invert max-w-none"
-              dangerouslySetInnerHTML={{ __html: email.html_preview }}
-            />
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
+        </DialogContent>
+      </Dialog>
     </>
   )
 }
@@ -648,7 +707,7 @@ function SentEmailDialog({ email }: { email: SentEmail }) {
 
 function TemplatesPanel() {
   const { t } = useTranslation()
-  const { data, isLoading, isError, refetch, isFetching } = useEmailTemplates()
+  const { data, refetch, isFetching } = useEmailTemplates()
 
   const templates = data?.templates ?? []
 
@@ -666,7 +725,10 @@ function TemplatesPanel() {
       <CardContent>
         {templates.length === 0 ? (
           <div className="text-center py-8 text-sm text-muted-foreground">
-            {t('email.noTemplates', 'No templates yet. Agents can save templates when sending emails.')}
+            {t(
+              'email.noTemplates',
+              'No templates yet. Agents can save templates when sending emails.',
+            )}
           </div>
         ) : (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -685,4 +747,3 @@ function TemplatesPanel() {
     </Card>
   )
 }
-
