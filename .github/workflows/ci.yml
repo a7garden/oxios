@@ -133,6 +133,14 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-target-${{ hashFiles('**/Cargo.lock') }}-
 
+      # Frontend assets must exist before Rust compilation because
+      # rust_embed::Embed generates code from web/dist/ at compile time.
+      - uses: oven-sh/setup-bun@v2
+
+      - name: Build web assets
+        working-directory: surface/oxios-web/web
+        run: bun install --frozen-lockfile && bun run build
+
       - name: Run unit tests (partitioned)
         run: |
           cargo nextest run --workspace \
