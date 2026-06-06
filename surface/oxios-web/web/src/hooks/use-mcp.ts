@@ -1,6 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api-client'
-import type { McpServer, McpTool, McpToolCallResult, McpServerRegisterRequest, McpToolCallRequest } from '@/types/mcp'
+import type {
+  McpServer,
+  McpServerRegisterRequest,
+  McpTool,
+  McpToolCallRequest,
+  McpToolCallResult,
+} from '@/types/mcp'
 
 export function useMcpServers() {
   return useQuery({

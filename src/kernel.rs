@@ -193,6 +193,8 @@ impl Kernel {
                     knowledge,
                     knowledge_lens,
                     self.build_marketplace_api(),
+                    self.build_calendar_api(),
+                    self.build_email_api(),
                 ))
             })
             .clone()
@@ -253,12 +255,101 @@ impl Kernel {
         )
     }
 
+    /// Build the calendar API facade (optional — only if `[calendar] enabled = true`).
+    fn build_calendar_api(&self) -> Option<oxios_kernel::CalendarApi> {
+        if !self.config.calendar.enabled {
+            return None;
+        }
+
+        let workspace = PathBuf::from(&self.config.kernel.workspace);
+        let calendar_dir = workspace.join("calendar").join("events");
+
+        // CalendarEngine::new only creates the directory and loads index.json — sync-compatible.
+        let engine = std::fs::create_dir_all(&calendar_dir)
+            .map_err(|e| {
+                tracing::warn!(error = %e, "Failed to create calendar directory");
+                e
+            })
+            .ok()
+            .and_then(|_| oxios_calendar::CalendarEngine::new_blocking(calendar_dir).ok());
+
+        match engine {
+            Some(engine) => {
+                tracing::info!("Calendar system initialized");
+                Some(oxios_kernel::CalendarApi::with_event_bus(
+                    Arc::new(engine),
+                    self.event_bus.clone(),
+                ))
+            }
+            None => {
+                tracing::warn!("Failed to initialize calendar system");
+                None
+            }
+        }
+    }
+
+    /// Build the email API facade (optional — only if `[email] enabled = true`).
+    fn build_email_api(&self) -> Option<oxios_kernel::EmailApi> {
+        if !self.config.email.enabled {
+            return None;
+        }
+
+        if self.config.email.my_email.is_empty() {
+            tracing::warn!("Email enabled but my_email not set — skipping");
+            return None;
+        }
+
+        // Resolve SMTP password: OXIOS_EMAIL_PASSWORD env → credential store
+        let password = std::env::var("OXIOS_EMAIL_PASSWORD").ok().or_else(|| {
+            // Try credential store
+            oxi_sdk::load_token(&self.config.email.secret_ref)
+                .ok()
+                .flatten()
+                .map(|t| t.access_token)
+        });
+
+        let password = match password {
+            Some(p) => p,
+            None => {
+                tracing::warn!(
+                    "Email enabled but no SMTP password found. Set OXIOS_EMAIL_PASSWORD env var or run 'oxios email setup'."
+                );
+                return None;
+            }
+        };
+
+        match oxios_kernel::SmtpClient::from_config(&self.config.email, &password) {
+            Ok(smtp) => {
+                let workspace = PathBuf::from(&self.config.kernel.workspace);
+                let template_dir = workspace.join("email_templates");
+                let _ = std::fs::create_dir_all(&template_dir);
+
+                tracing::info!(
+                    from = %smtp.from_addr(),
+                    "Email system initialized"
+                );
+                Some(oxios_kernel::EmailApi::new(
+                    smtp,
+                    template_dir,
+                    self.state_store.clone(),
+                    Some(self.event_bus.clone()),
+                    self.config.email.rate_limit_per_hour,
+                ))
+            }
+            Err(e) => {
+                tracing::warn!(error = %e, "Failed to initialize email system");
+                None
+            }
+        }
+    }
+
     /// Configuration reference.
     pub fn config(&self) -> &OxiosConfig {
         &self.config
     }
 
     /// Orchestrator reference — for hot-reload config propagation.
+    #[allow(dead_code)]
     pub fn orchestrator(&self) -> &Arc<Orchestrator> {
         &self.orchestrator
     }
@@ -860,6 +951,8 @@ impl KernelBuilder {
                     .expect("KnowledgeLens init failed"),
                 ),
                 build_marketplace_api_value(&config),
+                None, // calendar (initialized later)
+                None, // email (initialized later)
             ));
 
         // Build ToolRetriever for semantic capability discovery.
@@ -1094,8 +1187,6 @@ async fn build_tool_retriever(sm: &SkillManager) -> oxios_kernel::tools::retriev
     tracing::info!(count = retriever.len(), "ToolRetriever indexed");
     retriever
 }
-
-#[cfg(not(feature = "browser"))]
 
 /// Build a MarketplaceApi from the Kernel instance (used after Kernel construction).
 fn build_marketplace_api_value(config: &OxiosConfig) -> MarketplaceApi {

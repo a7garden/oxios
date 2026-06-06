@@ -1,19 +1,36 @@
+import {
+  BarChart3,
+  BookOpen,
+  FileText,
+  Gamepad2,
+  Globe,
+  Lightbulb,
+  Lock,
+  Package,
+  Palette,
+  Rocket,
+  Target,
+  Tent,
+  Wrench,
+  Zap,
+} from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import {
-  Package, Wrench, FileText, Gamepad2, Globe, BookOpen, Palette,
-  Zap, Target, Rocket, Lightbulb, Lock, BarChart3, Tent,
-} from 'lucide-react'
-import { useCreateProject } from '@/hooks/use-projects'
-import type { CreateProjectInput } from '@/hooks/use-projects'
 import { Button } from '@/components/ui/button'
 import {
-  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
-import { Switch } from '@/components/ui/switch'
 import { useToast } from '@/components/ui/sonner'
+import { Switch } from '@/components/ui/switch'
+import { Textarea } from '@/components/ui/textarea'
+import type { CreateProjectInput } from '@/hooks/use-projects'
+import { useCreateProject } from '@/hooks/use-projects'
 
 interface CreateProjectDialogProps {
   open: boolean
@@ -123,7 +140,9 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
                   type="button"
                   onClick={() => setIcon(opt.name)}
                   className={`w-8 h-8 rounded flex items-center justify-center border transition-colors ${
-                    icon === opt.name ? 'border-primary bg-primary/10' : 'border-transparent hover:bg-muted'
+                    icon === opt.name
+                      ? 'border-primary bg-primary/10'
+                      : 'border-transparent hover:bg-muted'
                   }`}
                 >
                   {opt.icon}
@@ -134,7 +153,9 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
 
           {/* Description */}
           <div className="space-y-1">
-            <label className="text-sm font-medium">{t('projects.description', 'Description')}</label>
+            <label className="text-sm font-medium">
+              {t('projects.description', 'Description')}
+            </label>
             <Textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
@@ -151,7 +172,9 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
               onChange={(e) => setTags(e.target.value)}
               placeholder="rust, kernel, async"
             />
-            <p className="text-2xs text-muted-foreground">{t('projects.tagsHint', 'Comma-separated')}</p>
+            <p className="text-2xs text-muted-foreground">
+              {t('projects.tagsHint', 'Comma-separated')}
+            </p>
           </div>
 
           {/* Paths */}
@@ -171,7 +194,9 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
           {/* Memory visible */}
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
-              <label className="text-sm font-medium">{t('projects.memoryVisible', 'Memory Visible')}</label>
+              <label className="text-sm font-medium">
+                {t('projects.memoryVisible', 'Memory Visible')}
+              </label>
               <p className="text-2xs text-muted-foreground">
                 {t('projects.memoryVisibleHint', 'Allow cross-project memory access')}
               </p>

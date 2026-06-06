@@ -48,7 +48,10 @@ function SessionsListPage() {
       accessor: (row: Session) => (row.user_id ? `${row.user_id.slice(0, 8)}...` : '—'),
     },
     { header: t('sessions.messages'), accessor: (row: Session) => row.message_count ?? 0 },
-    { header: t('sessions.createdAt'), accessor: (row: Session) => new Date(row.created_at).toLocaleString() },
+    {
+      header: t('sessions.createdAt'),
+      accessor: (row: Session) => new Date(row.created_at).toLocaleString(),
+    },
     {
       header: t('sessions.updatedAt'),
       accessor: (row: Session) =>

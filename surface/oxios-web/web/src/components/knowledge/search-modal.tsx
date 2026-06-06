@@ -228,7 +228,9 @@ export function SearchModal({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={isMoveMode ? t('knowledge.searchOrSelectDestination') : t('knowledge.searchFiles')}
+            placeholder={
+              isMoveMode ? t('knowledge.searchOrSelectDestination') : t('knowledge.searchFiles')
+            }
             className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
           />
           <kbd className="text-2xs text-muted-foreground border rounded px-1.5 py-0.5 font-mono">

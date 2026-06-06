@@ -44,7 +44,9 @@ export function useCreateFile() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async ({ path, isDir }: { path: string; isDir?: boolean }) => {
-      await api.post(`/api/workspace/file/${encodeURIComponent(path)}`, { is_dir: isDir ?? false } as CreateFileRequest)
+      await api.post(`/api/workspace/file/${encodeURIComponent(path)}`, {
+        is_dir: isDir ?? false,
+      } as CreateFileRequest)
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['workspace-tree'] })

@@ -1,10 +1,15 @@
-import { useTranslation } from 'react-i18next'
 import { Server } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { ServerCard } from '@/components/mcp/server-card'
-import { useMcpServers, useMcpDeleteServer, useMcpToggleServer, useMcpRefreshServer } from '@/hooks/use-mcp'
 import { EmptyState } from '@/components/shared/empty-state'
-import { LoadingCards } from '@/components/shared/loading'
 import { ErrorState } from '@/components/shared/error-state'
+import { LoadingCards } from '@/components/shared/loading'
+import {
+  useMcpDeleteServer,
+  useMcpRefreshServer,
+  useMcpServers,
+  useMcpToggleServer,
+} from '@/hooks/use-mcp'
 
 export function ServerList() {
   const { t } = useTranslation()

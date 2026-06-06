@@ -6,7 +6,7 @@
 
 use anyhow::Result;
 
-use super::{Project, ProjectId, ProjectSource};
+use super::{Project, ProjectSource};
 
 /// Schema DDL for project tables.
 pub const PROJECT_SCHEMA: &str = r#"
@@ -121,7 +121,10 @@ pub fn unlink_project_memory(
 }
 
 /// Get all memory IDs associated with a project.
-pub fn get_project_memory_ids(conn: &rusqlite::Connection, project_id: &str) -> Result<Vec<String>> {
+pub fn get_project_memory_ids(
+    conn: &rusqlite::Connection,
+    project_id: &str,
+) -> Result<Vec<String>> {
     let mut stmt = conn.prepare(
         "SELECT memory_id FROM project_memory WHERE project_id = ?1 ORDER BY created_at DESC",
     )?;

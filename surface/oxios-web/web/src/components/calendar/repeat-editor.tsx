@@ -1,10 +1,10 @@
+import { X } from 'lucide-react'
 import { useState } from 'react'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
-import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
-import { Button } from '@/components/ui/button'
-import { X } from 'lucide-react'
 import type { RepeatRule } from '@/types/calendar'
 
 interface Props {
@@ -95,7 +95,9 @@ export function RepeatEditor({ value, onChange }: Props) {
           {value.frequency === 'weekly' && (
             <div className="flex items-center gap-1">
               {DAY_LABELS.map((label) => {
-                const dayKey = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][DAY_LABELS.indexOf(label)]!
+                const dayKey = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][
+                  DAY_LABELS.indexOf(label)
+                ]!
                 const active = (value.days ?? []).includes(dayKey)
                 return (
                   <button

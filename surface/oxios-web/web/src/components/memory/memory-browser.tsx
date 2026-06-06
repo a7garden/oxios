@@ -1,13 +1,13 @@
+import { Brain } from 'lucide-react'
 import { useState } from 'react'
-import { Select } from '@/components/ui/select'
 import { useTranslation } from 'react-i18next'
-import { useMemoryList } from '@/hooks/use-memory'
+import { EmptyState } from '@/components/shared/empty-state'
 import { ErrorState } from '@/components/shared/error-state'
 import { LoadingCards } from '@/components/shared/loading'
-import { EmptyState } from '@/components/shared/empty-state'
-import { MemoryCard } from './memory-card'
-import { Brain } from 'lucide-react'
+import { Select } from '@/components/ui/select'
+import { useMemoryList } from '@/hooks/use-memory'
 import type { MemoryDetail } from '@/types/memory'
+import { MemoryCard } from './memory-card'
 
 interface MemoryBrowserProps {
   onSelect: (memory: MemoryDetail) => void
@@ -17,12 +17,7 @@ export function MemoryBrowser({ onSelect }: MemoryBrowserProps) {
   const { t } = useTranslation()
   const [tier, setTier] = useState<string>('all')
   const [type, setType] = useState<string>('all')
-  const {
-    data,
-    isLoading,
-    isError,
-    refetch,
-  } = useMemoryList(
+  const { data, isLoading, isError, refetch } = useMemoryList(
     tier !== 'all' ? tier : undefined,
     type !== 'all' ? type : undefined,
   )

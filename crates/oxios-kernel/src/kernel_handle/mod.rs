@@ -2,6 +2,8 @@
 
 pub mod a2a_api;
 pub mod agent_api;
+pub mod calendar_api;
+pub mod email_api;
 pub mod engine_api;
 pub mod exec_api;
 pub mod extension_api;
@@ -17,6 +19,8 @@ pub mod state_api;
 
 pub use a2a_api::A2aApi;
 pub use agent_api::AgentApi;
+pub use calendar_api::CalendarApi;
+pub use email_api::EmailApi;
 pub use engine_api::{
     EngineApi, EngineConfigResponse, FallbackEvent, InputModality, ModelInfo, ProviderCategory,
     ProviderInfo, RoutingConfigSnapshot, RoutingStats, RoutingStatsSnapshot, RoutingUpdate,
@@ -104,6 +108,10 @@ pub struct KernelHandle {
     pub knowledge_lens: Arc<KnowledgeLens>,
     /// Marketplace API — ClawHub search, install, update.
     pub marketplace_api: MarketplaceApi,
+    /// Calendar events — create, update, delete, list, search, freebusy.
+    pub calendar: Option<CalendarApi>,
+    /// Email — send HTML emails via SMTP, template management.
+    pub email: Option<EmailApi>,
 }
 
 impl KernelHandle {
@@ -127,6 +135,8 @@ impl KernelHandle {
         knowledge: Arc<oxios_markdown::KnowledgeBase>,
         knowledge_lens: Arc<KnowledgeLens>,
         marketplace_api: MarketplaceApi,
+        calendar: Option<CalendarApi>,
+        email: Option<EmailApi>,
     ) -> Self {
         Self {
             state,
@@ -143,6 +153,8 @@ impl KernelHandle {
             knowledge,
             knowledge_lens,
             marketplace_api,
+            calendar,
+            email,
         }
     }
 
@@ -239,6 +251,8 @@ impl KernelHandle {
                 )),
                 Arc::new(SkillsShClient::new(None, None).expect("valid Skills.sh client")),
             ),
+            calendar: None, // from_subsystems is deprecated; calendar initialized separately
+            email: None,    // from_subsystems is deprecated; email initialized separately
         }
     }
 

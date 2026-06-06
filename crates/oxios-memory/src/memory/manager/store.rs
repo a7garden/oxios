@@ -8,13 +8,12 @@ use std::collections::HashMap;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
+use crate::memory::auto_protect::AutoProtector;
 use crate::memory::embedding::EmbeddingVector;
 use crate::memory::storage::MemoryStorageExt;
-use crate::memory::types::{
-    content_hash, dedup_by_id, extract_keywords, MemoryEntry, MemoryTier,
-    MemoryType,
-};
-use crate::memory::auto_protect::AutoProtector;
+#[cfg(feature = "sqlite-memory")]
+use crate::memory::types::MemoryTier;
+use crate::memory::types::{content_hash, dedup_by_id, extract_keywords, MemoryEntry, MemoryType};
 
 use super::MemoryManager;
 
@@ -103,7 +102,8 @@ impl MemoryManager {
             .save_json("memory", "vector_index_snapshot", &snapshot)
             .await?;
 
-        self.git_commit("memory/vector_index_snapshot.json", "memory: snapshot save");
+        self.git_commit("memory/vector_index_snapshot.json", "memory: snapshot save")
+            .await;
 
         tracing::debug!(
             entries = snapshot.entry_count,
@@ -155,7 +155,8 @@ impl MemoryManager {
         self.git_commit(
             &format!("{category}/{id}.json"),
             &format!("memory: store {id}"),
-        );
+        )
+        .await;
 
         // Update vector index
         {
@@ -189,10 +190,8 @@ impl MemoryManager {
         if let Some(ref sqlite) = self.sqlite_store {
             return sqlite.get(id, memory_type);
         }
-        let result: Option<MemoryEntry> = self
-            .storage
-            .load_json(memory_type.category(), id)
-            .await?;
+        let result: Option<MemoryEntry> =
+            self.storage.load_json(memory_type.category(), id).await?;
         if let Some(mut entry) = result {
             AutoProtector::record_access(&mut entry, "");
             Ok(Some(entry))
@@ -207,10 +206,7 @@ impl MemoryManager {
         if let Some(ref sqlite) = self.sqlite_store {
             return sqlite.forget(id, memory_type);
         }
-        let result = self
-            .storage
-            .delete_file(memory_type.category(), id)
-            .await?;
+        let result = self.storage.delete_file(memory_type.category(), id).await?;
 
         // Remove from HNSW index if attached
         {
@@ -239,11 +235,7 @@ impl MemoryManager {
         let names = self.storage.list_category(category).await?;
         let mut entries = Vec::new();
         for name in names.into_iter().take(limit.saturating_mul(2)) {
-            if let Ok(Some(entry)) = self
-                .storage
-                .load_json::<MemoryEntry>(category, &name)
-                .await
-            {
+            if let Ok(Some(entry)) = self.storage.load_json::<MemoryEntry>(category, &name).await {
                 entries.push(entry);
             }
         }
@@ -280,10 +272,7 @@ impl MemoryManager {
                 })
                 .filter(|(_, score)| *score > 0.1)
                 .collect();
-            scored.sort_by(|a, b| {
-                b.1.partial_cmp(&a.1)
-                    .unwrap_or(std::cmp::Ordering::Equal)
-            });
+            scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
             scored.truncate(limit);
             scored
         }; // lock dropped here, before any .await
@@ -463,10 +452,7 @@ impl MemoryManager {
     /// Store a memory entry only if no duplicate content exists.
     ///
     /// Returns the entry ID if stored, or `None` if duplicate.
-    pub async fn remember_unique(
-        &self,
-        entry: MemoryEntry,
-    ) -> anyhow::Result<Option<String>> {
+    pub async fn remember_unique(&self, entry: MemoryEntry) -> anyhow::Result<Option<String>> {
         #[cfg(feature = "sqlite-memory")]
         if let Some(ref sqlite) = self.sqlite_store {
             return sqlite.remember_unique(&entry).await;

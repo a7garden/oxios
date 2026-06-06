@@ -1,12 +1,12 @@
-import { useTranslation } from 'react-i18next'
-import { useState } from 'react'
 import { ChevronDown, ChevronRight, Wrench } from 'lucide-react'
-import { useMcpTools } from '@/hooks/use-mcp'
+import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { ToolDetail } from '@/components/mcp/tool-detail'
 import { EmptyState } from '@/components/shared/empty-state'
-import { LoadingCards } from '@/components/shared/loading'
 import { ErrorState } from '@/components/shared/error-state'
+import { LoadingCards } from '@/components/shared/loading'
 import { Input } from '@/components/ui/input'
+import { useMcpTools } from '@/hooks/use-mcp'
 import type { McpTool } from '@/types/mcp'
 
 export function ToolList() {
@@ -38,7 +38,10 @@ export function ToolList() {
       <EmptyState
         icon={<Wrench className="h-8 w-8" />}
         title={t('mcp.noTools', 'No MCP tools available')}
-        description={t('mcp.noToolsDescription', 'Register and enable an MCP server to see its tools.')}
+        description={t(
+          'mcp.noToolsDescription',
+          'Register and enable an MCP server to see its tools.',
+        )}
         className="py-6"
       />
     )
@@ -49,7 +52,7 @@ export function ToolList() {
       <Input
         value={search}
         onChange={(e) => setSearch(e.target.value)}
-        placeholder={t('common.search', 'Search') + '...'}
+        placeholder={`${t('common.search', 'Search')}...`}
         className="max-w-sm"
       />
       {Object.entries(grouped).length === 0 ? (
@@ -67,6 +70,7 @@ export function ToolList() {
                 return (
                   <div key={key} className="rounded-lg border">
                     <button
+                      type="button"
                       className="flex items-center gap-2 w-full p-3 text-left hover:bg-muted/50 transition-colors"
                       onClick={() => setExpanded(isExpanded ? null : key)}
                     >

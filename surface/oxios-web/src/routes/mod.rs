@@ -12,8 +12,10 @@ mod a2a;
 mod agent_groups;
 mod audit_routes;
 mod budget_routes;
+mod calendar_routes;
 mod chat;
 mod cron_jobs;
+mod email_routes;
 mod engine_routes;
 mod events;
 mod git_routes;
@@ -52,12 +54,21 @@ pub(crate) use budget_routes::{
     handle_budget_get, handle_budget_list, handle_budget_remove, handle_budget_reserve,
     handle_budget_reset, handle_budget_set,
 };
+pub(crate) use calendar_routes::{
+    handle_calendar_event_create, handle_calendar_event_delete, handle_calendar_event_get,
+    handle_calendar_event_update, handle_calendar_events, handle_calendar_freebusy,
+    handle_calendar_search,
+};
 pub(crate) use chat::{
     handle_chat, handle_chat_stream, handle_chat_ticket, handle_session_tool_calls,
 };
 pub(crate) use cron_jobs::{
     handle_cron_job_create, handle_cron_job_delete, handle_cron_job_get, handle_cron_job_trigger,
     handle_cron_jobs_list, update_cron_job,
+};
+pub(crate) use email_routes::{
+    handle_email_history, handle_email_history_detail, handle_email_setup, handle_email_status,
+    handle_email_template_get, handle_email_templates, handle_email_test,
 };
 pub(crate) use engine_routes::{
     handle_engine_config, handle_engine_models, handle_engine_providers,
@@ -358,6 +369,30 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         .route("/api/cron-jobs/{id}", delete(handle_cron_job_delete))
         .route("/api/cron-jobs/{id}/edit", post(update_cron_job))
         .route("/api/cron-jobs/{id}/trigger", post(handle_cron_job_trigger))
+        // Calendar
+        .route(
+            "/api/calendar/events",
+            get(handle_calendar_events).post(handle_calendar_event_create),
+        )
+        .route(
+            "/api/calendar/events/{uid}",
+            get(handle_calendar_event_get)
+                .put(handle_calendar_event_update)
+                .delete(handle_calendar_event_delete),
+        )
+        .route("/api/calendar/search", get(handle_calendar_search))
+        .route("/api/calendar/freebusy", get(handle_calendar_freebusy))
+        // Email
+        .route("/api/email/status", get(handle_email_status))
+        .route("/api/email/history", get(handle_email_history))
+        .route("/api/email/history/{id}", get(handle_email_history_detail))
+        .route("/api/email/templates", get(handle_email_templates))
+        .route(
+            "/api/email/templates/{name}",
+            get(handle_email_template_get),
+        )
+        .route("/api/email/test", post(handle_email_test))
+        .route("/api/email/setup", post(handle_email_setup))
         // Approvals (HitL)
         .route("/api/approvals", get(handle_approvals_list))
         .route("/api/approvals/{id}/approve", post(handle_approval_approve))

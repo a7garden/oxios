@@ -1,17 +1,17 @@
-import { useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { Plus, Wallet } from 'lucide-react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { AgentBudgetCard } from '@/components/budget/agent-budget-card'
+import { BudgetSummaryCard } from '@/components/budget/budget-summary'
+import { SetBudgetDialog } from '@/components/budget/set-budget-dialog'
 import { EmptyState } from '@/components/shared/empty-state'
 import { ErrorState } from '@/components/shared/error-state'
 import { LoadingCards } from '@/components/shared/loading'
 import { RefreshButton } from '@/components/shared/refresh-button'
 import { Button } from '@/components/ui/button'
-import { useBudgetDelete, useBudgetList, useBudgetReset, useBudgetSet } from '@/hooks/use-budget'
 import { useToast } from '@/components/ui/sonner'
-import { BudgetSummaryCard } from '@/components/budget/budget-summary'
-import { AgentBudgetCard } from '@/components/budget/agent-budget-card'
-import { SetBudgetDialog } from '@/components/budget/set-budget-dialog'
+import { useBudgetDelete, useBudgetList, useBudgetReset, useBudgetSet } from '@/hooks/use-budget'
 import type { AgentBudget } from '@/types/budget'
 
 export const Route = createFileRoute('/budget')({ component: BudgetPage })
@@ -19,13 +19,7 @@ export const Route = createFileRoute('/budget')({ component: BudgetPage })
 function BudgetPage() {
   const { t } = useTranslation()
   const { toast } = useToast()
-  const {
-    data,
-    isLoading,
-    isError,
-    refetch,
-    isFetching,
-  } = useBudgetList()
+  const { data, isLoading, isError, refetch, isFetching } = useBudgetList()
 
   const setMutation = useBudgetSet()
   const deleteMutation = useBudgetDelete()
@@ -39,7 +33,12 @@ function BudgetPage() {
   if (isError) return <ErrorState onRetry={() => refetch()} />
 
   const agents = data?.agents ?? []
-  const summary = data?.summary ?? { total_agents: 0, total_tokens_used: 0, total_tokens_limit: 0, exhausted_agents: 0 }
+  const summary = data?.summary ?? {
+    total_agents: 0,
+    total_tokens_used: 0,
+    total_tokens_limit: 0,
+    exhausted_agents: 0,
+  }
 
   const handleEdit = (agent: AgentBudget) => {
     setEditingAgent(agent)
@@ -53,10 +52,16 @@ function BudgetPage() {
     setDialogOpen(true)
   }
 
-  const handleSubmit = (params: { agentId: string; token_budget: number; calls_budget: number; window_secs: number }) => {
+  const handleSubmit = (params: {
+    agentId: string
+    token_budget: number
+    calls_budget: number
+    window_secs: number
+  }) => {
     setMutation.mutate(params, {
       onSuccess: () => toast(t('budget.setSuccess'), 'success'),
-      onError: (e: unknown) => toast(e instanceof Error ? e.message : t('common.error'), 'destructive'),
+      onError: (e: unknown) =>
+        toast(e instanceof Error ? e.message : t('common.error'), 'destructive'),
     })
   }
 

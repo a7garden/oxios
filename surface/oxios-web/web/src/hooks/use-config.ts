@@ -22,14 +22,25 @@ export interface ConfigPatchResponse {
 }
 
 /** Walks two JSON values in parallel and yields a flat list of differences. */
-export function diffConfigs(before: Record<string, unknown>, after: Record<string, unknown>, prefix = ''): ConfigDiffEntry[] {
+export function diffConfigs(
+  before: Record<string, unknown>,
+  after: Record<string, unknown>,
+  prefix = '',
+): ConfigDiffEntry[] {
   const out: ConfigDiffEntry[] = []
   const keys = new Set([...Object.keys(before ?? {}), ...Object.keys(after ?? {})])
   for (const k of keys) {
     const path = prefix ? `${prefix}.${k}` : k
     const b = before?.[k]
     const a = after?.[k]
-    if (a !== null && typeof a === 'object' && !Array.isArray(a) && b !== null && typeof b === 'object' && !Array.isArray(b)) {
+    if (
+      a !== null &&
+      typeof a === 'object' &&
+      !Array.isArray(a) &&
+      b !== null &&
+      typeof b === 'object' &&
+      !Array.isArray(b)
+    ) {
       out.push(...diffConfigs(b as Record<string, unknown>, a as Record<string, unknown>, path))
     } else if (!deepEqual(b, a)) {
       // Default: assume hot-reloadable. Backend re-classifies authoritatively.
@@ -51,7 +62,9 @@ function deepEqual(a: unknown, b: unknown): boolean {
     const ka = Object.keys(a as object)
     const kb = Object.keys(b as object)
     if (ka.length !== kb.length) return false
-    return ka.every((k) => deepEqual((a as Record<string, unknown>)[k], (b as Record<string, unknown>)[k]))
+    return ka.every((k) =>
+      deepEqual((a as Record<string, unknown>)[k], (b as Record<string, unknown>)[k]),
+    )
   }
   return false
 }
@@ -85,7 +98,7 @@ export function useSaveConfig() {
     mutationFn: async (next: Record<string, unknown>) => {
       try {
         return await api.patch<ConfigPatchResponse>('/api/config', next)
-      } catch (err) {
+      } catch (_err) {
         // Defensive fallback: if PATCH is removed entirely (405/404
         // on a misconfigured server) we retry with PUT, which is
         // currently an alias for PATCH with identical semantics.

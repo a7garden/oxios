@@ -1,9 +1,9 @@
-import { useState, useMemo } from 'react'
-import { Button } from '@/components/ui/button'
+import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, List } from 'lucide-react'
+import { useMemo, useState } from 'react'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import type { CalendarEvent } from '@/types/calendar'
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, List } from 'lucide-react'
 import { EventChip } from './event-chip'
 
 // ─── Props ──────────────────────────────────────────────────────────────
@@ -164,9 +164,7 @@ function MonthView({
                 />
               ))}
               {overflow > 0 && (
-                <span className="text-2xs text-muted-foreground pl-1">
-                  +{overflow}개 더
-                </span>
+                <span className="text-2xs text-muted-foreground pl-1">+{overflow}개 더</span>
               )}
             </div>
           </div>
@@ -237,25 +235,16 @@ function WeekView({
               })
 
               return (
-                <div
-                  key={di}
-                  className="flex-1 border-r last:border-r-0 px-0.5 py-0.5"
-                >
+                <div key={di} className="flex-1 border-r last:border-r-0 px-0.5 py-0.5">
                   {dayEvents.map((ev) => {
                     const start = new Date(ev.start)
                     const end = new Date(ev.end)
-                    const durationMin = Math.max(
-                      15,
-                      (end.getTime() - start.getTime()) / 60000,
-                    )
+                    const durationMin = Math.max(15, (end.getTime() - start.getTime()) / 60000)
                     const heightPx = Math.max(20, (durationMin / 60) * 40)
 
                     return (
                       <div key={ev.uid} style={{ height: heightPx }}>
-                        <EventChip
-                          event={ev}
-                          onClick={() => onEventClick?.(ev.uid)}
-                        />
+                        <EventChip event={ev} onClick={() => onEventClick?.(ev.uid)} />
                       </div>
                     )
                   })}
@@ -307,7 +296,7 @@ function AgendaView({
   return (
     <div className="divide-y">
       {grouped.map(([dateKey, dayEvents]) => {
-        const date = new Date(dateKey + 'T00:00:00')
+        const date = new Date(`${dateKey}T00:00:00`)
         const today_ = isSameDay(date, today)
         const label = date.toLocaleDateString('ko-KR', {
           month: 'long',
@@ -319,10 +308,7 @@ function AgendaView({
           <div key={dateKey} className="py-3 px-2">
             <div className="flex items-center gap-2 mb-2">
               <span
-                className={cn(
-                  'text-sm font-semibold',
-                  today_ ? 'text-primary' : 'text-foreground',
-                )}
+                className={cn('text-sm font-semibold', today_ ? 'text-primary' : 'text-foreground')}
               >
                 {label}
               </span>
@@ -461,8 +447,7 @@ export function CalendarView({ events, onEventClick, onDateClick }: CalendarView
             onClick={() => setViewMode('month')}
             className="text-xs"
           >
-            <CalendarIcon className="h-3.5 w-3.5 mr-1" />
-            월
+            <CalendarIcon className="h-3.5 w-3.5 mr-1" />월
           </Button>
           <Button
             variant={viewMode === 'week' ? 'secondary' : 'ghost'}
@@ -470,8 +455,7 @@ export function CalendarView({ events, onEventClick, onDateClick }: CalendarView
             onClick={() => setViewMode('week')}
             className="text-xs"
           >
-            <CalendarIcon className="h-3.5 w-3.5 mr-1" />
-            주
+            <CalendarIcon className="h-3.5 w-3.5 mr-1" />주
           </Button>
           <Button
             variant={viewMode === 'agenda' ? 'secondary' : 'ghost'}
@@ -503,9 +487,7 @@ export function CalendarView({ events, onEventClick, onDateClick }: CalendarView
             onEventClick={onEventClick}
           />
         )}
-        {viewMode === 'agenda' && (
-          <AgendaView events={events} onEventClick={onEventClick} />
-        )}
+        {viewMode === 'agenda' && <AgendaView events={events} onEventClick={onEventClick} />}
       </div>
     </div>
   )

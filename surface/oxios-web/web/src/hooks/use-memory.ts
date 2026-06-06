@@ -1,12 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api-client'
 import type {
-  MemoryStats,
-  MemoryDetail,
   DreamReport,
   DreamStatus,
-  SemanticSearchResult,
+  MemoryDetail,
   MemoryMapResponse,
+  MemoryStats,
+  SemanticSearchResult,
 } from '@/types/memory'
 
 // ── Stats ──
@@ -96,11 +96,14 @@ export function useMemorySemanticSearch() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: ({ query, type, limit }: { query: string; type?: string; limit?: number }) =>
-      api.post<{ count: number; entries: SemanticSearchResult[]; engine: string }>('/api/memory/semantic', {
-        query,
-        memory_type: type,
-        limit,
-      }),
+      api.post<{ count: number; entries: SemanticSearchResult[]; engine: string }>(
+        '/api/memory/semantic',
+        {
+          query,
+          memory_type: type,
+          limit,
+        },
+      ),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['memory', 'search'] })
     },

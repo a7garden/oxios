@@ -82,7 +82,11 @@ function CronJobsPage() {
             <CardTitle>{t('cronJobs.createCronJob')}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder={t('cronJobs.jobNamePlaceholder')} />
+            <Input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder={t('cronJobs.jobNamePlaceholder')}
+            />
             <Input
               value={schedule}
               onChange={(e) => setSchedule(e.target.value)}
@@ -133,8 +137,16 @@ function CronJobsPage() {
                     <code className="text-xs bg-muted px-1 py-0.5 rounded">{job.command}</code>
                   </p>
                   <div className="flex gap-4 text-xs text-muted-foreground mt-1">
-                    {job.last_run && <span>{t('cronJobs.lastRunLabel')} {new Date(job.last_run).toLocaleString()}</span>}
-                    {job.next_run && <span>{t('cronJobs.nextRunLabel')} {new Date(job.next_run).toLocaleString()}</span>}
+                    {job.last_run && (
+                      <span>
+                        {t('cronJobs.lastRunLabel')} {new Date(job.last_run).toLocaleString()}
+                      </span>
+                    )}
+                    {job.next_run && (
+                      <span>
+                        {t('cronJobs.nextRunLabel')} {new Date(job.next_run).toLocaleString()}
+                      </span>
+                    )}
                   </div>
                 </div>
                 <div className="flex gap-1">

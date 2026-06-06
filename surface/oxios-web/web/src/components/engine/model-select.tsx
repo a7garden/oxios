@@ -1,8 +1,8 @@
 import { Check, ChevronDown } from 'lucide-react'
-import { useState, useRef, useEffect } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import type { ModelInfo } from '@/types/engine'
 import { cn } from '@/lib/utils'
+import type { ModelInfo } from '@/types/engine'
 
 // ─── Helpers ─────────────────────────────────────────────────
 
@@ -58,7 +58,9 @@ export function ModelSelect({ models, value, onValueChange, className }: ModelSe
           {selected ? (
             <span className="flex items-center gap-1.5">
               {selected.reasoning && <span title={t('engine.supportsReasoning')}>✦</span>}
-              {selected.input.includes('image') && <span title={t('engine.supportsVision')}>👁</span>}
+              {selected.input.includes('image') && (
+                <span title={t('engine.supportsVision')}>👁</span>
+              )}
               {selected.name}
             </span>
           ) : models.length === 0 ? (
@@ -79,7 +81,13 @@ export function ModelSelect({ models, value, onValueChange, className }: ModelSe
                 <span>✦</span> {t('engine.reasoningModels')}
               </div>
               {reasoningModels.map((m) => (
-                <ModelRow key={m.id} model={m} selected={value === m.id} onSelect={onValueChange} onClose={() => setOpen(false)} />
+                <ModelRow
+                  key={m.id}
+                  model={m}
+                  selected={value === m.id}
+                  onSelect={onValueChange}
+                  onClose={() => setOpen(false)}
+                />
               ))}
             </div>
           )}
@@ -93,7 +101,13 @@ export function ModelSelect({ models, value, onValueChange, className }: ModelSe
                 </div>
               )}
               {standardModels.map((m) => (
-                <ModelRow key={m.id} model={m} selected={value === m.id} onSelect={onValueChange} onClose={() => setOpen(false)} />
+                <ModelRow
+                  key={m.id}
+                  model={m}
+                  selected={value === m.id}
+                  onSelect={onValueChange}
+                  onClose={() => setOpen(false)}
+                />
               ))}
             </div>
           )}
@@ -131,9 +145,7 @@ function ModelRow({
       }}
     >
       {/* Selection indicator */}
-      <span className="w-4 shrink-0 mt-0.5">
-        {selected && <Check className="h-4 w-4" />}
-      </span>
+      <span className="w-4 shrink-0 mt-0.5">{selected && <Check className="h-4 w-4" />}</span>
 
       {/* Model info */}
       <div className="flex-1 min-w-0 text-left">
@@ -151,9 +163,15 @@ function ModelRow({
           <span className="font-medium truncate">{model.name}</span>
         </div>
         <div className="flex items-center gap-3 mt-0.5 text-xs text-muted-foreground">
-          <span>{formatContextWindow(model.contextWindow)} {t('engine.ctx')}</span>
-          <span>{t('engine.input')} {formatCost(model.costInput)}/M</span>
-          <span>{t('engine.output')} {formatCost(model.costOutput)}/M</span>
+          <span>
+            {formatContextWindow(model.contextWindow)} {t('engine.ctx')}
+          </span>
+          <span>
+            {t('engine.input')} {formatCost(model.costInput)}/M
+          </span>
+          <span>
+            {t('engine.output')} {formatCost(model.costOutput)}/M
+          </span>
         </div>
       </div>
     </button>

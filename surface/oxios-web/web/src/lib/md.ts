@@ -11,11 +11,7 @@
  * Completed items (- [x]) are pushed to the end; incomplete items (- [ ])
  * are inserted before the last incomplete item.
  */
-export function addChecklistItem(
-  md: string,
-  item: string,
-  checked = false,
-): string {
+export function addChecklistItem(md: string, item: string, checked = false): string {
   md = normNewLines(md)
 
   const lines = md.split('\n')
@@ -33,7 +29,7 @@ export function addChecklistItem(
   }
 
   if (checked) {
-    filteredLines.push('- [x] ' + item)
+    filteredLines.push(`- [x] ${item}`)
   } else {
     // Find the last incomplete item and insert before it
     let insertIndex = filteredLines.length
@@ -43,9 +39,9 @@ export function addChecklistItem(
       }
     }
     if (insertIndex === filteredLines.length) {
-      filteredLines.push('- [ ] ' + item)
+      filteredLines.push(`- [ ] ${item}`)
     } else {
-      filteredLines.splice(insertIndex, 0, '- [ ] ' + item)
+      filteredLines.splice(insertIndex, 0, `- [ ] ${item}`)
     }
   }
 
@@ -70,7 +66,7 @@ export function extractHeaderAndBody(
     if (!headerFound && line.startsWith('# ')) {
       header = line.substring(2).trim()
       if (header.length > maxTitleLen) {
-        header = header.substring(0, maxTitleLen) + '...'
+        header = `${header.substring(0, maxTitleLen)}...`
       }
       headerFound = true
     } else {
@@ -95,9 +91,7 @@ export function addHeaderAndBody(
   const { atStart = false, withTimestamp = true } = options ?? {}
   const md = normNewLines(existingMd)
 
-  const timestamp = withTimestamp
-    ? `\`${formatTime(options?.timezone)}\` `
-    : ''
+  const timestamp = withTimestamp ? `\`${formatTime(options?.timezone)}\` ` : ''
 
   const block = `### ${header}\n${timestamp}${text}`
 
@@ -108,10 +102,10 @@ export function addHeaderAndBody(
       lines.splice(1, 0, '', block, '')
       return lines.join('\n')
     }
-    return block + '\n\n' + md
+    return `${block}\n\n${md}`
   }
 
-  return md ? md + '\n\n' + block : `# ${header}\n\n${text}`
+  return md ? `${md}\n\n${block}` : `# ${header}\n\n${text}`
 }
 
 /** Normalize line endings (\\r\\n → \\n, strip trailing whitespace). */
@@ -128,7 +122,11 @@ export function hasImage(text: string): boolean {
 function formatTime(timezone?: string): string {
   const now = new Date()
   if (timezone) {
-    return now.toLocaleTimeString('en-GB', { timeZone: timezone, hour: '2-digit', minute: '2-digit' })
+    return now.toLocaleTimeString('en-GB', {
+      timeZone: timezone,
+      hour: '2-digit',
+      minute: '2-digit',
+    })
   }
   return now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
 }

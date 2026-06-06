@@ -18,7 +18,6 @@ function EventsPage() {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [_r, setRefreshKey] = useState(0)
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: liveEvents.length is sufficient dependency for scroll-to-bottom
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight })
   }, [liveEvents.length])

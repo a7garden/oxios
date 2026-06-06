@@ -8,8 +8,8 @@
 //! accessed through traits defined in [`crate::storage`]. The kernel
 //! implements those traits and injects concrete instances.
 
-mod store;
 mod ops;
+mod store;
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -87,18 +87,13 @@ impl MemoryManager {
 
     /// Attach a SQLite-backed memory store (RFC-012).
     #[cfg(feature = "sqlite-memory")]
-    pub fn set_sqlite_store(
-        &mut self,
-        store: Arc<crate::memory::sqlite::SqliteMemoryStore>,
-    ) {
+    pub fn set_sqlite_store(&mut self, store: Arc<crate::memory::sqlite::SqliteMemoryStore>) {
         self.sqlite_store = Some(store);
     }
 
     /// Get a reference to the SQLite store (if configured).
     #[cfg(feature = "sqlite-memory")]
-    pub fn sqlite_store(
-        &self,
-    ) -> &Option<Arc<crate::memory::sqlite::SqliteMemoryStore>> {
+    pub fn sqlite_store(&self) -> &Option<Arc<crate::memory::sqlite::SqliteMemoryStore>> {
         &self.sqlite_store
     }
 
@@ -134,10 +129,10 @@ impl MemoryManager {
     }
 
     /// Commit a file to git if git_layer is available.
-    pub(crate) fn git_commit(&self, rel_path: &str, message: &str) {
+    pub(crate) async fn git_commit(&self, rel_path: &str, message: &str) {
         if let Some(ref gl) = self.git {
             if gl.is_enabled() {
-                let _ = gl.commit_file(rel_path, message);
+                let _ = gl.commit_file(rel_path, message).await;
             }
         }
     }
@@ -169,10 +164,7 @@ impl MemoryManager {
                 .into_iter()
                 .map(|e| (e.id.clone(), e.memory_type, Self::effective_importance(&e)))
                 .collect();
-            scored.sort_by(|a, b| {
-                a.2.partial_cmp(&b.2)
-                    .unwrap_or(std::cmp::Ordering::Equal)
-            });
+            scored.sort_by(|a, b| a.2.partial_cmp(&b.2).unwrap_or(std::cmp::Ordering::Equal));
 
             let to_remove = scored.len() - budget.max_per_type;
             for (id, memory_type, score) in scored.into_iter().take(to_remove) {

@@ -1,14 +1,14 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { useTranslation } from 'react-i18next'
 import { Plus, Server, Terminal, Wrench } from 'lucide-react'
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
+import { AddServerDialog } from '@/components/mcp/add-server-dialog'
+import { ServerList } from '@/components/mcp/server-list'
+import { ToolList } from '@/components/mcp/tool-list'
+import { ToolTester } from '@/components/mcp/tool-tester'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { ServerList } from '@/components/mcp/server-list'
-import { AddServerDialog } from '@/components/mcp/add-server-dialog'
-import { ToolList } from '@/components/mcp/tool-list'
-import { ToolTester } from '@/components/mcp/tool-tester'
 
 export const Route = createFileRoute('/mcp')({ component: McpPage })
 
@@ -21,7 +21,9 @@ function McpPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">{t('mcp.title', 'MCP Servers')}</h1>
-          <p className="text-muted-foreground">{t('mcp.subtitle', 'Manage Model Context Protocol servers and tools')}</p>
+          <p className="text-muted-foreground">
+            {t('mcp.subtitle', 'Manage Model Context Protocol servers and tools')}
+          </p>
         </div>
         <Button onClick={() => setAddDialogOpen(true)}>
           <Plus className="h-4 w-4 mr-1" /> {t('mcp.addServer', 'Add Server')}

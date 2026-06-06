@@ -175,12 +175,7 @@ export interface ChatMessage {
 }
 
 // RFC-015: a single transparency activity entry shown in the chat timeline.
-export type ChatActivityType =
-  | 'phase'
-  | 'tool_call'
-  | 'memory'
-  | 'reasoning'
-  | 'usage'
+export type ChatActivityType = 'phase' | 'tool_call' | 'memory' | 'reasoning' | 'usage'
 
 export interface ChatActivity {
   id: string

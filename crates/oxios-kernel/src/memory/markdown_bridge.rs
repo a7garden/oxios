@@ -15,7 +15,7 @@ pub struct MarkdownKnowledgeBase(pub oxios_markdown::KnowledgeBase);
 
 impl oxios_memory::memory::storage::MarkdownSource for MarkdownKnowledgeBase {
     fn index_all(&self) -> anyhow::Result<usize> {
-        self.0.index_all().map_err(Into::into)
+        self.0.index_all()
     }
 
     fn note_tree(
@@ -34,7 +34,7 @@ impl oxios_memory::memory::storage::MarkdownSource for MarkdownKnowledgeBase {
     }
 
     fn note_read(&self, path: &str) -> anyhow::Result<Option<String>> {
-        self.0.note_read(path).map_err(Into::into)
+        self.0.note_read(path)
     }
 
     fn extract_headings(&self, content: &str) -> Vec<String> {
@@ -52,10 +52,9 @@ mod tests {
     /// `dir` argument (which is the search root, not the entry's parent).
     #[test]
     fn note_tree_preserves_entry_parent_dir() {
-        let kb = oxios_markdown::KnowledgeBase::new(
-            tempfile::tempdir().unwrap().path().to_path_buf(),
-        )
-        .unwrap();
+        let kb =
+            oxios_markdown::KnowledgeBase::new(tempfile::tempdir().unwrap().path().to_path_buf())
+                .unwrap();
         let wrapper = MarkdownKnowledgeBase(kb);
         let entries = wrapper.note_tree("/").unwrap();
         assert!(entries.is_empty());
@@ -64,10 +63,8 @@ mod tests {
     #[test]
     fn markdown_source_is_object_safe() {
         let _: Arc<dyn MarkdownSource> = Arc::new(MarkdownKnowledgeBase(
-            oxios_markdown::KnowledgeBase::new(
-                tempfile::tempdir().unwrap().path().to_path_buf(),
-            )
-            .unwrap(),
+            oxios_markdown::KnowledgeBase::new(tempfile::tempdir().unwrap().path().to_path_buf())
+                .unwrap(),
         ));
         let _: NoteEntry = NoteEntry {
             name: String::new(),

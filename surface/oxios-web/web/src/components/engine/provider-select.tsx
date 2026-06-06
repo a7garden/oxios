@@ -1,8 +1,8 @@
 import { Check, ChevronDown, Key } from 'lucide-react'
-import { useState, useRef, useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import type { ProviderInfo, ProviderCategory } from '@/types/engine'
 import { cn } from '@/lib/utils'
+import type { ProviderCategory, ProviderInfo } from '@/types/engine'
 
 // ─── Category definitions ────────────────────────────────────
 
@@ -102,9 +102,7 @@ export function ProviderSelect({
 
                     {/* Model count badge */}
                     {p.modelCount > 0 && (
-                      <span className="text-xs text-muted-foreground">
-                        {p.modelCount}
-                      </span>
+                      <span className="text-xs text-muted-foreground">{p.modelCount}</span>
                     )}
 
                     {/* API key indicator */}

@@ -1,15 +1,15 @@
 import { Outlet, useRouterState } from '@tanstack/react-router'
-import React from 'react'
 import { Menu } from 'lucide-react'
+import React from 'react'
 import { useTranslation } from 'react-i18next'
 import { InfoPanel } from '@/components/knowledge/info-panel'
 import { KnowledgeSidebar } from '@/components/knowledge/knowledge-sidebar'
 import { MoveModal } from '@/components/knowledge/move-modal'
 import { SearchModal } from '@/components/knowledge/search-modal'
+import { useApprovalWatcher, useGlobalEvents } from '@/hooks/use-global-events'
 import { useKnowledgeShortcuts } from '@/hooks/use-knowledge-shortcuts'
-import { useGlobalEvents, useApprovalWatcher } from '@/hooks/use-global-events'
-import { useEventStore } from '@/stores/events'
 import { cn } from '@/lib/utils'
+import { useEventStore } from '@/stores/events'
 import { useKnowledgeStore } from '@/stores/knowledge'
 import { useSidebarStore } from '@/stores/sidebar'
 import { Header } from './header'
@@ -42,8 +42,9 @@ export function AppLayout() {
 
   // Bootstrap singleton SSE connection on first mount
   const connectEvents = useEventStore((s) => s.connect)
-  // biome-ignore lint/correctness/useExhaustiveDependencies: connect is stable
-  React.useState(() => { connectEvents() })
+  React.useState(() => {
+    connectEvents()
+  })
 
   return (
     <div className="flex h-screen overflow-hidden">
@@ -103,7 +104,12 @@ export function AppLayout() {
               }}
             />
           )}
-          <div className={cn('hidden lg:flex', mobileOpen && 'fixed inset-y-0 left-0 z-50 flex flex-col w-60 bg-sidebar')}>
+          <div
+            className={cn(
+              'hidden lg:flex',
+              mobileOpen && 'fixed inset-y-0 left-0 z-50 flex flex-col w-60 bg-sidebar',
+            )}
+          >
             <Sidebar />
           </div>
         </>

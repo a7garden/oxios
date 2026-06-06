@@ -22,6 +22,7 @@ import { Route as GitRouteImport } from './routes/git'
 import { Route as EventsRouteImport } from './routes/events'
 import { Route as CronJobsRouteImport } from './routes/cron-jobs'
 import { Route as ChatRouteImport } from './routes/chat'
+import { Route as CalendarRouteImport } from './routes/calendar'
 import { Route as BudgetRouteImport } from './routes/budget'
 import { Route as ApprovalsRouteImport } from './routes/approvals'
 import { Route as A2aRouteImport } from './routes/a2a'
@@ -106,6 +107,11 @@ const CronJobsRoute = CronJobsRouteImport.update({
 const ChatRoute = ChatRouteImport.update({
   id: '/chat',
   path: '/chat',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CalendarRoute = CalendarRouteImport.update({
+  id: '/calendar',
+  path: '/calendar',
   getParentRoute: () => rootRouteImport,
 } as any)
 const BudgetRoute = BudgetRouteImport.update({
@@ -214,6 +220,7 @@ export interface FileRoutesByFullPath {
   '/a2a': typeof A2aRoute
   '/approvals': typeof ApprovalsRoute
   '/budget': typeof BudgetRoute
+  '/calendar': typeof CalendarRoute
   '/chat': typeof ChatRoute
   '/cron-jobs': typeof CronJobsRoute
   '/events': typeof EventsRoute
@@ -249,6 +256,7 @@ export interface FileRoutesByTo {
   '/a2a': typeof A2aRoute
   '/approvals': typeof ApprovalsRoute
   '/budget': typeof BudgetRoute
+  '/calendar': typeof CalendarRoute
   '/chat': typeof ChatRoute
   '/cron-jobs': typeof CronJobsRoute
   '/events': typeof EventsRoute
@@ -285,6 +293,7 @@ export interface FileRoutesById {
   '/a2a': typeof A2aRoute
   '/approvals': typeof ApprovalsRoute
   '/budget': typeof BudgetRoute
+  '/calendar': typeof CalendarRoute
   '/chat': typeof ChatRoute
   '/cron-jobs': typeof CronJobsRoute
   '/events': typeof EventsRoute
@@ -322,6 +331,7 @@ export interface FileRouteTypes {
     | '/a2a'
     | '/approvals'
     | '/budget'
+    | '/calendar'
     | '/chat'
     | '/cron-jobs'
     | '/events'
@@ -357,6 +367,7 @@ export interface FileRouteTypes {
     | '/a2a'
     | '/approvals'
     | '/budget'
+    | '/calendar'
     | '/chat'
     | '/cron-jobs'
     | '/events'
@@ -392,6 +403,7 @@ export interface FileRouteTypes {
     | '/a2a'
     | '/approvals'
     | '/budget'
+    | '/calendar'
     | '/chat'
     | '/cron-jobs'
     | '/events'
@@ -428,6 +440,7 @@ export interface RootRouteChildren {
   A2aRoute: typeof A2aRoute
   ApprovalsRoute: typeof ApprovalsRoute
   BudgetRoute: typeof BudgetRoute
+  CalendarRoute: typeof CalendarRoute
   ChatRoute: typeof ChatRoute
   CronJobsRoute: typeof CronJobsRoute
   EventsRoute: typeof EventsRoute
@@ -549,6 +562,13 @@ declare module '@tanstack/react-router' {
       path: '/chat'
       fullPath: '/chat'
       preLoaderRoute: typeof ChatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/calendar': {
+      id: '/calendar'
+      path: '/calendar'
+      fullPath: '/calendar'
+      preLoaderRoute: typeof CalendarRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/budget': {
@@ -711,6 +731,7 @@ const rootRouteChildren: RootRouteChildren = {
   A2aRoute: A2aRoute,
   ApprovalsRoute: ApprovalsRoute,
   BudgetRoute: BudgetRoute,
+  CalendarRoute: CalendarRoute,
   ChatRoute: ChatRoute,
   CronJobsRoute: CronJobsRoute,
   EventsRoute: EventsRoute,

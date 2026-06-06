@@ -527,6 +527,8 @@ mod tests {
                         .expect("valid Skills.sh client"),
                 ),
             ),
+            None, // calendar (not configured in test)
+            None, // email (not configured in test)
         ));
 
         let engine = crate::OxiosEngine::new("mock/model");

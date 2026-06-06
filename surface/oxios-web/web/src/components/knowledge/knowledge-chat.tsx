@@ -428,7 +428,9 @@ export function KnowledgeChat() {
                         <button
                           type="button"
                           className="mt-0.5 shrink-0 text-muted-foreground hover:text-foreground transition-colors"
-                          title={msg.done ? t('knowledge.markIncomplete') : t('knowledge.markComplete')}
+                          title={
+                            msg.done ? t('knowledge.markIncomplete') : t('knowledge.markComplete')
+                          }
                           disabled={chatDelete.isPending || chatAppend.isPending}
                           onClick={async (e) => {
                             e.stopPropagation()
@@ -465,54 +467,55 @@ export function KnowledgeChat() {
                         </span>
 
                         {/* Hover/touch actions */}
-                        {((isHovered && !hasSelection) || (isSelected && !isHovered)) && !isPending && (
-                          <div className="flex items-center gap-0.5 shrink-0">
-                            {/* To Journal */}
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-6 w-6"
-                              title={t('knowledge.toJournal')}
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                moveToJournal(msg)
-                              }}
-                            >
-                              <BookOpen className="h-3.5 w-3.5" />
-                            </Button>
-
-                            {/* Checklist targets */}
-                            {CHECKLIST_TARGETS.map((ct) => (
+                        {((isHovered && !hasSelection) || (isSelected && !isHovered)) &&
+                          !isPending && (
+                            <div className="flex items-center gap-0.5 shrink-0">
+                              {/* To Journal */}
                               <Button
-                                key={ct.path}
                                 variant="ghost"
                                 size="icon"
                                 className="h-6 w-6"
-                                title={t(ct.labelKey)}
+                                title={t('knowledge.toJournal')}
                                 onClick={(e) => {
                                   e.stopPropagation()
-                                  moveToChecklist(ct.path, msg)
+                                  moveToJournal(msg)
                                 }}
                               >
-                                <ct.icon className="h-3.5 w-3.5" />
+                                <BookOpen className="h-3.5 w-3.5" />
                               </Button>
-                            ))}
 
-                            {/* Delete */}
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-6 w-6 text-destructive"
-                              title={t('common.delete')}
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                deleteMessage(msg)
-                              }}
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
-                          </div>
-                        )}
+                              {/* Checklist targets */}
+                              {CHECKLIST_TARGETS.map((ct) => (
+                                <Button
+                                  key={ct.path}
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-6 w-6"
+                                  title={t(ct.labelKey)}
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    moveToChecklist(ct.path, msg)
+                                  }}
+                                >
+                                  <ct.icon className="h-3.5 w-3.5" />
+                                </Button>
+                              ))}
+
+                              {/* Delete */}
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 text-destructive"
+                                title={t('common.delete')}
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  deleteMessage(msg)
+                                }}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          )}
                       </div>
                     )
                   })}

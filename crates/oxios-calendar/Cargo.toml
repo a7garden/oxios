@@ -1,0 +1,25 @@
+[package]
+name = "oxios-calendar"
+version = "1.1.0"
+edition = "2021"
+description = "Oxios calendar: .ics-based event management"
+license = "MIT"
+
+[dependencies]
+oxios-markdown = { version = "1.1.0", path = "../oxios-markdown" }
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+chrono-tz = "0.10"
+uuid = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+parking_lot = { workspace = true }
+icalendar = "0.16"
+rrule = "0.13"
+cron = "0.16"
+
+[dev-dependencies]
+tempfile = { workspace = true }

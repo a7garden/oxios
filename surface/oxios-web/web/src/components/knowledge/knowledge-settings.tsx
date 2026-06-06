@@ -18,7 +18,8 @@ export function KnowledgeSettings() {
     if (config) setForm(config)
   }, [config])
 
-  if (isLoading) return <div className="p-6 text-muted-foreground">{t('knowledge.loadingSettings')}</div>
+  if (isLoading)
+    return <div className="p-6 text-muted-foreground">{t('knowledge.loadingSettings')}</div>
 
   const handleSave = async () => {
     await updateConfig.mutateAsync(form)

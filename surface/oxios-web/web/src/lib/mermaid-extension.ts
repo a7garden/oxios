@@ -16,10 +16,10 @@
  */
 import {
   Decoration,
-  EditorView,
+  type DecorationSet,
+  type EditorView,
   MatchDecorator,
   ViewPlugin,
-  type DecorationSet,
   type ViewUpdate,
   WidgetType,
 } from '@codemirror/view'

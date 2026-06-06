@@ -40,6 +40,7 @@ mod audit_persistence;
 // 이벤트, 메시징, 외부 프로토콜, 멀티 에이전트 조정.
 pub mod a2a;
 pub mod coordination;
+pub mod email;
 pub mod event_bus;
 pub mod mcp;
 
@@ -131,6 +132,7 @@ pub use a2a::{
     A2ACircuitBreaker, A2AMessage, A2AProtocol, A2ARequest, A2AResponse, AgentCard,
     AgentCardRegistry, CircuitState, DelegationHandler, TaskPriority, TaskSpec,
 };
+pub use email::{SendReceipt, SmtpClient};
 pub use event_bus::{EventBus, KernelEvent};
 pub use mcp::{
     McpBridge, McpCapabilities, McpServer, McpTool, McpToolCallResult as CallToolResult,
@@ -147,16 +149,10 @@ pub use memory::auto_memory_bridge::{
     AutoMemoryBridge, ExportResult, GuidancePattern, ImportResult, InsightCategory, MemoryInsight,
     SyncDirection, SyncResult,
 };
+pub use memory::{content_hash, MemoryEntry, MemoryTier, MemoryType, ProtectionLevel, TextVector};
 pub use memory::{
     DreamCheckpoint, DreamConfig, DreamProcess, DreamReport, HnswIndex, HnswMemoryIndex,
     MemoryManager, ProactiveRecall, RecallTiming, SemanticHit,
-};
-pub use memory::{MemoryEntry, MemoryTier, MemoryType, ProtectionLevel, TextVector, content_hash};
-pub use oxios_memory::{
-    AutoClassifier, AutoProtector, CompactionTree, CurationCandidate, CurationReport,
-    DecayEngine, EmbeddingCache, HistoricalPeriod,
-    MemoryBudget, MemoryGraph, MemoryMapEntry, MemoryNeighbor, RootEntry,
-    RootIndex, SonaEngine, TopicEntry,
 };
 pub use oxios_memory::memory::flash_attention::{
     BenchmarkResult as AttentionBenchmarkResult, FlashAttention, FlashAttentionConfig,
@@ -165,6 +161,11 @@ pub use oxios_memory::memory::flash_attention::{
 pub use oxios_memory::memory::{
     batch_euclidean_to_poincare, euclidean_to_poincare, hyperbolic_distance, mobius_add,
     mobius_scalar_mul, HyperbolicConfig, HyperbolicEmbedding,
+};
+pub use oxios_memory::{
+    AutoClassifier, AutoProtector, CompactionTree, CurationCandidate, CurationReport, DecayEngine,
+    EmbeddingCache, HistoricalPeriod, MemoryBudget, MemoryGraph, MemoryMapEntry, MemoryNeighbor,
+    RootEntry, RootIndex, SonaEngine, TopicEntry,
 };
 
 // ─── Memory core types (extracted to oxios-memory, RFC-018 b.1) ───
@@ -179,13 +180,15 @@ pub use oxios_memory::{
 #[cfg(feature = "sqlite-memory")]
 pub use oxios_memory::memory::sqlite::cache::{self as sqlite_cache};
 #[cfg(feature = "sqlite-memory")]
-pub use oxios_memory::memory::sqlite::{bytes_to_f32_slice, f32_slice_to_bytes, MemoryDatabase};
-#[cfg(feature = "sqlite-memory")]
 pub use oxios_memory::memory::sqlite::migration::{self as sqlite_migration, MigrationReport};
 #[cfg(feature = "sqlite-memory")]
-pub use oxios_memory::memory::sqlite::search::{reciprocal_rank_fusion, Bm25Hit, RankedMemory, VectorHit};
+pub use oxios_memory::memory::sqlite::search::{
+    reciprocal_rank_fusion, Bm25Hit, RankedMemory, VectorHit,
+};
 #[cfg(feature = "sqlite-memory")]
 pub use oxios_memory::memory::sqlite::SqliteMemoryStore;
+#[cfg(feature = "sqlite-memory")]
+pub use oxios_memory::memory::sqlite::{bytes_to_f32_slice, f32_slice_to_bytes, MemoryDatabase};
 pub use persona::{default_personas, Persona, PersonaManager, PersonaStore};
 
 // ─── Tools & Skills ────────────────────────────────────────────────
@@ -211,10 +214,10 @@ pub use wasm_sandbox::{ResourceKind, WasmConfig, WasmError, WasmSandbox};
 // ─── State & Config ─────────────────────────────────────────────────
 pub use backup::{BackupManifest, BackupSection};
 pub use config::{
-    BrowserConfig, ChannelsConfig, CronConfig, DaemonConfig, EmbeddingConfig, EngineConfig,
-    ExecConfig, ExecMode, GitConfig, InlineCronJob, LoggingConfig, MarketplaceConfig, McpConfig,
-    McpServerDef, MemoryConfig, OrchestratorConfig, OxiosConfig, PersonaConfig, SkillsShConfig,
-    SqliteMemoryConfig,
+    BrowserConfig, ChannelsConfig, CronConfig, DaemonConfig, EmailConfig, EmbeddingConfig,
+    EngineConfig, ExecConfig, ExecMode, GitConfig, InlineCronJob, LoggingConfig, MarketplaceConfig,
+    McpConfig, McpServerDef, MemoryConfig, OrchestratorConfig, OxiosConfig, PersonaConfig,
+    SkillsShConfig, SqliteMemoryConfig,
 };
 pub use git_layer::{
     CommitContext, CommitDiff, CommitInfo, DiffKind, DiffStats, FileDiff, GitLayer, LogEntry,
@@ -244,11 +247,12 @@ pub use types::{AgentId, AgentInfo, AgentStatus};
 pub use kernel_handle::KernelHandle;
 pub use kernel_handle::MarketplaceApi;
 pub use kernel_handle::{
-    A2aApi, AgentApi, CopilotResponse, EngineApi, EngineConfigResponse, ExecApi, ExtensionApi,
-    FallbackEvent, InfraApi, InputModality as EngineInputModality, KnowledgeContext, KnowledgeLens,
-    KnowledgeNote, McpApi, MemoryNote, ModelInfo, PersonaApi, ProjectApi, ProjectInfo,
-    ProviderCategory, ProviderInfo, RoutingConfigSnapshot, RoutingStats, RoutingStatsSnapshot,
-    RoutingUpdate, SecurityApi, SharedExecConfig, StateApi, ValidateKeyResult,
+    A2aApi, AgentApi, CalendarApi, CopilotResponse, EmailApi, EngineApi, EngineConfigResponse,
+    ExecApi, ExtensionApi, FallbackEvent, InfraApi, InputModality as EngineInputModality,
+    KnowledgeContext, KnowledgeLens, KnowledgeNote, McpApi, MemoryNote, ModelInfo, PersonaApi,
+    ProjectApi, ProjectInfo, ProviderCategory, ProviderInfo, RoutingConfigSnapshot, RoutingStats,
+    RoutingStatsSnapshot, RoutingUpdate, SecurityApi, SharedExecConfig, StateApi,
+    ValidateKeyResult,
 };
 pub use session_context::SessionContext;
 

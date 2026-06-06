@@ -2,7 +2,11 @@ import { PanelRightClose } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
-import { useKnowledgeBacklinks, useKnowledgeFileHistory, useKnowledgeFileRestore } from '@/hooks/use-knowledge'
+import {
+  useKnowledgeBacklinks,
+  useKnowledgeFileHistory,
+  useKnowledgeFileRestore,
+} from '@/hooks/use-knowledge'
 import { cn } from '@/lib/utils'
 import { useKnowledgeStore } from '@/stores/knowledge'
 import { Copilot } from './copilot'
@@ -104,7 +108,9 @@ function FileHistoryPanel() {
   const { t } = useTranslation()
 
   if (!currentFilePath) {
-    return <p className="text-xs text-muted-foreground">{t('knowledge.noFileOpen', 'No file open')}</p>
+    return (
+      <p className="text-xs text-muted-foreground">{t('knowledge.noFileOpen', 'No file open')}</p>
+    )
   }
 
   if (isLoading) {
@@ -134,9 +140,7 @@ function FileHistoryPanel() {
               variant="ghost"
               size="sm"
               className="h-6 px-2 text-xs opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
-              onClick={() =>
-                restore.mutate({ path: currentFilePath, hash: entry.hash })
-              }
+              onClick={() => restore.mutate({ path: currentFilePath, hash: entry.hash })}
               disabled={restore.isPending}
               title={t('knowledge.restoreVersion', 'Restore this version')}
             >

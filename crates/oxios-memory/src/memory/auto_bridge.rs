@@ -17,8 +17,8 @@ use anyhow::Result;
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 
-use crate::memory::types::{MemoryEntry, MemoryType};
 use crate::memory::manager::MemoryManager;
+use crate::memory::types::{MemoryEntry, MemoryType};
 
 // ---------------------------------------------------------------------------
 // Types
@@ -444,6 +444,7 @@ impl AutoMemoryBridge {
 impl AutoMemoryBridge {
     /// Find all MEMORY.md files in the auto_memory_dir.
     /// Parse insights from a markdown content string.
+    #[cfg(feature = "sqlite-memory")]
     fn parse_insights(&self, content: &str) -> Vec<MemoryInsight> {
         let mut insights = Vec::new();
 

@@ -1,8 +1,8 @@
+import { X } from 'lucide-react'
 import { useState } from 'react'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Badge } from '@/components/ui/badge'
-import { X } from 'lucide-react'
 
 interface Props {
   value: number[]
@@ -64,7 +64,9 @@ export function ReminderEditor({ value, onChange }: Props) {
             type="button"
             variant={value.includes(minutes) ? 'default' : 'outline'}
             size="sm"
-            onClick={() => (value.includes(minutes) ? removeReminder(minutes) : addReminder(minutes))}
+            onClick={() =>
+              value.includes(minutes) ? removeReminder(minutes) : addReminder(minutes)
+            }
           >
             {label}
           </Button>

@@ -2,13 +2,7 @@ import { CheckCircle2, XCircle } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
-export function CriteriaList({
-  criteria,
-  results,
-}: {
-  criteria: string[]
-  results?: boolean[]
-}) {
+export function CriteriaList({ criteria, results }: { criteria: string[]; results?: boolean[] }) {
   const { t } = useTranslation()
   if (!criteria?.length) return null
   return (

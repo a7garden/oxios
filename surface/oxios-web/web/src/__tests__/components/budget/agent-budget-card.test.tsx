@@ -1,9 +1,9 @@
-import { describe, expect, it } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { Wallet } from 'lucide-react'
+import { describe, expect, it } from 'vitest'
+import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
-import { Button } from '@/components/ui/button'
 
 // Mock i18next
 vi.mock('react-i18next', () => ({
@@ -47,7 +47,7 @@ describe('AgentBudgetCard - Rendering patterns', () => {
             <Progress value={costPercent} />
           </div>
         </CardContent>
-      </Card>
+      </Card>,
     )
 
     expect(screen.getByText(/Tokens:/)).toBeInTheDocument()
@@ -87,7 +87,7 @@ describe('AgentBudgetCard - Rendering patterns', () => {
             <Progress value={100} className="bg-destructive" />
           </div>
         </CardContent>
-      </Card>
+      </Card>,
     )
 
     expect(screen.getAllByText(/100,000/)).toHaveLength(2)
@@ -99,10 +99,14 @@ describe('AgentBudgetCard - Rendering patterns', () => {
       <Card>
         <CardContent className="flex gap-2 pt-4">
           <Button size="sm">Edit</Button>
-          <Button size="sm" variant="outline">Reset</Button>
-          <Button size="sm" variant="destructive">Remove</Button>
+          <Button size="sm" variant="outline">
+            Reset
+          </Button>
+          <Button size="sm" variant="destructive">
+            Remove
+          </Button>
         </CardContent>
-      </Card>
+      </Card>,
     )
 
     expect(screen.getByRole('button', { name: 'Edit' })).toBeInTheDocument()

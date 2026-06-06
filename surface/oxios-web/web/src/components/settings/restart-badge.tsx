@@ -19,9 +19,7 @@ interface RestartBadgeProps {
  */
 export function RestartBadge({ hotReload, scope, size = 'sm', className }: RestartBadgeProps) {
   const { t } = useTranslation()
-  const label = hotReload
-    ? t('settings.hotReload')
-    : t('settings.requiresRestart')
+  const label = hotReload ? t('settings.hotReload') : t('settings.requiresRestart')
   const tooltipContent = hotReload
     ? t('settings.hotReloadTooltip')
     : t('settings.requiresRestartTooltip', {

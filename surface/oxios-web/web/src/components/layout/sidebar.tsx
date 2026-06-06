@@ -1,3 +1,4 @@
+import { useQuery } from '@tanstack/react-query'
 import { Link, useRouterState } from '@tanstack/react-router'
 import {
   Activity,
@@ -22,20 +23,19 @@ import {
   Settings,
   Shield,
   Sun,
-  Timer,
   Theater,
+  Timer,
   Users,
   Wallet,
   Zap,
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { useQuery } from '@tanstack/react-query'
 import { Separator } from '@/components/ui/separator'
 import { Tooltip } from '@/components/ui/tooltip'
+import { api } from '@/lib/api-client'
 import { cn } from '@/lib/utils'
 import { useSidebarStore } from '@/stores/sidebar'
 import { useThemeStore } from '@/stores/theme'
-import { api } from '@/lib/api-client'
 
 interface NavItem {
   labelKey: string
@@ -59,7 +59,11 @@ const navGroups: { labelKey: string; items: NavItem[] }[] = [
     labelKey: 'common.agents',
     items: [
       { labelKey: 'common.agents', href: '/agents', icon: <Bot className="h-4 w-4" /> },
-      { labelKey: 'common.agentGroups', href: '/agent-groups', icon: <Users className="h-4 w-4" /> },
+      {
+        labelKey: 'common.agentGroups',
+        href: '/agent-groups',
+        icon: <Users className="h-4 w-4" />,
+      },
       { labelKey: 'common.seeds', href: '/seeds', icon: <Dna className="h-4 w-4" /> },
       { labelKey: 'common.personas', href: '/personas', icon: <Theater className="h-4 w-4" /> },
       { labelKey: 'common.skills', href: '/skills', icon: <Zap className="h-4 w-4" /> },
@@ -68,15 +72,27 @@ const navGroups: { labelKey: string; items: NavItem[] }[] = [
   {
     labelKey: 'common.projects',
     items: [
-      { labelKey: 'common.projects', href: '/projects', icon: <FolderKanban className="h-4 w-4" /> },
+      {
+        labelKey: 'common.projects',
+        href: '/projects',
+        icon: <FolderKanban className="h-4 w-4" />,
+      },
     ],
   },
   {
     labelKey: 'common.storage',
     items: [
-      { labelKey: 'common.knowledge', href: '/knowledge', icon: <NotebookPen className="h-4 w-4" /> },
+      {
+        labelKey: 'common.knowledge',
+        href: '/knowledge',
+        icon: <NotebookPen className="h-4 w-4" />,
+      },
       { labelKey: 'common.memory', href: '/memory', icon: <Brain className="h-4 w-4" /> },
-      { labelKey: 'common.workspace', href: '/workspace', icon: <FolderOpen className="h-4 w-4" /> },
+      {
+        labelKey: 'common.workspace',
+        href: '/workspace',
+        icon: <FolderOpen className="h-4 w-4" />,
+      },
     ],
   },
   {
@@ -84,7 +100,11 @@ const navGroups: { labelKey: string; items: NavItem[] }[] = [
     items: [
       { labelKey: 'common.resources', href: '/resources', icon: <Activity className="h-4 w-4" /> },
       { labelKey: 'common.scheduler', href: '/scheduler', icon: <Calendar className="h-4 w-4" /> },
-      { labelKey: 'common.calendar', href: '/calendar', icon: <CalendarDays className="h-4 w-4" /> },
+      {
+        labelKey: 'common.calendar',
+        href: '/calendar',
+        icon: <CalendarDays className="h-4 w-4" />,
+      },
       { labelKey: 'common.cronJobs', href: '/cron-jobs', icon: <Timer className="h-4 w-4" /> },
       { labelKey: 'common.budget', href: '/budget', icon: <Wallet className="h-4 w-4" /> },
       { labelKey: 'common.security', href: '/security', icon: <Shield className="h-4 w-4" /> },
@@ -136,7 +156,12 @@ export function Sidebar() {
     mainGroup.items[1]!, // Chat
   ]
 
-  const themeLabel = theme === 'system' ? t('common.system') : resolved === 'dark' ? t('common.light') : t('common.dark')
+  const themeLabel =
+    theme === 'system'
+      ? t('common.system')
+      : resolved === 'dark'
+        ? t('common.light')
+        : t('common.dark')
 
   return (
     <aside
@@ -146,7 +171,12 @@ export function Sidebar() {
       )}
     >
       {/* Header */}
-      <div className={cn('flex h-14 items-center px-3', collapsed ? 'justify-center' : 'justify-between')}>
+      <div
+        className={cn(
+          'flex h-14 items-center px-3',
+          collapsed ? 'justify-center' : 'justify-between',
+        )}
+      >
         {!collapsed && (
           <div className="flex items-center gap-2">
             <Zap className="h-5 w-5 text-primary" />
@@ -175,8 +205,7 @@ export function Sidebar() {
           )}
           {mainItems.map((item) => {
             const isActive =
-              currentPath === item.href ||
-              (item.href !== '/' && currentPath.startsWith(item.href))
+              currentPath === item.href || (item.href !== '/' && currentPath.startsWith(item.href))
             const link = (
               <Link
                 key={item.href}
@@ -199,7 +228,11 @@ export function Sidebar() {
               </Link>
             )
             return collapsed ? (
-              <Tooltip key={item.href} content={`${t(item.labelKey)}${item.badge ? ` (${item.badge})` : ''}`} side="right">
+              <Tooltip
+                key={item.href}
+                content={`${t(item.labelKey)}${item.badge ? ` (${item.badge})` : ''}`}
+                side="right"
+              >
                 {link}
               </Tooltip>
             ) : (
@@ -267,9 +300,7 @@ export function Sidebar() {
           ) : (
             <Moon className="h-4 w-4" />
           )}
-          {!collapsed && (
-            <span>{themeLabel}</span>
-          )}
+          {!collapsed && <span>{themeLabel}</span>}
         </button>
         <Link
           to="/settings"

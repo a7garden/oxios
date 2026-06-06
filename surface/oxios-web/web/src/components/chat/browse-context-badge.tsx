@@ -1,6 +1,13 @@
 import {
-  Search, ClipboardList, Zap, XCircle, FileText, Camera,
-  ExternalLink, LoaderCircle, ScrollText,
+  Camera,
+  ClipboardList,
+  ExternalLink,
+  FileText,
+  LoaderCircle,
+  ScrollText,
+  Search,
+  XCircle,
+  Zap,
 } from 'lucide-react'
 import type { ToolCallContext, VisitReason } from '@/types'
 
@@ -23,7 +30,9 @@ export function BrowseContextBadge({ context }: { context: ToolCallContext }) {
         <span className="inline-flex items-center gap-1 text-2xs text-info truncate max-w-[50ch]">
           <Search className="h-3 w-3 shrink-0" />
           {context.query ? context.query : ''}
-          {context.engine ? <span className="text-muted-foreground">({context.engine})</span> : null}
+          {context.engine ? (
+            <span className="text-muted-foreground">({context.engine})</span>
+          ) : null}
         </span>
       )
     case 'data_extraction':
@@ -91,7 +100,9 @@ function PageVisitBadge({
       <span className="inline-flex items-center gap-1 text-2xs text-error truncate max-w-[50ch]">
         <XCircle className="h-3 w-3 shrink-0" />
         <span className="truncate font-mono">{shortenUrl(context.url)}</span>
-        <span className="text-muted-foreground truncate max-w-[24ch]">— {context.navigation_error}</span>
+        <span className="text-muted-foreground truncate max-w-[24ch]">
+          — {context.navigation_error}
+        </span>
       </span>
     )
   }
@@ -131,10 +142,7 @@ function VisitReasonChip({ reason }: { reason?: VisitReason }) {
   if ('search_result' in reason) {
     const pos = reason.search_result.position
     return (
-      <span
-        className="text-info shrink-0"
-        title={`Search result #${pos}`}
-      >
+      <span className="text-info shrink-0" title={`Search result #${pos}`}>
         #{pos}
       </span>
     )
@@ -145,7 +153,7 @@ function VisitReasonChip({ reason }: { reason?: VisitReason }) {
         className="text-muted-foreground shrink-0"
         title={`Followed link from ${reason.link_followed.from_url}`}
       >
-          <ExternalLink className="h-3 w-3" />
+        <ExternalLink className="h-3 w-3" />
       </span>
     )
   }
@@ -165,7 +173,7 @@ function shortenUrl(url: string): string {
     const path = u.pathname === '/' ? '' : u.pathname
     return `${u.host}${path}`
   } catch {
-    return url.length > 40 ? url.slice(0, 40) + '…' : url
+    return url.length > 40 ? `${url.slice(0, 40)}…` : url
   }
 }
 

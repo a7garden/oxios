@@ -1,13 +1,16 @@
+import { CheckCircle2, Clock, Play, XCircle } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import type { GroupAgent } from '@/types/agent-group'
-import { Clock, Play, CheckCircle2, XCircle } from 'lucide-react'
 
 interface Props {
   agents: GroupAgent[]
 }
 
-const STATUS_META: Record<string, { icon: React.ReactNode; variant: 'success' | 'warning' | 'destructive' | 'secondary' }> = {
+const STATUS_META: Record<
+  string,
+  { icon: React.ReactNode; variant: 'success' | 'warning' | 'destructive' | 'secondary' }
+> = {
   Pending: { icon: <Clock className="h-3 w-3" />, variant: 'secondary' },
   Running: { icon: <Play className="h-3 w-3" />, variant: 'success' },
   Completed: { icon: <CheckCircle2 className="h-3 w-3" />, variant: 'success' },
@@ -18,7 +21,7 @@ export function SubAgentList({ agents }: Props) {
   return (
     <div className="space-y-3">
       {agents.map((agent) => {
-        const meta = STATUS_META[agent.status] ?? STATUS_META['Pending']!
+        const meta = STATUS_META[agent.status] ?? STATUS_META.Pending!
         return (
           <Card key={agent.id}>
             <CardContent className="p-4 space-y-2">

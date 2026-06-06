@@ -57,14 +57,15 @@ pub mod test_support;
 pub mod manager;
 
 // ─── Processes ──────────────────────────────────────────────────────
+pub mod auto_bridge;
 pub mod dream;
 pub mod proactive;
-pub mod auto_bridge;
 
 #[cfg(feature = "sqlite-memory")]
 pub mod sqlite;
 
 // ─── Re-exports (b.1 — chunking/normalizer/hyperbolic) ──────────────
+pub use backend::MemoryBackend;
 pub use chunking::{chunk_fixed, chunk_paragraphs, ChunkConfig, TextChunk};
 pub use hyperbolic::{
     batch_euclidean_to_poincare, euclidean_to_poincare, hyperbolic_distance, mobius_add,
@@ -74,7 +75,6 @@ pub use normalizer::{
     cosine_similarity_f32, dot_product_f32, l2_norm_f32, l2_norm_f64, l2_normalize_f32,
     l2_normalize_f64,
 };
-pub use backend::MemoryBackend;
 pub use storage::{MarkdownSource, MemoryGit, MemoryStorage, MemoryStorageExt, NoteEntry};
 
 // ─── Re-exports (lifecycle) ─────────────────────────────────────────
@@ -93,10 +93,10 @@ pub use root_index::{HistoricalPeriod, RootEntry, RootIndex, TopicEntry};
 pub use sona::{LearnedPattern, SonaEngine, SonaMode, Trajectory, TrajectoryStep, Verdict};
 
 // ─── Re-exports (core manager) ──────────────────────────────────────
-pub use manager::MemoryManager;
-pub use dream::{DreamCheckpoint, DreamConfig, DreamProcess, DreamReport};
-pub use proactive::{ProactiveRecall, RecallTiming};
 pub use auto_bridge::{
-    AutoMemoryBridge, ExportResult, GuidancePattern, ImportResult, InsightCategory,
-    MemoryInsight, SyncDirection, SyncResult,
+    AutoMemoryBridge, ExportResult, GuidancePattern, ImportResult, InsightCategory, MemoryInsight,
+    SyncDirection, SyncResult,
 };
+pub use dream::{DreamCheckpoint, DreamConfig, DreamProcess, DreamReport};
+pub use manager::MemoryManager;
+pub use proactive::{ProactiveRecall, RecallTiming};

@@ -10,9 +10,8 @@ interface ToolCallCardProps {
 
 export function ToolCallCard({ call, className }: ToolCallCardProps) {
   const [expanded, setExpanded] = useState(false)
-  const durationStr = call.duration_ms >= 1000
-    ? `${(call.duration_ms / 1000).toFixed(1)}s`
-    : `${call.duration_ms}ms`
+  const durationStr =
+    call.duration_ms >= 1000 ? `${(call.duration_ms / 1000).toFixed(1)}s` : `${call.duration_ms}ms`
 
   return (
     <div className={cn('rounded-lg border bg-muted/50 my-2', className)}>
@@ -21,7 +20,11 @@ export function ToolCallCard({ call, className }: ToolCallCardProps) {
         onClick={() => setExpanded(!expanded)}
         className="flex w-full items-center gap-2 px-3 py-2 text-sm"
       >
-        {expanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+        {expanded ? (
+          <ChevronDown className="h-3.5 w-3.5" />
+        ) : (
+          <ChevronRight className="h-3.5 w-3.5" />
+        )}
         <Wrench className="h-3.5 w-3.5 text-muted-foreground" />
         <span className="font-medium truncate">{call.tool_name}</span>
         <span className="ml-auto text-xs text-muted-foreground">{durationStr}</span>
@@ -30,11 +33,15 @@ export function ToolCallCard({ call, className }: ToolCallCardProps) {
         <div className="border-t px-3 py-2 space-y-2">
           <div>
             <p className="text-xs font-medium text-muted-foreground mb-1">Input</p>
-            <pre className="text-xs bg-background rounded p-2 overflow-x-auto whitespace-pre-wrap max-h-48 overflow-y-auto">{call.input}</pre>
+            <pre className="text-xs bg-background rounded p-2 overflow-x-auto whitespace-pre-wrap max-h-48 overflow-y-auto">
+              {call.input}
+            </pre>
           </div>
           <div>
             <p className="text-xs font-medium text-muted-foreground mb-1">Output</p>
-            <pre className="text-xs bg-background rounded p-2 overflow-x-auto whitespace-pre-wrap max-h-48 overflow-y-auto">{call.output}</pre>
+            <pre className="text-xs bg-background rounded p-2 overflow-x-auto whitespace-pre-wrap max-h-48 overflow-y-auto">
+              {call.output}
+            </pre>
           </div>
         </div>
       )}

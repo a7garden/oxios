@@ -1,32 +1,27 @@
+import { Activity, Brain, Hash, Pin } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import {
-  PieChart,
-  Pie,
-  Cell,
-  BarChart,
   Bar,
-  XAxis,
-  YAxis,
+  BarChart,
+  Cell,
+  Legend,
+  Pie,
+  PieChart,
   Tooltip as RechartsTooltip,
   ResponsiveContainer,
-  Legend,
+  XAxis,
+  YAxis,
 } from 'recharts'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Brain, Hash, Pin, Activity } from 'lucide-react'
-import { useTranslation } from 'react-i18next'
-import { useMemoryStats } from '@/hooks/use-memory'
 import { ErrorState } from '@/components/shared/error-state'
 import { LoadingCards } from '@/components/shared/loading'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { useMemoryStats } from '@/hooks/use-memory'
 
 const TIER_COLORS = { hot: '#ef4444', warm: '#eab308', cold: '#3b82f6' }
 
 export function MemoryOverview() {
   const { t } = useTranslation()
-  const {
-    data: stats,
-    isLoading,
-    isError,
-    refetch,
-  } = useMemoryStats()
+  const { data: stats, isLoading, isError, refetch } = useMemoryStats()
 
   if (isLoading) return <LoadingCards count={4} />
   if (isError) return <ErrorState onRetry={() => refetch()} />
@@ -101,9 +96,7 @@ export function MemoryOverview() {
                 </PieChart>
               </ResponsiveContainer>
             ) : (
-              <p className="text-sm text-muted-foreground">
-                {t('memory.noData')}
-              </p>
+              <p className="text-sm text-muted-foreground">{t('memory.noData')}</p>
             )}
           </CardContent>
         </Card>
@@ -122,9 +115,7 @@ export function MemoryOverview() {
                 </BarChart>
               </ResponsiveContainer>
             ) : (
-              <p className="text-sm text-muted-foreground">
-                {t('memory.noData')}
-              </p>
+              <p className="text-sm text-muted-foreground">{t('memory.noData')}</p>
             )}
           </CardContent>
         </Card>

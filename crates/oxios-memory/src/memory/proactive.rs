@@ -11,9 +11,9 @@ use std::collections::HashSet;
 
 use anyhow::Result;
 
-use crate::memory::types::{MemoryEntry, MemoryTier};
 use crate::memory::decay::DecayEngine;
 use crate::memory::manager::MemoryManager;
+use crate::memory::types::{MemoryEntry, MemoryTier};
 
 // ---------------------------------------------------------------------------
 // RecallTiming

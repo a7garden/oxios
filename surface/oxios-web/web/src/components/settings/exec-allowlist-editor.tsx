@@ -1,6 +1,6 @@
 import { X } from 'lucide-react'
+import { type KeyboardEvent, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useState, type KeyboardEvent } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
@@ -17,7 +17,12 @@ interface ExecAllowlistEditorProps {
  * Multi-line tag input for `exec.allowed_commands`. Enter or comma
  * adds a new tag; backspace on empty input removes the last tag.
  */
-export function ExecAllowlistEditor({ value, onChange, disabled, className }: ExecAllowlistEditorProps) {
+export function ExecAllowlistEditor({
+  value,
+  onChange,
+  disabled,
+  className,
+}: ExecAllowlistEditorProps) {
   const { t } = useTranslation()
   const [draft, setDraft] = useState('')
 

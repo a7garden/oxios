@@ -375,11 +375,10 @@ impl HyperbolicEmbedding {
     }
 
     // ── Phase 5: SQLite Persistence ────────────────────────────────
-    // *Moved to oxios-kernel::memory::hyperbolic_persist* (RFC-018 b.1).
-    // The cfg-gated sqlite-specific methods stay in kernel because they
-    // depend on `SqliteMemoryStore` (a kernel type). The pure-math core
-    // is in oxios-memory. See `oxios-kernel/src/memory/hyperbolic_persist.rs`
-    // for the kernel-side adapter with the same method signatures.
+    // Moved to `crate::sqlite::hyperbolic_persist` (RFC-018 b.8).
+    // The cfg-gated SQLite-specific methods live there as free functions
+    // that take `SqliteMemoryStore` as a parameter. The pure-math core
+    // remains here in `HyperbolicEmbedding`.
 
     /// Find memories near a query in hyperbolic space.
     ///

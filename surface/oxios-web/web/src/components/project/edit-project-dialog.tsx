@@ -1,15 +1,20 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useUpdateProject } from '@/hooks/use-projects'
-import type { Project } from '@/types'
 import { Button } from '@/components/ui/button'
 import {
-  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
-import { Switch } from '@/components/ui/switch'
 import { useToast } from '@/components/ui/sonner'
+import { Switch } from '@/components/ui/switch'
+import { Textarea } from '@/components/ui/textarea'
+import { useUpdateProject } from '@/hooks/use-projects'
+import type { Project } from '@/types'
 
 interface EditProjectDialogProps {
   project: Project | null
@@ -20,7 +25,12 @@ interface EditProjectDialogProps {
 
 import { ICON_OPTIONS } from './create-project-dialog'
 
-export function EditProjectDialog({ project, open, onOpenChange, onSuccess }: EditProjectDialogProps) {
+export function EditProjectDialog({
+  project,
+  open,
+  onOpenChange,
+  onSuccess,
+}: EditProjectDialogProps) {
   const { t } = useTranslation()
   const update = useUpdateProject()
   const { toast } = useToast()
@@ -38,8 +48,9 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess }: Ed
     if (icon !== (project.emoji ?? 'package')) setIcon(project.emoji ?? 'package')
     if (description !== (project.description ?? '')) setDescription(project.description ?? '')
     if (tags !== (project.tags ?? []).join(', ')) setTags((project.tags ?? []).join(', '))
-    if (paths !== ((project.paths ?? []).join('\n'))) setPaths((project.paths ?? []).join('\n'))
-    if (memoryVisible !== (project.memory_visible ?? true)) setMemoryVisible(project.memory_visible ?? true)
+    if (paths !== (project.paths ?? []).join('\n')) setPaths((project.paths ?? []).join('\n'))
+    if (memoryVisible !== (project.memory_visible ?? true))
+      setMemoryVisible(project.memory_visible ?? true)
   }
 
   const handleSubmit = () => {
@@ -78,11 +89,11 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess }: Ed
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>
-            {t('projects.editTitle', 'Edit Project')}
-          </DialogTitle>
+          <DialogTitle>{t('projects.editTitle', 'Edit Project')}</DialogTitle>
           <DialogDescription>
-            {project?.name ? t('projects.editDesc', 'Update "{{name}}"', { name: project.name }) : ''}
+            {project?.name
+              ? t('projects.editDesc', 'Update "{{name}}"', { name: project.name })
+              : ''}
           </DialogDescription>
         </DialogHeader>
 
@@ -101,7 +112,9 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess }: Ed
                   type="button"
                   onClick={() => setIcon(opt.name)}
                   className={`w-8 h-8 rounded flex items-center justify-center border transition-colors ${
-                    icon === opt.name ? 'border-primary bg-primary/10' : 'border-transparent hover:bg-muted'
+                    icon === opt.name
+                      ? 'border-primary bg-primary/10'
+                      : 'border-transparent hover:bg-muted'
                   }`}
                 >
                   {opt.icon}
@@ -111,24 +124,36 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess }: Ed
           </div>
 
           <div className="space-y-1">
-            <label className="text-sm font-medium">{t('projects.description', 'Description')}</label>
-            <Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} />
+            <label className="text-sm font-medium">
+              {t('projects.description', 'Description')}
+            </label>
+            <Textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={2}
+            />
           </div>
 
           <div className="space-y-1">
             <label className="text-sm font-medium">{t('projects.tags', 'Tags')}</label>
             <Input value={tags} onChange={(e) => setTags(e.target.value)} />
-            <p className="text-2xs text-muted-foreground">{t('projects.tagsHint', 'Comma-separated')}</p>
+            <p className="text-2xs text-muted-foreground">
+              {t('projects.tagsHint', 'Comma-separated')}
+            </p>
           </div>
 
           <div className="space-y-1">
             <label className="text-sm font-medium">{t('projects.paths', 'Paths')}</label>
             <Textarea value={paths} onChange={(e) => setPaths(e.target.value)} rows={2} />
-            <p className="text-2xs text-muted-foreground">{t('projects.pathsHint', 'One per line')}</p>
+            <p className="text-2xs text-muted-foreground">
+              {t('projects.pathsHint', 'One per line')}
+            </p>
           </div>
 
           <div className="flex items-center justify-between">
-            <label className="text-sm font-medium">{t('projects.memoryVisible', 'Memory Visible')}</label>
+            <label className="text-sm font-medium">
+              {t('projects.memoryVisible', 'Memory Visible')}
+            </label>
             <Switch checked={memoryVisible} onCheckedChange={setMemoryVisible} />
           </div>
         </div>

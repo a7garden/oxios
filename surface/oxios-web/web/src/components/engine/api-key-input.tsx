@@ -1,14 +1,17 @@
-import { Eye, EyeOff, Key, Shield, Terminal, AlertCircle } from 'lucide-react'
+import { AlertCircle, Eye, EyeOff, Key, Shield, Terminal } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import type { ApiKeySource } from '@/types/engine'
-import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
+import type { ApiKeySource } from '@/types/engine'
 
 // ─── API key source config ───────────────────────────────────
 
-const SOURCE_CONFIG: Record<ApiKeySource, { labelKey: string; icon: React.ReactNode; color: string }> = {
+const SOURCE_CONFIG: Record<
+  ApiKeySource,
+  { labelKey: string; icon: React.ReactNode; color: string }
+> = {
   env: {
     labelKey: 'engine.apiKeyEnv',
     icon: <Terminal className="h-3.5 w-3.5" />,
@@ -86,7 +89,9 @@ export function ApiKeyInput({
             type={visible ? 'text' : 'password'}
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
-            placeholder={hasKey ? t('engine.apiKeyOverrideHint') : `${providerName} API key를 입력하세요`}
+            placeholder={
+              hasKey ? t('engine.apiKeyOverrideHint') : `${providerName} API key를 입력하세요`
+            }
             className="pr-9 font-mono text-sm"
           />
           <button
@@ -98,16 +103,16 @@ export function ApiKeyInput({
           </button>
         </div>
         <Button type="submit" size="sm" disabled={!inputValue.trim() || isPending}>
-          {isPending ? t('engine.apiKeySaving') : hasKey ? t('engine.apiKeyUpdate') : t('engine.apiKeySetNew')}
+          {isPending
+            ? t('engine.apiKeySaving')
+            : hasKey
+              ? t('engine.apiKeyUpdate')
+              : t('engine.apiKeySetNew')}
         </Button>
       </form>
 
       {/* Hint */}
-      {hasKey && (
-        <p className="text-xs text-muted-foreground">
-          {t('engine.apiKeyOverrideHint')}
-        </p>
-      )}
+      {hasKey && <p className="text-xs text-muted-foreground">{t('engine.apiKeyOverrideHint')}</p>}
     </div>
   )
 }

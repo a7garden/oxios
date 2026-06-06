@@ -2,8 +2,8 @@ import { QueryClient } from '@tanstack/react-query'
 import { createRouter, RouterProvider } from '@tanstack/react-router'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import { routeTree } from './routeTree.gen'
 import { initI18n } from './i18n'
+import { routeTree } from './routeTree.gen'
 import './index.css'
 
 // Initialize i18n
@@ -18,9 +18,11 @@ const queryClient = new QueryClient({
     mutations: {
       onError: (error: Error) => {
         console.error('Mutation failed:', error)
-        window.dispatchEvent(new CustomEvent('oxios:mutation-error', {
-          detail: { message: error.message || 'Unknown error' },
-        }))
+        window.dispatchEvent(
+          new CustomEvent('oxios:mutation-error', {
+            detail: { message: error.message || 'Unknown error' },
+          }),
+        )
       },
     },
   },

@@ -3,5 +3,17 @@
   "defaultLocale": "en",
   "locales": ["en", "ko"],
   "defaultNS": "common",
-  "ns": ["common", "dashboard", "settings", "knowledge", "chat", "agents", "seeds", "scheduler", "security", "events", "resources"]
+  "ns": [
+    "common",
+    "dashboard",
+    "settings",
+    "knowledge",
+    "chat",
+    "agents",
+    "seeds",
+    "scheduler",
+    "security",
+    "events",
+    "resources"
+  ]
 }

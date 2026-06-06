@@ -20,28 +20,45 @@ import {
 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { SettingsLayout } from '@/components/layout/settings-layout'
-import type { SubNavGroup } from '@/components/layout/settings-layout'
-import { ProviderSelect } from '@/components/engine/provider-select'
-import { ModelSelect } from '@/components/engine/model-select'
 import { ApiKeyInput } from '@/components/engine/api-key-input'
+import { ModelSelect } from '@/components/engine/model-select'
 import { ProviderOptionsPanel } from '@/components/engine/provider-options'
+import { ProviderSelect } from '@/components/engine/provider-select'
 import { RoutingSection } from '@/components/engine/routing-section'
-import { SystemUpdateCard } from '@/components/system/system-update'
+import type { SubNavGroup } from '@/components/layout/settings-layout'
+import { SettingsLayout } from '@/components/layout/settings-layout'
+import { ChannelsSection } from '@/components/settings/channels-section'
+import { DiffPreview } from '@/components/settings/diff-preview'
+import {
+  NEW_SECTIONS,
+  type SettingsFieldDef,
+  type SettingsSectionDef,
+} from '@/components/settings/field-defs'
+import { FieldRow } from '@/components/settings/field-row'
+import { MemorySection } from '@/components/settings/memory-section'
+import { ErrorState } from '@/components/shared/error-state'
+import { LoadingCards } from '@/components/shared/loading'
 import { SystemToolsPanel } from '@/components/system/system-tools'
+import { SystemUpdateCard } from '@/components/system/system-update'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import { useToast } from '@/components/ui/sonner'
-import { LoadingCards } from '@/components/shared/loading'
-import { ErrorState } from '@/components/shared/error-state'
-import { useProviders, useModels, useEngineConfig, useSetModel, useSetApiKey, useSetProviderOptions } from '@/hooks/use-engine'
-import { useConfig, useSaveConfig, diffConfigs, type ConfigDiffEntry, type ConfigPatchResponse } from '@/hooks/use-config'
-import { NEW_SECTIONS, type SettingsFieldDef, type SettingsSectionDef } from '@/components/settings/field-defs'
-import { FieldRow } from '@/components/settings/field-row'
-import { MemorySection } from '@/components/settings/memory-section'
-import { ChannelsSection } from '@/components/settings/channels-section'
-import { DiffPreview } from '@/components/settings/diff-preview'
+import {
+  type ConfigDiffEntry,
+  type ConfigPatchResponse,
+  diffConfigs,
+  useConfig,
+  useSaveConfig,
+} from '@/hooks/use-config'
+import {
+  useEngineConfig,
+  useModels,
+  useProviders,
+  useSetApiKey,
+  useSetModel,
+  useSetProviderOptions,
+} from '@/hooks/use-engine'
 
 export const Route = createFileRoute('/settings')({ component: SettingsPage })
 
@@ -51,7 +68,9 @@ const navGroups: SubNavGroup[] = [
   {
     id: 'ai',
     labelKey: 'settings.groupAi',
-    items: [{ id: 'engine', labelKey: 'settings.sectionEngine', icon: <Bot className="h-4 w-4" /> }],
+    items: [
+      { id: 'engine', labelKey: 'settings.sectionEngine', icon: <Bot className="h-4 w-4" /> },
+    ],
   },
   {
     id: 'system',
@@ -59,8 +78,16 @@ const navGroups: SubNavGroup[] = [
     items: [
       { id: 'kernel', labelKey: 'settings.sectionKernel', icon: <Cpu className="h-4 w-4" /> },
       { id: 'exec', labelKey: 'settings.sectionExec', icon: <Terminal className="h-4 w-4" /> },
-      { id: 'scheduler', labelKey: 'settings.sectionScheduler', icon: <Timer className="h-4 w-4" /> },
-      { id: 'orchestrator', labelKey: 'settings.sectionOrchestrator', icon: <Zap className="h-4 w-4" /> },
+      {
+        id: 'scheduler',
+        labelKey: 'settings.sectionScheduler',
+        icon: <Timer className="h-4 w-4" />,
+      },
+      {
+        id: 'orchestrator',
+        labelKey: 'settings.sectionOrchestrator',
+        icon: <Zap className="h-4 w-4" />,
+      },
       { id: 'context', labelKey: 'settings.sectionContext', icon: <Brain className="h-4 w-4" /> },
       { id: 'gateway', labelKey: 'settings.sectionGateway', icon: <Globe className="h-4 w-4" /> },
       { id: 'session', labelKey: 'settings.sectionSession', icon: <Monitor className="h-4 w-4" /> },
@@ -72,19 +99,31 @@ const navGroups: SubNavGroup[] = [
     id: 'security',
     labelKey: 'settings.groupSecurity',
     items: [
-      { id: 'security', labelKey: 'settings.sectionSecurity', icon: <Shield className="h-4 w-4" /> },
+      {
+        id: 'security',
+        labelKey: 'settings.sectionSecurity',
+        icon: <Shield className="h-4 w-4" />,
+      },
       { id: 'audit', labelKey: 'settings.sectionAudit', icon: <Eye className="h-4 w-4" /> },
     ],
   },
   {
     id: 'memory',
     labelKey: 'settings.groupMemory',
-    items: [{ id: 'memory', labelKey: 'settings.sectionMemory', icon: <Database className="h-4 w-4" /> }],
+    items: [
+      { id: 'memory', labelKey: 'settings.sectionMemory', icon: <Database className="h-4 w-4" /> },
+    ],
   },
   {
     id: 'channels',
     labelKey: 'settings.groupChannels',
-    items: [{ id: 'channels.telegram', labelKey: 'settings.sectionTelegram', icon: <Send className="h-4 w-4" /> }],
+    items: [
+      {
+        id: 'channels.telegram',
+        labelKey: 'settings.sectionTelegram',
+        icon: <Send className="h-4 w-4" />,
+      },
+    ],
   },
 ]
 
@@ -203,49 +242,204 @@ const tKeys = {
 } as const
 
 const legacyFieldDefs: [string, string, LegacyField[]][] = [
-  ['kernel', tKeys.kernelDescription, [
-    // Kernel is constructed at boot; PATCH persists but the running
-    // daemon keeps the boot-time values. Restart required.
-    { key: 'workspace', labelKey: tKeys.workspacePath, descriptionKey: tKeys.workspacePathDescription, type: 'text', placeholder: '~/.oxios/workspace', hotReload: false, restartScope: 'kernel' },
-    { key: 'max_agents', labelKey: tKeys.maxConcurrentAgents, descriptionKey: tKeys.maxConcurrentAgentsDescription, type: 'number', placeholder: '10', hotReload: false, restartScope: 'kernel' },
-    { key: 'event_bus_capacity', labelKey: tKeys.eventBusCapacity, descriptionKey: tKeys.eventBusCapacityDescription, type: 'number', placeholder: '256', hotReload: false, restartScope: 'kernel' },
-  ]],
-  ['scheduler', tKeys.schedulerDescription, [
-    // Scheduler is propagated at runtime via `scheduler().update_config()`.
-    { key: 'max_concurrent', labelKey: tKeys.maxConcurrentTasks, descriptionKey: tKeys.maxConcurrentTasksDescription, type: 'number', placeholder: '5', hotReload: true, restartScope: 'kernel' },
-    { key: 'rate_limit_per_minute', labelKey: tKeys.rateLimitPerMin, descriptionKey: tKeys.rateLimitPerMinDescription, type: 'number', placeholder: '60', hotReload: true, restartScope: 'kernel' },
-    { key: 'zombie_timeout_secs', labelKey: tKeys.zombieTimeoutS, descriptionKey: tKeys.zombieTimeoutSDescription, type: 'number', placeholder: '300', hotReload: true, restartScope: 'kernel' },
-  ]],
-  ['orchestrator', tKeys.orchestratorDescription, [
-    // Orchestrator is constructed at boot; PATCH persists but does not
-    // re-create it. Restart required.
-    { key: 'max_evolution_iterations', labelKey: tKeys.maxEvolutionIterations, descriptionKey: tKeys.maxEvolutionIterationsDescription, type: 'number', placeholder: '3', hotReload: false, restartScope: 'kernel' },
-    { key: 'min_evaluation_score', labelKey: tKeys.minEvaluationScore, descriptionKey: tKeys.minEvaluationScoreDescription, type: 'number', placeholder: '0.8', hotReload: false, restartScope: 'kernel' },
-  ]],
-  ['context', tKeys.contextDescription, [
-    // Context manager is constructed at boot; restart required.
-    { key: 'active_limit_tokens', labelKey: tKeys.activeTokenLimit, descriptionKey: tKeys.activeTokenLimitDescription, type: 'number', placeholder: '100000', hotReload: false, restartScope: 'kernel' },
-    { key: 'cache_limit_entries', labelKey: tKeys.cacheEntryLimit, descriptionKey: tKeys.cacheEntryLimitDescription, type: 'number', placeholder: '50', hotReload: false, restartScope: 'kernel' },
-  ]],
-  ['gateway', tKeys.gatewayDescription, [
-    // gateway host/port are bound at boot; restart required.
-    { key: 'host', labelKey: tKeys.host, descriptionKey: tKeys.hostDescription, type: 'text', placeholder: '0.0.0.0', hotReload: false, restartScope: 'gateway' },
-    { key: 'port', labelKey: tKeys.port, descriptionKey: tKeys.portDescription, type: 'number', placeholder: '4200', hotReload: false, restartScope: 'gateway' },
-  ]],
-  ['session', tKeys.sessionDescription, [
-    // Session manager is constructed at boot; restart required.
-    { key: 'max_sessions', labelKey: tKeys.maxSessions, descriptionKey: tKeys.maxSessionsDescription, type: 'number', placeholder: '100', hotReload: false, restartScope: 'kernel' },
-    { key: 'ttl_hours', labelKey: tKeys.sessionTTLHours, descriptionKey: tKeys.sessionTTLHoursDescription, type: 'number', placeholder: '168', hotReload: false, restartScope: 'kernel' },
-    { key: 'auto_prune', labelKey: tKeys.autoPrune, descriptionKey: tKeys.autoPruneDescription, type: 'toggle', hotReload: false, restartScope: 'kernel' },
-  ]],
-  ['logging', tKeys.loggingDescription, [
-    // Logging format is set on the global subscriber at boot; restart required.
-    { key: 'format', labelKey: tKeys.format, descriptionKey: tKeys.formatDescription, type: 'select', options: [
-      { value: 'pretty', labelKey: tKeys.prettyDefault },
-      { value: 'json', labelKey: tKeys.jsonElkLoki },
-      { value: 'compact', labelKey: tKeys.compact },
-    ], hotReload: false, restartScope: 'logging' },
-  ]],
+  [
+    'kernel',
+    tKeys.kernelDescription,
+    [
+      // Kernel is constructed at boot; PATCH persists but the running
+      // daemon keeps the boot-time values. Restart required.
+      {
+        key: 'workspace',
+        labelKey: tKeys.workspacePath,
+        descriptionKey: tKeys.workspacePathDescription,
+        type: 'text',
+        placeholder: '~/.oxios/workspace',
+        hotReload: false,
+        restartScope: 'kernel',
+      },
+      {
+        key: 'max_agents',
+        labelKey: tKeys.maxConcurrentAgents,
+        descriptionKey: tKeys.maxConcurrentAgentsDescription,
+        type: 'number',
+        placeholder: '10',
+        hotReload: false,
+        restartScope: 'kernel',
+      },
+      {
+        key: 'event_bus_capacity',
+        labelKey: tKeys.eventBusCapacity,
+        descriptionKey: tKeys.eventBusCapacityDescription,
+        type: 'number',
+        placeholder: '256',
+        hotReload: false,
+        restartScope: 'kernel',
+      },
+    ],
+  ],
+  [
+    'scheduler',
+    tKeys.schedulerDescription,
+    [
+      // Scheduler is propagated at runtime via `scheduler().update_config()`.
+      {
+        key: 'max_concurrent',
+        labelKey: tKeys.maxConcurrentTasks,
+        descriptionKey: tKeys.maxConcurrentTasksDescription,
+        type: 'number',
+        placeholder: '5',
+        hotReload: true,
+        restartScope: 'kernel',
+      },
+      {
+        key: 'rate_limit_per_minute',
+        labelKey: tKeys.rateLimitPerMin,
+        descriptionKey: tKeys.rateLimitPerMinDescription,
+        type: 'number',
+        placeholder: '60',
+        hotReload: true,
+        restartScope: 'kernel',
+      },
+      {
+        key: 'zombie_timeout_secs',
+        labelKey: tKeys.zombieTimeoutS,
+        descriptionKey: tKeys.zombieTimeoutSDescription,
+        type: 'number',
+        placeholder: '300',
+        hotReload: true,
+        restartScope: 'kernel',
+      },
+    ],
+  ],
+  [
+    'orchestrator',
+    tKeys.orchestratorDescription,
+    [
+      // Orchestrator is constructed at boot; PATCH persists but does not
+      // re-create it. Restart required.
+      {
+        key: 'max_evolution_iterations',
+        labelKey: tKeys.maxEvolutionIterations,
+        descriptionKey: tKeys.maxEvolutionIterationsDescription,
+        type: 'number',
+        placeholder: '3',
+        hotReload: false,
+        restartScope: 'kernel',
+      },
+      {
+        key: 'min_evaluation_score',
+        labelKey: tKeys.minEvaluationScore,
+        descriptionKey: tKeys.minEvaluationScoreDescription,
+        type: 'number',
+        placeholder: '0.8',
+        hotReload: false,
+        restartScope: 'kernel',
+      },
+    ],
+  ],
+  [
+    'context',
+    tKeys.contextDescription,
+    [
+      // Context manager is constructed at boot; restart required.
+      {
+        key: 'active_limit_tokens',
+        labelKey: tKeys.activeTokenLimit,
+        descriptionKey: tKeys.activeTokenLimitDescription,
+        type: 'number',
+        placeholder: '100000',
+        hotReload: false,
+        restartScope: 'kernel',
+      },
+      {
+        key: 'cache_limit_entries',
+        labelKey: tKeys.cacheEntryLimit,
+        descriptionKey: tKeys.cacheEntryLimitDescription,
+        type: 'number',
+        placeholder: '50',
+        hotReload: false,
+        restartScope: 'kernel',
+      },
+    ],
+  ],
+  [
+    'gateway',
+    tKeys.gatewayDescription,
+    [
+      // gateway host/port are bound at boot; restart required.
+      {
+        key: 'host',
+        labelKey: tKeys.host,
+        descriptionKey: tKeys.hostDescription,
+        type: 'text',
+        placeholder: '0.0.0.0',
+        hotReload: false,
+        restartScope: 'gateway',
+      },
+      {
+        key: 'port',
+        labelKey: tKeys.port,
+        descriptionKey: tKeys.portDescription,
+        type: 'number',
+        placeholder: '4200',
+        hotReload: false,
+        restartScope: 'gateway',
+      },
+    ],
+  ],
+  [
+    'session',
+    tKeys.sessionDescription,
+    [
+      // Session manager is constructed at boot; restart required.
+      {
+        key: 'max_sessions',
+        labelKey: tKeys.maxSessions,
+        descriptionKey: tKeys.maxSessionsDescription,
+        type: 'number',
+        placeholder: '100',
+        hotReload: false,
+        restartScope: 'kernel',
+      },
+      {
+        key: 'ttl_hours',
+        labelKey: tKeys.sessionTTLHours,
+        descriptionKey: tKeys.sessionTTLHoursDescription,
+        type: 'number',
+        placeholder: '168',
+        hotReload: false,
+        restartScope: 'kernel',
+      },
+      {
+        key: 'auto_prune',
+        labelKey: tKeys.autoPrune,
+        descriptionKey: tKeys.autoPruneDescription,
+        type: 'toggle',
+        hotReload: false,
+        restartScope: 'kernel',
+      },
+    ],
+  ],
+  [
+    'logging',
+    tKeys.loggingDescription,
+    [
+      // Logging format is set on the global subscriber at boot; restart required.
+      {
+        key: 'format',
+        labelKey: tKeys.format,
+        descriptionKey: tKeys.formatDescription,
+        type: 'select',
+        options: [
+          { value: 'pretty', labelKey: tKeys.prettyDefault },
+          { value: 'json', labelKey: tKeys.jsonElkLoki },
+          { value: 'compact', labelKey: tKeys.compact },
+        ],
+        hotReload: false,
+        restartScope: 'logging',
+      },
+    ],
+  ],
 ]
 
 const legacyFieldsBySection = new Map(legacyFieldDefs.map(([key, , fields]) => [key, fields]))
@@ -301,7 +495,8 @@ function EnginePanel() {
     setProviderOptions.mutate({ provider: resolvedProvider ?? 'unknown', options })
   }
 
-  const apiKeySource = engineConfig?.api_key_source ?? (engineConfig?.api_key_set ? 'config' : 'none')
+  const apiKeySource =
+    engineConfig?.api_key_source ?? (engineConfig?.api_key_set ? 'config' : 'none')
 
   return (
     <Card>
@@ -341,11 +536,7 @@ function EnginePanel() {
             </p>
           </div>
           <div className="shrink-0 w-64">
-            <ModelSelect
-              models={models}
-              value={currentModelId}
-              onValueChange={handleModelChange}
-            />
+            <ModelSelect models={models} value={currentModelId} onValueChange={handleModelChange} />
           </div>
         </div>
 
@@ -367,25 +558,24 @@ function EnginePanel() {
           </div>
         </div>
 
-        {resolvedProvider &&
-          ['anthropic', 'openai', 'google'].includes(resolvedProvider) && (
-            <>
-              <Separator />
-              <div>
-                <div className="mb-3">
-                  <label className="text-sm font-medium">{t(tKeys.advancedOptions)}</label>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {t(tKeys.advancedOptionsDescription, { provider: resolvedProvider })}
-                  </p>
-                </div>
-                <ProviderOptionsPanel
-                  provider={resolvedProvider}
-                  onSave={handleOptionsSave}
-                  isPending={setProviderOptions.isPending}
-                />
+        {resolvedProvider && ['anthropic', 'openai', 'google'].includes(resolvedProvider) && (
+          <>
+            <Separator />
+            <div>
+              <div className="mb-3">
+                <label className="text-sm font-medium">{t(tKeys.advancedOptions)}</label>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {t(tKeys.advancedOptionsDescription, { provider: resolvedProvider })}
+                </p>
               </div>
-            </>
-          )}
+              <ProviderOptionsPanel
+                provider={resolvedProvider}
+                onSave={handleOptionsSave}
+                isPending={setProviderOptions.isPending}
+              />
+            </div>
+          </>
+        )}
       </CardContent>
 
       <RoutingSection />
@@ -462,7 +652,9 @@ function LegacyFieldRow({
   return (
     <div className="flex items-start justify-between gap-4 sm:gap-6">
       <div className="flex-1 min-w-0 pt-0.5">
-        <label htmlFor={id} className="text-sm font-medium">{t(field.labelKey)}</label>
+        <label htmlFor={id} className="text-sm font-medium">
+          {t(field.labelKey)}
+        </label>
         <p className="text-xs text-muted-foreground mt-0.5">{t(field.descriptionKey)}</p>
       </div>
       <div className="shrink-0 w-40 sm:w-56">
@@ -478,16 +670,20 @@ function LegacyFieldRow({
             value={String(value ?? '')}
             onValueChange={(v) => onChange(v)}
             placeholder={t(field.labelKey)}
-            options={field.options?.map((opt) => ({
-              label: t(opt.labelKey),
-              value: opt.value,
-            })) ?? []}
+            options={
+              field.options?.map((opt) => ({
+                label: t(opt.labelKey),
+                value: opt.value,
+              })) ?? []
+            }
             className="w-full"
           />
         ) : (
           <Input
             id={id}
-            type={field.type === 'password' ? 'password' : field.type === 'number' ? 'number' : 'text'}
+            type={
+              field.type === 'password' ? 'password' : field.type === 'number' ? 'number' : 'text'
+            }
             value={String(value ?? '')}
             onChange={(e) => onChange(e.target.value)}
             placeholder={field.placeholder}
@@ -555,7 +751,8 @@ function SettingsPage() {
       const bucket: Record<string, unknown> = {}
       for (const field of fields) {
         const raw = sectionConfig[field.key]
-        bucket[field.key] = field.type === 'toggle' ? raw === true || raw === 'true' : String(raw ?? '')
+        bucket[field.key] =
+          field.type === 'toggle' ? raw === true || raw === 'true' : String(raw ?? '')
       }
       next[sectionKey] = bucket
     }
@@ -590,7 +787,9 @@ function SettingsPage() {
           // The field key is the path *below* `channels.telegram`. The
           // section key is prepended at payload-build time, so we read
           // from `config.channels.telegram.<key>` directly.
-          const tg = (config.channels as Record<string, unknown> | undefined)?.telegram as Record<string, unknown> | undefined
+          const tg = (config.channels as Record<string, unknown> | undefined)?.telegram as
+            | Record<string, unknown>
+            | undefined
           if (tg) {
             const v = getNestedValue(tg, dottedKey)
             bucket[dottedKey] = field.type === 'toggle' ? v === true : String(v ?? '')
@@ -621,7 +820,7 @@ function SettingsPage() {
         if (field.type === 'toggle') sectionValues[field.key] = Boolean(val)
         else if (field.type === 'number') {
           const num = Number(val)
-          if (!isNaN(num) && val !== '') sectionValues[field.key] = num
+          if (!Number.isNaN(num) && val !== '') sectionValues[field.key] = num
         } else if (val !== '') sectionValues[field.key] = val
       }
       payload[sectionKey] = sectionValues
@@ -640,7 +839,11 @@ function SettingsPage() {
           setNestedValue(bucket, field.key, Boolean(raw))
         } else if (field.type === 'tags') {
           // String array (commands).
-          const arr = Array.isArray(raw) ? raw : String(raw).split(/[\s,]+/).filter(Boolean)
+          const arr = Array.isArray(raw)
+            ? raw
+            : String(raw)
+                .split(/[\s,]+/)
+                .filter(Boolean)
           setNestedValue(bucket, field.key, arr)
         } else if (field.type === 'csv') {
           const arr = String(raw)
@@ -652,11 +855,11 @@ function SettingsPage() {
           const arr = String(raw)
             .split('\n')
             .map((s) => Number(s.trim()))
-            .filter((n) => !isNaN(n))
+            .filter((n) => !Number.isNaN(n))
           setNestedValue(bucket, field.key, arr)
         } else if (field.type === 'number') {
           const num = Number(raw)
-          if (!isNaN(num)) setNestedValue(bucket, field.key, num)
+          if (!Number.isNaN(num)) setNestedValue(bucket, field.key, num)
         } else {
           setNestedValue(bucket, field.key, String(raw))
         }
@@ -679,7 +882,7 @@ function SettingsPage() {
     if (!config) return []
     const proposed = buildPayload()
     return diffConfigs(config, proposed)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [config, formValues, activeSection])
 
   // Re-classify the diff with the authoritative hot-reload metadata from
@@ -688,7 +891,9 @@ function SettingsPage() {
     return diff.map((entry) => {
       // Try to find the matching field def in the new sections.
       for (const section of NEW_SECTIONS) {
-        const f = section.fields.find((field) => field.key === entry.path || `${section.key}.${field.key}` === entry.path)
+        const f = section.fields.find(
+          (field) => field.key === entry.path || `${section.key}.${field.key}` === entry.path,
+        )
         if (f) {
           return { ...entry, hotReload: f.hotReload, scope: f.restartScope }
         }
@@ -696,7 +901,9 @@ function SettingsPage() {
       // Also try legacy fields. They declare their own hotReload and
       // restartScope so the diff badges and tooltips match the backend.
       for (const [sectionKey, , fields] of legacyFieldDefs) {
-        const f = (fields as LegacyField[]).find((field) => `${sectionKey}.${field.key}` === entry.path)
+        const f = (fields as LegacyField[]).find(
+          (field) => `${sectionKey}.${field.key}` === entry.path,
+        )
         if (f) {
           return { ...entry, hotReload: f.hotReload, scope: f.restartScope }
         }
@@ -705,7 +912,7 @@ function SettingsPage() {
       // handle it. Mark hotReload: false to err on the safe side.
       return { ...entry, hotReload: false }
     })
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [diff])
 
   const hasUnsaved = annotatedDiff.length > 0
@@ -738,10 +945,7 @@ function SettingsPage() {
               'default',
             )
           } else if (r.applied_immediately.length > 0) {
-            toast(
-              t('settings.savedApplied', { count: r.applied_immediately.length }),
-              'success',
-            )
+            toast(t('settings.savedApplied', { count: r.applied_immediately.length }), 'success')
           } else {
             toast(t('settings.settingsSaved'), 'success')
           }
@@ -828,11 +1032,7 @@ function SettingsPage() {
         </div>
       )}
 
-      <SettingsLayout
-        groups={navGroups}
-        activeId={activeSection}
-        onNavigate={setActiveSection}
-      >
+      <SettingsLayout groups={navGroups} activeId={activeSection} onNavigate={setActiveSection}>
         {renderContent()}
       </SettingsLayout>
 
@@ -845,7 +1045,8 @@ function SettingsPage() {
           <div className="text-xs text-muted-foreground">
             {hasUnsaved ? (
               <span>
-                {t('settings.unsavedChanges')} · {annotatedDiff.length} {annotatedDiff.length === 1 ? 'field' : 'fields'}
+                {t('settings.unsavedChanges')} · {annotatedDiff.length}{' '}
+                {annotatedDiff.length === 1 ? 'field' : 'fields'}
               </span>
             ) : (
               <span>{t('settings.settingsSaved')}</span>
@@ -894,7 +1095,6 @@ function renderNewSection(
   setField: (sectionKey: string, fieldKey: string, value: unknown) => void,
   t: (key: string) => string,
 ) {
-
   // Memory gets sub-cards.
   if (section.key === 'memory') {
     const fieldsBySubsection: Record<string, SettingsFieldDef[]> = {
@@ -942,7 +1142,14 @@ function renderNewSection(
             <FieldRow
               sectionKey={section.key}
               field={field}
-              value={formValues[section.key]?.[field.key] as string | boolean | string[] | number | undefined}
+              value={
+                formValues[section.key]?.[field.key] as
+                  | string
+                  | boolean
+                  | string[]
+                  | number
+                  | undefined
+              }
               onChange={(val) => setField(section.key, field.key, val)}
             />
           </div>
@@ -952,7 +1159,7 @@ function renderNewSection(
   )
 }
 
-// Imports that need to be available in this file.
-import { Switch } from '@/components/ui/switch'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
+// Imports that need to be available in this file.
+import { Switch } from '@/components/ui/switch'

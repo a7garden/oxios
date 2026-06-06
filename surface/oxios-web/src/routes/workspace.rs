@@ -817,7 +817,7 @@ pub(crate) async fn handle_memory_get(
 /// (no disk writes); the per-key TTL is short and the projection is
 /// cheap enough that we are happy to recompute on TTL expiry.
 #[derive(Default, Clone)]
-pub(crate) struct MemoryMapCache {
+pub struct MemoryMapCache {
     inner: std::sync::Arc<std::sync::Mutex<Option<MemoryMapCacheEntry>>>,
 }
 

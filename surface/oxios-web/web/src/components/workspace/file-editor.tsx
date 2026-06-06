@@ -1,26 +1,26 @@
-import { useCallback, useEffect, useRef } from 'react'
-import {
-  EditorView,
-  keymap,
-  lineNumbers,
-  highlightActiveLineGutter,
-  highlightSpecialChars,
-  drawSelection,
-  rectangularSelection,
-  crosshairCursor,
-  highlightActiveLine,
-} from '@codemirror/view'
-import { EditorState } from '@codemirror/state'
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands'
 import {
-  syntaxHighlighting,
-  defaultHighlightStyle,
   bracketMatching,
+  defaultHighlightStyle,
   foldGutter,
-  indentOnInput,
   foldKeymap,
+  indentOnInput,
+  syntaxHighlighting,
 } from '@codemirror/language'
+import { EditorState } from '@codemirror/state'
 import { oneDark } from '@codemirror/theme-one-dark'
+import {
+  crosshairCursor,
+  drawSelection,
+  EditorView,
+  highlightActiveLine,
+  highlightActiveLineGutter,
+  highlightSpecialChars,
+  keymap,
+  lineNumbers,
+  rectangularSelection,
+} from '@codemirror/view'
+import { useCallback, useEffect, useRef } from 'react'
 import { getLanguageExtension } from '@/lib/cm6-language'
 
 interface FileEditorProps {
@@ -111,10 +111,5 @@ export function FileEditor({ path, content, onSave, onChange }: FileEditorProps)
     }
   }, [path, content, handleSave, onChange])
 
-  return (
-    <div
-      ref={containerRef}
-      className="h-full w-full overflow-hidden"
-    />
-  )
+  return <div ref={containerRef} className="h-full w-full overflow-hidden" />
 }

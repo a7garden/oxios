@@ -1,5 +1,5 @@
-import { useState } from 'react'
 import { ChevronDown, ChevronRight, Clock } from 'lucide-react'
+import { useState } from 'react'
 import { Badge } from '@/components/ui/badge'
 import type { AgentTraceStep } from '@/types/agent'
 
@@ -19,14 +19,10 @@ export function TraceStepCard({ step }: TraceStepProps) {
 
   return (
     <div className="border rounded-lg">
-      <div
-        className="flex items-center gap-3 p-3 cursor-pointer hover:bg-muted/50"
+      <button
+        type="button"
+        className="flex items-center gap-3 p-3 w-full text-left hover:bg-muted/50"
         onClick={() => setExpanded(!expanded)}
-        role="button"
-        tabIndex={0}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') setExpanded(!expanded)
-        }}
       >
         <div className={`w-2 h-2 rounded-full ${statusColor}`} />
         <Badge variant="outline" className="text-xs font-mono truncate min-w-0 max-w-[180px]">
@@ -37,7 +33,7 @@ export function TraceStepCard({ step }: TraceStepProps) {
         </span>
         <div className="flex-1" />
         {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-      </div>
+      </button>
       {expanded && (
         <div className="border-t px-3 py-2 space-y-2 bg-muted/30">
           <div>
@@ -49,9 +45,7 @@ export function TraceStepCard({ step }: TraceStepProps) {
           <div>
             <p className="text-xs font-medium text-muted-foreground mb-1">Output</p>
             <pre className="text-xs bg-muted rounded p-2 overflow-x-auto whitespace-pre-wrap max-h-48">
-              {typeof step.output === 'string'
-                ? step.output
-                : JSON.stringify(step.output, null, 2)}
+              {typeof step.output === 'string' ? step.output : JSON.stringify(step.output, null, 2)}
             </pre>
           </div>
         </div>

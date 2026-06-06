@@ -16,12 +16,7 @@ interface ColumnFilterProps {
   onChange: (selected: string[]) => void
 }
 
-export function ColumnFilter({
-  label,
-  options,
-  selected,
-  onChange,
-}: ColumnFilterProps) {
+export function ColumnFilter({ label, options, selected, onChange }: ColumnFilterProps) {
   const { t } = useTranslation()
 
   return (

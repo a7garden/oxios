@@ -1,6 +1,6 @@
-import { describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { describe, expect, it, vi } from 'vitest'
 import { ServerCard } from '@/components/mcp/server-card'
 import type { McpServer } from '@/types/mcp'
 
@@ -55,7 +55,9 @@ describe('ServerCard', () => {
   it('renders command with args', () => {
     render(<ServerCard server={connectedServer} {...defaultProps} />)
 
-    expect(screen.getByText('npx -y @modelcontextprotocol/server-filesystem /tmp')).toBeInTheDocument()
+    expect(
+      screen.getByText('npx -y @modelcontextprotocol/server-filesystem /tmp'),
+    ).toBeInTheDocument()
   })
 
   it('renders command without args', () => {
@@ -69,7 +71,7 @@ describe('ServerCard', () => {
     render(<ServerCard server={connectedServer} {...defaultProps} />)
 
     expect(screen.getByText('mcp.connected')).toBeInTheDocument()
-    const dot = document.querySelector('.bg-green-500')
+    const dot = document.querySelector('.bg-success')
     expect(dot).toBeInTheDocument()
   })
 
@@ -77,7 +79,7 @@ describe('ServerCard', () => {
     render(<ServerCard server={disconnectedServer} {...defaultProps} />)
 
     expect(screen.getByText('mcp.disconnected')).toBeInTheDocument()
-    const dot = document.querySelector('.bg-red-500')
+    const dot = document.querySelector('.bg-error')
     expect(dot).toBeInTheDocument()
   })
 

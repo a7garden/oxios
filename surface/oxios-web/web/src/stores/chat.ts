@@ -243,8 +243,8 @@ export const useChatStore = create<ChatStore>()(
       _sendQueue: [],
       _lastDoneSessionId: null,
       _lastDoneProjectId: null,
-      detectedProject: null,       // Phase 2 stub: always null
-      dismissedProjectIds: [],     // Dismissed detection badges
+      detectedProject: null, // Phase 2 stub: always null
+      dismissedProjectIds: [], // Dismissed detection badges
 
       // ── Actions ──
 
@@ -426,7 +426,7 @@ export const useChatStore = create<ChatStore>()(
           activeProjectId: projectId,
           activeSessionId: null,
           messages: [],
-          detectedProject: null,   // Clear detection when project changes
+          detectedProject: null, // Clear detection when project changes
         })
       },
 
@@ -458,13 +458,21 @@ export const useChatStore = create<ChatStore>()(
               const last = updated[updated.length - 1]
               if (last?.role === 'assistant') {
                 return {
-                  messages: [...updated.slice(0, -1), { ...last, content: last.content + chunk.content }],
+                  messages: [
+                    ...updated.slice(0, -1),
+                    { ...last, content: last.content + chunk.content },
+                  ],
                 }
               }
               return {
                 messages: [
                   ...updated,
-                  { id: crypto.randomUUID(), role: 'assistant' as const, content: chunk.content ?? '', timestamp: new Date().toISOString() },
+                  {
+                    id: crypto.randomUUID(),
+                    role: 'assistant' as const,
+                    content: chunk.content ?? '',
+                    timestamp: new Date().toISOString(),
+                  },
                 ],
               }
             })
@@ -493,10 +501,7 @@ export const useChatStore = create<ChatStore>()(
               // For tool_call activities, merge into the matching toolCallId
               // entry instead of appending. `tool_start` creates the
               // placeholder; `tool_end` fills in duration/output/isError.
-              if (
-                activity.type === 'tool_call' &&
-                activity.toolCallId
-              ) {
+              if (activity.type === 'tool_call' && activity.toolCallId) {
                 const idx = existing.findIndex(
                   (a) => a.type === 'tool_call' && a.toolCallId === activity.toolCallId,
                 )
@@ -518,8 +523,10 @@ export const useChatStore = create<ChatStore>()(
                       {
                         ...last,
                         activities: newActivities,
-                        totalInputTokens: (last.totalInputTokens ?? 0) + (activity.inputTokens ?? 0),
-                        totalOutputTokens: (last.totalOutputTokens ?? 0) + (activity.outputTokens ?? 0),
+                        totalInputTokens:
+                          (last.totalInputTokens ?? 0) + (activity.inputTokens ?? 0),
+                        totalOutputTokens:
+                          (last.totalOutputTokens ?? 0) + (activity.outputTokens ?? 0),
                       },
                     ],
                   }
@@ -547,7 +554,8 @@ export const useChatStore = create<ChatStore>()(
             const vid = chunk.project_id ?? null
             const toolCalls = chunk.tool_calls ?? []
             const phase = chunk.phase
-            const evaluationPassed = chunk.evaluation_passed === 'true' || chunk.evaluation_passed === 'True'
+            const evaluationPassed =
+              chunk.evaluation_passed === 'true' || chunk.evaluation_passed === 'True'
             const seedId = chunk.seed_id
             const durationMs = chunk.duration_ms
 
@@ -564,11 +572,13 @@ export const useChatStore = create<ChatStore>()(
                   toolResult: tc.output,
                   toolDurationMs: tc.duration_ms,
                   timestamp: new Date().toISOString(),
-                })
+                }),
               )
 
               // Find last assistant message and attach metadata
-              const lastAssistantIdx = [...updated].reverse().findIndex((m) => m.role === 'assistant')
+              const lastAssistantIdx = [...updated]
+                .reverse()
+                .findIndex((m) => m.role === 'assistant')
               if (lastAssistantIdx >= 0) {
                 const idx = updated.length - 1 - lastAssistantIdx
                 const target = updated[idx]

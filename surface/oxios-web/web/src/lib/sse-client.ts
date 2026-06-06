@@ -84,7 +84,7 @@ export class SseClient {
     if (this.reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) return
     if (!this.currentPath) return
 
-    const delay = BASE_DELAY_MS * Math.pow(2, this.reconnectAttempts)
+    const delay = BASE_DELAY_MS * 2 ** this.reconnectAttempts
     this.reconnectAttempts++
 
     this.reconnectTimer = setTimeout(() => {

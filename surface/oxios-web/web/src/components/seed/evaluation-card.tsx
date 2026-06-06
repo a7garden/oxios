@@ -44,9 +44,7 @@ export function EvaluationCard({ evaluation }: { evaluation?: EvaluationResult }
               )}
               <div>
                 <p className="text-sm font-medium">{item.label}</p>
-                {item.detail && (
-                  <p className="text-xs text-muted-foreground">{item.detail}</p>
-                )}
+                {item.detail && <p className="text-xs text-muted-foreground">{item.detail}</p>}
               </div>
             </div>
           ))}

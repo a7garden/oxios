@@ -61,9 +61,13 @@ export function Copilot() {
       {/* Response */}
       <div className="flex-1 overflow-y-auto p-3">
         {copilot.isPending && (
-          <div className="text-sm text-muted-foreground animate-pulse">{t('knowledge.copilotThinking')}</div>
+          <div className="text-sm text-muted-foreground animate-pulse">
+            {t('knowledge.copilotThinking')}
+          </div>
         )}
-        {copilot.isError && <div className="text-sm text-destructive">{t('knowledge.copilotFailedResponse')}</div>}
+        {copilot.isError && (
+          <div className="text-sm text-destructive">{t('knowledge.copilotFailedResponse')}</div>
+        )}
         {response && (
           <div className="space-y-3">
             <div className="text-sm whitespace-pre-wrap">{response.content}</div>

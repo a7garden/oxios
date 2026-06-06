@@ -15,26 +15,29 @@
  *
  * Why not Tiptap? See worktree exp/frontend-markdown-editor-poc/DECISION.md
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import CodeMirror, {
-  EditorView,
-  type ReactCodeMirrorRef,
-} from '@uiw/react-codemirror'
-import { markdown, markdownLanguage } from '@codemirror/lang-markdown'
-import { languages } from '@codemirror/language-data'
-import { autocompletion, type Completion, type CompletionContext, type CompletionResult } from '@codemirror/autocomplete'
+
+import {
+  autocompletion,
+  type Completion,
+  type CompletionContext,
+  type CompletionResult,
+} from '@codemirror/autocomplete'
 import { history, indentWithTab } from '@codemirror/commands'
+import { markdown, markdownLanguage } from '@codemirror/lang-markdown'
 import { bracketMatching, defaultHighlightStyle, syntaxHighlighting } from '@codemirror/language'
-import { keymap } from '@codemirror/view'
-import { oneDark } from '@codemirror/theme-one-dark'
-import { mermaidExtension, mermaidDarkObserver } from '@/lib/mermaid-extension'
-import { tokenHideExtension } from '@/lib/token-hide-extension'
-import { wikilinkExtension } from '@/lib/wikilink-extension'
+import { languages } from '@codemirror/language-data'
 import { EditorSelection } from '@codemirror/state'
+import { oneDark } from '@codemirror/theme-one-dark'
+import { keymap } from '@codemirror/view'
+import CodeMirror, { EditorView, type ReactCodeMirrorRef } from '@uiw/react-codemirror'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useKnowledgeTree } from '@/hooks/use-knowledge'
 import { buildAutocompleteDict, type FileEntry } from '@/lib/autocomplete-link'
 import { EMOJI_SHORTCODES } from '@/lib/emoji-shortcodes'
+import { mermaidDarkObserver, mermaidExtension } from '@/lib/mermaid-extension'
+import { tokenHideExtension } from '@/lib/token-hide-extension'
 import { cn } from '@/lib/utils'
+import { wikilinkExtension } from '@/lib/wikilink-extension'
 import { useKnowledgeStore } from '@/stores/knowledge'
 
 interface MarkdownEditorProps {
@@ -52,10 +55,13 @@ const customKeymap = keymap.of([
   { key: 'Mod-b', run: wrapSelection('**', '**') },
   { key: 'Mod-i', run: wrapSelection('*', '*') },
   { key: 'Mod-y', run: insertCheckmark },
-  { key: 'Mod-s', run: () => {
-    document.dispatchEvent(new Event('knowledge:save'))
-    return true
-  } },
+  {
+    key: 'Mod-s',
+    run: () => {
+      document.dispatchEvent(new Event('knowledge:save'))
+      return true
+    },
+  },
   indentWithTab,
 ])
 
@@ -70,9 +76,7 @@ function wrapSelection(before: string, after: string) {
     view.dispatch({
       changes,
       selection: EditorSelection.create(
-        changes.map((c) =>
-          EditorSelection.range(c.from + before.length, c.to + before.length),
-        ),
+        changes.map((c) => EditorSelection.range(c.from + before.length, c.to + before.length)),
         1,
       ),
     })
@@ -118,10 +122,7 @@ const headingEnforcer = EditorView.updateListener.of((update) => {
 // ─────────────────────────────────────────────────────────────────────────
 // Wiki link + emoji completion source
 // ─────────────────────────────────────────────────────────────────────────
-function makeCompletionSource(
-  getEntries: () => FileEntry[],
-  emojiDict: Record<string, string>,
-) {
+function makeCompletionSource(getEntries: () => FileEntry[], emojiDict: Record<string, string>) {
   return (ctx: CompletionContext): CompletionResult | null => {
     // Word range: alphanumeric + some markdown-safe chars
     const word = ctx.matchBefore(/[\p{L}\p{N}_\s:-]*/u)
@@ -182,7 +183,7 @@ function makeCompletionSource(
 const linkClickHandler = EditorView.domEventHandlers({
   click(event, _view) {
     const target = event.target as HTMLElement | null
-    if (!target || target.tagName !== 'A') return false
+    if (target?.tagName !== 'A') return false
     if (!(target instanceof HTMLAnchorElement)) return false
     const href = target.getAttribute('href') ?? ''
     if (!href) return false
@@ -192,9 +193,7 @@ const linkClickHandler = EditorView.domEventHandlers({
     }
     if (href.startsWith('cmd:')) return true
     const path = href.endsWith('.md') ? href : `${href}.md`
-    document.dispatchEvent(
-      new CustomEvent('knowledge:open-file', { detail: { path } }),
-    )
+    document.dispatchEvent(new CustomEvent('knowledge:open-file', { detail: { path } }))
     return true
   },
 })

@@ -1,19 +1,18 @@
-import { useEffect, useMemo, useState, useCallback, useRef } from 'react'
+import { Brain, Search } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useMemoryMap } from '@/hooks/use-memory'
-import { Select } from '@/components/ui/select'
-import { Switch } from '@/components/ui/switch'
-import { Input } from '@/components/ui/input'
+import { EmptyState } from '@/components/shared/empty-state'
 import { ErrorState } from '@/components/shared/error-state'
 import { LoadingCards } from '@/components/shared/loading'
-import { EmptyState } from '@/components/shared/empty-state'
-import { EmbeddingCanvas } from './embedding-canvas'
-import { SelectionPanel } from './selection-panel'
+import { Input } from '@/components/ui/input'
+import { Select } from '@/components/ui/select'
+import { Switch } from '@/components/ui/switch'
+import { useMemoryDetail, useMemoryMap } from '@/hooks/use-memory'
+import type { MemoryDetail as MemDetail, MemoryMapEntry } from '@/types/memory'
 import { ClusterLegend } from './cluster-legend'
+import { EmbeddingCanvas } from './embedding-canvas'
 import { MemoryDetail } from './memory-detail'
-import { Brain, Search } from 'lucide-react'
-import { useMemoryDetail } from '@/hooks/use-memory'
-import type { MemoryMapEntry, MemoryDetail as MemDetail } from '@/types/memory'
+import { SelectionPanel } from './selection-panel'
 
 /**
  * Memory Embedding Map (RFC-T1-B).
@@ -40,12 +39,7 @@ export function MemoryMap() {
   const [detailId, setDetailId] = useState<string | null>(null)
   const [detailOpen, setDetailOpen] = useState<boolean>(false)
 
-  const {
-    data,
-    isLoading,
-    isError,
-    refetch,
-  } = useMemoryMap({
+  const { data, isLoading, isError, refetch } = useMemoryMap({
     tier: tier === 'all' ? undefined : tier,
     mem_type: type === 'all' ? undefined : type,
     limit: 500,
@@ -224,9 +218,7 @@ export function MemoryMap() {
             <ClusterLegend />
             <p className="text-xs text-muted-foreground">
               {t('memory.mapNodeCount', { count: entries.length })}
-              {activeQuery
-                ? ` · ${t('memory.mapSearchActive', { query: activeQuery })}`
-                : ''}
+              {activeQuery ? ` · ${t('memory.mapSearchActive', { query: activeQuery })}` : ''}
             </p>
           </div>
         </div>

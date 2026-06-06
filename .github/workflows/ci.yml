@@ -41,9 +41,9 @@ jobs:
       - name: Clippy (core crates)
         run: |
           cargo clippy \
-            -p oxios-kernel --features "browser,sqlite-memory" \
+            -p oxios-kernel --features "sqlite-memory" \
             -p oxios-ouroboros -p oxios-gateway -p oxios-markdown \
-            -p oxios-mcp \
+            -p oxios-mcp -p oxios-memory -p oxios-calendar \
             -- \
             -D warnings
 

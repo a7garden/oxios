@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import {
   Brain,
   ChevronDown,
@@ -9,6 +8,7 @@ import {
   Sparkles,
   Wrench,
 } from 'lucide-react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/utils'
 import type { ChatActivity } from '@/types'
@@ -119,7 +119,11 @@ function ActivityDetail({ activity, t }: { activity: ChatActivity; t: Translator
       const src = activity.memorySource
       const base = t('chat.transparency.memoryRecall', { count: activity.count ?? 0, y })
       const recallFor = q
-        ? t('chat.transparency.memoryRecallFor', { count: activity.count ?? 0, y, query: truncate(q, 60) })
+        ? t('chat.transparency.memoryRecallFor', {
+            count: activity.count ?? 0,
+            y,
+            query: truncate(q, 60),
+          })
         : null
       const srcSuffix = src ? t('chat.transparency.memorySource', { source: src }) : ''
       return (
@@ -151,7 +155,10 @@ function ActivityDetail({ activity, t }: { activity: ChatActivity; t: Translator
   }
 }
 
-function getActivityMeta(activity: ChatActivity, t: Translator): {
+function getActivityMeta(
+  activity: ChatActivity,
+  t: Translator,
+): {
   icon: React.ReactNode
   label: string
   badge: React.ReactNode

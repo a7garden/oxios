@@ -1,9 +1,9 @@
+import { Send } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
-import { FieldRow } from './field-row'
 import type { SettingsFieldDef } from './field-defs'
-import { Send } from 'lucide-react'
+import { FieldRow } from './field-row'
 
 interface ChannelsSectionProps {
   /** Section key, e.g. `channels.telegram`. */
@@ -19,7 +19,13 @@ interface ChannelsSectionProps {
  * standard `FieldRow` for every field so the restart badges and form
  * controls stay consistent.
  */
-export function ChannelsSection({ sectionKey, labelKey, fields, formValues, onFieldChange }: ChannelsSectionProps) {
+export function ChannelsSection({
+  sectionKey,
+  labelKey,
+  fields,
+  formValues,
+  onFieldChange,
+}: ChannelsSectionProps) {
   const { t } = useTranslation()
   if (fields.length === 0) return null
 
@@ -38,7 +44,14 @@ export function ChannelsSection({ sectionKey, labelKey, fields, formValues, onFi
             <FieldRow
               sectionKey={sectionKey}
               field={field}
-              value={formValues[sectionKey]?.[field.key] as string | boolean | string[] | number | undefined}
+              value={
+                formValues[sectionKey]?.[field.key] as
+                  | string
+                  | boolean
+                  | string[]
+                  | number
+                  | undefined
+              }
               onChange={(val) => onFieldChange(sectionKey, field.key, val)}
             />
           </div>

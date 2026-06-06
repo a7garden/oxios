@@ -710,22 +710,32 @@ async fn run_agent(
                     tool_call_id,
                     tool_name,
                     partial_result,
+                    tab_id,
+                    context,
                 } => {
                     // RFC-015: forward real-time progress to the event bus
                     // so the Web UI can show a spinner and progress text
                     // while the tool is still executing. Best-effort —
                     // publish failures (e.g. lagged subscribers) are ignored.
-                    // The optional `tab_id` is propagated for tab-aware tools
-                    // (e.g. browser) so the UI can distinguish concurrent
-                    // tab activity in the chat transparency timeline.
+                    //
+                    // `tab_id` and `context` come from oxi-agent 0.29+
+                    // (ToolCallContext: PageVisit, WebSearch, etc.).
+                    // Older agent versions won't send these — they default
+                    // to None and the UI gracefully ignores them.
                     if let Some(ref sid) = transparency_session {
+                        let context_json = context
+                            .as_ref()
+                            .map(serde_json::to_value)
+                            .transpose()
+                            .unwrap_or(None);
                         let _ = kernel_handle_for_cb.infra.publish(
                             KernelEvent::ToolExecutionProgress {
                                 session_id: sid.clone(),
                                 tool_call_id: tool_call_id.clone(),
                                 tool_name: tool_name.clone(),
                                 progress: partial_result,
-                                tab_id: None,
+                                tab_id,
+                                context: context_json,
                             },
                         );
                     }
@@ -896,7 +906,8 @@ async fn run_agent(
                 } else {
                     oxios_memory::memory::sona::Verdict::Failure
                 };
-                let trajectory = oxios_memory::memory::sona::Trajectory::new(steps, verdict, &domain);
+                let trajectory =
+                    oxios_memory::memory::sona::Trajectory::new(steps, verdict, &domain);
                 if let Err(e) = sona.record(trajectory).await {
                     tracing::debug!(error = %e, "SONA trajectory recording failed (non-fatal)");
                 }

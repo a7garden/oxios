@@ -3,16 +3,16 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 import { RefreshCw } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { ChatInput } from '@/components/chat/chat-input'
+import { ConnectionStatus } from '@/components/chat/connection-status'
+import { MessageBubble } from '@/components/chat/message-bubble'
+import { AiDetectionBadge } from '@/components/project/ai-detection-badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { AiDetectionBadge } from '@/components/project/ai-detection-badge'
-import { useChatStore } from '@/stores/chat'
 import { api } from '@/lib/api-client'
-import type { Session, Project } from '@/types'
-import { MessageBubble } from '@/components/chat/message-bubble'
-import { ChatInput } from '@/components/chat/chat-input'
-import { ConnectionStatus } from '@/components/chat/connection-status'
+import { useChatStore } from '@/stores/chat'
+import type { Project, Session } from '@/types'
 
 export const Route = createFileRoute('/chat')({ component: ChatPage })
 
@@ -102,7 +102,9 @@ function ChatPage() {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => { if (activeSessionId) loadSession(activeSessionId) }}
+              onClick={() => {
+                if (activeSessionId) loadSession(activeSessionId)
+              }}
             >
               <RefreshCw className="h-3 w-3 mr-1" /> {t('chat.refreshing')}
             </Button>
@@ -132,11 +134,7 @@ function ChatPage() {
           >
             {messages.length === 0 ? (
               <div className="flex items-center justify-center h-full text-muted-foreground">
-                <p>
-                  {!connected
-                    ? t('chat.serverConnecting')
-                    : t('chat.sendHint')}
-                </p>
+                <p>{!connected ? t('chat.serverConnecting') : t('chat.sendHint')}</p>
               </div>
             ) : (
               <div className="space-y-4">
@@ -188,15 +186,13 @@ function ProjectSessionSidebar({
   const { t } = useTranslation()
   const { data: projectsData } = useQuery({
     queryKey: ['projects'],
-    queryFn: () =>
-      api.get<{ items: Project[]; total: number }>('/api/projects'),
+    queryFn: () => api.get<{ items: Project[]; total: number }>('/api/projects'),
     refetchInterval: 30000,
   })
 
   const { data: sessionsData, refetch: refetchSessions } = useQuery({
     queryKey: ['sessions', activeProjectId],
-    queryFn: () =>
-      api.get<{ items: Session[]; total: number }>('/api/sessions'),
+    queryFn: () => api.get<{ items: Session[]; total: number }>('/api/sessions'),
     refetchInterval: 10000,
   })
 
@@ -218,6 +214,7 @@ function ProjectSessionSidebar({
         <div className="space-y-0.5">
           {projects.map((project) => (
             <button
+              type="button"
               key={project.id}
               onClick={() => onSelectProject(project.id)}
               className={`w-full flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-left transition-colors ${
@@ -226,11 +223,7 @@ function ProjectSessionSidebar({
                   : 'hover:bg-accent/50 text-muted-foreground'
               }`}
             >
-              <span
-                className={`h-2 w-2 rounded-full shrink-0 ${
-                  true ? 'bg-success' : 'bg-muted'
-                }`}
-              />
+              <span className="h-2 w-2 rounded-full shrink-0 bg-success" />
               <span className="truncate">{project.name}</span>
             </button>
           ))}
@@ -268,6 +261,7 @@ function ProjectSessionSidebar({
                 <p className="text-xs text-muted-foreground px-2 mb-1">{t(`chat.${label}`)}</p>
                 {group.map((s) => (
                   <button
+                    type="button"
                     key={s.id}
                     onClick={() => onSelectSession(s.id)}
                     className={`w-full text-left px-2 py-1.5 rounded text-xs transition-colors ${
@@ -279,7 +273,7 @@ function ProjectSessionSidebar({
                     <span className="block truncate">
                       {s.message_count != null && s.message_count > 0
                         ? t('chat.messageCount', { count: s.message_count })
-                        : s.id.slice(0, 8) + '...'}
+                        : `${s.id.slice(0, 8)}...`}
                     </span>
                     <span className="block text-2xs text-muted-foreground/60">
                       {new Date(s.created_at).toLocaleString(undefined, {
@@ -295,6 +289,7 @@ function ProjectSessionSidebar({
             ))}
             {sessions.length > 0 && (
               <button
+                type="button"
                 onClick={onToggleHistory}
                 className="w-full text-xs text-muted-foreground hover:text-foreground mt-2 px-2"
               >
@@ -305,6 +300,7 @@ function ProjectSessionSidebar({
         ) : (
           <div className="p-2 space-y-0.5">
             <button
+              type="button"
               onClick={onToggleHistory}
               className="text-xs text-muted-foreground hover:text-foreground mb-1 px-2"
             >
@@ -312,6 +308,7 @@ function ProjectSessionSidebar({
             </button>
             {sessions.map((s) => (
               <button
+                type="button"
                 key={s.id}
                 onClick={() => {
                   onSelectSession(s.id)
@@ -361,18 +358,14 @@ function ProjectSessionSidebar({
 // Helpers
 // ---------------------------------------------------------------------------
 
-function groupSessionsByDate(
-  sessions: Session[],
-): Record<string, Session[]> {
+function groupSessionsByDate(sessions: Session[]): Record<string, Session[]> {
   const now = new Date()
   const groups: Record<string, Session[]> = {}
 
   for (const s of sessions) {
     const d = new Date(s.created_at)
     let label: string
-    const diffDays = Math.floor(
-      (now.getTime() - d.getTime()) / (1000 * 60 * 60 * 24),
-    )
+    const diffDays = Math.floor((now.getTime() - d.getTime()) / (1000 * 60 * 60 * 24))
     if (diffDays === 0) label = 'today'
     else if (diffDays === 1) label = 'yesterday'
     else if (diffDays < 7) label = 'thisWeek'

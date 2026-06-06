@@ -39,10 +39,11 @@ jobs:
         run: bun install && bun run build
 
       # ─── 2. Publish crates to crates.io in dependency order ─────────
+      # Leaf crates first, then kernel, then consumers, then binary.
       # Each crate is published with --allow-dirty because web-dist.zip
       # is generated at runtime and not checked into git.
-      - name: Publish oxios-kernel
-        run: cargo publish -p oxios-kernel --token "${{ secrets.CARGO_REGISTRY_TOKEN }}" --allow-dirty
+      - name: Publish oxios-memory
+        run: cargo publish -p oxios-memory --token "${{ secrets.CARGO_REGISTRY_TOKEN }}" --allow-dirty
 
       - name: Publish oxios-markdown
         run: cargo publish -p oxios-markdown --token "${{ secrets.CARGO_REGISTRY_TOKEN }}" --allow-dirty
@@ -50,11 +51,17 @@ jobs:
       - name: Publish oxios-ouroboros
         run: cargo publish -p oxios-ouroboros --token "${{ secrets.CARGO_REGISTRY_TOKEN }}" --allow-dirty
 
-      - name: Publish oxios-gateway
-        run: cargo publish -p oxios-gateway --token "${{ secrets.CARGO_REGISTRY_TOKEN }}" --allow-dirty
-
       - name: Publish oxios-mcp
         run: cargo publish -p oxios-mcp --token "${{ secrets.CARGO_REGISTRY_TOKEN }}" --allow-dirty
+
+      - name: Publish oxios-calendar
+        run: cargo publish -p oxios-calendar --token "${{ secrets.CARGO_REGISTRY_TOKEN }}" --allow-dirty
+
+      - name: Publish oxios-kernel
+        run: cargo publish -p oxios-kernel --token "${{ secrets.CARGO_REGISTRY_TOKEN }}" --allow-dirty
+
+      - name: Publish oxios-gateway
+        run: cargo publish -p oxios-gateway --token "${{ secrets.CARGO_REGISTRY_TOKEN }}" --allow-dirty
 
       - name: Publish oxios-cli
         run: cargo publish -p oxios-cli --token "${{ secrets.CARGO_REGISTRY_TOKEN }}" --allow-dirty

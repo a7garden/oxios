@@ -13,7 +13,14 @@ interface PaginationProps {
   maxButtons?: number
 }
 
-export function Pagination({ page, limit, total, onPageChange, onLimitChange, maxButtons = 5 }: PaginationProps) {
+export function Pagination({
+  page,
+  limit,
+  total,
+  onPageChange,
+  onLimitChange,
+  maxButtons = 5,
+}: PaginationProps) {
   const { t } = useTranslation()
 
   const totalPages = Math.max(1, Math.ceil(total / limit))
@@ -82,7 +89,9 @@ export function Pagination({ page, limit, total, onPageChange, onLimitChange, ma
 
         {pages.map((p, i) =>
           p === '...' ? (
-            <span key={`ellipsis-${i}`} className="px-1">…</span>
+            <span key={`ellipsis-${i}`} className="px-1">
+              …
+            </span>
           ) : (
             <Button
               key={p}

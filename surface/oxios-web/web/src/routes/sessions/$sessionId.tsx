@@ -1,13 +1,13 @@
 import { useQuery } from '@tanstack/react-query'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { ArrowLeft, Clock, MessageSquare, FolderKanban } from 'lucide-react'
+import { ArrowLeft, Clock, FolderKanban, MessageSquare } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { useProjects } from '@/hooks/use-projects'
 import { ErrorState } from '@/components/shared/error-state'
 import { LoadingCards } from '@/components/shared/loading'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { useProjects } from '@/hooks/use-projects'
 import { api } from '@/lib/api-client'
 import type { SessionDetail } from '@/types'
 
@@ -15,7 +15,12 @@ export const Route = createFileRoute('/sessions/$sessionId')({
   component: SessionDetailPage,
 })
 
-function ProjectSelector({ currentProjectId }: { sessionId?: string; currentProjectId: string | null }) {
+function ProjectSelector({
+  currentProjectId,
+}: {
+  sessionId?: string
+  currentProjectId: string | null
+}) {
   const { t } = useTranslation()
   const { data: projectsData } = useProjects()
   const projects = projectsData?.items ?? []
@@ -25,13 +30,13 @@ function ProjectSelector({ currentProjectId }: { sessionId?: string; currentProj
     <div className="flex items-center gap-2">
       <FolderKanban className="h-4 w-4 text-muted-foreground shrink-0" />
       {currentProjectId && currentProject ? (
-        <>
-          <span className="text-sm">
-            {currentProject.emoji ?? '📦'} <span className="font-medium">{currentProject.name}</span>
-          </span>
-        </>
+        <span className="text-sm">
+          {currentProject.emoji ?? '📦'} <span className="font-medium">{currentProject.name}</span>
+        </span>
       ) : (
-        <span className="text-xs text-muted-foreground">{t('sessions.noProject', '— No project')}</span>
+        <span className="text-xs text-muted-foreground">
+          {t('sessions.noProject', '— No project')}
+        </span>
       )}
     </div>
   )
@@ -106,16 +111,14 @@ function SessionDetailPage() {
         <CardContent>
           <div className="grid gap-3 md:grid-cols-2">
             {/* Project row */}
-      <div className="flex items-center justify-between rounded-lg border p-3 bg-muted/20">
-        <span className="text-sm text-muted-foreground flex items-center gap-1">
-          <FolderKanban className="h-3 w-3" />
-          {t('sessions.project', 'Project')}
-        </span>
-        <ProjectSelector
-          currentProjectId={(session as any).project_id ?? null}
-        />
-      </div>
-      {details.map((d) => (
+            <div className="flex items-center justify-between rounded-lg border p-3 bg-muted/20">
+              <span className="text-sm text-muted-foreground flex items-center gap-1">
+                <FolderKanban className="h-3 w-3" />
+                {t('sessions.project', 'Project')}
+              </span>
+              <ProjectSelector currentProjectId={(session as any).project_id ?? null} />
+            </div>
+            {details.map((d) => (
               <div
                 key={d.label}
                 className="flex items-center justify-between rounded-lg border p-3"
@@ -138,11 +141,7 @@ function SessionDetailPage() {
           {messages.length > 0 ? (
             <div className="space-y-3">
               {messages.map((msg, i) => (
-                <div
-                  // biome-ignore lint/suspicious/noArrayIndexKey: session messages have no unique ID
-                  key={`msg-${i}`}
-                  className="flex gap-3"
-                >
+                <div key={`msg-${i}`} className="flex gap-3">
                   <Badge
                     variant={msg.role === 'user' ? 'default' : 'secondary'}
                     className="shrink-0 h-6"

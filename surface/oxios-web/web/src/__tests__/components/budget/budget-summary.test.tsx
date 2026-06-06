@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest'
 import { render, screen } from '@testing-library/react'
+import { describe, expect, it } from 'vitest'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 // Mock i18next
@@ -22,7 +22,7 @@ describe('BudgetSummary - Rendering patterns', () => {
         <CardContent>
           <div className="text-2xl font-bold">{totalTokens.toLocaleString()}</div>
         </CardContent>
-      </Card>
+      </Card>,
     )
 
     expect(screen.getByText('150,000')).toBeInTheDocument()
@@ -49,7 +49,7 @@ describe('BudgetSummary - Rendering patterns', () => {
             <div className="text-2xl font-bold">0</div>
           </CardContent>
         </Card>
-      </div>
+      </div>,
     )
 
     expect(screen.getAllByText('0').length).toBeGreaterThan(0)
@@ -64,7 +64,7 @@ describe('BudgetSummary - Rendering patterns', () => {
         <CardContent>
           <div className="text-2xl font-bold text-red-500">2</div>
         </CardContent>
-      </Card>
+      </Card>,
     )
 
     expect(screen.getByText('2')).toBeInTheDocument()

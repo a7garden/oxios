@@ -1,6 +1,6 @@
-import { Badge } from '@/components/ui/badge'
-import { Shield, Lock } from 'lucide-react'
+import { Lock, Shield } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { Badge } from '@/components/ui/badge'
 
 const protectionDisplay: Record<string, { icon: React.ReactNode; count: number }> = {
   none: { icon: null, count: 0 },
@@ -12,7 +12,7 @@ const protectionDisplay: Record<string, { icon: React.ReactNode; count: number }
 
 export function ProtectionBadge({ level }: { level: string }) {
   const { t } = useTranslation()
-  const display = protectionDisplay[level] ?? protectionDisplay['none']!
+  const display = protectionDisplay[level] ?? protectionDisplay.none!
   return (
     <Badge variant="outline" className="text-xs gap-1">
       {Array.from({ length: display.count }, (_, i) => (

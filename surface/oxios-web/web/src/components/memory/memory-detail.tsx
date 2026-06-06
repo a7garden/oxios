@@ -1,17 +1,12 @@
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
-import { Button } from '@/components/ui/button'
 import { Pin, Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { useMemoryDelete, useMemoryPin } from '@/hooks/use-memory'
 import type { MemoryDetail as MemDetail } from '@/types/memory'
-import { TierBadge } from './tier-badge'
 import { ProtectionBadge } from './protection-badge'
+import { TierBadge } from './tier-badge'
 import { TypeBadge } from './type-badge'
-import { useMemoryPin, useMemoryDelete } from '@/hooks/use-memory'
 
 interface MemoryDetailProps {
   memory: MemDetail | null
@@ -37,13 +32,9 @@ export function MemoryDetail({ memory, open, onClose }: MemoryDetailProps) {
               variant="ghost"
               size="icon"
               className="ml-auto h-8 w-8"
-              onClick={() =>
-                pinMut.mutate({ id: memory.id, pinned: !memory.pinned })
-              }
+              onClick={() => pinMut.mutate({ id: memory.id, pinned: !memory.pinned })}
             >
-              <Pin
-                className={`h-4 w-4 ${memory.pinned ? 'fill-current' : ''}`}
-              />
+              <Pin className={`h-4 w-4 ${memory.pinned ? 'fill-current' : ''}`} />
             </Button>
           </DialogTitle>
         </DialogHeader>
@@ -61,17 +52,13 @@ export function MemoryDetail({ memory, open, onClose }: MemoryDetailProps) {
             )}
             {memory.project_ids && (
               <div className="flex justify-between">
-                <span className="text-muted-foreground">
-                  {t('memory.source')}
-                </span>
+                <span className="text-muted-foreground">{t('memory.source')}</span>
                 <span className="text-xs">{memory.project_ids}</span>
               </div>
             )}
             {memory.created_at && (
               <div className="flex justify-between">
-                <span className="text-muted-foreground">
-                  {t('memory.created')}
-                </span>
+                <span className="text-muted-foreground">{t('memory.created')}</span>
                 <span>{new Date(memory.created_at).toLocaleString()}</span>
               </div>
             )}
@@ -89,27 +76,19 @@ export function MemoryDetail({ memory, open, onClose }: MemoryDetailProps) {
             )}
             {memory.access_count != null && (
               <div className="flex justify-between">
-                <span className="text-muted-foreground">
-                  {t('memory.appearances')}
-                </span>
+                <span className="text-muted-foreground">{t('memory.appearances')}</span>
                 <span>{memory.access_count}</span>
               </div>
             )}
             {memory.protected && (
               <div className="flex justify-between items-center">
-                <span className="text-muted-foreground">
-                  {t('memory.protection')}
-                </span>
-                <ProtectionBadge
-                  level={memory.protection_reason || 'none'}
-                />
+                <span className="text-muted-foreground">{t('memory.protection')}</span>
+                <ProtectionBadge level={memory.protection_reason || 'none'} />
               </div>
             )}
           </div>
           <div className="rounded-lg bg-muted p-3 overflow-x-auto">
-            <p className="text-sm whitespace-pre-wrap break-words">
-              {memory.content}
-            </p>
+            <p className="text-sm whitespace-pre-wrap break-words">{memory.content}</p>
           </div>
           {memory.summary && (
             <div className="rounded-lg border p-3">
@@ -120,10 +99,7 @@ export function MemoryDetail({ memory, open, onClose }: MemoryDetailProps) {
           {memory.tags && memory.tags.length > 0 && (
             <div className="flex flex-wrap gap-1">
               {memory.tags.map((tag) => (
-                <span
-                  key={tag}
-                  className="text-xs bg-secondary px-2 py-0.5 rounded"
-                >
+                <span key={tag} className="text-xs bg-secondary px-2 py-0.5 rounded">
                   {tag}
                 </span>
               ))}

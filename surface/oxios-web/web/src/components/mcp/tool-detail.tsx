@@ -25,9 +25,7 @@ export function ToolDetail({ tool }: ToolDetailProps) {
                 {arg.required && (
                   <span className="text-xs text-destructive font-medium">required</span>
                 )}
-                {arg.type && (
-                  <span className="text-xs text-muted-foreground">{arg.type}</span>
-                )}
+                {arg.type && <span className="text-xs text-muted-foreground">{arg.type}</span>}
                 {arg.description && (
                   <span className="text-xs text-muted-foreground flex-1">— {arg.description}</span>
                 )}

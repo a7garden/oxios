@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 //! Knowledge API route handlers — direct adapters over KnowledgeBase.
 //!
 //! All file I/O, backlink tracking, and app features are delegated to

@@ -1,7 +1,13 @@
-import { useTranslation } from 'react-i18next'
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useMcpRegisterServer } from '@/hooks/use-mcp'
@@ -24,7 +30,10 @@ export function AddServerDialog({ open, onOpenChange }: AddServerDialogProps) {
     if (!name.trim() || !command.trim()) return
 
     const parsedArgs = args.trim()
-      ? args.split(',').map((a) => a.trim()).filter(Boolean)
+      ? args
+          .split(',')
+          .map((a) => a.trim())
+          .filter(Boolean)
       : []
 
     registerServer.mutate(
@@ -63,7 +72,10 @@ export function AddServerDialog({ open, onOpenChange }: AddServerDialogProps) {
               id="mcp-command"
               value={command}
               onChange={(e) => setCommand(e.target.value)}
-              placeholder={t('mcp.commandPlaceholder', 'e.g. npx -y @modelcontextprotocol/server-filesystem')}
+              placeholder={t(
+                'mcp.commandPlaceholder',
+                'e.g. npx -y @modelcontextprotocol/server-filesystem',
+              )}
               required
             />
           </div>
@@ -73,15 +85,23 @@ export function AddServerDialog({ open, onOpenChange }: AddServerDialogProps) {
               id="mcp-args"
               value={args}
               onChange={(e) => setArgs(e.target.value)}
-              placeholder={t('mcp.argsPlaceholder', 'Comma-separated, e.g. /path/to/dir, --verbose')}
+              placeholder={t(
+                'mcp.argsPlaceholder',
+                'Comma-separated, e.g. /path/to/dir, --verbose',
+              )}
             />
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               {t('common.cancel', 'Cancel')}
             </Button>
-            <Button type="submit" disabled={!name.trim() || !command.trim() || registerServer.isPending}>
-              {registerServer.isPending ? t('common.loading', 'Loading...') : t('mcp.register', 'Register')}
+            <Button
+              type="submit"
+              disabled={!name.trim() || !command.trim() || registerServer.isPending}
+            >
+              {registerServer.isPending
+                ? t('common.loading', 'Loading...')
+                : t('mcp.register', 'Register')}
             </Button>
           </DialogFooter>
         </form>

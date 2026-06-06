@@ -1,13 +1,13 @@
-import type { Extension } from '@codemirror/state'
-import { StreamLanguage } from '@codemirror/language'
+import { javascript } from '@codemirror/lang-javascript'
 import { json } from '@codemirror/lang-json'
-import { rust } from '@codemirror/lang-rust'
 import { markdown } from '@codemirror/lang-markdown'
 import { python } from '@codemirror/lang-python'
+import { rust } from '@codemirror/lang-rust'
 import { yaml } from '@codemirror/lang-yaml'
-import { javascript } from '@codemirror/lang-javascript'
-import { toml } from '@codemirror/legacy-modes/mode/toml'
+import { StreamLanguage } from '@codemirror/language'
 import { shell } from '@codemirror/legacy-modes/mode/shell'
+import { toml } from '@codemirror/legacy-modes/mode/toml'
+import type { Extension } from '@codemirror/state'
 
 /**
  * Pick the right CM6 language extension based on file path extension.

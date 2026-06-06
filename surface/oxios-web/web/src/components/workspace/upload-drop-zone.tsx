@@ -1,5 +1,5 @@
-import { useCallback, useRef, useState } from 'react'
 import { Upload } from 'lucide-react'
+import { useCallback, useRef, useState } from 'react'
 import { api } from '@/lib/api-client'
 
 interface UploadDropZoneProps {
@@ -67,13 +67,7 @@ export function UploadDropZone({ currentDir, onUploaded }: UploadDropZoneProps) 
       onDragLeave={() => setIsDragging(false)}
       onDrop={handleDrop}
     >
-      <input
-        ref={inputRef}
-        type="file"
-        className="hidden"
-        multiple
-        onChange={handleFileSelect}
-      />
+      <input ref={inputRef} type="file" className="hidden" multiple onChange={handleFileSelect} />
       <button
         type="button"
         className="flex flex-col items-center gap-1 w-full text-sm text-muted-foreground hover:text-foreground transition-colors"

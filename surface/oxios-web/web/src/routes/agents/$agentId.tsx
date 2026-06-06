@@ -1,18 +1,18 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { Skull, ExternalLink } from 'lucide-react'
+import { ExternalLink, Skull } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { AgentBudgetBar } from '@/components/agent/agent-budget-bar'
+import { AgentHeader } from '@/components/agent/agent-header'
+import { AgentLogs as AgentLogsComponent } from '@/components/agent/agent-logs'
+import { ExecutionTrace } from '@/components/agent/execution-trace'
+import { ErrorState } from '@/components/shared/error-state'
+import { LoadingCards } from '@/components/shared/loading'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { ErrorState } from '@/components/shared/error-state'
-import { LoadingCards } from '@/components/shared/loading'
+import { useAgentDetail, useAgentLogs, useAgentTrace } from '@/hooks/use-agent-trace'
 import { api } from '@/lib/api-client'
-import { AgentHeader } from '@/components/agent/agent-header'
-import { AgentBudgetBar } from '@/components/agent/agent-budget-bar'
-import { ExecutionTrace } from '@/components/agent/execution-trace'
-import { AgentLogs as AgentLogsComponent } from '@/components/agent/agent-logs'
-import { useAgentDetail, useAgentTrace, useAgentLogs } from '@/hooks/use-agent-trace'
 
 export const Route = createFileRoute('/agents/$agentId')({
   component: AgentDetailPage,
@@ -24,12 +24,7 @@ function AgentDetailPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
 
-  const {
-    data: agent,
-    isLoading,
-    isError,
-    refetch,
-  } = useAgentDetail(agentId)
+  const { data: agent, isLoading, isError, refetch } = useAgentDetail(agentId)
   const { data: trace, isLoading: traceLoading } = useAgentTrace(agentId)
   const { data: logs } = useAgentLogs(agentId)
 

@@ -43,7 +43,9 @@ export function TodayStats() {
         )}
         {report && Object.keys(report).length > 0 && (
           <details className="mt-3">
-            <summary className="text-xs text-muted-foreground cursor-pointer">{t('knowledge.rawReport')}</summary>
+            <summary className="text-xs text-muted-foreground cursor-pointer">
+              {t('knowledge.rawReport')}
+            </summary>
             <pre className="text-xs bg-muted p-2 rounded mt-1 overflow-x-auto">
               {JSON.stringify(report, null, 2)}
             </pre>

@@ -1,10 +1,10 @@
-import { Select } from '@/components/ui/select'
-import { Input } from '@/components/ui/input'
-import { Separator } from '@/components/ui/separator'
-import { Label } from '@/components/ui/label'
-import { Button } from '@/components/ui/button'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Select } from '@/components/ui/select'
+import { Separator } from '@/components/ui/separator'
 
 // ─── Provider-specific option schemas ────────────────────────
 
@@ -154,7 +154,9 @@ function OptionControl({
         value={String(value ?? '')}
         onValueChange={(val) => onChange(val)}
         options={option.options.map((o) => ({ value: o.value, label: t(o.labelKey) }))}
-        placeholder={option.placeholderKey ? t(option.placeholderKey) : t('common.selectPlaceholder')}
+        placeholder={
+          option.placeholderKey ? t(option.placeholderKey) : t('common.selectPlaceholder')
+        }
       />
     )
   }
@@ -166,7 +168,7 @@ function OptionControl({
       value={value !== undefined && value !== null ? String(value) : ''}
       onChange={(e) => {
         const num = Number(e.target.value)
-        if (!isNaN(num) && e.target.value !== '') {
+        if (!Number.isNaN(num) && e.target.value !== '') {
           onChange(num)
         }
       }}
@@ -218,10 +220,7 @@ export function ProviderOptionsPanel({
     <div className={className}>
       <ProviderOptions provider={provider} values={localValues} onChange={handleChange} />
       <div className="mt-4 flex justify-end">
-        <Button
-          onClick={handleSave}
-          disabled={isPending}
-        >
+        <Button onClick={handleSave} disabled={isPending}>
           {isPending ? t('engine.saving') : t('engine.saveOptions')}
         </Button>
       </div>

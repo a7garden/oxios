@@ -1,5 +1,5 @@
+import { CheckCircle2, Clock, Play, XCircle } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { Clock, Play, CheckCircle2, XCircle } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import type { AgentGroup } from '@/types/agent-group'
@@ -9,7 +9,10 @@ interface Props {
   onClick: () => void
 }
 
-const STATUS_META: Record<string, { icon: React.ReactNode; variant: 'success' | 'warning' | 'destructive' | 'secondary' }> = {
+const STATUS_META: Record<
+  string,
+  { icon: React.ReactNode; variant: 'success' | 'warning' | 'destructive' | 'secondary' }
+> = {
   Pending: { icon: <Clock className="h-3 w-3" />, variant: 'secondary' },
   Running: { icon: <Play className="h-3 w-3" />, variant: 'success' },
   Completed: { icon: <CheckCircle2 className="h-3 w-3" />, variant: 'success' },
@@ -21,9 +24,9 @@ export function GroupCard({ group, onClick }: Props) {
 
   // Derive status from agents
   const total = group.agents.length
-  const completed = group.agents.filter(a => a.status === 'Completed').length
-  const failed = group.agents.filter(a => a.status === 'Failed').length
-  const running = group.agents.filter(a => a.status === 'Running').length
+  const completed = group.agents.filter((a) => a.status === 'Completed').length
+  const failed = group.agents.filter((a) => a.status === 'Failed').length
+  const running = group.agents.filter((a) => a.status === 'Running').length
   const pct = total > 0 ? Math.round((completed / total) * 100) : 0
 
   let status = 'Pending'
@@ -31,7 +34,7 @@ export function GroupCard({ group, onClick }: Props) {
   else if (completed === total && total > 0) status = 'Completed'
   else if (running > 0 || completed > 0) status = 'Running'
 
-  const meta = STATUS_META[status] ?? STATUS_META['Pending']!
+  const meta = STATUS_META[status] ?? STATUS_META.Pending!
 
   return (
     <Card className="cursor-pointer transition-shadow hover:shadow-md" onClick={onClick}>
@@ -54,7 +57,9 @@ export function GroupCard({ group, onClick }: Props) {
         <div>
           <div className="flex justify-between text-sm mb-1">
             <span>{t('agentGroups.progress')}</span>
-            <span className="text-muted-foreground">{pct}% ({completed}/{total})</span>
+            <span className="text-muted-foreground">
+              {pct}% ({completed}/{total})
+            </span>
           </div>
           <div className="h-2 rounded-full bg-muted overflow-hidden">
             <div

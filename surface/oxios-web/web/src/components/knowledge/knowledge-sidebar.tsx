@@ -1,5 +1,13 @@
 import { Link } from '@tanstack/react-router'
-import { BookOpen, FilePlus, FolderPlus, LayoutDashboard, MessageSquare, PanelLeftClose, Trash2 } from 'lucide-react'
+import {
+  BookOpen,
+  FilePlus,
+  FolderPlus,
+  LayoutDashboard,
+  MessageSquare,
+  PanelLeftClose,
+  Trash2,
+} from 'lucide-react'
 import { useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'

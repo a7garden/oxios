@@ -1,5 +1,5 @@
-import { useTranslation } from 'react-i18next'
 import { Power, RefreshCw, Trash2 } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import type { McpServer } from '@/types/mcp'
@@ -14,7 +14,15 @@ interface ServerCardProps {
   isDeleting: boolean
 }
 
-export function ServerCard({ server, onToggle, onRefresh, onDelete, isToggling, isRefreshing, isDeleting }: ServerCardProps) {
+export function ServerCard({
+  server,
+  onToggle,
+  onRefresh,
+  onDelete,
+  isToggling,
+  isRefreshing,
+  isDeleting,
+}: ServerCardProps) {
   const { t } = useTranslation()
 
   const statusColor = !server.enabled
@@ -41,7 +49,8 @@ export function ServerCard({ server, onToggle, onRefresh, onDelete, isToggling, 
             </Badge>
           </div>
           <p className="text-xs text-muted-foreground font-mono truncate mt-0.5">
-            {server.command}{server.args.length > 0 ? ` ${server.args.join(' ')}` : ''}
+            {server.command}
+            {server.args.length > 0 ? ` ${server.args.join(' ')}` : ''}
           </p>
         </div>
       </div>

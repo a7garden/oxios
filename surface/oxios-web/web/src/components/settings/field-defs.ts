@@ -252,7 +252,14 @@ const memorySection: SettingsSectionDef = {
     // embedding model, SONA state). Toggling `enabled` via PATCH
     // persists the new value but does not construct/teardown the
     // subsystem at runtime. Restart is required to apply.
-    { key: 'enabled', labelKey: 'settings.memoryEnabled', descriptionKey: 'settings.memoryEnabledDescription', type: 'toggle', hotReload: false, restartScope: 'memory' },
+    {
+      key: 'enabled',
+      labelKey: 'settings.memoryEnabled',
+      descriptionKey: 'settings.memoryEnabledDescription',
+      type: 'toggle',
+      hotReload: false,
+      restartScope: 'memory',
+    },
     {
       key: 'sqlite.path',
       labelKey: 'settings.memoryStoragePath',
@@ -470,7 +477,16 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
   {
     id: 'advanced',
     labelKey: 'settings.groupAdvanced',
-    sectionKeys: ['resource_monitor', 'otel', 'daemon', 'persona', 'cron', 'mcp', 'browser', 'marketplace'],
+    sectionKeys: [
+      'resource_monitor',
+      'otel',
+      'daemon',
+      'persona',
+      'cron',
+      'mcp',
+      'browser',
+      'marketplace',
+    ],
   },
 ]
 

@@ -69,6 +69,10 @@ impl SdkKernelToolProvider for OxiosKernelBridge {
             "knowledge",
             // Marketplace (ClawHub)
             "marketplace",
+            // Calendar
+            "calendar",
+            // Email
+            "send_email",
         ]
     }
 
@@ -179,12 +183,15 @@ mod tests {
                         .expect("valid Skills.sh client"),
                 ),
             ),
+            None, // calendar (not configured in test)
+            None, // email (not configured in test)
         ));
 
         let bridge = OxiosKernelBridge::new(kernel);
 
         let names = bridge.tool_names();
-        // 6 always-on + 17 kernel domain = 23 ... plus knowledge = 24
-        assert_eq!(names.len(), 24, "expected 24 tools, got {:?}", names);
+        // 6 always-on + 18 kernel domain = 24 ... plus knowledge = 25 ... plus calendar = 25 (optional, not configured)
+        // plus send_email = 26
+        assert_eq!(names.len(), 26, "expected 26 tools, got {:?}", names);
     }
 }

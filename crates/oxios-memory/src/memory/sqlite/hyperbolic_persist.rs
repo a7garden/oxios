@@ -21,16 +21,16 @@
 //!
 //! They are now free functions in this module:
 //! ```ignore
-//! use oxios_kernel::memory::hyperbolic_persist;
+//! use oxios_memory::memory::sqlite::hyperbolic_persist;
 //! hyperbolic_persist::build_from_sqlite(&store, config).await;
 //! hyperbolic_persist::restore_from_sqlite(&store, config)?;
 //! hyperbolic_persist::persist_to_sqlite(&he, &store)?;
 //! ```
 
 #[cfg(feature = "sqlite-memory")]
-use anyhow::Result;
-#[cfg(feature = "sqlite-memory")]
 use crate::memory::hyperbolic::{HyperbolicConfig, HyperbolicEmbedding};
+#[cfg(feature = "sqlite-memory")]
+use anyhow::Result;
 
 #[cfg(feature = "sqlite-memory")]
 use super::store::SqliteMemoryStore;

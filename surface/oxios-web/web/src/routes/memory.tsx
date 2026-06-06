@@ -1,13 +1,13 @@
-import { useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { MemoryOverview } from '@/components/memory/memory-overview'
-import { MemoryBrowser } from '@/components/memory/memory-browser'
-import { MemoryMap } from '@/components/memory/memory-map'
 import { DreamPanel } from '@/components/memory/dream-panel'
-import { MemorySearch } from '@/components/memory/memory-search'
+import { MemoryBrowser } from '@/components/memory/memory-browser'
 import { MemoryDetail } from '@/components/memory/memory-detail'
+import { MemoryMap } from '@/components/memory/memory-map'
+import { MemoryOverview } from '@/components/memory/memory-overview'
+import { MemorySearch } from '@/components/memory/memory-search'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import type { MemoryDetail as MemDetail } from '@/types/memory'
 
 export const Route = createFileRoute('/memory')({ component: MemoryPage })
@@ -91,11 +91,7 @@ function MemoryPage() {
           </TabsContent>
         )}
       </Tabs>
-      <MemoryDetail
-        memory={selected}
-        open={detailOpen}
-        onClose={() => setDetailOpen(false)}
-      />
+      <MemoryDetail memory={selected} open={detailOpen} onClose={() => setDetailOpen(false)} />
     </div>
   )
 }

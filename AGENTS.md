@@ -20,14 +20,16 @@ oxios/
 │   ├── oxios-markdown/    # Knowledge base (VirtualFs, BacklinkIndex)
 │   ├── oxios-ouroboros/   # Spec-first protocol (interview → seed → execute → evaluate → evolve)
 │   ├── oxios-gateway/     # Channel-agnostic message hub
-│   └── oxios-mcp/         # MCP client (JSON-RPC 2.0 over stdio)
+│   ├── oxios-mcp/         # MCP client (JSON-RPC 2.0 over stdio)
+│   ├── oxios-memory/      # Tiered agent memory (Hot/Warm/Cold, Dream, HNSW)
+│   └── oxios-calendar/    # .ics-based calendar event management
 ├── surface/oxios-web/     # Web dashboard (Axum + React)
 ├── channels/              # CLI, Telegram channels (feature-gated)
 ├── share/                 # Default skills, config
 └── docs/                  # Architecture, RFCs, design documents
 ```
 
-**Dependencies:** `oxios → oxios-kernel → {oxios-ouroboros, oxios-markdown, oxios-mcp, oxi-sdk}`. `oxi-sdk` is a crates.io dependency — never reimplement what it provides.
+**Dependencies:** `oxios → oxios-kernel → {oxios-memory, oxios-ouroboros, oxios-markdown, oxios-calendar, oxios-mcp, oxi-sdk}`. `oxi-sdk` is a crates.io dependency — never reimplement what it provides.
 
 ## Quick Facts
 
@@ -77,10 +79,9 @@ cd surface/oxios-web/web && bun install && bun dev   # Frontend dev server
 | Design doc (UI, flow) | `docs/designs/` | `YYYY-MM-DD-<topic>-design.md` |
 | Implementation result | `docs/archive/` | `<topic>-result.md` |
 | Audit / review | `docs/production-audit/` | `YYYY-MM-DD-<topic>.md` |
-| Progress tracking | `PROGRESS.md` (root) | Single file. No `progress-*.md` variants. |
-| Temporary analysis | **Delete after use.** | Never create `*-analysis.md`, `fix-*.md`, `*-output.md` in root. |
+| Temporary analysis | **Delete after use.** | Never create `*-analysis.md`, `fix-*.md`, `*-output.md`, `PROGRESS.md` in root. |
 
-**Allowed root files:** `AGENTS.md`, `README.md`, `CHANGELOG.md`, `DESIGN.md`, `CONTRIBUTING.md`, `PROGRESS.md`, `LICENSE`, `THIRD-PARTY-NOTICES.md`. Nothing else.
+**Allowed root files:** `AGENTS.md`, `README.md`, `CHANGELOG.md`, `DESIGN.md`, `CONTRIBUTING.md`, `LICENSE`, `THIRD-PARTY-NOTICES.md`. Nothing else.
 
 ## File Locations
 

@@ -8,8 +8,8 @@ import { create } from 'zustand'
  * central store, only ONE connection exists, and all consumers read from it.
  */
 
-import type { OxiosEvent } from '@/types'
 import { SseClient } from '@/lib/sse-client'
+import type { OxiosEvent } from '@/types'
 
 const MAX_EVENTS = 100
 

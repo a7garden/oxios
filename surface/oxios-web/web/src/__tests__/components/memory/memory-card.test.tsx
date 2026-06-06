@@ -1,5 +1,5 @@
-import { describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
+import { describe, expect, it, vi } from 'vitest'
 import { MemoryCard } from '@/components/memory/memory-card'
 import type { MemoryDetail } from '@/types/memory'
 
@@ -34,7 +34,9 @@ describe('MemoryCard', () => {
   it('renders memory content text', () => {
     render(<MemoryCard memory={baseMemory} onClick={vi.fn()} />)
 
-    expect(screen.getByText('This is a test memory content for the card display.')).toBeInTheDocument()
+    expect(
+      screen.getByText('This is a test memory content for the card display.'),
+    ).toBeInTheDocument()
   })
 
   it('renders type badge', () => {
@@ -54,7 +56,9 @@ describe('MemoryCard', () => {
   it('renders created date', () => {
     render(<MemoryCard memory={baseMemory} onClick={vi.fn()} />)
 
-    expect(screen.getByText(new Date('2025-01-15T10:30:00Z').toLocaleDateString())).toBeInTheDocument()
+    expect(
+      screen.getByText(new Date('2025-01-15T10:30:00Z').toLocaleDateString()),
+    ).toBeInTheDocument()
   })
 
   it('renders access count', () => {
@@ -99,7 +103,9 @@ describe('MemoryCard', () => {
     const onClick = vi.fn()
     render(<MemoryCard memory={baseMemory} onClick={onClick} />)
 
-    const card = screen.getByText('This is a test memory content for the card display.').closest('[class*="cursor-pointer"]') as HTMLElement
+    const card = screen
+      .getByText('This is a test memory content for the card display.')
+      .closest('[class*="cursor-pointer"]') as HTMLElement
     card!.click()
 
     expect(onClick).toHaveBeenCalledOnce()

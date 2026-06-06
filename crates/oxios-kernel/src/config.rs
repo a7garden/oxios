@@ -8,6 +8,7 @@ use cron::Schedule;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 
+use crate::email::{SmtpProvider, SmtpTls};
 use crate::scheduler::Priority;
 
 /// Cron scheduler configuration.
@@ -885,6 +886,12 @@ pub struct OxiosConfig {
     /// ClawHub marketplace configuration.
     #[serde(default)]
     pub marketplace: MarketplaceConfig,
+    /// Calendar configuration.
+    #[serde(default)]
+    pub calendar: CalendarConfig,
+    /// Email configuration.
+    #[serde(default)]
+    pub email: EmailConfig,
 }
 
 /// Kernel configuration.
@@ -1012,6 +1019,133 @@ impl Default for SkillsShConfig {
             api_key: None,
             enabled: true,
         }
+    }
+}
+
+/// Calendar configuration.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct CalendarConfig {
+    /// Enable the calendar system.
+    #[serde(default)]
+    pub enabled: bool,
+    /// Default timezone for events.
+    #[serde(default = "default_calendar_timezone")]
+    pub timezone: String,
+    /// Default reminder minutes for new events.
+    #[serde(default = "default_reminder_minutes")]
+    pub default_reminder_minutes: Vec<u32>,
+    /// Alarm dispatch channels.
+    #[serde(default)]
+    pub alarm_channels: Vec<String>,
+    /// Journal sync mode: "on_open", "midnight", "both".
+    #[serde(default = "default_journal_sync")]
+    pub journal_sync: String,
+    /// Show cron jobs on the calendar.
+    #[serde(default = "default_true")]
+    pub system_calendar: bool,
+    /// Days after which old events are archived.
+    #[serde(default = "default_archive_days")]
+    pub archive_after_days: u32,
+}
+
+fn default_calendar_timezone() -> String {
+    "Asia/Seoul".to_string()
+}
+
+fn default_reminder_minutes() -> Vec<u32> {
+    vec![15]
+}
+
+fn default_journal_sync() -> String {
+    "on_open".to_string()
+}
+
+fn default_archive_days() -> u32 {
+    365
+}
+
+impl Default for CalendarConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            timezone: default_calendar_timezone(),
+            default_reminder_minutes: default_reminder_minutes(),
+            alarm_channels: vec![],
+            journal_sync: default_journal_sync(),
+            system_calendar: true,
+            archive_after_days: default_archive_days(),
+        }
+    }
+}
+
+/// Email configuration.
+///
+/// Controls SMTP email sending. When enabled, agents gain the `send_email` tool.
+/// v1 sends to the user's own email only.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct EmailConfig {
+    /// Enable the email system.
+    #[serde(default)]
+    pub enabled: bool,
+    /// The user's email address (used as both sender and default recipient).
+    #[serde(default)]
+    pub my_email: String,
+    /// SMTP provider preset ("gmail", "icloud", "fastmail", "custom").
+    #[serde(default = "default_email_provider")]
+    pub provider: SmtpProvider,
+    /// SMTP host (auto-filled from provider if empty).
+    #[serde(default)]
+    pub host: String,
+    /// SMTP port (auto-filled from provider if 0).
+    #[serde(default)]
+    pub port: u16,
+    /// TLS mode (auto-filled from provider if None).
+    #[serde(default)]
+    pub tls: Option<SmtpTls>,
+    /// SMTP auth username (defaults to `my_email` if empty).
+    #[serde(default)]
+    pub user: String,
+    /// Credential store key for the SMTP password.
+    /// Falls back to `OXIOS_EMAIL_PASSWORD` env var.
+    #[serde(default = "default_email_secret_ref")]
+    pub secret_ref: String,
+    /// Maximum emails per hour (rate limit, default: 10).
+    #[serde(default = "default_rate_limit_emails")]
+    pub rate_limit_per_hour: usize,
+}
+
+fn default_email_provider() -> SmtpProvider {
+    SmtpProvider::Gmail
+}
+
+fn default_email_secret_ref() -> String {
+    "email_smtp".to_string()
+}
+
+fn default_rate_limit_emails() -> usize {
+    10
+}
+
+impl Default for EmailConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            my_email: String::new(),
+            provider: default_email_provider(),
+            host: String::new(),
+            port: 0,
+            tls: None,
+            user: String::new(),
+            secret_ref: default_email_secret_ref(),
+            rate_limit_per_hour: default_rate_limit_emails(),
+        }
+    }
+}
+
+impl EmailConfig {
+    /// Resolve the effective provider, falling back to Gmail.
+    pub fn provider(&self) -> SmtpProvider {
+        self.provider
     }
 }
 

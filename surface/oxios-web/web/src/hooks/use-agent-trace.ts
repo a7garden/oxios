@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { api } from '@/lib/api-client'
-import type { AgentDetail, AgentTrace, AgentLogs } from '@/types/agent'
+import type { AgentDetail, AgentLogs, AgentTrace } from '@/types/agent'
 
 // ── Agent detail ──
 export function useAgentDetail(id: string | null) {
@@ -40,7 +40,16 @@ export function useAgentLogs(id: string | null) {
 export function useSeedAgents(seedId: string | null) {
   return useQuery({
     queryKey: ['seeds', 'agents', seedId],
-    queryFn: () => api.get<{ agents: { id: string; name: string; status: string; steps_completed: number; created_at: string }[] }>(`/api/seeds/${seedId}/agents`),
+    queryFn: () =>
+      api.get<{
+        agents: {
+          id: string
+          name: string
+          status: string
+          steps_completed: number
+          created_at: string
+        }[]
+      }>(`/api/seeds/${seedId}/agents`),
     enabled: !!seedId,
     refetchInterval: 10_000,
   })

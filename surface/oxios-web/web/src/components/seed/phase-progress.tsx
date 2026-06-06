@@ -15,9 +15,7 @@ export function PhaseProgress({ phaseReached }: { phaseReached: OuroborosPhase }
         const isCurrent = idx === currentIdx
         return (
           <div key={phase} className="flex items-center gap-2">
-            {idx > 0 && (
-              <div className={`h-0.5 w-8 ${isComplete ? 'bg-primary' : 'bg-muted'}`} />
-            )}
+            {idx > 0 && <div className={`h-0.5 w-8 ${isComplete ? 'bg-primary' : 'bg-muted'}`} />}
             <div
               className={`flex items-center gap-1.5 rounded-full px-2 py-1 text-xs font-medium transition-colors ${
                 isComplete

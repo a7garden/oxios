@@ -3,14 +3,14 @@ import { createFileRoute } from '@tanstack/react-router'
 import {
   ChevronDown,
   ChevronRight,
+  Eye,
   File,
   Folder,
   FolderOpen,
-  RefreshCw,
-  Plus,
-  Trash2,
   Pencil,
-  Eye,
+  Plus,
+  RefreshCw,
+  Trash2,
 } from 'lucide-react'
 import { useCallback, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -18,19 +18,15 @@ import { EmptyState } from '@/components/shared/empty-state'
 import { ErrorState } from '@/components/shared/error-state'
 import { LoadingCards } from '@/components/shared/loading'
 import { Button } from '@/components/ui/button'
+import { CreateFileDialog } from '@/components/workspace/create-file-dialog'
+import { FileBreadcrumb } from '@/components/workspace/file-breadcrumb'
+import { FileEditor } from '@/components/workspace/file-editor'
+import { FileViewer } from '@/components/workspace/file-viewer'
+import { UploadDropZone } from '@/components/workspace/upload-drop-zone'
+import { useCreateFile, useDeleteFile, useSaveFile } from '@/hooks/use-workspace'
 import { api } from '@/lib/api-client'
 import type { TreeEntry } from '@/types'
 import { isEditable, isImage } from '@/types/workspace'
-import { FileViewer } from '@/components/workspace/file-viewer'
-import { FileEditor } from '@/components/workspace/file-editor'
-import { FileBreadcrumb } from '@/components/workspace/file-breadcrumb'
-import { CreateFileDialog } from '@/components/workspace/create-file-dialog'
-import { UploadDropZone } from '@/components/workspace/upload-drop-zone'
-import {
-  useSaveFile,
-  useCreateFile,
-  useDeleteFile,
-} from '@/hooks/use-workspace'
 
 export const Route = createFileRoute('/workspace/')({ component: WorkspacePage })
 
@@ -124,15 +120,18 @@ function WorkspacePage() {
     })
   }, [])
 
-  const handleFileClick = useCallback((entry: TreeEntry, parentPath: string) => {
-    if (entry.is_dir) {
-      const fullPath = parentPath ? `${parentPath}/${entry.name}` : entry.name
-      toggleExpand(fullPath)
-    } else {
-      const fullPath = parentPath ? `${parentPath}/${entry.name}` : entry.name
-      setSelectedFile({ path: fullPath, mode: 'view' })
-    }
-  }, [toggleExpand])
+  const handleFileClick = useCallback(
+    (entry: TreeEntry, parentPath: string) => {
+      if (entry.is_dir) {
+        const fullPath = parentPath ? `${parentPath}/${entry.name}` : entry.name
+        toggleExpand(fullPath)
+      } else {
+        const fullPath = parentPath ? `${parentPath}/${entry.name}` : entry.name
+        setSelectedFile({ path: fullPath, mode: 'view' })
+      }
+    },
+    [toggleExpand],
+  )
 
   const handleDoubleClick = useCallback((entry: TreeEntry, parentPath: string) => {
     if (entry.is_dir) return
@@ -142,12 +141,15 @@ function WorkspacePage() {
     }
   }, [])
 
-  const handleBreadcrumbNavigate = useCallback((dir: string) => {
-    setSelectedFile(null)
-    if (dir) {
-      toggleExpand(dir)
-    }
-  }, [toggleExpand])
+  const handleBreadcrumbNavigate = useCallback(
+    (dir: string) => {
+      setSelectedFile(null)
+      if (dir) {
+        toggleExpand(dir)
+      }
+    },
+    [toggleExpand],
+  )
 
   const handleSave = useCallback(
     (content: string) => {
@@ -159,10 +161,7 @@ function WorkspacePage() {
 
   const handleCreate = useCallback(
     (fullPath: string, isDir: boolean) => {
-      createFile.mutate(
-        { path: fullPath, isDir },
-        { onSuccess: () => refetchRoot() },
-      )
+      createFile.mutate({ path: fullPath, isDir }, { onSuccess: () => refetchRoot() })
     },
     [createFile, refetchRoot],
   )
@@ -227,9 +226,7 @@ function WorkspacePage() {
         </div>
         {isExpanded &&
           entry.is_dir &&
-          (childrenMap?.[fullPath] ?? []).map((child) =>
-            renderEntry(child, fullPath, depth + 1),
-          )}
+          (childrenMap?.[fullPath] ?? []).map((child) => renderEntry(child, fullPath, depth + 1))}
       </div>
     )
   }
@@ -248,19 +245,10 @@ function WorkspacePage() {
           <p className="text-muted-foreground">{t('workspace.description')}</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowCreateDialog(true)}
-          >
+          <Button variant="outline" size="sm" onClick={() => setShowCreateDialog(true)}>
             <Plus className="h-4 w-4 mr-1" /> New
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => refetchRoot()}
-            disabled={rootFetching}
-          >
+          <Button variant="outline" size="sm" onClick={() => refetchRoot()} disabled={rootFetching}>
             <RefreshCw className={`h-4 w-4 ${rootFetching ? 'animate-spin' : ''}`} />
           </Button>
         </div>
@@ -284,9 +272,7 @@ function WorkspacePage() {
                 className="py-6"
               />
             ) : (
-              <div className="space-y-0">
-                {rootEntries.map((entry) => renderEntry(entry, ''))}
-              </div>
+              <div className="space-y-0">{rootEntries.map((entry) => renderEntry(entry, ''))}</div>
             )}
           </div>
           {/* Upload zone */}
@@ -313,10 +299,7 @@ function WorkspacePage() {
             <>
               {/* Toolbar */}
               <div className="flex items-center justify-between px-3 py-2 border-b shrink-0">
-                <FileBreadcrumb
-                  path={selectedFile.path}
-                  onNavigate={handleBreadcrumbNavigate}
-                />
+                <FileBreadcrumb path={selectedFile.path} onNavigate={handleBreadcrumbNavigate} />
                 <div className="flex items-center gap-1">
                   {isEditable(selectedFile.path) && (
                     <>
@@ -324,9 +307,7 @@ function WorkspacePage() {
                         variant={selectedFile.mode === 'view' ? 'secondary' : 'ghost'}
                         size="sm"
                         className="h-7 px-2"
-                        onClick={() =>
-                          setSelectedFile((s) => s && { ...s, mode: 'view' })
-                        }
+                        onClick={() => setSelectedFile((s) => s && { ...s, mode: 'view' })}
                       >
                         <Eye className="h-3.5 w-3.5" />
                       </Button>
@@ -334,9 +315,7 @@ function WorkspacePage() {
                         variant={selectedFile.mode === 'edit' ? 'secondary' : 'ghost'}
                         size="sm"
                         className="h-7 px-2"
-                        onClick={() =>
-                          setSelectedFile((s) => s && { ...s, mode: 'edit' })
-                        }
+                        onClick={() => setSelectedFile((s) => s && { ...s, mode: 'edit' })}
                       >
                         <Pencil className="h-3.5 w-3.5" />
                       </Button>
@@ -387,10 +366,7 @@ function WorkspacePage() {
                     />
                   </div>
                 ) : (
-                  <FileViewer
-                    path={selectedFile.path}
-                    content={fileData ?? ''}
-                  />
+                  <FileViewer path={selectedFile.path} content={fileData ?? ''} />
                 )}
               </div>
             </>

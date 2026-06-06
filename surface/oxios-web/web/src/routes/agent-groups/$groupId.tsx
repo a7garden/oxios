@@ -1,12 +1,12 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { ArrowLeft } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { Badge } from '@/components/ui/badge'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { ErrorState } from '@/components/shared/error-state'
-import { LoadingCards } from '@/components/shared/loading'
 import { GroupProgress } from '@/components/agent-group/group-progress'
 import { SubAgentList } from '@/components/agent-group/sub-agent-list'
+import { ErrorState } from '@/components/shared/error-state'
+import { LoadingCards } from '@/components/shared/loading'
+import { Badge } from '@/components/ui/badge'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useAgentGroupDetail, useAgentGroupProgress } from '@/hooks/use-agent-groups'
 
 export const Route = createFileRoute('/agent-groups/$groupId')({ component: AgentGroupDetailPage })
@@ -26,7 +26,10 @@ function AgentGroupDetailPage() {
   return (
     <div className="space-y-6">
       {/* Back */}
-      <Link to="/agent-groups" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+      <Link
+        to="/agent-groups"
+        className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+      >
         <ArrowLeft className="h-4 w-4" /> {t('agentGroups.backToGroups')}
       </Link>
 
@@ -35,7 +38,11 @@ function AgentGroupDetailPage() {
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">
             {t('agentGroups.group')} #{group.id.slice(0, 8)}
-            <Badge variant={status === 'Completed' ? 'success' : status === 'Failed' ? 'destructive' : 'default'}>
+            <Badge
+              variant={
+                status === 'Completed' ? 'success' : status === 'Failed' ? 'destructive' : 'default'
+              }
+            >
               {status}
             </Badge>
           </h1>
@@ -45,7 +52,9 @@ function AgentGroupDetailPage() {
             </p>
           )}
         </div>
-        <span className="text-lg font-bold">{Math.round(pct)}% ({progress?.completed ?? 0}/{group.agents.length})</span>
+        <span className="text-lg font-bold">
+          {Math.round(pct)}% ({progress?.completed ?? 0}/{group.agents.length})
+        </span>
       </div>
 
       <GroupProgress pct={pct} />

@@ -1,5 +1,5 @@
-import { Pencil, Trash2, FolderOpen } from 'lucide-react'
 import { Link } from '@tanstack/react-router'
+import { FolderOpen, Pencil, Trash2 } from 'lucide-react'
 import type { Project } from '@/types'
 import { getProjectIcon } from './project-icon'
 
@@ -47,6 +47,7 @@ export function ProjectCard({ project, onEdit, onDelete }: ProjectCardProps) {
         </div>
         <div className="shrink-0 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
           <button
+            type="button"
             onClick={() => onEdit(project)}
             className="p-1 rounded hover:bg-muted text-xs text-muted-foreground"
             title="Edit"
@@ -54,6 +55,7 @@ export function ProjectCard({ project, onEdit, onDelete }: ProjectCardProps) {
             <Pencil className="h-3.5 w-3.5" />
           </button>
           <button
+            type="button"
             onClick={() => onDelete(project)}
             className="p-1 rounded hover:bg-muted text-xs text-destructive"
             title="Delete"
@@ -65,9 +67,7 @@ export function ProjectCard({ project, onEdit, onDelete }: ProjectCardProps) {
 
       {/* Description */}
       {project.description && (
-        <p className="text-xs text-muted-foreground mb-2 line-clamp-2">
-          {project.description}
-        </p>
+        <p className="text-xs text-muted-foreground mb-2 line-clamp-2">{project.description}</p>
       )}
 
       {/* Paths */}
@@ -96,7 +96,9 @@ export function ProjectCard({ project, onEdit, onDelete }: ProjectCardProps) {
 
       {/* Footer */}
       <div className="flex items-center justify-between text-2xs text-muted-foreground">
-        <span>{formatRelativeTime(project.last_active_at ?? project.updated_at ?? project.created_at)}</span>
+        <span>
+          {formatRelativeTime(project.last_active_at ?? project.updated_at ?? project.created_at)}
+        </span>
         <Link
           to="/projects/$projectId"
           params={{ projectId: project.id }}

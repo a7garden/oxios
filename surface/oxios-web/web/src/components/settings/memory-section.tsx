@@ -1,9 +1,9 @@
+import { Brain, Database, Moon, Sparkles } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
-import { Brain, Database, Sparkles, Moon } from 'lucide-react'
-import { FieldRow } from './field-row'
 import type { SettingsFieldDef } from './field-defs'
+import { FieldRow } from './field-row'
 
 interface MemorySectionProps {
   /** Field defs for the memory section, grouped by sub-section id. */
@@ -25,7 +25,11 @@ const SUBSECTIONS: { id: string; titleKey: string; icon: React.ReactNode }[] = [
  * Learning / Dream. Each sub-section is collapsible-friendly (just a
  * header + field rows for now).
  */
-export function MemorySection({ fieldsBySubsection, formValues, onFieldChange }: MemorySectionProps) {
+export function MemorySection({
+  fieldsBySubsection,
+  formValues,
+  onFieldChange,
+}: MemorySectionProps) {
   const { t } = useTranslation()
 
   return (
@@ -48,7 +52,14 @@ export function MemorySection({ fieldsBySubsection, formValues, onFieldChange }:
                   <FieldRow
                     sectionKey="memory"
                     field={field}
-                    value={formValues['memory']?.[field.key] as string | boolean | string[] | number | undefined}
+                    value={
+                      formValues.memory?.[field.key] as
+                        | string
+                        | boolean
+                        | string[]
+                        | number
+                        | undefined
+                    }
                     onChange={(val) => onFieldChange('memory', field.key, val)}
                   />
                 </div>

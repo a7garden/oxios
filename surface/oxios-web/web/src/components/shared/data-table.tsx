@@ -1,13 +1,12 @@
-import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react'
+import { ArrowDown, ArrowUp, ArrowUpDown, FolderOpen } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/utils'
-import { SearchBar } from './search-bar'
 import { ColumnFilter } from './column-filter'
-import { Pagination } from './pagination'
-import { LoadingCards } from './loading'
 import { EmptyState } from './empty-state'
-import { FolderOpen } from 'lucide-react'
+import { LoadingCards } from './loading'
+import { Pagination } from './pagination'
+import { SearchBar } from './search-bar'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -148,10 +147,12 @@ export function DataTable<T>({
     // Search
     if (search) {
       const lower = search.toLowerCase()
-      const keys = searchKeys ?? columns.map((c) => (typeof c.accessor === 'function' ? undefined : c.accessor)).filter(Boolean) as (keyof T)[]
-      result = result.filter((row) =>
-        keys.some((key) => getStringValue(row, key).includes(lower)),
-      )
+      const keys =
+        searchKeys ??
+        (columns
+          .map((c) => (typeof c.accessor === 'function' ? undefined : c.accessor))
+          .filter(Boolean) as (keyof T)[])
+      result = result.filter((row) => keys.some((key) => getStringValue(row, key).includes(lower)))
     }
 
     // Filters
@@ -215,20 +216,18 @@ export function DataTable<T>({
       {hasToolbar && (
         <div className="flex items-center gap-2 px-4 py-3 border-b">
           {searchable && (
-            <SearchBar
-              value={search}
-              onChange={handleSearch}
-              placeholder={searchPlaceholder}
-            />
+            <SearchBar value={search} onChange={handleSearch} placeholder={searchPlaceholder} />
           )}
           {filterable?.map((f) => (
             <ColumnFilter
               key={String(f.key)}
               columnKey={String(f.key)}
-              label={columns.find((c) => {
-                const acc = c.accessor
-                return typeof acc !== 'function' && acc === f.key
-              })?.header ?? String(f.key)}
+              label={
+                columns.find((c) => {
+                  const acc = c.accessor
+                  return typeof acc !== 'function' && acc === f.key
+                })?.header ?? String(f.key)
+              }
               options={f.options}
               selected={filters[String(f.key)] ?? []}
               onChange={(selected) => handleFilterChange(String(f.key), selected)}
@@ -254,10 +253,13 @@ export function DataTable<T>({
           <thead>
             <tr className="border-b bg-muted/50">
               {columns.map((col) => {
-                const canSort = sortable && (
-                  sortable.includes(col.sortKey ?? (typeof col.accessor !== 'function' ? col.accessor : undefined) as keyof T)
+                const canSort = sortable?.includes(
+                  col.sortKey ??
+                    ((typeof col.accessor !== 'function' ? col.accessor : undefined) as keyof T),
                 )
-                const sortKey = col.sortKey ?? (typeof col.accessor !== 'function' ? col.accessor : undefined) as keyof T
+                const sortKey =
+                  col.sortKey ??
+                  ((typeof col.accessor !== 'function' ? col.accessor : undefined) as keyof T)
                 const isSorted = sort?.key === sortKey
 
                 return (
@@ -273,11 +275,16 @@ export function DataTable<T>({
                   >
                     <span className="inline-flex items-center gap-1">
                       {col.header}
-                      {canSort && (
-                        isSorted
-                          ? (sort?.dir === 'asc' ? <ArrowUp className="h-3.5 w-3.5" /> : <ArrowDown className="h-3.5 w-3.5" />)
-                          : <ArrowUpDown className="h-3.5 w-3.5 opacity-30" />
-                      )}
+                      {canSort &&
+                        (isSorted ? (
+                          sort?.dir === 'asc' ? (
+                            <ArrowUp className="h-3.5 w-3.5" />
+                          ) : (
+                            <ArrowDown className="h-3.5 w-3.5" />
+                          )
+                        ) : (
+                          <ArrowUpDown className="h-3.5 w-3.5 opacity-30" />
+                        ))}
                     </span>
                   </th>
                 )
@@ -306,7 +313,10 @@ export function DataTable<T>({
                   onClick={() => onRowClick?.(row)}
                 >
                   {columns.map((col) => (
-                    <td key={String(col.accessor)} className={cn('px-4 py-3 text-sm', col.className)}>
+                    <td
+                      key={String(col.accessor)}
+                      className={cn('px-4 py-3 text-sm', col.className)}
+                    >
                       {getCellValue(row, col.accessor)}
                     </td>
                   ))}

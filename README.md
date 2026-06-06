@@ -7,7 +7,7 @@
 *Where AI agents don't just talk — they work.*
 
 [![Rust](https://img.shields.io/badge/Rust-1.85%2B-orange?logo=rust&logoColor=white)](https://www.rust-lang.org/)
-[![Version](https://img.shields.io/badge/Version-0.4.0-6E40C9?logo=rust&logoColor=white)](https://crates.io/crates/oxios)
+[![Version](https://img.shields.io/badge/Version-1.1.0-6E40C9?logo=rust&logoColor=white)](https://crates.io/crates/oxios)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Lines of Code](https://img.shields.io/badge/LOC-67K%2B-00A86B?logo=rust&logoColor=white)]()
 [![GitHub](https://img.shields.io/badge/GitHub-a7garden%2Foxios-181717?logo=github)](https://github.com/a7garden/oxios)
@@ -606,9 +606,13 @@ oxios/                          # Main binary (src/main.rs)
 ├── crates/
 │   ├── oxios-kernel/           # Core: supervisor, scheduler, event bus, state store, tools, tiered memory
 │   ├── oxios-ouroboros/        # Spec-first protocol (interview → seed → execute → evaluate → evolve)
-│   └── oxios-gateway/          # Channel-agnostic message hub
+│   ├── oxios-markdown/         # Knowledge base (VirtualFs, BacklinkIndex)
+│   ├── oxios-gateway/          # Channel-agnostic message hub
+│   ├── oxios-mcp/              # MCP client (JSON-RPC 2.0 over stdio)
+│   ├── oxios-memory/           # Tiered agent memory (Hot/Warm/Cold, Dream, HNSW, hyperbolic)
+│   └── oxios-calendar/         # .ics-based calendar event management
+├── surface/oxios-web/          # Web dashboard (Axum backend + React frontend)
 ├── channels/
-│   ├── oxios-web/              # Web dashboard (Axum backend + React frontend)
 │   ├── oxios-cli/              # CLI channel
 │   └── oxios-telegram/         # Telegram channel
 ├── share/                      # Default skills, config, migration scripts
@@ -618,11 +622,16 @@ oxios/                          # Main binary (src/main.rs)
 **Dependency graph:**
 
 ```
-oxios ──► oxios-kernel ──► oxi-sdk (crates.io)
-                       ──► oxi-ai (provider construction)
+oxios ──► oxios-kernel ──► oxios-memory
                        ──► oxios-ouroboros
-      ──► oxios-gateway
+                       ──► oxios-markdown
+                       ──► oxios-calendar
+                       ──► oxios-mcp
+                       ──► oxi-sdk (crates.io)
+      ──► oxios-calendar
+      ──► oxios-gateway ──► oxios-kernel
       ──► oxios-web / oxios-cli / oxios-telegram (feature-gated channels)
+                                 └──► oxios-gateway
 ```
 
 **File locations:**

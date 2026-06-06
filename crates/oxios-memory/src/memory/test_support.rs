@@ -29,11 +29,7 @@ impl MemoryStorage for InMemoryStorage {
         Ok(())
     }
 
-    async fn load_json_value(
-        &self,
-        category: &str,
-        key: &str,
-    ) -> anyhow::Result<Option<Value>> {
+    async fn load_json_value(&self, category: &str, key: &str) -> anyhow::Result<Option<Value>> {
         Ok(self
             .data
             .lock()

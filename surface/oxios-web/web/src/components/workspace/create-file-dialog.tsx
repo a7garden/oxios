@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Button } from '@/components/ui/button'
 import {
   Dialog,
   DialogContent,
@@ -7,7 +8,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 
 interface CreateFileDialogProps {
@@ -17,7 +17,12 @@ interface CreateFileDialogProps {
   onSubmit: (name: string, isDir: boolean) => void
 }
 
-export function CreateFileDialog({ open, onOpenChange, currentDir, onSubmit }: CreateFileDialogProps) {
+export function CreateFileDialog({
+  open,
+  onOpenChange,
+  currentDir,
+  onSubmit,
+}: CreateFileDialogProps) {
   const [name, setName] = useState('')
   const [isDir, setIsDir] = useState(false)
 

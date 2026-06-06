@@ -134,9 +134,7 @@ function FallbackModelsEditor({
         {models.map((model, i) => (
           <div key={i} className="flex items-center gap-2">
             <span className="w-6 text-sm text-muted-foreground text-right shrink-0">{i + 1}.</span>
-            <div className="flex-1 rounded-md border px-3 py-2 text-sm bg-muted/30">
-              {model}
-            </div>
+            <div className="flex-1 rounded-md border px-3 py-2 text-sm bg-muted/30">{model}</div>
             <Button
               variant="ghost"
               size="sm"
@@ -216,6 +214,7 @@ function ExcludedModelsEditor({
             <span className="text-xs text-muted-foreground">🚫</span>
             {model}
             <button
+              type="button"
               className="ml-1 text-muted-foreground hover:text-foreground"
               onClick={() => onRemove(model)}
             >

@@ -1,12 +1,17 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { useState, useMemo } from 'react'
-import { useCalendarEvents, useCalendarCreate, useCalendarUpdate, useCalendarDelete } from '@/hooks/use-calendar'
-import { CalendarView } from '@/components/calendar/calendar-view'
-import { EventEditor } from '@/components/calendar/event-editor'
-import { EventDetail } from '@/components/calendar/event-detail'
-import { ConflictWarning } from '@/components/calendar/conflict-warning'
-import { Button } from '@/components/ui/button'
 import { Plus } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { CalendarView } from '@/components/calendar/calendar-view'
+import { ConflictWarning } from '@/components/calendar/conflict-warning'
+import { EventDetail } from '@/components/calendar/event-detail'
+import { EventEditor } from '@/components/calendar/event-editor'
+import { Button } from '@/components/ui/button'
+import {
+  useCalendarCreate,
+  useCalendarDelete,
+  useCalendarEvents,
+  useCalendarUpdate,
+} from '@/hooks/use-calendar'
 import type { CalendarEvent, CreateEventRequest } from '@/types/calendar'
 
 export const Route = createFileRoute('/calendar')({ component: CalendarPage })
@@ -56,7 +61,13 @@ function CalendarPage() {
           <h1 className="text-2xl font-bold">📅 캘린더</h1>
           <p className="text-sm text-muted-foreground">일정 관리</p>
         </div>
-        <Button onClick={() => { setEditingEvent(undefined); setDefaultStart(new Date()); setEditorOpen(true) }}>
+        <Button
+          onClick={() => {
+            setEditingEvent(undefined)
+            setDefaultStart(new Date())
+            setEditorOpen(true)
+          }}
+        >
           <Plus className="h-4 w-4 mr-1" /> 새 일정
         </Button>
       </div>
@@ -66,7 +77,9 @@ function CalendarPage() {
       )}
 
       {isLoading ? (
-        <div className="flex items-center justify-center h-64 text-muted-foreground">불러오는 중...</div>
+        <div className="flex items-center justify-center h-64 text-muted-foreground">
+          불러오는 중...
+        </div>
       ) : (
         <CalendarView
           events={events}
@@ -89,9 +102,12 @@ function CalendarPage() {
         defaultStart={defaultStart}
         onSubmit={(data) => {
           if (editingEvent) {
-            updateMutation.mutate({ uid: editingEvent.uid, ...data }, {
-              onSuccess: () => setEditorOpen(false),
-            })
+            updateMutation.mutate(
+              { uid: editingEvent.uid, ...data },
+              {
+                onSuccess: () => setEditorOpen(false),
+              },
+            )
           } else {
             handleCreate(data as CreateEventRequest)
           }

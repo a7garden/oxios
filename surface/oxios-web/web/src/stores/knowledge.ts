@@ -107,6 +107,6 @@ export const useKnowledgeStore = create<KnowledgeState>()(
         sidebarWidth: state.sidebarWidth,
         sidebarOpen: state.sidebarOpen,
       }),
-    }
-  )
+    },
+  ),
 )

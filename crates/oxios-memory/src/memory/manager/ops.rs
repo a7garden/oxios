@@ -169,11 +169,7 @@ impl MemoryManager {
     // ------------------------------------------------------------------
 
     /// List memories by tier (loads all types, filters by tier field).
-    pub async fn list_by_tier(
-        &self,
-        tier: MemoryTier,
-        limit: usize,
-    ) -> Result<Vec<MemoryEntry>> {
+    pub async fn list_by_tier(&self, tier: MemoryTier, limit: usize) -> Result<Vec<MemoryEntry>> {
         #[cfg(feature = "sqlite-memory")]
         if let Some(ref sqlite) = self.sqlite_store {
             return sqlite.list_by_tier(tier, limit);
@@ -214,11 +210,7 @@ impl MemoryManager {
         }
         // Try as category/name format
         if let Some((cat, name)) = reference.split_once('/') {
-            if let Ok(Some(entry)) = self
-                .storage
-                .load_json::<MemoryEntry>(cat, name)
-                .await
-            {
+            if let Ok(Some(entry)) = self.storage.load_json::<MemoryEntry>(cat, name).await {
                 return Ok(Some(entry));
             }
         }
@@ -226,11 +218,7 @@ impl MemoryManager {
     }
 
     /// Select memories by manifest (keyword matching against content).
-    pub async fn select_by_manifest(
-        &self,
-        query: &str,
-        limit: usize,
-    ) -> Result<Vec<MemoryEntry>> {
+    pub async fn select_by_manifest(&self, query: &str, limit: usize) -> Result<Vec<MemoryEntry>> {
         self.keyword_search(query, None, limit).await
     }
 
@@ -274,12 +262,7 @@ impl MemoryManager {
     }
 
     /// Shift a memory entry between tiers.
-    pub async fn shift_tier(
-        &self,
-        id: &str,
-        from: MemoryTier,
-        to: MemoryTier,
-    ) -> Result<()> {
+    pub async fn shift_tier(&self, id: &str, from: MemoryTier, to: MemoryTier) -> Result<()> {
         if let Ok(Some(mut entry)) = self.get_by_id(id).await {
             if entry.tier == from {
                 entry.tier = to;
@@ -354,9 +337,7 @@ impl MemoryManager {
         let overflow = hot_entries.len() - hot_max;
         let mut candidates: Vec<MemoryEntry> = hot_entries
             .into_iter()
-            .filter(|e| {
-                e.protection < crate::memory::types::ProtectionLevel::High && !e.pinned
-            })
+            .filter(|e| e.protection < crate::memory::types::ProtectionLevel::High && !e.pinned)
             .collect();
 
         candidates.sort_by(|a, b| {

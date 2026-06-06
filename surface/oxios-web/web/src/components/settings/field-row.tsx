@@ -1,11 +1,11 @@
 import { useTranslation } from 'react-i18next'
 import { Input } from '@/components/ui/input'
-import { Switch } from '@/components/ui/switch'
 import { Select } from '@/components/ui/select'
+import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
-import { RestartBadge } from './restart-badge'
 import { ExecAllowlistEditor } from './exec-allowlist-editor'
 import type { SettingsFieldDef } from './field-defs'
+import { RestartBadge } from './restart-badge'
 
 interface FieldRowProps {
   sectionKey: string
@@ -41,7 +41,17 @@ export function FieldRow({ sectionKey, field, value, onChange }: FieldRowProps) 
   )
 }
 
-function FieldControl({ id, field, value, onChange }: { id: string; field: SettingsFieldDef; value: unknown; onChange: (v: string | boolean | string[]) => void }) {
+function FieldControl({
+  id,
+  field,
+  value,
+  onChange,
+}: {
+  id: string
+  field: SettingsFieldDef
+  value: unknown
+  onChange: (v: string | boolean | string[]) => void
+}) {
   const { t } = useTranslation()
   switch (field.type) {
     case 'toggle': {
@@ -64,10 +74,12 @@ function FieldControl({ id, field, value, onChange }: { id: string; field: Setti
           value={String(value ?? '')}
           onValueChange={(v) => onChange(v)}
           placeholder={t(field.labelKey)}
-          options={field.options?.map((opt) => ({
-            label: t(opt.labelKey),
-            value: opt.value,
-          })) ?? []}
+          options={
+            field.options?.map((opt) => ({
+              label: t(opt.labelKey),
+              value: opt.value,
+            })) ?? []
+          }
           className="w-full"
         />
       )
@@ -135,7 +147,6 @@ function FieldControl({ id, field, value, onChange }: { id: string; field: Setti
       const arr = Array.isArray(value) ? (value as string[]) : []
       return <ExecAllowlistEditor value={arr} onChange={(next) => onChange(next)} />
     }
-    case 'text':
     default: {
       return (
         <Input

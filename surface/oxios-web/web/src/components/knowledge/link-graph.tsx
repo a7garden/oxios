@@ -1,6 +1,6 @@
+import { useTranslation } from 'react-i18next'
 import { useKnowledgeGraph } from '@/hooks/use-knowledge'
 import { useKnowledgeStore } from '@/stores/knowledge'
-import { useTranslation } from 'react-i18next'
 
 interface LinkGraphProps {
   className?: string
@@ -12,7 +12,8 @@ export function LinkGraph({ className }: LinkGraphProps) {
   const openFile = useKnowledgeStore((s) => s.openFile)
   const currentFilePath = useKnowledgeStore((s) => s.currentFilePath)
 
-  if (isLoading) return <div className="text-xs text-muted-foreground p-2">{t('knowledge.loadingGraph')}</div>
+  if (isLoading)
+    return <div className="text-xs text-muted-foreground p-2">{t('knowledge.loadingGraph')}</div>
   if (!graph || graph.nodes.length === 0)
     return <div className="text-xs text-muted-foreground p-2">{t('knowledge.noLinksFound')}</div>
 

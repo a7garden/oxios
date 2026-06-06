@@ -13,7 +13,15 @@ interface ChatInputProps {
   connected?: boolean
 }
 
-export function ChatInput({ value, onChange, onSend, onCancel, disabled, isStreaming, connected }: ChatInputProps) {
+export function ChatInput({
+  value,
+  onChange,
+  onSend,
+  onCancel,
+  disabled,
+  isStreaming,
+  connected,
+}: ChatInputProps) {
   const { t } = useTranslation()
 
   return (
@@ -29,14 +37,21 @@ export function ChatInput({ value, onChange, onSend, onCancel, disabled, isStrea
             }
           }}
           placeholder={
-            connected ? t('chat.inputPlaceholder', 'Type a message...') : t('chat.waitingForConnection', 'Waiting for connection...')
+            connected
+              ? t('chat.inputPlaceholder', 'Type a message...')
+              : t('chat.waitingForConnection', 'Waiting for connection...')
           }
           disabled={disabled || !connected}
           className="min-h-[44px] max-h-[120px] resize-none"
           rows={1}
         />
         {isStreaming ? (
-          <Button onClick={onCancel} variant="destructive" size="icon" aria-label={t('chat.cancel', 'Cancel')}>
+          <Button
+            onClick={onCancel}
+            variant="destructive"
+            size="icon"
+            aria-label={t('chat.cancel', 'Cancel')}
+          >
             <X className="h-4 w-4" />
           </Button>
         ) : (

@@ -1025,7 +1025,7 @@ fn classify_patch(
 
 /// Returns true if a dotted config path requires a daemon restart to apply.
 fn is_restart_required(path: &str) -> bool {
-    if RESTART_REQUIRED_FIELDS.iter().any(|p| *p == path) {
+    if RESTART_REQUIRED_FIELDS.contains(&path) {
         return true;
     }
     // Top-level sections not in HOT_RELOADABLE_SECTIONS are restart-only.
@@ -1462,7 +1462,7 @@ pub(crate) struct DoctorResponse {
 /// POST /api/system/doctor — Run system diagnostics.
 pub(crate) async fn handle_doctor(state: State<Arc<AppState>>) -> Json<DoctorResponse> {
     // Clone what we need from config, don't hold the lock across await points
-    let (default_model, api_key, workspace, daemon_log_dir) = {
+    let (default_model, api_key, workspace, _daemon_log_dir) = {
         let config = state.config.read();
         (
             config.engine.default_model.clone(),
@@ -1503,7 +1503,7 @@ pub(crate) async fn handle_doctor(state: State<Arc<AppState>>) -> Json<DoctorRes
                 results.push(DoctorCheck {
                     name: "credentials".into(),
                     status: "pass".into(),
-                    message: format!("Credentials found ({}, via {:?})", preview, source),
+                    message: format!("Credentials found ({preview}, via {source:?})"),
                 });
             }
             None => {
@@ -1691,7 +1691,7 @@ pub(crate) struct BackupResponse {
 }
 
 /// POST /api/system/backup — Create a backup of Oxios state.
-pub(crate) async fn handle_backup(state: State<Arc<AppState>>) -> Json<BackupResponse> {
+pub(crate) async fn handle_backup(_state: State<Arc<AppState>>) -> Json<BackupResponse> {
     let home = match dirs::home_dir() {
         Some(h) => h,
         None => {

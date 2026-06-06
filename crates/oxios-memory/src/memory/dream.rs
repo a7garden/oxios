@@ -18,15 +18,13 @@ use serde::{Deserialize, Serialize};
 use tokio::fs;
 use uuid::Uuid;
 
-use crate::memory::types::{
-    MemoryEntry, MemoryTier, MemoryType, ProtectionLevel,
-};
 use crate::memory::auto_classify::AutoClassifier;
 use crate::memory::auto_protect::AutoProtector;
 use crate::memory::compaction::CompactionTree;
 use crate::memory::decay::DecayEngine;
-use crate::memory::root_index::{RootEntry, RootIndex, TopicEntry};
 use crate::memory::manager::MemoryManager;
+use crate::memory::root_index::{RootEntry, RootIndex, TopicEntry};
+use crate::memory::types::{MemoryEntry, MemoryTier, MemoryType, ProtectionLevel};
 
 // ---------------------------------------------------------------------------
 // DreamCheckpoint
@@ -37,8 +35,6 @@ use crate::memory::manager::MemoryManager;
 pub struct DreamCheckpoint {
     /// Unique dream ID.
     pub dream_id: String,
-    /// Space ID this dream is running for.
-
     /// When the dream started.
     pub started_at: DateTime<Utc>,
     /// Last completed phase (0 = not started).
@@ -76,8 +72,6 @@ impl DreamCheckpoint {
 pub struct DreamReport {
     /// Unique dream ID.
     pub dream_id: String,
-    /// Space ID.
-
     /// When the dream started.
     pub started_at: DateTime<Utc>,
     /// When the dream completed.
@@ -964,7 +958,7 @@ impl DreamProcess {
         #[cfg(feature = "sqlite-memory")]
         if let Some(ref sqlite) = self.memory_manager.sqlite_store() {
             let config = crate::memory::hyperbolic::HyperbolicConfig::default();
-                match crate::memory::sqlite::hyperbolic_persist::restore_from_sqlite(sqlite, config) {
+            match crate::memory::sqlite::hyperbolic_persist::restore_from_sqlite(sqlite, config) {
                 Ok(he) => {
                     let count = he.len();
                     if count < 10 {

@@ -1,21 +1,21 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
+  AlertCircle,
   ArrowDownToLine,
   CheckCircle2,
   ChevronDown,
   ChevronUp,
   ExternalLink,
   Loader2,
-  AlertCircle,
 } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { api } from '@/lib/api-client'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
-import type { UpdateCheckResponse, ChangelogResponse } from '@/types'
+import { api } from '@/lib/api-client'
+import type { ChangelogResponse, UpdateCheckResponse } from '@/types'
 
 function formatDate(iso: string): string {
   if (!iso) return '-'
@@ -46,10 +46,7 @@ export function SystemUpdateCard() {
     staleTime: 5 * 60 * 1000,
   })
 
-  const {
-    data: changelog,
-    isLoading: changelogLoading,
-  } = useQuery({
+  const { data: changelog, isLoading: changelogLoading } = useQuery({
     queryKey: ['update-changelog'],
     queryFn: () => api.get<ChangelogResponse>('/api/update/changelog'),
     staleTime: 5 * 60 * 1000,
@@ -132,9 +129,13 @@ export function SystemUpdateCard() {
             <div className="flex items-center gap-2">
               <p className="text-lg font-mono font-semibold">{check.latest_version}</p>
               {isUpToDate ? (
-                <Badge variant="success" className="text-xs">{t('update.upToDate')}</Badge>
+                <Badge variant="success" className="text-xs">
+                  {t('update.upToDate')}
+                </Badge>
               ) : (
-                <Badge variant="destructive" className="text-xs">{t('update.updateAvailable')}</Badge>
+                <Badge variant="destructive" className="text-xs">
+                  {t('update.updateAvailable')}
+                </Badge>
               )}
             </div>
           </div>
@@ -145,9 +146,7 @@ export function SystemUpdateCard() {
         {/* Update available */}
         {!isUpToDate && (
           <>
-            <div className="text-xs text-muted-foreground">
-              {t('update.methodDescription')}
-            </div>
+            <div className="text-xs text-muted-foreground">{t('update.methodDescription')}</div>
 
             {/* Update button */}
             <div className="flex items-center gap-3">
@@ -186,11 +185,11 @@ export function SystemUpdateCard() {
                   <CheckCircle2 className="h-4 w-4" />
                   <span className="font-medium">{t('update.updateSuccess')}</span>
                 </div>
-                <p className="text-xs">{(updateMutation.data as Record<string, unknown>)?.message as string}</p>
+                <p className="text-xs">
+                  {(updateMutation.data as Record<string, unknown>)?.message as string}
+                </p>
                 {((updateMutation.data as Record<string, unknown>)?.binary_updated as boolean) && (
-                  <p className="text-xs mt-1 text-warning">
-                    {t('update.restartRequired')}
-                  </p>
+                  <p className="text-xs mt-1 text-warning">{t('update.restartRequired')}</p>
                 )}
               </div>
             )}
@@ -201,7 +200,9 @@ export function SystemUpdateCard() {
                   <AlertCircle className="h-4 w-4" />
                   <span>{t('update.updateFailed')}</span>
                 </div>
-                <p className="text-xs mt-1">{(updateMutation.error as Error)?.message || t('update.unknownError')}</p>
+                <p className="text-xs mt-1">
+                  {(updateMutation.error as Error)?.message || t('update.unknownError')}
+                </p>
               </div>
             )}
           </>
@@ -220,6 +221,7 @@ export function SystemUpdateCard() {
         {/* Release notes toggle */}
         <div>
           <button
+            type="button"
             onClick={() => setShowNotes(!showNotes)}
             className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
           >
@@ -237,7 +239,9 @@ export function SystemUpdateCard() {
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 text-foreground font-medium">
                     <span>{changelog.tag_name}</span>
-                    <span className="text-muted-foreground">{formatDate(changelog.published_at)}</span>
+                    <span className="text-muted-foreground">
+                      {formatDate(changelog.published_at)}
+                    </span>
                   </div>
                   <pre className="whitespace-pre-wrap font-sans bg-muted/50 rounded-lg p-3 max-h-64 overflow-y-auto">
                     {changelog.body}

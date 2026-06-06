@@ -1,7 +1,6 @@
-import { describe, expect, it } from 'vitest'
+import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query'
 import { renderHook, waitFor } from '@testing-library/react'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { useQuery } from '@tanstack/react-query'
+import { describe, expect, it } from 'vitest'
 
 // Mock i18next
 vi.mock('react-i18next', () => ({
@@ -25,15 +24,18 @@ const createWrapper = () => {
 
 describe('useAgentGroups hook patterns', () => {
   it('useAgentGroups fetches list', async () => {
-    const { result } = renderHook(() => {
-      return useQuery({
-        queryKey: ['agent-groups'],
-        queryFn: async () => {
-          // Simulated mock response - actual API would be intercepted by MSW
-          return { items: [], total: 0, page: 1, limit: 100 }
-        },
-      })
-    }, { wrapper: createWrapper() })
+    const { result } = renderHook(
+      () => {
+        return useQuery({
+          queryKey: ['agent-groups'],
+          queryFn: async () => {
+            // Simulated mock response - actual API would be intercepted by MSW
+            return { items: [], total: 0, page: 1, limit: 100 }
+          },
+        })
+      },
+      { wrapper: createWrapper() },
+    )
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true))
     expect(result.current.data).toBeDefined()
@@ -65,18 +67,15 @@ describe('useAgentGroups hook patterns', () => {
       { status: 'Completed' },
     ]
 
-    const allCompleted = agents.every(a => a.status === 'Completed' || a.status === 'Failed')
-    const anyRunning = agents.some(a => a.status === 'Running')
+    const allCompleted = agents.every((a) => a.status === 'Completed' || a.status === 'Failed')
+    const anyRunning = agents.some((a) => a.status === 'Running')
 
     expect(allCompleted).toBe(false)
     expect(anyRunning).toBe(true)
 
     // All completed scenario
-    const allDoneAgents: GroupAgent[] = [
-      { status: 'Completed' },
-      { status: 'Completed' },
-    ]
-    const allDone = allDoneAgents.every(a => a.status === 'Completed' || a.status === 'Failed')
+    const allDoneAgents: GroupAgent[] = [{ status: 'Completed' }, { status: 'Completed' }]
+    const allDone = allDoneAgents.every((a) => a.status === 'Completed' || a.status === 'Failed')
     expect(allDone).toBe(true)
   })
 })

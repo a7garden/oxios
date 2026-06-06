@@ -1,7 +1,13 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import type { AgentBudget, SetBudgetRequest } from '@/types/budget'
 
@@ -14,10 +20,17 @@ interface Props {
   isPending: boolean
 }
 
-export function SetBudgetDialog({ open, onOpenChange, agent, agentId, onSubmit, isPending }: Props) {
+export function SetBudgetDialog({
+  open,
+  onOpenChange,
+  agent,
+  agentId,
+  onSubmit,
+  isPending,
+}: Props) {
   const { t } = useTranslation()
   const targetId = agent?.agent_id ?? agentId ?? ''
-  const displayName = agent?.name || targetId.slice(0, 12) + '...'
+  const displayName = agent?.name || `${targetId.slice(0, 12)}...`
 
   const [tokenBudget, setTokenBudget] = useState(agent?.budget.token_limit?.toString() ?? '50000')
   const [callsBudget, setCallsBudget] = useState(agent?.budget.calls_limit?.toString() ?? '100')

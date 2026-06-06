@@ -1,4 +1,4 @@
-import type { ToolCallContext, VisitReason, ScreenshotMeta } from '@/types'
+import type { ScreenshotMeta, ToolCallContext, VisitReason } from '@/types'
 
 /**
  * Expanded detail view for a browsing tool's semantic context.

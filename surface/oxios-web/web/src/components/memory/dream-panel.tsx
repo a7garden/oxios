@@ -1,22 +1,17 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
 import { Activity, Clock } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { useDreamReports, useDreamStatus } from '@/hooks/use-memory'
+import { EmptyState } from '@/components/shared/empty-state'
 import { ErrorState } from '@/components/shared/error-state'
 import { LoadingCards } from '@/components/shared/loading'
-import { EmptyState } from '@/components/shared/empty-state'
+import { Badge } from '@/components/ui/badge'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { useDreamReports, useDreamStatus } from '@/hooks/use-memory'
 import type { DreamReport } from '@/types/memory'
 
 export function DreamPanel() {
   const { t } = useTranslation()
   const { data: status, isLoading: sLoad } = useDreamStatus()
-  const {
-    data: reports,
-    isLoading: rLoad,
-    isError,
-    refetch,
-  } = useDreamReports()
+  const { data: reports, isLoading: rLoad, isError, refetch } = useDreamReports()
 
   if (isError) return <ErrorState onRetry={() => refetch()} />
   if (sLoad || rLoad) return <LoadingCards count={3} />
@@ -34,9 +29,7 @@ export function DreamPanel() {
         <CardContent>
           <div className="flex items-center gap-4 flex-wrap">
             <Badge variant={status?.running ? 'default' : 'secondary'}>
-              {status?.running
-                ? t('memory.dreamRunning')
-                : t('memory.dreamIdle')}
+              {status?.running ? t('memory.dreamRunning') : t('memory.dreamIdle')}
             </Badge>
             {status?.last_run && (
               <span className="text-sm text-muted-foreground flex items-center gap-1">
@@ -69,9 +62,7 @@ export function DreamPanel() {
                   </span>
                   <div className="flex items-center gap-2">
                     <Badge
-                      variant={
-                        r.status === 'completed' ? 'success' : 'secondary'
-                      }
+                      variant={r.status === 'completed' ? 'success' : 'secondary'}
                       className="text-xs"
                     >
                       {r.status}
@@ -79,8 +70,7 @@ export function DreamPanel() {
                     {r.completed_at && (
                       <span className="text-xs text-muted-foreground">
                         {(
-                          (new Date(r.completed_at).getTime() -
-                            new Date(r.started_at).getTime()) /
+                          (new Date(r.completed_at).getTime() - new Date(r.started_at).getTime()) /
                           1000
                         ).toFixed(1)}
                         s
@@ -90,25 +80,17 @@ export function DreamPanel() {
                 </div>
                 <div className="grid grid-cols-3 gap-2 text-xs">
                   <div>
-                    <span className="text-muted-foreground">Processed:</span>{' '}
-                    {r.memories_processed}
+                    <span className="text-muted-foreground">Processed:</span> {r.memories_processed}
                   </div>
                   <div>
-                    <span className="text-muted-foreground">
-                      Consolidated:
-                    </span>{' '}
+                    <span className="text-muted-foreground">Consolidated:</span>{' '}
                     {r.memories_consolidated}
                   </div>
                   <div>
-                    <span className="text-muted-foreground">Decayed:</span>{' '}
-                    {r.memories_decayed}
+                    <span className="text-muted-foreground">Decayed:</span> {r.memories_decayed}
                   </div>
                 </div>
-                {r.summary && (
-                  <p className="text-xs text-muted-foreground mt-2">
-                    {r.summary}
-                  </p>
-                )}
+                {r.summary && <p className="text-xs text-muted-foreground mt-2">{r.summary}</p>}
               </CardContent>
             </Card>
           ))}

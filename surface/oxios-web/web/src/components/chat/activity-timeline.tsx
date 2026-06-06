@@ -1,5 +1,5 @@
-import { useState } from 'react'
 import { ChevronDown, ChevronRight, ListTree } from 'lucide-react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/utils'
 import type { ChatActivity } from '@/types'
@@ -63,7 +63,8 @@ export function ActivityTimeline({
           )}
           {totalInput + totalOutput > 0 && (
             <span className="text-muted-foreground/70">
-              · {t('chat.transparency.tokenCount', {
+              ·{' '}
+              {t('chat.transparency.tokenCount', {
                 count: totalInput + totalOutput,
               })}
             </span>
@@ -84,12 +85,7 @@ export function ActivityTimeline({
                 : t('chat.transparency.collapseAll')}
             </button>
           )}
-          <div
-            className={cn(
-              'space-y-1 transition-opacity',
-              cardsCollapsed && 'opacity-70',
-            )}
-          >
+          <div className={cn('space-y-1 transition-opacity', cardsCollapsed && 'opacity-70')}>
             {activities.map((a) => (
               <ActivityCard key={a.id} activity={a} />
             ))}

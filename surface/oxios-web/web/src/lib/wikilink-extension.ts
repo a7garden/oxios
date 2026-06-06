@@ -31,9 +31,9 @@
 import type { Range } from '@codemirror/state'
 import {
   Decoration,
-  EditorView,
-  ViewPlugin,
   type DecorationSet,
+  type EditorView,
+  ViewPlugin,
   type ViewUpdate,
   WidgetType,
 } from '@codemirror/view'
@@ -47,7 +47,7 @@ import {
  * HyperMD's `[[X|alias]]` two-part form — see the test plan in
  * `e2e/knowledge-editor.spec.ts`.
  */
-const WIKILINK_RE = /\[\[([^\[\]\n|]+)(?:\|([^\[\]\n]+))*\]\]/g
+const WIKILINK_RE = /\[\[([^[\]\n|]+)(?:\|([^[\]\n]+))*\]\]/g
 
 class WikiLinkWidget extends WidgetType {
   constructor(
@@ -60,11 +60,10 @@ class WikiLinkWidget extends WidgetType {
   toDOM(): HTMLElement {
     const a = document.createElement('a')
     a.className = 'cm-wikilink'
-    a.setAttribute('href', '#' + this.target)
+    a.setAttribute('href', `#${this.target}`)
     a.setAttribute('data-wikilink-target', this.target)
     a.textContent = this.display
-    a.style.cssText =
-      'color: #79c0ff; text-decoration: underline dotted; cursor: pointer;'
+    a.style.cssText = 'color: #79c0ff; text-decoration: underline dotted; cursor: pointer;'
     a.addEventListener('click', (e) => {
       e.preventDefault()
       // Reuse the same CustomEvent the linkClickHandler listens for.
@@ -81,7 +80,11 @@ class WikiLinkWidget extends WidgetType {
   }
 
   eq(other: WikiLinkWidget): boolean {
-    return other instanceof WikiLinkWidget && other.target === this.target && other.display === this.display
+    return (
+      other instanceof WikiLinkWidget &&
+      other.target === this.target &&
+      other.display === this.display
+    )
   }
 }
 
@@ -104,6 +107,7 @@ function buildDecorations(view: EditorView): DecorationSet {
     const text = view.state.doc.sliceString(from, to)
     WIKILINK_RE.lastIndex = 0
     let m: RegExpExecArray | null
+    // biome-ignore lint/suspicious/noAssignInExpressions: standard regex exec loop pattern
     while ((m = WIKILINK_RE.exec(text)) !== null) {
       const matchStart = from + m.index
       const matchEnd = matchStart + m[0].length
@@ -137,11 +141,7 @@ export const wikilinkExtension = ViewPlugin.fromClass(
       this.decorations = buildDecorations(view)
     }
     update(update: ViewUpdate) {
-      if (
-        update.docChanged ||
-        update.selectionSet ||
-        update.viewportChanged
-      ) {
+      if (update.docChanged || update.selectionSet || update.viewportChanged) {
         this.decorations = buildDecorations(update.view)
       }
     }

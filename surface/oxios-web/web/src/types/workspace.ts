@@ -18,8 +18,27 @@ export interface FileAction {
 export type EditorMode = 'view' | 'edit'
 
 export const EDITABLE_EXTENSIONS = new Set([
-  'rs', 'ts', 'tsx', 'js', 'jsx', 'py', 'go', 'toml', 'json', 'yaml', 'yml',
-  'md', 'txt', 'log', 'env', 'sh', 'bash', 'css', 'html', 'xml', 'sql',
+  'rs',
+  'ts',
+  'tsx',
+  'js',
+  'jsx',
+  'py',
+  'go',
+  'toml',
+  'json',
+  'yaml',
+  'yml',
+  'md',
+  'txt',
+  'log',
+  'env',
+  'sh',
+  'bash',
+  'css',
+  'html',
+  'xml',
+  'sql',
 ])
 
 export const IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'ico'])

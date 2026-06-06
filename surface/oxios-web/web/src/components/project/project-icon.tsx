@@ -1,6 +1,18 @@
 import {
-  Package, Wrench, FileText, Gamepad2, Globe, BookOpen, Palette,
-  Zap, Target, Rocket, Lightbulb, Lock, BarChart3, Tent,
+  BarChart3,
+  BookOpen,
+  FileText,
+  Gamepad2,
+  Globe,
+  Lightbulb,
+  Lock,
+  Package,
+  Palette,
+  Rocket,
+  Target,
+  Tent,
+  Wrench,
+  Zap,
 } from 'lucide-react'
 
 /**

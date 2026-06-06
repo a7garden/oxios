@@ -5,7 +5,7 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.1.0] - 2026-06-06
 
 ### Added
 - **OxiBrowser Observability v0.12 — Phases 3 & 4** — Real-time tool progress flows from the oxi-agent loop through oxios-kernel → oxios-web → frontend.
@@ -13,39 +13,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - oxios-web converts the new event into a `tool_progress` WS chunk (and SSE event)
   - Frontend: `StreamChunk.tool_progress` → `ChatActivity.tool_call` with `progress` and `isRunning: true`; `tool_start` sets `isRunning: true`, `tool_end` clears it
   - `ActivityCard` renders a `Loader2` spinner for running tool calls and shows the latest progress text inline
-- **OxiBrowser Observability v0.12 — Phase 5 (tab-id propagation, kernel)** — The browser tab id starts flowing through the kernel so the web layer can distinguish concurrent tab activity in the chat transparency timeline.
-  - `KernelEvent::ToolExecutionProgress` gains `tab_id: Option<Uuid>` (optional in serde for back-compat with older oxi-agent that don't propagate `tab_id`).
-  - `agent_runtime` forwards the `tab_id` from `AgentEvent::ToolExecutionUpdate` into the kernel event.
-  - Audit-action detail string appends `:tab=<id>` when the tab is known.
-- **OxiBrowser Observability v0.12 — Phase 5 (tab-id propagation, web backend)** — The oxios-web chat transparency timeline now distinguishes concurrent tabs by id.
-  - The `tool_progress` WS chunk (and `/api/events` SSE event) include `tab_id` when the upstream `KernelEvent::ToolExecutionProgress` carries it. The field is omitted from the JSON payload when the upstream is `None` so older oxi-agent versions still round-trip cleanly.
-- **OxiBrowser Observability v0.12 — Phase 5 (tab-id propagation, frontend)** — The `ActivityCard` header now shows a short tab-id badge for tool_call activities that carry a `tabId`.
-  - `StreamChunk.tool_progress.tab_id?` and `ChatActivity.tool_call.tabId?` (omitted from the activity object when `tab_id` is missing, so the spread doesn't introduce `tabId: undefined`).
-  - `ActivityCard` renders a monospace, muted `tabId.slice(0, 8)` span with a `title` attribute holding the full id.
+- **OxiBrowser Observability v0.12 — Phase 5 (tab-id propagation)** — Browser tab id propagation through kernel → web → frontend, enabling concurrent tab distinction in the chat transparency timeline.
+  - `KernelEvent::ToolExecutionProgress` gains `tab_id: Option<Uuid>` (optional, serde skip-if-none for back-compat).
+  - WS/SSE events include `tab_id`; frontend `ActivityCard` shows a short tab-id badge.
+  - Audit-action detail string appends `:tab=<id>` when tab is known.
+- **RFC-018 b.1: Memory extraction** — `chunking`, `normalizer`, `hyperbolic` modules extracted from `oxios-kernel::memory` to new `oxios-memory` leaf crate.
+  - Back-compat: `use oxios_kernel::chunk_fixed` etc. all continue to work.
+- **oxios-calendar** — New `.ics`-based calendar event management crate (parse, query, CRUD).
+- **Email subsystem** — SMTP-based email sending integration (`leitner`), template management, sent history, provider config.
+- **Calendar CLI** — `oxios calendar` subcommand with `list`, `add`, `delete`, `search`, `import`, `export`.
+- **Email CLI** — `oxios email` subcommand with `setup`, `test`, `history`, `templates`.
+- **Email & Calendar REST API** — Full CRUD endpoints on `/api/email/*` and `/api/calendar/*`.
 
 ### Changed
-- **Version bump to 1.0.4 (kernel)** — `oxios-kernel` bumped. Additive (new optional `tab_id` field on `KernelEvent::ToolExecutionProgress`); no API breaks.
-- **Version bump to 1.0.4 (web)** — `oxios-web` bumped. Additive (new optional `tab_id` on the `tool_progress` WS chunk and SSE event); no API breaks.
+- **Version bump to 1.1.0** — All crates updated to 1.1.0 for first crates.io publication.
+- **Memory re-export layer** — `oxios-kernel` re-exports the moved memory types so downstream crates (web, gateway) require no source changes.
+- **Release profile applied** — `[profile.release]` with `lto = "thin"`, `codegen-units = 1`, `strip = true`, `panic = "abort"`, `opt-level = 3`. Binary size ~50 MB.
+- **CI workflow hardened** — Workflow-level `permissions: contents: read`; `cargo-audit` uses `taiki-e/install-action`; target cache key includes `${{ github.sha }}`.
+- **Release workflow permissions** — Read-only default; release job keeps `contents: write`.
 
 ### Fixed
-- **TSC error cleanup continued** — 3 remaining errors in v0.12-scope files removed: `chat-input.tsx` (unused `Loader2` import), `stores/chat.ts` (unused `AiDetectionState` interface, unused `err` local in the `error` chunk handler). Brings the tsc count to **0 errors** (down from 3 in v0.12-scope files).
-
-### Changed
-- **Memory extraction (RFC-018 b.1)** — `chunking`, `normalizer`, `hyperbolic` modules moved from `oxios-kernel::memory` to `oxios-memory::memory`. The pure-math core is now a leaf crate; the cfg-gated SQLite persistence methods for hyperbolic embeddings are kept in `oxios-kernel::memory::hyperbolic_persist` as a kernel-side adapter. See `docs/rfc-018-memory-extraction-strategy.md` §3.
-  - New workspace member: `crates/oxios-memory`.
-  - `oxios-kernel` now depends on `oxios-memory` (re-exports the moved types for back-compat).
-  - `oxios-memory` no longer depends on `oxios-kernel` (proper crate separation).
-  - Back-compat: `use oxios_kernel::chunk_fixed`, `use oxios_kernel::HyperbolicEmbedding`, `use oxios_kernel::cosine_similarity_f32`, etc. all continue to work.
-- **Version bump to 1.0.3** — `oxios-kernel` and `oxios-web` bumped. Additive (new enum variant, new optional TS fields); no API breaks.
-- **Release profile applied** — `Cargo.toml` now defines `[profile.release]` with `lto = "thin"`, `codegen-units = 1`, `strip = true`, `panic = "abort"`, `opt-level = 3`. Binary size reduced from ~66 MB → ~50 MB. See `docs/production-audit/07-infra/RELEASE-PROFILE.md`.
-- **CI workflow hardened** — Workflow-level `permissions: contents: read`; `cargo-audit` switched to `taiki-e/install-action` (saves ~30-60s/run); target cache key now includes `${{ github.sha }}` for better partial hits; frontend job now runs `typecheck`, `test`, and `lint` (was build-only).
-- **Release workflow permissions** — Workflow-level read-only default; release job keeps `contents: write`.
+- **TSC errors** — All 96 pre-existing + 3 v0.12-scope TypeScript errors cleared to 0.
+- **Clippy warnings** — 14 warnings in binary crate (`src/main.rs`, `src/kernel.rs`, `src/web_dist.rs`) resolved.
+- **CI formatting drift** — `cargo fmt` inconsistencies across kernel, web, and binary crate rectified.
+- **CI clippy feature flag** — Fixed `browser` feature not existing on core crates in CI workflow.
+- **Dead-code warning** — `WebDistResult::Embedded` marked `#[allow(dead_code)]`.
 
 ### Removed
-- **Legacy `share/default-programs/`** — Superseded by `share/default-skills/` per RFC-009. The three legacy skills (`code-review`, `refactor`, `debug`) had been duplicated to the skills directory; the program.toml manifests are gone.
+- **Legacy `share/default-programs/`** — Superseded by `share/default-skills/` per RFC-009.
 
-### Fixed
-- **Dead-code warning** — `WebDistResult::Embedded` marked `#[allow(dead_code)]` with a doc comment explaining it is a public-API variant reserved for future `rust-embed` use.
+### Release Infrastructure
+- **Publish order** — `release.yml` updated: `oxios-memory` and `oxios-calendar` added to publish sequence in correct dependency order.
 
 ## [1.0.2] - 2026-05-31
 

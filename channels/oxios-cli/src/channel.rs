@@ -207,7 +207,7 @@ impl CliChannelHandle {
     /// The gateway detects the `action` metadata and routes to `EngineApi::set_model()`
     /// instead of the orchestrator.
     pub async fn send_switch_model(&self, model_id: &str) -> Result<()> {
-        let mut msg = IncomingMessage::new("cli", "cli-user", &format!("switch_model: {model_id}"));
+        let mut msg = IncomingMessage::new("cli", "cli-user", format!("switch_model: {model_id}"));
         msg.metadata
             .insert("action".to_owned(), "switch_model".to_owned());
         msg.metadata
@@ -233,7 +233,7 @@ impl CliChannelHandle {
     /// instead of the orchestrator.
     pub async fn send_switch_persona(&self, persona_id: &str) -> Result<()> {
         let mut msg =
-            IncomingMessage::new("cli", "cli-user", &format!("switch_persona: {persona_id}"));
+            IncomingMessage::new("cli", "cli-user", format!("switch_persona: {persona_id}"));
         msg.metadata
             .insert("action".to_owned(), "switch_persona".to_owned());
         msg.metadata

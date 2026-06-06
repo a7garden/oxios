@@ -8,8 +8,8 @@ import { ErrorState } from '@/components/shared/error-state'
 import { LoadingCards } from '@/components/shared/loading'
 import { RefreshButton } from '@/components/shared/refresh-button'
 import { Badge } from '@/components/ui/badge'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { api } from '@/lib/api-client'
 
 export const Route = createFileRoute('/security')({ component: SecurityPage })
@@ -67,10 +67,7 @@ function SecurityPage() {
   }))
 
   const totalPages = Math.ceil(entries.length / AUDIT_PAGE_SIZE)
-  const pagedEntries = entries.slice(
-    (auditPage - 1) * AUDIT_PAGE_SIZE,
-    auditPage * AUDIT_PAGE_SIZE,
-  )
+  const pagedEntries = entries.slice((auditPage - 1) * AUDIT_PAGE_SIZE, auditPage * AUDIT_PAGE_SIZE)
 
   return (
     <div className="space-y-6">
@@ -161,9 +158,7 @@ function SecurityPage() {
                           {t('security.agent')}: {entry.agent_id.slice(0, 8)}...
                         </p>
                       )}
-                      {entry.reason && (
-                        <p className="text-xs text-warning">{entry.reason}</p>
-                      )}
+                      {entry.reason && <p className="text-xs text-warning">{entry.reason}</p>}
                     </div>
                   </div>
                   <div className="text-right">

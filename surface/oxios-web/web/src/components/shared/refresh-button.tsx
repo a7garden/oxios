@@ -40,7 +40,8 @@ export function RefreshButton({
 
   return (
     <Button variant="outline" size="sm" onClick={onClick} disabled={disabled}>
-      <RefreshCw className={`h-4 w-4 mr-1 ${isFetching ? 'animate-spin' : ''}`} /> {t('common.refresh')}
+      <RefreshCw className={`h-4 w-4 mr-1 ${isFetching ? 'animate-spin' : ''}`} />{' '}
+      {t('common.refresh')}
     </Button>
   )
 }

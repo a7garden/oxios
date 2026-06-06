@@ -1,7 +1,7 @@
-import { cn } from '@/lib/utils'
 import { ChevronDown } from 'lucide-react'
-import { useState, useRef, useEffect } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { cn } from '@/lib/utils'
 
 // ─── Types ────────────────────────────────────────────────────
 
@@ -56,7 +56,9 @@ function MobileSelector({
           {current?.icon}
           {currentLabel}
         </span>
-        <ChevronDown className={cn('h-4 w-4 text-muted-foreground transition-transform', open && 'rotate-180')} />
+        <ChevronDown
+          className={cn('h-4 w-4 text-muted-foreground transition-transform', open && 'rotate-180')}
+        />
       </button>
 
       {open && (
@@ -184,9 +186,7 @@ export function SettingsLayout({
         <DesktopNav groups={groups} activeId={activeId} onSelect={onNavigate} />
 
         {/* Content */}
-        <div className="flex-1 min-w-0 max-w-3xl">
-          {children}
-        </div>
+        <div className="flex-1 min-w-0 max-w-3xl">{children}</div>
       </div>
     </div>
   )

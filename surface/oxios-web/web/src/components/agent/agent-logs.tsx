@@ -1,7 +1,7 @@
-import { useTranslation } from 'react-i18next'
-import { Badge } from '@/components/ui/badge'
-import { EmptyState } from '@/components/shared/empty-state'
 import { FileText } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
+import { EmptyState } from '@/components/shared/empty-state'
+import { Badge } from '@/components/ui/badge'
 import type { AgentLogs as AgentLogsType } from '@/types/agent'
 
 const levelColors: Record<string, string> = {

@@ -1,8 +1,20 @@
-import { useEffect, useRef } from 'react'
-import { EditorView, lineNumbers, highlightActiveLineGutter, highlightSpecialChars, drawSelection } from '@codemirror/view'
+import {
+  bracketMatching,
+  defaultHighlightStyle,
+  foldGutter,
+  indentOnInput,
+  syntaxHighlighting,
+} from '@codemirror/language'
 import { EditorState } from '@codemirror/state'
-import { syntaxHighlighting, defaultHighlightStyle, bracketMatching, foldGutter, indentOnInput } from '@codemirror/language'
 import { oneDark } from '@codemirror/theme-one-dark'
+import {
+  drawSelection,
+  EditorView,
+  highlightActiveLineGutter,
+  highlightSpecialChars,
+  lineNumbers,
+} from '@codemirror/view'
+import { useEffect, useRef } from 'react'
 import { getLanguageExtension } from '@/lib/cm6-language'
 
 interface FileViewerProps {
@@ -62,10 +74,5 @@ export function FileViewer({ path, content }: FileViewerProps) {
     }
   }, [path, content])
 
-  return (
-    <div
-      ref={containerRef}
-      className="h-full w-full overflow-hidden"
-    />
-  )
+  return <div ref={containerRef} className="h-full w-full overflow-hidden" />
 }

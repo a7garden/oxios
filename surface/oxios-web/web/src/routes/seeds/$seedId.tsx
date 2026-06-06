@@ -1,11 +1,8 @@
-import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { ArrowLeft, ChevronDown, ChevronRight, Dna, Target } from 'lucide-react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ConstraintList } from '@/components/seed/constraint-list'
 import { CriteriaList } from '@/components/seed/criteria-list'
 import { EvaluationCard } from '@/components/seed/evaluation-card'
@@ -15,6 +12,9 @@ import { OntologyGrid } from '@/components/seed/ontology-grid'
 import { PhaseProgress } from '@/components/seed/phase-progress'
 import { ErrorState } from '@/components/shared/error-state'
 import { LoadingCards } from '@/components/shared/loading'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { api } from '@/lib/api-client'
 import type { EvolutionEntry, OuroborosPhase, SeedDetail } from '@/types/seed'
 
@@ -72,9 +72,7 @@ function SeedDetailPage() {
           <p className="font-mono text-xs text-muted-foreground">{seed.id}</p>
         </div>
         {seed.generation != null && (
-          <Badge variant="default">
-            {t('seeds.generation', { gen: seed.generation })}
-          </Badge>
+          <Badge variant="default">{t('seeds.generation', { gen: seed.generation })}</Badge>
         )}
       </div>
 
@@ -117,9 +115,7 @@ function SeedDetailPage() {
         <EvolutionChain
           entries={evolution}
           currentId={seed.id}
-          onNavigate={(id) =>
-            navigate({ to: '/seeds/$seedId', params: { seedId: id } })
-          }
+          onNavigate={(id) => navigate({ to: '/seeds/$seedId', params: { seedId: id } })}
         />
       )}
 
@@ -138,11 +134,7 @@ function SeedDetailPage() {
             role="button"
             tabIndex={0}
           >
-            {showRaw ? (
-              <ChevronDown className="h-4 w-4" />
-            ) : (
-              <ChevronRight className="h-4 w-4" />
-            )}
+            {showRaw ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
             {t('seeds.rawData')}
           </CardTitle>
         </CardHeader>

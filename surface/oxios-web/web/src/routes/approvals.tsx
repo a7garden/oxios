@@ -58,7 +58,8 @@ function ApprovalsPage() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Timer className="h-4 w-4" /> {t('approvals.pendingWithCount', { count: pending.length })}
+            <Timer className="h-4 w-4" />{' '}
+            {t('approvals.pendingWithCount', { count: pending.length })}
           </CardTitle>
         </CardHeader>
         <CardContent>

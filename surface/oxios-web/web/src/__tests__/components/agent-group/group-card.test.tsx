@@ -1,8 +1,8 @@
-import { describe, expect, it } from 'vitest'
 import { render, screen } from '@testing-library/react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
+import { describe, expect, it } from 'vitest'
 import { StatusIndicator } from '@/components/shared/status-indicator'
+import { Badge } from '@/components/ui/badge'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 // Mock i18next
 vi.mock('react-i18next', () => ({
@@ -29,11 +29,9 @@ describe('GroupCard - Rendering patterns', () => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-muted-foreground">
-            {agentsCount} agents
-          </p>
+          <p className="text-sm text-muted-foreground">{agentsCount} agents</p>
         </CardContent>
-      </Card>
+      </Card>,
     )
 
     expect(screen.getByText(groupName)).toBeInTheDocument()
@@ -57,11 +55,9 @@ describe('GroupCard - Rendering patterns', () => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-muted-foreground">
-            {agentsCount} agents
-          </p>
+          <p className="text-sm text-muted-foreground">{agentsCount} agents</p>
         </CardContent>
-      </Card>
+      </Card>,
     )
 
     expect(screen.getByText(groupName)).toBeInTheDocument()
@@ -81,7 +77,7 @@ describe('GroupCard - Rendering patterns', () => {
             <StatusIndicator status={status} />
           </CardTitle>
         </CardHeader>
-      </Card>
+      </Card>,
     )
 
     expect(screen.getByText(groupName)).toBeInTheDocument()

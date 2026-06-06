@@ -1,8 +1,8 @@
+import { Activity } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { EmptyState } from '@/components/shared/empty-state'
-import { Activity } from 'lucide-react'
-import { TraceStepCard } from './trace-step'
 import type { AgentTrace } from '@/types/agent'
+import { TraceStepCard } from './trace-step'
 
 interface ExecutionTraceProps {
   trace: AgentTrace | null | undefined
@@ -22,7 +22,7 @@ export function ExecutionTrace({ trace, isLoading }: ExecutionTraceProps) {
     )
   }
 
-  if (!trace || !trace.steps?.length) {
+  if (!trace?.steps?.length) {
     return (
       <EmptyState
         icon={<Activity className="h-10 w-10" />}

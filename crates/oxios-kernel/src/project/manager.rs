@@ -16,9 +16,9 @@ use parking_lot::RwLock;
 
 use oxios_memory::memory::sqlite::MemoryDatabase;
 
-use crate::event_bus::{EventBus, KernelEvent};
 use super::project_db;
 use super::{detect_project, DetectionResult, Project, ProjectId, ProjectSource};
+use crate::event_bus::{EventBus, KernelEvent};
 
 /// Errors from ProjectManager operations.
 #[derive(thiserror::Error, Debug)]

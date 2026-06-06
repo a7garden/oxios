@@ -26,7 +26,8 @@ export function BudgetSummaryCard({ summary }: Props) {
             <p className="text-2xl font-bold">
               {summary.total_tokens_used.toLocaleString()}
               <span className="text-sm text-muted-foreground font-normal">
-                {' '}/ {summary.total_tokens_limit.toLocaleString()}
+                {' '}
+                / {summary.total_tokens_limit.toLocaleString()}
               </span>
             </p>
             <div className="mt-1.5 h-2 rounded-full bg-muted overflow-hidden">

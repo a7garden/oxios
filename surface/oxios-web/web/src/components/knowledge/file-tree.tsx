@@ -50,7 +50,14 @@ interface FileTreeItemProps {
   toggleDir: (path: string) => void
 }
 
-function FileTreeItem({ entry, parentPath, onFileSelect, currentPath, expandedDirs, toggleDir }: FileTreeItemProps) {
+function FileTreeItem({
+  entry,
+  parentPath,
+  onFileSelect,
+  currentPath,
+  expandedDirs,
+  toggleDir,
+}: FileTreeItemProps) {
   const fullPath = parentPath ? `${parentPath}/${entry.name}` : entry.name
   const isActive = currentPath === fullPath
   const expanded = expandedDirs.has(fullPath)
@@ -122,7 +129,8 @@ function SubDirectory({
 }) {
   const { data: entries, isLoading } = useKnowledgeTree(dir)
   const { t } = useTranslation()
-  if (isLoading) return <div className="pl-4 text-xs text-muted-foreground">{t('knowledge.loading')}</div>
+  if (isLoading)
+    return <div className="pl-4 text-xs text-muted-foreground">{t('knowledge.loading')}</div>
   if (!entries || entries.length === 0) return null
   return (
     <div className="pl-4">

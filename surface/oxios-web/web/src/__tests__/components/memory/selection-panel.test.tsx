@@ -1,5 +1,5 @@
-import { describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
+import { describe, expect, it, vi } from 'vitest'
 import { SelectionPanel } from '@/components/memory/selection-panel'
 import type { MemoryMapEntry } from '@/types/memory'
 
@@ -38,30 +38,16 @@ describe('SelectionPanel', () => {
       { ...baseEntry, id: 'mem-2', content_preview: 'related A', tier: 'warm' },
       { ...baseEntry, id: 'mem-3', content_preview: 'related B', tier: 'cold' },
     ]
-    render(
-      <SelectionPanel
-        selected={baseEntry}
-        allEntries={all}
-        onOpenDetail={vi.fn()}
-      />,
-    )
+    render(<SelectionPanel selected={baseEntry} allEntries={all} onOpenDetail={vi.fn()} />)
     expect(screen.getByTestId('selection-panel')).toBeInTheDocument()
-    expect(
-      screen.getByText('Sample content for the selected node'),
-    ).toBeInTheDocument()
+    expect(screen.getByText('Sample content for the selected node')).toBeInTheDocument()
     // Related list shows both neighbour previews.
     expect(screen.getByText('related A')).toBeInTheDocument()
     expect(screen.getByText('related B')).toBeInTheDocument()
   })
 
   it('falls back to neighbour id when the entry is not in the dataset', () => {
-    render(
-      <SelectionPanel
-        selected={baseEntry}
-        allEntries={[baseEntry]}
-        onOpenDetail={vi.fn()}
-      />,
-    )
+    render(<SelectionPanel selected={baseEntry} allEntries={[baseEntry]} onOpenDetail={vi.fn()} />)
     // mem-2 / mem-3 are neighbours but not in `allEntries`; the panel
     // should still render the neighbour label by id.
     expect(screen.getByText('mem-2')).toBeInTheDocument()
@@ -71,11 +57,7 @@ describe('SelectionPanel', () => {
   it('invokes the open-detail handler when the action button is clicked', () => {
     const onOpenDetail = vi.fn()
     render(
-      <SelectionPanel
-        selected={baseEntry}
-        allEntries={[baseEntry]}
-        onOpenDetail={onOpenDetail}
-      />,
+      <SelectionPanel selected={baseEntry} allEntries={[baseEntry]} onOpenDetail={onOpenDetail} />,
     )
     screen.getByTestId('selection-open-detail').click()
     expect(onOpenDetail).toHaveBeenCalledWith('mem-1')

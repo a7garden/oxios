@@ -12,11 +12,11 @@ import {
 } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { api } from '@/lib/api-client'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
+import { api } from '@/lib/api-client'
 import type { DoctorResponse } from '@/types'
 
 function formatBytes(bytes: number): string {
@@ -53,7 +53,7 @@ function ActionCard({
           {onRun && (
             <Button size="sm" onClick={onRun} disabled={isRunning}>
               {isRunning ? (
-                <><Loader2 className="h-3 w-3 animate-spin mr-1" /></>
+                <Loader2 className="h-3 w-3 animate-spin mr-1" />
               ) : (
                 <RotateCcw className="h-3 w-3 mr-1" />
               )}
@@ -158,7 +158,10 @@ function AuditVerifyPanel() {
   const { t } = useTranslation()
 
   const auditMutation = useMutation({
-    mutationFn: () => api.post<{ valid: boolean; entries_checked: number; message: string }>('/api/system/audit-verify'),
+    mutationFn: () =>
+      api.post<{ valid: boolean; entries_checked: number; message: string }>(
+        '/api/system/audit-verify',
+      ),
   })
 
   return (
@@ -195,7 +198,10 @@ function BackupPanel() {
   const { t } = useTranslation()
 
   const backupMutation = useMutation({
-    mutationFn: () => api.post<{ success: boolean; path: string; size_bytes: number; message: string }>('/api/system/backup'),
+    mutationFn: () =>
+      api.post<{ success: boolean; path: string; size_bytes: number; message: string }>(
+        '/api/system/backup',
+      ),
   })
 
   return (
@@ -206,7 +212,7 @@ function BackupPanel() {
       onRun={() => backupMutation.mutate()}
       isRunning={backupMutation.isPending}
     >
-      {backupMutation.data && backupMutation.data.success && (
+      {backupMutation.data?.success && (
         <div className="flex items-center gap-2 text-sm rounded-md bg-success-subtle text-success px-3 py-2">
           <CheckCircle2 className="h-4 w-4" />
           <span>

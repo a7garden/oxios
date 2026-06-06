@@ -13,10 +13,13 @@
 //! - [`SecurityTool`] — Security audit (verify_chain, query_audit, audit_count)
 //! - [`BudgetTool`] — Budget management (check, set, reserve, reset)
 //! - [`ResourceTool`] — Resource monitoring (snapshot, history, overloaded)
+//! - [`CalendarTool`] — Calendar events (create, update, delete, list, search, freebusy)
 
 pub mod agent_tool;
 pub mod budget_tool;
+pub mod calendar_tool;
 pub mod cron_tool;
+pub mod email_tool;
 pub mod knowledge_tool;
 pub mod marketplace_tool;
 pub mod persona_tool;
@@ -26,7 +29,9 @@ pub mod security_tool;
 
 pub use agent_tool::AgentTool as KernelAgentTool;
 pub use budget_tool::BudgetTool;
+pub use calendar_tool::CalendarTool;
 pub use cron_tool::CronTool;
+pub use email_tool::EmailTool;
 pub use knowledge_tool::KnowledgeTool;
 pub use marketplace_tool::MarketplaceTool;
 pub use persona_tool::PersonaTool;
@@ -82,9 +87,19 @@ pub fn register_all_kernel_tools(registry: &ToolRegistry, kernel: &KernelHandle,
     registry.register(KnowledgeTool::from_kernel(kernel));
 
     // Browser (optional feature, stores Arc<KernelHandle>)
-    #[cfg(feature = "browser")]
+    #[cfg(feature = "native-browser")]
     {}
 
     // Marketplace (ClawHub — search, install, update)
     registry.register(MarketplaceTool::from_kernel(kernel));
+
+    // Calendar (optional — only if [calendar] is enabled)
+    if let Some(calendar_tool) = CalendarTool::try_from_kernel(kernel) {
+        registry.register(calendar_tool);
+    }
+
+    // Email (optional — only if [email] is enabled)
+    if let Some(email_tool) = EmailTool::try_from_kernel(kernel) {
+        registry.register(email_tool);
+    }
 }

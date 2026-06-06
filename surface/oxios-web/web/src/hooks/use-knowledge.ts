@@ -305,8 +305,7 @@ export function useAutoEmoji(text: string) {
 export function useKnowledgeFileHistory(path: string | null) {
   return useQuery({
     queryKey: ['knowledge', 'history', path],
-    queryFn: () =>
-      api.get<KnowledgeHistoryResponse>(`/api/knowledge/file/${path}/history`),
+    queryFn: () => api.get<KnowledgeHistoryResponse>(`/api/knowledge/file/${path}/history`),
     enabled: !!path,
   })
 }

@@ -1,10 +1,10 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { ArrowLeft } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { Button } from '@/components/ui/button'
+import { ExecutionTrace } from '@/components/agent/execution-trace'
 import { ErrorState } from '@/components/shared/error-state'
 import { LoadingCards } from '@/components/shared/loading'
-import { ExecutionTrace } from '@/components/agent/execution-trace'
+import { Button } from '@/components/ui/button'
 import { useAgentTrace } from '@/hooks/use-agent-trace'
 
 export const Route = createFileRoute('/agents/$agentId/trace')({
@@ -15,12 +15,7 @@ function TracePage() {
   const { t } = useTranslation()
   const { agentId } = Route.useParams()
   const navigate = useNavigate()
-  const {
-    data: trace,
-    isLoading,
-    isError,
-    refetch,
-  } = useAgentTrace(agentId)
+  const { data: trace, isLoading, isError, refetch } = useAgentTrace(agentId)
 
   if (isLoading) return <LoadingCards count={3} />
   if (isError) return <ErrorState onRetry={() => refetch()} />
@@ -31,9 +26,7 @@ function TracePage() {
         <Button
           variant="ghost"
           size="icon"
-          onClick={() =>
-            navigate({ to: '/agents/$agentId', params: { agentId } })
-          }
+          onClick={() => navigate({ to: '/agents/$agentId', params: { agentId } })}
         >
           <ArrowLeft className="h-4 w-4" />
         </Button>

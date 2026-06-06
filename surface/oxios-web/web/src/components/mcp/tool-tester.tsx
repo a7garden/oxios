@@ -1,11 +1,11 @@
-import { useTranslation } from 'react-i18next'
-import { useState, useMemo } from 'react'
 import { Play } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
-import { useMcpServers, useMcpTools, useMcpCallTool } from '@/hooks/use-mcp'
+import { useMcpCallTool, useMcpServers, useMcpTools } from '@/hooks/use-mcp'
 import type { McpTool } from '@/types/mcp'
 
 export function ToolTester() {
@@ -21,16 +21,10 @@ export function ToolTester() {
   const [duration, setDuration] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  const enabledServers = useMemo(
-    () => (servers ?? []).filter((s) => s.enabled),
-    [servers],
-  )
+  const enabledServers = useMemo(() => (servers ?? []).filter((s) => s.enabled), [servers])
 
   const serverTools = useMemo<McpTool[]>(
-    () =>
-      selectedServer
-        ? (tools ?? []).filter((tool) => tool.server === selectedServer)
-        : [],
+    () => (selectedServer ? (tools ?? []).filter((tool) => tool.server === selectedServer) : []),
     [tools, selectedServer],
   )
 
@@ -94,15 +88,13 @@ export function ToolTester() {
       </div>
 
       {/* Tool description */}
-      {selectedTool && serverTools.length > 0 && (
+      {selectedTool &&
+        serverTools.length > 0 &&
         (() => {
           const tool = serverTools.find((t) => t.name === selectedTool)
           if (!tool) return null
-          return (
-            <p className="text-xs text-muted-foreground">{tool.description}</p>
-          )
-        })()
-      )}
+          return <p className="text-xs text-muted-foreground">{tool.description}</p>
+        })()}
 
       {/* Arguments */}
       <div className="space-y-2">

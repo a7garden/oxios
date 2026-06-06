@@ -176,7 +176,7 @@ async fn download_and_extract_web_dist(version_tag: &str) -> Result<PathBuf> {
     }
 
     let ok = style("✓").green().to_string();
-    let done_msg = format!("  {} {} files extracted", ok, file_count);
+    let done_msg = format!("  {ok} {file_count} files extracted");
     extract_pb.finish_with_message(done_msg);
 
     // Write version file
@@ -224,23 +224,23 @@ pub async fn ensure_web_dist(workspace: &Path) -> WebDistResult {
     match fetch_latest_release_tag().await {
         Ok(tag) => match download_and_extract_web_dist(&tag).await {
             Ok(p) => {
-                return WebDistResult::Downloaded {
+                WebDistResult::Downloaded {
                     path: p,
                     version: tag,
                 }
             }
             Err(e) => {
                 tracing::warn!(error = %e, "Failed to auto-download web UI");
-                return WebDistResult::DownloadFailed {
+                WebDistResult::DownloadFailed {
                     reason: e.to_string(),
-                };
+                }
             }
         },
         Err(e) => {
             tracing::warn!(error = %e, "Could not fetch latest release info");
-            return WebDistResult::DownloadFailed {
+            WebDistResult::DownloadFailed {
                 reason: e.to_string(),
-            };
+            }
         }
     }
 }

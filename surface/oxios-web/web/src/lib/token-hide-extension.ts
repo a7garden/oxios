@@ -29,9 +29,9 @@ import { syntaxTree } from '@codemirror/language'
 import type { Range } from '@codemirror/state'
 import {
   Decoration,
-  EditorView,
-  ViewPlugin,
   type DecorationSet,
+  type EditorView,
+  ViewPlugin,
   type ViewUpdate,
 } from '@codemirror/view'
 
@@ -95,11 +95,7 @@ export const tokenHideExtension = ViewPlugin.fromClass(
       this.decorations = buildDecorations(view)
     }
     update(update: ViewUpdate) {
-      if (
-        update.docChanged ||
-        update.selectionSet ||
-        update.viewportChanged
-      ) {
+      if (update.docChanged || update.selectionSet || update.viewportChanged) {
         this.decorations = buildDecorations(update.view)
       }
     }

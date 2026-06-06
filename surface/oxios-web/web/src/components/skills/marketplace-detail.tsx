@@ -30,15 +30,22 @@ export function MarketplaceDetail({ slug, onClose }: { slug: string; onClose: ()
           <Package className="h-5 w-5 text-muted-foreground shrink-0" />
           <div className="min-w-0">
             <h2 className="font-semibold text-lg leading-tight truncate">
-              {isLoading ? <Skeleton className="h-5 w-32" /> : data?.skill?.displayName ?? slug}
+              {isLoading ? <Skeleton className="h-5 w-32" /> : (data?.skill?.displayName ?? slug)}
             </h2>
-            <Badge variant="secondary" className="text-xs mt-1">OpenClaw</Badge>
+            <Badge variant="secondary" className="text-xs mt-1">
+              OpenClaw
+            </Badge>
           </div>
         </div>
         <Button variant="ghost" size="icon" className="shrink-0 h-7 w-7" onClick={onClose}>
           {/* X icon inline to avoid import from parent */}
           <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M6 18L18 6M6 6l12 12"
+            />
           </svg>
         </Button>
       </div>
@@ -61,9 +68,7 @@ export function MarketplaceDetail({ slug, onClose }: { slug: string; onClose: ()
 
           {/* Version + date */}
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            {data.latestVersion && (
-              <span className="font-mono">v{data.latestVersion.version}</span>
-            )}
+            {data.latestVersion && <span className="font-mono">v{data.latestVersion.version}</span>}
             {data.skill?.updatedAt && (
               <>
                 <span>·</span>
@@ -88,7 +93,9 @@ export function MarketplaceDetail({ slug, onClose }: { slug: string; onClose: ()
           {/* Tags */}
           {data.skill?.tags && Object.keys(data.skill.tags).length > 0 && (
             <div className="space-y-2">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Tags</p>
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                Tags
+              </p>
               <div className="flex flex-wrap gap-1.5">
                 {Object.entries(data.skill.tags).map(([key, val]) => (
                   <Badge key={key} variant="outline" className="text-xs">
@@ -102,13 +109,19 @@ export function MarketplaceDetail({ slug, onClose }: { slug: string; onClose: ()
           {/* Metadata */}
           {(data.metadata?.os || data.metadata?.systems) && (
             <div className="space-y-2">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Compatibility</p>
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                Compatibility
+              </p>
               <div className="flex flex-wrap gap-1.5">
-                {data.metadata?.os?.map(o => (
-                  <Badge key={o} variant="outline" className="text-xs">{o}</Badge>
+                {data.metadata?.os?.map((o) => (
+                  <Badge key={o} variant="outline" className="text-xs">
+                    {o}
+                  </Badge>
                 ))}
-                {data.metadata?.systems?.map(s => (
-                  <Badge key={s} variant="secondary" className="text-xs">{s}</Badge>
+                {data.metadata?.systems?.map((s) => (
+                  <Badge key={s} variant="secondary" className="text-xs">
+                    {s}
+                  </Badge>
                 ))}
               </div>
             </div>
@@ -117,7 +130,9 @@ export function MarketplaceDetail({ slug, onClose }: { slug: string; onClose: ()
           {/* Changelog */}
           {data.latestVersion?.changelog && (
             <div className="space-y-2">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Changelog</p>
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                Changelog
+              </p>
               <div className="rounded-md bg-muted/50 px-3 py-2 text-xs text-muted-foreground whitespace-pre-wrap font-mono max-h-40 overflow-y-auto">
                 {data.latestVersion.changelog}
               </div>
@@ -126,7 +141,9 @@ export function MarketplaceDetail({ slug, onClose }: { slug: string; onClose: ()
 
           {/* Slug + ClawHub link */}
           <div className="space-y-1">
-            <p className="text-xs text-muted-foreground/60 font-mono truncate" title={slug}>{slug}</p>
+            <p className="text-xs text-muted-foreground/60 font-mono truncate" title={slug}>
+              {slug}
+            </p>
             <a
               href={`https://clawhub.io/skills/${slug}`}
               target="_blank"
@@ -145,5 +162,9 @@ export function MarketplaceDetail({ slug, onClose }: { slug: string; onClose: ()
 // ─── Helpers ─────────────────────────────────────────────────
 
 function formatDate(ts: number): string {
-  return new Date(ts).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+  return new Date(ts).toLocaleDateString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  })
 }

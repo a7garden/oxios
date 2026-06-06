@@ -1,13 +1,24 @@
-import { useState, useEffect } from 'react'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
+import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
-import type { CalendarEvent, CreateEventRequest, UpdateEventRequest, RepeatRule } from '@/types/calendar'
-import { RepeatEditor } from './repeat-editor'
+import { Textarea } from '@/components/ui/textarea'
+import type {
+  CalendarEvent,
+  CreateEventRequest,
+  RepeatRule,
+  UpdateEventRequest,
+} from '@/types/calendar'
 import { ReminderEditor } from './reminder-editor'
+import { RepeatEditor } from './repeat-editor'
 
 interface Props {
   open: boolean

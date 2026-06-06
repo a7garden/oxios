@@ -1127,7 +1127,7 @@ mod tests {
         assert!(audit_path.exists(), "audit file should exist");
 
         // Overwrite it.
-        let original = std::fs::read_to_string(&audit_path).unwrap();
+        let _original = std::fs::read_to_string(&audit_path).unwrap();
         std::fs::write(&audit_path, "CORRUPTED").unwrap();
         layer.commit_file(&audit_rel, "corrupt").unwrap();
 

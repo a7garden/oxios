@@ -40,9 +40,7 @@ export function EvolutionChain({ entries, currentId, onNavigate }: EvolutionChai
                   </Button>
                 )}
                 {entry.score != null && (
-                  <span className="text-xs text-muted-foreground">
-                    {entry.score.toFixed(2)}
-                  </span>
+                  <span className="text-xs text-muted-foreground">{entry.score.toFixed(2)}</span>
                 )}
               </div>
             )

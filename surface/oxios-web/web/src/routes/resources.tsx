@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
 import { Activity } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import {
   Area,
   AreaChart,
@@ -10,7 +11,6 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
-import { useTranslation } from 'react-i18next'
 
 function getChartColor(token: string): string {
   if (typeof window === 'undefined') return '#888'
@@ -18,8 +18,8 @@ function getChartColor(token: string): string {
 }
 
 import { ErrorState } from '@/components/shared/error-state'
-import { RefreshButton } from '@/components/shared/refresh-button'
 import { LoadingCards } from '@/components/shared/loading'
+import { RefreshButton } from '@/components/shared/refresh-button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { api } from '@/lib/api-client'
 import type { ResourceSnapshot } from '@/types'

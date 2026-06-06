@@ -5,8 +5,8 @@ import { Separator } from '@/components/ui/separator'
 import { cn } from '@/lib/utils'
 import { useKnowledgeStore } from '@/stores/knowledge'
 import { useSidebarStore } from '@/stores/sidebar'
-import { NotificationBell } from './notification-bell'
 import { LanguageSelector } from './language-selector'
+import { NotificationBell } from './notification-bell'
 
 export function Header() {
   const { t } = useTranslation()
@@ -31,7 +31,11 @@ export function Header() {
         type="button"
         className="lg:hidden"
         onClick={handleMobileMenu}
-        aria-label={isKnowledge ? t('common.toggleSidebar', 'Toggle sidebar') : t('common.openNav', 'Open navigation menu')}
+        aria-label={
+          isKnowledge
+            ? t('common.toggleSidebar', 'Toggle sidebar')
+            : t('common.openNav', 'Open navigation menu')
+        }
       >
         <Menu className="h-5 w-5" />
       </button>
@@ -79,7 +83,9 @@ function KnowledgeBreadcrumb() {
       </Link>
       <Separator orientation="vertical" className="h-6" />
       <div className="flex items-center gap-2 text-sm">
-        <span className={cn('font-medium', !currentFilePath && 'text-foreground')}>{t('knowledge.title', 'Knowledge')}</span>
+        <span className={cn('font-medium', !currentFilePath && 'text-foreground')}>
+          {t('knowledge.title', 'Knowledge')}
+        </span>
         {currentFilePath && (
           <>
             <span className="text-muted-foreground">/</span>

@@ -1,0 +1,1083 @@
+# Delivery Design — 에이전트가 내게 보내는 네이티브 채널
+
+> **날짜:** 2026-06-06  
+> **상태:** Draft (RFC 후보)  
+> **범위:** `crates/oxios-kernel/src/delivery.rs` (신규) + Web/CLI/Telegram 서피스의 delivery 라우트  
+> **관련 문서:** `2026-06-06-mail-calendar-design.md` (별도), `2026-06-06-calendar-design.md` (별도)  
+> **핵심 결정:** **이 기능은 외부 IMAP/SMTP 전체 통합보다 먼저 만들어진다.** 사용자가 "내 이메일 주소"를 한 번 지정하면, 에이전트는 그 주소로 능동적으로 메시지를 보낸다. 읽기는 옵션.
+
+---
+
+## 0. 이 문서가 답하는 질문
+
+> "에이전트가 내게 직접 매일 뉴스레터 같은 걸 보내줄 수도 있잖아."
+
+**답:** 이건 두 가지로 쪼개집니다.
+
+| | 흐름 A: 외부 IMAP (RFC-019-mail) | 흐름 B: Delivery (이 문서) |
+|---|---|---|
+| **누가 누구에게** | Gmail/iCloud ↔ Oxios | Oxios → 나 |
+| **프로토콜** | IMAP fetch + SMTP send | SMTP send only |
+| **읽기** | 메일함 fetch | 없음 |
+| **쓰기** | 외부 사람에게 발송 | **내 이메일 주소**로 발송 |
+| **우선순위** | 낮음 (후순위) | **최우선** |
+
+**흐름 B가 우선이다.** 이유는 단순합니다:
+- 내 이메일을 받는 건 **나 자신**이므로 발송 정책이 단순 (수신자 = 항상 나)
+- SMTP 한 방향이면 됨. IMAP fetch 폴링/IDLE, OAuth 토큰, UID 동기화 다 불필요
+- 한 사람이 "내 Gmail 한 개" 지정 → 5분 안에 daily digest 받기 시작
+- 가장 자주 쓰일 기능이 가장 일찍 출시되어야 한다
+
+흐름 A (전체 메일 통합)은 별도 RFC로 후순위. 이 문서는 **흐름 B**만 다룬다.
+
+---
+
+## 1. 목표와 비목표
+
+### 1.1 목표
+
+| # | 목표 | 이유 |
+|---|------|-----|
+| **G1** | 사용자가 **단일 "내 이메일"**을 한 번 지정한다. 그 뒤로 에이전트는 그 주소로 메시지를 보낼 수 있다. | 핵심 가치. 한 줄 config. |
+| **G2** | **3가지 트리거**를 지원한다: (a) cron, (b) EventBus 이벤트, (c) 수동. | 정기 digest, 이벤트 알림, 즉석 요청 모두 커버. |
+| **G3** | 본문은 **에이전트 실행 결과**다. 다른 입력(메일, 캘린더, 메모리, 웹 검색)을 받아 LLM이 생성한 자연어. | 진짜 "개인 비서" 느낌. |
+| **G4** | 결과는 **여러 채널로 동시 발송**된다: 내 이메일 + Telegram + Web 카드 + ntfy + knowledge 베이스 영구 저장. 한 delivery 정의에 N개 채널. | 사용자가 어디에 있어도 받음. 백업 채널 보장. |
+| **G5** | **모든 결과는 knowledge 베이스에 영구 저장**된다 (`~/.oxios/workspace/knowledge/delivery/YYYY-MM-DD_<name>.md`). | 검색 가능, 백링크, git 히스토리. |
+| **G6** | **quiet hours** (야간 알림 음소거)와 **채널별 fallback**을 지원한다. | 새벽 3시에 메일 안 옴. Telegram 죽었으면 메일로. |
+| **G7** | **모든 채널과 모든 채널 (Web/CLI/Telegram)** 에서 delivery를 정의·수정·트리거·이력 조회할 수 있다. | 일관성. |
+| **G8** | 외부 메일 통합(MailApi) 없이도 동작한다. **순수 SMTP 송신만 사용.** | 의존성 최소화. 빠르게 출시. |
+| **G9** | 발송 실패는 **자동 재시도 + 데드레터 큐**. 한 번 실패 = 한 번 재시도 (5분 후), 두 번 실패 = 데드레터 + 사용자에게 알림. | 신뢰성. |
+
+### 1.2 비목표 (명시)
+
+- **외부 IMAP은 하지 않는다.** 메일함 읽기는 별도 RFC. (이건 G8과 일치.)
+- **HTML 이메일 작성 도구는 제공하지 않는다.** 발송은 마크다운 → 단순 변환 (text/plain + text/markdown, 옵션 text/html).
+- **MTA 역할은 하지 않는다.** Oxios는 SMTP *클라이언트*다. 로컬 SMTP 서버를 띄우지 않는다.
+- **OAuth flow는 지원하지 않는다.** Gmail SMTP는 별도 "앱 비밀번호"만 사용 (OAuth SMTP는 Google이 더 이상 권장 안 함, RFC 2024-Q2 deprecation 예정). 2단계 인증 활성화 후 앱 비밀번호 1회 발급.
+- **인박스 자동 분류·자동 답장은 하지 않는다.** 이건 흐름 A (외부 IMAP) 의 영역.
+- **외부 수신자에게 보내는 것도 이 RFC의 일부가 아니다.** "Send a draft to Jane"는 흐름 A의 `mail:send` 도구가 HITL 거쳐 처리. Delivery는 항상 `to == me` 정책.
+
+---
+
+## 2. 사용자 시나리오 (이 RFC의 가치 증명)
+
+### 시나리오 1: 아침 다이제스트 (가장 흔한 사용)
+
+```toml
+[[delivery.deliveries]]
+name = "morning-digest"
+trigger = { kind = "cron", schedule = "0 8 * * *" }   # 매일 08:00
+body = {
+  kind = "agent_run",
+  seed = """
+    오늘 보낼 메시지 형식:
+    1. 어제 보낸/받은 메일 중 응답 필요한 것 (3건 이내)
+    2. 오늘 예정된 미팅 5건 + 관련 첨부/링크
+    3. 어제 메일에 약속한 액션 중 기한 도래 2건
+    4. 한 줄 코멘터리 (의욕/주의 등)
+  """,
+  inputs = [
+    { kind = "memory", scope = "personal", max_age_days = 1 },
+    { kind = "agent_owned", query = "promised_actions" },
+  ],
+  max_tokens = 800,
+}
+channels = [
+  { kind = "knowledge", path = "delivery/{date}_morning-digest.md" },
+  { kind = "email_me",  subject = "☀️ {date} Morning Digest" },
+  { kind = "telegram",  chat = "@me" },
+]
+```
+
+**결과:**
+- 08:00에 `CronScheduler`가 fire
+- `Ouroboros protocol`: spec(seed) → execute → evaluate
+- 산출물:
+  - `~/.oxios/workspace/knowledge/delivery/2026-06-06_morning-digest.md` (영구)
+  - 이메일이 `me@gmail.com`로 도착
+  - Telegram 봇이 요약 + knowledge 링크 전송
+- 야간(23:00~08:00)이어도 cron 발화는 정상. 단, `quiet_hours` 동안 telegram 채널은 큐에 쌓이고 08:00에 일괄 발송. 이메일은 즉시 (서버가 결정).
+
+### 시나리오 2: 긴급 알림 (event-driven)
+
+```toml
+[[delivery.deliveries]]
+name = "build-failure-ping"
+trigger = { kind = "event", event_filter = "kernel.cron.failed and cron.name == 'nightly-build'" }
+body = { kind = "transform", source = "the_event", kind = "render_alert" }
+channels = [
+  { kind = "telegram", chat = "@me", priority = "high" },   # quiet hours 무시
+  { kind = "email_me" },
+]
+```
+
+- nightly-build cron이 실패 → EventBus 발행
+- delivery 엔진이 매치 → 즉시 Telegram + 이메일
+- 새벽 4시라도 priority=high는 quiet hours 무시
+
+### 시나리오 3: 주간 리서치 (구독형)
+
+```toml
+[[delivery.deliveries]]
+name = "weekly-ai-trends"
+trigger = { kind = "cron", schedule = "0 10 * * MON" }
+body = {
+  kind = "agent_run",
+  seed = "지난 7일간 [agent systems, Rust, Oxios] 주제 동향을 5 bullet으로.",
+  inputs = [{ kind = "web_search", query = "...", days_back = 7 }],
+  max_tokens = 600,
+}
+channels = [{ kind = "knowledge", path = "delivery/weekly/{date}_trends.md" }]
+# 이메일 발송 없음. knowledge에만 저장하고, 사용자가 /knowledge UI에서 열람
+```
+
+### 시나리오 4: 사용자가 즉석에서
+
+```bash
+$ oxios delivery run "오늘 나한트 중요한 메일 3개 요약해줘"
+# → 즉시 agent 실행 → 결과를 knowledge에 저장 + Telegram + 이메일
+```
+
+---
+
+## 3. 아키텍처
+
+### 3.1 컴포넌트 다이어그램
+
+```
+                    ┌─────────────────────────────────────────────────────┐
+                    │                  oxios-kernel                       │
+                    │                                                     │
+   ┌────────┐       │  ┌──────────────────────────────────────────┐       │
+   │  Cron  │───────┼─►│                                          │       │
+   │  Event │       │  │  DeliveryEngine (신규)                    │       │
+   │  User  │───────┼─►│  - matches delivery configs vs triggers  │       │
+   └────────┘       │  │  - invokes OuroborosEngine for body gen  │       │
+                    │  │  - dispatches to channels in order        │       │
+                    │  │  - handles retries, dead-letter           │       │
+                    │  └────────┬─────────────────────┬────────────┘       │
+                    │           │                     │                    │
+                    │  ┌────────▼────────┐   ┌────────▼─────────┐         │
+                    │  │ DeliveryApi     │   │ DeliveryStore    │         │
+                    │  │ (kernel handle) │   │ (StateStore +    │         │
+                    │  │ list/add/remove │   │  GitLayer)       │         │
+                    │  │ enable/disable  │   │                  │         │
+                    │  │ run/history     │   │                  │         │
+                    │  └────────┬────────┘   └────────▲─────────┘         │
+                    │           │                     │                    │
+                    │           │           ┌─────────┴──────────┐         │
+                    │           │           │ oxios-markdown     │         │
+                    │           │           │ VirtualFs (write)  │         │
+                    │           │           └────────────────────┘         │
+                    │           │                                          │
+                    │           ▼                                          │
+                    │  ┌──────────────────────────────────┐               │
+                    │  │  ChannelDispatchers              │               │
+                    │  │  ┌────────────┐ ┌─────────────┐  │               │
+                    │  │  │ EmailMe    │ │ Telegram    │  │               │
+                    │  │  │ (SMTP)     │ │ (existing)  │  │               │
+                    │  │  └─────┬──────┘ └──────┬──────┘  │               │
+                    │  │  ┌─────▼──────┐ ┌──────▼──────┐  │               │
+                    │  │  │ Web        │ │ Ntfy/Push   │  │               │
+                    │  │  │ (SSE)      │ │ (http)      │  │               │
+                    │  │  └────────────┘ └─────────────┘  │               │
+                    │  └──────────────────────────────────┘               │
+                    └────────────────────────┬────────────────────────────┘
+                                             │
+                                             ▼
+                                    ┌─────────────────┐
+                                    │  SMTP server    │  (Gmail, Fastmail, …)
+                                    │  Telegram API   │
+                                    │  ntfy server    │
+                                    └─────────────────┘
+```
+
+### 3.2 새 모듈
+
+```
+crates/oxios-kernel/src/
+├── delivery.rs                  # 신규 — 엔진, 디스패처, 트리거 매처
+├── delivery_api.rs              # 신규 — KernelHandle 14번째 API
+├── delivery_store.rs            # 신규 — StateStore + GitLayer 백킹
+├── delivery_dispatchers/
+│   ├── mod.rs
+│   ├── email_me.rs              # 신규 — lettre SMTP wrapper
+│   ├── telegram.rs              # 기존 채널에 위임 (얇은 어댑터)
+│   ├── knowledge.rs             # 신규 — VirtualFs write
+│   ├── web.rs                   # 신규 — SSE push
+│   └── ntfy.rs                  # 신규 — HTTP POST to ntfy
+└── kernel_handle/
+    └── mod.rs                   # + DeliveryApi re-export
+```
+
+**중요:** 새 외부 crate 의존성은 **`lettre` (이메일 SMTP)** + **`tonic`/`reqwest` (ntfy)** 정도. `async-imap`, `mailparse`, `caldav-rs` 같은 무거운 의존성은 흐름 A로 미룬다.
+
+### 3.3 KernelHandle API
+
+```rust
+// crates/oxios-kernel/src/kernel_handle/delivery_api.rs
+pub struct DeliveryApi {
+    engine: Arc<DeliveryEngine>,
+    store: Arc<DeliveryStore>,
+    access: Arc<AccessManager>,
+    event_bus: Option<EventBus>,
+}
+
+impl DeliveryApi {
+    // ── 정의 관리 (admin) ─────────────────────────
+    pub fn list_definitions(&self) -> Vec<DeliveryDefinition>;
+    pub fn get_definition(&self, id: DeliveryId) -> Option<DeliveryDefinition>;
+    pub fn add_definition(&self, def: DeliveryDefinition) -> Result<DeliveryId>;
+    pub fn update_definition(&self, id: DeliveryId, def: DeliveryDefinition) -> Result<()>;
+    pub fn delete_definition(&self, id: DeliveryId) -> Result<()>;
+    pub fn set_enabled(&self, id: DeliveryId, enabled: bool) -> Result<()>;
+    pub fn set_my_email(&self, account: MailAccountId) -> Result<()>;  // ★ 핵심 1줄
+
+    // ── 실행/제어 ─────────────────────────
+    pub async fn run_now(&self, name_or_seed: &str) -> Result<DeliveryRunId>;
+    pub async fn run_with_seed(&self, seed: &str) -> Result<DeliveryRunId>;
+
+    // ── 이력/관측 ───────────────────────
+    pub fn list_runs(&self, def_id: Option<DeliveryId>, limit: u32) -> Vec<DeliveryRun>;
+    pub fn get_run(&self, run_id: DeliveryRunId) -> Option<DeliveryRun>;
+    pub fn failed_runs(&self, limit: u32) -> Vec<DeliveryRun>;
+
+    // ── 채녈 health ──────────────────────
+    pub fn channel_health(&self) -> HashMap<ChannelKind, ChannelHealth>;
+}
+```
+
+### 3.4 데이터 모델
+
+```rust
+// crates/oxios-kernel/src/delivery.rs
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DeliveryDefinition {
+    pub id: DeliveryId,
+    pub name: String,                          // "morning-digest"
+    pub description: Option<String>,
+    pub trigger: DeliveryTrigger,
+    pub body: DeliveryBody,
+    pub channels: Vec<ChannelSpec>,            // 순서 = 발송 순서 (실패시 다음으로)
+    pub quiet_hours: Option<QuietHours>,
+    pub retry_policy: RetryPolicy,
+    pub enabled: bool,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum DeliveryTrigger {
+    /// cron 표현식. CronScheduler가 fire.
+    Cron { schedule: String, timezone: Option<String> },
+    /// EventBus 이벤트 구독.
+    Event {
+        /// 예: "kernel.cron.failed", "kernel.mail.received"
+        event_filter: String,
+        /// payload에서 매치할 추가 조건. 예: `payload.cron_name == "nightly-build"`
+        predicate: Option<String>,
+    },
+    /// 사용자 명령. Web/CLI/Telegram의 "run delivery X".
+    Manual,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum DeliveryBody {
+    AgentRun {
+        seed: String,
+        ouroboros: bool,                        // false = 단순 1-shot
+        inputs: Vec<DeliveryInput>,             // 메일/캘린더/메모리/웹 등
+        max_tokens: u32,
+        timeout: Duration,
+    },
+    /// 외부에서 만들어진 markdown/HTML을 그대로 발송.
+    /// 예: "어제 받은 메일 중 3건 요약"을 외부 스크립트가 만들어 발송.
+    Static {
+        content: String,
+        content_kind: ContentKind,              // Markdown | Html
+    },
+    Transform {
+        /// 트리거 이벤트의 payload를 변환.
+        /// 예: kernel.cron.failed → "❌ nightly-build 실패: <reason>"
+        template: String,
+    },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum DeliveryInput {
+    Memory { scope: String, max_age_days: Option<u32> },
+    Knowledge { query: String, limit: u32 },
+    /// 흐름 A의 mail 시스템이 있을 때만 사용. 없으면 빈 결과.
+    Mail { account: Option<String>, query: String },
+    /// 흐름 A의 calendar 시스템이 있을 때만 사용.
+    Calendar { range: String },
+    WebSearch { query: String, days_back: u32 },
+    /// 이전 delivery의 결과.
+    PreviousDelivery { name: String, since: Duration },
+    /// 사용자가 채팅으로 보낸 raw 텍스트.
+    UserMessage,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum ChannelSpec {
+    /// 내 이메일로 발송. (★ 핵심 채널)
+    EmailMe {
+        /// 템플릿. {date}, {time}, {name} 치환.
+        subject_template: String,
+        /// 옵션: cc/bcc 다른 계정. 보통 없음.
+        cc: Vec<String>,
+        /// 우선순위 — high면 quiet_hours 무시.
+        priority: ChannelPriority,
+    },
+    Telegram {
+        chat: String,                          // "@me" 또는 chat_id
+        format: TelegramFormat,                // Short | Full | SummaryWithLink
+        priority: ChannelPriority,
+    },
+    Knowledge {
+        /// {date}, {name} 치환. 예: "delivery/{date}_{name}.md"
+        path: String,
+        frontmatter: HashMap<String, String>,  // type=delivery, name=morning-digest, …
+    },
+    Web {
+        panel: String,                         // "dashboard" | "approvals"
+        priority: ChannelPriority,
+    },
+    Ntfy {
+        topic: String,
+        server: Option<String>,                // 기본 https://ntfy.sh
+        priority: ChannelPriority,
+    },
+    Webhook {
+        url: String,
+        method: String,
+        headers: HashMap<String, String>,
+    },
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum ChannelPriority {
+    /// quiet_hours 무시. 즉시 발송.
+    High,
+    /// quiet_hours 동안 큐에 쌓임.
+    Normal,
+    /// quiet_hours + 새벽 0~6시에는 드롭 (knowledge에는 저장).
+    Low,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct QuietHours {
+    pub start: NaiveTime,                      // 23:00
+    pub end: NaiveTime,                        // 08:00
+    pub behavior: QuietBehavior,                // QueueThenDeliver | Drop | QueueThenDeliverAtEnd
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RetryPolicy {
+    pub max_attempts: u32,                     // 기본 2
+    pub backoff: Duration,                     // 기본 5분
+    pub on_exhaust: ExhaustBehavior,           // MoveToDeadLetter | MarkAsFailed
+}
+```
+
+### 3.5 DeliveryRun (이력)
+
+```rust
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DeliveryRun {
+    pub id: DeliveryRunId,
+    pub definition_id: DeliveryId,
+    pub definition_name: String,
+    pub started_at: DateTime<Utc>,
+    pub finished_at: Option<DateTime<Utc>>,
+    pub status: RunStatus,
+    pub body: RenderedBody,                     // 실제 발송된 콘텐츠
+    pub channel_results: Vec<ChannelResult>,
+    pub trigger_event: Option<TriggeredBy>,     // cron | event | manual
+    pub error: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+pub enum RunStatus {
+    Running,
+    Succeeded,                                  // 모든 채널 성공
+    PartialSuccess,                             // knowledge는 성공, 일부는 실패
+    Failed,
+    DeadLettered,                               // 재시도 소진
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ChannelResult {
+    pub channel: ChannelKind,
+    pub status: ChannelStatus,
+    pub attempt: u32,
+    pub sent_at: Option<DateTime<Utc>>,
+    pub external_id: Option<String>,            // SMTP message-id, telegram message_id, …
+    pub error: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+pub enum ChannelStatus {
+    Pending,
+    Queued,                                     // quiet hours 중
+    Sent,
+    Failed,
+    DeadLettered,
+    DroppedQuietHours,
+}
+```
+
+### 3.6 트리거 매칭
+
+```rust
+impl DeliveryEngine {
+    pub fn new(
+        store: Arc<DeliveryStore>,
+        access: Arc<AccessManager>,
+        ouroboros: Arc<OuroborosEngine>,
+        smtp: Arc<SmtpDispatcher>,              // EmailMe
+        telegram: Arc<TelegramAdapter>,
+        ntfy: Arc<NtfyDispatcher>,
+        knowledge_bridge: Arc<KnowledgeBridge>,
+        event_bus: EventBus,
+    ) -> Self { … }
+
+    /// CronScheduler의 tick 콜백.
+    /// CronScheduler가 fire한 job을 DeliveryEngine에 위임하도록 CronScheduler에 등록.
+    pub async fn on_cron_tick(&self, job: CronTick) -> Result<DeliveryRunId> { … }
+
+    /// EventBus 구독 콜백.
+    pub async fn on_event(&self, event: KernelEvent) -> Result<()> { … }
+
+    /// 수동 실행.
+    pub async fn run_now(&self, def_id: DeliveryId) -> Result<DeliveryRunId> { … }
+}
+```
+
+DeliveryEngine은 두 가지 방식으로 시작 시 트리거를 등록한다:
+
+1. **Cron 매칭**: `CronScheduler`에 *sentinel job*을 하나 등록한다. sentinel은 실제 작업을 하지 않고, fire 시 `DeliveryEngine::on_cron_tick(now)`를 호출. tick마다 `DeliveryStore::definitions_with_cron()`을 조회해 매치하는 def를 실행.
+   - 또는 더 깔끔하게: `CronScheduler`에 `CronJob`을 *delivery def로* 등록할 수 있게 한다. cron job의 `goal`이 비어있고 `kind=delivery` 플래그가 있으면 DeliveryEngine이 처리. **이쪽을 채택** — CronScheduler의 기존 메커니즘 재사용, UI도 같이 쓸 수 있음.
+
+2. **Event 매칭**: DeliveryEngine이 EventBus를 구독. fire되는 모든 이벤트를 받음. `event_filter` (예: `kernel.cron.failed`)와 매칭되는 def만 실행.
+
+### 3.7 발송 디스패처
+
+#### 3.7.1 EmailMe 디스패처 (★ 핵심)
+
+```rust
+// crates/oxios-kernel/src/delivery_dispatchers/email_me.rs
+pub struct EmailMeDispatcher {
+    smtp_pool: SmtpPool,                        // 계정당 1 connection, pool
+    my_address: RwLock<Option<MailAddress>>,
+    from_identity: RwLock<Option<Identity>>,    // "Oxios <oxios@me.com>"
+}
+
+impl EmailMeDispatcher {
+    pub async fn send(&self, body: &RenderedBody, spec: &EmailMeSpec) -> Result<ChannelResult> {
+        let to = self.my_address.read().clone()
+            .ok_or(DeliveryError::NoMyAddress)?;
+        let mime = self.build_mime(body, &to, spec)?;
+        let transport = self.smtp_pool.get(to.account_id()).await?;
+        let receipt = transport.send(mime).await?;
+        Ok(ChannelResult { … })
+    }
+}
+```
+
+**SMTP 풀:**
+- `lettre` 0.31+의 tokio transport 사용
+- 한 계정당 1 connection, idle 시 5분 후 close, 새 send 시 reopen
+- 한 connection에서 여러 send 직렬화 (lettre는 send가 &mut self)
+
+**MIME 빌드:**
+- `text/plain` (항상) — 본문을 plain text로
+- `text/markdown` (대부분의 클라이언트가 인식) — `Content-Type: text/markdown; charset=utf-8`
+- `text/html` (옵션) — markdown → HTML 변환은 `pulldown-cmark` (이미 의존성)
+- 첨부파일: `DeliveryInput::Knowledge` 결과를 .zip으로 묶어 첨부 가능 (Phase 2)
+
+**내 주소 설정:**
+```bash
+# CLI
+$ oxios delivery set-my-email me@gmail.com
+# → account가 없으면 [delivery.smtp] 섹션을 사용해 즉시 1회 설정 wizard 시작
+# → 계정이 있으면 그 계정의 SMTP 자격증명 사용
+```
+
+또는 Web UI: `/delivery` 페이지 진입 시 "내 이메일을 설정하세요" 마법사.
+
+#### 3.7.2 Knowledge 디스패처
+
+```rust
+pub struct KnowledgeDispatcher {
+    fs: Arc<VirtualFs>,                          // oxios-markdown
+    git: Arc<GitLayer>,
+}
+
+impl KnowledgeDispatcher {
+    pub async fn deliver(&self, body: &RenderedBody, spec: &KnowledgeSpec) -> Result<ChannelResult> {
+        let path = expand_template(&spec.path, &body.context);
+        let frontmatter = build_frontmatter(&spec.frontmatter, &body.context);
+        let content = format!("---\n{}\n---\n\n{}", frontmatter, body.markdown);
+        self.fs.write(&path, &content).await?;
+        self.git.commit_file(&path, &format!("delivery: {}", spec.name))?;
+        Ok(ChannelResult {
+            external_id: Some(path.clone()),
+            status: ChannelStatus::Sent,
+            sent_at: Some(Utc::now()),
+            …
+        })
+    }
+}
+```
+
+저장 위치: `~/.oxios/workspace/knowledge/delivery/...` (oxios-markdown의 `DIR_KNOWLEDGE` 하위).
+
+각 delivery 파일은 다음 frontmatter 가진다:
+
+```markdown
+---
+type: delivery
+name: morning-digest
+delivery_id: <uuid>
+triggered_at: 2026-06-06T08:00:00+09:00
+trigger_kind: cron
+run_id: <uuid>
+status: succeeded
+channels: [email_me, telegram]
+---
+
+# Morning Digest — 2026-06-06
+
+(실제 본문)
+```
+
+**BacklinkIndex 자동 활용:**
+- 본문에 `[[calendar/2026-06-06]]` 같은 링크를 LLM이 자연스럽게 만들도록 seed에서 유도
+- 이전 delivery 참조: `[[delivery/2026-06-05_morning-digest]]`
+- journal 자동 링크: 당일 journal이 있으면 `[[journal/2026-06-06]]` 백링크
+
+#### 3.7.3 다른 디스패처
+
+- **Telegram** — 기존 `channels/oxios-telegram`의 API 클라이언트 재사용. DeliveryEngine은 *adapter*만 제공. 메시지 발송 + 인라인 버튼 (필요시).
+- **Ntfy** — `reqwest`로 `POST https://ntfy.sh/<topic>` + 헤더(`Title`, `Priority`, `Tags`).
+- **Web (SSE)** — `EventBus`의 SSE bridge에 푸시. 기존 `/api/events` 라우트의 subscriber set에 push.
+- **Webhook** — 임의 HTTP POST. retry/backoff 지원.
+
+### 3.8 Quiet Hours & 큐잉
+
+```rust
+pub struct QuietHoursQueue {
+    pending: Mutex<VecDeque<PendingChannelSend>>,
+}
+
+impl QuietHoursQueue {
+    pub async fn run_until(&self, target_time: DateTime<Utc>) {
+        // 1분마다 깨서 현재 시간에 발송 가능한 큐 아이템을 채널 디스패처로 보냄
+        loop {
+            tokio::time::sleep(Duration::from_secs(60)).await;
+            if Utc::now() >= target_time {
+                self.flush().await;
+                break;
+            }
+        }
+    }
+    pub async fn flush(&self) { … }
+}
+```
+
+quiet_hours 동안 `priority=normal`인 채널 디스패처 호출은 큐에 쌓인다. 큐는 background task가 1분마다 깨서 quiet_hours 종료 시점을 확인, 종료 시점 이후 발송.
+
+`priority=high`는 큐 우회 (즉시 발송). `priority=low`는 quiet_hours + 0~6시는 드롭 (knowledge에는 저장되어 있으니 안전).
+
+### 3.9 실패 & 재시도 & 데드레터
+
+```rust
+pub struct DeadLetterStore {
+    path: PathBuf,                               // ~/.oxios/workspace/delivery/dead_letter/
+}
+
+impl DeadLetterStore {
+    pub fn write(&self, run: &DeliveryRun, reason: &str) -> Result<()>;
+    pub fn list(&self, limit: u32) -> Vec<DeadLetter>;
+    pub fn retry(&self, run_id: DeliveryRunId) -> Result<DeliveryRunId>;  // 재실행
+    pub fn drop(&self, run_id: DeliveryRunId) -> Result<()>;
+}
+```
+
+- 1차 실패: 5분 후 1회 재시도 (configurable)
+- 2차 실패: `DeadLetterStore`에 저장, 사용자에게 Web/Telegram으로 "delivery X failed, see /delivery/dead-letter" 알림
+- Web UI `/delivery/dead-letter` 페이지에서: 원본 body + 실패 사유 + [Retry] [Drop] [Edit & Retry]
+
+### 3.10 보안 & 권한
+
+```rust
+// crates/oxios-kernel/src/access_manager/rbac.rs 확장
+pub enum Action {
+    // … 기존
+    ManageDelivery,          // delivery 정의 CRUD
+    SendEmailSelf,           // EmailMe 채널 발송 (낮은 위험 — 나에게 보내는 거)
+}
+```
+
+- `SendEmailSelf`는 `Role::User`에게 기본 허용 (가장 낮은 위험)
+- `ManageDelivery`는 `Role::Superuser`+
+- **받는 사람이 항상 자신**이므로 별도 HITL 불필요. (메일을 *다른 사람에게* 보내는 건 흐름 A의 `SendMail`이고, 그것은 HITL 대상.)
+- 단, **외부 영향이 있는 채널** (Webhook, Telegram 다른 사람, ntfy public topic) 은 발송 전 dry-run 알림: "X delivery will POST to https://attacker-controlled.com. Approve?" — 1회만, 이후 자동.
+
+### 3.11 감사 로그
+
+`DeliveryRun` 완료 시마다:
+
+```rust
+KernelEvent::DeliverySent {
+    run_id, def_id, def_name, status,
+    channels: Vec<(ChannelKind, ChannelStatus)>,
+    bytes_sent, duration_ms,
+}
+```
+
+→ `AuditTrail` (RFC-014, Merkle 체인) → `/events` UI에서 조회 가능.
+
+### 3.12 Ouroboros 통합
+
+`AgentRun` 본문은 OuroborosEngine을 거친다:
+
+```rust
+pub async fn render_body(&self, def: &DeliveryDefinition, ctx: &DeliveryContext) -> Result<RenderedBody> {
+    match &def.body {
+        DeliveryBody::AgentRun { seed, ouroboros, inputs, max_tokens, timeout } => {
+            let resolved_inputs = self.resolve_inputs(inputs, ctx).await?;
+            let agent = self.ouroboros.spawn_spec_first(
+                Seed {
+                    goal: seed.clone(),
+                    inputs: resolved_inputs,
+                    max_tokens: *max_tokens,
+                    evolution_budget: if *ouroboros { 2 } else { 0 },
+                },
+                AgentContext::Delivery(def.id),
+            ).await?;
+            let result = agent.run_with_timeout(*timeout).await?;
+            Ok(RenderedBody {
+                markdown: result.final_answer,
+                context: ctx.clone(),
+            })
+        }
+        DeliveryBody::Static { content, content_kind } => Ok(RenderedBody {
+            markdown: content.clone(),
+            context: ctx.clone(),
+        }),
+        DeliveryBody::Transform { template } => {
+            let event = ctx.trigger_event_payload.as_ref()
+                .ok_or(DeliveryError::NoEventPayload)?;
+            let rendered = render_template(template, event)?;
+            Ok(RenderedBody { markdown: rendered, context: ctx.clone() })
+        }
+    }
+}
+```
+
+`ouroboros = false` (대부분의 delivery)면 1-shot LLM call. `ouroboros = true` (덜 빈번하지만 중요한 것) 면 Interview→Seed→Execute→Evaluate→Evolve.
+
+---
+
+## 4. 채널별 fallback & 정족 정책
+
+### 4.1 발송 순서
+
+```toml
+channels = [
+  { kind = "knowledge", path = "delivery/{date}_{name}.md" },   # 1. 항상 성공
+  { kind = "email_me", subject = "..." },                       # 2. SMTP 성공 시 Telegram 생략 가능
+  { kind = "telegram", chat = "@me" },                          # 3. 이메일 실패 시 알림
+]
+```
+
+**규칙:** "성공" 정족은 *첫 N개 채널 중 하나 이상* 성공이면 `Succeeded`. 모두 실패면 `Failed` (knowledge도 실패할 수 있는 케이스 — 이건 즉시 데드레터).
+
+기본 정족: `knowledge` + `(email_me | telegram | web)`. 둘 중 하나라도 성공이면 사용자가 알림을 받음.
+
+```toml
+[[delivery.deliveries]]
+name = "morning-digest"
+…
+success_criterion = "any_of:email_me,telegram,web"   # knowledge는 필수, 다른 채널 중 하나만
+```
+
+### 4.2 채널 간 의존성 표현
+
+심화: 채널이 다른 채널의 결과에 의존 가능 (rare).
+
+```toml
+channels = [
+  { kind = "knowledge", path = "delivery/{date}_{name}.md" },
+  { kind = "email_me",
+    subject = "{name} ({date})",
+    body_template = "include_knowledge:delivery/{date}_{name}.md"   # knowledge 파일을 본문으로 사용
+  },
+]
+```
+
+이건 Phase 1에서는 단순화. 기본은 *본문 markdown을 그대로 사용*.
+
+---
+
+## 5. Configuration (전체 스키마)
+
+```toml
+# ── Delivery ────────────────────────────────────────────
+[delivery]
+# 마스터 스위치. false면 /delivery 라우트 404, 엔진 시작 안 함.
+enabled = true
+
+# "내 이메일" — 1줄 설정. 없으면 [delivery.smtp]로 즉시 wizard.
+# my_email = "me@gmail.com"
+
+# SMTP 자격증명 (계정이 따로 없을 때 여기서 직접)
+# [delivery.smtp]
+# account = "personal-gmail"   # [mail.accounts.*]에 정의된 id 참조 또는
+# host = "smtp.gmail.com"
+# port = 465
+# tls = "tls"
+# user = "me@gmail.com"
+# auth = { kind = "app_password" }   # 앱 비밀번호는 wizard에서 입력
+# from_name = "Oxios"
+
+# 기본 동작
+default_quiet_hours = { start = "23:00", end = "08:00", behavior = "queue_then_deliver" }
+default_retry = { max_attempts = 2, backoff_seconds = 300, on_exhaust = "dead_letter" }
+
+# 모든 delivery 결과 영구 저장 위치
+knowledge_root = "~/.oxios/workspace/knowledge/delivery"
+
+# ── Delivery 정의 ────────────────────────────────
+[[delivery.deliveries]]
+name = "morning-digest"
+description = "매일 아침 8시 — 메일/캘린더/메모리 종합"
+trigger = { kind = "cron", schedule = "0 8 * * *" }
+body = {
+  kind = "agent_run",
+  seed = "...",
+  ouroboros = true,
+  inputs = [ … ],
+  max_tokens = 1000,
+  timeout_seconds = 120,
+}
+channels = [
+  { kind = "knowledge", path = "delivery/{date}_{name}.md" },
+  { kind = "email_me", subject = "☀️ {date} Morning", priority = "normal" },
+  { kind = "telegram", chat = "@me", format = "summary_with_link", priority = "normal" },
+]
+enabled = true
+# (quiet_hours, retry는 default 따르거나 여기서 override)
+
+[[delivery.deliveries]]
+name = "weekly-research"
+trigger = { kind = "cron", schedule = "0 10 * * MON" }
+body = { … }
+channels = [{ kind = "knowledge", path = "delivery/weekly/{date}_research.md" }]
+```
+
+---
+
+## 6. Web UI
+
+### 6.1 라우트
+
+| Path | 용도 |
+|------|------|
+| `/delivery` | 메인 페이지: 정의 목록 + 최근 실행 + 채널 상태 |
+| `/delivery/new` | 새 delivery wizard (트리거 → 본문 → 채널 순서) |
+| `/delivery/:id` | 정의 상세, run 이력, 채널별 결과 |
+| `/delivery/:id/edit` | 정의 편집 (YAML 또는 폼) |
+| `/delivery/runs` | 전체 실행 이력 (필터: status, date, channel) |
+| `/delivery/dead-letter` | 데드레터 큐, [Retry] [Drop] |
+| `/delivery/settings` | "내 이메일" 설정, SMTP 자격증명, quiet hours 기본값 |
+
+### 6.2 컴포넌트
+
+```
+surface/oxios-web/web/src/components/delivery/
+├── DeliveryList.tsx           # 정의 카드 목록
+├── DeliveryCard.tsx           # 한 정의 = 한 카드 (마지막 run, status badge)
+├── DeliveryEditor.tsx         # wizard + YAML 토글
+├── TriggerEditor.tsx          # cron (UI) / event (필터 빌더) / manual
+├── BodyEditor.tsx             # seed textarea + inputs multiselect + max_tokens slider
+├── ChannelEditor.tsx          # 채널별 설정 (priority, quiet_hours override)
+├── RunHistory.tsx             # 시간순, status filter
+├── RunDetail.tsx              # 본문 + 채널별 결과 + [재발송]
+├── DeadLetter.tsx             # [Retry] [Drop] [Edit & Retry]
+├── ChannelHealthBadge.tsx     # SMTP/Telegram/ntfy 마지막 성공 시각
+├── MyEmailSetup.tsx           # "내 이메일" 마법사 (1단계 wizard)
+└── QuietHoursEditor.tsx       # 시간 슬라이더
+```
+
+### 6.3 Dashboard 통합
+
+기존 `/` (Dashboard)에 "Today's Deliveries" 카드 추가. 오늘 트리거된 delivery 결과 (있으면) 표시. 클릭 → `/delivery/runs?date=2026-06-06`.
+
+### 6.4 Web 실시간 알림
+
+`/api/delivery/events` (SSE). Dashboard에 토스트:
+
+> 📬 Morning Digest (08:00) — [열기] [음소거 1시간]
+
+음소거 = 1시간 동안 모든 delivery 토스트 끄기. 영구 음소거는 정의별 `enabled = false`.
+
+---
+
+## 7. CLI
+
+```bash
+# 정의 관리
+oxios delivery list                              # 모든 정의 (table)
+oxios delivery show <name>                       # 정의 상세
+oxios delivery add <yaml-file>                   # YAML 파일에서 추가
+oxios delivery edit <name>                       # $EDITOR 열기
+oxios delivery enable <name>
+oxios delivery disable <name>
+oxios delivery remove <name>
+
+# "내 이메일" 설정
+oxios delivery set-my-email                      # wizard
+oxios delivery set-my-email me@gmail.com         # 비대화
+oxios delivery show-my-email                     # 설정된 주소 + health
+
+# 수동 실행
+oxios delivery run <name>                        # 정의된 대로 실행
+oxios delivery ask "오늘 일정 요약해줘"            # ad-hoc, 1회 delivery로 저장
+
+# 이력
+oxios delivery runs [--name X] [--status failed] [--since 7d]
+oxios delivery show-run <run-id>
+oxios delivery retry <run-id>
+oxios delivery drop <run-id>
+
+# 채널 진단
+oxios delivery test-channel email_me             # 테스트 메일 발송
+oxios delivery test-channel telegram             # 테스트 메시지
+oxios delivery test-channel ntfy
+oxios delivery test-channel web
+oxios delivery test-channel webhook
+```
+
+대화형 REPL: `oxios` (no args) → 메뉴 "Deliveries".
+
+---
+
+## 8. Telegram
+
+- `/delivery list` — 정의 목록 (5개)
+- `/delivery run <name>` — 즉시 실행
+- `/delivery pause 1h` / `/delivery resume`
+- 인라인 버튼: delivery 결과 메시지 하단에 [다시 실행] [음소거] [정의 편집] (Web UI deep link)
+- **기존 Telegram 플러그인 재활용.** DeliveryEngine은 TelegramAdapter로 위임.
+
+---
+
+## 9. 구현 단계
+
+### Phase 0 — 엔진 + EmailMe 채널 (≈ 1.5주)
+
+**왜 0?** 가장 핵심 채널 + 엔진 골격만. 다른 채널은 stub.
+
+작업:
+- `delivery.rs`, `delivery_api.rs`, `delivery_store.rs` 작성
+- `EmailMeDispatcher` (lettre SMTP) + SMTP pool
+- `KnowledgeDispatcher` (VirtualFs write + GitLayer commit)
+- `CronScheduler` 통합 (delivery kind cron job)
+- EventBus 구독 골격 (event filter 적용만, 본문은 단순 transform)
+- `DeliveryStore` (StateStore + GitLayer)
+- `DeliveryRun` 이력 (최근 1000건 보존, 오래된 건 archive)
+- `DeadLetterStore`
+- Web UI: `/delivery`, `/delivery/new`, `/delivery/:id`, `/delivery/runs`, `/delivery/dead-letter`, `/delivery/settings` (EmailMe 설정 마법사)
+- CLI: `oxios delivery list/show/add/enable/disable/run/runs/test-channel email_me`
+- `untrusted_context_message` (모든 입력에 적용)
+
+**Acceptance:**
+```bash
+$ oxios delivery set-my-email me@gmail.com
+# SMTP wizard 1회
+$ oxios delivery add examples/morning-digest.toml
+$ oxios delivery run morning-digest
+# → 30초 안에:
+#   ✓ knowledge/delivery/2026-06-06_morning-digest.md 생성
+#   ✓ me@gmail.com으로 이메일 도착
+$ cat ~/.oxios/workspace/knowledge/delivery/2026-06-06_morning-digest.md
+# (markdown 본문 보임)
+```
+
+### Phase 1 — 다른 채널 + Quiet Hours (≈ 1주)
+
+작업:
+- `TelegramAdapter` (기존 플러그인 위임)
+- `WebDispatcher` (SSE push)
+- `NtfyDispatcher` (reqwest)
+- `WebhookDispatcher` (reqwest)
+- `QuietHoursQueue` + 1분 background task
+- `ChannelPriority` 동작 (high 우회, low 드롭)
+- `oxios delivery test-channel telegram` 등
+- Web UI: `ChannelHealthBadge`, `QuietHoursEditor`
+- Telegram: `/delivery list`, `/delivery run`
+
+**Acceptance:**
+- 동일 delivery에 3개 채널 동시 발송
+- quiet_hours 동안 normal 채널은 큐, 08:00에 일괄 발송
+- high 채널은 quiet_hours 무시
+
+### Phase 2 — 다이제스트 마법사 + 5-스타 템플릿 (≈ 1주)
+
+작업:
+- "5-스타 템플릿" 5개를 `share/default-deliveries/`로 번들:
+  1. `morning-digest.yaml`
+  2. `weekly-research.yaml`
+  3. `evening-recap.yaml`
+  4. `build-failure-alert.yaml`
+  5. `birthday-reminder.yaml` (memory의 contacts 입력)
+- Web UI wizard: "5-스타 템플릿에서 시작" + 단계별 편집
+- `oxios delivery ask "<raw prompt>"` — 정의 없이 1회 실행 (자동으로 knowledge/delivery/adhoc/ 저장)
+- Telegram 봇에서 "오늘 어땠어?" → 자동 digest
+
+**Acceptance:** 신선한 설치에서 `oxios delivery set-my-email` + 템플릿 1개 enable → 24시간 안에 첫 digest 수신.
+
+### Phase 3 — 폴리시 (≈ 1주)
+
+작업:
+- 첨부파일 (knowledge 결과를 .zip으로 묶어 첨부, EmailMe 한정)
+- Retry-After 헤더 파싱 (SMTP 4xx의 권고 retry-after 존중)
+- Delivery run 통계 (`oxios delivery stats` — 채널별 성공률, 평균 지연, 토큰 사용)
+- Delivery 결과에 자동 backlink (knowledge tree BacklinkIndex)
+- Markdown → HTML 변환 옵션 (EmailMe `text/html` 파트로 추가)
+- 알림 throttling (N분 내 동일 정의 N회 발송 시 자동 합치기)
+- 모바일 친화적 Web UI
+
+**Total: ~4.5주, 1명 engineer.**
+
+---
+
+## 10. 테스트
+
+| Layer | 테스트 | 방법 |
+|---|---|---|
+| Unit | `EmailMeDispatcher::build_mime` | Golden file: 동일 입력 → 동일 MIME (text/plain + text/markdown + 옵션 text/html) |
+| Unit | `QuietHours` 매처 | 경계값 (23:00, 00:00, 08:00) |
+| Unit | `Trigger::cron` 매칭 | 다양한 cron 표현식 |
+| Unit | `Trigger::event` 필터 | payload 조건 평가 |
+| Unit | `RetryPolicy` | attempt 카운트, backoff, exhaust → dead letter |
+| Unit | `KnowledgeDispatcher` | VirtualFs write + GitLayer commit (mocked) |
+| Unit | `transform` template | Mustache-like placeholder 치환 |
+| Unit | `untrusted_context_message` | Golden output |
+| Integration | SMTP 발송 | `mailhog` 로컬 SMTP (TestContainers 또는 native binary) |
+| Integration | Telegram | Telegram test server (또는 mock adapter) |
+| Integration | EventBus → delivery | EventBus mock + delivery 정합 |
+| Integration | CronScheduler → delivery | `cron` 표현식 평가, fire → delivery 호출 |
+| E2E | 신선한 install → 첫 digest | bash: `oxios init` + set-my-email + add delivery + run → 30s 안에 이메일함 (mailhog) 에 도착 |
+| E2E | quiet hours 동작 | 23:00 cron → 큐 → 08:00에 발송 |
+| E2E | 채널 failure fallback | SMTP 실패 → Telegram으로 fallback, 둘 다 실패 → dead letter |
+| Security | prompt injection | 입력에 "ignore previous instructions" 포함 → 결과에 발송 동작이 trigger되지 않음 (또는 trigger되어도 HITL 대상) |
+| Security | Webhook SSRF | `oxios delivery add` 시 webhook URL이 loopback/private IP 거부 (RFC 1918 검증) |
+
+목표: 1,200+ 테스트, ~1.5:1 LOC ratio.
+
+---
+
+## 11. 기존 시스템과의 관계
+
+### 11.1 CronScheduler
+
+| 기존 | 변화 |
+|---|---|
+| `CronScheduler`는 `CronJob { name, schedule, goal, … }`를 받아 fire | delivery는 *goal 필드가 비어있고* delivery_id를 가진 `CronJob`으로 등록. 또는 DeliveryStore가 `cron`-trigger 정의를 cron 표현식으로 변환해 `CronScheduler`에 *delegate job*을 등록. **후자 채택** — DeliveryStore가 진실의 원천, CronScheduler는 fire 메커니즘만 제공. |
+
+### 11.2 Ouroboros
+
+| 기존 | 변화 |
+|---|---|
+| `OuroborosEngine::spawn` | `DeliveryEngine::render_body`가 `AgentRun` 본문을 Ouroboros spec으로 변환해 호출. 진화 예산(evolution_budget)은 delivery 설정에서 override 가능 (기본 0 = 1-shot, 2 = full 5-phase). |
+
+### 11.3 EventBus
+
+| 기존 | 변화 |
+|---|---|
+| `EventBus<KernelEvent>` | DeliveryEngine이 구독자. 이벤트마다 매칭되는 delivery def 조회, fire. |
+| 새 이벤트: `KernelEvent::DeliverySent { … }` | 모든 발송이 audit 이벤트로 발행. |
+
+### 11.4 AuditTrail
+
+| 기존 | 변화 |
+|---|---|
+| `AuditTrail` (oxi-sdk) | 모든 `DeliveryRun`이 `DeliverySent` 이벤트로 기록. dead letter도 별도 이벤트. |
+
+### 11.5 oxios-markdown
+
+| 기존 | 변화 |
+|---|---|
+| `VirtualFs`, `GitLayer`, `BacklinkIndex` | 그대로 사용. `KnowledgeDispatcher`가 `delivery/` 서브트리에 마크다운 파일 작성. |
+| `journal.rs` | delivery 결과에 당일 journal 파일이 있으면 자동 backlink. (`add_record`로 timestamped 항목 추가 — Phase 3 polish). |
+
+### 11.6 Telegram 채널 (기존)
+
+| 기존 | 변화 |
+|---|---|
+| `channels/oxios-telegram` | **변경 없음.** DeliveryEngine은 *adapter*만 추가. TelegramAdapter가 기존 채널의 `send_message` 호출. |
+
+### 11.7 mail/calendar (별도 RFC) 와의 관계
+
+| | Delivery (이 문서) | mail/calendar RFC |
+|---|---|---|
+| **상태** | 우선 출시 | 후속 |
+| **SMTP** | EmailMe 채널 (lettre) | mail:send 도구 (lettre 재사용) |
+| **IMAP** | 없음 | mail:list/get 도구 |
+| **CalDAV** | 없음 | calendar:read/write |
+| **자격증명** | 내 이메일 1개 (앱 비밀번호) | 다중 계정 (OAuth 포함) |
+| **HITL** | 불필요 (받는 사람 = 나) | mail:send는 HITL |
+
+**두 시스템은 SMTP 클라이언트 코드(`lettre` 래퍼)를 공유**한다. `crates/oxios-mail/src/smtp/` 모듈이 공통 라이브러리, `oxios-kernel`은 그 의존성으로 EmailMe dispatcher 구현. **Phase 의존성:**
+
+```
+Phase 0 (이 문서)        Phase 1 (mail/calendar RFC의 Phase 1)
+   ↓ SMTP wrapper 공통   ↓ 같은 wrapper + IMAP
+   delivery uses         mail uses
+```
+
+**dependency direction:** `oxios-kernel` → `oxios-mail` (mail RFC Phase 1 시점에 만들어짐). 이 RFC 시점에서는 `oxios-kernel/src/smtp.rs` (또는 `delivery_dispatchers/smtp.rs`)에 *독립적인* lettre 래퍼 작성, mail RFC가 도착하면 그쪽으로 *deprecate/move*.
+
+---
+
+## 12. Open Questions
+
+| # | 질문 | 기본값 |
+|---|------|--------|
+| Q1 | **Default 채널.** `email_me + knowledge`가 기본, 사용자가 telegram 추가? 아니면 `telegram + knowledge`가 기본? | **`email_me + knowledge`**. 사용자가 Telegram 설정 시 자동 추가 (Phase 1). |
+| Q2 | **기본 quiet_hours.** 없음 / 23:00-08:00 / 22:00-07:00 | **`22:00-08:00`**, 사용자가 정의마다 override 가능. |
+| Q3 | **Default retry.** 0회 / 1회 (5분 후) / 3회 (exponential) | **`max_attempts=2, backoff=5min, on_exhaust=dead_letter`**. |
+| Q4 | **Delivery ID 표기.** 자동 생성 (uuid) vs 사용자 지정 (slug) | **둘 다 허용.** 슬러그 없으면 자동. |
+| Q5 | **EmailMe에서 첨부파일.** 기본 off / 1MB cap / 10MB cap | **Phase 3에서 10MB cap으로 추가.** |
+| Q6 | **자동 re-engagement.** 30일간 0 delivery run이면 "delivery X still working?" 알림? | **Yes, 1회 (30일 후), 90일 후 1회 더, 그 후 disabled 제안.** |
+| Q7 | **Delivery 정의 export/import.** YAML 파일로 백업/공유. | **Yes**, `oxios delivery export <name> > file.yaml` / `oxios delivery add < file.yaml`. ClawHub에서 다른 사람 정의 설치 가능 (RFC-010 marketplace 호환). |
+| Q8 | **Multi-account email_me.** "긴급은 gmail, 일반은 work" 같은 분기. | **Phase 3+.** 우선 1계정. |
+| Q9 | **Delivery 결과에 사용자 주석 가능.** "이 digest에 ★별표" 등. | **Yes**, 단순한 `.annotations.md` sidecar 파일. |
+| Q10 | **Delivery 본문이 LLM 응답이 아닐 때.** LLM 다운 시 fallback 발송. | **Yes**, `body = { kind = "static", content = "CronScheduler가 fire했지만 LLM 응답 실패" }` 같은 비상 본문. |
+
+---
+
+## 13. 요약
+
+이 RFC는 **에이전트가 내게 보내는 네이티브 채널**을 정의한다.
+
+1. **단일 설정.** `oxios delivery set-my-email me@gmail.com` 한 줄로 시작. SMTP wizard 1회.
+2. **트리거 3종.** cron / event / manual. 기존 CronScheduler와 EventBus 재활용.
+3. **본문 = 에이전트 실행.** `DeliveryInput` (메모리, 지식, [옵션] 메일, [옵션] 캘린더, 웹 검색) 받아 LLM이 자연어 생성. Ouroboros 옵션.
+4. **채널 N개 동시 발송.** EmailMe가 핵심, Telegram/Web/Ntfy/Knowledge/Webhook 옵션. 실패 시 fallback.
+5. **모두 knowledge에 저장.** `~/.oxios/workspace/knowledge/delivery/...`. 검색·백링크·git 가능.
+6. **Quiet hours + priority + retry + dead letter.** 신뢰성과 사용자 평온 둘 다.
+7. **모든 채널에서 관리.** Web UI, CLI, Telegram.
+8. **외부 IMAP 없이도 동작.** 4.5주로 출시. 메일/캘린더 RFC와 SMTP 클라이언트 코드만 공유.
+
+이 RFC가 완료되면, 사용자는 "내 이메일 주소" 한 줄 지정만으로 매일 아침 8시에 어제/오늘 정리된 다이제스트를 받기 시작한다. **가장 자주 쓰일 기능이 가장 일찍 출시된다.**

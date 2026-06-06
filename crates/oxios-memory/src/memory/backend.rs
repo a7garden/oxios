@@ -5,7 +5,7 @@
 //! backend is active, eliminating `#[cfg]` branching in business logic.
 //!
 //! The JSON path is implemented by `MemoryManager` itself (via `state_store`).
-//! The SQLite path is implemented by `oxios-kernel::SqliteMemoryStore`.
+//! The SQLite path is implemented by `SqliteMemoryStore`.
 
 use anyhow::Result;
 

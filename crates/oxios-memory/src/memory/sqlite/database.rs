@@ -293,9 +293,10 @@ impl MemoryDatabase {
     }
 }
 
+/// Convert a `&[f32]` to a little-endian byte vector.
+///
+/// Useful for storing embedding vectors as `BLOB` in SQLite.
 pub fn f32_slice_to_bytes(vec: &[f32]) -> Vec<u8> {
-    // Safety: f32 is 4 bytes, and we're reading the raw representation.
-    // zerocopy would be cleaner but this avoids an extra dependency.
     let mut bytes = Vec::with_capacity(vec.len() * 4);
     for &v in vec {
         bytes.extend_from_slice(&v.to_le_bytes());

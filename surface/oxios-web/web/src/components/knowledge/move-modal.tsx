@@ -31,7 +31,11 @@ export function MoveModal() {
 
   // Also allow manual path input by the user — the query field doubles as a path entry
   // If the query looks like a path (contains /), add it as a suggestion
-  const manualDir = query.trim().startsWith('/') ? query.trim() : query.trim() && query.includes('/') ? query.trim() : null
+  const manualDir = query.trim().startsWith('/')
+    ? query.trim()
+    : query.trim() && query.includes('/')
+      ? query.trim()
+      : null
   const extraDirs = manualDir && !allDirs.includes(manualDir) ? [manualDir] : []
   const allDirsWithManual = [...allDirs, ...extraDirs]
 

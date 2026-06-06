@@ -167,6 +167,28 @@ sync_enabled = false
 # 프리셋: "conservative" | "balanced" | "aggressive" | "custom"
 # 프리셋을 변경하면 아래 개별 필드가 무시되고 프리셋 값으로 덮어씌워집니다.
 # 개별 필드를 직접 제어하려면 preset = "custom" 으로 설정하세요.
+# Calendar system (disabled by default).
+# Enable to allow agents and users to manage events.
+# Events are stored as .ics files in ~/.oxios/workspace/calendar/events/
+# [calendar]
+# enabled = true
+# timezone = "Asia/Seoul"
+# default_reminder_minutes = [15]
+# alarm_channels = ["web"]
+# journal_sync = "on_open"
+# system_calendar = true
+# archive_after_days = 365
+
+# Email system (disabled by default).
+# Enable to allow agents to send HTML emails via SMTP.
+# v1: sends to your own email only (my_email).
+# [email]
+# enabled = true
+# my_email = "me@gmail.com"
+# provider = "gmail"  # gmail | icloud | fastmail | custom
+# Set password via: export OXIOS_EMAIL_PASSWORD="your-app-password"
+# rate_limit_per_hour = 10
+
 [memory.consolidation]
 preset = "balanced"
 # dream_enabled = true

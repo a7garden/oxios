@@ -1,13 +1,12 @@
-import { useNavigate } from '@tanstack/react-router'
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { Users } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { GroupCard } from '@/components/agent-group/group-card'
 import { EmptyState } from '@/components/shared/empty-state'
 import { ErrorState } from '@/components/shared/error-state'
 import { LoadingCards } from '@/components/shared/loading'
 import { RefreshButton } from '@/components/shared/refresh-button'
 import { useAgentGroups } from '@/hooks/use-agent-groups'
-import { GroupCard } from '@/components/agent-group/group-card'
 
 export const Route = createFileRoute('/agent-groups/')({ component: AgentGroupsPage })
 
@@ -45,7 +44,9 @@ function AgentGroupsPage() {
             <GroupCard
               key={group.id}
               group={group}
-              onClick={() => navigate({ to: '/agent-groups/$groupId', params: { groupId: group.id } })}
+              onClick={() =>
+                navigate({ to: '/agent-groups/$groupId', params: { groupId: group.id } })
+              }
             />
           ))}
         </div>

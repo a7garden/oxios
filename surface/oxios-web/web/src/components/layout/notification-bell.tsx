@@ -2,13 +2,13 @@ import { useNavigate } from '@tanstack/react-router'
 import { Bell, Check, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { cn } from '@/lib/utils'
 import {
-  useNotificationStore,
   type Notification,
   type NotificationSeverity,
+  useNotificationStore,
 } from '@/stores/notifications'
 
 /** Color map for severity. */
@@ -77,12 +77,7 @@ export function NotificationBell() {
           <div className="flex items-center justify-between border-b px-3 py-2">
             <span className="text-sm font-medium">{t('notifications.title')}</span>
             {unreadCount > 0 && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-6 text-xs"
-                onClick={markAllRead}
-              >
+              <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={markAllRead}>
                 <Check className="h-3 w-3 mr-1" /> {t('notifications.markAllRead')}
               </Button>
             )}
@@ -97,6 +92,7 @@ export function NotificationBell() {
             ) : (
               <div className="divide-y">
                 {notifications.map((n) => (
+                  // biome-ignore lint/a11y/useSemanticElements: contains nested dismiss button; div is correct
                   <div
                     key={n.id}
                     className={cn(
@@ -104,13 +100,18 @@ export function NotificationBell() {
                       !n.read && 'bg-accent/20',
                     )}
                     onClick={() => handleClick(n)}
+                    role="button"
+                    tabIndex={0}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') handleClick(n)
                     }}
-                    role="button"
-                    tabIndex={0}
                   >
-                    <div className={cn('mt-0.5 h-2 w-2 shrink-0 rounded-full', severityDot[n.severity])} />
+                    <div
+                      className={cn(
+                        'mt-0.5 h-2 w-2 shrink-0 rounded-full',
+                        severityDot[n.severity],
+                      )}
+                    />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium leading-tight truncate">{n.title}</p>
                       {n.message && (

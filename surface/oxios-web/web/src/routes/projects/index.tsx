@@ -1,7 +1,11 @@
-import { useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
+import { Package, Plus } from 'lucide-react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Plus, Package } from 'lucide-react'
+import { CreateProjectDialog } from '@/components/project/create-project-dialog'
+import { DeleteProjectDialog } from '@/components/project/delete-project-dialog'
+import { EditProjectDialog } from '@/components/project/edit-project-dialog'
+import { ProjectCard } from '@/components/project/project-card'
 import { EmptyState } from '@/components/shared/empty-state'
 import { ErrorState } from '@/components/shared/error-state'
 import { LoadingCards } from '@/components/shared/loading'
@@ -9,10 +13,6 @@ import { RefreshButton } from '@/components/shared/refresh-button'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useProjects } from '@/hooks/use-projects'
-import { ProjectCard } from '@/components/project/project-card'
-import { CreateProjectDialog } from '@/components/project/create-project-dialog'
-import { EditProjectDialog } from '@/components/project/edit-project-dialog'
-import { DeleteProjectDialog } from '@/components/project/delete-project-dialog'
 import type { Project } from '@/types'
 
 export const Route = createFileRoute('/projects/')({ component: ProjectsPage })
@@ -24,13 +24,7 @@ function ProjectsPage() {
   const [deleteTarget, setDeleteTarget] = useState<Project | null>(null)
   const [showCreate, setShowCreate] = useState(false)
 
-  const {
-    data,
-    isLoading,
-    isError,
-    refetch,
-    isFetching,
-  } = useProjects(search || undefined)
+  const { data, isLoading, isError, refetch, isFetching } = useProjects(search || undefined)
 
   const projects = data?.items ?? []
 
@@ -76,7 +70,11 @@ function ProjectsPage() {
       ) : projects.length === 0 ? (
         <EmptyState
           icon={<Package className="h-10 w-10" />}
-          title={search ? t('projects.noResults', 'No projects found') : t('projects.empty', 'No projects yet')}
+          title={
+            search
+              ? t('projects.noResults', 'No projects found')
+              : t('projects.empty', 'No projects yet')
+          }
           description={
             search
               ? t('projects.noResultsDesc', 'Try a different search term')

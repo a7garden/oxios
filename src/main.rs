@@ -222,6 +222,18 @@ enum Command {
 
     /// Generate shell completion script.
     Completion { shell: Shell },
+
+    /// Manage calendar events.
+    Calendar {
+        #[command(subcommand)]
+        action: CalendarAction,
+    },
+
+    /// Email commands (setup, test, history, templates).
+    Email {
+        #[command(subcommand)]
+        action: EmailAction,
+    },
 }
 
 #[derive(Debug, Clone, Subcommand)]
@@ -347,6 +359,95 @@ enum ProjectAction {
         /// Project name or ID.
         name: String,
     },
+}
+
+#[derive(Debug, Subcommand)]
+enum CalendarAction {
+    /// Show today's events.
+    Today,
+
+    /// Show tomorrow's events.
+    Tomorrow,
+
+    /// Show events for this week.
+    Week,
+
+    /// List events in a date range.
+    List {
+        /// Start date (ISO 8601, e.g. 2026-06-01).
+        #[arg(short, long)]
+        from: Option<String>,
+
+        /// End date (ISO 8601, e.g. 2026-06-30).
+        #[arg(short, long)]
+        to: Option<String>,
+    },
+
+    /// Create a new event.
+    Create {
+        /// Event title.
+        #[arg(short, long)]
+        title: String,
+
+        /// Start time (ISO 8601, e.g. "2026-06-07T10:00:00+09:00").
+        #[arg(short, long)]
+        start: String,
+
+        /// End time (ISO 8601).
+        #[arg(short, long)]
+        end: String,
+
+        /// Location.
+        #[arg(short, long)]
+        location: Option<String>,
+
+        /// Description.
+        #[arg(short, long)]
+        description: Option<String>,
+
+        /// Reminder in minutes before event.
+        #[arg(short, long)]
+        reminder: Option<Vec<u32>>,
+    },
+
+    /// Delete an event.
+    Delete {
+        /// Event UID.
+        uid: String,
+    },
+
+    /// Search events.
+    Search {
+        /// Search query.
+        query: String,
+    },
+
+    /// Show free/busy slots for a date.
+    Freebusy {
+        /// Date (ISO 8601, default: today).
+        #[arg(short, long)]
+        date: Option<String>,
+    },
+}
+
+/// Email subcommands.
+#[derive(Debug, Subcommand)]
+enum EmailAction {
+    /// Interactive SMTP setup wizard.
+    Setup,
+
+    /// Send a test email to verify SMTP configuration.
+    Test,
+
+    /// Show email sending history.
+    History {
+        /// Maximum number of records to show.
+        #[arg(short, long, default_value = "20")]
+        limit: usize,
+    },
+
+    /// List saved email templates.
+    Templates,
 }
 
 // ─── Constants & helpers ───────────────────────────────────────────────────
@@ -908,7 +1009,7 @@ fn format_bytes(bytes: u64) -> String {
     } else if bytes >= KB {
         format!("{:.1} KB", bytes as f64 / KB as f64)
     } else {
-        format!("{} B", bytes)
+        format!("{bytes} B")
     }
 }
 
@@ -1305,6 +1406,233 @@ fn cmd_models(provider: Option<&str>) -> Result<()> {
         provider_id
     );
     println!();
+    Ok(())
+}
+
+// ─── Calendar helpers ───────────────────────────────────────────────────────
+
+fn today_range() -> (chrono::DateTime<chrono::Utc>, chrono::DateTime<chrono::Utc>) {
+    let now = chrono::Local::now();
+    let today = now.date_naive();
+    let from = today.and_hms_opt(0, 0, 0).unwrap().and_utc();
+    let to = today.and_hms_opt(23, 59, 59).unwrap().and_utc();
+    (from, to)
+}
+
+fn tomorrow_range() -> (chrono::DateTime<chrono::Utc>, chrono::DateTime<chrono::Utc>) {
+    let now = chrono::Local::now();
+    let tomorrow = now.date_naive() + chrono::Duration::days(1);
+    let from = tomorrow.and_hms_opt(0, 0, 0).unwrap().and_utc();
+    let to = tomorrow.and_hms_opt(23, 59, 59).unwrap().and_utc();
+    (from, to)
+}
+
+fn week_range() -> (chrono::DateTime<chrono::Utc>, chrono::DateTime<chrono::Utc>) {
+    let now = chrono::Local::now();
+    let today = now.date_naive();
+    let from = today.and_hms_opt(0, 0, 0).unwrap().and_utc();
+    let to = (today + chrono::Duration::days(7))
+        .and_hms_opt(23, 59, 59)
+        .unwrap()
+        .and_utc();
+    (from, to)
+}
+
+fn parse_range(
+    from: Option<String>,
+    to: Option<String>,
+) -> (chrono::DateTime<chrono::Utc>, chrono::DateTime<chrono::Utc>) {
+    let f = from
+        .as_deref()
+        .and_then(|s| chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d").ok())
+        .unwrap_or_else(|| chrono::Local::now().date_naive());
+    let t = to
+        .as_deref()
+        .and_then(|s| chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d").ok())
+        .unwrap_or_else(|| f + chrono::Duration::days(1));
+    (
+        f.and_hms_opt(0, 0, 0).unwrap().and_utc(),
+        t.and_hms_opt(23, 59, 59).unwrap().and_utc(),
+    )
+}
+
+fn parse_dt_cli(s: &str) -> Result<chrono::DateTime<chrono::Utc>, String> {
+    chrono::DateTime::parse_from_rfc3339(s)
+        .map(|dt| dt.to_utc())
+        .map_err(|e| {
+            format!(
+            "Invalid datetime '{s}': {e}. Use ISO 8601, e.g. \"2026-06-07T10:00:00+09:00\"",
+        )
+        })
+}
+
+fn print_events(label: &str, events: &[oxios_calendar::Event]) {
+    if events.is_empty() {
+        println!("{label}: No events.");
+        return;
+    }
+    println!(
+        "{} {} ({} events):",
+        style("📅").bold(),
+        label,
+        events.len()
+    );
+    println!("{}", "─".repeat(50));
+    for e in events {
+        let time = e.start.format("%H:%M");
+        let end = e.end.format("%H:%M");
+        println!("  **{}–{}** {}", time, end, style(&e.title).bold());
+        if let Some(ref loc) = e.location {
+            println!("     📍 {loc}");
+        }
+    }
+}
+
+// ─── Email setup ────────────────────────────────────────────────────────────
+
+async fn cmd_email_setup(kernel: &Kernel) {
+    use console::style;
+    use inquire::{Select, Text};
+
+    println!(
+        "{}\n  Oxios Email Setup\n{}",
+        "─".repeat(40),
+        "─".repeat(40)
+    );
+
+    // Check if already configured
+    let handle = kernel.handle();
+    if handle.email.is_some() {
+        println!(
+            "{} Email is already configured.",
+            style("⚠").yellow().bold()
+        );
+        println!("  To reconfigure, update config.toml and restart.");
+        return;
+    }
+
+    // Step 1: Email address
+    let my_email = Text::new("Your email address:")
+        .prompt()
+        .unwrap_or_default();
+    if my_email.is_empty() {
+        eprintln!("{} Email address is required.", style("✗").red().bold());
+        return;
+    }
+
+    // Step 2: Provider
+    let provider = Select::new(
+        "SMTP provider:",
+        vec!["gmail", "icloud", "fastmail", "custom"],
+    )
+    .prompt()
+    .unwrap_or("gmail")
+    .to_string();
+
+    // Step 3: Password
+    println!("\n  For Gmail: use an App Password (not your regular password).");
+    println!("  Create one at: https://myaccount.google.com/apppasswords");
+    let password = Text::new("SMTP password / app password:")
+        .prompt()
+        .unwrap_or_default();
+    if password.is_empty() {
+        eprintln!("{} Password is required.", style("✗").red().bold());
+        return;
+    }
+
+    // Step 4: Build config and test
+    let smtp_provider = match provider.as_str() {
+        "gmail" => oxios_kernel::email::SmtpProvider::Gmail,
+        "icloud" => oxios_kernel::email::SmtpProvider::Icloud,
+        "fastmail" => oxios_kernel::email::SmtpProvider::Fastmail,
+        _ => oxios_kernel::email::SmtpProvider::Custom,
+    };
+
+    let config = oxios_kernel::config::EmailConfig {
+        enabled: true,
+        my_email: my_email.clone(),
+        provider: smtp_provider,
+        host: String::new(),
+        port: 0,
+        tls: None,
+        user: String::new(),
+        secret_ref: "email_smtp".to_string(),
+        rate_limit_per_hour: 10,
+    };
+
+    println!("\n  Testing SMTP connection...");
+    match oxios_kernel::SmtpClient::from_config(&config, &password) {
+        Ok(smtp) => match smtp.test_connection().await {
+            Ok(()) => {
+                // Save credentials
+                let token = oxi_sdk::TokenBundle {
+                    access_token: password,
+                    refresh_token: None,
+                    token_type: "Bearer".to_string(),
+                    obtained_at: chrono::Utc::now(),
+                    expires_in: 0,
+                    scope: None,
+                };
+                if let Err(e) = oxi_sdk::save_token("email_smtp", &token) {
+                    eprintln!(
+                        "{} Failed to save credentials: {}",
+                        style("✗").red().bold(),
+                        e
+                    );
+                    return;
+                }
+
+                // Save to config.toml
+                let config_path = oxios_kernel::config::expand_home(&format!(
+                    "{}/.oxios/config.toml",
+                    std::env::var("HOME").unwrap_or_default()
+                ));
+                if config_path.exists() {
+                    let _ = append_email_to_config(&config_path, &config);
+                }
+
+                println!(
+                    "{} Email configured successfully!",
+                    style("✓").green().bold()
+                );
+                println!("  Email: {}", style(&my_email).cyan());
+                println!("  Provider: {}", style(&provider).cyan());
+                println!(
+                    "\n  Restart oxios to activate: {}",
+                    style("oxios restart").yellow()
+                );
+            }
+            Err(e) => {
+                eprintln!("{} SMTP test failed: {}", style("✗").red().bold(), e);
+            }
+        },
+        Err(e) => {
+            eprintln!("{} Invalid SMTP config: {}", style("✗").red().bold(), e);
+        }
+    }
+}
+
+/// Append [email] section to config.toml if not already present.
+fn append_email_to_config(
+    config_path: &std::path::Path,
+    config: &oxios_kernel::config::EmailConfig,
+) -> anyhow::Result<()> {
+    let content = std::fs::read_to_string(config_path)?;
+    // Only append if [email] section doesn't exist
+    if content.contains("[email]") {
+        return Ok(());
+    }
+    let provider_str = match config.provider {
+        oxios_kernel::email::SmtpProvider::Gmail => "gmail",
+        oxios_kernel::email::SmtpProvider::Icloud => "icloud",
+        oxios_kernel::email::SmtpProvider::Fastmail => "fastmail",
+        oxios_kernel::email::SmtpProvider::Custom => "custom",
+    };
+    let section = format!(
+        "\n# Email (configured by `oxios email setup`)\n[email]\nenabled = true\nmy_email = \"{}\"\nprovider = \"{}\"\n",
+        config.my_email, provider_str
+    );
+    std::fs::write(config_path, content + &section)?;
     Ok(())
 }
 
@@ -2042,6 +2370,268 @@ async fn run() -> Result<()> {
                         None => {
                             eprintln!("{} Project '{}' not found", style("✗").red().bold(), name)
                         }
+                    }
+                }
+            }
+            Ok(())
+        }
+
+        Some(Command::Calendar { action }) => {
+            let handle = kernel.handle();
+            let api = handle.calendar.as_ref();
+            if api.is_none() {
+                eprintln!(
+                    "{} Calendar is not enabled. Add `[calendar] enabled = true` to config.toml",
+                    style("✗").red().bold()
+                );
+                return Ok(());
+            }
+            let api = api.unwrap();
+            match action {
+                CalendarAction::Today => {
+                    let (from, to) = today_range();
+                    match api.list(from, to).await {
+                        Ok(events) => print_events("Today", &events),
+                        Err(e) => eprintln!("{} {}", style("✗").red().bold(), e),
+                    }
+                }
+                CalendarAction::Tomorrow => {
+                    let (from, to) = tomorrow_range();
+                    match api.list(from, to).await {
+                        Ok(events) => print_events("Tomorrow", &events),
+                        Err(e) => eprintln!("{} {}", style("✗").red().bold(), e),
+                    }
+                }
+                CalendarAction::Week => {
+                    let (from, to) = week_range();
+                    match api.list(from, to).await {
+                        Ok(events) => print_events("This Week", &events),
+                        Err(e) => eprintln!("{} {}", style("✗").red().bold(), e),
+                    }
+                }
+                CalendarAction::List { ref from, ref to } => {
+                    let (f, t) = parse_range(from.clone(), to.clone());
+                    match api.list(f, t).await {
+                        Ok(events) => print_events(
+                            &format!(
+                                "Events {} to {}",
+                                f.format("%Y-%m-%d"),
+                                t.format("%Y-%m-%d")
+                            ),
+                            &events,
+                        ),
+                        Err(e) => eprintln!("{} {}", style("✗").red().bold(), e),
+                    }
+                }
+                CalendarAction::Create {
+                    title,
+                    start,
+                    end,
+                    location,
+                    description,
+                    reminder,
+                } => {
+                    let start_dt = parse_dt_cli(start);
+                    let end_dt = parse_dt_cli(end);
+                    match (start_dt, end_dt) {
+                        (Ok(s), Ok(e)) => {
+                            let draft = oxios_calendar::EventDraft {
+                                title: title.clone(),
+                                start: s,
+                                end: e,
+                                all_day: false,
+                                description: description.clone(),
+                                location: location.clone(),
+                                repeat: None,
+                                reminder_minutes: reminder.clone().unwrap_or_default(),
+                                source: oxios_calendar::EventSource::User,
+                            };
+                            match api.create(draft).await {
+                                Ok(r) => {
+                                    println!(
+                                        "{} Event created: {} ({})",
+                                        style("✓").green().bold(),
+                                        r.uid,
+                                        r.file
+                                    );
+                                    if !r.conflicts.is_empty() {
+                                        for c in &r.conflicts {
+                                            eprintln!(
+                                                "  {} Conflicts with '{}' ({}min overlap)",
+                                                style("⚠").yellow().bold(),
+                                                c.title,
+                                                c.overlap_minutes
+                                            );
+                                        }
+                                    }
+                                }
+                                Err(e) => eprintln!("{} {}", style("✗").red().bold(), e),
+                            }
+                        }
+                        (Err(e), _) | (_, Err(e)) => eprintln!("{} {}", style("✗").red().bold(), e),
+                    }
+                }
+                CalendarAction::Delete { uid } => match api.delete(uid).await {
+                    Ok(()) => println!("{} Event deleted", style("✓").green().bold()),
+                    Err(e) => eprintln!("{} {}", style("✗").red().bold(), e),
+                },
+                CalendarAction::Search { query } => match api.search(query).await {
+                    Ok(events) => print_events(&format!("Search: {query}"), &events),
+                    Err(e) => eprintln!("{} {}", style("✗").red().bold(), e),
+                },
+                CalendarAction::Freebusy { date } => {
+                    let d = date.as_deref().unwrap_or("today");
+                    let (from, to) = if d == "today" {
+                        today_range()
+                    } else {
+                        parse_range(Some(d.to_string()), None)
+                    };
+                    match api.freebusy(from, to).await {
+                        Ok(slots) => {
+                            println!("{} Free/Busy:", style("📅").bold());
+                            for slot in &slots {
+                                let label = if slot.busy { "BUSY" } else { "free" };
+                                let icon = if slot.busy { "🔴" } else { "🟢" };
+                                println!(
+                                    "  {} {} – {} [{}]",
+                                    icon,
+                                    slot.start.format("%H:%M"),
+                                    slot.end.format("%H:%M"),
+                                    label
+                                );
+                            }
+                        }
+                        Err(e) => eprintln!("{} {}", style("✗").red().bold(), e),
+                    }
+                }
+            }
+            Ok(())
+        }
+
+        Some(Command::Email { action }) => {
+            let handle = kernel.handle();
+            match action {
+                EmailAction::Setup => {
+                    cmd_email_setup(&kernel).await;
+                }
+                EmailAction::Test => {
+                    let api = handle.email.as_ref();
+                    if let Some(api) = api {
+                        match api.test_connection().await {
+                            Ok(()) => println!(
+                                "{} Test email sent to {}",
+                                style("✓").green().bold(),
+                                api.default_to()
+                            ),
+                            Err(e) => {
+                                eprintln!("{} SMTP test failed: {}", style("✗").red().bold(), e)
+                            }
+                        }
+                    } else {
+                        eprintln!(
+                            "{} Email is not configured. Run `oxios email setup` first.",
+                            style("✗").red().bold()
+                        );
+                    }
+                }
+                EmailAction::History { ref limit } => {
+                    let state_store = handle.state.store();
+                    let sent_dir = state_store.base_path.join("email_sent");
+                    if !sent_dir.exists() {
+                        println!("No emails sent yet.");
+                        return Ok(());
+                    }
+                    let mut records: Vec<serde_json::Value> = Vec::new();
+                    for entry in std::fs::read_dir(&sent_dir)? {
+                        let entry = entry?;
+                        if entry.path().extension().is_some_and(|ext| ext == "json") {
+                            if let Ok(content) = std::fs::read_to_string(entry.path()) {
+                                if let Ok(val) = serde_json::from_str::<serde_json::Value>(&content)
+                                {
+                                    records.push(val);
+                                }
+                            }
+                        }
+                    }
+                    // Sort by sent_at descending
+                    records.sort_by(|a, b| {
+                        let sa = a.get("sent_at").and_then(|v| v.as_str()).unwrap_or("");
+                        let sb = b.get("sent_at").and_then(|v| v.as_str()).unwrap_or("");
+                        sb.cmp(sa)
+                    });
+                    records.truncate(*limit);
+                    if records.is_empty() {
+                        println!("No emails sent yet.");
+                    } else {
+                        println!(
+                            "{} Email History ({} records)",
+                            style("📬").bold(),
+                            records.len()
+                        );
+                        for r in &records {
+                            let subject = r.get("subject").and_then(|v| v.as_str()).unwrap_or("?");
+                            let sent_at = r.get("sent_at").and_then(|v| v.as_str()).unwrap_or("?");
+                            let template = r
+                                .get("template_used")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("");
+                            let tpl_tag = if template.is_empty() {
+                                String::new()
+                            } else {
+                                format!(" [{}]", style(template).cyan())
+                            };
+                            // Parse sent_at for a shorter display
+                            let display_time = if sent_at.len() >= 19 {
+                                &sent_at[..19]
+                            } else {
+                                sent_at
+                            };
+                            println!(
+                                "  {} {}{}",
+                                style(display_time).dim(),
+                                style(subject).white().bold(),
+                                tpl_tag,
+                            );
+                        }
+                    }
+                }
+                EmailAction::Templates => {
+                    let api = handle.email.as_ref();
+                    if let Some(api) = api {
+                        match api.list_templates() {
+                            Ok(templates) => {
+                                if templates.is_empty() {
+                                    println!("No templates saved yet.");
+                                } else {
+                                    println!(
+                                        "{} Email Templates ({} records)",
+                                        style("📄").bold(),
+                                        templates.len()
+                                    );
+                                    for name in &templates {
+                                        let preview = api.load_template(name).unwrap_or_default();
+                                        let first_line = preview
+                                            .lines()
+                                            .next()
+                                            .unwrap_or("")
+                                            .chars()
+                                            .take(60)
+                                            .collect::<String>();
+                                        println!(
+                                            "  {} {}",
+                                            style(name).cyan().bold(),
+                                            style(first_line).dim(),
+                                        );
+                                    }
+                                }
+                            }
+                            Err(e) => eprintln!("{} {}", style("✗").red().bold(), e),
+                        }
+                    } else {
+                        eprintln!(
+                            "{} Email is not configured. Run `oxios email setup` first.",
+                            style("✗").red().bold()
+                        );
                     }
                 }
             }

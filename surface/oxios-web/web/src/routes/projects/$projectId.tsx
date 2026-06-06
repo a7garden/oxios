@@ -1,16 +1,16 @@
-import { useState } from 'react'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { useTranslation } from 'react-i18next'
 import { ArrowLeft, Edit, Trash2 } from 'lucide-react'
+import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
+import { DeleteProjectDialog } from '@/components/project/delete-project-dialog'
+import { EditProjectDialog } from '@/components/project/edit-project-dialog'
 import { ErrorState } from '@/components/shared/error-state'
 import { LoadingCards } from '@/components/shared/loading'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Badge } from '@/components/ui/badge'
 import { useProject, useProjectMemories } from '@/hooks/use-projects'
-import { EditProjectDialog } from '@/components/project/edit-project-dialog'
-import { DeleteProjectDialog } from '@/components/project/delete-project-dialog'
 import type { Project } from '@/types'
 
 export const Route = createFileRoute('/projects/$projectId')({
@@ -51,7 +51,9 @@ function ProjectPathsCard({ project }: { project: Project }) {
             {project.paths.map((path, i) => (
               <div key={i} className="flex items-center gap-2 text-sm">
                 <span>📁</span>
-                <code className="text-xs bg-muted px-2 py-1 rounded font-mono truncate">{path}</code>
+                <code className="text-xs bg-muted px-2 py-1 rounded font-mono truncate">
+                  {path}
+                </code>
               </div>
             ))}
           </div>
@@ -71,9 +73,15 @@ function ProjectDetailsCard({ project }: { project: Project }) {
 
   const details = [
     { label: t('projects.source', 'Source'), value: project.source ?? 'manual' },
-    { label: t('projects.memoryVisible', 'Memory Visible'), value: project.memory_visible ? 'Yes' : 'No' },
+    {
+      label: t('projects.memoryVisible', 'Memory Visible'),
+      value: project.memory_visible ? 'Yes' : 'No',
+    },
     { label: t('projects.createdAt', 'Created'), value: formatDate(project.created_at) },
-    { label: t('projects.updatedAt', 'Updated'), value: formatDate(project.updated_at ?? project.created_at) },
+    {
+      label: t('projects.updatedAt', 'Updated'),
+      value: formatDate(project.updated_at ?? project.created_at),
+    },
     {
       label: t('projects.lastActive', 'Last Active'),
       value: formatRelativeTime(project.last_active_at ?? project.updated_at ?? project.created_at),
@@ -90,7 +98,9 @@ function ProjectDetailsCard({ project }: { project: Project }) {
           {/* Description */}
           {project.description && (
             <div>
-              <p className="text-xs text-muted-foreground mb-1">{t('projects.description', 'Description')}</p>
+              <p className="text-xs text-muted-foreground mb-1">
+                {t('projects.description', 'Description')}
+              </p>
               <p className="text-sm">{project.description}</p>
             </div>
           )}
@@ -114,7 +124,13 @@ function ProjectDetailsCard({ project }: { project: Project }) {
             {details.map((d) => (
               <div key={d.label} className="flex items-center justify-between">
                 <span className="text-muted-foreground text-xs">{d.label}</span>
-                <span className={d.label === 'Source' ? `text-2xs px-1.5 py-0.5 rounded ${sourceColor}` : 'text-xs'}>
+                <span
+                  className={
+                    d.label === 'Source'
+                      ? `text-2xs px-1.5 py-0.5 rounded ${sourceColor}`
+                      : 'text-xs'
+                  }
+                >
                   {d.value}
                 </span>
               </div>
@@ -138,7 +154,9 @@ function ProjectMemoriesCard({ project }: { project: Project }) {
         <CardTitle className="text-base flex items-center gap-2">
           {t('projects.memories', 'Memories')}
           {memories.length > 0 && (
-            <Badge variant="secondary" className="text-xs">{memories.length}</Badge>
+            <Badge variant="secondary" className="text-xs">
+              {memories.length}
+            </Badge>
           )}
         </CardTitle>
       </CardHeader>
@@ -199,7 +217,8 @@ function ProjectDetailPage() {
 
   if (isLoading) return <LoadingCards count={4} />
   if (isError) return <ErrorState onRetry={() => refetch()} />
-  if (!project) return <p className="text-muted-foreground">{t('projects.notFound', 'Project not found')}</p>
+  if (!project)
+    return <p className="text-muted-foreground">{t('projects.notFound', 'Project not found')}</p>
 
   return (
     <div className="space-y-4">
@@ -270,11 +289,7 @@ function ProjectDetailPage() {
           refetch()
         }}
       />
-      <DeleteProjectDialog
-        project={project}
-        open={showDelete}
-        onOpenChange={setShowDelete}
-      />
+      <DeleteProjectDialog project={project} open={showDelete} onOpenChange={setShowDelete} />
     </div>
   )
 }

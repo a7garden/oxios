@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest'
 import { render, screen } from '@testing-library/react'
+import { describe, expect, it } from 'vitest'
 import { EvaluationCard } from '@/components/seed/evaluation-card'
 import type { EvaluationResult } from '@/types/seed'
 
@@ -46,9 +46,8 @@ describe('EvaluationCard', () => {
     // Green check icon has text-green-500
     const matches = screen.getAllByText('seeds.mechanical')
     const el = matches[0]!
-    const checkIcons = el
-      .closest('div[class*="rounded-lg"]')
-      ?.querySelector('.text-green-500') ?? null
+    const checkIcons =
+      el.closest('div[class*="rounded-lg"]')?.querySelector('.text-green-500') ?? null
     expect(checkIcons).toBeInTheDocument()
   })
 
@@ -62,9 +61,8 @@ describe('EvaluationCard', () => {
 
     render(<EvaluationCard evaluation={evaluation} />)
 
-    const failRow = screen.getByText('seeds.mechanical')
-      .closest('div[class*="rounded-lg"]')
-    const xIcon = failRow?.querySelector('.text-red-500')
+    const failRow = screen.getByText('seeds.mechanical').closest('div[class*="rounded-lg"]')
+    const xIcon = failRow?.querySelector('.text-error')
     expect(xIcon).toBeInTheDocument()
   })
 

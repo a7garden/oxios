@@ -1,7 +1,7 @@
-import { Bot, ArrowLeft } from 'lucide-react'
+import { ArrowLeft, Bot } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { Button } from '@/components/ui/button'
 import { StatusIndicator } from '@/components/shared/status-indicator'
+import { Button } from '@/components/ui/button'
 import type { AgentDetail } from '@/types/agent'
 
 interface AgentHeaderProps {

@@ -1,7 +1,14 @@
 import { AlertTriangle, ArrowRight, Check } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { Separator } from '@/components/ui/separator'
 
 export interface ConfigDiff {
@@ -51,9 +58,7 @@ export function DiffPreview({ open, onOpenChange, diffs, onConfirm, isPending }:
               {t('settings.noChanges')}
             </p>
           ) : (
-            diffs.map((diff) => (
-              <DiffRow key={diff.path} diff={diff} />
-            ))
+            diffs.map((diff) => <DiffRow key={diff.path} diff={diff} />)
           )}
         </div>
 

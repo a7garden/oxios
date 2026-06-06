@@ -40,14 +40,19 @@ pub trait MemoryStorage: Send + Sync {
 #[async_trait]
 pub trait MemoryStorageExt: MemoryStorage {
     /// Save a typed serializable value as JSON.
-    async fn save_json<T: Serialize + Send + Sync>(&self, category: &str, key: &str, value: &T)
-        -> Result<()> {
+    async fn save_json<T: Serialize + Send + Sync>(
+        &self,
+        category: &str,
+        key: &str,
+        value: &T,
+    ) -> Result<()> {
         let v = serde_json::to_value(value)?;
         self.save_json_value(category, key, &v).await
     }
 
     /// Load a typed deserializable value from JSON.
-    async fn load_json<T: DeserializeOwned + Send>(&self,
+    async fn load_json<T: DeserializeOwned + Send>(
+        &self,
         category: &str,
         key: &str,
     ) -> Result<Option<T>> {

@@ -1,7 +1,7 @@
 import { useRouterState } from '@tanstack/react-router'
 import { useEffect, useRef } from 'react'
-import { useKnowledgeStore } from '@/stores/knowledge'
 import { api } from '@/lib/api-client'
+import { useKnowledgeStore } from '@/stores/knowledge'
 
 /**
  * Register global keyboard shortcuts for the Knowledge UI.
@@ -23,7 +23,9 @@ import { api } from '@/lib/api-client'
 
 /** Stable write-file helper that doesn't change reference */
 function useStableWriteFile() {
-  const mutateRef = useRef<((path: string, content: string) => Promise<void>) | undefined>(undefined)
+  const mutateRef = useRef<((path: string, content: string) => Promise<void>) | undefined>(
+    undefined,
+  )
 
   // Recreate the mutator on each render (it's only called from the event handler via ref)
   mutateRef.current = async (path: string, content: string) => {
@@ -160,5 +162,15 @@ export function useKnowledgeShortcuts() {
     window.addEventListener('keydown', handler, true)
     return () => window.removeEventListener('keydown', handler, true)
     // These selectors are stable references from zustand — the effect only runs once
-  }, [openFile, mode, currentFilePath, openChat, toggleSidebar, splitEditorOpen, closeSplit, writeFileRef, deleteFileRef])
+  }, [
+    openFile,
+    mode,
+    currentFilePath,
+    openChat,
+    toggleSidebar,
+    splitEditorOpen,
+    closeSplit,
+    writeFileRef,
+    deleteFileRef,
+  ])
 }

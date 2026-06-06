@@ -339,6 +339,7 @@ pub(crate) fn sanitize_event(event: &oxios_kernel::event_bus::KernelEvent) -> se
             tool_name,
             progress,
             tab_id,
+            context,
         } => {
             let mut obj = serde_json::json!({
                 "type": "tool_progress",
@@ -349,6 +350,9 @@ pub(crate) fn sanitize_event(event: &oxios_kernel::event_bus::KernelEvent) -> se
             });
             if let Some(id) = tab_id {
                 obj["tab_id"] = serde_json::json!(id.to_string());
+            }
+            if let Some(ctx) = context {
+                obj["context"] = ctx.clone();
             }
             obj
         }
@@ -383,6 +387,31 @@ pub(crate) fn sanitize_event(event: &oxios_kernel::event_bus::KernelEvent) -> se
             "session_id": session_id,
             "content": content,
             "source": source,
+        }),
+        KernelEvent::CalendarEventCreated { uid, title, .. } => serde_json::json!({
+            "type": "calendar_event_created",
+            "uid": uid,
+            "title": title,
+        }),
+        KernelEvent::CalendarEventUpdated { uid, title } => serde_json::json!({
+            "type": "calendar_event_updated",
+            "uid": uid,
+            "title": title,
+        }),
+        KernelEvent::CalendarEventDeleted { uid, title } => serde_json::json!({
+            "type": "calendar_event_deleted",
+            "uid": uid,
+            "title": title,
+        }),
+        KernelEvent::EmailSent {
+            subject,
+            message_id,
+            template_name,
+        } => serde_json::json!({
+            "type": "email_sent",
+            "subject": subject,
+            "message_id": message_id,
+            "template_name": template_name,
         }),
     };
     // Merge payload into base

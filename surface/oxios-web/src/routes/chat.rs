@@ -743,6 +743,7 @@ fn kernel_event_to_ws_chunk(
             tool_name,
             progress,
             tab_id,
+            context,
             ..
         } => {
             let mut obj = serde_json::json!({
@@ -753,6 +754,9 @@ fn kernel_event_to_ws_chunk(
             });
             if let Some(id) = tab_id {
                 obj["tab_id"] = serde_json::json!(id.to_string());
+            }
+            if let Some(ctx) = context {
+                obj["context"] = ctx.clone();
             }
             Some(obj)
         }
@@ -861,6 +865,7 @@ mod rfc015_tests {
             tool_name: "browse".into(),
             progress: "loading https://example.com".into(),
             tab_id: Some(tab_id),
+            context: None,
         };
         let chunk = kernel_event_to_ws_chunk(&event, &Some("s1".into())).unwrap();
         assert_eq!(chunk["type"], "tool_progress");
@@ -879,6 +884,7 @@ mod rfc015_tests {
             tool_name: "browse".into(),
             progress: "leak me".into(),
             tab_id: None,
+            context: None,
         };
         let chunk = kernel_event_to_ws_chunk(&event, &Some("s1".into()));
         assert!(chunk.is_none(), "foreign progress should be filtered");
@@ -895,6 +901,7 @@ mod rfc015_tests {
             tool_name: "browse".into(),
             progress: "step 1".into(),
             tab_id: None,
+            context: None,
         };
         let chunk = kernel_event_to_ws_chunk(&event, &Some("s1".into())).unwrap();
         assert!(

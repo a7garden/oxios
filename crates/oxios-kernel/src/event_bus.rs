@@ -226,6 +226,13 @@ pub enum KernelEvent {
         /// oxi-agent versions that don't propagate `tab_id`).
         #[serde(default, skip_serializing_if = "Option::is_none")]
         tab_id: Option<Uuid>,
+        /// Semantic context from the tool call (e.g. PageVisit, WebSearch).
+        /// Stored as `serde_json::Value` to decouple kernel events from
+        /// oxi-sdk's internal `ToolCallContext` enum. UI consumers that
+        /// understand a context variant render it richly; older consumers
+        /// simply ignore the field.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        context: Option<serde_json::Value>,
     },
     /// Memory was recalled during agent execution (RFC-015).
     MemoryRecallUsed {
@@ -255,6 +262,43 @@ pub enum KernelEvent {
         content: String,
         /// Source label: "chain_of_thought" | "compaction" | "reflection".
         source: String,
+    },
+
+    // ── Calendar ──────────────────────────────────────────────
+    /// A calendar event was created.
+    CalendarEventCreated {
+        /// Event UID.
+        uid: String,
+        /// Event title.
+        title: String,
+        /// Start time.
+        start: String,
+        /// End time.
+        end: String,
+    },
+    /// A calendar event was updated.
+    CalendarEventUpdated {
+        /// Event UID.
+        uid: String,
+        /// Event title.
+        title: String,
+    },
+    /// A calendar event was deleted.
+    CalendarEventDeleted {
+        /// Event UID.
+        uid: String,
+        /// Event title.
+        title: String,
+    },
+    /// An email has been sent.
+    EmailSent {
+        /// Email subject.
+        subject: String,
+        /// SMTP message ID.
+        message_id: String,
+        /// Template name (if template was used/saved).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        template_name: Option<String>,
     },
 }
 
@@ -369,11 +413,24 @@ pub fn kernel_event_to_audit_action(event: &KernelEvent) -> AuditAction {
             ),
         },
         KernelEvent::ToolExecutionProgress {
-            tool_name, tab_id, ..
+            tool_name,
+            tab_id,
+            context,
+            ..
         } => AuditAction::Other {
-            detail: match tab_id {
-                Some(id) => format!("tool_progress:{tool_name}:tab={id}"),
-                None => format!("tool_progress:{tool_name}"),
+            detail: {
+                let mut d = format!("tool_progress:{tool_name}");
+                if let Some(id) = tab_id {
+                    d.push_str(&format!(":tab={id}"));
+                }
+                if let Some(ctx) = context
+                    .as_ref()
+                    .and_then(|c| c.get("kind"))
+                    .and_then(|k| k.as_str())
+                {
+                    d.push_str(&format!(":{ctx}"));
+                }
+                d
             },
         },
         KernelEvent::MemoryRecallUsed { query, count, .. } => AuditAction::MemoryRead {
@@ -388,6 +445,22 @@ pub fn kernel_event_to_audit_action(event: &KernelEvent) -> AuditAction {
         },
         KernelEvent::ReasoningFragment { source, .. } => AuditAction::Other {
             detail: format!("reasoning:{source}"),
+        },
+        KernelEvent::CalendarEventCreated { uid, title, .. } => AuditAction::Other {
+            detail: format!("calendar:created:{uid}:{title}"),
+        },
+        KernelEvent::CalendarEventUpdated { uid, title } => AuditAction::Other {
+            detail: format!("calendar:updated:{uid}:{title}"),
+        },
+        KernelEvent::CalendarEventDeleted { uid, title } => AuditAction::Other {
+            detail: format!("calendar:deleted:{uid}:{title}"),
+        },
+        KernelEvent::EmailSent {
+            subject,
+            message_id,
+            template_name,
+        } => AuditAction::Other {
+            detail: format!("email:sent:{subject} (msg={message_id}, tpl={template_name:?})"),
         },
     }
 }
@@ -542,6 +615,7 @@ mod tests {
                 tool_name: "read_file".into(),
                 progress: "reading line 42/100".into(),
                 tab_id: None,
+                context: None,
             },
             KernelEvent::MemoryRecallUsed {
                 session_id: "s1".into(),
@@ -578,6 +652,7 @@ mod tests {
             tool_name: "browse".into(),
             progress: "loading https://example.com".into(),
             tab_id: Some(Uuid::new_v4()),
+            context: None,
         };
         let json = serde_json::to_string(&event).expect("serialize");
         let back: KernelEvent = serde_json::from_str(&json).expect("deserialize");
@@ -588,6 +663,7 @@ mod tests {
                 ref tool_name,
                 ref progress,
                 tab_id,
+                ..
             } => {
                 assert_eq!(session_id, "s-abc");
                 assert_eq!(tool_call_id, "call_42");
@@ -612,6 +688,7 @@ mod tests {
             tool_name: "browse".into(),
             progress: "navigating".into(),
             tab_id: Some(Uuid::new_v4()),
+            context: None,
         };
         match kernel_event_to_audit_action(&with_tab) {
             AuditAction::Other { detail } => {
@@ -630,6 +707,7 @@ mod tests {
             tool_name: "browse".into(),
             progress: "navigating".into(),
             tab_id: None,
+            context: None,
         };
         match kernel_event_to_audit_action(&without_tab) {
             AuditAction::Other { detail } => {
@@ -662,6 +740,7 @@ mod tests {
                 tool_name,
                 progress,
                 tab_id,
+                ..
             } => {
                 assert_eq!(session_id, "s-old");
                 assert_eq!(tool_call_id, "call_legacy");

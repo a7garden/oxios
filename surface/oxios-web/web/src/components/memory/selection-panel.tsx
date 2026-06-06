@@ -1,10 +1,10 @@
+import { Calendar, Hash, Link2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import type { MemoryMapEntry } from '@/types/memory'
 import { TierBadge } from './tier-badge'
 import { TypeBadge } from './type-badge'
-import { Calendar, Hash, Link2 } from 'lucide-react'
-import type { MemoryMapEntry } from '@/types/memory'
 
 interface SelectionPanelProps {
   selected: MemoryMapEntry | null
@@ -83,9 +83,7 @@ export function SelectionPanel({
                     onMouseEnter={() => onHoverNeighbour?.(nbr.id)}
                     onMouseLeave={() => onHoverNeighbour?.(null)}
                   >
-                    <span className="truncate">
-                      {nbrEntry?.content_preview ?? nbr.id}
-                    </span>
+                    <span className="truncate">{nbrEntry?.content_preview ?? nbr.id}</span>
                     <span className="shrink-0 font-mono text-muted-foreground">
                       {nbr.similarity.toFixed(2)}
                     </span>

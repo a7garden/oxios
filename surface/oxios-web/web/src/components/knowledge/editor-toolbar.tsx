@@ -76,7 +76,13 @@ export function EditorToolbar() {
       {/* Save */}
       {currentFilePath && (
         <Tooltip content={t('knowledge.saveWithShortcut')}>
-          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleSave} title={t('common.save')}>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7"
+            onClick={handleSave}
+            title={t('common.save')}
+          >
             <Save className="h-4 w-4" />
           </Button>
         </Tooltip>
@@ -113,7 +119,9 @@ export function EditorToolbar() {
       )}
 
       {/* Info panel toggle */}
-      <Tooltip content={infoPanelOpen ? t('knowledge.hideInfoPanel') : t('knowledge.showInfoPanel')}>
+      <Tooltip
+        content={infoPanelOpen ? t('knowledge.hideInfoPanel') : t('knowledge.showInfoPanel')}
+      >
         <Button
           variant="ghost"
           size="icon"
