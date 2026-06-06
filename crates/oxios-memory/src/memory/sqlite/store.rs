@@ -15,7 +15,7 @@ use chrono::Utc;
 use super::cache;
 use super::database::MemoryDatabase;
 use super::search::{self, RankedMemory};
-use super::{content_hash, dedup_by_id, MemoryEntry, MemoryTier, MemoryType};
+use crate::memory::types::{content_hash, dedup_by_id, MemoryEntry, MemoryTier, MemoryType};
 
 /// A learning pattern row from the `patterns` table.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -301,7 +301,7 @@ impl SqliteMemoryStore {
         }
 
         // Flash Attention re-ranking
-        let fa = super::FlashAttention::with_dimensions(query_vec.len());
+        let fa = crate::memory::flash_attention::FlashAttention::with_dimensions(query_vec.len());
 
         let queries = vec![query_vec.clone()];
         let keys: Vec<Vec<f32>> = candidate_vecs.iter().map(|(_, v)| v.clone()).collect();
@@ -419,7 +419,7 @@ impl SqliteMemoryStore {
     ///
     /// Groups memories by `session_id` and links all co-accessed pairs.
     /// Returns a `MemoryGraph` ready for PageRank computation.
-    pub fn build_co_access_graph(&self) -> super::MemoryGraph {
+    pub fn build_co_access_graph(&self) -> crate::memory::graph::MemoryGraph {
         let conn = self.db.conn();
 
         // Collect session_id -> [rowid] mappings
@@ -430,7 +430,7 @@ impl SqliteMemoryStore {
             .prepare("SELECT rowid, session_id FROM memories WHERE session_id IS NOT NULL")
         {
             Ok(s) => s,
-            Err(_) => return super::MemoryGraph::new(),
+            Err(_) => return crate::memory::graph::MemoryGraph::new(),
         };
 
         let rows: Vec<(i64, String)> = match stmt.query_map([], |row| {
@@ -456,7 +456,7 @@ impl SqliteMemoryStore {
         }
 
         let session_vecs: Vec<Vec<u64>> = sessions.into_values().collect();
-        super::MemoryGraph::from_co_access(&session_vecs)
+        crate::memory::graph::MemoryGraph::from_co_access(&session_vecs)
     }
 
     /// Compute PageRank-based importance scores for all memories.
@@ -713,11 +713,73 @@ impl SqliteMemoryStore {
     }
 }
 
+// ── MemoryBackend trait impl ──────────────────────────────────────────────
+
+#[async_trait::async_trait]
+impl crate::memory::backend::MemoryBackend for SqliteMemoryStore {
+    async fn remember(&self, entry: &MemoryEntry) -> anyhow::Result<String> {
+        SqliteMemoryStore::remember(self, entry).await
+    }
+
+    fn get(&self, id: &str, memory_type: MemoryType) -> anyhow::Result<Option<MemoryEntry>> {
+        SqliteMemoryStore::get(self, id, memory_type)
+    }
+
+    fn get_by_id(&self, id: &str) -> anyhow::Result<Option<MemoryEntry>> {
+        SqliteMemoryStore::get_by_id(self, id)
+    }
+
+    fn forget(&self, id: &str, memory_type: MemoryType) -> anyhow::Result<bool> {
+        SqliteMemoryStore::forget(self, id, memory_type)
+    }
+
+    fn list(&self, memory_type: MemoryType, limit: usize) -> anyhow::Result<Vec<MemoryEntry>> {
+        SqliteMemoryStore::list(self, memory_type, limit)
+    }
+
+    async fn search(
+        &self,
+        query: &str,
+        memory_type: Option<MemoryType>,
+        limit: usize,
+    ) -> anyhow::Result<Vec<MemoryEntry>> {
+        SqliteMemoryStore::search(self, query, memory_type, limit).await
+    }
+
+    async fn recall(&self, query: &str, max_recall: usize) -> anyhow::Result<Vec<MemoryEntry>> {
+        SqliteMemoryStore::recall(self, query, max_recall).await
+    }
+
+    async fn recall_with_rerank(
+        &self,
+        query: &str,
+        max_recall: usize,
+    ) -> anyhow::Result<Vec<MemoryEntry>> {
+        SqliteMemoryStore::recall_with_rerank(self, query, max_recall).await
+    }
+
+    fn blend_into_prompt(&self, memories: &[MemoryEntry], system_prompt: &str) -> String {
+        SqliteMemoryStore::blend_into_prompt(self, memories, system_prompt)
+    }
+
+    async fn is_duplicate(&self, content: &str) -> bool {
+        SqliteMemoryStore::is_duplicate(self, content).await
+    }
+
+    async fn remember_unique(&self, entry: &MemoryEntry) -> anyhow::Result<Option<String>> {
+        SqliteMemoryStore::remember_unique(self, entry).await
+    }
+
+    fn list_by_tier(&self, tier: MemoryTier, limit: usize) -> anyhow::Result<Vec<MemoryEntry>> {
+        SqliteMemoryStore::list_by_tier(self, tier, limit)
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Re-export search helper functions from sub-modules
 // ---------------------------------------------------------------------------
 
-use crate::embedding::EmbeddingProvider;
+use crate::memory::embedding::EmbeddingProvider;
 
 /// Cosine similarity between two vectors.
 fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
@@ -746,7 +808,7 @@ fn memory_delete_vector(db: &MemoryDatabase, rowid: i64) -> anyhow::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::embedding::TfIdfEmbeddingProvider;
+    use crate::memory::embedding::TfIdfEmbeddingProvider;
     use crate::memory::{MemoryTier, ProtectionLevel};
 
     fn make_test_entry(id: &str, ty: MemoryType, content: &str) -> MemoryEntry {

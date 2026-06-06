@@ -9,7 +9,7 @@ use std::path::Path;
 use anyhow::Result;
 
 use super::database::MemoryDatabase;
-use crate::memory::{MemoryEntry, MemoryType};
+use crate::memory::types::{MemoryEntry, MemoryType};
 
 /// Migration report.
 #[derive(Debug, Clone, Default)]

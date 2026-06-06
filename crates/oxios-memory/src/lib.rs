@@ -33,7 +33,7 @@
 pub mod memory;
 
 // Re-export storage traits
-pub use crate::memory::{MemoryGit, MemoryStorage};
+pub use crate::memory::{MemoryBackend, MemoryGit, MemoryStorage, MemoryStorageExt, MarkdownSource, NoteEntry};
 
 // Re-export core types (RFC-018)
 pub use crate::memory::types::{
@@ -57,3 +57,16 @@ pub use crate::memory::{
 
 // Re-export HNSW
 pub use crate::memory::hnsw::HnswIndex;
+pub use crate::memory::hnsw_memory_index::{HnswMemoryIndex, SemanticHit};
+
+// Re-export SONA pattern engine
+pub use crate::memory::sona::{LearnedPattern, SonaEngine, SonaMode, Trajectory, TrajectoryStep, Verdict};
+
+// Re-export MemoryManager (RFC-018 Phase 4)
+pub use crate::memory::manager::MemoryManager;
+
+// Re-export Dream consolidation process (RFC-018 Phase 5)
+pub use crate::memory::dream::{DreamCheckpoint, DreamConfig, DreamProcess, DreamReport};
+
+// Re-export Proactive recall (RFC-018 Phase 5)
+pub use crate::memory::proactive::{ProactiveRecall, RecallTiming};

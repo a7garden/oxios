@@ -18,10 +18,15 @@ use serde::{Deserialize, Serialize};
 use tokio::fs;
 use uuid::Uuid;
 
-use super::{
-    AutoClassifier, AutoProtector, CompactionTree, DecayEngine, MemoryEntry, MemoryManager,
-    MemoryTier, MemoryType, ProtectionLevel, RootEntry, RootIndex, TopicEntry,
+use crate::memory::types::{
+    MemoryEntry, MemoryTier, MemoryType, ProtectionLevel,
 };
+use crate::memory::auto_classify::AutoClassifier;
+use crate::memory::auto_protect::AutoProtector;
+use crate::memory::compaction::CompactionTree;
+use crate::memory::decay::DecayEngine;
+use crate::memory::root_index::{RootEntry, RootIndex, TopicEntry};
+use crate::memory::manager::MemoryManager;
 
 // ---------------------------------------------------------------------------
 // DreamCheckpoint
@@ -320,33 +325,32 @@ pub struct DreamConfig {
     pub pagerank_boost_factor: f32,
 }
 
-impl DreamConfig {
-    /// Extract from the kernel's ConsolidationConfig.
-    pub fn from_consolidation(c: &crate::config::ConsolidationConfig) -> Self {
+impl Default for DreamConfig {
+    fn default() -> Self {
         Self {
-            dream_enabled: c.dream_enabled,
-            dream_interval_hours: c.dream_interval_hours,
-            dream_min_sessions: c.dream_min_sessions,
-            hot_max_entries: c.hot_max_entries,
-            warm_max_entries: c.warm_max_entries,
-            cold_max_entries: c.cold_max_entries,
-            hot_token_budget: c.hot_token_budget,
-            decay_threshold: c.decay_threshold,
-            retention_days: c.retention_days,
-            decay_multiplier: c.decay_multiplier,
-            auto_protection: c.auto_protection,
-            protection_low_access: c.protection_low_access,
-            protection_medium_access: c.protection_medium_access,
-            protection_high_access: c.protection_high_access,
-            protection_medium_sessions: c.protection_medium_sessions,
-            protection_high_sessions: c.protection_high_sessions,
-            protection_demotion_enabled: c.protection_demotion_enabled,
-            protection_demotion_stale_days: c.protection_demotion_stale_days,
-            auto_classification: c.auto_classification,
-            type_promotion_repetitions: c.type_promotion_repetitions,
-            compaction_line_threshold: c.compaction_line_threshold,
-            proactive_recall_limit: c.proactive_recall_limit,
-            proactive_recall_threshold: c.proactive_recall_threshold,
+            dream_enabled: true,
+            dream_interval_hours: 24,
+            dream_min_sessions: 5,
+            hot_max_entries: 100,
+            warm_max_entries: 1000,
+            cold_max_entries: 10000,
+            hot_token_budget: 2000,
+            decay_threshold: 0.1,
+            retention_days: 90,
+            decay_multiplier: 0.95,
+            auto_protection: true,
+            protection_low_access: 3,
+            protection_medium_access: 10,
+            protection_high_access: 50,
+            protection_medium_sessions: 3,
+            protection_high_sessions: 10,
+            protection_demotion_enabled: true,
+            protection_demotion_stale_days: 30,
+            auto_classification: true,
+            type_promotion_repetitions: 3,
+            compaction_line_threshold: 10,
+            proactive_recall_limit: 5,
+            proactive_recall_threshold: 0.6,
             pagerank_enabled: true,
             pagerank_damping: 0.85,
             pagerank_iterations: 30,
@@ -959,8 +963,8 @@ impl DreamProcess {
         // is a kernel-side adapter (`hyperbolic_persist`).
         #[cfg(feature = "sqlite-memory")]
         if let Some(ref sqlite) = self.memory_manager.sqlite_store() {
-            let config = oxios_memory::memory::hyperbolic::HyperbolicConfig::default();
-            match super::hyperbolic_persist::restore_from_sqlite(sqlite, config) {
+            let config = crate::memory::hyperbolic::HyperbolicConfig::default();
+                match crate::memory::sqlite::hyperbolic_persist::restore_from_sqlite(sqlite, config) {
                 Ok(he) => {
                     let count = he.len();
                     if count < 10 {
@@ -1200,12 +1204,11 @@ mod tests {
 
     #[test]
     fn test_should_dream_never_ran() {
-        let config =
-            DreamConfig::from_consolidation(&crate::config::ConsolidationConfig::default());
+        let config = DreamConfig::default();
         let temp = tempfile::tempdir().unwrap();
-        let store =
-            Arc::new(crate::state_store::StateStore::new(temp.path().to_path_buf()).unwrap());
-        let mgr = Arc::new(MemoryManager::new(store));
+        let storage: Arc<dyn crate::memory::storage::MemoryStorage> =
+            Arc::new(crate::memory::test_support::InMemoryStorage::default());
+        let mgr = Arc::new(MemoryManager::new(storage));
         let dream = DreamProcess::new(mgr, config, temp.path().to_path_buf());
 
         assert!(dream.should_dream(None, 0));
@@ -1213,12 +1216,11 @@ mod tests {
 
     #[test]
     fn test_should_dream_too_recent() {
-        let config =
-            DreamConfig::from_consolidation(&crate::config::ConsolidationConfig::default());
+        let config = DreamConfig::default();
         let temp = tempfile::tempdir().unwrap();
-        let store =
-            Arc::new(crate::state_store::StateStore::new(temp.path().to_path_buf()).unwrap());
-        let mgr = Arc::new(MemoryManager::new(store));
+        let storage: Arc<dyn crate::memory::storage::MemoryStorage> =
+            Arc::new(crate::memory::test_support::InMemoryStorage::default());
+        let mgr = Arc::new(MemoryManager::new(storage));
         let dream = DreamProcess::new(mgr, config, temp.path().to_path_buf());
 
         assert!(!dream.should_dream(Some(Utc::now()), 1));

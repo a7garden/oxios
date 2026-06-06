@@ -41,10 +41,28 @@ pub mod embedding_viz;
 pub mod flash_attention;
 pub mod graph;
 pub mod hnsw;
+pub mod hnsw_memory_index;
 pub mod root_index;
+pub mod sona;
 
 // ─── Storage abstraction ────────────────────────────────────────────
+pub mod backend;
 pub mod storage;
+
+// ─── Test support ───────────────────────────────────────────────────
+#[cfg(test)]
+pub mod test_support;
+
+// ─── Core manager ────────────────────────────────────────────────────
+pub mod manager;
+
+// ─── Processes ──────────────────────────────────────────────────────
+pub mod dream;
+pub mod proactive;
+pub mod auto_bridge;
+
+#[cfg(feature = "sqlite-memory")]
+pub mod sqlite;
 
 // ─── Re-exports (b.1 — chunking/normalizer/hyperbolic) ──────────────
 pub use chunking::{chunk_fixed, chunk_paragraphs, ChunkConfig, TextChunk};
@@ -56,7 +74,8 @@ pub use normalizer::{
     cosine_similarity_f32, dot_product_f32, l2_norm_f32, l2_norm_f64, l2_normalize_f32,
     l2_normalize_f64,
 };
-pub use storage::{MemoryGit, MemoryStorage};
+pub use backend::MemoryBackend;
+pub use storage::{MarkdownSource, MemoryGit, MemoryStorage, MemoryStorageExt, NoteEntry};
 
 // ─── Re-exports (lifecycle) ─────────────────────────────────────────
 pub use auto_classify::AutoClassifier;
@@ -68,5 +87,16 @@ pub use embedding_viz::{compute_pca_2d, compute_top_neighbors, MemoryMapEntry, M
 pub use flash_attention::{BenchmarkResult, FlashAttention, FlashAttentionConfig, MemoryEstimate};
 pub use graph::MemoryGraph;
 pub use hnsw::HnswIndex;
+pub use hnsw_memory_index::{HnswMemoryIndex, SemanticHit};
 pub use quota::{CurationCandidate, CurationReport, MemoryBudget};
 pub use root_index::{HistoricalPeriod, RootEntry, RootIndex, TopicEntry};
+pub use sona::{LearnedPattern, SonaEngine, SonaMode, Trajectory, TrajectoryStep, Verdict};
+
+// ─── Re-exports (core manager) ──────────────────────────────────────
+pub use manager::MemoryManager;
+pub use dream::{DreamCheckpoint, DreamConfig, DreamProcess, DreamReport};
+pub use proactive::{ProactiveRecall, RecallTiming};
+pub use auto_bridge::{
+    AutoMemoryBridge, ExportResult, GuidancePattern, ImportResult, InsightCategory,
+    MemoryInsight, SyncDirection, SyncResult,
+};

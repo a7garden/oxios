@@ -1,85 +1,116 @@
 //! Agent memory system.
 //!
-//! Core types and leaf modules live in [`oxios_memory`]. This module
-//! re-exports them for back-compat and keeps kernel-coupled modules here.
+//! Core logic lives in [`oxios_memory`]. This module provides:
 //!
-//! ## Structure
-//!
-//! ```text
-//! oxios-memory (crate)       oxios-kernel/memory (this module)
-//! ─────────────────────      ──────────────────────────────────
-//! types.rs                   memory_manager.rs   — MemoryManager struct
-//! embedding.rs               store.rs            — CRUD operations
-//! chunking.rs                memory_ops.rs       — advanced search & tier ops
-//! normalizer.rs              hnsw_memory_index.rs — HNSW index wrapper
-//! hyperbolic.rs              dream.rs            — Dream consolidation
-//! auto_classify.rs           auto_memory_bridge.rs — external memory sync
-//! auto_protect.rs            proactive.rs        — proactive recall
-//! compaction.rs              sona.rs             — learning engine
-//! decay.rs                   sqlite_store.rs     — SQLite backend
-//! graph.rs                   database.rs         — SQLite schema
-//! flash_attention.rs         cache.rs            — embedding cache (SQLite)
-//! embedding_cache.rs         search/             — BM25 + vector + RRF
-//! embedding_viz.rs           migration.rs        — JSON → SQLite migration
-//! hnsw.rs                    hyperbolic_persist.rs
-//! root_index.rs
-//! quota.rs
-//! storage.rs (traits)
-//! ```
+//! 1. **Trait bridge** — `impl MemoryStorage for StateStore`, `impl MemoryGit for GitLayer`
+//! 2. **Config bridge** — `From<&ConsolidationConfig> for DreamConfig`
+//! 3. **Re-exports** — types used by kernel internals and the web surface
+//! 4. **Sub-modules** — `markdown_bridge` (orphan-rule wrapper),
+//!    `auto_memory_bridge` (oxios_memory re-export)
 
-// Re-export all types from oxios-memory (back-compat)
+// ── Trait: StateStore → MemoryStorage ───────────────────────────────
+
+use async_trait::async_trait;
+use oxios_memory::memory::storage::{MemoryGit, MemoryStorage};
+use serde_json::Value;
+
+#[async_trait]
+impl MemoryStorage for crate::state_store::StateStore {
+    async fn save_json_value(&self, c: &str, k: &str, v: &Value) -> anyhow::Result<()> {
+        self.save_json(c, k, v).await
+    }
+    async fn load_json_value(&self, c: &str, k: &str) -> anyhow::Result<Option<Value>> {
+        self.load_json::<Value>(c, k).await
+    }
+    async fn list_category(&self, category: &str) -> anyhow::Result<Vec<String>> {
+        crate::state_store::StateStore::list_category(self, category).await
+    }
+    async fn delete_file(&self, category: &str, key: &str) -> anyhow::Result<bool> {
+        crate::state_store::StateStore::delete_file(self, category, key).await
+    }
+}
+
+// ── Trait: GitLayer → MemoryGit ─────────────────────────────────────
+
+#[async_trait]
+impl MemoryGit for crate::git_layer::GitLayer {
+    async fn commit_file(&self, path: &str, message: &str) -> anyhow::Result<()> {
+        crate::git_layer::GitLayer::commit_file(self, path, message)?;
+        Ok(())
+    }
+    fn is_enabled(&self) -> bool {
+        crate::git_layer::GitLayer::is_enabled(self)
+    }
+}
+
+// ── Config bridge: ConsolidationConfig → DreamConfig ────────────────
+
+impl From<&crate::config::ConsolidationConfig> for oxios_memory::memory::dream::DreamConfig {
+    fn from(c: &crate::config::ConsolidationConfig) -> Self {
+        Self {
+            dream_enabled: c.dream_enabled,
+            dream_interval_hours: c.dream_interval_hours,
+            dream_min_sessions: c.dream_min_sessions,
+            hot_max_entries: c.hot_max_entries,
+            warm_max_entries: c.warm_max_entries,
+            cold_max_entries: c.cold_max_entries,
+            hot_token_budget: c.hot_token_budget,
+            decay_threshold: c.decay_threshold,
+            retention_days: c.retention_days,
+            decay_multiplier: c.decay_multiplier,
+            auto_protection: c.auto_protection,
+            protection_low_access: c.protection_low_access,
+            protection_medium_access: c.protection_medium_access,
+            protection_high_access: c.protection_high_access,
+            protection_medium_sessions: c.protection_medium_sessions,
+            protection_high_sessions: c.protection_high_sessions,
+            protection_demotion_enabled: c.protection_demotion_enabled,
+            protection_demotion_stale_days: c.protection_demotion_stale_days,
+            auto_classification: c.auto_classification,
+            type_promotion_repetitions: c.type_promotion_repetitions,
+            compaction_line_threshold: c.compaction_line_threshold,
+            proactive_recall_limit: c.proactive_recall_limit,
+            proactive_recall_threshold: c.proactive_recall_threshold,
+            pagerank_enabled: true,
+            pagerank_damping: 0.85,
+            pagerank_iterations: 30,
+            pagerank_boost_factor: 0.3,
+        }
+    }
+}
+
+// ── Re-exports ──────────────────────────────────────────────────────
+//
+// Minimal set: only types used by kernel internals or re-exported
+// through lib.rs for the web surface / binary crate.
+
+// Core types (kernel internal consumers)
+pub use oxios_memory::memory::manager::MemoryManager;
 pub use oxios_memory::memory::types::{
-    content_hash, dedup_by_id, extract_keywords, MemoryEntry, MemoryTier, MemoryType,
-    ProtectionLevel, TextVector,
+    content_hash, MemoryEntry, MemoryTier, MemoryType, ProtectionLevel, TextVector,
 };
 
-// Re-export leaf modules from oxios-memory
-pub use oxios_memory::l2_normalize_f32;
-pub use oxios_memory::memory::embedding_viz::{compute_pca_2d, compute_top_neighbors};
-pub use oxios_memory::HnswIndex;
-pub use oxios_memory::{
-    AutoClassifier, AutoProtector, CacheStats, CompactionTree, CurationCandidate, CurationReport,
-    DecayEngine, EmbeddingCache, FlashAttention, FlashAttentionConfig, HistoricalPeriod,
-    MemoryBudget, MemoryEstimate, MemoryGraph, MemoryMapEntry, MemoryNeighbor, RootEntry,
-    RootIndex, TopicEntry,
+// Dream + Proactive (binary crate)
+pub use oxios_memory::memory::dream::{DreamCheckpoint, DreamConfig, DreamProcess, DreamReport};
+pub use oxios_memory::memory::proactive::{ProactiveRecall, RecallTiming};
+
+// Web surface consumers (embedding viz, HNSW, graph)
+pub use oxios_memory::memory::embedding_viz::{
+    compute_pca_2d, compute_top_neighbors, MemoryMapEntry, MemoryNeighbor,
 };
+pub use oxios_memory::memory::hnsw::HnswIndex;
+pub use oxios_memory::memory::hnsw_memory_index::{HnswMemoryIndex, SemanticHit};
 
-// Re-export from kernel sub-modules
-pub use hnsw_memory_index::{HnswMemoryIndex, SemanticHit};
-pub use memory_manager::MemoryManager;
+// SQLite backend (feature-gated) — re-exported through lib.rs
+// to avoid duplicate re-exports. Don't re-export here.
 
-// ---------------------------------------------------------------------------
-// Sub-modules
-// ---------------------------------------------------------------------------
+// ── Sub-modules ─────────────────────────────────────────────────────
 
-/// HNSW index wrapper + semantic search hit type.
-pub mod hnsw_memory_index;
-/// Core struct + constructor + curation.
-mod memory_manager;
-/// Advanced operations (semantic search, HNSW rebuild, tier shift, pin).
-mod memory_ops;
-/// CRUD operations (remember, forget, list, search, recall, blend).
-pub(crate) mod store;
+/// Orphan-rule wrapper implementing `MarkdownSource` for `KnowledgeBase`.
+pub mod markdown_bridge;
 
-// Kernel-coupled sub-modules
-pub mod auto_memory_bridge;
-pub mod dream;
-pub mod proactive;
-pub mod sona;
-
-#[cfg(feature = "sqlite-memory")]
-pub mod cache;
-#[cfg(feature = "sqlite-memory")]
-pub mod database;
-#[cfg(feature = "sqlite-memory")]
-pub mod hyperbolic_persist;
-#[cfg(feature = "sqlite-memory")]
-pub mod migration;
-#[cfg(feature = "sqlite-memory")]
-pub mod search;
-#[cfg(feature = "sqlite-memory")]
-pub mod sqlite_store;
-
-// Re-export dream types
-pub use dream::{DreamCheckpoint, DreamProcess, DreamReport};
-pub use proactive::{ProactiveRecall, RecallTiming};
+/// Re-export of `oxios_memory::memory::auto_bridge` under the
+/// kernel's `memory::` namespace for back-compat.
+pub mod auto_memory_bridge {
+    pub use oxios_memory::memory::auto_bridge::*;
+}

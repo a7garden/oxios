@@ -30,10 +30,10 @@
 #[cfg(feature = "sqlite-memory")]
 use anyhow::Result;
 #[cfg(feature = "sqlite-memory")]
-use oxios_memory::memory::hyperbolic::{HyperbolicConfig, HyperbolicEmbedding};
+use crate::memory::hyperbolic::{HyperbolicConfig, HyperbolicEmbedding};
 
 #[cfg(feature = "sqlite-memory")]
-use crate::memory::sqlite_store::SqliteMemoryStore;
+use super::store::SqliteMemoryStore;
 
 /// Build a `HyperbolicEmbedding` from memory entries in SQLite.
 ///

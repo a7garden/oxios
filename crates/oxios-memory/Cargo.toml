@@ -18,6 +18,7 @@ anyhow = { workspace = true }
 chrono = { workspace = true }
 parking_lot = { workspace = true }
 uuid = { workspace = true }
+tokio = { workspace = true }
 tracing = { workspace = true }
 lru = "0.10"
 usearch = "2.25"
@@ -33,3 +34,4 @@ hf-hub = { version = "0.4", optional = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }
+tokio = { workspace = true }

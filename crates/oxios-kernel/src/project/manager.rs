@@ -14,9 +14,11 @@ use anyhow::Result;
 use chrono::Utc;
 use parking_lot::RwLock;
 
-use super::{detect_project, DetectionResult, Project, ProjectId, ProjectSource};
+use oxios_memory::memory::sqlite::MemoryDatabase;
+
 use crate::event_bus::{EventBus, KernelEvent};
-use crate::memory::database::MemoryDatabase;
+use super::project_db;
+use super::{detect_project, DetectionResult, Project, ProjectId, ProjectSource};
 
 /// Errors from ProjectManager operations.
 #[derive(thiserror::Error, Debug)]
@@ -54,7 +56,7 @@ impl ProjectManager {
         let mut name_index = HashMap::new();
 
         // Load existing projects from SQLite
-        let rows = db.list_projects()?;
+        let rows = project_db::list_projects(&db.conn())?;
         for project in rows {
             name_index.insert(project.name.clone(), project.id);
             projects.insert(project.id, project);
@@ -116,7 +118,7 @@ impl ProjectManager {
         }
 
         // Persist to SQLite
-        self.db.save_project(&project)?;
+        project_db::save_project(&self.db.conn(), &project)?;
 
         // Update in-memory indices
         {
@@ -188,7 +190,7 @@ impl ProjectManager {
         let project_clone = project.clone();
         drop(projects);
         drop(name_index);
-        self.db.save_project(&project_clone)?;
+        project_db::save_project(&self.db.conn(), &project_clone)?;
 
         tracing::info!(name = %project_clone.name, id = %id, "Project updated");
         Ok(project_clone)
@@ -207,7 +209,7 @@ impl ProjectManager {
         }
 
         // Remove from SQLite (cascades to project_memory via FK)
-        self.db.delete_project(&id.to_string())?;
+        project_db::delete_project(&self.db.conn(), &id.to_string())?;
 
         tracing::info!(id = %id, "Project removed");
         Ok(())
@@ -219,7 +221,7 @@ impl ProjectManager {
             project.touch();
             let project_clone = project.clone();
             drop(self.projects.write());
-            let _ = self.db.save_project(&project_clone);
+            let _ = project_db::save_project(&self.db.conn(), &project_clone);
         }
     }
 
@@ -239,21 +241,19 @@ impl ProjectManager {
                 return Err(ProjectManagerError::NotFound(project_id).into());
             }
         }
-        self.db
-            .link_project_memory(&project_id.to_string(), memory_id)?;
+        project_db::link_project_memory(&self.db.conn(), &project_id.to_string(), memory_id)?;
         Ok(())
     }
 
     /// Unlink a memory from a project.
     pub fn unlink_memory(&self, project_id: ProjectId, memory_id: &str) -> Result<()> {
-        self.db
-            .unlink_project_memory(&project_id.to_string(), memory_id)?;
+        project_db::unlink_project_memory(&self.db.conn(), &project_id.to_string(), memory_id)?;
         Ok(())
     }
 
     /// Get all memory IDs associated with a project.
     pub fn get_project_memory_ids(&self, project_id: ProjectId) -> Result<Vec<String>> {
-        self.db.get_project_memory_ids(&project_id.to_string())
+        project_db::get_project_memory_ids(&self.db.conn(), &project_id.to_string())
     }
 
     /// Save (upsert) a project to SQLite directly.
@@ -261,7 +261,7 @@ impl ProjectManager {
     /// Used when fields like `memory_visible` need updating
     /// outside the standard `update_project()` flow.
     pub fn save_project(&self, project: &Project) -> Result<()> {
-        self.db.save_project(project)?;
+        project_db::save_project(&self.db.conn(), project)?;
 
         // Refresh in-memory indices
         let mut projects = self.projects.write();

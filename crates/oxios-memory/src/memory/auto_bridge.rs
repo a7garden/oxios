@@ -17,7 +17,8 @@ use anyhow::Result;
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 
-use super::{MemoryEntry, MemoryManager, MemoryType};
+use crate::memory::types::{MemoryEntry, MemoryType};
+use crate::memory::manager::MemoryManager;
 
 // ---------------------------------------------------------------------------
 // Types
@@ -162,7 +163,7 @@ pub struct AutoMemoryBridge {
     /// Oxios memory manager (agent session memory).
     oxios_memory: std::sync::Arc<MemoryManager>,
     /// Optional markdown knowledge base (global, not per-Space).
-    knowledge_base: Option<std::sync::Arc<oxios_markdown::KnowledgeBase>>,
+    knowledge_base: Option<std::sync::Arc<dyn crate::memory::storage::MarkdownSource>>,
 }
 
 impl AutoMemoryBridge {
@@ -185,7 +186,7 @@ impl AutoMemoryBridge {
     /// `.md` files instead of relying on MemoryManager entries.
     pub fn with_knowledge_base(
         mut self,
-        kb: std::sync::Arc<oxios_markdown::KnowledgeBase>,
+        kb: std::sync::Arc<dyn crate::memory::storage::MarkdownSource>,
     ) -> Self {
         self.knowledge_base = Some(kb);
         self
@@ -307,7 +308,7 @@ impl AutoMemoryBridge {
     #[cfg(feature = "sqlite-memory")]
     pub async fn sync_sqlite_to_auto(
         &self,
-        store: &crate::memory::sqlite_store::SqliteMemoryStore,
+        store: &crate::memory::sqlite::SqliteMemoryStore,
     ) -> Result<ExportResult> {
         let rows = store.load_patterns()?;
         if rows.is_empty() {
@@ -341,7 +342,7 @@ impl AutoMemoryBridge {
     #[cfg(feature = "sqlite-memory")]
     pub async fn sync_auto_to_sqlite(
         &self,
-        store: &crate::memory::sqlite_store::SqliteMemoryStore,
+        store: &crate::memory::sqlite::SqliteMemoryStore,
     ) -> Result<ImportResult> {
         let import_result = self.import_from_auto().await?;
 
@@ -553,7 +554,7 @@ impl AutoMemoryBridge {
                     chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0)
                 ),
                 memory_type: MemoryType::Knowledge,
-                tier: super::MemoryTier::Warm,
+                tier: crate::memory::types::MemoryTier::Warm,
                 content: match &insight.detail {
                     Some(d) => format!("{}\n\n{}", insight.summary, d),
                     None => insight.summary.clone(),
@@ -564,7 +565,7 @@ impl AutoMemoryBridge {
                 tags: vec![insight.category.to_tag().to_string()],
                 importance: insight.confidence,
                 pinned: false,
-                protection: super::ProtectionLevel::None,
+                protection: crate::memory::types::ProtectionLevel::None,
                 auto_classified: false,
                 session_appearances: 0,
                 user_corrected: false,
@@ -773,11 +774,10 @@ mod tests {
     use std::sync::Arc;
 
     fn make_bridge(dir: &Path) -> AutoMemoryBridge {
-        let store = Arc::new(crate::state_store::StateStore::new(dir.join("state")).unwrap());
-        let memory = Arc::new(MemoryManager::new(store));
-        AutoMemoryBridge::new(dir.join("auto"), memory).with_knowledge_base(Arc::new(
-            oxios_markdown::KnowledgeBase::new(dir.join("kb")).unwrap(),
-        ))
+        let storage: Arc<dyn crate::memory::storage::MemoryStorage> =
+            Arc::new(crate::memory::test_support::InMemoryStorage::default());
+        let memory = Arc::new(MemoryManager::new(storage));
+        AutoMemoryBridge::new(dir.join("auto"), memory)
     }
 
     #[test]

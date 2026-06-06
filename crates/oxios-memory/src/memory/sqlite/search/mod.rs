@@ -12,7 +12,7 @@ pub(super) mod vector;
 use anyhow::Result;
 
 use super::database::MemoryDatabase;
-use crate::memory::{MemoryEntry, MemoryTier, MemoryType, ProtectionLevel};
+use crate::memory::types::{MemoryEntry, MemoryTier, MemoryType, ProtectionLevel};
 
 // Re-export for external use
 pub use bm25::Bm25Hit;
@@ -227,7 +227,7 @@ fn parse_protection(s: &str) -> ProtectionLevel {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::memory::database::MemoryDatabase;
+    use crate::memory::sqlite::database::MemoryDatabase;
 
     #[test]
     fn test_search_with_bm25_only() {

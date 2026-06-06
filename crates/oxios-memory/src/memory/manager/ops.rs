@@ -2,8 +2,12 @@
 
 use anyhow::Result;
 
-use super::hnsw_memory_index::{HnswMemoryIndex, SemanticHit};
-use super::{AutoProtector, MemoryEntry, MemoryManager, MemoryType};
+use crate::memory::auto_protect::AutoProtector;
+use crate::memory::hnsw_memory_index::{HnswMemoryIndex, SemanticHit};
+use crate::memory::storage::MemoryStorageExt;
+use crate::memory::types::{MemoryEntry, MemoryTier, MemoryType};
+
+use super::MemoryManager;
 
 impl MemoryManager {
     /// Semantic search using HNSW index.
@@ -11,18 +15,6 @@ impl MemoryManager {
     /// Unlike `search()` which uses brute-force cosine similarity over the
     /// in-memory HashMap, `semantic_search()` uses the HNSW approximate
     /// nearest neighbor index for sub-linear time complexity.
-    ///
-    /// This is the preferred search method when the HNSW index is available
-    /// and populated with dense vectors.
-    ///
-    /// # Arguments
-    /// * `query` — Search query text.
-    /// * `memory_type` — Optional filter by memory type.
-    /// * `limit` — Maximum results to return.
-    /// * `hnsw_index` — The HNSW index to search against.
-    ///
-    /// # Returns
-    /// A list of `SemanticHit` with entry and similarity score.
     pub async fn semantic_search(
         &self,
         query: &str,
@@ -84,7 +76,7 @@ impl MemoryManager {
         for (id, distance) in raw_hits {
             for mt in types {
                 if let Ok(Some(mut entry)) = self
-                    .state_store
+                    .storage
                     .load_json::<MemoryEntry>(mt.category(), &id)
                     .await
                 {
@@ -144,10 +136,10 @@ impl MemoryManager {
         let mut count = 0;
 
         for mt in MemoryType::all() {
-            if let Ok(names) = self.state_store.list_category(mt.category()).await {
+            if let Ok(names) = self.storage.list_category(mt.category()).await {
                 for name in names {
                     if let Ok(Some(entry)) = self
-                        .state_store
+                        .storage
                         .load_json::<MemoryEntry>(mt.category(), &name)
                         .await
                     {
@@ -179,7 +171,7 @@ impl MemoryManager {
     /// List memories by tier (loads all types, filters by tier field).
     pub async fn list_by_tier(
         &self,
-        tier: super::MemoryTier,
+        tier: MemoryTier,
         limit: usize,
     ) -> Result<Vec<MemoryEntry>> {
         #[cfg(feature = "sqlite-memory")]
@@ -222,7 +214,11 @@ impl MemoryManager {
         }
         // Try as category/name format
         if let Some((cat, name)) = reference.split_once('/') {
-            if let Ok(Some(entry)) = self.state_store.load_json::<MemoryEntry>(cat, name).await {
+            if let Ok(Some(entry)) = self
+                .storage
+                .load_json::<MemoryEntry>(cat, name)
+                .await
+            {
                 return Ok(Some(entry));
             }
         }
@@ -230,18 +226,17 @@ impl MemoryManager {
     }
 
     /// Select memories by manifest (keyword matching against content).
-    ///
-    /// Used by proactive recall Step 2 for cross-domain keyword matching.
-    pub async fn select_by_manifest(&self, query: &str, limit: usize) -> Result<Vec<MemoryEntry>> {
+    pub async fn select_by_manifest(
+        &self,
+        query: &str,
+        limit: usize,
+    ) -> Result<Vec<MemoryEntry>> {
         self.keyword_search(query, None, limit).await
     }
 
     /// Build the Hot tier context for agent prompt injection.
-    ///
-    /// Returns a formatted string of all Hot tier memories, truncated to
-    /// fit within the configured token budget (4 chars ≈ 1 token).
     pub async fn build_hot_context(&self, token_budget: usize) -> Result<String> {
-        let hot_entries = self.list_by_tier(super::MemoryTier::Hot, 50).await?;
+        let hot_entries = self.list_by_tier(MemoryTier::Hot, 50).await?;
 
         let mut context_parts = Vec::new();
         let mut char_budget = token_budget * 4;
@@ -282,8 +277,8 @@ impl MemoryManager {
     pub async fn shift_tier(
         &self,
         id: &str,
-        from: super::MemoryTier,
-        to: super::MemoryTier,
+        from: MemoryTier,
+        to: MemoryTier,
     ) -> Result<()> {
         if let Ok(Some(mut entry)) = self.get_by_id(id).await {
             if entry.tier == from {
@@ -298,7 +293,7 @@ impl MemoryManager {
     pub async fn pin(&self, id: &str) -> Result<()> {
         if let Ok(Some(mut entry)) = self.get_by_id(id).await {
             entry.pinned = true;
-            entry.protection = super::ProtectionLevel::Permanent;
+            entry.protection = crate::memory::types::ProtectionLevel::Permanent;
             self.remember(entry).await?;
         }
         Ok(())
@@ -309,7 +304,7 @@ impl MemoryManager {
         if let Ok(Some(mut entry)) = self.get_by_id(id).await {
             entry.pinned = false;
             // Recompute protection
-            let protector = oxios_memory::memory::auto_protect::AutoProtector::default_protector();
+            let protector = crate::memory::auto_protect::AutoProtector::default_protector();
             entry.protection = protector.compute_protection(&entry);
             self.remember(entry).await?;
         }
@@ -329,7 +324,7 @@ impl MemoryManager {
     ///
     /// Returns the number of entries updated.
     pub async fn recompute_all_decay(&self, multiplier: f32) -> Result<usize> {
-        let engine = oxios_memory::memory::decay::DecayEngine::new(multiplier);
+        let engine = crate::memory::decay::DecayEngine::new(multiplier);
         let now = chrono::Utc::now();
         let mut count = 0;
 
@@ -350,13 +345,8 @@ impl MemoryManager {
     }
 
     /// Immediate Hot overflow handling.
-    ///
-    /// Called after remember() to immediately demote entries when Hot
-    /// exceeds its budget.
     pub async fn immediate_hot_overflow(&self, hot_max: usize) -> Result<usize> {
-        let hot_entries = self
-            .list_by_tier(super::MemoryTier::Hot, hot_max * 2)
-            .await?;
+        let hot_entries = self.list_by_tier(MemoryTier::Hot, hot_max * 2).await?;
         if hot_entries.len() <= hot_max {
             return Ok(0);
         }
@@ -364,7 +354,9 @@ impl MemoryManager {
         let overflow = hot_entries.len() - hot_max;
         let mut candidates: Vec<MemoryEntry> = hot_entries
             .into_iter()
-            .filter(|e| e.protection < super::ProtectionLevel::High && !e.pinned)
+            .filter(|e| {
+                e.protection < crate::memory::types::ProtectionLevel::High && !e.pinned
+            })
             .collect();
 
         candidates.sort_by(|a, b| {
@@ -377,7 +369,7 @@ impl MemoryManager {
 
         let mut demoted = 0;
         for entry in candidates.into_iter().take(overflow) {
-            self.shift_tier(&entry.id, super::MemoryTier::Hot, super::MemoryTier::Warm)
+            self.shift_tier(&entry.id, MemoryTier::Hot, MemoryTier::Warm)
                 .await?;
             demoted += 1;
         }

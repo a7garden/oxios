@@ -13,8 +13,8 @@
 
 pub mod conversation_buffer;
 pub mod detection;
-
 pub mod manager;
+pub mod project_db;
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};

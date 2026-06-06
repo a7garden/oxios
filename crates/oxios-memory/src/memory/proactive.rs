@@ -11,7 +11,9 @@ use std::collections::HashSet;
 
 use anyhow::Result;
 
-use super::{MemoryEntry, MemoryManager};
+use crate::memory::types::{MemoryEntry, MemoryTier};
+use crate::memory::decay::DecayEngine;
+use crate::memory::manager::MemoryManager;
 
 // ---------------------------------------------------------------------------
 // RecallTiming
@@ -108,11 +110,6 @@ impl ProactiveRecall {
     }
 
     /// Execute 3-step proactive recall.
-    ///
-    /// Steps:
-    /// 1. HOT tier memories (always injected for context)
-    /// 2. ROOT index triage (O(1) topic lookup)
-    /// 3. SQLite semantic + BM25 search (vector + keyword fusion)
     pub async fn recall(
         &self,
         mgr: &MemoryManager,
@@ -123,10 +120,7 @@ impl ProactiveRecall {
         let mut seen_ids: HashSet<String> = current_context.iter().map(|e| e.id.clone()).collect();
 
         // Step 1: HOT tier memories (always included)
-        if let Ok(hot_entries) = mgr
-            .list_by_tier(crate::memory::MemoryTier::Hot, self.limit)
-            .await
-        {
+        if let Ok(hot_entries) = mgr.list_by_tier(MemoryTier::Hot, self.limit).await {
             for entry in hot_entries {
                 if !seen_ids.contains(&entry.id) {
                     seen_ids.insert(entry.id.clone());
@@ -135,7 +129,7 @@ impl ProactiveRecall {
             }
         }
 
-        // Step 2: SQLite semantic + BM25 search
+        // Step 2: Semantic + BM25 search
         if results.len() < self.limit {
             let remaining = self.limit - results.len();
             let search_results = mgr
@@ -154,7 +148,7 @@ impl ProactiveRecall {
         }
 
         // Filter by importance threshold
-        results.retain(|e| super::DecayEngine::effective_importance(e) >= self.threshold);
+        results.retain(|e| DecayEngine::effective_importance(e) >= self.threshold);
 
         Ok(results)
     }

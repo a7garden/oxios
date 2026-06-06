@@ -736,8 +736,7 @@ impl KernelBuilder {
         {
             let consolidation = &config.memory.consolidation;
             if consolidation.dream_enabled {
-                let dream_config =
-                    oxios_kernel::memory::dream::DreamConfig::from_consolidation(consolidation);
+                let dream_config = oxios_kernel::DreamConfig::from(consolidation);
                 let space_dir = PathBuf::from(&config.kernel.workspace);
                 let dream = Arc::new(oxios_kernel::DreamProcess::new(
                     memory_manager.clone(),

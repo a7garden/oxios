@@ -11,7 +11,7 @@ default = ["sqlite-memory"]
 otel = ["tracing-opentelemetry", "opentelemetry", "opentelemetry_sdk", "opentelemetry-otlp", "opentelemetry-stdout"]
 wasm-sandbox = ["dep:wasmtime", "dep:wasmtime-wasi"]
 native-browser = ["oxi-sdk/native-browser"]
-sqlite-memory = ["dep:rusqlite", "dep:sqlite-vec"]
+sqlite-memory = ["dep:rusqlite", "dep:sqlite-vec", "oxios-memory/sqlite-memory"]
 
 # MLX embedding provider (Apple Silicon only)
 # Provides EmbeddingGemma-300m dense vectors for semantic search.
@@ -57,20 +57,14 @@ once_cell = { workspace = true }
 blake3 = { workspace = true }
 tracing-subscriber = { workspace = true }
 parking_lot = { workspace = true }
-
-# WASM sandbox (optional)
 wasmtime = { version = "22", features = ["cranelift"], optional = true }
 wasmtime-wasi = { version = "22", optional = true }
 sysinfo = "0.35"
 dirs = { workspace = true }
 libc = { workspace = true }
-lru = "0.10"
 inquire = { workspace = true }
 console = { workspace = true }
 indicatif = "0.17"
-
-# Vector search (HNSW, legacy)
-usearch = "2.25"
 
 # SQLite-based memory storage (RFC-012)
 rusqlite = { version = "0.34", features = ["bundled"], optional = true }
