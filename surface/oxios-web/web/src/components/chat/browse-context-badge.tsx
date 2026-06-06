@@ -1,3 +1,7 @@
+import {
+  Search, ClipboardList, Zap, XCircle, FileText, Camera,
+  ExternalLink, LoaderCircle, ScrollText,
+} from 'lucide-react'
 import type { ToolCallContext, VisitReason } from '@/types'
 
 /**
@@ -17,7 +21,7 @@ export function BrowseContextBadge({ context }: { context: ToolCallContext }) {
     case 'web_search':
       return (
         <span className="inline-flex items-center gap-1 text-2xs text-info truncate max-w-[50ch]">
-          <span className="font-medium">🔍</span>
+          <Search className="h-3 w-3 shrink-0" />
           {context.query ? context.query : ''}
           {context.engine ? <span className="text-muted-foreground">({context.engine})</span> : null}
         </span>
@@ -25,7 +29,7 @@ export function BrowseContextBadge({ context }: { context: ToolCallContext }) {
     case 'data_extraction':
       return (
         <span className="inline-flex items-center gap-1 text-2xs text-warning truncate max-w-[50ch]">
-          <span className="font-medium">📋</span>
+          <ClipboardList className="h-3 w-3 shrink-0" />
           {context.target}
           {context.result_count != null ? (
             <span className="text-muted-foreground">({context.result_count} items)</span>
@@ -35,7 +39,7 @@ export function BrowseContextBadge({ context }: { context: ToolCallContext }) {
     case 'session_action':
       return (
         <span className="inline-flex items-center gap-1 text-2xs text-purple-500 dark:text-purple-400 truncate max-w-[40ch]">
-          <span className="font-medium">⚡</span>
+          <Zap className="h-3 w-3 shrink-0" />
           {context.action}
         </span>
       )
@@ -53,7 +57,7 @@ function ScriptStepBadge({
 
   return (
     <span className="inline-flex items-center gap-1.5 text-2xs text-muted-foreground">
-      <span className="font-medium">📜</span>
+      <ScrollText className="h-3 w-3 shrink-0" />
       <span className="flex items-center gap-1">
         <span
           className="inline-block w-10 h-1.5 rounded-full bg-muted overflow-hidden"
@@ -85,7 +89,7 @@ function PageVisitBadge({
   if (context.navigation_error) {
     return (
       <span className="inline-flex items-center gap-1 text-2xs text-error truncate max-w-[50ch]">
-        <span className="font-medium">❌</span>
+        <XCircle className="h-3 w-3 shrink-0" />
         <span className="truncate font-mono">{shortenUrl(context.url)}</span>
         <span className="text-muted-foreground truncate max-w-[24ch]">— {context.navigation_error}</span>
       </span>
@@ -96,7 +100,7 @@ function PageVisitBadge({
   if (context.page_title) {
     return (
       <span className="inline-flex items-center gap-1 text-2xs text-success truncate max-w-[50ch]">
-        <span className="font-medium">📄</span>
+        <FileText className="h-3 w-3 shrink-0" />
         <VisitReasonChip reason={context.reason} />
         <span className="truncate">{context.page_title}</span>
         {context.page_status ? (
@@ -105,7 +109,7 @@ function PageVisitBadge({
         {context.page_duration_ms != null ? (
           <span className="text-muted-foreground">{formatDuration(context.page_duration_ms)}</span>
         ) : null}
-        {context.screenshot ? <span className="text-muted-foreground">📷</span> : null}
+        {context.screenshot ? <Camera className="h-3 w-3 text-muted-foreground" /> : null}
       </span>
     )
   }
@@ -113,7 +117,7 @@ function PageVisitBadge({
   // Still loading — show URL with visit reason
   return (
     <span className="inline-flex items-center gap-1 text-2xs text-muted-foreground truncate max-w-[50ch]">
-      <span className="font-medium animate-pulse">⏳</span>
+      <LoaderCircle className="h-3 w-3 shrink-0 animate-spin" />
       <VisitReasonChip reason={context.reason} />
       <span className="truncate font-mono">{shortenUrl(context.url)}</span>
     </span>
@@ -141,7 +145,7 @@ function VisitReasonChip({ reason }: { reason?: VisitReason }) {
         className="text-muted-foreground shrink-0"
         title={`Followed link from ${reason.link_followed.from_url}`}
       >
-        🔗
+          <ExternalLink className="h-3 w-3" />
       </span>
     )
   }
