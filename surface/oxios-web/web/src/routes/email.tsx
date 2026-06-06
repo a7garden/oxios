@@ -154,9 +154,7 @@ function providerDashboardLabel(provider: string | null): string | null {
 function EmailPage() {
   const { t } = useTranslation()
   const { data: status, isLoading, isError, refetch } = useEmailStatus()
-  const [activeTab, setActiveTab] = useState(
-    status?.configured ? 'overview' : 'setup',
-  )
+  const [activeTab, setActiveTab] = useState(status?.configured ? 'overview' : 'setup')
 
   if (isLoading) return <LoadingCards count={3} />
   if (isError) return <ErrorState onRetry={() => refetch()} />
@@ -213,10 +211,7 @@ function EmailPage() {
         <Separator className="my-4" />
 
         <TabsContent value="overview">
-          <OverviewPanel
-            status={status}
-            onGoSetup={() => setActiveTab('setup')}
-          />
+          <OverviewPanel status={status} onGoSetup={() => setActiveTab('setup')} />
         </TabsContent>
         <TabsContent value="setup">
           <SetupPanel
@@ -240,13 +235,7 @@ function EmailPage() {
 
 // ─── Overview Panel ────────────────────────────────────────
 
-function OverviewPanel({
-  status,
-  onGoSetup,
-}: {
-  status?: EmailStatus
-  onGoSetup: () => void
-}) {
+function OverviewPanel({ status, onGoSetup }: { status?: EmailStatus; onGoSetup: () => void }) {
   const { t } = useTranslation()
 
   if (!status) return null
@@ -282,13 +271,9 @@ function OverviewPanel({
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="font-semibold truncate">
-              {status.email ?? t('email.noAddress', '—')}
-            </p>
+            <p className="font-semibold truncate">{status.email ?? t('email.noAddress', '—')}</p>
             {status.provider && (
-              <p className="text-xs text-muted-foreground mt-1 capitalize">
-                {status.provider}
-              </p>
+              <p className="text-xs text-muted-foreground mt-1 capitalize">{status.provider}</p>
             )}
           </CardContent>
         </Card>
@@ -315,9 +300,7 @@ function OverviewPanel({
         <Card className="border-dashed">
           <CardContent className="flex items-center justify-between py-6">
             <div>
-              <p className="font-medium">
-                {t('email.getStarted', 'Get started with email')}
-              </p>
+              <p className="font-medium">{t('email.getStarted', 'Get started with email')}</p>
               <p className="text-sm text-muted-foreground">
                 {t(
                   'email.getStartedDesc',
@@ -338,13 +321,7 @@ function OverviewPanel({
 
 // ─── Setup Panel ───────────────────────────────────────────
 
-function SetupPanel({
-  status,
-  onComplete,
-}: {
-  status?: EmailStatus
-  onComplete: () => void
-}) {
+function SetupPanel({ status, onComplete }: { status?: EmailStatus; onComplete: () => void }) {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
   const [provider, setProvider] = useState('resend')
@@ -410,9 +387,7 @@ function SetupPanel({
       body.port = parseInt(port, 10) || 587
       if (user) body.user = user
     }
-    setupMutation.mutate(
-      body as Parameters<typeof setupMutation.mutate>[0],
-    )
+    setupMutation.mutate(body as Parameters<typeof setupMutation.mutate>[0])
   }
 
   const handleTest = () => {
@@ -437,17 +412,11 @@ function SetupPanel({
         </CardHeader>
         <CardContent className="space-y-3">
           <p className="text-sm text-muted-foreground">
-            {t('email.configuredWith', 'Sending from')}{' '}
-            <strong>{status.email}</strong>
+            {t('email.configuredWith', 'Sending from')} <strong>{status.email}</strong>
             {status.provider ? ` (${status.provider})` : ''}
           </p>
           <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleTest}
-              disabled={isPending}
-            >
+            <Button variant="outline" size="sm" onClick={handleTest} disabled={isPending}>
               {isPending ? (
                 <Loader2 className="h-4 w-4 mr-1 animate-spin" />
               ) : (
@@ -456,11 +425,7 @@ function SetupPanel({
               {t('email.sendTest', 'Send Test')}
             </Button>
             {dashUrl && dashLabel && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => window.open(dashUrl, '_blank')}
-              >
+              <Button variant="outline" size="sm" onClick={() => window.open(dashUrl, '_blank')}>
                 <ExternalLink className="h-4 w-4 mr-1" />
                 {dashLabel}
               </Button>
@@ -480,10 +445,7 @@ function SetupPanel({
           )}
         </CardContent>
         <CardFooter className="border-t text-xs text-muted-foreground">
-          {t(
-            'email.reconfigNotice',
-            'To reconfigure, update config.toml and restart.',
-          )}
+          {t('email.reconfigNotice', 'To reconfigure, update config.toml and restart.')}
         </CardFooter>
       </Card>
     )
@@ -525,17 +487,13 @@ function SetupPanel({
 
           {/* Email */}
           <div className="space-y-2">
-            <Label htmlFor="email">
-              {t('email.emailLabel', 'Email address')}
-            </Label>
+            <Label htmlFor="email">{t('email.emailLabel', 'Email address')}</Label>
             <Input
               id="email"
               type="email"
               value={myEmail}
               onChange={(e) => setMyEmail(e.target.value)}
-              placeholder={
-                isResend ? 'hello@mydomain.com' : 'user@gmail.com'
-              }
+              placeholder={isResend ? 'hello@mydomain.com' : 'user@gmail.com'}
               required
               className="max-w-sm"
             />
@@ -554,10 +512,7 @@ function SetupPanel({
             <Label htmlFor="password">
               {isResend
                 ? t('email.apiKeyLabel', 'Resend API key')
-                : t(
-                    'email.passwordLabel',
-                    'SMTP password / app password',
-                  )}
+                : t('email.passwordLabel', 'SMTP password / app password')}
             </Label>
             <div className="relative max-w-sm">
               <Input
@@ -575,11 +530,7 @@ function SetupPanel({
                 onClick={() => setShowPassword(!showPassword)}
                 tabIndex={-1}
               >
-                {showPassword ? (
-                  <EyeOff className="h-4 w-4" />
-                ) : (
-                  <Eye className="h-4 w-4" />
-                )}
+                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
             </div>
             {isResend && (
@@ -615,10 +566,7 @@ function SetupPanel({
             )}
             {provider === 'icloud' && (
               <p className="text-xs text-muted-foreground">
-                {t(
-                  'email.icloudHint',
-                  'Use an App-Specific Password from',
-                )}{' '}
+                {t('email.icloudHint', 'Use an App-Specific Password from')}{' '}
                 <a
                   href="https://appleid.apple.com"
                   target="_blank"
@@ -638,9 +586,7 @@ function SetupPanel({
               <Separator />
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="host">
-                    {t('email.hostLabel', 'SMTP Host')}
-                  </Label>
+                  <Label htmlFor="host">{t('email.hostLabel', 'SMTP Host')}</Label>
                   <Input
                     id="host"
                     value={host}
@@ -650,9 +596,7 @@ function SetupPanel({
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="port">
-                    {t('email.portLabel', 'Port')}
-                  </Label>
+                  <Label htmlFor="port">{t('email.portLabel', 'Port')}</Label>
                   <Input
                     id="port"
                     type="number"
@@ -663,9 +607,7 @@ function SetupPanel({
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="user">
-                    {t('email.userLabel', 'Username')}
-                  </Label>
+                  <Label htmlFor="user">{t('email.userLabel', 'Username')}</Label>
                   <Input
                     id="user"
                     value={user}
@@ -673,10 +615,7 @@ function SetupPanel({
                     placeholder={myEmail || 'user@example.com'}
                   />
                   <p className="text-xs text-muted-foreground">
-                    {t(
-                      'email.userHint',
-                      'Defaults to the email address if empty.',
-                    )}
+                    {t('email.userHint', 'Defaults to the email address if empty.')}
                   </p>
                 </div>
               </div>
@@ -685,18 +624,13 @@ function SetupPanel({
 
           {/* Submit */}
           <div className="flex gap-2 pt-2">
-            <Button
-              type="submit"
-              disabled={!myEmail || !password || isPending}
-            >
+            <Button type="submit" disabled={!myEmail || !password || isPending}>
               {isPending ? (
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
               ) : (
                 <Settings className="h-4 w-4 mr-2" />
               )}
-              {isPending
-                ? t('email.saving', 'Saving...')
-                : t('email.saveAndTest', 'Save & Test')}
+              {isPending ? t('email.saving', 'Saving...') : t('email.saveAndTest', 'Save & Test')}
             </Button>
           </div>
 
@@ -722,13 +656,7 @@ function SetupPanel({
 
 function HistoryPanel({ active }: { active: boolean }) {
   const { t } = useTranslation()
-  const {
-    data,
-    isLoading,
-    isError,
-    refetch,
-    isFetching,
-  } = useEmailHistory(100, active)
+  const { data, isLoading, isError, refetch, isFetching } = useEmailHistory(100, active)
 
   const emails = data?.emails ?? []
 
@@ -750,9 +678,7 @@ function HistoryPanel({ active }: { active: boolean }) {
           {t('email.sentHistory', 'Sent History')}
         </CardTitle>
         <Button variant="ghost" size="icon" onClick={() => refetch()}>
-          <RefreshCw
-            className={cn('h-4 w-4', isFetching && 'animate-spin')}
-          />
+          <RefreshCw className={cn('h-4 w-4', isFetching && 'animate-spin')} />
         </Button>
       </CardHeader>
       <CardContent>
@@ -770,9 +696,7 @@ function HistoryPanel({ active }: { active: boolean }) {
                 className="flex items-start justify-between gap-4 rounded-lg border p-3"
               >
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium truncate">
-                    {email.subject}
-                  </p>
+                  <p className="text-sm font-medium truncate">{email.subject}</p>
                   <p className="text-xs text-muted-foreground">
                     {t('email.to', 'To')}: {email.to}
                     {email.template_used &&
@@ -792,8 +716,7 @@ function HistoryPanel({ active }: { active: boolean }) {
       </CardContent>
       {data && data.total > data.limit && (
         <CardFooter className="text-xs text-muted-foreground">
-          {t('email.showingLatest', 'Showing latest')}{' '}
-          {data.emails.length} / {data.total}
+          {t('email.showingLatest', 'Showing latest')} {data.emails.length} / {data.total}
         </CardFooter>
       )}
     </Card>
@@ -805,12 +728,7 @@ function SentEmailDialog({ email }: { email: SentEmail }) {
   const [open, setOpen] = useState(false)
   return (
     <>
-      <Button
-        variant="link"
-        size="sm"
-        className="h-auto p-0 text-xs"
-        onClick={() => setOpen(true)}
-      >
+      <Button variant="link" size="sm" className="h-auto p-0 text-xs" onClick={() => setOpen(true)}>
         {t('email.viewDetails', 'View')}
       </Button>
       <Dialog open={open} onOpenChange={setOpen}>
@@ -824,15 +742,10 @@ function SentEmailDialog({ email }: { email: SentEmail }) {
           <div className="space-y-3 text-sm">
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <span className="text-muted-foreground">
-                  {t('email.to', 'To')}:
-                </span>{' '}
-                {email.to}
+                <span className="text-muted-foreground">{t('email.to', 'To')}:</span> {email.to}
               </div>
               <div>
-                <span className="text-muted-foreground">
-                  {t('email.sentAt', 'Sent at')}:
-                </span>{' '}
+                <span className="text-muted-foreground">{t('email.sentAt', 'Sent at')}:</span>{' '}
                 {new Date(email.sent_at).toLocaleString()}
               </div>
               <div>
@@ -841,9 +754,7 @@ function SentEmailDialog({ email }: { email: SentEmail }) {
               </div>
               {email.template_used && (
                 <div>
-                  <span className="text-muted-foreground">
-                    {t('email.template', 'Template')}:
-                  </span>{' '}
+                  <span className="text-muted-foreground">{t('email.template', 'Template')}:</span>{' '}
                   {email.template_used}
                 </div>
               )}
@@ -868,13 +779,7 @@ function SentEmailDialog({ email }: { email: SentEmail }) {
 
 function TemplatesPanel({ active }: { active: boolean }) {
   const { t } = useTranslation()
-  const {
-    data,
-    isLoading,
-    isError,
-    refetch,
-    isFetching,
-  } = useEmailTemplates(active)
+  const { data, isLoading, isError, refetch, isFetching } = useEmailTemplates(active)
 
   const templates = data?.templates ?? []
 
@@ -896,9 +801,7 @@ function TemplatesPanel({ active }: { active: boolean }) {
           {t('email.emailTemplates', 'Email Templates')}
         </CardTitle>
         <Button variant="ghost" size="icon" onClick={() => refetch()}>
-          <RefreshCw
-            className={cn('h-4 w-4', isFetching && 'animate-spin')}
-          />
+          <RefreshCw className={cn('h-4 w-4', isFetching && 'animate-spin')} />
         </Button>
       </CardHeader>
       <CardContent>
@@ -919,9 +822,7 @@ function TemplatesPanel({ active }: { active: boolean }) {
                 <p className="text-xs text-muted-foreground mt-1">
                   {(tmpl.size / 1024).toFixed(1)} KB
                 </p>
-                <p className="text-xs text-muted-foreground mt-2 line-clamp-3">
-                  {tmpl.preview}
-                </p>
+                <p className="text-xs text-muted-foreground mt-2 line-clamp-3">{tmpl.preview}</p>
               </div>
             ))}
           </div>
