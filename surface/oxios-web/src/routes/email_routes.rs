@@ -236,7 +236,8 @@ pub(crate) async fn handle_email_status(
         oxios_kernel::email::SmtpProvider::Icloud => "icloud",
         oxios_kernel::email::SmtpProvider::Fastmail => "fastmail",
         oxios_kernel::email::SmtpProvider::Custom => "custom",
-    }.to_string();
+    }
+    .to_string();
 
     let configured = state.kernel.email.is_some();
     let (email, provider, template_count) = if let Some(api) = &state.kernel.email {
