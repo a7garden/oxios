@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
 import {
+  ArrowRight,
   CheckCircle2,
   ExternalLink,
   Eye,
@@ -92,20 +93,60 @@ function useEmailStatus() {
   })
 }
 
-function useEmailHistory(limit = 50) {
+function useEmailHistory(limit = 50, enabled = false) {
   return useQuery({
     queryKey: ['email-history', limit],
     queryFn: () => api.get<EmailHistory>(`/api/email/history?limit=${limit}`),
-    enabled: false, // manual fetch
+    enabled,
   })
 }
 
-function useEmailTemplates() {
+function useEmailTemplates(enabled = false) {
   return useQuery({
     queryKey: ['email-templates'],
     queryFn: () => api.get<TemplatesResponse>('/api/email/templates'),
-    enabled: false,
+    enabled,
   })
+}
+
+// ─── Provider metadata ─────────────────────────────────────
+
+const PROVIDERS = [
+  { value: 'resend', label: 'Resend' },
+  { value: 'gmail', label: 'Gmail' },
+  { value: 'icloud', label: 'iCloud' },
+  { value: 'fastmail', label: 'Fastmail' },
+  { value: 'custom', label: 'Custom SMTP' },
+] as const
+
+function providerDashboardUrl(provider: string | null): string | null {
+  switch (provider) {
+    case 'resend':
+      return 'https://resend.com/emails'
+    case 'gmail':
+      return 'https://mail.google.com'
+    case 'icloud':
+      return 'https://www.icloud.com/mail'
+    case 'fastmail':
+      return 'https://app.fastmail.com'
+    default:
+      return null
+  }
+}
+
+function providerDashboardLabel(provider: string | null): string | null {
+  switch (provider) {
+    case 'resend':
+      return 'Resend Dashboard'
+    case 'gmail':
+      return 'Gmail'
+    case 'icloud':
+      return 'iCloud Mail'
+    case 'fastmail':
+      return 'Fastmail'
+    default:
+      return null
+  }
 }
 
 // ─── Page ──────────────────────────────────────────────────
@@ -113,7 +154,9 @@ function useEmailTemplates() {
 function EmailPage() {
   const { t } = useTranslation()
   const { data: status, isLoading, isError, refetch } = useEmailStatus()
-  const [activeTab, setActiveTab] = useState('overview')
+  const [activeTab, setActiveTab] = useState(
+    status?.configured ? 'overview' : 'setup',
+  )
 
   if (isLoading) return <LoadingCards count={3} />
   if (isError) return <ErrorState onRetry={() => refetch()} />
@@ -170,7 +213,10 @@ function EmailPage() {
         <Separator className="my-4" />
 
         <TabsContent value="overview">
-          <OverviewPanel status={status} refetch={refetch} />
+          <OverviewPanel
+            status={status}
+            onGoSetup={() => setActiveTab('setup')}
+          />
         </TabsContent>
         <TabsContent value="setup">
           <SetupPanel
@@ -182,10 +228,10 @@ function EmailPage() {
           />
         </TabsContent>
         <TabsContent value="history">
-          <HistoryPanel />
+          <HistoryPanel active={activeTab === 'history'} />
         </TabsContent>
         <TabsContent value="templates">
-          <TemplatesPanel />
+          <TemplatesPanel active={activeTab === 'templates'} />
         </TabsContent>
       </Tabs>
     </div>
@@ -196,82 +242,109 @@ function EmailPage() {
 
 function OverviewPanel({
   status,
-  refetch: _refetch,
+  onGoSetup,
 }: {
   status?: EmailStatus
-  refetch: () => void
+  onGoSetup: () => void
 }) {
   const { t } = useTranslation()
 
   if (!status) return null
 
   return (
-    <div className="grid gap-4 md:grid-cols-3">
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm text-muted-foreground">
-            {t('email.statusCard', 'Status')}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {status.configured ? (
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="h-5 w-5 text-success" />
-              <span className="font-semibold">{t('email.ready', 'Ready')}</span>
-            </div>
-          ) : (
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <MailWarning className="h-5 w-5" />
-              <span>{t('email.notReady', 'Not configured')}</span>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+    <div className="space-y-4">
+      <div className="grid gap-4 md:grid-cols-3">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm text-muted-foreground">
+              {t('email.statusCard', 'Status')}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {status.configured ? (
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="h-5 w-5 text-success" />
+                <span className="font-semibold">{t('email.ready', 'Ready')}</span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <MailWarning className="h-5 w-5" />
+                <span>{t('email.notReady', 'Not configured')}</span>
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm text-muted-foreground">
-            {t('email.senderAddress', 'Sender')}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="font-semibold truncate">{status.email ?? t('email.noAddress', '—')}</p>
-          {status.provider && (
-            <p className="text-xs text-muted-foreground mt-1 capitalize">{status.provider}</p>
-          )}
-        </CardContent>
-      </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm text-muted-foreground">
+              {t('email.senderAddress', 'Sender')}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="font-semibold truncate">
+              {status.email ?? t('email.noAddress', '—')}
+            </p>
+            {status.provider && (
+              <p className="text-xs text-muted-foreground mt-1 capitalize">
+                {status.provider}
+              </p>
+            )}
+          </CardContent>
+        </Card>
 
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm text-muted-foreground">
-            {t('email.activity', 'Activity')}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-2xl font-bold">{status.total_sent}</p>
-          <p className="text-xs text-muted-foreground">
-            {t('email.totalSent', 'total sent')}
-            {' · '}
-            {status.template_count} {t('email.templates', 'templates')}
-          </p>
-        </CardContent>
-      </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm text-muted-foreground">
+              {t('email.activity', 'Activity')}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-bold">{status.total_sent}</p>
+            <p className="text-xs text-muted-foreground">
+              {t('email.totalSent', 'total sent')}
+              {' · '}
+              {status.template_count} {t('email.templates', 'templates')}
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* CTA when not configured */}
+      {!status.configured && (
+        <Card className="border-dashed">
+          <CardContent className="flex items-center justify-between py-6">
+            <div>
+              <p className="font-medium">
+                {t('email.getStarted', 'Get started with email')}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                {t(
+                  'email.getStartedDesc',
+                  'Connect Resend or another SMTP provider to let agents send emails.',
+                )}
+              </p>
+            </div>
+            <Button onClick={onGoSetup}>
+              {t('email.setupTab', 'Setup')}
+              <ArrowRight className="h-4 w-4 ml-1" />
+            </Button>
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }
 
 // ─── Setup Panel ───────────────────────────────────────────
 
-const PROVIDERS = [
-  { value: 'resend', label: 'Resend' },
-  { value: 'gmail', label: 'Gmail' },
-  { value: 'icloud', label: 'iCloud' },
-  { value: 'fastmail', label: 'Fastmail' },
-  { value: 'custom', label: 'Custom SMTP' },
-] as const
-
-function SetupPanel({ status, onComplete }: { status?: EmailStatus; onComplete: () => void }) {
+function SetupPanel({
+  status,
+  onComplete,
+}: {
+  status?: EmailStatus
+  onComplete: () => void
+}) {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
   const [provider, setProvider] = useState('resend')
@@ -281,9 +354,11 @@ function SetupPanel({ status, onComplete }: { status?: EmailStatus; onComplete: 
   const [host, setHost] = useState('')
   const [port, setPort] = useState('587')
   const [user, setUser] = useState('')
-  const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null)
+  const [testResult, setTestResult] = useState<{
+    ok: boolean
+    message: string
+  } | null>(null)
 
-  // Step tracking
   const isResend = provider === 'resend'
   const isCustom = provider === 'custom'
 
@@ -335,7 +410,9 @@ function SetupPanel({ status, onComplete }: { status?: EmailStatus; onComplete: 
       body.port = parseInt(port, 10) || 587
       if (user) body.user = user
     }
-    setupMutation.mutate(body as Parameters<typeof setupMutation.mutate>[0])
+    setupMutation.mutate(
+      body as Parameters<typeof setupMutation.mutate>[0],
+    )
   }
 
   const handleTest = () => {
@@ -344,8 +421,13 @@ function SetupPanel({ status, onComplete }: { status?: EmailStatus; onComplete: 
   }
 
   const isPending = setupMutation.isPending || testMutation.isPending
+  const dashboardUrl = providerDashboardUrl(status?.provider ?? provider)
 
+  // ── Already configured state ────────────────────────────
   if (status?.configured) {
+    const dashUrl = providerDashboardUrl(status.provider)
+    const dashLabel = providerDashboardLabel(status.provider)
+
     return (
       <Card>
         <CardHeader>
@@ -356,11 +438,17 @@ function SetupPanel({ status, onComplete }: { status?: EmailStatus; onComplete: 
         </CardHeader>
         <CardContent className="space-y-3">
           <p className="text-sm text-muted-foreground">
-            {t('email.configuredWith', 'Sending from')} <strong>{status.email}</strong>
+            {t('email.configuredWith', 'Sending from')}{' '}
+            <strong>{status.email}</strong>
             {status.provider ? ` (${status.provider})` : ''}
           </p>
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={handleTest} disabled={isPending}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleTest}
+              disabled={isPending}
+            >
               {isPending ? (
                 <Loader2 className="h-4 w-4 mr-1 animate-spin" />
               ) : (
@@ -368,14 +456,16 @@ function SetupPanel({ status, onComplete }: { status?: EmailStatus; onComplete: 
               )}
               {t('email.sendTest', 'Send Test')}
             </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => window.open('https://resend.com/emails', '_blank')}
-            >
-              <ExternalLink className="h-4 w-4 mr-1" />
-              {t('email.openDashboard', 'Dashboard')}
-            </Button>
+            {dashUrl && dashLabel && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => window.open(dashUrl, '_blank')}
+              >
+                <ExternalLink className="h-4 w-4 mr-1" />
+                {dashLabel}
+              </Button>
+            )}
           </div>
           {testResult && (
             <div
@@ -391,12 +481,16 @@ function SetupPanel({ status, onComplete }: { status?: EmailStatus; onComplete: 
           )}
         </CardContent>
         <CardFooter className="border-t text-xs text-muted-foreground">
-          {t('email.reconfigNotice', 'To reconfigure, update config.toml and restart.')}
+          {t(
+            'email.reconfigNotice',
+            'To reconfigure, update config.toml and restart.',
+          )}
         </CardFooter>
       </Card>
     )
   }
 
+  // ── Setup form ──────────────────────────────────────────
   return (
     <Card>
       <CardHeader>
@@ -415,25 +509,34 @@ function SetupPanel({ status, onComplete }: { status?: EmailStatus; onComplete: 
         <form onSubmit={handleSetup} className="space-y-5">
           {/* Provider */}
           <div className="space-y-2">
-            <Label htmlFor="provider">{t('email.providerLabel', 'Provider')}</Label>
+            <Label>{t('email.providerLabel', 'Provider')}</Label>
             <Select
-              id="provider"
               value={provider}
-              onValueChange={setProvider}
-              options={PROVIDERS.map((p) => ({ label: p.label, value: p.value }))}
+              onValueChange={(v) => {
+                setProvider(v)
+                setTestResult(null)
+              }}
+              options={PROVIDERS.map((p) => ({
+                label: p.label,
+                value: p.value,
+              }))}
               className="w-full sm:w-64"
             />
           </div>
 
           {/* Email */}
           <div className="space-y-2">
-            <Label htmlFor="email">{t('email.emailLabel', 'Email address')}</Label>
+            <Label htmlFor="email">
+              {t('email.emailLabel', 'Email address')}
+            </Label>
             <Input
               id="email"
               type="email"
               value={myEmail}
               onChange={(e) => setMyEmail(e.target.value)}
-              placeholder={isResend ? 'hello@mydomain.com' : 'user@gmail.com'}
+              placeholder={
+                isResend ? 'hello@mydomain.com' : 'user@gmail.com'
+              }
               required
               className="max-w-sm"
             />
@@ -452,28 +555,33 @@ function SetupPanel({ status, onComplete }: { status?: EmailStatus; onComplete: 
             <Label htmlFor="password">
               {isResend
                 ? t('email.apiKeyLabel', 'Resend API key')
-                : t('email.passwordLabel', 'SMTP password / app password')}
+                : t(
+                    'email.passwordLabel',
+                    'SMTP password / app password',
+                  )}
             </Label>
-            <div className="flex gap-2 max-w-sm">
-              <div className="relative flex-1">
-                <Input
-                  id="password"
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder={isResend ? 're_...' : 'Enter password'}
-                  required
-                  className="pr-9"
-                />
-                <button
-                  type="button"
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                  onClick={() => setShowPassword(!showPassword)}
-                  tabIndex={-1}
-                >
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
-              </div>
+            <div className="relative max-w-sm">
+              <Input
+                id="password"
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder={isResend ? 're_...' : 'Enter password'}
+                required
+                className="pr-9"
+              />
+              <button
+                type="button"
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                onClick={() => setShowPassword(!showPassword)}
+                tabIndex={-1}
+              >
+                {showPassword ? (
+                  <EyeOff className="h-4 w-4" />
+                ) : (
+                  <Eye className="h-4 w-4" />
+                )}
+              </button>
             </div>
             {isResend && (
               <p className="text-xs text-muted-foreground">
@@ -508,7 +616,10 @@ function SetupPanel({ status, onComplete }: { status?: EmailStatus; onComplete: 
             )}
             {provider === 'icloud' && (
               <p className="text-xs text-muted-foreground">
-                {t('email.icloudHint', 'Use an App-Specific Password from')}{' '}
+                {t(
+                  'email.icloudHint',
+                  'Use an App-Specific Password from',
+                )}{' '}
                 <a
                   href="https://appleid.apple.com"
                   target="_blank"
@@ -528,7 +639,9 @@ function SetupPanel({ status, onComplete }: { status?: EmailStatus; onComplete: 
               <Separator />
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="host">{t('email.hostLabel', 'SMTP Host')}</Label>
+                  <Label htmlFor="host">
+                    {t('email.hostLabel', 'SMTP Host')}
+                  </Label>
                   <Input
                     id="host"
                     value={host}
@@ -538,7 +651,9 @@ function SetupPanel({ status, onComplete }: { status?: EmailStatus; onComplete: 
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="port">{t('email.portLabel', 'Port')}</Label>
+                  <Label htmlFor="port">
+                    {t('email.portLabel', 'Port')}
+                  </Label>
                   <Input
                     id="port"
                     type="number"
@@ -549,7 +664,9 @@ function SetupPanel({ status, onComplete }: { status?: EmailStatus; onComplete: 
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="user">{t('email.userLabel', 'Username')}</Label>
+                  <Label htmlFor="user">
+                    {t('email.userLabel', 'Username')}
+                  </Label>
                   <Input
                     id="user"
                     value={user}
@@ -557,7 +674,10 @@ function SetupPanel({ status, onComplete }: { status?: EmailStatus; onComplete: 
                     placeholder={myEmail || 'user@example.com'}
                   />
                   <p className="text-xs text-muted-foreground">
-                    {t('email.userHint', 'Defaults to the email address if empty.')}
+                    {t(
+                      'email.userHint',
+                      'Defaults to the email address if empty.',
+                    )}
                   </p>
                 </div>
               </div>
@@ -566,13 +686,18 @@ function SetupPanel({ status, onComplete }: { status?: EmailStatus; onComplete: 
 
           {/* Submit */}
           <div className="flex gap-2 pt-2">
-            <Button type="submit" disabled={!myEmail || !password || isPending}>
+            <Button
+              type="submit"
+              disabled={!myEmail || !password || isPending}
+            >
               {isPending ? (
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
               ) : (
                 <Settings className="h-4 w-4 mr-2" />
               )}
-              {isPending ? t('email.saving', 'Saving...') : t('email.saveAndTest', 'Save & Test')}
+              {isPending
+                ? t('email.saving', 'Saving...')
+                : t('email.saveAndTest', 'Save & Test')}
             </Button>
           </div>
 
@@ -596,11 +721,27 @@ function SetupPanel({ status, onComplete }: { status?: EmailStatus; onComplete: 
 
 // ─── History Panel ─────────────────────────────────────────
 
-function HistoryPanel() {
+function HistoryPanel({ active }: { active: boolean }) {
   const { t } = useTranslation()
-  const { data, refetch, isFetching } = useEmailHistory(100)
+  const {
+    data,
+    isLoading,
+    isError,
+    refetch,
+    isFetching,
+  } = useEmailHistory(100, active)
 
   const emails = data?.emails ?? []
+
+  if (isError) {
+    return (
+      <Card>
+        <CardContent className="py-8">
+          <ErrorState onRetry={() => refetch()} />
+        </CardContent>
+      </Card>
+    )
+  }
 
   return (
     <Card>
@@ -610,11 +751,15 @@ function HistoryPanel() {
           {t('email.sentHistory', 'Sent History')}
         </CardTitle>
         <Button variant="ghost" size="icon" onClick={() => refetch()}>
-          <RefreshCw className={cn('h-4 w-4', isFetching && 'animate-spin')} />
+          <RefreshCw
+            className={cn('h-4 w-4', isFetching && 'animate-spin')}
+          />
         </Button>
       </CardHeader>
       <CardContent>
-        {emails.length === 0 ? (
+        {isLoading ? (
+          <LoadingCards count={3} />
+        ) : emails.length === 0 ? (
           <div className="text-center py-8 text-sm text-muted-foreground">
             {t('email.noSentEmails', 'No emails sent yet.')}
           </div>
@@ -626,7 +771,9 @@ function HistoryPanel() {
                 className="flex items-start justify-between gap-4 rounded-lg border p-3"
               >
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium truncate">{email.subject}</p>
+                  <p className="text-sm font-medium truncate">
+                    {email.subject}
+                  </p>
                   <p className="text-xs text-muted-foreground">
                     {t('email.to', 'To')}: {email.to}
                     {email.template_used &&
@@ -646,7 +793,8 @@ function HistoryPanel() {
       </CardContent>
       {data && data.total > data.limit && (
         <CardFooter className="text-xs text-muted-foreground">
-          {t('email.showingLatest', 'Showing latest')} {data.emails.length} / {data.total}
+          {t('email.showingLatest', 'Showing latest')}{' '}
+          {data.emails.length} / {data.total}
         </CardFooter>
       )}
     </Card>
@@ -658,7 +806,12 @@ function SentEmailDialog({ email }: { email: SentEmail }) {
   const [open, setOpen] = useState(false)
   return (
     <>
-      <Button variant="link" size="sm" className="h-auto p-0 text-xs" onClick={() => setOpen(true)}>
+      <Button
+        variant="link"
+        size="sm"
+        className="h-auto p-0 text-xs"
+        onClick={() => setOpen(true)}
+      >
         {t('email.viewDetails', 'View')}
       </Button>
       <Dialog open={open} onOpenChange={setOpen}>
@@ -672,10 +825,15 @@ function SentEmailDialog({ email }: { email: SentEmail }) {
           <div className="space-y-3 text-sm">
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <span className="text-muted-foreground">{t('email.to', 'To')}:</span> {email.to}
+                <span className="text-muted-foreground">
+                  {t('email.to', 'To')}:
+                </span>{' '}
+                {email.to}
               </div>
               <div>
-                <span className="text-muted-foreground">{t('email.sentAt', 'Sent at')}:</span>{' '}
+                <span className="text-muted-foreground">
+                  {t('email.sentAt', 'Sent at')}:
+                </span>{' '}
                 {new Date(email.sent_at).toLocaleString()}
               </div>
               <div>
@@ -684,7 +842,9 @@ function SentEmailDialog({ email }: { email: SentEmail }) {
               </div>
               {email.template_used && (
                 <div>
-                  <span className="text-muted-foreground">{t('email.template', 'Template')}:</span>{' '}
+                  <span className="text-muted-foreground">
+                    {t('email.template', 'Template')}:
+                  </span>{' '}
                   {email.template_used}
                 </div>
               )}
@@ -693,7 +853,9 @@ function SentEmailDialog({ email }: { email: SentEmail }) {
             <div className="max-h-96 overflow-auto border rounded-md p-3 bg-muted/30">
               <div
                 className="prose prose-sm dark:prose-invert max-w-none"
-                dangerouslySetInnerHTML={{ __html: email.html_preview }}
+                dangerouslySetInnerHTML={{
+                  __html: email.html_preview,
+                }}
               />
             </div>
           </div>
@@ -705,11 +867,27 @@ function SentEmailDialog({ email }: { email: SentEmail }) {
 
 // ─── Templates Panel ───────────────────────────────────────
 
-function TemplatesPanel() {
+function TemplatesPanel({ active }: { active: boolean }) {
   const { t } = useTranslation()
-  const { data, refetch, isFetching } = useEmailTemplates()
+  const {
+    data,
+    isLoading,
+    isError,
+    refetch,
+    isFetching,
+  } = useEmailTemplates(active)
 
   const templates = data?.templates ?? []
+
+  if (isError) {
+    return (
+      <Card>
+        <CardContent className="py-8">
+          <ErrorState onRetry={() => refetch()} />
+        </CardContent>
+      </Card>
+    )
+  }
 
   return (
     <Card>
@@ -719,11 +897,15 @@ function TemplatesPanel() {
           {t('email.emailTemplates', 'Email Templates')}
         </CardTitle>
         <Button variant="ghost" size="icon" onClick={() => refetch()}>
-          <RefreshCw className={cn('h-4 w-4', isFetching && 'animate-spin')} />
+          <RefreshCw
+            className={cn('h-4 w-4', isFetching && 'animate-spin')}
+          />
         </Button>
       </CardHeader>
       <CardContent>
-        {templates.length === 0 ? (
+        {isLoading ? (
+          <LoadingCards count={3} />
+        ) : templates.length === 0 ? (
           <div className="text-center py-8 text-sm text-muted-foreground">
             {t(
               'email.noTemplates',
@@ -738,7 +920,9 @@ function TemplatesPanel() {
                 <p className="text-xs text-muted-foreground mt-1">
                   {(tmpl.size / 1024).toFixed(1)} KB
                 </p>
-                <p className="text-xs text-muted-foreground mt-2 line-clamp-3">{tmpl.preview}</p>
+                <p className="text-xs text-muted-foreground mt-2 line-clamp-3">
+                  {tmpl.preview}
+                </p>
               </div>
             ))}
           </div>
