@@ -82,7 +82,7 @@ function ApprovalsPage() {
                     <Button
                       size="sm"
                       variant="outline"
-                      className="text-emerald-600"
+                      className="text-success"
                       onClick={() => approveMutation.mutate(approval.id)}
                       disabled={approveMutation.isPending}
                     >
@@ -91,7 +91,7 @@ function ApprovalsPage() {
                     <Button
                       size="sm"
                       variant="outline"
-                      className="text-red-600"
+                      className="text-error"
                       onClick={() => rejectMutation.mutate(approval.id)}
                       disabled={rejectMutation.isPending}
                     >

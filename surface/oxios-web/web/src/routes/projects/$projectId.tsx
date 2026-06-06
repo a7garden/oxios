@@ -71,7 +71,7 @@ function ProjectDetailsCard({ project }: { project: Project }) {
 
   const details = [
     { label: t('projects.source', 'Source'), value: project.source ?? 'manual' },
-    { label: t('projects.memoryVisible', 'Memory Visible'), value: project.memory_visible ? '✅' : '❌' },
+    { label: t('projects.memoryVisible', 'Memory Visible'), value: project.memory_visible ? 'Yes' : 'No' },
     { label: t('projects.createdAt', 'Created'), value: formatDate(project.created_at) },
     { label: t('projects.updatedAt', 'Updated'), value: formatDate(project.updated_at ?? project.created_at) },
     {
@@ -114,7 +114,7 @@ function ProjectDetailsCard({ project }: { project: Project }) {
             {details.map((d) => (
               <div key={d.label} className="flex items-center justify-between">
                 <span className="text-muted-foreground text-xs">{d.label}</span>
-                <span className={d.label === 'Source' ? `text-[10px] px-1.5 py-0.5 rounded ${sourceColor}` : 'text-xs'}>
+                <span className={d.label === 'Source' ? `text-2xs px-1.5 py-0.5 rounded ${sourceColor}` : 'text-xs'}>
                   {d.value}
                 </span>
               </div>
@@ -157,7 +157,7 @@ function ProjectMemoriesCard({ project }: { project: Project }) {
           <div className="space-y-2">
             {memories.map((mem: any) => (
               <div key={mem.id} className="flex items-center gap-2 p-2 rounded bg-muted/50">
-                <Badge variant="outline" className="text-[10px] shrink-0">
+                <Badge variant="outline" className="text-2xs shrink-0">
                   {mem.memory_type ?? mem.tier ?? 'memory'}
                 </Badge>
                 <p className="text-xs truncate flex-1">{mem.content?.slice(0, 80)}...</p>

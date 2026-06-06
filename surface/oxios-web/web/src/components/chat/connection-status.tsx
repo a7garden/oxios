@@ -13,7 +13,7 @@ export function ConnectionStatus({ connected, className }: ConnectionStatusProps
       <span
         className={cn(
           'h-2 w-2 rounded-full',
-          connected ? 'bg-emerald-500' : 'bg-amber-500 animate-pulse',
+          connected ? 'bg-success' : 'bg-warning animate-pulse',
         )}
       />
       {connected ? t('chat.connected', 'Connected') : t('chat.connecting', 'Connecting...')}

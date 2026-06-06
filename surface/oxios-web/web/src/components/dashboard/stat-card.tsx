@@ -97,8 +97,8 @@ export function StatCard({
                   <span
                     className={cn(
                       'inline-flex items-center gap-0.5 font-medium',
-                      deltaDir === 'up' && 'text-emerald-600 dark:text-emerald-400',
-                      deltaDir === 'down' && 'text-red-600 dark:text-red-400',
+                      deltaDir === 'up' && 'text-success',
+                      deltaDir === 'down' && 'text-error',
                       deltaDir === 'flat' && 'text-muted-foreground',
                     )}
                     aria-label={

@@ -24,7 +24,7 @@ export function AgentLogs({ logs }: { logs: AgentLogsType | null | undefined }) 
         <div key={i} className="flex items-start gap-2 py-1">
           <Badge
             variant="outline"
-            className={`text-[10px] shrink-0 ${levelColors[entry.level] || ''}`}
+            className={`text-2xs shrink-0 ${levelColors[entry.level] || ''}`}
           >
             {entry.level}
           </Badge>

@@ -181,14 +181,14 @@ export function SystemUpdateCard() {
 
             {/* Update result */}
             {updateMutation.isSuccess && updateMutation.data && (
-              <div className="rounded-lg border border-emerald-200 bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-950 p-3 text-sm text-emerald-700 dark:text-emerald-400">
+              <div className="rounded-lg border border-success-subtle p-3 text-sm text-success">
                 <div className="flex items-center gap-2 mb-1">
                   <CheckCircle2 className="h-4 w-4" />
                   <span className="font-medium">{t('update.updateSuccess')}</span>
                 </div>
                 <p className="text-xs">{(updateMutation.data as Record<string, unknown>)?.message as string}</p>
                 {((updateMutation.data as Record<string, unknown>)?.binary_updated as boolean) && (
-                  <p className="text-xs mt-1 text-amber-600 dark:text-amber-400">
+                  <p className="text-xs mt-1 text-warning">
                     {t('update.restartRequired')}
                   </p>
                 )}
@@ -196,7 +196,7 @@ export function SystemUpdateCard() {
             )}
 
             {updateMutation.isError && (
-              <div className="rounded-lg border border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950 p-3 text-sm text-red-700 dark:text-red-400">
+              <div className="rounded-lg border border-error-subtle p-3 text-sm text-error">
                 <div className="flex items-center gap-2">
                   <AlertCircle className="h-4 w-4" />
                   <span>{t('update.updateFailed')}</span>
@@ -209,7 +209,7 @@ export function SystemUpdateCard() {
 
         {/* Already up to date */}
         {isUpToDate && (
-          <div className="flex items-center gap-2 text-sm text-emerald-600 dark:text-emerald-400">
+          <div className="flex items-center gap-2 text-sm text-success">
             <CheckCircle2 className="h-4 w-4" />
             <span>{t('update.alreadyUpToDate')}</span>
           </div>

@@ -12,17 +12,17 @@ const SOURCE_CONFIG: Record<ApiKeySource, { labelKey: string; icon: React.ReactN
   env: {
     labelKey: 'engine.apiKeyEnv',
     icon: <Terminal className="h-3.5 w-3.5" />,
-    color: 'text-emerald-600 dark:text-emerald-400',
+    color: 'text-success',
   },
   auth_store: {
     labelKey: 'engine.apiKeyAuthStore',
     icon: <Shield className="h-3.5 w-3.5" />,
-    color: 'text-blue-600 dark:text-blue-400',
+    color: 'text-info',
   },
   config: {
     labelKey: 'engine.apiKeyConfig',
     icon: <Key className="h-3.5 w-3.5" />,
-    color: 'text-amber-600 dark:text-amber-400',
+    color: 'text-warning',
   },
   none: {
     labelKey: 'engine.apiKeyNone',

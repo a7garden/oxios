@@ -13,10 +13,10 @@ import {
 
 /** Color map for severity. */
 const severityDot: Record<NotificationSeverity, string> = {
-  info: 'bg-blue-500',
-  warning: 'bg-amber-500',
-  error: 'bg-red-500',
-  success: 'bg-emerald-500',
+  info: 'bg-info',
+  warning: 'bg-warning',
+  error: 'bg-error',
+  success: 'bg-success',
 }
 
 /**
@@ -65,7 +65,7 @@ export function NotificationBell() {
       >
         <Bell className="h-4 w-4" />
         {unreadCount > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-destructive-foreground">
+          <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-2xs font-bold text-destructive-foreground">
             {unreadCount > 99 ? '99+' : unreadCount}
           </span>
         )}
@@ -118,7 +118,7 @@ export function NotificationBell() {
                           {n.message}
                         </p>
                       )}
-                      <p className="text-[10px] text-muted-foreground/60 mt-1">
+                      <p className="text-2xs text-muted-foreground/60 mt-1">
                         {timeAgo(n.timestamp)}
                       </p>
                     </div>

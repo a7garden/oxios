@@ -228,7 +228,7 @@ function ProjectSessionSidebar({
             >
               <span
                 className={`h-2 w-2 rounded-full shrink-0 ${
-                  true ? 'bg-emerald-500' : 'bg-muted'
+                  true ? 'bg-success' : 'bg-muted'
                 }`}
               />
               <span className="truncate">{project.name}</span>
@@ -281,7 +281,7 @@ function ProjectSessionSidebar({
                         ? t('chat.messageCount', { count: s.message_count })
                         : s.id.slice(0, 8) + '...'}
                     </span>
-                    <span className="block text-[10px] text-muted-foreground/60">
+                    <span className="block text-2xs text-muted-foreground/60">
                       {new Date(s.created_at).toLocaleString(undefined, {
                         month: 'short',
                         day: 'numeric',
@@ -324,7 +324,7 @@ function ProjectSessionSidebar({
                 }`}
               >
                 <div className="truncate font-mono">{s.id.slice(0, 12)}...</div>
-                <div className="text-[10px] text-muted-foreground/70">
+                <div className="text-2xs text-muted-foreground/70">
                   {new Date(s.created_at).toLocaleString(undefined, {
                     month: 'short',
                     day: 'numeric',

@@ -43,6 +43,25 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+  /* Semantic status colors — text, backgrounds, borders */
+  --color-success: var(--success);
+  --color-success-subtle: var(--success-subtle);
+  --color-success-muted: var(--success-muted);
+  --color-success-subtle-border: var(--success-subtle-border);
+  --color-warning: var(--warning);
+  --color-warning-subtle: var(--warning-subtle);
+  --color-warning-muted: var(--warning-muted);
+  --color-warning-subtle-border: var(--warning-subtle-border);
+  --color-error: var(--error);
+  --color-error-subtle: var(--error-subtle);
+  --color-error-muted: var(--error-muted);
+  --color-error-subtle-border: var(--error-subtle-border);
+  --color-info: var(--info);
+  --color-info-subtle: var(--info-subtle);
+  --color-info-muted: var(--info-muted);
+  --color-info-subtle-border: var(--info-subtle-border);
+  /* Micro label text size — badges, metadata only. Prefer text-xs for readable text. */
+  --text-2xs: 10px;
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -97,6 +116,27 @@
   --sidebar-accent-foreground: oklch(0.21 0.006 285.885);
   --sidebar-border: oklch(0.92 0.004 286.32);
   --sidebar-ring: oklch(0.708 0 0);
+  /* ── Semantic status tokens ─────────────────────────────── */
+  /* Text / foreground */
+  --success: oklch(0.596 0.145 163);          /* emerald-600 */
+  --warning: oklch(0.669 0.162 70);            /* amber-600 */
+  --error: oklch(0.577 0.245 27.325);          /* red-500 */
+  --info: oklch(0.623 0.214 259.815);          /* blue-500 */
+  /* Background — subtle (info panels, callout blocks) */
+  --success-subtle: oklch(0.97 0.014 163);
+  --warning-subtle: oklch(0.97 0.014 70);
+  --error-subtle: oklch(0.97 0.014 27);
+  --info-subtle: oklch(0.97 0.014 259);
+  /* Background — muted (badge fills, 15% of base color) */
+  --success-muted: oklch(0.696 0.17 162.48 / 0.15);
+  --warning-muted: oklch(0.769 0.188 70.08 / 0.15);
+  --error-muted: oklch(0.577 0.245 27.325 / 0.15);
+  --info-muted: oklch(0.623 0.214 259.815 / 0.15);
+  /* Border — subtle (info panel borders) */
+  --success-subtle-border: oklch(0.91 0.05 163);
+  --warning-subtle-border: oklch(0.91 0.05 70);
+  --error-subtle-border: oklch(0.91 0.05 27);
+  --info-subtle-border: oklch(0.91 0.05 259);
 }
 
 .dark {
@@ -132,6 +172,27 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.552 0.016 285.938);
+  /* ── Semantic status tokens (dark) ─────────────────────── */
+  /* Text / foreground */
+  --success: oklch(0.723 0.219 149.579);      /* emerald-400 */
+  --warning: oklch(0.769 0.188 70.08);        /* amber-400 */
+  --error: oklch(0.704 0.191 22.216);          /* red-400 */
+  --info: oklch(0.685 0.196 259);              /* blue-400 */
+  /* Background — subtle */
+  --success-subtle: oklch(0.18 0.03 163);
+  --warning-subtle: oklch(0.18 0.03 70);
+  --error-subtle: oklch(0.18 0.03 27);
+  --info-subtle: oklch(0.18 0.03 259);
+  /* Background — muted (same as light — already transparent) */
+  --success-muted: oklch(0.723 0.219 149.579 / 0.15);
+  --warning-muted: oklch(0.769 0.188 70.08 / 0.15);
+  --error-muted: oklch(0.704 0.191 22.216 / 0.15);
+  --info-muted: oklch(0.685 0.196 259 / 0.15);
+  /* Border — subtle */
+  --success-subtle-border: oklch(0.28 0.04 163);
+  --warning-subtle-border: oklch(0.28 0.04 70);
+  --error-subtle-border: oklch(0.28 0.04 27);
+  --info-subtle-border: oklch(0.28 0.04 259);
 }
 
 @layer base {

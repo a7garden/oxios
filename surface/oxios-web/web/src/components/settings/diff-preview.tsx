@@ -60,12 +60,12 @@ export function DiffPreview({ open, onOpenChange, diffs, onConfirm, isPending }:
         {restartRequired.length > 0 && (
           <>
             <Separator />
-            <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950 p-3 text-sm">
-              <p className="font-medium flex items-center gap-2 text-amber-700 dark:text-amber-400">
+            <div className="mt-4 rounded-lg border border-warning-subtle p-3 text-sm">
+              <p className="font-medium flex items-center gap-2 text-warning">
                 <AlertTriangle className="h-4 w-4" />
                 {t('settings.restartRequiredWarning', { count: restartRequired.length })}
               </p>
-              <ul className="mt-2 list-disc list-inside text-xs text-amber-700/90 dark:text-amber-400/90 space-y-0.5">
+              <ul className="mt-2 list-disc list-inside text-xs text-warning/90 space-y-0.5">
                 {restartRequired.map((d) => (
                   <li key={d.path}>
                     <code className="font-mono">{d.path}</code>
@@ -79,7 +79,7 @@ export function DiffPreview({ open, onOpenChange, diffs, onConfirm, isPending }:
         {hotReload.length > 0 && (
           <div className="text-xs text-muted-foreground">
             <p className="flex items-center gap-1.5">
-              <Check className="h-3 w-3 text-emerald-600" />
+              <Check className="h-3 w-3 text-success" />
               {t('settings.appliedImmediately', { count: hotReload.length })}
             </p>
           </div>
@@ -109,11 +109,11 @@ function DiffRow({ diff }: { diff: ConfigDiff }) {
       <div className="flex items-center justify-between">
         <code className="font-mono text-xs text-muted-foreground">{diff.path}</code>
         {diff.hotReload ? (
-          <span className="text-[10px] uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+          <span className="text-2xs uppercase tracking-wider text-success">
             {t('settings.hotReload')}
           </span>
         ) : (
-          <span className="text-[10px] uppercase tracking-wider text-amber-600 dark:text-amber-400 flex items-center gap-1">
+          <span className="text-2xs uppercase tracking-wider text-warning flex items-center gap-1">
             <AlertTriangle className="h-2.5 w-2.5" />
             {t('settings.requiresRestart')}
           </span>

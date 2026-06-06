@@ -34,10 +34,10 @@ export function AgentBudgetCard({ agent, onEdit, onReset, onRemove, isResetting,
   const callPct = b.calls_limit > 0 ? Math.min(100, (b.calls_used / b.calls_limit) * 100) : 0
 
   return (
-    <Card className={b.is_exhausted ? 'border-red-500/50' : ''}>
+    <Card className={b.is_exhausted ? 'border-error/50' : ''}>
       <CardHeader className="pb-2">
         <CardTitle className="text-sm flex items-center gap-2">
-          <span className={`h-2.5 w-2.5 rounded-full ${b.is_exhausted ? 'bg-red-500' : 'bg-emerald-500'}`} />
+          <span className={`h-2.5 w-2.5 rounded-full ${b.is_exhausted ? 'bg-error' : 'bg-success'}`} />
           <span className="font-mono">{name}</span>
           {b.is_exhausted && (
             <Badge variant="destructive" className="text-xs">{t('budget.exhausted')}</Badge>
@@ -53,7 +53,7 @@ export function AgentBudgetCard({ agent, onEdit, onReset, onRemove, isResetting,
           </div>
           <div className="h-2 rounded-full bg-muted overflow-hidden">
             <div
-              className={`h-full rounded-full transition-all ${tokenPct >= 90 ? 'bg-red-500' : tokenPct >= 70 ? 'bg-amber-500' : 'bg-primary'}`}
+              className={`h-full rounded-full transition-all ${tokenPct >= 90 ? 'bg-error' : tokenPct >= 70 ? 'bg-warning' : 'bg-primary'}`}
               style={{ width: `${tokenPct}%` }}
             />
           </div>
@@ -67,7 +67,7 @@ export function AgentBudgetCard({ agent, onEdit, onReset, onRemove, isResetting,
           </div>
           <div className="h-2 rounded-full bg-muted overflow-hidden">
             <div
-              className={`h-full rounded-full transition-all ${callPct >= 90 ? 'bg-red-500' : callPct >= 70 ? 'bg-amber-500' : 'bg-blue-500'}`}
+              className={`h-full rounded-full transition-all ${callPct >= 90 ? 'bg-error' : callPct >= 70 ? 'bg-warning' : 'bg-info'}`}
               style={{ width: `${callPct}%` }}
             />
           </div>

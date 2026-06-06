@@ -31,14 +31,14 @@ export function BudgetSummaryCard({ summary }: Props) {
             </p>
             <div className="mt-1.5 h-2 rounded-full bg-muted overflow-hidden">
               <div
-                className={`h-full rounded-full transition-all ${pct >= 90 ? 'bg-red-500' : pct >= 70 ? 'bg-amber-500' : 'bg-primary'}`}
+                className={`h-full rounded-full transition-all ${pct >= 90 ? 'bg-error' : pct >= 70 ? 'bg-warning' : 'bg-primary'}`}
                 style={{ width: `${pct}%` }}
               />
             </div>
           </div>
           <div>
             <p className="text-sm text-muted-foreground">{t('budget.exhaustedCount')}</p>
-            <p className={`text-2xl font-bold ${summary.exhausted_agents > 0 ? 'text-red-500' : ''}`}>
+            <p className={`text-2xl font-bold ${summary.exhausted_agents > 0 ? 'text-error' : ''}`}>
               {summary.exhausted_agents}
             </p>
           </div>

@@ -92,7 +92,7 @@ function DashboardPage() {
     {
       labelKey: 'common.chat',
       href: '/chat',
-      icon: <MessageSquare className="h-5 w-5 text-blue-500" />,
+      icon: <MessageSquare className="h-5 w-5 text-info" />,
       descKey: 'dashboard.startConversation',
     },
     {
@@ -104,19 +104,19 @@ function DashboardPage() {
     {
       labelKey: 'common.agents',
       href: '/agents',
-      icon: <Bot className="h-5 w-5 text-emerald-500" />,
+      icon: <Bot className="h-5 w-5 text-success" />,
       descKey: 'dashboard.manageRunningAgents',
     },
     {
       labelKey: 'common.sessions',
       href: '/sessions',
-      icon: <Clock className="h-5 w-5 text-blue-500" />,
+      icon: <Clock className="h-5 w-5 text-info" />,
       descKey: 'dashboard.viewSessionHistory',
     },
     {
       labelKey: 'common.resources',
       href: '/resources',
-      icon: <Activity className="h-5 w-5 text-amber-500" />,
+      icon: <Activity className="h-5 w-5 text-warning" />,
       descKey: 'dashboard.systemResourceUsage',
     },
     {
@@ -128,7 +128,7 @@ function DashboardPage() {
     {
       labelKey: 'common.security',
       href: '/security',
-      icon: <Shield className="h-5 w-5 text-red-500" />,
+      icon: <Shield className="h-5 w-5 text-error" />,
       descKey: 'dashboard.auditTrailAccessControl',
     },
     {
@@ -152,7 +152,7 @@ function DashboardPage() {
           label={t('dashboard.totalAgents')}
           value={totalForked ?? '?'}
           icon={<Bot className="h-4 w-4" />}
-          iconClassName="text-blue-500"
+          iconClassName="text-info"
           sparkline={totalSeries}
           sparkColor="blue"
           hint={t('dashboard.forkedTotal')}
@@ -166,7 +166,7 @@ function DashboardPage() {
           label={t('dashboard.runningAgents')}
           value={runningAgents.length}
           icon={<Activity className="h-4 w-4" />}
-          iconClassName="text-emerald-500"
+          iconClassName="text-success"
           sparkline={runningSeries}
           sparkColor="emerald"
           href="/agents"
@@ -187,7 +187,7 @@ function DashboardPage() {
             cpuSeries.length > 0 ? `${(cpuSeries[cpuSeries.length - 1] ?? 0).toFixed(0)}%` : '—'
           }
           icon={<Cpu className="h-4 w-4" />}
-          iconClassName="text-amber-500"
+          iconClassName="text-warning"
           delta={cpuSeries.length > 1 ? cpuDelta : undefined}
           sparkline={cpuSeries}
           sparkColor="amber"
@@ -197,7 +197,7 @@ function DashboardPage() {
           label={t('dashboard.pendingApprovals')}
           value={pendingApprovals.length}
           icon={<AlertTriangle className="h-4 w-4" />}
-          iconClassName={pendingApprovals.length > 0 ? 'text-red-500' : 'text-muted-foreground'}
+          iconClassName={pendingApprovals.length > 0 ? 'text-error' : 'text-muted-foreground'}
           sparkColor={pendingApprovals.length > 0 ? 'red' : 'cyan'}
           hint={
             pendingApprovals.length > 0 ? t('dashboard.needsAttention') : t('dashboard.allClear')
@@ -289,7 +289,7 @@ function ActiveAgentsCard({
                   <Bot className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                   <span className="text-sm font-medium truncate">{agent.name}</span>
                 </div>
-                <span className="text-[10px] text-muted-foreground font-mono">
+                <span className="text-2xs text-muted-foreground font-mono">
                   {agent.id.slice(0, 6)}
                 </span>
               </Link>
@@ -366,7 +366,7 @@ function HealthRow({
   const { t } = useTranslation()
   return (
     <div className="flex items-center gap-2 text-muted-foreground">
-      <div className={`h-2 w-2 rounded-full ${healthy ? 'bg-emerald-500' : 'bg-red-500'}`} />
+      <div className={`h-2 w-2 rounded-full ${healthy ? 'bg-success' : 'bg-error'}`} />
       <span className="text-foreground">{t(labelKey)}</span>
       {detail && <span className="text-xs truncate">· {detail}</span>}
     </div>

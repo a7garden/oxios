@@ -118,13 +118,13 @@ export function EditProjectDialog({ project, open, onOpenChange, onSuccess }: Ed
           <div className="space-y-1">
             <label className="text-sm font-medium">{t('projects.tags', 'Tags')}</label>
             <Input value={tags} onChange={(e) => setTags(e.target.value)} />
-            <p className="text-[10px] text-muted-foreground">{t('projects.tagsHint', 'Comma-separated')}</p>
+            <p className="text-2xs text-muted-foreground">{t('projects.tagsHint', 'Comma-separated')}</p>
           </div>
 
           <div className="space-y-1">
             <label className="text-sm font-medium">{t('projects.paths', 'Paths')}</label>
             <Textarea value={paths} onChange={(e) => setPaths(e.target.value)} rows={2} />
-            <p className="text-[10px] text-muted-foreground">{t('projects.pathsHint', 'One per line')}</p>
+            <p className="text-2xs text-muted-foreground">{t('projects.pathsHint', 'One per line')}</p>
           </div>
 
           <div className="flex items-center justify-between">

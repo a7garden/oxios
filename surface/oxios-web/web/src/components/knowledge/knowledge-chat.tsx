@@ -441,7 +441,7 @@ export function KnowledgeChat() {
                           }}
                         >
                           {msg.done ? (
-                            <CheckSquare className="h-4 w-4 text-emerald-500" />
+                            <CheckSquare className="h-4 w-4 text-success" />
                           ) : (
                             <Square className="h-4 w-4" />
                           )}

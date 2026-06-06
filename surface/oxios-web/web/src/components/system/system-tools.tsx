@@ -110,13 +110,13 @@ function DoctorPanel() {
                 className="flex items-start gap-2 text-sm rounded-md bg-muted/50 px-3 py-2"
               >
                 {check.status === 'pass' && (
-                  <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0 mt-0.5" />
+                  <CheckCircle2 className="h-4 w-4 text-success shrink-0 mt-0.5" />
                 )}
                 {check.status === 'warn' && (
-                  <TriangleAlert className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
+                  <TriangleAlert className="h-4 w-4 text-warning shrink-0 mt-0.5" />
                 )}
                 {check.status === 'fail' && (
-                  <AlertCircle className="h-4 w-4 text-red-500 shrink-0 mt-0.5" />
+                  <AlertCircle className="h-4 w-4 text-error shrink-0 mt-0.5" />
                 )}
                 <span className="text-muted-foreground">{check.message}</span>
               </div>
@@ -173,8 +173,8 @@ function AuditVerifyPanel() {
         <div
           className={`flex items-center gap-2 text-sm rounded-md px-3 py-2 ${
             auditMutation.data.valid
-              ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400'
-              : 'bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-400'
+              ? 'bg-success-subtle text-success'
+              : 'bg-error-subtle text-error'
           }`}
         >
           {auditMutation.data.valid ? (
@@ -207,7 +207,7 @@ function BackupPanel() {
       isRunning={backupMutation.isPending}
     >
       {backupMutation.data && backupMutation.data.success && (
-        <div className="flex items-center gap-2 text-sm rounded-md bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 px-3 py-2">
+        <div className="flex items-center gap-2 text-sm rounded-md bg-success-subtle text-success px-3 py-2">
           <CheckCircle2 className="h-4 w-4" />
           <span>
             {backupMutation.data.message}

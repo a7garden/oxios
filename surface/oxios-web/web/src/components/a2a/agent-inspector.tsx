@@ -205,10 +205,10 @@ export function AgentInspector({
                       className="rounded-md border bg-background p-2 text-xs space-y-1"
                     >
                       <div className="flex items-center justify-between">
-                        <span className="font-mono text-[10px] text-muted-foreground">
+                        <span className="font-mono text-2xs text-muted-foreground">
                           {new Date(m.timestamp).toLocaleTimeString()}
                         </span>
-                        <Badge variant="outline" className="text-[10px]">
+                        <Badge variant="outline" className="text-2xs">
                           {m.message_type}
                         </Badge>
                       </div>
@@ -249,7 +249,7 @@ export function AgentInspector({
             </Button>
           </footer>
 
-          <div className="px-4 pb-4 text-[10px] text-muted-foreground flex items-center gap-1">
+          <div className="px-4 pb-4 text-2xs text-muted-foreground flex items-center gap-1">
             <Power className="h-3 w-3" aria-hidden="true" />
             {node.last_seen
               ? `${t('a2a.inspectorLastSeen')}: ${new Date(node.last_seen).toLocaleString()}`

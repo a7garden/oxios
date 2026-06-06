@@ -81,7 +81,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
           <ActivityTimeline activities={message.activities} />
         )}
         <div className="flex items-center gap-2 mt-1.5">
-          {relTime && <span className="text-[10px] text-muted-foreground">{relTime}</span>}
+          {relTime && <span className="text-2xs text-muted-foreground">{relTime}</span>}
           {!isUser && <ChatMetadata message={message} />}
         </div>
       </div>

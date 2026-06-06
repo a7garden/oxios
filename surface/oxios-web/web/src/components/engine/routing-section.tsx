@@ -62,7 +62,7 @@ export function RoutingSection() {
         <div className="flex items-start justify-between gap-4">
           <div className="space-y-0.5">
             <Label className="flex items-center gap-1">
-              <Zap className="h-3.5 w-3.5 text-amber-500" />
+              <Zap className="h-3.5 w-3.5 text-warning" />
               {t(tKeys.costEfficient)}
             </Label>
             <p className="text-xs text-muted-foreground">{t(tKeys.costEfficientDesc)}</p>

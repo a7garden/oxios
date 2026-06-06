@@ -113,7 +113,7 @@ export function LiveActivityFeed() {
           </Badge>
           {isConnected && !connectionError && (
             <span
-              className="ml-1 h-2 w-2 rounded-full bg-emerald-500 animate-pulse"
+              className="ml-1 h-2 w-2 rounded-full bg-success animate-pulse"
               aria-label={t('dashboard.connected')}
             />
           )}
@@ -208,14 +208,14 @@ export function LiveActivityFeed() {
                     />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5 text-sm">
-                        <Badge variant="outline" className="px-1 py-0 text-[10px] uppercase">
+                        <Badge variant="outline" className="px-1 py-0 text-2xs uppercase">
                           {fmt.label}
                         </Badge>
                         <span className="truncate text-foreground">{fmt.summary}</span>
                       </div>
                     </div>
                     <span
-                      className="shrink-0 text-[10px] text-muted-foreground tabular-nums"
+                      className="shrink-0 text-2xs text-muted-foreground tabular-nums"
                       title={time}
                     >
                       {relative}

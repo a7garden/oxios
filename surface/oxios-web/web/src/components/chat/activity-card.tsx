@@ -12,6 +12,8 @@ import {
 import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/utils'
 import type { ChatActivity } from '@/types'
+import { BrowseContextBadge } from './browse-context-badge'
+import { BrowseContextDetail } from './browse-context-detail'
 
 interface ActivityCardProps {
   activity: ChatActivity
@@ -49,16 +51,19 @@ export function ActivityCard({ activity, className }: ActivityCardProps) {
         )}
         {activity.type === 'tool_call' && activity.tabId && (
           <span
-            className="text-[10px] text-muted-foreground/70 font-mono shrink-0"
+            className="text-2xs text-muted-foreground/70 font-mono shrink-0"
             title={`Browser tab ${activity.tabId}`}
           >
             {activity.tabId.slice(0, 8)}
           </span>
         )}
-        {activity.type === 'tool_call' && activity.progress && (
-          <span className="text-[10px] text-muted-foreground truncate max-w-[40ch]">
+        {activity.type === 'tool_call' && activity.progress && !activity.context && (
+          <span className="text-2xs text-muted-foreground truncate max-w-[40ch]">
             {activity.progress}
           </span>
+        )}
+        {activity.type === 'tool_call' && activity.context && (
+          <BrowseContextBadge context={activity.context} />
         )}
         {badge}
         {durationStr && (
@@ -83,9 +88,10 @@ function ActivityDetail({ activity, t }: { activity: ChatActivity; t: Translator
     case 'tool_call':
       return (
         <>
+          {activity.context && <BrowseContextDetail context={activity.context} />}
           {activity.toolArgs !== undefined && (
             <div>
-              <p className="text-[10px] font-medium text-muted-foreground mb-1 uppercase tracking-wider">
+              <p className="text-2xs font-medium text-muted-foreground mb-1 uppercase tracking-wider">
                 {t('chat.transparency.input')}
               </p>
               <pre className="text-xs bg-background rounded p-2 overflow-x-auto whitespace-pre-wrap max-h-40 overflow-y-auto">
@@ -97,7 +103,7 @@ function ActivityDetail({ activity, t }: { activity: ChatActivity; t: Translator
           )}
           {activity.outputSummary !== undefined && (
             <div>
-              <p className="text-[10px] font-medium text-muted-foreground mb-1 uppercase tracking-wider">
+              <p className="text-2xs font-medium text-muted-foreground mb-1 uppercase tracking-wider">
                 {t('chat.transparency.output')}
               </p>
               <pre className="text-xs bg-background rounded p-2 overflow-x-auto whitespace-pre-wrap max-h-40 overflow-y-auto">
@@ -156,7 +162,7 @@ function getActivityMeta(activity: ChatActivity, t: Translator): {
         icon: <Wrench className="h-3 w-3" />,
         label: activity.toolName ?? 'tool',
         badge: activity.isError ? (
-          <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-500/10 text-red-600 font-medium">
+          <span className="text-2xs px-1.5 py-0.5 rounded bg-error/10 text-error font-medium">
             {t('chat.transparency.error')}
           </span>
         ) : null,
@@ -169,7 +175,7 @@ function getActivityMeta(activity: ChatActivity, t: Translator): {
           y: activity.count === 1 ? 'y' : 'ies',
         }),
         badge: (
-          <span className="text-[10px] px-1.5 py-0.5 rounded bg-violet-500/10 text-violet-600 font-medium">
+          <span className="text-2xs px-1.5 py-0.5 rounded bg-violet-500/10 text-violet-600 font-medium">
             {activity.memoryAction ?? 'recall'}
           </span>
         ),
@@ -195,7 +201,7 @@ function getActivityMeta(activity: ChatActivity, t: Translator): {
           phase: activity.phase ?? 'unknown',
         }),
         badge: (
-          <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-600 font-medium">
+          <span className="text-2xs px-1.5 py-0.5 rounded bg-info/10 text-info font-medium">
             {activity.status ?? 'started'}
           </span>
         ),

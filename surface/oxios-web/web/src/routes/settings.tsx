@@ -818,12 +818,12 @@ function SettingsPage() {
 
       {/* Save notice */}
       {saveNotice === 'success' && (
-        <div className="rounded-lg border border-emerald-200 bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-950 p-3 text-sm text-emerald-700 dark:text-emerald-400 mb-4">
+        <div className="rounded-lg border border-success-subtle p-3 text-sm text-success mb-4">
           {t('settings.settingsSaved')}
         </div>
       )}
       {saveNotice === 'error' && (
-        <div className="rounded-lg border border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950 p-3 text-sm text-red-700 dark:text-red-400 mb-4">
+        <div className="rounded-lg border border-error-subtle p-3 text-sm text-error mb-4">
           {t('settings.settingsSaveFailed')}
         </div>
       )}

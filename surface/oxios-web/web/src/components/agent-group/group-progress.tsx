@@ -18,7 +18,7 @@ export function GroupProgress({ pct, className, label }: Props) {
       <div className="h-2 rounded-full bg-muted overflow-hidden">
         <div
           className={`h-full rounded-full transition-all ${
-            pct >= 100 ? 'bg-emerald-500' : pct > 0 ? 'bg-primary' : 'bg-muted-foreground/30'
+            pct >= 100 ? 'bg-success' : pct > 0 ? 'bg-primary' : 'bg-muted-foreground/30'
           }`}
           style={{ width: `${Math.min(100, pct)}%` }}
         />

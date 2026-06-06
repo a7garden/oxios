@@ -20,8 +20,8 @@ export function ServerCard({ server, onToggle, onRefresh, onDelete, isToggling, 
   const statusColor = !server.enabled
     ? 'bg-gray-400'
     : server.initialized
-      ? 'bg-green-500'
-      : 'bg-red-500'
+      ? 'bg-success'
+      : 'bg-error'
 
   const statusText = !server.enabled
     ? t('common.disabled', 'Disabled')

@@ -41,7 +41,7 @@ export function ProjectCard({ project, onEdit, onDelete }: ProjectCardProps) {
           >
             {project.name}
           </Link>
-          <span className={`shrink-0 text-[10px] px-1.5 py-0.5 rounded ${sourceColor}`}>
+          <span className={`shrink-0 text-2xs px-1.5 py-0.5 rounded ${sourceColor}`}>
             {project.source ?? 'manual'}
           </span>
         </div>
@@ -72,7 +72,7 @@ export function ProjectCard({ project, onEdit, onDelete }: ProjectCardProps) {
 
       {/* Paths */}
       {project.paths && project.paths.length > 0 && (
-        <p className="text-[11px] text-muted-foreground font-mono truncate mb-2">
+        <p className="text-2xs text-muted-foreground font-mono truncate mb-2">
           <FolderOpen className="h-3 w-3 shrink-0" /> {project.paths[0]}
         </p>
       )}
@@ -83,19 +83,19 @@ export function ProjectCard({ project, onEdit, onDelete }: ProjectCardProps) {
           {project.tags.slice(0, 4).map((tag) => (
             <span
               key={tag}
-              className="text-[10px] px-1.5 py-0.5 rounded bg-secondary text-secondary-foreground"
+              className="text-2xs px-1.5 py-0.5 rounded bg-secondary text-secondary-foreground"
             >
               {tag}
             </span>
           ))}
           {project.tags.length > 4 && (
-            <span className="text-[10px] text-muted-foreground">+{project.tags.length - 4}</span>
+            <span className="text-2xs text-muted-foreground">+{project.tags.length - 4}</span>
           )}
         </div>
       )}
 
       {/* Footer */}
-      <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+      <div className="flex items-center justify-between text-2xs text-muted-foreground">
         <span>{formatRelativeTime(project.last_active_at ?? project.updated_at ?? project.created_at)}</span>
         <Link
           to="/projects/$projectId"

@@ -44,7 +44,7 @@ export function ActivityTimeline({
         <button
           type="button"
           onClick={() => setTimelineCollapsed((v) => !v)}
-          className="flex w-full items-center gap-2 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+          className="flex w-full items-center gap-2 text-2xs text-muted-foreground hover:text-foreground transition-colors"
           aria-expanded={!timelineCollapsed}
         >
           {timelineCollapsed ? (
@@ -77,7 +77,7 @@ export function ActivityTimeline({
             <button
               type="button"
               onClick={() => setCardsCollapsed((v) => !v)}
-              className="text-[10px] text-muted-foreground hover:text-foreground"
+              className="text-2xs text-muted-foreground hover:text-foreground"
             >
               {cardsCollapsed
                 ? t('chat.transparency.expandAll')

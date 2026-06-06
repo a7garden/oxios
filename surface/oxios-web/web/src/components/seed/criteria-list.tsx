@@ -25,7 +25,7 @@ export function CriteriaList({
                 {passed === true ? (
                   <CheckCircle2 className="mt-0.5 h-4 w-4 text-green-500" />
                 ) : passed === false ? (
-                  <XCircle className="mt-0.5 h-4 w-4 text-red-500" />
+                  <XCircle className="mt-0.5 h-4 w-4 text-error" />
                 ) : (
                   <span className="mt-0.5 text-muted-foreground">○</span>
                 )}

@@ -38,7 +38,7 @@ export function EvaluationCard({ evaluation }: { evaluation?: EvaluationResult }
               {item.passed === true ? (
                 <CheckCircle2 className="h-5 w-5 text-green-500" />
               ) : item.passed === false ? (
-                <XCircle className="h-5 w-5 text-red-500" />
+                <XCircle className="h-5 w-5 text-error" />
               ) : (
                 <HelpCircle className="h-5 w-5 text-muted-foreground" />
               )}

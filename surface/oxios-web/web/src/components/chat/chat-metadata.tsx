@@ -24,13 +24,13 @@ export function ChatMetadata({ message, className }: ChatMetadataProps) {
       {phase && <span className="px-1.5 py-0.5 rounded bg-muted font-medium">{phase}</span>}
       {evaluation_passed !== undefined && (
         evaluation_passed
-          ? <span className="flex items-center gap-1 text-emerald-600"><CheckCircle2 className="h-3.5 w-3.5" /> Passed</span>
-          : <span className="flex items-center gap-1 text-red-500"><XCircle className="h-3.5 w-3.5" /> Failed</span>
+          ? <span className="flex items-center gap-1 text-success"><CheckCircle2 className="h-3.5 w-3.5" /> Passed</span>
+          : <span className="flex items-center gap-1 text-error"><XCircle className="h-3.5 w-3.5" /> Failed</span>
       )}
       {durationStr && (
         <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> {durationStr}</span>
       )}
-      {seed_id && <span className="font-mono text-[10px]">Seed {seed_id.slice(0, 8)}...</span>}
+      {seed_id && <span className="font-mono text-2xs">Seed {seed_id.slice(0, 8)}...</span>}
     </div>
   )
 }

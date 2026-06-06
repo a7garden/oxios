@@ -76,7 +76,7 @@ export function AgentNode({ data, id }: NodeProps<AgentNodeData>) {
         <span>{t('a2a.skillsCount', { count: data.skills?.length ?? 0 })}</span>
       </div>
 
-      <div className="text-[10px] text-muted-foreground/80 mt-0.5 flex items-center gap-1">
+      <div className="text-2xs text-muted-foreground/80 mt-0.5 flex items-center gap-1">
         <Power className="h-2.5 w-2.5" aria-hidden="true" />
         {formatLastSeen(data.last_seen, t)}
       </div>

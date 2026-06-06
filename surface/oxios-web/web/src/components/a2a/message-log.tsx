@@ -52,11 +52,11 @@ export function MessageLog({ messages }: Props) {
               </td>
               <td className="px-3 py-2">
                 {msg.accepted ? (
-                  <span className="text-emerald-600 flex items-center gap-1">
+                  <span className="text-success flex items-center gap-1">
                     <CheckCircle2 className="h-3.5 w-3.5" /> Accepted
                   </span>
                 ) : (
-                  <span className="text-amber-500 flex items-center gap-1">
+                  <span className="text-warning flex items-center gap-1">
                     <Clock className="h-3.5 w-3.5" /> Pending
                   </span>
                 )}

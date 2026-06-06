@@ -30,7 +30,7 @@ export function ColumnFilter({
         <Button variant="outline" size="sm" className="h-9">
           {label}
           {selected.length > 0 && (
-            <span className="ml-1.5 flex h-4 min-w-4 items-center justify-center rounded bg-primary px-1 text-[10px] font-medium text-primary-foreground">
+            <span className="ml-1.5 flex h-4 min-w-4 items-center justify-center rounded bg-primary px-1 text-2xs font-medium text-primary-foreground">
               {selected.length}
             </span>
           )}

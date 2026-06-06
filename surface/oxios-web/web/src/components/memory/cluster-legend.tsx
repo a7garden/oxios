@@ -14,24 +14,21 @@ export function ClusterLegend() {
       <CardContent className="flex flex-wrap items-center gap-3 p-3 text-xs">
         <div className="flex items-center gap-1.5">
           <span
-            className="inline-block h-3 w-3 rounded-full"
-            style={{ background: '#10b981' }}
+            className="inline-block h-3 w-3 rounded-full bg-emerald-500"
             aria-hidden
           />
           <span>{t('memory.hot')}</span>
         </div>
         <div className="flex items-center gap-1.5">
           <span
-            className="inline-block h-3 w-3 rounded-full"
-            style={{ background: '#f59e0b' }}
+            className="inline-block h-3 w-3 rounded-full bg-amber-500"
             aria-hidden
           />
           <span>{t('memory.warm')}</span>
         </div>
         <div className="flex items-center gap-1.5">
           <span
-            className="inline-block h-3 w-3 rounded-full"
-            style={{ background: '#71717a' }}
+            className="inline-block h-3 w-3 rounded-full bg-zinc-500"
             aria-hidden
           />
           <span>{t('memory.cold')}</span>

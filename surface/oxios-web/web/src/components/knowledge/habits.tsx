@@ -208,7 +208,7 @@ function HabitYearGrid({
 
       {/* Month labels */}
       <div
-        className="text-[10px] text-muted-foreground/60 mt-1"
+        className="text-2xs text-muted-foreground/60 mt-1"
         style={{
           display: 'grid',
           gridTemplateColumns: `repeat(${TOTAL_WEEKS}, 1fr)`,

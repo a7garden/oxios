@@ -231,7 +231,7 @@ export function SearchModal({
             placeholder={isMoveMode ? t('knowledge.searchOrSelectDestination') : t('knowledge.searchFiles')}
             className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
           />
-          <kbd className="text-[10px] text-muted-foreground border rounded px-1.5 py-0.5 font-mono">
+          <kbd className="text-2xs text-muted-foreground border rounded px-1.5 py-0.5 font-mono">
             ESC
           </kbd>
         </div>
@@ -277,7 +277,7 @@ export function SearchModal({
         </ul>
 
         {/* Footer hint */}
-        <div className="flex items-center justify-between border-t px-3 py-1.5 text-[10px] text-muted-foreground">
+        <div className="flex items-center justify-between border-t px-3 py-1.5 text-2xs text-muted-foreground">
           <span>
             <kbd className="font-mono border rounded px-1">↑↓</kbd> navigate
             {' · '}

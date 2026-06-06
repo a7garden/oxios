@@ -109,7 +109,7 @@ export function ProviderSelect({
 
                     {/* API key indicator */}
                     {p.hasKey ? (
-                      <Key className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+                      <Key className="h-3.5 w-3.5 text-success shrink-0" />
                     ) : (
                       <Key className="h-3.5 w-3.5 text-muted-foreground/40 shrink-0" />
                     )}

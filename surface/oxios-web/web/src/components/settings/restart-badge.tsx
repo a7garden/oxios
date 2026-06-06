@@ -33,10 +33,10 @@ export function RestartBadge({ hotReload, scope, size = 'sm', className }: Resta
       <span
         className={cn(
           'inline-flex items-center gap-1 rounded-full border font-medium select-none whitespace-nowrap',
-          size === 'sm' ? 'px-1.5 py-0.5 text-[10px]' : 'px-2 py-0.5 text-xs',
+          size === 'sm' ? 'px-1.5 py-0.5 text-2xs' : 'px-2 py-0.5 text-xs',
           hotReload
-            ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-400'
-            : 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-400',
+            ? 'border-success-subtle bg-success-subtle text-success'
+            : 'border-warning-subtle bg-warning-subtle text-warning',
           className,
         )}
         data-testid={hotReload ? 'hot-reload-badge' : 'restart-badge'}

@@ -79,8 +79,8 @@ export function SkillDetail({ skill, onClose }: { skill: Skill; onClose: () => v
 
       {/* Missing warning */}
       {hasMissing && skill.status === 'needs_setup' && (
-        <div className="rounded-md bg-amber-500/10 border border-amber-500/20 px-3 py-2">
-          <p className="text-xs text-amber-700 dark:text-amber-400">
+        <div className="rounded-md bg-warning/10 border border-warning/20 px-3 py-2">
+          <p className="text-xs text-warning">
             {t('skills.missingWarning', {
               missing: [
                 ...skill.missing.bins.map(b => `bin:${b}`),
@@ -116,9 +116,9 @@ export function SkillDetail({ skill, onClose }: { skill: Skill; onClose: () => v
             {skill.config_checks.map((cc, i) => (
               <div key={i} className="flex items-center gap-2 text-xs">
                 {cc.satisfied
-                  ? <Check className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
-                  : <X className="h-3 w-3 text-red-600 dark:text-red-400" />}
-                <span className={cn('font-mono', !cc.satisfied && 'text-red-600 dark:text-red-400')}>{cc.path}</span>
+                  ? <Check className="h-3 w-3 text-success" />
+                  : <X className="h-3 w-3 text-error" />}
+                <span className={cn('font-mono', !cc.satisfied && 'text-error')}>{cc.path}</span>
               </div>
             ))}
           </div>
@@ -162,7 +162,7 @@ function ReqList({ items, missing }: { items: string[]; missing: string[] }) {
       {items.map(item => {
         const m = missing.includes(item)
         return (
-          <span key={item} className={cn('flex items-center gap-1 text-xs', m ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400')}>
+          <span key={item} className={cn('flex items-center gap-1 text-xs', m ? 'text-error' : 'text-success')}>
             {m ? <X className="h-3 w-3" /> : <Check className="h-3 w-3" />}
             {item}
           </span>

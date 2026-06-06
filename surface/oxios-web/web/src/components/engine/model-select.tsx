@@ -139,12 +139,12 @@ function ModelRow({
       <div className="flex-1 min-w-0 text-left">
         <div className="flex items-center gap-1.5">
           {model.reasoning && (
-            <span className="text-amber-500 text-xs" title={t('engine.supportsReasoning')}>
+            <span className="text-warning text-xs" title={t('engine.supportsReasoning')}>
               ✦
             </span>
           )}
           {model.input.includes('image') && (
-            <span className="text-blue-500 text-xs" title={t('engine.supportsVision')}>
+            <span className="text-info text-xs" title={t('engine.supportsVision')}>
               👁
             </span>
           )}

@@ -63,7 +63,7 @@ function MobileSelector({
         <div className="absolute z-50 mt-1 w-full rounded-lg border bg-popover shadow-lg overflow-hidden">
           {groups.map((group) => (
             <div key={group.id}>
-              <div className="px-4 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/60 bg-muted/30">
+              <div className="px-4 py-1.5 text-2xs font-semibold uppercase tracking-wider text-muted-foreground/60 bg-muted/30">
                 {t(group.labelKey)}
               </div>
               {group.items.map((item) => (
@@ -112,7 +112,7 @@ function DesktopNav({
         {groups.map((group) => (
           <div key={group.id}>
             <div className="px-3 pt-4 pb-1 first:pt-0">
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/60">
+              <span className="text-2xs font-semibold uppercase tracking-wider text-muted-foreground/60">
                 {t(group.labelKey)}
               </span>
             </div>

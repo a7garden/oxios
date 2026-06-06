@@ -361,7 +361,7 @@ function MarketplaceTab({ source, onSourceChange, clawhubResults, skillsShResult
         </button>
         <button onClick={() => onSourceChange('skills-sh')} className={cn('inline-flex items-center justify-center whitespace-nowrap rounded-md px-2.5 py-1 text-xs font-medium transition-all gap-1', source === 'skills-sh' ? 'bg-background text-foreground shadow' : 'hover:bg-background/50')}>
           Skills.sh
-          <span className="text-[10px] text-muted-foreground">npx</span>
+          <span className="text-2xs text-muted-foreground">npx</span>
         </button>
       </div>
     </div>
@@ -430,7 +430,7 @@ function SkillCard({ skill, isSelected, hasUpdate, onSelect, onToggle, onDelete,
           </div>
           <div className="flex items-center gap-2 shrink-0">
             {hasUpdate && (
-              <Badge variant="outline" className="text-xs gap-1 border-amber-500/50 text-amber-600 dark:text-amber-400">
+              <Badge variant="outline" className="text-xs gap-1 border-warning/50 text-warning">
                 {t('skills.updateAvailable')}
               </Badge>
             )}
@@ -445,8 +445,8 @@ function SkillCard({ skill, isSelected, hasUpdate, onSelect, onToggle, onDelete,
           {skill.author && <span>{t('skills.by')} {skill.author}</span>}
         </div>
         {isClaude && (
-          <div className="rounded-md bg-blue-500/10 border border-blue-500/20 px-3 py-2">
-            <p className="text-xs text-blue-700 dark:text-blue-400">{t('skills.claudeCompatible')}</p>
+          <div className="rounded-md bg-info/10 border border-info/20 px-3 py-2">
+            <p className="text-xs text-info">{t('skills.claudeCompatible')}</p>
           </div>
         )}
         {(skill.requirements.bins.length > 0 || skill.requirements.anyBins.length > 0 || skill.requirements.env.length > 0 || skill.requirements.config.length > 0) && (
@@ -472,8 +472,8 @@ function SkillCard({ skill, isSelected, hasUpdate, onSelect, onToggle, onDelete,
           </div>
         )}
         {hasMissing && skill.status === 'needs_setup' && (
-          <div className="rounded-md bg-amber-500/10 border border-amber-500/20 px-3 py-2">
-            <p className="text-xs text-amber-700 dark:text-amber-400">{t('skills.missingWarning', { missing: [...skill.missing.bins.map(b => `bin:${b}`), ...skill.missing.env.map(e => `env:${e}`), ...skill.missing.config.map(c => `config:${c}`), ...skill.missing.anyBins.map(b => `any_bin:${b}`)].join(', ') })}</p>
+          <div className="rounded-md bg-warning/10 border border-warning/20 px-3 py-2">
+            <p className="text-xs text-warning">{t('skills.missingWarning', { missing: [...skill.missing.bins.map(b => `bin:${b}`), ...skill.missing.env.map(e => `env:${e}`), ...skill.missing.config.map(c => `config:${c}`), ...skill.missing.anyBins.map(b => `any_bin:${b}`)].join(', ') })}</p>
           </div>
         )}
         {/* Inline actions */}
@@ -560,8 +560,8 @@ function SkillsShCard({ skill, isSelected, isInstalling, onSelect, onInstall }: 
           <span className="font-mono text-muted-foreground/80">{skill.slug}</span>
           <span>·</span>
           <span>{skill.source}</span>
-          {skill.sourceType === 'github' && <Badge variant="outline" className="text-[10px] px-1 py-0">GitHub</Badge>}
-          {skill.isDuplicate && <Badge variant="outline" className="text-[10px] px-1 py-0 border-amber-500/50 text-amber-600">fork</Badge>}
+          {skill.sourceType === 'github' && <Badge variant="outline" className="text-2xs px-1 py-0">GitHub</Badge>}
+          {skill.isDuplicate && <Badge variant="outline" className="text-2xs px-1 py-0 border-warning/50 text-warning">fork</Badge>}
         </div>
       </CardContent>
     </Card>
@@ -651,9 +651,9 @@ function ReqRow({ labelKey, items, missing }: { labelKey: string; items: string[
       <span className="text-muted-foreground w-16 shrink-0 pt-px">{t(labelKey)}</span>
       <div className="flex flex-wrap gap-x-3 gap-y-0.5">
         {items.map(item => { const m = missing.includes(item); return (
-          <span key={item} className={cn('flex items-center gap-1', m ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400')}>
+          <span key={item} className={cn('flex items-center gap-1', m ? 'text-error' : 'text-success')}>
             {m ? <X className="h-3 w-3" /> : <Check className="h-3 w-3" />}
-            {item}{m && <span className="text-red-400 dark:text-red-500">{t('skills.missing')}</span>}
+            {item}{m && <span className="text-error">{t('skills.missing')}</span>}
           </span>
         )})}
       </div>

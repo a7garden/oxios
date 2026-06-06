@@ -51,7 +51,7 @@ function EventsPage() {
               {liveEvents.length}
             </Badge>
             {isConnected && !connectionError && (
-              <div className="ml-auto h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+              <div className="ml-auto h-2 w-2 rounded-full bg-success animate-pulse" />
             )}
             {connectionError && (
               <div className="ml-auto flex items-center gap-1.5 text-destructive text-xs">

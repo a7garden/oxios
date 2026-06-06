@@ -5,6 +5,7 @@ import {
   Bot,
   Brain,
   Calendar,
+  CalendarDays,
   CheckSquare,
   Dna,
   FolderKanban,
@@ -83,6 +84,7 @@ const navGroups: { labelKey: string; items: NavItem[] }[] = [
     items: [
       { labelKey: 'common.resources', href: '/resources', icon: <Activity className="h-4 w-4" /> },
       { labelKey: 'common.scheduler', href: '/scheduler', icon: <Calendar className="h-4 w-4" /> },
+      { labelKey: 'common.calendar', href: '/calendar', icon: <CalendarDays className="h-4 w-4" /> },
       { labelKey: 'common.cronJobs', href: '/cron-jobs', icon: <Timer className="h-4 w-4" /> },
       { labelKey: 'common.budget', href: '/budget', icon: <Wallet className="h-4 w-4" /> },
       { labelKey: 'common.security', href: '/security', icon: <Shield className="h-4 w-4" /> },
@@ -190,7 +192,7 @@ export function Sidebar() {
                 {item.icon}
                 {!collapsed && <span>{t(item.labelKey)}</span>}
                 {!collapsed && item.badge != null && item.badge > 0 && (
-                  <span className="ml-auto flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-bold text-white">
+                  <span className="ml-auto flex h-4 min-w-4 items-center justify-center rounded-full bg-warning px-1 text-2xs font-bold text-white">
                     {item.badge}
                   </span>
                 )}

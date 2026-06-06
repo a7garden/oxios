@@ -41,10 +41,10 @@ export function ApprovalsQueue() {
   const empty = !isLoading && pending.length === 0
 
   return (
-    <Card className={empty ? 'border-emerald-500/30' : 'border-amber-500/40'}>
+    <Card className={empty ? 'border-success/30' : 'border-warning/40'}>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="flex items-center gap-2 text-base">
-          <Bell className={`h-4 w-4 ${empty ? 'text-emerald-500' : 'text-amber-500'}`} />
+          <Bell className={`h-4 w-4 ${empty ? 'text-success' : 'text-warning'}`} />
           {t('approvals.title')}
           <Badge variant={empty ? 'secondary' : 'warning'} className="ml-1">
             {pending.length}
@@ -62,7 +62,7 @@ export function ApprovalsQueue() {
           <p className="text-sm text-muted-foreground py-2">{t('common.loading')}</p>
         ) : empty ? (
           <div className="flex items-center gap-2 py-2 text-sm text-muted-foreground">
-            <CheckCircle className="h-4 w-4 text-emerald-500" aria-hidden="true" />
+            <CheckCircle className="h-4 w-4 text-success" aria-hidden="true" />
             <span>{t('dashboard.approvalsAllClear')}</span>
           </div>
         ) : (
@@ -110,8 +110,8 @@ function ApprovalRow({
   const reason = approval.reason || action
 
   return (
-    <li className="flex flex-wrap items-center gap-3 rounded-lg border bg-amber-500/5 p-3">
-      <AlertTriangle className="h-4 w-4 shrink-0 text-amber-500" aria-hidden="true" />
+    <li className="flex flex-wrap items-center gap-3 rounded-lg border bg-warning/5 p-3">
+      <AlertTriangle className="h-4 w-4 shrink-0 text-warning" aria-hidden="true" />
       <div className="min-w-0 flex-1">
         <p className="text-sm font-medium text-foreground truncate" title={reason}>
           <span className="font-mono text-xs text-muted-foreground mr-1.5">{action}</span>
@@ -126,7 +126,7 @@ function ApprovalRow({
         <Button
           size="sm"
           variant="outline"
-          className="text-emerald-600 border-emerald-500/40 hover:bg-emerald-500/10"
+          className="text-success border-success/40 hover:bg-success/10"
           onClick={() => onApprove(approval.id)}
           disabled={busy}
           aria-label={approveLabel}
@@ -136,7 +136,7 @@ function ApprovalRow({
         <Button
           size="sm"
           variant="outline"
-          className="text-red-600 border-red-500/40 hover:bg-red-500/10"
+          className="text-error border-error/40 hover:bg-error/10"
           onClick={() => onDeny(approval.id)}
           disabled={busy}
           aria-label={denyLabel}

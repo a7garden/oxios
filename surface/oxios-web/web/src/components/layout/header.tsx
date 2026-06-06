@@ -51,7 +51,7 @@ export function Header() {
       <LanguageSelector />
 
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
-        <div className="h-2 w-2 rounded-full bg-emerald-500" aria-hidden="true" />
+        <div className="h-2 w-2 rounded-full bg-success" aria-hidden="true" />
         <span>{t('common.oxiosBrand')}</span>
       </div>
     </header>

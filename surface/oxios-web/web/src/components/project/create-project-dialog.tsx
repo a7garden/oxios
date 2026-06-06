@@ -151,7 +151,7 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
               onChange={(e) => setTags(e.target.value)}
               placeholder="rust, kernel, async"
             />
-            <p className="text-[10px] text-muted-foreground">{t('projects.tagsHint', 'Comma-separated')}</p>
+            <p className="text-2xs text-muted-foreground">{t('projects.tagsHint', 'Comma-separated')}</p>
           </div>
 
           {/* Paths */}
@@ -163,7 +163,7 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
               placeholder="/Volumes/MERCURY/PROJECTS/oxios"
               rows={2}
             />
-            <p className="text-[10px] text-muted-foreground">
+            <p className="text-2xs text-muted-foreground">
               {t('projects.pathsHint', 'One per line, or leave empty for non-code projects')}
             </p>
           </div>
@@ -172,7 +172,7 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
               <label className="text-sm font-medium">{t('projects.memoryVisible', 'Memory Visible')}</label>
-              <p className="text-[10px] text-muted-foreground">
+              <p className="text-2xs text-muted-foreground">
                 {t('projects.memoryVisibleHint', 'Allow cross-project memory access')}
               </p>
             </div>

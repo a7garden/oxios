@@ -134,13 +134,13 @@ function SchedulerPage() {
                 >
                   <div className="flex items-center gap-3">
                     {task.status === 'Running' || task.status === 'running' ? (
-                      <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
+                      <Loader2 className="h-4 w-4 animate-spin text-info" />
                     ) : task.status === 'Completed' || task.status === 'completed' ? (
-                      <CheckCircle className="h-4 w-4 text-emerald-500" />
+                      <CheckCircle className="h-4 w-4 text-success" />
                     ) : task.status === 'Failed' || task.status === 'failed' ? (
-                      <Clock className="h-4 w-4 text-red-500" />
+                      <Clock className="h-4 w-4 text-error" />
                     ) : (
-                      <Clock className="h-4 w-4 text-amber-500" />
+                      <Clock className="h-4 w-4 text-warning" />
                     )}
                     <div>
                       <p className="font-medium text-sm">

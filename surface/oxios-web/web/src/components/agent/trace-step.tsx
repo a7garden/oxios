@@ -12,10 +12,10 @@ export function TraceStepCard({ step }: TraceStepProps) {
   const durationSec = (step.duration_ms / 1000).toFixed(1)
   const statusColor =
     step.status === 'completed'
-      ? 'bg-green-500'
+      ? 'bg-success'
       : step.status === 'failed'
-        ? 'bg-red-500'
-        : 'bg-yellow-500'
+        ? 'bg-error'
+        : 'bg-warning'
 
   return (
     <div className="border rounded-lg">

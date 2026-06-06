@@ -27,7 +27,7 @@ export function useSkillUpdates() {
 export function UpdateBadge({ count }: { count: number }) {
   if (count <= 0) return null
   return (
-    <Badge variant="outline" className="text-xs gap-1 border-amber-500/50 text-amber-600 dark:text-amber-400">
+    <Badge variant="outline" className="text-xs gap-1 border-warning/50 text-warning">
       <ArrowUpCircle className="h-3 w-3" />
       {count}
     </Badge>

@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next'
+import { Clock, Play, CheckCircle2, XCircle } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import type { AgentGroup } from '@/types/agent-group'
@@ -8,11 +9,11 @@ interface Props {
   onClick: () => void
 }
 
-const STATUS_META: Record<string, { emoji: string; variant: 'success' | 'warning' | 'destructive' | 'secondary' }> = {
-  Pending: { emoji: '⏳', variant: 'secondary' },
-  Running: { emoji: '🟢', variant: 'success' },
-  Completed: { emoji: '✅', variant: 'success' },
-  Failed: { emoji: '🔴', variant: 'destructive' },
+const STATUS_META: Record<string, { icon: React.ReactNode; variant: 'success' | 'warning' | 'destructive' | 'secondary' }> = {
+  Pending: { icon: <Clock className="h-3 w-3" />, variant: 'secondary' },
+  Running: { icon: <Play className="h-3 w-3" />, variant: 'success' },
+  Completed: { icon: <CheckCircle2 className="h-3 w-3" />, variant: 'success' },
+  Failed: { icon: <XCircle className="h-3 w-3" />, variant: 'destructive' },
 }
 
 export function GroupCard({ group, onClick }: Props) {
@@ -45,7 +46,7 @@ export function GroupCard({ group, onClick }: Props) {
             )}
           </div>
           <Badge variant={meta.variant} className="gap-1">
-            <span>{meta.emoji}</span> {status}
+            {meta.icon} {status}
           </Badge>
         </div>
 
@@ -57,7 +58,7 @@ export function GroupCard({ group, onClick }: Props) {
           </div>
           <div className="h-2 rounded-full bg-muted overflow-hidden">
             <div
-              className={`h-full rounded-full transition-all ${status === 'Completed' ? 'bg-emerald-500' : status === 'Failed' ? 'bg-red-500' : 'bg-primary'}`}
+              className={`h-full rounded-full transition-all ${status === 'Completed' ? 'bg-success' : status === 'Failed' ? 'bg-error' : 'bg-primary'}`}
               style={{ width: `${pct}%` }}
             />
           </div>
@@ -65,7 +66,7 @@ export function GroupCard({ group, onClick }: Props) {
 
         <p className="text-xs text-muted-foreground">
           {t('agentGroups.subAgents')}: {total}
-          {failed > 0 && <span className="text-red-500 ml-2">· {failed} failed</span>}
+          {failed > 0 && <span className="text-error ml-2">· {failed} failed</span>}
         </p>
       </CardContent>
     </Card>

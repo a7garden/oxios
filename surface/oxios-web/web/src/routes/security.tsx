@@ -162,7 +162,7 @@ function SecurityPage() {
                         </p>
                       )}
                       {entry.reason && (
-                        <p className="text-xs text-amber-600">{entry.reason}</p>
+                        <p className="text-xs text-warning">{entry.reason}</p>
                       )}
                     </div>
                   </div>
