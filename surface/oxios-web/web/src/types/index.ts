@@ -207,6 +207,9 @@ export interface ChatActivity {
   /// is tab-aware, e.g. browser). Rendered as a short badge in
   /// `ActivityCard` so users can distinguish concurrent tab activity.
   tabId?: string
+  /// Semantic context from browsing tool (PageVisit, WebSearch, etc.).
+  /// Used by `BrowseContextBadge` / `BrowseContextDetail` for rich rendering.
+  context?: ToolCallContext
   // memory
   memoryAction?: 'recall' | 'store'
   query?: string
@@ -290,7 +293,57 @@ export interface StreamChunk {
   source?: string
   input_tokens?: number
   output_tokens?: number
+  /// Semantic context from the tool call (oxi-agent 0.29+ BrowseProgress).
+  /// Carries structured info about what a browsing tool is doing.
+  /// UI consumers that understand a context kind render it richly;
+  /// older consumers simply ignore the field.
+  context?: ToolCallContext
 }
+
+// ── Browser observability (RFC-015 Phase G, oxi-agent 0.29.1+) ─────────
+
+/** Reason for visiting a page. Mirrors oxi-agent's `VisitReason` enum. */
+export type VisitReason =
+  | 'direct_navigation'
+  | { search_result: { position: number } }
+  | { link_followed: { from_url: string } }
+
+/** Screenshot metadata. Mirrors oxi-agent's `ScreenshotMeta` struct. */
+export interface ScreenshotMeta {
+  /** PNG payload size in bytes. */
+  bytes: number
+  /** Viewport width. */
+  width: number
+  /** Capture duration in milliseconds. */
+  duration_ms: number
+}
+
+/** Semantic context for a browsing tool execution event. */
+export type ToolCallContext =
+  | { kind: 'web_search'; query: string; engine?: string }
+  | {
+      kind: 'page_visit'
+      url: string
+      reason?: VisitReason
+      page_title?: string
+      page_status?: number
+      page_bytes?: number
+      page_duration_ms?: number
+      /** Navigation error (from BrowseProgress::NavigationFailed, oxi-agent 0.29.1+). */
+      navigation_error?: string
+      /** Screenshot metadata (from BrowseProgress::ScreenshotCaptured, oxi-agent 0.29.1+). */
+      screenshot?: ScreenshotMeta
+    }
+  | {
+      kind: 'data_extraction'
+      target: string
+      url?: string
+      result_count?: number
+      page_status?: number
+      page_duration_ms?: number
+    }
+  | { kind: 'session_action'; action: string; url?: string }
+  | { kind: 'script_step'; current: number; total: number; step: string }
 
 // Event (SSE)
 export interface OxiosEvent {
@@ -560,3 +613,5 @@ export interface LogResponse {
   lines: string[]
   total: number
 }
+
+export * from './calendar'

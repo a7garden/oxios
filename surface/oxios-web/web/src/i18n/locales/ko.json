@@ -70,6 +70,7 @@
     "spaces": "공간",
     "workspace": "작업공간",
     "approvals": "승인",
+    "calendar": "캘린더",
     "cronJobs": "Cron 작업",
     "expandSidebar": "사이드바 펼치기",
     "collapseSidebar": "사이드바 접기",
@@ -574,7 +575,16 @@
       "inputOutputTokens": "입력: {{in}}, 출력: {{out}}",
       "error": "오류",
       "input": "입력",
-      "output": "출력"
+      "output": "출력",
+      "browsePageVisit": "페이지 방문 중",
+      "browsePageLoaded": "페이지 로드 완료",
+      "browsePageFailed": "페이지 로드 실패",
+      "browseNavigationError": "탐색 오류",
+      "browseWaitingForSelector": "요소 대기 중",
+      "browseScreenshotCaptured": "스크린샷 촬영됨",
+      "visitReasonDirect": "직접 탐색",
+      "visitReasonSearch": "검색 결과 #{{position}}",
+      "visitReasonLink": "링크 따라감"
     }
   },
   "agents": {

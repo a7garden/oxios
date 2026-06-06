@@ -70,6 +70,7 @@
     "spaces": "Spaces",
     "workspace": "Workspace",
     "approvals": "Approvals",
+    "calendar": "Calendar",
     "cronJobs": "Cron Jobs",
     "expandSidebar": "Expand sidebar",
     "collapseSidebar": "Collapse sidebar",
@@ -574,7 +575,16 @@
       "inputOutputTokens": "Input: {{in}}, Output: {{out}}",
       "error": "error",
       "input": "Input",
-      "output": "Output"
+      "output": "Output",
+      "browsePageVisit": "Visiting page",
+      "browsePageLoaded": "Page loaded",
+      "browsePageFailed": "Page load failed",
+      "browseNavigationError": "Navigation error",
+      "browseWaitingForSelector": "Waiting for element",
+      "browseScreenshotCaptured": "Screenshot captured",
+      "visitReasonDirect": "Direct navigation",
+      "visitReasonSearch": "Search result #{{position}}",
+      "visitReasonLink": "Followed link"
     }
   },
   "agents": {

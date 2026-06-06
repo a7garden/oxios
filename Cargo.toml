@@ -33,6 +33,7 @@ resolver = "2"
 members = [
     "crates/oxios-mcp",
     "crates/oxios-memory",
+    "crates/oxios-calendar",
     "crates/oxios-kernel",
     "crates/oxios-markdown",
     "crates/oxios-ouroboros",
@@ -80,7 +81,7 @@ regex = "1"
 parking_lot = "0.12"
 
 # oxi engine — single dependency for everything (oxi-ai re-exported via oxi-sdk)
-oxi-sdk = "0.26.2"
+oxi-sdk = "0.29.1"
 
 # HTTP client
 reqwest = { version = "0.12", features = ["json", "rustls-tls"] }
@@ -89,7 +90,11 @@ reqwest = { version = "0.12", features = ["json", "rustls-tls"] }
 zip = "2"
 
 # File system paths
+# File system paths
 dirs = "6"
+
+# Email
+lettre = { version = "0.11", default-features = false, features = ["tokio1-rustls-tls", "smtp-transport", "builder", "hostname"] }
 
 # CLI / interactive
 inquire = "0.9"
@@ -115,6 +120,7 @@ otel = ["oxios-kernel/otel", "dep:opentelemetry", "dep:opentelemetry_sdk"]
 
 [dependencies]
 oxios-kernel = { version = "1.0.2", path = "crates/oxios-kernel", default-features = false }
+oxios-calendar = { version = "0.1.0", path = "crates/oxios-calendar" }
 oxios-markdown = { version = "1.0.2", path = "crates/oxios-markdown" }
 oxios-ouroboros = { version = "1.0.2", path = "crates/oxios-ouroboros" }
 oxios-gateway = { version = "1.0.2", path = "crates/oxios-gateway" }

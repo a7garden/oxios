@@ -111,6 +111,7 @@ function chunkToActivity(chunk: StreamChunk): ChatActivity | null {
         progress: chunk.progress,
         isRunning: true,
         ...(chunk.tab_id ? { tabId: chunk.tab_id } : {}),
+        ...(chunk.context ? { context: chunk.context } : {}),
       }
     case 'tool_end':
       return {
@@ -165,6 +166,8 @@ function trajectoryToActivity(step: {
   is_error: boolean
   tool_call_id: string
   timestamp: string
+  /** Semantic context persisted by the backend (RFC-015). */
+  context?: import('@/types').ToolCallContext
 }): ChatActivity {
   return {
     id: step.tool_call_id,
@@ -176,6 +179,7 @@ function trajectoryToActivity(step: {
     outputSummary: step.output_summary,
     durationMs: step.duration_ms,
     isError: step.is_error,
+    ...(step.context ? { context: step.context } : {}),
   }
 }
 
@@ -359,6 +363,8 @@ export const useChatStore = create<ChatStore>()(
             is_error: boolean
             tool_call_id: string
             timestamp: string
+            /** Semantic context persisted by the backend (RFC-015). */
+            context?: import('@/types').ToolCallContext
           }> = data.trajectory_steps ?? []
           const trajectoryActivities = trajectorySteps.map(trajectoryToActivity)
 
