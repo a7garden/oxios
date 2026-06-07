@@ -3,7 +3,7 @@ import { Area, AreaChart, ResponsiveContainer } from 'recharts'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
 
-export type SparkColor = 'blue' | 'emerald' | 'amber' | 'violet' | 'red' | 'cyan'
+export type SparkColor = 'blue' | 'emerald' | 'amber' | 'violet' | 'red' | 'cyan' | 'rose'
 
 const COLOR_MAP: Record<SparkColor, { stroke: string; fill: string }> = {
   blue: { stroke: 'rgb(59 130 246)', fill: 'rgb(59 130 246 / 0.18)' },
@@ -12,6 +12,7 @@ const COLOR_MAP: Record<SparkColor, { stroke: string; fill: string }> = {
   violet: { stroke: 'rgb(139 92 246)', fill: 'rgb(139 92 246 / 0.18)' },
   red: { stroke: 'rgb(239 68 68)', fill: 'rgb(239 68 68 / 0.18)' },
   cyan: { stroke: 'rgb(6 182 212)', fill: 'rgb(6 182 212 / 0.18)' },
+  rose: { stroke: 'rgb(244 63 94)', fill: 'rgb(244 63 94 / 0.18)' },
 }
 
 export interface StatCardProps {
@@ -121,7 +122,7 @@ export function StatCard({
           </div>
           {hasSparkline && (
             <div className="h-10 w-20 shrink-0" aria-hidden="true">
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width={80} height={40}>
                 <AreaChart data={series} margin={{ top: 2, right: 0, bottom: 2, left: 0 }}>
                   <defs>
                     <linearGradient id={`spark-${sparkColor}`} x1="0" y1="0" x2="0" y2="1">

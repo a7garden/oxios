@@ -31,6 +31,7 @@ import {
   Zap,
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { Tooltip } from '@/components/ui/tooltip'
 import { api } from '@/lib/api-client'
@@ -48,6 +49,20 @@ interface NavItem {
   badge?: number
 }
 
+/**
+ * Sidebar navigation groups.
+ *
+ * Reorganized from the old 5-group layout where "Monitor" had 11 items
+ * crammed together. Now split into 7 semantically clear groups:
+ *
+ *   Main        → Dashboard, Approvals (always visible), Chat
+ *   Agents      → Agents, Agent Groups, Seeds, Personas, Skills
+ *   Projects    → Projects
+ *   Storage     → Knowledge, Memory, Workspace
+ *   Operations  → Scheduler, Calendar, Cron Jobs, Budget
+ *   Infra       → MCP Servers, Email, Git, A2A Monitor
+ *   System      → Resources, Security, Events
+ */
 const navGroups: { labelKey: string; items: NavItem[] }[] = [
   {
     labelKey: 'common.main',
@@ -97,9 +112,8 @@ const navGroups: { labelKey: string; items: NavItem[] }[] = [
     ],
   },
   {
-    labelKey: 'common.monitor',
+    labelKey: 'common.operations',
     items: [
-      { labelKey: 'common.resources', href: '/resources', icon: <Activity className="h-4 w-4" /> },
       { labelKey: 'common.scheduler', href: '/scheduler', icon: <Calendar className="h-4 w-4" /> },
       {
         labelKey: 'common.calendar',
@@ -108,18 +122,29 @@ const navGroups: { labelKey: string; items: NavItem[] }[] = [
       },
       { labelKey: 'common.cronJobs', href: '/cron-jobs', icon: <Timer className="h-4 w-4" /> },
       { labelKey: 'common.budget', href: '/budget', icon: <Wallet className="h-4 w-4" /> },
+    ],
+  },
+  {
+    labelKey: 'common.infrastructure',
+    items: [
+      { labelKey: 'common.mcpServers', href: '/mcp', icon: <Zap className="h-4 w-4" /> },
+      { labelKey: 'common.email', href: '/email', icon: <Mail className="h-4 w-4" /> },
+      { labelKey: 'common.git', href: '/git', icon: <GitBranch className="h-4 w-4" /> },
+      { labelKey: 'common.a2aMonitor', href: '/a2a', icon: <Network className="h-4 w-4" /> },
+    ],
+  },
+  {
+    labelKey: 'common.system',
+    items: [
+      { labelKey: 'common.resources', href: '/resources', icon: <Activity className="h-4 w-4" /> },
       { labelKey: 'common.security', href: '/security', icon: <Shield className="h-4 w-4" /> },
       { labelKey: 'common.events', href: '/events', icon: <Bell className="h-4 w-4" /> },
-      { labelKey: 'common.git', href: '/git', icon: <GitBranch className="h-4 w-4" /> },
-      { labelKey: 'common.email', href: '/email', icon: <Mail className="h-4 w-4" /> },
-      { labelKey: 'common.mcpServers', href: '/mcp', icon: <Zap className="h-4 w-4" /> },
-      { labelKey: 'common.a2aMonitor', href: '/a2a', icon: <Network className="h-4 w-4" /> },
     ],
   },
 ]
 
-/** Dynamic items that appear conditionally at the top of Main. */
-function useDynamicItems(): NavItem[] {
+/** Dynamic items that appear in the Main group with a badge. */
+function useApprovalsBadge(): { count: number } {
   const { data } = useQuery({
     queryKey: ['approvals-pending-count'],
     queryFn: async () => {
@@ -130,16 +155,7 @@ function useDynamicItems(): NavItem[] {
     refetchInterval: 10_000,
   })
 
-  const count = data ?? 0
-  return [
-    {
-      labelKey: 'common.approvals',
-      href: '/approvals',
-      icon: <CheckSquare className="h-4 w-4" />,
-      show: count > 0,
-      badge: count,
-    },
-  ]
+  return { count: data ?? 0 }
 }
 
 export function Sidebar() {
@@ -148,14 +164,18 @@ export function Sidebar() {
   const { theme, resolved, setTheme } = useThemeStore()
   const router = useRouterState()
   const currentPath = router.location.pathname
-  const dynamicItems = useDynamicItems()
+  const { count: pendingCount } = useApprovalsBadge()
 
-  // Insert dynamic items after the first static Main item (Dashboard)
-  const mainGroup = navGroups[0]!
-  const mainItems = [
-    mainGroup.items[0]!, // Dashboard
-    ...dynamicItems.filter((d) => d.show !== false),
-    mainGroup.items[1]!, // Chat
+  // Build Main group items: Dashboard → Approvals (always visible, badge when pending) → Chat
+  const mainItems: NavItem[] = [
+    navGroups[0]!.items[0]!, // Dashboard
+    {
+      labelKey: 'common.approvals',
+      href: '/approvals',
+      icon: <CheckSquare className="h-4 w-4" />,
+      badge: pendingCount,
+    },
+    navGroups[0]!.items[1]!, // Chat
   ]
 
   const themeLabel =
@@ -198,52 +218,17 @@ export function Sidebar() {
 
       {/* Nav */}
       <nav className="flex-1 overflow-y-auto p-2">
-        {/* Main group with dynamic approvals */}
+        {/* Main group (with dynamic Approvals badge) */}
         <div className="mb-3">
           {!collapsed && (
             <p className="mb-1 px-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">
               {t('common.main')}
             </p>
           )}
-          {mainItems.map((item) => {
-            const isActive =
-              currentPath === item.href || (item.href !== '/' && currentPath.startsWith(item.href))
-            const link = (
-              <Link
-                key={item.href}
-                to={item.href}
-                className={cn(
-                  'flex items-center gap-3 rounded-lg px-2.5 py-2 text-sm transition-colors',
-                  isActive
-                    ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
-                    : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground',
-                  collapsed && 'justify-center',
-                )}
-              >
-                {item.icon}
-                {!collapsed && <span>{t(item.labelKey)}</span>}
-                {!collapsed && item.badge != null && item.badge > 0 && (
-                  <span className="ml-auto flex h-4 min-w-4 items-center justify-center rounded-full bg-warning px-1 text-2xs font-bold text-white">
-                    {item.badge}
-                  </span>
-                )}
-              </Link>
-            )
-            return collapsed ? (
-              <Tooltip
-                key={item.href}
-                content={`${t(item.labelKey)}${item.badge ? ` (${item.badge})` : ''}`}
-                side="right"
-              >
-                {link}
-              </Tooltip>
-            ) : (
-              link
-            )
-          })}
+          {mainItems.map((item) => renderNavItem(item, currentPath, collapsed, t))}
         </div>
 
-        {/* Remaining static groups */}
+        {/* Remaining groups */}
         {navGroups.slice(1).map((group) => (
           <div key={group.labelKey} className="mb-3">
             {!collapsed && (
@@ -251,34 +236,7 @@ export function Sidebar() {
                 {t(group.labelKey)}
               </p>
             )}
-            {group.items.map((item) => {
-              const isActive =
-                currentPath === item.href ||
-                (item.href !== '/' && currentPath.startsWith(item.href))
-              const link = (
-                <Link
-                  key={item.href}
-                  to={item.href}
-                  className={cn(
-                    'flex items-center gap-3 rounded-lg px-2.5 py-2 text-sm transition-colors',
-                    isActive
-                      ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
-                      : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground',
-                    collapsed && 'justify-center',
-                  )}
-                >
-                  {item.icon}
-                  {!collapsed && <span>{t(item.labelKey)}</span>}
-                </Link>
-              )
-              return collapsed ? (
-                <Tooltip key={item.href} content={t(item.labelKey)} side="right">
-                  {link}
-                </Tooltip>
-              ) : (
-                link
-              )
-            })}
+            {group.items.map((item) => renderNavItem(item, currentPath, collapsed, t))}
           </div>
         ))}
       </nav>
@@ -306,6 +264,7 @@ export function Sidebar() {
         </button>
         <Link
           to="/settings"
+          search={{ section: undefined }}
           className="flex items-center gap-3 rounded-lg px-2.5 py-2 text-sm hover:bg-sidebar-accent/50"
         >
           <Settings className="h-4 w-4" />
@@ -313,5 +272,59 @@ export function Sidebar() {
         </Link>
       </div>
     </aside>
+  )
+}
+
+/** Render a single nav item (link + optional badge + tooltip when collapsed). */
+function renderNavItem(
+  item: NavItem,
+  currentPath: string,
+  collapsed: boolean,
+  t: (key: string) => string,
+) {
+  const isActive =
+    currentPath === item.href || (item.href !== '/' && currentPath.startsWith(item.href))
+  const showBadge = item.badge != null && item.badge > 0
+
+  const link = (
+    <Link
+      key={item.href}
+      to={item.href}
+      className={cn(
+        'flex items-center gap-3 rounded-lg px-2.5 py-2 text-sm transition-colors',
+        isActive
+          ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
+          : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground',
+        collapsed && 'justify-center',
+      )}
+    >
+      {item.icon}
+      {!collapsed && <span>{t(item.labelKey)}</span>}
+      {!collapsed && showBadge && (
+        <span className="ml-auto flex h-4 min-w-4 items-center justify-center rounded-full bg-warning px-1 text-2xs font-bold text-white">
+          {item.badge}
+        </span>
+      )}
+      {!collapsed && item.badge != null && !showBadge && (
+        <Badge
+          variant="secondary"
+          className="ml-auto h-4 min-w-4 px-1 text-2xs font-normal text-muted-foreground"
+        >
+          0
+        </Badge>
+      )}
+    </Link>
+  )
+
+  return collapsed ? (
+    <Tooltip
+      key={item.href}
+      content={`${t(item.labelKey)}${item.badge ? ` (${item.badge})` : ''}`}
+      side="right"
+    >
+      {link}
+    </Tooltip>
+  ) : (
+    link
   )
 }

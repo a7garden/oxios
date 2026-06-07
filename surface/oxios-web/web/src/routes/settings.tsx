@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, Link, useSearch } from '@tanstack/react-router'
 import {
   Bot,
   Brain,
@@ -60,7 +60,12 @@ import {
   useSetProviderOptions,
 } from '@/hooks/use-engine'
 
-export const Route = createFileRoute('/settings')({ component: SettingsPage })
+export const Route = createFileRoute('/settings')({
+  validateSearch: (search: Record<string, unknown>) => ({
+    section: (search.section as string) || undefined,
+  }),
+  component: SettingsPage,
+})
 
 // ─── Navigation structure (groups) ────────────────────────────
 
@@ -474,7 +479,7 @@ function EnginePanel() {
 
   const currentModelId = useMemo(() => {
     if (!currentModel.includes('/')) return null
-    return currentModel.split('/').slice(1).join('/')
+    return currentModel  // ModelInfo.id is already "provider/model", used as-is
   }, [currentModel])
 
   const handleProviderChange = (providerId: string) => {
@@ -482,9 +487,8 @@ function EnginePanel() {
   }
 
   const handleModelChange = (modelId: string) => {
-    const provider = resolvedProvider ?? 'unknown'
-    const fullId = `${provider}/${modelId}`
-    setModel.mutate(fullId)
+    // modelId from ModelSelect is already in "provider/model" format (ModelInfo.id)
+    setModel.mutate(modelId)
   }
 
   const handleApiKeySubmit = (apiKey: string) => {
@@ -729,7 +733,8 @@ function setNestedValue(obj: Record<string, unknown>, dotted: string, value: unk
 function SettingsPage() {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
-  const [activeSection, setActiveSection] = useState('engine')
+  const search = useSearch({ from: '/settings' })
+  const [activeSection, setActiveSection] = useState(search?.section ?? 'engine')
   const [showDiff, setShowDiff] = useState(false)
   // `formValues` is keyed by sectionKey (e.g. `memory`, `channels.telegram`)
   // and contains arbitrary nested objects for those sections.
