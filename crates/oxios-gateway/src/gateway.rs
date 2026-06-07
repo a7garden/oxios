@@ -329,6 +329,12 @@ impl Gateway {
                         evaluation_passed: orchestration.evaluation_passed,
                         duration_ms: Some(duration_ms),
                         error: None,
+                        // Chat UI redesign: interactive interview payload.
+                        // None when the LLM did not produce structured
+                        // questions — the frontend falls back to markdown.
+                        interview_questions: orchestration.interview_questions,
+                        interview_round: orchestration.interview_round,
+                        interview_ambiguity: orchestration.interview_ambiguity,
                     };
 
                     let outgoing = OutgoingMessage::success(
@@ -421,6 +427,9 @@ impl Gateway {
                                 evaluation_passed: true,
                                 duration_ms: None,
                                 error: None,
+                                interview_questions: None,
+                                interview_round: None,
+                                interview_ambiguity: None,
                             },
                         );
                         if let Err(e) = entry.channel.send(outgoing).await {
@@ -496,6 +505,9 @@ impl Gateway {
                                 evaluation_passed: true,
                                 duration_ms: None,
                                 error: None,
+                                interview_questions: None,
+                                interview_round: None,
+                                interview_ambiguity: None,
                             },
                         );
                         if let Err(e) = entry.channel.send(outgoing).await {

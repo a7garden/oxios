@@ -5343,6 +5343,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "oxios-kernel",
+ "oxios-ouroboros",
  "parking_lot",
  "serde",
  "serde_json",

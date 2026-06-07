@@ -36,6 +36,12 @@ interface ChatRuntimeState {
   detectedProject: import('@/types').Project | null
   /** IDs of dismissed detection badges. */
   dismissedProjectIds: string[]
+  /** Active structured interview questions (null = no interview active). */
+  activeInterview: import('@/types').InterviewQuestion[] | null
+  /** Interview round number. */
+  interviewRound: number
+  /** Interview ambiguity score. */
+  interviewAmbiguity: number
 }
 
 // ---------------------------------------------------------------------------
@@ -61,6 +67,8 @@ interface ChatActions {
   dismissDetection: (projectId: string) => void
   /** Clear persisted state (e.g. on logout). */
   clearPersist: () => void
+  /** Submit interview answers and send them as a message. */
+  submitInterviewResponse: (answers: import('@/types').InterviewAnswer[]) => void
   /** Handle an incoming WS chunk. */
   handleChunk: (chunk: StreamChunk) => void
 }
@@ -245,6 +253,9 @@ export const useChatStore = create<ChatStore>()(
       _lastDoneProjectId: null,
       detectedProject: null, // Phase 2 stub: always null
       dismissedProjectIds: [], // Dismissed detection badges
+      activeInterview: null,
+      interviewRound: 0,
+      interviewAmbiguity: 0,
 
       // ── Actions ──
 
@@ -418,6 +429,9 @@ export const useChatStore = create<ChatStore>()(
           activeSessionId: null,
           _lastDoneSessionId: null,
           _lastDoneProjectId: null,
+          activeInterview: null,
+          interviewRound: 0,
+          interviewAmbiguity: 0,
         })
       },
 
@@ -446,7 +460,52 @@ export const useChatStore = create<ChatStore>()(
           activeSessionId: null,
           activeProjectId: null,
           messages: [],
+          activeInterview: null,
+          interviewRound: 0,
+          interviewAmbiguity: 0,
         })
+      },
+
+      submitInterviewResponse(answers: import('@/types').InterviewAnswer[]) {
+        const { activeInterview, activeSessionId, activeProjectId } = get()
+        if (!activeInterview) return
+
+        // Build answer summary for user message bubble
+        const answerParts = answers
+          .filter((a) => a.value.trim())
+          .map((a) => {
+            const q = activeInterview.find((q) => q.id === a.question_id)
+            return q ? `${q.text}\n→ ${a.value}` : a.value
+          })
+        const answerText = answerParts.join('\n\n')
+
+        // Send via WebSocket as interview_response
+        if (wsInstance && wsInstance.readyState === WebSocket.OPEN) {
+          wsInstance.send(
+            JSON.stringify({
+              type: 'interview_response',
+              session_id: activeSessionId ?? '',
+              project_id: activeProjectId ?? '',
+              answers,
+            }),
+          )
+        }
+
+        // Add user message showing their answers
+        const userMsg: ChatMessage = {
+          id: crypto.randomUUID(),
+          role: 'user',
+          content: answerText || answers.map((a) => a.value).join(', '),
+          timestamp: new Date().toISOString(),
+        }
+
+        set((s) => ({
+          messages: [...s.messages, userMsg],
+          activeInterview: null,
+          interviewRound: 0,
+          interviewAmbiguity: 0,
+          isStreaming: true,
+        }))
       },
 
       handleChunk(chunk) {
@@ -546,6 +605,18 @@ export const useChatStore = create<ChatStore>()(
                 ],
               }
             })
+            break
+          }
+
+          case 'interview': {
+            if (chunk.questions && chunk.questions.length > 0) {
+              set({
+                activeInterview: chunk.questions,
+                interviewRound: chunk.round ?? 1,
+                interviewAmbiguity: chunk.ambiguity ?? 0,
+                isStreaming: false,
+              })
+            }
             break
           }
 

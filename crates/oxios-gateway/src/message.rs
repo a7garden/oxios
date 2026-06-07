@@ -73,6 +73,22 @@ pub struct ResponseMeta {
     /// Structured error, if this is an error response.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<UserFacingError>,
+    /// Structured interview questions (chat UI redesign — interactive
+    /// interview). Populated when the interview phase needs clarification
+    /// and the LLM produced a structured form. The WebSocket handler
+    /// forwards this to the client as an `interview` chunk so the Web
+    /// UI can render interactive widgets. When `None`, the frontend
+    /// renders the plain `content` as markdown (graceful degradation).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub interview_questions: Option<Vec<oxios_ouroboros::ouroboros_engine::InterviewQuestionOutput>>,
+    /// Current interview round (1-based). Populated alongside
+    /// `interview_questions`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub interview_round: Option<u32>,
+    /// Current ambiguity score (0.0 = clear, 1.0 = fully ambiguous).
+    /// Populated alongside `interview_questions`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub interview_ambiguity: Option<f64>,
 }
 
 /// A user-facing structured error.
@@ -233,6 +249,9 @@ impl OutgoingMessage {
                 evaluation_passed: false,
                 duration_ms: None,
                 error: Some(err),
+                interview_questions: None,
+                interview_round: None,
+                interview_ambiguity: None,
             }),
         }
     }

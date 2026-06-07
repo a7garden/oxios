@@ -13,7 +13,7 @@ use async_trait::async_trait;
 use chrono::Utc;
 use futures::StreamExt;
 use oxi_sdk::{Context, Message, Model, Provider, UserMessage};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
 use crate::evaluation::EvaluationResult;
@@ -38,6 +38,13 @@ struct InterviewResponse {
     /// Socratic questions to ask the user (only used when is_task = true).
     #[serde(default)]
     questions: Vec<String>,
+    /// Structured form of the same questions with options/kind for the
+    /// interactive Web UI. Optional — when the LLM omits this field or
+    /// the JSON is malformed, the frontend falls back to plain markdown
+    /// rendering. The plain `questions` array is always present and
+    /// remains the source of truth for the Orchestrator.
+    #[serde(default)]
+    structured_questions: Option<Vec<InterviewQuestionOutput>>,
     /// Ambiguity scores along each dimension (0.0–1.0 clarity).
     scores: Option<AmbiguityScores>,
     /// Task complexity: "simple" for clear single-action requests,
@@ -72,6 +79,49 @@ struct SeedResponse {
     acceptance_criteria: Vec<String>,
     #[serde(default)]
     ontology: Vec<Entity>,
+}
+
+// ---------------------------------------------------------------------------
+// Structured interview questions (chat UI redesign — interactive interview)
+//
+// The interview LLM is asked to produce a parallel `structured_questions`
+// array alongside the plain `questions` strings. The frontend renders
+// structured questions as interactive UI (chips, yes/no buttons, etc.).
+// When the LLM omits `structured_questions` or returns malformed JSON,
+// the frontend falls back to the plain markdown response — graceful
+// degradation. The plain `questions: Vec<String>` field is kept
+// untouched so the Orchestrator's existing logic continues to work.
+// ---------------------------------------------------------------------------
+
+/// Single option for a structured interview question.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct InterviewOptionOutput {
+    /// Stable identifier for the answer payload (e.g. "points", "ko").
+    pub value: String,
+    /// Human-readable label rendered as a chip/button.
+    pub label: String,
+    /// Optional longer description shown as a tooltip.
+    #[serde(default)]
+    pub description: String,
+}
+
+/// One structured question produced by the LLM.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct InterviewQuestionOutput {
+    /// Short identifier used as the answer key (e.g. "q1", "q2").
+    pub id: String,
+    /// The question text (also present in the parallel `questions` array).
+    pub text: String,
+    /// Question kind — drives the frontend widget selection.
+    #[serde(default = "default_question_kind")]
+    pub kind: String,
+    /// Choice options (empty for free_text / yes_no).
+    #[serde(default)]
+    pub options: Vec<InterviewOptionOutput>,
+}
+
+fn default_question_kind() -> String {
+    "free_text".to_string()
 }
 
 /// Expected LLM response shape for the evaluation phase.
@@ -304,12 +354,136 @@ impl OuroborosEngine {
             }
         }
     }
+
+    /// Returns structured question output for a given interview, if the
+    /// LLM produced one. Called by the Orchestrator right after
+    /// `interview()` for the same `user_input`. The two calls are
+    /// independent (no shared LLM call) — this keeps the trait stable
+    /// and avoids changing the InterviewResult shape that the existing
+    /// Orchestrator and persistence code depend on.
+    ///
+    /// Returns `Ok(None)` when:
+    /// - The LLM's `structured_questions` field was absent/null.
+    /// - JSON parsing failed for the structured sub-field.
+    /// - The interview was a non-task (chat) response.
+    pub async fn interview_structured(
+        &self,
+        user_input: &str,
+    ) -> Result<Option<Vec<InterviewQuestionOutput>>> {
+        let system_prompt = INTERVIEW_SYSTEM_PROMPT;
+        let user_message = format!(
+            "The user said:\n\"{user_input}\"\n\n\
+             Analyze this message and produce a JSON object with:\n\
+             - \"is_task\": true if the message requests a concrete action (create, read, write, run, find, fix, analyze, deploy, etc.) or describes something to build/execute. false for greetings, small talk, questions, gratitude, opinions, or conversational messages.\n\
+             - \"chat_response\": (only when is_task=false) A natural, friendly response. Be warm, concise, and helpful. Skip this field when is_task=true.\n\
+             - \"complexity\": (only when is_task=true) \"simple\" for clear single-action requests that need no clarification (check weather, set alarm, search, calculate, simple file read/write, echo). \"complex\" for ambiguous or multi-step tasks (modify code, write blog post, deploy, analyze). Default to \"complex\" when unsure.\n\
+             - \"questions\": (only when is_task=true) Up to 3 Socratic clarifying questions. Empty array when is_task=false.\n\
+             - \"structured_questions\": (only when is_task=true) Parallel array matching `questions`. Each entry has {{ \"id\": \"q1\", \"text\": \"...\", \"kind\": \"single_choice\"|\"free_text\"|\"yes_no\", \"options\": [{{ \"value\": \"...\", \"label\": \"...\" }}] }}. Omit or set null when you cannot predict reasonable options. Skip when is_task=false.\n\
+             - \"scores\": (only when is_task=true) {{ \"goal_clarity\": 0.0-1.0, \"constraint_clarity\": 0.0-1.0, \"success_criteria\": 0.0-1.0 }}. Skip this field when is_task=false.\n\n\
+             IMPORTANT SCORING (when is_task=true):\n\
+             - Score GOAL_CLARITY 0.9+ ONLY if the request is immediately executable with no ambiguity\n\
+             - Score CONSTRAINT_CLARITY 0.8+ ONLY if specific filenames, paths, or content are provided\n\
+             - Score SUCCESS_CRITERIA 0.7+ ONLY if 'done' is clearly defined\n\
+             - Be HONEST with clarity scores. When in doubt, score LOWER."
+        );
+
+        let raw = self.llm_complete(system_prompt, &user_message).await?;
+        let parsed: InterviewResponse = match Self::parse_json(&raw) {
+            Ok(p) => p,
+            Err(e) => {
+                tracing::warn!(error = %e, "interview_structured: JSON parse failed");
+                return Ok(None);
+            }
+        };
+
+        if !parsed.is_task {
+            return Ok(None);
+        }
+
+        // Validate structured_questions: drop entries with empty id/text,
+        // and ensure single_choice / multi_choice / yes_no have valid
+        // options. Empty/missing options for choice kinds cause the
+        // question to be downgraded to free_text (forgiving — better
+        // than silently dropping the question).
+        let plain_questions = &parsed.questions;
+        let structured = match parsed.structured_questions {
+            Some(s) if !s.is_empty() => s,
+            _ => return Ok(None),
+        };
+
+        let sanitized: Vec<InterviewQuestionOutput> = structured
+            .into_iter()
+            .filter_map(|mut q| {
+                if q.id.is_empty() || q.text.is_empty() {
+                    return None;
+                }
+                match q.kind.as_str() {
+                    "single_choice" | "multi_choice" | "yes_no" | "free_text" => {}
+                    _ => {
+                        q.kind = "free_text".to_string();
+                        q.options.clear();
+                    }
+                }
+                if matches!(q.kind.as_str(), "single_choice" | "multi_choice")
+                    && q.options.is_empty()
+                {
+                    q.kind = "free_text".to_string();
+                }
+                q.options.retain(|o| !o.value.is_empty() && !o.label.is_empty());
+                if q.kind == "yes_no" && q.options.is_empty() {
+                    q.options = vec![
+                        InterviewOptionOutput {
+                            value: "yes".to_string(),
+                            label: "Yes".to_string(),
+                            description: String::new(),
+                        },
+                        InterviewOptionOutput {
+                            value: "no".to_string(),
+                            label: "No".to_string(),
+                            description: String::new(),
+                        },
+                    ];
+                }
+                Some(q)
+            })
+            .collect();
+
+        if sanitized.is_empty() {
+            return Ok(None);
+        }
+
+        // Sanity log: how many plain questions matched structured ones.
+        let match_count = sanitized
+            .iter()
+            .filter(|q| plain_questions.iter().any(|p| p == &q.text))
+            .count();
+        tracing::info!(
+            structured = sanitized.len(),
+            plain = plain_questions.len(),
+            matched = match_count,
+            "interview_structured produced questions"
+        );
+
+        Ok(Some(sanitized))
+    }
 }
 
 #[async_trait]
 impl OuroborosProtocol for OuroborosEngine {
     fn set_persona_prompt(&self, prompt: Option<String>) {
         *self.persona_prompt.lock() = prompt;
+    }
+
+    async fn interview_structured(
+        &self,
+        user_input: &str,
+    ) -> Result<Option<Vec<InterviewQuestionOutput>>> {
+        // Delegate to the inherent method on `OuroborosEngine` to keep
+        // the long implementation body in one place. Inherent methods
+        // are not visible through `Arc<dyn OuroborosProtocol>`, so
+        // callers (the Orchestrator) get to this point through the
+        // trait method.
+        OuroborosEngine::interview_structured(self, user_input).await
     }
 
     async fn interview(&self, user_input: &str) -> Result<InterviewResult> {
@@ -345,6 +519,9 @@ impl OuroborosProtocol for OuroborosEngine {
                 } else {
                     vec!["Could you describe the goal in more detail?".into()]
                 },
+                // Degraded fallback never produces structured questions;
+                // the frontend renders the plain markdown response.
+                structured_questions: None,
                 scores: Some(AmbiguityScores {
                     goal_clarity: 0.4,
                     constraint_clarity: 0.3,

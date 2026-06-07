@@ -420,22 +420,52 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
                     }
 
                     // ── Forward to WebSocket client ──
-                    // Send token chunk with metadata
-                    let token_chunk = serde_json::json!({
-                        "type": "token",
-                        "content": msg.content,
-                        "session_id": session_id,
-                        "project_id": project_id,
-                    });
-                    let json = match serde_json::to_string(&token_chunk) {
-                        Ok(j) => j,
-                        Err(e) => {
-                            tracing::error!(error = %e, "Failed to serialize outgoing message");
-                            continue;
+                    //
+                    // Chat UI redesign: when `meta.interview_questions` is
+                    // present, send an `interview` chunk (structured widgets)
+                    // and skip the token chunk — the questions are already
+                    // carried by the interview payload. When absent, fall
+                    // back to the existing token + done sequence.
+                    let has_interview = msg.meta.as_ref().and_then(|m| m.interview_questions.as_ref()).is_some();
+
+                    if has_interview {
+                        // Send interview chunk with structured questions
+                        let interview_chunk = serde_json::json!({
+                            "type": "interview",
+                            "session_id": session_id,
+                            "project_id": project_id,
+                            "questions": msg.meta.as_ref().and_then(|m| m.interview_questions.clone()),
+                            "round": msg.meta.as_ref().and_then(|m| m.interview_round),
+                            "ambiguity": msg.meta.as_ref().and_then(|m| m.interview_ambiguity),
+                        });
+                        let json = match serde_json::to_string(&interview_chunk) {
+                            Ok(j) => j,
+                            Err(e) => {
+                                tracing::error!(error = %e, "Failed to serialize interview chunk");
+                                continue;
+                            }
+                        };
+                        if ws_tx.send(Message::Text(json.into())).await.is_err() {
+                            break;
                         }
-                    };
-                    if ws_tx.send(Message::Text(json.into())).await.is_err() {
-                        break; // WS closed — session was already persisted above
+                    } else {
+                        // Standard token chunk
+                        let token_chunk = serde_json::json!({
+                            "type": "token",
+                            "content": msg.content,
+                            "session_id": session_id,
+                            "project_id": project_id,
+                        });
+                        let json = match serde_json::to_string(&token_chunk) {
+                            Ok(j) => j,
+                            Err(e) => {
+                                tracing::error!(error = %e, "Failed to serialize outgoing message");
+                                continue;
+                            }
+                        };
+                        if ws_tx.send(Message::Text(json.into())).await.is_err() {
+                            break; // WS closed — session was already persisted above
+                        }
                     }
 
                     // Send done chunk with final metadata
@@ -497,11 +527,10 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
                         Err(_) => continue,
                     };
 
-                    let content = parsed
-                        .get("content")
+                    let msg_type = parsed
+                        .get("type")
                         .and_then(|v| v.as_str())
-                        .unwrap_or("")
-                        .to_string();
+                        .unwrap_or("message");
 
                     let incoming_session_id = parsed
                         .get("session_id")
@@ -515,33 +544,96 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
                         .filter(|s| !s.is_empty())
                         .map(String::from);
 
-                    if content.is_empty() {
-                        continue;
-                    }
+                    match msg_type {
+                        // Chat UI redesign: user submits structured interview
+                        // answers. Convert to natural language and forward as
+                        // a regular message so the Orchestrator's existing
+                        // multi-turn interview path handles it without any
+                        // special treatment.
+                        "interview_response" => {
+                            let answers = parsed
+                                .get("answers")
+                                .and_then(|v| v.as_array())
+                                .cloned()
+                                .unwrap_or_default();
 
-                    let mut incoming = IncomingMessage::new("web", "default", content.clone());
+                            let answer_text = answers
+                                .iter()
+                                .filter_map(|a| {
+                                    let value = a.get("value")?.as_str()?;
+                                    if value.is_empty() {
+                                        return None;
+                                    }
+                                    Some(value.to_string())
+                                })
+                                .collect::<Vec<_>>()
+                                .join("\n");
 
-                    if let Some(ref sid) = incoming_session_id {
-                        incoming.metadata.insert("session_id".into(), sid.clone());
-                    }
-                    if let Some(ref vid) = incoming_project_id {
-                        incoming.metadata.insert("project_id".into(), vid.clone());
-                    }
+                            if answer_text.is_empty() {
+                                continue;
+                            }
 
-                    // Save user message + its ID for correlated session persistence.
-                    {
-                        let mut pending = pending_for_send.lock().await;
-                        *pending = Some((
-                            incoming.id,
-                            PendingMessage {
-                                content,
-                                user_id: "default".to_string(),
-                            },
-                        ));
-                    }
+                            let mut incoming =
+                                IncomingMessage::new("web", "default", answer_text.clone());
+                            if let Some(ref sid) = incoming_session_id {
+                                incoming.metadata.insert("session_id".into(), sid.clone());
+                            }
+                            if let Some(ref vid) = incoming_project_id {
+                                incoming.metadata.insert("project_id".into(), vid.clone());
+                            }
 
-                    if incoming_tx.send(incoming).await.is_err() {
-                        break;
+                            {
+                                let mut pending = pending_for_send.lock().await;
+                                *pending = Some((
+                                    incoming.id,
+                                    PendingMessage {
+                                        content: answer_text,
+                                        user_id: "default".to_string(),
+                                    },
+                                ));
+                            }
+
+                            if incoming_tx.send(incoming).await.is_err() {
+                                break;
+                            }
+                        }
+                        // Default: regular chat message
+                        _ => {
+                            let content = parsed
+                                .get("content")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("")
+                                .to_string();
+
+                            if content.is_empty() {
+                                continue;
+                            }
+
+                            let mut incoming =
+                                IncomingMessage::new("web", "default", content.clone());
+
+                            if let Some(ref sid) = incoming_session_id {
+                                incoming.metadata.insert("session_id".into(), sid.clone());
+                            }
+                            if let Some(ref vid) = incoming_project_id {
+                                incoming.metadata.insert("project_id".into(), vid.clone());
+                            }
+
+                            {
+                                let mut pending = pending_for_send.lock().await;
+                                *pending = Some((
+                                    incoming.id,
+                                    PendingMessage {
+                                        content,
+                                        user_id: "default".to_string(),
+                                    },
+                                ));
+                            }
+
+                            if incoming_tx.send(incoming).await.is_err() {
+                                break;
+                            }
+                        }
                     }
                 }
                 Message::Close(_) => break,

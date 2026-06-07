@@ -8,6 +8,7 @@ repository = "https://github.com/a7garden/oxios"
 
 [dependencies]
 oxios-kernel = { version = "1.2.0", path = "../oxios-kernel", default-features = false, features = ["sqlite-memory"] }
+oxios-ouroboros = { version = "1.2.0", path = "../oxios-ouroboros" }
 tokio = { workspace = true }
 async-trait = { workspace = true }
 serde = { workspace = true }
