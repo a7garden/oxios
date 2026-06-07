@@ -278,7 +278,7 @@ async fn test_orchestrator_happy_path() {
     assert!(result.session_id.is_some());
     assert!(result.seed_id.is_some());
     assert_eq!(result.phase_reached, Phase::Evaluate);
-    assert!(result.evaluation_passed);
+    assert_eq!(result.evaluation_passed, Some(true));
     assert!(!result.response.is_empty());
 
     // Verify phases: interview, seed, execute, evaluate (no evolve).
@@ -323,7 +323,7 @@ async fn test_orchestrator_evolution_loop() {
 
     // Phase should reach Evolve (new seed was generated via evolve).
     assert_eq!(result.phase_reached, Phase::Evolve);
-    assert!(result.evaluation_passed, "Final evaluation should pass");
+    assert_eq!(result.evaluation_passed, Some(true), "Final evaluation should pass");
 
     // Verify the evolution loop:
     // evaluate(fail) → evolve → fork+run → evaluate(pass)

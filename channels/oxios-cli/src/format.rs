@@ -17,7 +17,7 @@ impl ChannelFormatter for CliFormatter {
         let mut out = msg.content.clone();
 
         if let Some(meta) = &msg.meta {
-            let eval_icon = if meta.evaluation_passed {
+            let eval_icon = if meta.evaluation_passed.unwrap_or(false) {
                 "✅"
             } else {
                 "⚠️"
@@ -27,7 +27,7 @@ impl ChannelFormatter for CliFormatter {
                     "\n{} {} | {}",
                     eval_icon,
                     meta.phase,
-                    if meta.evaluation_passed {
+                    if meta.evaluation_passed.unwrap_or(false) {
                         "통과"
                     } else {
                         "미통과"
@@ -120,7 +120,7 @@ mod tests {
             project_tag: Some("[🔧 oxios]".into()),
             seed_id: None,
             phase: "Execute".into(),
-            evaluation_passed: true,
+            evaluation_passed: Some(true),
             duration_ms: Some(1500),
             error: None,
         };
@@ -140,7 +140,7 @@ mod tests {
             project_tag: None,
             seed_id: None,
             phase: "Evaluate".into(),
-            evaluation_passed: false,
+            evaluation_passed: Some(false),
             duration_ms: Some(500),
             error: None,
         };
@@ -159,7 +159,7 @@ mod tests {
             project_tag: None,
             seed_id: None,
             phase: String::new(),
-            evaluation_passed: false,
+            evaluation_passed: None,
             duration_ms: None,
             error: Some(UserFacingError {
                 message: "시간이 초과되었습니다.".into(),
@@ -182,7 +182,7 @@ mod tests {
             project_tag: None,
             seed_id: None,
             phase: String::new(),
-            evaluation_passed: false,
+            evaluation_passed: None,
             duration_ms: None,
             error: Some(UserFacingError {
                 message: "AI 서비스 오류.".into(),

@@ -19,7 +19,7 @@ use anyhow::Result;
 use oxi_sdk::{Oxi, OxiBuilder, ProviderPool, RateLimitPolicy};
 use std::sync::Arc;
 
-use crate::credential::CredentialStore;
+use crate::credential::{discover_auth_store_providers, CredentialStore};
 
 /// The kernel's engine — wraps oxi-sdk's Oxi instance.
 ///
@@ -89,10 +89,48 @@ impl OxiosEngine {
 
         let mut builder = OxiBuilder::new().with_builtins();
 
-        // Inject credentials for all major providers via CredentialStore.
-        // This ensures `create_provider()` can always build an authenticated provider.
-        let providers = ["anthropic", "openai", "google", "deepseek", "xai"];
-        for provider in providers {
+        // Collect all providers that need credential injection:
+        // 1. Known major providers (always try to resolve)
+        // 2. Any provider found in ~/.oxi/auth.json (discovered dynamically)
+        // 3. The primary provider (from the default model)
+        let mut providers_to_try: Vec<String> = vec![
+            "anthropic".into(),
+            "openai".into(),
+            "google".into(),
+            "deepseek".into(),
+            "xai".into(),
+            "groq".into(),
+            "openrouter".into(),
+            "mistral".into(),
+            "cerebras".into(),
+            "fireworks".into(),
+            "github-copilot".into(),
+            "huggingface".into(),
+            "together".into(),
+            "minimax".into(),
+            "moonshotai".into(),
+            "kimi-coding".into(),
+            "zai".into(),
+            "opencode".into(),
+        ];
+
+        // Discover any additional providers from auth.json that aren't in the
+        // known list (e.g. custom/third-party providers).
+        if let Ok(extra) = discover_auth_store_providers() {
+            for p in extra {
+                if !providers_to_try.contains(&p) {
+                    providers_to_try.push(p);
+                }
+            }
+        }
+
+        // Ensure the primary provider is always included.
+        let primary_owned = primary_provider.to_string();
+        if !providers_to_try.contains(&primary_owned) {
+            providers_to_try.push(primary_owned);
+        }
+
+        for provider in &providers_to_try {
             // Use the config-level key only for the primary provider;
             // other providers resolve from env/auth.json.
             let config_key = if provider == primary_provider {

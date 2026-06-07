@@ -60,7 +60,9 @@ pub async fn run(kernel: &Kernel, prompt: &str, opts: &RunOptions) -> Result<i32
     let duration_ms = start.elapsed().as_millis() as u64;
 
     // ── Determine exit code ──
-    let exit_code = if opts.exit_code && !result.evaluation_passed {
+    let exit_code = if opts.exit_code && result.evaluation_passed.unwrap_or(false) {
+        0
+    } else if opts.exit_code {
         1
     } else {
         0
@@ -93,7 +95,7 @@ pub async fn run(kernel: &Kernel, prompt: &str, opts: &RunOptions) -> Result<i32
         if let Some(ref session_id) = result.session_id {
             println!("Session: {session_id}");
         }
-        if !result.evaluation_passed {
+        if result.evaluation_passed == Some(false) {
             eprintln!("\n⚠️  Evaluation did not fully pass.");
             if let Some(ref output) = result.output {
                 eprintln!("Notes: {output}");

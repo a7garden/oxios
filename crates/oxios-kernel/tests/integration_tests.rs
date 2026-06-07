@@ -459,7 +459,7 @@ async fn test_orchestrator_happy_path() {
     assert!(result.seed_id.is_some());
     // With acceptance_criteria → should_evaluate=true → reaches Evaluate.
     assert_eq!(result.phase_reached, Phase::Evaluate);
-    assert!(result.evaluation_passed);
+    assert_eq!(result.evaluation_passed, Some(true));
     assert!(!result.response.is_empty());
 
     // Verify phases called: Interview, Seed, Execute, Evaluate.
@@ -509,7 +509,7 @@ async fn test_orchestrator_evolution_loop() {
 
     // Evaluation fails first → evolve → re-execute → evaluate(pass).
     assert_eq!(result.phase_reached, Phase::Evolve);
-    assert!(result.evaluation_passed);
+    assert_eq!(result.evaluation_passed, Some(true));
 
     // Verify the evolution loop was exercised.
     assert_eq!(ouroboros.evaluate_called.load(Ordering::SeqCst), 2); // fail + pass

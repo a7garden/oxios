@@ -16,7 +16,7 @@ impl ChannelFormatter for TelegramFormatter {
         if let Some(meta) = &msg.meta {
             let mut footer_parts = Vec::new();
             if !meta.phase.is_empty() {
-                let eval = if meta.evaluation_passed {
+                let eval = if meta.evaluation_passed.unwrap_or(false) {
                     "✅"
                 } else {
                     "⚠️"
@@ -104,7 +104,7 @@ mod tests {
             project_tag: Some("[🔧 Test]".to_string()),
             seed_id: None,
             phase: "Execute".to_string(),
-            evaluation_passed: true,
+            evaluation_passed: Some(true),
             duration_ms: Some(3500),
             error: None,
         };
@@ -125,7 +125,7 @@ mod tests {
             project_tag: None,
             seed_id: None,
             phase: String::new(),
-            evaluation_passed: false,
+            evaluation_passed: None,
             duration_ms: None,
             error: Some(UserFacingError {
                 message: "내부 오류".to_string(),
@@ -147,7 +147,7 @@ mod tests {
             project_tag: None,
             seed_id: None,
             phase: String::new(),
-            evaluation_passed: false,
+            evaluation_passed: None,
             duration_ms: None,
             error: Some(UserFacingError {
                 message: "AI 서비스 오류".to_string(),

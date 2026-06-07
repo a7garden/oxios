@@ -206,6 +206,26 @@ fn auth_json_path() -> Result<PathBuf> {
     Ok(PathBuf::from(home).join(".oxi").join("auth.json"))
 }
 
+/// Discover all provider names stored in `~/.oxi/auth.json`.
+///
+/// Returns a list of provider IDs (top-level keys in the JSON file).
+/// Special keys like `"version"` are filtered out. Used by `OxiosEngine::from_config`
+/// to ensure credentials from the auth store are always injected, even for
+/// providers not in the hardcoded known list.
+pub fn discover_auth_store_providers() -> Result<Vec<String>> {
+    let path = auth_json_path()?;
+    if !path.exists() {
+        return Ok(vec![]);
+    }
+    let raw = std::fs::read_to_string(&path)?;
+    let map: serde_json::Map<String, serde_json::Value> = serde_json::from_str(&raw)?;
+    Ok(map
+        .keys()
+        .filter(|k| *k != "version" && !k.starts_with('_'))
+        .cloned()
+        .collect())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

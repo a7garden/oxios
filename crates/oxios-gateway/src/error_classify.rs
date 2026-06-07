@@ -12,8 +12,7 @@ use crate::message::{ErrorKind, UserFacingError};
 /// (in that priority). Falls back to `ErrorKind::Internal` when nothing matches.
 pub fn classify_error(e: &anyhow::Error) -> UserFacingError {
     let kind = infer_kind(e);
-    let message = user_message(&kind);
-    let suggestion = suggest(&kind);
+    let (message, suggestion) = user_message_and_suggestion(&kind, &e.to_string());
 
     UserFacingError {
         message,
@@ -39,6 +38,9 @@ fn infer_kind(e: &anyhow::Error) -> ErrorKind {
 
     // 3. Message-pattern matching (heuristic).
     let msg = e.to_string().to_lowercase();
+    if msg.contains("missing api key") || msg.contains("no api key") {
+        return ErrorKind::ApiKeyMissing;
+    }
     if msg.contains("rate limit") || msg.contains("api key") || msg.contains("provider") {
         return ErrorKind::ProviderError;
     }
@@ -55,29 +57,36 @@ fn infer_kind(e: &anyhow::Error) -> ErrorKind {
     ErrorKind::Internal
 }
 
-fn user_message(kind: &ErrorKind) -> String {
+fn user_message_and_suggestion(kind: &ErrorKind, _raw_msg: &str) -> (String, Option<String>) {
     match kind {
-        ErrorKind::ExecutionFailed => "요청을 처리하는 중 오류가 발생했습니다.".to_string(),
-        ErrorKind::ProviderError => {
-            "AI 서비스에 일시적인 문제가 있습니다. 잠시 후 다시 시도해 주세요.".to_string()
-        }
-        ErrorKind::Timeout => "요청 처리 시간이 초과되었습니다.".to_string(),
-        ErrorKind::PermissionDenied => "이 작업을 수행할 권한이 없습니다.".to_string(),
-        ErrorKind::ValidationError => "입력이 올바르지 않습니다.".to_string(),
-        ErrorKind::Internal => "내부 오류가 발생했습니다.".to_string(),
-    }
-}
-
-fn suggest(kind: &ErrorKind) -> Option<String> {
-    match kind {
-        ErrorKind::ProviderError => {
-            Some("1-2분 후 다시 시도하거나 다른 모델을 선택하세요.".to_string())
-        }
-        ErrorKind::Timeout => {
-            Some("더 간단한 요청으로 시도하거나 타임아웃을 늘리세요.".to_string())
-        }
-        ErrorKind::PermissionDenied => Some("관리자에게 권한을 요청하세요.".to_string()),
-        _ => None,
+        ErrorKind::ApiKeyMissing => (
+            "API 키가 설정되지 않았습니다.".to_string(),
+            Some("설정에서 API 키를 등록하거나 사용 가능한 모델로 변경하세요.".to_string()),
+        ),
+        ErrorKind::ExecutionFailed => (
+            "요청을 처리하는 중 오류가 발생했습니다.".to_string(),
+            None,
+        ),
+        ErrorKind::ProviderError => (
+            "AI 서비스에 일시적인 문제가 있습니다. 잠시 후 다시 시도해 주세요.".to_string(),
+            Some("1-2분 후 다시 시도하거나 다른 모델을 선택하세요.".to_string()),
+        ),
+        ErrorKind::Timeout => (
+            "요청 처리 시간이 초과되었습니다.".to_string(),
+            Some("더 간단한 요청으로 시도하거나 타임아웃을 늘리세요.".to_string()),
+        ),
+        ErrorKind::PermissionDenied => (
+            "이 작업을 수행할 권한이 없습니다.".to_string(),
+            Some("관리자에게 권한을 요청하세요.".to_string()),
+        ),
+        ErrorKind::ValidationError => (
+            "입력이 올바르지 않습니다.".to_string(),
+            None,
+        ),
+        ErrorKind::Internal => (
+            "내부 오류가 발생했습니다.".to_string(),
+            None,
+        ),
     }
 }
 
@@ -118,6 +127,20 @@ mod tests {
         let e = anyhow::anyhow!("something went wrong in the system");
         let ufe = classify_error(&e);
         assert_eq!(ufe.kind, ErrorKind::Internal);
+    }
+
+    #[test]
+    fn api_key_missing_classified() {
+        let e = anyhow::anyhow!("Missing API key");
+        let ufe = classify_error(&e);
+        assert_eq!(ufe.kind, ErrorKind::ApiKeyMissing);
+    }
+
+    #[test]
+    fn no_api_key_classified() {
+        let e = anyhow::anyhow!("No API key configured");
+        let ufe = classify_error(&e);
+        assert_eq!(ufe.kind, ErrorKind::ApiKeyMissing);
     }
 
     #[test]
@@ -179,13 +202,14 @@ mod tests {
     fn user_messages_are_korean() {
         for kind in &[
             ErrorKind::ExecutionFailed,
+            ErrorKind::ApiKeyMissing,
             ErrorKind::ProviderError,
             ErrorKind::Timeout,
             ErrorKind::PermissionDenied,
             ErrorKind::ValidationError,
             ErrorKind::Internal,
         ] {
-            let msg = user_message(kind);
+            let (msg, _) = user_message_and_suggestion(kind, "");
             assert!(
                 !msg.is_empty(),
                 "user_message should not be empty for {:?}",
