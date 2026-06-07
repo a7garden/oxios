@@ -625,8 +625,7 @@ export const useChatStore = create<ChatStore>()(
             const vid = chunk.project_id ?? null
             const toolCalls = chunk.tool_calls ?? []
             const phase = chunk.phase
-            const evaluationPassed =
-              chunk.evaluation_passed === 'true' || chunk.evaluation_passed === 'True'
+            const evaluationPassed = chunk.evaluation_passed === true || chunk.evaluation_passed === 'true'
             const seedId = chunk.seed_id
             const durationMs = chunk.duration_ms
 

@@ -518,7 +518,7 @@ impl Orchestrator {
                 seed_id: None,
                 agent_id: None,
                 phase_reached: Phase::Interview,
-                evaluation_passed: false,
+                evaluation_passed: None,
                 output: None,
                 tool_calls: vec![],
                 interview_questions: None,
@@ -601,7 +601,7 @@ impl Orchestrator {
                 seed_id: None,
                 agent_id: None,
                 phase_reached: Phase::Interview,
-                evaluation_passed: false,
+                evaluation_passed: None,
                 output: None,
                 tool_calls: vec![],
                 interview_questions: structured,
@@ -702,7 +702,7 @@ impl Orchestrator {
                     seed_id: Some(seed.id),
                     agent_id: None,
                     phase_reached: Phase::Execute,
-                    evaluation_passed: all_passed,
+                    evaluation_passed: Some(all_passed),
                     output: Some(combined),
                     tool_calls: vec![],
                     interview_questions: None,
@@ -827,7 +827,7 @@ impl Orchestrator {
             seed_id: Some(final_seed.id),
             agent_id: None,
             phase_reached,
-            evaluation_passed: passed,
+            evaluation_passed: Some(passed),
             output: Some(final_result.output.clone()),
             tool_calls: final_result.tool_calls.clone(),
             interview_questions: None,
@@ -1395,8 +1395,12 @@ pub struct OrchestrationResult {
     pub agent_id: Option<AgentId>,
     /// The furthest phase reached.
     pub phase_reached: Phase,
-    /// Whether evaluation passed (false if evaluation was skipped or failed).
-    pub evaluation_passed: bool,
+    /// Whether evaluation passed.
+    ///
+    /// - `None` — evaluation was not applicable (interview, chat, non-task).
+    /// - `Some(true)` — evaluation passed.
+    /// - `Some(false)` — evaluation failed or execution unsuccessful.
+    pub evaluation_passed: Option<bool>,
     /// Output or notes from evaluation.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub output: Option<String>,

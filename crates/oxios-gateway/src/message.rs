@@ -66,7 +66,12 @@ pub struct ResponseMeta {
     /// Furthest phase reached (Interview | Seed | Execute | Evaluate | Evolve).
     pub phase: String,
     /// Whether evaluation passed.
-    pub evaluation_passed: bool,
+    ///
+    /// - `None` — evaluation was not applicable (interview, chat).
+    /// - `Some(true)` — evaluation passed.
+    /// - `Some(false)` — evaluation failed.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub evaluation_passed: Option<bool>,
     /// Wall-clock duration of the dispatch in milliseconds.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub duration_ms: Option<u64>,
@@ -108,6 +113,8 @@ pub struct UserFacingError {
 pub enum ErrorKind {
     /// Agent execution failed.
     ExecutionFailed,
+    /// API key is missing or not configured.
+    ApiKeyMissing,
     /// LLM provider error (rate limit, API error, etc.).
     ProviderError,
     /// Timeout.
@@ -246,7 +253,7 @@ impl OutgoingMessage {
                 project_tag: None,
                 seed_id: None,
                 phase: String::new(),
-                evaluation_passed: false,
+                evaluation_passed: None,
                 duration_ms: None,
                 error: Some(err),
                 interview_questions: None,

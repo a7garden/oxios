@@ -125,7 +125,7 @@ pub(crate) async fn handle_chat(
                 .or_else(|| response.metadata.get("phase").cloned());
             let project_tag = meta.and_then(|m| m.project_tag.clone());
             let seed_id = meta.and_then(|m| m.seed_id.clone());
-            let evaluation_passed = meta.map(|m| m.evaluation_passed);
+            let evaluation_passed = meta.and_then(|m| m.evaluation_passed);
             let duration_ms = meta.and_then(|m| m.duration_ms);
 
             // Persist session
@@ -378,7 +378,7 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
                         .as_ref()
                         .map(|m| m.phase.clone())
                         .or_else(|| msg.metadata.get("phase").cloned());
-                    let evaluation_passed = msg.meta.as_ref().map(|m| m.evaluation_passed);
+                    let evaluation_passed = msg.meta.as_ref().and_then(|m| m.evaluation_passed);
                     let project_tag = msg.meta.as_ref().and_then(|m| m.project_tag.clone());
                     let seed_id = msg.meta.as_ref().and_then(|m| m.seed_id.clone());
                     let duration_ms = msg.meta.as_ref().and_then(|m| m.duration_ms);
