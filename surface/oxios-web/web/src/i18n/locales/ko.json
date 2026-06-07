@@ -100,7 +100,9 @@
     "description": "설명",
     "previous": "이전",
     "name": "이름",
-    "mcpServers": "MCP 서버"
+    "mcpServers": "MCP 서버",
+    "operations": "운영",
+    "infrastructure": "인프라"
   },
   "ui": {
     "selectPlaceholder": "선택..."
@@ -156,7 +158,26 @@
     "viewAllCount": "{{count}}개 전체 보기",
     "risk": "위험도",
     "totalForkedUnavailable": "/api/status 엔드포인트에서 누적 포크 수를 보고하지 않습니다 — 백엔드 필드 누락.",
-    "approvalsAllClear": "대기 중인 승인이 없습니다. 시스템이 정상입니다."
+    "approvalsAllClear": "대기 중인 승인이 없습니다. 시스템이 정상입니다.",
+    "agentsStatus": "에이전트 상태",
+    "agentsFailed": "실패",
+    "agentsRunning": "실행",
+    "agentsCompleted": "완료",
+    "ram": "RAM",
+    "modelUsage": "모델 사용량",
+    "totalCostAndCalls": "${{cost}} 총 비용 · {{count}}회 호출",
+    "onboarding": {
+      "title": "빠른 시작",
+      "subtitle": "시스템이 유휴 상태입니다. 아래에서 시작해 보세요.",
+      "chat": "채팅 시작",
+      "chatDesc": "에이전트에게 바로 프롬프트를 보내세요",
+      "seed": "시드 만들기",
+      "seedDesc": "구조화된 에이전트 스펙을 작성하세요",
+      "knowledge": "지식 노트",
+      "knowledgeDesc": "마크다운 노트와 일기를 관리하세요",
+      "memory": "메모리 탐색",
+      "memoryDesc": "에이전트 메모리 저장소를 살펴보세요"
+    }
   },
   "settings": {
     "title": "설정",
@@ -557,6 +578,28 @@
     "sessionsLabel": "세션",
     "serverConnecting": "서버에 연결 중...",
     "sendHint": "메시지를 보내 대화를 시작하세요.",
+    "toggleSidebar": "사이드바 토글",
+    "reconnecting": "재연결 중...",
+    "greeting": "무엇을 도와드릴까요?",
+    "greetingHint": "제안을 선택하거나 직접 입력하세요.",
+    "suggestions": {
+      "codeReview": "최근 코드 변경 사항 리뷰",
+      "techTrend": "이번 주 AI 트렌드 알려줘",
+      "projectAnalysis": "이 프로젝트가 무엇을 하는지 요약",
+      "todaySchedule": "오늘 일정 알려줘"
+    },
+    "interview": {
+      "title": "요청을 더 정확히 이해하고 싶어요",
+      "submit": "답변 제출",
+      "additionalThoughts": "추가로 의견이 있으면 입력하세요 (선택)",
+      "optionalPlaceholder": "원하는 내용이 있으면 적어주세요...",
+      "typeAnswer": "답변을 입력하세요...",
+      "yes": "예",
+      "no": "아니오",
+      "progressLabel": "인터뷰 진행 중",
+      "roundLabel": "Round {{round}}",
+      "ambiguityLabel": "모호도 {{value}}"
+    },
     "transparency": {
       "timelineHeader_one": "활동 {{count}}개",
       "timelineHeader_other": "활동 {{count}}개",

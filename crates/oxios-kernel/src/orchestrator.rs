@@ -521,6 +521,9 @@ impl Orchestrator {
                 evaluation_passed: false,
                 output: None,
                 tool_calls: vec![],
+                interview_questions: None,
+                interview_round: None,
+                interview_ambiguity: None,
             });
         }
 
@@ -567,6 +570,29 @@ impl Orchestrator {
             self.publish_phase_completed(&session_id, Phase::Interview, "needs clarification")
                 .await;
 
+            // Try to produce structured questions for the interactive
+            // Web UI. This is best-effort: failure here does NOT block
+            // the interview flow — the frontend will fall back to
+            // rendering `response` as plain markdown.
+            let structured = match self.ouroboros.interview_structured(user_message).await {
+                Ok(Some(s)) if !s.is_empty() => Some(s),
+                Ok(_) => None,
+                Err(e) => {
+                    tracing::warn!(error = %e, "interview_structured failed; falling back to markdown");
+                    None
+                }
+            };
+
+            // Round = 1 + number of prior answers in the session's
+            // interview history (best-effort: 1 when not present).
+            let interview_round = {
+                let sessions = self.sessions.read();
+                sessions
+                    .get(&session_id)
+                    .map(|s| (s.interview.answers.len().saturating_sub(1)).max(1) as u32)
+                    .unwrap_or(1)
+            };
+
             return Ok(OrchestrationResult {
                 session_id: Some(session_id.clone()),
                 primary_project_id,
@@ -578,6 +604,9 @@ impl Orchestrator {
                 evaluation_passed: false,
                 output: None,
                 tool_calls: vec![],
+                interview_questions: structured,
+                interview_round: Some(interview_round),
+                interview_ambiguity: Some(interview.ambiguity.ambiguity()),
             });
         }
 
@@ -676,6 +705,9 @@ impl Orchestrator {
                     evaluation_passed: all_passed,
                     output: Some(combined),
                     tool_calls: vec![],
+                    interview_questions: None,
+                    interview_round: None,
+                    interview_ambiguity: None,
                 });
             }
         }
@@ -798,6 +830,9 @@ impl Orchestrator {
             evaluation_passed: passed,
             output: Some(final_result.output.clone()),
             tool_calls: final_result.tool_calls.clone(),
+            interview_questions: None,
+            interview_round: None,
+            interview_ambiguity: None,
         })
     }
 
@@ -1368,6 +1403,23 @@ pub struct OrchestrationResult {
     /// Tool calls recorded during execution.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub tool_calls: Vec<oxios_ouroboros::ToolCallRecord>,
+    /// Structured interview questions (chat UI redesign — interactive
+    /// interview). Populated when the interview phase needs clarification
+    /// and the LLM produced a structured form of the questions. The
+    /// Gateway forwards this to the WebSocket as an `interview` chunk;
+    /// the Web UI renders it as interactive widgets (chips, yes/no
+    /// buttons). When `None`, the frontend falls back to rendering
+    /// `response` as plain markdown.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub interview_questions: Option<Vec<oxios_ouroboros::ouroboros_engine::InterviewQuestionOutput>>,
+    /// Current interview round (1-based). Populated alongside
+    /// `interview_questions`. Drives the "Round N/M" indicator.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub interview_round: Option<u32>,
+    /// Current ambiguity score (0.0 = clear, 1.0 = fully ambiguous).
+    /// Populated alongside `interview_questions`. Drives the progress bar.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub interview_ambiguity: Option<f64>,
 }
 
 /// Format clarifying questions for display.

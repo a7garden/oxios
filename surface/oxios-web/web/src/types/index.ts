@@ -243,6 +243,26 @@ export interface ChatResponse {
   duration_ms?: number
 }
 
+// ── Interactive interview (chat UI redesign) ────────────────────────────
+
+export interface InterviewOption {
+  value: string
+  label: string
+  description?: string
+}
+
+export interface InterviewQuestion {
+  id: string
+  text: string
+  kind: 'single_choice' | 'multi_choice' | 'free_text' | 'yes_no'
+  options?: InterviewOption[]
+}
+
+export interface InterviewAnswer {
+  question_id: string
+  value: string
+}
+
 export interface StreamChunk {
   type:
     | 'token'
@@ -258,6 +278,8 @@ export interface StreamChunk {
     | 'memory'
     | 'reasoning'
     | 'usage'
+    // Chat UI redesign: interactive interview
+    | 'interview'
   content?: string
   tool_name?: string
   tool_args?: Record<string, unknown>
@@ -293,6 +315,10 @@ export interface StreamChunk {
   /// UI consumers that understand a context kind render it richly;
   /// older consumers simply ignore the field.
   context?: ToolCallContext
+  // ── Interview chunk fields (chat UI redesign) ──
+  questions?: InterviewQuestion[]
+  round?: number
+  ambiguity?: number
 }
 
 // ── Browser observability (RFC-015 Phase G, oxi-agent 0.29.1+) ─────────

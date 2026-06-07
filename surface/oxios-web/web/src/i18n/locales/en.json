@@ -100,7 +100,9 @@
     "description": "Description",
     "previous": "Previous",
     "name": "Name",
-    "mcpServers": "MCP Servers"
+    "mcpServers": "MCP Servers",
+    "operations": "Operations",
+    "infrastructure": "Infrastructure"
   },
   "ui": {
     "selectPlaceholder": "Select..."
@@ -156,7 +158,26 @@
     "viewAllCount": "View all {{count}}",
     "risk": "Risk",
     "totalForkedUnavailable": "Total forked count is not reported by the /api/status endpoint — backend field missing.",
-    "approvalsAllClear": "No pending approvals. The system is healthy."
+    "approvalsAllClear": "No pending approvals. The system is healthy.",
+    "agentsStatus": "Agent Status",
+    "agentsFailed": "failed",
+    "agentsRunning": "running",
+    "agentsCompleted": "completed",
+    "ram": "RAM",
+    "modelUsage": "Model Usage",
+    "totalCostAndCalls": "${{cost}} total · {{count}} calls",
+    "onboarding": {
+      "title": "Quick Start",
+      "subtitle": "The system is idle. Get started with one of these actions.",
+      "chat": "Start Chatting",
+      "chatDesc": "Send a prompt directly to an agent",
+      "seed": "Create a Seed",
+      "seedDesc": "Write a structured agent specification",
+      "knowledge": "Knowledge Notes",
+      "knowledgeDesc": "Manage markdown notes and journal",
+      "memory": "Explore Memory",
+      "memoryDesc": "Browse the agent memory store"
+    }
   },
   "settings": {
     "title": "Settings",
@@ -557,6 +578,28 @@
     "sessionsLabel": "Sessions",
     "serverConnecting": "Connecting to server...",
     "sendHint": "Send a message to start a conversation.",
+    "toggleSidebar": "Toggle sidebar",
+    "reconnecting": "Reconnecting...",
+    "greeting": "What can I help you with?",
+    "greetingHint": "Pick a suggestion or type your own.",
+    "suggestions": {
+      "codeReview": "Review my recent code changes",
+      "techTrend": "What's trending in AI this week?",
+      "projectAnalysis": "Summarize what this project does",
+      "todaySchedule": "What's on my schedule today?"
+    },
+    "interview": {
+      "title": "I'd like to understand your request better",
+      "submit": "Submit answers",
+      "additionalThoughts": "Anything else to add? (optional)",
+      "optionalPlaceholder": "Type any additional thoughts...",
+      "typeAnswer": "Type your answer...",
+      "yes": "Yes",
+      "no": "No",
+      "progressLabel": "Interview in progress",
+      "roundLabel": "Round {{round}}",
+      "ambiguityLabel": "Ambiguity {{value}}"
+    },
     "transparency": {
       "timelineHeader_one": "{{count}} activity",
       "timelineHeader_other": "{{count}} activities",
