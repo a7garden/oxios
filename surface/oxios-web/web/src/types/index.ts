@@ -288,7 +288,7 @@ export interface StreamChunk {
   session_id?: string
   project_id?: string
   phase?: string
-  evaluation_passed?: string
+  evaluation_passed?: boolean | string
   seed_id?: string
   duration_ms?: number
   tool_calls?: ToolCallSummary[]
