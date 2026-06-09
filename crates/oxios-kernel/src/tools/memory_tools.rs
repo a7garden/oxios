@@ -5,12 +5,12 @@
 //! - `memory_read` — read/list memory entries
 //! - `memory_search` — search memory entries by content or tags
 
+use async_trait::async_trait;
 use std::sync::Arc;
 
-use async_trait::async_trait;
 use chrono::Utc;
 use oxi_sdk::{AgentTool, AgentToolResult, ToolContext};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use crate::memory::{MemoryEntry, MemoryManager, MemoryType};
 
@@ -40,6 +40,7 @@ impl std::fmt::Debug for MemoryWriteTool {
 }
 
 #[async_trait]
+
 impl AgentTool for MemoryWriteTool {
     fn name(&self) -> &str {
         "memory_write"
@@ -86,7 +87,8 @@ impl AgentTool for MemoryWriteTool {
         params: Value,
         _signal: Option<tokio::sync::oneshot::Receiver<()>>,
         _ctx: &ToolContext,
-    ) -> Result<AgentToolResult, oxi_sdk::ToolError> {
+    ) -> Result<AgentToolResult, oxi_sdk::ToolError>
+     {
         let content = params["content"].as_str().unwrap_or("").to_string();
         if content.is_empty() {
             return Ok(AgentToolResult::error("content is required"));
@@ -99,8 +101,8 @@ impl AgentTool for MemoryWriteTool {
             "knowledge" => MemoryType::Knowledge,
             _ => {
                 return Ok(AgentToolResult::error(format!(
-                "Invalid memory_type '{memory_type_str}'. Must be one of: fact, episode, knowledge"
-            )))
+                    "Invalid memory_type '{memory_type_str}'. Must be one of: fact, episode, knowledge"
+                )));
             }
         };
 
@@ -181,6 +183,7 @@ impl std::fmt::Debug for MemoryReadTool {
 }
 
 #[async_trait]
+
 impl AgentTool for MemoryReadTool {
     fn name(&self) -> &str {
         "memory_read"
@@ -221,7 +224,8 @@ impl AgentTool for MemoryReadTool {
         params: Value,
         _signal: Option<tokio::sync::oneshot::Receiver<()>>,
         _ctx: &ToolContext,
-    ) -> Result<AgentToolResult, oxi_sdk::ToolError> {
+    ) -> Result<AgentToolResult, oxi_sdk::ToolError>
+     {
         let limit = params["limit"].as_u64().unwrap_or(10) as usize;
 
         if let Some(id) = params["id"].as_str() {
@@ -310,6 +314,7 @@ impl std::fmt::Debug for MemorySearchTool {
 }
 
 #[async_trait]
+
 impl AgentTool for MemorySearchTool {
     fn name(&self) -> &str {
         "memory_search"
@@ -351,7 +356,8 @@ impl AgentTool for MemorySearchTool {
         params: Value,
         _signal: Option<tokio::sync::oneshot::Receiver<()>>,
         _ctx: &ToolContext,
-    ) -> Result<AgentToolResult, oxi_sdk::ToolError> {
+    ) -> Result<AgentToolResult, oxi_sdk::ToolError>
+     {
         let query = params["query"].as_str().unwrap_or("");
         if query.is_empty() {
             return Ok(AgentToolResult::error("query is required"));

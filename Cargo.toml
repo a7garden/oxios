@@ -1,7 +1,7 @@
 [package]
 name = "oxios"
 version = "1.2.0"
-edition = "2021"
+edition = "2024"
 description = "Oxios Agent OS — Agent Operating System powered by oxi-sdk"
 license = "MIT"
 repository = "https://github.com/a7garden/oxios"
@@ -29,7 +29,6 @@ panic = "abort"
 opt-level = 3
 
 [workspace]
-resolver = "2"
 members = [
     "crates/oxios-mcp",
     "crates/oxios-memory",
@@ -81,7 +80,7 @@ regex = "1"
 parking_lot = "0.12"
 
 # oxi engine — single dependency for everything (oxi-ai re-exported via oxi-sdk)
-oxi-sdk = "0.30.0"
+oxi-sdk = "0.31.0"
 
 # HTTP client
 reqwest = { version = "0.12", features = ["json", "rustls-tls"] }
@@ -164,3 +163,12 @@ tokio = { workspace = true }
 serde_json = { workspace = true }
 tempfile = { workspace = true }
 mockall = "0.12"
+
+# Patch oxi crates to local version with #[async_trait] on AgentTool trait.
+# Same version number (0.31.0), but the trait uses async fn + #[async_trait]
+# instead of manual Pin<Box<dyn Future>>.
+[patch.crates-io]
+oxios-kernel = { path = "crates/oxios-kernel" }
+oxi-ai = { path = "/Volumes/MERCURY/PROJECTS/oxi/oxi-ai" }
+oxi-agent = { path = "/Volumes/MERCURY/PROJECTS/oxi/oxi-agent" }
+oxi-sdk = { path = "/Volumes/MERCURY/PROJECTS/oxi/oxi-sdk" }

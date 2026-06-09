@@ -8,13 +8,12 @@
 //! - New tools are automatically protected
 //! - oxi-sdk crate tools (ReadTool, WriteTool, etc.) are covered without modification
 
+use async_trait::async_trait;
 use std::path::Path;
 use std::sync::Arc;
 
-use async_trait::async_trait;
 use oxi_sdk::{AgentTool, AgentToolResult, ToolContext};
 use serde_json::Value;
-use tokio::sync::oneshot;
 
 use crate::access_manager::{
     AccessDenied, AccessGate, AgentContext, CheckRequest, DenyLayer, PathMode,
@@ -115,9 +114,10 @@ impl<T: AgentTool + 'static> AgentTool for GatedTool<T> {
         &self,
         tool_call_id: &str,
         params: Value,
-        signal: Option<oneshot::Receiver<()>>,
+        signal: Option<tokio::sync::oneshot::Receiver<()>>,
         ctx: &ToolContext,
-    ) -> Result<AgentToolResult, String> {
+    ) -> Result<AgentToolResult, oxi_sdk::ToolError>
+     {
         let tool_name = self.inner.name();
 
         // Step 1: Check tool access permission

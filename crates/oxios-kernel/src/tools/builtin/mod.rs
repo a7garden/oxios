@@ -39,8 +39,8 @@ pub use project_tool::ProjectTool;
 pub use resource_tool::ResourceTool;
 pub use security_tool::SecurityTool;
 
-use crate::types::AgentId;
 use crate::KernelHandle;
+use crate::types::AgentId;
 use oxi_sdk::ToolRegistry;
 
 /// Register all kernel domain tools into the registry.

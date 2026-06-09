@@ -12,12 +12,11 @@
 //! { "action": "reset", "agent_id": "uuid" }
 //! ```
 
+use async_trait::async_trait;
 use std::sync::Arc;
 
-use async_trait::async_trait;
 use oxi_sdk::{AgentTool, AgentToolResult, ToolContext};
-use serde_json::{json, Value};
-use tokio::sync::oneshot;
+use serde_json::{Value, json};
 
 use crate::budget::{BudgetLimit, BudgetManager};
 use crate::kernel_handle::KernelHandle;
@@ -58,6 +57,7 @@ impl std::fmt::Debug for BudgetTool {
 }
 
 #[async_trait]
+
 impl AgentTool for BudgetTool {
     fn name(&self) -> &str {
         "budget"
@@ -102,9 +102,10 @@ impl AgentTool for BudgetTool {
         &self,
         _tool_call_id: &str,
         params: Value,
-        _signal: Option<oneshot::Receiver<()>>,
+        _signal: Option<tokio::sync::oneshot::Receiver<()>>,
         _ctx: &ToolContext,
-    ) -> Result<AgentToolResult, String> {
+    ) -> Result<AgentToolResult, oxi_sdk::ToolError>
+     {
         let action = params
             .get("action")
             .and_then(|v| v.as_str())

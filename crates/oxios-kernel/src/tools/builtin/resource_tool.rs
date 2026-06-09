@@ -11,12 +11,11 @@
 //! { "action": "overloaded" }
 //! ```
 
+use async_trait::async_trait;
 use std::sync::Arc;
 
-use async_trait::async_trait;
 use oxi_sdk::{AgentTool, AgentToolResult, ToolContext};
-use serde_json::{json, Value};
-use tokio::sync::oneshot;
+use serde_json::{Value, json};
 
 use crate::kernel_handle::KernelHandle;
 use crate::resource_monitor::ResourceMonitor;
@@ -55,6 +54,7 @@ impl std::fmt::Debug for ResourceTool {
 }
 
 #[async_trait]
+
 impl AgentTool for ResourceTool {
     fn name(&self) -> &str {
         "resource"
@@ -91,9 +91,10 @@ impl AgentTool for ResourceTool {
         &self,
         _tool_call_id: &str,
         params: Value,
-        _signal: Option<oneshot::Receiver<()>>,
+        _signal: Option<tokio::sync::oneshot::Receiver<()>>,
         _ctx: &ToolContext,
-    ) -> Result<AgentToolResult, String> {
+    ) -> Result<AgentToolResult, oxi_sdk::ToolError>
+     {
         let action = params
             .get("action")
             .and_then(|v| v.as_str())
@@ -103,27 +104,27 @@ impl AgentTool for ResourceTool {
             "snapshot" => {
                 let snap = self.resource_monitor.snapshot();
                 Ok(AgentToolResult::success(
-                    serde_json::to_string_pretty(&json!({
-                        "timestamp": snap.timestamp.to_rfc3339(),
-                        "cpu_percent": format!("{:.1}%", snap.cpu_percent),
-                        "memory_used_mb": snap.memory_used_mb,
-                        "memory_total_mb": snap.memory_total_mb,
-                        "memory_percent": format!(
-                            "{:.1}%",
-                            if snap.memory_total_mb > 0 {
-                                (snap.memory_used_mb as f64 / snap.memory_total_mb as f64) * 100.0
-                            } else {
-                                0.0
-                            }
-                        ),
-                        "active_agents": snap.active_agents,
-                        "pending_tasks": snap.pending_tasks,
-                        "total_token_usage": snap.total_token_usage,
-                        "disk_used_gb": format!("{:.2}", snap.disk_used_gb),
-                        "load_avg_1m": format!("{:.2}", snap.load_avg_1m),
-                    }))
-                    .unwrap_or_default(),
-                ))
+                serde_json::to_string_pretty(&json!({
+                    "timestamp": snap.timestamp.to_rfc3339(),
+                    "cpu_percent": format!("{:.1}%", snap.cpu_percent),
+                    "memory_used_mb": snap.memory_used_mb,
+                    "memory_total_mb": snap.memory_total_mb,
+                    "memory_percent": format!(
+                        "{:.1}%",
+                        if snap.memory_total_mb > 0 {
+                            (snap.memory_used_mb as f64 / snap.memory_total_mb as f64) * 100.0
+                        } else {
+                            0.0
+                        }
+                    ),
+                    "active_agents": snap.active_agents,
+                    "pending_tasks": snap.pending_tasks,
+                    "total_token_usage": snap.total_token_usage,
+                    "disk_used_gb": format!("{:.2}", snap.disk_used_gb),
+                    "load_avg_1m": format!("{:.2}", snap.load_avg_1m),
+                }))
+                .unwrap_or_default(),
+            ))
             }
 
             "history" => {
@@ -137,17 +138,17 @@ impl AgentTool for ResourceTool {
                 }
 
                 let display: Vec<Value> = history
-                    .iter()
-                    .map(|snap| {
-                        json!({
-                            "timestamp": snap.timestamp.to_rfc3339(),
-                            "cpu_percent": format!("{:.1}%", snap.cpu_percent),
-                            "memory_mb": format!("{}/{}", snap.memory_used_mb, snap.memory_total_mb),
-                            "active_agents": snap.active_agents,
-                            "load_avg_1m": format!("{:.2}", snap.load_avg_1m),
-                        })
+                .iter()
+                .map(|snap| {
+                    json!({
+                        "timestamp": snap.timestamp.to_rfc3339(),
+                        "cpu_percent": format!("{:.1}%", snap.cpu_percent),
+                        "memory_mb": format!("{}/{}", snap.memory_used_mb, snap.memory_total_mb),
+                        "active_agents": snap.active_agents,
+                        "load_avg_1m": format!("{:.2}", snap.load_avg_1m),
                     })
-                    .collect();
+                })
+                .collect();
 
                 Ok(AgentToolResult::success(
                     serde_json::to_string_pretty(&json!({

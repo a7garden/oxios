@@ -6,12 +6,11 @@
 //! Agents can query projects and manage memory associations,
 //! but cannot create, update, or remove projects (user-level only).
 
+use async_trait::async_trait;
 use std::sync::Arc;
 
-use async_trait::async_trait;
 use oxi_sdk::{AgentTool, AgentToolResult, ToolContext};
-use serde_json::{json, Value};
-use tokio::sync::oneshot;
+use serde_json::{Value, json};
 
 use crate::kernel_handle::KernelHandle;
 use crate::project::ProjectManager;
@@ -49,6 +48,7 @@ impl std::fmt::Debug for ProjectTool {
 }
 
 #[async_trait]
+
 impl AgentTool for ProjectTool {
     fn name(&self) -> &str {
         "project"
@@ -97,9 +97,10 @@ impl AgentTool for ProjectTool {
         &self,
         _tool_call_id: &str,
         params: Value,
-        _signal: Option<oneshot::Receiver<()>>,
+        _signal: Option<tokio::sync::oneshot::Receiver<()>>,
         _ctx: &ToolContext,
-    ) -> Result<AgentToolResult, String> {
+    ) -> Result<AgentToolResult, oxi_sdk::ToolError>
+     {
         let action = params
             .get("action")
             .and_then(|v| v.as_str())
@@ -155,20 +156,20 @@ impl AgentTool for ProjectTool {
                         // Also get associated memory IDs
                         let memory_ids = pm.get_project_memory_ids(p.id).unwrap_or_default();
                         Ok(AgentToolResult::success(
-                            serde_json::to_string_pretty(&json!({
-                                "id": p.id.to_string(),
-                                "name": p.name,
-                                "description": p.description,
-                                "emoji": p.emoji,
-                                "source": p.source.to_string(),
-                                "paths": p.paths.iter().map(|p| p.to_string_lossy().to_string()).collect::<Vec<_>>(),
-                                "tags": p.tags,
-                                "memory_visible": p.memory_visible,
-                                "associated_memory_count": memory_ids.len(),
-                                "last_active": p.last_active_at.to_rfc3339(),
-                            }))
-                            .unwrap_or_default(),
-                        ))
+                        serde_json::to_string_pretty(&json!({
+                            "id": p.id.to_string(),
+                            "name": p.name,
+                            "description": p.description,
+                            "emoji": p.emoji,
+                            "source": p.source.to_string(),
+                            "paths": p.paths.iter().map(|p| p.to_string_lossy().to_string()).collect::<Vec<_>>(),
+                            "tags": p.tags,
+                            "memory_visible": p.memory_visible,
+                            "associated_memory_count": memory_ids.len(),
+                            "last_active": p.last_active_at.to_rfc3339(),
+                        }))
+                        .unwrap_or_default(),
+                    ))
                     }
                     None => Ok(AgentToolResult::error("Project not found")),
                 }

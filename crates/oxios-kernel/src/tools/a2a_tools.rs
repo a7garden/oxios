@@ -5,11 +5,11 @@
 //! - `a2a_send` — send a message to a specific agent
 //! - `a2a_query` — discover agents by capability or skill
 
+use async_trait::async_trait;
 use std::sync::Arc;
 
-use async_trait::async_trait;
-use oxi_sdk::{AgentTool, AgentToolResult, ToolContext, ToolError};
-use serde_json::{json, Value};
+use oxi_sdk::{AgentTool, AgentToolResult, ToolContext};
+use serde_json::{Value, json};
 use uuid::Uuid;
 
 use crate::a2a::{A2AMessage, A2AProtocol, TaskPriority, TaskSpec};
@@ -52,6 +52,7 @@ impl std::fmt::Debug for A2aDelegateTool {
 }
 
 #[async_trait]
+
 impl AgentTool for A2aDelegateTool {
     fn name(&self) -> &str {
         "a2a_delegate"
@@ -99,7 +100,8 @@ impl AgentTool for A2aDelegateTool {
         params: Value,
         _shutdown: Option<tokio::sync::oneshot::Receiver<()>>,
         _ctx: &ToolContext,
-    ) -> Result<AgentToolResult, ToolError> {
+    ) -> Result<AgentToolResult, oxi_sdk::ToolError>
+     {
         let description = params["description"].as_str().unwrap_or("").to_string();
         if description.is_empty() {
             return Ok(AgentToolResult::error(
@@ -125,7 +127,7 @@ impl AgentTool for A2aDelegateTool {
             Err(e) => {
                 return Ok(AgentToolResult::error(format!(
                     "Failed to query capabilities: {e}"
-                )))
+                )));
             }
         };
 
@@ -221,6 +223,7 @@ impl std::fmt::Debug for A2aSendTool {
 }
 
 #[async_trait]
+
 impl AgentTool for A2aSendTool {
     fn name(&self) -> &str {
         "a2a_send"
@@ -275,14 +278,15 @@ impl AgentTool for A2aSendTool {
         params: Value,
         _shutdown: Option<tokio::sync::oneshot::Receiver<()>>,
         _ctx: &ToolContext,
-    ) -> Result<AgentToolResult, ToolError> {
+    ) -> Result<AgentToolResult, oxi_sdk::ToolError>
+     {
         let target_str = params["target_agent_id"].as_str().unwrap_or("");
         let target_id: AgentId = match Uuid::parse_str(target_str) {
             Ok(id) => id,
             Err(e) => {
                 return Ok(AgentToolResult::error(format!(
                     "Invalid target_agent_id: {e}"
-                )))
+                )));
             }
         };
 
@@ -322,7 +326,7 @@ impl AgentTool for A2aSendTool {
             _ => {
                 return Ok(AgentToolResult::error(format!(
                     "Unknown message_type: {message_type}"
-                )))
+                )));
             }
         };
 
@@ -369,6 +373,7 @@ impl std::fmt::Debug for A2aQueryTool {
 }
 
 #[async_trait]
+
 impl AgentTool for A2aQueryTool {
     fn name(&self) -> &str {
         "a2a_query"
@@ -409,7 +414,8 @@ impl AgentTool for A2aQueryTool {
         params: Value,
         _shutdown: Option<tokio::sync::oneshot::Receiver<()>>,
         _ctx: &ToolContext,
-    ) -> Result<AgentToolResult, ToolError> {
+    ) -> Result<AgentToolResult, oxi_sdk::ToolError>
+     {
         let capability = params["capability"].as_str();
         let skill = params["skill"].as_str();
         let limit = params["limit"].as_u64().unwrap_or(10) as usize;

@@ -12,8 +12,8 @@ use oxi_sdk::{
     KernelToolContext as SdkKernelToolContext, KernelToolProvider as SdkKernelToolProvider,
 };
 
-use crate::tools::registration::register_always_on;
 use crate::KernelHandle;
+use crate::tools::registration::register_always_on;
 
 /// Bridges all oxios kernel tools into the oxi-sdk agent builder.
 pub struct OxiosKernelBridge {

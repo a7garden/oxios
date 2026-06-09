@@ -4,12 +4,12 @@
 //! the same pattern as `memory_tools.rs`. Actions: read, write, delete,
 //! move, tree, search, backlinks.
 
+use async_trait::async_trait;
 use std::sync::Arc;
 
-use async_trait::async_trait;
 use chrono::Datelike;
 use oxi_sdk::{AgentTool as OxiAgentTool, AgentToolResult, ToolContext};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use crate::KernelHandle;
 use oxios_markdown::KnowledgeBase;
@@ -45,6 +45,7 @@ impl std::fmt::Debug for KnowledgeTool {
 }
 
 #[async_trait]
+
 impl OxiAgentTool for KnowledgeTool {
     fn name(&self) -> &str {
         "knowledge"
@@ -168,7 +169,8 @@ impl OxiAgentTool for KnowledgeTool {
         params: Value,
         _signal: Option<tokio::sync::oneshot::Receiver<()>>,
         _ctx: &ToolContext,
-    ) -> Result<AgentToolResult, oxi_sdk::ToolError> {
+    ) -> Result<AgentToolResult, oxi_sdk::ToolError>
+     {
         let action = params["action"].as_str().unwrap_or("");
         if action.is_empty() {
             return Ok(AgentToolResult::error("action is required"));
@@ -209,7 +211,9 @@ impl OxiAgentTool for KnowledgeTool {
                 }
                 match self.kb.note_delete(path) {
                     Ok(()) => Ok(AgentToolResult::success(format!("Note '{path}' deleted"))),
-                    Err(e) => Ok(AgentToolResult::error(format!("Failed to delete note: {e}"))),
+                    Err(e) => Ok(AgentToolResult::error(format!(
+                        "Failed to delete note: {e}"
+                    ))),
                 }
             }
             "move" => {
@@ -247,11 +251,8 @@ impl OxiAgentTool for KnowledgeTool {
                         if entries.is_empty() {
                             return Ok(AgentToolResult::success("Directory is empty"));
                         }
-                        let mut output = format!(
-                            "Found {} entries (showing {}):\n\n",
-                            count,
-                            entries.len()
-                        );
+                        let mut output =
+                            format!("Found {} entries (showing {}):\n\n", count, entries.len());
                         for entry in &entries {
                             let kind = if entry.is_dir { "📁" } else { "📄" };
                             output.push_str(&format!(
@@ -279,17 +280,14 @@ impl OxiAgentTool for KnowledgeTool {
                         for hit in &hits {
                             output.push_str(&format!(
                                 "- {} (path: {}, backlinks: {}, name_sim: {}%)\n",
-                                hit.name,
-                                hit.path,
-                                hit.backlink_count,
-                                hit.name_similarity,
+                                hit.name, hit.path, hit.backlink_count, hit.name_similarity,
                             ));
                         }
                         Ok(AgentToolResult::success(&output))
                     }
-                    Err(e) => {
-                        Ok(AgentToolResult::error(format!("Failed to search notes: {e}")))
-                    }
+                    Err(e) => Ok(AgentToolResult::error(format!(
+                        "Failed to search notes: {e}"
+                    ))),
                 }
             }
             "backlinks" => {
@@ -313,25 +311,32 @@ impl OxiAgentTool for KnowledgeTool {
                 Ok(AgentToolResult::success(&output))
             }
             // ── Checklist ─────────────────────────────────────────
-
             "checklist_items" => {
                 let path = params["path"].as_str().unwrap_or("");
                 if path.is_empty() {
-                    return Ok(AgentToolResult::error("path is required for checklist_items"));
+                    return Ok(AgentToolResult::error(
+                        "path is required for checklist_items",
+                    ));
                 }
                 match self.kb.checklist_items(path) {
                     Ok((items, checked_map)) => {
                         if items.is_empty() {
                             return Ok(AgentToolResult::success("No checklist items found"));
                         }
-                        let mut output = format!("Checklist items for '{}' ({}):\n\n", path, items.len());
+                        let mut output =
+                            format!("Checklist items for '{}' ({}):\n\n", path, items.len());
                         for item in &items {
-                            let status = checked_map.get(item).map(|b| if *b { "✅" } else { "⬜" }).unwrap_or("⬜");
+                            let status = checked_map
+                                .get(item)
+                                .map(|b| if *b { "✅" } else { "⬜" })
+                                .unwrap_or("⬜");
                             output.push_str(&format!("{status} {item}\n"));
                         }
                         Ok(AgentToolResult::success(&output))
                     }
-                    Err(e) => Ok(AgentToolResult::error(format!("Failed to get checklist items: {e}"))),
+                    Err(e) => Ok(AgentToolResult::error(format!(
+                        "Failed to get checklist items: {e}"
+                    ))),
                 }
             }
 
@@ -349,7 +354,9 @@ impl OxiAgentTool for KnowledgeTool {
                     Ok(()) => Ok(AgentToolResult::success(format!(
                         "Checklist item added to '{path}'"
                     ))),
-                    Err(e) => Ok(AgentToolResult::error(format!("Failed to add checklist item: {e}"))),
+                    Err(e) => Ok(AgentToolResult::error(format!(
+                        "Failed to add checklist item: {e}"
+                    ))),
                 }
             }
 
@@ -357,10 +364,14 @@ impl OxiAgentTool for KnowledgeTool {
                 let path = params["path"].as_str().unwrap_or("");
                 let item_hash = params["item_hash"].as_str().unwrap_or("");
                 if path.is_empty() {
-                    return Ok(AgentToolResult::error("path is required for checklist_complete"));
+                    return Ok(AgentToolResult::error(
+                        "path is required for checklist_complete",
+                    ));
                 }
                 if item_hash.is_empty() {
-                    return Ok(AgentToolResult::error("item_hash is required for checklist_complete"));
+                    return Ok(AgentToolResult::error(
+                        "item_hash is required for checklist_complete",
+                    ));
                 }
                 match self.kb.checklist_complete(path, item_hash) {
                     Ok(true) => Ok(AgentToolResult::success(format!(
@@ -369,7 +380,9 @@ impl OxiAgentTool for KnowledgeTool {
                     Ok(false) => Ok(AgentToolResult::error(format!(
                         "Checklist item '{item_hash}' not found in '{path}'"
                     ))),
-                    Err(e) => Ok(AgentToolResult::error(format!("Failed to complete checklist item: {e}"))),
+                    Err(e) => Ok(AgentToolResult::error(format!(
+                        "Failed to complete checklist item: {e}"
+                    ))),
                 }
             }
 
@@ -377,10 +390,14 @@ impl OxiAgentTool for KnowledgeTool {
                 let path = params["path"].as_str().unwrap_or("");
                 let item_or_hash = params["item_or_hash"].as_str().unwrap_or("");
                 if path.is_empty() {
-                    return Ok(AgentToolResult::error("path is required for checklist_remove"));
+                    return Ok(AgentToolResult::error(
+                        "path is required for checklist_remove",
+                    ));
                 }
                 if item_or_hash.is_empty() {
-                    return Ok(AgentToolResult::error("item_or_hash is required for checklist_remove"));
+                    return Ok(AgentToolResult::error(
+                        "item_or_hash is required for checklist_remove",
+                    ));
                 }
                 match self.kb.checklist_remove(path, item_or_hash) {
                     Ok(true) => Ok(AgentToolResult::success(format!(
@@ -389,43 +406,50 @@ impl OxiAgentTool for KnowledgeTool {
                     Ok(false) => Ok(AgentToolResult::error(format!(
                         "Checklist item '{item_or_hash}' not found in '{path}'"
                     ))),
-                    Err(e) => Ok(AgentToolResult::error(format!("Failed to remove checklist item: {e}"))),
+                    Err(e) => Ok(AgentToolResult::error(format!(
+                        "Failed to remove checklist item: {e}"
+                    ))),
                 }
             }
 
             // ── Chat ────────────────────────────────────────────────
-
             "chat_append" => {
                 let message = params["message"].as_str().unwrap_or("");
                 if message.is_empty() {
-                    return Ok(AgentToolResult::error("message is required for chat_append"));
+                    return Ok(AgentToolResult::error(
+                        "message is required for chat_append",
+                    ));
                 }
                 match self.kb.chat_append(message) {
                     Ok(()) => Ok(AgentToolResult::success("Message appended to chat")),
-                    Err(e) => Ok(AgentToolResult::error(format!("Failed to append chat message: {e}"))),
+                    Err(e) => Ok(AgentToolResult::error(format!(
+                        "Failed to append chat message: {e}"
+                    ))),
                 }
             }
 
-            "chat_messages" => {
-                match self.kb.chat_messages() {
-                    Ok(messages) => {
-                        if messages.is_empty() {
-                            return Ok(AgentToolResult::success("No chat messages found"));
-                        }
-                        let mut output = format!("Chat messages ({}):\n\n", messages.len());
-                        for (i, msg) in messages.iter().enumerate() {
-                            output.push_str(&format!("{}. {}\n", i + 1, msg));
-                        }
-                        Ok(AgentToolResult::success(&output))
+            "chat_messages" => match self.kb.chat_messages() {
+                Ok(messages) => {
+                    if messages.is_empty() {
+                        return Ok(AgentToolResult::success("No chat messages found"));
                     }
-                    Err(e) => Ok(AgentToolResult::error(format!("Failed to get chat messages: {e}"))),
+                    let mut output = format!("Chat messages ({}):\n\n", messages.len());
+                    for (i, msg) in messages.iter().enumerate() {
+                        output.push_str(&format!("{}. {}\n", i + 1, msg));
+                    }
+                    Ok(AgentToolResult::success(&output))
                 }
-            }
+                Err(e) => Ok(AgentToolResult::error(format!(
+                    "Failed to get chat messages: {e}"
+                ))),
+            },
 
             "chat_delete" => {
                 let msg_hash = params["msg_hash"].as_str().unwrap_or("");
                 if msg_hash.is_empty() {
-                    return Ok(AgentToolResult::error("msg_hash is required for chat_delete"));
+                    return Ok(AgentToolResult::error(
+                        "msg_hash is required for chat_delete",
+                    ));
                 }
                 match self.kb.chat_delete(msg_hash) {
                     Ok(true) => Ok(AgentToolResult::success(format!(
@@ -434,7 +458,9 @@ impl OxiAgentTool for KnowledgeTool {
                     Ok(false) => Ok(AgentToolResult::error(format!(
                         "Chat message '{msg_hash}' not found"
                     ))),
-                    Err(e) => Ok(AgentToolResult::error(format!("Failed to delete chat message: {e}"))),
+                    Err(e) => Ok(AgentToolResult::error(format!(
+                        "Failed to delete chat message: {e}"
+                    ))),
                 }
             }
 
@@ -445,7 +471,9 @@ impl OxiAgentTool for KnowledgeTool {
                     return Ok(AgentToolResult::error("msg_hash is required for chat_move"));
                 }
                 if target_path.is_empty() {
-                    return Ok(AgentToolResult::error("target_path is required for chat_move"));
+                    return Ok(AgentToolResult::error(
+                        "target_path is required for chat_move",
+                    ));
                 }
                 match self.kb.chat_move_to(msg_hash, target_path) {
                     Ok(true) => Ok(AgentToolResult::success(format!(
@@ -454,12 +482,13 @@ impl OxiAgentTool for KnowledgeTool {
                     Ok(false) => Ok(AgentToolResult::error(format!(
                         "Chat message '{msg_hash}' not found"
                     ))),
-                    Err(e) => Ok(AgentToolResult::error(format!("Failed to move chat message: {e}"))),
+                    Err(e) => Ok(AgentToolResult::error(format!(
+                        "Failed to move chat message: {e}"
+                    ))),
                 }
             }
 
             // ── Journal ─────────────────────────────────────────────
-
             "journal_add" => {
                 let record = params["record"].as_str().unwrap_or("");
                 if record.is_empty() {
@@ -467,18 +496,26 @@ impl OxiAgentTool for KnowledgeTool {
                 }
                 match self.kb.journal_add_record(record) {
                     Ok(()) => Ok(AgentToolResult::success("Journal record added")),
-                    Err(e) => Ok(AgentToolResult::error(format!("Failed to add journal record: {e}"))),
+                    Err(e) => Ok(AgentToolResult::error(format!(
+                        "Failed to add journal record: {e}"
+                    ))),
                 }
             }
 
             "journal_emoji" => {
                 let emoji = params["emoji"].as_str().unwrap_or("");
                 if emoji.is_empty() {
-                    return Ok(AgentToolResult::error("emoji is required for journal_emoji"));
+                    return Ok(AgentToolResult::error(
+                        "emoji is required for journal_emoji",
+                    ));
                 }
                 match self.kb.journal_add_emoji(emoji) {
-                    Ok(()) => Ok(AgentToolResult::success(format!("Journal emoji set to '{emoji}'"))),
-                    Err(e) => Ok(AgentToolResult::error(format!("Failed to set journal emoji: {e}"))),
+                    Ok(()) => Ok(AgentToolResult::success(format!(
+                        "Journal emoji set to '{emoji}'"
+                    ))),
+                    Err(e) => Ok(AgentToolResult::error(format!(
+                        "Failed to set journal emoji: {e}"
+                    ))),
                 }
             }
 
@@ -488,11 +525,11 @@ impl OxiAgentTool for KnowledgeTool {
             }
 
             // ── Habits ──────────────────────────────────────────────
-
             "habits" => {
-                let year = params["year"].as_i64().unwrap_or_else(|| {
-                    chrono::Local::now().year() as i64
-                }) as i32;
+                let year = params["year"]
+                    .as_i64()
+                    .unwrap_or_else(|| chrono::Local::now().year() as i64)
+                    as i32;
                 match self.kb.habits(year) {
                     Ok(habits) => {
                         let json = serde_json::to_string_pretty(&habits)
@@ -503,112 +540,115 @@ impl OxiAgentTool for KnowledgeTool {
                 }
             }
 
-            "habits_last_week" => {
-                match self.kb.habits_last_week() {
-                    Ok(habits) => {
-                        let json = serde_json::to_string_pretty(&habits)
-                            .unwrap_or_else(|_| "{}".to_string());
-                        Ok(AgentToolResult::success(&json))
-                    }
-                    Err(e) => Ok(AgentToolResult::error(format!("Failed to get last week habits: {e}"))),
+            "habits_last_week" => match self.kb.habits_last_week() {
+                Ok(habits) => {
+                    let json = serde_json::to_string_pretty(&habits)
+                        .unwrap_or_else(|_| "{}".to_string());
+                    Ok(AgentToolResult::success(&json))
                 }
-            }
+                Err(e) => Ok(AgentToolResult::error(format!(
+                    "Failed to get last week habits: {e}"
+                ))),
+            },
 
             // ── Stats ───────────────────────────────────────────────
-
-            "today_report" => {
-                match self.kb.today_report() {
-                    Ok(report) => {
-                        let json = serde_json::to_string_pretty(&report)
-                            .unwrap_or_else(|_| "{}".to_string());
-                        Ok(AgentToolResult::success(&json))
-                    }
-                    Err(e) => Ok(AgentToolResult::error(format!("Failed to get today report: {e}"))),
+            "today_report" => match self.kb.today_report() {
+                Ok(report) => {
+                    let json = serde_json::to_string_pretty(&report)
+                        .unwrap_or_else(|_| "{}".to_string());
+                    Ok(AgentToolResult::success(&json))
                 }
-            }
+                Err(e) => Ok(AgentToolResult::error(format!(
+                    "Failed to get today report: {e}"
+                ))),
+            },
 
-            "done_today" => {
-                match self.kb.done_today() {
-                    Ok(entries) => {
-                        if entries.is_empty() {
-                            return Ok(AgentToolResult::success("No completed items today"));
-                        }
-                        let mut output = format!("Done today ({}):\n\n", entries.len());
-                        for entry in &entries {
-                            let kind = if entry.is_dir { "📁" } else { "📄" };
-                            output.push_str(&format!(
-                                "{} {} ({})\n",
-                                kind, entry.display_name, entry.name
-                            ));
-                        }
-                        Ok(AgentToolResult::success(&output))
+            "done_today" => match self.kb.done_today() {
+                Ok(entries) => {
+                    if entries.is_empty() {
+                        return Ok(AgentToolResult::success("No completed items today"));
                     }
-                    Err(e) => Ok(AgentToolResult::error(format!("Failed to get done today: {e}"))),
+                    let mut output = format!("Done today ({}):\n\n", entries.len());
+                    for entry in &entries {
+                        let kind = if entry.is_dir { "📁" } else { "📄" };
+                        output.push_str(&format!(
+                            "{} {} ({})\n",
+                            kind, entry.display_name, entry.name
+                        ));
+                    }
+                    Ok(AgentToolResult::success(&output))
                 }
-            }
+                Err(e) => Ok(AgentToolResult::error(format!(
+                    "Failed to get done today: {e}"
+                ))),
+            },
 
             // ── Config ──────────────────────────────────────────────
-
-            "config_read" => {
-                match self.kb.config() {
-                    Ok(config) => {
-                        let json = serde_json::to_string_pretty(&config)
-                            .unwrap_or_else(|_| "{}".to_string());
-                        Ok(AgentToolResult::success(&json))
-                    }
-                    Err(e) => Ok(AgentToolResult::error(format!("Failed to read config: {e}"))),
+            "config_read" => match self.kb.config() {
+                Ok(config) => {
+                    let json = serde_json::to_string_pretty(&config)
+                        .unwrap_or_else(|_| "{}".to_string());
+                    Ok(AgentToolResult::success(&json))
                 }
-            }
+                Err(e) => Ok(AgentToolResult::error(format!(
+                    "Failed to read config: {e}"
+                ))),
+            },
 
             "config_write" => {
                 let config_val = params.get("config").cloned().unwrap_or(json!({}));
-                match serde_json::from_value::<oxios_markdown::types::KnowledgeConfig>(config_val) {
-                    Ok(config) => {
-                        match self.kb.set_config(&config) {
-                            Ok(()) => Ok(AgentToolResult::success("Config updated successfully")),
-                            Err(e) => Ok(AgentToolResult::error(format!("Failed to write config: {e}"))),
-                        }
-                    }
-                    Err(e) => Ok(AgentToolResult::error(format!("Invalid config object: {e}"))),
+                match serde_json::from_value::<oxios_markdown::types::KnowledgeConfig>(
+                    config_val,
+                ) {
+                    Ok(config) => match self.kb.set_config(&config) {
+                        Ok(()) => Ok(AgentToolResult::success("Config updated successfully")),
+                        Err(e) => Ok(AgentToolResult::error(format!(
+                            "Failed to write config: {e}"
+                        ))),
+                    },
+                    Err(e) => Ok(AgentToolResult::error(format!(
+                        "Invalid config object: {e}"
+                    ))),
                 }
             }
 
             // ── Automation ──────────────────────────────────────────
-
-            "nightly_cleanup" => {
-                match self.kb.run_nightly_cleanup() {
-                    Ok(report) => {
-                        let json = serde_json::to_string_pretty(&report)
-                            .unwrap_or_else(|_| "{}".to_string());
-                        Ok(AgentToolResult::success(&json))
-                    }
-                    Err(e) => Ok(AgentToolResult::error(format!("Failed to run nightly cleanup: {e}"))),
+            "nightly_cleanup" => match self.kb.run_nightly_cleanup() {
+                Ok(report) => {
+                    let json = serde_json::to_string_pretty(&report)
+                        .unwrap_or_else(|_| "{}".to_string());
+                    Ok(AgentToolResult::success(&json))
                 }
-            }
+                Err(e) => Ok(AgentToolResult::error(format!(
+                    "Failed to run nightly cleanup: {e}"
+                ))),
+            },
 
-            "run_scheduled" => {
-                match self.kb.run_scheduled_tasks() {
-                    Ok(moved) => {
-                        if moved.is_empty() {
-                            Ok(AgentToolResult::success("No scheduled tasks due"))
-                        } else {
-                            let mut output = format!("Moved {} scheduled tasks to chat:\n\n", moved.len());
-                            for task in &moved {
-                                output.push_str(&format!("- {task}\n"));
-                            }
-                            Ok(AgentToolResult::success(&output))
+            "run_scheduled" => match self.kb.run_scheduled_tasks() {
+                Ok(moved) => {
+                    if moved.is_empty() {
+                        Ok(AgentToolResult::success("No scheduled tasks due"))
+                    } else {
+                        let mut output =
+                            format!("Moved {} scheduled tasks to chat:\n\n", moved.len());
+                        for task in &moved {
+                            output.push_str(&format!("- {task}\n"));
                         }
+                        Ok(AgentToolResult::success(&output))
                     }
-                    Err(e) => Ok(AgentToolResult::error(format!("Failed to run scheduled tasks: {e}"))),
                 }
-            }
+                Err(e) => Ok(AgentToolResult::error(format!(
+                    "Failed to run scheduled tasks: {e}"
+                ))),
+            },
 
             // ── Utils ───────────────────────────────────────────────
-
             "markdown_to_html" => {
                 let md = params["md"].as_str().unwrap_or("");
                 if md.is_empty() {
-                    return Ok(AgentToolResult::error("md is required for markdown_to_html"));
+                    return Ok(AgentToolResult::error(
+                        "md is required for markdown_to_html",
+                    ));
                 }
                 let html = self.kb.markdown_to_html(md);
                 Ok(AgentToolResult::success(&html))
@@ -625,12 +665,12 @@ impl OxiAgentTool for KnowledgeTool {
 
             _ => Ok(AgentToolResult::error(format!(
                 "Unknown action '{action}'. Must be one of: read, write, delete, move, tree, search, backlinks, \
-                 checklist_items, checklist_add, checklist_complete, checklist_remove, \
-                 chat_append, chat_messages, chat_delete, chat_move, \
-                 journal_add, journal_emoji, journal_today, \
-                 habits, habits_last_week, today_report, done_today, \
-                 config_read, config_write, nightly_cleanup, run_scheduled, \
-                 markdown_to_html, auto_emoji"
+             checklist_items, checklist_add, checklist_complete, checklist_remove, \
+             chat_append, chat_messages, chat_delete, chat_move, \
+             journal_add, journal_emoji, journal_today, \
+             habits, habits_last_week, today_report, done_today, \
+             config_read, config_write, nightly_cleanup, run_scheduled, \
+             markdown_to_html, auto_emoji"
             ))),
         }
     }

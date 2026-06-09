@@ -11,13 +11,12 @@
 //! { "action": "audit_count" }
 //! ```
 
+use async_trait::async_trait;
 use std::sync::Arc;
 
-use async_trait::async_trait;
 use oxi_sdk::observability::AuditTrail;
 use oxi_sdk::{AgentTool, AgentToolResult, ToolContext};
-use serde_json::{json, Value};
-use tokio::sync::oneshot;
+use serde_json::{Value, json};
 
 use crate::kernel_handle::KernelHandle;
 
@@ -55,6 +54,7 @@ impl std::fmt::Debug for SecurityTool {
 }
 
 #[async_trait]
+
 impl AgentTool for SecurityTool {
     fn name(&self) -> &str {
         "security"
@@ -95,9 +95,10 @@ impl AgentTool for SecurityTool {
         &self,
         _tool_call_id: &str,
         params: Value,
-        _signal: Option<oneshot::Receiver<()>>,
+        _signal: Option<tokio::sync::oneshot::Receiver<()>>,
         _ctx: &ToolContext,
-    ) -> Result<AgentToolResult, String> {
+    ) -> Result<AgentToolResult, oxi_sdk::ToolError>
+     {
         let action = params
             .get("action")
             .and_then(|v| v.as_str())

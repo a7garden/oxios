@@ -15,10 +15,9 @@
 //! { "action": "skills_sh_install", "skill_id": "vercel-labs/agent-skills/frontend-design" }
 //! ```
 
-use async_trait::async_trait;
 use oxi_sdk::{AgentTool, AgentToolResult, ToolContext};
-use serde_json::{json, Value};
-use tokio::sync::oneshot;
+use serde_json::{Value, json};
+use async_trait::async_trait;
 
 use crate::kernel_handle::KernelHandle;
 use crate::kernel_handle::MarketplaceApi;
@@ -62,6 +61,7 @@ impl std::fmt::Debug for MarketplaceTool {
 }
 
 #[async_trait]
+
 impl AgentTool for MarketplaceTool {
     fn name(&self) -> &str {
         "marketplace"
@@ -128,9 +128,10 @@ impl AgentTool for MarketplaceTool {
         &self,
         _tool_call_id: &str,
         params: Value,
-        _signal: Option<oneshot::Receiver<()>>,
+        _signal: Option<tokio::sync::oneshot::Receiver<()>>,
         _ctx: &ToolContext,
-    ) -> Result<AgentToolResult, String> {
+    ) -> Result<AgentToolResult, oxi_sdk::ToolError>
+     {
         let action = params
             .get("action")
             .and_then(|v| v.as_str())
@@ -209,9 +210,7 @@ impl AgentTool for MarketplaceTool {
                     .get("slug")
                     .and_then(|v| v.as_str())
                     .ok_or_else(|| "install requires 'slug' parameter".to_string())?;
-                let version = params
-                    .get("version")
-                    .and_then(|v| v.as_str());
+                let version = params.get("version").and_then(|v| v.as_str());
 
                 match self.api.install(slug, version).await {
                     Ok(result) => Ok(AgentToolResult::success(
@@ -253,69 +252,64 @@ impl AgentTool for MarketplaceTool {
                 }
             }
 
-            "update_all" => {
-                match self.api.update_all().await {
-                    Ok(results) => {
-                        let display: Vec<Value> = results
-                            .into_iter()
-                            .map(|r| {
-                                json!({
-                                    "ok": r.ok,
-                                    "slug": r.slug,
-                                    "previousVersion": r.previous_version,
-                                    "version": r.version,
-                                    "changed": r.changed,
-                                    "error": r.error,
-                                })
+            "update_all" => match self.api.update_all().await {
+                Ok(results) => {
+                    let display: Vec<Value> = results
+                        .into_iter()
+                        .map(|r| {
+                            json!({
+                                "ok": r.ok,
+                                "slug": r.slug,
+                                "previousVersion": r.previous_version,
+                                "version": r.version,
+                                "changed": r.changed,
+                                "error": r.error,
                             })
-                            .collect();
-                        Ok(AgentToolResult::success(
-                            serde_json::to_string_pretty(&json!({
-                                "results": display,
-                                "count": display.len(),
-                            }))
-                            .unwrap_or_default(),
-                        ))
-                    }
-                    Err(e) => Ok(AgentToolResult::error(format!(
-                        "Failed to update all skills: {e}"
-                    ))),
+                        })
+                        .collect();
+                    Ok(AgentToolResult::success(
+                        serde_json::to_string_pretty(&json!({
+                            "results": display,
+                            "count": display.len(),
+                        }))
+                        .unwrap_or_default(),
+                    ))
                 }
-            }
+                Err(e) => Ok(AgentToolResult::error(format!(
+                    "Failed to update all skills: {e}"
+                ))),
+            },
 
-            "check_updates" => {
-                match self.api.check_updates().await {
-                    Ok(updates) => {
-                        if updates.is_empty() {
-                            return Ok(AgentToolResult::success("All skills are up to date."));
-                        }
-                        let display: Vec<Value> = updates
-                            .into_iter()
-                            .map(|u| {
-                                json!({
-                                    "slug": u.slug,
-                                    "currentVersion": u.current_version,
-                                    "latestVersion": u.latest_version,
-                                    "changelog": u.changelog,
-                                })
-                            })
-                            .collect();
-                        Ok(AgentToolResult::success(
-                            serde_json::to_string_pretty(&json!({
-                                "updates": display,
-                                "count": display.len(),
-                            }))
-                            .unwrap_or_default(),
-                        ))
+            "check_updates" => match self.api.check_updates().await {
+                Ok(updates) => {
+                    if updates.is_empty() {
+                        return Ok(AgentToolResult::success("All skills are up to date."));
                     }
-                    Err(e) => Ok(AgentToolResult::error(format!(
-                        "Failed to check updates: {e}"
-                    ))),
+                    let display: Vec<Value> = updates
+                        .into_iter()
+                        .map(|u| {
+                            json!({
+                                "slug": u.slug,
+                                "currentVersion": u.current_version,
+                                "latestVersion": u.latest_version,
+                                "changelog": u.changelog,
+                            })
+                        })
+                        .collect();
+                    Ok(AgentToolResult::success(
+                        serde_json::to_string_pretty(&json!({
+                            "updates": display,
+                            "count": display.len(),
+                        }))
+                        .unwrap_or_default(),
+                    ))
                 }
-            }
+                Err(e) => Ok(AgentToolResult::error(format!(
+                    "Failed to check updates: {e}"
+                ))),
+            },
 
             // ─── Skills.sh Actions ───────────────────────────────────────
-
             "skills_sh_search" => {
                 let query = params
                     .get("query")
@@ -394,10 +388,13 @@ impl AgentTool for MarketplaceTool {
             }
 
             "skills_sh_install" => {
-                let skill_id = params
-                    .get("skill_id")
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| "skills_sh_install requires 'skill_id' parameter".to_string())?;
+                let skill_id =
+                    params
+                        .get("skill_id")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| {
+                            "skills_sh_install requires 'skill_id' parameter".to_string()
+                        })?;
 
                 match self.api.install_skills_sh(skill_id).await {
                     Ok(result) => Ok(AgentToolResult::success(
@@ -418,17 +415,20 @@ impl AgentTool for MarketplaceTool {
             }
 
             "skills_sh_detail" => {
-                let skill_id = params
-                    .get("skill_id")
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| "skills_sh_detail requires 'skill_id' parameter".to_string())?;
+                let skill_id =
+                    params
+                        .get("skill_id")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| {
+                            "skills_sh_detail requires 'skill_id' parameter".to_string()
+                        })?;
 
                 match self.api.get_skills_sh_skill(skill_id).await {
                     Ok(detail) => {
                         let files: Vec<Value> = detail
-                            .files
-                            .map(|f| f.into_iter().map(|file| json!({ "path": file.path, "size": file.contents.len() })).collect())
-                            .unwrap_or_default();
+                        .files
+                        .map(|f| f.into_iter().map(|file| json!({ "path": file.path, "size": file.contents.len() })).collect())
+                        .unwrap_or_default();
                         Ok(AgentToolResult::success(
                             serde_json::to_string_pretty(&json!({
                                 "id": detail.id,

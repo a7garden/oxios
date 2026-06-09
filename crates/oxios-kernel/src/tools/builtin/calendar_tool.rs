@@ -13,12 +13,11 @@
 //! { "op": "delete", "uid": "event-uid-here" }
 //! ```
 
+use async_trait::async_trait;
 use std::sync::Arc;
 
-use async_trait::async_trait;
 use oxi_sdk::{AgentTool, AgentToolResult, ToolContext};
-use serde_json::{json, Value};
-use tokio::sync::oneshot;
+use serde_json::{Value, json};
 
 use crate::kernel_handle::KernelHandle;
 use oxios_calendar::{CalendarEngine, EventDraft, EventPatch, Repeat};
@@ -135,6 +134,7 @@ fn opt_repeat(params: &Value) -> Option<Repeat> {
 }
 
 #[async_trait]
+
 impl AgentTool for CalendarTool {
     fn name(&self) -> &str {
         "calendar"
@@ -240,9 +240,10 @@ impl AgentTool for CalendarTool {
         &self,
         _tool_call_id: &str,
         params: Value,
-        _signal: Option<oneshot::Receiver<()>>,
+        _signal: Option<tokio::sync::oneshot::Receiver<()>>,
         _ctx: &ToolContext,
-    ) -> Result<AgentToolResult, String> {
+    ) -> Result<AgentToolResult, oxi_sdk::ToolError>
+     {
         let op = params
             .get("op")
             .and_then(|v| v.as_str())

@@ -4,12 +4,11 @@
 //! to implement the `AgentTool` trait. The full tool name is namespaced as
 //! `mcp:{server_name}:{tool_name}` to avoid collisions with Tier 1-2 tools.
 
+use async_trait::async_trait;
 use std::sync::Arc;
 
-use async_trait::async_trait;
 use oxi_sdk::{AgentTool, AgentToolResult, ToolContext};
 use serde_json::Value;
-use tokio::sync::oneshot;
 
 use crate::mcp::{McpBridge, McpContentBlock};
 
@@ -95,6 +94,7 @@ fn format_content_block(block: &McpContentBlock) -> String {
 }
 
 #[async_trait]
+
 impl AgentTool for McpToolWrapper {
     fn name(&self) -> &str {
         &self.full_name
@@ -116,9 +116,10 @@ impl AgentTool for McpToolWrapper {
         &self,
         _tool_call_id: &str,
         params: Value,
-        _signal: Option<oneshot::Receiver<()>>,
+        _signal: Option<tokio::sync::oneshot::Receiver<()>>,
         _ctx: &ToolContext,
-    ) -> Result<AgentToolResult, String> {
+    ) -> Result<AgentToolResult, oxi_sdk::ToolError>
+     {
         match self
             .bridge
             .call_tool(&self.server_name, &self.tool_name, params)

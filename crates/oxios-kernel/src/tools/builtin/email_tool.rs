@@ -13,13 +13,12 @@
 //! | List templates | List available templates | `list_templates: true` |
 
 use std::collections::HashMap;
+use async_trait::async_trait;
 use std::sync::Arc;
 
-use async_trait::async_trait;
 use oxi_sdk::{AgentTool as OxiAgentTool, AgentToolResult, ToolContext};
 use serde::Deserialize;
-use serde_json::{json, Value};
-use tokio::sync::oneshot;
+use serde_json::{Value, json};
 
 use crate::kernel_handle::EmailApi;
 
@@ -101,6 +100,7 @@ impl std::fmt::Debug for EmailTool {
 }
 
 #[async_trait]
+
 impl OxiAgentTool for EmailTool {
     fn name(&self) -> &str {
         "send_email"
@@ -156,9 +156,10 @@ impl OxiAgentTool for EmailTool {
         &self,
         _tool_call_id: &str,
         params: Value,
-        _signal: Option<oneshot::Receiver<()>>,
+        _signal: Option<tokio::sync::oneshot::Receiver<()>>,
         _ctx: &ToolContext,
-    ) -> Result<AgentToolResult, String> {
+    ) -> Result<AgentToolResult, oxi_sdk::ToolError>
+     {
         let args: EmailArgs =
             serde_json::from_value(params).map_err(|e| format!("Invalid arguments: {e}"))?;
 

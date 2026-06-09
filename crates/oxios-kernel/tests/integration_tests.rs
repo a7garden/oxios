@@ -7,8 +7,8 @@
 //! - Gateway routing with mock channel
 
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 use async_trait::async_trait;
 
@@ -78,6 +78,14 @@ impl OuroborosProtocol for MockOuroboros {
         result.update_ambiguity(score);
         result.add_exchange("What is the goal?", "Test goal");
         Ok(result)
+    }
+
+    async fn interview_structured(
+        &self,
+        _user_input: &str,
+    ) -> anyhow::Result<Option<Vec<oxios_ouroboros::ouroboros_engine::InterviewQuestionOutput>>>
+    {
+        Ok(None)
     }
 
     async fn generate_seed(&self, _interview: &InterviewResult) -> anyhow::Result<Seed> {
@@ -1033,9 +1041,11 @@ async fn test_access_manager_permission_lifecycle() {
     access.set_permissions(AgentPermissions::for_new_agent("lifecycle-agent"));
 
     // Check agent is listed.
-    assert!(access
-        .list_agents()
-        .contains(&"lifecycle-agent".to_string()));
+    assert!(
+        access
+            .list_agents()
+            .contains(&"lifecycle-agent".to_string())
+    );
 
     // Grant a tool.
     let perms = access.get_or_create_permissions("lifecycle-agent");
@@ -1048,9 +1058,11 @@ async fn test_access_manager_permission_lifecycle() {
     access.remove_permissions("lifecycle-agent");
 
     // Agent no longer listed.
-    assert!(!access
-        .list_agents()
-        .contains(&"lifecycle-agent".to_string()));
+    assert!(
+        !access
+            .list_agents()
+            .contains(&"lifecycle-agent".to_string())
+    );
 
     // All access denied for removed agent.
     assert!(!access.can_use_tool("lifecycle-agent", "custom-tool"));

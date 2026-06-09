@@ -18,13 +18,13 @@
 //! and all arguments are validated against shell metacharacters (`;`, `|`, `$`,
 //! backtick, `<`, `>`, etc.) and path traversal (`..`).
 
+use async_trait::async_trait;
 use std::sync::Arc;
 
-use async_trait::async_trait;
 use oxi_sdk::{AgentTool, AgentToolResult, ToolContext};
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use tokio::sync::oneshot;
 
 use crate::access_manager::AccessManager;
@@ -530,6 +530,7 @@ impl std::fmt::Debug for ExecTool {
 // ─── AgentTool implementation ──────────────────────────────────────────────
 
 #[async_trait]
+
 impl AgentTool for ExecTool {
     fn name(&self) -> &str {
         "exec"
@@ -579,9 +580,10 @@ impl AgentTool for ExecTool {
         &self,
         _tool_call_id: &str,
         params: Value,
-        shutdown: Option<oneshot::Receiver<()>>,
+        shutdown: Option<tokio::sync::oneshot::Receiver<()>>,
         _ctx: &ToolContext,
-    ) -> Result<AgentToolResult, String> {
+    ) -> Result<AgentToolResult, oxi_sdk::ToolError>
+     {
         let mode = params.get("mode").and_then(|v| v.as_str()).ok_or_else(|| {
             "Missing required parameter: mode (expected 'shell' or 'structured')".to_string()
         })?;
@@ -599,7 +601,7 @@ impl AgentTool for ExecTool {
                     None => {
                         return Ok(AgentToolResult::error(
                             "shell mode requires 'command' parameter",
-                        ))
+                        ));
                     }
                 };
 
@@ -622,7 +624,7 @@ impl AgentTool for ExecTool {
                     None => {
                         return Ok(AgentToolResult::error(
                             "structured mode requires 'binary' parameter",
-                        ))
+                        ));
                     }
                 };
 
@@ -879,9 +881,11 @@ mod tests {
             )
             .await;
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .contains("Missing required parameter: mode"));
+        assert!(
+            result
+                .unwrap_err()
+                .contains("Missing required parameter: mode")
+        );
     }
 
     #[tokio::test]
@@ -930,9 +934,10 @@ mod tests {
         assert!(result.is_ok());
         let r = result.unwrap();
         assert!(!r.success);
-        assert!(r
-            .output
-            .contains("structured mode requires 'binary' parameter"));
+        assert!(
+            r.output
+                .contains("structured mode requires 'binary' parameter")
+        );
     }
 
     #[tokio::test]

@@ -12,12 +12,11 @@
 //! { "action": "trigger", "id": "job-uuid" }
 //! ```
 
+use async_trait::async_trait;
 use std::sync::Arc;
 
-use async_trait::async_trait;
 use oxi_sdk::{AgentTool, AgentToolResult, ToolContext};
-use serde_json::{json, Value};
-use tokio::sync::oneshot;
+use serde_json::{Value, json};
 
 use crate::cron::CronScheduler;
 use crate::kernel_handle::KernelHandle;
@@ -57,6 +56,7 @@ impl std::fmt::Debug for CronTool {
 }
 
 #[async_trait]
+
 impl AgentTool for CronTool {
     fn name(&self) -> &str {
         "cron"
@@ -101,9 +101,10 @@ impl AgentTool for CronTool {
         &self,
         _tool_call_id: &str,
         params: Value,
-        _signal: Option<oneshot::Receiver<()>>,
+        _signal: Option<tokio::sync::oneshot::Receiver<()>>,
         _ctx: &ToolContext,
-    ) -> Result<AgentToolResult, String> {
+    ) -> Result<AgentToolResult, oxi_sdk::ToolError>
+     {
         let action = params
             .get("action")
             .and_then(|v| v.as_str())
@@ -178,7 +179,9 @@ impl AgentTool for CronTool {
 
                 let job_id = match uuid::Uuid::parse_str(id_str) {
                     Ok(id) => id,
-                    Err(e) => return Ok(AgentToolResult::error(format!("Invalid job ID: {e}"))),
+                    Err(e) => {
+                        return Ok(AgentToolResult::error(format!("Invalid job ID: {e}")));
+                    }
                 };
 
                 match self.cron_scheduler.remove_job(job_id).await {
@@ -199,7 +202,9 @@ impl AgentTool for CronTool {
 
                 let job_id = match uuid::Uuid::parse_str(id_str) {
                     Ok(id) => id,
-                    Err(e) => return Ok(AgentToolResult::error(format!("Invalid job ID: {e}"))),
+                    Err(e) => {
+                        return Ok(AgentToolResult::error(format!("Invalid job ID: {e}")));
+                    }
                 };
 
                 match self.cron_scheduler.trigger_job(job_id) {

@@ -11,12 +11,11 @@
 //! { "action": "budget", "id": "agent-uuid" }
 //! ```
 
+use async_trait::async_trait;
 use std::sync::Arc;
 
-use async_trait::async_trait;
 use oxi_sdk::{AgentTool as OxiAgentTool, AgentToolResult, ToolContext};
-use serde_json::{json, Value};
-use tokio::sync::oneshot;
+use serde_json::{Value, json};
 
 use crate::budget::BudgetManager;
 use crate::kernel_handle::KernelHandle;
@@ -63,6 +62,7 @@ impl std::fmt::Debug for AgentTool {
 }
 
 #[async_trait]
+
 impl OxiAgentTool for AgentTool {
     // Note: we implement the oxi_sdk::AgentTool trait on our struct,
     // which is also named AgentTool. Rust resolves this by treating
@@ -107,9 +107,10 @@ impl OxiAgentTool for AgentTool {
         &self,
         _tool_call_id: &str,
         params: Value,
-        _signal: Option<oneshot::Receiver<()>>,
+        _signal: Option<tokio::sync::oneshot::Receiver<()>>,
         _ctx: &ToolContext,
-    ) -> Result<AgentToolResult, String> {
+    ) -> Result<AgentToolResult, oxi_sdk::ToolError>
+     {
         let action = params
             .get("action")
             .and_then(|v| v.as_str())
@@ -124,7 +125,7 @@ impl OxiAgentTool for AgentTool {
                     Err(e) => {
                         return Ok(AgentToolResult::error(format!(
                             "Failed to list agents: {e}"
-                        )))
+                        )));
                     }
                 };
 
@@ -159,7 +160,9 @@ impl OxiAgentTool for AgentTool {
 
                 let agent_id: AgentId = match uuid::Uuid::parse_str(id_str) {
                     Ok(id) => id,
-                    Err(e) => return Ok(AgentToolResult::error(format!("Invalid agent ID: {e}"))),
+                    Err(e) => {
+                        return Ok(AgentToolResult::error(format!("Invalid agent ID: {e}")));
+                    }
                 };
 
                 match self.supervisor.kill(agent_id).await {
@@ -178,7 +181,9 @@ impl OxiAgentTool for AgentTool {
 
                 let agent_id: AgentId = match uuid::Uuid::parse_str(id_str) {
                     Ok(id) => id,
-                    Err(e) => return Ok(AgentToolResult::error(format!("Invalid agent ID: {e}"))),
+                    Err(e) => {
+                        return Ok(AgentToolResult::error(format!("Invalid agent ID: {e}")));
+                    }
                 };
 
                 let info = self.budget_manager.remaining(&agent_id);

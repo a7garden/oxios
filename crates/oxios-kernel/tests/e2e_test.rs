@@ -6,15 +6,15 @@
 
 use async_trait::async_trait;
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 use anyhow::Result;
 use oxios_kernel::supervisor::Supervisor;
 use oxios_kernel::types::{AgentId, AgentInfo, AgentStatus};
 use oxios_kernel::{
-    config::OrchestratorConfig, A2AProtocol, AccessManager, AgentLifecycleManager, EventBus,
-    KernelEvent, Orchestrator, StateStore,
+    A2AProtocol, AccessManager, AgentLifecycleManager, EventBus, KernelEvent, Orchestrator,
+    StateStore, config::OrchestratorConfig,
 };
 use oxios_ouroboros::{
     AmbiguityScore, EvaluationResult, ExecutionResult, InterviewResult, OuroborosProtocol, Phase,
@@ -75,6 +75,13 @@ impl OuroborosProtocol for MockOuroboros {
         result.update_ambiguity(score);
         result.add_exchange("Goal confirmed", "User wants to proceed");
         Ok(result)
+    }
+
+    async fn interview_structured(
+        &self,
+        _user_input: &str,
+    ) -> Result<Option<Vec<oxios_ouroboros::ouroboros_engine::InterviewQuestionOutput>>> {
+        Ok(None)
     }
 
     async fn generate_seed(&self, _interview: &InterviewResult) -> Result<Seed> {
@@ -323,7 +330,11 @@ async fn test_orchestrator_evolution_loop() {
 
     // Phase should reach Evolve (new seed was generated via evolve).
     assert_eq!(result.phase_reached, Phase::Evolve);
-    assert_eq!(result.evaluation_passed, Some(true), "Final evaluation should pass");
+    assert_eq!(
+        result.evaluation_passed,
+        Some(true),
+        "Final evaluation should pass"
+    );
 
     // Verify the evolution loop:
     // evaluate(fail) → evolve → fork+run → evaluate(pass)

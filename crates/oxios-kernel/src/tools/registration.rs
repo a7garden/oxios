@@ -31,6 +31,7 @@ use oxi_sdk::{
     ToolRegistry, WebSearchTool, WriteTool,
 };
 
+use crate::KernelHandle;
 use crate::access_manager::{AccessGate, AgentContext};
 use crate::capability::{CSpace, ResourceRef, Rights};
 use crate::tools::builtin::*;
@@ -40,7 +41,6 @@ use crate::tools::{
     MemorySearchTool, MemoryWriteTool,
 };
 use crate::types::AgentId;
-use crate::KernelHandle;
 
 /// Register the always-on tool set into a [`ToolRegistry`].
 ///
