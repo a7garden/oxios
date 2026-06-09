@@ -5,7 +5,8 @@ import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ChatInput } from '@/components/chat/chat-input'
 import { EmptyChatState } from '@/components/chat/empty-chat-state'
-import { InterviewResponse } from '@/components/chat/interview-response'
+import { InterviewWizard } from '@/components/chat/interview-wizard'
+import { ToolApprovalCard } from '@/components/chat/tool-approval-card'
 import { MessageBubble } from '@/components/chat/message-bubble'
 import { AiDetectionBadge } from '@/components/project/ai-detection-badge'
 import { Button } from '@/components/ui/button'
@@ -39,6 +40,8 @@ function ChatPage() {
     setActiveProject,
     dismissDetection,
     submitInterviewResponse,
+    activeToolApproval,
+    resolveToolApproval,
     disconnect,
     connect,
   } = useChatStore()
@@ -164,13 +167,24 @@ function ChatPage() {
                   <MessageBubble key={msg.id} message={msg} />
                 ))}
 
-                {/* Interactive interview UI */}
+                {/* Interactive interview wizard */}
                 {activeInterview && activeInterview.length > 0 && (
-                  <InterviewResponse
+                  <InterviewWizard
                     questions={activeInterview}
                     round={interviewRound}
                     ambiguity={interviewAmbiguity}
                     onSubmit={submitInterviewResponse}
+                    disabled={isStreaming}
+                  />
+                )}
+
+                {/* RFC-017: runtime tool capability escalation */}
+                {activeToolApproval && (
+                  <ToolApprovalCard
+                    toolName={activeToolApproval.toolName}
+                    reason={activeToolApproval.reason}
+                    onApprove={() => resolveToolApproval(activeToolApproval.id, true)}
+                    onDeny={() => resolveToolApproval(activeToolApproval.id, false)}
                     disabled={isStreaming}
                   />
                 )}
