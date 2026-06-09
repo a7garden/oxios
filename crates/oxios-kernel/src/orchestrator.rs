@@ -325,10 +325,10 @@ impl Orchestrator {
 
     /// Commit a file to git if GitLayer is configured and enabled.
     fn git_commit(&self, rel_path: &str, message: &str) {
-        if let Some(ref gl) = self.git_layer {
-            if gl.is_enabled() {
-                let _ = gl.commit_file(rel_path, message);
-            }
+        if let Some(ref gl) = self.git_layer
+            && gl.is_enabled()
+        {
+            let _ = gl.commit_file(rel_path, message);
         }
     }
 
@@ -390,10 +390,10 @@ impl Orchestrator {
             .unwrap_or_default();
 
         // Touch the project to record activity
-        if let Some(pid) = primary_project_id {
-            if let Some(pm) = self.project_manager() {
-                pm.touch(pid);
-            }
+        if let Some(pid) = primary_project_id
+            && let Some(pm) = self.project_manager()
+        {
+            pm.touch(pid);
         }
 
         let _conversation_turns = {
@@ -546,10 +546,10 @@ impl Orchestrator {
                 // Record the questions as the agent's response in history.
                 let questions_text = interview.questions.join("\n");
                 let last_answer = session.interview.answers.last().cloned();
-                if let Some(ref ans) = last_answer {
-                    if !ans.is_empty() {
-                        session.interview.add_to_history(ans, &questions_text);
-                    }
+                if let Some(ref ans) = last_answer
+                    && !ans.is_empty()
+                {
+                    session.interview.add_to_history(ans, &questions_text);
                 }
             } // Lock dropped before .await
 
@@ -574,7 +574,30 @@ impl Orchestrator {
             // Web UI. This is best-effort: failure here does NOT block
             // the interview flow — the frontend will fall back to
             // rendering `response` as plain markdown.
-            let structured = match self.ouroboros.interview_structured(user_message).await {
+            //
+            // For follow-up interview rounds, pass the full multi-turn
+            // context so the LLM can produce relevant structured follow-ups.
+            // When this is the first round, multi_turn_input equals
+            // `user_message` so the behavior is unchanged.
+            let structured_input = if existing_history.is_some() {
+                // Rebuild the multi-turn context that was already fed
+                // to `self.ouroboros.interview()` above.
+                let mut context_parts = Vec::new();
+                if let Some(ref history) = existing_history {
+                    for exchange in history {
+                        context_parts.push(format!(
+                            "User: {}\nAgent: {}",
+                            exchange.user, exchange.agent
+                        ));
+                    }
+                }
+                context_parts.push(format!("User: {user_message}"));
+                context_parts.join("\n\n")
+            } else {
+                user_message.to_string()
+            };
+
+            let mut structured = match self.ouroboros.interview_structured(&structured_input).await {
                 Ok(Some(s)) if !s.is_empty() => Some(s),
                 Ok(_) => None,
                 Err(e) => {
@@ -582,6 +605,26 @@ impl Orchestrator {
                     None
                 }
             };
+
+            // Fallback: if the LLM did not produce structured questions
+            // but we have plain questions from the interview, synthesize
+            // free_text structured questions so the wizard UI still works.
+            // This prevents the second+ round from falling back to
+            // plain markdown when the LLM omits `structured_questions`.
+            if structured.is_none() && !questions.is_empty() {
+                structured = Some(
+                    questions
+                        .iter()
+                        .enumerate()
+                        .map(|(i, q)| oxios_ouroboros::ouroboros_engine::InterviewQuestionOutput {
+                            id: format!("q{}", i + 1),
+                            text: q.clone(),
+                            kind: "free_text".to_string(),
+                            options: vec![],
+                        })
+                        .collect(),
+                );
+            }
 
             // Round = 1 + number of prior answers in the session's
             // interview history (best-effort: 1 when not present).
@@ -1415,7 +1458,8 @@ pub struct OrchestrationResult {
     /// buttons). When `None`, the frontend falls back to rendering
     /// `response` as plain markdown.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub interview_questions: Option<Vec<oxios_ouroboros::ouroboros_engine::InterviewQuestionOutput>>,
+    pub interview_questions:
+        Option<Vec<oxios_ouroboros::ouroboros_engine::InterviewQuestionOutput>>,
     /// Current interview round (1-based). Populated alongside
     /// `interview_questions`. Drives the "Round N/M" indicator.
     #[serde(default, skip_serializing_if = "Option::is_none")]
