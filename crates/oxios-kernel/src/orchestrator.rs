@@ -449,12 +449,15 @@ impl Orchestrator {
                     context_parts.join("\n\n")
                 };
 
-                // Record user's answer in session for future turns (brief write lock)
+                // Record all Q&A as a single exchange for multi-turn history.
+                // The formatted `user_message` already contains Q&A context
+                // (sent from the frontend as `text` field). Pair it with
+                // the full question list as the agent side.
                 {
                     let mut sessions = self.sessions.write();
                     if let Some(s) = sessions.get_mut(&session_id) {
-                        let last_q = s.interview.questions.last().cloned().unwrap_or_default();
-                        s.interview.add_exchange(&last_q, user_message);
+                        let all_questions = s.interview.questions.join("\n");
+                        s.interview.add_to_history(user_message, &all_questions);
                     }
                 }
 

@@ -505,6 +505,8 @@ export const useChatStore = create<ChatStore>()(
         }
 
         // Send via WebSocket as interview_response
+        // Include formatted `text` with Q&A context so the LLM
+        // understands the answers (not just raw values).
         if (wsInstance && wsInstance.readyState === WebSocket.OPEN) {
           wsInstance.send(
             JSON.stringify({
@@ -512,6 +514,7 @@ export const useChatStore = create<ChatStore>()(
               session_id: activeSessionId ?? '',
               project_id: activeProjectId ?? '',
               answers,
+              text: answerText,
             }),
           )
         }

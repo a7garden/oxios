@@ -1,12 +1,12 @@
 use std::sync::Arc;
 
-use axum::extract::{
-    ws::{Message, WebSocket},
-    State, WebSocketUpgrade,
-};
-use axum::extract::{Path, Query};
-use axum::response::IntoResponse;
 use axum::Json;
+use axum::extract::{Path, Query};
+use axum::extract::{
+    State, WebSocketUpgrade,
+    ws::{Message, WebSocket},
+};
+use axum::response::IntoResponse;
 use futures_util::{SinkExt, StreamExt as FuturesStreamExt};
 use serde::{Deserialize, Serialize};
 
@@ -395,8 +395,8 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
                     // the exchange is durable even if the connection drops mid-stream.
                     if let Some(ref sid) = session_id {
                         let pending = pending_user_msg.lock().await;
-                        if let Some((ref pending_id, _)) = *pending {
-                            if *pending_id == msg_id {
+                        if let Some((ref pending_id, _)) = *pending
+                            && *pending_id == msg_id {
                                 drop(pending); // release lock before async I/O
                                 let pm = {
                                     let mut guard = pending_user_msg.lock().await;
@@ -416,7 +416,6 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
                                     .await;
                                 }
                             }
-                        }
                     }
 
                     // ── Forward to WebSocket client ──
@@ -557,17 +556,27 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
                                 .cloned()
                                 .unwrap_or_default();
 
-                            let answer_text = answers
-                                .iter()
-                                .filter_map(|a| {
-                                    let value = a.get("value")?.as_str()?;
-                                    if value.is_empty() {
-                                        return None;
-                                    }
-                                    Some(value.to_string())
-                                })
-                                .collect::<Vec<_>>()
-                                .join("\n");
+                            // Prefer the pre-formatted Q&A text from the frontend
+                            // (includes question context so the LLM understands
+                            // the answers). Fall back to raw values if absent.
+                            let answer_text = parsed
+                                .get("text")
+                                .and_then(|v| v.as_str())
+                                .filter(|s| !s.is_empty())
+                                .map(String::from)
+                                .unwrap_or_else(|| {
+                                    answers
+                                        .iter()
+                                        .filter_map(|a| {
+                                            let value = a.get("value")?.as_str()?;
+                                            if value.is_empty() {
+                                                return None;
+                                            }
+                                            Some(value.to_string())
+                                        })
+                                        .collect::<Vec<_>>()
+                                        .join("\n")
+                                });
 
                             if answer_text.is_empty() {
                                 continue;
@@ -797,10 +806,10 @@ fn kernel_event_to_ws_chunk(
         KernelEvent::ReasoningFragment { session_id, .. } => Some(session_id),
         _ => None,
     };
-    if let (Some(eid), Some(active)) = (event_session_id, active_session_id.as_ref()) {
-        if eid != active.as_str() {
-            return None;
-        }
+    if let (Some(eid), Some(active)) = (event_session_id, active_session_id.as_ref())
+        && eid != active.as_str()
+    {
+        return None;
     }
 
     match event {
@@ -884,6 +893,26 @@ fn kernel_event_to_ws_chunk(
         // here because the orchestrator already publishes them with extra
         // metadata (result_summary) and we don't want to double-emit. The
         // global /api/events SSE channel carries them for the events page.
+        KernelEvent::ApprovalRequested {
+            id,
+            tool_name,
+            reason,
+            session_id,
+            ..
+        } => {
+            // Filter by active session
+            if let (Some(eid), Some(active)) = (session_id.as_ref(), active_session_id.as_ref())
+                && eid != active.as_str()
+            {
+                return None;
+            }
+            Some(serde_json::json!({
+                "type": "tool_approval",
+                "id": id.to_string(),
+                "tool_name": tool_name,
+                "reason": reason,
+            }))
+        }
         _ => None,
     }
 }
@@ -902,11 +931,55 @@ pub(crate) async fn handle_session_tool_calls(
     })))
 }
 
+// ---------------------------------------------------------------------------
+// Tool Approval (RFC-017: runtime capability escalation)
+// ---------------------------------------------------------------------------
+
+/// POST /api/chat/tool-approval/{id}/respond — Approve or deny a pending
+/// tool approval request. Resolves the oneshot the GatedTool is waiting on.
+pub(crate) async fn handle_tool_approval_respond(
+    state: State<Arc<AppState>>,
+    Path(id): Path<String>,
+    Json(body): Json<ToolApprovalResponseBody>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    let approval_id = uuid::Uuid::parse_str(&id)
+        .map_err(|e| AppError::BadRequest(format!("invalid approval id: {e}")))?;
+
+    let result = if body.approved {
+        oxios_kernel::tools::ToolApprovalResult::Approved
+    } else {
+        oxios_kernel::tools::ToolApprovalResult::Denied
+    };
+
+    state
+        .kernel
+        .infra
+        .pending_tool_approvals()
+        .resolve(approval_id, result)
+        .ok_or_else(|| {
+            AppError::NotFound(format!("tool approval {id} not found or already resolved"))
+        })?;
+
+    tracing::info!(
+        approval_id = %id,
+        approved = body.approved,
+        "Tool approval resolved"
+    );
+
+    Ok(Json(serde_json::json!({ "status": "ok" })))
+}
+
+#[derive(Debug, serde::Deserialize)]
+pub(crate) struct ToolApprovalResponseBody {
+    /// Whether the user approved the tool access.
+    pub approved: bool,
+}
+
 #[cfg(test)]
 mod rfc015_tests {
     use super::*;
-    use oxios_kernel::event_bus::KernelEvent;
     use oxios_kernel::AgentId;
+    use oxios_kernel::event_bus::KernelEvent;
 
     /// Every RFC-015 KernelEvent should map to the documented WS chunk type
     /// (tool_start, tool_end, memory, usage, reasoning). This is the wire
