@@ -545,14 +545,29 @@ impl Orchestrator {
                             seed_id: None,
                             agent_id: None,
                         });
-                // The session already has user's answer recorded via add_exchange above.
-                // Record the questions as the agent's response in history.
+
                 let questions_text = interview.questions.join("\n");
-                let last_answer = session.interview.answers.last().cloned();
-                if let Some(ref ans) = last_answer
-                    && !ans.is_empty()
-                {
-                    session.interview.add_to_history(ans, &questions_text);
+
+                // If this is the first round (no prior history), record the
+                // original user message → agent questions as the first exchange.
+                // Without this the multi-turn context loses the user's intent
+                // and follow-up rounds can't understand the conversation.
+                let is_first_round = session.interview.conversation_history.is_empty();
+                if is_first_round {
+                    let original = if interview.original_message.is_empty() {
+                        user_message.to_string()
+                    } else {
+                        interview.original_message.clone()
+                    };
+                    session.interview.add_to_history(&original, &questions_text);
+                } else {
+                    // Follow-up round: record the user's answer + these questions.
+                    let last_answer = session.interview.answers.last().cloned();
+                    if let Some(ref ans) = last_answer
+                        && !ans.is_empty()
+                    {
+                        session.interview.add_to_history(ans, &questions_text);
+                    }
                 }
             } // Lock dropped before .await
 
