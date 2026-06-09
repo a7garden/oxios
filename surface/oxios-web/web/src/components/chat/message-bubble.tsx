@@ -1,4 +1,4 @@
-import { Bot, User, Wrench } from 'lucide-react'
+import { Bot, ClipboardList, User, Wrench } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import rehypeHighlight from 'rehype-highlight'
 import remarkGfm from 'remark-gfm'
@@ -68,15 +68,31 @@ export function MessageBubble({ message }: MessageBubbleProps) {
             isUser ? 'bg-primary text-primary-foreground' : 'bg-muted'
           }`}
         >
+          {/* Interview questions summary (persisted after submit) */}
+          {!isUser && message._interviewQuestions && message._interviewQuestions.length > 0 && (
+            <div className="mb-2">
+              <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground mb-1.5">
+                <ClipboardList className="h-3 w-3" />
+                <span>Interview{message._interviewRound ? ` R${message._interviewRound}` : ''}</span>
+              </div>
+              <div className="space-y-1">
+                {message._interviewQuestions.map((q, i) => (
+                  <p key={q.id} className="text-xs text-muted-foreground">
+                    {i + 1}. {q.text}
+                  </p>
+                ))}
+              </div>
+            </div>
+          )}
           {isUser ? (
             <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-          ) : (
+          ) : message.content ? (
             <div className="text-sm prose prose-sm dark:prose-invert max-w-none [&>p:first-child]:mt-0 [&>p:last-child]:mb-0">
               <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]}>
                 {message.content}
               </ReactMarkdown>
             </div>
-          )}
+          ) : null}
         </div>
         {/* RFC-015: real-time activity timeline (tool calls, memory,
             reasoning, token usage). Hidden for user messages. */}

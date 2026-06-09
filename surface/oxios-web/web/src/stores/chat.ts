@@ -38,6 +38,12 @@ interface ChatRuntimeState {
   dismissedProjectIds: string[]
   /** Active structured interview questions (null = no interview active). */
   activeInterview: import('@/types').InterviewQuestion[] | null
+  /** Active tool approval request awaiting user response (RFC-017). */
+  activeToolApproval: {
+    id: string
+    toolName: string
+    reason: string
+  } | null
   /** Interview round number. */
   interviewRound: number
   /** Interview ambiguity score. */
@@ -69,6 +75,8 @@ interface ChatActions {
   clearPersist: () => void
   /** Submit interview answers and send them as a message. */
   submitInterviewResponse: (answers: import('@/types').InterviewAnswer[]) => void
+  /** Resolve a pending tool approval (RFC-017). */
+  resolveToolApproval: (id: string, approved: boolean) => Promise<void>
   /** Handle an incoming WS chunk. */
   handleChunk: (chunk: StreamChunk) => void
 }
@@ -256,6 +264,7 @@ export const useChatStore = create<ChatStore>()(
       activeInterview: null,
       interviewRound: 0,
       interviewAmbiguity: 0,
+      activeToolApproval: null,
 
       // ── Actions ──
 
@@ -463,11 +472,12 @@ export const useChatStore = create<ChatStore>()(
           activeInterview: null,
           interviewRound: 0,
           interviewAmbiguity: 0,
+          activeToolApproval: null,
         })
       },
 
       submitInterviewResponse(answers: import('@/types').InterviewAnswer[]) {
-        const { activeInterview, activeSessionId, activeProjectId } = get()
+        const { activeInterview, activeSessionId, activeProjectId, interviewRound } = get()
         if (!activeInterview) return
 
         // Build answer summary for user message bubble
@@ -478,6 +488,21 @@ export const useChatStore = create<ChatStore>()(
             return q ? `${q.text}\n→ ${a.value}` : a.value
           })
         const answerText = answerParts.join('\n\n')
+
+        // Persist interview questions as an assistant message BEFORE
+        // the user's answer, so the Q&A exchange remains in chat history.
+        const interviewMsg: ChatMessage = {
+          id: crypto.randomUUID(),
+          role: 'assistant',
+          content: '',
+          timestamp: new Date().toISOString(),
+          metadata: {
+            phase: 'interview',
+            tool_calls: [],
+          },
+          _interviewQuestions: activeInterview,
+          _interviewRound: interviewRound,
+        }
 
         // Send via WebSocket as interview_response
         if (wsInstance && wsInstance.readyState === WebSocket.OPEN) {
@@ -500,7 +525,7 @@ export const useChatStore = create<ChatStore>()(
         }
 
         set((s) => ({
-          messages: [...s.messages, userMsg],
+          messages: [...s.messages, interviewMsg, userMsg],
           activeInterview: null,
           interviewRound: 0,
           interviewAmbiguity: 0,
@@ -508,6 +533,33 @@ export const useChatStore = create<ChatStore>()(
         }))
       },
 
+
+      async resolveToolApproval(id: string, approved: boolean) {
+        const { activeToolApproval } = get()
+        if (!activeToolApproval || activeToolApproval.id !== id) return
+        set({ activeToolApproval: null, isStreaming: true })
+        try {
+          const token = useAuthStore.getState().token
+          const res = await fetch(
+            `/api/chat/tool-approval/${encodeURIComponent(id)}/respond`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                ...(token ? { Authorization: `Bearer ${token}` } : {}),
+              },
+              body: JSON.stringify({ approved }),
+            },
+          )
+          if (!res.ok) {
+            const err = await res.text().catch(() => "unknown error")
+            throw new Error(`HTTP ${res.status}: ${err}`)
+          }
+        } catch (e) {
+          set({ activeToolApproval, isStreaming: false })
+          throw e
+        }
+      },
       handleChunk(chunk) {
         switch (chunk.type) {
           case 'token': {
@@ -614,6 +666,20 @@ export const useChatStore = create<ChatStore>()(
                 activeInterview: chunk.questions,
                 interviewRound: chunk.round ?? 1,
                 interviewAmbiguity: chunk.ambiguity ?? 0,
+                isStreaming: false,
+              })
+            }
+            break
+          }
+
+          case "tool_approval": {
+            if (chunk.id && chunk.tool_name) {
+              set({
+                activeToolApproval: {
+                  id: chunk.id as string,
+                  toolName: chunk.tool_name as string,
+                  reason: (chunk.reason as string) || "",
+                },
                 isStreaming: false,
               })
             }

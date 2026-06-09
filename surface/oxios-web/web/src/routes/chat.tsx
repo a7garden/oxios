@@ -8,6 +8,7 @@ import { EmptyChatState } from '@/components/chat/empty-chat-state'
 import { InterviewWizard } from '@/components/chat/interview-wizard'
 import { ToolApprovalCard } from '@/components/chat/tool-approval-card'
 import { MessageBubble } from '@/components/chat/message-bubble'
+import { TypingIndicator } from '@/components/chat/typing-indicator'
 import { AiDetectionBadge } from '@/components/project/ai-detection-badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -187,6 +188,11 @@ function ChatPage() {
                     onDeny={() => resolveToolApproval(activeToolApproval.id, false)}
                     disabled={isStreaming}
                   />
+                )}
+
+                {/* Typing indicator: shown while streaming and no active interview */}
+                {isStreaming && !activeInterview && !activeToolApproval && (
+                  <TypingIndicator />
                 )}
 
                 <div ref={bottomRef} />

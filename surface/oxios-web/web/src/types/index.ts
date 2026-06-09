@@ -172,6 +172,11 @@ export interface ChatMessage {
   // RFC-015: cumulative token usage for the turn.
   totalInputTokens?: number
   totalOutputTokens?: number
+  // Interview history: persisted questions from a completed interview round.
+  // Used by MessageBubble to render the Q&A exchange inline. Prefixed with
+  // _ to signal this is internal-only and not serialized to the backend.
+  _interviewQuestions?: InterviewQuestion[]
+  _interviewRound?: number
 }
 
 // RFC-015: a single transparency activity entry shown in the chat timeline.
@@ -280,6 +285,8 @@ export interface StreamChunk {
     | 'usage'
     // Chat UI redesign: interactive interview
     | 'interview'
+    // RFC-017: runtime tool capability escalation
+    | 'tool_approval'
   content?: string
   tool_name?: string
   tool_args?: Record<string, unknown>
@@ -319,6 +326,9 @@ export interface StreamChunk {
   questions?: InterviewQuestion[]
   round?: number
   ambiguity?: number
+  // ── Tool approval (RFC-017) ──
+  id?: string
+  reason?: string
 }
 
 // ── Browser observability (RFC-015 Phase G, oxi-agent 0.29.1+) ─────────
