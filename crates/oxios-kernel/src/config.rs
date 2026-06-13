@@ -110,6 +110,9 @@ pub struct MemoryConfig {
     /// Learning configuration (RFC-012 Phase 4: SONA).
     #[serde(default)]
     pub learning: LearningConfig,
+    /// Knowledge dream configuration (RFC-022).
+    #[serde(default)]
+    pub knowledge_dream: crate::knowledge_dream::KnowledgeDreamConfig,
     /// AutoMemoryBridge configuration (RFC-012 Phase 7: SQLite ↔ MEMORY.md sync).
     #[serde(default)]
     pub bridge: MemoryBridgeConfig,
@@ -146,6 +149,7 @@ impl Default for MemoryConfig {
             sqlite: SqliteMemoryConfig::default(),
             embedding: EmbeddingConfig::default(),
             learning: LearningConfig::default(),
+            knowledge_dream: crate::knowledge_dream::KnowledgeDreamConfig::default(),
             bridge: MemoryBridgeConfig::default(),
         }
     }
@@ -1315,6 +1319,22 @@ pub struct OrchestratorConfig {
     /// Enable evaluation result caching.
     #[serde(default = "default_true")]
     pub eval_cache_enabled: bool,
+
+    /// Keywords that trigger spec (Ouroboros) mode. Prefix-only match.
+    #[serde(default = "default_spec_keywords")]
+    pub spec_keywords: Vec<String>,
+
+    /// Default execution mode: "chat" (agent) or "spec" (Ouroboros pipeline).
+    #[serde(default = "default_mode")]
+    pub default_mode: String,
+}
+
+fn default_spec_keywords() -> Vec<String> {
+    vec!["#spec".into(), "#plan".into()]
+}
+
+fn default_mode() -> String {
+    "spec".into() // v1: backward compat
 }
 
 fn default_max_evolution_iterations() -> u32 {
@@ -1331,6 +1351,8 @@ impl Default for OrchestratorConfig {
             max_evolution_iterations: default_max_evolution_iterations(),
             min_evaluation_score: default_min_evaluation_score(),
             eval_cache_enabled: true,
+            spec_keywords: default_spec_keywords(),
+            default_mode: default_mode(),
         }
     }
 }
@@ -1878,10 +1900,10 @@ impl OxiosConfig {
 ///
 /// Shared utility for path expansion across the binary and kernel.
 pub fn expand_home(path: &str) -> std::path::PathBuf {
-    if let Some(rest) = path.strip_prefix("~/") {
-        if let Ok(home) = std::env::var("HOME") {
-            return std::path::PathBuf::from(format!("{home}/{rest}"));
-        }
+    if let Some(rest) = path.strip_prefix("~/")
+        && let Ok(home) = std::env::var("HOME")
+    {
+        return std::path::PathBuf::from(format!("{home}/{rest}"));
     }
     std::path::PathBuf::from(path)
 }

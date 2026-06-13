@@ -973,6 +973,20 @@ impl KernelBuilder {
                 None, // email (initialized later)
             ));
 
+        // Knowledge dream (RFC-022)
+        if config.memory.knowledge_dream.enabled {
+            let kb = kernel_handle.knowledge.clone();
+            let kd_config = config.memory.knowledge_dream.clone();
+            let kd = Arc::new(oxios_kernel::knowledge_dream::KnowledgeDream::new(
+                kb,
+                git_layer.clone(),
+                engine_handle.clone(),
+                kd_config,
+            ));
+            kd.spawn();
+            tracing::info!("Knowledge dream spawned for background note curation");
+        }
+
         // Build ToolRetriever for semantic capability discovery.
         let tool_retriever = build_tool_retriever(&skill_manager).await;
 

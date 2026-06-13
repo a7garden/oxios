@@ -13,6 +13,7 @@ use serde_json::{Value, json};
 
 use crate::KernelHandle;
 use oxios_markdown::KnowledgeBase;
+use oxios_markdown::types::{NoteMeta, NoteQuality, NoteSource};
 
 /// Tool for reading, writing, and managing markdown knowledge notes.
 ///
@@ -196,7 +197,16 @@ impl OxiAgentTool for KnowledgeTool {
                 if content.is_empty() {
                     return Ok(AgentToolResult::error("content is required for write"));
                 }
-                match self.kb.note_write(path, content) {
+                let meta = NoteMeta {
+                    author: "agent".to_string(),
+                    source: NoteSource::Tool,
+                    quality: NoteQuality::Raw,
+                    needs_review: true,
+                    session_id: None,
+                    message_index: None,
+                    saved_at: Some(chrono::Utc::now().to_rfc3339()),
+                };
+                match self.kb.note_write_with_meta(path, content, &meta) {
                     Ok(()) => Ok(AgentToolResult::success(format!(
                         "Note '{path}' written successfully"
                     ))),

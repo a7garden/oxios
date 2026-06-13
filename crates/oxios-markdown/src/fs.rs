@@ -425,6 +425,14 @@ impl VirtualFs {
         Ok(notes)
     }
 
+    /// List all `.md` files in the vault with their sizes.
+    /// Returns `(posix_path, size_bytes)` pairs. Skips dot-files and dot-dirs.
+    pub fn all_md_files(&self) -> Result<Vec<(String, i64)>, FsError> {
+        let mut result = Vec::new();
+        self.collect_md_paths(&self.root, &self.root, &mut result)?;
+        Ok(result)
+    }
+
     // ── Private helpers ─────────────────────────────────────
 
     #[allow(clippy::only_used_in_recursion)]
@@ -533,6 +541,37 @@ impl VirtualFs {
                     false,
                     parent_str,
                 ));
+            }
+        }
+        Ok(())
+    }
+
+    /// Collect all .md file paths and sizes (for frontmatter scanning).
+    #[allow(clippy::only_used_in_recursion)]
+    fn collect_md_paths(
+        &self,
+        root_path: &Path,
+        current_path: &Path,
+        result: &mut Vec<(String, i64)>,
+    ) -> Result<(), FsError> {
+        if !current_path.is_dir() {
+            return Ok(());
+        }
+        for entry in std::fs::read_dir(current_path)? {
+            let entry = entry?;
+            let path = entry.path();
+            let filename = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+            if filename.starts_with('.') {
+                continue;
+            }
+            if path.is_dir() {
+                self.collect_md_paths(root_path, &path, result)?;
+            } else if filename.ends_with(".md") {
+                let meta = std::fs::metadata(&path)?;
+                let rel = path
+                    .strip_prefix(root_path)
+                    .map_err(|_| FsError::UnsafePath)?;
+                result.push((rel.to_string_lossy().to_string(), meta.len() as i64));
             }
         }
         Ok(())

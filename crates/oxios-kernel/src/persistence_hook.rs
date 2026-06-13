@@ -14,6 +14,7 @@ use crate::event_bus::{EventBus, KernelEvent};
 use crate::memory::{MemoryEntry, MemoryManager, MemoryType, content_hash};
 use crate::state_store::StateStore;
 use oxios_markdown::KnowledgeBase;
+use oxios_markdown::types::{NoteMeta, NoteQuality, NoteSource};
 use oxios_memory::memory::sona::TrajectoryStep;
 use oxios_ouroboros::Seed;
 
@@ -24,6 +25,21 @@ pub struct KnowledgeWrite {
     pub path: String,
     /// Markdown content to write.
     pub content: String,
+    /// Provenance metadata (RFC-022).
+    #[serde(default = "default_knowledge_meta")]
+    pub meta: NoteMeta,
+}
+
+fn default_knowledge_meta() -> NoteMeta {
+    NoteMeta {
+        author: "agent".to_string(),
+        source: NoteSource::Hook,
+        quality: NoteQuality::Raw,
+        needs_review: true,
+        session_id: None,
+        message_index: None,
+        saved_at: None,
+    }
 }
 
 /// A planned write to agent memory.
@@ -115,9 +131,19 @@ impl PersistenceHook {
         // Layer 1: Heuristic — detect markdown documents
         if !already_saved_knowledge && looks_like_document(output) {
             let path = auto_save_path(seed, output);
+            let now = chrono::Utc::now().to_rfc3339();
             plan.knowledge.push(KnowledgeWrite {
                 path,
                 content: output.to_string(),
+                meta: NoteMeta {
+                    author: "agent".to_string(),
+                    source: NoteSource::Hook,
+                    quality: NoteQuality::Raw,
+                    needs_review: true,
+                    session_id: None,
+                    message_index: None,
+                    saved_at: Some(now),
+                },
             });
         }
 
@@ -189,7 +215,7 @@ impl PersistenceHook {
 
         // Knowledge writes
         for kw in &plan.knowledge {
-            match self.knowledge_base.note_write(&kw.path, &kw.content) {
+            match self.knowledge_base.note_write_with_meta(&kw.path, &kw.content, &kw.meta) {
                 Ok(()) => {
                     tracing::info!(
                         path = %kw.path,
@@ -292,6 +318,7 @@ impl PersistenceHook {
              - Memory: facts about the user, preference corrections, project context. Not visible to the user. Agent's own learning.\n\
              {knowledge_section}\
              \n\
+             When saving to knowledge, strip conversational wrapping: greetings, sign-offs, questions to the user, hedging. Extract only substantive content.\n\
              JSON only:\n\
              {{\"memory\":[{{\"content\":\"...\",\"type\":\"fact|episode\",\"importance\":0.0-1.0}}]{knowledge_field}}}",
             seed.goal,

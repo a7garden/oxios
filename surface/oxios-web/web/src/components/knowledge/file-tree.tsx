@@ -1,4 +1,4 @@
-import { ChevronRight, File, Folder, FolderOpen } from 'lucide-react'
+import { Bot, ChevronRight, File, Folder, FolderOpen, Gem, Sparkles } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useKnowledgeTree } from '@/hooks/use-knowledge'
@@ -113,6 +113,20 @@ function FileTreeItem({
         <span className="w-4 shrink-0" /> {/* indent spacer */}
         <File className="h-4 w-4 shrink-0 text-muted-foreground" />
         <span className="truncate">{entry.name.replace(/\.md$/, '')}</span>
+        {entry.oxios_quality && entry.oxios_quality !== 'user' && (
+          <span
+            className={cn(
+              'ml-auto shrink-0 flex items-center gap-0.5 text-2xs',
+              entry.oxios_quality === 'raw' && 'text-muted-foreground',
+              entry.oxios_quality === 'curated' && 'text-green-600',
+              entry.oxios_quality === 'refined' && 'text-blue-600',
+            )}
+          >
+            {entry.oxios_quality === 'raw' && <Bot className="h-2.5 w-2.5" />}
+            {entry.oxios_quality === 'curated' && <Sparkles className="h-2.5 w-2.5" />}
+            {entry.oxios_quality === 'refined' && <Gem className="h-2.5 w-2.5" />}
+          </span>
+        )}
       </button>
     </li>
   )

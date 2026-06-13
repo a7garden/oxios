@@ -280,6 +280,59 @@ pub struct Schedule {
     pub cmd: String,
 }
 
+// ============================================================================
+// Knowledge Provenance Types (RFC-022)
+// ============================================================================
+
+/// Source of a knowledge note write.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum NoteSource {
+    /// PersistenceHook (heuristic or reflection).
+    Hook,
+    /// Agent tool-calling (knowledge write action).
+    Tool,
+    /// Web UI "save to knowledge" button.
+    Ui,
+    /// Knowledge Dream curation pass.
+    Dream,
+}
+
+/// Content quality stage of a knowledge note.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+pub enum NoteQuality {
+    /// Agent-generated, not yet curated.
+    Raw,
+    /// Dream has cleaned up conversational artifacts.
+    Curated,
+    /// Dream has refined and enriched (future).
+    Refined,
+}
+
+/// Provenance metadata for agent-originated knowledge writes (RFC-022).
+///
+/// Serialized as the `oxios:` key inside YAML frontmatter.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NoteMeta {
+    /// Who created this note.
+    pub author: String,
+    /// How the save was triggered.
+    pub source: NoteSource,
+    /// Content quality stage.
+    pub quality: NoteQuality,
+    /// Whether Dream should process this note.
+    pub needs_review: bool,
+    /// Originating session ID.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub session_id: Option<String>,
+    /// Message index in the session.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub message_index: Option<usize>,
+    /// When the note was first saved (ISO 8601).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub saved_at: Option<String>,
+}
+
+// ============================================================================
 // Knowledge Config Types
 // ============================================================================
 

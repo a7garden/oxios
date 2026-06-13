@@ -1344,8 +1344,17 @@ pub(crate) async fn handle_save_to_knowledge(
         format!("notes/{slug}-{date}.md")
     });
 
-    // Write to KnowledgeBase
-    state.kernel.knowledge.note_write(&path, content)?;
+    // Write to KnowledgeBase with provenance metadata (RFC-022)
+    let meta = oxios_markdown::types::NoteMeta {
+        author: "agent".to_string(),
+        source: oxios_markdown::types::NoteSource::Ui,
+        quality: oxios_markdown::types::NoteQuality::Raw,
+        needs_review: true,
+        session_id: Some(session_id.clone()),
+        message_index: Some(message_index),
+        saved_at: Some(chrono::Utc::now().to_rfc3339()),
+    };
+    state.kernel.knowledge.note_write_with_meta(&path, content, &meta)?;;
 
     // Record the save
     let record = serde_json::json!({

@@ -3,6 +3,8 @@ export interface KnowledgeTreeEntry {
   name: string
   is_dir: boolean
   size: number
+  /** RFC-022: note quality from frontmatter. null/undefined = user-written. */
+  oxios_quality?: 'raw' | 'curated' | 'refined' | null
 }
 
 // Search

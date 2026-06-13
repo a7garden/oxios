@@ -89,10 +89,11 @@ impl BacklinkIndex {
         }
 
         // Extract and register new links
-        let links = extract_markdown_links(content);
+        let body = strip_frontmatter(content);
+        let links = extract_markdown_links(body);
         let mut targets = HashSet::new();
 
-        for (line_num, line) in content.lines().enumerate() {
+        for (line_num, line) in body.lines().enumerate() {
             for (text, target) in extract_markdown_links(line) {
                 targets.insert(target.clone());
                 self.backward
@@ -239,6 +240,24 @@ impl BacklinkIndex {
         self.forward.clear();
         self.backward.clear();
         self.details.clear();
+    }
+}
+
+/// Strip YAML frontmatter from content, returning the body.
+/// If no frontmatter is found, returns the original content unchanged.
+pub fn strip_frontmatter(content: &str) -> &str {
+    let trimmed = content.trim_start();
+    if !trimmed.starts_with("---") {
+        return content;
+    }
+    // Skip the opening ---
+    let after_first = &trimmed[3..];
+    let rest = after_first.trim_start_matches(['-', '\n', '\r']);
+    if let Some(idx) = rest.find("\n---") {
+        let body_start = idx + 4;
+        rest[body_start..].trim_start()
+    } else {
+        content
     }
 }
 

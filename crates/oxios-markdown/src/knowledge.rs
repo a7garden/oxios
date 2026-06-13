@@ -31,6 +31,7 @@ use crate::journal::{add_emoji as journal_add_emoji, add_record as journal_add_r
 use crate::parser::{extract_headings, similar};
 use crate::plugins::world_clock_for_names;
 use crate::stats::{done_today, today_report};
+use crate::types::{NoteMeta, NoteQuality, NoteSource};
 use crate::types::{FileEntry, Habits, KnowledgeConfig, CHAT_FILENAME, DIR_USER_ROOT};
 use crate::worker::{move_due_tasks, remove_completed_items};
 use crate::{today_chat_header, today_journal_filename};
@@ -173,7 +174,72 @@ impl KnowledgeBase {
         Ok(())
     }
 
-    /// Delete a note.
+    /// Write a note with provenance metadata (RFC-022).
+    ///
+    /// Prepends a YAML frontmatter block with `oxios:` metadata,
+    /// then delegates to `note_write`. If the file already has an
+    /// `oxios:` frontmatter block, it is merged (preserving `saved_at`,
+    /// updating `quality`/`source`). If the file has non-Oxios
+    /// frontmatter (e.g., Obsidian tags), it is left intact and
+    /// the note is treated as user-authored — no metadata is added.
+    pub fn note_write_with_meta(&self, path: &str, content: &str, meta: &NoteMeta) -> Result<()> {
+        // Check existing content for frontmatter
+        let existing = self.note_read(path).ok().flatten();
+        let final_content = match existing {
+            Some(ref existing_content) => {
+                let (existing_meta, body) = parse_note_meta(existing_content);
+                match existing_meta {
+                    // Has Oxios frontmatter — merge
+                    Some(old_meta) => {
+                        let merged = NoteMeta {
+                            saved_at: old_meta.saved_at.or(meta.saved_at.clone()),
+                            ..meta.clone()
+                        };
+                        format_frontmatter(&merged, if body.is_empty() { content } else { &body })
+                    }
+                    // No Oxios frontmatter — could be user note with its own frontmatter
+                    // or no frontmatter at all. Don't touch user notes.
+                    None => {
+                        // If content is provided, write it; if the existing content is
+                        // user-authored, skip metadata injection entirely.
+                        return self.note_write(path, content);
+                    }
+                }
+            }
+            None => format_frontmatter(meta, content),
+        };
+        self.note_write(path, &final_content)
+    }
+
+    /// List notes that need Dream review (RFC-022).
+    ///
+    /// Scans the vault for `.md` files with `needs_review: true` in their
+    /// Oxios frontmatter. Reads only the frontmatter block (stops at the
+    /// closing `---`) for efficiency.
+    pub fn notes_needing_review(&self) -> Result<Vec<(String, NoteMeta)>> {
+        let fs = self.fs.read();
+        let mut result = Vec::new();
+
+        let files = fs.all_md_files()?;
+        for (path, _size) in &files {
+            if let Ok(content) = fs.read_path(path) {
+                let (meta, _body) = parse_note_meta(&content);
+                if let Some(m) = meta {
+                    if m.needs_review {
+                        result.push((path.clone(), m));
+                    }
+                }
+            }
+        }
+
+        // Oldest first — they've been raw the longest
+        result.sort_by(|a, b| {
+            a.1.saved_at.as_deref().unwrap_or("").cmp(&b.1.saved_at.as_deref().unwrap_or(""))
+        });
+
+        Ok(result)
+    }
+
     pub fn note_delete(&self, path: &str) -> Result<()> {
         self.fs.read().delete_path(path)?;
         self.backlinks.write().remove_file(path);
@@ -572,6 +638,57 @@ impl KnowledgeBase {
     pub fn extract_headings(&self, content: &str) -> Vec<String> {
         extract_headings(content).into_iter().take(5).collect()
     }
+}
+
+// ---------------------------------------------------------------------------
+// Frontmatter helpers (RFC-022)
+// ---------------------------------------------------------------------------
+
+/// Parse Oxios frontmatter from a note's content.
+///
+/// Returns `(Some(NoteMeta), body)` if the `oxios:` key is present in the
+/// frontmatter. Returns `(None, original_content)` if there is no frontmatter
+/// or the frontmatter does not contain the `oxios:` key (e.g., user-written
+/// Obsidian frontmatter). In the latter case, the full original content
+/// (including any user frontmatter) is returned as the body.
+pub fn parse_note_meta(content: &str) -> (Option<NoteMeta>, String) {
+    let trimmed = content.trim_start();
+    if !trimmed.starts_with("---") {
+        return (None, content.to_string());
+    }
+
+    // Find the closing ---
+    let after_first = &trimmed[3..];
+    let rest = after_first.trim_start_matches(['-', '\n', '\r']);
+    if let Some(end_offset) = rest.find("\n---") {
+        let yaml_block = &rest[..end_offset];
+        let body_start = end_offset + 4; // skip \n---
+        let body = rest[body_start..].trim_start().to_string();
+
+        // Parse YAML looking for the `oxios:` key
+        if !yaml_block.contains("oxios:") {
+            // User frontmatter, not ours
+            return (None, content.to_string());
+        }
+
+        #[derive(serde::Deserialize)]
+        struct FrontmatterWrapper {
+            oxios: NoteMeta,
+        }
+
+        match serde_yaml::from_str::<FrontmatterWrapper>(yaml_block) {
+            Ok(wrapper) => (Some(wrapper.oxios), body),
+            Err(_) => (None, content.to_string()),
+        }
+    } else {
+        (None, content.to_string())
+    }
+}
+
+/// Format a NoteMeta as YAML frontmatter prepended to content.
+fn format_frontmatter(meta: &NoteMeta, body: &str) -> String {
+    let yaml = serde_yaml::to_string(meta).unwrap_or_default();
+    format!("---\noxios:\n{}---\n\n{}", yaml, body)
 }
 
 // ---------------------------------------------------------------------------

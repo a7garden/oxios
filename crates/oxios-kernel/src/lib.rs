@@ -39,6 +39,7 @@ mod audit_persistence;
 // ─── Autonomous Persistence ─────────────────────────────────────────
 // RFC-016: Post-execution hook for auto-saving knowledge and memory.
 pub mod persistence_hook;
+pub mod knowledge_dream;
 
 // ─── Communication ──────────────────────────────────────────────────
 // 이벤트, 메시징, 외부 프로토콜, 멀티 에이전트 조정.
