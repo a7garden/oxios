@@ -1011,7 +1011,7 @@ checksum = "af491d569909a7e4dee0ad7db7f5341fef5c614d5b8ec8cf765732aba3cff681"
 dependencies = [
  "serde",
  "termcolor",
- "unicode-width 0.2.2",
+ "unicode-width 0.1.14",
 ]
 
 [[package]]
@@ -5041,7 +5041,9 @@ checksum = "1a80800c0488c3a21695ea981a54918fbb37abf04f4d0720c453632255e2ff0e"
 
 [[package]]
 name = "oxi-agent"
-version = "0.31.0"
+version = "0.32.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e8f9c886471027689b92c2755b5b0445fb0f6591af9ed2ac2e1bee7a81ba233b"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5068,7 +5070,9 @@ dependencies = [
 
 [[package]]
 name = "oxi-ai"
-version = "0.31.0"
+version = "0.32.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e9630a16318b952b7d54bcfec69cc8d81124cc5bd5c06dbec4277c64fce02e0e"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -5101,7 +5105,9 @@ dependencies = [
 
 [[package]]
 name = "oxi-sdk"
-version = "0.31.0"
+version = "0.32.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1d2753d929309853542f57eca0699d69dd2bcc34e622ba1a0e47c9adca952e55"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5276,7 +5282,7 @@ dependencies = [
 
 [[package]]
 name = "oxios"
-version = "1.2.0"
+version = "1.3.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -5319,7 +5325,7 @@ dependencies = [
 
 [[package]]
 name = "oxios-bench"
-version = "1.2.0"
+version = "1.3.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5343,7 +5349,7 @@ dependencies = [
 
 [[package]]
 name = "oxios-calendar"
-version = "1.2.0"
+version = "1.3.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -5364,7 +5370,7 @@ dependencies = [
 
 [[package]]
 name = "oxios-cli"
-version = "1.2.0"
+version = "1.3.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5380,7 +5386,7 @@ dependencies = [
 
 [[package]]
 name = "oxios-gateway"
-version = "1.2.0"
+version = "1.3.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5398,7 +5404,7 @@ dependencies = [
 
 [[package]]
 name = "oxios-kernel"
-version = "1.2.0"
+version = "1.3.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5458,7 +5464,7 @@ dependencies = [
 
 [[package]]
 name = "oxios-markdown"
-version = "1.2.0"
+version = "1.3.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -5473,6 +5479,7 @@ dependencies = [
  "regex",
  "serde",
  "serde_json",
+ "serde_yaml",
  "sha2",
  "tempfile",
  "thiserror 1.0.69",
@@ -5486,7 +5493,7 @@ dependencies = [
 
 [[package]]
 name = "oxios-mcp"
-version = "1.2.0"
+version = "1.3.0"
 dependencies = [
  "anyhow",
  "parking_lot",
@@ -5498,7 +5505,7 @@ dependencies = [
 
 [[package]]
 name = "oxios-memory"
-version = "1.2.0"
+version = "1.3.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5520,7 +5527,7 @@ dependencies = [
 
 [[package]]
 name = "oxios-ouroboros"
-version = "1.2.0"
+version = "1.3.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5538,7 +5545,7 @@ dependencies = [
 
 [[package]]
 name = "oxios-telegram"
-version = "1.2.0"
+version = "1.3.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5554,7 +5561,7 @@ dependencies = [
 
 [[package]]
 name = "oxios-web"
-version = "1.2.0"
+version = "1.3.0"
 dependencies = [
  "anyhow",
  "async-trait",

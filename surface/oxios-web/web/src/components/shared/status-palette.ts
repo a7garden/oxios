@@ -29,36 +29,42 @@ export interface StatusStyle {
  *
  * Keys are lowercase. Any status not in this map falls back to
  * [`DEFAULT_STATUS_STYLE`].
+ *
+ * NOTE: `hex` values are Tailwind v3 palette defaults kept for
+ * React Flow's MiniMap (which needs plain CSS colors — not OKLCH).
+ * They are intentionally kept in sync with the semantic tokens
+ * in index.css (--success, --warning, --error, --info) by visual
+ * equivalence, not exact value match.
  */
 export const STATUS_PALETTE: Record<string, StatusStyle> = {
   running: {
-    border: 'border-emerald-500',
-    dot: 'bg-emerald-500 animate-pulse',
+    border: 'border-success',
+    dot: 'bg-success animate-pulse',
     hex: '#10b981',
   },
   active: {
-    border: 'border-emerald-500',
-    dot: 'bg-emerald-500 animate-pulse',
+    border: 'border-success',
+    dot: 'bg-success animate-pulse',
     hex: '#10b981',
   },
   idle: {
-    border: 'border-amber-500',
-    dot: 'bg-amber-500',
+    border: 'border-warning',
+    dot: 'bg-warning',
     hex: '#f59e0b',
   },
   pending: {
-    border: 'border-amber-500',
-    dot: 'bg-amber-500',
+    border: 'border-warning',
+    dot: 'bg-warning',
     hex: '#f59e0b',
   },
   starting: {
-    border: 'border-blue-500',
-    dot: 'bg-blue-500',
+    border: 'border-info',
+    dot: 'bg-info',
     hex: '#3b82f6',
   },
   stopped: {
-    border: 'border-red-500',
-    dot: 'bg-red-500',
+    border: 'border-error',
+    dot: 'bg-error',
     hex: '#ef4444',
   },
   failed: {
@@ -72,8 +78,8 @@ export const STATUS_PALETTE: Record<string, StatusStyle> = {
     hex: '#ef4444',
   },
   archived: {
-    border: 'border-zinc-400',
-    dot: 'bg-zinc-400',
+    border: 'border-muted-foreground',
+    dot: 'bg-muted-foreground',
     hex: '#a1a1aa',
   },
   rejected: {
@@ -86,7 +92,7 @@ export const STATUS_PALETTE: Record<string, StatusStyle> = {
 /** Fallback style used when a status is not in the palette. */
 export const DEFAULT_STATUS_STYLE: StatusStyle = {
   border: 'border-border',
-  dot: 'bg-zinc-400',
+  dot: 'bg-muted-foreground',
   hex: '#a1a1aa',
 }
 

@@ -1,5 +1,7 @@
 import { Link } from '@tanstack/react-router'
 import { FolderOpen, Pencil, Trash2 } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
+import { formatRelativeTime } from '@/lib/utils'
 import type { Project } from '@/types'
 import { getProjectIcon } from './project-icon'
 
@@ -10,22 +12,12 @@ interface ProjectCardProps {
 }
 
 const SOURCE_COLORS: Record<string, string> = {
-  manual: 'bg-emerald-100 text-emerald-700',
-  auto_detected: 'bg-amber-100 text-amber-700',
-}
-
-function formatRelativeTime(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime()
-  const mins = Math.floor(diff / 60000)
-  const hours = Math.floor(diff / 3600000)
-  const days = Math.floor(diff / 86400000)
-  if (mins < 1) return 'just now'
-  if (mins < 60) return `${mins}m ago`
-  if (hours < 24) return `${hours}h ago`
-  return `${days}d ago`
+  manual: 'bg-success-subtle text-success',
+  auto_detected: 'bg-warning-subtle text-warning',
 }
 
 export function ProjectCard({ project, onEdit, onDelete }: ProjectCardProps) {
+  const { t } = useTranslation()
   const sourceColor = SOURCE_COLORS[project.source ?? 'manual'] ?? SOURCE_COLORS.manual
 
   return (
@@ -97,7 +89,10 @@ export function ProjectCard({ project, onEdit, onDelete }: ProjectCardProps) {
       {/* Footer */}
       <div className="flex items-center justify-between text-2xs text-muted-foreground">
         <span>
-          {formatRelativeTime(project.last_active_at ?? project.updated_at ?? project.created_at)}
+          {formatRelativeTime(
+            project.last_active_at ?? project.updated_at ?? project.created_at,
+            t,
+          )}
         </span>
         <Link
           to="/projects/$projectId"

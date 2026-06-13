@@ -5,6 +5,28 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+/**
+ * Resolve a CSS custom property (e.g. '--color-info') to an RGB string
+ * suitable for SVG attributes in Recharts. CSS variables are NOT
+ * natively supported as SVG presentation attributes.
+ *
+ * Returns 'rgb(0 0 0)' as fallback when the variable cannot be resolved.
+ */
+export function cssVarToRgb(varName: string): string {
+  if (typeof document === 'undefined') return 'rgb(0 0 0)'
+  const value = getComputedStyle(document.documentElement).getPropertyValue(varName).trim()
+  if (!value) return 'rgb(0 0 0)'
+  // Already an rgb() value
+  if (value.startsWith('rgb')) return value
+  // OKLCH or other — create a temporary element to resolve
+  const el = document.createElement('div')
+  el.style.color = value
+  document.body.appendChild(el)
+  const resolved = getComputedStyle(el).color
+  document.body.removeChild(el)
+  return resolved || 'rgb(0 0 0)'
+}
+
 export function formatBytes(bytes: number, decimals = 2): string {
   if (bytes === 0) return '0 Bytes'
   const k = 1024
@@ -20,11 +42,55 @@ export function formatDuration(ms: number): string {
   return `${Math.floor(ms / 60000)}m ${Math.floor((ms % 60000) / 1000)}s`
 }
 
-export function formatRelativeTime(date: string | Date): string {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function formatRelativeTime(date: string | Date, t?: (...args: any[]) => any): string {
   const d = typeof date === 'string' ? new Date(date) : date
   const diff = Date.now() - d.getTime()
-  if (diff < 60000) return 'just now'
-  if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`
-  if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`
-  return `${Math.floor(diff / 86400000)}d ago`
+  if (diff < 60000) return t ? t('common.justNow', 'just now') : 'just now'
+  if (diff < 3600000) {
+    const mins = Math.floor(diff / 60000)
+    return t ? t('common.minutesAgo', { count: mins }) : `${mins}m ago`
+  }
+  if (diff < 86400000) {
+    const hrs = Math.floor(diff / 3600000)
+    return t ? t('common.hoursAgo', { count: hrs }) : `${hrs}h ago`
+  }
+  const days = Math.floor(diff / 86400000)
+  return t ? t('common.daysAgo', { count: days }) : `${days}d ago`
+}
+
+/**
+ * Format a date as a relative time string, supporting both past and future.
+ * Uses compact notation suitable for dashboard cards.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function formatRelativeDate(date: string | Date, t?: (...args: any[]) => any): string {
+  const d = typeof date === 'string' ? new Date(date) : date
+  const diffMs = Date.now() - d.getTime()
+  const absDiff = Math.abs(diffMs)
+  const isFuture = diffMs < 0
+
+  if (absDiff < 60_000) return t ? t('common.justNow', 'just now') : '방금 전'
+
+  const mins = Math.floor(absDiff / 60_000)
+  const hours = Math.floor(mins / 60)
+  const days = Math.floor(hours / 24)
+
+  if (mins < 60) {
+    if (t)
+      return isFuture
+        ? t('common.minutesLater', { count: mins })
+        : t('common.minutesAgo', { count: mins })
+    return `${mins}분 ${isFuture ? '후' : '전'}`
+  }
+  if (hours < 24) {
+    if (t)
+      return isFuture
+        ? t('common.hoursLater', { count: hours })
+        : t('common.hoursAgo', { count: hours })
+    return `${hours}시간 ${isFuture ? '후' : '전'}`
+  }
+  if (t)
+    return isFuture ? t('common.daysLater', { count: days }) : t('common.daysAgo', { count: days })
+  return `${days}일 ${isFuture ? '후' : '전'}`
 }

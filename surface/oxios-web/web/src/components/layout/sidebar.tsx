@@ -3,72 +3,99 @@ import { Link, useRouterState } from '@tanstack/react-router'
 import {
   Activity,
   Bell,
+  BookOpen,
   Bot,
   Brain,
   Calendar,
   CalendarDays,
   CheckSquare,
   Dna,
+  FilePlus,
   FolderKanban,
   FolderOpen,
+  FolderPlus,
   GitBranch,
   LayoutDashboard,
   Mail,
   MessageSquare,
-  Monitor,
-  Moon,
   Network,
-  NotebookPen,
   PanelLeft,
   PanelLeftClose,
   Settings,
-  Shield,
-  Sun,
   Theater,
   Timer,
+  Trash2,
   Users,
   Wallet,
   Zap,
 } from 'lucide-react'
+import React, { useCallback, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Badge } from '@/components/ui/badge'
+import { FileTree } from '@/components/knowledge/file-tree'
+import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
-import { Tooltip } from '@/components/ui/tooltip'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import {
+  useDeleteFile,
+  useJournalToday,
+  useKnowledgeTree,
+  useWriteFile,
+} from '@/hooks/use-knowledge'
 import { api } from '@/lib/api-client'
 import { cn } from '@/lib/utils'
-import { useSidebarStore } from '@/stores/sidebar'
-import { useThemeStore } from '@/stores/theme'
+import { useKnowledgeStore } from '@/stores/knowledge'
+import { deriveSidebarMode, useSidebarStore } from '@/stores/sidebar'
+import { ChatSessionNav } from './chat-session-nav'
+import { ModeTabs } from './mode-tabs'
+
+// ── Types ──────────────────────────────────────────────────────
 
 interface NavItem {
   labelKey: string
   href: string
   icon: React.ReactNode
-  /** Only show this item when condition is true. Always visible when omitted. */
   show?: boolean
-  /** Optional badge content (e.g. pending count). */
   badge?: number
 }
 
-/**
- * Sidebar navigation groups.
- *
- * Reorganized from the old 5-group layout where "Monitor" had 11 items
- * crammed together. Now split into 7 semantically clear groups:
- *
- *   Main        → Dashboard, Approvals (always visible), Chat
- *   Agents      → Agents, Agent Groups, Seeds, Personas, Skills
- *   Projects    → Projects
- *   Storage     → Knowledge, Memory, Workspace
- *   Operations  → Scheduler, Calendar, Cron Jobs, Budget
- *   Infra       → MCP Servers, Email, Git, A2A Monitor
- *   System      → Resources, Security, Events
- */
-const navGroups: { labelKey: string; items: NavItem[] }[] = [
+// ── Sidebar design primitives ─────────────────────────────────
+//
+// Shared tokens for all three sidebar modes (Console, Knowledge, Chat).
+// Every item, section header, and separator must use these constants
+// so the three modes feel visually identical.
+//
+
+/** Primary navigation item (icon + label). */
+export const itemBase =
+  'flex items-center gap-3 rounded-lg px-2.5 py-2 text-sm w-full text-left transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-sidebar'
+
+/** Dense list item (session rows, file rows). */
+export const itemDense =
+  'flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs w-full text-left transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring'
+
+export const itemActive = 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
+export const itemInactive =
+  'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
+export const itemCollapsedBase =
+  'flex items-center justify-center rounded-lg p-2 transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring'
+
+/** Section header label. */
+export const sectionHeader =
+  'px-2 mb-1 text-xs font-medium text-muted-foreground uppercase tracking-wider'
+
+/** Vertical spacing between sections. */
+export const sectionGap = 'mb-3'
+
+/** Horizontal separator between sections. */
+export const sectionSeparator = 'border-t border-sidebar-border my-2'
+
+// ── Console mode nav groups ────────────────────────────────────
+
+const consoleNavGroups: { labelKey: string; items: NavItem[] }[] = [
   {
     labelKey: 'common.main',
     items: [
       { labelKey: 'common.dashboard', href: '/', icon: <LayoutDashboard className="h-4 w-4" /> },
-      { labelKey: 'common.chat', href: '/chat', icon: <MessageSquare className="h-4 w-4" /> },
     ],
   },
   {
@@ -98,11 +125,6 @@ const navGroups: { labelKey: string; items: NavItem[] }[] = [
   {
     labelKey: 'common.storage',
     items: [
-      {
-        labelKey: 'common.knowledge',
-        href: '/knowledge',
-        icon: <NotebookPen className="h-4 w-4" />,
-      },
       { labelKey: 'common.memory', href: '/memory', icon: <Brain className="h-4 w-4" /> },
       {
         labelKey: 'common.workspace',
@@ -137,14 +159,79 @@ const navGroups: { labelKey: string; items: NavItem[] }[] = [
     labelKey: 'common.system',
     items: [
       { labelKey: 'common.resources', href: '/resources', icon: <Activity className="h-4 w-4" /> },
-      { labelKey: 'common.security', href: '/security', icon: <Shield className="h-4 w-4" /> },
+      { labelKey: 'common.security', href: '/security', icon: <Bell className="h-4 w-4" /> },
       { labelKey: 'common.events', href: '/events', icon: <Bell className="h-4 w-4" /> },
     ],
   },
 ]
 
-/** Dynamic items that appear in the Main group with a badge. */
-function useApprovalsBadge(): { count: number } {
+// ── Sidebar component ──────────────────────────────────────────
+
+export function Sidebar() {
+  const { collapsed, toggle, mode, setMode, mobileOpen } = useSidebarStore()
+  const router = useRouterState()
+  const currentPath = router.location.pathname
+
+  // Sync mode from route
+  useEffect(() => {
+    const derivedMode = deriveSidebarMode(currentPath)
+    setMode(derivedMode)
+  }, [currentPath, setMode])
+
+  return (
+    <aside
+      className={cn(
+        'flex flex-col border-r bg-sidebar text-sidebar-foreground transition-all duration-300',
+        // Desktop: always visible with dynamic width
+        mobileOpen ? 'w-60' : collapsed ? 'w-16' : 'w-60',
+      )}
+    >
+      {/* Header — brand + collapse toggle */}
+      <div
+        className={cn(
+          'flex h-14 items-center px-3',
+          collapsed && !mobileOpen ? 'justify-center' : 'justify-between',
+        )}
+      >
+        {!(collapsed && !mobileOpen) && (
+          <div className="flex items-center gap-2">
+            <Zap className="h-5 w-5 text-primary" />
+            <span className="font-bold text-lg">Oxios</span>
+          </div>
+        )}
+        {/* Desktop collapse toggle */}
+        <button
+          type="button"
+          onClick={toggle}
+          className="hidden lg:block rounded-md p-1.5 hover:bg-sidebar-accent"
+          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        >
+          {collapsed ? <PanelLeft className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
+        </button>
+      </div>
+
+      {/* Mobile only: mode tabs inside sidebar overlay */}
+      {mobileOpen && (
+        <div className="lg:hidden px-2 py-1.5">
+          <ModeTabs variant="sidebar" />
+        </div>
+      )}
+
+      <Separator />
+
+      {/* Nav content — mode-specific */}
+      <nav className="flex-1 overflow-y-auto p-2">
+        {mode === 'console' && <ConsoleNav />}
+        {mode === 'knowledge' && <KnowledgeNav />}
+        {mode === 'chat' && <ChatSessionNav />}
+      </nav>
+    </aside>
+  )
+}
+
+// ── Console Nav ────────────────────────────────────────────────
+
+function useApprovalsCount() {
   const { data } = useQuery({
     queryKey: ['approvals-pending-count'],
     queryFn: async () => {
@@ -154,177 +241,293 @@ function useApprovalsBadge(): { count: number } {
     },
     refetchInterval: 10_000,
   })
-
-  return { count: data ?? 0 }
+  return data ?? 0
 }
 
-export function Sidebar() {
+function ConsoleNav() {
   const { t } = useTranslation()
-  const { collapsed, toggle } = useSidebarStore()
-  const { theme, resolved, setTheme } = useThemeStore()
   const router = useRouterState()
   const currentPath = router.location.pathname
-  const { count: pendingCount } = useApprovalsBadge()
+  const { collapsed } = useSidebarStore()
+  const pendingCount = useApprovalsCount()
 
-  // Build Main group items: Dashboard → Approvals (always visible, badge when pending) → Chat
   const mainItems: NavItem[] = [
-    navGroups[0]!.items[0]!, // Dashboard
+    consoleNavGroups[0]!.items[0]!, // Dashboard
     {
       labelKey: 'common.approvals',
       href: '/approvals',
       icon: <CheckSquare className="h-4 w-4" />,
       badge: pendingCount,
     },
-    navGroups[0]!.items[1]!, // Chat
   ]
 
-  const themeLabel =
-    theme === 'system'
-      ? t('common.system')
-      : resolved === 'dark'
-        ? t('common.light')
-        : t('common.dark')
-
   return (
-    <aside
-      className={cn(
-        'flex flex-col border-r bg-sidebar text-sidebar-foreground transition-all duration-300',
-        collapsed ? 'w-16' : 'w-60',
-      )}
-    >
-      {/* Header */}
-      <div
-        className={cn(
-          'flex h-14 items-center px-3',
-          collapsed ? 'justify-center' : 'justify-between',
-        )}
-      >
-        {!collapsed && (
-          <div className="flex items-center gap-2">
-            <Zap className="h-5 w-5 text-primary" />
-            <span className="font-bold text-lg">Oxios</span>
-          </div>
-        )}
-        <button
-          type="button"
-          onClick={toggle}
-          className="rounded-md p-1.5 hover:bg-sidebar-accent"
-          aria-label={collapsed ? t('common.expandSidebar') : t('common.collapseSidebar')}
-        >
-          {collapsed ? <PanelLeft className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
-        </button>
-      </div>
-      <Separator />
-
-      {/* Nav */}
-      <nav className="flex-1 overflow-y-auto p-2">
-        {/* Main group (with dynamic Approvals badge) */}
-        <div className="mb-3">
-          {!collapsed && (
-            <p className="mb-1 px-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-              {t('common.main')}
-            </p>
-          )}
-          {mainItems.map((item) => renderNavItem(item, currentPath, collapsed, t))}
-        </div>
-
-        {/* Remaining groups */}
-        {navGroups.slice(1).map((group) => (
-          <div key={group.labelKey} className="mb-3">
-            {!collapsed && (
-              <p className="mb-1 px-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                {t(group.labelKey)}
-              </p>
-            )}
-            {group.items.map((item) => renderNavItem(item, currentPath, collapsed, t))}
-          </div>
+    <>
+      <div className={sectionGap}>
+        {!collapsed && <p className={sectionHeader}>{t('common.main')}</p>}
+        {mainItems.map((item) => (
+          <NavItemLink
+            key={item.href}
+            item={item}
+            currentPath={currentPath}
+            collapsed={collapsed}
+          />
         ))}
-      </nav>
-
-      <Separator />
-      {/* Footer */}
-      <div className="p-2 flex flex-col gap-1">
-        <button
-          type="button"
-          onClick={() => {
-            const next = theme === 'dark' ? 'light' : theme === 'light' ? 'system' : 'dark'
-            setTheme(next)
-          }}
-          className="flex items-center gap-3 rounded-lg px-2.5 py-2 text-sm w-full hover:bg-sidebar-accent/50"
-          aria-label={t('common.toggleTheme')}
-        >
-          {theme === 'system' ? (
-            <Monitor className="h-4 w-4" />
-          ) : resolved === 'dark' ? (
-            <Sun className="h-4 w-4" />
-          ) : (
-            <Moon className="h-4 w-4" />
-          )}
-          {!collapsed && <span>{themeLabel}</span>}
-        </button>
-        <Link
-          to="/settings"
-          search={{ section: undefined }}
-          className="flex items-center gap-3 rounded-lg px-2.5 py-2 text-sm hover:bg-sidebar-accent/50"
-        >
-          <Settings className="h-4 w-4" />
-          {!collapsed && <span>{t('common.settings')}</span>}
-        </Link>
       </div>
-    </aside>
+      {consoleNavGroups.slice(1).map((group) => (
+        <div key={group.labelKey} className={sectionGap}>
+          {!collapsed && <p className={sectionHeader}>{t(group.labelKey)}</p>}
+          {group.items.map((item) => (
+            <NavItemLink
+              key={item.href}
+              item={item}
+              currentPath={currentPath}
+              collapsed={collapsed}
+            />
+          ))}
+        </div>
+      ))}
+    </>
   )
 }
 
-/** Render a single nav item (link + optional badge + tooltip when collapsed). */
-function renderNavItem(
-  item: NavItem,
-  currentPath: string,
-  collapsed: boolean,
-  t: (key: string) => string,
-) {
+// ── Knowledge Nav ──────────────────────────────────────────────
+
+function KnowledgeNav() {
+  const { t } = useTranslation()
+  const { collapsed } = useSidebarStore()
+  const router = useRouterState()
+  const currentPath = router.location.pathname
+  const { mode, currentFilePath, openFile, openChat } = useKnowledgeStore()
+  const { data: entries, isLoading, refetch } = useKnowledgeTree()
+  const writeFile = useWriteFile()
+  const deleteFile = useDeleteFile()
+  const journalToday = useJournalToday()
+
+  const handleNewFile = useCallback(async () => {
+    const name = 'New file.md'
+    await writeFile.mutateAsync({ path: name, content: `# New file\n\n` })
+    openFile(name)
+    refetch()
+  }, [writeFile, openFile, refetch])
+
+  const handleNewFolder = useCallback(async () => {
+    const name = prompt('Enter folder name:', 'New Folder')
+    if (!name?.trim()) return
+    await writeFile.mutateAsync({ path: `${name.trim()}/.keep`, content: '' })
+    refetch()
+  }, [writeFile, refetch])
+
+  const handleDelete = useCallback(async () => {
+    if (!currentFilePath) return
+    if (confirm(`Delete ${currentFilePath}?`)) {
+      await deleteFile.mutateAsync(currentFilePath)
+    }
+  }, [deleteFile, currentFilePath])
+
+  const handleOpenJournal = useCallback(() => {
+    if (journalToday.data?.path) {
+      openFile(journalToday.data.path)
+    }
+  }, [journalToday.data, openFile])
+
+  // Collapsed: show minimal icons
+  if (collapsed) {
+    return (
+      <div className="flex flex-col items-center gap-1 py-1">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              type="button"
+              onClick={() => openChat()}
+              className={cn(itemCollapsedBase, mode === 'chat' && itemActive)}
+            >
+              <MessageSquare className="h-4 w-4" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="right">{t('knowledge.chatTitle', 'Quick Notes')}</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              type="button"
+              onClick={handleOpenJournal}
+              className={cn(itemCollapsedBase, itemInactive)}
+            >
+              <BookOpen className="h-4 w-4" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="right">{t('knowledge.toJournal')}</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              type="button"
+              onClick={handleNewFile}
+              className={cn(itemCollapsedBase, itemInactive)}
+            >
+              <FilePlus className="h-4 w-4" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="right">{t('knowledge.newFile')}</TooltipContent>
+        </Tooltip>
+      </div>
+    )
+  }
+
+  return (
+    <>
+      {/* Quick Notes */}
+      <div className={sectionGap}>
+        <button
+          type="button"
+          onClick={() => openChat()}
+          className={cn(itemBase, mode === 'chat' ? itemActive : itemInactive)}
+        >
+          <MessageSquare className="h-4 w-4" />
+          <span>{t('knowledge.chatTitle', 'Quick Notes')}</span>
+        </button>
+      </div>
+
+      {/* Journal */}
+      <div className={sectionGap}>
+        <button
+          type="button"
+          onClick={handleOpenJournal}
+          disabled={journalToday.isLoading}
+          className={cn(itemBase, itemInactive, 'disabled:opacity-50')}
+        >
+          <BookOpen className="h-4 w-4" />
+          <span>{t('knowledge.toJournal')}</span>
+        </button>
+      </div>
+
+      {/* Sub-routes */}
+      <div className={sectionGap}>
+        <NavItemLink
+          item={{
+            href: '/knowledge/graph',
+            icon: <Network className="h-4 w-4" />,
+            labelKey: 'knowledge.linkGraphTitle',
+          }}
+          currentPath={currentPath}
+          collapsed={collapsed}
+        />
+        <NavItemLink
+          item={{
+            href: '/knowledge/habits',
+            icon: <Activity className="h-4 w-4" />,
+            labelKey: 'knowledge.habitsTitle',
+          }}
+          currentPath={currentPath}
+          collapsed={collapsed}
+        />
+        <NavItemLink
+          item={{
+            href: '/knowledge/settings',
+            icon: <Settings className="h-4 w-4" />,
+            labelKey: 'knowledge.knowledgeSettings',
+          }}
+          currentPath={currentPath}
+          collapsed={collapsed}
+        />
+      </div>
+
+      <div className={sectionSeparator} />
+
+      {/* File tree */}
+      <div className={sectionGap}>
+        <p className={sectionHeader}>{t('knowledge.files', 'Files')}</p>
+      </div>
+      <div className="flex-1 overflow-y-auto">
+        {isLoading ? (
+          <div className="px-4 py-2 text-xs text-sidebar-foreground/50">
+            {t('knowledge.loading')}
+          </div>
+        ) : entries ? (
+          <FileTree entries={entries} onFileSelect={openFile} currentPath={currentFilePath} />
+        ) : null}
+      </div>
+
+      {/* Action bar */}
+      <div className="flex items-center gap-0.5 pt-2 border-t border-sidebar-border mt-2 px-1">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7 hover:bg-sidebar-accent/50"
+          onClick={handleNewFile}
+          title={t('knowledge.newFileShortcut')}
+        >
+          <FilePlus className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7 hover:bg-sidebar-accent/50"
+          onClick={handleNewFolder}
+          title={t('knowledge.newFolderShortcut')}
+        >
+          <FolderPlus className="h-4 w-4" />
+        </Button>
+        {currentFilePath && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 text-destructive hover:bg-sidebar-accent/50"
+            onClick={handleDelete}
+            title={t('knowledge.deleteCurrentFile')}
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        )}
+        <div className="flex-1" />
+        <span className="text-2xs text-sidebar-foreground/50 font-mono rounded border bg-sidebar/50 px-1.5 py-0.5">
+          ⌘K
+        </span>
+      </div>
+    </>
+  )
+}
+
+// ── NavItemLink (shared) ───────────────────────────────────────
+
+function NavItemLink({
+  item,
+  currentPath,
+  collapsed,
+}: {
+  item: NavItem
+  currentPath: string
+  collapsed: boolean
+}) {
+  const { t } = useTranslation()
   const isActive =
     currentPath === item.href || (item.href !== '/' && currentPath.startsWith(item.href))
   const showBadge = item.badge != null && item.badge > 0
 
   const link = (
     <Link
-      key={item.href}
       to={item.href}
-      className={cn(
-        'flex items-center gap-3 rounded-lg px-2.5 py-2 text-sm transition-colors',
-        isActive
-          ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
-          : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground',
-        collapsed && 'justify-center',
-      )}
+      className={cn(itemBase, isActive ? itemActive : itemInactive, collapsed && 'justify-center')}
     >
       {item.icon}
       {!collapsed && <span>{t(item.labelKey)}</span>}
       {!collapsed && showBadge && (
-        <span className="ml-auto flex h-4 min-w-4 items-center justify-center rounded-full bg-warning px-1 text-2xs font-bold text-white">
+        <span className="ml-auto flex h-4 min-w-4 items-center justify-center rounded-full bg-warning px-1 text-2xs font-bold text-white animate-scale-in">
           {item.badge}
         </span>
-      )}
-      {!collapsed && item.badge != null && !showBadge && (
-        <Badge
-          variant="secondary"
-          className="ml-auto h-4 min-w-4 px-1 text-2xs font-normal text-muted-foreground"
-        >
-          0
-        </Badge>
       )}
     </Link>
   )
 
   return collapsed ? (
-    <Tooltip
-      key={item.href}
-      content={`${t(item.labelKey)}${item.badge ? ` (${item.badge})` : ''}`}
-      side="right"
-    >
-      {link}
+    <Tooltip key={item.href}>
+      <TooltipTrigger asChild>{link}</TooltipTrigger>
+      <TooltipContent side="right">
+        {`${t(item.labelKey)}${item.badge ? ` (${item.badge})` : ''}`}
+      </TooltipContent>
     </Tooltip>
   ) : (
-    link
+    <React.Fragment key={item.href}>{link}</React.Fragment>
   )
 }

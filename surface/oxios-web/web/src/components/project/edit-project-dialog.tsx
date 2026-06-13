@@ -10,7 +10,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
-import { useToast } from '@/components/ui/sonner'
+import { toast } from 'sonner'
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { useUpdateProject } from '@/hooks/use-projects'
@@ -33,7 +33,6 @@ export function EditProjectDialog({
 }: EditProjectDialogProps) {
   const { t } = useTranslation()
   const update = useUpdateProject()
-  const { toast } = useToast()
 
   const [name, setName] = useState('')
   const [icon, setIcon] = useState('package')
@@ -79,7 +78,7 @@ export function EditProjectDialog({
           onSuccess?.()
         },
         onError: (err) => {
-          toast(t('projects.updateError', `Failed to update: ${err}`), 'destructive')
+          toast.error(t('projects.updateError', `Failed to update: ${err}`))
         },
       },
     )
@@ -97,7 +96,7 @@ export function EditProjectDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-3 py-2">
+        <div className="space-y-4 py-2">
           <div className="space-y-1">
             <label className="text-sm font-medium">{t('projects.name', 'Name')}</label>
             <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="oxios" />

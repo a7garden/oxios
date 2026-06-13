@@ -62,10 +62,10 @@ impl ClawHubClient {
             .append_pair("limit", &limit.unwrap_or(20).to_string());
 
         let mut req = self.client.get(url);
-        if let Ok(token) = std::env::var("CLAWHUB_TOKEN") {
-            if !token.is_empty() {
-                req = req.header("Authorization", format!("Bearer {token}"));
-            }
+        if let Ok(token) = std::env::var("CLAWHUB_TOKEN")
+            && !token.is_empty()
+        {
+            req = req.header("Authorization", format!("Bearer {token}"));
         }
 
         let resp = req.send().await?;
@@ -84,10 +84,10 @@ impl ClawHubClient {
         let url = self.base_url.join(&format!("/api/v1/skills/{slug}"))?;
 
         let mut req = self.client.get(url);
-        if let Ok(token) = std::env::var("CLAWHUB_TOKEN") {
-            if !token.is_empty() {
-                req = req.header("Authorization", format!("Bearer {token}"));
-            }
+        if let Ok(token) = std::env::var("CLAWHUB_TOKEN")
+            && !token.is_empty()
+        {
+            req = req.header("Authorization", format!("Bearer {token}"));
         }
 
         let resp = req.send().await?;
@@ -114,10 +114,10 @@ impl ClawHubClient {
         }
 
         let mut req = self.client.get(url);
-        if let Ok(token) = std::env::var("CLAWHUB_TOKEN") {
-            if !token.is_empty() {
-                req = req.header("Authorization", format!("Bearer {token}"));
-            }
+        if let Ok(token) = std::env::var("CLAWHUB_TOKEN")
+            && !token.is_empty()
+        {
+            req = req.header("Authorization", format!("Bearer {token}"));
         }
 
         let resp = req.send().await?;

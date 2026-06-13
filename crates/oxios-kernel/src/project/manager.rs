@@ -17,7 +17,7 @@ use parking_lot::RwLock;
 use oxios_memory::memory::sqlite::MemoryDatabase;
 
 use super::project_db;
-use super::{detect_project, DetectionResult, Project, ProjectId, ProjectSource};
+use super::{DetectionResult, Project, ProjectId, ProjectSource, detect_project};
 use crate::event_bus::{EventBus, KernelEvent};
 
 /// Errors from ProjectManager operations.
@@ -159,16 +159,16 @@ impl ProjectManager {
             .ok_or(ProjectManagerError::NotFound(id))?;
 
         // If renaming, check for duplicate
-        if let Some(ref new_name) = name {
-            if *new_name != project.name {
-                if name_index.contains_key(new_name) {
-                    return Err(ProjectManagerError::DuplicateName(new_name.clone()).into());
-                }
-                // Remove old name from index
-                name_index.remove(&project.name);
-                name_index.insert(new_name.clone(), id);
-                project.name = new_name.clone();
+        if let Some(ref new_name) = name
+            && *new_name != project.name
+        {
+            if name_index.contains_key(new_name) {
+                return Err(ProjectManagerError::DuplicateName(new_name.clone()).into());
             }
+            // Remove old name from index
+            name_index.remove(&project.name);
+            name_index.insert(new_name.clone(), id);
+            project.name = new_name.clone();
         }
 
         if let Some(paths) = paths {

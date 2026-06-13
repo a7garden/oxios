@@ -113,18 +113,18 @@ pub fn filter_tasks(
 
     for suite in suites {
         // Filter by suite name
-        if let Some(name) = suite_name {
-            if suite.name != name {
-                continue;
-            }
+        if let Some(name) = suite_name
+            && suite.name != name
+        {
+            continue;
         }
 
         for task in &suite.tasks {
             // Filter by tier
-            if let Some(t) = tier {
-                if task.tier != t {
-                    continue;
-                }
+            if let Some(t) = tier
+                && task.tier != t
+            {
+                continue;
             }
 
             // Filter by tag
@@ -136,10 +136,10 @@ pub fn filter_tasks(
             }
 
             // Filter by task ID
-            if let Some(id) = task_id {
-                if task.id != id {
-                    continue;
-                }
+            if let Some(id) = task_id
+                && task.id != id
+            {
+                continue;
             }
 
             tasks.push(task.clone());

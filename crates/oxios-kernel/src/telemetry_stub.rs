@@ -26,7 +26,7 @@ impl Default for TelemetryConfig {
 }
 
 /// Initialize OTel layers — no-op when compiled without the `otel` feature.
-pub fn init_telemetry_layers(
-) -> Result<Vec<Box<dyn tracing_subscriber::Layer<tracing_subscriber::Registry> + Send + Sync>>> {
+pub fn init_telemetry_layers()
+-> Result<Vec<Box<dyn tracing_subscriber::Layer<tracing_subscriber::Registry> + Send + Sync>>> {
     Ok(vec![])
 }

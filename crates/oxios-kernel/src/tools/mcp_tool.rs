@@ -118,8 +118,7 @@ impl AgentTool for McpToolWrapper {
         params: Value,
         _signal: Option<tokio::sync::oneshot::Receiver<()>>,
         _ctx: &ToolContext,
-    ) -> Result<AgentToolResult, oxi_sdk::ToolError>
-     {
+    ) -> Result<AgentToolResult, oxi_sdk::ToolError> {
         match self
             .bridge
             .call_tool(&self.server_name, &self.tool_name, params)

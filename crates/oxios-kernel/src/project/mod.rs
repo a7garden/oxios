@@ -23,7 +23,7 @@ use uuid::Uuid;
 
 // ── Re-exports ──────────────────────────────────────────────
 pub use conversation_buffer::{ConversationBuffer, ConversationTurn};
-pub use detection::{detect_project, extract_path, find_by_id, find_by_name, DetectionResult};
+pub use detection::{DetectionResult, detect_project, extract_path, find_by_id, find_by_name};
 
 pub use manager::{ProjectManager, ProjectManagerError};
 

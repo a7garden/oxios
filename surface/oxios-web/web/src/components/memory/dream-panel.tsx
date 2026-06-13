@@ -16,7 +16,7 @@ export function DreamPanel() {
   if (isError) return <ErrorState onRetry={() => refetch()} />
   if (sLoad || rLoad) return <LoadingCards count={3} />
 
-  const items = reports ?? []
+  const items = Array.isArray(reports) ? reports : []
 
   return (
     <div className="space-y-6">

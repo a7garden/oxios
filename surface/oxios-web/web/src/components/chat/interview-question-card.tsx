@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/utils'
 import type { InterviewQuestion } from '@/types'
 
@@ -20,6 +21,7 @@ export function InterviewQuestionCard({
   disabled,
 }: InterviewQuestionCardProps) {
   const { kind, text, options } = question
+  const { t } = useTranslation()
 
   if (kind === 'single_choice') {
     return (
@@ -61,9 +63,7 @@ export function InterviewQuestionCard({
                 type="button"
                 onClick={() => {
                   onChange(
-                    isActive
-                      ? selected.filter((v) => v !== opt.value)
-                      : [...selected, opt.value],
+                    isActive ? selected.filter((v) => v !== opt.value) : [...selected, opt.value],
                   )
                 }}
                 disabled={disabled}
@@ -99,7 +99,7 @@ export function InterviewQuestionCard({
                 : 'bg-card hover:bg-accent/50 border-border',
             )}
           >
-            ✅ 예
+            ✅ {t('chat.interview.yes')}
           </button>
           <button
             type="button"
@@ -112,7 +112,7 @@ export function InterviewQuestionCard({
                 : 'bg-card hover:bg-accent/50 border-border',
             )}
           >
-            ❌ 아니오
+            ❌ {t('chat.interview.no')}
           </button>
         </div>
       </div>
@@ -128,7 +128,7 @@ export function InterviewQuestionCard({
         onChange={(e) => onChange(e.target.value)}
         disabled={disabled}
         className="flex min-h-[44px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none"
-        placeholder="답변을 입력하세요..."
+        placeholder={t('chat.interview.freeTextPlaceholder')}
       />
     </div>
   )

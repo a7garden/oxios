@@ -1,8 +1,10 @@
 import { Link } from '@tanstack/react-router'
 import { Activity, Bot } from 'lucide-react'
+import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Area, AreaChart, ResponsiveContainer } from 'recharts'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { cssVarToRgb } from '@/lib/utils'
 
 export interface AgentStatusCardProps {
   /** Cumulative forked count from /api/status. `null` = unknown. */
@@ -37,10 +39,13 @@ export function AgentStatusCard({ total, running, failed, runningSeries }: Agent
   const totalUnknown = total === null
   const totalLabel = totalUnknown ? '?' : String(total)
 
+  // Resolve success color at runtime for SVG (Recharts)
+  const successColor = useMemo(() => cssVarToRgb('--color-success'), [])
+
   return (
     <Link to="/agents" className="block h-full focus:outline-none">
       <Card
-        className="relative h-full overflow-hidden cursor-pointer transition-colors hover:bg-accent/40 focus-visible:ring-2 focus-visible:ring-ring"
+        className="relative h-full overflow-hidden cursor-pointer transition-all hover:bg-accent/60 hover:shadow-sm hover:-translate-y-px focus-visible:ring-2 focus-visible:ring-ring"
         title={totalUnknown ? t('dashboard.totalForkedUnavailable') : undefined}
       >
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -78,14 +83,14 @@ export function AgentStatusCard({ total, running, failed, runningSeries }: Agent
                   <AreaChart data={series} margin={{ top: 2, right: 0, bottom: 2, left: 0 }}>
                     <defs>
                       <linearGradient id="spark-agent-status" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="rgb(16 185 129)" stopOpacity={0.4} />
-                        <stop offset="100%" stopColor="rgb(16 185 129)" stopOpacity={0} />
+                        <stop offset="0%" stopColor={successColor} stopOpacity={0.5} />
+                        <stop offset="100%" stopColor={successColor} stopOpacity={0} />
                       </linearGradient>
                     </defs>
                     <Area
                       type="monotone"
                       dataKey="v"
-                      stroke="rgb(16 185 129)"
+                      stroke={successColor}
                       strokeWidth={1.5}
                       fill="url(#spark-agent-status)"
                       isAnimationActive={false}

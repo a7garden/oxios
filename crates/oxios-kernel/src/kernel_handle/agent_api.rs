@@ -1,11 +1,13 @@
-//! Agent API — agent lifecycle, budget, memory.
+//! Agent API — agent lifecycle, budget, memory, history log.
 
+use crate::agent_log_db::{AgentListFilter, AgentStats, QueryResult};
 use crate::budget::{BudgetExceeded, BudgetInfo, BudgetLimit, BudgetManager};
 use crate::event_bus::{EventBus, KernelEvent};
 use crate::memory::{HnswMemoryIndex, SemanticHit};
 use crate::memory::{MemoryEntry, MemoryManager, MemoryType};
+use crate::state_store::StateStore;
 use crate::supervisor::Supervisor;
-use crate::types::AgentId;
+use crate::types::{AgentId, AgentInfo};
 use std::sync::Arc;
 
 /// Agent management system calls.
@@ -17,6 +19,11 @@ pub struct AgentApi {
     pub(crate) hnsw_index: Option<Arc<HnswMemoryIndex>>,
     /// Event bus for publishing agent-related events.
     pub(crate) event_bus: Option<EventBus>,
+    /// State store for filesystem agent persistence.
+    pub(crate) state_store: Option<Arc<StateStore>>,
+    /// SQLite-backed agent history query index.
+    #[cfg(feature = "sqlite-memory")]
+    pub(crate) agent_log_db: Option<Arc<crate::agent_log_db::AgentLogDb>>,
 }
 
 impl AgentApi {
@@ -33,7 +40,21 @@ impl AgentApi {
             memory_manager,
             hnsw_index: None,
             event_bus,
+            state_store: None,
+            #[cfg(feature = "sqlite-memory")]
+            agent_log_db: None,
         }
+    }
+
+    /// Attach a state store for agent history persistence.
+    pub fn set_state_store(&mut self, store: Arc<StateStore>) {
+        self.state_store = Some(store);
+    }
+
+    /// Attach an SQLite-backed agent log database.
+    #[cfg(feature = "sqlite-memory")]
+    pub fn set_agent_log_db(&mut self, db: Arc<crate::agent_log_db::AgentLogDb>) {
+        self.agent_log_db = Some(db);
     }
 
     /// Attach an HNSW index for semantic search.
@@ -47,8 +68,8 @@ impl AgentApi {
             let _ = eb.publish(event);
         }
     }
-    /// List running agents.
-    pub async fn list(&self) -> anyhow::Result<Vec<crate::types::AgentInfo>> {
+    /// List running agents (in-memory only).
+    pub async fn list(&self) -> anyhow::Result<Vec<AgentInfo>> {
         self.supervisor
             .list()
             .await
@@ -164,6 +185,140 @@ impl AgentApi {
         &self.memory_manager
     }
 
+    // ── Agent History Log ─────────────────────────────────────────
+
+    /// Query agent history (in-memory + SQLite) with filters.
+    ///
+    /// Merges running agents from supervisor with persisted agents
+    /// from the SQLite query index. Running agents are prepended.
+    pub async fn query(&self, filter: &AgentListFilter) -> anyhow::Result<QueryResult> {
+        // Get running agents from supervisor
+        let running = self.supervisor.list().await.unwrap_or_default();
+
+        // Query SQLite for historical agents
+        #[cfg(feature = "sqlite-memory")]
+        if let Some(ref db) = self.agent_log_db {
+            let mut result = db.query(filter).map_err(|e| anyhow::anyhow!("{e}"))?;
+
+            // Prepend running agents that match the filter
+            for agent in &running {
+                if filter_matches(agent, filter) {
+                    result.items.insert(0, agent.clone());
+                    result.total += 1;
+                }
+            }
+
+            return Ok(result);
+        }
+
+        // Fallback: filesystem-only scan
+        #[allow(unused_mut)]
+        let mut persisted: Vec<AgentInfo> = Vec::new();
+        if let Some(ref store) = self.state_store {
+            let names = store.list_category("agents").await.unwrap_or_default();
+            for name in &names {
+                if let Ok(Some(agent)) = store.load_json::<AgentInfo>("agents", name).await {
+                    persisted.push(agent);
+                }
+            }
+        }
+
+        // Merge running + persisted, dedup by id (running wins)
+        let running_ids: std::collections::HashSet<_> = running.iter().map(|a| a.id).collect();
+        persisted.retain(|a| !running_ids.contains(&a.id));
+
+        let mut all = running;
+        all.extend(persisted);
+
+        // In-memory filter/sort/paginate (basic fallback)
+        let filtered = fallback_filter(all, filter);
+        let total = filtered.len() as u64;
+        let offset = ((filter.page.max(1) - 1) * filter.per_page) as usize;
+        let limit = filter.per_page.min(200) as usize;
+        let items: Vec<AgentInfo> = filtered.into_iter().skip(offset).take(limit).collect();
+        let total_pages = if total == 0 {
+            1
+        } else {
+            ((total as f64) / filter.per_page as f64).ceil() as u32
+        };
+
+        Ok(QueryResult {
+            items,
+            total,
+            page: filter.page,
+            per_page: filter.per_page,
+            total_pages,
+            stats: crate::agent_log_db::FilteredStats::default(),
+        })
+    }
+
+    /// Get an agent by ID (from SQLite or filesystem fallback).
+    pub async fn get(&self, id: &str) -> anyhow::Result<Option<AgentInfo>> {
+        // Try SQLite first
+        #[cfg(feature = "sqlite-memory")]
+        if let Some(ref db) = self.agent_log_db
+            && let Ok(Some(agent)) = db.get(id)
+        {
+            return Ok(Some(agent));
+        }
+
+        // Fallback: filesystem JSON
+        if let Some(ref store) = self.state_store
+            && let Ok(Some(agent)) = store.load_json::<AgentInfo>("agents", id).await
+        {
+            return Ok(Some(agent));
+        }
+
+        // Fallback: in-memory
+        if let Ok(agents) = self.supervisor.list().await
+            && let Some(agent) = agents.into_iter().find(|a| a.id.to_string() == id)
+        {
+            return Ok(Some(agent));
+        }
+
+        Ok(None)
+    }
+
+    /// Global agent stats (unfiltered).
+    pub async fn stats(&self) -> anyhow::Result<AgentStats> {
+        // Try SQLite first
+        #[cfg(feature = "sqlite-memory")]
+        if let Some(ref db) = self.agent_log_db {
+            return db.stats().map_err(|e| anyhow::anyhow!("{e}"));
+        }
+
+        // Fallback: compute from in-memory + filesystem
+        let mut s = AgentStats::default();
+        let running = self.supervisor.list().await.unwrap_or_default();
+        for a in &running {
+            s.total_agents += 1;
+            match a.status {
+                crate::types::AgentStatus::Running | crate::types::AgentStatus::Starting => {
+                    s.running += 1
+                }
+                crate::types::AgentStatus::Idle
+                | crate::types::AgentStatus::Stopped
+                | crate::types::AgentStatus::Completed => s.completed += 1,
+                crate::types::AgentStatus::Failed => s.failed += 1,
+            }
+            s.total_tokens += a.tokens_input + a.tokens_output;
+            s.total_cost_usd += a.cost_usd;
+        }
+        Ok(s)
+    }
+
+    /// Rebuild SQLite agent log index from filesystem JSON.
+    #[cfg(feature = "sqlite-memory")]
+    pub async fn reindex(&self) -> anyhow::Result<crate::agent_log_db::RebuildReport> {
+        match (self.agent_log_db.as_ref(), self.state_store.as_ref()) {
+            (Some(db), Some(store)) => db
+                .reindex_all(store)
+                .await
+                .map_err(|e| anyhow::anyhow!("{e}")),
+            _ => anyhow::bail!("Agent log DB not initialized"),
+        }
+    }
+
     /// Rebuild the HNSW index from all stored memories.
     pub async fn rebuild_hnsw_index(&self) -> anyhow::Result<usize> {
         if let Some(ref hnsw) = self.hnsw_index {
@@ -172,4 +327,123 @@ impl AgentApi {
             Err(anyhow::anyhow!("HNSW index not initialized"))
         }
     }
+}
+
+/// Check if an agent matches the filter (used for prepending running agents).
+fn filter_matches(agent: &AgentInfo, filter: &AgentListFilter) -> bool {
+    // Status filter
+    if let Some(status) = filter.status {
+        let status_str = agent.status.to_string();
+        if status_str != status.as_sql()
+            && !(status_str == "idle" && status.as_sql() == "completed")
+            && !(status_str == "idle" && status.as_sql() == "running")
+        {
+            return false;
+        }
+    }
+
+    // Date range
+    if let Some(from) = filter.date_from
+        && agent.created_at < from
+    {
+        return false;
+    }
+    if let Some(to) = filter.date_to
+        && agent.created_at > to
+    {
+        return false;
+    }
+
+    // Session / project / seed
+    if let Some(ref sid) = filter.session_id
+        && agent.session_id.as_deref() != Some(sid.as_str())
+    {
+        return false;
+    }
+    if let Some(ref pid) = filter.project_id
+        && agent.project_id.map(|p| p.to_string()).as_deref() != Some(pid.as_str())
+    {
+        return false;
+    }
+    if let Some(ref sid) = filter.seed_id
+        && agent.seed_id.map(|s| s.to_string()).as_deref() != Some(sid.as_str())
+    {
+        return false;
+    }
+
+    // Model filter (substring)
+    if let Some(ref model) = filter.model_id
+        && !agent.model_id.contains(model)
+    {
+        return false;
+    }
+
+    // Text search (name + error only for in-memory agents — no tool_calls scan)
+    if let Some(ref q) = filter.q {
+        let q_lower = q.to_lowercase();
+        let name_match = agent.name.to_lowercase().contains(&q_lower);
+        let error_match = agent
+            .error
+            .as_deref()
+            .is_some_and(|e| e.to_lowercase().contains(&q_lower));
+        if !name_match && !error_match {
+            return false;
+        }
+    }
+
+    // Error filter
+    if let Some(has_err) = filter.has_error {
+        let agent_has_err = agent.error.as_deref().is_some_and(|e| !e.is_empty());
+        if has_err != agent_has_err {
+            return false;
+        }
+    }
+
+    // Budget ranges
+    if let Some(min) = filter.cost_min
+        && agent.cost_usd < min
+    {
+        return false;
+    }
+    if let Some(max) = filter.cost_max
+        && agent.cost_usd > max
+    {
+        return false;
+    }
+
+    true
+}
+
+/// Fallback in-memory filtering (used when SQLite is not available).
+fn fallback_filter(mut agents: Vec<AgentInfo>, filter: &AgentListFilter) -> Vec<AgentInfo> {
+    // Sort
+    match filter.sort_by {
+        crate::agent_log_db::SortBy::CreatedAt => {
+            agents.sort_by_key(|a| std::cmp::Reverse(a.created_at));
+        }
+        crate::agent_log_db::SortBy::Cost => {
+            agents.sort_by(|a, b| {
+                b.cost_usd
+                    .partial_cmp(&a.cost_usd)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            });
+        }
+        crate::agent_log_db::SortBy::Duration => {
+            let dur = |a: &AgentInfo| -> i64 {
+                match (a.started_at, a.completed_at) {
+                    (Some(s), Some(e)) => (e - s).num_seconds(),
+                    _ => 0,
+                }
+            };
+            agents.sort_by_key(|a| std::cmp::Reverse(dur(a)));
+        }
+        crate::agent_log_db::SortBy::Tokens => {
+            agents.sort_by_key(|a| std::cmp::Reverse(a.tokens_input + a.tokens_output));
+        }
+        crate::agent_log_db::SortBy::Name => {
+            agents.sort_by(|a, b| a.name.cmp(&b.name));
+        }
+    }
+
+    agents
 }

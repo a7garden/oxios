@@ -527,6 +527,7 @@ impl Orchestrator {
                 interview_questions: None,
                 interview_round: None,
                 interview_ambiguity: None,
+                mode: "ouroboros".to_string(),
             });
         }
 
@@ -615,7 +616,8 @@ impl Orchestrator {
                 user_message.to_string()
             };
 
-            let mut structured = match self.ouroboros.interview_structured(&structured_input).await {
+            let mut structured = match self.ouroboros.interview_structured(&structured_input).await
+            {
                 Ok(Some(s)) if !s.is_empty() => Some(s),
                 Ok(_) => None,
                 Err(e) => {
@@ -634,12 +636,14 @@ impl Orchestrator {
                     questions
                         .iter()
                         .enumerate()
-                        .map(|(i, q)| oxios_ouroboros::ouroboros_engine::InterviewQuestionOutput {
-                            id: format!("q{}", i + 1),
-                            text: q.clone(),
-                            kind: "free_text".to_string(),
-                            options: vec![],
-                        })
+                        .map(
+                            |(i, q)| oxios_ouroboros::ouroboros_engine::InterviewQuestionOutput {
+                                id: format!("q{}", i + 1),
+                                text: q.clone(),
+                                kind: "free_text".to_string(),
+                                options: vec![],
+                            },
+                        )
                         .collect(),
                 );
             }
@@ -668,6 +672,7 @@ impl Orchestrator {
                 interview_questions: structured,
                 interview_round: Some(interview_round),
                 interview_ambiguity: Some(interview.ambiguity.ambiguity()),
+                mode: "ouroboros".to_string(),
             });
         }
 
@@ -691,7 +696,7 @@ impl Orchestrator {
         // "complex" (or ambiguous simple) → generate a full Seed via LLM.
         let is_simple = interview.complexity == "simple" && interview.ambiguity.ambiguity() <= 0.3;
 
-        let seed = if is_simple {
+        let mut seed = if is_simple {
             tracing::info!(
                 phase = "seed",
                 method = "from_message",
@@ -706,6 +711,7 @@ impl Orchestrator {
             );
             self.ouroboros.generate_seed(&interview).await?
         };
+        seed.project_id = primary_project_id;
 
         // Save seed to state store.
         self.save_seed(&seed).await?;
@@ -769,6 +775,7 @@ impl Orchestrator {
                     interview_questions: None,
                     interview_round: None,
                     interview_ambiguity: None,
+                    mode: "ouroboros".to_string(),
                 });
             }
         }
@@ -894,6 +901,7 @@ impl Orchestrator {
             interview_questions: None,
             interview_round: None,
             interview_ambiguity: None,
+            mode: "ouroboros".to_string(),
         })
     }
 
@@ -903,6 +911,96 @@ impl Orchestrator {
     /// Simple tasks (from_message, no criteria) get boolean pass/fail.
     fn should_evaluate(&self, seed: &Seed) -> bool {
         !seed.acceptance_criteria.is_empty() && seed.output_schema.is_none()
+    }
+
+    /// Default chat mode: execute via AgentRuntime directly.
+    ///
+    /// Skips interview/seed/evaluate/evolve. Returns fast responses.
+    pub async fn chat(
+        &self,
+        _user_id: &str,
+        user_message: &str,
+        session_id: Option<&str>,
+        project_ids: Option<&str>,
+        request_id: &str,
+    ) -> Result<OrchestrationResult> {
+        tracing::info!(name = "orchestrator.chat", session_id = %session_id.unwrap_or("new"), request_id = %request_id, "starting");
+        let metrics = get_metrics();
+        metrics.messages.inc();
+        let orch_start = std::time::Instant::now();
+
+        let session_id = session_id
+            .map(String::from)
+            .unwrap_or_else(|| Uuid::new_v4().to_string());
+
+        // Project detection (same as handle_message)
+        let primary_project_id: Option<Uuid> = if let Some(ids_str) = project_ids {
+            ids_str
+                .split(',')
+                .next()
+                .and_then(|s| Uuid::parse_str(s.trim()).ok())
+        } else {
+            self.detect_project_tag(user_message).and_then(|_tag| {
+                self.project_manager().and_then(|pm| {
+                    let projects = pm.list_projects();
+                    let result = crate::project::detect_project(user_message, &projects);
+                    match result {
+                        crate::project::DetectionResult::Found(id) => Some(id),
+                        crate::project::DetectionResult::NoMatch { .. } => None,
+                    }
+                })
+            })
+        };
+
+        let project_tag = primary_project_id
+            .and_then(|id| {
+                self.project_manager()
+                    .and_then(|pm| pm.get_project(id).map(|p| p.tag()))
+            })
+            .unwrap_or_default();
+
+        // Lightweight seed — goal only, no constraints/criteria
+        let mut seed = Seed::from_message(user_message);
+        seed.project_id = primary_project_id;
+
+        // Execute via lifecycle manager (fork → run → cleanup)
+        tracing::info!(
+            phase = "execute",
+            mode = "chat",
+            "Starting direct execution"
+        );
+        let exec_result = self
+            .lifecycle
+            .spawn_and_run(&seed, Priority::Normal)
+            .await?;
+        self.lifecycle.reap_zombies();
+
+        let metrics = get_metrics();
+        metrics
+            .orch_duration
+            .observe(orch_start.elapsed().as_secs_f64());
+        if exec_result.success {
+            metrics.agents_completed.inc();
+        } else {
+            metrics.agents_failed.inc();
+        }
+
+        Ok(OrchestrationResult {
+            session_id: Some(session_id),
+            primary_project_id,
+            project_tag: Some(project_tag),
+            response: exec_result.output.clone(),
+            seed_id: Some(seed.id),
+            agent_id: None,
+            phase_reached: Phase::Execute,
+            evaluation_passed: None,
+            output: Some(exec_result.output),
+            tool_calls: exec_result.tool_calls,
+            interview_questions: None,
+            interview_round: None,
+            interview_ambiguity: None,
+            mode: "chat".to_string(),
+        })
     }
 
     /// Execute a seed via the lifecycle manager.
@@ -1174,6 +1272,7 @@ impl Orchestrator {
             cspace_hint: None,
             original_request: parent_seed.original_request.clone(),
             output_schema: None,
+            project_id: None,
         };
         match self
             .lifecycle
@@ -1434,6 +1533,10 @@ struct InterviewSession {
     agent_id: Option<AgentId>,
 }
 
+fn default_chat_mode() -> String {
+    "chat".into()
+}
+
 /// Result of a full orchestration cycle.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OrchestrationResult {
@@ -1486,6 +1589,9 @@ pub struct OrchestrationResult {
     /// Populated alongside `interview_questions`. Drives the progress bar.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub interview_ambiguity: Option<f64>,
+    /// Execution mode: "chat" (default agent) | "ouroboros" (spec-first pipeline).
+    #[serde(default = "default_chat_mode")]
+    pub mode: String,
 }
 
 /// Format clarifying questions for display.
@@ -1608,6 +1714,7 @@ async fn run_via_lifecycle(
         cspace_hint: None,
         original_request: parent_seed.original_request.clone(),
         output_schema: None,
+        project_id: None,
     };
     match lifecycle.spawn_and_run(&child_seed, Priority::Normal).await {
         Ok(result) => (result.output, result.success),

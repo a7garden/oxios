@@ -102,6 +102,9 @@ impl OuroborosProtocol for MockOuroboros {
             steps_completed: 5,
             success: true,
             tool_calls: vec![],
+            tokens_input: 0,
+            tokens_output: 0,
+            model_id: String::new(),
         })
     }
 
@@ -168,6 +171,18 @@ impl Supervisor for MockSupervisor {
             status: AgentStatus::Starting,
             created_at: chrono::Utc::now(),
             seed_id: Some(spec.id),
+            project_id: None,
+            started_at: None,
+            completed_at: None,
+            error: None,
+            steps_completed: 0,
+            steps_total: None,
+            tool_calls: vec![],
+            tokens_input: 0,
+            tokens_output: 0,
+            cost_usd: 0.0,
+            model_id: String::new(),
+            session_id: None,
         };
         {
             let mut agents = self.agents.write();
@@ -204,6 +219,9 @@ impl Supervisor for MockSupervisor {
             steps_completed: 3,
             success: true,
             tool_calls: vec![],
+            tokens_input: 0,
+            tokens_output: 0,
+            model_id: String::new(),
         })
     }
 
@@ -425,6 +443,8 @@ fn make_evolution_config(max_iterations: u32) -> OrchestratorConfig {
         max_evolution_iterations: max_iterations,
         min_evaluation_score: 0.8,
         eval_cache_enabled: true,
+        spec_keywords: vec!["#spec".into(), "#plan".into()],
+        default_mode: "spec".into(),
     }
 }
 
@@ -449,6 +469,9 @@ async fn test_orchestrator_happy_path() {
         a2a.clone(),
         event_bus.clone(),
         300,
+        vec![],
+        true,
+        "/tmp/oxios-test-workspace".to_string(),
     );
     let orchestrator = Orchestrator::with_config(
         ouroboros.clone(),
@@ -501,6 +524,9 @@ async fn test_orchestrator_evolution_loop() {
         a2a.clone(),
         event_bus.clone(),
         300,
+        vec![],
+        true,
+        "/tmp/oxios-test-workspace".to_string(),
     );
     let orchestrator = Orchestrator::with_config(
         ouroboros.clone(),
@@ -546,6 +572,9 @@ async fn test_orchestrator_events_published() {
         a2a.clone(),
         event_bus.clone(),
         300,
+        vec![],
+        true,
+        "/tmp/oxios-test-workspace".to_string(),
     );
     let orchestrator = Orchestrator::with_config(
         ouroboros,
@@ -624,6 +653,9 @@ async fn test_gateway_routes_message_through_orchestrator() {
             a2a.clone(),
             event_bus.clone(),
             300,
+            vec![],
+            true,
+            "/tmp/oxios-test-workspace".to_string(),
         );
         Orchestrator::with_config(
             ouroboros,
@@ -670,6 +702,9 @@ async fn test_gateway_unknown_channel() {
             a2a.clone(),
             event_bus.clone(),
             300,
+            vec![],
+            true,
+            "/tmp/oxios-test-workspace".to_string(),
         );
         Orchestrator::with_config(
             ouroboros,
@@ -725,6 +760,18 @@ impl Supervisor for SchedulerAwareSupervisor {
             status: AgentStatus::Starting,
             created_at: chrono::Utc::now(),
             seed_id: Some(spec.id),
+            project_id: None,
+            started_at: None,
+            completed_at: None,
+            error: None,
+            steps_completed: 0,
+            steps_total: None,
+            tool_calls: vec![],
+            tokens_input: 0,
+            tokens_output: 0,
+            cost_usd: 0.0,
+            model_id: String::new(),
+            session_id: None,
         };
         {
             let mut agents = self.agents.write();
@@ -765,6 +812,9 @@ impl Supervisor for SchedulerAwareSupervisor {
             steps_completed: 1,
             success: true,
             tool_calls: vec![],
+            tokens_input: 0,
+            tokens_output: 0,
+            model_id: String::new(),
         })
     }
 
@@ -812,6 +862,9 @@ async fn test_scheduler_orchestrator_integration() {
         a2a.clone(),
         event_bus.clone(),
         300,
+        vec![],
+        true,
+        "/tmp/oxios-test-workspace".to_string(),
     );
     let orchestrator = Orchestrator::with_config(
         ouroboros,
@@ -905,6 +958,9 @@ async fn test_scheduler_priority_ordering_in_orchestration() {
         a2a.clone(),
         event_bus.clone(),
         300,
+        vec![],
+        true,
+        "/tmp/oxios-test-workspace".to_string(),
     );
     let _orchestrator = Orchestrator::with_config(
         ouroboros,

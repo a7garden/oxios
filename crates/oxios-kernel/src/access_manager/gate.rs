@@ -274,7 +274,20 @@ impl AccessGate {
         if !ctx.cspace.can(&resource, Rights::EXECUTE) {
             // CSpace check is advisory for always-on tools — if the tool
             // is in the default set (read/write/edit/grep/find/ls), skip CSpace.
-            let always_on = ["read", "write", "edit", "grep", "find", "ls"];
+            let always_on = [
+                "read",
+                "write",
+                "edit",
+                "grep",
+                "find",
+                "ls",
+                "web_search",
+                "browse",
+                "browse_extract",
+                "browse_script",
+                "knowledge_save",
+                "knowledge_search",
+            ];
             if !always_on.contains(&tool) {
                 return Err(AccessDenied {
                     agent: ctx.agent_name.clone(),
@@ -315,7 +328,17 @@ impl AccessGate {
         path: &Path,
         mode: PathMode,
     ) -> Result<(), AccessDenied> {
-        let path_str = path.to_string_lossy();
+        // Resolve relative paths to absolute using CWD.
+        // Agents run in the workspace directory, so relative paths like
+        // "." or "AGENTS.md" resolve to /path/to/workspace/. or /path/to/workspace/AGENTS.md.
+        let resolved = if path.is_relative() {
+            std::env::current_dir()
+                .unwrap_or_else(|_| std::path::PathBuf::from("."))
+                .join(path)
+        } else {
+            path.to_path_buf()
+        };
+        let path_str = resolved.to_string_lossy();
 
         // Layer 0: CSpace (file system access)
         let resource = ResourceRef::KernelDomain {
@@ -335,11 +358,10 @@ impl AccessGate {
             );
         }
 
-        // Layer 1: RBAC check — use a generic path access action,
-        // not the specific path (RBAC doesn't do glob matching).
+        // Layer 1: RBAC check — use the resolved path for matching.
         let mut access = self.access.lock();
         let rbac_subject = Subject::Agent(ctx.agent_id);
-        let rbac_action = Action::AccessPath("/workspace/**".to_string());
+        let rbac_action = Action::AccessPath(path_str.to_string());
         if !access
             .rbac_manager_mut()
             .check_permission(&rbac_subject, &rbac_action, &path_str)
@@ -365,23 +387,23 @@ impl AccessGate {
         }
 
         // Layer 2 (continued): Workspace sandbox
-        if let Some(ws) = access.get_workspace_for_agent(&ctx.agent_name) {
-            if !access.is_path_in_workspace(&ws, &path_str) {
-                // Record sandbox violation separately
-                self.audit.record(AuditEvent::SandboxViolation {
-                    timestamp: chrono::Utc::now(),
-                    agent: ctx.agent_name.clone(),
-                    path: path_str.to_string(),
-                    workspace: ws.clone(),
-                });
-                return Err(AccessDenied {
-                    agent: ctx.agent_name.clone(),
-                    resource: path_str.to_string(),
-                    layer: DenyLayer::Permission,
-                    reason: format!("경로 '{path_str}'이(가) 워크스페이스 '{ws}' 경계를 벗어남"),
-                    suggestion: None,
-                });
-            }
+        if let Some(ws) = access.get_workspace_for_agent(&ctx.agent_name)
+            && !access.is_path_in_workspace(&ws, &path_str)
+        {
+            // Record sandbox violation separately
+            self.audit.record(AuditEvent::SandboxViolation {
+                timestamp: chrono::Utc::now(),
+                agent: ctx.agent_name.clone(),
+                path: path_str.to_string(),
+                workspace: ws.clone(),
+            });
+            return Err(AccessDenied {
+                agent: ctx.agent_name.clone(),
+                resource: path_str.to_string(),
+                layer: DenyLayer::Permission,
+                reason: format!("경로 '{path_str}'이(가) 워크스페이스 '{ws}' 경계를 벗어남"),
+                suggestion: None,
+            });
         }
 
         Ok(())
@@ -621,8 +643,8 @@ impl std::fmt::Debug for AccessGate {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::access_manager::audit_sink::NoOpAuditSink;
     use crate::access_manager::AgentPermissions;
+    use crate::access_manager::audit_sink::NoOpAuditSink;
     use crate::config::AllowlistMode;
 
     /// Helper: build an AccessGate with a configured agent.
@@ -633,7 +655,9 @@ mod tests {
         let ctx = AgentContext::test_fixture("test-agent");
 
         // Set up permissions for test agent
-        let perms = AgentPermissions::for_new_agent("test-agent");
+        let mut perms = AgentPermissions::for_new_agent("test-agent");
+        perms.allow_path("/workspace/**");
+        perms.allow_path("/tmp/**");
         access.set_permissions(perms);
 
         // Assign RBAC role using the same agent_id as the context

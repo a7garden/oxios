@@ -35,7 +35,7 @@ function ResourcesPage() {
       const res = await api.get<{ snapshots: ResourceSnapshot[]; count: number }>(
         '/api/resources/history?last_n=30',
       )
-      return res.snapshots ?? []
+      return Array.isArray(res?.snapshots) ? res.snapshots : []
     },
     refetchInterval: 5000,
   })
@@ -43,7 +43,7 @@ function ResourcesPage() {
   if (isLoading) return <LoadingCards count={4} />
   if (isError) return <ErrorState onRetry={() => refetch()} />
 
-  const snapshots = data ?? []
+  const snapshots = Array.isArray(data) ? data : []
   const latest = snapshots.length > 0 ? snapshots[snapshots.length - 1] : null
 
   const chartData = snapshots.map((s) => ({

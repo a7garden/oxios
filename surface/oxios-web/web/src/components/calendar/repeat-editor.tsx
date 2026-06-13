@@ -1,5 +1,6 @@
 import { X } from 'lucide-react'
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -12,17 +13,18 @@ interface Props {
   onChange: (value: RepeatRule | undefined) => void
 }
 
-const FREQUENCY_OPTIONS = [
-  { label: '매일', value: 'daily' },
-  { label: '매주', value: 'weekly' },
-  { label: '매월', value: 'monthly' },
-  { label: '매년', value: 'yearly' },
-]
-
-const DAY_LABELS = ['일', '월', '화', '수', '목', '금', '토']
-
 export function RepeatEditor({ value, onChange }: Props) {
+  const { t } = useTranslation()
   const [expanded, setExpanded] = useState(!!value)
+
+  const FREQUENCY_OPTIONS = [
+    { label: t('calendar.freqDaily'), value: 'daily' },
+    { label: t('calendar.freqWeekly'), value: 'weekly' },
+    { label: t('calendar.freqMonthly'), value: 'monthly' },
+    { label: t('calendar.freqYearly'), value: 'yearly' },
+  ]
+
+  const DAY_LABELS = [t('calendar.daySun'), t('calendar.dayMon'), t('calendar.dayTue'), t('calendar.dayWed'), t('calendar.dayThu'), t('calendar.dayFri'), t('calendar.daySat')]
 
   const handleToggle = (checked: boolean) => {
     setExpanded(checked)
@@ -40,7 +42,7 @@ export function RepeatEditor({ value, onChange }: Props) {
 
   const toggleDay = (dayLabel: string) => {
     if (!value) return
-    const current = value.days ?? []
+    const current = Array.isArray(value?.days) ? value.days : []
     const next = current.includes(dayLabel)
       ? current.filter((d) => d !== dayLabel)
       : [...current, dayLabel]
@@ -55,7 +57,7 @@ export function RepeatEditor({ value, onChange }: Props) {
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <Label className="text-sm font-medium">반복</Label>
+        <Label className="text-sm font-medium">{t('calendar.repeat')}</Label>
         <Switch checked={expanded} onCheckedChange={handleToggle} />
       </div>
 
@@ -63,7 +65,7 @@ export function RepeatEditor({ value, onChange }: Props) {
         <div className="space-y-3 rounded-md border p-3">
           {/* Frequency */}
           <div className="flex items-center gap-3">
-            <Label className="text-sm whitespace-nowrap">빈도</Label>
+            <Label className="text-sm whitespace-nowrap">{t('calendar.frequency')}</Label>
             <Select
               value={value.frequency}
               onValueChange={(v) =>
@@ -79,7 +81,7 @@ export function RepeatEditor({ value, onChange }: Props) {
 
           {/* Interval */}
           <div className="flex items-center gap-3">
-            <Label className="text-sm whitespace-nowrap">간격</Label>
+            <Label className="text-sm whitespace-nowrap">{t('calendar.interval')}</Label>
             <Input
               type="number"
               min={1}
@@ -88,7 +90,7 @@ export function RepeatEditor({ value, onChange }: Props) {
               onChange={(e) => updateRule({ interval: Math.max(1, Number(e.target.value)) })}
               className="w-20"
             />
-            <span className="text-sm text-muted-foreground">회마다</span>
+            <span className="text-sm text-muted-foreground">{t('calendar.intervalSuffix')}</span>
           </div>
 
           {/* Weekly day selection */}
@@ -119,7 +121,7 @@ export function RepeatEditor({ value, onChange }: Props) {
 
           {/* Until / Count */}
           <div className="flex items-center gap-3">
-            <Label className="text-sm whitespace-nowrap">종료</Label>
+            <Label className="text-sm whitespace-nowrap">{t('calendar.endCondition')}</Label>
             <div className="flex flex-1 items-center gap-2">
               <Input
                 type="date"
@@ -131,9 +133,9 @@ export function RepeatEditor({ value, onChange }: Props) {
                   })
                 }
                 className="flex-1"
-                placeholder="종료일"
+                placeholder={t('calendar.endDatePlaceholder')}
               />
-              <span className="text-sm text-muted-foreground">또는</span>
+              <span className="text-sm text-muted-foreground">{t('calendar.or')}</span>
               <Input
                 type="number"
                 min={1}
@@ -146,9 +148,9 @@ export function RepeatEditor({ value, onChange }: Props) {
                   })
                 }
                 className="w-20"
-                placeholder="횟수"
+                placeholder={t('calendar.countPlaceholder')}
               />
-              <span className="text-sm text-muted-foreground">회</span>
+              <span className="text-sm text-muted-foreground">{t('calendar.countSuffix')}</span>
             </div>
           </div>
 
@@ -156,7 +158,7 @@ export function RepeatEditor({ value, onChange }: Props) {
           <div className="flex justify-end">
             <Button type="button" variant="ghost" size="sm" onClick={handleClear}>
               <X className="mr-1 h-3 w-3" />
-              반복 제거
+              {t('calendar.clearRepeat')}
             </Button>
           </div>
         </div>

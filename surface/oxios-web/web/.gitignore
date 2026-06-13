@@ -5,3 +5,7 @@ dist/
 node_modules/hypermd
 playwright-report/
 test-results/
+
+*storybook.log
+storybook-static
+.design-farmer/

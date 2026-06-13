@@ -864,13 +864,12 @@ impl EngineApi {
         let cfg = self.config.read();
         if let Some(current_provider) =
             CredentialStore::provider_from_model(&cfg.engine.default_model)
+            && current_provider == provider
         {
-            if current_provider == provider {
-                drop(cfg);
-                let mut cfg = self.config.write();
-                cfg.engine.api_key = Some(key.to_string());
-                self.persist(&cfg)?;
-            }
+            drop(cfg);
+            let mut cfg = self.config.write();
+            cfg.engine.api_key = Some(key.to_string());
+            self.persist(&cfg)?;
         }
         tracing::info!(provider = %provider, "API key stored");
         self.rebuild_and_swap();

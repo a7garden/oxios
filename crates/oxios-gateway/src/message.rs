@@ -85,7 +85,8 @@ pub struct ResponseMeta {
     /// UI can render interactive widgets. When `None`, the frontend
     /// renders the plain `content` as markdown (graceful degradation).
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub interview_questions: Option<Vec<oxios_ouroboros::ouroboros_engine::InterviewQuestionOutput>>,
+    pub interview_questions:
+        Option<Vec<oxios_ouroboros::ouroboros_engine::InterviewQuestionOutput>>,
     /// Current interview round (1-based). Populated alongside
     /// `interview_questions`.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -94,6 +95,9 @@ pub struct ResponseMeta {
     /// Populated alongside `interview_questions`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub interview_ambiguity: Option<f64>,
+    /// Execution mode: "chat" | "ouroboros".
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mode: Option<String>,
 }
 
 /// A user-facing structured error.
@@ -146,6 +150,13 @@ pub struct OutgoingMessage {
     /// RFC-014: typed orchestration metadata.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub meta: Option<ResponseMeta>,
+    /// Target connection ID for point-to-point delivery.
+    ///
+    /// When set, only the WebSocket connection with a matching `conn_id`
+    /// should process this message. `None` means broadcast to all connections.
+    /// Used to prevent cross-tab message leakage in multi-session scenarios.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub target_conn_id: Option<String>,
 }
 
 impl OutgoingMessage {
@@ -173,6 +184,7 @@ impl OutgoingMessage {
             timestamp: Utc::now(),
             metadata: HashMap::new(),
             meta: None,
+            target_conn_id: None,
         }
     }
 
@@ -202,6 +214,7 @@ impl OutgoingMessage {
             timestamp: Utc::now(),
             metadata,
             meta: None,
+            target_conn_id: None,
         }
     }
 
@@ -231,6 +244,7 @@ impl OutgoingMessage {
             timestamp: Utc::now(),
             metadata: channel_meta,
             meta: Some(response_meta),
+            target_conn_id: None,
         }
     }
 
@@ -259,7 +273,9 @@ impl OutgoingMessage {
                 interview_questions: None,
                 interview_round: None,
                 interview_ambiguity: None,
+                mode: None,
             }),
+            target_conn_id: None,
         }
     }
 }

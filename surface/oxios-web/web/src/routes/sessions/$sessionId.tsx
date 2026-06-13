@@ -23,7 +23,7 @@ function ProjectSelector({
 }) {
   const { t } = useTranslation()
   const { data: projectsData } = useProjects()
-  const projects = projectsData?.items ?? []
+  const projects = Array.isArray(projectsData?.items) ? projectsData.items : []
   const currentProject = projects.find((p) => p.id === currentProjectId)
 
   return (
@@ -63,8 +63,12 @@ function SessionDetailPage() {
 
   // Build interleaved messages from user_messages and agent_responses
   const messages: { role: 'user' | 'assistant'; content: string }[] = []
-  const userMsgs: { content: string }[] = session.user_messages ?? []
-  const agentMsgs: { content: string }[] = session.agent_responses ?? []
+  const userMsgs: { content: string }[] = Array.isArray(session.user_messages)
+    ? session.user_messages
+    : []
+  const agentMsgs: { content: string }[] = Array.isArray(session.agent_responses)
+    ? session.agent_responses
+    : []
   const maxLen = Math.max(userMsgs.length, agentMsgs.length)
   for (let i = 0; i < maxLen; i++) {
     const userMsg = userMsgs[i]

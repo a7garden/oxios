@@ -582,8 +582,7 @@ impl AgentTool for ExecTool {
         params: Value,
         shutdown: Option<tokio::sync::oneshot::Receiver<()>>,
         _ctx: &ToolContext,
-    ) -> Result<AgentToolResult, oxi_sdk::ToolError>
-     {
+    ) -> Result<AgentToolResult, oxi_sdk::ToolError> {
         let mode = params.get("mode").and_then(|v| v.as_str()).ok_or_else(|| {
             "Missing required parameter: mode (expected 'shell' or 'structured')".to_string()
         })?;

@@ -26,7 +26,7 @@ function ProjectsPage() {
 
   const { data, isLoading, isError, refetch, isFetching } = useProjects(search || undefined)
 
-  const projects = data?.items ?? []
+  const projects = Array.isArray(data?.items) ? data.items : []
 
   return (
     <div className="space-y-4">

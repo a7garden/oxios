@@ -15,7 +15,10 @@ export function ErrorState({ title, message, onRetry, className }: ErrorStatePro
   const resolvedMessage = message ?? t('common.errorSomethingWrong')
   return (
     <div
-      className={cn('flex flex-col items-center justify-center py-12 text-center', className)}
+      className={cn(
+        'flex flex-col items-center justify-center py-12 text-center animate-fade-in-up',
+        className,
+      )}
       role="alert"
     >
       <h3 className="text-lg font-semibold text-destructive">{resolvedTitle}</h3>

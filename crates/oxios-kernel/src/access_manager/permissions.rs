@@ -47,7 +47,7 @@ impl Default for AgentPermissions {
                 .iter()
                 .map(|s| s.to_string())
                 .collect(),
-            allowed_paths: vec!["/workspace/**".to_string()],
+            allowed_paths: vec![],
             denied_paths: vec![
                 "/etc/**".to_string(),
                 "/root/**".to_string(),
@@ -162,10 +162,10 @@ impl AgentPermissions {
     /// Checks if a path matches any denied pattern.
     pub(crate) fn is_path_denied(&self, path: &str) -> bool {
         for pattern in &self.denied_paths {
-            if let Ok(p) = Pattern::new(pattern) {
-                if p.matches(path) {
-                    return true;
-                }
+            if let Ok(p) = Pattern::new(pattern)
+                && p.matches(path)
+            {
+                return true;
             }
         }
         false
@@ -174,10 +174,10 @@ impl AgentPermissions {
     /// Checks if a path matches any allowed pattern.
     pub(crate) fn is_path_allowed(&self, path: &str) -> bool {
         for pattern in &self.allowed_paths {
-            if let Ok(p) = Pattern::new(pattern) {
-                if p.matches(path) {
-                    return true;
-                }
+            if let Ok(p) = Pattern::new(pattern)
+                && p.matches(path)
+            {
+                return true;
             }
         }
         false
@@ -252,9 +252,14 @@ mod tests {
     #[test]
     fn test_default_permissions_allows_workspace() {
         let perms = AgentPermissions::default();
+        // Default has empty allowed_paths — paths are granted by ensure_permissions
+        assert!(!perms.is_path_allowed("/workspace/src/main.rs"));
+        assert!(!perms.is_path_allowed("/tmp/evil"));
+        // With explicit pattern, it should match
+        let mut perms = AgentPermissions::for_new_agent("test");
+        perms.allow_path("/workspace/**");
         assert!(perms.is_path_allowed("/workspace/src/main.rs"));
         assert!(perms.is_path_allowed("/workspace/README.md"));
-        assert!(!perms.is_path_allowed("/tmp/evil"));
     }
 
     #[test]

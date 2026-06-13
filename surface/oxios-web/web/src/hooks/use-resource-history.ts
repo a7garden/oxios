@@ -16,7 +16,7 @@ export function useResourceHistory(lastN = 30, refetchInterval = 10_000) {
       const res = await api.get<{ snapshots: ResourceSnapshot[]; count: number }>(
         `/api/resources/history?last_n=${lastN}`,
       )
-      return res.snapshots ?? []
+      return Array.isArray(res?.snapshots) ? res.snapshots : []
     },
     refetchInterval,
   })

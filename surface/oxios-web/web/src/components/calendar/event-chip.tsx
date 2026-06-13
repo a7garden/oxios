@@ -1,4 +1,5 @@
 import { cn } from '@/lib/utils'
+import { useTranslation } from 'react-i18next'
 import type { CalendarEvent } from '@/types/calendar'
 
 interface Props {
@@ -8,14 +9,15 @@ interface Props {
 }
 
 const sourceColors: Record<string, string> = {
-  agent: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
-  user: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300',
-  cron: 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300',
+  agent: 'bg-info-subtle text-info',
+  user: 'bg-secondary text-secondary-foreground',
+  cron: 'bg-muted text-muted-foreground',
 }
 
 export function EventChip({ event, onClick, compact }: Props) {
+  const { i18n } = useTranslation()
   const start = new Date(event.start)
-  const time = start.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
+  const time = start.toLocaleTimeString(i18n.language, { hour: '2-digit', minute: '2-digit' })
   const color = sourceColors[event.source] || sourceColors.user
 
   return (

@@ -3,7 +3,7 @@ import { ArrowLeft, ArrowRight, Columns2, PanelRight, Save, X } from 'lucide-rea
 import { useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
-import { Tooltip } from '@/components/ui/tooltip'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useKnowledgeStore } from '@/stores/knowledge'
 
 export function EditorToolbar() {
@@ -75,62 +75,74 @@ export function EditorToolbar() {
 
       {/* Save */}
       {currentFilePath && (
-        <Tooltip content={t('knowledge.saveWithShortcut')}>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7"
-            onClick={handleSave}
-            title={t('common.save')}
-          >
-            <Save className="h-4 w-4" />
-          </Button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              onClick={handleSave}
+              title={t('common.save')}
+            >
+              <Save className="h-4 w-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>{t('knowledge.saveWithShortcut')}</TooltipContent>
         </Tooltip>
       )}
 
       {/* Split editor */}
       {!splitEditorOpen && currentFilePath && (
-        <Tooltip content={t('knowledge.splitView')}>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7"
-            onClick={() => openSplit(currentFilePath)}
-            title={t('knowledge.openSplitView')}
-          >
-            <Columns2 className="h-4 w-4" />
-          </Button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              onClick={() => openSplit(currentFilePath)}
+              title={t('knowledge.openSplitView')}
+            >
+              <Columns2 className="h-4 w-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>{t('knowledge.splitView')}</TooltipContent>
         </Tooltip>
       )}
 
       {/* Close split */}
       {splitEditorOpen && (
-        <Tooltip content={t('knowledge.closeSplitWithShortcut')}>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7"
-            onClick={closeSplit}
-            title={t('knowledge.closeSplit')}
-          >
-            <X className="h-4 w-4" />
-          </Button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              onClick={closeSplit}
+              title={t('knowledge.closeSplit')}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>{t('knowledge.closeSplitWithShortcut')}</TooltipContent>
         </Tooltip>
       )}
 
       {/* Info panel toggle */}
-      <Tooltip
-        content={infoPanelOpen ? t('knowledge.hideInfoPanel') : t('knowledge.showInfoPanel')}
-      >
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7"
-          onClick={toggleInfoPanel}
-          title={t('knowledge.toggleInfoPanel')}
-        >
-          <PanelRight className="h-4 w-4" />
-        </Button>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7"
+            onClick={toggleInfoPanel}
+            title={t('knowledge.toggleInfoPanel')}
+          >
+            <PanelRight className="h-4 w-4" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>
+          {infoPanelOpen ? t('knowledge.hideInfoPanel') : t('knowledge.showInfoPanel')}
+        </TooltipContent>
       </Tooltip>
     </div>
   )

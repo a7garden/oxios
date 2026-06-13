@@ -2,7 +2,7 @@
 //!
 //! Run with: `cargo bench --bench kernel_bench`
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, black_box, criterion_group, criterion_main};
 use tempfile::TempDir;
 
 fn bench_state_save(c: &mut Criterion) {

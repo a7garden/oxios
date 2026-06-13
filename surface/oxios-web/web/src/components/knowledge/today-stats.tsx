@@ -12,7 +12,7 @@ export function TodayStats() {
     return <div className="p-4 text-sm text-muted-foreground">{t('knowledge.loadingStats')}</div>
   }
 
-  const doneItems = doneData?.items ?? []
+  const doneItems = Array.isArray(doneData?.items) ? doneData.items : []
   const doneCount = doneData?.count ?? 0
 
   return (

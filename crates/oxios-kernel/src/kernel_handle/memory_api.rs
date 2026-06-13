@@ -87,7 +87,7 @@ impl MemoryApi {
     ) -> anyhow::Result<Vec<SemanticHit>> {
         if let Some(hnsw) = &self.hnsw_index {
             let _ = hnsw; // hnsw available, would use it here
-                          // For now, delegate to regular search and convert
+            // For now, delegate to regular search and convert
             let entries = self.memory_manager.search(query, None, limit).await?;
             Ok(entries
                 .into_iter()

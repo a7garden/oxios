@@ -129,7 +129,7 @@ function AgentsList({
             key={agent.id}
             to="/agents/$agentId"
             params={{ agentId: agent.id }}
-            className="flex items-center justify-between rounded-md border px-3 py-2 hover:bg-accent/40 transition-colors"
+            className="flex items-center justify-between rounded-md border px-3 py-2 hover:bg-accent hover:border-primary/20 hover:shadow-sm transition-all"
           >
             <div className="flex items-center gap-2 min-w-0">
               <Bot className="h-3.5 w-3.5 text-muted-foreground shrink-0" />

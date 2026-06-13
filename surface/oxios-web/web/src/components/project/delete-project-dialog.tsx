@@ -10,7 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { useToast } from '@/components/ui/sonner'
+import { toast } from 'sonner'
 import { useDeleteProject } from '@/hooks/use-projects'
 import type { Project } from '@/types'
 
@@ -23,7 +23,6 @@ interface DeleteProjectDialogProps {
 export function DeleteProjectDialog({ project, open, onOpenChange }: DeleteProjectDialogProps) {
   const { t } = useTranslation()
   const deleteProject = useDeleteProject()
-  const { toast } = useToast()
   const navigate = useNavigate()
 
   const handleDelete = () => {
@@ -36,7 +35,7 @@ export function DeleteProjectDialog({ project, open, onOpenChange }: DeleteProje
         navigate({ to: '/projects' })
       },
       onError: (err) => {
-        toast(t('projects.deleteError', `Failed to delete: ${err}`), 'destructive')
+        toast.error(t('projects.deleteError', `Failed to delete: ${err}`))
       },
     })
   }

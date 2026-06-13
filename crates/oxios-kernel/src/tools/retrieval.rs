@@ -266,7 +266,15 @@ fn escape_xml(s: &str) -> String {
 
 /// Well-known domain names that can appear in a kernel manifest.
 const KNOWN_DOMAINS: &[&str] = &[
-    "space", "agent", "a2a", "memory", "knowledge", "security", "budget", "resource", "program",
+    "space",
+    "agent",
+    "a2a",
+    "memory",
+    "knowledge",
+    "security",
+    "budget",
+    "resource",
+    "program",
 ];
 
 /// Build a markdown kernel manifest from the set of active domains.
@@ -312,8 +320,12 @@ fn domain_description(domain: &str) -> &'static str {
         "space" => "Filesystem workspace management and conversation buffers.",
         "agent" => "Agent lifecycle, runtime, and supervisor.",
         "a2a" => "Agent-to-agent communication and delegation.",
-        "memory" => "Internal agent recall — facts, preferences, behavioral patterns. Not user-visible.",
-        "knowledge" => "Personal markdown vault — documents, articles, notes, journal. File-based with backlinks and full-text search.",
+        "memory" => {
+            "Internal agent recall — facts, preferences, behavioral patterns. Not user-visible."
+        }
+        "knowledge" => {
+            "Personal markdown vault — documents, articles, notes, journal. File-based with backlinks and full-text search."
+        }
         "security" => "RBAC access control and audit trail.",
         "budget" => "Token and cost budget enforcement.",
         "resource" => "System resource monitoring and overload protection.",

@@ -28,7 +28,7 @@ function SeedsListPage() {
   if (isLoading) return <LoadingTable rows={5} />
   if (isError) return <ErrorState onRetry={() => refetch()} />
 
-  const seeds = data?.items ?? []
+  const seeds = Array.isArray(data?.items) ? data.items : []
 
   const columns = [
     {
@@ -46,7 +46,7 @@ function SeedsListPage() {
   ]
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-fade-in-up">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">{t('seeds.title')}</h1>

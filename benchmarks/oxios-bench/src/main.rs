@@ -5,9 +5,9 @@ use oxios_bench::config::BenchConfig;
 use oxios_bench::report::compare::{compare_runs, print_compare};
 use oxios_bench::report::console::print_report;
 use oxios_bench::report::json_report::{build_summary, load_report, save_report};
-use oxios_bench::runner::process_runner::ProcessRunner;
 use oxios_bench::runner::Runner;
-use oxios_bench::suite::{filter_tasks, Suite};
+use oxios_bench::runner::process_runner::ProcessRunner;
+use oxios_bench::suite::{Suite, filter_tasks};
 use oxios_bench::{BenchmarkRun, Tier};
 use std::time::Instant;
 

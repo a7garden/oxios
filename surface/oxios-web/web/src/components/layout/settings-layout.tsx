@@ -110,7 +110,7 @@ function DesktopNav({
 
   return (
     <nav className="hidden lg:block w-52 shrink-0">
-      <div className="sticky top-0 space-y-1">
+      <div className="sticky top-0 max-h-[calc(100vh-5rem)] overflow-y-auto space-y-1">
         {groups.map((group) => (
           <div key={group.id}>
             <div className="px-3 pt-4 pb-1 first:pt-0">

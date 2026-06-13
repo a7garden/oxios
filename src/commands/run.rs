@@ -23,6 +23,8 @@ pub struct RunOptions {
     pub context_file: Option<String>,
     /// Set process exit code based on evaluation result.
     pub exit_code: bool,
+    /// Chat mode: skip Ouroboros pipeline, execute directly.
+    pub chat: bool,
 }
 
 /// Execute the `oxios run` subcommand.
@@ -53,9 +55,15 @@ pub async fn run(kernel: &Kernel, prompt: &str, opts: &RunOptions) -> Result<i32
     );
 
     // ── Execute ──
-    let result = kernel
-        .execute_prompt_with_session(&effective_prompt, opts.session_id.as_deref())
-        .await?;
+    let result = if opts.chat {
+        kernel
+            .execute_prompt_chat(&effective_prompt, opts.session_id.as_deref())
+            .await?
+    } else {
+        kernel
+            .execute_prompt_with_session(&effective_prompt, opts.session_id.as_deref())
+            .await?
+    };
 
     let duration_ms = start.elapsed().as_millis() as u64;
 
@@ -108,7 +116,7 @@ pub async fn run(kernel: &Kernel, prompt: &str, opts: &RunOptions) -> Result<i32
 
 /// Build the effective prompt by optionally prepending file context.
 fn build_effective_prompt(prompt: &str, context_file: &Option<String>) -> Result<String> {
-    let Some(ref path) = context_file else {
+    let Some(path) = context_file else {
         return Ok(prompt.to_string());
     };
 

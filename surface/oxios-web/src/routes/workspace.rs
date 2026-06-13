@@ -1,18 +1,16 @@
-use std::future::Future;
-use std::pin::Pin;
 use std::sync::Arc;
 
+use axum::Json;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
-use axum::Json;
 use serde::{Deserialize, Serialize};
 
 use oxios_kernel::memory::{MemoryEntry, MemoryType};
 use oxios_kernel::{SkillEntry, SkillSource, SkillStatus};
 
 use crate::error::AppError;
-use crate::routes::{paginate, PageParams};
+use crate::routes::{PageParams, paginate};
 use crate::server::AppState;
 
 // ---------------------------------------------------------------------------
@@ -375,62 +373,60 @@ pub(crate) async fn handle_seed_evolution(
     use oxios_ouroboros::Seed;
     // Helper to build lineage by following parent IDs.
     // Build lineage iteratively using a work stack.
-    fn build_lineage_iterative(
+    async fn build_lineage_iterative(
         kernel: Arc<oxios_kernel::KernelHandle>,
         seed_id: String,
-    ) -> Pin<Box<dyn Future<Output = anyhow::Result<Vec<EvolutionEntry>>> + Send>> {
-        Box::pin(async move {
-            let mut lineage = Vec::new();
-            let mut stack = vec![seed_id];
+    ) -> anyhow::Result<Vec<EvolutionEntry>> {
+        let mut lineage = Vec::new();
+        let mut stack = vec![seed_id];
 
-            while let Some(current_id) = stack.pop() {
-                let content = match kernel.state.load_markdown("seeds", &current_id).await {
-                    Ok(Some(c)) => c,
-                    _ => continue,
-                };
-                let seed: Seed = match serde_json::from_str(&content) {
-                    Ok(s) => s,
-                    Err(e) => {
-                        tracing::warn!(error = %e, "Skipping invalid seed");
-                        continue;
-                    }
-                };
-
-                // Push parent first so it's processed before children (reversed order).
-                if let Some(ref parent_id) = seed.parent_seed_id {
-                    stack.push(parent_id.to_string());
+        while let Some(current_id) = stack.pop() {
+            let content = match kernel.state.load_markdown("seeds", &current_id).await {
+                Ok(Some(c)) => c,
+                _ => continue,
+            };
+            let seed: Seed = match serde_json::from_str(&content) {
+                Ok(s) => s,
+                Err(e) => {
+                    tracing::warn!(error = %e, "Skipping invalid seed");
+                    continue;
                 }
+            };
 
-                let (score, passed) = {
-                    let eval_name = format!("{current_id}-eval");
-                    if let Ok(Some(eval_content)) =
-                        kernel.state.load_markdown("evals", &eval_name).await
+            // Push parent first so it's processed before children (reversed order).
+            if let Some(ref parent_id) = seed.parent_seed_id {
+                stack.push(parent_id.to_string());
+            }
+
+            let (score, passed) = {
+                let eval_name = format!("{current_id}-eval");
+                if let Ok(Some(eval_content)) =
+                    kernel.state.load_markdown("evals", &eval_name).await
+                {
+                    if let Ok(eval) =
+                        serde_json::from_str::<oxios_ouroboros::EvaluationResult>(&eval_content)
                     {
-                        if let Ok(eval) =
-                            serde_json::from_str::<oxios_ouroboros::EvaluationResult>(&eval_content)
-                        {
-                            (Some(eval.score), Some(eval.all_passed()))
-                        } else {
-                            (None, None)
-                        }
+                        (Some(eval.score), Some(eval.all_passed()))
                     } else {
                         (None, None)
                     }
-                };
+                } else {
+                    (None, None)
+                }
+            };
 
-                lineage.push(EvolutionEntry {
-                    id: seed.id.to_string(),
-                    generation: seed.generation,
-                    goal: seed.goal,
-                    parent_id: seed.parent_seed_id.map(|p| p.to_string()),
-                    score,
-                    passed,
-                });
-            }
+            lineage.push(EvolutionEntry {
+                id: seed.id.to_string(),
+                generation: seed.generation,
+                goal: seed.goal,
+                parent_id: seed.parent_seed_id.map(|p| p.to_string()),
+                score,
+                passed,
+            });
+        }
 
-            lineage.reverse(); // Reverse so parent comes first.
-            Ok(lineage)
-        })
+        lineage.reverse(); // Reverse so parent comes first.
+        Ok(lineage)
     }
 
     match build_lineage_iterative(state.kernel.clone(), id).await {
@@ -968,10 +964,10 @@ pub(crate) async fn handle_memory_map(
             // (e.g. "fact") returned by the frontend, NOT the plural
             // category short name ("facts"). The `tier` filter is
             // matched in the same place for symmetry.
-            if let Some(ref want) = params.mem_type {
-                if entry.memory_type.label() != want.as_str() {
-                    continue;
-                }
+            if let Some(ref want) = params.mem_type
+                && entry.memory_type.label() != want.as_str()
+            {
+                continue;
             }
             if let Some(ref want_tier) = params.tier {
                 let tier_str = match entry.tier {
@@ -1010,7 +1006,7 @@ async fn compute_memory_map_entries(
     entries: &[MemoryEntry],
 ) -> Vec<oxios_kernel::memory::MemoryMapEntry> {
     use oxios_kernel::embedding::EmbeddingProvider;
-    use oxios_kernel::memory::{compute_pca_2d, compute_top_neighbors, MemoryMapEntry};
+    use oxios_kernel::memory::{MemoryMapEntry, compute_pca_2d, compute_top_neighbors};
 
     if entries.is_empty() {
         return Vec::new();
@@ -1167,7 +1163,7 @@ pub(crate) async fn handle_memory_create(
         _ => {
             return Err(AppError::BadRequest(
                 "memory_type must be fact, episode, or knowledge".into(),
-            ))
+            ));
         }
     };
     let entry = MemoryEntry {

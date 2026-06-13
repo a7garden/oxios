@@ -35,7 +35,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
-import { useToast } from '@/components/ui/sonner'
+import { toast } from 'sonner'
 import { api } from '@/lib/api-client'
 import { cn } from '@/lib/utils'
 import type { ClawHubSearchResult, Skill, SkillFormat, SkillStatus, SkillsShSkill } from '@/types'
@@ -123,7 +123,7 @@ function SkillsPage() {
     queryKey: ['skills'],
     queryFn: async () => {
       const r = await api.get<{ skills: Skill[] }>('/api/skills')
-      return r.skills ?? []
+      return Array.isArray(r?.skills) ? r.skills : []
     },
     refetchInterval: 30000,
   })
@@ -138,7 +138,7 @@ function SkillsPage() {
       const r = await api.get<ClawHubSearchResult[]>('/api/marketplace/search', {
         q: deferredQuery,
       })
-      return r ?? []
+      return Array.isArray(r) ? r : []
     },
     enabled: tab === 'marketplace' && mktSource === 'clawhub' && deferredQuery.trim().length > 0,
     refetchOnWindowFocus: false,
@@ -155,7 +155,7 @@ function SkillsPage() {
       const r = await api.get<{ data: SkillsShSkill[] }>('/api/marketplace/skills-sh/search', {
         q: deferredQuery,
       })
-      return r?.data ?? []
+      return Array.isArray(r?.data) ? r.data : []
     },
     enabled: tab === 'marketplace' && mktSource === 'skills-sh' && deferredQuery.trim().length > 0,
     refetchOnWindowFocus: false,
@@ -168,7 +168,7 @@ function SkillsPage() {
         view: 'trending',
         per_page: '20',
       })
-      return r?.data ?? []
+      return Array.isArray(r?.data) ? r.data : []
     },
     enabled: tab === 'marketplace' && mktSource === 'skills-sh',
     refetchOnWindowFocus: false,
@@ -180,7 +180,7 @@ function SkillsPage() {
   const updateCount = updates?.length ?? 0
 
   const counts = useMemo(() => {
-    const l = skills ?? []
+    const l: Skill[] = Array.isArray(skills) ? skills : []
     return {
       all: l.length,
       ready: l.filter((s) => s.status === 'ready').length,
@@ -190,7 +190,7 @@ function SkillsPage() {
   }, [skills])
 
   const filtered = useMemo(() => {
-    let l = skills ?? []
+    let l: Skill[] = Array.isArray(skills) ? skills : []
     if (filter !== 'all') l = l.filter((s) => s.status === filter)
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase()
@@ -268,7 +268,7 @@ function SkillsPage() {
           {tab === 'installed' ? (
             <InstalledTab
               filtered={filtered}
-              allSkills={skills ?? []}
+              allSkills={Array.isArray(skills) ? skills : []}
               counts={counts}
               filter={filter}
               setFilter={setFilter}
@@ -365,7 +365,6 @@ function InstalledTab({
 }) {
   const { t } = useTranslation()
   const qc = useQueryClient()
-  const { toast } = useToast()
   const [deleteTarget, setDeleteTarget] = useState<Skill | null>(null)
 
   const toggleMutation = useMutation({
@@ -376,18 +375,18 @@ function InstalledTab({
       return api.post(endpoint)
     },
     onSuccess: () => {
-      toast(t('skills.toggleSuccess'), 'success')
+      toast.success(t('skills.toggleSuccess'))
       qc.invalidateQueries({ queryKey: ['skills'] })
     },
     onError: (err: unknown) => {
-      toast(err instanceof Error ? err.message : t('common.error'), 'destructive')
+      toast.error(err instanceof Error ? err.message : t('common.error'))
     },
   })
 
   const deleteMutation = useMutation({
     mutationFn: (name: string) => api.delete(`/api/skills/${encodeURIComponent(name)}`),
     onSuccess: () => {
-      toast(t('skills.deleteSuccess', { name: deleteTarget?.name }), 'success')
+      toast.success(t('skills.deleteSuccess', { name: deleteTarget?.name }))
       qc.invalidateQueries({ queryKey: ['skills'] })
       setDeleteTarget(null)
       if (selectedSkill && deleteTarget && selectedSkill.name === deleteTarget.name) {
@@ -395,7 +394,7 @@ function InstalledTab({
       }
     },
     onError: (err: unknown) => {
-      toast(err instanceof Error ? err.message : t('common.error'), 'destructive')
+      toast.error(err instanceof Error ? err.message : t('common.error'))
     },
   })
 
@@ -541,18 +540,17 @@ function MarketplaceTab({
 }) {
   const { t } = useTranslation()
   const qc = useQueryClient()
-  const { toast } = useToast()
 
   // ClawHub install mutation
   const clawhubMut = useMutation({
     mutationFn: ({ slug, version }: { slug: string; version?: string }) =>
       api.post(`/api/marketplace/skills/${slug}/install`, { version }),
     onSuccess: (_: unknown, v: { slug: string; version?: string }) => {
-      toast(t('skills.installSuccess', { slug: v.slug }), 'success')
+      toast.success(t('skills.installSuccess', { slug: v.slug }))
       qc.invalidateQueries({ queryKey: ['skills'] })
     },
     onError: (e: unknown) => {
-      toast(e instanceof Error ? e.message : t('skills.installFailed'), 'destructive')
+      toast.error(e instanceof Error ? e.message : t('skills.installFailed'))
     },
   })
 
@@ -561,11 +559,11 @@ function MarketplaceTab({
     mutationFn: (id: string) =>
       api.post(`/api/marketplace/skills-sh/skill/${encodeURIComponent(id)}/install`),
     onSuccess: (_: unknown, id: string) => {
-      toast(t('skills.installSuccess', { slug: id }), 'success')
+      toast.success(t('skills.installSuccess', { slug: id }))
       qc.invalidateQueries({ queryKey: ['skills'] })
     },
     onError: (e: unknown) => {
-      toast(e instanceof Error ? e.message : t('skills.installFailed'), 'destructive')
+      toast.error(e instanceof Error ? e.message : t('skills.installFailed'))
     },
   })
 
@@ -1020,7 +1018,6 @@ function SkillsShCard({
 
 function SkillsShDetail({ id, onClose }: { id: string; onClose: () => void }) {
   const { t } = useTranslation()
-  const { toast } = useToast()
   const qc = useQueryClient()
 
   const { data, isLoading, isError } = useQuery({
@@ -1043,11 +1040,11 @@ function SkillsShDetail({ id, onClose }: { id: string; onClose: () => void }) {
     mutationFn: () =>
       api.post(`/api/marketplace/skills-sh/skill/${encodeURIComponent(id)}/install`),
     onSuccess: () => {
-      toast(t('skills.installSuccess', { slug: id }), 'success')
+      toast.success(t('skills.installSuccess', { slug: id }))
       qc.invalidateQueries({ queryKey: ['skills'] })
     },
     onError: (e: unknown) => {
-      toast(e instanceof Error ? e.message : t('skills.installFailed'), 'destructive')
+      toast.error(e instanceof Error ? e.message : t('skills.installFailed'))
     },
   })
 

@@ -5,6 +5,32 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-06-13
+
+### Added
+- **Agent History Log** — Persistent agent records survive daemon restarts.
+  - Dual-tier storage: filesystem JSON (source of truth, `state/agents/<id>.json`) + SQLite query index (`state/agent_log.db`) with FTS5 full-text search.
+  - `AgentLogDb` query engine: filtering (status, date range, session/project/seed), sorting (cost, duration, tokens, name), pagination, search across agent name / error / tool names / tool outputs.
+  - `KernelHandle::reindex()` rebuilds the SQLite index from filesystem JSON at any time. SQLite is optional via the `sqlite-memory` feature; falls back to filesystem scan when disabled.
+- **`AgentStatus::Completed`** — New terminal status for agents that finish successfully; integrated into the agent stats aggregation (`Idle`/`Stopped`/`Completed` → `completed`).
+- **RFC-015 knowledge/memory separation** — Distinguished agent memory (`MemoryManager`) from user knowledge notes (`KnowledgeBase`), clarifying the two-system boundary.
+- **RFC-016 autonomous persistence** — Agent-generated notes persist with provenance metadata automatically.
+- **RFC-022 knowledge provenance, quality metadata & dream curation** — Notes carry `source` (Hook/Agent) and `quality` (Raw/Reviewed) frontmatter; dream consolidation curates based on quality.
+- **Interactive interview wizard (Web)** — Multi-round Ouroboros interview UI with Q&A preserved across turns, typing indicator, and structured question rendering.
+- **Chat & dashboard redesign (Web)** — Redesigned chat (tool-name transparency, session titles, keyboard shortcuts) and dashboard (agent status, system health, live activity feed, approvals queue).
+
+### Changed
+- **Version bump to 1.3.0** — All crates updated to 1.3.0.
+- **Interview multi-turn context** — Original user message and prior Q&A are now included in interview context so the LLM understands follow-up rounds.
+- **Evaluation semantics** — `evaluation_passed` modelled as `Option<bool>` end-to-end (gateway → web → frontend) for correct null semantics.
+- **Async-trait restoration** — Replaced manual `Pin<Box<...>>` boilerplate with the `async-trait` macro in the kernel.
+
+### Fixed
+- **Test compile & clippy** — Resolved incomplete `agent_log_db` module (added `AgentStatus::Completed` variant, completed `parse_status` mapping) and cleared all `clippy -D warnings` lints in the new code.
+- **Agent stats SQL NULL handling** — `SUM(CASE …)` / `AVG(…)` / `MIN`/`MAX` aggregates now wrapped in `COALESCE` and read as `Option`, so stats queries succeed on empty/all-NULL tables.
+- **i18n** — Added missing `common.justNow` / `minutesAgo` / `hoursAgo` translation keys.
+- **Frontend provider catalog** — Added missing provider models to the frontend fallback catalog.
+
 ## [1.1.0] - 2026-06-06
 
 ### Added

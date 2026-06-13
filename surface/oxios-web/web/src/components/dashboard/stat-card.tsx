@@ -1,18 +1,40 @@
 import { Minus, TrendingDown, TrendingUp } from 'lucide-react'
+import { useMemo } from 'react'
 import { Area, AreaChart, ResponsiveContainer } from 'recharts'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { cn } from '@/lib/utils'
+import { cn, cssVarToRgb } from '@/lib/utils'
 
-export type SparkColor = 'blue' | 'emerald' | 'amber' | 'violet' | 'red' | 'cyan' | 'rose'
+export type SparkColor = 'info' | 'success' | 'warning' | 'primary' | 'error' | 'accent' | 'muted'
 
-const COLOR_MAP: Record<SparkColor, { stroke: string; fill: string }> = {
-  blue: { stroke: 'rgb(59 130 246)', fill: 'rgb(59 130 246 / 0.18)' },
-  emerald: { stroke: 'rgb(16 185 129)', fill: 'rgb(16 185 129 / 0.18)' },
-  amber: { stroke: 'rgb(245 158 11)', fill: 'rgb(245 158 11 / 0.18)' },
-  violet: { stroke: 'rgb(139 92 246)', fill: 'rgb(139 92 246 / 0.18)' },
-  red: { stroke: 'rgb(239 68 68)', fill: 'rgb(239 68 68 / 0.18)' },
-  cyan: { stroke: 'rgb(6 182 212)', fill: 'rgb(6 182 212 / 0.18)' },
-  rose: { stroke: 'rgb(244 63 94)', fill: 'rgb(244 63 94 / 0.18)' },
+/**
+ * CSS custom property names for each spark color.
+ * Resolved at runtime via cssVarToRgb() because Recharts SVG
+ * attributes don't support CSS variables directly.
+ */
+const COLOR_VARS: Record<SparkColor, { stroke: string; fill: string }> = {
+  info: { stroke: '--color-info', fill: '--color-info-muted' },
+  success: { stroke: '--color-success', fill: '--color-success-muted' },
+  warning: { stroke: '--color-warning', fill: '--color-warning-muted' },
+  primary: { stroke: '--color-primary', fill: '--color-primary' },
+  error: { stroke: '--color-error', fill: '--color-error-muted' },
+  accent: { stroke: '--color-info', fill: '--color-info-muted' },
+  muted: { stroke: '--color-muted-foreground', fill: '--color-muted-foreground' },
+}
+
+/**
+ * Resolve spark color tokens to computed RGB strings.
+ * Memoized per sparkColor so we don't thrash getComputedStyle.
+ */
+function useSparkColors(sparkColor: SparkColor) {
+  return useMemo(() => {
+    const vars = COLOR_VARS[sparkColor]
+    const stroke = cssVarToRgb(vars.stroke)
+    const fillBase = cssVarToRgb(vars.fill)
+    // Convert fill to a semi-transparent version for the area fill
+    // e.g. 'rgb(59 130 246)' → 'rgb(59 130 246 / 0.18)'
+    const fill = fillBase.replace('rgb(', 'rgba(').replace(')', ' / 0.18)')
+    return { stroke, fill }
+  }, [sparkColor])
 }
 
 export interface StatCardProps {
@@ -56,13 +78,13 @@ export function StatCard({
   iconClassName,
   delta,
   sparkline,
-  sparkColor = 'blue',
+  sparkColor = 'info',
   hint,
   href,
   onClick,
   title,
 }: StatCardProps) {
-  const colors = COLOR_MAP[sparkColor]
+  const colors = useSparkColors(sparkColor)
   const hasSparkline = Array.isArray(sparkline) && sparkline.length > 1
 
   const series = hasSparkline ? sparkline.map((v, i) => ({ i, v })) : []
@@ -75,7 +97,7 @@ export function StatCard({
       className={cn(
         'relative h-full overflow-hidden',
         (href || onClick) &&
-          'cursor-pointer transition-colors hover:bg-accent/40 focus-visible:ring-2 focus-visible:ring-ring',
+          'cursor-pointer transition-all hover:bg-accent/60 hover:shadow-sm hover:-translate-y-px focus-visible:ring-2 focus-visible:ring-ring',
       )}
       onClick={onClick}
       title={title}
@@ -126,7 +148,7 @@ export function StatCard({
                 <AreaChart data={series} margin={{ top: 2, right: 0, bottom: 2, left: 0 }}>
                   <defs>
                     <linearGradient id={`spark-${sparkColor}`} x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor={colors.stroke} stopOpacity={0.4} />
+                      <stop offset="0%" stopColor={colors.stroke} stopOpacity={0.5} />
                       <stop offset="100%" stopColor={colors.stroke} stopOpacity={0} />
                     </linearGradient>
                   </defs>

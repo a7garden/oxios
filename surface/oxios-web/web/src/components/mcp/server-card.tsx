@@ -26,7 +26,7 @@ export function ServerCard({
   const { t } = useTranslation()
 
   const statusColor = !server.enabled
-    ? 'bg-gray-400'
+    ? 'bg-muted-foreground'
     : server.initialized
       ? 'bg-success'
       : 'bg-error'

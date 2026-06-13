@@ -7,7 +7,7 @@ export function useA2AAgents() {
     queryKey: ['a2a', 'agents'],
     queryFn: async () => {
       const res = await api.get<{ agents: A2AAgentCard[] }>('/api/a2a/agents')
-      return res.agents ?? []
+      return Array.isArray(res?.agents) ? res.agents : []
     },
     refetchInterval: 10000,
   })
@@ -18,7 +18,7 @@ export function useA2AMessages() {
     queryKey: ['a2a', 'messages'],
     queryFn: async () => {
       const res = await api.get<{ messages: A2AMessage[] }>('/api/a2a/messages')
-      return res.messages ?? []
+      return Array.isArray(res?.messages) ? res.messages : []
     },
     refetchInterval: 10000,
   })

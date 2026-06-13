@@ -40,7 +40,7 @@ function ApprovalsPage() {
   if (isLoading) return <LoadingCards count={4} />
   if (isError) return <ErrorState onRetry={() => refetch()} />
 
-  const items = data?.items ?? []
+  const items = Array.isArray(data?.items) ? data.items : []
   const pending = items.filter((a) => a.status === 'pending')
   const resolved = items.filter((a) => a.status !== 'pending')
 

@@ -1,5 +1,6 @@
 import { ChevronDown, ChevronRight, Clock } from 'lucide-react'
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Badge } from '@/components/ui/badge'
 import type { AgentTraceStep } from '@/types/agent'
 
@@ -9,6 +10,7 @@ interface TraceStepProps {
 
 export function TraceStepCard({ step }: TraceStepProps) {
   const [expanded, setExpanded] = useState(false)
+  const { t } = useTranslation()
   const durationSec = (step.duration_ms / 1000).toFixed(1)
   const statusColor =
     step.status === 'completed'
@@ -37,13 +39,13 @@ export function TraceStepCard({ step }: TraceStepProps) {
       {expanded && (
         <div className="border-t px-3 py-2 space-y-2 bg-muted/30">
           <div>
-            <p className="text-xs font-medium text-muted-foreground mb-1">Input</p>
+            <p className="text-xs font-medium text-muted-foreground mb-1">{t('agents.inputLabel', 'Input')}</p>
             <pre className="text-xs bg-muted rounded p-2 overflow-x-auto whitespace-pre-wrap max-h-48 overflow-y-auto">
               {typeof step.input === 'string' ? step.input : JSON.stringify(step.input, null, 2)}
             </pre>
           </div>
           <div>
-            <p className="text-xs font-medium text-muted-foreground mb-1">Output</p>
+            <p className="text-xs font-medium text-muted-foreground mb-1">{t('agents.outputLabel', 'Output')}</p>
             <pre className="text-xs bg-muted rounded p-2 overflow-x-auto whitespace-pre-wrap max-h-48">
               {typeof step.output === 'string' ? step.output : JSON.stringify(step.output, null, 2)}
             </pre>

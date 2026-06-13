@@ -66,6 +66,9 @@ pub struct Seed {
     /// Example: `{"type": "object", "required": ["files_changed"]}`
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub output_schema: Option<serde_json::Value>,
+    /// Project ID detected by the orchestrator, passed through to AgentInfo.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub project_id: Option<uuid::Uuid>,
 }
 
 impl Seed {
@@ -111,6 +114,7 @@ impl Seed {
             parent_seed_id: None,
             cspace_hint: None,
             output_schema: None,
+            project_id: None,
         }
     }
 
@@ -133,6 +137,7 @@ impl Seed {
             parent_seed_id: None,
             cspace_hint: None,
             output_schema: None,
+            project_id: None,
         }
     }
 
@@ -153,6 +158,7 @@ impl Seed {
             parent_seed_id: Some(parent.id),
             cspace_hint: parent.cspace_hint.clone(),
             output_schema: parent.output_schema.clone(),
+            project_id: parent.project_id,
         }
     }
 }

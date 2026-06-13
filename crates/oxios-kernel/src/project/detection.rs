@@ -90,11 +90,12 @@ pub fn extract_path(message: &str) -> Option<PathBuf> {
         let cleaned = word.trim_matches(|c: char| {
             !c.is_alphanumeric() && c != '/' && c != '.' && c != '-' && c != '_' && c != '~'
         });
-        if cleaned.starts_with("~/") && cleaned.len() > 2 {
-            if let Some(home) = std::env::var_os("HOME") {
-                let expanded = cleaned.replacen("~", &home.to_string_lossy(), 1);
-                return Some(PathBuf::from(expanded));
-            }
+        if cleaned.starts_with("~/")
+            && cleaned.len() > 2
+            && let Some(home) = std::env::var_os("HOME")
+        {
+            let expanded = cleaned.replacen("~", &home.to_string_lossy(), 1);
+            return Some(PathBuf::from(expanded));
         }
     }
 

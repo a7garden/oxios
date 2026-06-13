@@ -10,7 +10,7 @@ import { ErrorState } from '@/components/shared/error-state'
 import { LoadingCards } from '@/components/shared/loading'
 import { RefreshButton } from '@/components/shared/refresh-button'
 import { Button } from '@/components/ui/button'
-import { useToast } from '@/components/ui/sonner'
+import { toast } from 'sonner'
 import { useBudgetDelete, useBudgetList, useBudgetReset, useBudgetSet } from '@/hooks/use-budget'
 import type { AgentBudget } from '@/types/budget'
 
@@ -18,7 +18,6 @@ export const Route = createFileRoute('/budget')({ component: BudgetPage })
 
 function BudgetPage() {
   const { t } = useTranslation()
-  const { toast } = useToast()
   const { data, isLoading, isError, refetch, isFetching } = useBudgetList()
 
   const setMutation = useBudgetSet()
@@ -32,7 +31,7 @@ function BudgetPage() {
   if (isLoading) return <LoadingCards count={4} />
   if (isError) return <ErrorState onRetry={() => refetch()} />
 
-  const agents = data?.agents ?? []
+  const agents = Array.isArray(data?.agents) ? data.agents : []
   const summary = data?.summary ?? {
     total_agents: 0,
     total_tokens_used: 0,
@@ -59,21 +58,21 @@ function BudgetPage() {
     window_secs: number
   }) => {
     setMutation.mutate(params, {
-      onSuccess: () => toast(t('budget.setSuccess'), 'success'),
+      onSuccess: () => toast.success(t('budget.setSuccess')),
       onError: (e: unknown) =>
-        toast(e instanceof Error ? e.message : t('common.error'), 'destructive'),
+        toast.error(e instanceof Error ? e.message : t('common.error')),
     })
   }
 
   const handleReset = (agentId: string) => {
     resetMutation.mutate(agentId, {
-      onSuccess: () => toast(t('budget.resetSuccess'), 'success'),
+      onSuccess: () => toast.success(t('budget.resetSuccess')),
     })
   }
 
   const handleRemove = (agentId: string) => {
     deleteMutation.mutate(agentId, {
-      onSuccess: () => toast(t('budget.removeSuccess'), 'success'),
+      onSuccess: () => toast.success(t('budget.removeSuccess')),
     })
   }
 

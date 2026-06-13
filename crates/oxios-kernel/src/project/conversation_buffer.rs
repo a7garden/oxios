@@ -58,12 +58,13 @@ impl ConversationBuffer {
         };
 
         // If last turn has empty agent, it's the pending turn — replace
-        if let Some(last) = self.turns.back_mut() {
-            if last.agent.is_empty() && last.project_id.is_none() {
-                last.user = message.to_string();
-                last.timestamp = Utc::now();
-                return;
-            }
+        if let Some(last) = self.turns.back_mut()
+            && last.agent.is_empty()
+            && last.project_id.is_none()
+        {
+            last.user = message.to_string();
+            last.timestamp = Utc::now();
+            return;
         }
 
         self.turns.push_back(turn);

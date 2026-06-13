@@ -13,8 +13,6 @@ interface KnowledgeState {
   historyIndex: number
 
   // Layout
-  sidebarOpen: boolean
-  sidebarWidth: number
   infoPanelOpen: boolean
 
   // Split editor
@@ -26,8 +24,6 @@ interface KnowledgeState {
   openChat: () => void
   goBack: () => string | null | undefined
   goForward: () => string | null | undefined
-  toggleSidebar: () => void
-  setSidebarWidth: (w: number) => void
   toggleInfoPanel: () => void
   openSplit: (path: string) => void
   closeSplit: () => void
@@ -40,8 +36,6 @@ export const useKnowledgeStore = create<KnowledgeState>()(
       currentFilePath: null,
       history: [],
       historyIndex: -1,
-      sidebarOpen: true,
-      sidebarWidth: 280,
       infoPanelOpen: false,
       splitEditorOpen: false,
       splitFilePath: null,
@@ -80,15 +74,6 @@ export const useKnowledgeStore = create<KnowledgeState>()(
         return path
       },
 
-      toggleSidebar: () => {
-        set({ sidebarOpen: !get().sidebarOpen })
-      },
-
-      setSidebarWidth: (w) => {
-        const clamped = Math.min(Math.max(w, 200), 600)
-        set({ sidebarWidth: clamped })
-      },
-
       toggleInfoPanel: () => {
         set({ infoPanelOpen: !get().infoPanelOpen })
       },
@@ -103,10 +88,7 @@ export const useKnowledgeStore = create<KnowledgeState>()(
     }),
     {
       name: 'oxios-knowledge',
-      partialize: (state) => ({
-        sidebarWidth: state.sidebarWidth,
-        sidebarOpen: state.sidebarOpen,
-      }),
+      partialize: () => ({}),
     },
   ),
 )

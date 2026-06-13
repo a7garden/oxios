@@ -1,4 +1,5 @@
 import { AlertTriangle } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import type { EventConflict } from '@/types/calendar'
 
 interface Props {
@@ -6,18 +7,19 @@ interface Props {
 }
 
 export function ConflictWarning({ conflicts }: Props) {
+  const { t } = useTranslation()
   if (conflicts.length === 0) return null
 
   return (
-    <div className="rounded-md bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 p-3">
-      <div className="flex items-center gap-2 text-amber-800 dark:text-amber-200 text-sm font-medium">
+    <div className="rounded-md bg-warning-subtle border border-warning-subtle-border p-3">
+      <div className="flex items-center gap-2 text-warning text-sm font-medium">
         <AlertTriangle className="h-4 w-4" />
-        {conflicts.length}개 일정과 겹침
+        {t('calendar.conflictTitle', { count: conflicts.length })}
       </div>
-      <ul className="mt-1 text-xs text-amber-700 dark:text-amber-300 space-y-0.5">
+      <ul className="mt-1 text-xs text-warning/80 space-y-0.5">
         {conflicts.map((c) => (
           <li key={c.uid}>
-            {c.title} ({c.overlap_minutes}분 겹침)
+            {c.title} ({t('calendar.conflictDetail', { minutes: c.overlap_minutes })})
           </li>
         ))}
       </ul>

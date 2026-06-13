@@ -658,7 +658,7 @@ function HistoryPanel({ active }: { active: boolean }) {
   const { t } = useTranslation()
   const { data, isLoading, isError, refetch, isFetching } = useEmailHistory(100, active)
 
-  const emails = data?.emails ?? []
+  const emails = Array.isArray(data?.emails) ? data.emails : []
 
   if (isError) {
     return (
@@ -781,7 +781,7 @@ function TemplatesPanel({ active }: { active: boolean }) {
   const { t } = useTranslation()
   const { data, isLoading, isError, refetch, isFetching } = useEmailTemplates(active)
 
-  const templates = data?.templates ?? []
+  const templates = Array.isArray(data?.templates) ? data.templates : []
 
   if (isError) {
     return (

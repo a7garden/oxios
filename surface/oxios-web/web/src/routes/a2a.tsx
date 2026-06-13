@@ -7,7 +7,7 @@ import { AgentInspector } from '@/components/a2a/agent-inspector'
 import { InteractiveTopology } from '@/components/a2a/interactive-topology'
 import { MessageLog } from '@/components/a2a/message-log'
 import { RefreshButton } from '@/components/shared/refresh-button'
-import { useToast } from '@/components/ui/sonner'
+import { toast } from 'sonner'
 import { useA2AAgents, useA2AMessages, useA2ATopology } from '@/hooks/use-a2a'
 import { cn } from '@/lib/utils'
 import type { A2AMessage } from '@/types/a2a'
@@ -18,7 +18,6 @@ type Tab = 'topology' | 'messages' | 'agents'
 
 function A2APage() {
   const { t } = useTranslation()
-  const { toast } = useToast()
   const [tab, setTab] = useState<Tab>('topology')
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
 
@@ -54,7 +53,7 @@ function A2APage() {
   // Most recent 5 messages involving the selected agent.
   const selectedMessages: A2AMessage[] = useMemo(() => {
     if (!selectedNodeId) return []
-    return (messagesQ.data ?? [])
+    return (Array.isArray(messagesQ.data) ? messagesQ.data : [])
       .filter((m) => m.from_agent === selectedNodeId || m.to_agent === selectedNodeId)
       .slice(0, 5)
   }, [messagesQ.data, selectedNodeId])
@@ -68,7 +67,7 @@ function A2APage() {
       // Trace view is not yet implemented — surface the gap with a toast
       // rather than a silent console.info (which made the destructive
       // [Stop agent] button look broken).
-      toast(t('a2a.traceNotImplemented'), 'default')
+      toast(t('a2a.traceNotImplemented'))
       // `id` is captured for the future router hook-up:
       //   navigate({ to: '/agents/$id/trace', params: { id } })
       void id
@@ -80,7 +79,7 @@ function A2APage() {
     (id: string) => {
       // Stop-agent endpoint is not yet implemented. Honest UX: tell the
       // user via toast instead of logging to the console.
-      toast(t('a2a.stopNotImplemented'), 'destructive')
+      toast.error(t('a2a.stopNotImplemented'))
       // `id` is captured for the future mutation hook-up:
       //   api.stopAgent(id)
       void id
@@ -120,8 +119,8 @@ function A2APage() {
       {/* Content */}
       {tab === 'topology' && (
         <InteractiveTopology
-          nodes={topologyQ.data?.nodes ?? []}
-          edges={topologyQ.data?.edges ?? []}
+          nodes={Array.isArray(topologyQ.data?.nodes) ? topologyQ.data.nodes : []}
+          edges={Array.isArray(topologyQ.data?.edges) ? topologyQ.data.edges : []}
           isLoading={topologyQ.isLoading}
           isError={topologyQ.isError}
           onRetry={() => topologyQ.refetch()}
@@ -129,8 +128,12 @@ function A2APage() {
           selectedNodeId={selectedNodeId}
         />
       )}
-      {tab === 'messages' && <MessageLog messages={messagesQ.data ?? []} />}
-      {tab === 'agents' && <AgentCardList agents={agentsQ.data ?? []} />}
+      {tab === 'messages' && (
+        <MessageLog messages={Array.isArray(messagesQ.data) ? messagesQ.data : []} />
+      )}
+      {tab === 'agents' && (
+        <AgentCardList agents={Array.isArray(agentsQ.data) ? agentsQ.data : []} />
+      )}
 
       <AgentInspector
         node={selectedNode}

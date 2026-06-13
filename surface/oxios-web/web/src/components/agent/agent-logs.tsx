@@ -5,10 +5,10 @@ import { Badge } from '@/components/ui/badge'
 import type { AgentLogs as AgentLogsType } from '@/types/agent'
 
 const levelColors: Record<string, string> = {
-  info: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
-  warn: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
-  error: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
-  debug: 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400',
+  info: 'bg-info-subtle text-info',
+  warn: 'bg-warning-subtle text-warning',
+  error: 'bg-error-subtle text-error',
+  debug: 'bg-muted text-muted-foreground',
 }
 
 export function AgentLogs({ logs }: { logs: AgentLogsType | null | undefined }) {

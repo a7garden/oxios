@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { Plus } from 'lucide-react'
 import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { CalendarView } from '@/components/calendar/calendar-view'
 import { ConflictWarning } from '@/components/calendar/conflict-warning'
 import { EventDetail } from '@/components/calendar/event-detail'
@@ -17,6 +18,7 @@ import type { CalendarEvent, CreateEventRequest } from '@/types/calendar'
 export const Route = createFileRoute('/calendar')({ component: CalendarPage })
 
 function CalendarPage() {
+  const { t } = useTranslation()
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null)
   const [editorOpen, setEditorOpen] = useState(false)
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | undefined>()
@@ -34,7 +36,7 @@ function CalendarPage() {
   }, [])
 
   const { data, isLoading } = useCalendarEvents(from, to)
-  const events = data?.events ?? []
+  const events = Array.isArray(data?.events) ? data.events : []
 
   const createMutation = useCalendarCreate()
   const updateMutation = useCalendarUpdate()
@@ -58,8 +60,8 @@ function CalendarPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">📅 캘린더</h1>
-          <p className="text-sm text-muted-foreground">일정 관리</p>
+          <h1 className="text-2xl font-bold">{t('calendar.title')}</h1>
+          <p className="text-sm text-muted-foreground">{t('calendar.subtitle')}</p>
         </div>
         <Button
           onClick={() => {
@@ -68,7 +70,7 @@ function CalendarPage() {
             setEditorOpen(true)
           }}
         >
-          <Plus className="h-4 w-4 mr-1" /> 새 일정
+          <Plus className="h-4 w-4 mr-1" /> {t('calendar.newEvent')}
         </Button>
       </div>
 
@@ -78,7 +80,7 @@ function CalendarPage() {
 
       {isLoading ? (
         <div className="flex items-center justify-center h-64 text-muted-foreground">
-          불러오는 중...
+          {t('calendar.loading')}
         </div>
       ) : (
         <CalendarView

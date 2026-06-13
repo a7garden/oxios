@@ -228,7 +228,10 @@ impl PersistenceHook {
             }
         }
         for kw in &plan.knowledge {
-            match self.knowledge_base.note_write_with_meta(&kw.path, &kw.content, &kw.meta) {
+            match self
+                .knowledge_base
+                .note_write_with_meta(&kw.path, &kw.content, &kw.meta)
+            {
                 Ok(true) => {
                     tracing::info!(
                         path = %kw.path,
@@ -357,10 +360,7 @@ impl PersistenceHook {
             ..Default::default()
         };
 
-        let agent = engine
-            .oxi()
-            .agent(agent_config)
-            .build()?;
+        let agent = engine.oxi().agent(agent_config).build()?;
 
         let (response, _events) = agent.run(prompt).await?;
 
@@ -413,7 +413,13 @@ fn auto_save_path(seed: &Seed, content: &str) -> String {
     let slug: String = heading
         .to_lowercase()
         .chars()
-        .map(|c| if c.is_alphanumeric() || c == '-' || c == '_' { c } else { '-' })
+        .map(|c| {
+            if c.is_alphanumeric() || c == '-' || c == '_' {
+                c
+            } else {
+                '-'
+            }
+        })
         .collect();
     let slug = slug
         .split('-')

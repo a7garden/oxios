@@ -6,8 +6,8 @@
 
 use std::sync::Arc;
 
-use axum::extract::{Path, Query, State};
 use axum::Json;
+use axum::extract::{Path, Query, State};
 use serde::{Deserialize, Serialize};
 #[cfg(test)]
 use serde_json::Value;
@@ -33,6 +33,7 @@ fn default_history_limit() -> usize {
 
 /// A single sent email record returned by the API.
 #[derive(Debug, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub struct SentEmailResponse {
     /// Unique ID.
     pub id: String,
@@ -209,14 +210,12 @@ fn load_sent_record(
     };
 
     for entry in entries.flatten() {
-        if entry.path().extension().is_some_and(|ext| ext == "json") {
-            if let Ok(content) = std::fs::read_to_string(entry.path()) {
-                if let Ok(val) = serde_json::from_str::<serde_json::Value>(&content) {
-                    if val.get("id").and_then(|v| v.as_str()) == Some(id) {
-                        return Some(val);
-                    }
-                }
-            }
+        if entry.path().extension().is_some_and(|ext| ext == "json")
+            && let Ok(content) = std::fs::read_to_string(entry.path())
+            && let Ok(val) = serde_json::from_str::<serde_json::Value>(&content)
+            && val.get("id").and_then(|v| v.as_str()) == Some(id)
+        {
+            return Some(val);
         }
     }
     None
@@ -380,7 +379,7 @@ pub(crate) async fn handle_email_setup(
             return Err(AppError::BadRequest(format!(
                 "Unknown provider: {}",
                 body.provider
-            )))
+            )));
         }
     };
 

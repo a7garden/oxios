@@ -164,10 +164,10 @@ async fn download_and_extract_web_dist(version_tag: &str) -> Result<PathBuf> {
         if file.is_dir() {
             std::fs::create_dir_all(&outpath)?;
         } else {
-            if let Some(p) = outpath.parent() {
-                if !p.exists() {
-                    std::fs::create_dir_all(p)?;
-                }
+            if let Some(p) = outpath.parent()
+                && !p.exists()
+            {
+                std::fs::create_dir_all(p)?;
             }
             let mut outfile = std::fs::File::create(&outpath)?;
             std::io::copy(&mut file, &mut outfile)?;
@@ -205,11 +205,11 @@ async fn download_and_extract_web_dist(version_tag: &str) -> Result<PathBuf> {
 /// Returns a [`WebDistResult`] describing what happened.
 pub async fn ensure_web_dist(workspace: &Path) -> WebDistResult {
     // 1. ~/.oxios/web/dist/ (user override — always wins)
-    if let Some(ref dist) = user_web_dist_dir() {
-        if dist.join("index.html").is_file() {
-            tracing::info!(path = ?dist, "Serving web UI from ~/.oxios/web/dist/");
-            return WebDistResult::UserDir(dist.clone());
-        }
+    if let Some(ref dist) = user_web_dist_dir()
+        && dist.join("index.html").is_file()
+    {
+        tracing::info!(path = ?dist, "Serving web UI from ~/.oxios/web/dist/");
+        return WebDistResult::UserDir(dist.clone());
     }
 
     // 2. workspace/web/dist/ (bundled / dev)

@@ -12,7 +12,7 @@ mod web_dist;
 
 use anyhow::{Context, Result};
 use clap::{CommandFactory, Parser, Subcommand};
-use clap_complete::{generate, Shell};
+use clap_complete::{Shell, generate};
 use console::style;
 use std::net::TcpStream;
 use std::path::{Path, PathBuf};
@@ -20,7 +20,7 @@ use std::sync::Arc;
 
 use kernel::Kernel;
 use oxios_kernel::onboarding::WORKSPACE_SUBDIRS;
-use oxios_kernel::{credential::CredentialStore, DaemonManager, OxiosConfig};
+use oxios_kernel::{DaemonManager, OxiosConfig, credential::CredentialStore};
 
 #[cfg(feature = "cli")]
 use oxios_cli::CliPlugin;
@@ -105,6 +105,11 @@ enum Command {
         /// Set exit code: 0 = evaluation passed, 1 = failed.
         #[arg(long)]
         exit_code: bool,
+
+        /// Chat mode: skip Ouroboros pipeline (interview/seed/evaluate)
+        /// and execute directly via the agent runtime.
+        #[arg(long)]
+        chat: bool,
     },
 
     /// Start an interactive CLI chat session.
@@ -960,15 +965,15 @@ fn collect_reset_targets(oxios_home: &Path) -> ResetTargets {
     }
 
     // 2. launchd plist
-    if let Some(ref plist) = launchd_plist {
-        if plist.exists() {
-            let size = plist.metadata().map(|m| m.len()).unwrap_or(0);
-            existing.push(ResetItem {
-                label: "macOS launchd service registration".to_string(),
-                path: plist.clone(),
-                size,
-            });
-        }
+    if let Some(ref plist) = launchd_plist
+        && plist.exists()
+    {
+        let size = plist.metadata().map(|m| m.len()).unwrap_or(0);
+        existing.push(ResetItem {
+            label: "macOS launchd service registration".to_string(),
+            path: plist.clone(),
+            size,
+        });
     }
 
     ResetTargets {
@@ -1089,16 +1094,16 @@ fn cmd_reset(oxios_home: &Path, skip_confirm: bool, pid_file: &Path) -> Result<(
     }
 
     // ── Phase 4: Remove launchd service ──
-    if let Some(ref plist) = targets.launchd_plist {
-        if plist.exists() {
-            // Unload first
-            let _ = std::process::Command::new("launchctl")
-                .args(["unload", &plist.to_string_lossy()])
-                .output();
-            match std::fs::remove_file(plist) {
-                Ok(()) => println!("  {} launchd service removed", style("✓").green()),
-                Err(e) => println!("  {} launchd removal failed: {}", style("⚠").yellow(), e),
-            }
+    if let Some(ref plist) = targets.launchd_plist
+        && plist.exists()
+    {
+        // Unload first
+        let _ = std::process::Command::new("launchctl")
+            .args(["unload", &plist.to_string_lossy()])
+            .output();
+        match std::fs::remove_file(plist) {
+            Ok(()) => println!("  {} launchd service removed", style("✓").green()),
+            Err(e) => println!("  {} launchd removal failed: {}", style("⚠").yellow(), e),
         }
     }
 
@@ -1915,12 +1920,14 @@ async fn run() -> Result<()> {
             session,
             context_file,
             exit_code,
+            chat,
         }) => {
             let opts = commands::run::RunOptions {
                 json: *json,
                 session_id: session.clone(),
                 context_file: context_file.clone(),
                 exit_code: *exit_code,
+                chat: *chat,
             };
             let code = commands::run::run(&kernel, prompt, &opts).await?;
             std::process::exit(code);
@@ -2267,7 +2274,9 @@ async fn run() -> Result<()> {
                     let projects = pm.list_projects();
                     if projects.is_empty() {
                         println!("No projects registered.");
-                        println!("Use `oxios project add <name> --path /path/to/project` to register one.");
+                        println!(
+                            "Use `oxios project add <name> --path /path/to/project` to register one."
+                        );
                     } else {
                         println!(
                             "{}",
@@ -2421,7 +2430,7 @@ async fn run() -> Result<()> {
                         Err(e) => eprintln!("{} {}", style("✗").red().bold(), e),
                     }
                 }
-                CalendarAction::List { ref from, ref to } => {
+                CalendarAction::List { from, to } => {
                     let (f, t) = parse_range(from.clone(), to.clone());
                     match api.list(f, t).await {
                         Ok(events) => print_events(
@@ -2546,7 +2555,7 @@ async fn run() -> Result<()> {
                         );
                     }
                 }
-                EmailAction::History { ref limit } => {
+                EmailAction::History { limit } => {
                     let state_store = handle.state.store();
                     let sent_dir = state_store.base_path.join("email_sent");
                     if !sent_dir.exists() {
@@ -2556,13 +2565,11 @@ async fn run() -> Result<()> {
                     let mut records: Vec<serde_json::Value> = Vec::new();
                     for entry in std::fs::read_dir(&sent_dir)? {
                         let entry = entry?;
-                        if entry.path().extension().is_some_and(|ext| ext == "json") {
-                            if let Ok(content) = std::fs::read_to_string(entry.path()) {
-                                if let Ok(val) = serde_json::from_str::<serde_json::Value>(&content)
-                                {
-                                    records.push(val);
-                                }
-                            }
+                        if entry.path().extension().is_some_and(|ext| ext == "json")
+                            && let Ok(content) = std::fs::read_to_string(entry.path())
+                            && let Ok(val) = serde_json::from_str::<serde_json::Value>(&content)
+                        {
+                            records.push(val);
                         }
                     }
                     // Sort by sent_at descending
@@ -2788,24 +2795,24 @@ async fn cmd_serve(kernel: &Kernel, config_path: &Path) -> Result<()> {
 
     // Phase 4: Terminate running agents (parallel)
     let handle = kernel.handle();
-    if let Ok(agents) = handle.agents.list().await {
-        if !agents.is_empty() {
-            tracing::info!(count = agents.len(), "Terminating agents...");
-            let mut kill_futures = Vec::new();
-            for agent in &agents {
-                let agent_id = agent.id.to_string();
-                let h = handle.clone();
-                kill_futures.push(tokio::spawn(async move {
-                    if let Err(e) = h.agents.kill(&agent_id).await {
-                        tracing::warn!(agent = %agent_id, error = %e, "Failed to kill agent");
-                    }
-                }));
-            }
-            for f in kill_futures {
-                let _ = f.await;
-            }
-            tracing::info!(count = agents.len(), "Agents terminated");
+    if let Ok(agents) = handle.agents.list().await
+        && !agents.is_empty()
+    {
+        tracing::info!(count = agents.len(), "Terminating agents...");
+        let mut kill_futures = Vec::new();
+        for agent in &agents {
+            let agent_id = agent.id.to_string();
+            let h = handle.clone();
+            kill_futures.push(tokio::spawn(async move {
+                if let Err(e) = h.agents.kill(&agent_id).await {
+                    tracing::warn!(agent = %agent_id, error = %e, "Failed to kill agent");
+                }
+            }));
         }
+        for f in kill_futures {
+            let _ = f.await;
+        }
+        tracing::info!(count = agents.len(), "Agents terminated");
     }
 
     if let Err(e) = handle.mcp.shutdown_all().await {

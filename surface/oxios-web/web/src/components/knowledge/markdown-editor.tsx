@@ -31,6 +31,7 @@ import { oneDark } from '@codemirror/theme-one-dark'
 import { keymap } from '@codemirror/view'
 import CodeMirror, { EditorView, type ReactCodeMirrorRef } from '@uiw/react-codemirror'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useKnowledgeTree } from '@/hooks/use-knowledge'
 import { buildAutocompleteDict, type FileEntry } from '@/lib/autocomplete-link'
 import { EMOJI_SHORTCODES } from '@/lib/emoji-shortcodes'
@@ -243,6 +244,7 @@ export function MarkdownEditor({
   const currentFilePath = useKnowledgeStore((s) => s.currentFilePath)
   const { data: treeEntries } = useKnowledgeTree()
   const [isDark, setIsDark] = useState(false)
+  const { t } = useTranslation()
 
   // Track dark mode via document class
   useEffect(() => {
@@ -346,7 +348,7 @@ export function MarkdownEditor({
   return (
     <div className={cn('h-full relative', className)} onBlur={handleBlur}>
       {isDirty && (
-        <span className="absolute top-2 right-3 text-xs text-muted-foreground z-10">Unsaved</span>
+        <span className="absolute top-2 right-3 text-xs text-muted-foreground z-10">{t('knowledge.unsavedChanges')}</span>
       )}
       <CodeMirror
         ref={(instance) => {

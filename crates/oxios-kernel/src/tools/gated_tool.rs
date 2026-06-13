@@ -116,8 +116,7 @@ impl<T: AgentTool + 'static> AgentTool for GatedTool<T> {
         params: Value,
         signal: Option<tokio::sync::oneshot::Receiver<()>>,
         ctx: &ToolContext,
-    ) -> Result<AgentToolResult, oxi_sdk::ToolError>
-     {
+    ) -> Result<AgentToolResult, oxi_sdk::ToolError> {
         let tool_name = self.inner.name();
 
         // Step 1: Check tool access permission

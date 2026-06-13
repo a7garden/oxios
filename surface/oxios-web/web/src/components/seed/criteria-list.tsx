@@ -17,7 +17,7 @@ export function CriteriaList({ criteria, results }: { criteria: string[]; result
             return (
               <li key={i} className="flex items-start gap-2 text-sm">
                 {passed === true ? (
-                  <CheckCircle2 className="mt-0.5 h-4 w-4 text-green-500" />
+                  <CheckCircle2 className="mt-0.5 h-4 w-4 text-success" />
                 ) : passed === false ? (
                   <XCircle className="mt-0.5 h-4 w-4 text-error" />
                 ) : (

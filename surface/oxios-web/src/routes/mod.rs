@@ -118,7 +118,7 @@ pub(crate) use resource_routes::{
     handle_resource_history, handle_resource_overload, handle_resource_snapshot,
 };
 pub(crate) use system::{
-    handle_agent_get, handle_agent_kill, handle_agent_logs, handle_agent_trace,
+    handle_agent_get, handle_agent_kill, handle_agent_logs, handle_agent_stats, handle_agent_trace,
     handle_agents_list, handle_audit_verify_api, handle_backup, handle_config_get,
     handle_config_patch, handle_config_put, handle_doctor, handle_health, handle_log,
     handle_readiness, handle_status, handle_update_changelog, handle_update_check,
@@ -214,9 +214,15 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         .route("/api/chat/ticket", post(handle_chat_ticket))
         .route("/api/chat/stream", get(handle_chat_stream))
         // RFC-017: runtime tool capability escalation
-        .route("/api/chat/tool-approval/{id}/respond", post(handle_tool_approval_respond))
+        .route(
+            "/api/chat/tool-approval/{id}/respond",
+            post(handle_tool_approval_respond),
+        )
         // RFC-016: Knowledge persistence API
-        .route("/api/chat/{session_id}/knowledge-saves", get(handle_knowledge_saves))
+        .route(
+            "/api/chat/{session_id}/knowledge-saves",
+            get(handle_knowledge_saves),
+        )
         .route(
             "/api/chat/{session_id}/messages/{message_index}/save-to-knowledge",
             post(handle_save_to_knowledge),
@@ -228,6 +234,7 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         // Control
         .route("/api/status", get(handle_status))
         .route("/api/agents", get(handle_agents_list))
+        .route("/api/agents/stats", get(handle_agent_stats))
         .route("/api/agents/{id}", get(handle_agent_get))
         .route("/api/agents/{id}/trace", get(handle_agent_trace))
         .route("/api/agents/{id}/logs", get(handle_agent_logs))

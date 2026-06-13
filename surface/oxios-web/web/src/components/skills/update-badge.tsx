@@ -16,7 +16,7 @@ export function useSkillUpdates() {
     queryKey: ['marketplace', 'updates'],
     queryFn: async () => {
       const r = await api.get<SkillUpdate[]>('/api/marketplace/updates')
-      return r ?? []
+      return Array.isArray(r) ? r : []
     },
     refetchInterval: 60_000 * 5, // 5 min
     refetchOnWindowFocus: false,

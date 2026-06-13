@@ -468,7 +468,9 @@ impl StateStore {
                         id: session.id.0.clone(),
                         user_id: session.user_id.clone(),
                         message_count: session.user_messages.len(),
-                        title: session.metadata.get("title")
+                        title: session
+                            .metadata
+                            .get("title")
                             .and_then(|v| v.as_str())
                             .map(String::from)
                             .or_else(|| {
@@ -585,6 +587,79 @@ impl StateStore {
 
         if pruned > 0 {
             tracing::info!(pruned = pruned, "Session pruning completed");
+        }
+
+        Ok(pruned)
+    }
+
+    /// Prune agent records based on config.
+    ///
+    /// 1. TTL-based: delete agents with created_at older than ttl_hours.
+    /// 2. Count-based: if still over max_entries, delete oldest.
+    pub async fn prune_agents_by_config(
+        &self,
+        max_entries: usize,
+        ttl_hours: u64,
+        batch_size: usize,
+    ) -> Result<usize> {
+        let mut pruned = 0usize;
+
+        let names = self.list_category("agents").await?;
+        if names.is_empty() {
+            return Ok(0);
+        }
+
+        let now = Utc::now();
+
+        // 1. TTL-based pruning
+        let mut remaining: Vec<(String, DateTime<Utc>)> = Vec::with_capacity(names.len());
+
+        if ttl_hours > 0 {
+            let cutoff = now - chrono::Duration::hours(ttl_hours as i64);
+            for name in &names {
+                // Load just enough to check created_at
+                if let Ok(Some(info)) = self
+                    .load_json::<crate::types::AgentInfo>("agents", name)
+                    .await
+                {
+                    if info.created_at < cutoff {
+                        if self.delete_file("agents", name).await.unwrap_or(false) {
+                            pruned += 1;
+                        }
+                    } else {
+                        remaining.push((name.clone(), info.created_at));
+                    }
+                }
+            }
+        } else {
+            // Load all created_at for count-based pruning
+            for name in &names {
+                if let Ok(Some(info)) = self
+                    .load_json::<crate::types::AgentInfo>("agents", name)
+                    .await
+                {
+                    remaining.push((name.clone(), info.created_at));
+                }
+            }
+        }
+
+        // 2. Count-based pruning
+        if max_entries > 0 && remaining.len() > max_entries {
+            // Sort by created_at ascending (oldest first)
+            remaining.sort_by_key(|a| a.1);
+
+            let excess = remaining.len() - max_entries;
+            let to_delete = excess.min(batch_size);
+
+            for (name, _) in remaining.iter().take(to_delete) {
+                if self.delete_file("agents", name).await.unwrap_or(false) {
+                    pruned += 1;
+                }
+            }
+        }
+
+        if pruned > 0 {
+            tracing::info!(pruned = pruned, "Agent filesystem pruning completed");
         }
 
         Ok(pruned)

@@ -1,6 +1,30 @@
 # Oxios Agent OS — Default Configuration
 # Copy to ~/.oxios/config.toml and customize as needed.
 
+# ── Secrets (API keys, tokens, passwords) ─────────────────────────────────
+# All sensitive values in one place.
+# Environment variables serve as fallback when not set here.
+# Priority: config.toml → ~/.oxi/auth.json → env var
+#
+# [secrets]
+# # Web API authentication key (falls back to OXIOS_API_KEY env var)
+# oxios_api_key = ""
+#
+# # Email SMTP password (falls back to OXIOS_EMAIL_PASSWORD / RESEND_API_KEY env var)
+# email_smtp_password = ""
+#
+# # Telegram bot token (falls back to TELEGRAM_BOT_TOKEN env var)
+# telegram_bot_token = ""
+#
+# # ClawHub marketplace API key (falls back to CLAWHUB_TOKEN env var)
+# clawhub_api_key = ""
+#
+# # LLM provider API keys (fall back to OXIOS_<PROVIDER>_API_KEY env var)
+# [secrets.providers]
+# anthropic = "sk-ant-..."
+# openai = "sk-..."
+# google = "..."
+
 [kernel]
 # Path to the workspace directory.
 # workspace = "~/.oxios/workspace"
@@ -74,6 +98,10 @@ max_evolution_iterations = 3
 min_evaluation_score = 0.8
 # Enable evaluation result caching (avoids re-evaluating same seed+output).
 eval_cache_enabled = true
+# Keywords that trigger spec (Ouroboros) mode. Prefix-only match.
+spec_keywords = ["#spec", "#plan"]
+# Default execution mode: "spec" (Ouroboros pipeline) or "chat" (direct agent).
+default_mode = "spec"
 
 [context]
 active_limit_tokens = 100000
@@ -178,6 +206,22 @@ sync_enabled = false
 # journal_sync = "on_open"
 # system_calendar = true
 # archive_after_days = 365
+
+# Agent history log (enabled by default).
+# Controls how past agent executions are retained for transparent observation.
+[agent_log]
+# Maximum number of agent records to keep (0 = unlimited)
+max_entries = 10000
+# TTL for agent records in hours (0 = unlimited)
+ttl_hours = 720  # 30 days
+# Max tool_calls per agent to persist (0 = unlimited)
+# Truncates old calls to keep storage bounded
+# Full traces remain available via Session.trajectory_steps
+max_tool_calls_per_agent = 500
+# How many agents to prune per cycle (prevents long locks)
+prune_batch_size = 100
+# Path to the SQLite database file (empty = ~/.oxios/state/agent_log.db)
+# db_path = ""
 
 # Email system (disabled by default).
 # Enable to allow agents to send HTML emails via SMTP.

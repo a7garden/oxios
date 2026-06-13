@@ -8,7 +8,7 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
 use crate::seed::Seed;
-use crate::{EvaluationResult, InterviewResult, ouroboros_engine::InterviewQuestionOutput};
+use crate::{ouroboros_engine::InterviewQuestionOutput, EvaluationResult, InterviewResult};
 
 /// The phases of the Ouroboros lifecycle.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -48,6 +48,15 @@ pub struct ToolCallRecord {
     pub output: String,
     /// Duration of the tool call in milliseconds.
     pub duration_ms: u64,
+    /// Whether the tool call returned an error.
+    #[serde(default)]
+    pub is_error: bool,
+    /// Provider-specific tool call ID for start/end correlation.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub tool_call_id: String,
+    /// Timestamp when the tool call started (UTC).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub timestamp: Option<chrono::DateTime<chrono::Utc>>,
 }
 
 /// Result of executing a seed.
@@ -62,6 +71,15 @@ pub struct ExecutionResult {
     /// Tool calls recorded during execution.
     #[serde(default)]
     pub tool_calls: Vec<ToolCallRecord>,
+    /// Total input tokens consumed during execution.
+    #[serde(default)]
+    pub tokens_input: u64,
+    /// Total output tokens generated during execution.
+    #[serde(default)]
+    pub tokens_output: u64,
+    /// Model ID used for this execution.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub model_id: String,
 }
 
 /// The Ouroboros protocol trait.

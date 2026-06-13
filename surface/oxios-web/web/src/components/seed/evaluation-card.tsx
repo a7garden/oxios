@@ -36,7 +36,7 @@ export function EvaluationCard({ evaluation }: { evaluation?: EvaluationResult }
           {items.map((item) => (
             <div key={item.label} className="flex items-center gap-2 rounded-lg border p-3">
               {item.passed === true ? (
-                <CheckCircle2 className="h-5 w-5 text-green-500" />
+                <CheckCircle2 className="h-5 w-5 text-success" />
               ) : item.passed === false ? (
                 <XCircle className="h-5 w-5 text-error" />
               ) : (

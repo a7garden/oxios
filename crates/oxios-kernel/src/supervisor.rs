@@ -23,16 +23,21 @@ use oxi_sdk::Agent;
 use oxios_ouroboros::Seed;
 use parking_lot::RwLock;
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use tokio::task::JoinHandle;
 
 use crate::agent_runtime::AgentRuntime;
+use crate::config::AgentLogConfig;
 use crate::event_bus::EventBus;
 use crate::resource_monitor::ResourceMonitor;
 use crate::session_context::SessionContext;
+use crate::state_store::StateStore;
 use crate::types::{AgentId, AgentInfo, AgentStatus};
 use oxios_ouroboros::ExecutionResult;
+
+#[cfg(feature = "sqlite-memory")]
+use crate::agent_log_db::AgentLogDb;
 
 /// Tracks the runtime handles needed to cancel a running agent.
 struct AgentHandle {
@@ -147,6 +152,13 @@ pub struct BasicSupervisor {
     /// Uses tokio::sync::RwLock (not parking_lot) so the guard is Send,
     /// allowing it to be held across .await in tokio::spawn.
     session_context: Arc<tokio::sync::RwLock<SessionContext>>,
+    /// Filesystem state store for agent persistence (JSON files).
+    state_store: Option<Arc<StateStore>>,
+    /// SQLite-backed agent history query index.
+    #[cfg(feature = "sqlite-memory")]
+    agent_log_db: Option<Arc<AgentLogDb>>,
+    /// Agent log retention configuration.
+    agent_log_config: AgentLogConfig,
 }
 
 impl BasicSupervisor {
@@ -160,7 +172,27 @@ impl BasicSupervisor {
             runtime: Arc::new(runtime),
             resource_monitor: None,
             session_context: Arc::new(tokio::sync::RwLock::new(SessionContext::new())),
+            state_store: None,
+            #[cfg(feature = "sqlite-memory")]
+            agent_log_db: None,
+            agent_log_config: AgentLogConfig::default(),
         }
+    }
+
+    /// Attach a filesystem state store for agent history persistence.
+    pub fn set_state_store(&mut self, store: Arc<StateStore>) {
+        self.state_store = Some(store);
+    }
+
+    /// Attach a SQLite-backed agent history log database.
+    #[cfg(feature = "sqlite-memory")]
+    pub fn set_agent_log_db(&mut self, db: Arc<AgentLogDb>) {
+        self.agent_log_db = Some(db);
+    }
+
+    /// Set agent log retention configuration.
+    pub fn set_agent_log_config(&mut self, config: AgentLogConfig) {
+        self.agent_log_config = config;
     }
 
     /// Attach a resource monitor for agent count tracking.
@@ -192,6 +224,18 @@ impl Supervisor for BasicSupervisor {
             status: AgentStatus::Starting,
             created_at: Utc::now(),
             seed_id: Some(spec.id),
+            project_id: spec.project_id,
+            started_at: None,
+            completed_at: None,
+            error: None,
+            steps_completed: 0,
+            steps_total: None,
+            tool_calls: vec![],
+            tokens_input: 0,
+            tokens_output: 0,
+            cost_usd: 0.0,
+            model_id: String::new(),
+            session_id: None,
         };
 
         {
@@ -238,7 +282,10 @@ impl Supervisor for BasicSupervisor {
         {
             let mut agents = self.agents.write();
             match agents.get_mut(&id) {
-                Some(agent) => agent.status = AgentStatus::Running,
+                Some(agent) => {
+                    agent.status = AgentStatus::Running;
+                    agent.started_at = Some(Utc::now());
+                }
                 None => anyhow::bail!("Agent {id} not found"),
             }
         }
@@ -267,6 +314,9 @@ impl Supervisor for BasicSupervisor {
                     steps_completed: 0,
                     success: false,
                     tool_calls: vec![],
+                    tokens_input: 0,
+                    tokens_output: 0,
+                    model_id: String::new(),
                 });
             }
             let mut ctx = session_ctx.write().await;
@@ -304,6 +354,9 @@ impl Supervisor for BasicSupervisor {
                             steps_completed: 0,
                             success: false,
                             tool_calls: vec![],
+                            tokens_input: 0,
+                            tokens_output: 0,
+                            model_id: String::new(),
                         })
                     }
                 },
@@ -328,6 +381,36 @@ impl Supervisor for BasicSupervisor {
                         } else {
                             AgentStatus::Failed
                         };
+                        agent.completed_at = Some(Utc::now());
+                        agent.steps_completed = result.steps_completed;
+                        agent.tool_calls = result
+                            .tool_calls
+                            .iter()
+                            .map(|tc| crate::types::ToolCallRecord {
+                                tool: tc.tool.clone(),
+                                input: tc.input.clone(),
+                                output: tc.output.clone(),
+                                duration_ms: tc.duration_ms,
+                                is_error: tc.is_error,
+                                tool_call_id: tc.tool_call_id.clone(),
+                                timestamp: tc.timestamp,
+                            })
+                            .collect();
+                        agent.tokens_input = result.tokens_input;
+                        agent.tokens_output = result.tokens_output;
+                        agent.model_id = result.model_id.clone();
+                        agent.cost_usd = if !result.model_id.is_empty() {
+                            crate::kernel_handle::engine_api::estimate_cost(
+                                &result.model_id,
+                                result.tokens_input,
+                                result.tokens_output,
+                            )
+                        } else {
+                            0.0
+                        };
+                        if !result.success {
+                            agent.error = Some(result.output.clone());
+                        }
                     }
                 }
 
@@ -335,6 +418,10 @@ impl Supervisor for BasicSupervisor {
                     .event_bus
                     .publish(crate::event_bus::KernelEvent::AgentStopped { id });
                 self.update_agent_count();
+
+                // Persist to agent history log (async, non-blocking)
+                self.persist_agent(id).await;
+
                 Ok(result)
             }
             Err(e) => {
@@ -344,6 +431,8 @@ impl Supervisor for BasicSupervisor {
                     let mut agents = self.agents.write();
                     if let Some(agent) = agents.get_mut(&id) {
                         agent.status = AgentStatus::Failed;
+                        agent.completed_at = Some(Utc::now());
+                        agent.error = Some(e.to_string());
                     }
                 }
 
@@ -355,11 +444,17 @@ impl Supervisor for BasicSupervisor {
                     });
                 self.update_agent_count();
 
+                // Persist to agent history log (async, non-blocking)
+                self.persist_agent(id).await;
+
                 Ok(ExecutionResult {
                     output: format!("Agent failed: {e}"),
                     steps_completed: 0,
                     success: false,
                     tool_calls: vec![],
+                    tokens_input: 0,
+                    tokens_output: 0,
+                    model_id: String::new(),
                 })
             }
         }
@@ -388,6 +483,7 @@ impl Supervisor for BasicSupervisor {
             let mut agents = self.agents.write();
             if let Some(agent) = agents.get_mut(&id) {
                 agent.status = AgentStatus::Stopped;
+                agent.completed_at = Some(Utc::now());
             } else {
                 anyhow::bail!("Agent {id} not found");
             }
@@ -397,6 +493,10 @@ impl Supervisor for BasicSupervisor {
             .event_bus
             .publish(crate::event_bus::KernelEvent::AgentStopped { id });
         self.update_agent_count();
+
+        // Persist to agent history log (async, non-blocking)
+        self.persist_agent(id).await;
+
         tracing::info!(agent_id = %id, "Agent killed");
         Ok(())
     }
@@ -404,6 +504,61 @@ impl Supervisor for BasicSupervisor {
     async fn list(&self) -> Result<Vec<AgentInfo>> {
         let agents = self.agents.read();
         Ok(agents.values().cloned().collect())
+    }
+}
+
+impl BasicSupervisor {
+    /// Persist a terminated agent to both filesystem JSON and SQLite.
+    /// Non-blocking: spawns a tokio task for the actual persistence.
+    async fn persist_agent(&self, id: AgentId) {
+        // Snapshot the agent info from the in-memory map
+        let info = {
+            let agents = self.agents.read();
+            agents.get(&id).cloned()
+        };
+
+        let Some(info) = info else { return };
+
+        // 1. Filesystem JSON (source of truth)
+        if let Some(ref store) = self.state_store {
+            let store = store.clone();
+            let info = info.clone();
+            let max_entries = self.agent_log_config.max_entries;
+            let ttl_hours = self.agent_log_config.ttl_hours;
+            let batch_size = self.agent_log_config.prune_batch_size;
+            tokio::spawn(async move {
+                let _ = store
+                    .save_json("agents", &id.to_string(), &info)
+                    .await
+                    .inspect_err(|e| tracing::warn!(agent_id = %id, error = %e, "Failed to persist agent to filesystem"));
+
+                // Prune old records (async, best-effort)
+                if max_entries > 0 || ttl_hours > 0 {
+                    let _ = store
+                        .prune_agents_by_config(max_entries, ttl_hours, batch_size)
+                        .await
+                        .inspect_err(|e| tracing::warn!(error = %e, "Failed to prune agent log"));
+                }
+            });
+        }
+
+        // 2. SQLite (query index)
+        #[cfg(feature = "sqlite-memory")]
+        if let Some(ref db) = self.agent_log_db {
+            let db = db.clone();
+            let info = info.clone();
+            let config = self.agent_log_config.clone();
+            tokio::spawn(async move {
+                let _ = db
+                    .upsert_agent(&info)
+                    .inspect_err(|e| tracing::warn!(agent_id = %id, error = %e, "Failed to upsert agent to SQLite"));
+
+                // Prune old records
+                let _ = db
+                    .prune(&config)
+                    .inspect_err(|e| tracing::warn!(error = %e, "Failed to prune agent SQLite"));
+            });
+        }
     }
 }
 
@@ -429,7 +584,6 @@ mod tests {
         let state_store_2 =
             Arc::new(crate::state_store::StateStore::new(tmp.join("state")).expect("state store"));
         let state_store = state_store_2.clone();
-        let state_store_for_space = state_store_2.clone();
         let memory_manager = Arc::new({
             let mut mm = crate::memory::MemoryManager::new(state_store.clone());
             mm.set_git_layer(Arc::new(
@@ -551,6 +705,7 @@ mod tests {
             cspace_hint: None,
             original_request: String::new(),
             output_schema: None,
+            project_id: None,
         }
     }
 

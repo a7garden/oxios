@@ -157,32 +157,30 @@ pub fn run_onboarding(
     is_first_run: bool,
 ) -> anyhow::Result<OnboardingResult> {
     // ── Already configured? ──
-    if !config.engine.default_model.is_empty() {
-        if let Some(provider_id) =
+    if !config.engine.default_model.is_empty()
+        && let Some(provider_id) =
             CredentialStore::provider_from_model(&config.engine.default_model)
-        {
-            if CredentialStore::has_credential(provider_id, config.api_key().as_deref()) {
-                println!();
-                println!(
-                    "  {} {}",
-                    style("✓").green(),
-                    style(&config.engine.default_model).cyan(),
-                );
+        && CredentialStore::has_credential(provider_id, config.api_key().as_deref())
+    {
+        println!();
+        println!(
+            "  {} {}",
+            style("✓").green(),
+            style(&config.engine.default_model).cyan(),
+        );
 
-                let ans = Select::new(
-                    "  What next?",
-                    vec!["Keep current configuration", "Reconfigure"],
-                )
-                .with_starting_cursor(0)
-                .prompt()?;
+        let ans = Select::new(
+            "  What next?",
+            vec!["Keep current configuration", "Reconfigure"],
+        )
+        .with_starting_cursor(0)
+        .prompt()?;
 
-                if ans == "Keep current configuration" {
-                    return Ok(OnboardingResult {
-                        configured: true,
-                        skipped: false,
-                    });
-                }
-            }
+        if ans == "Keep current configuration" {
+            return Ok(OnboardingResult {
+                configured: true,
+                skipped: false,
+            });
         }
     }
 
@@ -285,18 +283,18 @@ fn resolve_api_key(provider: &str) -> anyhow::Result<(Option<String>, &'static s
     }
 
     // Try auth.json
-    if let Ok(Some(token)) = oxi_sdk::load_token(provider) {
-        if !token.access_token.is_empty() {
-            println!();
-            println!(
-                "  {} Credentials found in {}",
-                theme::step("API Key"),
-                theme::dim("~/.oxi/auth.json"),
-            );
-            let use_it = Confirm::new("  Use them?").with_default(true).prompt()?;
-            if use_it {
-                return Ok((None, "auth.json"));
-            }
+    if let Ok(Some(token)) = oxi_sdk::load_token(provider)
+        && !token.access_token.is_empty()
+    {
+        println!();
+        println!(
+            "  {} Credentials found in {}",
+            theme::step("API Key"),
+            theme::dim("~/.oxi/auth.json"),
+        );
+        let use_it = Confirm::new("  Use them?").with_default(true).prompt()?;
+        if use_it {
+            return Ok((None, "auth.json"));
         }
     }
 

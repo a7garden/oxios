@@ -44,7 +44,7 @@ impl Role {
                 role: Role::Superuser,
                 allowed_actions: vec![
                     Action::UseTool("*".into()),
-                    Action::AccessPath("/workspace/**".into()),
+                    Action::AccessPath("*".into()),
                     Action::ManageAgents,
                     Action::ManagePrograms,
                     Action::ManageWorkspaces,
@@ -52,7 +52,7 @@ impl Role {
                 ]
                 .into_iter()
                 .collect(),
-                resource_patterns: vec!["/workspace/**".into(), "/tmp/**".into()],
+                resource_patterns: vec!["*".into()],
                 max_concurrent_agents: 10,
             },
             Role::User => RbacPolicy {

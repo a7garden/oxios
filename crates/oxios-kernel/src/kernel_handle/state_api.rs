@@ -3,7 +3,7 @@
 use crate::state_store::{
     PruneConfig, PruneThrottle, Session, SessionId, SessionSummary, StateStore,
 };
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{Serialize, de::DeserializeOwned};
 use std::sync::Arc;
 
 /// State management system calls.

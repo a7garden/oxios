@@ -13,7 +13,10 @@ interface MemoryCardProps {
 export function MemoryCard({ memory, onClick }: MemoryCardProps) {
   const { t } = useTranslation()
   return (
-    <Card className="cursor-pointer hover:border-primary/50 transition-colors" onClick={onClick}>
+    <Card
+      className="cursor-pointer hover:border-primary/30 hover:shadow-sm transition-all"
+      onClick={onClick}
+    >
       <CardContent className="p-4 space-y-2">
         <div className="flex items-center justify-between">
           <div className="flex gap-1.5">

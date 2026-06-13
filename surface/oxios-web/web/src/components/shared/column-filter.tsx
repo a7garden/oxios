@@ -1,7 +1,7 @@
 import { ChevronDown, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
-import { DropdownMenu, DropdownMenuItem } from '@/components/ui/dropdown-menu'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 
 interface FilterOption {
   label: string
@@ -20,8 +20,8 @@ export function ColumnFilter({ label, options, selected, onChange }: ColumnFilte
   const { t } = useTranslation()
 
   return (
-    <DropdownMenu
-      trigger={
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
         <Button variant="outline" size="sm" className="h-9">
           {label}
           {selected.length > 0 && (
@@ -31,39 +31,39 @@ export function ColumnFilter({ label, options, selected, onChange }: ColumnFilte
           )}
           <ChevronDown className="ml-1 h-3.5 w-3.5" />
         </Button>
-      }
-      align="left"
-    >
-      {options.map((opt) => {
-        const isSelected = selected.includes(opt.value)
-        return (
+      </DropdownMenuTrigger>
+      <DropdownMenuContent>
+        {options.map((opt) => {
+          const isSelected = selected.includes(opt.value)
+          return (
+            <DropdownMenuItem
+              key={opt.value}
+              onClick={() => {
+                if (isSelected) {
+                  onChange(selected.filter((v) => v !== opt.value))
+                } else {
+                  onChange([...selected, opt.value])
+                }
+              }}
+              className="cursor-pointer"
+            >
+              <span className={isSelected ? 'opacity-100' : 'opacity-30 mr-2'}>
+                {isSelected ? '✓' : ''}
+              </span>
+              {opt.label}
+            </DropdownMenuItem>
+          )
+        })}
+        {selected.length > 0 && (
           <DropdownMenuItem
-            key={opt.value}
-            onClick={() => {
-              if (isSelected) {
-                onChange(selected.filter((v) => v !== opt.value))
-              } else {
-                onChange([...selected, opt.value])
-              }
-            }}
-            className="cursor-pointer"
+            onClick={() => onChange([])}
+            className="cursor-pointer text-muted-foreground border-t mt-1"
           >
-            <span className={isSelected ? 'opacity-100' : 'opacity-30 mr-2'}>
-              {isSelected ? '✓' : ''}
-            </span>
-            {opt.label}
+            <X className="mr-2 h-3.5 w-3.5" />
+            {t('dataTable.clearFilters', 'Clear filters')}
           </DropdownMenuItem>
-        )
-      })}
-      {selected.length > 0 && (
-        <DropdownMenuItem
-          onClick={() => onChange([])}
-          className="cursor-pointer text-muted-foreground border-t mt-1"
-        >
-          <X className="mr-2 h-3.5 w-3.5" />
-          {t('dataTable.clearFilters', 'Clear filters')}
-        </DropdownMenuItem>
-      )}
+        )}
+      </DropdownMenuContent>
     </DropdownMenu>
   )
 }

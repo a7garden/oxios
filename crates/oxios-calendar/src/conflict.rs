@@ -46,7 +46,7 @@ pub fn detect_conflicts(
     }
 
     // Sort by overlap duration descending
-    conflicts.sort_by(|a, b| b.overlap_minutes.cmp(&a.overlap_minutes));
+    conflicts.sort_by_key(|b| std::cmp::Reverse(b.overlap_minutes));
     conflicts
 }
 

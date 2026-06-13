@@ -12,8 +12,8 @@
 //! | Save template | Send + save as template | `subject`, `body_html` or `use_template`, `save_template_as` |
 //! | List templates | List available templates | `list_templates: true` |
 
-use std::collections::HashMap;
 use async_trait::async_trait;
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use oxi_sdk::{AgentTool as OxiAgentTool, AgentToolResult, ToolContext};
@@ -158,8 +158,7 @@ impl OxiAgentTool for EmailTool {
         params: Value,
         _signal: Option<tokio::sync::oneshot::Receiver<()>>,
         _ctx: &ToolContext,
-    ) -> Result<AgentToolResult, oxi_sdk::ToolError>
-     {
+    ) -> Result<AgentToolResult, oxi_sdk::ToolError> {
         let args: EmailArgs =
             serde_json::from_value(params).map_err(|e| format!("Invalid arguments: {e}"))?;
 

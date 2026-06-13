@@ -1,8 +1,8 @@
 //! Persona API routes: CRUD and active persona management.
 use axum::{
+    Json,
     extract::{Path, State},
     http::StatusCode,
-    Json,
 };
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -177,12 +177,12 @@ pub async fn handle_persona_delete(
         .map_err(|e: anyhow::Error| (StatusCode::NOT_FOUND, e.to_string()))?;
 
     // If deleted persona was active, clear the active reference.
-    if let Some(active) = state.kernel.persona.active() {
-        if active.id == id {
-            // Try to set another persona as active.
-            if let Some(next) = state.kernel.persona.list_enabled().into_iter().next() {
-                let _ = state.kernel.persona.set_active(&next.id);
-            }
+    if let Some(active) = state.kernel.persona.active()
+        && active.id == id
+    {
+        // Try to set another persona as active.
+        if let Some(next) = state.kernel.persona.list_enabled().into_iter().next() {
+            let _ = state.kernel.persona.set_active(&next.id);
         }
     }
 

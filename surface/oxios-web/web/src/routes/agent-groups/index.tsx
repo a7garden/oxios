@@ -18,7 +18,7 @@ function AgentGroupsPage() {
   if (isLoading) return <LoadingCards count={4} />
   if (isError) return <ErrorState onRetry={() => refetch()} />
 
-  const items = groups ?? []
+  const items = Array.isArray(groups) ? groups : []
 
   return (
     <div className="space-y-6">

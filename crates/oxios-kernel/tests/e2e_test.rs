@@ -30,6 +30,8 @@ fn make_config(max_iterations: u32) -> OrchestratorConfig {
         max_evolution_iterations: max_iterations,
         min_evaluation_score: 0.8,
         eval_cache_enabled: true,
+        spec_keywords: vec!["#spec".into(), "#plan".into()],
+        default_mode: "spec".into(),
     }
 }
 
@@ -99,6 +101,9 @@ impl OuroborosProtocol for MockOuroboros {
             steps_completed: 3,
             success: true,
             tool_calls: vec![],
+            tokens_input: 0,
+            tokens_output: 0,
+            model_id: String::new(),
         })
     }
 
@@ -160,6 +165,18 @@ impl Supervisor for MockSupervisor {
             status: AgentStatus::Starting,
             created_at: chrono::Utc::now(),
             seed_id: Some(spec.id),
+            project_id: None,
+            started_at: None,
+            completed_at: None,
+            error: None,
+            steps_completed: 0,
+            steps_total: None,
+            tool_calls: vec![],
+            tokens_input: 0,
+            tokens_output: 0,
+            cost_usd: 0.0,
+            model_id: String::new(),
+            session_id: None,
         };
         self.agents.write().insert(id, info);
         let _ = self.event_bus.publish(KernelEvent::AgentCreated {
@@ -190,6 +207,9 @@ impl Supervisor for MockSupervisor {
             steps_completed: 5,
             success: true,
             tool_calls: vec![],
+            tokens_input: 0,
+            tokens_output: 0,
+            model_id: String::new(),
         })
     }
 
@@ -248,6 +268,9 @@ fn make_lifecycle(
         a2a,
         event_bus.clone(),
         300,
+        vec![],
+        true,
+        "/tmp/oxios-test-workspace".to_string(),
     )
 }
 

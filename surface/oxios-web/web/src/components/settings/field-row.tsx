@@ -75,10 +75,12 @@ function FieldControl({
           onValueChange={(v) => onChange(v)}
           placeholder={t(field.labelKey)}
           options={
-            field.options?.map((opt) => ({
-              label: t(opt.labelKey),
-              value: opt.value,
-            })) ?? []
+            Array.isArray(field.options)
+              ? field.options.map((opt) => ({
+                  label: t(opt.labelKey),
+                  value: opt.value,
+                }))
+              : []
           }
           className="w-full"
         />

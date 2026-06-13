@@ -1,93 +1,43 @@
-import { useNavigate } from '@tanstack/react-router'
-import { Settings, Shield, Sparkles } from 'lucide-react'
+import { Shield } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { ProvidersSection } from '@/components/dashboard/providers-section'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import { Separator } from '@/components/ui/separator'
-import { useEngineConfig, useProviders, useRoutingStats } from '@/hooks/use-engine'
+import { useRoutingStats } from '@/hooks/use-engine'
 import type { SystemStatus } from '@/types'
 
 export interface SystemHealthCardProps {
   status?: SystemStatus
+  className?: string
 }
 
 /**
- * Combined system health card for the dashboard.
+ * System health card for the dashboard.
  *
- * Replaces the three separate `SystemHealthCard`, `CurrentModelCard`,
- * and `ModelUsageCard` components from the old dashboard. The new
- * layout shows:
- *
- *   ┌─ Shield · 시스템 상태        v0.14.2 ─┐
- *   │                                      │
- *   │   💡 모델: gpt-4o  [openai]  [⚙️]   │  ← CurrentModelCard
- *   │                                      │
- *   │   ✅ Store   ✅ Bus                 │  ← HealthRow
- *   │   ✅ Memory (142)   ⏱ 1h 30m 5s     │
- *   │   12 완료 · 2 실패                   │  ← agents summary
- *   │  ─────────────────────────────────  │
- *   │   모델 사용량                       │  ← ModelUsageCard
- *   │   gpt-4o     65% · $1.23            │
- *   │   $1.68 총 비용 · 342회 호출        │
- *   └──────────────────────────────────────┘
+ * Shows component health, providers/model switching (via ProvidersSection),
+ * and model usage stats. Keeps the card slim by delegating provider
+ * interaction to a separate component.
  */
-export function SystemHealthCard({ status }: SystemHealthCardProps) {
+export function SystemHealthCard({ status, className }: SystemHealthCardProps) {
   const { t } = useTranslation()
-  const navigate = useNavigate()
-  const { data: engineConfig } = useEngineConfig()
-  const { data: providers } = useProviders()
   const { data: routingStats } = useRoutingStats()
 
   if (!status) return null
-
-  const currentModel = engineConfig?.default_model ?? ''
-  const providerId = currentModel.includes('/') ? currentModel.split('/')[0] : null
-  const modelId = currentModel.includes('/')
-    ? currentModel.split('/').slice(1).join('/')
-    : currentModel
-  const providerName = providers?.find((p) => p.id === providerId)?.name ?? providerId ?? '—'
 
   const completed = status.components?.agents?.total_completed ?? 0
   const failed = status.components?.agents?.total_failed ?? 0
   const hasUsage = !!routingStats && routingStats.totalRequests > 0
 
   return (
-    <Card>
+    <Card className={className}>
       <CardHeader className="flex flex-row items-center justify-between pb-2">
         <CardTitle className="flex items-center gap-2 text-base">
           <Shield className="h-4 w-4" />
           {t('dashboard.systemHealth')}
         </CardTitle>
-        <span className="text-xs font-mono text-muted-foreground">{status.version}</span>
       </CardHeader>
       <CardContent className="pt-0 space-y-3">
-        {/* ── Model ── */}
-        <button
-          type="button"
-          onClick={() => navigate({ to: '/settings', search: { section: 'engine' } })}
-          className="flex w-full items-center gap-3 rounded-md p-2 -mx-2 text-left hover:bg-accent/40 transition-colors group"
-        >
-          <Sparkles className="h-4 w-4 shrink-0 text-violet-500" />
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-semibold truncate">
-                {modelId || t('dashboard.modelNotSet')}
-              </span>
-              {providerId && (
-                <span className="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary whitespace-nowrap">
-                  {providerName}
-                </span>
-              )}
-            </div>
-            {currentModel && (
-              <p className="text-2xs text-muted-foreground mt-0.5 font-mono truncate">
-                {currentModel}
-              </p>
-            )}
-          </div>
-          <Settings className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
-        </button>
-
         {/* ── Health rows ── */}
         <div className="grid gap-2 sm:grid-cols-2 text-xs">
           {status.components?.state_store && (
@@ -132,6 +82,10 @@ export function SystemHealthCard({ status }: SystemHealthCardProps) {
             )}
           </p>
         )}
+
+        {/* ── Providers & Model Switcher ── */}
+        <Separator />
+        <ProvidersSection />
 
         {/* ── Model usage (RFC-011 routing stats) ── */}
         {hasUsage && (

@@ -93,8 +93,7 @@ impl AgentTool for ResourceTool {
         params: Value,
         _signal: Option<tokio::sync::oneshot::Receiver<()>>,
         _ctx: &ToolContext,
-    ) -> Result<AgentToolResult, oxi_sdk::ToolError>
-     {
+    ) -> Result<AgentToolResult, oxi_sdk::ToolError> {
         let action = params
             .get("action")
             .and_then(|v| v.as_str())
@@ -104,27 +103,27 @@ impl AgentTool for ResourceTool {
             "snapshot" => {
                 let snap = self.resource_monitor.snapshot();
                 Ok(AgentToolResult::success(
-                serde_json::to_string_pretty(&json!({
-                    "timestamp": snap.timestamp.to_rfc3339(),
-                    "cpu_percent": format!("{:.1}%", snap.cpu_percent),
-                    "memory_used_mb": snap.memory_used_mb,
-                    "memory_total_mb": snap.memory_total_mb,
-                    "memory_percent": format!(
-                        "{:.1}%",
-                        if snap.memory_total_mb > 0 {
-                            (snap.memory_used_mb as f64 / snap.memory_total_mb as f64) * 100.0
-                        } else {
-                            0.0
-                        }
-                    ),
-                    "active_agents": snap.active_agents,
-                    "pending_tasks": snap.pending_tasks,
-                    "total_token_usage": snap.total_token_usage,
-                    "disk_used_gb": format!("{:.2}", snap.disk_used_gb),
-                    "load_avg_1m": format!("{:.2}", snap.load_avg_1m),
-                }))
-                .unwrap_or_default(),
-            ))
+                    serde_json::to_string_pretty(&json!({
+                        "timestamp": snap.timestamp.to_rfc3339(),
+                        "cpu_percent": format!("{:.1}%", snap.cpu_percent),
+                        "memory_used_mb": snap.memory_used_mb,
+                        "memory_total_mb": snap.memory_total_mb,
+                        "memory_percent": format!(
+                            "{:.1}%",
+                            if snap.memory_total_mb > 0 {
+                                (snap.memory_used_mb as f64 / snap.memory_total_mb as f64) * 100.0
+                            } else {
+                                0.0
+                            }
+                        ),
+                        "active_agents": snap.active_agents,
+                        "pending_tasks": snap.pending_tasks,
+                        "total_token_usage": snap.total_token_usage,
+                        "disk_used_gb": format!("{:.2}", snap.disk_used_gb),
+                        "load_avg_1m": format!("{:.2}", snap.load_avg_1m),
+                    }))
+                    .unwrap_or_default(),
+                ))
             }
 
             "history" => {

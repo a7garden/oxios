@@ -1,0 +1,12 @@
+[program]
+name = "hackernews-digest"
+version = "1.0.0"
+description = "Fetch Hacker News top articles and output Markdown with Korean summaries"
+author = "oxios"
+
+[requires_tools]
+names = ["web_search", "exec", "read", "write"]
+
+[host_requirements]
+required = ["curl"]
+optional = []

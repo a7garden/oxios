@@ -42,17 +42,17 @@ function StatusDot({ status, isMood }: { status: number; isMood: boolean }) {
   if (status !== -1 && status !== undefined) {
     if (isMood) {
       const moodColors = [
-        'bg-zinc-300',
-        'bg-red-400',
-        'bg-amber-400',
-        'bg-yellow-400',
-        'bg-lime-400',
-        'bg-emerald-400',
+        'bg-muted',
+        'bg-error',
+        'bg-warning',
+        'bg-warning/80',
+        'bg-success/60',
+        'bg-success',
       ]
       const level = Math.min(Math.max(status, 0), 5)
       color = moodColors[level] ?? color
     } else if (status > 0) {
-      color = 'bg-emerald-500/80'
+      color = 'bg-success/80'
     }
   }
   return <span className={cn('inline-block h-2 w-2 rounded-full align-middle', color)} />
@@ -71,6 +71,7 @@ function HabitYearGrid({
   year: number
   isMood: boolean
 }) {
+  const { t } = useTranslation()
   const [hoveredDay, setHoveredDay] = useState<number | null>(null)
 
   // Build a 53×7 grid (week × weekday)
@@ -114,18 +115,18 @@ function HabitYearGrid({
       const level = Math.min(Math.max(status, 0), 5)
       const colors = [
         'bg-muted/40',
-        'bg-red-400/60',
-        'bg-amber-400/60',
-        'bg-yellow-400/60',
-        'bg-emerald-400/70',
-        'bg-emerald-500',
+        'bg-error/60',
+        'bg-warning/60',
+        'bg-warning/50',
+        'bg-success/70',
+        'bg-success',
       ]
       return colors[level] ?? 'bg-muted/40'
     }
 
     // Regular habit: completed
     // Check if weekend (simplified: we use the status from backend)
-    return 'bg-emerald-500/80'
+    return 'bg-success/80'
   }
 
   // Format tooltip
@@ -133,11 +134,11 @@ function HabitYearGrid({
     const date = new Date(year, 0, doy)
     const dateStr = date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
     if (status === -1) return `${dateStr}`
-    if (status === 0) return `${dateStr}: 미완료`
+    if (status === 0) return `${dateStr}: ${t('knowledge.markIncomplete')}`
     if (isMood) {
       return `${dateStr}: ●`
     }
-    return `${dateStr}: 완료`
+    return `${dateStr}: ${t('knowledge.markComplete')}`
   }
 
   // Build grid as CSS grid: 53 columns (weeks) × 7 rows (Mon-Sun)
@@ -289,11 +290,11 @@ export function Habits() {
           {t('knowledge.habitSkipped')}
         </span>
         <span className="flex items-center gap-1">
-          <span className="w-3 h-3 rounded-sm bg-emerald-500/80 inline-block" />
+          <span className="w-3 h-3 rounded-sm bg-success/80 inline-block" />
           {t('knowledge.habitCompleted')}
         </span>
         <span className="flex items-center gap-1">
-          <span className="w-3 h-3 rounded-sm bg-emerald-500 inline-block" />
+          <span className="w-3 h-3 rounded-sm bg-success inline-block" />
           {t('knowledge.habitWeekend')}
         </span>
       </div>

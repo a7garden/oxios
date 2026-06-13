@@ -3,7 +3,7 @@
 //! PersonaStore manages CRUD operations for personas in memory.
 //! Persists personas to the state store on save.
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::sync::Arc;

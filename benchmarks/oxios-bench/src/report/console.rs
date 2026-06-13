@@ -1,6 +1,6 @@
 //! Console report — human-readable terminal output with colors.
 
-use crate::report::json_report::{suite_stats, SuiteStats};
+use crate::report::json_report::{SuiteStats, suite_stats};
 use crate::{BenchmarkRun, Regression, TaskResult};
 use console::style;
 use std::collections::BTreeMap;

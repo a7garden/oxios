@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useProject, useProjectMemories } from '@/hooks/use-projects'
+import { formatRelativeTime } from '@/lib/utils'
 import type { Project } from '@/types'
 
 export const Route = createFileRoute('/projects/$projectId')({
@@ -18,23 +19,12 @@ export const Route = createFileRoute('/projects/$projectId')({
 })
 
 const SOURCE_COLORS: Record<string, string> = {
-  manual: 'bg-emerald-100 text-emerald-700',
-  auto_detected: 'bg-amber-100 text-amber-700',
+  manual: 'bg-success-subtle text-success',
+  auto_detected: 'bg-warning-subtle text-warning',
 }
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleString()
-}
-
-function formatRelativeTime(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime()
-  const mins = Math.floor(diff / 60000)
-  const hours = Math.floor(diff / 3600000)
-  const days = Math.floor(diff / 86400000)
-  if (mins < 1) return 'just now'
-  if (mins < 60) return `${mins}m ago`
-  if (hours < 24) return `${hours}h ago`
-  return `${days}d ago`
 }
 
 function ProjectPathsCard({ project }: { project: Project }) {
@@ -84,7 +74,10 @@ function ProjectDetailsCard({ project }: { project: Project }) {
     },
     {
       label: t('projects.lastActive', 'Last Active'),
-      value: formatRelativeTime(project.last_active_at ?? project.updated_at ?? project.created_at),
+      value: formatRelativeTime(
+        project.last_active_at ?? project.updated_at ?? project.created_at,
+        t,
+      ),
     },
   ]
 
@@ -146,7 +139,7 @@ function ProjectMemoriesCard({ project }: { project: Project }) {
   const { t } = useTranslation()
   const { data, isLoading } = useProjectMemories(project.id)
 
-  const memories = data?.items ?? []
+  const memories = Array.isArray(data?.items) ? data.items : []
 
   return (
     <Card>

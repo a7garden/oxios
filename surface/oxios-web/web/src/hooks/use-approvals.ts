@@ -24,7 +24,7 @@ export function useApprovals() {
 /** Convenience selector: just the pending approvals. */
 export function usePendingApprovals() {
   const q = useApprovals()
-  const items = q.data?.items ?? []
+  const items = Array.isArray(q.data?.items) ? q.data.items : []
   return { ...q, items: items.filter((a) => a.status === 'pending') }
 }
 

@@ -41,12 +41,12 @@ export function MemoryDetail({ memory, open, onClose }: MemoryDetailProps) {
         <div className="mt-4 space-y-4">
           <div className="grid gap-2 text-sm">
             <div className="flex justify-between gap-2">
-              <span className="text-muted-foreground shrink-0">ID</span>
+              <span className="text-muted-foreground shrink-0">{t('memory.id')}</span>
               <span className="font-mono text-xs truncate">{memory.id}</span>
             </div>
             {memory.key && (
               <div className="flex justify-between gap-2">
-                <span className="text-muted-foreground shrink-0">Key</span>
+                <span className="text-muted-foreground shrink-0">{t('memory.key')}</span>
                 <span className="font-mono text-xs truncate">{memory.key}</span>
               </div>
             )}
@@ -64,13 +64,13 @@ export function MemoryDetail({ memory, open, onClose }: MemoryDetailProps) {
             )}
             {memory.updated_at && (
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Updated</span>
+                <span className="text-muted-foreground">{t('memory.updated')}</span>
                 <span>{new Date(memory.updated_at).toLocaleString()}</span>
               </div>
             )}
             {memory.last_accessed && (
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Last accessed</span>
+                <span className="text-muted-foreground">{t('memory.lastAccessed')}</span>
                 <span>{new Date(memory.last_accessed).toLocaleString()}</span>
               </div>
             )}
@@ -92,7 +92,7 @@ export function MemoryDetail({ memory, open, onClose }: MemoryDetailProps) {
           </div>
           {memory.summary && (
             <div className="rounded-lg border p-3">
-              <p className="text-xs text-muted-foreground mb-1">Summary</p>
+              <p className="text-xs text-muted-foreground mb-1">{t('memory.summary')}</p>
               <p className="text-sm">{memory.summary}</p>
             </div>
           )}

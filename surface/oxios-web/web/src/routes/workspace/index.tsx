@@ -209,7 +209,7 @@ function WorkspacePage() {
               ) : (
                 <ChevronRight className="h-4 w-4 shrink-0" />
               )}
-              <Folder className="h-4 w-4 text-amber-500 shrink-0" />
+              <Folder className="h-4 w-4 text-warning shrink-0" />
             </>
           ) : (
             <>
@@ -226,7 +226,9 @@ function WorkspacePage() {
         </div>
         {isExpanded &&
           entry.is_dir &&
-          (childrenMap?.[fullPath] ?? []).map((child) => renderEntry(child, fullPath, depth + 1))}
+          (Array.isArray(childrenMap?.[fullPath]) ? childrenMap[fullPath] : []).map((child) =>
+            renderEntry(child, fullPath, depth + 1),
+          )}
       </div>
     )
   }
@@ -241,12 +243,12 @@ function WorkspacePage() {
       {/* Header */}
       <div className="flex items-center justify-between shrink-0">
         <div>
-          <h1 className="text-2xl font-bold">Workspace</h1>
+          <h1 className="text-2xl font-bold">{t('workspace.title')}</h1>
           <p className="text-muted-foreground">{t('workspace.description')}</p>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={() => setShowCreateDialog(true)}>
-            <Plus className="h-4 w-4 mr-1" /> New
+            <Plus className="h-4 w-4 mr-1" /> {t('common.create')}
           </Button>
           <Button variant="outline" size="sm" onClick={() => refetchRoot()} disabled={rootFetching}>
             <RefreshCw className={`h-4 w-4 ${rootFetching ? 'animate-spin' : ''}`} />
@@ -374,8 +376,8 @@ function WorkspacePage() {
             <div className="flex items-center justify-center h-full text-muted-foreground">
               <div className="text-center space-y-2">
                 <File className="h-10 w-10 mx-auto opacity-50" />
-                <p className="text-sm">Select a file to view</p>
-                <p className="text-xs">Double-click to edit</p>
+                <p className="text-sm">{t('workspace.selectFile')}</p>
+                <p className="text-xs">{t('workspace.doubleClickEdit')}</p>
               </div>
             </div>
           )}

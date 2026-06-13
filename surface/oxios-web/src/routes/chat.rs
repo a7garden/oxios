@@ -637,7 +637,9 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
                             if let Some(ref vid) = incoming_project_id {
                                 incoming.metadata.insert("project_ids".into(), vid.clone());
                             }
-                            incoming.metadata.insert("conn_id".into(), conn_id_for_send.clone());
+                            incoming
+                                .metadata
+                                .insert("conn_id".into(), conn_id_for_send.clone());
                             if let Some(m) = incoming_mode.clone() {
                                 incoming.metadata.insert("mode".into(), m);
                             }
@@ -678,7 +680,9 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
                             if let Some(ref vid) = incoming_project_id {
                                 incoming.metadata.insert("project_ids".into(), vid.clone());
                             }
-                            incoming.metadata.insert("conn_id".into(), conn_id_for_send.clone());
+                            incoming
+                                .metadata
+                                .insert("conn_id".into(), conn_id_for_send.clone());
                             if let Some(m) = incoming_mode.clone() {
                                 incoming.metadata.insert("mode".into(), m);
                             }
@@ -1297,7 +1301,10 @@ pub(crate) async fn handle_save_to_knowledge(
 
     for save in &existing {
         if save.get("message_index").and_then(|v| v.as_u64()) == Some(message_index as u64) {
-            let path = save.get("knowledge_path").and_then(|v| v.as_str()).unwrap_or("");
+            let path = save
+                .get("knowledge_path")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
             return Ok(Json(serde_json::json!({
                 "error": "already_saved",
                 "path": path,
@@ -1320,7 +1327,11 @@ pub(crate) async fn handle_save_to_knowledge(
     // Find the agent response at the given index
     let response = match session.agent_responses.get(message_index) {
         Some(r) => r,
-        None => return Err(AppError::from(anyhow::anyhow!("Message index out of range"))),
+        None => {
+            return Err(AppError::from(anyhow::anyhow!(
+                "Message index out of range"
+            )));
+        }
     };
 
     let content = &response.content;
@@ -1338,7 +1349,13 @@ pub(crate) async fn handle_save_to_knowledge(
         let slug: String = slug
             .to_lowercase()
             .chars()
-            .map(|c| if c.is_alphanumeric() || c == '-' || c == '_' { c } else { '-' })
+            .map(|c| {
+                if c.is_alphanumeric() || c == '-' || c == '_' {
+                    c
+                } else {
+                    '-'
+                }
+            })
             .collect();
         let date = chrono::Local::now().format("%Y-%m-%d").to_string();
         format!("notes/{slug}-{date}.md")
@@ -1354,7 +1371,11 @@ pub(crate) async fn handle_save_to_knowledge(
         message_index: Some(message_index),
         saved_at: Some(chrono::Utc::now().to_rfc3339()),
     };
-    match state.kernel.knowledge.note_write_with_meta(&path, content, &meta) {
+    match state
+        .kernel
+        .knowledge
+        .note_write_with_meta(&path, content, &meta)
+    {
         Ok(true) => {}
         Ok(false) => {
             // Path is a user-authored file — force write via plain note_write
@@ -1379,14 +1400,15 @@ pub(crate) async fn handle_save_to_knowledge(
         .await?;
 
     // Publish event
-    let _ = state.kernel.infra.publish(
-        oxios_kernel::event_bus::KernelEvent::KnowledgePersisted {
+    let _ = state
+        .kernel
+        .infra
+        .publish(oxios_kernel::event_bus::KernelEvent::KnowledgePersisted {
             session_id: session_id.clone(),
             message_index,
             path: path.clone(),
             source: "user".to_string(),
-        },
-    );
+        });
 
     Ok(Json(serde_json::json!({ "path": path })))
 }
@@ -1412,10 +1434,17 @@ pub(crate) async fn handle_remove_knowledge_save(
 
     let target = match target {
         Some(t) => t.clone(),
-        None => return Err(AppError::from(anyhow::anyhow!("No save found for this message"))),
+        None => {
+            return Err(AppError::from(anyhow::anyhow!(
+                "No save found for this message"
+            )));
+        }
     };
 
-    let path = target.get("knowledge_path").and_then(|v| v.as_str()).unwrap_or("");
+    let path = target
+        .get("knowledge_path")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
 
     // Delete from KnowledgeBase
     if !path.is_empty() {
@@ -1436,12 +1465,13 @@ pub(crate) async fn handle_remove_knowledge_save(
         .await?;
 
     // Publish removal event
-    let _ = state.kernel.infra.publish(
-        oxios_kernel::event_bus::KernelEvent::KnowledgeRemoved {
+    let _ = state
+        .kernel
+        .infra
+        .publish(oxios_kernel::event_bus::KernelEvent::KnowledgeRemoved {
             session_id: session_id.clone(),
             message_index,
-        },
-    );
+        });
 
     Ok(Json(serde_json::json!({ "deleted_path": path })))
 }

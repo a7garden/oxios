@@ -15,9 +15,9 @@
 //! { "action": "skills_sh_install", "skill_id": "vercel-labs/agent-skills/frontend-design" }
 //! ```
 
+use async_trait::async_trait;
 use oxi_sdk::{AgentTool, AgentToolResult, ToolContext};
 use serde_json::{Value, json};
-use async_trait::async_trait;
 
 use crate::kernel_handle::KernelHandle;
 use crate::kernel_handle::MarketplaceApi;
@@ -130,8 +130,7 @@ impl AgentTool for MarketplaceTool {
         params: Value,
         _signal: Option<tokio::sync::oneshot::Receiver<()>>,
         _ctx: &ToolContext,
-    ) -> Result<AgentToolResult, oxi_sdk::ToolError>
-     {
+    ) -> Result<AgentToolResult, oxi_sdk::ToolError> {
         let action = params
             .get("action")
             .and_then(|v| v.as_str())
@@ -388,13 +387,10 @@ impl AgentTool for MarketplaceTool {
             }
 
             "skills_sh_install" => {
-                let skill_id =
-                    params
-                        .get("skill_id")
-                        .and_then(|v| v.as_str())
-                        .ok_or_else(|| {
-                            "skills_sh_install requires 'skill_id' parameter".to_string()
-                        })?;
+                let skill_id = params
+                    .get("skill_id")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| "skills_sh_install requires 'skill_id' parameter".to_string())?;
 
                 match self.api.install_skills_sh(skill_id).await {
                     Ok(result) => Ok(AgentToolResult::success(
@@ -415,13 +411,10 @@ impl AgentTool for MarketplaceTool {
             }
 
             "skills_sh_detail" => {
-                let skill_id =
-                    params
-                        .get("skill_id")
-                        .and_then(|v| v.as_str())
-                        .ok_or_else(|| {
-                            "skills_sh_detail requires 'skill_id' parameter".to_string()
-                        })?;
+                let skill_id = params
+                    .get("skill_id")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| "skills_sh_detail requires 'skill_id' parameter".to_string())?;
 
                 match self.api.get_skills_sh_skill(skill_id).await {
                     Ok(detail) => {

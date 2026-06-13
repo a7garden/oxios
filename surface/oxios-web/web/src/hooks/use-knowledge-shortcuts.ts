@@ -2,6 +2,7 @@ import { useRouterState } from '@tanstack/react-router'
 import { useEffect, useRef } from 'react'
 import { api } from '@/lib/api-client'
 import { useKnowledgeStore } from '@/stores/knowledge'
+import { useSidebarStore } from '@/stores/sidebar'
 
 /**
  * Register global keyboard shortcuts for the Knowledge UI.
@@ -16,7 +17,7 @@ import { useKnowledgeStore } from '@/stores/knowledge'
  * ⌘D        → Delete current file (editor mode)
  * ⌘Enter    → Open chat
  * ⌘⇧Enter   → Toggle chat overlay
- * ⌘~ / ⌘§   → Toggle sidebar
+ * ⌘~ / ⌘§   → Toggle main sidebar
  * ⌘W        → Close split editor
  * Escape    → Close split / deselect all
  */
@@ -52,7 +53,7 @@ export function useKnowledgeShortcuts() {
   const mode = useKnowledgeStore((s) => s.mode)
   const currentFilePath = useKnowledgeStore((s) => s.currentFilePath)
   const openChat = useKnowledgeStore((s) => s.openChat)
-  const toggleSidebar = useKnowledgeStore((s) => s.toggleSidebar)
+  const toggleMainSidebar = useSidebarStore((s) => s.toggle)
   const splitEditorOpen = useKnowledgeStore((s) => s.splitEditorOpen)
   const closeSplit = useKnowledgeStore((s) => s.closeSplit)
 
@@ -132,11 +133,11 @@ export function useKnowledgeShortcuts() {
         return
       }
 
-      // ⌘~ or ⌘§ — toggle sidebar
+      // ⌘~ or ⌘§ — toggle main sidebar
       if (isMeta && (e.key === '~' || e.key === '§')) {
         e.preventDefault()
         e.stopPropagation()
-        toggleSidebar()
+        toggleMainSidebar()
         return
       }
 
@@ -167,7 +168,7 @@ export function useKnowledgeShortcuts() {
     mode,
     currentFilePath,
     openChat,
-    toggleSidebar,
+    toggleMainSidebar,
     splitEditorOpen,
     closeSplit,
     writeFileRef,

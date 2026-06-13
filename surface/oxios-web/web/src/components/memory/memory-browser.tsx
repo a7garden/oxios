@@ -24,7 +24,7 @@ export function MemoryBrowser({ onSelect }: MemoryBrowserProps) {
 
   if (isError) return <ErrorState onRetry={() => refetch()} />
 
-  const items = data?.items ?? []
+  const items = Array.isArray(data?.items) ? data.items : []
 
   const tierOptions = [
     { label: t('common.all'), value: 'all' },

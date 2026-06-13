@@ -32,7 +32,9 @@ use crate::parser::{extract_headings, similar};
 use crate::plugins::world_clock_for_names;
 use crate::stats::{done_today, today_report};
 use crate::types::NoteMeta;
-use crate::types::{FileEntry, Habits, KnowledgeConfig, NoteQuality, NoteSource, CHAT_FILENAME, DIR_USER_ROOT};
+use crate::types::{FileEntry, Habits, KnowledgeConfig, CHAT_FILENAME, DIR_USER_ROOT};
+#[cfg(test)]
+use crate::types::{NoteQuality, NoteSource};
 use crate::worker::{move_due_tasks, remove_completed_items};
 use crate::{today_chat_header, today_journal_filename};
 
@@ -236,12 +238,17 @@ impl KnowledgeBase {
 
         // Oldest first — they've been raw the longest
         result.sort_by(|a, b| {
-            a.1.saved_at.as_deref().unwrap_or("").cmp(&b.1.saved_at.as_deref().unwrap_or(""))
+            a.1.saved_at
+                .as_deref()
+                .unwrap_or("")
+                .cmp(b.1.saved_at.as_deref().unwrap_or(""))
         });
 
         Ok(result)
     }
 
+    /// Delete the note at `path`, removing it from the filesystem and
+    /// dropping any recorded backlinks for that file.
     pub fn note_delete(&self, path: &str) -> Result<()> {
         self.fs.read().delete_path(path)?;
         self.backlinks.write().remove_file(path);
@@ -878,7 +885,10 @@ mod tests {
         let formatted = format_frontmatter(&meta, body);
         assert!(formatted.starts_with("---\noxios:\n"));
         let (parsed_meta, parsed_body) = parse_note_meta(&formatted);
-        assert!(parsed_meta.is_some(), "Failed to parse round-tripped frontmatter");
+        assert!(
+            parsed_meta.is_some(),
+            "Failed to parse round-tripped frontmatter"
+        );
         let pm = parsed_meta.unwrap();
         assert_eq!(pm.author, "agent");
         assert_eq!(pm.session_id.as_deref(), Some("abc123"));
@@ -890,8 +900,14 @@ mod tests {
     fn test_parse_user_frontmatter_ignored() {
         let content = "---\ntags: [rust, design]\n---\n\n## My Note\nContent.";
         let (meta, body) = parse_note_meta(content);
-        assert!(meta.is_none(), "User frontmatter should not be parsed as NoteMeta");
-        assert!(body.contains("tags: [rust, design]"), "User frontmatter preserved");
+        assert!(
+            meta.is_none(),
+            "User frontmatter should not be parsed as NoteMeta"
+        );
+        assert!(
+            body.contains("tags: [rust, design]"),
+            "User frontmatter preserved"
+        );
     }
 
     #[test]

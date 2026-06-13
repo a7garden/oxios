@@ -7,8 +7,8 @@
 use std::sync::Arc;
 
 use axum::{
-    extract::{Path, Query, State},
     Json,
+    extract::{Path, Query, State},
 };
 
 use oxios_kernel::{ClawHubSearchResult, ClawHubSkillDetail};

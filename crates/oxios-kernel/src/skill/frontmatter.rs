@@ -1,7 +1,7 @@
 #![allow(missing_docs, dead_code)]
 //! Format-specific frontmatter types and unified parsing pipeline.
 
-use super::format::{resolve_format, SkillFormat};
+use super::format::{SkillFormat, resolve_format};
 use super::types::*;
 use anyhow::{Context, Result};
 use serde::Deserialize;

@@ -51,7 +51,10 @@ function SchedulerPage() {
         total_tasks: stats.queued,
         active_tasks: stats.running,
         max_concurrent: stats.max_concurrent,
-        tasks: [...(tasksRes.queued ?? []), ...(tasksRes.running ?? [])],
+        tasks: [
+          ...(Array.isArray(tasksRes.queued) ? tasksRes.queued : []),
+          ...(Array.isArray(tasksRes.running) ? tasksRes.running : []),
+        ],
       } as SchedulerStatus
     },
     refetchInterval: 5000,
@@ -60,7 +63,7 @@ function SchedulerPage() {
   if (isLoading) return <LoadingCards count={4} />
   if (isError) return <ErrorState onRetry={() => refetch()} />
 
-  const tasks = data?.tasks ?? []
+  const tasks = Array.isArray(data?.tasks) ? data.tasks : []
 
   return (
     <div className="space-y-6">

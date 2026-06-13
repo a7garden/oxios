@@ -1,5 +1,6 @@
 import { X } from 'lucide-react'
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -9,21 +10,23 @@ interface Props {
   onChange: (value: number[]) => void
 }
 
-const PRESETS = [
-  { label: '5분', minutes: 5 },
-  { label: '15분', minutes: 15 },
-  { label: '30분', minutes: 30 },
-  { label: '1시간', minutes: 60 },
-  { label: '1일', minutes: 1440 },
-]
-
-function formatReminder(minutes: number): string {
-  if (minutes < 60) return `${minutes}분 전`
-  if (minutes < 1440) return `${Math.floor(minutes / 60)}시간 전`
-  return `${Math.floor(minutes / 1440)}일 전`
-}
-
 export function ReminderEditor({ value, onChange }: Props) {
+  const { t } = useTranslation()
+
+  const PRESETS = [
+    { label: t('calendar.reminder5min'), minutes: 5 },
+    { label: t('calendar.reminder15min'), minutes: 15 },
+    { label: t('calendar.reminder30min'), minutes: 30 },
+    { label: t('calendar.reminder1hour'), minutes: 60 },
+    { label: t('calendar.reminder1day'), minutes: 1440 },
+  ]
+
+  function formatReminder(minutes: number): string {
+    if (minutes < 60) return `${minutes}${t('calendar.minutesBefore')}`
+    if (minutes < 1440) return `${Math.floor(minutes / 60)}${t('calendar.hoursBefore')}`
+    return `${Math.floor(minutes / 1440)}${t('calendar.daysBefore')}`
+  }
+
   const [customMinutes, setCustomMinutes] = useState<number>(10)
 
   const addReminder = (minutes: number) => {
@@ -83,7 +86,7 @@ export function ReminderEditor({ value, onChange }: Props) {
           onChange={(e) => setCustomMinutes(Math.max(1, Number(e.target.value)))}
           className="w-20"
         />
-        <span className="text-sm text-muted-foreground">분 전</span>
+        <span className="text-sm text-muted-foreground">{t('calendar.minutesBefore')}</span>
         <Button
           type="button"
           variant="outline"
@@ -91,7 +94,7 @@ export function ReminderEditor({ value, onChange }: Props) {
           onClick={() => addReminder(customMinutes)}
           disabled={value.includes(customMinutes)}
         >
-          추가
+          {t('calendar.add')}
         </Button>
       </div>
     </div>

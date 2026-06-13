@@ -264,13 +264,15 @@ function LogPanel() {
       isRunning={isLoading}
     >
       {showLog && logData && (
-        <div className="rounded-md bg-zinc-950 text-zinc-100 dark:bg-zinc-900 p-3 max-h-80 overflow-y-auto font-mono text-xs leading-relaxed">
+        <div className="rounded-md bg-primary-foreground text-primary-foreground dark:bg-card p-3 max-h-80 overflow-y-auto font-mono text-xs leading-relaxed">
           {logData.lines.length === 0 ? (
-            <span className="text-zinc-500">{t('systemTools.noLogEntries')}</span>
+            <span className="text-muted-foreground">{t('systemTools.noLogEntries')}</span>
           ) : (
             logData.lines.map((line, i) => (
               <div key={i} className="whitespace-pre-wrap break-all">
-                <span className="text-zinc-600 select-none mr-2">{String(i + 1).padStart(3)}</span>
+                <span className="text-muted-foreground select-none mr-2">
+                  {String(i + 1).padStart(3)}
+                </span>
                 {line}
               </div>
             ))

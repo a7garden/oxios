@@ -15,13 +15,13 @@
 use std::sync::Arc;
 
 use chrono::Utc;
-use lettre::message::header::ContentType;
-use lettre::message::MultiPart;
-use lettre::message::SinglePart;
-use lettre::transport::smtp::authentication::Credentials;
 use lettre::AsyncTransport;
 use lettre::Message;
 use lettre::Tokio1Executor;
+use lettre::message::MultiPart;
+use lettre::message::SinglePart;
+use lettre::message::header::ContentType;
+use lettre::transport::smtp::authentication::Credentials;
 use serde::{Deserialize, Serialize};
 
 use crate::config::EmailConfig;

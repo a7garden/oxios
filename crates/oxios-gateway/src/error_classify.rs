@@ -63,10 +63,7 @@ fn user_message_and_suggestion(kind: &ErrorKind, _raw_msg: &str) -> (String, Opt
             "API 키가 설정되지 않았습니다.".to_string(),
             Some("설정에서 API 키를 등록하거나 사용 가능한 모델로 변경하세요.".to_string()),
         ),
-        ErrorKind::ExecutionFailed => (
-            "요청을 처리하는 중 오류가 발생했습니다.".to_string(),
-            None,
-        ),
+        ErrorKind::ExecutionFailed => ("요청을 처리하는 중 오류가 발생했습니다.".to_string(), None),
         ErrorKind::ProviderError => (
             "AI 서비스에 일시적인 문제가 있습니다. 잠시 후 다시 시도해 주세요.".to_string(),
             Some("1-2분 후 다시 시도하거나 다른 모델을 선택하세요.".to_string()),
@@ -79,14 +76,8 @@ fn user_message_and_suggestion(kind: &ErrorKind, _raw_msg: &str) -> (String, Opt
             "이 작업을 수행할 권한이 없습니다.".to_string(),
             Some("관리자에게 권한을 요청하세요.".to_string()),
         ),
-        ErrorKind::ValidationError => (
-            "입력이 올바르지 않습니다.".to_string(),
-            None,
-        ),
-        ErrorKind::Internal => (
-            "내부 오류가 발생했습니다.".to_string(),
-            None,
-        ),
+        ErrorKind::ValidationError => ("입력이 올바르지 않습니다.".to_string(), None),
+        ErrorKind::Internal => ("내부 오류가 발생했습니다.".to_string(), None),
     }
 }
 

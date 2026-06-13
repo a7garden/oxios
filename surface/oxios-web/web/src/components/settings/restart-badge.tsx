@@ -1,6 +1,6 @@
 import { AlertTriangle, Check } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { Tooltip } from '@/components/ui/tooltip'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 
 interface RestartBadgeProps {
@@ -27,8 +27,9 @@ export function RestartBadge({ hotReload, scope, size = 'sm', className }: Resta
       })
 
   return (
-    <Tooltip content={tooltipContent} side="top">
-      <span
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span
         className={cn(
           'inline-flex items-center gap-1 rounded-full border font-medium select-none whitespace-nowrap',
           size === 'sm' ? 'px-1.5 py-0.5 text-2xs' : 'px-2 py-0.5 text-xs',
@@ -46,6 +47,8 @@ export function RestartBadge({ hotReload, scope, size = 'sm', className }: Resta
         )}
         <span>{label}</span>
       </span>
+      </TooltipTrigger>
+      <TooltipContent side="top">{tooltipContent}</TooltipContent>
     </Tooltip>
   )
 }

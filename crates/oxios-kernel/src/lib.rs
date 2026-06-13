@@ -14,6 +14,10 @@ pub mod agent_runtime;
 pub mod daemon;
 pub mod supervisor;
 
+// ─── Agent History Log ──────────────────────────────────────────────
+// 에이전트 실행 기록 — SQLite + JSON dual storage.
+pub mod agent_log_db;
+
 // ─── Orchestration ──────────────────────────────────────────────────
 // 작업 조율, 스케줄링, 예산 관리.
 pub mod budget;
@@ -38,8 +42,8 @@ mod audit_persistence;
 
 // ─── Autonomous Persistence ─────────────────────────────────────────
 // RFC-016: Post-execution hook for auto-saving knowledge and memory.
-pub mod persistence_hook;
 pub mod knowledge_dream;
+pub mod persistence_hook;
 
 // ─── Communication ──────────────────────────────────────────────────
 // 이벤트, 메시징, 외부 프로토콜, 멀티 에이전트 조정.
@@ -102,8 +106,8 @@ pub mod kernel_handle;
 pub use agent_group::{OxiosAgentGroup, OxiosAgentGroupStatus, OxiosGroupAgent};
 pub use agent_lifecycle::AgentLifecycleManager;
 pub use agent_runtime::AgentRuntime;
-pub use persistence_hook::PersistenceHook;
 pub use daemon::{DaemonManager, DaemonStatus};
+pub use persistence_hook::PersistenceHook;
 pub use supervisor::{BasicSupervisor, Supervisor};
 
 // ─── Orchestration ──────────────────────────────────────────────────

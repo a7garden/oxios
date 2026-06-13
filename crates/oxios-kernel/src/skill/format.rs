@@ -28,13 +28,12 @@ impl std::fmt::Display for SkillFormat {
 }
 
 pub fn detect_format(value: &Value) -> SkillFormat {
-    if let Some(meta) = value.get("metadata") {
-        if meta.get("openclaw").is_some()
+    if let Some(meta) = value.get("metadata")
+        && (meta.get("openclaw").is_some()
             || meta.get("clawdbot").is_some()
-            || meta.get("clawdis").is_some()
-        {
-            return SkillFormat::OpenClaw;
-        }
+            || meta.get("clawdis").is_some())
+    {
+        return SkillFormat::OpenClaw;
     }
     for key in &[
         "allowed-tools",

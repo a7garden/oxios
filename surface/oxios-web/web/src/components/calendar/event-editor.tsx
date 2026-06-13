@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -48,6 +49,7 @@ function defaultEnd(start: Date): Date {
 }
 
 export function EventEditor({ open, onClose, event, defaultStart, onSubmit, isLoading }: Props) {
+  const { t } = useTranslation()
   const isEdit = !!event
 
   const [title, setTitle] = useState('')
@@ -119,18 +121,18 @@ export function EventEditor({ open, onClose, event, defaultStart, onSubmit, isLo
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>{isEdit ? '일정 수정' : '일정 생성'}</DialogTitle>
+          <DialogTitle>{isEdit ? t('calendar.editEvent') : t('calendar.createEvent')}</DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Title */}
           <div className="space-y-2">
-            <Label htmlFor="event-title">제목</Label>
+            <Label htmlFor="event-title">{t('calendar.titleLabel')}</Label>
             <Input
               id="event-title"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="일정 제목"
+              placeholder={t('calendar.titlePlaceholder')}
               required
               autoFocus
             />
@@ -138,14 +140,14 @@ export function EventEditor({ open, onClose, event, defaultStart, onSubmit, isLo
 
           {/* All day toggle */}
           <div className="flex items-center justify-between">
-            <Label className="text-sm font-medium">종일</Label>
+            <Label className="text-sm font-medium">{t('calendar.allDay')}</Label>
             <Switch checked={allDay} onCheckedChange={setAllDay} />
           </div>
 
           {/* Start / End */}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
-              <Label htmlFor="event-start">시작</Label>
+              <Label htmlFor="event-start">{t('calendar.start')}</Label>
               <Input
                 id="event-start"
                 type={allDay ? 'date' : 'datetime-local'}
@@ -155,7 +157,7 @@ export function EventEditor({ open, onClose, event, defaultStart, onSubmit, isLo
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="event-end">종료</Label>
+              <Label htmlFor="event-end">{t('calendar.end')}</Label>
               <Input
                 id="event-end"
                 type={allDay ? 'date' : 'datetime-local'}
@@ -168,23 +170,23 @@ export function EventEditor({ open, onClose, event, defaultStart, onSubmit, isLo
 
           {/* Location */}
           <div className="space-y-2">
-            <Label htmlFor="event-location">장소</Label>
+            <Label htmlFor="event-location">{t('calendar.location')}</Label>
             <Input
               id="event-location"
               value={location}
               onChange={(e) => setLocation(e.target.value)}
-              placeholder="장소 입력"
+              placeholder={t('calendar.locationPlaceholder')}
             />
           </div>
 
           {/* Description */}
           <div className="space-y-2">
-            <Label htmlFor="event-description">설명</Label>
+            <Label htmlFor="event-description">{t('calendar.description')}</Label>
             <Textarea
               id="event-description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="일정 설명"
+              placeholder={t('calendar.descriptionPlaceholder')}
               rows={3}
             />
           </div>
@@ -194,17 +196,17 @@ export function EventEditor({ open, onClose, event, defaultStart, onSubmit, isLo
 
           {/* Reminders */}
           <div className="space-y-2">
-            <Label className="text-sm font-medium">알림</Label>
+            <Label className="text-sm font-medium">{t('calendar.reminder')}</Label>
             <ReminderEditor value={reminders} onChange={setReminders} />
           </div>
 
           {/* Actions */}
           <DialogFooter>
             <Button type="button" variant="outline" onClick={onClose} disabled={isLoading}>
-              취소
+              {t('calendar.cancel')}
             </Button>
             <Button type="submit" disabled={isLoading || !title.trim() || !start || !end}>
-              {isLoading ? '처리 중…' : isEdit ? '일정 수정' : '일정 생성'}
+              {isLoading ? t('calendar.processing') : isEdit ? t('calendar.editEvent') : t('calendar.createEvent')}
             </Button>
           </DialogFooter>
         </form>

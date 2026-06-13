@@ -34,7 +34,7 @@ const FILTER_PREFIXES: Record<string, string[]> = {
 }
 
 function matchesFilter(type: string, filter: string): boolean {
-  const prefixes = FILTER_PREFIXES[filter] ?? []
+  const prefixes = Array.isArray(FILTER_PREFIXES[filter]) ? FILTER_PREFIXES[filter] : []
   if (prefixes.length === 0) return true
   return prefixes.some((p) => type.startsWith(p))
 }
@@ -149,9 +149,9 @@ export function LiveActivityFeed({ variant = 'card' }: { variant?: 'card' | 'bar
             const time = event.timestamp
               ? new Date(event.timestamp as string).toLocaleTimeString()
               : ''
-            const relative = event.timestamp ? formatRelativeTime(event.timestamp as string) : ''
+            const relative = event.timestamp ? formatRelativeTime(event.timestamp as string, t) : ''
             const inner = (
-              <div className="flex items-start gap-2 rounded-md border border-transparent px-2 py-1.5 hover:border-border hover:bg-accent/30 transition-colors">
+              <div className="flex items-start gap-2 rounded-md border border-transparent px-2 py-1.5 hover:border-border hover:bg-accent/50 transition-all">
                 <Icon className={`mt-0.5 h-3.5 w-3.5 shrink-0 ${fmt.color}`} aria-hidden="true" />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5 text-sm">
@@ -191,7 +191,7 @@ export function LiveActivityFeed({ variant = 'card' }: { variant?: 'card' | 'bar
   const controls = (
     <div className="flex items-center gap-1">
       <select
-        className="h-7 rounded-md border bg-background px-2 text-xs"
+        className="h-7 rounded-md border bg-background px-2 text-xs transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
         value={filter}
         onChange={(e) => setFilter(e.target.value)}
         aria-label={t('dashboard.filterEvents')}

@@ -373,12 +373,13 @@ impl OuroborosEngine {
         let system_prompt = INTERVIEW_SYSTEM_PROMPT;
         let user_message = format!(
             "The user said:\n\"{user_input}\"\n\n\
+             LANGUAGE: Write ALL text output (questions, chat_response, structured question labels and descriptions) in the SAME language as the user's message above.\n\n\
              Analyze this message and produce a JSON object with:\n\
              - \"is_task\": true if the message requests a concrete action (create, read, write, run, find, fix, analyze, deploy, etc.) or describes something to build/execute. false for greetings, small talk, questions, gratitude, opinions, or conversational messages.\n\
-             - \"chat_response\": (only when is_task=false) A natural, friendly response. Be warm, concise, and helpful. Skip this field when is_task=true.\n\
+             - \"chat_response\": (only when is_task=false) A natural, friendly response in the user's language. Be warm, concise, and helpful. Skip this field when is_task=true.\n\
              - \"complexity\": (only when is_task=true) \"simple\" for clear single-action requests that need no clarification (check weather, set alarm, search, calculate, simple file read/write, echo). \"complex\" for ambiguous or multi-step tasks (modify code, write blog post, deploy, analyze). Default to \"complex\" when unsure.\n\
-             - \"questions\": (only when is_task=true) Up to 3 Socratic clarifying questions. Empty array when is_task=false.\n\
-             - \"structured_questions\": (only when is_task=true) Parallel array matching `questions`. Each entry has {{ \"id\": \"q1\", \"text\": \"...\", \"kind\": \"single_choice\"|\"free_text\"|\"yes_no\", \"options\": [{{ \"value\": \"...\", \"label\": \"...\" }}] }}. Omit or set null when you cannot predict reasonable options. Skip when is_task=false.\n\
+             - \"questions\": (only when is_task=true) Up to 3 Socratic clarifying questions in the user's language. Empty array when is_task=false.\n\
+             - \"structured_questions\": (only when is_task=true) Parallel array matching `questions`. Each entry has {{ \"id\": \"q1\", \"text\": \"...\", \"kind\": \"single_choice\"|\"free_text\"|\"yes_no\", \"options\": [{{ \"value\": \"...\", \"label\": \"...\" }}] }}. All text fields MUST be in the user's language. Omit or set null when you cannot predict reasonable options. Skip when is_task=false.\n\
              - \"scores\": (only when is_task=true) {{ \"goal_clarity\": 0.0-1.0, \"constraint_clarity\": 0.0-1.0, \"success_criteria\": 0.0-1.0 }}. Skip this field when is_task=false.\n\n\
              IMPORTANT SCORING (when is_task=true):\n\
              - Score GOAL_CLARITY 0.9+ ONLY if the request is immediately executable with no ambiguity\n\
@@ -429,7 +430,8 @@ impl OuroborosEngine {
                 {
                     q.kind = "free_text".to_string();
                 }
-                q.options.retain(|o| !o.value.is_empty() && !o.label.is_empty());
+                q.options
+                    .retain(|o| !o.value.is_empty() && !o.label.is_empty());
                 if q.kind == "yes_no" && q.options.is_empty() {
                     q.options = vec![
                         InterviewOptionOutput {
@@ -492,11 +494,12 @@ impl OuroborosProtocol for OuroborosEngine {
         let system_prompt = INTERVIEW_SYSTEM_PROMPT;
         let user_message = format!(
             "The user said:\n\"{user_input}\"\n\n\
+             LANGUAGE: Write ALL text output (questions, chat_response) in the SAME language as the user's message above.\n\n\
              Analyze this message and produce a JSON object with:\n\
              - \"is_task\": true if the message requests a concrete action (create, read, write, run, find, fix, analyze, deploy, etc.) or describes something to build/execute. false for greetings, small talk, questions, gratitude, opinions, or conversational messages.\n\
-             - \"chat_response\": (only when is_task=false) A natural, friendly response. Be warm, concise, and helpful. Skip this field when is_task=true.\n\
+             - \"chat_response\": (only when is_task=false) A natural, friendly response in the user's language. Be warm, concise, and helpful. Skip this field when is_task=true.\n\
              - \"complexity\": (only when is_task=true) \"simple\" for clear single-action requests that need no clarification (check weather, set alarm, search, calculate, simple file read/write, echo). \"complex\" for ambiguous or multi-step tasks (modify code, write blog post, deploy, analyze). Default to \"complex\" when unsure.\n\
-             - \"questions\": (only when is_task=true) Up to 3 Socratic clarifying questions. Empty array when is_task=false.\n\
+             - \"questions\": (only when is_task=true) Up to 3 Socratic clarifying questions in the user's language. Empty array when is_task=false.\n\
              - \"scores\": (only when is_task=true) {{ \"goal_clarity\": 0.0-1.0, \"constraint_clarity\": 0.0-1.0, \"success_criteria\": 0.0-1.0 }}. Skip this field when is_task=false.\n\n\
              IMPORTANT SCORING (when is_task=true):\n\
              - Score GOAL_CLARITY 0.9+ ONLY if the request is immediately executable with no ambiguity\n\
@@ -609,11 +612,12 @@ impl OuroborosProtocol for OuroborosEngine {
         let system_prompt = SEED_SYSTEM_PROMPT;
         let user_message = format!(
             "{context_block}\n\n\
+             LANGUAGE: Write the goal and all text fields in the SAME language as the user's original request above.\n\n\
              Generate a Seed specification that faithfully captures the user's ORIGINAL request.\n\
              The goal MUST preserve exact details (filenames, content, paths, languages) from the request.\n\
              Do NOT generalize or abstract — keep the specific details.\n\n\
              Produce a JSON object with:\n\
-             - \"goal\": a single clear goal that preserves ALL specifics from the original request\n\
+             - \"goal\": a single clear goal in the user's language that preserves ALL specifics from the original request\n\
              - \"constraints\": list of constraints\n\
              - \"acceptance_criteria\": list of measurable acceptance criteria that verify the specific details\n\
              - \"ontology\": list of {{ \"name\": \"\", \"entity_type\": \"\", \"description\": \"\" }} domain entities"
@@ -644,6 +648,7 @@ impl OuroborosProtocol for OuroborosEngine {
             cspace_hint: None,
             original_request: interview.original_message.clone(),
             output_schema: None,
+            project_id: None,
         };
 
         tracing::info!(seed_id = %seed.id, goal = %seed.goal, "Seed generated");
@@ -663,6 +668,9 @@ impl OuroborosProtocol for OuroborosEngine {
             steps_completed: 0,
             success: false, // Caller should replace with actual result
             tool_calls: vec![],
+            tokens_input: 0,
+            tokens_output: 0,
+            model_id: String::new(),
         })
     }
 
@@ -884,6 +892,7 @@ impl OuroborosProtocol for OuroborosEngine {
             cspace_hint: evolved.cspace_hint,
             original_request: seed.original_request.clone(),
             output_schema: None,
+            project_id: seed.project_id,
         };
 
         tracing::info!(
@@ -905,6 +914,12 @@ const INTERVIEW_SYSTEM_PROMPT: &str = "\
 You are the Interview phase of the Ouroboros protocol. \
 Your job: determine whether the user's message is a task or conversation, \
 and if it's a task, assess ambiguity along three dimensions.
+
+## Language Fidelity (CRITICAL)
+You MUST match the language of the user's message in ALL output text.
+- Whatever language the user uses, you use that SAME language. No exceptions.
+- This applies to: questions, chat_response, structured_questions labels/descriptions.
+- Never translate, paraphrase, or switch to a different language regardless of context length or turn number.
 
 ## Critical Boundaries
 - NEVER propose solutions. You ask, you do not implement.

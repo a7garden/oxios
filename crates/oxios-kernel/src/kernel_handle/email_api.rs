@@ -117,10 +117,10 @@ impl EmailApi {
         let mut templates = Vec::new();
         for entry in std::fs::read_dir(&self.template_dir)? {
             let entry = entry?;
-            if let Some(name) = entry.path().file_stem() {
-                if entry.path().extension().is_some_and(|ext| ext == "html") {
-                    templates.push(name.to_string_lossy().to_string());
-                }
+            if let Some(name) = entry.path().file_stem()
+                && entry.path().extension().is_some_and(|ext| ext == "html")
+            {
+                templates.push(name.to_string_lossy().to_string());
             }
         }
         templates.sort();
@@ -186,10 +186,9 @@ impl EmailApi {
                 );
                 if let Ok(dt) =
                     chrono::NaiveDateTime::parse_from_str(&datetime_str, "%Y-%m-%dT%H:%M:%S")
+                    && dt.and_utc() > cutoff
                 {
-                    if dt.and_utc() > cutoff {
-                        count += 1;
-                    }
+                    count += 1;
                 }
             }
         }

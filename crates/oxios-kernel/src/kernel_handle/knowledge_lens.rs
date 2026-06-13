@@ -225,12 +225,12 @@ impl KnowledgeLens {
         let mut referenced_notes = Vec::new();
 
         // 1. Current file context
-        if let Some(path) = context_path {
-            if let Ok(Some(content)) = self.kb.note_read(path) {
-                let snippet: String = content.chars().take(2000).collect();
-                context_parts.push(format!("## Current: {path}\n\n{snippet}"));
-                referenced_notes.push(path.to_string());
-            }
+        if let Some(path) = context_path
+            && let Ok(Some(content)) = self.kb.note_read(path)
+        {
+            let snippet: String = content.chars().take(2000).collect();
+            context_parts.push(format!("## Current: {path}\n\n{snippet}"));
+            referenced_notes.push(path.to_string());
         }
 
         // 2. Related notes

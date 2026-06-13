@@ -69,70 +69,69 @@
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
+  /* Animation tokens */
+  --animate-in-duration: 200ms;
+  --animate-in-duration-slow: 350ms;
+  --animate-in-easing: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* Oxios Design System -- Zinc base, OKLCH color space */
+/* ============================================================================
+   Oxios Design System — Geist base, OKLCH color space
+   ============================================================================ */
 :root {
   --radius: 0.625rem;
-  --background: oklch(1 0 0);
+  --background: oklch(0.985 0 0);
   --foreground: oklch(0.141 0.005 285.823);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.141 0.005 285.823);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.141 0.005 285.823);
-  --primary: oklch(0.21 0.006 285.885);
+  /* Primary with subtle blue chroma — technical authority */
+  --primary: oklch(0.23 0.025 265);
   --primary-foreground: oklch(0.985 0 0);
   --secondary: oklch(0.967 0.001 286.375);
-  --secondary-foreground: oklch(0.21 0.006 285.885);
+  --secondary-foreground: oklch(0.23 0.025 265);
   --muted: oklch(0.967 0.001 286.375);
   --muted-foreground: oklch(0.552 0.016 285.938);
-  --accent: oklch(0.967 0.001 286.375);
-  --accent-foreground: oklch(0.21 0.006 285.885);
+  --accent: oklch(0.967 0.003 265);
+  --accent-foreground: oklch(0.23 0.025 265);
   --destructive: oklch(0.577 0.245 27.325);
   --destructive-foreground: oklch(0.985 0 0);
   --border: oklch(0.92 0.004 286.32);
   --input: oklch(0.92 0.004 286.32);
-  --ring: oklch(0.708 0 0);
+  --ring: oklch(0.45 0.04 265);
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
   --chart-4: oklch(0.828 0.189 84.429);
   --chart-5: oklch(0.769 0.188 70.08);
-  /* A2A message-kind edge colors. The OkLCH values mirror the Tailwind
-   * v3 palette (blue-500, gray-400, green-500, purple-500, amber-500,
-   * slate-400) so the topology edges stay readable in both light and
-   * dark mode. Used via `var(--color-message-...)` in inline styles. */
-  --message-task: oklch(0.623 0.214 259.815); /* blue-500 */
-  --message-status: oklch(0.707 0.022 261.325); /* gray-400 */
-  --message-result: oklch(0.723 0.219 149.579); /* green-500 */
-  --message-query: oklch(0.627 0.265 303.9); /* purple-500 */
-  --message-handshake: oklch(0.769 0.188 70.08); /* amber-500 */
-  --message-default: oklch(0.704 0.04 256.788); /* slate-400 */
-  --sidebar: oklch(0.985 0 0);
+  --message-task: oklch(0.623 0.214 259.815);
+  --message-status: oklch(0.707 0.022 261.325);
+  --message-result: oklch(0.723 0.219 149.579);
+  --message-query: oklch(0.627 0.265 303.9);
+  --message-handshake: oklch(0.769 0.188 70.08);
+  --message-default: oklch(0.704 0.04 256.788);
+  --sidebar: oklch(0.978 0.002 265);
   --sidebar-foreground: oklch(0.141 0.005 285.823);
-  --sidebar-primary: oklch(0.21 0.006 285.885);
+  --sidebar-primary: oklch(0.23 0.025 265);
   --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.967 0.001 286.375);
-  --sidebar-accent-foreground: oklch(0.21 0.006 285.885);
+  --sidebar-accent: oklch(0.967 0.003 265);
+  --sidebar-accent-foreground: oklch(0.23 0.025 265);
   --sidebar-border: oklch(0.92 0.004 286.32);
-  --sidebar-ring: oklch(0.708 0 0);
+  --sidebar-ring: oklch(0.45 0.04 265);
   /* ── Semantic status tokens ─────────────────────────────── */
-  /* Text / foreground */
-  --success: oklch(0.596 0.145 163);          /* emerald-600 */
-  --warning: oklch(0.669 0.162 70);            /* amber-600 */
-  --error: oklch(0.577 0.245 27.325);          /* red-500 */
-  --info: oklch(0.623 0.214 259.815);          /* blue-500 */
-  /* Background — subtle (info panels, callout blocks) */
+  --success: oklch(0.596 0.145 163);
+  --warning: oklch(0.669 0.162 70);
+  --error: oklch(0.577 0.245 27.325);
+  --info: oklch(0.623 0.214 259.815);
   --success-subtle: oklch(0.97 0.014 163);
   --warning-subtle: oklch(0.97 0.014 70);
   --error-subtle: oklch(0.97 0.014 27);
   --info-subtle: oklch(0.97 0.014 259);
-  /* Background — muted (badge fills, 15% of base color) */
   --success-muted: oklch(0.696 0.17 162.48 / 0.15);
   --warning-muted: oklch(0.769 0.188 70.08 / 0.15);
   --error-muted: oklch(0.577 0.245 27.325 / 0.15);
   --info-muted: oklch(0.623 0.214 259.815 / 0.15);
-  /* Border — subtle (info panel borders) */
   --success-subtle-border: oklch(0.91 0.05 163);
   --warning-subtle-border: oklch(0.91 0.05 70);
   --error-subtle-border: oklch(0.91 0.05 27);
@@ -140,55 +139,51 @@
 }
 
 .dark {
-  --background: oklch(0.141 0.005 285.823);
+  --background: oklch(0.13 0.005 285.823);
   --foreground: oklch(0.985 0 0);
-  --card: oklch(0.178 0.008 285.89);
+  --card: oklch(0.19 0.008 265);
   --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.178 0.008 285.89);
+  --popover: oklch(0.19 0.008 265);
   --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.985 0 0);
-  --primary-foreground: oklch(0.21 0.006 285.885);
+  --primary: oklch(0.91 0.03 265);
+  --primary-foreground: oklch(0.15 0.02 265);
   --secondary: oklch(0.274 0.006 286.033);
   --secondary-foreground: oklch(0.985 0 0);
   --muted: oklch(0.274 0.006 286.033);
   --muted-foreground: oklch(0.705 0.015 286.067);
-  --accent: oklch(0.274 0.006 286.033);
+  --accent: oklch(0.274 0.01 265);
   --accent-foreground: oklch(0.985 0 0);
   --destructive: oklch(0.704 0.191 22.216);
   --destructive-foreground: oklch(0.985 0 0);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.552 0.016 285.938);
+  --ring: oklch(0.6 0.05 265);
   --chart-1: oklch(0.488 0.243 264.376);
   --chart-2: oklch(0.696 0.17 162.48);
   --chart-3: oklch(0.769 0.188 70.08);
   --chart-4: oklch(0.627 0.265 303.9);
   --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.178 0.008 285.89);
+  --sidebar: oklch(0.16 0.008 265);
   --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.274 0.006 286.033);
+  --sidebar-primary: oklch(0.91 0.03 265);
+  --sidebar-primary-foreground: oklch(0.15 0.02 265);
+  --sidebar-accent: oklch(0.274 0.01 265);
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.552 0.016 285.938);
+  --sidebar-ring: oklch(0.6 0.05 265);
   /* ── Semantic status tokens (dark) ─────────────────────── */
-  /* Text / foreground */
-  --success: oklch(0.723 0.219 149.579);      /* emerald-400 */
-  --warning: oklch(0.769 0.188 70.08);        /* amber-400 */
-  --error: oklch(0.704 0.191 22.216);          /* red-400 */
-  --info: oklch(0.685 0.196 259);              /* blue-400 */
-  /* Background — subtle */
+  --success: oklch(0.723 0.219 149.579);
+  --warning: oklch(0.769 0.188 70.08);
+  --error: oklch(0.704 0.191 22.216);
+  --info: oklch(0.685 0.196 259);
   --success-subtle: oklch(0.18 0.03 163);
   --warning-subtle: oklch(0.18 0.03 70);
   --error-subtle: oklch(0.18 0.03 27);
   --info-subtle: oklch(0.18 0.03 259);
-  /* Background — muted (same as light — already transparent) */
   --success-muted: oklch(0.723 0.219 149.579 / 0.15);
   --warning-muted: oklch(0.769 0.188 70.08 / 0.15);
   --error-muted: oklch(0.704 0.191 22.216 / 0.15);
   --info-muted: oklch(0.685 0.196 259 / 0.15);
-  /* Border — subtle */
   --success-subtle-border: oklch(0.28 0.04 163);
   --warning-subtle-border: oklch(0.28 0.04 70);
   --error-subtle-border: oklch(0.28 0.04 27);
@@ -202,9 +197,118 @@
   body {
     @apply bg-background text-foreground;
     font-family:
-      'Inter',
+      'Geist',
       system-ui,
       -apple-system,
       sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+/* ============================================================================
+   Animations — entrance, stagger, count-up
+   ============================================================================ */
+
+@layer utilities {
+  /* Fade + slide up for cards, panels, list items */
+  @keyframes fade-in-up {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* Subtle scale-in for badges, indicators */
+  @keyframes scale-in {
+    from {
+      opacity: 0;
+      transform: scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  /* Typing indicator bounce */
+  @keyframes typing-bounce {
+    0%,
+    60%,
+    100% {
+      transform: translateY(0);
+      opacity: 0.4;
+    }
+    30% {
+      transform: translateY(-4px);
+      opacity: 1;
+    }
+  }
+
+  /* Stagger utility — apply to parent container */
+  .animate-stagger > * {
+    animation: fade-in-up var(--animate-in-duration) var(--animate-in-easing) both;
+  }
+  .animate-stagger > *:nth-child(1) { animation-delay: 0ms; }
+  .animate-stagger > *:nth-child(2) { animation-delay: 40ms; }
+  .animate-stagger > *:nth-child(3) { animation-delay: 80ms; }
+  .animate-stagger > *:nth-child(4) { animation-delay: 120ms; }
+  .animate-stagger > *:nth-child(5) { animation-delay: 160ms; }
+  .animate-stagger > *:nth-child(6) { animation-delay: 200ms; }
+  .animate-stagger > *:nth-child(7) { animation-delay: 240ms; }
+  .animate-stagger > *:nth-child(8) { animation-delay: 280ms; }
+  .animate-stagger > *:nth-child(9) { animation-delay: 320ms; }
+  .animate-stagger > *:nth-child(10) { animation-delay: 360ms; }
+  .animate-stagger > *:nth-child(11) { animation-delay: 400ms; }
+  .animate-stagger > *:nth-child(12) { animation-delay: 440ms; }
+  .animate-stagger > *:nth-child(n+13) { animation-delay: 480ms; }
+
+  /* Single element entrance */
+  .animate-fade-in-up {
+    animation: fade-in-up var(--animate-in-duration) var(--animate-in-easing) both;
+  }
+
+  .animate-scale-in {
+    animation: scale-in var(--animate-in-duration) var(--animate-in-easing) both;
+  }
+}
+
+/* ============================================================================
+   Scrollbar styling
+   ============================================================================ */
+@layer base {
+  /* Firefox — standard scrollbar properties */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: oklch(0.7 0 0 / 0.25) transparent;
+  }
+  .dark * {
+    scrollbar-color: oklch(0.4 0 0 / 0.4) transparent;
+  }
+
+  /* WebKit / Blink — pseudo-element scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: oklch(0.7 0 0 / 0.25);
+    border-radius: 3px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: oklch(0.5 0 0 / 0.4);
+  }
+  .dark ::-webkit-scrollbar-thumb {
+    background: oklch(0.4 0 0 / 0.4);
+  }
+  .dark ::-webkit-scrollbar-thumb:hover {
+    background: oklch(0.5 0 0 / 0.5);
   }
 }

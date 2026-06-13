@@ -8,7 +8,9 @@ describe('GroupProgress - Progress bar patterns', () => {
 
     const progressBar = screen.getByRole('progressbar')
     expect(progressBar).toBeInTheDocument()
-    expect(progressBar).toHaveAttribute('aria-valuenow', '50')
+    // Radix Progress uses CSS transform on the indicator, not aria-valuenow
+    const indicator = progressBar.querySelector('[data-slot="progress-indicator"]')
+    expect(indicator).toHaveStyle({ transform: 'translateX(-50%)' })
   })
 
   it('renders progress bar at 100%', () => {
@@ -16,7 +18,8 @@ describe('GroupProgress - Progress bar patterns', () => {
 
     const progressBar = screen.getByRole('progressbar')
     expect(progressBar).toBeInTheDocument()
-    expect(progressBar).toHaveAttribute('aria-valuenow', '100')
+    const indicator = progressBar.querySelector('[data-slot="progress-indicator"]')
+    expect(indicator).toHaveStyle({ transform: 'translateX(-0%)' })
   })
 
   it('renders progress bar at 0%', () => {
@@ -24,18 +27,19 @@ describe('GroupProgress - Progress bar patterns', () => {
 
     const progressBar = screen.getByRole('progressbar')
     expect(progressBar).toBeInTheDocument()
-    expect(progressBar).toHaveAttribute('aria-valuenow', '0')
+    const indicator = progressBar.querySelector('[data-slot="progress-indicator"]')
+    expect(indicator).toHaveStyle({ transform: 'translateX(-100%)' })
   })
 
   it('renders progress with custom class for completed state', () => {
-    render(<Progress value={100} className="bg-emerald-500" />)
+    render(<Progress value={100} className="bg-success" />)
 
     const progressBar = screen.getByRole('progressbar')
     expect(progressBar).toBeInTheDocument()
   })
 
   it('renders progress with custom class for running state', () => {
-    render(<Progress value={75} className="bg-blue-500" />)
+    render(<Progress value={75} className="bg-info" />)
 
     const progressBar = screen.getByRole('progressbar')
     expect(progressBar).toBeInTheDocument()

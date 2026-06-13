@@ -34,17 +34,17 @@ impl CredentialStore {
     pub fn resolve(provider: &str, config_key: Option<&str>) -> Option<(String, CredentialSource)> {
         // 1. Explicit Oxios env var: OXIOS_<PROVIDER>_API_KEY (highest priority for containers)
         let env_var = format!("OXIOS_{}_API_KEY", provider.to_uppercase());
-        if let Ok(key) = std::env::var(&env_var) {
-            if !key.is_empty() {
-                return Some((key, CredentialSource::EnvVar));
-            }
+        if let Ok(key) = std::env::var(&env_var)
+            && !key.is_empty()
+        {
+            return Some((key, CredentialSource::EnvVar));
         }
 
         // 2. config.toml explicit key
-        if let Some(key) = config_key {
-            if !key.is_empty() {
-                return Some((key.to_string(), CredentialSource::Config));
-            }
+        if let Some(key) = config_key
+            && !key.is_empty()
+        {
+            return Some((key.to_string(), CredentialSource::Config));
         }
 
         // 3. oxi auth store (~/.oxi/auth.json)

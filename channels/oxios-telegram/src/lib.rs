@@ -7,13 +7,13 @@ pub use plugin::TelegramPlugin;
 use anyhow::Result;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
+use oxios_gateway::GatewayInbox;
 use oxios_gateway::channel::Channel;
 use oxios_gateway::format::ChannelFormatter;
 use oxios_gateway::message::{IncomingMessage, OutgoingMessage};
-use oxios_gateway::GatewayInbox;
 use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::sync::{mpsc, watch, RwLock};
+use tokio::sync::{RwLock, mpsc, watch};
 
 /// Per-chat session state for Telegram.
 #[derive(Debug, Clone)]
@@ -222,10 +222,10 @@ impl TelegramChannel {
             .unwrap_or_default();
 
         // Update offset
-        if let Some(last) = updates.last() {
-            if let Some(id) = last.get("update_id").and_then(|id| id.as_i64()) {
-                *self.offset.write().await = id + 1;
-            }
+        if let Some(last) = updates.last()
+            && let Some(id) = last.get("update_id").and_then(|id| id.as_i64())
+        {
+            *self.offset.write().await = id + 1;
         }
 
         Ok(updates)
@@ -323,8 +323,8 @@ impl Channel for TelegramChannel {
                                     }
 
                                     // Permission check
-                                    if let Some(uid) = user_id {
-                                        if !this.is_user_allowed(uid) {
+                                    if let Some(uid) = user_id
+                                        && !this.is_user_allowed(uid) {
                                             tracing::warn!(user_id = uid, "Unauthorized Telegram user");
                                             if let Some(cid) = chat_id {
                                                 let _ = this
@@ -337,7 +337,6 @@ impl Channel for TelegramChannel {
                                             }
                                             continue;
                                         }
-                                    }
 
                                     let Some(cid) = chat_id else { continue };
                                     let user_id_str = user_id

@@ -164,6 +164,7 @@ mod tests {
             cspace_hint: None,
             original_request: String::new(),
             output_schema: None,
+            project_id: None,
         }
     }
 

@@ -13,8 +13,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::engine::EngineHandle;
 use crate::git_layer::GitLayer;
-use oxios_markdown::types::{NoteMeta, NoteQuality, NoteSource};
 use oxios_markdown::KnowledgeBase;
+use oxios_markdown::types::{NoteMeta, NoteQuality, NoteSource};
 
 /// Configuration for knowledge dream.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -165,10 +165,10 @@ impl KnowledgeDream {
         // Phase 3: Write back
         for note in &curated {
             // Git commit the original before overwriting
-            if let Err(e) = self
-                .git_layer
-                .commit_file(&note.path, &format!("dream: pre-curation snapshot ({})", dream_id))
-            {
+            if let Err(e) = self.git_layer.commit_file(
+                &note.path,
+                &format!("dream: pre-curation snapshot ({})", dream_id),
+            ) {
                 tracing::warn!(
                     path = %note.path,
                     error = %e,
@@ -183,10 +183,11 @@ impl KnowledgeDream {
                 ..note.original_meta.clone()
             };
 
-            match self
-                .knowledge_base
-                .note_write_with_meta(&note.path, &note.curated_body, &new_meta)
-            {
+            match self.knowledge_base.note_write_with_meta(
+                &note.path,
+                &note.curated_body,
+                &new_meta,
+            ) {
                 Ok(true) => {
                     tracing::info!(path = %note.path, "Knowledge dream curated note");
                     report.notes_curated += 1;
@@ -197,7 +198,9 @@ impl KnowledgeDream {
                 }
                 Err(e) => {
                     tracing::warn!(path = %note.path, error = %e, "Failed to write curated note");
-                    report.errors.push(format!("Write failed for {}: {e}", note.path));
+                    report
+                        .errors
+                        .push(format!("Write failed for {}: {e}", note.path));
                     report.notes_skipped += 1;
                 }
             }

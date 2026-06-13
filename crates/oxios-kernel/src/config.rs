@@ -896,6 +896,9 @@ pub struct OxiosConfig {
     /// Email configuration.
     #[serde(default)]
     pub email: EmailConfig,
+    /// Agent history log configuration.
+    #[serde(default)]
+    pub agent_log: AgentLogConfig,
 }
 
 /// Kernel configuration.
@@ -1685,6 +1688,51 @@ impl Default for OtelConfig {
             endpoint: default_otel_endpoint(),
             service_name: default_otel_service_name(),
             sampling_ratio: default_otel_sampling_ratio(),
+        }
+    }
+}
+
+/// Agent history log configuration.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AgentLogConfig {
+    /// Maximum number of agent records to keep (0 = unlimited).
+    #[serde(default = "default_agent_log_max_entries")]
+    pub max_entries: usize,
+    /// TTL for agent records in hours (0 = unlimited).
+    #[serde(default = "default_agent_log_ttl_hours")]
+    pub ttl_hours: u64,
+    /// Max tool_calls per agent to persist (0 = unlimited).
+    #[serde(default = "default_agent_log_max_tool_calls")]
+    pub max_tool_calls_per_agent: usize,
+    /// How many agents to prune per cycle.
+    #[serde(default = "default_agent_log_prune_batch")]
+    pub prune_batch_size: usize,
+    /// Path to the SQLite database file (empty = default).
+    #[serde(default)]
+    pub db_path: String,
+}
+
+fn default_agent_log_max_entries() -> usize {
+    10_000
+}
+fn default_agent_log_ttl_hours() -> u64 {
+    720
+}
+fn default_agent_log_max_tool_calls() -> usize {
+    500
+}
+fn default_agent_log_prune_batch() -> usize {
+    100
+}
+
+impl Default for AgentLogConfig {
+    fn default() -> Self {
+        Self {
+            max_entries: 10_000,
+            ttl_hours: 720,
+            max_tool_calls_per_agent: 500,
+            prune_batch_size: 100,
+            db_path: String::new(),
         }
     }
 }

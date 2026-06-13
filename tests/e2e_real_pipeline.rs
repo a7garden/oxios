@@ -81,6 +81,7 @@ mod tests {
             cspace_hint: None,
             original_request: String::new(),
             output_schema: None,
+            project_id: None,
         };
 
         let execution = oxios_ouroboros::ExecutionResult {
@@ -88,6 +89,9 @@ mod tests {
             steps_completed: 1,
             success: true,
             tool_calls: vec![],
+            tokens_input: 0,
+            tokens_output: 0,
+            model_id: String::new(),
         };
 
         // First call: mechanical pass → skip LLM

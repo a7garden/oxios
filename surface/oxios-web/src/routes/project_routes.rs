@@ -3,18 +3,18 @@
 //! Provides CRUD endpoints for Projects and Project-Memory linking.
 
 use axum::{
+    Json,
     extract::{Path, Query, State},
     http::StatusCode,
-    Json,
 };
 use serde::Deserialize;
 use std::sync::Arc;
 
-use oxios_kernel::{memory::MemoryEntry, ProjectInfo};
+use oxios_kernel::{ProjectInfo, memory::MemoryEntry};
 
 use crate::error::AppError;
-use crate::routes::paginate;
 use crate::routes::PageParams;
+use crate::routes::paginate;
 use crate::server::AppState;
 
 // ─── Request / Query types ──────────────────────────────────

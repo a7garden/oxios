@@ -101,8 +101,16 @@ export function AgentInspector({
   if (!node) return null
 
   const dot = statusDot(node.status)
-  const capList = agentCard?.capabilities ?? node.capabilities ?? []
-  const skillList = agentCard?.skills ?? node.skills ?? []
+  const capList = Array.isArray(agentCard?.capabilities)
+    ? agentCard.capabilities
+    : Array.isArray(node.capabilities)
+      ? node.capabilities
+      : []
+  const skillList = Array.isArray(agentCard?.skills)
+    ? agentCard.skills
+    : Array.isArray(node.skills)
+      ? node.skills
+      : []
 
   return (
     <div

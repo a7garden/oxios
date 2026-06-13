@@ -43,11 +43,11 @@ describe('EvaluationCard', () => {
 
     render(<EvaluationCard evaluation={evaluation} />)
 
-    // Green check icon has text-green-500
+    // Green check icon has text-success
     const matches = screen.getAllByText('seeds.mechanical')
     const el = matches[0]!
     const checkIcons =
-      el.closest('div[class*="rounded-lg"]')?.querySelector('.text-green-500') ?? null
+      el.closest('div[class*="rounded-lg"]')?.querySelector('.text-success') ?? null
     expect(checkIcons).toBeInTheDocument()
   })
 

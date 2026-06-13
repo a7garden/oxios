@@ -13,6 +13,7 @@ export default defineConfig({
   },
   optimizeDeps: {
     include: [
+      'radix-ui',
       '@uiw/react-codemirror',
       '@codemirror/lang-markdown',
       '@codemirror/autocomplete',

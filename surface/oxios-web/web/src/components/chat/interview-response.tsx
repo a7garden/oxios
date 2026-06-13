@@ -52,8 +52,7 @@ export function InterviewResponse({
 
   // Ambiguity bar: 1.0 = fully ambiguous (red), 0.0 = clear (green)
   const clarity = Math.max(0, Math.min(1, 1 - ambiguity))
-  const barColor =
-    clarity > 0.7 ? 'bg-success' : clarity > 0.4 ? 'bg-warning' : 'bg-error'
+  const barColor = clarity > 0.7 ? 'bg-success' : clarity > 0.4 ? 'bg-warning' : 'bg-error'
 
   return (
     <div className="flex gap-3 my-1.5">
@@ -64,9 +63,7 @@ export function InterviewResponse({
         <div className="rounded-xl border bg-card shadow-sm">
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b">
-            <span className="text-sm font-medium">
-              {t('chat.interview.title')}
-            </span>
+            <span className="text-sm font-medium">{t('chat.interview.title')}</span>
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <span>{t('chat.interview.roundLabel', { round })}</span>
               <div className="w-16 h-1.5 rounded-full bg-muted overflow-hidden">
@@ -107,11 +104,7 @@ export function InterviewResponse({
 
           {/* Submit */}
           <div className="flex justify-end px-4 py-3 border-t">
-            <Button
-              onClick={handleSubmit}
-              disabled={!allChoiceAnswered || disabled}
-              size="sm"
-            >
+            <Button onClick={handleSubmit} disabled={!allChoiceAnswered || disabled} size="sm">
               {t('chat.interview.submit')}
             </Button>
           </div>

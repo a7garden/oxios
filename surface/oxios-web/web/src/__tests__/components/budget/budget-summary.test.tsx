@@ -62,7 +62,7 @@ describe('BudgetSummary - Rendering patterns', () => {
           <CardTitle className="text-sm text-muted-foreground">Exhausted</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold text-red-500">2</div>
+          <div className="text-2xl font-bold text-error">2</div>
         </CardContent>
       </Card>,
     )

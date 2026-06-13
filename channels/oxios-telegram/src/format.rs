@@ -49,10 +49,10 @@ impl ChannelFormatter for TelegramFormatter {
 
         let mut out = format!("{} {}", icon, msg.content);
 
-        if let Some(err) = meta.and_then(|m| m.error.as_ref()) {
-            if let Some(s) = &err.suggestion {
-                out.push_str(&format!("\n\n💡 _{s}_"));
-            }
+        if let Some(err) = meta.and_then(|m| m.error.as_ref())
+            && let Some(s) = &err.suggestion
+        {
+            out.push_str(&format!("\n\n💡 _{s}_"));
         }
 
         out
@@ -86,6 +86,7 @@ mod tests {
             timestamp: chrono::Utc::now(),
             metadata: HashMap::new(),
             meta,
+            target_conn_id: None,
         }
     }
 
@@ -107,6 +108,10 @@ mod tests {
             evaluation_passed: Some(true),
             duration_ms: Some(3500),
             error: None,
+            interview_questions: None,
+            interview_round: None,
+            interview_ambiguity: None,
+            mode: None,
         };
         let msg = make_msg("Done!", Some(meta));
         let fmt = TelegramFormatter;
@@ -132,6 +137,10 @@ mod tests {
                 kind: ErrorKind::Internal,
                 suggestion: None,
             }),
+            interview_questions: None,
+            interview_round: None,
+            interview_ambiguity: None,
+            mode: None,
         };
         let msg = make_msg("내부 오류", Some(meta));
         let fmt = TelegramFormatter;
@@ -154,6 +163,10 @@ mod tests {
                 kind: ErrorKind::ProviderError,
                 suggestion: Some("1-2분 후 다시 시도하세요.".to_string()),
             }),
+            interview_questions: None,
+            interview_round: None,
+            interview_ambiguity: None,
+            mode: None,
         };
         let msg = make_msg("AI 서비스 오류", Some(meta));
         let fmt = TelegramFormatter;

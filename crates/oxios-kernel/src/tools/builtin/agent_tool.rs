@@ -109,8 +109,7 @@ impl OxiAgentTool for AgentTool {
         params: Value,
         _signal: Option<tokio::sync::oneshot::Receiver<()>>,
         _ctx: &ToolContext,
-    ) -> Result<AgentToolResult, oxi_sdk::ToolError>
-     {
+    ) -> Result<AgentToolResult, oxi_sdk::ToolError> {
         let action = params
             .get("action")
             .and_then(|v| v.as_str())

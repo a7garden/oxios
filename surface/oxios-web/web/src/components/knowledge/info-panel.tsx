@@ -27,7 +27,7 @@ export function InfoPanel() {
 
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-2.5 border-b">
-        <span className="text-sm font-medium">Info</span>
+        <span className="text-sm font-medium">{t('knowledge.info')}</span>
         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={toggleInfoPanel}>
           <PanelRightClose className="h-4 w-4" />
         </Button>

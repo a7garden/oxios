@@ -9,12 +9,12 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
+use oxios_gateway::GatewayInbox;
 use oxios_gateway::channel::Channel;
 use oxios_gateway::message::{IncomingMessage, OutgoingMessage};
-use oxios_gateway::GatewayInbox;
 use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::sync::{broadcast, mpsc, oneshot, watch, Mutex, RwLock};
+use tokio::sync::{Mutex, RwLock, broadcast, mpsc, oneshot, watch};
 
 /// The web bridge adapter.
 ///

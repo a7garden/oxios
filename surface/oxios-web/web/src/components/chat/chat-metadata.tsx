@@ -27,16 +27,16 @@ export function ChatMetadata({ message, className }: ChatMetadataProps) {
       )}
     >
       {phase && <span className="px-1.5 py-0.5 rounded bg-muted font-medium">{phase}</span>}
-      {evaluation_passed !== undefined &&
-        (evaluation_passed ? (
-          <span className="flex items-center gap-1 text-success">
-            <CheckCircle2 className="h-3.5 w-3.5" /> Passed
-          </span>
-        ) : (
-          <span className="flex items-center gap-1 text-error">
-            <XCircle className="h-3.5 w-3.5" /> Failed
-          </span>
-        ))}
+      {evaluation_passed === true && (
+        <span className="flex items-center gap-1 text-success">
+          <CheckCircle2 className="h-3.5 w-3.5" /> Passed
+        </span>
+      )}
+      {evaluation_passed === false && phase !== 'interview' && (
+        <span className="flex items-center gap-1 text-error">
+          <XCircle className="h-3.5 w-3.5" /> Failed
+        </span>
+      )}
       {durationStr && (
         <span className="flex items-center gap-1">
           <Clock className="h-3 w-3" /> {durationStr}

@@ -388,10 +388,10 @@ impl AccessManager {
         }
 
         // Remove from previous workspace if any
-        if let Some(prev_workspace) = self.agent_workspaces.get(agent_name) {
-            if let Some(agents) = self.workspace_agents.get_mut(prev_workspace) {
-                agents.remove(agent_name);
-            }
+        if let Some(prev_workspace) = self.agent_workspaces.get(agent_name)
+            && let Some(agents) = self.workspace_agents.get_mut(prev_workspace)
+        {
+            agents.remove(agent_name);
         }
 
         // Assign to new workspace
@@ -691,7 +691,9 @@ impl AccessManager {
         }
 
         if perms.allowed_paths.is_empty() {
-            warnings.push("Agent has no path restrictions (wide open)".to_string());
+            warnings.push(
+                "Agent has no path restrictions (paths granted by ensure_permissions)".to_string(),
+            );
         }
 
         if perms.network_access {
@@ -763,9 +765,11 @@ mod tests {
         assert!(perms.allowed_paths.contains(&"/workspace/**".to_string()));
 
         perms.deny_path("/workspace/.secret/**");
-        assert!(perms
-            .denied_paths
-            .contains(&"/workspace/.secret/**".to_string()));
+        assert!(
+            perms
+                .denied_paths
+                .contains(&"/workspace/.secret/**".to_string())
+        );
     }
 
     #[test]
@@ -876,7 +880,8 @@ mod tests {
     fn test_can_access_path_allowed() {
         let mut access = AccessManager::new();
 
-        let perms = AgentPermissions::for_new_agent("file-agent");
+        let mut perms = AgentPermissions::for_new_agent("file-agent");
+        perms.allow_path("/workspace/**");
         access.set_permissions(perms);
 
         assert!(access.can_access_path("file-agent", "/workspace/project/file.rs"));
@@ -1177,9 +1182,11 @@ mod tests {
         let warnings = access.validate_permissions(&perms);
         assert!(warnings.iter().any(|w| w.contains("network access")));
         assert!(warnings.iter().any(|w| w.contains("fork sub-agents")));
-        assert!(warnings
-            .iter()
-            .any(|w| w.contains("no execution time limit")));
+        assert!(
+            warnings
+                .iter()
+                .any(|w| w.contains("no execution time limit"))
+        );
         assert!(warnings.iter().any(|w| w.contains("no memory limit")));
     }
 

@@ -16,7 +16,7 @@ describe('TierBadge', () => {
 
     const badge = screen.getByText('memory.hot')
     expect(badge).toBeInTheDocument()
-    expect(badge.closest('[class*="bg-red-100"]')).toBeInTheDocument()
+    expect(badge.closest('[class*="bg-error-subtle"]')).toBeInTheDocument()
   })
 
   it('renders warm tier badge', () => {
@@ -24,7 +24,7 @@ describe('TierBadge', () => {
 
     const badge = screen.getByText('memory.warm')
     expect(badge).toBeInTheDocument()
-    expect(badge.closest('[class*="bg-yellow-100"]')).toBeInTheDocument()
+    expect(badge.closest('[class*="bg-warning-subtle"]')).toBeInTheDocument()
   })
 
   it('renders cold tier badge', () => {
@@ -32,7 +32,7 @@ describe('TierBadge', () => {
 
     const badge = screen.getByText('memory.cold')
     expect(badge).toBeInTheDocument()
-    expect(badge.closest('[class*="bg-blue-100"]')).toBeInTheDocument()
+    expect(badge.closest('[class*="bg-info-subtle"]')).toBeInTheDocument()
   })
 
   it('renders unknown tier with fallback text', () => {

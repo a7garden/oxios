@@ -47,7 +47,7 @@ export function BrowseContextBadge({ context }: { context: ToolCallContext }) {
       )
     case 'session_action':
       return (
-        <span className="inline-flex items-center gap-1 text-2xs text-purple-500 dark:text-purple-400 truncate max-w-[40ch]">
+        <span className="inline-flex items-center gap-1 text-2xs text-info truncate max-w-[40ch]">
           <Zap className="h-3 w-3 shrink-0" />
           {context.action}
         </span>

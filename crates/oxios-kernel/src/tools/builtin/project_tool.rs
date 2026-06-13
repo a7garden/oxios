@@ -99,8 +99,7 @@ impl AgentTool for ProjectTool {
         params: Value,
         _signal: Option<tokio::sync::oneshot::Receiver<()>>,
         _ctx: &ToolContext,
-    ) -> Result<AgentToolResult, oxi_sdk::ToolError>
-     {
+    ) -> Result<AgentToolResult, oxi_sdk::ToolError> {
         let action = params
             .get("action")
             .and_then(|v| v.as_str())
@@ -234,8 +233,6 @@ impl AgentTool for ProjectTool {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     #[test]
     fn test_schema_actions() {
         let schema = serde_json::json!({

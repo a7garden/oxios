@@ -51,13 +51,13 @@ pub async fn create_backup(
     ];
 
     for category in &categories {
-        if let Ok(names) = state_store.list_category(category).await {
-            if !names.is_empty() {
-                manifest.sections.push(BackupSection {
-                    name: category.to_string(),
-                    entry_count: names.len(),
-                });
-            }
+        if let Ok(names) = state_store.list_category(category).await
+            && !names.is_empty()
+        {
+            manifest.sections.push(BackupSection {
+                name: category.to_string(),
+                entry_count: names.len(),
+            });
         }
     }
 

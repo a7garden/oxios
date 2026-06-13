@@ -74,7 +74,7 @@ function PersonasPage() {
   if (isLoading) return <LoadingCards count={4} />
   if (isError) return <ErrorState onRetry={() => refetch()} />
 
-  const items = personas ?? []
+  const items = Array.isArray(personas) ? personas : []
 
   return (
     <div className="space-y-6">
@@ -145,7 +145,7 @@ function PersonasPage() {
                 <div>
                   <CardTitle className="text-base flex items-center gap-2">
                     <Users className="h-4 w-4" /> {persona.name}
-                    {persona.enabled && <Star className="h-3 w-3 text-amber-500 fill-amber-500" />}
+                    {persona.enabled && <Star className="h-3 w-3 text-warning fill-warning" />}
                   </CardTitle>
                   {persona.description && (
                     <p className="text-xs text-muted-foreground mt-1">{persona.description}</p>

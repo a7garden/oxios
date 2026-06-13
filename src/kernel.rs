@@ -56,6 +56,9 @@ pub struct Kernel {
     a2a_protocol: Arc<A2AProtocol>,
     /// Hot-swappable engine reference — shared between EngineApi and AgentRuntime.
     engine_handle: Arc<EngineHandle>,
+    /// SQLite-backed agent history query index.
+    #[cfg(feature = "sqlite-memory")]
+    agent_log_db: Option<Arc<oxios_kernel::agent_log_db::AgentLogDb>>,
 }
 
 impl Kernel {
@@ -149,14 +152,22 @@ impl Kernel {
                     });
                 }
 
+                let mut agent_api = oxios_kernel::AgentApi::new(
+                    self.supervisor.clone(),
+                    self.budget_manager.clone(),
+                    self.memory_manager.clone(),
+                    Some(self.event_bus.clone()),
+                );
+                agent_api.set_state_store(self.state_store.clone());
+
+                #[cfg(feature = "sqlite-memory")]
+                if let Some(ref db) = self.agent_log_db {
+                    agent_api.set_agent_log_db(db.clone());
+                }
+
                 Arc::new(oxios_kernel::KernelHandle::new(
                     oxios_kernel::StateApi::new(self.state_store.clone()),
-                    oxios_kernel::AgentApi::new(
-                        self.supervisor.clone(),
-                        self.budget_manager.clone(),
-                        self.memory_manager.clone(),
-                        Some(self.event_bus.clone()),
-                    ),
+                    agent_api,
                     oxios_kernel::SecurityApi::new(
                         self.auth_manager.clone(),
                         self.audit_trail.clone(),
@@ -1012,24 +1023,68 @@ impl KernelBuilder {
                 ..Default::default()
             }
         })
-        .with_persistence_hook(Arc::new(
-            oxios_kernel::PersistenceHook::new(
-                memory_manager.clone(),
-                Arc::new(
-                    oxios_markdown::KnowledgeBase::new(
-                        PathBuf::from(&config.kernel.workspace).join("knowledge"),
-                    )
-                    .expect("KnowledgeBase init failed"),
-                ),
-                Arc::clone(&engine_handle),
-                model_id.clone(),
-                state_store.clone(),
-                event_bus.clone(),
+        .with_persistence_hook(Arc::new(oxios_kernel::PersistenceHook::new(
+            memory_manager.clone(),
+            Arc::new(
+                oxios_markdown::KnowledgeBase::new(
+                    PathBuf::from(&config.kernel.workspace).join("knowledge"),
+                )
+                .expect("KnowledgeBase init failed"),
             ),
-        ));
+            Arc::clone(&engine_handle),
+            model_id.clone(),
+            state_store.clone(),
+            event_bus.clone(),
+        )));
 
-        let supervisor: Arc<dyn Supervisor> =
-            Arc::new(BasicSupervisor::new(event_bus.clone(), agent_runtime));
+        let mut basic_supervisor = BasicSupervisor::new(event_bus.clone(), agent_runtime);
+
+        // Wire agent history persistence
+        basic_supervisor.set_state_store(state_store.clone());
+        basic_supervisor.set_agent_log_config(config.agent_log.clone());
+
+        // Wire SQLite agent log index if available
+        #[cfg(feature = "sqlite-memory")]
+        let (agent_log_db,) = {
+            let db_path = if config.agent_log.db_path.is_empty() {
+                dirs::home_dir()
+                    .unwrap_or_default()
+                    .join(".oxios/state/agent_log.db")
+            } else {
+                let p = std::path::PathBuf::from(&config.agent_log.db_path);
+                if p.is_absolute() {
+                    p
+                } else {
+                    dirs::home_dir().unwrap_or_default().join(".oxios").join(&p)
+                }
+            };
+
+            // Ensure parent dir exists
+            if let Some(parent) = db_path.parent() {
+                let _ = std::fs::create_dir_all(parent);
+            }
+
+            match oxios_kernel::agent_log_db::AgentLogDb::open(&db_path) {
+                Ok(db) => {
+                    let db = Arc::new(db);
+                    basic_supervisor.set_agent_log_db(db.clone());
+                    tracing::info!(path = %db_path.display(), "Agent history SQLite log initialized");
+                    (Some(db),)
+                }
+                Err(e) => {
+                    tracing::warn!(
+                        error = %e,
+                        path = %db_path.display(),
+                        "Failed to open agent history SQLite DB, falling back to filesystem-only"
+                    );
+                    (None,)
+                }
+            }
+        };
+        #[cfg(not(feature = "sqlite-memory"))]
+        let agent_log_db: Option<Arc<oxios_kernel::agent_log_db::AgentLogDb>> = None;
+
+        let supervisor: Arc<dyn Supervisor> = Arc::new(basic_supervisor);
 
         let lifecycle = oxios_kernel::AgentLifecycleManager::new(
             supervisor.clone(),
@@ -1132,6 +1187,8 @@ impl KernelBuilder {
             handle_cache: OnceLock::new(),
             a2a_protocol,
             engine_handle,
+            #[cfg(feature = "sqlite-memory")]
+            agent_log_db,
         })
     }
 }

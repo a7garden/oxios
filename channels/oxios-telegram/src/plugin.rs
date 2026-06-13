@@ -29,12 +29,15 @@ impl ChannelPlugin for TelegramPlugin {
 
     async fn setup(&self, ctx: ChannelContext) -> Result<ChannelBundle> {
         let config = ctx.config.read().clone();
-        let token = std::env::var(&config.channels.telegram.bot_token_env).map_err(|_| {
-            anyhow::anyhow!(
-                "Telegram bot token not found. Set {} env var.",
-                config.channels.telegram.bot_token_env
-            )
-        })?;
+        let token = std::env::var(&config.channels.telegram.bot_token_env)
+            .ok()
+            .filter(|t| !t.is_empty())
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "Telegram bot token not found. Set {} env var.",
+                    config.channels.telegram.bot_token_env
+                )
+            })?;
         let allowed = config.channels.telegram.allowed_users.clone();
 
         let session_settings = TelegramSessionSettings {

@@ -60,7 +60,7 @@ function SecurityPage() {
   if (auditLoading) return <LoadingCards count={4} />
   if (auditError) return <ErrorState onRetry={() => refetch()} />
 
-  const entries = (audits?.items ?? []).map((e) => ({
+  const entries = (Array.isArray(audits?.items) ? audits.items : []).map((e) => ({
     ...e,
     id: `${e.timestamp}-${e.agent_name}`,
     agent_id: e.agent_name,

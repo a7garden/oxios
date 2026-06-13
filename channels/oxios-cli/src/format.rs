@@ -66,10 +66,10 @@ impl ChannelFormatter for CliFormatter {
 
         let mut out = format!("{} {}", icon, msg.content);
 
-        if let Some(err) = meta.and_then(|m| m.error.as_ref()) {
-            if let Some(s) = &err.suggestion {
-                out.push_str(&format!("\n💡 {s}"));
-            }
+        if let Some(err) = meta.and_then(|m| m.error.as_ref())
+            && let Some(s) = &err.suggestion
+        {
+            out.push_str(&format!("\n💡 {s}"));
         }
 
         out
@@ -102,6 +102,7 @@ mod tests {
             timestamp: chrono::Utc::now(),
             metadata: HashMap::new(),
             meta,
+            target_conn_id: None,
         }
     }
 
@@ -123,6 +124,10 @@ mod tests {
             evaluation_passed: Some(true),
             duration_ms: Some(1500),
             error: None,
+            interview_questions: None,
+            interview_round: None,
+            interview_ambiguity: None,
+            mode: None,
         };
         let msg = make_msg("Done!", Some(meta));
         let formatter = CliFormatter;
@@ -143,6 +148,10 @@ mod tests {
             evaluation_passed: Some(false),
             duration_ms: Some(500),
             error: None,
+            interview_questions: None,
+            interview_round: None,
+            interview_ambiguity: None,
+            mode: None,
         };
         let msg = make_msg("Partial", Some(meta));
         let formatter = CliFormatter;
@@ -166,6 +175,10 @@ mod tests {
                 kind: ErrorKind::Timeout,
                 suggestion: Some("더 간단한 요청으로 시도하세요.".into()),
             }),
+            interview_questions: None,
+            interview_round: None,
+            interview_ambiguity: None,
+            mode: None,
         };
         let msg = make_msg("시간이 초과되었습니다.", Some(meta));
         let formatter = CliFormatter;
@@ -189,6 +202,10 @@ mod tests {
                 kind: ErrorKind::ProviderError,
                 suggestion: None,
             }),
+            interview_questions: None,
+            interview_round: None,
+            interview_ambiguity: None,
+            mode: None,
         };
         let msg = make_msg("AI 서비스 오류.", Some(meta));
         let formatter = CliFormatter;

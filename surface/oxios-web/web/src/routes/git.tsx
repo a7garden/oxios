@@ -32,7 +32,7 @@ function GitPage() {
     queryKey: ['git-log'],
     queryFn: async () => {
       const res = await api.get<{ entries: GitCommit[] }>('/api/git/log')
-      return res.entries ?? []
+      return Array.isArray(res?.entries) ? res.entries : []
     },
     refetchInterval: 15000,
   })
@@ -41,7 +41,7 @@ function GitPage() {
     queryKey: ['git-tags'],
     queryFn: async () => {
       const res = await api.get<{ tags: string[] }>('/api/git/tags')
-      return res.tags ?? []
+      return Array.isArray(res?.tags) ? res.tags : []
     },
     refetchInterval: 15000,
   })
@@ -69,8 +69,8 @@ function GitPage() {
   if (isLoading) return <LoadingCards count={4} />
   if (isError) return <ErrorState onRetry={() => refetch()} />
 
-  const commitList = commits ?? []
-  const tagList = tags ?? []
+  const commitList = Array.isArray(commits) ? commits : []
+  const tagList = Array.isArray(tags) ? tags : []
 
   return (
     <div className="space-y-6">

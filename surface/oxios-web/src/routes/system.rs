@@ -1,11 +1,10 @@
 use std::sync::Arc;
 
-use axum::extract::{Path, Query, State};
 use axum::Json;
+use axum::extract::{Path, Query, State};
 use serde::{Deserialize, Serialize};
 
 use crate::error::AppError;
-use crate::routes::{paginate, PageParams};
 use crate::server::AppState;
 
 // ---------------------------------------------------------------------------
@@ -131,8 +130,10 @@ pub(crate) struct StatusResponse {
     service: String,
     /// Current status.
     status: String,
-    /// API version.
+    /// Binary (daemon) version.
     version: String,
+    /// Web UI frontend version (from package.json at build time).
+    web_version: String,
     /// Registered channels.
     channels: Vec<String>,
     /// Uptime info.
@@ -218,10 +219,17 @@ pub(crate) async fn handle_status(state: State<Arc<AppState>>) -> Json<StatusRes
             .unwrap_or(0),
     });
 
+    // Web UI version — embedded at build time via env variable.
+    // Falls back to "unknown" when not set (e.g. dev mode without the env).
+    let web_version = option_env!("OXIOS_WEB_VERSION")
+        .map(|s| s.to_string())
+        .unwrap_or_else(|| "dev".to_string());
+
     Json(StatusResponse {
         service: "oxios".into(),
         status: "running".into(),
         version: env!("CARGO_PKG_VERSION").into(),
+        web_version,
         channels: vec!["web".into()],
         uptime: uptime_str,
         components,
@@ -595,130 +603,352 @@ fn parse_agent_metrics() -> (u64, u64, u64) {
     (forked, completed, failed)
 }
 
-/// Agent summary for listing.
-#[derive(Debug, Serialize, Clone)]
-pub(crate) struct AgentSummary {
-    /// Agent unique ID.
-    id: String,
-    /// Agent name/goal.
-    name: String,
-    /// Current status.
-    status: String,
-    /// Creation timestamp.
-    created_at: String,
-    /// Seed ID if applicable.
-    seed_id: Option<String>,
+/// Query params for GET /api/agents.
+#[derive(Debug, Deserialize)]
+pub(crate) struct AgentQueryParams {
+    pub q: Option<String>,
+    pub search_field: Option<String>,
+    pub status: Option<String>,
+    pub session_id: Option<String>,
+    pub project_id: Option<String>,
+    pub seed_id: Option<String>,
+    pub model_id: Option<String>,
+    pub tool: Option<String>,
+    pub has_error: Option<bool>,
+    pub date_from: Option<String>,
+    pub date_to: Option<String>,
+    pub cost_min: Option<f64>,
+    pub cost_max: Option<f64>,
+    pub tokens_min: Option<u64>,
+    pub tokens_max: Option<u64>,
+    pub duration_min: Option<u64>,
+    pub duration_max: Option<u64>,
+    pub sort_by: Option<String>,
+    pub sort_dir: Option<String>,
+    #[serde(default = "default_page")]
+    pub page: u32,
+    #[serde(default = "default_limit")]
+    pub per_page: u32,
 }
 
-/// GET /api/agents — List agent instances.
+fn default_page() -> u32 {
+    1
+}
+fn default_limit() -> u32 {
+    50
+}
+
+/// Convert query params to AgentListFilter.
+fn params_to_filter(p: &AgentQueryParams) -> oxios_kernel::agent_log_db::AgentListFilter {
+    let status = p.status.as_deref().and_then(|s| match s {
+        "running" => Some(oxios_kernel::agent_log_db::AgentStatusFilter::Running),
+        "completed" => Some(oxios_kernel::agent_log_db::AgentStatusFilter::Completed),
+        "failed" => Some(oxios_kernel::agent_log_db::AgentStatusFilter::Failed),
+        "stopped" => Some(oxios_kernel::agent_log_db::AgentStatusFilter::Stopped),
+        "starting" => Some(oxios_kernel::agent_log_db::AgentStatusFilter::Starting),
+        "idle" => Some(oxios_kernel::agent_log_db::AgentStatusFilter::Idle),
+        _ => None,
+    });
+
+    let search_field = p.search_field.as_deref().map_or(
+        oxios_kernel::agent_log_db::SearchField::All,
+        |s| match s {
+            "name" => oxios_kernel::agent_log_db::SearchField::Name,
+            "error" => oxios_kernel::agent_log_db::SearchField::Error,
+            "tool_name" => oxios_kernel::agent_log_db::SearchField::ToolName,
+            "tool_output" => oxios_kernel::agent_log_db::SearchField::ToolOutput,
+            _ => oxios_kernel::agent_log_db::SearchField::All,
+        },
+    );
+
+    let sort_by = p
+        .sort_by
+        .as_deref()
+        .map_or(oxios_kernel::agent_log_db::SortBy::CreatedAt, |s| match s {
+            "cost" => oxios_kernel::agent_log_db::SortBy::Cost,
+            "duration" => oxios_kernel::agent_log_db::SortBy::Duration,
+            "tokens" => oxios_kernel::agent_log_db::SortBy::Tokens,
+            "name" => oxios_kernel::agent_log_db::SortBy::Name,
+            _ => oxios_kernel::agent_log_db::SortBy::CreatedAt,
+        });
+
+    let sort_dir = p
+        .sort_dir
+        .as_deref()
+        .map_or(oxios_kernel::agent_log_db::SortDir::Desc, |s| match s {
+            "asc" => oxios_kernel::agent_log_db::SortDir::Asc,
+            _ => oxios_kernel::agent_log_db::SortDir::Desc,
+        });
+
+    let parse_dt = |s: &Option<String>| -> Option<chrono::DateTime<chrono::Utc>> {
+        s.as_deref()
+            .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
+            .map(|dt| dt.with_timezone(&chrono::Utc))
+    };
+
+    oxios_kernel::agent_log_db::AgentListFilter {
+        q: p.q.clone(),
+        search_field,
+        status,
+        session_id: p.session_id.clone(),
+        project_id: p.project_id.clone(),
+        seed_id: p.seed_id.clone(),
+        model_id: p.model_id.clone(),
+        tool: p.tool.clone(),
+        has_error: p.has_error,
+        date_from: parse_dt(&p.date_from),
+        date_to: parse_dt(&p.date_to),
+        cost_min: p.cost_min,
+        cost_max: p.cost_max,
+        tokens_min: p.tokens_min,
+        tokens_max: p.tokens_max,
+        duration_min: p.duration_min,
+        duration_max: p.duration_max,
+        sort_by,
+        sort_dir,
+        page: p.page,
+        per_page: p.per_page,
+    }
+}
+
+/// GET /api/agents — List agent instances with full filter/search/sort/paginate.
 pub(crate) async fn handle_agents_list(
     state: State<Arc<AppState>>,
-    Query(params): Query<PageParams>,
+    Query(params): Query<AgentQueryParams>,
 ) -> Json<serde_json::Value> {
-    match state.kernel.agents.list().await {
-        Ok(agents) => {
-            let items: Vec<AgentSummary> = agents
-                .into_iter()
-                .map(|a| AgentSummary {
-                    id: a.id.to_string(),
-                    name: a.name,
-                    status: a.status.to_string(),
-                    created_at: a.created_at.to_rfc3339(),
-                    seed_id: a.seed_id.map(|s| s.to_string()),
-                })
-                .collect();
-            Json(paginate(&items, &params))
-        }
+    let filter = params_to_filter(&params);
+    match state.kernel.agents.query(&filter).await {
+        Ok(result) => Json(serde_json::json!({
+            "items": result.items.iter().map(serialize_agent_summary).collect::<Vec<_>>(),
+            "total": result.total,
+            "page": result.page,
+            "per_page": result.per_page,
+            "total_pages": result.total_pages,
+            "stats": {
+                "total_cost_usd": result.stats.total_cost_usd,
+                "total_tokens": result.stats.total_tokens,
+                "avg_duration_secs": result.stats.avg_duration_secs,
+                "count_running": result.stats.count_running,
+                "count_completed": result.stats.count_completed,
+                "count_failed": result.stats.count_failed,
+            },
+        })),
         Err(e) => {
-            tracing::error!(error = %e, "Failed to list agents");
-            Json(paginate(&Vec::<AgentSummary>::new(), &params))
+            tracing::error!(error = %e, "Failed to query agents");
+            Json(serde_json::json!({
+                "items": [],
+                "total": 0,
+                "page": params.page,
+                "per_page": params.per_page,
+                "total_pages": 0,
+                "stats": {},
+            }))
         }
     }
 }
 
-/// GET /api/agents/{id} — Agent detail.
-#[allow(dead_code)]
+/// GET /api/agents/stats — Global agent stats.
+pub(crate) async fn handle_agent_stats(state: State<Arc<AppState>>) -> Json<serde_json::Value> {
+    match state.kernel.agents.stats().await {
+        Ok(s) => Json(serde_json::json!({
+            "total_agents": s.total_agents,
+            "running": s.running,
+            "completed": s.completed,
+            "failed": s.failed,
+            "total_cost_usd": s.total_cost_usd,
+            "total_tokens": s.total_tokens,
+            "total_duration_secs": s.total_duration_secs,
+            "avg_duration_secs": s.avg_duration_secs,
+            "avg_cost_usd": s.avg_cost_usd,
+            "total_sessions": s.total_sessions,
+            "oldest_agent_at": s.oldest_agent_at.map(|t| t.to_rfc3339()),
+            "newest_agent_at": s.newest_agent_at.map(|t| t.to_rfc3339()),
+        })),
+        Err(e) => {
+            tracing::error!(error = %e, "Failed to get agent stats");
+            Json(serde_json::json!({"error": e.to_string()}))
+        }
+    }
+}
+
+fn serialize_agent_summary(a: &oxios_kernel::types::AgentInfo) -> serde_json::Value {
+    serde_json::json!({
+        "id": a.id.to_string(),
+        "name": a.name,
+        "status": a.status.to_string(),
+        "created_at": a.created_at.to_rfc3339(),
+        "started_at": a.started_at.map(|t| t.to_rfc3339()),
+        "completed_at": a.completed_at.map(|t| t.to_rfc3339()),
+        "seed_id": a.seed_id.map(|s| s.to_string()),
+        "project_id": a.project_id.map(|id| id.to_string()),
+        "session_id": a.session_id,
+        "error": a.error,
+        "steps_completed": a.steps_completed,
+        "steps_total": a.steps_total,
+        "tokens_used": a.tokens_input + a.tokens_output,
+        "cost_usd": a.cost_usd,
+        "model_id": a.model_id,
+        "duration_secs": a.completed_at.zip(a.started_at)
+            .map(|(end, start)| (end - start).num_seconds().max(0)),
+    })
+}
+
+/// GET /api/agents/{id} — Agent detail (from memory or SQLite).
 pub(crate) async fn handle_agent_get(
     state: State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<Json<serde_json::Value>, AppError> {
-    let agents = state
-        .kernel
-        .agents
-        .list()
-        .await
-        .map_err(|e| AppError::Internal(e.to_string()))?;
-    let agent = agents
-        .into_iter()
-        .find(|a| a.id.to_string() == id)
-        .ok_or_else(|| AppError::NotFound("agent not found".into()))?;
+    // Try in-memory first
+    if let Ok(agents) = state.kernel.agents.list().await {
+        if let Some(agent) = agents.into_iter().find(|a| a.id.to_string() == id) {
+            return Ok(Json(agent_detail_json(&agent, &state)));
+        }
+    }
 
+    // Fall back to SQLite (or filesystem)
+    let agent = state.kernel.agents.get(&id).await?;
+    match agent {
+        Some(agent) => Ok(Json(agent_detail_json(&agent, &state))),
+        None => Err(AppError::NotFound("agent not found".into())),
+    }
+}
+
+fn agent_detail_json(
+    agent: &oxios_kernel::types::AgentInfo,
+    state: &Arc<AppState>,
+) -> serde_json::Value {
     let budget = state.kernel.agents.check_budget(&agent.id);
-
-    Ok(Json(serde_json::json!({
+    serde_json::json!({
         "id": agent.id.to_string(),
         "name": agent.name,
         "status": agent.status.to_string(),
         "created_at": agent.created_at.to_rfc3339(),
         "seed_id": agent.seed_id.map(|s| s.to_string()),
-        "steps_completed": 0,
+        "project_id": agent.project_id.map(|id| id.to_string()),
+        "session_id": agent.session_id,
+        "started_at": agent.started_at.map(|t| t.to_rfc3339()),
+        "completed_at": agent.completed_at.map(|t| t.to_rfc3339()),
+        "error": agent.error,
+        "steps_completed": agent.steps_completed,
+        "steps_total": agent.steps_total,
+        "tokens_used": agent.tokens_input + agent.tokens_output,
+        "cost_usd": agent.cost_usd,
+        "model_id": agent.model_id,
         "budget": {
             "tokens_remaining": budget.tokens_remaining,
             "calls_remaining": budget.calls_remaining,
             "window_remaining_secs": budget.window_remaining_secs,
             "is_exhausted": budget.is_exhausted,
         },
-    })))
+    })
 }
 
-/// GET /api/agents/{id}/trace — Agent execution trace.
-#[allow(dead_code)]
 pub(crate) async fn handle_agent_trace(
     state: State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<Json<serde_json::Value>, AppError> {
-    // Verify the agent exists
-    let agents = state
-        .kernel
-        .agents
-        .list()
-        .await
-        .map_err(|e| AppError::Internal(e.to_string()))?;
-    let _agent = agents
-        .into_iter()
-        .find(|a| a.id.to_string() == id)
-        .ok_or_else(|| AppError::NotFound("agent not found".into()))?;
+    // Try in-memory first
+    if let Ok(agents) = state.kernel.agents.list().await {
+        if let Some(agent) = agents.into_iter().find(|a| a.id.to_string() == id) {
+            return Ok(Json(trace_json(&agent)));
+        }
+    }
 
-    // Try to load trace from sessions/{session_id}/trace.json
-    // For now, return empty trace
-    Ok(Json(serde_json::json!({
-        "agent_id": id,
-        "steps": [],
-        "completed_at": null,
-    })))
+    // Fallback: load from SQLite
+    if let Ok(Some(agent)) = state.kernel.agents.get(&id).await {
+        return Ok(Json(trace_json(&agent)));
+    }
+
+    Err(AppError::NotFound("agent not found".into()))
+}
+
+fn trace_json(agent: &oxios_kernel::types::AgentInfo) -> serde_json::Value {
+    let steps: Vec<serde_json::Value> = agent
+        .tool_calls
+        .iter()
+        .enumerate()
+        .map(|(i, tc)| {
+            serde_json::json!({
+                "index": i,
+                "tool_name": tc.tool,
+                "action": tc.tool,
+                "input": tc.input,
+                "output": tc.output,
+                "started_at": tc.timestamp.map(|t| t.to_rfc3339()).unwrap_or_default(),
+                "duration_ms": tc.duration_ms,
+                "status": if tc.is_error { "failed" } else { "completed" },
+            })
+        })
+        .collect();
+
+    serde_json::json!({
+        "agent_id": agent.id.to_string(),
+        "steps": steps,
+        "completed_at": agent.completed_at.map(|t| t.to_rfc3339()),
+    })
 }
 
 /// GET /api/agents/{id}/logs — Agent execution logs.
-#[allow(dead_code)]
 pub(crate) async fn handle_agent_logs(
     state: State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<Json<serde_json::Value>, AppError> {
-    // Verify the agent exists
-    let agents = state
-        .kernel
-        .agents
-        .list()
-        .await
-        .map_err(|e| AppError::Internal(e.to_string()))?;
-    let _agent = agents
-        .into_iter()
-        .find(|a| a.id.to_string() == id)
-        .ok_or_else(|| AppError::NotFound("agent not found".into()))?;
+    // Try in-memory first
+    let agent = if let Ok(agents) = state.kernel.agents.list().await {
+        agents.into_iter().find(|a| a.id.to_string() == id)
+    } else {
+        None
+    };
+
+    // Fallback: load from SQLite
+    let agent = match agent {
+        Some(a) => a,
+        None => match state.kernel.agents.get(&id).await {
+            Ok(Some(a)) => a,
+            _ => return Err(AppError::NotFound("agent not found".into())),
+        },
+    };
+
+    let mut entries = Vec::new();
+
+    if let Some(started) = agent.started_at {
+        entries.push(serde_json::json!({
+            "timestamp": started.to_rfc3339(),
+            "level": "info",
+            "message": format!("Agent started: {}", agent.name),
+        }));
+    }
+
+    for (i, tc) in agent.tool_calls.iter().enumerate() {
+        let ts = tc.timestamp.map(|t| t.to_rfc3339()).unwrap_or_default();
+        entries.push(serde_json::json!({
+            "timestamp": ts,
+            "level": "info",
+            "message": format!("[Step {}] {} ({}) → {}",
+                i + 1, tc.tool, format_duration(tc.duration_ms),
+                truncate_str(&tc.output, 120)),
+        }));
+    }
+
+    if let Some(completed) = agent.completed_at {
+        let (level, msg) = if let Some(ref err) = agent.error {
+            ("error", format!("Agent failed: {err}"))
+        } else {
+            (
+                "info",
+                format!("Agent completed ({} steps)", agent.steps_completed),
+            )
+        };
+        entries.push(serde_json::json!({
+            "timestamp": completed.to_rfc3339(),
+            "level": level,
+            "message": msg,
+        }));
+    }
 
     Ok(Json(serde_json::json!({
         "agent_id": id,
-        "entries": [],
+        "entries": entries,
     })))
 }
 
@@ -747,12 +977,11 @@ pub(crate) async fn handle_config_get(
     match serde_json::to_value(&*config) {
         Ok(mut json) => {
             // Mask API key in response — never expose plaintext
-            if let Some(engine) = json.get_mut("engine") {
-                if let Some(api_key) = engine.get_mut("api_key") {
-                    if api_key.as_str().is_some_and(|k| !k.is_empty()) {
-                        *api_key = serde_json::Value::String("***".to_string());
-                    }
-                }
+            if let Some(engine) = json.get_mut("engine")
+                && let Some(api_key) = engine.get_mut("api_key")
+                && api_key.as_str().is_some_and(|k| !k.is_empty())
+            {
+                *api_key = serde_json::Value::String("***".to_string());
             }
             // Add api_key_set flag so the frontend knows if a key is currently set
             json["engine"]["api_key_set"] =
@@ -1334,7 +1563,7 @@ mod patch_rejection_tests {
     //! masking, and provider-scoped semantics) and sending them via the
     //! bulk PATCH would risk wiping the encrypted api_key.
 
-    use super::{find_forbidden_patch_key, PATCH_FORBIDDEN_TOP_LEVEL_KEYS};
+    use super::{PATCH_FORBIDDEN_TOP_LEVEL_KEYS, find_forbidden_patch_key};
     use serde_json::json;
 
     #[test]
@@ -1700,7 +1929,7 @@ pub(crate) async fn handle_backup(_state: State<Arc<AppState>>) -> Json<BackupRe
                 path: String::new(),
                 size_bytes: 0,
                 message: "Cannot determine home directory.".into(),
-            })
+            });
         }
     };
     let oxios_home = home.join(".oxios");
@@ -1723,7 +1952,7 @@ pub(crate) async fn handle_backup(_state: State<Arc<AppState>>) -> Json<BackupRe
                         path: String::new(),
                         size_bytes: 0,
                         message: "Invalid backup path.".into(),
-                    })
+                    });
                 }
             },
             "-C",
@@ -1742,7 +1971,7 @@ pub(crate) async fn handle_backup(_state: State<Arc<AppState>>) -> Json<BackupRe
                 path: String::new(),
                 size_bytes: 0,
                 message: format!("tar failed: {e}"),
-            })
+            });
         }
     };
 
@@ -1825,5 +2054,24 @@ fn format_size_helper(bytes: u64) -> String {
         format!("{:.1} KB", bytes as f64 / 1024.0)
     } else {
         format!("{:.1} MB", bytes as f64 / (1024.0 * 1024.0))
+    }
+}
+
+/// Format milliseconds into a human-readable duration.
+fn format_duration(ms: u64) -> String {
+    if ms < 1000 {
+        format!("{ms}ms")
+    } else {
+        format!("{:.1}s", ms as f64 / 1000.0)
+    }
+}
+
+/// Truncate a string to `max_len` characters, appending "..." if needed.
+fn truncate_str(s: &str, max_len: usize) -> String {
+    if s.chars().count() <= max_len {
+        s.to_string()
+    } else {
+        let truncated: String = s.chars().take(max_len - 3).collect();
+        format!("{truncated}...")
     }
 }

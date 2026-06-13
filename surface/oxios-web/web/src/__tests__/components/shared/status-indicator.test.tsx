@@ -8,7 +8,7 @@ describe('StatusIndicator', () => {
 
     // Component uses CSS capitalize, so DOM text is lowercase
     expect(screen.getByText('running')).toBeInTheDocument()
-    const dot = document.querySelector('.bg-emerald-500')
+    const dot = document.querySelector('.bg-success')
     expect(dot).toBeInTheDocument()
   })
 
@@ -16,7 +16,7 @@ describe('StatusIndicator', () => {
     render(<StatusIndicator status="active" />)
 
     expect(screen.getByText('active')).toBeInTheDocument()
-    const dot = document.querySelector('.bg-emerald-500')
+    const dot = document.querySelector('.bg-success')
     expect(dot).toBeInTheDocument()
   })
 
@@ -24,7 +24,7 @@ describe('StatusIndicator', () => {
     render(<StatusIndicator status="stopped" />)
 
     expect(screen.getByText('stopped')).toBeInTheDocument()
-    const dot = document.querySelector('.bg-red-500')
+    const dot = document.querySelector('.bg-error')
     expect(dot).toBeInTheDocument()
   })
 
@@ -32,7 +32,7 @@ describe('StatusIndicator', () => {
     render(<StatusIndicator status="pending" />)
 
     expect(screen.getByText('pending')).toBeInTheDocument()
-    const dot = document.querySelector('.bg-amber-500')
+    const dot = document.querySelector('.bg-warning')
     expect(dot).toBeInTheDocument()
   })
 
@@ -56,8 +56,8 @@ describe('StatusIndicator', () => {
     render(<StatusIndicator status="unknown" />)
 
     expect(screen.getByText('unknown')).toBeInTheDocument()
-    // Unknown status falls back to 'bg-zinc-400'
-    const dot = document.querySelector('.bg-zinc-400')
+    // Unknown status falls back to 'bg-muted-foreground'
+    const dot = document.querySelector('.bg-muted-foreground')
     expect(dot).toBeInTheDocument()
   })
 
@@ -65,7 +65,7 @@ describe('StatusIndicator', () => {
     render(<StatusIndicator status="idle" />)
 
     expect(screen.getByText('idle')).toBeInTheDocument()
-    const dot = document.querySelector('.bg-amber-500')
+    const dot = document.querySelector('.bg-warning')
     expect(dot).toBeInTheDocument()
   })
 

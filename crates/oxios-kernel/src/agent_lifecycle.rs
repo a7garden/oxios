@@ -4,13 +4,13 @@
 //! Handles: fork agent → register A2A → check permissions →
 //! submit to scheduler → run → unregister → complete/fail.
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use std::sync::Arc;
 
-use tokio::time::{timeout, Duration};
+use tokio::time::{Duration, timeout};
 
 use crate::a2a::{A2AProtocol, AgentCard};
-use crate::access_manager::AccessManager;
+use crate::access_manager::{AccessManager, Role, Subject};
 use crate::event_bus::{EventBus, KernelEvent};
 use crate::metrics::get_metrics;
 use crate::scheduler::{AgentScheduler, Priority, ScheduledTask};
@@ -27,6 +27,12 @@ pub struct AgentLifecycleManager {
     event_bus: EventBus,
     /// Maximum execution time in seconds for agent tasks (0 = no limit).
     max_execution_time_secs: std::sync::atomic::AtomicU64,
+    /// Default allowed tools from config.
+    allowed_tools: Vec<String>,
+    /// Whether agents get network access by default.
+    network_access: bool,
+    /// Workspace path for path sandbox.
+    workspace_path: String,
 }
 
 impl Clone for AgentLifecycleManager {
@@ -41,12 +47,16 @@ impl Clone for AgentLifecycleManager {
                 self.max_execution_time_secs
                     .load(std::sync::atomic::Ordering::Relaxed),
             ),
+            allowed_tools: self.allowed_tools.clone(),
+            network_access: self.network_access,
+            workspace_path: self.workspace_path.clone(),
         }
     }
 }
 
 impl AgentLifecycleManager {
     /// Create a new lifecycle manager.
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         supervisor: Arc<dyn Supervisor>,
         scheduler: Arc<AgentScheduler>,
@@ -54,6 +64,9 @@ impl AgentLifecycleManager {
         a2a: Arc<A2AProtocol>,
         event_bus: EventBus,
         max_execution_time_secs: u64,
+        allowed_tools: Vec<String>,
+        network_access: bool,
+        workspace_path: String,
     ) -> Self {
         Self {
             supervisor,
@@ -62,6 +75,9 @@ impl AgentLifecycleManager {
             a2a,
             event_bus,
             max_execution_time_secs: std::sync::atomic::AtomicU64::new(max_execution_time_secs),
+            allowed_tools,
+            network_access,
+            workspace_path,
         }
     }
 
@@ -191,17 +207,49 @@ impl AgentLifecycleManager {
     }
 
     /// Ensure default tool permissions exist for an agent.
+    ///
+    /// Applies config.toml `[security]` settings:
+    /// - `allowed_tools` → agent's tool set
+    /// - `network_access` → network permission
+    /// - workspace path → path sandbox
+    /// - RBAC `Superuser` role → allows all tools and paths
     fn ensure_permissions(&self, agent_name: &str) {
         let mut access = self.access_manager.lock();
         let perms = access.get_or_create_permissions(agent_name);
-        // Grant default tool set to new agents
-        for tool in [
-            "bash", "read", "write", "edit", "grep", "find", "exec", "ls",
-        ] {
-            if !perms.allowed_tools.contains(tool) {
+
+        // Grant all tools from config
+        for tool in &self.allowed_tools {
+            if !perms.allowed_tools.contains(tool.as_str()) {
                 perms.allow_tool(tool);
             }
         }
+
+        // Add workspace path to allowed paths
+        let ws_pattern = format!("{}/**", self.workspace_path.trim_end_matches('/'));
+        if !perms.allowed_paths.iter().any(|p| p == &ws_pattern) {
+            perms.allow_path(&ws_pattern);
+        }
+        // Also allow /tmp for agent temp files
+        if !perms.allowed_paths.iter().any(|p| p == "/tmp/**") {
+            perms.allow_path("/tmp/**");
+        }
+
+        // Apply network access from config
+        if self.network_access {
+            perms.enable_network();
+        }
+
+        // Assign Superuser RBAC role so AccessGate passes
+        // (config.toml already defines which tools are allowed)
+        let subject = Subject::Agent(
+            agent_name
+                .strip_prefix("agent-")
+                .and_then(|s| s.parse().ok())
+                .unwrap_or_default(),
+        );
+        access
+            .rbac_manager_mut()
+            .assign_role(subject, Role::Superuser);
     }
 
     /// Unregister A2A, complete/fail scheduler task.

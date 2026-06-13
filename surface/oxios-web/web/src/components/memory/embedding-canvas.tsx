@@ -459,7 +459,9 @@ export function EmbeddingCanvas({
         else if (neighbourSet?.has(n.id)) alpha = 0.95
         else alpha = 0.2
       } else if (hoverIdRef.current && hoverIdRef.current !== n.id) {
-        const hoverNeighbours = neighboursRef.current.get(hoverIdRef.current) ?? []
+        const hoverNeighbours = Array.isArray(neighboursRef.current.get(hoverIdRef.current))
+          ? neighboursRef.current.get(hoverIdRef.current)!
+          : []
         alpha = hoverNeighbours.includes(n.id) ? 0.95 : 0.25
       }
       ctx.globalAlpha = alpha

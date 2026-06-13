@@ -47,7 +47,7 @@ export function ProviderSelect({
   const grouped = useMemo(() => {
     const map = new Map<ProviderCategory, ProviderInfo[]>()
     for (const p of providers) {
-      const list = map.get(p.category) ?? []
+      const list = Array.isArray(map.get(p.category)) ? map.get(p.category)! : []
       list.push(p)
       map.set(p.category, list)
     }

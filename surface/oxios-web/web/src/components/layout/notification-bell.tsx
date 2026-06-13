@@ -20,6 +20,19 @@ const severityDot: Record<NotificationSeverity, string> = {
 }
 
 /**
+ * i18n-aware relative time formatter.
+ * Defined outside the component to avoid re-creation, but requires `t`.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function timeAgo(iso: string, t: (...args: any[]) => any): string {
+  const diff = Date.now() - new Date(iso).getTime()
+  if (diff < 60_000) return t('common.justNow', 'just now')
+  if (diff < 3_600_000) return t('common.minutesAgo', { count: Math.floor(diff / 60_000) })
+  if (diff < 86_400_000) return t('common.hoursAgo', { count: Math.floor(diff / 3_600_000) })
+  return t('common.daysAgo', { count: Math.floor(diff / 86_400_000) })
+}
+
+/**
  * Global notification bell displayed in the header.
  * Shows unread count badge and a dropdown panel with recent notifications.
  */
@@ -60,19 +73,19 @@ export function NotificationBell() {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="relative rounded-md p-2 hover:bg-accent/50 transition-colors"
+        className="relative rounded-md p-2 hover:bg-accent/50 transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
         aria-label={`${t('notifications.openNotifications')}${unreadCount > 0 ? t('common.unreadCount', { count: unreadCount }) : ''}`}
       >
         <Bell className="h-4 w-4" />
         {unreadCount > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-2xs font-bold text-destructive-foreground">
+          <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-2xs font-bold text-destructive-foreground animate-scale-in">
             {unreadCount > 99 ? '99+' : unreadCount}
           </span>
         )}
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full mt-2 z-50 w-80 max-w-[calc(100vw-2rem)] rounded-lg border bg-popover text-popover-foreground shadow-lg">
+        <div className="absolute right-0 top-full mt-2 z-[var(--z-popover,200)] w-80 max-w-[calc(100vw-2rem)] rounded-xl border bg-popover text-popover-foreground shadow-xl animate-scale-in">
           {/* Header */}
           <div className="flex items-center justify-between border-b px-3 py-2">
             <span className="text-sm font-medium">{t('notifications.title')}</span>
@@ -96,7 +109,7 @@ export function NotificationBell() {
                   <div
                     key={n.id}
                     className={cn(
-                      'group flex gap-2 px-3 py-2.5 transition-colors cursor-pointer hover:bg-accent/50',
+                      'group flex gap-2 px-3 py-2.5 transition-all cursor-pointer hover:bg-accent/50',
                       !n.read && 'bg-accent/20',
                     )}
                     onClick={() => handleClick(n)}
@@ -120,7 +133,7 @@ export function NotificationBell() {
                         </p>
                       )}
                       <p className="text-2xs text-muted-foreground/60 mt-1">
-                        {timeAgo(n.timestamp)}
+                        {timeAgo(n.timestamp, t)}
                       </p>
                     </div>
                     <button
@@ -143,12 +156,4 @@ export function NotificationBell() {
       )}
     </div>
   )
-}
-
-function timeAgo(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime()
-  if (diff < 60_000) return 'just now'
-  if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m ago`
-  if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)}h ago`
-  return `${Math.floor(diff / 86_400_000)}d ago`
 }

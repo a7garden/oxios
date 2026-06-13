@@ -441,11 +441,14 @@ pub(crate) async fn handle_knowledge_tree(
                     .flatten()
                     .and_then(|content| {
                         let (meta, _) = oxios_markdown::knowledge::parse_note_meta(&content);
-                        meta.map(|m| match m.quality {
-                            oxios_markdown::types::NoteQuality::Raw => "raw",
-                            oxios_markdown::types::NoteQuality::Curated => "curated",
-                            oxios_markdown::types::NoteQuality::Refined => "refined",
-                        }.to_string())
+                        meta.map(|m| {
+                            match m.quality {
+                                oxios_markdown::types::NoteQuality::Raw => "raw",
+                                oxios_markdown::types::NoteQuality::Curated => "curated",
+                                oxios_markdown::types::NoteQuality::Refined => "refined",
+                            }
+                            .to_string()
+                        })
                     })
             } else {
                 None
@@ -1288,6 +1291,7 @@ mod tests {
             name: "Rust.md".into(),
             is_dir: false,
             size: 1024,
+            oxios_quality: None,
         };
         let json = serde_json::to_value(&entry).unwrap();
         assert_eq!(json["name"], "Rust.md");

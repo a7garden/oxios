@@ -397,10 +397,10 @@ impl ExpectToml {
     pub fn into_assertions(self) -> Vec<Assertion> {
         let mut assertions = Vec::new();
 
-        if let Some(ref phase_str) = self.phase_reached {
-            if let Some(phase) = Phase::from_str_opt(phase_str) {
-                assertions.push(Assertion::PhaseReached { min: phase });
-            }
+        if let Some(ref phase_str) = self.phase_reached
+            && let Some(phase) = Phase::from_str_opt(phase_str)
+        {
+            assertions.push(Assertion::PhaseReached { min: phase });
         }
         if let Some(ep) = self.evaluation_passed {
             assertions.push(Assertion::EvaluationPassed { expected: ep });

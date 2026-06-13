@@ -9,7 +9,7 @@
 //! - **D2**: `diff_commits` / `file_at_commit` for Ouroboros evaluate.
 //! - **D3**: Removed hex round-trips; `list_tags` uses `Category::Tag`.
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use gix::bstr::BStr;
 use gix::hash::ObjectId;
 use gix::objs::tree::EntryKind;
@@ -1171,10 +1171,11 @@ mod tests {
         let info = layer.commit_file("new.txt", "add file").unwrap();
 
         let diff = layer.diff_commits(&first, &info.hash).unwrap();
-        assert!(diff
-            .files
-            .iter()
-            .any(|f| f.path == "new.txt" && f.kind == DiffKind::Added));
+        assert!(
+            diff.files
+                .iter()
+                .any(|f| f.path == "new.txt" && f.kind == DiffKind::Added)
+        );
     }
 
     #[test]
@@ -1188,10 +1189,11 @@ mod tests {
         let second = layer.commit_file("data.txt", "v2").unwrap();
 
         let diff = layer.diff_commits(&first.hash, &second.hash).unwrap();
-        assert!(diff
-            .files
-            .iter()
-            .any(|f| f.path == "data.txt" && f.kind == DiffKind::Modified));
+        assert!(
+            diff.files
+                .iter()
+                .any(|f| f.path == "data.txt" && f.kind == DiffKind::Modified)
+        );
 
         let patch = diff
             .files
@@ -1216,10 +1218,11 @@ mod tests {
         let second = layer.remove_file("temp.txt", "remove temp").unwrap();
 
         let diff = layer.diff_commits(&first.hash, &second.hash).unwrap();
-        assert!(diff
-            .files
-            .iter()
-            .any(|f| f.path == "temp.txt" && f.kind == DiffKind::Deleted));
+        assert!(
+            diff.files
+                .iter()
+                .any(|f| f.path == "temp.txt" && f.kind == DiffKind::Deleted)
+        );
     }
 
     #[test]

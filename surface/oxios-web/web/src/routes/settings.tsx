@@ -43,7 +43,7 @@ import { SystemUpdateCard } from '@/components/system/system-update'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
-import { useToast } from '@/components/ui/sonner'
+import { toast } from 'sonner'
 import {
   type ConfigDiffEntry,
   type ConfigPatchResponse,
@@ -479,7 +479,7 @@ function EnginePanel() {
 
   const currentModelId = useMemo(() => {
     if (!currentModel.includes('/')) return null
-    return currentModel  // ModelInfo.id is already "provider/model", used as-is
+    return currentModel // ModelInfo.id is already "provider/model", used as-is
   }, [currentModel])
 
   const handleProviderChange = (providerId: string) => {
@@ -675,10 +675,12 @@ function LegacyFieldRow({
             onValueChange={(v) => onChange(v)}
             placeholder={t(field.labelKey)}
             options={
-              field.options?.map((opt) => ({
-                label: t(opt.labelKey),
-                value: opt.value,
-              })) ?? []
+              Array.isArray(field.options)
+                ? field.options.map((opt) => ({
+                    label: t(opt.labelKey),
+                    value: opt.value,
+                  }))
+                : []
             }
             className="w-full"
           />
@@ -922,7 +924,6 @@ function SettingsPage() {
 
   const hasUnsaved = annotatedDiff.length > 0
 
-  const { toast } = useToast()
 
   const handleSaveClick = () => {
     if (annotatedDiff.length === 0) return
@@ -947,15 +948,14 @@ function SettingsPage() {
                 applied: r.applied_immediately.length,
                 restart: r.requires_restart.length,
               }),
-              'default',
             )
           } else if (r.applied_immediately.length > 0) {
-            toast(t('settings.savedApplied', { count: r.applied_immediately.length }), 'success')
+            toast.success(t('settings.savedApplied', { count: r.applied_immediately.length }))
           } else {
-            toast(t('settings.settingsSaved'), 'success')
+            toast.success(t('settings.settingsSaved'))
           }
         } else {
-          toast(t('settings.settingsSaved'), 'success')
+          toast.success(t('settings.settingsSaved'))
         }
         queryClient.invalidateQueries({ queryKey: ['config'] })
       },
@@ -963,7 +963,7 @@ function SettingsPage() {
         setShowDiff(false)
         setSaveNotice('error')
         setTimeout(() => setSaveNotice(null), 5000)
-        toast(t('settings.settingsSaveFailed'), 'destructive')
+        toast.error(t('settings.settingsSaveFailed'))
       },
     })
   }

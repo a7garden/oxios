@@ -21,14 +21,26 @@ export interface ConfigPatchResponse {
   }
 }
 
-/** Walks two JSON values in parallel and yields a flat list of differences. */
+/** Walks two JSON values in parallel and yields a flat list of differences.
+ *
+ * Only iterates keys from `after` (the proposed payload), not `before` (the
+ * current config). This matches PATCH semantics: keys absent from the
+ * payload are "no change" — the server deep-merges and preserves them.
+ *
+ * Previously, this function iterated keys from **both** sides, which caused
+ * every section not present in the form (browser, budget, calendar, …) to
+ * appear as a phantom "deleted" change, since `buildPayload()` only
+ * includes sections with form fields. This resulted in 60+ false-positive
+ * diff entries requiring a daemon restart. */
 export function diffConfigs(
   before: Record<string, unknown>,
   after: Record<string, unknown>,
   prefix = '',
 ): ConfigDiffEntry[] {
   const out: ConfigDiffEntry[] = []
-  const keys = new Set([...Object.keys(before ?? {}), ...Object.keys(after ?? {})])
+  // Only iterate `after` keys — missing keys in `after` mean "no change"
+  // under PATCH semantics, so they must not appear in the diff.
+  const keys = Object.keys(after ?? {})
   for (const k of keys) {
     const path = prefix ? `${prefix}.${k}` : k
     const b = before?.[k]

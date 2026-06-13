@@ -18,6 +18,9 @@ fn test_execution(output: &str) -> ExecutionResult {
         steps_completed: 1,
         success: true,
         tool_calls: vec![],
+        tokens_input: 0,
+        tokens_output: 0,
+        model_id: String::new(),
     }
 }
 

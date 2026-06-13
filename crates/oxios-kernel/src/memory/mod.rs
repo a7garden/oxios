@@ -87,7 +87,7 @@ impl From<&crate::config::ConsolidationConfig> for oxios_memory::memory::dream::
 // Core types (kernel internal consumers)
 pub use oxios_memory::memory::manager::MemoryManager;
 pub use oxios_memory::memory::types::{
-    content_hash, MemoryEntry, MemoryTier, MemoryType, ProtectionLevel, TextVector,
+    MemoryEntry, MemoryTier, MemoryType, ProtectionLevel, TextVector, content_hash,
 };
 
 // Dream + Proactive (binary crate)
@@ -96,7 +96,7 @@ pub use oxios_memory::memory::proactive::{ProactiveRecall, RecallTiming};
 
 // Web surface consumers (embedding viz, HNSW, graph)
 pub use oxios_memory::memory::embedding_viz::{
-    compute_pca_2d, compute_top_neighbors, MemoryMapEntry, MemoryNeighbor,
+    MemoryMapEntry, MemoryNeighbor, compute_pca_2d, compute_top_neighbors,
 };
 pub use oxios_memory::memory::hnsw::HnswIndex;
 pub use oxios_memory::memory::hnsw_memory_index::{HnswMemoryIndex, SemanticHit};

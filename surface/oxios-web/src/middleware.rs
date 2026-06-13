@@ -126,19 +126,18 @@ pub async fn require_auth(
         .strip_prefix("Bearer ")
         .ok_or(StatusCode::UNAUTHORIZED)?;
 
-    // Also allow OXIOS_API_KEY env var or static config key as fallback
+    // Resolve API key: [engine].api_key → OXIOS_API_KEY env var
+    let config_key = state.config.read().api_key();
     let env_key = std::env::var("OXIOS_API_KEY")
         .ok()
         .filter(|k| !k.is_empty());
-    let config_key = state.config.read().api_key();
 
     let is_valid = {
-        // Validate against auth_manager (kernel subsystem), OXIOS_API_KEY env, or config key
+        // Validate against auth_manager (kernel subsystem), config key, or env var
         let key_valid = state.kernel.security.validate_token(token);
-        // Also accept OXIOS_API_KEY env or static config key
-        let env_valid = env_key.as_deref().map(|k| k == token).unwrap_or(false);
         let config_valid = config_key.as_deref().map(|k| k == token).unwrap_or(false);
-        key_valid || env_valid || config_valid
+        let env_valid = env_key.as_deref().map(|k| k == token).unwrap_or(false);
+        key_valid || config_valid || env_valid
     }; // guard dropped here
     if !is_valid {
         tracing::warn!(path = %request.uri().path(), "Authentication failed");

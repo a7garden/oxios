@@ -12,7 +12,7 @@
 //! assert!(cb.is_allowed());
 //! ```
 
-use std::sync::atomic::{AtomicU32, AtomicU64, AtomicU8, Ordering};
+use std::sync::atomic::{AtomicU8, AtomicU32, AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 
 /// Circuit breaker states.

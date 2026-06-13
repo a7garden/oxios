@@ -87,7 +87,7 @@ describe('ServerCard', () => {
     render(<ServerCard server={disabledServer} {...defaultProps} />)
 
     expect(screen.getByText('common.disabled')).toBeInTheDocument()
-    const dot = document.querySelector('.bg-gray-400')
+    const dot = document.querySelector('.bg-muted-foreground')
     expect(dot).toBeInTheDocument()
   })
 

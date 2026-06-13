@@ -14,7 +14,7 @@ export function LinkedAgents({ seedId }: { seedId: string }) {
 
   if (isLoading) return <LoadingCards count={2} />
 
-  const agents = data?.agents ?? []
+  const agents = Array.isArray(data?.agents) ? data.agents : []
   if (!agents.length) {
     return <EmptyState icon={<Bot className="h-10 w-10" />} title={t('seeds.noLinkedAgents')} />
   }

@@ -1,5 +1,6 @@
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, List } from 'lucide-react'
 import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -18,7 +19,7 @@ type ViewMode = 'month' | 'week' | 'agenda'
 
 // ─── Constants ──────────────────────────────────────────────────────────
 
-const DAY_LABELS = ['일', '월', '화', '수', '목', '금', '토']
+
 
 // ─── Date helpers (no external deps) ────────────────────────────────────
 
@@ -48,8 +49,8 @@ function formatDateKey(d: Date): string {
   return `${y}-${m}-${day}`
 }
 
-function formatMonthYear(d: Date): string {
-  return d.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long' })
+function formatMonthYear(d: Date, locale: string): string {
+  return d.toLocaleDateString(locale, { year: 'numeric', month: 'long' })
 }
 
 /** Build an array of 42 cells (6 weeks × 7 days) for a month grid. */
@@ -78,7 +79,7 @@ function groupByDate(events: CalendarEvent[]): Map<string, CalendarEvent[]> {
   const map = new Map<string, CalendarEvent[]>()
   for (const ev of events) {
     const key = formatDateKey(new Date(ev.start))
-    const arr = map.get(key) ?? []
+    const arr = Array.isArray(map.get(key)) ? map.get(key)! : []
     arr.push(ev)
     map.set(key, arr)
   }
@@ -97,12 +98,16 @@ function MonthView({
   eventsByDate,
   onEventClick,
   onDateClick,
+  dayLabels,
+  t,
 }: {
   year: number
   month: number
   eventsByDate: Map<string, CalendarEvent[]>
   onEventClick?: (uid: string) => void
   onDateClick?: (date: Date) => void
+  dayLabels: string[]
+  t: (key: string, options?: Record<string, unknown>) => string
 }) {
   const cells = useMemo(() => buildMonthGrid(year, month), [year, month])
   const today = new Date()
@@ -111,7 +116,7 @@ function MonthView({
   return (
     <div className="grid grid-cols-7 border-t border-l">
       {/* Day headers */}
-      {DAY_LABELS.map((label) => (
+      {dayLabels.map((label) => (
         <div
           key={label}
           className="border-b border-r px-2 py-1.5 text-center text-xs font-medium text-muted-foreground bg-muted/30"
@@ -164,7 +169,7 @@ function MonthView({
                 />
               ))}
               {overflow > 0 && (
-                <span className="text-2xs text-muted-foreground pl-1">+{overflow}개 더</span>
+                <span className="text-2xs text-muted-foreground pl-1">{t('calendar.moreEvents', { count: overflow })}</span>
               )}
             </div>
           </div>
@@ -180,10 +185,12 @@ function WeekView({
   anchorDate,
   eventsByDate,
   onEventClick,
+  dayLabels,
 }: {
   anchorDate: Date
   eventsByDate: Map<string, CalendarEvent[]>
   onEventClick?: (uid: string) => void
+  dayLabels: string[]
 }) {
   const days = useMemo(() => buildWeekGrid(anchorDate), [anchorDate])
   const today = new Date()
@@ -204,7 +211,7 @@ function WeekView({
                 t ? 'text-primary' : 'text-muted-foreground',
               )}
             >
-              <div>{DAY_LABELS[i]}</div>
+              <div>{dayLabels[i]}</div>
               <div
                 className={cn(
                   'inline-flex items-center justify-center h-6 w-6 rounded-full text-xs',
@@ -263,9 +270,13 @@ function WeekView({
 function AgendaView({
   events,
   onEventClick,
+  t,
+  i18n,
 }: {
   events: CalendarEvent[]
   onEventClick?: (uid: string) => void
+  t: (key: string, options?: Record<string, unknown>) => string
+  i18n: { language: string }
 }) {
   const today = new Date()
 
@@ -277,7 +288,7 @@ function AgendaView({
     )
     for (const ev of sorted) {
       const key = formatDateKey(new Date(ev.start))
-      const arr = map.get(key) ?? []
+      const arr = Array.isArray(map.get(key)) ? map.get(key)! : []
       arr.push(ev)
       map.set(key, arr)
     }
@@ -288,7 +299,7 @@ function AgendaView({
     return (
       <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
         <CalendarIcon className="h-10 w-10 mb-2 opacity-40" />
-        <p className="text-sm">등록된 일정이 없습니다</p>
+        <p className="text-sm">{t('calendar.noEvents')}</p>
       </div>
     )
   }
@@ -298,7 +309,7 @@ function AgendaView({
       {grouped.map(([dateKey, dayEvents]) => {
         const date = new Date(`${dateKey}T00:00:00`)
         const today_ = isSameDay(date, today)
-        const label = date.toLocaleDateString('ko-KR', {
+        const label = date.toLocaleDateString(i18n.language, {
           month: 'long',
           day: 'numeric',
           weekday: 'short',
@@ -314,7 +325,7 @@ function AgendaView({
               </span>
               {today_ && (
                 <Badge variant="secondary" className="text-2xs px-1.5 py-0">
-                  오늘
+                  {t('calendar.today')}
                 </Badge>
               )}
             </div>
@@ -322,10 +333,10 @@ function AgendaView({
               {dayEvents.map((ev) => {
                 const start = new Date(ev.start)
                 const end = new Date(ev.end)
-                const timeLabel = `${start.toLocaleTimeString('ko-KR', {
+                const timeLabel = `${start.toLocaleTimeString(i18n.language, {
                   hour: '2-digit',
                   minute: '2-digit',
-                })} – ${end.toLocaleTimeString('ko-KR', {
+                })} – ${end.toLocaleTimeString(i18n.language, {
                   hour: '2-digit',
                   minute: '2-digit',
                 })}`
@@ -341,9 +352,9 @@ function AgendaView({
                       <span
                         className={cn(
                           'inline-block w-2 h-2 rounded-full',
-                          ev.source === 'agent' && 'bg-blue-500',
-                          ev.source === 'user' && 'bg-purple-500',
-                          ev.source === 'cron' && 'bg-gray-400',
+                          ev.source === 'agent' && 'bg-info',
+                          ev.source === 'user' && 'bg-secondary-foreground',
+                          ev.source === 'cron' && 'bg-muted-foreground',
                         )}
                       />
                     </div>
@@ -365,6 +376,8 @@ function AgendaView({
 // ─── Main CalendarView ──────────────────────────────────────────────────
 
 export function CalendarView({ events, onEventClick, onDateClick }: CalendarViewProps) {
+  const { t, i18n } = useTranslation()
+  const dayLabels = [t('calendar.daySun'), t('calendar.dayMon'), t('calendar.dayTue'), t('calendar.dayWed'), t('calendar.dayThu'), t('calendar.dayFri'), t('calendar.daySat')]
   const [viewMode, setViewMode] = useState<ViewMode>('month')
   const [currentDate, setCurrentDate] = useState(() => new Date())
 
@@ -397,15 +410,15 @@ export function CalendarView({ events, onEventClick, onDateClick }: CalendarView
       const from = days[0]!
       const to = days[6]!
       if (from.getMonth() === to.getMonth()) {
-        return from.toLocaleDateString('ko-KR', {
+        return from.toLocaleDateString(i18n.language, {
           year: 'numeric',
           month: 'long',
           day: 'numeric',
         })
       }
-      return `${from.toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })} – ${to.toLocaleDateString('ko-KR', { month: 'short', day: 'numeric', year: 'numeric' })}`
+      return `${from.toLocaleDateString(i18n.language, { month: 'short', day: 'numeric' })} – ${to.toLocaleDateString(i18n.language, { month: 'short', day: 'numeric', year: 'numeric' })}`
     }
-    return formatMonthYear(currentDate)
+    return formatMonthYear(currentDate, i18n.language)
   }, [currentDate, viewMode])
 
   const today = new Date()
@@ -433,7 +446,7 @@ export function CalendarView({ events, onEventClick, onDateClick }: CalendarView
           </Button>
           {!isViewingCurrentMonth && (
             <Button variant="outline" size="sm" onClick={goToday} className="ml-1 text-xs">
-              오늘
+              {t('calendar.today')}
             </Button>
           )}
           <h2 className="text-sm font-semibold ml-2">{headerTitle}</h2>
@@ -447,7 +460,7 @@ export function CalendarView({ events, onEventClick, onDateClick }: CalendarView
             onClick={() => setViewMode('month')}
             className="text-xs"
           >
-            <CalendarIcon className="h-3.5 w-3.5 mr-1" />월
+            <CalendarIcon className="h-3.5 w-3.5 mr-1" />{t('calendar.month')}
           </Button>
           <Button
             variant={viewMode === 'week' ? 'secondary' : 'ghost'}
@@ -455,7 +468,7 @@ export function CalendarView({ events, onEventClick, onDateClick }: CalendarView
             onClick={() => setViewMode('week')}
             className="text-xs"
           >
-            <CalendarIcon className="h-3.5 w-3.5 mr-1" />주
+            <CalendarIcon className="h-3.5 w-3.5 mr-1" />{t('calendar.week')}
           </Button>
           <Button
             variant={viewMode === 'agenda' ? 'secondary' : 'ghost'}
@@ -464,7 +477,7 @@ export function CalendarView({ events, onEventClick, onDateClick }: CalendarView
             className="text-xs"
           >
             <List className="h-3.5 w-3.5 mr-1" />
-            목록
+            {t('calendar.agenda')}
           </Button>
         </div>
       </div>
@@ -478,6 +491,8 @@ export function CalendarView({ events, onEventClick, onDateClick }: CalendarView
             eventsByDate={eventsByDate}
             onEventClick={onEventClick}
             onDateClick={onDateClick}
+            dayLabels={dayLabels}
+            t={t}
           />
         )}
         {viewMode === 'week' && (
@@ -485,9 +500,10 @@ export function CalendarView({ events, onEventClick, onDateClick }: CalendarView
             anchorDate={currentDate}
             eventsByDate={eventsByDate}
             onEventClick={onEventClick}
+            dayLabels={dayLabels}
           />
         )}
-        {viewMode === 'agenda' && <AgendaView events={events} onEventClick={onEventClick} />}
+        {viewMode === 'agenda' && <AgendaView events={events} onEventClick={onEventClick} t={t} i18n={i18n} />}
       </div>
     </div>
   )

@@ -396,7 +396,19 @@ impl AgentRuntime {
         let audit_trail: Option<Arc<AuditTrail>> =
             Some(Arc::clone(&self.kernel_handle.security.audit_trail));
 
-        let (mut final_content, steps_completed, success, trajectory_steps, agent, tool_call_ids, tool_args_map, tool_error_map, tool_timestamps, total_input_tokens, total_output_tokens) = {
+        let (
+            mut final_content,
+            steps_completed,
+            success,
+            trajectory_steps,
+            agent,
+            tool_call_ids,
+            tool_args_map,
+            tool_error_map,
+            tool_timestamps,
+            total_input_tokens,
+            total_output_tokens,
+        ) = {
             run_agent(
                 &config,
                 &engine,
@@ -506,43 +518,49 @@ impl AgentRuntime {
 
         // RFC-016: Autonomous persistence hook.
         // Runs after successful execution, fire-and-forget.
-        if success {
-            if let Some(hook) = &self.persistence_hook {
-                let already_saved_knowledge = trajectory_steps.iter().any(|s| {
-                    s.input == "knowledge" && s.output.contains("written successfully")
-                });
-                let hook = hook.clone();
-                let seed_clone = seed.clone();
-                let traj_clone = trajectory_steps.clone();
-                let output_clone = final_content.clone();
-                let sid = session_id.clone();
-                // Compute the assistant message index for this execution.
-                // Increment per-session counter, then use the pre-increment value.
-                let msg_index = {
-                    let mut counter = self.session_msg_counter.lock();
-                    let idx = counter.entry(sid.clone().unwrap_or_default()).or_insert(0);
-                    let current = *idx;
-                    *idx += 1;
-                    current
-                };
-                tokio::spawn(async move {
-                    match hook.evaluate(&seed_clone, &traj_clone, &output_clone, already_saved_knowledge).await {
-                        Ok(plan) => {
-                            if !plan.memory.is_empty() || !plan.knowledge.is_empty() {
-                                tracing::info!(
-                                    memory = plan.memory.len(),
-                                    knowledge = plan.knowledge.len(),
-                                    message_index = msg_index,
-                                    "PersistenceHook executing plan"
-                                );
-                                let session_id = sid.unwrap_or_default();
-                                hook.execute_plan(plan, &session_id, msg_index).await;
-                            }
+        if success && let Some(hook) = &self.persistence_hook {
+            let already_saved_knowledge = trajectory_steps
+                .iter()
+                .any(|s| s.input == "knowledge" && s.output.contains("written successfully"));
+            let hook = hook.clone();
+            let seed_clone = seed.clone();
+            let traj_clone = trajectory_steps.clone();
+            let output_clone = final_content.clone();
+            let sid = session_id.clone();
+            // Compute the assistant message index for this execution.
+            // Increment per-session counter, then use the pre-increment value.
+            let msg_index = {
+                let mut counter = self.session_msg_counter.lock();
+                let idx = counter.entry(sid.clone().unwrap_or_default()).or_insert(0);
+                let current = *idx;
+                *idx += 1;
+                current
+            };
+            tokio::spawn(async move {
+                match hook
+                    .evaluate(
+                        &seed_clone,
+                        &traj_clone,
+                        &output_clone,
+                        already_saved_knowledge,
+                    )
+                    .await
+                {
+                    Ok(plan) => {
+                        if !plan.memory.is_empty() || !plan.knowledge.is_empty() {
+                            tracing::info!(
+                                memory = plan.memory.len(),
+                                knowledge = plan.knowledge.len(),
+                                message_index = msg_index,
+                                "PersistenceHook executing plan"
+                            );
+                            let session_id = sid.unwrap_or_default();
+                            hook.execute_plan(plan, &session_id, msg_index).await;
                         }
-                        Err(e) => tracing::warn!(error = %e, "PersistenceHook evaluate failed"),
                     }
-                });
-            }
+                    Err(e) => tracing::warn!(error = %e, "PersistenceHook evaluate failed"),
+                }
+            });
         }
 
         Ok(result)
@@ -635,7 +653,11 @@ async fn run_agent(
         }
 
         // 3. Kernel workspace (state store path)
-        let kernel_ws = kernel_handle.state.workspace_path().to_string_lossy().to_string();
+        let kernel_ws = kernel_handle
+            .state
+            .workspace_path()
+            .to_string_lossy()
+            .to_string();
         let kernel_ws_pattern = format!("{}/**", kernel_ws.trim_end_matches('/'));
         if kernel_ws_pattern != ws_pattern
             && !perms.allowed_paths.iter().any(|p| p == &kernel_ws_pattern)
@@ -650,7 +672,8 @@ async fn run_agent(
 
         // Ensure RBAC Superuser role so AccessGate Layer 1 passes.
         let rbac_subject = Subject::Agent(agent_id);
-        am.rbac_manager_mut().assign_role(rbac_subject, Role::Superuser);
+        am.rbac_manager_mut()
+            .assign_role(rbac_subject, Role::Superuser);
     }
 
     // Start distributed trace span for this agent execution.
@@ -879,8 +902,12 @@ async fn run_agent(
                     let idx = s.trajectory_steps.len();
                     s.pending_tools
                         .insert(tool_call_id.clone(), (std::time::Instant::now(), idx));
-                    s.tool_args_map.insert(tool_call_id.clone(), serde_json::to_string(&args).unwrap_or_default());
-                    s.tool_timestamps.insert(tool_call_id.clone(), chrono::Utc::now());
+                    s.tool_args_map.insert(
+                        tool_call_id.clone(),
+                        serde_json::to_string(&args).unwrap_or_default(),
+                    );
+                    s.tool_timestamps
+                        .insert(tool_call_id.clone(), chrono::Utc::now());
                     s.tool_call_ids.push(tool_call_id.clone());
                     s.trajectory_steps
                         .push(oxios_memory::memory::sona::TrajectoryStep {
@@ -992,10 +1019,7 @@ async fn run_agent(
                     // ToolUse should not occur at AgentEnd in 0.32.0 (the loop
                     // continues until text-only), but treat it as non-failure
                     // since tool calls were executed successfully.
-                    s.success = matches!(
-                        stop_reason.as_deref(),
-                        Some("Stop") | Some("ToolUse")
-                    );
+                    s.success = matches!(stop_reason.as_deref(), Some("Stop") | Some("ToolUse"));
                 }
                 AgentEvent::Error { message, .. } => {
                     s.final_content = message.clone();

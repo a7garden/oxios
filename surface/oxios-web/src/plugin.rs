@@ -14,7 +14,7 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
-use axum::{body::Body, response::Response, routing::get, Router};
+use axum::{Router, body::Body, response::Response, routing::get};
 use rust_embed::Embed;
 use std::sync::Arc;
 
@@ -125,15 +125,15 @@ async fn static_handler(
 /// SPA fallback — serves index.html for client-side routing.
 async fn spa_handler(axum::extract::State(state): axum::extract::State<Arc<AppState>>) -> Response {
     // Try filesystem first
-    if let Some(ref dist) = state.web_dist {
-        if let Some(data) = fs_read(dist, "index.html") {
-            return Response::builder()
-                .status(200)
-                .header("Content-Type", "text/html; charset=utf-8")
-                .header("Cache-Control", "no-cache")
-                .body(Body::from(data))
-                .unwrap();
-        }
+    if let Some(ref dist) = state.web_dist
+        && let Some(data) = fs_read(dist, "index.html")
+    {
+        return Response::builder()
+            .status(200)
+            .header("Content-Type", "text/html; charset=utf-8")
+            .header("Cache-Control", "no-cache")
+            .body(Body::from(data))
+            .unwrap();
     }
 
     // Fall back to embedded

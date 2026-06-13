@@ -28,7 +28,7 @@ function CronJobsPage() {
     queryKey: ['cron-jobs'],
     queryFn: async () => {
       const res = await api.get<{ jobs: CronJob[] }>('/api/cron-jobs')
-      return res.jobs ?? []
+      return Array.isArray(res?.jobs) ? res.jobs : []
     },
     refetchInterval: 10000,
   })
@@ -59,7 +59,7 @@ function CronJobsPage() {
   if (isLoading) return <LoadingCards count={4} />
   if (isError) return <ErrorState onRetry={() => refetch()} />
 
-  const jobs = data ?? []
+  const jobs = Array.isArray(data) ? data : []
 
   return (
     <div className="space-y-6">

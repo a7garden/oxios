@@ -92,7 +92,7 @@ export function Copilot() {
           </div>
         )}
         {!response && !copilot.isPending && !copilot.isError && (
-          <div className="text-sm text-muted-foreground">Ask a question about your notes</div>
+          <div className="text-sm text-muted-foreground">{t('knowledge.copilotPlaceholder')}</div>
         )}
       </div>
     </div>

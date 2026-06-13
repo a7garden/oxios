@@ -6,6 +6,7 @@ use crate::event_bus::{EventBus, KernelEvent};
 use crate::git_layer::{GitLayer, LogEntry};
 use crate::resource_monitor::{ResourceMonitor, ResourceSnapshot};
 use crate::scheduler::{AgentScheduler, ScheduledTask, SchedulerStats};
+use crate::tools::PendingToolApprovals;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -20,6 +21,8 @@ pub struct InfraApi {
     pub(crate) start_time: Instant,
     /// Hot-reloadable orchestrator config (evolution iterations, score threshold).
     pub(crate) orchestrator_config: parking_lot::RwLock<crate::config::OrchestratorConfig>,
+    /// Pending tool approval requests (HitL escalation).
+    pub(crate) pending_tool_approvals: PendingToolApprovals,
 }
 
 impl InfraApi {
@@ -44,6 +47,7 @@ impl InfraApi {
             orchestrator_config: parking_lot::RwLock::new(
                 crate::config::OrchestratorConfig::default(),
             ),
+            pending_tool_approvals: PendingToolApprovals::new(),
         }
     }
     /// Get a reference to the GitLayer.
@@ -178,5 +182,10 @@ impl InfraApi {
     /// Get system uptime.
     pub fn uptime(&self) -> Duration {
         self.start_time.elapsed()
+    }
+
+    /// Access the pending tool approvals registry.
+    pub fn pending_tool_approvals(&self) -> &PendingToolApprovals {
+        &self.pending_tool_approvals
     }
 }

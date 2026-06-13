@@ -26,7 +26,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
-import { useToast } from '@/components/ui/sonner'
+import { toast } from 'sonner'
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import type { CreateProjectInput } from '@/hooks/use-projects'
@@ -60,7 +60,6 @@ export { ICON_OPTIONS }
 export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogProps) {
   const { t } = useTranslation()
   const create = useCreateProject()
-  const { toast } = useToast()
 
   const [name, setName] = useState('')
   const [icon, setIcon] = useState('package')
@@ -103,7 +102,7 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
         onOpenChange(false)
       },
       onError: (err) => {
-        toast(t('projects.createError', `Failed to create project: ${err}`), 'destructive')
+        toast.error(t('projects.createError', `Failed to create project: ${err}`))
       },
     })
   }
@@ -118,7 +117,7 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-3 py-2">
+        <div className="space-y-4 py-2">
           {/* Name */}
           <div className="space-y-1">
             <label className="text-sm font-medium">{t('projects.name', 'Name')}</label>

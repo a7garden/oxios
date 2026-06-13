@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { ExternalLink, Skull } from 'lucide-react'
+import { AlertTriangle, ExternalLink, Skull } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { AgentBudgetBar } from '@/components/agent/agent-budget-bar'
 import { AgentHeader } from '@/components/agent/agent-header'
@@ -56,6 +56,21 @@ function AgentDetailPage() {
         </Button>
       </AgentHeader>
 
+      {/* Error message */}
+      {agent.error && (
+        <Card className="border-destructive/50 bg-destructive/5">
+          <CardContent className="pt-4">
+            <div className="flex items-start gap-2 text-sm text-destructive">
+              <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+              <div>
+                <p className="font-medium">{t('agents.error', 'Execution Error')}</p>
+                <p className="text-xs font-mono mt-1 whitespace-pre-wrap break-all">{agent.error}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Meta info */}
       <Card>
         <CardContent className="pt-4 space-y-3">
@@ -83,10 +98,63 @@ function AgentDetailPage() {
                 <span className="text-xs font-mono">{agent.project_id.slice(0, 8)}...</span>
               </div>
             )}
+            {(agent as { session_id?: string | null }).session_id && (
+              <div className="flex items-center gap-1">
+                <span className="text-muted-foreground">{t('agents.session', 'Session')}:</span>
+                <Button
+                  variant="link"
+                  className="h-auto p-0 text-xs"
+                  onClick={() =>
+                    navigate({
+                      to: '/sessions/$sessionId',
+                      params: { sessionId: (agent as { session_id: string }).session_id },
+                    })
+                  }
+                >
+                  {(agent as { session_id: string }).session_id.slice(0, 12)}...
+                </Button>
+              </div>
+            )}
             <div className="flex items-center gap-1">
               <span className="text-muted-foreground">{t('agents.created')}:</span>
               <span>{new Date(agent.created_at).toLocaleString()}</span>
             </div>
+            {agent.started_at && (
+              <div className="flex items-center gap-1">
+                <span className="text-muted-foreground">{t('agents.startedAt', 'Started')}:</span>
+                <span>{new Date(agent.started_at).toLocaleString()}</span>
+              </div>
+            )}
+            {agent.completed_at && (
+              <div className="flex items-center gap-1">
+                <span className="text-muted-foreground">{t('agents.completedAt', 'Completed')}:</span>
+                <span>{new Date(agent.completed_at).toLocaleString()}</span>
+              </div>
+            )}
+            {agent.steps_completed > 0 && (
+              <div className="flex items-center gap-1">
+                <span className="text-muted-foreground">{t('agents.stepsCompleted', 'Steps')}:</span>
+                <span>{agent.steps_completed}{agent.steps_total ? ` / ${agent.steps_total}` : ''}</span>
+              </div>
+            )}
+            {agent.model_id && (
+              <div className="flex items-center gap-1">
+                <span className="text-muted-foreground">{t('agents.model', 'Model')}:</span>
+                <span className="text-xs font-mono">{agent.model_id}</span>
+              </div>
+            )}
+            {agent.tokens_used > 0 && (
+              <div className="flex items-center gap-1">
+                <span className="text-muted-foreground">{t('agents.tokens', 'Tokens')}:</span>
+                <span>{agent.tokens_used.toLocaleString()}</span>
+              </div>
+            )}
+            {agent.cost_usd > 0 && (
+              <div className="flex items-center gap-1">
+                <span className="text-muted-foreground">{t('agents.cost', 'Cost')}:</span>
+                <span>${agent.cost_usd.toFixed(4)}</span>
+              </div>
+            )}
           </div>
           <AgentBudgetBar agent={agent} />
         </CardContent>

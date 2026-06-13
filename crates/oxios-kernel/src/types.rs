@@ -21,6 +21,8 @@ pub enum AgentStatus {
     Stopped,
     /// Agent has encountered an error.
     Failed,
+    /// Agent finished execution successfully.
+    Completed,
 }
 
 impl std::fmt::Display for AgentStatus {
@@ -31,6 +33,7 @@ impl std::fmt::Display for AgentStatus {
             AgentStatus::Idle => write!(f, "idle"),
             AgentStatus::Stopped => write!(f, "stopped"),
             AgentStatus::Failed => write!(f, "failed"),
+            AgentStatus::Completed => write!(f, "completed"),
         }
     }
 }
@@ -48,6 +51,64 @@ pub struct AgentInfo {
     pub created_at: DateTime<Utc>,
     /// The seed this agent was forked from, if any.
     pub seed_id: Option<uuid::Uuid>,
+    /// Project ID detected by the orchestrator.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub project_id: Option<uuid::Uuid>,
+    /// Timestamp when execution started.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub started_at: Option<DateTime<Utc>>,
+    /// Timestamp when execution completed.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub completed_at: Option<DateTime<Utc>>,
+    /// Error message if the agent failed.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+    /// Number of tool call steps completed.
+    #[serde(default)]
+    pub steps_completed: usize,
+    /// Number of total steps (if known).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub steps_total: Option<usize>,
+    /// Tool calls recorded during execution.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tool_calls: Vec<ToolCallRecord>,
+    /// Total input tokens consumed.
+    #[serde(default)]
+    pub tokens_input: u64,
+    /// Total output tokens generated.
+    #[serde(default)]
+    pub tokens_output: u64,
+    /// Estimated cost in USD.
+    #[serde(default)]
+    pub cost_usd: f64,
+    /// Model ID used for execution.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub model_id: String,
+    /// Session ID that spawned this agent (if any).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub session_id: Option<String>,
+}
+
+/// Record of a single tool call during agent execution.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ToolCallRecord {
+    /// Tool name (e.g. "read", "bash", "grep").
+    pub tool: String,
+    /// Input parameters or invocation summary.
+    pub input: String,
+    /// Output or result summary.
+    pub output: String,
+    /// Duration of the tool call in milliseconds.
+    pub duration_ms: u64,
+    /// Whether the tool call returned an error.
+    #[serde(default)]
+    pub is_error: bool,
+    /// Provider-specific tool call ID.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub tool_call_id: String,
+    /// Timestamp when the tool call started (UTC).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub timestamp: Option<DateTime<Utc>>,
 }
 
 #[cfg(test)]
@@ -96,6 +157,18 @@ mod tests {
             status: AgentStatus::Running,
             created_at: now,
             seed_id: Some(seed_id),
+            project_id: None,
+            started_at: None,
+            completed_at: None,
+            error: None,
+            steps_completed: 0,
+            steps_total: None,
+            tool_calls: vec![],
+            tokens_input: 0,
+            tokens_output: 0,
+            cost_usd: 0.0,
+            model_id: String::new(),
+            session_id: None,
         };
 
         assert_eq!(info.id, id);
@@ -113,6 +186,18 @@ mod tests {
             status: AgentStatus::Idle,
             created_at: Utc::now(),
             seed_id: None,
+            project_id: None,
+            started_at: None,
+            completed_at: None,
+            error: None,
+            steps_completed: 3,
+            steps_total: Some(5),
+            tool_calls: vec![],
+            tokens_input: 100,
+            tokens_output: 50,
+            cost_usd: 0.002,
+            model_id: String::new(),
+            session_id: None,
         };
 
         let json = serde_json::to_string(&info).unwrap();
@@ -121,6 +206,7 @@ mod tests {
         assert_eq!(restored.name, info.name);
         assert_eq!(restored.status, info.status);
         assert_eq!(restored.seed_id, None);
+        assert_eq!(restored.steps_completed, 3);
     }
 
     #[test]

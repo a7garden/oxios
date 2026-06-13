@@ -214,7 +214,7 @@ export function DataTable<T>({
     <div className={cn('rounded-xl border', className)}>
       {/* Toolbar */}
       {hasToolbar && (
-        <div className="flex items-center gap-2 px-4 py-3 border-b">
+        <div className="flex items-center gap-2 px-4 py-3 border-b bg-muted/30">
           {searchable && (
             <SearchBar value={search} onChange={handleSearch} placeholder={searchPlaceholder} />
           )}
@@ -307,10 +307,15 @@ export function DataTable<T>({
                 <tr
                   key={keyExtractor(row)}
                   className={cn(
-                    'border-b last:border-0 transition-colors',
-                    onRowClick && 'cursor-pointer hover:bg-muted/50',
+                    'border-b last:border-0 transition-all',
+                    onRowClick &&
+                      'cursor-pointer hover:bg-muted/80 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-inset',
                   )}
                   onClick={() => onRowClick?.(row)}
+                  tabIndex={onRowClick ? 0 : undefined}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') onRowClick?.(row)
+                  }}
                 >
                   {columns.map((col) => (
                     <td

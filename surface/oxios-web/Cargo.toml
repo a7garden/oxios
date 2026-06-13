@@ -1,7 +1,7 @@
 [package]
 name = "oxios-web"
-version = "1.2.0"
-edition = "2021"
+version = "1.3.0"
+edition = "2024"
 description = "Web dashboard channel for Oxios"
 license = "MIT"
 repository = "https://github.com/a7garden/oxios"
@@ -9,11 +9,11 @@ exclude = ["frontend/target/*", "static/wasm/*.wasm", "static/assets/*.wasm"]
 include = ["src/**", "web/dist/**", "static/**", "Cargo.toml", "LICENSE", "README.md"]
 
 [dependencies]
-oxios-gateway = { version = "1.2.0", path = "../../crates/oxios-gateway" }
-oxios-kernel = { version = "1.2.0", path = "../../crates/oxios-kernel", default-features = false, features = ["sqlite-memory"] }
-oxios-markdown = { version = "1.2.0", path = "../../crates/oxios-markdown" }
-oxios-ouroboros = { version = "1.2.0", path = "../../crates/oxios-ouroboros" }
-oxios-calendar = { version = "1.2.0", path = "../../crates/oxios-calendar" }
+oxios-gateway = { version = "1.3.0", path = "../../crates/oxios-gateway" }
+oxios-kernel = { version = "1.3.0", path = "../../crates/oxios-kernel", default-features = false, features = ["sqlite-memory"] }
+oxios-markdown = { version = "1.3.0", path = "../../crates/oxios-markdown" }
+oxios-ouroboros = { version = "1.3.0", path = "../../crates/oxios-ouroboros" }
+oxios-calendar = { version = "1.3.0", path = "../../crates/oxios-calendar" }
 # oxi-ai re-exported via oxi-sdk — no direct dependency needed
 oxi-sdk = { workspace = true }
 tokio = { workspace = true }

@@ -65,10 +65,10 @@ pub async fn activate_surfaces(
                 match surface.start(ctx).await {
                     Ok(handle) => {
                         tracing::info!(surface = %name, "Surface activated");
-                        if let Some(channel) = handle.channel {
-                            if let Err(e) = kernel.register_channel(channel).await {
-                                tracing::error!(surface = %name, error = %e, "Failed to register surface channel");
-                            }
+                        if let Some(channel) = handle.channel
+                            && let Err(e) = kernel.register_channel(channel).await
+                        {
+                            tracing::error!(surface = %name, error = %e, "Failed to register surface channel");
                         }
                         all_tasks.extend(handle.tasks);
                     }

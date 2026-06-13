@@ -21,11 +21,11 @@ use std::time::{Duration, Instant};
 
 use anyhow::{Context, Result};
 use llama_gguf::{
+    HfClient,
     backend::cpu::CpuBackend,
     gguf::GgufFile,
-    model::{load_llama_model, EmbeddingConfig, EmbeddingExtractor, LlamaModel, PoolingStrategy},
+    model::{EmbeddingConfig, EmbeddingExtractor, LlamaModel, PoolingStrategy, load_llama_model},
     tokenizer::Tokenizer,
-    HfClient,
 };
 use parking_lot::Mutex;
 

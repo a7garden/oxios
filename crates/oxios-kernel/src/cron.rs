@@ -7,15 +7,15 @@ use crate::config::CronConfig;
 use crate::git_layer::GitLayer;
 use crate::scheduler::Priority;
 use crate::state_store::StateStore;
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use chrono::{DateTime, Utc};
 use cron::Schedule;
 use parking_lot::{Mutex, RwLock};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::str::FromStr;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use uuid::Uuid;
 
 // ── Data types ─────────────────────────────────────────────
@@ -523,10 +523,10 @@ impl CronScheduler {
             tracing::error!("Failed to persist cron jobs: {}", e);
         }
         // Fire-and-forget git commit if git layer is configured
-        if let Some(ref gl) = self.git_layer {
-            if gl.is_enabled() {
-                let _ = gl.commit_file("cron/jobs.json", "cron: update jobs");
-            }
+        if let Some(ref gl) = self.git_layer
+            && gl.is_enabled()
+        {
+            let _ = gl.commit_file("cron/jobs.json", "cron: update jobs");
         }
     }
 

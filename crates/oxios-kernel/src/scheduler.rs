@@ -333,16 +333,15 @@ impl AgentScheduler {
             match task_opt {
                 Some(t) => {
                     // Check budget before scheduling (soft gate).
-                    if let (Some(ref bm), Some(ref agent_id)) = (&self.budget_manager, &t.agent_id)
+                    if let (Some(bm), Some(agent_id)) = (&self.budget_manager, &t.agent_id)
+                        && !bm.can_schedule(agent_id)
                     {
-                        if !bm.can_schedule(agent_id) {
-                            tracing::warn!(
-                                agent_id = %agent_id,
-                                "Agent budget exhausted, skipping task"
-                            );
-                            discarded += 1;
-                            continue; // skip, try next task
-                        }
+                        tracing::warn!(
+                            agent_id = %agent_id,
+                            "Agent budget exhausted, skipping task"
+                        );
+                        discarded += 1;
+                        continue; // skip, try next task
                     }
                     break t;
                 }
@@ -381,14 +380,14 @@ impl AgentScheduler {
         );
 
         // Track call for budget management.
-        if let (Some(ref bm), Some(ref agent_id)) = (&self.budget_manager, &task.agent_id) {
-            if let Err(e) = bm.track_call(agent_id) {
-                tracing::warn!(
-                    agent_id = %agent_id,
-                    error = %e,
-                    "Budget exceeded during task track_call"
-                );
-            }
+        if let (Some(bm), Some(agent_id)) = (&self.budget_manager, &task.agent_id)
+            && let Err(e) = bm.track_call(agent_id)
+        {
+            tracing::warn!(
+                agent_id = %agent_id,
+                error = %e,
+                "Budget exceeded during task track_call"
+            );
         }
 
         Some(task)
@@ -773,7 +772,7 @@ mod tests {
         // Start 2 tasks (fills max_concurrent).
         let t1 = scheduler.next_task().unwrap(); // Task 2 (first popped).
         let t2 = scheduler.next_task().unwrap(); // Task 1 (second popped).
-                                                 // Running: [Task 2, Task 1], Queue: []
+        // Running: [Task 2, Task 1], Queue: []
         assert!(scheduler.next_task().is_none()); // Blocked.
 
         // Complete both tasks.

@@ -23,4 +23,6 @@ pub mod meta {
     pub const MODEL_ID: &str = "model_id";
     /// Persona ID for switch_persona action.
     pub const PERSONA_ID: &str = "persona_id";
+    /// Execution mode: "chat" | "spec".
+    pub const MODE: &str = "mode";
 }

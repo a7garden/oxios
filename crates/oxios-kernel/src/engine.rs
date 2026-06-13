@@ -19,7 +19,7 @@ use anyhow::Result;
 use oxi_sdk::{Oxi, OxiBuilder, ProviderPool, RateLimitPolicy};
 use std::sync::Arc;
 
-use crate::credential::{discover_auth_store_providers, CredentialStore};
+use crate::credential::{CredentialStore, discover_auth_store_providers};
 
 /// The kernel's engine — wraps oxi-sdk's Oxi instance.
 ///

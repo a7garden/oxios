@@ -90,6 +90,39 @@ pub struct Gateway {
 
     /// Concurrency limiter for route tasks.
     concurrency: Arc<Semaphore>,
+
+    /// Keywords that trigger spec (Ouroboros) mode. Prefix-only match.
+    spec_keywords: Vec<String>,
+}
+
+/// Default spec keywords (used when no config is available).
+fn default_spec_keywords() -> Vec<String> {
+    vec!["#spec".into(), "#plan".into()]
+}
+
+/// Detect whether a message should be routed to Ouroboros (spec) mode.
+/// Checks: metadata["mode"] == "spec", or content starts with a spec keyword.
+fn detect_spec_mode(msg: &IncomingMessage, spec_keywords: &[String]) -> bool {
+    // 1. Explicit metadata flag
+    if msg.metadata.get(meta::MODE).is_some_and(|v| v == "spec") {
+        return true;
+    }
+    // 2. Prefix keyword match
+    let content = msg.content.trim();
+    spec_keywords
+        .iter()
+        .any(|kw| content.starts_with(kw.as_str()))
+}
+
+/// Strip spec keyword prefix from content if present.
+fn strip_spec_keyword<'a>(content: &'a str, spec_keywords: &[String]) -> &'a str {
+    let trimmed = content.trim_start();
+    for kw in spec_keywords {
+        if let Some(rest) = trimmed.strip_prefix(kw.as_str()) {
+            return rest.trim_start();
+        }
+    }
+    content
 }
 
 impl Gateway {
@@ -106,6 +139,7 @@ impl Gateway {
             persona_api: None,
             shutdown,
             concurrency: Arc::new(Semaphore::new(MAX_CONCURRENT_ROUTES)),
+            spec_keywords: default_spec_keywords(),
         }
     }
 
@@ -126,6 +160,7 @@ impl Gateway {
             persona_api: Some(persona_api),
             shutdown,
             concurrency: Arc::new(Semaphore::new(MAX_CONCURRENT_ROUTES)),
+            spec_keywords: default_spec_keywords(),
         }
     }
 
@@ -255,6 +290,7 @@ impl Gateway {
         let orchestrator = self.orchestrator.clone();
         let channels = self.channels.clone();
         let semaphore = self.concurrency.clone();
+        let spec_keywords = self.spec_keywords.clone();
 
         tokio::spawn(async move {
             // Concurrency limit — excess requests wait.
@@ -279,16 +315,38 @@ impl Gateway {
 
             let session_id = msg.metadata.get(meta::SESSION_ID).cloned();
             let project_ids = msg.metadata.get(meta::PROJECT_IDS).cloned();
+            let conn_id = msg.metadata.get("conn_id").cloned();
             let request_id = msg.id.to_string();
-            let result = orchestrator
-                .handle_message(
-                    &msg.user_id,
-                    &msg.content,
-                    session_id.as_deref(),
-                    project_ids.as_deref(),
-                    &request_id,
-                )
-                .await;
+
+            // ── Mode detection: spec vs chat ──
+            let is_spec = detect_spec_mode(&msg, &spec_keywords);
+            let effective_content = if is_spec {
+                strip_spec_keyword(&msg.content, &spec_keywords).to_string()
+            } else {
+                msg.content.clone()
+            };
+
+            let result = if is_spec {
+                orchestrator
+                    .handle_message(
+                        &msg.user_id,
+                        &effective_content,
+                        session_id.as_deref(),
+                        project_ids.as_deref(),
+                        &request_id,
+                    )
+                    .await
+            } else {
+                orchestrator
+                    .chat(
+                        &msg.user_id,
+                        &msg.content,
+                        session_id.as_deref(),
+                        project_ids.as_deref(),
+                        &request_id,
+                    )
+                    .await
+            };
 
             let duration_ms = start.elapsed().as_millis() as u64;
 
@@ -318,6 +376,8 @@ impl Gateway {
                             channel_meta.insert("tool_calls".to_owned(), json);
                         }
                     }
+                    // Persist execution mode in channel_meta so session persistence can read it.
+                    channel_meta.insert("mode".to_owned(), orchestration.mode.clone());
 
                     // Typed orchestration metadata (RFC-014)
                     let response_meta = ResponseMeta {
@@ -335,9 +395,10 @@ impl Gateway {
                         interview_questions: orchestration.interview_questions,
                         interview_round: orchestration.interview_round,
                         interview_ambiguity: orchestration.interview_ambiguity,
+                        mode: Some(orchestration.mode.clone()),
                     };
 
-                    let outgoing = OutgoingMessage::success(
+                    let mut outgoing = OutgoingMessage::success(
                         msg.id,
                         &msg.channel,
                         &msg.user_id,
@@ -345,6 +406,7 @@ impl Gateway {
                         channel_meta,
                         response_meta,
                     );
+                    outgoing.target_conn_id = conn_id;
                     if let Err(e) = entry.channel.send(outgoing).await {
                         tracing::error!(error = %e, "Failed to send response");
                     }
@@ -359,6 +421,7 @@ impl Gateway {
                     if let Some(sid) = msg.metadata.get(meta::SESSION_ID).cloned() {
                         outgoing.metadata.insert(meta::SESSION_ID.to_string(), sid);
                     }
+                    outgoing.target_conn_id = conn_id;
 
                     if let Err(e) = entry.channel.send(outgoing).await {
                         tracing::error!(error = %e, "Failed to send error response");
@@ -390,6 +453,7 @@ impl Gateway {
     fn dispatch_switch_model(&self, channel_name: String, msg: IncomingMessage) {
         let engine_api = self.engine_api.clone();
         let channels = self.channels.clone();
+        let conn_id = msg.metadata.get("conn_id").cloned();
 
         tokio::spawn(async move {
             let model_id = msg
@@ -412,7 +476,7 @@ impl Gateway {
                 (Some(api), Some(entry)) => match api.set_model(&model_id) {
                     Ok(()) => {
                         let response = format!("✅ 모델이 {model_id}(으)로 전환되었습니다.");
-                        let outgoing = OutgoingMessage::success(
+                        let mut outgoing = OutgoingMessage::success(
                             msg.id,
                             &msg.channel,
                             &msg.user_id,
@@ -430,8 +494,10 @@ impl Gateway {
                                 interview_questions: None,
                                 interview_round: None,
                                 interview_ambiguity: None,
+                                mode: None,
                             },
                         );
+                        outgoing.target_conn_id = conn_id;
                         if let Err(e) = entry.channel.send(outgoing).await {
                             tracing::error!(error = %e, "Failed to send switch_model response");
                         }
@@ -446,8 +512,9 @@ impl Gateway {
                                     .to_string(),
                             ),
                         };
-                        let outgoing =
+                        let mut outgoing =
                             OutgoingMessage::error(msg.id, &msg.channel, &msg.user_id, user_err);
+                        outgoing.target_conn_id = conn_id;
                         if let Err(e) = entry.channel.send(outgoing).await {
                             tracing::error!(error = %e, "Failed to send switch_model error");
                         }
@@ -467,6 +534,7 @@ impl Gateway {
     fn dispatch_switch_persona(&self, channel_name: String, msg: IncomingMessage) {
         let persona_api = self.persona_api.clone();
         let channels = self.channels.clone();
+        let conn_id = msg.metadata.get("conn_id").cloned();
 
         tokio::spawn(async move {
             let persona_id = msg
@@ -490,7 +558,7 @@ impl Gateway {
                     Ok(()) => {
                         let response =
                             format!("✅ 페르소나가 '{persona_id}'(으)로 전환되었습니다.");
-                        let outgoing = OutgoingMessage::success(
+                        let mut outgoing = OutgoingMessage::success(
                             msg.id,
                             &msg.channel,
                             &msg.user_id,
@@ -508,8 +576,10 @@ impl Gateway {
                                 interview_questions: None,
                                 interview_round: None,
                                 interview_ambiguity: None,
+                                mode: None,
                             },
                         );
+                        outgoing.target_conn_id = conn_id;
                         if let Err(e) = entry.channel.send(outgoing).await {
                             tracing::error!(error = %e, "Failed to send switch_persona response");
                         }
@@ -521,8 +591,9 @@ impl Gateway {
                                 kind: ErrorKind::Internal,
                                 suggestion: Some("페르소나 ID가 올바른지 확인하세요. (.help를 입력하여 명령어를 확인하세요.)".to_string()),
                             };
-                        let outgoing =
+                        let mut outgoing =
                             OutgoingMessage::error(msg.id, &msg.channel, &msg.user_id, user_err);
+                        outgoing.target_conn_id = conn_id;
                         if let Err(e) = entry.channel.send(outgoing).await {
                             tracing::error!(error = %e, "Failed to send switch_persona error");
                         }

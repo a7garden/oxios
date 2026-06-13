@@ -11,7 +11,7 @@ use std::time::Instant;
 use crate::bridge::WebBridgeHandle;
 use crate::error::AppError;
 use crate::middleware::RateLimiter;
-use oxios_kernel::{config, KernelHandle, OxiosConfig};
+use oxios_kernel::{KernelHandle, OxiosConfig, config};
 
 /// Shared application state for the web dashboard.
 ///

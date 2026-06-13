@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { useToast } from '@/components/ui/sonner'
+import { toast } from 'sonner'
 import { useApproveApproval, usePendingApprovals, useRejectApproval } from '@/hooks/use-approvals'
 import type { Approval } from '@/types'
 
@@ -23,18 +23,17 @@ export function ApprovalsQueue() {
   const { items: pending, isLoading } = usePendingApprovals()
   const approve = useApproveApproval()
   const reject = useRejectApproval()
-  const { toast } = useToast()
 
   const handleApprove = (id: string) => {
     approve.mutate(id, {
-      onSuccess: () => toast(t('approvals.approveSuccess'), 'success'),
-      onError: (err) => toast(t('approvals.mutationError', { error: String(err) }), 'destructive'),
+      onSuccess: () => toast.success(t('approvals.approveSuccess')),
+      onError: (err) => toast.error(t('approvals.mutationError', { error: String(err) })),
     })
   }
   const handleDeny = (id: string) => {
     reject.mutate(id, {
-      onSuccess: () => toast(t('approvals.rejectSuccess'), 'success'),
-      onError: (err) => toast(t('approvals.mutationError', { error: String(err) }), 'destructive'),
+      onSuccess: () => toast.success(t('approvals.rejectSuccess')),
+      onError: (err) => toast.error(t('approvals.mutationError', { error: String(err) })),
     })
   }
 

@@ -23,7 +23,7 @@ export function SearchBar({ value, onChange, placeholder, className }: SearchBar
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder ?? t('dataTable.search', 'Search...')}
-        className="pl-8 pr-8 h-9"
+        className="pl-8 pr-8 h-9 transition-shadow focus-visible:shadow-sm"
       />
       {value && (
         <button
