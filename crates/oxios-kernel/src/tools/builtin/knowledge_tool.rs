@@ -207,8 +207,11 @@ impl OxiAgentTool for KnowledgeTool {
                     saved_at: Some(chrono::Utc::now().to_rfc3339()),
                 };
                 match self.kb.note_write_with_meta(path, content, &meta) {
-                    Ok(()) => Ok(AgentToolResult::success(format!(
+                    Ok(true) => Ok(AgentToolResult::success(format!(
                         "Note '{path}' written successfully"
+                    ))),
+                    Ok(false) => Ok(AgentToolResult::error(format!(
+                        "Note '{path}' is a user-authored file, not overwriting"
                     ))),
                     Err(e) => Ok(AgentToolResult::error(format!("Failed to write note: {e}"))),
                 }

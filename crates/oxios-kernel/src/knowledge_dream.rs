@@ -187,9 +187,13 @@ impl KnowledgeDream {
                 .knowledge_base
                 .note_write_with_meta(&note.path, &note.curated_body, &new_meta)
             {
-                Ok(()) => {
+                Ok(true) => {
                     tracing::info!(path = %note.path, "Knowledge dream curated note");
                     report.notes_curated += 1;
+                }
+                Ok(false) => {
+                    tracing::warn!(path = %note.path, "Dream skipped: user-authored note");
+                    report.notes_skipped += 1;
                 }
                 Err(e) => {
                     tracing::warn!(path = %note.path, error = %e, "Failed to write curated note");

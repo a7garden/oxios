@@ -182,7 +182,7 @@ impl KnowledgeBase {
     /// updating `quality`/`source`). If the file has non-Oxios
     /// frontmatter (e.g., Obsidian tags), it is left intact and
     /// the note is treated as user-authored — no metadata is added.
-    pub fn note_write_with_meta(&self, path: &str, content: &str, meta: &NoteMeta) -> Result<()> {
+    pub fn note_write_with_meta(&self, path: &str, content: &str, meta: &NoteMeta) -> Result<bool> {
         // Check existing content for frontmatter
         let existing = self.note_read(path).ok().flatten();
         let final_content = match existing {
@@ -204,13 +204,13 @@ impl KnowledgeBase {
                             path,
                             "Skipping note_write_with_meta on user-authored note"
                         );
-                        return Ok(());
+                        return Ok(false);
                     }
                 }
             }
             None => format_frontmatter(meta, content),
         };
-        self.note_write(path, &final_content)
+        self.note_write(path, &final_content).map(|_| true)
     }
 
     /// List notes that need Dream review (RFC-022).

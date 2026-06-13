@@ -34,6 +34,7 @@ use oxi_sdk::{
 };
 use oxi_sdk::{SearchCache, ToolExecutionMode, ToolRegistry};
 use parking_lot::Mutex;
+use std::collections::HashMap;
 use std::sync::Arc;
 // RFC-014 Phase D: `ToolRegistry::register_arc` is used in the AgentBuilder
 // path to attach CSpace tools after `builder.build()` returns.
@@ -161,6 +162,8 @@ pub struct AgentRuntime {
     routing_stats: Option<Arc<crate::kernel_handle::RoutingStats>>,
     /// Autonomous persistence hook (RFC-016).
     persistence_hook: Option<Arc<crate::persistence_hook::PersistenceHook>>,
+    /// Per-session assistant message index counter (RFC-016).
+    session_msg_counter: Arc<Mutex<HashMap<String, usize>>>,
 }
 
 impl AgentRuntime {
@@ -185,6 +188,7 @@ impl AgentRuntime {
             tool_retriever: None,
             routing_stats,
             persistence_hook: None,
+            session_msg_counter: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 
@@ -512,6 +516,15 @@ impl AgentRuntime {
                 let traj_clone = trajectory_steps.clone();
                 let output_clone = final_content.clone();
                 let sid = session_id.clone();
+                // Compute the assistant message index for this execution.
+                // Increment per-session counter, then use the pre-increment value.
+                let msg_index = {
+                    let mut counter = self.session_msg_counter.lock();
+                    let idx = counter.entry(sid.clone().unwrap_or_default()).or_insert(0);
+                    let current = *idx;
+                    *idx += 1;
+                    current
+                };
                 tokio::spawn(async move {
                     match hook.evaluate(&seed_clone, &traj_clone, &output_clone, already_saved_knowledge).await {
                         Ok(plan) => {
@@ -519,12 +532,11 @@ impl AgentRuntime {
                                 tracing::info!(
                                     memory = plan.memory.len(),
                                     knowledge = plan.knowledge.len(),
+                                    message_index = msg_index,
                                     "PersistenceHook executing plan"
                                 );
                                 let session_id = sid.unwrap_or_default();
-                                // message_index 0 is a placeholder — the caller should
-                                // update this based on actual session message count.
-                                hook.execute_plan(plan, &session_id, 0).await;
+                                hook.execute_plan(plan, &session_id, msg_index).await;
                             }
                         }
                         Err(e) => tracing::warn!(error = %e, "PersistenceHook evaluate failed"),

@@ -229,7 +229,7 @@ impl PersistenceHook {
         }
         for kw in &plan.knowledge {
             match self.knowledge_base.note_write_with_meta(&kw.path, &kw.content, &kw.meta) {
-                Ok(()) => {
+                Ok(true) => {
                     tracing::info!(
                         path = %kw.path,
                         session = session_id,
@@ -250,6 +250,12 @@ impl PersistenceHook {
                         path: kw.path.clone(),
                         source: "hook".to_string(),
                     });
+                }
+                Ok(false) => {
+                    tracing::warn!(
+                        path = %kw.path,
+                        "Hook skipped knowledge save: path is a user-authored note"
+                    );
                 }
                 Err(e) => {
                     tracing::warn!(error = %e, path = %kw.path, "Hook failed to save knowledge")
