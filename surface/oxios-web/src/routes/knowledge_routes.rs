@@ -61,10 +61,10 @@
 
 use std::sync::Arc;
 
+use axum::Json;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
-use axum::Json;
 use chrono::Datelike;
 use serde::{Deserialize, Serialize};
 
@@ -92,6 +92,9 @@ pub(crate) struct KnowledgeTreeEntry {
     pub is_dir: bool,
     /// File size in bytes (0 for directories).
     pub size: u64,
+    /// RFC-022: note quality from frontmatter. null = user-written.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub oxios_quality: Option<String>,
 }
 
 /// Search request body.
@@ -422,10 +425,37 @@ pub(crate) async fn handle_knowledge_tree(
     let mut result: Vec<KnowledgeTreeEntry> = entries
         .into_iter()
         .filter(|e| !e.name.starts_with('.') && e.name != ".DS_Store")
-        .map(|e| KnowledgeTreeEntry {
-            name: e.name,
-            is_dir: e.is_dir,
-            size: 0, // VirtualFs doesn't track file size
+        .map(|e| {
+            // Read frontmatter for quality badge (RFC-022)
+            let oxios_quality = if !e.is_dir {
+                let rel_path = if dir.is_empty() || dir == "/" {
+                    e.name.clone()
+                } else {
+                    format!("{}/{}", dir.trim_start_matches('/'), e.name)
+                };
+                state
+                    .kernel
+                    .knowledge
+                    .note_read(&rel_path)
+                    .ok()
+                    .flatten()
+                    .and_then(|content| {
+                        let (meta, _) = oxios_markdown::knowledge::parse_note_meta(&content);
+                        meta.map(|m| match m.quality {
+                            oxios_markdown::types::NoteQuality::Raw => "raw",
+                            oxios_markdown::types::NoteQuality::Curated => "curated",
+                            oxios_markdown::types::NoteQuality::Refined => "refined",
+                        }.to_string())
+                    })
+            } else {
+                None
+            };
+            KnowledgeTreeEntry {
+                name: e.name,
+                is_dir: e.is_dir,
+                size: 0,
+                oxios_quality,
+            }
         })
         .collect();
 

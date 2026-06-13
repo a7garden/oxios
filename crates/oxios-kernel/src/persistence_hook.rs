@@ -170,7 +170,7 @@ impl PersistenceHook {
     /// Execute a persistence plan (fire-and-forget style, but still awaits I/O).
     pub async fn execute_plan(
         &self,
-        plan: &PersistencePlan,
+        mut plan: PersistencePlan,
         session_id: &str,
         message_index: usize,
     ) {
@@ -214,6 +214,19 @@ impl PersistenceHook {
         }
 
         // Knowledge writes
+        let now_iso = chrono::Utc::now().to_rfc3339();
+        for kw in &mut plan.knowledge {
+            // Backfill session context into meta (reflection path leaves these empty)
+            if kw.meta.session_id.is_none() {
+                kw.meta.session_id = Some(session_id.to_string());
+            }
+            if kw.meta.message_index.is_none() {
+                kw.meta.message_index = Some(message_index);
+            }
+            if kw.meta.saved_at.is_none() {
+                kw.meta.saved_at = Some(now_iso.clone());
+            }
+        }
         for kw in &plan.knowledge {
             match self.knowledge_base.note_write_with_meta(&kw.path, &kw.content, &kw.meta) {
                 Ok(()) => {

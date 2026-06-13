@@ -5,7 +5,6 @@
 //! Phase 3: Write Back — overwrite with curated content, commit to git first.
 //! Phase 4: Report — save dream report.
 
-use std::path::PathBuf;
 use std::sync::Arc;
 
 use anyhow::Result;

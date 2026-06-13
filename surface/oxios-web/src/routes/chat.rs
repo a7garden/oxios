@@ -1354,7 +1354,7 @@ pub(crate) async fn handle_save_to_knowledge(
         message_index: Some(message_index),
         saved_at: Some(chrono::Utc::now().to_rfc3339()),
     };
-    state.kernel.knowledge.note_write_with_meta(&path, content, &meta)?;;
+    state.kernel.knowledge.note_write_with_meta(&path, content, &meta)?;
 
     // Record the save
     let record = serde_json::json!({

@@ -524,7 +524,7 @@ impl AgentRuntime {
                                 let session_id = sid.unwrap_or_default();
                                 // message_index 0 is a placeholder — the caller should
                                 // update this based on actual session message count.
-                                hook.execute_plan(&plan, &session_id, 0).await;
+                                hook.execute_plan(plan, &session_id, 0).await;
                             }
                         }
                         Err(e) => tracing::warn!(error = %e, "PersistenceHook evaluate failed"),

@@ -31,8 +31,8 @@ use crate::journal::{add_emoji as journal_add_emoji, add_record as journal_add_r
 use crate::parser::{extract_headings, similar};
 use crate::plugins::world_clock_for_names;
 use crate::stats::{done_today, today_report};
-use crate::types::{NoteMeta, NoteQuality, NoteSource};
-use crate::types::{FileEntry, Habits, KnowledgeConfig, CHAT_FILENAME, DIR_USER_ROOT};
+use crate::types::NoteMeta;
+use crate::types::{FileEntry, Habits, KnowledgeConfig, NoteQuality, NoteSource, CHAT_FILENAME, DIR_USER_ROOT};
 use crate::worker::{move_due_tasks, remove_completed_items};
 use crate::{today_chat_header, today_journal_filename};
 
@@ -197,12 +197,14 @@ impl KnowledgeBase {
                         };
                         format_frontmatter(&merged, if body.is_empty() { content } else { &body })
                     }
-                    // No Oxios frontmatter — could be user note with its own frontmatter
-                    // or no frontmatter at all. Don't touch user notes.
+                    // No Oxios frontmatter — user-authored or foreign frontmatter.
+                    // Don't touch it. Return Ok without writing.
                     None => {
-                        // If content is provided, write it; if the existing content is
-                        // user-authored, skip metadata injection entirely.
-                        return self.note_write(path, content);
+                        tracing::debug!(
+                            path,
+                            "Skipping note_write_with_meta on user-authored note"
+                        );
+                        return Ok(());
                     }
                 }
             }
@@ -686,9 +688,19 @@ pub fn parse_note_meta(content: &str) -> (Option<NoteMeta>, String) {
 }
 
 /// Format a NoteMeta as YAML frontmatter prepended to content.
+///
+/// `serde_yaml::to_string` produces flat YAML like `author: agent\nsource: Hook\n`.
+/// We must indent each line with 2 spaces so they become children of the
+/// `oxios:` mapping key.
 fn format_frontmatter(meta: &NoteMeta, body: &str) -> String {
     let yaml = serde_yaml::to_string(meta).unwrap_or_default();
-    format!("---\noxios:\n{}---\n\n{}", yaml, body)
+    let indented: String = yaml
+        .lines()
+        .filter(|l| !l.is_empty())
+        .map(|l| format!("  {l}"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    format!("---\noxios:\n{}\n---\n\n{}", indented, body)
 }
 
 // ---------------------------------------------------------------------------
@@ -849,5 +861,44 @@ mod tests {
         let kb = make_test_kb();
         let headings = kb.extract_headings("# Title\n\n## Section\n\n### Subsection");
         assert!(headings.len() >= 2);
+    }
+
+    #[test]
+    fn test_frontmatter_roundtrip() {
+        let meta = NoteMeta {
+            author: "agent".to_string(),
+            source: NoteSource::Hook,
+            quality: NoteQuality::Raw,
+            needs_review: true,
+            session_id: Some("abc123".to_string()),
+            message_index: Some(3),
+            saved_at: Some("2026-06-13T00:00:00Z".to_string()),
+        };
+        let body = "## Test\n\nContent here.";
+        let formatted = format_frontmatter(&meta, body);
+        assert!(formatted.starts_with("---\noxios:\n"));
+        let (parsed_meta, parsed_body) = parse_note_meta(&formatted);
+        assert!(parsed_meta.is_some(), "Failed to parse round-tripped frontmatter");
+        let pm = parsed_meta.unwrap();
+        assert_eq!(pm.author, "agent");
+        assert_eq!(pm.session_id.as_deref(), Some("abc123"));
+        assert_eq!(pm.message_index, Some(3));
+        assert_eq!(parsed_body.trim(), body.trim());
+    }
+
+    #[test]
+    fn test_parse_user_frontmatter_ignored() {
+        let content = "---\ntags: [rust, design]\n---\n\n## My Note\nContent.";
+        let (meta, body) = parse_note_meta(content);
+        assert!(meta.is_none(), "User frontmatter should not be parsed as NoteMeta");
+        assert!(body.contains("tags: [rust, design]"), "User frontmatter preserved");
+    }
+
+    #[test]
+    fn test_parse_no_frontmatter() {
+        let content = "# Just a note\nSome content.";
+        let (meta, body) = parse_note_meta(content);
+        assert!(meta.is_none());
+        assert_eq!(body, content);
     }
 }
