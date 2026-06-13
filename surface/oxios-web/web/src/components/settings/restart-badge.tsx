@@ -30,23 +30,23 @@ export function RestartBadge({ hotReload, scope, size = 'sm', className }: Resta
     <Tooltip>
       <TooltipTrigger asChild>
         <span
-        className={cn(
-          'inline-flex items-center gap-1 rounded-full border font-medium select-none whitespace-nowrap',
-          size === 'sm' ? 'px-1.5 py-0.5 text-2xs' : 'px-2 py-0.5 text-xs',
-          hotReload
-            ? 'border-success-subtle bg-success-subtle text-success'
-            : 'border-warning-subtle bg-warning-subtle text-warning',
-          className,
-        )}
-        data-testid={hotReload ? 'hot-reload-badge' : 'restart-badge'}
-      >
-        {hotReload ? (
-          <Check className={size === 'sm' ? 'h-2.5 w-2.5' : 'h-3 w-3'} />
-        ) : (
-          <AlertTriangle className={size === 'sm' ? 'h-2.5 w-2.5' : 'h-3 w-3'} />
-        )}
-        <span>{label}</span>
-      </span>
+          className={cn(
+            'inline-flex items-center gap-1 rounded-full border font-medium select-none whitespace-nowrap',
+            size === 'sm' ? 'px-1.5 py-0.5 text-2xs' : 'px-2 py-0.5 text-xs',
+            hotReload
+              ? 'border-success-subtle bg-success-subtle text-success'
+              : 'border-warning-subtle bg-warning-subtle text-warning',
+            className,
+          )}
+          data-testid={hotReload ? 'hot-reload-badge' : 'restart-badge'}
+        >
+          {hotReload ? (
+            <Check className={size === 'sm' ? 'h-2.5 w-2.5' : 'h-3 w-3'} />
+          ) : (
+            <AlertTriangle className={size === 'sm' ? 'h-2.5 w-2.5' : 'h-3 w-3'} />
+          )}
+          <span>{label}</span>
+        </span>
       </TooltipTrigger>
       <TooltipContent side="top">{tooltipContent}</TooltipContent>
     </Tooltip>

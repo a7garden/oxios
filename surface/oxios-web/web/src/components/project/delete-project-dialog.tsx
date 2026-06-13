@@ -1,6 +1,7 @@
 import { useNavigate } from '@tanstack/react-router'
 import { AlertTriangle } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -10,7 +11,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { toast } from 'sonner'
 import { useDeleteProject } from '@/hooks/use-projects'
 import type { Project } from '@/types'
 

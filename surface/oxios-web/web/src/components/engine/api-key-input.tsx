@@ -90,7 +90,11 @@ export function ApiKeyInput({
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             placeholder={
-              hasKey ? t('engine.apiKeyOverrideHint') : t('engine.apiKeyPlaceholder', 'Enter {{provider}} API key', { provider: providerName })
+              hasKey
+                ? t('engine.apiKeyOverrideHint')
+                : t('engine.apiKeyPlaceholder', 'Enter {{provider}} API key', {
+                    provider: providerName,
+                  })
             }
             className="pr-9 font-mono text-sm"
           />

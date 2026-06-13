@@ -20,6 +20,7 @@ import {
 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { toast } from 'sonner'
 import { ApiKeyInput } from '@/components/engine/api-key-input'
 import { ModelSelect } from '@/components/engine/model-select'
 import { ProviderOptionsPanel } from '@/components/engine/provider-options'
@@ -43,7 +44,6 @@ import { SystemUpdateCard } from '@/components/system/system-update'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
-import { toast } from 'sonner'
 import {
   type ConfigDiffEntry,
   type ConfigPatchResponse,
@@ -923,7 +923,6 @@ function SettingsPage() {
   }, [diff])
 
   const hasUnsaved = annotatedDiff.length > 0
-
 
   const handleSaveClick = () => {
     if (annotatedDiff.length === 0) return

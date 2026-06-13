@@ -158,10 +158,7 @@ function MobileSettingsDropdown() {
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
-          <Link
-            to="/settings"
-            search={{ section: undefined }}
-          >
+          <Link to="/settings" search={{ section: undefined }}>
             <Settings className="h-4 w-4 mr-2" />
             {t('common.settings')}
           </Link>

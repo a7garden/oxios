@@ -42,10 +42,7 @@ export function ToolApprovalCard({
           <div className="px-4 py-3">
             <p className="text-sm text-muted-foreground">{reason}</p>
             <p className="text-xs text-muted-foreground mt-2">
-              {t(
-                'chat.toolApproval.description',
-                '이 세션에서 해당 도구 사용을 허용하시겠습니까?',
-              )}
+              {t('chat.toolApproval.description', '이 세션에서 해당 도구 사용을 허용하시겠습니까?')}
             </p>
           </div>
           <div className="flex justify-end gap-2 px-4 py-3 border-t">

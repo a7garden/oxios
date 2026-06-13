@@ -34,13 +34,17 @@ export function ToolCallCard({ call, className }: ToolCallCardProps) {
       {expanded && (
         <div className="border-t px-3 py-2 space-y-2">
           <div>
-            <p className="text-xs font-medium text-muted-foreground mb-1">{t('agents.inputLabel', 'Input')}</p>
+            <p className="text-xs font-medium text-muted-foreground mb-1">
+              {t('agents.inputLabel', 'Input')}
+            </p>
             <pre className="text-xs bg-background rounded p-2 overflow-x-auto whitespace-pre-wrap max-h-48 overflow-y-auto">
               {call.input}
             </pre>
           </div>
           <div>
-            <p className="text-xs font-medium text-muted-foreground mb-1">{t('agents.outputLabel', 'Output')}</p>
+            <p className="text-xs font-medium text-muted-foreground mb-1">
+              {t('agents.outputLabel', 'Output')}
+            </p>
             <pre className="text-xs bg-background rounded p-2 overflow-x-auto whitespace-pre-wrap max-h-48 overflow-y-auto">
               {call.output}
             </pre>

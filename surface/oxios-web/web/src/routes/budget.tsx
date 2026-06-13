@@ -2,6 +2,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { Plus, Wallet } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { toast } from 'sonner'
 import { AgentBudgetCard } from '@/components/budget/agent-budget-card'
 import { BudgetSummaryCard } from '@/components/budget/budget-summary'
 import { SetBudgetDialog } from '@/components/budget/set-budget-dialog'
@@ -10,7 +11,6 @@ import { ErrorState } from '@/components/shared/error-state'
 import { LoadingCards } from '@/components/shared/loading'
 import { RefreshButton } from '@/components/shared/refresh-button'
 import { Button } from '@/components/ui/button'
-import { toast } from 'sonner'
 import { useBudgetDelete, useBudgetList, useBudgetReset, useBudgetSet } from '@/hooks/use-budget'
 import type { AgentBudget } from '@/types/budget'
 
@@ -59,8 +59,7 @@ function BudgetPage() {
   }) => {
     setMutation.mutate(params, {
       onSuccess: () => toast.success(t('budget.setSuccess')),
-      onError: (e: unknown) =>
-        toast.error(e instanceof Error ? e.message : t('common.error')),
+      onError: (e: unknown) => toast.error(e instanceof Error ? e.message : t('common.error')),
     })
   }
 

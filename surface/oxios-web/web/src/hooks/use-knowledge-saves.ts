@@ -41,13 +41,7 @@ export function useKnowledgeSaves(sessionId: string | null) {
 export function useSaveToKnowledge(sessionId: string | null) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({
-      messageIndex,
-      path,
-    }: {
-      messageIndex: number
-      path?: string
-    }) =>
+    mutationFn: ({ messageIndex, path }: { messageIndex: number; path?: string }) =>
       api.post<SaveResult | SaveError>(
         `/api/chat/${encodeURIComponent(sessionId!)}/messages/${messageIndex}/save-to-knowledge`,
         path ? { path } : undefined,

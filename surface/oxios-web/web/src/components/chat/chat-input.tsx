@@ -79,7 +79,7 @@ export function ChatInput({
     const el = textareaRef.current
     if (!el) return
     el.style.height = 'auto'
-    const lineHeight = parseInt(getComputedStyle(el).lineHeight) || 24
+    const lineHeight = parseInt(getComputedStyle(el).lineHeight, 10) || 24
     const maxHeight = lineHeight * 10
     el.style.height = `${Math.min(el.scrollHeight, maxHeight)}px`
   }, [])

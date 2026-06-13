@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -7,7 +8,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { useTranslation } from 'react-i18next'
 import type { CalendarEvent } from '@/types/calendar'
 
 interface Props {
@@ -66,7 +66,9 @@ export function EventDetail({ event, onEdit, onDelete, onClose }: Props) {
           {/* Description */}
           {event.description && (
             <div className="space-y-1">
-              <p className="text-sm font-medium text-muted-foreground">{t('calendar.description')}</p>
+              <p className="text-sm font-medium text-muted-foreground">
+                {t('calendar.description')}
+              </p>
               <p className="text-sm whitespace-pre-wrap">{event.description}</p>
             </div>
           )}

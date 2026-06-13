@@ -113,7 +113,7 @@ function FileTreeItem({
         <span className="w-4 shrink-0" /> {/* indent spacer */}
         <File className="h-4 w-4 shrink-0 text-muted-foreground" />
         <span className="truncate">{entry.name.replace(/\.md$/, '')}</span>
-        {entry.oxios_quality && entry.oxios_quality !== 'user' && (
+        {entry.oxios_quality && (
           <span
             className={cn(
               'ml-auto shrink-0 flex items-center gap-0.5 text-2xs',

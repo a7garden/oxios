@@ -1,4 +1,4 @@
-import { FileText, Save, Trash2 } from 'lucide-react'
+import { FileText, Save } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
@@ -13,10 +13,7 @@ interface KnowledgeSaveIndicatorProps {
   messageIndex: number
 }
 
-export function KnowledgeSaveIndicator({
-  sessionId,
-  messageIndex,
-}: KnowledgeSaveIndicatorProps) {
+export function KnowledgeSaveIndicator({ sessionId, messageIndex }: KnowledgeSaveIndicatorProps) {
   const { t } = useTranslation()
   const [confirmDelete, setConfirmDelete] = useState(false)
 
@@ -36,6 +33,7 @@ export function KnowledgeSaveIndicator({
             {t('chat.knowledgeDeleteConfirm', '이 노트를 삭제하시겠습니까?')}
           </span>
           <button
+            type="button"
             className="text-2xs text-destructive hover:underline"
             onClick={() => {
               removeMutation.mutate(messageIndex)
@@ -46,6 +44,7 @@ export function KnowledgeSaveIndicator({
             {t('common.delete', '삭제')}
           </button>
           <button
+            type="button"
             className="text-2xs text-muted-foreground hover:underline"
             onClick={() => setConfirmDelete(false)}
           >
@@ -57,6 +56,7 @@ export function KnowledgeSaveIndicator({
 
     return (
       <button
+        type="button"
         className={cn(
           'flex items-center gap-1 mt-1 text-2xs text-muted-foreground',
           'hover:text-foreground transition-colors cursor-pointer',
@@ -75,6 +75,7 @@ export function KnowledgeSaveIndicator({
   // Not saved — show save button
   return (
     <button
+      type="button"
       className={cn(
         'flex items-center gap-1 mt-1 text-2xs text-muted-foreground',
         'hover:text-foreground transition-colors cursor-pointer',

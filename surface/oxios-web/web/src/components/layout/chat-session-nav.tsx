@@ -121,9 +121,7 @@ function ExpandedChatNav() {
                 onClick={() => loadSession(s.id)}
                 className={cn(itemDense, activeSessionId === s.id ? itemActive : itemInactive)}
               >
-                <span className="block truncate">
-                  {s.title ?? `${s.id.slice(0, 8)}...`}
-                </span>
+                <span className="block truncate">{s.title ?? `${s.id.slice(0, 8)}...`}</span>
                 <span className="block text-2xs text-muted-foreground/60">
                   {new Date(s.created_at).toLocaleString(undefined, {
                     month: 'short',
@@ -170,7 +168,11 @@ function CollapsedChatNav() {
     <div className="flex flex-col items-center gap-1 py-1">
       <Tooltip>
         <TooltipTrigger asChild>
-          <button type="button" onClick={newSession} className={cn(itemCollapsedBase, itemInactive)}>
+          <button
+            type="button"
+            onClick={newSession}
+            className={cn(itemCollapsedBase, itemInactive)}
+          >
             <Plus className="h-4 w-4" />
           </button>
         </TooltipTrigger>

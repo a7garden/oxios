@@ -70,12 +70,17 @@ export class ErrorBoundary extends Component<Props, State> {
         <div className="flex items-center justify-center p-8">
           <div className="text-center max-w-md">
             <h2 className="text-lg font-semibold text-destructive">
-              {isChunkError ? i18n.t('errorBoundary.chunkError', '페이지를 불러오지 못했습니다') : i18n.t('errorBoundary.genericError', '문제가 발생했습니다')}
+              {isChunkError
+                ? i18n.t('errorBoundary.chunkError', '페이지를 불러오지 못했습니다')
+                : i18n.t('errorBoundary.genericError', '문제가 발생했습니다')}
             </h2>
             <p className="mt-2 text-sm text-muted-foreground">
               {isChunkError
-                ? i18n.t('errorBoundary.chunkErrorDesc', '웹 UI 파일을 최신 상태로 업데이트 중입니다. 잠시 후 다시 시도해주세요.')
-                : error?.message ?? i18n.t('errorBoundary.unknownError', '알 수 없는 오류')}
+                ? i18n.t(
+                    'errorBoundary.chunkErrorDesc',
+                    '웹 UI 파일을 최신 상태로 업데이트 중입니다. 잠시 후 다시 시도해주세요.',
+                  )
+                : (error?.message ?? i18n.t('errorBoundary.unknownError', '알 수 없는 오류'))}
             </p>
             <div className="mt-4 flex items-center justify-center gap-3">
               <button
@@ -83,7 +88,9 @@ export class ErrorBoundary extends Component<Props, State> {
                 className="rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground hover:bg-primary/90 transition-colors"
                 onClick={this.handleRetry}
               >
-                {retryCount >= MAX_RETRIES ? i18n.t('common.refresh', '새로고침') : i18n.t('common.retry', '다시 시도')}
+                {retryCount >= MAX_RETRIES
+                  ? i18n.t('common.refresh', '새로고침')
+                  : i18n.t('common.retry', '다시 시도')}
               </button>
               {!isChunkError && (
                 <button

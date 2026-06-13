@@ -16,9 +16,9 @@ export const Route = createRootRouteWithContext<RouterContext>()({
     return (
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
-            <ErrorBoundary>
-              <AppLayout />
-            </ErrorBoundary>
+          <ErrorBoundary>
+            <AppLayout />
+          </ErrorBoundary>
           <Toaster />
         </TooltipProvider>
       </QueryClientProvider>

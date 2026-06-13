@@ -348,7 +348,9 @@ export function MarkdownEditor({
   return (
     <div className={cn('h-full relative', className)} onBlur={handleBlur}>
       {isDirty && (
-        <span className="absolute top-2 right-3 text-xs text-muted-foreground z-10">{t('knowledge.unsavedChanges')}</span>
+        <span className="absolute top-2 right-3 text-xs text-muted-foreground z-10">
+          {t('knowledge.unsavedChanges')}
+        </span>
       )}
       <CodeMirror
         ref={(instance) => {

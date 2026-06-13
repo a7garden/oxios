@@ -24,7 +24,15 @@ export function RepeatEditor({ value, onChange }: Props) {
     { label: t('calendar.freqYearly'), value: 'yearly' },
   ]
 
-  const DAY_LABELS = [t('calendar.daySun'), t('calendar.dayMon'), t('calendar.dayTue'), t('calendar.dayWed'), t('calendar.dayThu'), t('calendar.dayFri'), t('calendar.daySat')]
+  const DAY_LABELS = [
+    t('calendar.daySun'),
+    t('calendar.dayMon'),
+    t('calendar.dayTue'),
+    t('calendar.dayWed'),
+    t('calendar.dayThu'),
+    t('calendar.dayFri'),
+    t('calendar.daySat'),
+  ]
 
   const handleToggle = (checked: boolean) => {
     setExpanded(checked)

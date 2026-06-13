@@ -290,7 +290,10 @@ export const useChatStore = create<ChatStore>()(
           currentWs.onmessage = null
           currentWs.onclose = null
           currentWs.onerror = null
-          if (currentWs.readyState === WebSocket.OPEN || currentWs.readyState === WebSocket.CONNECTING) {
+          if (
+            currentWs.readyState === WebSocket.OPEN ||
+            currentWs.readyState === WebSocket.CONNECTING
+          ) {
             currentWs.close()
           }
         }
@@ -344,7 +347,7 @@ export const useChatStore = create<ChatStore>()(
           const attempt = get()._reconnectAttempts
           if (attempt >= MAX_RECONNECT_ATTEMPTS) return
 
-          const delay = 1000 * Math.pow(2, attempt)
+          const delay = 1000 * 2 ** attempt
           const timer = setTimeout(() => {
             set({ _reconnectTimer: null })
             // Only reconnect if no new connection was established in the meantime.
@@ -628,17 +631,14 @@ export const useChatStore = create<ChatStore>()(
         set({ activeToolApproval: null, isStreaming: true })
         try {
           const token = useAuthStore.getState().token
-          const res = await fetch(
-            `/api/chat/tool-approval/${encodeURIComponent(id)}/respond`,
-            {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                ...(token ? { Authorization: `Bearer ${token}` } : {}),
-              },
-              body: JSON.stringify({ approved }),
+          const res = await fetch(`/api/chat/tool-approval/${encodeURIComponent(id)}/respond`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
             },
-          )
+            body: JSON.stringify({ approved }),
+          })
           if (!res.ok) {
             const err = await res.text().catch(() => 'unknown error')
             throw new Error(`HTTP ${res.status}: ${err}`)
@@ -810,32 +810,38 @@ export const useChatStore = create<ChatStore>()(
               // Convert tool_calls from done chunk into ChatActivity entries
               // (same shape as loadSession's trajectoryToActivity). These are
               // used as a fallback when RFC-015 real-time events didn't arrive.
-              const doneActivities: ChatActivity[] = (Array.isArray(toolCalls) ? toolCalls : []).map(
-                (tc: ToolCallSummary, i: number) => ({
-                  id: `done-tc-${i}`,
-                  type: 'tool_call' as const,
-                  timestamp: new Date().toISOString(),
-                  toolName: tc.tool_name ?? tc.tool,
-                  toolCallId: `done-${i}`,
-                  toolArgs:
-                    typeof tc.input === 'string'
-                      ? (() => { try { return JSON.parse(tc.input) } catch { return undefined } })()
-                      : undefined,
-                  outputSummary:
-                    typeof tc.output === 'string'
-                      ? tc.output
-                      : JSON.stringify(tc.output ?? '', null, 2),
-                  durationMs: tc.duration_ms,
-                  isError: false,
-                  isRunning: false,
-                }),
-              )
+              const doneActivities: ChatActivity[] = (
+                Array.isArray(toolCalls) ? toolCalls : []
+              ).map((tc: ToolCallSummary, i: number) => ({
+                id: `done-tc-${i}`,
+                type: 'tool_call' as const,
+                timestamp: new Date().toISOString(),
+                toolName: tc.tool_name ?? tc.tool,
+                toolCallId: `done-${i}`,
+                toolArgs:
+                  typeof tc.input === 'string'
+                    ? (() => {
+                        try {
+                          return JSON.parse(tc.input)
+                        } catch {
+                          return undefined
+                        }
+                      })()
+                    : undefined,
+                outputSummary:
+                  typeof tc.output === 'string'
+                    ? tc.output
+                    : JSON.stringify(tc.output ?? '', null, 2),
+                durationMs: tc.duration_ms,
+                isError: false,
+                isRunning: false,
+              }))
 
               // Find the last assistant message to attach metadata.
               // If none exists yet (Ouroboros mode: execution completes
               // without any prior token chunk), create one so the
               // completion metadata has a home.
-              let lastAssistantIdx = [...updated]
+              const lastAssistantIdx = [...updated]
                 .reverse()
                 .findIndex((m) => m.role === 'assistant')
               if (lastAssistantIdx < 0) {
@@ -867,12 +873,13 @@ export const useChatStore = create<ChatStore>()(
                 const existingActivities = target.activities ?? []
                 const realTimeNames = new Set(
                   existingActivities
-                    .filter((a) => a.type === 'tool_call' && a.toolCallId && !a.toolCallId.startsWith('done-'))
+                    .filter(
+                      (a) =>
+                        a.type === 'tool_call' && a.toolCallId && !a.toolCallId.startsWith('done-'),
+                    )
                     .map((a) => a.toolName),
                 )
-                const newActivities = doneActivities.filter(
-                  (a) => !realTimeNames.has(a.toolName),
-                )
+                const newActivities = doneActivities.filter((a) => !realTimeNames.has(a.toolName))
 
                 updated[idx] = {
                   ...target,

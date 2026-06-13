@@ -16,6 +16,7 @@ import {
 } from 'lucide-react'
 import { useCallback, useDeferredValue, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { toast } from 'sonner'
 import { EmptyState } from '@/components/shared/empty-state'
 import { ErrorState } from '@/components/shared/error-state'
 import { LoadingCards } from '@/components/shared/loading'
@@ -35,7 +36,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
-import { toast } from 'sonner'
 import { api } from '@/lib/api-client'
 import { cn } from '@/lib/utils'
 import type { ClawHubSearchResult, Skill, SkillFormat, SkillStatus, SkillsShSkill } from '@/types'

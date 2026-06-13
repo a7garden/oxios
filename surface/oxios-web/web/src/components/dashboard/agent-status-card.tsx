@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next'
 import { Area, AreaChart, ResponsiveContainer } from 'recharts'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { cssVarToRgb } from '@/lib/utils'
+import { defaultAgentSearch } from '@/routes/agents'
 
 export interface AgentStatusCardProps {
   /** Cumulative forked count from /api/status. `null` = unknown. */
@@ -43,7 +44,11 @@ export function AgentStatusCard({ total, running, failed, runningSeries }: Agent
   const successColor = useMemo(() => cssVarToRgb('--color-success'), [])
 
   return (
-    <Link to="/agents" className="block h-full focus:outline-none">
+    <Link
+      to="/agents"
+      search={{ ...defaultAgentSearch }}
+      className="block h-full focus:outline-none"
+    >
       <Card
         className="relative h-full overflow-hidden cursor-pointer transition-all hover:bg-accent/60 hover:shadow-sm hover:-translate-y-px focus-visible:ring-2 focus-visible:ring-ring"
         title={totalUnknown ? t('dashboard.totalForkedUnavailable') : undefined}

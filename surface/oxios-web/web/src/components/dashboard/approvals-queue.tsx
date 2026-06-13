@@ -1,10 +1,10 @@
 import { Link } from '@tanstack/react-router'
 import { AlertTriangle, Bell, CheckCircle, XCircle } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { toast } from 'sonner'
 import { useApproveApproval, usePendingApprovals, useRejectApproval } from '@/hooks/use-approvals'
 import type { Approval } from '@/types'
 

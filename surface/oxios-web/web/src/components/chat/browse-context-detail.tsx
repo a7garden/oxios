@@ -20,7 +20,10 @@ export function BrowseContextDetail({ context }: { context: ToolCallContext }) {
         <div className="space-y-1">
           <DetailRow label={t('chat.transparency.browseQuery', 'Query')} value={context.query} />
           {context.engine ? (
-            <DetailRow label={t('chat.transparency.browseEngine', 'Engine')} value={context.engine} />
+            <DetailRow
+              label={t('chat.transparency.browseEngine', 'Engine')}
+              value={context.engine}
+            />
           ) : null}
         </div>
       )
@@ -98,16 +101,25 @@ function PageVisitDetail({
       <DetailRow label={t('chat.transparency.browseUrl', 'URL')} value={context.url} mono />
       {context.reason ? <VisitReasonDetail reason={context.reason} /> : null}
       {context.navigation_error ? (
-        <DetailRow label={t('chat.transparency.browseError', 'Error')} value={context.navigation_error} />
+        <DetailRow
+          label={t('chat.transparency.browseError', 'Error')}
+          value={context.navigation_error}
+        />
       ) : null}
       {context.page_title ? (
         <DetailRow label={t('chat.transparency.browseTitle', 'Title')} value={context.page_title} />
       ) : null}
       {context.page_status != null ? (
-        <DetailRow label={t('chat.transparency.browseStatus', 'Status')} value={`${context.page_status}`} />
+        <DetailRow
+          label={t('chat.transparency.browseStatus', 'Status')}
+          value={`${context.page_status}`}
+        />
       ) : null}
       {context.page_bytes != null ? (
-        <DetailRow label={t('chat.transparency.browseSize', 'Size')} value={formatBytes(context.page_bytes)} />
+        <DetailRow
+          label={t('chat.transparency.browseSize', 'Size')}
+          value={formatBytes(context.page_bytes)}
+        />
       ) : null}
       {context.page_duration_ms != null ? (
         <DetailRow
@@ -124,13 +136,20 @@ function VisitReasonDetail({ reason }: { reason: VisitReason }) {
   const { t } = useTranslation()
 
   if (reason === 'direct_navigation') {
-    return <DetailRow label={t('chat.transparency.browseReason', 'Reason')} value={t('chat.transparency.visitReasonDirect')} />
+    return (
+      <DetailRow
+        label={t('chat.transparency.browseReason', 'Reason')}
+        value={t('chat.transparency.visitReasonDirect')}
+      />
+    )
   }
   if ('search_result' in reason) {
     return (
       <DetailRow
         label={t('chat.transparency.browseReason', 'Reason')}
-        value={t('chat.transparency.visitReasonSearch', { position: reason.search_result.position })}
+        value={t('chat.transparency.visitReasonSearch', {
+          position: reason.search_result.position,
+        })}
       />
     )
   }
@@ -154,7 +173,10 @@ function ScreenshotDetail({ meta }: { meta: ScreenshotMeta }) {
         {t('chat.transparency.browseScreenshot', 'Screenshot')}
       </p>
       <div className="rounded border bg-muted/50 px-2 py-1.5 space-y-0.5">
-        <DetailRow label={t('chat.transparency.browseSize', 'Size')} value={formatBytes(meta.bytes)} />
+        <DetailRow
+          label={t('chat.transparency.browseSize', 'Size')}
+          value={formatBytes(meta.bytes)}
+        />
         <DetailRow label={t('chat.transparency.browseWidth', 'Width')} value={`${meta.width}px`} />
         <DetailRow
           label={t('chat.transparency.browseDuration', 'Duration')}

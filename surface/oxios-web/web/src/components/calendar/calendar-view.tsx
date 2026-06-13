@@ -19,8 +19,6 @@ type ViewMode = 'month' | 'week' | 'agenda'
 
 // ─── Constants ──────────────────────────────────────────────────────────
 
-
-
 // ─── Date helpers (no external deps) ────────────────────────────────────
 
 function isSameDay(a: Date, b: Date): boolean {
@@ -169,7 +167,9 @@ function MonthView({
                 />
               ))}
               {overflow > 0 && (
-                <span className="text-2xs text-muted-foreground pl-1">{t('calendar.moreEvents', { count: overflow })}</span>
+                <span className="text-2xs text-muted-foreground pl-1">
+                  {t('calendar.moreEvents', { count: overflow })}
+                </span>
               )}
             </div>
           </div>
@@ -377,7 +377,15 @@ function AgendaView({
 
 export function CalendarView({ events, onEventClick, onDateClick }: CalendarViewProps) {
   const { t, i18n } = useTranslation()
-  const dayLabels = [t('calendar.daySun'), t('calendar.dayMon'), t('calendar.dayTue'), t('calendar.dayWed'), t('calendar.dayThu'), t('calendar.dayFri'), t('calendar.daySat')]
+  const dayLabels = [
+    t('calendar.daySun'),
+    t('calendar.dayMon'),
+    t('calendar.dayTue'),
+    t('calendar.dayWed'),
+    t('calendar.dayThu'),
+    t('calendar.dayFri'),
+    t('calendar.daySat'),
+  ]
   const [viewMode, setViewMode] = useState<ViewMode>('month')
   const [currentDate, setCurrentDate] = useState(() => new Date())
 
@@ -460,7 +468,8 @@ export function CalendarView({ events, onEventClick, onDateClick }: CalendarView
             onClick={() => setViewMode('month')}
             className="text-xs"
           >
-            <CalendarIcon className="h-3.5 w-3.5 mr-1" />{t('calendar.month')}
+            <CalendarIcon className="h-3.5 w-3.5 mr-1" />
+            {t('calendar.month')}
           </Button>
           <Button
             variant={viewMode === 'week' ? 'secondary' : 'ghost'}
@@ -468,7 +477,8 @@ export function CalendarView({ events, onEventClick, onDateClick }: CalendarView
             onClick={() => setViewMode('week')}
             className="text-xs"
           >
-            <CalendarIcon className="h-3.5 w-3.5 mr-1" />{t('calendar.week')}
+            <CalendarIcon className="h-3.5 w-3.5 mr-1" />
+            {t('calendar.week')}
           </Button>
           <Button
             variant={viewMode === 'agenda' ? 'secondary' : 'ghost'}
@@ -503,7 +513,9 @@ export function CalendarView({ events, onEventClick, onDateClick }: CalendarView
             dayLabels={dayLabels}
           />
         )}
-        {viewMode === 'agenda' && <AgendaView events={events} onEventClick={onEventClick} t={t} i18n={i18n} />}
+        {viewMode === 'agenda' && (
+          <AgendaView events={events} onEventClick={onEventClick} t={t} i18n={i18n} />
+        )}
       </div>
     </div>
   )

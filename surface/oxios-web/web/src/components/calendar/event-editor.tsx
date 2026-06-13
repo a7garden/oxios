@@ -206,7 +206,11 @@ export function EventEditor({ open, onClose, event, defaultStart, onSubmit, isLo
               {t('calendar.cancel')}
             </Button>
             <Button type="submit" disabled={isLoading || !title.trim() || !start || !end}>
-              {isLoading ? t('calendar.processing') : isEdit ? t('calendar.editEvent') : t('calendar.createEvent')}
+              {isLoading
+                ? t('calendar.processing')
+                : isEdit
+                  ? t('calendar.editEvent')
+                  : t('calendar.createEvent')}
             </Button>
           </DialogFooter>
         </form>

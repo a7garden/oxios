@@ -1,5 +1,5 @@
-import { MessageSquare, Zap } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
+import { MessageSquare, Zap } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { api } from '@/lib/api-client'
 import { cn } from '@/lib/utils'
@@ -68,17 +68,13 @@ export function EmptyChatState() {
                   <div
                     className={cn(
                       'flex h-8 w-8 shrink-0 items-center justify-center rounded-full',
-                      isSpec
-                        ? 'bg-primary/10 text-primary'
-                        : 'bg-muted text-muted-foreground',
+                      isSpec ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground',
                     )}
                   >
                     {isSpec ? <Zap className="h-4 w-4" /> : <MessageSquare className="h-4 w-4" />}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-foreground">
-                      {s.title ?? `${s.id.slice(0, 8)}…`}
-                    </p>
+                    <p className="truncate text-foreground">{s.title ?? `${s.id.slice(0, 8)}…`}</p>
                     <p className="text-2xs text-muted-foreground">
                       {isSpec ? 'Ouroboros · ' : ''}
                       {timeStr}

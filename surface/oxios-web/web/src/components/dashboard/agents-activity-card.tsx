@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next'
 import { ErrorState } from '@/components/shared/error-state'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
+import { defaultAgentSearch } from '@/routes/agents'
 import type { Agent } from '@/types'
 import { LiveActivityFeed } from './live-activity-feed'
 
@@ -141,6 +142,7 @@ function AgentsList({
         {agents.length > MAX_AGENTS_VISIBLE && (
           <Link
             to="/agents"
+            search={{ ...defaultAgentSearch }}
             className="block text-center text-xs text-muted-foreground hover:text-foreground pt-1"
           >
             {t('dashboard.viewAllCount', { count: agents.length })}

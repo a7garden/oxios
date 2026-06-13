@@ -45,8 +45,7 @@ export function InterviewWizard({
   const clarityPercent = Math.round(clarity * 100)
 
   // Clarity bar color
-  const barColor =
-    clarity > 0.7 ? 'bg-success' : clarity > 0.4 ? 'bg-warning' : 'bg-error'
+  const barColor = clarity > 0.7 ? 'bg-success' : clarity > 0.4 ? 'bg-warning' : 'bg-error'
 
   const setAnswer = (qid: string, value: string | string[]) => {
     setAnswers((prev) => ({ ...prev, [qid]: value }))
@@ -176,12 +175,13 @@ export function InterviewWizard({
 
   // Answered dots for progress
   const answeredDots = useMemo(
-    () => questions.map((q) => {
-      const v = answers[q.id]
-      if (v === undefined) return false
-      if (typeof v === 'string') return v.trim().length > 0
-      return (v as string[]).length > 0
-    }),
+    () =>
+      questions.map((q) => {
+        const v = answers[q.id]
+        if (v === undefined) return false
+        if (typeof v === 'string') return v.trim().length > 0
+        return (v as string[]).length > 0
+      }),
     [questions, answers],
   )
 
@@ -198,9 +198,7 @@ export function InterviewWizard({
           <div className="flex items-center justify-between px-4 py-2.5 border-b bg-muted/30">
             <div className="flex items-center gap-2">
               <ClipboardList className="h-3.5 w-3.5 text-muted-foreground" />
-              <span className="text-sm font-medium">
-                {t('chat.interview.wizardTitle')}
-              </span>
+              <span className="text-sm font-medium">{t('chat.interview.wizardTitle')}</span>
               <span className="text-xs text-muted-foreground ml-1">
                 {t('chat.interview.roundLabel', { round })}
               </span>
@@ -256,9 +254,7 @@ export function InterviewWizard({
               className="animate-in fade-in-0 slide-in-from-bottom-2 duration-200"
             >
               {/* Question text */}
-              <p className="text-sm font-medium mb-3 leading-relaxed">
-                {question.text}
-              </p>
+              <p className="text-sm font-medium mb-3 leading-relaxed">{question.text}</p>
 
               {/* Structured widget */}
               <QuestionWidget
@@ -419,9 +415,7 @@ function QuestionWidget({
                   {isActive ? '☑' : '☐'} {opt.label}
                 </span>
                 {opt.description && isActive && (
-                  <span className="block text-xs opacity-70 mt-1 ml-5">
-                    {opt.description}
-                  </span>
+                  <span className="block text-xs opacity-70 mt-1 ml-5">{opt.description}</span>
                 )}
               </button>
             )
@@ -452,9 +446,7 @@ function QuestionWidget({
               {opt.label}
             </span>
             {opt.description && value === opt.value && (
-              <span className="block text-xs opacity-70 mt-1 ml-5">
-                {opt.description}
-              </span>
+              <span className="block text-xs opacity-70 mt-1 ml-5">{opt.description}</span>
             )}
           </button>
         ))}

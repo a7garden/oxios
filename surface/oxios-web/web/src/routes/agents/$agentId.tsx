@@ -13,6 +13,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useAgentDetail, useAgentLogs, useAgentTrace } from '@/hooks/use-agent-trace'
 import { api } from '@/lib/api-client'
+import { defaultAgentSearch } from '@/routes/agents'
 
 export const Route = createFileRoute('/agents/$agentId')({
   component: AgentDetailPage,
@@ -33,7 +34,7 @@ function AgentDetailPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['agents'] })
       queryClient.invalidateQueries({ queryKey: ['agents', 'detail', agentId] })
-      navigate({ to: '/agents' })
+      navigate({ to: '/agents', search: { ...defaultAgentSearch } })
     },
   })
 
@@ -43,7 +44,10 @@ function AgentDetailPage() {
 
   return (
     <div className="space-y-6">
-      <AgentHeader agent={agent} onBack={() => navigate({ to: '/agents' })}>
+      <AgentHeader
+        agent={agent}
+        onBack={() => navigate({ to: '/agents', search: { ...defaultAgentSearch } })}
+      >
         <Button
           variant="destructive"
           size="sm"
@@ -64,7 +68,9 @@ function AgentDetailPage() {
               <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
               <div>
                 <p className="font-medium">{t('agents.error', 'Execution Error')}</p>
-                <p className="text-xs font-mono mt-1 whitespace-pre-wrap break-all">{agent.error}</p>
+                <p className="text-xs font-mono mt-1 whitespace-pre-wrap break-all">
+                  {agent.error}
+                </p>
               </div>
             </div>
           </CardContent>
@@ -127,14 +133,21 @@ function AgentDetailPage() {
             )}
             {agent.completed_at && (
               <div className="flex items-center gap-1">
-                <span className="text-muted-foreground">{t('agents.completedAt', 'Completed')}:</span>
+                <span className="text-muted-foreground">
+                  {t('agents.completedAt', 'Completed')}:
+                </span>
                 <span>{new Date(agent.completed_at).toLocaleString()}</span>
               </div>
             )}
             {agent.steps_completed > 0 && (
               <div className="flex items-center gap-1">
-                <span className="text-muted-foreground">{t('agents.stepsCompleted', 'Steps')}:</span>
-                <span>{agent.steps_completed}{agent.steps_total ? ` / ${agent.steps_total}` : ''}</span>
+                <span className="text-muted-foreground">
+                  {t('agents.stepsCompleted', 'Steps')}:
+                </span>
+                <span>
+                  {agent.steps_completed}
+                  {agent.steps_total ? ` / ${agent.steps_total}` : ''}
+                </span>
               </div>
             )}
             {agent.model_id && (

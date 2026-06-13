@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { createFileRoute, useNavigate, useSearch } from '@tanstack/react-router'
-import { Bot, ChevronDown, Search, X } from 'lucide-react'
+import { Bot, Search, X } from 'lucide-react'
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { DataTable } from '@/components/shared/data-table'
@@ -12,13 +12,7 @@ import { StatusIndicator } from '@/components/shared/status-indicator'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
+import { Select } from '@/components/ui/select'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { api } from '@/lib/api-client'
 import type { AgentListItem, AgentListResponse } from '@/types/agent'
@@ -37,6 +31,17 @@ export const Route = createFileRoute('/agents/')({
   }),
 })
 
+/** Default `/agents` search params — shared so other routes can link here
+ *  with a type-safe, fully-populated search object. */
+export const defaultAgentSearch = {
+  q: undefined,
+  status: 'all',
+  sort_by: 'created_at',
+  sort_dir: 'desc',
+  page: 1,
+  per_page: 50,
+} as const
+
 function buildQueryString(params: Record<string, string | number | undefined>) {
   const qs = new URLSearchParams()
   for (const [k, v] of Object.entries(params)) {
@@ -49,11 +54,7 @@ function buildQueryString(params: Record<string, string | number | undefined>) {
 
 // ── Stats Bar ────────────────────────────────────────────────────────
 
-function StatsBar({
-  response,
-}: {
-  response: AgentListResponse | undefined
-}) {
+function StatsBar({ response }: { response: AgentListResponse | undefined }) {
   if (!response) return null
 
   const { stats, total } = response
@@ -64,14 +65,10 @@ function StatsBar({
       {stats.count_running > 0 && (
         <span className="text-green-500">{stats.count_running} running</span>
       )}
-      {stats.count_failed > 0 && (
-        <span className="text-red-500">{stats.count_failed} failed</span>
-      )}
+      {stats.count_failed > 0 && <span className="text-red-500">{stats.count_failed} failed</span>}
       <span>${stats.total_cost_usd.toFixed(2)} total</span>
       <span>{stats.total_tokens.toLocaleString()} tokens</span>
-      {stats.avg_duration_secs > 0 && (
-        <span>avg {(stats.avg_duration_secs).toFixed(1)}s</span>
-      )}
+      {stats.avg_duration_secs > 0 && <span>avg {stats.avg_duration_secs.toFixed(1)}s</span>}
     </div>
   )
 }
@@ -94,8 +91,9 @@ function FilterChips({
     <div className="flex flex-wrap items-center gap-2">
       {entries.map(([key, value]) => (
         <Badge key={key} variant="secondary" className="gap-1">
-          {key.replace(/_/g, ' ')}: {value.length > 30 ? value.slice(0, 30) + '…' : value}
+          {key.replace(/_/g, ' ')}: {value.length > 30 ? `${value.slice(0, 30)}…` : value}
           <button
+            type="button"
             onClick={() => onRemove(key)}
             className="ml-1 hover:text-foreground"
           >
@@ -146,14 +144,14 @@ function AgentsListPage() {
   // Update URL param
   function setParam(key: string, value: string | number | undefined) {
     navigate({
-      search: (prev: Record<string, unknown>) => ({ ...prev, [key]: value, page: key === 'page' ? value : prev.page || 1 }),
+      search: { ...search, [key]: value, page: key === 'page' ? value : 1 } as any,
     })
   }
 
   // Active filters for chips (excluding page/per_page/sort)
   const activeFilters: Record<string, string> = {}
-  if (statusTab !== 'all') activeFilters['status'] = statusTab
-  if (searchQuery) activeFilters['search'] = searchQuery
+  if (statusTab !== 'all') activeFilters.status = statusTab
+  if (searchQuery) activeFilters.search = searchQuery
 
   const agents = data?.items ?? []
 
@@ -231,10 +229,14 @@ function AgentsListPage() {
           <StatsBar response={data} />
         </div>
         <div className="flex items-center gap-2">
-          <SortSelect value={sortBy} dir={sortDir} onChange={(by, dir) => {
-            setParam('sort_by', by)
-            setParam('sort_dir', dir)
-          }} />
+          <SortSelect
+            value={sortBy}
+            dir={sortDir}
+            onChange={(by, dir) => {
+              setParam('sort_by', by)
+              setParam('sort_dir', dir)
+            }}
+          />
           <RefreshButton onClick={() => refetch()} isFetching={isFetching} />
         </div>
       </div>
@@ -244,7 +246,10 @@ function AgentsListPage() {
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
           className="pl-9"
-          placeholder={t('agents.searchPlaceholder', 'Search agents by name, error, or tool output…')}
+          placeholder={t(
+            'agents.searchPlaceholder',
+            'Search agents by name, error, or tool output…',
+          )}
           defaultValue={searchQuery}
           onChange={(e) => {
             const val = e.target.value
@@ -259,31 +264,44 @@ function AgentsListPage() {
         filters={activeFilters}
         onRemove={(key) => setParam(key, key === 'status' ? 'all' : undefined)}
         onClear={() => {
-          navigate({ search: { page: 1, per_page: 50 } })
+          navigate({ search: { ...defaultAgentSearch } as any })
         }}
       />
 
       {/* Status tabs */}
-      <Tabs
-        value={statusTab}
-        onValueChange={(v) => setParam('status', v === 'all' ? 'all' : v)}
-      >
+      <Tabs value={statusTab} onValueChange={(v) => setParam('status', v === 'all' ? 'all' : v)}>
         <TabsList>
           <TabsTrigger value="all">
             {t('agents.all', 'All')}
-            {data && <Badge variant="outline" className="ml-1 text-xs">{data.total}</Badge>}
+            {data && (
+              <Badge variant="outline" className="ml-1 text-xs">
+                {data.total}
+              </Badge>
+            )}
           </TabsTrigger>
           <TabsTrigger value="running">
             {t('agents.running', 'Running')}
-            {data?.stats.count_running ? <Badge variant="outline" className="ml-1 text-xs">{data.stats.count_running}</Badge> : null}
+            {data?.stats.count_running ? (
+              <Badge variant="outline" className="ml-1 text-xs">
+                {data.stats.count_running}
+              </Badge>
+            ) : null}
           </TabsTrigger>
           <TabsTrigger value="completed">
             {t('agents.completed', 'Completed')}
-            {data?.stats.count_completed ? <Badge variant="outline" className="ml-1 text-xs">{data.stats.count_completed}</Badge> : null}
+            {data?.stats.count_completed ? (
+              <Badge variant="outline" className="ml-1 text-xs">
+                {data.stats.count_completed}
+              </Badge>
+            ) : null}
           </TabsTrigger>
           <TabsTrigger value="failed">
             {t('agents.failed', 'Failed')}
-            {data?.stats.count_failed ? <Badge variant="outline" className="ml-1 text-xs">{data.stats.count_failed}</Badge> : null}
+            {data?.stats.count_failed ? (
+              <Badge variant="outline" className="ml-1 text-xs">
+                {data.stats.count_failed}
+              </Badge>
+            ) : null}
           </TabsTrigger>
         </TabsList>
       </Tabs>
@@ -358,23 +376,20 @@ function SortSelect({
         const desc = v.startsWith('-')
         onChange(v.slice(1), desc ? 'desc' : 'asc')
       }}
-    >
-      <SelectTrigger className="w-[160px] h-9 text-xs">
-        <SelectValue />
-      </SelectTrigger>
-      <SelectContent>
-        <SelectItem value="-created_at">Newest first</SelectItem>
-        <SelectItem value="+created_at">Oldest first</SelectItem>
-        <SelectItem value="-cost_usd">Most expensive</SelectItem>
-        <SelectItem value="+cost_usd">Least expensive</SelectItem>
-        <SelectItem value="-duration_secs">Longest duration</SelectItem>
-        <SelectItem value="+duration_secs">Shortest duration</SelectItem>
-        <SelectItem value="-tokens_total">Most tokens</SelectItem>
-        <SelectItem value="+tokens_total">Fewest tokens</SelectItem>
-        <SelectItem value="-name">Name Z→A</SelectItem>
-        <SelectItem value="+name">Name A→Z</SelectItem>
-      </SelectContent>
-    </Select>
+      className="w-[160px] h-9 text-xs"
+      options={[
+        { label: 'Newest first', value: '-created_at' },
+        { label: 'Oldest first', value: '+created_at' },
+        { label: 'Most expensive', value: '-cost_usd' },
+        { label: 'Least expensive', value: '+cost_usd' },
+        { label: 'Longest duration', value: '-duration_secs' },
+        { label: 'Shortest duration', value: '+duration_secs' },
+        { label: 'Most tokens', value: '-tokens_total' },
+        { label: 'Fewest tokens', value: '+tokens_total' },
+        { label: 'Name Z→A', value: '-name' },
+        { label: 'Name A→Z', value: '+name' },
+      ]}
+    />
   )
 }
 
