@@ -36,6 +36,10 @@ pub mod credential;
 // below — RFC-014 Phase F.
 mod audit_persistence;
 
+// ─── Autonomous Persistence ─────────────────────────────────────────
+// RFC-016: Post-execution hook for auto-saving knowledge and memory.
+pub mod persistence_hook;
+
 // ─── Communication ──────────────────────────────────────────────────
 // 이벤트, 메시징, 외부 프로토콜, 멀티 에이전트 조정.
 pub mod a2a;
@@ -97,6 +101,7 @@ pub mod kernel_handle;
 pub use agent_group::{OxiosAgentGroup, OxiosAgentGroupStatus, OxiosGroupAgent};
 pub use agent_lifecycle::AgentLifecycleManager;
 pub use agent_runtime::AgentRuntime;
+pub use persistence_hook::PersistenceHook;
 pub use daemon::{DaemonManager, DaemonStatus};
 pub use supervisor::{BasicSupervisor, Supervisor};
 
@@ -149,18 +154,18 @@ pub use memory::auto_memory_bridge::{
     AutoMemoryBridge, ExportResult, GuidancePattern, ImportResult, InsightCategory, MemoryInsight,
     SyncDirection, SyncResult,
 };
-pub use memory::{content_hash, MemoryEntry, MemoryTier, MemoryType, ProtectionLevel, TextVector};
 pub use memory::{
     DreamCheckpoint, DreamConfig, DreamProcess, DreamReport, HnswIndex, HnswMemoryIndex,
     MemoryManager, ProactiveRecall, RecallTiming, SemanticHit,
 };
+pub use memory::{MemoryEntry, MemoryTier, MemoryType, ProtectionLevel, TextVector, content_hash};
 pub use oxios_memory::memory::flash_attention::{
     BenchmarkResult as AttentionBenchmarkResult, FlashAttention, FlashAttentionConfig,
     MemoryEstimate,
 };
 pub use oxios_memory::memory::{
-    batch_euclidean_to_poincare, euclidean_to_poincare, hyperbolic_distance, mobius_add,
-    mobius_scalar_mul, HyperbolicConfig, HyperbolicEmbedding,
+    HyperbolicConfig, HyperbolicEmbedding, batch_euclidean_to_poincare, euclidean_to_poincare,
+    hyperbolic_distance, mobius_add, mobius_scalar_mul,
 };
 pub use oxios_memory::{
     AutoClassifier, AutoProtector, CompactionTree, CurationCandidate, CurationReport, DecayEngine,
@@ -172,24 +177,24 @@ pub use oxios_memory::{
 // Re-exported here for back-compat — existing `use oxios_kernel::chunk_fixed;`
 // and friends continue to work without code changes.
 pub use oxios_memory::{
-    chunk_fixed, chunk_paragraphs, cosine_similarity_f32, l2_normalize_f32, l2_normalize_f64,
-    ChunkConfig, TextChunk,
+    ChunkConfig, TextChunk, chunk_fixed, chunk_paragraphs, cosine_similarity_f32, l2_normalize_f32,
+    l2_normalize_f64,
 };
 
 // ─── SQLite Memory (RFC-012) ────────────────────────────────────────
+#[cfg(feature = "sqlite-memory")]
+pub use oxios_memory::memory::sqlite::SqliteMemoryStore;
 #[cfg(feature = "sqlite-memory")]
 pub use oxios_memory::memory::sqlite::cache::{self as sqlite_cache};
 #[cfg(feature = "sqlite-memory")]
 pub use oxios_memory::memory::sqlite::migration::{self as sqlite_migration, MigrationReport};
 #[cfg(feature = "sqlite-memory")]
 pub use oxios_memory::memory::sqlite::search::{
-    reciprocal_rank_fusion, Bm25Hit, RankedMemory, VectorHit,
+    Bm25Hit, RankedMemory, VectorHit, reciprocal_rank_fusion,
 };
 #[cfg(feature = "sqlite-memory")]
-pub use oxios_memory::memory::sqlite::SqliteMemoryStore;
-#[cfg(feature = "sqlite-memory")]
-pub use oxios_memory::memory::sqlite::{bytes_to_f32_slice, f32_slice_to_bytes, MemoryDatabase};
-pub use persona::{default_personas, Persona, PersonaManager, PersonaStore};
+pub use oxios_memory::memory::sqlite::{MemoryDatabase, bytes_to_f32_slice, f32_slice_to_bytes};
+pub use persona::{Persona, PersonaManager, PersonaStore, default_personas};
 
 // ─── Tools & Skills ────────────────────────────────────────────────
 pub use skill::clawhub::{
@@ -223,8 +228,8 @@ pub use git_layer::{
     CommitContext, CommitDiff, CommitInfo, DiffKind, DiffStats, FileDiff, GitLayer, LogEntry,
 };
 pub use project::{
-    detect_project, extract_path, find_by_id, find_by_name, ConversationBuffer, ConversationTurn,
-    DetectionResult, Project, ProjectId, ProjectSource,
+    ConversationBuffer, ConversationTurn, DetectionResult, Project, ProjectId, ProjectSource,
+    detect_project, extract_path, find_by_id, find_by_name,
 };
 #[cfg(feature = "sqlite-memory")]
 pub use project::{ProjectManager, ProjectManagerError};
@@ -238,10 +243,10 @@ pub use engine::{EngineHandle, EngineProvider, OxiosEngine};
 pub use error::{HttpStatus, KernelError, KernelResult};
 pub use metrics::{get_metrics, register_builtin_metrics, registry};
 pub use observability::{
-    audit_log, cost_tracker, tracer, AuditEntry as SdkAuditEntry, AuditFilter, CostSnapshot,
-    CostTracker, Span, SpanGuard, SpanKind, TokenUsage, Tracer as SdkTracer,
+    AuditEntry as SdkAuditEntry, AuditFilter, CostSnapshot, CostTracker, Span, SpanGuard, SpanKind,
+    TokenUsage, Tracer as SdkTracer, audit_log, cost_tracker, tracer,
 };
-pub use types::{AgentId, AgentInfo, AgentStatus};
+pub use types::{AgentId, AgentInfo, AgentStatus, ToolCallRecord};
 
 // ─── API Surface ────────────────────────────────────────────────────
 pub use kernel_handle::KernelHandle;

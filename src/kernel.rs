@@ -7,15 +7,15 @@
 use anyhow::{Context, Result};
 use oxios_gateway::Gateway;
 use oxios_kernel::{
-    access_manager::AccessManager, auth::AuthManager, config::load_config, A2AProtocol,
-    AgentRuntime, AgentScheduler, AuditPersistence, AuditTrail, BasicSupervisor, BudgetManager,
-    ClawHubClient, ClawHubInstaller, CronScheduler, EngineHandle, EventBus, GitLayer,
-    MarketplaceApi, McpBridge, McpServer, MemoryManager, Orchestrator, OxiosConfig, OxiosEngine,
-    PersonaManager, ProjectManager, ResourceMonitor, SkillManager, SkillsShClient,
-    SkillsShInstaller, Supervisor,
+    A2AProtocol, AgentRuntime, AgentScheduler, AuditPersistence, AuditTrail, BasicSupervisor,
+    BudgetManager, ClawHubClient, ClawHubInstaller, CronScheduler, EngineHandle, EventBus,
+    GitLayer, MarketplaceApi, McpBridge, McpServer, MemoryManager, Orchestrator, OxiosConfig,
+    OxiosEngine, PersonaManager, ProjectManager, ResourceMonitor, SkillManager, SkillsShClient,
+    SkillsShInstaller, Supervisor, access_manager::AccessManager, auth::AuthManager,
+    config::load_config,
 };
-use oxios_markdown::knowledge::FileChange;
 use oxios_markdown::KnowledgeBase;
+use oxios_markdown::knowledge::FileChange;
 
 use oxios_ouroboros::{OuroborosEngine, OuroborosProtocol, Seed};
 use std::path::PathBuf;
@@ -299,9 +299,10 @@ impl Kernel {
             return None;
         }
 
-        // Resolve SMTP password: OXIOS_EMAIL_PASSWORD env → RESEND_API_KEY → credential store
-        let password = std::env::var("OXIOS_EMAIL_PASSWORD")
+        // Resolve SMTP password: env var → credential store
+        let password: Option<String> = std::env::var("OXIOS_EMAIL_PASSWORD")
             .ok()
+            .filter(|p| !p.is_empty())
             .or_else(|| std::env::var("RESEND_API_KEY").ok())
             .or_else(|| {
                 // Try credential store
@@ -315,7 +316,7 @@ impl Kernel {
             Some(p) => p,
             None => {
                 tracing::warn!(
-                    "Email enabled but no SMTP password found. Set OXIOS_EMAIL_PASSWORD / RESEND_API_KEY env var or run 'oxios email setup'."
+                    "Email enabled but no SMTP password found. Set OXIOS_EMAIL_PASSWORD env var or run 'oxios email setup'."
                 );
                 return None;
             }
@@ -376,6 +377,20 @@ impl Kernel {
     ) -> Result<oxios_kernel::OrchestrationResult> {
         self.orchestrator
             .handle_message("cli", prompt, session_id, None, "cli-direct")
+            .await
+    }
+
+    /// Execute a prompt in chat mode (skips Ouroboros pipeline).
+    ///
+    /// Uses direct agent execution without interview/seed/evaluate/evolve.
+    /// Called by `oxios run --chat`.
+    pub async fn execute_prompt_chat(
+        &self,
+        prompt: &str,
+        session_id: Option<&str>,
+    ) -> Result<oxios_kernel::OrchestrationResult> {
+        self.orchestrator
+            .chat("cli", prompt, session_id, None, "cli-direct")
             .await
     }
 
@@ -442,16 +457,16 @@ impl Kernel {
             loop {
                 tokio::time::sleep(std::time::Duration::from_secs(300)).await;
 
-                if let Ok(valid) = handle.security.verify_chain() {
-                    if !valid {
-                        handle.security.audit(
-                            "guardian",
-                            AuditAction::Other {
-                                detail: "AUDIT CHAIN BROKEN".into(),
-                            },
-                            "guardian",
-                        );
-                    }
+                if let Ok(valid) = handle.security.verify_chain()
+                    && !valid
+                {
+                    handle.security.audit(
+                        "guardian",
+                        AuditAction::Other {
+                            detail: "AUDIT CHAIN BROKEN".into(),
+                        },
+                        "guardian",
+                    );
                 }
 
                 if handle.infra.is_overloaded() {
@@ -465,16 +480,16 @@ impl Kernel {
                     );
                 }
 
-                if let Ok(valid) = handle.infra.git_verify() {
-                    if !valid {
-                        handle.security.audit(
-                            "guardian",
-                            AuditAction::Other {
-                                detail: "GIT REPOSITORY CORRUPTED".into(),
-                            },
-                            "guardian",
-                        );
-                    }
+                if let Ok(valid) = handle.infra.git_verify()
+                    && !valid
+                {
+                    handle.security.audit(
+                        "guardian",
+                        AuditAction::Other {
+                            detail: "GIT REPOSITORY CORRUPTED".into(),
+                        },
+                        "guardian",
+                    );
                 }
 
                 let _ = handle.commit_all("guardian: periodic checkpoint");
@@ -864,11 +879,11 @@ impl KernelBuilder {
         oxios_kernel::event_bus::attach_audit_trail(&event_bus, audit_trail.clone());
 
         // Restore persisted audit entries.
-        if let Ok(entries) = state_store.load() {
-            if !entries.is_empty() {
-                tracing::info!(count = entries.len(), "Restored audit trail entries");
-                audit_trail.restore_from(entries);
-            }
+        if let Ok(entries) = state_store.load()
+            && !entries.is_empty()
+        {
+            tracing::info!(count = entries.len(), "Restored audit trail entries");
+            audit_trail.restore_from(entries);
         }
 
         // Routing stats — shared between EngineApi and AgentRuntime
@@ -982,7 +997,22 @@ impl KernelBuilder {
                 provider_options: config.engine.provider_options.clone(),
                 ..Default::default()
             }
-        });
+        })
+        .with_persistence_hook(Arc::new(
+            oxios_kernel::PersistenceHook::new(
+                memory_manager.clone(),
+                Arc::new(
+                    oxios_markdown::KnowledgeBase::new(
+                        PathBuf::from(&config.kernel.workspace).join("knowledge"),
+                    )
+                    .expect("KnowledgeBase init failed"),
+                ),
+                Arc::clone(&engine_handle),
+                model_id.clone(),
+                state_store.clone(),
+                event_bus.clone(),
+            ),
+        ));
 
         let supervisor: Arc<dyn Supervisor> =
             Arc::new(BasicSupervisor::new(event_bus.clone(), agent_runtime));
@@ -994,6 +1024,9 @@ impl KernelBuilder {
             a2a_protocol.clone(),
             event_bus.clone(),
             config.security.max_execution_time_secs,
+            config.security.allowed_tools.clone(),
+            config.security.network_access,
+            config.kernel.workspace.clone(),
         );
 
         // Register the A2A dispatch handler.
@@ -1016,6 +1049,7 @@ impl KernelBuilder {
                         cspace_hint: None,
                         original_request: String::new(),
                         output_schema: None,
+                        project_id: None,
                     };
                     match lc
                         .spawn_and_run(&seed, oxios_kernel::scheduler::Priority::Normal)
@@ -1153,6 +1187,11 @@ async fn build_tool_retriever(sm: &SkillManager) -> oxios_kernel::tools::retriev
         ("memory_read", "os-tool", "Recall persistent memories"),
         ("memory_write", "os-tool", "Store persistent memories"),
         ("memory_search", "os-tool", "Semantic search over memories"),
+        (
+            "knowledge",
+            "os-service",
+            "Personal markdown vault — save, read, search documents and notes",
+        ),
         (
             "browser",
             "os-tool",

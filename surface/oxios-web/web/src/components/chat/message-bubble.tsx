@@ -1,27 +1,34 @@
 import { Bot, ClipboardList, User, Wrench } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import ReactMarkdown from 'react-markdown'
 import rehypeHighlight from 'rehype-highlight'
 import remarkGfm from 'remark-gfm'
 import type { ChatMessage } from '@/types'
 import { ActivityTimeline } from './activity-timeline'
 import { ChatMetadata } from './chat-metadata'
+import { KnowledgeSaveIndicator } from './knowledge-save-indicator'
 import { ToolCallCard } from './tool-call-card'
 
 interface MessageBubbleProps {
   message: ChatMessage
+  /** Session ID for knowledge save tracking (RFC-016). */
+  sessionId?: string
+  /** Index of this message among assistant messages only (RFC-016). */
+  assistantIndex?: number
 }
 
-export function MessageBubble({ message }: MessageBubbleProps) {
+export function MessageBubble({ message, sessionId, assistantIndex }: MessageBubbleProps) {
+  const { t } = useTranslation()
   const isUser = message.role === 'user'
   const isTool = message.role === 'tool'
 
-  // Relative timestamp
+  // Relative timestamp — i18n aware
   const relTime = (() => {
     if (!message.timestamp) return ''
     const diff = Date.now() - new Date(message.timestamp).getTime()
-    if (diff < 60000) return 'just now'
-    if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`
-    if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`
+    if (diff < 60000) return t('common.justNow', 'just now')
+    if (diff < 3600000) return t('common.minutesAgo', { count: Math.floor(diff / 60000) })
+    if (diff < 86400000) return t('common.hoursAgo', { count: Math.floor(diff / 3600000) })
     return new Date(message.timestamp).toLocaleDateString()
   })()
 
@@ -73,7 +80,9 @@ export function MessageBubble({ message }: MessageBubbleProps) {
             <div className="mb-2">
               <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground mb-1.5">
                 <ClipboardList className="h-3 w-3" />
-                <span>Interview{message._interviewRound ? ` R${message._interviewRound}` : ''}</span>
+                <span>
+                  Interview{message._interviewRound ? ` R${message._interviewRound}` : ''}
+                </span>
               </div>
               <div className="space-y-1">
                 {message._interviewQuestions.map((q, i) => (
@@ -103,6 +112,10 @@ export function MessageBubble({ message }: MessageBubbleProps) {
           {relTime && <span className="text-2xs text-muted-foreground">{relTime}</span>}
           {!isUser && <ChatMetadata message={message} />}
         </div>
+        {/* RFC-016: Knowledge save toggle — assistant messages only */}
+        {!isUser && sessionId && assistantIndex !== undefined && (
+          <KnowledgeSaveIndicator sessionId={sessionId} messageIndex={assistantIndex} />
+        )}
       </div>
       {isUser && (
         <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted">

@@ -11,8 +11,8 @@
 //! - `kernel_event_to_audit_action` mapping for the audit trail
 //! - `attach_audit_trail` helper (subscribes the bus to the trail)
 
-use oxi_sdk::observability::{AuditAction, AuditTrail};
 use oxi_sdk::EventBus as SdkEventBus;
+use oxi_sdk::observability::{AuditAction, AuditTrail};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use uuid::Uuid;
@@ -101,12 +101,16 @@ pub enum KernelEvent {
     ApprovalRequested {
         /// The approval request ID.
         id: uuid::Uuid,
+        /// The tool requesting approval.
+        tool_name: String,
         /// The action requiring approval.
         action: String,
         /// The resource involved.
         resource: String,
         /// Reason for the request.
         reason: String,
+        /// The session ID that triggered this request.
+        session_id: Option<String>,
     },
     /// A HitL approval has been resolved (approved or rejected).
     ApprovalResolved {
@@ -195,6 +199,10 @@ pub enum KernelEvent {
         tool_call_id: String,
         /// Tool input arguments (JSON).
         tool_args: serde_json::Value,
+        /// Semantic context inferred by oxi-agent 0.32+ from tool name/args
+        /// (e.g. WebSearch, PageVisit). `None` for tools without context mapping.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        context: Option<serde_json::Value>,
     },
     /// A tool execution has finished (real-time, RFC-015).
     ToolExecutionFinished {
@@ -300,6 +308,20 @@ pub enum KernelEvent {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         template_name: Option<String>,
     },
+
+    // ── Knowledge ──────────────────────────────────────────────
+    /// A knowledge note was persisted (hook, user, or tool).
+    KnowledgePersisted {
+        session_id: String,
+        message_index: usize,
+        path: String,
+        source: String, // "hook", "user", "tool"
+    },
+    /// A knowledge note was removed by user action.
+    KnowledgeRemoved {
+        session_id: String,
+        message_index: usize,
+    },
 }
 
 /// Convert a KernelEvent to an AuditAction for the audit trail.
@@ -343,7 +365,7 @@ pub fn kernel_event_to_audit_action(event: &KernelEvent) -> AuditAction {
             id,
             action,
             resource,
-            reason: _,
+            ..
         } => AuditAction::Other {
             detail: format!("approval_requested:{id}:{action}:{resource}"),
         },
@@ -462,6 +484,20 @@ pub fn kernel_event_to_audit_action(event: &KernelEvent) -> AuditAction {
         } => AuditAction::Other {
             detail: format!("email:sent:{subject} (msg={message_id}, tpl={template_name:?})"),
         },
+        KernelEvent::KnowledgePersisted {
+            session_id,
+            message_index,
+            path,
+            source,
+        } => AuditAction::Other {
+            detail: format!("knowledge:persisted:{session_id}:{message_index}:{path}:{source}"),
+        },
+        KernelEvent::KnowledgeRemoved {
+            session_id,
+            message_index,
+        } => AuditAction::Other {
+            detail: format!("knowledge:removed:{session_id}:{message_index}"),
+        },
     }
 }
 
@@ -483,6 +519,8 @@ fn extract_agent_id(event: &KernelEvent) -> String {
         KernelEvent::MemoryRecallUsed { session_id, .. } => format!("session:{session_id}"),
         KernelEvent::TokenUsageUpdate { session_id, .. } => format!("session:{session_id}"),
         KernelEvent::ReasoningFragment { session_id, .. } => format!("session:{session_id}"),
+        KernelEvent::KnowledgePersisted { session_id, .. } => format!("session:{session_id}"),
+        KernelEvent::KnowledgeRemoved { session_id, .. } => format!("session:{session_id}"),
         _ => "system".to_string(),
     }
 }
@@ -600,6 +638,7 @@ mod tests {
                 tool_name: "read_file".into(),
                 tool_call_id: "call_1".into(),
                 tool_args: serde_json::json!({"path": "/src/main.rs"}),
+                context: None,
             },
             KernelEvent::ToolExecutionFinished {
                 session_id: "s1".into(),
@@ -769,6 +808,7 @@ mod tests {
             tool_name: "bash".into(),
             tool_call_id: "c1".into(),
             tool_args: serde_json::Value::Null,
+            context: None,
         };
         // The function is private; verify via the public AuditAction mapping
         // that session-scoped events do not collide with real agent ids.

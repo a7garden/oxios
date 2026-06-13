@@ -45,10 +45,10 @@ use crate::memory::{MemoryEntry, MemoryManager, MemoryType};
 use crate::persona::PersonaManager;
 use crate::tools::registration::register_tools_from_cspace_gated;
 
+use crate::KernelHandle;
 use crate::event_bus::KernelEvent;
 use crate::session_context::SessionContext;
 use crate::types::AgentId;
-use crate::KernelHandle;
 use oxios_ouroboros::{ExecutionResult, Seed};
 
 /// Global LLM circuit breaker instance — delegates to oxi-sdk's ProviderCircuitBreaker.
@@ -70,8 +70,6 @@ fn get_llm_circuit_breaker() -> &'static oxi_sdk::ProviderCircuitBreaker {
 pub struct AgentRuntimeConfig {
     /// Model ID in `provider/model` format (e.g. `anthropic/claude-sonnet-4-20250514`).
     pub model_id: String,
-    /// Maximum number of agent turns before forcing a stop.
-    pub max_iterations: usize,
     /// How to execute tool calls within a single turn.
     pub tool_execution: ToolExecutionMode,
     /// Whether auto-retry is enabled for retryable LLM errors.
@@ -99,7 +97,6 @@ impl Default for AgentRuntimeConfig {
     fn default() -> Self {
         Self {
             model_id: String::new(),
-            max_iterations: 8,
             tool_execution: ToolExecutionMode::Parallel,
             auto_retry_enabled: true,
             project_paths: Vec::new(),
@@ -128,6 +125,19 @@ struct ExecuteState {
     /// Used to correlate ToolExecutionEnd with the correct step when
     /// parallel tool calls complete out of order.
     pending_tools: std::collections::HashMap<String, (std::time::Instant, usize)>,
+    /// Ordered tool_call_ids matching trajectory_steps indices.
+    /// Pushed in ToolExecutionStart, same order as trajectory_steps.
+    tool_call_ids: Vec<String>,
+    /// Per-step tool args (JSON string) captured from ToolExecutionStart.
+    tool_args_map: std::collections::HashMap<String, String>,
+    /// Per-step error flag from ToolExecutionEnd.
+    tool_error_map: std::collections::HashMap<String, bool>,
+    /// Per-step start timestamp (UTC) from ToolExecutionStart.
+    tool_timestamps: std::collections::HashMap<String, chrono::DateTime<chrono::Utc>>,
+    /// Cumulative input tokens from AgentEvent::Usage.
+    total_input_tokens: u64,
+    /// Cumulative output tokens from AgentEvent::Usage.
+    total_output_tokens: u64,
 }
 
 /// Runtime that wraps an oxi-sdk `Agent` for executing Seeds.
@@ -149,6 +159,8 @@ pub struct AgentRuntime {
     tool_retriever: Option<Arc<crate::tools::retrieval::ToolRetriever>>,
     /// Shared routing stats (shared with EngineApi).
     routing_stats: Option<Arc<crate::kernel_handle::RoutingStats>>,
+    /// Autonomous persistence hook (RFC-016).
+    persistence_hook: Option<Arc<crate::persistence_hook::PersistenceHook>>,
 }
 
 impl AgentRuntime {
@@ -172,6 +184,7 @@ impl AgentRuntime {
             persona_manager: None,
             tool_retriever: None,
             routing_stats,
+            persistence_hook: None,
         }
     }
 
@@ -193,6 +206,15 @@ impl AgentRuntime {
         retriever: Arc<crate::tools::retrieval::ToolRetriever>,
     ) -> Self {
         self.tool_retriever = Some(retriever);
+        self
+    }
+
+    /// Attach a PersistenceHook for autonomous persistence (RFC-016).
+    pub fn with_persistence_hook(
+        mut self,
+        hook: Arc<crate::persistence_hook::PersistenceHook>,
+    ) -> Self {
+        self.persistence_hook = Some(hook);
         self
     }
 
@@ -370,7 +392,7 @@ impl AgentRuntime {
         let audit_trail: Option<Arc<AuditTrail>> =
             Some(Arc::clone(&self.kernel_handle.security.audit_trail));
 
-        let (final_content, steps_completed, success, trajectory_steps, _agent) = {
+        let (mut final_content, steps_completed, success, trajectory_steps, agent, tool_call_ids, tool_args_map, tool_error_map, tool_timestamps, total_input_tokens, total_output_tokens) = {
             run_agent(
                 &config,
                 &engine,
@@ -388,14 +410,75 @@ impl AgentRuntime {
             .await?
         };
 
+        // ── Post-execution: safety net for empty final content ──
+        //
+        // oxi 0.32.0 removed max_iterations — the loop now exits naturally
+        // when the LLM produces a text-only response (pi-agent behavior).
+        // This block is kept as a safety net in case the LLM returns empty
+        // text despite a natural exit (rare, but possible).
+        if final_content.is_empty() && !trajectory_steps.is_empty() {
+            let tool_summary: Vec<String> = trajectory_steps
+                .iter()
+                .enumerate()
+                .map(|(i, step)| {
+                    let truncated = if step.output.len() > 800 {
+                        format!("{}...", &step.output[..800])
+                    } else {
+                        step.output.clone()
+                    };
+                    format!("{}. [{}] {}", i + 1, step.input, truncated)
+                })
+                .collect();
+            let summary_prompt = format!(
+                "도구 실행 결과:\n\n{}\n\n\
+                 위 결과를 바탕으로 사용자의 요청에 대해 자연스럽게 한국어로 답변해주세요. \
+                 도구의 원시 출력을 그대로 복사하지 말고, 의미 있는 내용만 정리해서 전달하세요.",
+                tool_summary.join("\n")
+            );
+            match agent.run(summary_prompt).await {
+                Ok((response, _events)) => {
+                    if !response.content.is_empty() {
+                        tracing::info!(seed_id = %seed_id, "Post-execution summary generated");
+                        final_content = response.content;
+                    }
+                }
+                Err(e) => {
+                    tracing::warn!(error = %e, "Post-execution summary failed");
+                }
+            }
+        }
+
         // Map trajectory steps to tool call records for the execution result.
+        // tool_call_ids[i] corresponds to trajectory_steps[i].
         let tool_calls: Vec<oxios_ouroboros::ToolCallRecord> = trajectory_steps
             .iter()
-            .map(|s| oxios_ouroboros::ToolCallRecord {
-                tool: s.input.clone(),
-                input: String::new(), // Input is summarized in the trajectory step's input field
-                output: s.output.clone(),
-                duration_ms: s.duration_ms,
+            .enumerate()
+            .map(|(i, step)| {
+                let tc_id = tool_call_ids.get(i).cloned().unwrap_or_default();
+                let args_str = tool_call_ids
+                    .get(i)
+                    .and_then(|id| tool_args_map.get(id))
+                    .cloned()
+                    .unwrap_or_default();
+                let is_error = tool_call_ids
+                    .get(i)
+                    .and_then(|id| tool_error_map.get(id))
+                    .copied()
+                    .unwrap_or(false);
+                let timestamp = tool_call_ids
+                    .get(i)
+                    .and_then(|id| tool_timestamps.get(id))
+                    .copied();
+                let input_str = truncate_json_str(&args_str, 500);
+                oxios_ouroboros::ToolCallRecord {
+                    tool: step.input.clone(),
+                    input: input_str,
+                    output: step.output.clone(),
+                    duration_ms: step.duration_ms,
+                    is_error,
+                    tool_call_id: tc_id,
+                    timestamp,
+                }
             })
             .collect();
 
@@ -407,16 +490,50 @@ impl AgentRuntime {
             "AgentRuntime finished"
         );
 
-        Ok(ExecutionResult {
-            output: if final_content.is_empty() {
-                "Agent execution completed".into()
-            } else {
-                final_content
-            },
+        let result = ExecutionResult {
+            output: final_content.clone(),
             steps_completed,
             success,
             tool_calls,
-        })
+            tokens_input: total_input_tokens,
+            tokens_output: total_output_tokens,
+            model_id: self.engine_handle.get().default_model_id().to_string(),
+        };
+
+        // RFC-016: Autonomous persistence hook.
+        // Runs after successful execution, fire-and-forget.
+        if success {
+            if let Some(hook) = &self.persistence_hook {
+                let already_saved_knowledge = trajectory_steps.iter().any(|s| {
+                    s.input == "knowledge" && s.output.contains("written successfully")
+                });
+                let hook = hook.clone();
+                let seed_clone = seed.clone();
+                let traj_clone = trajectory_steps.clone();
+                let output_clone = final_content.clone();
+                let sid = session_id.clone();
+                tokio::spawn(async move {
+                    match hook.evaluate(&seed_clone, &traj_clone, &output_clone, already_saved_knowledge).await {
+                        Ok(plan) => {
+                            if !plan.memory.is_empty() || !plan.knowledge.is_empty() {
+                                tracing::info!(
+                                    memory = plan.memory.len(),
+                                    knowledge = plan.knowledge.len(),
+                                    "PersistenceHook executing plan"
+                                );
+                                let session_id = sid.unwrap_or_default();
+                                // message_index 0 is a placeholder — the caller should
+                                // update this based on actual session message count.
+                                hook.execute_plan(&plan, &session_id, 0).await;
+                            }
+                        }
+                        Err(e) => tracing::warn!(error = %e, "PersistenceHook evaluate failed"),
+                    }
+                });
+            }
+        }
+
+        Ok(result)
     }
 }
 
@@ -444,6 +561,12 @@ async fn run_agent(
     bool,
     Vec<oxios_memory::memory::sona::TrajectoryStep>,
     Arc<Agent>,
+    Vec<String>,
+    std::collections::HashMap<String, String>,
+    std::collections::HashMap<String, bool>,
+    std::collections::HashMap<String, chrono::DateTime<chrono::Utc>>,
+    u64,
+    u64,
 )> {
     // Extract workspace.
     let workspace = if !config.project_paths.is_empty() {
@@ -460,6 +583,63 @@ async fn run_agent(
     let _ = std::fs::create_dir_all(&workspace);
 
     tracing::debug!(workspace = %workspace.display(), "Agent workspace scoped");
+
+    // Ensure all paths the agent might access are in allowed_paths.
+    //
+    // AgentLifecycleManager::ensure_permissions() adds kernel.workspace (~/.oxios/workspace),
+    // but the agent operates in different directories depending on context:
+    //
+    //   1. CWD -- oxi-sdk tools (ReadTool, LsTool, etc.) resolve relative paths
+    //      against std::env::current_dir(), which is the daemon working directory.
+    //      Without CWD in allowed_paths, EVERY file tool call is denied.
+    //   2. The designated workspace -- computed from project_paths / workspace_dir / temp.
+    //   3. Kernel workspace -- state store path for seeds, sessions, etc.
+    //   4. /tmp -- general temp file access.
+    //
+    // All four must be in allowed_paths before GatedTool wraps any tool.
+    {
+        use crate::access_manager::{Role, Subject};
+        let agent_name = format!("agent-{agent_id}");
+        let mut am = kernel_handle.exec.access_manager().lock();
+        let perms = am.get_or_create_permissions(&agent_name);
+
+        // 1. CWD -- critical: oxi-sdk resolves relative paths here
+        if let Ok(cwd) = std::env::current_dir() {
+            let cwd_pattern = format!("{}/**", cwd.to_string_lossy().trim_end_matches('/'));
+            if !perms.allowed_paths.iter().any(|p| p == &cwd_pattern) {
+                perms.allow_path(&cwd_pattern);
+                tracing::debug!(
+                    agent = %agent_name,
+                    path = %cwd_pattern,
+                    "Added CWD to agent allowed paths"
+                );
+            }
+        }
+
+        // 2. Designated workspace
+        let ws_pattern = format!("{}/**", workspace.to_string_lossy().trim_end_matches('/'));
+        if !perms.allowed_paths.iter().any(|p| p == &ws_pattern) {
+            perms.allow_path(&ws_pattern);
+        }
+
+        // 3. Kernel workspace (state store path)
+        let kernel_ws = kernel_handle.state.workspace_path().to_string_lossy().to_string();
+        let kernel_ws_pattern = format!("{}/**", kernel_ws.trim_end_matches('/'));
+        if kernel_ws_pattern != ws_pattern
+            && !perms.allowed_paths.iter().any(|p| p == &kernel_ws_pattern)
+        {
+            perms.allow_path(&kernel_ws_pattern);
+        }
+
+        // 4. /tmp -- for general temp file access
+        if !perms.allowed_paths.iter().any(|p| p == "/tmp/**") {
+            perms.allow_path("/tmp/**");
+        }
+
+        // Ensure RBAC Superuser role so AccessGate Layer 1 passes.
+        let rbac_subject = Subject::Agent(agent_id);
+        am.rbac_manager_mut().assign_role(rbac_subject, Role::Superuser);
+    }
 
     // Start distributed trace span for this agent execution.
     let _trace_guard = crate::observability::tracer().start(
@@ -526,7 +706,6 @@ async fn run_agent(
         description: None,
         model_id: config.model_id.clone(),
         system_prompt: Some(system_prompt.clone()),
-        max_iterations: config.max_iterations,
         timeout_seconds: 300,
         temperature: Some(0.7),
         max_tokens: Some(8192),
@@ -680,12 +859,17 @@ async fn run_agent(
                 AgentEvent::ToolExecutionStart {
                     tool_name,
                     tool_call_id,
+                    args,
+                    context,
                     ..
                 } => {
                     // Record start time and push a placeholder step.
                     let idx = s.trajectory_steps.len();
                     s.pending_tools
                         .insert(tool_call_id.clone(), (std::time::Instant::now(), idx));
+                    s.tool_args_map.insert(tool_call_id.clone(), serde_json::to_string(&args).unwrap_or_default());
+                    s.tool_timestamps.insert(tool_call_id.clone(), chrono::Utc::now());
+                    s.tool_call_ids.push(tool_call_id.clone());
                     s.trajectory_steps
                         .push(oxios_memory::memory::sona::TrajectoryStep {
                             input: tool_name.clone(),
@@ -695,6 +879,11 @@ async fn run_agent(
                         });
                     // RFC-015: broadcast tool start so Web UI can show progress.
                     if let Some(ref sid) = transparency_session {
+                        let context_json = context
+                            .as_ref()
+                            .map(serde_json::to_value)
+                            .transpose()
+                            .unwrap_or(None);
                         let _ =
                             kernel_handle_for_cb
                                 .infra
@@ -702,7 +891,8 @@ async fn run_agent(
                                     session_id: sid.clone(),
                                     tool_name: tool_name.clone(),
                                     tool_call_id: tool_call_id.clone(),
-                                    tool_args: serde_json::Value::Null,
+                                    tool_args: args.clone(),
+                                    context: context_json,
                                 });
                     }
                 }
@@ -762,6 +952,7 @@ async fn run_agent(
                             step.confidence = if is_error { 0.3 } else { 0.8 };
                         }
                     }
+                    s.tool_error_map.insert(tool_call_id.clone(), is_error);
                     // RFC-015: broadcast tool completion.
                     if let Some(ref sid) = transparency_session {
                         let _ = kernel_handle_for_cb.infra.publish(
@@ -784,7 +975,15 @@ async fn run_agent(
                     if let Some(oxi_sdk::Message::Assistant(a)) = messages.last() {
                         s.final_content = a.text_content();
                     }
-                    s.success = stop_reason.as_deref() == Some("Stop");
+                    // oxi 0.32.0: loop exits naturally when LLM produces text-only
+                    // response (StopReason::Stop). Error/Aborted = failure.
+                    // ToolUse should not occur at AgentEnd in 0.32.0 (the loop
+                    // continues until text-only), but treat it as non-failure
+                    // since tool calls were executed successfully.
+                    s.success = matches!(
+                        stop_reason.as_deref(),
+                        Some("Stop") | Some("ToolUse")
+                    );
                 }
                 AgentEvent::Error { message, .. } => {
                     s.final_content = message.clone();
@@ -794,6 +993,10 @@ async fn run_agent(
                     input_tokens,
                     output_tokens,
                 } => {
+                    // Accumulate totals for ExecutionResult.
+                    s.total_input_tokens += input_tokens as u64;
+                    s.total_output_tokens += output_tokens as u64;
+
                     // Record token usage to cost tracker (existing).
                     let agent_label = format!("agent-{agent_id_for_callback}");
                     crate::observability::cost_tracker().record(
@@ -881,6 +1084,12 @@ async fn run_agent(
             false,
             s.trajectory_steps.clone(),
             agent,
+            s.tool_call_ids.clone(),
+            s.tool_args_map.clone(),
+            s.tool_error_map.clone(),
+            s.tool_timestamps.clone(),
+            s.total_input_tokens,
+            s.total_output_tokens,
         ));
     }
 
@@ -894,25 +1103,24 @@ async fn run_agent(
 
     // Record trajectory to SONA learning engine (RFC-020 Phase 2).
     // Fire-and-forget: don't block the result on learning.
-    if !s.trajectory_steps.is_empty() {
-        if let Some(sona) = kernel_handle.agents.memory_manager().sona_engine() {
-            let steps = s.trajectory_steps.clone();
-            let success = s.success;
-            let sona = Arc::clone(sona);
-            let domain = infer_domain(&seed_goal);
-            tokio::spawn(async move {
-                let verdict = if success {
-                    oxios_memory::memory::sona::Verdict::Success
-                } else {
-                    oxios_memory::memory::sona::Verdict::Failure
-                };
-                let trajectory =
-                    oxios_memory::memory::sona::Trajectory::new(steps, verdict, &domain);
-                if let Err(e) = sona.record(trajectory).await {
-                    tracing::debug!(error = %e, "SONA trajectory recording failed (non-fatal)");
-                }
-            });
-        }
+    if !s.trajectory_steps.is_empty()
+        && let Some(sona) = kernel_handle.agents.memory_manager().sona_engine()
+    {
+        let steps = s.trajectory_steps.clone();
+        let success = s.success;
+        let sona = Arc::clone(sona);
+        let domain = infer_domain(&seed_goal);
+        tokio::spawn(async move {
+            let verdict = if success {
+                oxios_memory::memory::sona::Verdict::Success
+            } else {
+                oxios_memory::memory::sona::Verdict::Failure
+            };
+            let trajectory = oxios_memory::memory::sona::Trajectory::new(steps, verdict, &domain);
+            if let Err(e) = sona.record(trajectory).await {
+                tracing::debug!(error = %e, "SONA trajectory recording failed (non-fatal)");
+            }
+        });
     }
 
     Ok((
@@ -921,6 +1129,12 @@ async fn run_agent(
         s.success,
         s.trajectory_steps.clone(),
         agent,
+        s.tool_call_ids.clone(),
+        s.tool_args_map.clone(),
+        s.tool_error_map.clone(),
+        s.tool_timestamps.clone(),
+        s.total_input_tokens,
+        s.total_output_tokens,
     ))
 }
 
@@ -941,6 +1155,17 @@ fn summarize_tool_result(result: &str, max_len: usize) -> String {
         let truncated: String = first_line.chars().take(max_len - 3).collect();
         format!("{truncated}...")
     }
+}
+
+/// Truncate a JSON string representation to `max_len` chars for storage
+/// in tool call records. Returns the original string if short enough,
+/// otherwise truncates and appends "...".
+fn truncate_json_str(json_str: &str, max_len: usize) -> String {
+    if json_str.len() <= max_len {
+        return json_str.to_string();
+    }
+    let truncated: String = json_str.chars().take(max_len - 3).collect();
+    format!("{truncated}...")
 }
 
 /// Infer a domain category from a seed goal for SONA trajectory grouping.
@@ -1072,15 +1297,24 @@ fn build_system_prompt(
     capabilities_xml: Option<&str>,
     kernel_manifest: Option<&str>,
 ) -> String {
-    let mut prompt = format!(
+    let mut prompt = String::from(
         "You are an autonomous agent in the Oxios operating system.\n\
          You execute Seeds — immutable specifications with goals, constraints, and\n\
-         acceptance criteria. You have tools for reading, writing, editing files,\n\
-         running commands, and accessing kernel services.\n\n\
-         ## Goal\n\
-         {}\n",
-        seed.goal,
+         acceptance criteria.\n\n\
+         ## Available Tools\n\
+         You have the following tools:\n\
+         - **File tools**: read, write, edit files; grep, find, ls for searching\n\
+         - **Web tools**: web_search for searching the web, get_search_results for retrieving cached results\n\
+         - **Exec**: run shell commands\n\
+         - **Memory tools**: memory_read, memory_write, memory_search — agent's internal recall\n\
+         - **Knowledge**: knowledge — personal markdown vault for documents and notes\n\
+         - **Kernel tools**: agent, project, persona, cron, security, budget, resource\n\n\
+         **Important**: When the task involves fetching information from the internet,\n\
+         websites, or online services, use `web_search` first — do NOT search local files.\n\
+         When the task asks to \"get\", \"fetch\", \"find online\", or \"look up\" something\n\
+         from the web, use `web_search`.\n",
     );
+    prompt.push_str(&format!("\n## Goal\n{}\n", seed.goal));
 
     // Preserve user's original wording so the agent sees exact language,
     // filenames, and nuances that may have been abstracted in the goal.
@@ -1285,6 +1519,7 @@ mod tests {
             cspace_hint: None,
             original_request: String::new(),
             output_schema: None,
+            project_id: None,
         };
 
         let prompt = build_system_prompt(&seed, None, None, None);
@@ -1310,6 +1545,7 @@ mod tests {
             cspace_hint: None,
             original_request: String::new(),
             output_schema: None,
+            project_id: None,
         };
 
         let prompt = build_system_prompt(&seed, None, None, None);

@@ -23,6 +23,7 @@ function ChatPage() {
     messages,
     isStreaming,
     connected,
+    activeSessionId,
     activeProjectId,
     detectedProject,
     activeInterview,
@@ -140,9 +141,20 @@ function ChatPage() {
             <div className="max-w-3xl mx-auto px-4 py-6">
             {messages.length === 0 && <EmptyChatState />}
             <div className="space-y-5">
-              {messages.map((msg) => (
-                <MessageBubble key={msg.id} message={msg} />
-              ))}
+              {messages.map((msg, _idx) => {
+                // Compute assistant-only index for knowledge save tracking
+                const assistantIndex = msg.role === 'assistant'
+                  ? messages.slice(0, _idx).filter((m) => m.role === 'assistant').length
+                  : undefined
+                return (
+                  <MessageBubble
+                    key={msg.id}
+                    message={msg}
+                    sessionId={activeSessionId ?? undefined}
+                    assistantIndex={assistantIndex}
+                  />
+                )
+              })}
 
               {/* Interview wizard */}
               {activeInterview && activeInterview.length > 0 && (

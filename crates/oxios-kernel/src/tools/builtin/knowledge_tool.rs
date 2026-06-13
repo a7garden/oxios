@@ -56,7 +56,7 @@ impl OxiAgentTool for KnowledgeTool {
     }
 
     fn description(&self) -> &'static str {
-        "Manage markdown knowledge notes. Actions: read, write, delete, move, tree, search, backlinks, checklist_items, checklist_add, checklist_complete, checklist_remove, chat_append, chat_messages, chat_delete, chat_move, journal_add, journal_emoji, journal_today, habits, habits_last_week, today_report, done_today, config_read, config_write, nightly_cleanup, run_scheduled, markdown_to_html, auto_emoji."
+        "Personal markdown vault — documents, articles, notes, journal entries. File-based with backlinks, full-text search, and directory structure. Read, write, search, and organize user content as markdown files."
     }
 
     fn parameters_schema(&self) -> Value {
@@ -169,8 +169,7 @@ impl OxiAgentTool for KnowledgeTool {
         params: Value,
         _signal: Option<tokio::sync::oneshot::Receiver<()>>,
         _ctx: &ToolContext,
-    ) -> Result<AgentToolResult, oxi_sdk::ToolError>
-     {
+    ) -> Result<AgentToolResult, oxi_sdk::ToolError> {
         let action = params["action"].as_str().unwrap_or("");
         if action.is_empty() {
             return Ok(AgentToolResult::error("action is required"));
@@ -542,8 +541,8 @@ impl OxiAgentTool for KnowledgeTool {
 
             "habits_last_week" => match self.kb.habits_last_week() {
                 Ok(habits) => {
-                    let json = serde_json::to_string_pretty(&habits)
-                        .unwrap_or_else(|_| "{}".to_string());
+                    let json =
+                        serde_json::to_string_pretty(&habits).unwrap_or_else(|_| "{}".to_string());
                     Ok(AgentToolResult::success(&json))
                 }
                 Err(e) => Ok(AgentToolResult::error(format!(
@@ -554,8 +553,8 @@ impl OxiAgentTool for KnowledgeTool {
             // ── Stats ───────────────────────────────────────────────
             "today_report" => match self.kb.today_report() {
                 Ok(report) => {
-                    let json = serde_json::to_string_pretty(&report)
-                        .unwrap_or_else(|_| "{}".to_string());
+                    let json =
+                        serde_json::to_string_pretty(&report).unwrap_or_else(|_| "{}".to_string());
                     Ok(AgentToolResult::success(&json))
                 }
                 Err(e) => Ok(AgentToolResult::error(format!(
@@ -586,8 +585,8 @@ impl OxiAgentTool for KnowledgeTool {
             // ── Config ──────────────────────────────────────────────
             "config_read" => match self.kb.config() {
                 Ok(config) => {
-                    let json = serde_json::to_string_pretty(&config)
-                        .unwrap_or_else(|_| "{}".to_string());
+                    let json =
+                        serde_json::to_string_pretty(&config).unwrap_or_else(|_| "{}".to_string());
                     Ok(AgentToolResult::success(&json))
                 }
                 Err(e) => Ok(AgentToolResult::error(format!(
@@ -597,9 +596,7 @@ impl OxiAgentTool for KnowledgeTool {
 
             "config_write" => {
                 let config_val = params.get("config").cloned().unwrap_or(json!({}));
-                match serde_json::from_value::<oxios_markdown::types::KnowledgeConfig>(
-                    config_val,
-                ) {
+                match serde_json::from_value::<oxios_markdown::types::KnowledgeConfig>(config_val) {
                     Ok(config) => match self.kb.set_config(&config) {
                         Ok(()) => Ok(AgentToolResult::success("Config updated successfully")),
                         Err(e) => Ok(AgentToolResult::error(format!(
@@ -615,8 +612,8 @@ impl OxiAgentTool for KnowledgeTool {
             // ── Automation ──────────────────────────────────────────
             "nightly_cleanup" => match self.kb.run_nightly_cleanup() {
                 Ok(report) => {
-                    let json = serde_json::to_string_pretty(&report)
-                        .unwrap_or_else(|_| "{}".to_string());
+                    let json =
+                        serde_json::to_string_pretty(&report).unwrap_or_else(|_| "{}".to_string());
                     Ok(AgentToolResult::success(&json))
                 }
                 Err(e) => Ok(AgentToolResult::error(format!(

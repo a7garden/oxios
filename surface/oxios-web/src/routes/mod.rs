@@ -30,8 +30,8 @@ mod workspace;
 use std::sync::Arc;
 
 use axum::{
-    routing::{delete, get, patch, post, put},
     Router,
+    routing::{delete, get, patch, post, put},
 };
 use serde::Deserialize;
 
@@ -60,7 +60,9 @@ pub(crate) use calendar_routes::{
     handle_calendar_search,
 };
 pub(crate) use chat::{
-    handle_chat, handle_chat_stream, handle_chat_ticket, handle_session_tool_calls,
+    handle_chat, handle_chat_stream, handle_chat_ticket, handle_knowledge_saves,
+    handle_remove_knowledge_save, handle_save_to_knowledge, handle_session_tool_calls,
+    handle_tool_approval_respond,
 };
 pub(crate) use cron_jobs::{
     handle_cron_job_create, handle_cron_job_delete, handle_cron_job_get, handle_cron_job_trigger,
@@ -116,18 +118,19 @@ pub(crate) use resource_routes::{
     handle_resource_history, handle_resource_overload, handle_resource_snapshot,
 };
 pub(crate) use system::{
-    handle_agent_kill, handle_agents_list, handle_audit_verify_api, handle_backup,
-    handle_config_get, handle_config_patch, handle_config_put, handle_doctor, handle_health,
-    handle_log, handle_readiness, handle_status, handle_update_changelog, handle_update_check,
+    handle_agent_get, handle_agent_kill, handle_agent_logs, handle_agent_trace,
+    handle_agents_list, handle_audit_verify_api, handle_backup, handle_config_get,
+    handle_config_patch, handle_config_put, handle_doctor, handle_health, handle_log,
+    handle_readiness, handle_status, handle_update_changelog, handle_update_check,
     handle_update_run,
 };
 pub(crate) use workspace::{
-    handle_memory_create, handle_memory_get, handle_memory_list, handle_memory_map,
+    MemoryMapCache, handle_memory_create, handle_memory_get, handle_memory_list, handle_memory_map,
     handle_memory_search, handle_memory_semantic_search, handle_seed_evolution, handle_seed_get,
     handle_seeds_list, handle_skill_content, handle_skill_create, handle_skill_delete,
     handle_skill_disable, handle_skill_enable, handle_skill_get, handle_skills_list,
     handle_workspace_file_create, handle_workspace_file_delete, handle_workspace_file_get,
-    handle_workspace_file_put, handle_workspace_tree, MemoryMapCache,
+    handle_workspace_file_put, handle_workspace_tree,
 };
 
 // ---------------------------------------------------------------------------
@@ -210,9 +213,24 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         .route("/api/chat", post(handle_chat))
         .route("/api/chat/ticket", post(handle_chat_ticket))
         .route("/api/chat/stream", get(handle_chat_stream))
+        // RFC-017: runtime tool capability escalation
+        .route("/api/chat/tool-approval/{id}/respond", post(handle_tool_approval_respond))
+        // RFC-016: Knowledge persistence API
+        .route("/api/chat/{session_id}/knowledge-saves", get(handle_knowledge_saves))
+        .route(
+            "/api/chat/{session_id}/messages/{message_index}/save-to-knowledge",
+            post(handle_save_to_knowledge),
+        )
+        .route(
+            "/api/chat/{session_id}/messages/{message_index}/knowledge-save",
+            delete(handle_remove_knowledge_save),
+        )
         // Control
         .route("/api/status", get(handle_status))
         .route("/api/agents", get(handle_agents_list))
+        .route("/api/agents/{id}", get(handle_agent_get))
+        .route("/api/agents/{id}/trace", get(handle_agent_trace))
+        .route("/api/agents/{id}/logs", get(handle_agent_logs))
         .route("/api/agents/{id}/kill", post(handle_agent_kill))
         // Config
         .route("/api/config", get(handle_config_get))

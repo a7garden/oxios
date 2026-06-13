@@ -8,7 +8,7 @@
 //! # Hierarchy
 //!
 //! ```text
-//! worker()     → Exec + Browser
+//! worker()     → Exec + Browser + Knowledge(RW)
 //!   standard() → worker + Memory(READ)
 //!   operator() → standard + Space + Agent + A2a + Program + MCP + Memory(WRITE)
 //!   supervisor() → operator + Security + Budget + Resource + Cron

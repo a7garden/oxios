@@ -52,7 +52,6 @@ impl SdkKernelToolProvider for OxiosKernelBridge {
             // Kernel domain
             "exec",
             "memory_read",
-            "memory_write",
             "memory_search",
             "project",
             "agent",
@@ -192,6 +191,6 @@ mod tests {
         let names = bridge.tool_names();
         // 6 always-on + 18 kernel domain = 24 ... plus knowledge = 25 ... plus calendar = 25 (optional, not configured)
         // plus send_email = 26
-        assert_eq!(names.len(), 26, "expected 26 tools, got {:?}", names);
+        assert_eq!(names.len(), 25, "expected 25 tools, got {:?}", names);
     }
 }

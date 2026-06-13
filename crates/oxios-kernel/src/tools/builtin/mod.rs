@@ -56,7 +56,6 @@ pub fn register_all_kernel_tools(registry: &ToolRegistry, kernel: &KernelHandle,
     // Memory tools (each stores Arc<KernelHandle>)
     registry.register(crate::tools::MemoryReadTool::from_kernel(kernel));
     registry.register(crate::tools::MemorySearchTool::from_kernel(kernel));
-    registry.register(crate::tools::MemoryWriteTool::from_kernel(kernel));
 
     // Kernel domain tools (take &KernelHandle)
     registry.register(ProjectTool::from_kernel(kernel));
