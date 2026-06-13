@@ -34,7 +34,7 @@ function SessionsListPage() {
   if (isLoading) return <LoadingTable rows={5} />
   if (isError) return <ErrorState onRetry={() => refetch()} />
 
-  const sessions = data?.items ?? []
+  const sessions = Array.isArray(data?.items) ? data.items : []
 
   const columns = [
     {
@@ -42,6 +42,10 @@ function SessionsListPage() {
       accessor: (row: Session) => (
         <span className="font-mono text-xs">{row.id.slice(0, 12)}...</span>
       ),
+    },
+    {
+      header: t('sessions.title', 'Title'),
+      accessor: (row: Session) => row.title ?? '—',
     },
     {
       header: t('sessions.agent'),

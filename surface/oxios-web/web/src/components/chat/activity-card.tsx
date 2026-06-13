@@ -182,7 +182,7 @@ function getActivityMeta(
           y: activity.count === 1 ? 'y' : 'ies',
         }),
         badge: (
-          <span className="text-2xs px-1.5 py-0.5 rounded bg-violet-500/10 text-violet-600 font-medium">
+          <span className="text-2xs px-1.5 py-0.5 rounded bg-info/10 text-info font-medium">
             {activity.memoryAction ?? 'recall'}
           </span>
         ),

@@ -127,6 +127,7 @@ pub(crate) async fn handle_chat(
             let seed_id = meta.and_then(|m| m.seed_id.clone());
             let evaluation_passed = meta.and_then(|m| m.evaluation_passed);
             let duration_ms = meta.and_then(|m| m.duration_ms);
+            let mode = meta.and_then(|m| m.mode.clone());
 
             // Persist session
             {
@@ -172,6 +173,10 @@ pub(crate) async fn handle_chat(
                 match state.kernel.state.load_session(&sid).await {
                     Ok(Some(mut session)) => {
                         session.add_user_message(&content_echo);
+                        // Capture existing trajectory length before extending
+                        let traj_start = session.trajectory_steps.len();
+                        session.extend_trajectory(trajectory_steps);
+                        let traj_end = session.trajectory_steps.len();
                         session.add_agent_response(oxios_kernel::state_store::AgentResponse {
                             content: response.content.clone(),
                             session_id: Some(sid.0.clone()),
@@ -179,13 +184,22 @@ pub(crate) async fn handle_chat(
                             phase_reached: phase.clone(),
                             evaluation_passed,
                             timestamp: chrono::Utc::now(),
+                            trajectory_range: if traj_end > traj_start {
+                                Some(oxios_kernel::state_store::TrajectoryRange {
+                                    start: traj_start,
+                                    end: traj_end,
+                                })
+                            } else {
+                                None
+                            },
                         });
-                        // RFC-015: persist trajectory so the Web UI can re-render
-                        // the execution timeline when the user re-opens the session.
-                        session.extend_trajectory(trajectory_steps);
                         // Attach project_id to session metadata if provided by orchestrator
                         if let Some(ref vid) = project_id {
                             session.set_metadata("project_id", serde_json::json!(vid));
+                        }
+                        // Persist execution mode (chat/ouroboros) in session metadata
+                        if let Some(ref m) = mode {
+                            session.set_metadata("mode", serde_json::json!(m));
                         }
                         if let Err(e) = state.kernel.state.save_session(&session).await {
                             tracing::warn!(error = %e, "Failed to persist session");
@@ -197,6 +211,10 @@ pub(crate) async fn handle_chat(
                             oxios_kernel::state_store::Session::new(body.user_id.clone());
                         session.id = oxios_kernel::state_store::SessionId(session_id_for_save);
                         session.add_user_message(&content_echo);
+                        // New session: trajectory starts at 0
+                        let traj_start = 0usize;
+                        session.extend_trajectory(trajectory_steps);
+                        let traj_end = session.trajectory_steps.len();
                         session.add_agent_response(oxios_kernel::state_store::AgentResponse {
                             content: response.content.clone(),
                             session_id: Some(sid.0.clone()),
@@ -204,12 +222,22 @@ pub(crate) async fn handle_chat(
                             phase_reached: phase.clone(),
                             evaluation_passed,
                             timestamp: chrono::Utc::now(),
+                            trajectory_range: if traj_end > traj_start {
+                                Some(oxios_kernel::state_store::TrajectoryRange {
+                                    start: traj_start,
+                                    end: traj_end,
+                                })
+                            } else {
+                                None
+                            },
                         });
-                        // RFC-015: persist trajectory on first save.
-                        session.extend_trajectory(trajectory_steps);
                         // Attach project_id to session metadata if provided by orchestrator
                         if let Some(ref vid) = project_id {
                             session.set_metadata("project_id", serde_json::json!(vid));
+                        }
+                        // Persist execution mode for new session
+                        if let Some(ref m) = mode {
+                            session.set_metadata("mode", serde_json::json!(m));
                         }
                         if let Err(e) = state.kernel.state.save_session(&session).await {
                             tracing::warn!(error = %e, "Failed to create session");
@@ -305,6 +333,12 @@ pub(crate) async fn handle_chat_stream(
 /// - **Outgoing done** (backend → frontend):
 ///   `{ type: "done", session_id?, project_id?, phase?, evaluation_passed? }`
 pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState>) {
+    // Assign a unique connection ID for point-to-point message routing.
+    // Prevents cross-tab message leakage in multi-session scenarios.
+    let conn_id = uuid::Uuid::new_v4().to_string();
+    // Clone for recv_task (send_task gets its own clone below).
+    let conn_id_for_recv = conn_id.clone();
+    let conn_id_for_send = conn_id.clone();
     let (mut ws_tx, mut ws_rx) = socket.split();
 
     // Subscribe to outgoing messages from the web channel (not kernel event bus).
@@ -362,6 +396,13 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
                 biased;
                 msg_result = outgoing_rx.recv() => {
                     let Ok(msg) = msg_result else { break };
+
+                    // Filter by target_conn_id: only process messages addressed
+                    // to this connection (or broadcast messages with None).
+                    if msg.target_conn_id.as_ref().is_some_and(|id| id != &conn_id_for_recv) {
+                        continue;
+                    }
+
                     let msg_id = msg.id;
                     let session_id = msg
                         .meta
@@ -481,6 +522,7 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
                         "tool_calls": msg.metadata.get("tool_calls")
                             .and_then(|v| serde_json::from_str::<serde_json::Value>(v).ok())
                             .unwrap_or(serde_json::json!([])),
+                        "mode": msg.meta.as_ref().and_then(|m| m.mode.clone()),
                     });
                     let done_json = match serde_json::to_string(&done_chunk) {
                         Ok(j) => j,
@@ -543,6 +585,11 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
                         .filter(|s| !s.is_empty())
                         .map(String::from);
 
+                    let incoming_mode = parsed
+                        .get("mode")
+                        .and_then(|v| v.as_str())
+                        .map(String::from);
+
                     match msg_type {
                         // Chat UI redesign: user submits structured interview
                         // answers. Convert to natural language and forward as
@@ -588,7 +635,11 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
                                 incoming.metadata.insert("session_id".into(), sid.clone());
                             }
                             if let Some(ref vid) = incoming_project_id {
-                                incoming.metadata.insert("project_id".into(), vid.clone());
+                                incoming.metadata.insert("project_ids".into(), vid.clone());
+                            }
+                            incoming.metadata.insert("conn_id".into(), conn_id_for_send.clone());
+                            if let Some(m) = incoming_mode.clone() {
+                                incoming.metadata.insert("mode".into(), m);
                             }
 
                             {
@@ -625,7 +676,11 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
                                 incoming.metadata.insert("session_id".into(), sid.clone());
                             }
                             if let Some(ref vid) = incoming_project_id {
-                                incoming.metadata.insert("project_id".into(), vid.clone());
+                                incoming.metadata.insert("project_ids".into(), vid.clone());
+                            }
+                            incoming.metadata.insert("conn_id".into(), conn_id_for_send.clone());
+                            if let Some(m) = incoming_mode.clone() {
+                                incoming.metadata.insert("mode".into(), m);
                             }
 
                             {
@@ -712,6 +767,10 @@ async fn persist_session(
     match state_store.load_session(&sid).await {
         Ok(Some(mut session)) => {
             session.add_user_message(user_content);
+            // Capture existing trajectory length before extending
+            let traj_start = session.trajectory_steps.len();
+            session.extend_trajectory(trajectory_steps);
+            let traj_end = session.trajectory_steps.len();
             session.add_agent_response(oxios_kernel::state_store::AgentResponse {
                 content: agent_content.to_string(),
                 session_id: Some(sid.0.clone()),
@@ -721,13 +780,22 @@ async fn persist_session(
                     .get("evaluation_passed")
                     .and_then(|v| v.parse().ok()),
                 timestamp: chrono::Utc::now(),
+                trajectory_range: if traj_end > traj_start {
+                    Some(oxios_kernel::state_store::TrajectoryRange {
+                        start: traj_start,
+                        end: traj_end,
+                    })
+                } else {
+                    None
+                },
             });
-            // RFC-015: persist trajectory so the Web UI can re-render the
-            // execution timeline when the user re-opens the session.
-            session.extend_trajectory(trajectory_steps);
             // Attach project_id to session metadata if provided
             if let Some(vid) = project_id {
                 session.set_metadata("project_id", serde_json::json!(vid));
+            }
+            // Persist execution mode in session metadata
+            if let Some(mode) = metadata.get("mode") {
+                session.set_metadata("mode", serde_json::json!(mode));
             }
             if let Err(e) = state_store.save_session(&session).await {
                 tracing::warn!(error = %e, "WS: failed to persist session");
@@ -737,6 +805,10 @@ async fn persist_session(
             let mut session = oxios_kernel::state_store::Session::new(user_id);
             session.id = oxios_kernel::state_store::SessionId(session_id.to_string());
             session.add_user_message(user_content);
+            // New session: trajectory starts at 0
+            let traj_start = 0usize;
+            session.extend_trajectory(trajectory_steps);
+            let traj_end = session.trajectory_steps.len();
             session.add_agent_response(oxios_kernel::state_store::AgentResponse {
                 content: agent_content.to_string(),
                 session_id: Some(sid.0.clone()),
@@ -746,12 +818,22 @@ async fn persist_session(
                     .get("evaluation_passed")
                     .and_then(|v| v.parse().ok()),
                 timestamp: chrono::Utc::now(),
+                trajectory_range: if traj_end > traj_start {
+                    Some(oxios_kernel::state_store::TrajectoryRange {
+                        start: traj_start,
+                        end: traj_end,
+                    })
+                } else {
+                    None
+                },
             });
-            // RFC-015: persist trajectory on first save.
-            session.extend_trajectory(trajectory_steps);
             // Attach project_id to session metadata
             if let Some(vid) = project_id {
                 session.set_metadata("project_id", serde_json::json!(vid));
+            }
+            // Persist execution mode for new session
+            if let Some(mode) = metadata.get("mode") {
+                session.set_metadata("mode", serde_json::json!(mode));
             }
             if let Err(e) = state_store.save_session(&session).await {
                 tracing::warn!(error = %e, "WS: failed to create session");
@@ -817,12 +899,14 @@ fn kernel_event_to_ws_chunk(
             tool_name,
             tool_call_id,
             tool_args,
+            context,
             ..
         } => Some(serde_json::json!({
             "type": "tool_start",
             "tool_name": tool_name,
             "tool_call_id": tool_call_id,
             "tool_args": tool_args,
+            "context": context,
         })),
         KernelEvent::ToolExecutionFinished {
             tool_name,
@@ -992,6 +1076,7 @@ mod rfc015_tests {
             tool_name: "read_file".into(),
             tool_call_id: "c1".into(),
             tool_args: serde_json::json!({"path": "/x"}),
+            context: None,
         };
         let chunk = kernel_event_to_ws_chunk(&event, &Some("s1".into())).unwrap();
         assert_eq!(chunk["type"], "tool_start");
@@ -1124,6 +1209,7 @@ mod rfc015_tests {
             tool_name: "bash".into(),
             tool_call_id: "x".into(),
             tool_args: serde_json::Value::Null,
+            context: None,
         };
         let chunk = kernel_event_to_ws_chunk(&event, &Some("s1".into()));
         assert!(chunk.is_none(), "foreign session should not be forwarded");
@@ -1161,4 +1247,185 @@ mod rfc015_tests {
         let chunk = kernel_event_to_ws_chunk(&event, &None);
         assert!(chunk.is_none());
     }
+}
+
+// ---------------------------------------------------------------------------
+// RFC-016: Knowledge Save API
+// ---------------------------------------------------------------------------
+
+/// GET /api/chat/{session_id}/knowledge-saves
+///   → Returns the knowledge save records for a session.
+pub(crate) async fn handle_knowledge_saves(
+    state: State<Arc<AppState>>,
+    Path(session_id): Path<String>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    let saves: Vec<serde_json::Value> = state
+        .kernel
+        .state
+        .load("knowledge-saves", &session_id)
+        .await
+        .ok()
+        .flatten()
+        .unwrap_or_default();
+    Ok(Json(serde_json::json!({ "saves": saves })))
+}
+
+/// Request body for saving a message to knowledge.
+#[derive(Debug, Deserialize)]
+pub(crate) struct SaveToKnowledgeRequest {
+    /// Optional path hint for the knowledge note.
+    #[serde(default)]
+    path: Option<String>,
+}
+
+/// POST /api/chat/{session_id}/messages/{message_index}/save-to-knowledge
+///   → Saves the message content to the knowledge vault.
+pub(crate) async fn handle_save_to_knowledge(
+    state: State<Arc<AppState>>,
+    Path((session_id, message_index)): Path<(String, usize)>,
+    Json(_body): Json<SaveToKnowledgeRequest>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    // Check if already saved
+    let existing: Vec<serde_json::Value> = state
+        .kernel
+        .state
+        .load("knowledge-saves", &session_id)
+        .await
+        .ok()
+        .flatten()
+        .unwrap_or_default();
+
+    for save in &existing {
+        if save.get("message_index").and_then(|v| v.as_u64()) == Some(message_index as u64) {
+            let path = save.get("knowledge_path").and_then(|v| v.as_str()).unwrap_or("");
+            return Ok(Json(serde_json::json!({
+                "error": "already_saved",
+                "path": path,
+            })));
+        }
+    }
+
+    // Load the session to get the message content
+    let session = state
+        .kernel
+        .state
+        .load_session(&oxios_kernel::state_store::SessionId(session_id.clone()))
+        .await?;
+
+    let session = match session {
+        Some(s) => s,
+        None => return Err(AppError::from(anyhow::anyhow!("Session not found"))),
+    };
+
+    // Find the agent response at the given index
+    let response = match session.agent_responses.get(message_index) {
+        Some(r) => r,
+        None => return Err(AppError::from(anyhow::anyhow!("Message index out of range"))),
+    };
+
+    let content = &response.content;
+    if content.is_empty() {
+        return Err(AppError::from(anyhow::anyhow!("Message content is empty")));
+    }
+
+    // Generate path
+    let path = _body.path.clone().unwrap_or_else(|| {
+        let slug: String = content
+            .lines()
+            .find(|l| l.starts_with("# ") || l.starts_with("## "))
+            .map(|l| l.trim_start_matches('#').trim().to_string())
+            .unwrap_or_else(|| "note".to_string());
+        let slug: String = slug
+            .to_lowercase()
+            .chars()
+            .map(|c| if c.is_alphanumeric() || c == '-' || c == '_' { c } else { '-' })
+            .collect();
+        let date = chrono::Local::now().format("%Y-%m-%d").to_string();
+        format!("notes/{slug}-{date}.md")
+    });
+
+    // Write to KnowledgeBase
+    state.kernel.knowledge.note_write(&path, content)?;
+
+    // Record the save
+    let record = serde_json::json!({
+        "message_index": message_index,
+        "knowledge_path": path,
+        "saved_at": chrono::Utc::now().to_rfc3339(),
+        "source": "user",
+    });
+    let mut saves = existing;
+    saves.push(record);
+    state
+        .kernel
+        .state
+        .save("knowledge-saves", &session_id, &saves)
+        .await?;
+
+    // Publish event
+    let _ = state.kernel.infra.publish(
+        oxios_kernel::event_bus::KernelEvent::KnowledgePersisted {
+            session_id: session_id.clone(),
+            message_index,
+            path: path.clone(),
+            source: "user".to_string(),
+        },
+    );
+
+    Ok(Json(serde_json::json!({ "path": path })))
+}
+
+/// DELETE /api/chat/{session_id}/messages/{message_index}/knowledge-save
+///   → Removes a knowledge note that was saved from this message.
+pub(crate) async fn handle_remove_knowledge_save(
+    state: State<Arc<AppState>>,
+    Path((session_id, message_index)): Path<(String, usize)>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    let existing: Vec<serde_json::Value> = state
+        .kernel
+        .state
+        .load("knowledge-saves", &session_id)
+        .await
+        .ok()
+        .flatten()
+        .unwrap_or_default();
+
+    let target = existing.iter().find(|save| {
+        save.get("message_index").and_then(|v| v.as_u64()) == Some(message_index as u64)
+    });
+
+    let target = match target {
+        Some(t) => t.clone(),
+        None => return Err(AppError::from(anyhow::anyhow!("No save found for this message"))),
+    };
+
+    let path = target.get("knowledge_path").and_then(|v| v.as_str()).unwrap_or("");
+
+    // Delete from KnowledgeBase
+    if !path.is_empty() {
+        let _ = state.kernel.knowledge.note_delete(path);
+    }
+
+    // Remove the record
+    let updated: Vec<serde_json::Value> = existing
+        .into_iter()
+        .filter(|save| {
+            save.get("message_index").and_then(|v| v.as_u64()) != Some(message_index as u64)
+        })
+        .collect();
+    state
+        .kernel
+        .state
+        .save("knowledge-saves", &session_id, &updated)
+        .await?;
+
+    // Publish removal event
+    let _ = state.kernel.infra.publish(
+        oxios_kernel::event_bus::KernelEvent::KnowledgeRemoved {
+            session_id: session_id.clone(),
+            message_index,
+        },
+    );
+
+    Ok(Json(serde_json::json!({ "deleted_path": path })))
 }

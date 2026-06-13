@@ -48,6 +48,18 @@ interface ChatRuntimeState {
   interviewRound: number
   /** Interview ambiguity score. */
   interviewAmbiguity: number
+  /** Per-session spec mode map: sessionId → true (ouroboros) / false (chat). */
+  specModes: Record<string, boolean>
+  /** Effective spec mode for the current active session. */
+  specMode: boolean
+
+  // ── WebSocket lifecycle (encapsulated, not persisted) ──
+  /** WebSocket instance managed by the store. */
+  _ws: WebSocket | null
+  /** Reconnect timer (exponential backoff). */
+  _reconnectTimer: ReturnType<typeof setTimeout> | null
+  /** Reconnect attempt counter. */
+  _reconnectAttempts: number
 }
 
 // ---------------------------------------------------------------------------
@@ -57,7 +69,7 @@ interface ChatRuntimeState {
 interface ChatActions {
   /** Start or continue a WebSocket connection. */
   connect: () => Promise<void>
-  /** Close the WebSocket and reset all runtime state. */
+  /** Close the WebSocket and reset connection state. */
   disconnect: () => void
   /** Send a message using the active session. */
   sendMessage: (content: string) => void
@@ -79,11 +91,16 @@ interface ChatActions {
   resolveToolApproval: (id: string, approved: boolean) => Promise<void>
   /** Handle an incoming WS chunk. */
   handleChunk: (chunk: StreamChunk) => void
+  /** Toggle spec (Ouroboros) mode for the current session. */
+  toggleSpecMode: () => void
 }
 
 export type ChatStore = PersistedState & ChatRuntimeState & ChatActions
 
-// Helper to build a typed chunk from unknown WS data
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
 function parseChunk(raw: unknown): StreamChunk {
   if (typeof raw === 'object' && raw !== null && !Array.isArray(raw)) {
     return raw as StreamChunk
@@ -91,9 +108,6 @@ function parseChunk(raw: unknown): StreamChunk {
   return { type: 'error', error: 'Malformed chunk' }
 }
 
-// Convert an RFC-015 transparency chunk into a ChatActivity entry. Returns
-// null for chunk types that should not be persisted on the message (the
-// phase chunk is currently informational and grouped via metadata instead).
 function chunkToActivity(chunk: StreamChunk): ChatActivity | null {
   const ts = new Date().toISOString()
   const baseId = (id?: string) => `${id ?? crypto.randomUUID()}`
@@ -172,8 +186,6 @@ function chunkToActivity(chunk: StreamChunk): ChatActivity | null {
   }
 }
 
-// Convert a persisted TrajectoryStepRecord (from /api/sessions/:id) into a
-// ChatActivity, so the timeline is rendered the same way after reload.
 function trajectoryToActivity(step: {
   tool_name: string
   tool_args: unknown
@@ -182,7 +194,6 @@ function trajectoryToActivity(step: {
   is_error: boolean
   tool_call_id: string
   timestamp: string
-  /** Semantic context persisted by the backend (RFC-015). */
   context?: import('@/types').ToolCallContext
 }): ChatActivity {
   return {
@@ -199,12 +210,6 @@ function trajectoryToActivity(step: {
   }
 }
 
-// ---------------------------------------------------------------------------
-// WS singleton
-// ---------------------------------------------------------------------------
-
-let wsInstance: WebSocket | null = null
-
 function getToken(): string {
   return useAuthStore.getState().token || ''
 }
@@ -213,7 +218,6 @@ async function buildWsUrl(): Promise<string> {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
   const token = getToken()
 
-  // Try to get a one-time ticket for WS auth
   if (token) {
     try {
       const res = await fetch('/api/chat/ticket', {
@@ -234,12 +238,11 @@ async function buildWsUrl(): Promise<string> {
     }
   }
 
-  // Fallback: no auth or ticket endpoint unavailable
   return `${protocol}//${window.location.host}/api/chat/stream`
 }
 
-/** Set by the store on connect; used by the WS onmessage handler. */
-let chunkHandler: ((chunk: StreamChunk) => void) | null = null
+/** Max reconnect attempts before giving up. */
+const MAX_RECONNECT_ATTEMPTS = 5
 
 // ---------------------------------------------------------------------------
 // Store definition
@@ -259,27 +262,57 @@ export const useChatStore = create<ChatStore>()(
       _sendQueue: [],
       _lastDoneSessionId: null,
       _lastDoneProjectId: null,
-      detectedProject: null, // Phase 2 stub: always null
-      dismissedProjectIds: [], // Dismissed detection badges
+      detectedProject: null,
+      dismissedProjectIds: [],
       activeInterview: null,
       interviewRound: 0,
       interviewAmbiguity: 0,
       activeToolApproval: null,
+      specModes: {},
+      specMode: false,
+      // WebSocket lifecycle
+      _ws: null,
+      _reconnectTimer: null,
+      _reconnectAttempts: 0,
 
       // ── Actions ──
 
       async connect() {
-        if (wsInstance && wsInstance.readyState === WebSocket.OPEN) return
+        const currentWs = get()._ws
+
+        // Already connected — nothing to do.
+        if (currentWs && currentWs.readyState === WebSocket.OPEN) return
         if (typeof window === 'undefined') return
+
+        // Tear down any previous connection (stale or connecting).
+        if (currentWs) {
+          currentWs.onopen = null
+          currentWs.onmessage = null
+          currentWs.onclose = null
+          currentWs.onerror = null
+          if (currentWs.readyState === WebSocket.OPEN || currentWs.readyState === WebSocket.CONNECTING) {
+            currentWs.close()
+          }
+        }
+
+        // Clear any pending reconnect timer.
+        const prevTimer = get()._reconnectTimer
+        if (prevTimer) {
+          clearTimeout(prevTimer)
+          set({ _reconnectTimer: null })
+        }
 
         const url = await buildWsUrl()
         const ws = new WebSocket(url)
-        wsInstance = ws
-        set({ connected: false, isStreaming: false })
+
+        // Store reference so stale-checks work.
+        set({ _ws: ws, connected: false, isStreaming: false })
 
         ws.onopen = () => {
-          set({ connected: true })
-          // Flush any messages queued while connecting
+          // If another connect() replaced this ws, ignore.
+          if (get()._ws !== ws) return
+          set({ connected: true, _reconnectAttempts: 0 })
+          // Flush queued messages.
           const queue = get()._sendQueue
           if (queue.length > 0) {
             set({ _sendQueue: [] })
@@ -290,46 +323,76 @@ export const useChatStore = create<ChatStore>()(
         }
 
         ws.onmessage = (event) => {
+          // Stale connection — ignore.
+          if (get()._ws !== ws) return
           try {
             const raw = JSON.parse(event.data as string)
             const chunk = parseChunk(raw)
-            if (chunkHandler) chunkHandler(chunk)
+            get().handleChunk(chunk)
           } catch {
             // Ignore malformed JSON
           }
         }
 
         ws.onclose = () => {
-          wsInstance = null
-          set({ connected: false, isStreaming: false })
+          // Another connect() already replaced this ws — do nothing.
+          if (get()._ws !== ws) return
+
+          set({ connected: false, isStreaming: false, _ws: null })
+
+          // Auto-reconnect with exponential backoff.
+          const attempt = get()._reconnectAttempts
+          if (attempt >= MAX_RECONNECT_ATTEMPTS) return
+
+          const delay = 1000 * Math.pow(2, attempt)
+          const timer = setTimeout(() => {
+            set({ _reconnectTimer: null })
+            // Only reconnect if no new connection was established in the meantime.
+            if (get()._ws === null) {
+              set({ _reconnectAttempts: attempt + 1 })
+              get().connect()
+            }
+          }, delay)
+          set({ _reconnectTimer: timer })
         }
 
         ws.onerror = () => {
+          if (get()._ws !== ws) return
           ws.close()
         }
-
-        // Wire up chunk handler to current store
-        chunkHandler = (chunk: StreamChunk) => get().handleChunk(chunk)
       },
 
       disconnect() {
-        wsInstance?.close()
-        wsInstance = null
-        chunkHandler = null
+        const { _ws, _reconnectTimer } = get()
+
+        // Stop any pending reconnect.
+        if (_reconnectTimer) clearTimeout(_reconnectTimer)
+
+        if (_ws) {
+          // Detach handlers before closing to prevent onclose from
+          // triggering auto-reconnect.
+          _ws.onopen = null
+          _ws.onmessage = null
+          _ws.onclose = null
+          _ws.onerror = null
+          _ws.close()
+        }
+
         set({
           connected: false,
           isStreaming: false,
+          _ws: null,
+          _reconnectTimer: null,
+          _reconnectAttempts: 0,
         })
       },
 
       sendMessage(content: string) {
-        const { activeSessionId, activeProjectId, connected, connect } = get()
+        const { activeSessionId, activeProjectId, connected, connect, _ws } = get()
 
         // Ensure WS is connected first
-        if (!connected) {
+        if (!connected || !_ws || _ws.readyState !== WebSocket.OPEN) {
           connect()
-          // Queue the message; WS onopen will flush it via _flushQueue.
-          // Avoid infinite retry by queuing once.
           const q = get()._sendQueue
           if (!q.includes(content)) {
             set({ _sendQueue: [...q, content] })
@@ -346,15 +409,18 @@ export const useChatStore = create<ChatStore>()(
         }
         set((s) => ({ messages: [...s.messages, userMsg], isStreaming: true }))
 
-        // Send via WebSocket with session context
-        wsInstance?.send(
-          JSON.stringify({
-            type: 'message',
-            content,
-            session_id: activeSessionId ?? '',
-            project_ids: activeProjectId ?? '',
-          }),
-        )
+        // Send via WebSocket with session context and mode
+        const payload: Record<string, unknown> = {
+          type: 'message',
+          content,
+          session_id: activeSessionId ?? '',
+          project_ids: activeProjectId ?? '',
+        }
+        const effectiveSpecMode = get().specMode
+        if (effectiveSpecMode) {
+          payload.mode = 'spec'
+        }
+        _ws.send(JSON.stringify(payload))
       },
 
       async loadSession(sessionId: string) {
@@ -373,8 +439,11 @@ export const useChatStore = create<ChatStore>()(
           // Reconstruct messages from session history
           const messages: ChatMessage[] = []
           const userMsgs: { content: string; timestamp?: string }[] = data.user_messages ?? []
-          const agentMsgs: { content: string; timestamp?: string }[] = data.agent_responses ?? []
-          // RFC-015: persisted trajectory for chat transparency replay.
+          const agentMsgs: Array<{
+            content: string
+            timestamp?: string
+            trajectory_range?: { start: number; end: number }
+          }> = data.agent_responses ?? []
           const trajectorySteps: Array<{
             tool_name: string
             tool_args: unknown
@@ -383,7 +452,6 @@ export const useChatStore = create<ChatStore>()(
             is_error: boolean
             tool_call_id: string
             timestamp: string
-            /** Semantic context persisted by the backend (RFC-015). */
             context?: import('@/types').ToolCallContext
           }> = data.trajectory_steps ?? []
           const trajectoryActivities = trajectorySteps.map(trajectoryToActivity)
@@ -401,30 +469,45 @@ export const useChatStore = create<ChatStore>()(
               })
             }
             if (agentMsg) {
-              // Attach the trajectory to the LAST agent response in the
-              // session. Per-turn slicing would need timestamps; full-session
-              // attachment is a good enough approximation for the replay view
-              // and avoids a more expensive join.
-              const isLast = i === maxLen - 1
+              // Per-turn trajectory mapping: if the backend provides
+              // trajectory_range on each AgentResponse, extract only the
+              // relevant slice. Fallback: attach all to last response.
+              const range = agentMsg.trajectory_range
+              let activitiesForThisTurn: ChatActivity[] | undefined
+              if (range && trajectoryActivities.length > 0) {
+                activitiesForThisTurn = trajectoryActivities.slice(range.start, range.end)
+                if (activitiesForThisTurn.length === 0) activitiesForThisTurn = undefined
+              } else {
+                // Fallback for sessions saved before trajectory_range was added:
+                // attach all activities to the last assistant message.
+                const isLast = i === maxLen - 1
+                if (isLast && trajectoryActivities.length > 0) {
+                  activitiesForThisTurn = trajectoryActivities
+                }
+              }
               messages.push({
                 id: crypto.randomUUID(),
                 role: 'assistant',
                 content: agentMsg.content ?? '',
                 timestamp: agentMsg.timestamp ?? data.updated_at,
-                ...(isLast && trajectoryActivities.length > 0
-                  ? { activities: trajectoryActivities }
-                  : null),
+                ...(activitiesForThisTurn ? { activities: activitiesForThisTurn } : null),
               })
             }
           }
 
           const projectId = data.project_id ?? data.metadata?.project_ids ?? null
+          // Restore spec mode from session metadata (persisted by backend)
+          const storedMode = data.metadata?.mode
+          const isSpec = storedMode === 'spec' || storedMode === 'ouroboros'
+          const updatedSpecModes = { ...get().specModes, [sessionId]: isSpec }
 
           set({
             messages,
             activeSessionId: sessionId,
             activeProjectId: projectId,
             isStreaming: false,
+            specMode: isSpec,
+            specModes: updatedSpecModes,
           })
         } catch {
           // Silently fail — network issues shouldn't break the UI
@@ -432,7 +515,7 @@ export const useChatStore = create<ChatStore>()(
       },
 
       newSession() {
-        set({
+        set(() => ({
           messages: [],
           isStreaming: false,
           activeSessionId: null,
@@ -441,7 +524,9 @@ export const useChatStore = create<ChatStore>()(
           activeInterview: null,
           interviewRound: 0,
           interviewAmbiguity: 0,
-        })
+          specMode: false,
+          // Keep specModes for other sessions, just reset active display
+        }))
       },
 
       setActiveProject(projectId: string | null) {
@@ -449,7 +534,8 @@ export const useChatStore = create<ChatStore>()(
           activeProjectId: projectId,
           activeSessionId: null,
           messages: [],
-          detectedProject: null, // Clear detection when project changes
+          detectedProject: null,
+          specMode: false,
         })
       },
 
@@ -473,11 +559,13 @@ export const useChatStore = create<ChatStore>()(
           interviewRound: 0,
           interviewAmbiguity: 0,
           activeToolApproval: null,
+          specModes: {},
+          specMode: false,
         })
       },
 
       submitInterviewResponse(answers: import('@/types').InterviewAnswer[]) {
-        const { activeInterview, activeSessionId, activeProjectId, interviewRound } = get()
+        const { _ws, activeInterview, activeSessionId, activeProjectId, interviewRound } = get()
         if (!activeInterview) return
 
         // Build answer summary for user message bubble
@@ -505,10 +593,8 @@ export const useChatStore = create<ChatStore>()(
         }
 
         // Send via WebSocket as interview_response
-        // Include formatted `text` with Q&A context so the LLM
-        // understands the answers (not just raw values).
-        if (wsInstance && wsInstance.readyState === WebSocket.OPEN) {
-          wsInstance.send(
+        if (_ws && _ws.readyState === WebSocket.OPEN) {
+          _ws.send(
             JSON.stringify({
               type: 'interview_response',
               session_id: activeSessionId ?? '',
@@ -536,7 +622,6 @@ export const useChatStore = create<ChatStore>()(
         }))
       },
 
-
       async resolveToolApproval(id: string, approved: boolean) {
         const { activeToolApproval } = get()
         if (!activeToolApproval || activeToolApproval.id !== id) return
@@ -546,16 +631,16 @@ export const useChatStore = create<ChatStore>()(
           const res = await fetch(
             `/api/chat/tool-approval/${encodeURIComponent(id)}/respond`,
             {
-              method: "POST",
+              method: 'POST',
               headers: {
-                "Content-Type": "application/json",
+                'Content-Type': 'application/json',
                 ...(token ? { Authorization: `Bearer ${token}` } : {}),
               },
               body: JSON.stringify({ approved }),
             },
           )
           if (!res.ok) {
-            const err = await res.text().catch(() => "unknown error")
+            const err = await res.text().catch(() => 'unknown error')
             throw new Error(`HTTP ${res.status}: ${err}`)
           }
         } catch (e) {
@@ -563,6 +648,17 @@ export const useChatStore = create<ChatStore>()(
           throw e
         }
       },
+
+      toggleSpecMode() {
+        set((s) => {
+          const next = !s.specMode
+          const sid = s.activeSessionId
+          // Persist to per-session map if we have a session ID
+          const nextModes = sid ? { ...s.specModes, [sid]: next } : s.specModes
+          return { specMode: next, specModes: nextModes }
+        })
+      },
+
       handleChunk(chunk) {
         switch (chunk.type) {
           case 'token': {
@@ -594,9 +690,6 @@ export const useChatStore = create<ChatStore>()(
           }
 
           // ── RFC-015 chat transparency chunks ──
-          // These are attached to the most recent assistant message as
-          // activity entries. Pre-streaming events (sent before any token)
-          // are dropped — they have no message to attach to.
           case 'phase':
           case 'tool_start':
           case 'tool_progress':
@@ -609,12 +702,25 @@ export const useChatStore = create<ChatStore>()(
             set((s) => {
               const updated = [...s.messages]
               const last = updated[updated.length - 1]
-              if (last?.role !== 'assistant') return s
+
+              // If the last message is not an assistant message (e.g. the user
+              // just submitted an interview response and tool events arrive
+              // before the first token chunk), create a placeholder assistant
+              // message so the activity timeline has somewhere to attach to.
+              // The token chunk will later fill in the content.
+              if (last?.role !== 'assistant') {
+                const placeholder: ChatMessage = {
+                  id: crypto.randomUUID(),
+                  role: 'assistant',
+                  content: '',
+                  timestamp: new Date().toISOString(),
+                  activities: [activity],
+                }
+                return { messages: [...updated, placeholder] }
+              }
+
               const existing = last.activities ?? []
 
-              // For tool_call activities, merge into the matching toolCallId
-              // entry instead of appending. `tool_start` creates the
-              // placeholder; `tool_end` fills in duration/output/isError.
               if (activity.type === 'tool_call' && activity.toolCallId) {
                 const idx = existing.findIndex(
                   (a) => a.type === 'tool_call' && a.toolCallId === activity.toolCallId,
@@ -624,9 +730,6 @@ export const useChatStore = create<ChatStore>()(
                   const merged: ChatActivity = {
                     ...prior,
                     ...activity,
-                    // Preserve tool_name from the start event — tool_end
-                    // re-asserts the same value but be defensive in case
-                    // the provider omits it.
                     toolName: prior.toolName ?? activity.toolName,
                   }
                   const newActivities = [...existing]
@@ -646,8 +749,6 @@ export const useChatStore = create<ChatStore>()(
                   }
                 }
               }
-              // All non-tool_call activities (and unmatched tool_call with
-              // a fresh toolCallId) get appended.
               return {
                 messages: [
                   ...updated.slice(0, -1),
@@ -675,13 +776,13 @@ export const useChatStore = create<ChatStore>()(
             break
           }
 
-          case "tool_approval": {
+          case 'tool_approval': {
             if (chunk.id && chunk.tool_name) {
               set({
                 activeToolApproval: {
                   id: chunk.id as string,
                   toolName: chunk.tool_name as string,
-                  reason: (chunk.reason as string) || "",
+                  reason: (chunk.reason as string) || '',
                 },
                 isStreaming: false,
               })
@@ -694,53 +795,116 @@ export const useChatStore = create<ChatStore>()(
             const vid = chunk.project_id ?? null
             const toolCalls = chunk.tool_calls ?? []
             const phase = chunk.phase
-            const evaluationPassed = chunk.evaluation_passed === true || chunk.evaluation_passed === 'true'
+            const evaluationPassed: boolean | undefined =
+              chunk.evaluation_passed === true || chunk.evaluation_passed === 'true'
+                ? true
+                : chunk.evaluation_passed === false || chunk.evaluation_passed === 'false'
+                  ? false
+                  : undefined
             const seedId = chunk.seed_id
             const durationMs = chunk.duration_ms
 
-            // Insert tool call messages and attach metadata
             set((s) => {
               const updated = [...s.messages]
-              const toolMessages: ChatMessage[] = (Array.isArray(toolCalls) ? toolCalls : []).map(
-                (tc: ToolCallSummary) => ({
-                  id: crypto.randomUUID(),
-                  role: 'tool' as const,
-                  content: '',
-                  toolName: tc.tool_name,
-                  toolArgs: typeof tc.input === 'string' ? undefined : JSON.parse(tc.input),
-                  toolResult: tc.output,
-                  toolDurationMs: tc.duration_ms,
+
+              // Convert tool_calls from done chunk into ChatActivity entries
+              // (same shape as loadSession's trajectoryToActivity). These are
+              // used as a fallback when RFC-015 real-time events didn't arrive.
+              const doneActivities: ChatActivity[] = (Array.isArray(toolCalls) ? toolCalls : []).map(
+                (tc: ToolCallSummary, i: number) => ({
+                  id: `done-tc-${i}`,
+                  type: 'tool_call' as const,
                   timestamp: new Date().toISOString(),
+                  toolName: tc.tool_name ?? tc.tool,
+                  toolCallId: `done-${i}`,
+                  toolArgs:
+                    typeof tc.input === 'string'
+                      ? (() => { try { return JSON.parse(tc.input) } catch { return undefined } })()
+                      : undefined,
+                  outputSummary:
+                    typeof tc.output === 'string'
+                      ? tc.output
+                      : JSON.stringify(tc.output ?? '', null, 2),
+                  durationMs: tc.duration_ms,
+                  isError: false,
+                  isRunning: false,
                 }),
               )
 
-              // Find last assistant message and attach metadata
-              const lastAssistantIdx = [...updated]
+              // Find the last assistant message to attach metadata.
+              // If none exists yet (Ouroboros mode: execution completes
+              // without any prior token chunk), create one so the
+              // completion metadata has a home.
+              let lastAssistantIdx = [...updated]
                 .reverse()
                 .findIndex((m) => m.role === 'assistant')
-              if (lastAssistantIdx >= 0) {
-                const idx = updated.length - 1 - lastAssistantIdx
-                const target = updated[idx]
-                if (target) {
-                  updated[idx] = {
-                    ...target,
-                    id: target.id ?? crypto.randomUUID(),
-                    metadata: {
-                      phase,
-                      evaluation_passed: evaluationPassed,
-                      seed_id: seedId,
-                      duration_ms: durationMs,
-                      tool_calls: Array.isArray(toolCalls) ? toolCalls : [],
-                    },
-                  }
+              if (lastAssistantIdx < 0) {
+                // No assistant message yet — create one.
+                const placeholder: ChatMessage = {
+                  id: crypto.randomUUID(),
+                  role: 'assistant',
+                  content: '',
+                  timestamp: new Date().toISOString(),
+                  activities: doneActivities.length > 0 ? doneActivities : undefined,
+                  metadata: {
+                    phase,
+                    evaluation_passed: evaluationPassed,
+                    seed_id: seedId,
+                    duration_ms: durationMs,
+                    tool_calls: Array.isArray(toolCalls) ? toolCalls : [],
+                  },
+                }
+                return { messages: [...updated, placeholder], isStreaming: false }
+              }
+
+              const idx = updated.length - 1 - lastAssistantIdx
+              const target = updated[idx]
+              if (target) {
+                // Merge done activities into existing ones, skipping
+                // duplicates already added by RFC-015 real-time events.
+                // Done activities are a fallback — only keep them when
+                // no real-time activities with matching toolName exist.
+                const existingActivities = target.activities ?? []
+                const realTimeNames = new Set(
+                  existingActivities
+                    .filter((a) => a.type === 'tool_call' && a.toolCallId && !a.toolCallId.startsWith('done-'))
+                    .map((a) => a.toolName),
+                )
+                const newActivities = doneActivities.filter(
+                  (a) => !realTimeNames.has(a.toolName),
+                )
+
+                updated[idx] = {
+                  ...target,
+                  id: target.id ?? crypto.randomUUID(),
+                  activities:
+                    existingActivities.length > 0 || newActivities.length > 0
+                      ? [...existingActivities, ...newActivities]
+                      : undefined,
+                  metadata: {
+                    phase,
+                    evaluation_passed: evaluationPassed,
+                    seed_id: seedId,
+                    duration_ms: durationMs,
+                    tool_calls: Array.isArray(toolCalls) ? toolCalls : [],
+                  },
                 }
               }
 
-              return { messages: [...updated, ...toolMessages], isStreaming: false }
+              return { messages: updated, isStreaming: false }
             })
 
             if (sid) {
-              set({ _lastDoneSessionId: sid, activeSessionId: sid })
+              // Track the mode returned by the backend for this session
+              const doneMode = chunk.mode
+              const isSpec = doneMode === 'spec' || doneMode === 'ouroboros'
+              set((s) => ({
+                _lastDoneSessionId: sid,
+                activeSessionId: sid,
+                specModes: { ...s.specModes, [sid]: isSpec },
+                // Only update effective specMode if this is the active session
+                ...(s.activeSessionId === sid || !s.activeSessionId ? { specMode: isSpec } : {}),
+              }))
             }
             if (vid) {
               set({ activeProjectId: vid, _lastDoneProjectId: vid })
@@ -749,7 +913,6 @@ export const useChatStore = create<ChatStore>()(
           }
           case 'error': {
             set({ isStreaming: false })
-            // Don't inline error into message — will be shown as toast
             break
           }
         }
@@ -764,8 +927,8 @@ export const useChatStore = create<ChatStore>()(
       onRehydrateStorage: () => (state) => {
         if (!state) return
         // After rehydration, if there's an active session, load its history.
-        // Note: WS auto-connect moved to ChatPage component — don't connect
-        // from every page load, only when the chat route is active.
+        // WS auto-connect is handled by the ChatPage component — only
+        // connect when the chat route is active.
         if (state.activeSessionId) {
           state.loadSession(state.activeSessionId)
         }

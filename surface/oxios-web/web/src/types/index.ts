@@ -23,6 +23,7 @@ export interface Session {
   created_at: string
   updated_at?: string
   message_count?: number
+  title?: string
   metadata?: Record<string, unknown>
 }
 
@@ -224,7 +225,10 @@ export interface ChatActivity {
 }
 
 export interface ToolCallSummary {
-  tool_name: string
+  /// Tool name. Backend ToolCallRecord serializes as `tool`,
+  /// but TrajectoryStepRecord uses `tool_name`. Accept both.
+  tool_name?: string
+  tool?: string
   input: string
   output: string
   duration_ms: number
@@ -328,6 +332,8 @@ export interface StreamChunk {
   ambiguity?: number
   // ── Tool approval (RFC-017) ──
   id?: string
+  /// Execution mode returned in 'done' chunk: "chat" | "spec" | "ouroboros".
+  mode?: string
   reason?: string
 }
 
@@ -472,6 +478,7 @@ export interface SystemStatus {
   service: string
   status: string
   version: string
+  web_version?: string
   channels: string[]
   uptime: string // formatted "1h 30m 5s"
   components?: {

@@ -3,9 +3,9 @@
 //! All state is persisted as markdown or JSON files organized
 //! by category. This is the "filesystem" of Oxios.
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use chrono::{DateTime, Utc};
-use serde::{de::DeserializeOwned, Deserialize, Deserializer, Serialize, Serializer};
+use serde::{Deserialize, Deserializer, Serialize, Serializer, de::DeserializeOwned};
 use std::path::PathBuf;
 use tokio::fs;
 
@@ -75,6 +75,20 @@ pub struct AgentResponse {
     pub evaluation_passed: Option<bool>,
     /// Timestamp when the response was generated.
     pub timestamp: DateTime<Utc>,
+    /// Index range into `Session::trajectory_steps` for tool calls that
+    /// occurred during this response. `None` when no tool calls were made.
+    /// Used by the Web UI to render per-turn execution timelines.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub trajectory_range: Option<TrajectoryRange>,
+}
+
+/// Index range (exclusive end) into `Session::trajectory_steps`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TrajectoryRange {
+    /// Start index (inclusive).
+    pub start: usize,
+    /// End index (exclusive).
+    pub end: usize,
 }
 
 /// A single tool execution step recorded in a session (RFC-015).
@@ -332,12 +346,11 @@ impl StateStore {
         let mut names = Vec::new();
         while let Some(entry) = entries.next_entry().await? {
             let path = entry.path();
-            if let Some(ext) = path.extension() {
-                if ext == "md" || ext == "json" {
-                    if let Some(stem) = path.file_stem() {
-                        names.push(stem.to_string_lossy().into_owned());
-                    }
-                }
+            if let Some(ext) = path.extension()
+                && (ext == "md" || ext == "json")
+                && let Some(stem) = path.file_stem()
+            {
+                names.push(stem.to_string_lossy().into_owned());
             }
         }
         names.sort();
@@ -455,6 +468,20 @@ impl StateStore {
                         id: session.id.0.clone(),
                         user_id: session.user_id.clone(),
                         message_count: session.user_messages.len(),
+                        title: session.metadata.get("title")
+                            .and_then(|v| v.as_str())
+                            .map(String::from)
+                            .or_else(|| {
+                                // Auto-generate from first user message
+                                session.user_messages.first().map(|m| {
+                                    let s = m.content.lines().next().unwrap_or("");
+                                    if s.len() > 60 {
+                                        format!("{}…", &s[..s.ceil_char_boundary(59)])
+                                    } else {
+                                        s.to_string()
+                                    }
+                                })
+                            }),
                         active_seed_id: session.active_seed_id.clone(),
                         project_id: session
                             .metadata
@@ -495,10 +522,10 @@ impl StateStore {
         user_id: &str,
         session_id: Option<&SessionId>,
     ) -> Result<Session> {
-        if let Some(sid) = session_id {
-            if let Some(existing) = self.load_session(sid).await? {
-                return Ok(existing);
-            }
+        if let Some(sid) = session_id
+            && let Some(existing) = self.load_session(sid).await?
+        {
+            return Ok(existing);
         }
 
         // Create new session
@@ -573,6 +600,10 @@ pub struct SessionSummary {
     pub user_id: String,
     /// Number of messages in this session.
     pub message_count: usize,
+    /// Auto-generated title for this session. Derived from the first user
+    /// message (truncated to ~60 chars) when not explicitly set.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
     /// Active seed ID if any.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub active_seed_id: Option<String>,

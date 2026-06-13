@@ -1,15 +1,15 @@
+use axum::Json;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::response::sse::{Event as SseEvent, Sse};
-use axum::Json;
 use serde::Serialize;
 use std::convert::Infallible;
 use std::sync::Arc;
-use tokio_stream::wrappers::BroadcastStream;
 use tokio_stream::StreamExt as TokioStreamExt;
+use tokio_stream::wrappers::BroadcastStream;
 
 use crate::error::AppError;
-use crate::routes::{paginate, PageParams};
+use crate::routes::{PageParams, paginate};
 use crate::server::AppState;
 
 // ---------------------------------------------------------------------------
@@ -23,6 +23,7 @@ pub(crate) struct SessionListItem {
     user_id: String,
     project_id: Option<String>,
     message_count: usize,
+    title: Option<String>,
     active_seed_id: Option<String>,
     created_at: String,
     updated_at: String,
@@ -42,6 +43,7 @@ pub(crate) async fn handle_sessions_list(
                     user_id: s.user_id,
                     project_id: s.project_id,
                     message_count: s.message_count,
+                    title: s.title,
                     active_seed_id: s.active_seed_id,
                     created_at: s.created_at.to_rfc3339(),
                     updated_at: s.updated_at.to_rfc3339(),
@@ -222,14 +224,16 @@ pub(crate) fn sanitize_event(event: &oxios_kernel::event_bus::KernelEvent) -> se
         }),
         KernelEvent::ApprovalRequested {
             id,
-            action,
-            resource,
+            tool_name,
+            reason,
+            session_id,
             ..
         } => serde_json::json!({
             "type": "approval_requested",
             "id": id.to_string(),
-            "action": action,
-            "resource": resource,
+            "tool_name": tool_name,
+            "reason": reason,
+            "session_id": session_id,
         }),
         KernelEvent::ApprovalResolved { id, approved } => serde_json::json!({
             "type": "approval_resolved",
@@ -310,12 +314,14 @@ pub(crate) fn sanitize_event(event: &oxios_kernel::event_bus::KernelEvent) -> se
             tool_name,
             tool_call_id,
             tool_args,
+            context,
         } => serde_json::json!({
             "type": "tool_started",
             "session_id": session_id,
             "tool_name": tool_name,
             "tool_call_id": tool_call_id,
             "tool_args": tool_args,
+            "context": context,
         }),
         KernelEvent::ToolExecutionFinished {
             session_id,
@@ -412,6 +418,26 @@ pub(crate) fn sanitize_event(event: &oxios_kernel::event_bus::KernelEvent) -> se
             "subject": subject,
             "message_id": message_id,
             "template_name": template_name,
+        }),
+        KernelEvent::KnowledgePersisted {
+            session_id,
+            message_index,
+            path,
+            source,
+        } => serde_json::json!({
+            "type": "knowledge_persisted",
+            "session_id": session_id,
+            "message_index": message_index,
+            "path": path,
+            "source": source,
+        }),
+        KernelEvent::KnowledgeRemoved {
+            session_id,
+            message_index,
+        } => serde_json::json!({
+            "type": "knowledge_removed",
+            "session_id": session_id,
+            "message_index": message_index,
         }),
     };
     // Merge payload into base

@@ -1,5 +1,6 @@
 import { ChevronDown, ChevronRight, Wrench } from 'lucide-react'
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/utils'
 import type { ToolCallSummary } from '@/types'
 
@@ -10,15 +11,16 @@ interface ToolCallCardProps {
 
 export function ToolCallCard({ call, className }: ToolCallCardProps) {
   const [expanded, setExpanded] = useState(false)
+  const { t } = useTranslation()
   const durationStr =
     call.duration_ms >= 1000 ? `${(call.duration_ms / 1000).toFixed(1)}s` : `${call.duration_ms}ms`
 
   return (
-    <div className={cn('rounded-lg border bg-muted/50 my-2', className)}>
+    <div className={cn('rounded-lg border bg-muted/50 my-2 overflow-hidden', className)}>
       <button
         type="button"
         onClick={() => setExpanded(!expanded)}
-        className="flex w-full items-center gap-2 px-3 py-2 text-sm"
+        className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-muted/80 transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-inset"
       >
         {expanded ? (
           <ChevronDown className="h-3.5 w-3.5" />
@@ -32,13 +34,13 @@ export function ToolCallCard({ call, className }: ToolCallCardProps) {
       {expanded && (
         <div className="border-t px-3 py-2 space-y-2">
           <div>
-            <p className="text-xs font-medium text-muted-foreground mb-1">Input</p>
+            <p className="text-xs font-medium text-muted-foreground mb-1">{t('agents.inputLabel', 'Input')}</p>
             <pre className="text-xs bg-background rounded p-2 overflow-x-auto whitespace-pre-wrap max-h-48 overflow-y-auto">
               {call.input}
             </pre>
           </div>
           <div>
-            <p className="text-xs font-medium text-muted-foreground mb-1">Output</p>
+            <p className="text-xs font-medium text-muted-foreground mb-1">{t('agents.outputLabel', 'Output')}</p>
             <pre className="text-xs bg-background rounded p-2 overflow-x-auto whitespace-pre-wrap max-h-48 overflow-y-auto">
               {call.output}
             </pre>

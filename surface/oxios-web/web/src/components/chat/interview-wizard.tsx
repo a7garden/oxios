@@ -295,33 +295,33 @@ export function InterviewWizard({
                 <Button
                   onClick={handlePrev}
                   variant="ghost"
-                  size="sm"
+                  size="icon"
                   disabled={disabled}
-                  className="h-7 px-2 text-xs"
+                  className="h-7 w-7"
+                  title={t('chat.interview.previous')}
                 >
-                  <ArrowLeft className="h-3 w-3 mr-1" />
-                  {t('chat.interview.previous')}
+                  <ArrowLeft className="h-3.5 w-3.5" />
                 </Button>
               )}
               <Button
                 onClick={handleSkip}
                 variant="ghost"
-                size="sm"
+                size="icon"
                 disabled={disabled}
-                className="h-7 px-2 text-xs text-muted-foreground"
+                className="h-7 w-7 text-muted-foreground"
+                title={t('chat.interview.skip')}
               >
-                <SkipForward className="h-3 w-3 mr-1" />
-                {t('chat.interview.skip')}
+                <SkipForward className="h-3.5 w-3.5" />
               </Button>
             </div>
             <Button
               onClick={handleNext}
               disabled={disabled}
-              size="sm"
-              className="h-7 px-3 text-xs"
+              size="icon"
+              className="h-7 w-7"
+              title={isLastStep ? t('chat.interview.submit') : t('chat.interview.next')}
             >
-              {isLastStep ? t('chat.interview.submit') : t('chat.interview.next')}
-              <ArrowRight className="h-3 w-3 ml-1" />
+              <ArrowRight className="h-3.5 w-3.5" />
             </Button>
           </div>
 
