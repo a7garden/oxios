@@ -62,8 +62,11 @@ impl DaemonManager {
         }
     }
 
-    /// Start the daemon in the background.
-    pub fn start(&self, config_path: &Path) -> Result<()> {
+    /// Start the daemon in the background and wait for it to begin accepting
+    /// connections on `port` (RFC-024 SP4: verifies the listener came up so
+    /// a port-bind failure is reported immediately instead of masked by a
+    /// `started` message that never resolves).
+    pub fn start(&self, config_path: &Path, port: u16) -> Result<()> {
         match self.status() {
             DaemonStatus::Running { pid } => {
                 anyhow::bail!("oxios is already running (PID {pid})");
@@ -94,8 +97,35 @@ impl DaemonManager {
 
         println!("⬡ oxios started (PID {pid})");
         println!("  Logs: {}", log_file.display());
-        println!("  Dashboard: http://127.0.0.1:4200");
+        println!("  Dashboard: http://127.0.0.1:{port}");
+
+        // RFC-024 SP4: verify the daemon is actually accepting connections.
+        // A misconfigured bind (TIME_WAIT, port in use) used to be invisible
+        // here — the user saw `started` but `curl` got connection refused.
+        match self.wait_until_listening(port, std::time::Duration::from_secs(15)) {
+            Ok(()) => println!("  Status:   ready (listening on :{port})"),
+            Err(_) => println!(
+                "  Status:   still warming up (did not respond on :{port} within 15s)"
+            ),
+        }
         Ok(())
+    }
+
+    /// Poll `127.0.0.1:port` until a TCP connect succeeds or `timeout` elapses.
+    fn wait_until_listening(&self, port: u16, timeout: std::time::Duration) -> Result<()> {
+        use std::net::ToSocketAddrs;
+        let addr = format!("127.0.0.1:{port}").to_socket_addrs()?.next().ok_or_else(|| {
+            anyhow::anyhow!("invalid bind address 127.0.0.1:{port}")
+        })?;
+        let start = std::time::Instant::now();
+        let interval = std::time::Duration::from_millis(200);
+        while start.elapsed() < timeout {
+            if std::net::TcpStream::connect_timeout(&addr, interval).is_ok() {
+                return Ok(());
+            }
+            std::thread::sleep(interval);
+        }
+        anyhow::bail!("daemon did not start listening on :{port} within {timeout:?}")
     }
 
     /// Stop the daemon by sending SIGTERM.
@@ -142,12 +172,12 @@ impl DaemonManager {
     }
 
     /// Restart the daemon.
-    pub fn restart(&self, config_path: &Path) -> Result<()> {
+    pub fn restart(&self, config_path: &Path, port: u16) -> Result<()> {
         if matches!(self.status(), DaemonStatus::Running { .. }) {
             self.stop()?;
             std::thread::sleep(std::time::Duration::from_millis(500));
         }
-        self.start(config_path)
+        self.start(config_path, port)
     }
 
     /// Install as a system service (launchd on macOS, systemd on Linux).

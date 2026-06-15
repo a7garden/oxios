@@ -367,6 +367,41 @@ pub fn register_builtin_metrics() {
         "Full orchestration duration",
         vec![0.1, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0, 60.0],
     );
+
+    // RFC-024 §11: web↔daemon reliability metrics. Registered here so they
+    // appear on /metrics from startup; the corresponding increment sites
+    // live in oxios-gateway (deliver/timeout/replay) and the web routes
+    // (SSE/WS reconnect, asset swap, readiness state).
+    r.counter(
+        "oxios_gateway_messages_total",
+        "Outgoing messages (label: result=delivered|dropped|resynced|timed_out)",
+        &[],
+    );
+    r.counter(
+        "oxios_gateway_replay_requests_total",
+        "Replay requests (label: outcome=replay|resync)",
+        &[],
+    );
+    r.counter(
+        "oxios_sse_reconnects_total",
+        "SSE reconnects (label: reason=ok|lag|error|unauthorized)",
+        &[],
+    );
+    r.counter(
+        "oxios_ws_reconnects_total",
+        "WS reconnects (label: reason=ok|lag|error|unauthorized)",
+        &[],
+    );
+    r.counter(
+        "oxios_web_dist_swaps_total",
+        "Atomic web-dist swaps (RFC-024 SP3)",
+        &[],
+    );
+    r.gauge(
+        "oxios_readiness_state",
+        "0 = warming up, 1 = ready (RFC-024 SP4)",
+        0.0,
+    );
     r.histogram(
         "oxios_phase_duration_seconds",
         "Phase duration",

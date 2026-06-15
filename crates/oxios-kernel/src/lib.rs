@@ -12,6 +12,7 @@ pub mod agent_group;
 pub mod agent_lifecycle;
 pub mod agent_runtime;
 pub mod daemon;
+pub mod readiness;
 pub mod supervisor;
 
 // ─── Agent History Log ──────────────────────────────────────────────
@@ -108,6 +109,7 @@ pub use agent_lifecycle::AgentLifecycleManager;
 pub use agent_runtime::AgentRuntime;
 pub use daemon::{DaemonManager, DaemonStatus};
 pub use persistence_hook::PersistenceHook;
+pub use readiness::{ReadinessGate, SubsystemState};
 pub use supervisor::{BasicSupervisor, Supervisor};
 
 // ─── Orchestration ──────────────────────────────────────────────────

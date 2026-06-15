@@ -48,6 +48,7 @@ use crate::budget::BudgetManager;
 use crate::config::OxiosConfig;
 use crate::cron::CronScheduler;
 use crate::event_bus::EventBus;
+use crate::readiness::ReadinessGate;
 use crate::git_layer::CommitInfo;
 use crate::git_layer::GitLayer;
 use crate::mcp::McpBridge;
@@ -112,6 +113,8 @@ pub struct KernelHandle {
     pub calendar: Option<CalendarApi>,
     /// Email — send HTML emails via SMTP, template management.
     pub email: Option<EmailApi>,
+    /// RFC-024 SP4: subsystem readiness gate.
+    pub readiness: Arc<ReadinessGate>,
 }
 
 impl KernelHandle {
@@ -155,6 +158,10 @@ impl KernelHandle {
             marketplace_api,
             calendar,
             email,
+            // RFC-024 SP4: default Warming/no-deadline. The Kernel
+            // (src/kernel.rs) sets the actual state and deadline during
+            // startup via `readiness.set_*` / a background task.
+            readiness: Arc::new(ReadinessGate::new(0)),
         }
     }
 
