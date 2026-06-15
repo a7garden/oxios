@@ -890,6 +890,51 @@ impl KernelBuilder {
             }
         }
 
+        // ── RFC-025 Phase 5: Mount auto-promotion background scanner ──
+        // Scans session history on a cadence and promotes paths that cross
+        // the frequency threshold into Mounts. Cheap (one filesystem walk
+        // per scan) and debounced by the threshold.
+        {
+            let mounts_cfg = &config.mounts;
+            if mounts_cfg.auto_promote_enabled
+                && let Some(ref mm) = mount_manager
+            {
+                let mm = mm.clone();
+                let ss = state_store.clone();
+                let promo_config = oxios_kernel::PromotionConfig {
+                    enabled: true,
+                    threshold: mounts_cfg.auto_promote_threshold,
+                    window_days: mounts_cfg.auto_promote_window_days,
+                };
+                let interval_secs = mounts_cfg.auto_promote_interval_secs;
+                tokio::spawn(async move {
+                    let mut ticker =
+                        tokio::time::interval(std::time::Duration::from_secs(interval_secs));
+                    // The first tick completes immediately — run a scan right
+                    // after startup, then wait the full interval thereafter.
+                    ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+                    loop {
+                        ticker.tick().await;
+                        match ss.load_all_sessions().await {
+                            Ok(sessions) => {
+                                let created = mm.promote_frequent_paths(&sessions, &promo_config);
+                                if !created.is_empty() {
+                                    tracing::info!(
+                                        promoted = created.len(),
+                                        "RFC-025: auto-promoted frequent paths to Mounts"
+                                    );
+                                }
+                            }
+                            Err(e) => {
+                                tracing::warn!(error = %e, "Mount promotion scan failed");
+                            }
+                        }
+                    }
+                });
+                tracing::info!("Mount auto-promotion scanner spawned");
+            }
+        }
+
         let budget_manager = Arc::new(BudgetManager::new());
 
         let auth_manager = AuthManager::new();

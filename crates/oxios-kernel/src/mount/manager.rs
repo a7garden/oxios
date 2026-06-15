@@ -15,6 +15,7 @@ use parking_lot::RwLock;
 use oxios_memory::memory::sqlite::MemoryDatabase;
 
 use super::mount_db;
+use super::path_promotion;
 use super::{DetectionResult, Mount, MountId, MountMeta, MountSource, detect_mounts};
 use crate::event_bus::{EventBus, KernelEvent};
 
@@ -289,6 +290,86 @@ impl MountManager {
             .filter(|id| self.check_drift(*id).unwrap_or(false))
             .collect()
     }
+
+    /// RFC-025 Phase 5: scan session history and auto-create Mounts for paths
+    /// that cross the frequency threshold.
+    ///
+    /// Returns the IDs of newly-created Mounts (empty if none promoted). Safe
+    /// to call repeatedly — paths already covered by an existing Mount are
+    /// skipped, as are name collisions.
+    pub fn promote_frequent_paths(
+        &self,
+        sessions: &[crate::state_store::Session],
+        config: &path_promotion::PromotionConfig,
+    ) -> Vec<MountId> {
+        if !config.enabled {
+            return Vec::new();
+        }
+
+        let freqs = path_promotion::tally_frequencies(sessions, config);
+        let mut created = Vec::new();
+
+        for (root, freq) in freqs {
+            if freq.count < config.threshold {
+                continue;
+            }
+            // Skip if any existing Mount already covers this root.
+            if self.root_already_covered(&root) {
+                continue;
+            }
+            // Derive a name from the final path component.
+            let Some(name) = root
+                .file_name()
+                .and_then(|n| n.to_str())
+                .map(|s| s.to_string())
+            else {
+                continue;
+            };
+            // Skip if the name is already taken (collision → leave for the
+            // user to resolve, rather than inventing "name-2").
+            if self.get_mount_by_name(&name).is_some() {
+                continue;
+            }
+
+            match self.create_mount(
+                name.clone(),
+                vec![root.clone()],
+                super::MountSource::AutoPromoted,
+            ) {
+                Ok(mount) => {
+                    tracing::info!(
+                        name = %mount.name,
+                        path = %root.display(),
+                        count = freq.count,
+                        "RFC-025: auto-promoted frequent path to Mount"
+                    );
+                    // Seed auto_meta immediately so the new Mount is useful.
+                    let _ = self.seed_auto_meta(mount.id);
+                    created.push(mount.id);
+                }
+                Err(e) => {
+                    tracing::debug!(
+                        path = %root.display(),
+                        error = %e,
+                        "auto-promotion skipped"
+                    );
+                }
+            }
+        }
+
+        created
+    }
+
+    /// Returns `true` if some existing Mount's `paths` already includes (or is
+    /// an ancestor of) `root`, meaning the root is already covered.
+    fn root_already_covered(&self, root: &PathBuf) -> bool {
+        let mounts = self.mounts.read();
+        mounts.values().any(|m| {
+            m.paths
+                .iter()
+                .any(|p| root.starts_with(p) || p.starts_with(root))
+        })
+    }
 }
 
 /// Compare a stored marker snapshot against the current state.
@@ -416,5 +497,89 @@ mod tests {
         assert_eq!(got.len(), 2);
         assert_eq!(got[0].name, "a");
         assert_eq!(got[1].name, "b");
+    }
+
+    #[test]
+    fn test_promote_frequent_paths_creates_mount() {
+        use crate::state_store::{Session, UserMessage};
+        use chrono::Utc;
+
+        let mgr = open_manager();
+        // Use this crate's own source dir — it has Cargo.toml at its root,
+        // so normalize_to_root will collapse to the oxios-kernel root.
+        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let file = root.join("src/lib.rs");
+
+        let mut session = Session::new("test");
+        // Three touches of the same root → crosses the default threshold.
+        for _ in 0..3 {
+            session.user_messages.push(UserMessage {
+                content: format!("fix {} please", file.display()),
+                timestamp: Utc::now(),
+            });
+        }
+
+        let config = path_promotion::PromotionConfig::default();
+        let created = mgr.promote_frequent_paths(&[session], &config);
+        assert_eq!(created.len(), 1, "expected exactly one promoted Mount");
+
+        let mount = mgr.get_mount(created[0]).expect("promoted mount exists");
+        assert_eq!(mount.source, MountSource::AutoPromoted);
+        assert_eq!(mount.name, "oxios-kernel");
+        // auto_meta should be seeded (Cargo.toml → rust).
+        assert!(mount.auto_meta.languages.contains(&"rust".to_string()));
+    }
+
+    #[test]
+    fn test_promote_skips_already_covered_root() {
+        use crate::state_store::{Session, UserMessage};
+        use chrono::Utc;
+
+        let mgr = open_manager();
+        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        // Pre-create a Mount covering this root.
+        mgr.create_mount(
+            "manual-kernel".to_string(),
+            vec![root.clone()],
+            MountSource::Manual,
+        )
+        .unwrap();
+
+        let mut session = Session::new("test");
+        for _ in 0..5 {
+            session.user_messages.push(UserMessage {
+                content: format!("work on {}/src/lib.rs", root.display()),
+                timestamp: Utc::now(),
+            });
+        }
+
+        let config = path_promotion::PromotionConfig::default();
+        let created = mgr.promote_frequent_paths(&[session], &config);
+        assert!(
+            created.is_empty(),
+            "should not promote an already-covered root"
+        );
+    }
+
+    #[test]
+    fn test_promote_respects_threshold() {
+        use crate::state_store::{Session, UserMessage};
+        use chrono::Utc;
+
+        let mgr = open_manager();
+        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+
+        let mut session = Session::new("test");
+        // Only two touches — below the default threshold of 3.
+        for _ in 0..2 {
+            session.user_messages.push(UserMessage {
+                content: format!("work on {}/src/lib.rs", root.display()),
+                timestamp: Utc::now(),
+            });
+        }
+
+        let config = path_promotion::PromotionConfig::default();
+        let created = mgr.promote_frequent_paths(&[session], &config);
+        assert!(created.is_empty(), "should not promote below threshold");
     }
 }

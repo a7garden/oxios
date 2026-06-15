@@ -20,6 +20,7 @@ pub mod detection;
 pub mod manager;
 pub mod meta_detection;
 pub mod mount_db;
+pub mod path_promotion;
 
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -33,6 +34,7 @@ use uuid::Uuid;
 pub use detection::{DetectionResult, detect_mounts, extract_path, find_by_id, find_by_name};
 pub use manager::{MountManager, MountManagerError};
 pub use meta_detection::{detect_meta, snapshot_markers};
+pub use path_promotion::{PathFrequency, PromotionConfig};
 
 /// Unique identifier for a Mount.
 pub type MountId = Uuid;
@@ -46,6 +48,10 @@ pub enum MountSource {
     Manual,
     /// OS auto-detected from a path in the conversation.
     AutoDetected,
+    /// RFC-025 Phase 5: auto-promoted from a frequently-used path.
+    /// Created by the background scanner when a path crosses the frequency
+    /// threshold. Distinguishable in the UI so users can review/prune them.
+    AutoPromoted,
 }
 
 impl std::fmt::Display for MountSource {
@@ -53,6 +59,7 @@ impl std::fmt::Display for MountSource {
         match self {
             MountSource::Manual => write!(f, "manual"),
             MountSource::AutoDetected => write!(f, "auto_detected"),
+            MountSource::AutoPromoted => write!(f, "auto_promoted"),
         }
     }
 }

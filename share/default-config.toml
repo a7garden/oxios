@@ -168,6 +168,20 @@ ttl_hours = 168
 # Enable automatic pruning on every session save.
 auto_prune = true
 
+# ── Mounts (RFC-025) ───────────────────────────────────────────────────────
+# Auto-promote frequently-used paths into Mounts. A background scanner counts
+# how often each path appears in session trajectories (tool calls) and user
+# messages; paths that cross the threshold within the window become Mounts.
+
+[mounts]
+auto_promote_enabled = true
+# Minimum distinct touches within the window to trigger promotion.
+auto_promote_threshold = 3
+# How far back to look, in days.
+auto_promote_window_days = 14
+# Seconds between promotion scans (background cadence).
+auto_promote_interval_secs = 3600
+
 # ── Memory (RFC-012) ────────────────────────────────────────────────────────
 # All memory settings have sensible defaults — no configuration needed.
 # Override only if you want to change behavior.

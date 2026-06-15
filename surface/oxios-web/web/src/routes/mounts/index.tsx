@@ -103,8 +103,13 @@ function MountsPage() {
 
               {/* Name */}
               <div className="mb-2 flex items-center gap-2">
-                <span className="text-lg">🔧</span>
+                <span className="text-lg">{mount.source === 'auto_promoted' ? '✨' : '🔧'}</span>
                 <h3 className="font-semibold truncate">{mount.name}</h3>
+                {mount.source === 'auto_promoted' && (
+                  <span className="rounded-full bg-violet-500/10 px-2 py-0.5 text-xs text-violet-600">
+                    {t('mounts.autoPromoted', '자동 생성')}
+                  </span>
+                )}
                 {mount.enrichment_pending && (
                   <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-xs text-amber-600">
                     {t('mounts.needsRefresh', '갱신 필요')}

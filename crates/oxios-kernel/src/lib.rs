@@ -230,14 +230,15 @@ pub use backup::{BackupManifest, BackupSection};
 pub use config::{
     BrowserConfig, ChannelsConfig, CronConfig, DaemonConfig, EmailConfig, EmbeddingConfig,
     EngineConfig, ExecConfig, ExecMode, GitConfig, InlineCronJob, LoggingConfig, MarketplaceConfig,
-    McpConfig, McpServerDef, MemoryConfig, OrchestratorConfig, OxiosConfig, PersonaConfig,
-    SkillsShConfig, SqliteMemoryConfig,
+    McpConfig, McpServerDef, MemoryConfig, MountsConfig, OrchestratorConfig, OxiosConfig,
+    PersonaConfig, SkillsShConfig, SqliteMemoryConfig,
 };
 pub use git_layer::{
     CommitContext, CommitDiff, CommitInfo, DiffKind, DiffStats, FileDiff, GitLayer, LogEntry,
 };
 pub use mount::{
-    DetectionResult as MountDetectionResult, Mount, MountId, MountMeta, MountSource, detect_mounts,
+    DetectionResult as MountDetectionResult, Mount, MountId, MountMeta, MountSource,
+    PromotionConfig, detect_mounts,
 };
 #[cfg(feature = "sqlite-memory")]
 pub use mount::{MountManager, MountManagerError};

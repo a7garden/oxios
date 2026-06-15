@@ -1,6 +1,6 @@
 # RFC-025: Mount + Project System
 
-> **Status:** Fully implemented (Phase 1–4)
+> **Status:** Fully implemented (Phase 1–5)
 > **Date:** 2026-06-15
 > **Replaces:** RFC-011 (project-system) — evolves the single `Project` concept into two distinct concepts (`Mount` + `Project`)
 > **Related:** RFC-008 (memory consolidation — Dream integration), RFC-011 Phase 1–4
@@ -426,6 +426,21 @@ Agents still **cannot** create or remove Mounts/Projects — those remain user-l
 - [x] Mount re-scan trigger (`POST /api/mounts/:id/rescan`)
 - [x] Drag-to-reparent sessions between Projects (HTML5 drag-and-drop)
 - [x] One-time data migration: legacy Project `paths` → Mounts (idempotent, runs at startup)
+
+**Phase 5 — Frequent-path auto-promotion** ✅
+- [x] `mount::path_promotion` — extract paths from session trajectories (tool
+  calls) + user messages, normalize to project roots via marker walk-up
+  (`Cargo.toml`, `package.json`, `.git`, …), tally within a sliding window
+- [x] `MountManager::promote_frequent_paths()` — promotes roots crossing the
+  threshold into Mounts (`MountSource::AutoPromoted`), seeds `auto_meta`, skips
+  already-covered roots and name collisions
+- [x] Background scanner (Dream-cadence) wired in the kernel assembler; reads
+  `load_all_sessions()` so it sees full trajectories
+- [x] `MountsConfig` (`[mounts]` in config.toml): `auto_promote_enabled`,
+  `auto_promote_threshold` (default 3), `auto_promote_window_days` (14),
+  `auto_promote_interval_secs` (3600)
+- [x] Frontend: ✨ badge + violet chip on auto-promoted Mount cards
+- [x] 7 new tests (extraction, windowing, root collapse, threshold, coverage-skip, e2e)
 
 ## Sidebar UX: Project-Centric Chat Navigation
 

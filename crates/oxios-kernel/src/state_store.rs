@@ -463,6 +463,23 @@ impl StateStore {
         self.load_json("sessions", &session_id.0).await
     }
 
+    /// RFC-025 Phase 5: Load all sessions in full (messages + trajectories).
+    ///
+    /// Used by the Mount auto-promotion scanner, which needs trajectory
+    /// tool_args to identify paths the agent actually worked on. Cheaper to
+    /// call once per scan than `load_session` per id.
+    pub async fn load_all_sessions(&self) -> Result<Vec<Session>> {
+        let mut sessions = Vec::new();
+        if let Ok(names) = self.list_category("sessions").await {
+            for name in names {
+                if let Ok(Some(session)) = self.load_json::<Session>("sessions", &name).await {
+                    sessions.push(session);
+                }
+            }
+        }
+        Ok(sessions)
+    }
+
     /// Lists all sessions (sorted by updated_at descending).
     pub async fn list_sessions(&self) -> Result<Vec<SessionSummary>> {
         let mut sessions = Vec::new();
