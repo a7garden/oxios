@@ -2,6 +2,7 @@ import { BookOpen, Brain, FileText, Send, Square, X } from 'lucide-react'
 import { type KeyboardEvent, useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
+import { useIsTouch } from '@/hooks/use-is-touch'
 import { useKnowledgeSearch } from '@/hooks/use-knowledge'
 import { useMemorySemanticSearch } from '@/hooks/use-memory'
 import { cn } from '@/lib/utils'
@@ -63,6 +64,7 @@ export function ChatInput({
   const { t } = useTranslation()
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const [isComposing, setIsComposing] = useState(false)
+  const isTouch = useIsTouch()
 
   // ── @mention state ──
   const [mentionQuery, setMentionQuery] = useState<string | null>(null)
@@ -229,8 +231,10 @@ export function ChatInput({
     if (isComposing) return
 
     if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
-      handleSend()
+      if (!isTouch) {
+        e.preventDefault()
+        handleSend()
+      }
     }
   }
 
@@ -383,7 +387,7 @@ export function ChatInput({
                 disabled={!canSend}
                 size="icon"
                 className={cn(
-                  'h-8 w-8 rounded-lg transition-all',
+                  'h-11 w-11 rounded-lg transition-all sm:h-9 sm:w-9',
                   canSend
                     ? 'bg-primary text-primary-foreground hover:bg-primary/90'
                     : 'bg-muted text-muted-foreground',
@@ -398,7 +402,7 @@ export function ChatInput({
       </div>
 
       {/* ── Hint ── */}
-      <p className="mt-1.5 text-center text-2xs text-muted-foreground/70">
+      <p className="mt-1.5 text-center text-2xs text-muted-foreground/70 hidden sm:block">
         <kbd className="rounded border bg-muted/60 px-1.5 py-0.5 text-2xs font-mono text-muted-foreground">
           Enter
         </kbd>

@@ -40,17 +40,40 @@ function DialogContent({
   className,
   children,
   showCloseButton = true,
+  mobileSheet = false,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean
+  mobileSheet?: boolean
 }) {
+  const positionClasses = mobileSheet
+    ? cn(
+        'fixed inset-x-0 bottom-0 z-50 w-full',
+        'translate-y-0 max-h-[90vh] max-h-[90dvh] overflow-y-auto',
+        'rounded-t-2xl rounded-b-none pb-[env(safe-area-inset-bottom)]',
+        'sm:inset-x-auto sm:bottom-auto sm:top-[50%] sm:left-[50%]',
+        'sm:translate-x-[-50%] sm:translate-y-[-50%]',
+        'sm:rounded-t-lg sm:rounded-b-lg sm:max-h-[calc(100dvh-2rem)]',
+        'sm:max-w-lg',
+        'transition-none',
+        'data-[state=open]:animate-in data-[state=open]:fade-in-0',
+        'data-[state=closed]:animate-out data-[state=closed]:fade-out-0',
+      )
+    : cn(
+        'fixed top-[50%] left-[50%] z-50 translate-x-[-50%] translate-y-[-50%]',
+        'max-h-[100vh] max-h-[calc(100dvh-2rem)] overflow-y-auto',
+        'data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95',
+        'data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95',
+      )
+
   return (
     <DialogPortal data-slot="dialog-portal">
       <DialogOverlay />
       <DialogPrimitive.Content
         data-slot="dialog-content"
         className={cn(
-          'fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border bg-background p-6 shadow-lg duration-200 outline-none data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 sm:max-w-lg',
+          'z-50 grid w-full max-w-[calc(100%-2rem)] gap-4 rounded-lg border bg-background p-6 shadow-lg duration-200 outline-none sm:max-w-lg',
+          positionClasses,
           className,
         )}
         {...props}

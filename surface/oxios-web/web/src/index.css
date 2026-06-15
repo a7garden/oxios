@@ -250,6 +250,10 @@
     -webkit-user-select: none;
     user-select: none;
   }
+  
+  button, [role='button'], a {
+    -webkit-tap-highlight-color: transparent;
+  }
 }
 
 /* ============================================================================
@@ -358,3 +362,17 @@
     background: oklch(0.5 0 0 / 0.5);
   }
 }
+
+@layer utilities {
+  .pt-safe { padding-top: env(safe-area-inset-top); }
+  .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+  .pl-safe { padding-left: env(safe-area-inset-left); }
+  .pr-safe { padding-right: env(safe-area-inset-right); }
+  .p-safe { padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+  .tap-feedback { transition: transform 100ms ease; }
+  .tap-feedback:active { transform: scale(0.97); }
+}
+
+/* ReactFlow Controls touch target */
+.react-flow__controls-button { height: 36px; width: 36px; }
+@media (pointer: coarse) { .react-flow__controls-button { height: 44px; width: 44px; } }

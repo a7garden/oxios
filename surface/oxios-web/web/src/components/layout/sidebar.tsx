@@ -181,9 +181,9 @@ export function Sidebar() {
   return (
     <aside
       className={cn(
-        'flex h-full w-60 flex-col overflow-hidden border-r bg-sidebar text-sidebar-foreground transition-[width] duration-300 ease-[var(--animate-in-easing)]',
+        'flex h-full w-72 max-w-[85vw] flex-col overflow-hidden border-r bg-sidebar text-sidebar-foreground transition-[width] duration-300 ease-[var(--animate-in-easing)]',
         // Desktop collapses to icon rail; mobile drawer stays full width
-        collapsed ? 'lg:w-16' : 'lg:w-60',
+        collapsed ? 'lg:w-16 lg:max-w-none' : 'lg:w-60 lg:max-w-none',
       )}
     >
       {/* Header — brand + collapse toggle */}

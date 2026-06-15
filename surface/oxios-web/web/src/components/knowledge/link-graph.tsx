@@ -34,7 +34,11 @@ export function LinkGraph({ className }: LinkGraphProps) {
   })
 
   return (
-    <svg viewBox="0 0 300 300" className={className} style={{ maxWidth: '100%' }}>
+    <svg
+      viewBox="0 0 300 300"
+      className={className}
+      style={{ maxWidth: '100%', touchAction: 'manipulation' }}
+    >
       {/* Edges */}
       {edges.map((edge, i) => {
         const from = positions.get(edge.source)
@@ -63,15 +67,16 @@ export function LinkGraph({ className }: LinkGraphProps) {
             <circle
               cx={pos.x}
               cy={pos.y}
-              r={isActive ? 8 : 5}
+              r={isActive ? 9 : 7}
               fill={isActive ? 'var(--primary)' : 'var(--muted-foreground)'}
               opacity={isActive ? 1 : 0.6}
             />
+            <circle cx={pos.x} cy={pos.y} r="14" fill="transparent" />
             <text
               x={pos.x}
               y={pos.y + 14}
               textAnchor="middle"
-              className="text-[7px] fill-muted-foreground"
+              className="text-[9px] fill-muted-foreground sm:text-[7px]"
             >
               {node.label.length > 12 ? `${node.label.slice(0, 12)}…` : node.label}
             </text>

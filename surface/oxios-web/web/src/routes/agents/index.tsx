@@ -3,7 +3,7 @@ import { createFileRoute, useNavigate, useSearch } from '@tanstack/react-router'
 import { Bot, Search, X } from 'lucide-react'
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { DataTable } from '@/components/shared/data-table'
+import { type Column, DataTable } from '@/components/shared/data-table'
 import { EmptyState } from '@/components/shared/empty-state'
 import { ErrorState } from '@/components/shared/error-state'
 import { LoadingTable } from '@/components/shared/loading'
@@ -156,9 +156,10 @@ function AgentsListPage() {
   const agents = data?.items ?? []
 
   // -- Columns --
-  const columns = [
+  const columns: Column<AgentListItem>[] = [
     {
       header: t('agents.name'),
+      mobilePriority: 'primary',
       accessor: (row: AgentListItem) => (
         <div className="flex items-center gap-2">
           <Bot className="h-4 w-4 shrink-0 text-muted-foreground" />
@@ -168,12 +169,14 @@ function AgentsListPage() {
     },
     {
       header: t('agents.status'),
+      mobilePriority: 'secondary',
       accessor: (row: AgentListItem) => (
         <StatusIndicator status={row.status?.toLowerCase() ?? 'unknown'} />
       ),
     },
     {
       header: t('agents.cost', 'Cost'),
+      mobilePriority: 'secondary',
       accessor: (row: AgentListItem) =>
         row.cost_usd > 0 ? (
           <span className="text-xs font-mono">${row.cost_usd.toFixed(4)}</span>
@@ -183,6 +186,7 @@ function AgentsListPage() {
     },
     {
       header: t('agents.duration', 'Duration'),
+      mobilePriority: 'hidden',
       accessor: (row: AgentListItem) =>
         row.duration_secs != null ? (
           <span className="text-xs">{formatDuration(row.duration_secs)}</span>
@@ -194,12 +198,14 @@ function AgentsListPage() {
     },
     {
       header: t('agents.created'),
+      mobilePriority: 'hidden',
       accessor: (row: AgentListItem) => (
         <span className="text-xs">{new Date(row.created_at).toLocaleString()}</span>
       ),
     },
     {
       header: t('agents.session', 'Session'),
+      mobilePriority: 'hidden',
       accessor: (row: AgentListItem) =>
         row.session_id ? (
           <span className="text-xs text-muted-foreground truncate max-w-[120px] block">
@@ -211,6 +217,7 @@ function AgentsListPage() {
     },
     {
       header: t('agents.tokens', 'Tokens'),
+      mobilePriority: 'secondary',
       accessor: (row: AgentListItem) =>
         row.tokens_used > 0 ? (
           <span className="text-xs">{row.tokens_used.toLocaleString()}</span>

@@ -52,7 +52,7 @@ export function AppLayout() {
   }, [mobileOpen, setMobileOpen])
 
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="flex h-[100vh] h-dvh overflow-hidden">
       {/* ── Desktop sidebar — persistent, width-collapsible ── */}
       <div className="hidden lg:flex">
         <Sidebar />

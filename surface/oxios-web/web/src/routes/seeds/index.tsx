@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { Dna } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { DataTable } from '@/components/shared/data-table'
+import { type Column, DataTable } from '@/components/shared/data-table'
 import { EmptyState } from '@/components/shared/empty-state'
 import { ErrorState } from '@/components/shared/error-state'
 import { LoadingTable } from '@/components/shared/loading'
@@ -30,17 +30,20 @@ function SeedsListPage() {
 
   const seeds = Array.isArray(data?.items) ? data.items : []
 
-  const columns = [
+  const columns: Column<Seed>[] = [
     {
       header: t('seeds.goal'),
+      mobilePriority: 'primary',
       accessor: (row: Seed) => <span className="font-medium">{row.goal}</span>,
     },
     {
       header: t('seeds.constraints'),
+      mobilePriority: 'secondary',
       accessor: (row: Seed) => <Badge variant="outline">{row.constraints_count}</Badge>,
     },
     {
       header: t('seeds.created'),
+      mobilePriority: 'hidden',
       accessor: (row: Seed) => (row.created_at ? new Date(row.created_at).toLocaleString() : '—'),
     },
   ]

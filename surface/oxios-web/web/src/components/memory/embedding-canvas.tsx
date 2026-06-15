@@ -147,6 +147,7 @@ export function EmbeddingCanvas({
   // Initial-fit flag — we want to fit-once, not on every prop change.
   const hasFittedRef = useRef(false)
 
+  const [isPanning, setIsPanning] = useState(false)
   const [size, setSize] = useState({ width: 600, height: 400 })
 
   // Hold the d3-zoom behavior in a ref so resize/edge-threshold changes
@@ -293,6 +294,8 @@ export function EmbeddingCanvas({
     if (!canvas) return
     const z: ZoomBehavior<HTMLCanvasElement, unknown> = zoom<HTMLCanvasElement, unknown>()
       .scaleExtent([0.2, 8])
+      .on('start', () => setIsPanning(true))
+      .on('end', () => setIsPanning(false))
       .on('zoom', (event) => {
         transformRef.current = { k: event.transform.k, x: event.transform.x, y: event.transform.y }
         requestDraw()
@@ -571,7 +574,13 @@ export function EmbeddingCanvas({
           }
         }}
         onClick={handleClick}
-        style={{ display: 'block', width: '100%', height: '100%', cursor: 'grab' }}
+        style={{
+          display: 'block',
+          width: '100%',
+          height: '100%',
+          cursor: isPanning ? 'grabbing' : 'grab',
+          touchAction: 'none',
+        }}
       />
     </div>
   )

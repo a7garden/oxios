@@ -25,6 +25,8 @@ export interface Column<T> {
   }
   /** Additional CSS class for cells */
   className?: string
+  /** Mobile card view priority */
+  mobilePriority?: 'primary' | 'secondary' | 'hidden'
 }
 
 export interface DataTableProps<T> {
@@ -67,6 +69,8 @@ export interface DataTableProps<T> {
   // Pagination
   /** Enable pagination with given page size */
   pagination?: { pageSize: number }
+  /** Show mobile card view (dual-render: hidden on md+ via CSS) */
+  mobileCardView?: boolean
 
   // Display
   /** Empty state message */
@@ -102,6 +106,45 @@ function getStringValue<T>(row: T, key: keyof T): string {
 }
 
 // ---------------------------------------------------------------------------
+// CardRow (mobile card view)
+// ---------------------------------------------------------------------------
+
+function CardRow<T>({
+  row,
+  columns,
+  onRowClick,
+}: {
+  row: T
+  columns: Column<T>[]
+  onRowClick?: (row: T) => void
+}) {
+  const primary = columns.find((c) => c.mobilePriority === 'primary')
+  const secondary = columns.filter((c) => c.mobilePriority === 'secondary')
+
+  return (
+    <button
+      type="button"
+      onClick={() => onRowClick?.(row)}
+      className="w-full text-left p-4 hover:bg-muted/50 active:bg-muted transition-colors"
+    >
+      {primary && (
+        <div className="font-medium text-sm truncate">{getCellValue(row, primary.accessor)}</div>
+      )}
+      {secondary.length > 0 && (
+        <div className="mt-1 grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-muted-foreground">
+          {secondary.map((col) => (
+            <div key={String(col.accessor)} className="flex gap-1 min-w-0">
+              <span className="opacity-60 shrink-0">{col.header}:</span>
+              <span className="truncate">{getCellValue(row, col.accessor)}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </button>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // DataTable
 // ---------------------------------------------------------------------------
 
@@ -120,6 +163,7 @@ export function DataTable<T>({
   defaultSortKey,
   defaultSortDir,
   pagination,
+  mobileCardView,
   emptyMessage,
   loading,
   caption,
@@ -246,8 +290,8 @@ export function DataTable<T>({
         </div>
       )}
 
-      {/* Table */}
-      <div className="overflow-x-auto">
+      {/* Table — hidden on mobile when card view active */}
+      <div className={cn('overflow-x-auto', mobileCardView && 'hidden md:block')}>
         <table className="w-full" aria-label={caption}>
           {caption && <caption className="sr-only">{caption}</caption>}
           <thead>
@@ -342,6 +386,15 @@ export function DataTable<T>({
             onPageChange={setPage}
             onLimitChange={setPageSize}
           />
+        </div>
+      )}
+
+      {/* Mobile card view */}
+      {mobileCardView !== false && (
+        <div className="divide-y md:hidden">
+          {paginated.map((row) => (
+            <CardRow key={keyExtractor(row)} row={row} columns={columns} onRowClick={onRowClick} />
+          ))}
         </div>
       )}
     </div>

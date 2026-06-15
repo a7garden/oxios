@@ -189,6 +189,10 @@ export function InteractiveTopology({
           proOptions={{ hideAttribution: true }}
           minZoom={0.3}
           maxZoom={2}
+          zoomOnPinch
+          panOnDrag
+          zoomOnScroll
+          preventScrolling
           nodesDraggable
           nodesConnectable={false}
           edgesFocusable

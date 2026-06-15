@@ -16,6 +16,21 @@ export default defineConfig({
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
     },
+    {
+      name: 'mobile-safari',
+      use: { ...devices['iPhone 15'] },
+      testMatch: /.*\.mobile\.spec\.ts/,
+    },
+    {
+      name: 'mobile-chrome',
+      use: { ...devices['Pixel 7'] },
+      testMatch: /.*\.mobile\.spec\.ts/,
+    },
+    {
+      name: 'tablet',
+      use: { ...devices['iPad (gen 10)'] },
+      testMatch: /.*\.mobile\.spec\.ts/,
+    },
   ],
   webServer: {
     command: 'bun run dev',

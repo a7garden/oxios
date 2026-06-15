@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { Clock, Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { DataTable } from '@/components/shared/data-table'
+import { type Column, DataTable } from '@/components/shared/data-table'
 import { EmptyState } from '@/components/shared/empty-state'
 import { ErrorState } from '@/components/shared/error-state'
 import { LoadingTable } from '@/components/shared/loading'
@@ -36,33 +36,43 @@ function SessionsListPage() {
 
   const sessions = Array.isArray(data?.items) ? data.items : []
 
-  const columns = [
+  const columns: Column<Session>[] = [
     {
       header: t('sessions.id'),
+      mobilePriority: 'hidden',
       accessor: (row: Session) => (
         <span className="font-mono text-xs">{row.id.slice(0, 12)}...</span>
       ),
     },
     {
       header: t('sessions.title', 'Title'),
+      mobilePriority: 'primary',
       accessor: (row: Session) => row.title ?? '—',
     },
     {
       header: t('sessions.agent'),
+      mobilePriority: 'secondary',
       accessor: (row: Session) => (row.user_id ? `${row.user_id.slice(0, 8)}...` : '—'),
     },
-    { header: t('sessions.messages'), accessor: (row: Session) => row.message_count ?? 0 },
+    {
+      header: t('sessions.messages'),
+      mobilePriority: 'secondary',
+      accessor: (row: Session) => row.message_count ?? 0,
+    },
     {
       header: t('sessions.createdAt'),
+      mobilePriority: 'hidden',
       accessor: (row: Session) => new Date(row.created_at).toLocaleString(),
     },
     {
       header: t('sessions.updatedAt'),
+      mobilePriority: 'hidden',
       accessor: (row: Session) =>
         row.updated_at ? new Date(row.updated_at).toLocaleString() : '—',
     },
     {
       header: '',
+      mobilePriority: 'hidden',
       accessor: (row: Session) => (
         <Button
           variant="ghost"
