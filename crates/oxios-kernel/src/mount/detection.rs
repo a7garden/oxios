@@ -8,9 +8,70 @@
 
 use std::path::PathBuf;
 
-#[cfg(test)]
-use super::MountSource;
 use super::{Mount, MountId};
+
+/// Check if `haystack` contains `needle` as a whole word (token),
+/// case-insensitive. A character is considered part of the same word only if
+/// it is an ASCII alphanumeric or `_`. This means:
+///   - Latin substring false-positives are prevented ("go" does not match
+///     "going", "rust" does not match "trust") — the adjacent ASCII letter is
+///     a word continuation, not a boundary.
+///   - A script transition is a boundary, so Korean/Japanese postpositions
+///     written without spaces ("oxios에서", "oxios로") still let the Latin
+///     name match. This codebase is Korean-user-facing, so this is the
+///     desired behaviour.
+///
+/// Unicode-safe: boundary checks examine actual characters (not raw bytes),
+/// and the search cursor is advanced one character at a time so multi-byte
+/// (e.g. CJK) haystacks never slice on a non-char-boundary.
+fn contains_word(haystack: &str, needle: &str) -> bool {
+    if needle.is_empty() {
+        return false;
+    }
+    let h: String = haystack.to_lowercase();
+    let n: String = needle.to_lowercase();
+
+    /// `true` if `c` continues the current word (ASCII alphanumeric or `_`).
+    /// Everything else — punctuation, whitespace, or a non-ASCII script char
+    /// — acts as a word boundary.
+    fn continues_word(c: char) -> bool {
+        c.is_ascii_alphanumeric() || c == '_'
+    }
+
+    let mut start = 0;
+    while start < h.len() {
+        let Some(rel) = h[start..].find(&n) else {
+            break;
+        };
+        let abs_pos = start + rel;
+        let end_pos = abs_pos + n.len();
+
+        // Character immediately before the match (if any) must be a boundary.
+        let before_ok = abs_pos == 0
+            || h[..abs_pos]
+                .chars()
+                .next_back()
+                .is_none_or(|c| !continues_word(c));
+        // Character immediately after the match (if any) must be a boundary.
+        let after_ok = end_pos >= h.len()
+            || h[end_pos..]
+                .chars()
+                .next()
+                .is_none_or(|c| !continues_word(c));
+
+        if before_ok && after_ok {
+            return true;
+        }
+        // Advance past this occurrence by exactly one character so that
+        // overlapping matches are still considered and `start` remains on a
+        // valid char boundary (required for `h[start..]` slicing).
+        start = match h[abs_pos..].char_indices().nth(1) {
+            Some((i, _)) => abs_pos + i,
+            None => h.len(),
+        };
+    }
+    false
+}
 
 /// Result of a Mount lookup attempt.
 #[derive(Debug, Clone)]
@@ -28,11 +89,13 @@ pub enum DetectionResult {
 pub fn detect_mounts(message: &str, mounts: &[Mount]) -> DetectionResult {
     let lower = message.to_lowercase();
 
-    // Layer 1: Direct name match (case-insensitive, word-ish boundary).
+    // Layer 1: Direct name match (case-insensitive, whole-word match).
     // Match the longest name first so "oxios-dev" wins over "oxios".
+    // Names shorter than 3 chars are too ambiguous for Layer 1 ("go", "ai",
+    // "os", "pi") — they are skipped here (mirrors Layer 3's `kw.len() >= 3`).
     let mut by_name: Vec<&Mount> = mounts
         .iter()
-        .filter(|m| lower.contains(&m.name.to_lowercase()))
+        .filter(|m| m.name.len() >= 3 && contains_word(&lower, &m.name))
         .collect();
     by_name.sort_by_key(|m| std::cmp::Reverse(m.name.len()));
     if let Some(m) = by_name.first() {
@@ -73,18 +136,31 @@ pub fn detect_mounts(message: &str, mounts: &[Mount]) -> DetectionResult {
     }
 
     // Layer 3: auto_meta keyword match (languages / stack / summary).
-    for mount in mounts {
-        let keywords: Vec<&str> = mount
+    //
+    // Iterate in deterministic order: most recently active first, then by
+    // name. The caller-supplied `mounts` slice order is not guaranteed stable
+    // (MountManager builds it from a HashMap), so without sorting the winner
+    // among mounts sharing a keyword would be non-deterministic.
+    let mut sorted: Vec<&Mount> = mounts.iter().collect();
+    sorted.sort_by(|a, b| {
+        b.last_active_at
+            .cmp(&a.last_active_at)
+            .then_with(|| a.name.cmp(&b.name))
+    });
+    for mount in &sorted {
+        // Split the summary into individual words so that a multi-word summary
+        // (e.g. "Agent OS in Rust") does not have to match verbatim.
+        let keywords: Vec<String> = mount
             .auto_meta
             .languages
             .iter()
             .chain(mount.auto_meta.stack.iter())
-            .chain(std::iter::once(&mount.auto_meta.summary))
-            .map(String::as_str)
+            .cloned()
+            .chain(mount.auto_meta.summary.split_whitespace().map(String::from))
             .collect();
         for kw in keywords {
             let kw = kw.trim().to_lowercase();
-            if kw.len() >= 3 && lower.contains(&kw) {
+            if kw.len() >= 3 && contains_word(&lower, &kw) {
                 return DetectionResult::Found(mount.id);
             }
         }
@@ -245,5 +321,79 @@ mod tests {
         assert!(find_by_name(&mounts, "oxios").is_some());
         assert!(find_by_name(&mounts, "Oxios").is_some());
         assert!(find_by_name(&mounts, "nonexistent").is_none());
+    }
+
+    // --- RFC-025 detection hardening (issues M1/M2/M3) ---
+
+    #[test]
+    fn test_short_name_not_substring_matched() {
+        // A mount named "go" (len < 3) must NOT match messages where it only
+        // appears as a substring of a larger word ("going", "again").
+        let mounts = vec![Mount::from_name_and_path("go", PathBuf::from("/p/go"))];
+        let result = detect_mounts("i am going there again", &mounts);
+        assert!(
+            matches!(result, DetectionResult::NoMatch { .. }),
+            "short name 'go' must not substring-match 'going'/'again'"
+        );
+    }
+
+    #[test]
+    fn test_name_word_boundary_no_substring() {
+        // A 3+ char name must not match as a substring of a larger token.
+        // "ring" (len 4) should not match "during", "string", or "brings".
+        let mounts = vec![Mount::from_name_and_path("ring", PathBuf::from("/p/ring"))];
+        let result = detect_mounts("during the string test it brings results", &mounts);
+        assert!(
+            matches!(result, DetectionResult::NoMatch { .. }),
+            "name 'ring' must not substring-match 'during'/'string'/'brings'"
+        );
+        // But it SHOULD match as a standalone word.
+        let result = detect_mounts("let's talk about ring design", &mounts);
+        assert!(matches!(result, DetectionResult::Found(_)));
+    }
+
+    #[test]
+    fn test_keyword_word_boundary_no_substring() {
+        // Layer 3 keyword "rust" must not substring-match "trust".
+        let mounts = make_mounts();
+        let result = detect_mounts("i really trust you on this", &mounts);
+        assert!(
+            matches!(result, DetectionResult::NoMatch { .. }),
+            "keyword 'rust' must not substring-match 'trust'"
+        );
+    }
+
+    #[test]
+    fn test_word_boundary_with_cjk_after() {
+        // A name followed (after a space) by CJK must still match as a word.
+        let mounts = make_mounts();
+        let result = detect_mounts("oxios 코드리뷰", &mounts);
+        assert!(matches!(result, DetectionResult::Found(id) if id == mounts[0].id));
+    }
+
+    #[test]
+    fn test_layer3_most_recent_active_wins() {
+        // Two mounts share the "rust" keyword. The more recently active one
+        // must win regardless of the order they appear in the input slice
+        // (deterministic tie-break on shared keywords — issue M3).
+        let mut oxios = Mount::from_name_and_path("oxios", PathBuf::from("/p/oxios"));
+        oxios.auto_meta.languages = vec!["rust".to_string()];
+
+        let mut oxi = Mount::from_name_and_path("oxi", PathBuf::from("/p/oxi"));
+        oxi.auto_meta.languages = vec!["rust".to_string()];
+        // Make `oxi` more recently active than `oxios`.
+        oxi.last_active_at = oxios.last_active_at + chrono::Duration::seconds(60);
+
+        // Deliberately pass them in least-recent-first order.
+        let mounts = vec![oxios, oxi];
+        let recent_id = mounts[1].id;
+        let result = detect_mounts("help with a rust project", &mounts);
+        match result {
+            DetectionResult::Found(id) => assert_eq!(
+                id, recent_id,
+                "most recently active mount should win on shared keyword"
+            ),
+            other => panic!("expected Found, got {other:?}"),
+        }
     }
 }

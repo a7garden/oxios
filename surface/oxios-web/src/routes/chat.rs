@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use axum::Json;
@@ -399,12 +400,21 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
         }
     };
 
-    // Track the last user message for session persistence.
-    // The send_task sets this before forwarding to gateway;
-    // the recv_task reads it when the response arrives.
-    // Keyed by message ID so only the matching response triggers persistence.
-    let pending_user_msg: Arc<tokio::sync::Mutex<Option<(uuid::Uuid, PendingMessage)>>> =
-        Arc::new(tokio::sync::Mutex::new(None));
+    // Track in-flight user messages for session persistence.
+    // The send_task inserts before forwarding to gateway (keyed by message
+    // ID); the recv_task removes the matching entry when the response arrives.
+    //
+    // RFC-025 Web-M3: this is a HashMap, not a single Option slot. A single
+    // slot caused the first message + response pair to be silently dropped
+    // when a user sent a second message before the first response arrived
+    // (the second insert overwrote the first, so the first response's
+    // `pending_id == msg_id` check failed and persistence was skipped).
+    //
+    // Bounded by the number of in-flight requests: each entry is removed by
+    // its matching response. If a response never arrives (e.g. agent killed),
+    // the entry stays — this is acceptable since in-flight counts are small.
+    let pending_user_msg: Arc<tokio::sync::Mutex<HashMap<uuid::Uuid, PendingMessage>>> =
+        Arc::new(tokio::sync::Mutex::new(HashMap::new()));
 
     let pending_for_send = pending_user_msg.clone();
     let bridge_for_resume = state.bridge.clone();
@@ -485,29 +495,30 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
                     // ── Persist session to disk FIRST ──
                     // Always persist, even if WS send fails later. This ensures
                     // the exchange is durable even if the connection drops mid-stream.
+                    //
+                    // RFC-025 Web-M3: check-and-remove happen under a single
+                    // lock so there is no TOCTOU window between peeking the
+                    // pending slot and taking it. The lock is released before
+                    // the async persist_session call.
                     if let Some(ref sid) = session_id {
-                        let pending = pending_user_msg.lock().await;
-                        if let Some((ref pending_id, _)) = *pending
-                            && *pending_id == msg_id {
-                                drop(pending); // release lock before async I/O
-                                let pm = {
-                                    let mut guard = pending_user_msg.lock().await;
-                                    guard.take()
-                                };
-                                if let Some((_, pm)) = pm {
-                                    persist_session(
-                                        &state_store,
-                                        sid,
-                                        pm.content.as_str(),
-                                        pm.user_id.as_str(),
-                                        &msg.content,
-                                        project_id.as_deref(),
-                                        &msg.metadata,
-                                        prune_config.clone(),
-                                    )
-                                    .await;
-                                }
-                            }
+                        let pm = {
+                            let mut guard = pending_user_msg.lock().await;
+                            guard.remove(&msg_id)
+                        };
+                        // lock released here, before async I/O
+                        if let Some(pm) = pm {
+                            persist_session(
+                                &state_store,
+                                sid,
+                                pm.content.as_str(),
+                                pm.user_id.as_str(),
+                                &msg.content,
+                                project_id.as_deref(),
+                                &msg.metadata,
+                                prune_config.clone(),
+                            )
+                            .await;
+                        }
                     }
 
                     // ── Forward to WebSocket client ──
@@ -728,13 +739,13 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
 
                             {
                                 let mut pending = pending_for_send.lock().await;
-                                *pending = Some((
+                                pending.insert(
                                     incoming.id,
                                     PendingMessage {
                                         content: answer_text,
                                         user_id: "default".to_string(),
                                     },
-                                ));
+                                );
                             }
 
                             if incoming_tx.send(incoming).await.is_err() {
@@ -774,13 +785,13 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
 
                             {
                                 let mut pending = pending_for_send.lock().await;
-                                *pending = Some((
+                                pending.insert(
                                     incoming.id,
                                     PendingMessage {
                                         content,
                                         user_id: "default".to_string(),
                                     },
-                                ));
+                                );
                             }
 
                             if incoming_tx.send(incoming).await.is_err() {

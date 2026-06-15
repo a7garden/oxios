@@ -333,6 +333,21 @@ impl Orchestrator {
             }
         }
 
+        // Legacy fallback (RFC-025 migration window): a Project created
+        // before Mounts may carry explicit `paths` but no `mount_ids`. In
+        // that case grant path access directly so pre-RFC-025 Projects still
+        // resolve a CWD and populate `allowed_paths` (see agent_runtime.rs).
+        if let Some(project) = &project_for_instructions
+            && project.mount_ids.is_empty()
+            && !project.paths.is_empty()
+        {
+            for p in &project.paths {
+                if !paths.contains(p) {
+                    paths.push(p.clone());
+                }
+            }
+        }
+
         // Display tag.
         let tag = if mounts.len() == 1 {
             mounts[0].tag()
@@ -1472,7 +1487,7 @@ impl Orchestrator {
             cspace_hint: None,
             original_request: parent_seed.original_request.clone(),
             output_schema: None,
-            project_id: None,
+            project_id: parent_seed.project_id,
             workspace_context: parent_seed.workspace_context.clone(),
             mount_paths: parent_seed.mount_paths.clone(),
         };
@@ -1922,7 +1937,7 @@ async fn run_via_lifecycle(
         cspace_hint: None,
         original_request: parent_seed.original_request.clone(),
         output_schema: None,
-        project_id: None,
+        project_id: parent_seed.project_id,
         workspace_context: parent_seed.workspace_context.clone(),
         mount_paths: parent_seed.mount_paths.clone(),
     };

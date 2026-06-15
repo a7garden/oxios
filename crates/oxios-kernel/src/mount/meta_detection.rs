@@ -152,25 +152,45 @@ fn extract_stack(marker: &str, path: &Path, stack: &mut Vec<String>) {
 
     match marker {
         "Cargo.toml" => {
-            // Look for crate names in [dependencies] / [workspace.dependencies].
+            // Track the current TOML section so we only extract crate names
+            // from dependency sections. Without this, fields from `[package]`
+            // (name, edition, authors, license, …) leak into the stack.
+            let mut current_section = String::new();
+            let dep_sections = ["dependencies", "dev-dependencies", "build-dependencies"];
+
             for line in content.lines() {
                 let trimmed = line.trim();
-                if let Some(name) = trimmed.strip_suffix(" = ") {
-                    push(stack, name.trim());
-                } else if let Some(eq_pos) = trimmed.find('=') {
-                    let name = trimmed[..eq_pos].trim();
-                    // Only dependency-style lines (not section headers).
-                    if !name.starts_with('[')
-                        && !name.is_empty()
-                        && ![
-                            "path",
-                            "version",
-                            "features",
-                            "default-features",
-                            "optional",
-                        ]
-                        .contains(&name)
+                // Track section headers like `[dependencies]` or
+                // `[dependencies.serde]` (also `[workspace.dependencies]`).
+                if trimmed.starts_with('[') && trimmed.ends_with(']') {
+                    current_section = trimmed
+                        .trim_start_matches('[')
+                        .trim_end_matches(']')
+                        .to_string();
+                    // Dotted-table form: `[dependencies.serde]` or
+                    // `[workspace.dependencies.serde]` — the trailing segment
+                    // after the dependency-section name is the crate name.
+                    if let Some(suffix) =
+                        crate_suffix_of_dep_section(&current_section, &dep_sections)
                     {
+                        let crate_name = suffix.split('.').next().unwrap_or(suffix);
+                        push(stack, crate_name);
+                    }
+                    continue;
+                }
+                // For *bare* dependency sections (e.g. `[dependencies]`),
+                // the `=` keys are crate names. Dotted tables were handled
+                // above via their section header; their sub-keys (version,
+                // path, features, …) must not be pushed.
+                let is_bare_dep_section = dep_sections.iter().any(|ds| {
+                    current_section == *ds || current_section == format!("workspace.{ds}")
+                });
+                if !is_bare_dep_section {
+                    continue;
+                }
+                if let Some(eq_pos) = trimmed.find('=') {
+                    let name = trimmed[..eq_pos].trim();
+                    if !name.is_empty() {
                         push(stack, name);
                     }
                 }
@@ -229,6 +249,23 @@ fn extract_stack(marker: &str, path: &Path, stack: &mut Vec<String>) {
     stack.truncate(8);
 }
 
+/// If `section` (a normalized TOML header without brackets, e.g.
+/// `dependencies.serde` or `workspace.dependencies.serde`) names a *dotted*
+/// dependency table, return the substring after the dependency-section prefix
+/// (the crate name, possibly dotted). Returns `None` for bare sections like
+/// `dependencies` and for non-dependency sections like `package`.
+fn crate_suffix_of_dep_section<'a>(section: &'a str, dep_sections: &[&str]) -> Option<&'a str> {
+    for ds in dep_sections {
+        if let Some(rest) = section.strip_prefix(&format!("{ds}.")) {
+            return Some(rest);
+        }
+        if let Some(rest) = section.strip_prefix(&format!("workspace.{ds}.")) {
+            return Some(rest);
+        }
+    }
+    None
+}
+
 /// Take the first non-heading, non-empty line as a summary seed.
 fn first_meaningful_line(content: &str) -> String {
     for line in content.lines() {
@@ -281,6 +318,77 @@ mod tests {
         assert!(meta.stack.iter().any(|s| s == "tokio"));
         assert!(meta.stack.iter().any(|s| s == "axum"));
         assert!(!meta.summary.is_empty());
+    }
+
+    #[test]
+    fn test_extract_stack_ignores_non_dependency_sections() {
+        // RFC-025 fix: `[package]` fields must not leak into the stack.
+        let dir = TempDir::new().unwrap();
+        fs::write(
+            dir.path().join("Cargo.toml"),
+            [
+                "[package]",
+                "name = \"foo\"",
+                "edition = \"2021\"",
+                "authors = [\"a\"]",
+                "description = \"desc\"",
+                "license = \"MIT\"",
+                "",
+                "[dependencies]",
+                "tokio = { version = \"1\", features = [\"full\"] }",
+                "serde = \"1.0\"",
+                "",
+                "[dev-dependencies]",
+                "pretty_assertions = \"1\"",
+                "",
+                "[dependencies.axum]",
+                "version = \"0.7\"",
+                "features = [\"json\"]",
+            ]
+            .join("\n"),
+        )
+        .unwrap();
+
+        let meta = detect_meta(dir.path());
+        // Real deps are captured (bare section + dotted table).
+        assert!(
+            meta.stack.iter().any(|s| s == "tokio"),
+            "tokio missing: {meta:?}"
+        );
+        assert!(
+            meta.stack.iter().any(|s| s == "serde"),
+            "serde missing: {meta:?}"
+        );
+        assert!(
+            meta.stack.iter().any(|s| s == "axum"),
+            "dotted-table crate name missing: {meta:?}"
+        );
+        assert!(
+            meta.stack.iter().any(|s| s == "pretty_assertions"),
+            "dev-dep missing: {meta:?}"
+        );
+        // `[package]` fields must NOT appear.
+        assert!(
+            !meta.stack.iter().any(|s| s == "name"),
+            "name leaked: {meta:?}"
+        );
+        assert!(
+            !meta.stack.iter().any(|s| s == "edition"),
+            "edition leaked: {meta:?}"
+        );
+        assert!(
+            !meta.stack.iter().any(|s| s == "authors"),
+            "authors leaked: {meta:?}"
+        );
+        // Dotted-table sub-keys must NOT appear.
+        assert!(
+            !meta.stack.iter().any(|s| s == "version"),
+            "version leaked: {meta:?}"
+        );
+        assert!(
+            !meta.stack.iter().any(|s| s == "features"),
+            "features leaked: {meta:?}"
+        );
     }
 
     #[test]
