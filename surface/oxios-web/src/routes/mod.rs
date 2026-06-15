@@ -25,6 +25,7 @@ mod marketplace;
 mod project_routes;
 mod resource_routes;
 mod system;
+mod tools;
 mod workspace;
 
 use std::sync::Arc;
@@ -92,6 +93,7 @@ pub(crate) use infra::{
     handle_permissions_put, handle_scheduler_stats, handle_scheduler_tasks,
     handle_security_permissions,
 };
+pub(crate) use tools::handle_tools_registry;
 pub(crate) use knowledge_routes::{
     handle_knowledge_backlinks, handle_knowledge_chat_append, handle_knowledge_chat_delete,
     handle_knowledge_chat_messages, handle_knowledge_chat_move, handle_knowledge_checklist_add,
@@ -442,6 +444,8 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
             "/api/projects/{id}/memories/{memoryId}",
             delete(handle_project_unlink_memory),
         )
+        // Tool Registry (for settings UI)
+        .route("/api/tools/registry", get(handle_tools_registry))
         // Budget
         .route("/api/budget", get(handle_budget_list))
         .route("/api/budget/{agent_id}", get(handle_budget_get))

@@ -6,7 +6,8 @@ use crate::event_bus::{EventBus, KernelEvent};
 use crate::git_layer::{GitLayer, LogEntry};
 use crate::resource_monitor::{ResourceMonitor, ResourceSnapshot};
 use crate::scheduler::{AgentScheduler, ScheduledTask, SchedulerStats};
-use crate::tools::PendingToolApprovals;
+use crate::tools::{PendingToolApprovals, known_tools};
+use crate::ToolMeta;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -187,5 +188,10 @@ impl InfraApi {
     /// Access the pending tool approvals registry.
     pub fn pending_tool_approvals(&self) -> &PendingToolApprovals {
         &self.pending_tool_approvals
+    }
+
+    /// List all known tool metadata (static catalog).
+    pub fn list_available_tools(&self) -> &'static [ToolMeta] {
+        known_tools()
     }
 }

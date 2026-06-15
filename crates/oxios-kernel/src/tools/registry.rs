@@ -1,0 +1,105 @@
+//! Tool metadata registry — known tools catalog for the frontend.
+//!
+//! This module provides a static catalog of all Oxios kernel tools
+//! and their metadata (name, description, category). The frontend
+//! settings UI uses this via `GET /api/tools/registry` to render
+//! the `allowed_tools` multi-select widget.
+//!
+//! The catalog is a superset of the tools registered in
+//! [`super::registration::register_tools_from_cspace_gated`].
+//! It includes all always-on tools and all CSpace-driven tools.
+//!
+//! MCP tools are dynamically registered per-server and are NOT
+//! included here. Users can type MCP tool names manually when
+//! customising the `allowed_tools` list.
+
+use serde::Serialize;
+
+/// Metadata for a single tool in the registry.
+#[derive(Debug, Clone, Serialize)]
+pub struct ToolMeta {
+    /// Tool identifier (matches `AgentTool::name()`).
+    pub name: &'static str,
+    /// Human-readable description key (frontend translates via i18n).
+    pub description_key: &'static str,
+    /// Category slug for UI grouping.
+    pub category: &'static str,
+}
+
+impl ToolMeta {
+    pub const fn new(name: &'static str, description_key: &'static str, category: &'static str) -> Self {
+        Self { name, description_key, category }
+    }
+}
+
+/// Return the full static tool catalog.
+///
+/// This is the single source of truth for "which tools exist" shown
+/// in the frontend settings. The list mirrors
+/// [`super::registration`] — always-on tools + CSpace-driven tools.
+pub fn known_tools() -> &'static [ToolMeta] {
+    &TOOL_CATALOG
+}
+
+const TOOL_CATALOG: &[ToolMeta] = &[
+    // ── Always-on tools (registered for every agent) ──────────────
+    ToolMeta::new("read",              "tools.read",            "fs"),
+    ToolMeta::new("write",             "tools.write",           "fs"),
+    ToolMeta::new("edit",              "tools.edit",            "fs"),
+    ToolMeta::new("grep",              "tools.grep",            "fs"),
+    ToolMeta::new("find",              "tools.find",            "fs"),
+    ToolMeta::new("ls",                "tools.ls",              "fs"),
+    ToolMeta::new("web_search",        "tools.webSearch",       "comms"),
+    ToolMeta::new("get_search_results","tools.getSearchResults","comms"),
+    // ── Kernel domain tools (CSpace-driven) ───────────────────────
+    ToolMeta::new("exec",              "tools.exec",            "exec"),
+    ToolMeta::new("browse",            "tools.browse",          "comms"),
+    ToolMeta::new("memory_read",       "tools.memoryRead",      "memory"),
+    ToolMeta::new("memory_write",      "tools.memoryWrite",     "memory"),
+    ToolMeta::new("memory_search",     "tools.memorySearch",    "memory"),
+    ToolMeta::new("project",           "tools.project",         "system"),
+    ToolMeta::new("kernel_agent",      "tools.kernelAgent",     "system"),
+    ToolMeta::new("a2a_delegate",      "tools.a2aDelegate",     "a2a"),
+    ToolMeta::new("a2a_send",          "tools.a2aSend",         "a2a"),
+    ToolMeta::new("a2a_query",         "tools.a2aQuery",        "a2a"),
+    ToolMeta::new("persona",           "tools.persona",         "system"),
+    ToolMeta::new("cron",              "tools.cron",            "system"),
+    ToolMeta::new("security",          "tools.security",        "system"),
+    ToolMeta::new("budget",            "tools.budget",          "system"),
+    ToolMeta::new("resource",          "tools.resource",        "system"),
+    ToolMeta::new("knowledge",         "tools.knowledge",       "system"),
+    ToolMeta::new("calendar",          "tools.calendar",        "system"),
+    ToolMeta::new("send_email",        "tools.sendEmail",       "comms"),
+];
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn catalog_is_populated() {
+        let tools = known_tools();
+        assert!(!tools.is_empty(), "tool catalog should not be empty");
+        assert!(tools.iter().any(|t| t.name == "read"), "read tool should be in catalog");
+        assert!(tools.iter().any(|t| t.name == "exec"), "exec tool should be in catalog");
+        assert!(tools.iter().any(|t| t.name == "memory_read"), "memory_read should be in catalog");
+    }
+
+    #[test]
+    fn all_tools_have_required_fields() {
+        for tool in known_tools() {
+            assert!(!tool.name.is_empty(), "tool name should not be empty");
+            assert!(!tool.description_key.is_empty(), "description_key should not be empty");
+            assert!(!tool.category.is_empty(), "category should not be empty");
+        }
+    }
+
+    #[test]
+    fn no_duplicate_names() {
+        let names: Vec<&str> = known_tools().iter().map(|t| t.name).collect();
+        let mut sorted = names.clone();
+        sorted.sort();
+        sorted.dedup();
+        assert_eq!(names.len(), sorted.len(), "duplicate tool names found");
+    }
+}

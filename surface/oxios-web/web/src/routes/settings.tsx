@@ -60,7 +60,7 @@ export const Route = createFileRoute('/settings')({
 // `SectionCard` components, but their declarations still live in this
 // file because they share form-state plumbing with the new sections.
 
-type FieldType = 'text' | 'number' | 'password' | 'toggle' | 'select'
+type FieldType = 'text' | 'number' | 'password' | 'toggle' | 'select' | 'range'
 
 interface LegacyField {
   key: string
@@ -144,7 +144,9 @@ const legacyFieldDefs: [string, LegacyField[]][] = [
         key: 'max_agents',
         labelKey: tKeys.maxConcurrentAgents,
         descriptionKey: tKeys.maxConcurrentAgentsDescription,
-        type: 'number',
+        type: 'range',
+        min: 1,
+        max: 50,
         placeholder: '10',
         hotReload: false,
         restartScope: 'kernel',
@@ -167,7 +169,9 @@ const legacyFieldDefs: [string, LegacyField[]][] = [
         key: 'max_concurrent',
         labelKey: tKeys.maxConcurrentTasks,
         descriptionKey: tKeys.maxConcurrentTasksDescription,
-        type: 'number',
+        type: 'range',
+        min: 1,
+        max: 20,
         placeholder: '5',
         hotReload: true,
         restartScope: 'kernel',
@@ -185,7 +189,10 @@ const legacyFieldDefs: [string, LegacyField[]][] = [
         key: 'zombie_timeout_secs',
         labelKey: tKeys.zombieTimeoutS,
         descriptionKey: tKeys.zombieTimeoutSDescription,
-        type: 'number',
+        type: 'range',
+        min: 30,
+        max: 900,
+        step: 30,
         placeholder: '300',
         hotReload: true,
         restartScope: 'kernel',
@@ -199,7 +206,9 @@ const legacyFieldDefs: [string, LegacyField[]][] = [
         key: 'max_evolution_iterations',
         labelKey: tKeys.maxEvolutionIterations,
         descriptionKey: tKeys.maxEvolutionIterationsDescription,
-        type: 'number',
+        type: 'range',
+        min: 1,
+        max: 10,
         placeholder: '3',
         hotReload: false,
         restartScope: 'kernel',
@@ -208,7 +217,10 @@ const legacyFieldDefs: [string, LegacyField[]][] = [
         key: 'min_evaluation_score',
         labelKey: tKeys.minEvaluationScore,
         descriptionKey: tKeys.minEvaluationScoreDescription,
-        type: 'number',
+        type: 'range',
+        min: 0,
+        max: 1,
+        step: 0.05,
         placeholder: '0.8',
         hotReload: false,
         restartScope: 'kernel',
@@ -231,7 +243,10 @@ const legacyFieldDefs: [string, LegacyField[]][] = [
         key: 'cache_limit_entries',
         labelKey: tKeys.cacheEntryLimit,
         descriptionKey: tKeys.cacheEntryLimitDescription,
-        type: 'number',
+        type: 'range',
+        min: 5,
+        max: 200,
+        step: 5,
         placeholder: '50',
         hotReload: false,
         restartScope: 'kernel',
@@ -268,7 +283,10 @@ const legacyFieldDefs: [string, LegacyField[]][] = [
         key: 'max_sessions',
         labelKey: tKeys.maxSessions,
         descriptionKey: tKeys.maxSessionsDescription,
-        type: 'number',
+        type: 'range',
+        min: 10,
+        max: 500,
+        step: 10,
         placeholder: '100',
         hotReload: false,
         restartScope: 'kernel',
@@ -277,7 +295,10 @@ const legacyFieldDefs: [string, LegacyField[]][] = [
         key: 'ttl_hours',
         labelKey: tKeys.sessionTTLHours,
         descriptionKey: tKeys.sessionTTLHoursDescription,
-        type: 'number',
+        type: 'range',
+        min: 1,
+        max: 720,
+        step: 24,
         placeholder: '168',
         hotReload: false,
         restartScope: 'kernel',
@@ -583,7 +604,7 @@ function SettingsPage() {
         const val = formValues[sectionKey]?.[field.key]
         if (val === undefined) continue
         if (field.type === 'toggle') sectionValues[field.key] = Boolean(val)
-        else if (field.type === 'number') {
+        else if (field.type === 'number' || field.type === 'range') {
           const num = Number(val)
           if (!Number.isNaN(num) && val !== '') sectionValues[field.key] = num
         } else if (val !== '') sectionValues[field.key] = val
@@ -617,7 +638,7 @@ function SettingsPage() {
             .map((s) => Number(s.trim()))
             .filter((n) => !Number.isNaN(n))
           setNestedValue(bucket, field.key, arr)
-        } else if (field.type === 'number') {
+        } else if (field.type === 'number' || field.type === 'range') {
           const num = Number(raw)
           if (!Number.isNaN(num)) setNestedValue(bucket, field.key, num)
         } else {

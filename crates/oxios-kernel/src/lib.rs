@@ -219,6 +219,7 @@ pub use skill::{
     SkillSnapshot, SkillSource, SkillState, SkillStatus,
 };
 pub use tools::tool_types::{ArgumentDef, ToolDef};
+pub use tools::ToolMeta;
 pub use tools::{ExecTool, KnowledgeTool};
 #[cfg(feature = "wasm-sandbox")]
 pub use wasm_sandbox::{ResourceKind, WasmConfig, WasmError, WasmSandbox};

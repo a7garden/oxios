@@ -12,6 +12,7 @@ pub mod mcp_tool;
 pub mod memory_tools;
 pub mod pending_tool_approvals;
 pub mod registration;
+pub mod registry;
 pub mod retrieval;
 pub mod tool_types;
 
@@ -26,3 +27,4 @@ pub use memory_tools::{MemoryReadTool, MemorySearchTool, MemoryWriteTool};
 
 pub use kernel_bridge::OxiosKernelBridge;
 pub use pending_tool_approvals::{PendingToolApprovals, ToolApprovalResult};
+pub use registry::{ToolMeta, known_tools};

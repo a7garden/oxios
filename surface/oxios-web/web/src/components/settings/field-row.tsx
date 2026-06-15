@@ -110,6 +110,8 @@ export function FieldRow({
           value={value}
           onChange={onChange}
           disabled={isDisabled}
+          validate={validate}
+          suggestions={suggestions}
         />
       </div>
     </div>
@@ -122,12 +124,16 @@ function FieldControl({
   value,
   onChange,
   disabled,
+  validate,
+  suggestions,
 }: {
   id: string
   field: SettingsFieldDef
   value: unknown
   onChange: (v: string | boolean | string[]) => void
   disabled: boolean
+  validate?: (value: string) => string | null
+  suggestions?: { value: string; label: string; group?: string }[]
 }) {
   const { t } = useTranslation()
   switch (field.type) {
@@ -237,9 +243,50 @@ function FieldControl({
       )
     }
     case 'tags': {
-      const arr = Array.isArray(value) ? (value as string[]) : []
+      // Support both string[] (native tags) and string (migration from old CSV format).
+      const arr = Array.isArray(value)
+        ? (value as string[])
+        : String(value ?? '')
+            .split(/[\s,]+/)
+            .map((s) => s.trim())
+            .filter(Boolean)
       return (
-        <ExecAllowlistEditor value={arr} onChange={(next) => onChange(next)} disabled={disabled} />
+        <ExecAllowlistEditor
+          value={arr}
+          onChange={(next) => onChange(next)}
+          disabled={disabled}
+          validate={validate}
+          suggestions={suggestions}
+        />
+      )
+    }
+    case 'range': {
+      const numVal = Number(value) || 0
+      const min = field.min ?? 0
+      const max = field.max ?? 100
+      const step = field.step ?? 1
+      const decimals = step < 1 ? 2 : 0
+      return (
+        <div className="flex items-center gap-3 w-full">
+          <span className="text-xs text-muted-foreground tabular-nums w-6 text-right shrink-0">
+            {min}
+          </span>
+          <Slider
+            value={[numVal]}
+            min={min}
+            max={max}
+            step={step}
+            onValueChange={([v]) => onChange(String(v))}
+            disabled={disabled}
+            className="flex-1"
+          />
+          <span className="text-xs text-muted-foreground tabular-nums w-6 shrink-0">
+            {max}
+          </span>
+          <span className="text-sm font-mono tabular-nums w-14 text-right shrink-0">
+            {numVal.toFixed(decimals)}
+          </span>
+        </div>
       )
     }
     default: {
