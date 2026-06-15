@@ -2,11 +2,11 @@ use axum::Json;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::response::sse::{Event as SseEvent, Sse};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::convert::Infallible;
 use std::sync::Arc;
 use tokio_stream::StreamExt as TokioStreamExt;
-use tokio_stream::wrappers::{BroadcastStream, BroadcastStreamRecvError};
+use tokio_stream::wrappers::{BroadcastStream, errors::BroadcastStreamRecvError};
 
 use crate::error::AppError;
 use crate::routes::{PageParams, paginate};
@@ -27,6 +27,13 @@ pub(crate) struct SessionListItem {
     active_seed_id: Option<String>,
     created_at: String,
     updated_at: String,
+}
+
+/// RFC-025: Body for moving a session to a Project (drag-to-reparent).
+#[derive(Debug, Deserialize)]
+pub(crate) struct MoveSessionBody {
+    /// Target Project ID, or null to unassign (move to "unfiled").
+    pub project_id: Option<String>,
 }
 
 /// GET /api/sessions — List recent sessions (paginated).
@@ -96,6 +103,32 @@ pub(crate) async fn handle_session_delete(
         }))),
         Ok(false) => Err(StatusCode::NOT_FOUND),
         Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
+    }
+}
+
+/// PATCH /api/sessions/:id/project — Move a session to a different Project
+/// (RFC-025 drag-to-reparent). Body: `{ "project_id": "<uuid>" | null }`.
+pub(crate) async fn handle_session_move(
+    state: State<Arc<AppState>>,
+    Path(id): Path<String>,
+    body: axum::extract::Json<MoveSessionBody>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    use oxios_kernel::state_store::SessionId;
+    let session_id = SessionId(id);
+    let project_id = body.project_id.as_deref();
+    match state
+        .kernel
+        .state
+        .move_session_to_project(&session_id, project_id)
+        .await
+    {
+        Ok(true) => Ok(Json(serde_json::json!({
+            "status": "moved",
+            "id": session_id.0,
+            "project_id": project_id,
+        }))),
+        Ok(false) => Err(AppError::NotFound("Session not found".into())),
+        Err(e) => Err(AppError::Internal(format!("Failed to move session: {e}"))),
     }
 }
 
@@ -177,7 +210,6 @@ pub(crate) async fn handle_events(
                 let data = serde_json::to_string(&resync).unwrap_or_default();
                 Some(Ok(SseEvent::default().event("resync").data(data)))
             }
-            Err(_) => None,
         }
     });
 

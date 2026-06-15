@@ -106,10 +106,15 @@ pub(crate) async fn handle_chat(
             .insert("session_id".to_owned(), body.session_id.clone());
     }
 
-    // Include project_id from request if provided (for context partitioning).
-    if !body.project_id.is_empty() {
-        msg.metadata
-            .insert("project_ids".to_owned(), body.project_id.clone());
+    // RFC-025: Request project_id drives both context (orchestrator) and
+    // session grouping (sidebar tree). Capture it for session persistence.
+    let request_project_id = if !body.project_id.is_empty() {
+        Some(body.project_id.clone())
+    } else {
+        None
+    };
+    if let Some(ref pid) = request_project_id {
+        msg.metadata.insert("project_ids".to_owned(), pid.clone());
     }
     // RFC-025: include mount_ids from request (multi-path injection).
     if !body.mount_ids.is_empty() {
@@ -210,9 +215,11 @@ pub(crate) async fn handle_chat(
                                 None
                             },
                         });
-                        // Attach project_id to session metadata if provided by orchestrator
-                        if let Some(ref vid) = project_id {
-                            session.set_metadata("project_id", serde_json::json!(vid));
+                        // RFC-025: Set top-level project_id for grouping.
+                        // User-requested project_id takes priority; otherwise
+                        // keep the existing grouping.
+                        if let Some(ref pid) = request_project_id {
+                            session.project_id = Some(pid.clone());
                         }
                         // Persist execution mode (chat/ouroboros) in session metadata
                         if let Some(ref m) = mode {
@@ -248,9 +255,9 @@ pub(crate) async fn handle_chat(
                                 None
                             },
                         });
-                        // Attach project_id to session metadata if provided by orchestrator
-                        if let Some(ref vid) = project_id {
-                            session.set_metadata("project_id", serde_json::json!(vid));
+                        // RFC-025: Set top-level project_id for grouping.
+                        if let Some(ref pid) = request_project_id {
+                            session.project_id = Some(pid.clone());
                         }
                         // Persist execution mode for new session
                         if let Some(ref m) = mode {

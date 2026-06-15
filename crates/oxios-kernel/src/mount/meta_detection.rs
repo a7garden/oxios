@@ -75,10 +75,11 @@ pub fn detect_meta(path: &Path) -> MountMeta {
         if marker_path.is_file() {
             found_markers.push(marker.to_string());
             // AGENTS.md / README.md seed the summary (first paragraph).
-            if (marker == &"AGENTS.md" || marker == &"README.md") && meta.summary.is_empty() {
-                if let Ok(content) = std::fs::read_to_string(&marker_path) {
-                    meta.summary = first_meaningful_line(&content);
-                }
+            if (marker == &"AGENTS.md" || marker == &"README.md")
+                && meta.summary.is_empty()
+                && let Ok(content) = std::fs::read_to_string(&marker_path)
+            {
+                meta.summary = first_meaningful_line(&content);
             }
         }
     }

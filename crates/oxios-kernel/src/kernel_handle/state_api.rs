@@ -107,6 +107,17 @@ impl StateApi {
         self.state_store.delete_session(id).await
     }
 
+    /// RFC-025: Move a session to a different Project (drag-to-reparent).
+    pub async fn move_session_to_project(
+        &self,
+        id: &SessionId,
+        project_id: Option<&str>,
+    ) -> anyhow::Result<bool> {
+        self.state_store
+            .move_session_to_project(id, project_id)
+            .await
+    }
+
     /// Get workspace base path.
     pub fn workspace_path(&self) -> &std::path::Path {
         &self.state_store.base_path

@@ -838,6 +838,12 @@ impl KernelBuilder {
                     // Coexists with ProjectManager during the migration window.
                     match oxios_kernel::MountManager::new(db_clone, Some(event_bus.clone())) {
                         Ok(mm) => {
+                            // RFC-025: one-time migration — promote legacy
+                            // Project paths into Mounts. Idempotent: Projects
+                            // that already reference Mounts are skipped.
+                            if let Some(ref pm) = project_manager {
+                                migrate_projects_to_mounts(&mm, pm);
+                            }
                             mount_manager = Some(Arc::new(mm));
                             tracing::info!("MountManager initialized");
                         }
@@ -1379,4 +1385,74 @@ fn build_marketplace_api_value(config: &OxiosConfig) -> MarketplaceApi {
         Arc::new(skills_sh_installer),
         Arc::new(skills_sh_client),
     )
+}
+
+/// RFC-025 one-time migration: promote legacy Project paths into Mounts.
+///
+/// For each Project that has `paths` but no `mount_ids`, create a Mount
+/// named after the Project (carrying its paths) and link it via `mount_ids`.
+/// Idempotent — Projects already referencing Mounts are left untouched, and
+/// a name collision (Mount already exists) is treated as already-migrated.
+fn migrate_projects_to_mounts(
+    mount_manager: &oxios_kernel::MountManager,
+    project_manager: &ProjectManager,
+) {
+    let projects = project_manager.list_projects();
+    let mut migrated = 0usize;
+
+    for project in projects {
+        // Skip Projects that already reference Mounts (idempotent).
+        if !project.mount_ids.is_empty() {
+            continue;
+        }
+        // Skip Projects without paths — nothing to lift into a Mount.
+        if project.paths.is_empty() {
+            continue;
+        }
+
+        // A Mount named after the Project is the natural alias.
+        if mount_manager.get_mount_by_name(&project.name).is_some() {
+            tracing::debug!(
+                project = %project.name,
+                "migration skipped: Mount with this name already exists"
+            );
+            continue;
+        }
+
+        let paths: Vec<PathBuf> = project.paths.iter().map(PathBuf::from).collect();
+        match mount_manager.create_mount(
+            project.name.clone(),
+            paths,
+            oxios_kernel::MountSource::AutoDetected,
+        ) {
+            Ok(mount) => {
+                // Link the new Mount back to the Project.
+                if let Err(e) =
+                    project_manager.update_project_bundle(project.id, Some(vec![mount.id]), None)
+                {
+                    tracing::warn!(
+                        project = %project.name,
+                        error = %e,
+                        "failed to link migrated Mount to Project"
+                    );
+                } else {
+                    migrated += 1;
+                }
+            }
+            Err(e) => {
+                tracing::warn!(
+                    project = %project.name,
+                    error = %e,
+                    "failed to create Mount during migration"
+                );
+            }
+        }
+    }
+
+    if migrated > 0 {
+        tracing::info!(
+            migrated = migrated,
+            "RFC-025: migrated legacy Project paths into Mounts"
+        );
+    }
 }

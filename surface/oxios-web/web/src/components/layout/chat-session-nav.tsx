@@ -1,11 +1,20 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
-import { Plus, RefreshCw } from 'lucide-react'
+import {
+  ChevronRight,
+  FolderKanban,
+  Inbox,
+  Plus,
+  RefreshCw,
+} from 'lucide-react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { api } from '@/lib/api-client'
 import { cn } from '@/lib/utils'
+import { useMoveSession } from '@/hooks/use-sessions'
 import { useChatStore } from '@/stores/chat'
 import { useSidebarStore } from '@/stores/sidebar'
 import type { Project, Session } from '@/types'
@@ -22,7 +31,7 @@ import {
 
 // ---------------------------------------------------------------------------
 // ChatSessionNav — renders inside the main sidebar when chat mode is active.
-// Replaces the old inner ProjectSessionSidebar.
+// RFC-025: Project-tree layout (Project folders → sessions).
 // ---------------------------------------------------------------------------
 
 export function ChatSessionNav() {
@@ -36,16 +45,18 @@ export function ChatSessionNav() {
 }
 
 // ---------------------------------------------------------------------------
-// Expanded
+// Expanded — Project-tree
 // ---------------------------------------------------------------------------
 
 function ExpandedChatNav() {
   const { t } = useTranslation()
-  const activeProjectId = useChatStore((s) => s.activeProjectId)
   const activeSessionId = useChatStore((s) => s.activeSessionId)
-  const setActiveProject = useChatStore((s) => s.setActiveProject)
   const loadSession = useChatStore((s) => s.loadSession)
   const newSession = useChatStore((s) => s.newSession)
+  const moveSession = useMoveSession()
+
+  const [collapsedProjects, setCollapsedProjects] = useState<Set<string>>(new Set())
+  const [dragOverProject, setDragOverProject] = useState<string | null>(null)
 
   const { data: projectsData } = useQuery({
     queryKey: ['projects'],
@@ -54,14 +65,48 @@ function ExpandedChatNav() {
   })
 
   const { data: sessionsData, refetch: refetchSessions } = useQuery({
-    queryKey: ['sessions', activeProjectId],
+    queryKey: ['sessions'],
     queryFn: () => api.get<{ items: Session[]; total: number }>('/api/sessions'),
     refetchInterval: 10_000,
   })
 
   const projects: Project[] = Array.isArray(projectsData?.items) ? projectsData.items : []
-  const sessions: Session[] = Array.isArray(sessionsData?.items) ? sessionsData.items : []
-  const grouped = groupSessionsByDate(sessions)
+  const allSessions: Session[] = Array.isArray(sessionsData?.items) ? sessionsData.items : []
+
+  // Group sessions by project_id.
+  const sessionsByProject = new Map<string, Session[]>()
+  const unfiledSessions: Session[] = []
+  for (const s of allSessions) {
+    if (s.project_id) {
+      const arr = sessionsByProject.get(s.project_id) ?? []
+      arr.push(s)
+      sessionsByProject.set(s.project_id, arr)
+    } else {
+      unfiledSessions.push(s)
+    }
+  }
+
+  const toggleProject = (id: string) => {
+    setCollapsedProjects((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const handleDropToProject = async (projectId: string | null) => {
+    const draggedId = window.__draggedSessionId
+    setDragOverProject(null)
+    if (!draggedId) return
+    delete window.__draggedSessionId
+    try {
+      await moveSession.mutateAsync({ sessionId: draggedId, project_id: projectId })
+      toast.success(t('chat.sessionMoved', '세션이 이동되었습니다'))
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t('chat.sessionMoveFailed', '이동 실패'))
+    }
+  }
 
   return (
     <>
@@ -78,29 +123,7 @@ function ExpandedChatNav() {
         </Button>
       </div>
 
-      {/* Projects */}
-      {projects.length > 0 && (
-        <div className={sectionGap}>
-          <p className={sectionHeader}>{t('chat.projectsLabel', 'Projects')}</p>
-          <div className="space-y-0.5">
-            {projects.map((p) => (
-              <button
-                type="button"
-                key={p.id}
-                onClick={() => setActiveProject(p.id)}
-                className={cn(itemBase, activeProjectId === p.id ? itemActive : itemInactive)}
-              >
-                <span className="h-2 w-2 rounded-full shrink-0 bg-success" />
-                <span className="truncate">{p.name}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      <div className={sectionSeparator} />
-
-      {/* Sessions */}
+      {/* Sessions tree */}
       <div className="flex-1 overflow-y-auto">
         <div className="flex items-center justify-between px-2 mb-1">
           <span className={sectionHeader.replace('mb-1 ', '')}>
@@ -111,34 +134,117 @@ function ExpandedChatNav() {
           </Button>
         </div>
 
-        {Object.entries(grouped).map(([label, group]) => (
-          <div key={label} className={sectionGap}>
-            <p className="px-2.5 text-xs text-muted-foreground mb-0.5">{t(`chat.${label}`)}</p>
-            {group.map((s) => (
-              <button
-                type="button"
-                key={s.id}
-                onClick={() => loadSession(s.id)}
-                className={cn(itemDense, activeSessionId === s.id ? itemActive : itemInactive)}
+        {/* ── Project folders ── */}
+        {projects.map((p) => {
+          const sessions = sessionsByProject.get(p.id) ?? []
+          const isCollapsed = collapsedProjects.has(p.id)
+          const isDragOver = dragOverProject === p.id
+          return (
+            <div key={p.id} className="mb-0.5">
+              {/* Project header (drop target) */}
+              <div className="flex items-center">
+                <button
+                  type="button"
+                  onClick={() => toggleProject(p.id)}
+                  className="flex flex-1 items-center gap-1 px-2 py-1 text-sm hover:bg-sidebar-accent rounded-sm"
+                >
+                  <ChevronRight
+                    className={cn(
+                      'h-3 w-3 shrink-0 transition-transform',
+                      !isCollapsed && 'rotate-90',
+                    )}
+                  />
+                  <FolderKanban className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                  <span className="truncate font-medium">{p.name}</span>
+                  {sessions.length > 0 && (
+                    <span className="ml-auto text-2xs text-muted-foreground/60">
+                      {sessions.length}
+                    </span>
+                  )}
+                </button>
+              </div>
+              {/* Project as drop target */}
+              <div
+                onDragOver={(e) => {
+                  e.preventDefault()
+                  setDragOverProject(p.id)
+                }}
+                onDragLeave={() => setDragOverProject((cur) => (cur === p.id ? null : cur))}
+                onDrop={(e) => {
+                  e.preventDefault()
+                  handleDropToProject(p.id)
+                }}
+                className={cn(
+                  'rounded-sm transition-colors',
+                  isDragOver && 'bg-primary/10 ring-1 ring-primary/30',
+                )}
               >
-                <span className="block truncate">{s.title ?? `${s.id.slice(0, 8)}...`}</span>
-                <span className="block text-2xs text-muted-foreground/60">
-                  {new Date(s.created_at).toLocaleString(undefined, {
-                    month: 'short',
-                    day: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}
-                </span>
-              </button>
-            ))}
-          </div>
-        ))}
+                {/* Sessions under this project */}
+                {!isCollapsed &&
+                  sessions.map((s) => (
+                    <SessionItem
+                      key={s.id}
+                      session={s}
+                      active={activeSessionId === s.id}
+                      indented
+                      onClick={() => loadSession(s.id)}
+                    />
+                  ))}
+                {!isCollapsed && sessions.length === 0 && (
+                  <p className="px-7 py-0.5 text-2xs text-muted-foreground/40">
+                    {t('chat.noSessionsInProject', '대화 없음')}
+                  </p>
+                )}
+              </div>
+            </div>
+          )
+        })}
 
-        {sessions.length === 0 && (
-          <p className="text-xs text-sidebar-foreground/50 px-4 py-2">
-            {t('chat.noSessions', 'No sessions yet')}
-          </p>
+        {/* ── Unfiled sessions ── */}
+        {unfiledSessions.length > 0 && (
+          <div className={sectionGap}>
+            <div className="flex items-center gap-1 px-2 py-1 text-sm text-muted-foreground">
+              <Inbox className="h-3.5 w-3.5" />
+              <span className="font-medium">
+                {t('chat.unfiled', '분류 안 됨')}
+              </span>
+              <span className="ml-auto text-2xs text-muted-foreground/60">
+                {unfiledSessions.length}
+              </span>
+            </div>
+            <div
+              onDragOver={(e) => {
+                e.preventDefault()
+                setDragOverProject('__unfiled__')
+              }}
+              onDragLeave={() =>
+                setDragOverProject((cur) => (cur === '__unfiled__' ? null : cur))
+              }
+              onDrop={(e) => {
+                e.preventDefault()
+                handleDropToProject(null)
+              }}
+              className={cn(
+                'rounded-sm transition-colors',
+                dragOverProject === '__unfiled__' && 'bg-primary/10 ring-1 ring-primary/30',
+              )}
+            >
+              {unfiledSessions.map((s) => (
+                <SessionItem
+                  key={s.id}
+                  session={s}
+                  active={activeSessionId === s.id}
+                  indented
+                  onClick={() => loadSession(s.id)}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Quick project switcher (sets the active project for new sessions) */}
+        {projects.length > 0 && (
+          <div className={sectionSeparator} />
         )}
       </div>
 
@@ -151,8 +257,58 @@ function ExpandedChatNav() {
         <Link to="/projects" className={cn(itemBase, itemInactive)}>
           {t('chat.manageProjects', 'Manage Projects')}
         </Link>
+        <Link to="/mounts" className={cn(itemBase, itemInactive)}>
+          {t('common.mounts', 'Mounts')}
+        </Link>
       </div>
     </>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Session item (draggable)
+// ---------------------------------------------------------------------------
+
+function SessionItem({
+  session,
+  active,
+  indented,
+  onClick,
+}: {
+  session: Session
+  active: boolean
+  indented?: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      draggable
+      onDragStart={(e) => {
+        window.__draggedSessionId = session.id
+        e.dataTransfer.effectAllowed = 'move'
+      }}
+      onDragEnd={() => {
+        delete window.__draggedSessionId
+      }}
+      onClick={onClick}
+      className={cn(
+        itemDense,
+        indented && 'pl-7',
+        active ? itemActive : itemInactive,
+        'cursor-grab active:cursor-grabbing',
+      )}
+    >
+      <span className="block truncate">{session.title ?? `${session.id.slice(0, 8)}...`}</span>
+      <span className="block text-2xs text-muted-foreground/60">
+        {new Date(session.created_at).toLocaleString(undefined, {
+          month: 'short',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+        })}
+      </span>
+    </button>
   )
 }
 
@@ -180,28 +336,4 @@ function CollapsedChatNav() {
       </Tooltip>
     </div>
   )
-}
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function groupSessionsByDate(sessions: Session[]): Record<string, Session[]> {
-  const now = new Date()
-  const groups: Record<string, Session[]> = {}
-
-  for (const s of sessions) {
-    const d = new Date(s.created_at)
-    let label: string
-    const diffDays = Math.floor((now.getTime() - d.getTime()) / (1000 * 60 * 60 * 24))
-    if (diffDays === 0) label = 'today'
-    else if (diffDays === 1) label = 'yesterday'
-    else if (diffDays < 7) label = 'thisWeek'
-    else label = 'previous'
-
-    if (!groups[label]) groups[label] = []
-    groups[label]!.push(s)
-  }
-
-  return groups
 }

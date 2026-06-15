@@ -1,6 +1,6 @@
 # RFC-025: Mount + Project System
 
-> **Status:** Phase 1–4 implemented
+> **Status:** Fully implemented (Phase 1–4)
 > **Date:** 2026-06-15
 > **Replaces:** RFC-011 (project-system) — evolves the single `Project` concept into two distinct concepts (`Mount` + `Project`)
 > **Related:** RFC-008 (memory consolidation — Dream integration), RFC-011 Phase 1–4
@@ -412,7 +412,8 @@ Agents still **cannot** create or remove Mounts/Projects — those remain user-l
 - [x] Orchestrator injects Project instructions + auto-activates referenced Mounts
 - [x] `PUT /api/projects/:id` accepts `mount_ids` + `instructions`
 - [x] EditProjectDialog: Mount multi-select chips + instructions textarea
-- [ ] Sidebar reorganized as Project-tree (deferred — current flat list works)
+- [x] Sidebar reorganized as Project-tree (Project folders → sessions, unfiled group)
+- [x] `session.project_id` top-level field (replaces buggy `metadata["project_ids"]`)
 
 **Phase 3 — Agent-driven enrichment** ✅
 - [x] `mount` tool (list/get/update): agent explores and writes auto_description/auto_meta
@@ -420,10 +421,11 @@ Agents still **cannot** create or remove Mounts/Projects — those remain user-l
 - [x] Drift detection: marker mtime snapshot comparison
 - [x] `check_all_drift()` for Dream-time refresh hook
 
-**Phase 4 — UX polish** ◑
+**Phase 4 — UX polish** ✅
 - [x] Detection-badge full flow (dismiss / accept / bind)
 - [x] Mount re-scan trigger (`POST /api/mounts/:id/rescan`)
-- [ ] Drag-to-reparent sessions between Projects (deferred — low priority)
+- [x] Drag-to-reparent sessions between Projects (HTML5 drag-and-drop)
+- [x] One-time data migration: legacy Project `paths` → Mounts (idempotent, runs at startup)
 
 ## Sidebar UX: Project-Centric Chat Navigation
 

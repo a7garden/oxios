@@ -146,6 +146,10 @@ pub struct Session {
     /// Currently active persona ID (for future multi-persona support).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub active_persona_id: Option<String>,
+    /// RFC-025: Project this session belongs to (singular, grouping only).
+    /// Set by the sidebar/drag-to-reparent; consumed for Project-tree view.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub project_id: Option<String>,
     /// Timestamp when the session was created.
     pub created_at: DateTime<Utc>,
     /// Timestamp when the session was last updated.
@@ -167,6 +171,7 @@ impl Session {
             trajectory_steps: Vec::new(),
             active_seed_id: None,
             active_persona_id: None,
+            project_id: None,
             created_at: now,
             updated_at: now,
             metadata: SessionMetadata::new(),
@@ -184,6 +189,7 @@ impl Session {
             trajectory_steps: Vec::new(),
             active_seed_id: None,
             active_persona_id: None,
+            project_id: None,
             created_at: now,
             updated_at: now,
             metadata: SessionMetadata::new(),
@@ -486,10 +492,23 @@ impl StateStore {
                             }),
                         active_seed_id: session.active_seed_id.clone(),
                         project_id: session
-                            .metadata
-                            .get("project_ids")
-                            .and_then(|v| v.as_str())
-                            .map(String::from),
+                            .project_id
+                            .clone()
+                            // Backward-compat: fall back to legacy metadata keys.
+                            .or_else(|| {
+                                session
+                                    .metadata
+                                    .get("project_id")
+                                    .and_then(|v| v.as_str())
+                                    .map(String::from)
+                            })
+                            .or_else(|| {
+                                session
+                                    .metadata
+                                    .get("project_ids")
+                                    .and_then(|v| v.as_str())
+                                    .and_then(|s| s.split(',').next().map(String::from))
+                            }),
                         created_at: session.created_at,
                         updated_at: session.updated_at,
                     });
@@ -543,6 +562,25 @@ impl StateStore {
     /// Updates an existing session, saving it to disk.
     pub async fn update_session(&self, session: &Session) -> Result<()> {
         self.save_session(session).await
+    }
+
+    /// RFC-025: Move a session to a different Project (drag-to-reparent).
+    ///
+    /// Pass `None` to unassign (move to "unfiled").
+    pub async fn move_session_to_project(
+        &self,
+        session_id: &SessionId,
+        project_id: Option<&str>,
+    ) -> Result<bool> {
+        match self.load_session(session_id).await? {
+            Some(mut session) => {
+                session.project_id = project_id.map(String::from);
+                session.updated_at = Utc::now();
+                self.save_session(&session).await?;
+                Ok(true)
+            }
+            None => Ok(false),
+        }
     }
 
     /// Prune sessions based on configuration.
