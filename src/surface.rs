@@ -6,6 +6,7 @@
 pub use oxios_gateway::{Surface, SurfaceContext};
 
 use anyhow::Result;
+use oxios_gateway::ActiveWebDist;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -27,7 +28,7 @@ pub fn build_surfaces() -> Vec<Box<dyn Surface>> {
 pub async fn activate_surfaces(
     kernel: &Kernel,
     config_path: &Path,
-    web_dist: Option<PathBuf>,
+    web_dist: ActiveWebDist,
 ) -> Result<Vec<tokio::task::JoinHandle<()>>> {
     let surfaces = build_surfaces();
     let config = kernel.config();

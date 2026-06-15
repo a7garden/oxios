@@ -6,7 +6,7 @@ use serde::Serialize;
 use std::convert::Infallible;
 use std::sync::Arc;
 use tokio_stream::StreamExt as TokioStreamExt;
-use tokio_stream::wrappers::BroadcastStream;
+use tokio_stream::wrappers::{BroadcastStream, BroadcastStreamRecvError};
 
 use crate::error::AppError;
 use crate::routes::{PageParams, paginate};
@@ -147,10 +147,37 @@ pub(crate) async fn handle_events(
                 // Sanitize events: include type and basic metadata only.
                 // Detailed data (full seed content, LLM responses) is excluded.
                 let sanitized = sanitize_event(&event);
+                // RFC-024 SP2: attach the sanitized event's `id` as the SSE
+                // event id so the browser (or fetch client) can set
+                // `Last-Event-ID` on reconnect. The server treats the header
+                // as advisory — it does not maintain a replay buffer for
+                // kernel events (those are stateless and a reconnecting
+                // client pulls fresh state via `/api/status`).
+                let id = sanitized
+                    .get("id")
+                    .and_then(|v| v.as_str())
+                    .map(str::to_string)
+                    .unwrap_or_default();
                 let data = serde_json::to_string(&sanitized).unwrap_or_default();
-                Some(Ok(SseEvent::default().data(data)))
+                let mut ev = SseEvent::default();
+                if !id.is_empty() {
+                    ev = ev.id(id);
+                }
+                Some(Ok(ev.data(data)))
             }
-            Err(_) => None, // Skip lagged messages
+            Err(BroadcastStreamRecvError::Lagged(n)) => {
+                // RFC-024 SP2: lag used to be silently dropped (None). It is
+                // now a first-class resync signal so the client knows it
+                // has missed events and should pull state via the regular
+                // HTTP API before continuing.
+                let resync = serde_json::json!({
+                    "type": "resync",
+                    "lagged": n,
+                });
+                let data = serde_json::to_string(&resync).unwrap_or_default();
+                Some(Ok(SseEvent::default().event("resync").data(data)))
+            }
+            Err(_) => None,
         }
     });
 

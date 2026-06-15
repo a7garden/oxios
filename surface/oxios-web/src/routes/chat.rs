@@ -278,7 +278,13 @@ pub(crate) async fn handle_chat(
         }
         Err(e) => {
             tracing::error!(error = %e, "Failed to get response from gateway");
-            Err(AppError::Internal("gateway response failed".into()))
+            // RFC-024 C1: distinguish timeout (504) from other failures
+            // (500) so callers can retry only what is safe to retry.
+            if e.to_string().contains("timeout") {
+                Err(AppError::GatewayTimeout(e.to_string()))
+            } else {
+                Err(AppError::Internal("gateway response failed".into()))
+            }
         }
     }
 }
@@ -375,6 +381,7 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
         Arc::new(tokio::sync::Mutex::new(None));
 
     let pending_for_send = pending_user_msg.clone();
+    let bridge_for_resume = state.bridge.clone();
 
     // ── Forward gateway responses → WebSocket client ──
     //
@@ -429,6 +436,24 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
                     // (some events are system-wide).
                     if session_id.is_some() {
                         active_session_id = session_id.clone();
+                    }
+
+                    // RFC-024 SP2 / C2: a synthetic `type: "resync"` message
+                    // (broadcast by the bridge when a resume cursor was
+                    // older than the replay buffer) is forwarded as a
+                    // resync chunk and *skips* persistence / token / done
+                    // emission — the client is expected to pull state via
+                    // the regular HTTP API after seeing it.
+                    if msg.metadata.get("type").and_then(|v| v.as_str()) == Some("resync") {
+                        let chunk = serde_json::json!({"type": "resync"});
+                        if ws_tx
+                            .send(Message::Text(chunk.to_string().into()))
+                            .await
+                            .is_err()
+                        {
+                            break;
+                        }
+                        continue;
                     }
 
                     // ── Persist session to disk FIRST ──
@@ -591,6 +616,27 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
                         .map(String::from);
 
                     match msg_type {
+                        // RFC-024 SP2 / C2 (replay): client announces its
+                        // last-seen seq and asks the server to replay any
+                        // messages it missed while disconnected. The bridge
+                        // broadcasts the replayed slice (or a synthetic
+                        // `type: "resync"` message) which the recv_task
+                        // forwards to the client. We do NOT treat this as a
+                        // user message, so we `continue` without touching
+                        // the gateway.
+                        "resume" => {
+                            let last_seq: u64 = parsed
+                                .get("last_seq")
+                                .and_then(|v| v.as_u64())
+                                .unwrap_or(0);
+                            tracing::debug!(
+                                conn_id = %conn_id_for_send,
+                                last_seq,
+                                "WS resume: replaying since last_seq"
+                            );
+                            bridge_for_resume.replay_after(last_seq);
+                            continue;
+                        }
                         // Chat UI redesign: user submits structured interview
                         // answers. Convert to natural language and forward as
                         // a regular message so the Orchestrator's existing

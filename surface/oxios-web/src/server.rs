@@ -11,6 +11,7 @@ use std::time::Instant;
 use crate::bridge::WebBridgeHandle;
 use crate::error::AppError;
 use crate::middleware::RateLimiter;
+use oxios_gateway::ActiveWebDist;
 use oxios_kernel::{KernelHandle, OxiosConfig, config};
 
 /// Shared application state for the web dashboard.
@@ -35,8 +36,13 @@ pub struct AppState {
     pub rate_limiter: RateLimiter,
     /// In-process cache for `/api/memory/map` 2D projections.
     pub memory_map_cache: crate::routes::MemoryMapCache,
-    /// Override web dist directory for auto-update UI. `None` = embedded only.
-    pub web_dist: Option<PathBuf>,
+    /// Atomic handle to the active web-dist directory (RFC-024 SP3).
+    /// Serves from `web_dist.path()` on every request; updates swap the
+    /// pointer atomically so no request ever sees a half-populated dist.
+    pub web_dist: ActiveWebDist,
+    /// RFC-024 SP4: subsystem readiness gate. The readiness middleware
+    /// returns 503 (with `Retry-After`) when the gate is not yet open.
+    pub readiness: std::sync::Arc<oxios_kernel::ReadinessGate>,
 }
 
 impl std::fmt::Debug for AppState {

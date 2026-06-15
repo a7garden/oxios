@@ -1668,7 +1668,7 @@ fn cmd_web(config: &OxiosConfig, port_override: Option<u16>) -> Result<()> {
             "{}/.oxios/config.toml",
             std::env::var("HOME").unwrap_or_default()
         ));
-        daemon.start(&config_path)?;
+        daemon.start(&config_path, port)?;
 
         // Give the server a moment to bind the port
         let url = format!("http://127.0.0.1:{port}");
@@ -1905,13 +1905,13 @@ async fn run() -> Result<()> {
             if cli.foreground {
                 cmd_serve(&kernel, &config_path).await
             } else {
-                daemon.start(&config_path)
+                daemon.start(&config_path, config.gateway.port)
             }
         }
 
         Some(Command::Restart) => {
             let daemon = DaemonManager::new(&config.daemon.pid_file, &config.daemon.log_dir);
-            daemon.restart(&config_path)
+            daemon.restart(&config_path, config.gateway.port)
         }
 
         Some(Command::Run {
@@ -2694,6 +2694,27 @@ async fn cmd_serve(kernel: &Kernel, config_path: &Path) -> Result<()> {
     let workspace = PathBuf::from(&kernel.config().kernel.workspace);
     let web_result = web_dist::ensure_web_dist(&workspace).await;
 
+    // RFC-024 SP4: finalize the engine readiness. State store is already
+    // `Ready` (set in kernel::build). An engine with a configured API key
+    // is `Ready`; a missing key (or one that resolves to a fallback model
+    // only) is `Degraded` — still usable but signals a partial setup to
+    // the readiness middleware.
+    {
+        let cfg = kernel.config();
+        let has_key = cfg
+            .engine
+            .api_key
+            .as_deref()
+            .map(|s| !s.is_empty())
+            .unwrap_or(false);
+        let engine_state = if has_key {
+            oxios_kernel::SubsystemState::Ready
+        } else {
+            oxios_kernel::SubsystemState::Degraded
+        };
+        kernel.handle().readiness.set_engine(engine_state);
+    }
+
     // Extract path for surface activation
     let web_dist_path: Option<PathBuf> = match &web_result {
         web_dist::WebDistResult::UserDir(p) => Some(p.clone()),
@@ -2732,11 +2753,14 @@ async fn cmd_serve(kernel: &Kernel, config_path: &Path) -> Result<()> {
     }
 
     // Activate channels
-    let surface_tasks = surface::activate_surfaces(kernel, config_path, web_dist_path).await?;
+    let active_web_dist = oxios_gateway::ActiveWebDist::new(web_dist_path);
+    let surface_tasks =
+        surface::activate_surfaces(kernel, config_path, active_web_dist.clone()).await?;
     let channel_tasks = activate_channels(kernel, config_path).await?;
 
-    // Start guardian
-    kernel.start_guardian();
+    // Start guardian (RFC-024 SP3: hands the atomic web-dist handle to the
+    // daily health check so auto-updates publish atomically — no 404 window).
+    kernel.start_guardian(active_web_dist);
 
     // Run gateway event loop on the main tokio runtime.
     // Event-driven architecture: each channel runs its own background task,

@@ -10,9 +10,9 @@ use oxios_kernel::{
     A2AProtocol, AgentRuntime, AgentScheduler, AuditPersistence, AuditTrail, BasicSupervisor,
     BudgetManager, ClawHubClient, ClawHubInstaller, CronScheduler, EngineHandle, EventBus,
     GitLayer, MarketplaceApi, McpBridge, McpServer, MemoryManager, Orchestrator, OxiosConfig,
-    OxiosEngine, PersonaManager, ProjectManager, ResourceMonitor, SkillManager, SkillsShClient,
-    SkillsShInstaller, Supervisor, access_manager::AccessManager, auth::AuthManager,
-    config::load_config,
+    OxiosEngine, PersonaManager, ProjectManager, ResourceMonitor, ReadinessGate, SkillManager,
+    SkillsShClient, SkillsShInstaller, SubsystemState, Supervisor,
+    access_manager::AccessManager, auth::AuthManager, config::load_config,
 };
 use oxios_markdown::KnowledgeBase;
 use oxios_markdown::knowledge::FileChange;
@@ -461,7 +461,12 @@ impl Kernel {
     }
 
     /// Start the guardian daemon (background integrity checks).
-    pub fn start_guardian(&self) {
+    ///
+    /// `web_dist` is the atomic handle to the active web-dist directory. It is
+    /// forwarded to the daily health check so auto-updates publish a new
+    /// generation atomically (RFC-024 SP3) instead of deleting files that
+    /// in-flight requests may be reading.
+    pub fn start_guardian(&self, web_dist: oxios_gateway::ActiveWebDist) {
         use oxi_sdk::AuditAction;
         let handle = self.handle();
         tokio::spawn(async move {
@@ -508,14 +513,14 @@ impl Kernel {
         });
 
         // Daily health check: web UI update, self-update check.
-        self.start_daily_health_check();
+        self.start_daily_health_check(web_dist);
     }
 
     /// Start the daily health check loop.
     ///
     /// Runs at 03:00 AM every day (user's local time) via cron expression.
     /// First tick is calculated to land on the next 3 AM, then every 24h after.
-    fn start_daily_health_check(&self) {
+    fn start_daily_health_check(&self, web_dist: oxios_gateway::ActiveWebDist) {
         tokio::spawn(async move {
             let now = chrono::Local::now();
             let mut next = now
@@ -536,14 +541,14 @@ impl Kernel {
 
             tokio::time::sleep(std::time::Duration::from_secs(delay_secs)).await;
 
-            if let Err(e) = daily_health_check().await {
+            if let Err(e) = daily_health_check(web_dist.clone()).await {
                 tracing::warn!(error = %e, "Daily health check failed");
             }
 
             let mut interval = tokio::time::interval(std::time::Duration::from_secs(86400));
             loop {
                 interval.tick().await;
-                if let Err(e) = daily_health_check().await {
+                if let Err(e) = daily_health_check(web_dist.clone()).await {
                     tracing::warn!(error = %e, "Daily health check failed");
                 }
             }
@@ -551,12 +556,13 @@ impl Kernel {
     }
 }
 
-/// Daily health check logic.
-async fn daily_health_check() -> anyhow::Result<()> {
-    let home = dirs::home_dir().ok_or_else(|| anyhow::anyhow!("no home dir"))?;
-    let web_dist = home.join(".oxios").join("web").join("dist");
-    let version_file = home.join(".oxios").join("web").join("version");
-
+/// Daily health check logic (RFC-024 SP3: atomic publish).
+///
+/// Downloads the new dist into a **fresh versioned staging directory** and
+/// publishes it atomically via the in-memory pointer + persisted marker.
+/// The previously-active directory is removed after a grace period by a
+/// background task. No request ever observes a half-extracted directory.
+async fn daily_health_check(web_dist: oxios_gateway::ActiveWebDist) -> anyhow::Result<()> {
     // Fetch latest release tag from GitHub
     let client = reqwest::Client::builder()
         .user_agent("oxios-health")
@@ -573,12 +579,20 @@ async fn daily_health_check() -> anyhow::Result<()> {
         .as_str()
         .ok_or_else(|| anyhow::anyhow!("no tag_name in response"))?;
 
-    let current_version = std::fs::read_to_string(&version_file)
-        .unwrap_or_default()
-        .trim()
-        .to_string();
+    // Current active directory + its version. The version lives inside the
+    // dist itself (written by the Vite build as `dist/version.json`).
+    // GitHub tags carry a leading `v`; the version file does not, so
+    // normalize before comparing.
+    let active_path = web_dist.path();
+    let current_version = active_path
+        .as_ref()
+        .and_then(|p| std::fs::read(p.join("version.json")).ok())
+        .and_then(|b| serde_json::from_slice::<serde_json::Value>(&b).ok())
+        .and_then(|v| v["version"].as_str().map(str::to_string))
+        .unwrap_or_default();
 
-    let needs_download = !web_dist.join("index.html").is_file() || current_version != latest_tag;
+    let latest_version = latest_tag.trim_start_matches('v');
+    let needs_download = active_path.is_none() || current_version != latest_version;
 
     if !needs_download {
         tracing::debug!("Daily health check: web UI up to date ({})", latest_tag);
@@ -596,37 +610,22 @@ async fn daily_health_check() -> anyhow::Result<()> {
         format!("https://github.com/a7garden/oxios/releases/download/{latest_tag}/web-dist.zip");
     let bytes = client.get(&url).send().await?.bytes().await?;
 
-    // Clear and extract
-    if web_dist.exists() {
-        std::fs::remove_dir_all(&web_dist)?;
-    }
-    std::fs::create_dir_all(&web_dist)?;
+    // Extract into a fresh versioned staging dir (never the active dir).
+    let staging = crate::web_dist::staging_dir_for(latest_tag)
+        .ok_or_else(|| anyhow::anyhow!("cannot determine home directory"))?;
+    crate::web_dist::extract_zip_into(&staging, &bytes)?;
 
-    let reader = std::io::Cursor::new(bytes.as_ref());
-    let mut archive = zip::ZipArchive::new(reader)?;
-
-    for i in 0..archive.len() {
-        let mut file = archive.by_index(i)?;
-        let outpath = match file.enclosed_name() {
-            Some(path) => web_dist.join(path),
-            None => continue,
-        };
-        if file.is_dir() {
-            std::fs::create_dir_all(&outpath)?;
-        } else {
-            if let Some(p) = outpath.parent() {
-                std::fs::create_dir_all(p)?;
-            }
-            let mut outfile = std::fs::File::create(&outpath)?;
-            std::io::copy(&mut file, &mut outfile)?;
-        }
+    // Validate before publishing — a corrupt extraction must not become active.
+    if !staging.join("index.html").is_file() {
+        anyhow::bail!("extracted dist missing index.html");
     }
 
-    // Write version file
-    if let Some(parent) = version_file.parent() {
-        std::fs::create_dir_all(parent)?;
-    }
-    std::fs::write(&version_file, latest_tag)?;
+    // Atomic publish: swap the pointer + persist marker. The previous
+    // generation is cleaned up after a grace period so in-flight requests
+    // reading from the old inode complete successfully.
+    let marker = crate::web_dist::active_marker_path()
+        .ok_or_else(|| anyhow::anyhow!("cannot determine home directory"))?;
+    web_dist.publish(staging, &marker);
 
     tracing::info!(version = %latest_tag, "Daily health check: web UI updated");
     Ok(())
@@ -1162,6 +1161,19 @@ impl KernelBuilder {
         oxios_kernel::register_builtin_metrics();
         oxios_kernel::observability::init();
 
+        // RFC-024 SP4: mark state store ready and start the 30 s readiness
+        // deadline. The engine state is finalized by the caller (main.rs
+        // cmd_serve) once it knows whether the configured model has an API
+        // key — at which point the gate is set to `Ready` or `Degraded`.
+        // The deadline forcibly promotes any still-Warming subsystem to
+        // `Degraded` so a missing API key cannot lock the gate forever.
+        kernel_handle.readiness.set_state_store(SubsystemState::Ready);
+        let deadline_secs = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs() + 30)
+            .unwrap_or(0);
+        kernel_handle.readiness.set_deadline_secs(deadline_secs);
+
         Ok(Kernel {
             orchestrator,
             gateway,
@@ -1184,7 +1196,11 @@ impl KernelBuilder {
             project_manager,
             start_time: std::time::Instant::now(),
             config_path,
-            handle_cache: OnceLock::new(),
+            handle_cache: {
+                let cell = std::sync::OnceLock::new();
+                let _ = cell.set(kernel_handle.clone());
+                cell
+            },
             a2a_protocol,
             engine_handle,
             #[cfg(feature = "sqlite-memory")]

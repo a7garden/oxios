@@ -12,6 +12,7 @@ use async_trait::async_trait;
 use oxios_gateway::GatewayInbox;
 use oxios_gateway::channel::Channel;
 use oxios_gateway::message::{IncomingMessage, OutgoingMessage};
+use oxios_gateway::{ReplayResult, ReliabilityLayer};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::{Mutex, RwLock, broadcast, mpsc, oneshot, watch};
@@ -30,11 +31,16 @@ pub struct WebBridge {
     outgoing_tx: broadcast::Sender<OutgoingMessage>,
     /// Correlation map for HTTP request-response matching.
     responses: Arc<RwLock<HashMap<uuid::Uuid, oneshot::Sender<OutgoingMessage>>>>,
+    /// RFC-024 SP2: per-bridge reliability layer (independent of the
+    /// gateway's global one) so WS resume replays go through the same
+    /// broadcast channel that live messages use.
+    reliability: Arc<ReliabilityLayer>,
 }
 
 impl WebBridge {
-    /// Creates a new web bridge with a bounded message buffer.
-    pub fn new(buffer: usize) -> Self {
+    /// Creates a new web bridge with a bounded message buffer and its own
+    /// reliability layer (for WS resume/replay).
+    pub fn new(buffer: usize, reliability: Arc<ReliabilityLayer>) -> Self {
         let (incoming_tx, incoming_rx) = mpsc::channel(buffer);
         let (outgoing_tx, _) = broadcast::channel(buffer);
         Self {
@@ -42,6 +48,7 @@ impl WebBridge {
             incoming_tx,
             outgoing_tx,
             responses: Arc::new(RwLock::new(HashMap::new())),
+            reliability,
         }
     }
 
@@ -154,6 +161,12 @@ pub struct WebBridgeHandle {
     pub outgoing_tx: broadcast::Sender<OutgoingMessage>,
     /// Correlation map for HTTP request-response matching.
     responses: Arc<RwLock<HashMap<uuid::Uuid, oneshot::Sender<OutgoingMessage>>>>,
+    /// RFC-024 SP2: per-bridge reliability layer shared with [`WebBridge`].
+    reliability: Arc<ReliabilityLayer>,
+    /// RFC-024 SP1: ceiling on `send_and_wait`. When the gateway does not
+    /// respond within this duration, the request is dropped and the HTTP
+    /// layer returns 504 Gateway Timeout. Default 120 s.
+    response_timeout: std::time::Duration,
 }
 
 impl WebBridgeHandle {
@@ -163,6 +176,44 @@ impl WebBridgeHandle {
             incoming_tx: channel.sender(),
             outgoing_tx: channel.outgoing_tx.clone(),
             responses: channel.responses.clone(),
+            reliability: channel.reliability.clone(),
+            response_timeout: std::time::Duration::from_secs(120),
+        }
+    }
+
+    /// Override the default `send_and_wait` timeout.
+    pub fn with_response_timeout(mut self, timeout: std::time::Duration) -> Self {
+        self.response_timeout = timeout;
+        self
+    }
+
+    /// RFC-024 SP2 / C2 (replay): look up messages newer than `last_seq` in
+    /// the per-bridge reliability layer and broadcast them through the
+    /// outgoing channel so a WebSocket handler forwarding `outgoing_rx` to
+    /// the client sees them as if they had just been delivered.
+    ///
+    /// If the cursor is older than the buffer's oldest surviving message,
+    /// a synthetic `type: "resync"` message is broadcast instead and the
+    /// client is expected to pull state via the regular HTTP API.
+    pub fn replay_after(&self, last_seq: u64) {
+        match self.reliability.replay(last_seq) {
+            ReplayResult::Replay(msgs) => {
+                for m in msgs {
+                    let _ = self.outgoing_tx.send(m);
+                }
+            }
+            ReplayResult::Resync => {
+                let mut meta = HashMap::new();
+                meta.insert("type".into(), "resync".into());
+                let resync = OutgoingMessage::with_id(
+                    uuid::Uuid::new_v4(),
+                    "web",
+                    "system",
+                    "",
+                )
+                .with_metadata_only(meta);
+                let _ = self.outgoing_tx.send(resync);
+            }
         }
     }
 
@@ -183,7 +234,23 @@ impl WebBridgeHandle {
     ///
     /// This registers a oneshot receiver for the response and waits for it.
     /// Used by the HTTP chat endpoint to get the orchestrator's response.
+    ///
+    /// RFC-024 SP1 / C1 (response guarantee): the wait is bounded by
+    /// `response_timeout` (default 120 s). On timeout the correlation map
+    /// entry is removed (no leak) and the caller receives a `Timeout` error
+    /// so the HTTP layer can map it to a 504 Gateway Timeout.
     pub async fn send_and_wait(&self, msg: IncomingMessage) -> Result<OutgoingMessage> {
+        self.send_and_wait_with_timeout(msg, self.response_timeout).await
+    }
+
+    /// Like [`send_and_wait`] but with an explicit timeout. Exposed for
+    /// tests and for callers that want a different ceiling (e.g. health
+    /// probes with a 1 s deadline).
+    pub async fn send_and_wait_with_timeout(
+        &self,
+        msg: IncomingMessage,
+        timeout: std::time::Duration,
+    ) -> Result<OutgoingMessage> {
         let (tx, rx) = oneshot::channel::<OutgoingMessage>();
         let msg_id = msg.id;
 
@@ -194,13 +261,24 @@ impl WebBridgeHandle {
         }
 
         // Send the message.
-        self.incoming_tx
-            .send(msg)
-            .await
-            .map_err(|e| anyhow::anyhow!("{e}"))?;
+        if let Err(e) = self.incoming_tx.send(msg).await {
+            // Could not even enqueue — drop our correlation entry.
+            self.responses.write().await.remove(&msg_id);
+            return Err(anyhow::anyhow!("incoming channel send failed: {e}"));
+        }
 
-        // Wait for the response.
-        rx.await
-            .map_err(|e| anyhow::anyhow!("Response channel dropped: {e}"))
+        match tokio::time::timeout(timeout, rx).await {
+            Ok(Ok(resp)) => Ok(resp),
+            Ok(Err(_)) => {
+                // Gateway gave up; remove the entry.
+                self.responses.write().await.remove(&msg_id);
+                Err(anyhow::anyhow!("response channel dropped"))
+            }
+            Err(_) => {
+                // Deadline elapsed; remove the entry to prevent a leak.
+                self.responses.write().await.remove(&msg_id);
+                Err(anyhow::anyhow!("gateway response timeout"))
+            }
+        }
     }
 }

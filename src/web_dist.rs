@@ -14,14 +14,23 @@ use std::path::{Path, PathBuf};
 
 const GITHUB_REPO: &str = "a7garden/oxios";
 
-/// Returns `~/.oxios/web/dist/` path.
-fn user_web_dist_dir() -> Option<PathBuf> {
-    dirs::home_dir().map(|h| h.join(".oxios").join("web").join("dist"))
+/// Returns `~/.oxios/web/` (parent of the dist directory).
+fn user_web_root() -> Option<PathBuf> {
+    dirs::home_dir().map(|h| h.join(".oxios").join("web"))
 }
 
-/// Returns `~/.oxios/web/version` path.
-fn user_web_version_file() -> Option<PathBuf> {
-    dirs::home_dir().map(|h| h.join(".oxios").join("web").join("version"))
+/// Returns `~/.oxios/web/dist/` path.
+fn user_web_dist_dir() -> Option<PathBuf> {
+    user_web_root().map(|r| r.join("dist"))
+}
+
+/// Returns the path to the active-dist marker file (`~/.oxios/web/.active`).
+///
+/// RFC-024 SP3: persists the path the in-memory atomic pointer last pointed
+/// at, so a daemon restart resolves the same generation the previous process
+/// was serving (the pointer itself does not survive restart).
+pub fn active_marker_path() -> Option<PathBuf> {
+    user_web_root().map(|r| r.join(".active"))
 }
 
 /// Result of ensuring web UI availability.
@@ -86,12 +95,63 @@ async fn fetch_latest_release_tag() -> Result<String> {
     Ok(tag.to_string())
 }
 
-/// Downloads `web-dist.zip` from a GitHub release and extracts to `~/.oxios/web/dist/`.
+/// Extract a `web-dist.zip` byte slice into `dest` (created if missing).
+///
+/// RFC-024 SP3: shared extraction used by both the startup download and the
+/// daily health check so both land in a staging dir before an atomic publish.
+/// Returns the number of files extracted. `dest` is cleared first if it
+/// already exists (e.g. an interrupted prior run).
+pub fn extract_zip_into(dest: &std::path::Path, bytes: &[u8]) -> Result<usize> {
+    if dest.exists() {
+        std::fs::remove_dir_all(dest)?;
+    }
+    std::fs::create_dir_all(dest)?;
+
+    let reader = std::io::Cursor::new(bytes);
+    let mut archive = zip::ZipArchive::new(reader).context("invalid zip file")?;
+    let mut count = 0usize;
+    for i in 0..archive.len() {
+        let mut file = archive
+            .by_index(i)
+            .context("zip read error")?;
+        let outpath = match file.enclosed_name() {
+            Some(path) => dest.join(path),
+            None => continue,
+        };
+        if file.is_dir() {
+            std::fs::create_dir_all(&outpath)?;
+        } else {
+            if let Some(p) = outpath.parent()
+                && !p.exists()
+            {
+                std::fs::create_dir_all(p)?;
+            }
+            let mut outfile = std::fs::File::create(&outpath)?;
+            std::io::copy(&mut file, &mut outfile)?;
+            count += 1;
+        }
+    }
+    Ok(count)
+}
+
+/// Path for a versioned staging directory under `~/.oxios/web/`.
+pub fn staging_dir_for(version_tag: &str) -> Option<PathBuf> {
+    let id = version_tag.trim_start_matches('v');
+    user_web_root().map(|r| r.join(format!("dist-{id}")))
+}
+
+/// Downloads `web-dist.zip` from a GitHub release and extracts it into a
+/// **fresh, versioned staging directory** (`~/.oxios/web/dist-<version>/`).
+///
+/// RFC-024 SP3: never deletes the canonical `dist/` here — the caller
+/// publishes the staging dir atomically via the in-memory pointer + marker
+/// so concurrent requests never observe a half-extracted directory.
 async fn download_and_extract_web_dist(version_tag: &str) -> Result<PathBuf> {
-    let dist_dir =
-        user_web_dist_dir().ok_or_else(|| anyhow::anyhow!("cannot determine home directory"))?;
-    let version_file = user_web_version_file()
-        .ok_or_else(|| anyhow::anyhow!("cannot determine home directory"))?;
+    let web_root =
+        user_web_root().ok_or_else(|| anyhow::anyhow!("cannot determine home directory"))?;
+    // Versioned dir so multiple generations can coexist during the swap.
+    let version_id = version_tag.trim_start_matches('v');
+    let dist_dir = web_root.join(format!("dist-{version_id}"));
 
     let url =
         format!("https://github.com/{GITHUB_REPO}/releases/download/{version_tag}/web-dist.zip");
@@ -149,11 +209,12 @@ async fn download_and_extract_web_dist(version_tag: &str) -> Result<PathBuf> {
     );
     extract_pb.set_message("Extracting files".to_string());
 
-    // Clear old dist
+    // Clear any pre-existing staging dir for this exact version (interrupted
+    // prior run), then create fresh. The canonical `dist/` is left untouched.
     if dist_dir.exists() {
         std::fs::remove_dir_all(&dist_dir)?;
     }
-    std::fs::create_dir_all(&dist_dir)?;
+    std::fs::create_dir_all(&dist_dir)?;;
 
     for i in 0..archive.len() {
         let mut file = archive.by_index(i)?;
@@ -179,12 +240,6 @@ async fn download_and_extract_web_dist(version_tag: &str) -> Result<PathBuf> {
     let done_msg = format!("  {ok} {file_count} files extracted");
     extract_pb.finish_with_message(done_msg);
 
-    // Write version file
-    if let Some(parent) = version_file.parent() {
-        std::fs::create_dir_all(parent)?;
-    }
-    std::fs::write(&version_file, version_tag)?;
-
     tracing::info!(
         path = ?dist_dir,
         version = %version_tag,
@@ -196,37 +251,54 @@ async fn download_and_extract_web_dist(version_tag: &str) -> Result<PathBuf> {
 
 /// Ensures the web UI is available, downloading from GitHub if needed.
 ///
-/// Priority order:
-///  1. `~/.oxios/web/dist/index.html` — user override, always wins
-///  2. `workspace/web/dist/index.html` — bundled / dev mode
-///  3. Download from GitHub Releases (latest tag)
-///  4. Embedded fallback (`rust-embed`, only if binary was built with web assets)
+/// Resolution order (RFC-024 SP3, marker-aware):
+///  1. `~/.oxios/web/.active` marker → generation last served (survives restart)
+///  2. `~/.oxios/web/dist/index.html` — legacy / user override
+///  3. `workspace/web/dist/index.html` — bundled / dev mode
+///  4. Download from GitHub Releases into a fresh versioned staging dir,
+///     then publish via marker so restarts resolve it.
 ///
-/// Returns a [`WebDistResult`] describing what happened.
+/// Returns a [`WebDistResult`] describing what happened. The returned path
+/// is the directory the caller should publish as the active dist.
 pub async fn ensure_web_dist(workspace: &Path) -> WebDistResult {
-    // 1. ~/.oxios/web/dist/ (user override — always wins)
-    if let Some(ref dist) = user_web_dist_dir()
+    let marker = active_marker_path();
+    let legacy = user_web_dist_dir();
+
+    // 1. Marker (RFC-024): generation the previous process was serving.
+    if let Some(m) = marker.as_ref()
+        && let Some(p) = oxios_gateway::ActiveWebDist::resolve(m, legacy.as_deref())
+    {
+        tracing::info!(path = ?p, "Serving web UI from active marker");
+        return WebDistResult::UserDir(p);
+    }
+
+    // 2. ~/.oxios/web/dist/ (legacy / user override)
+    if let Some(ref dist) = legacy
         && dist.join("index.html").is_file()
     {
         tracing::info!(path = ?dist, "Serving web UI from ~/.oxios/web/dist/");
         return WebDistResult::UserDir(dist.clone());
     }
 
-    // 2. workspace/web/dist/ (bundled / dev)
+    // 3. workspace/web/dist/ (bundled / dev)
     let workspace_dist = workspace.join("web").join("dist");
     if workspace_dist.join("index.html").is_file() {
         tracing::info!(path = ?workspace_dist, "Serving web UI from workspace (web/dist/)");
         return WebDistResult::WorkspaceDir(workspace_dist);
     }
 
-    // 3. Auto-download from GitHub Releases
+    // 4. Auto-download from GitHub Releases
     tracing::info!("No web UI found locally, downloading from GitHub Releases...");
     match fetch_latest_release_tag().await {
         Ok(tag) => match download_and_extract_web_dist(&tag).await {
-            Ok(p) => WebDistResult::Downloaded {
-                path: p,
-                version: tag,
-            },
+            Ok(p) => {
+                // Publish the freshly-extracted staging dir so restarts
+                // resolve it via the marker.
+                if let Some(m) = marker.as_ref() {
+                    let _ = std::fs::write(m, p.to_string_lossy().as_bytes());
+                }
+                WebDistResult::Downloaded { path: p, version: tag }
+            }
             Err(e) => {
                 tracing::warn!(error = %e, "Failed to auto-download web UI");
                 WebDistResult::DownloadFailed {

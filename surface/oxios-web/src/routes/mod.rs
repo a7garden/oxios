@@ -35,7 +35,7 @@ use axum::{
 };
 use serde::Deserialize;
 
-use crate::middleware::{rate_limit_layer, require_auth};
+use crate::middleware::{rate_limit_layer, require_auth, require_ready};
 use crate::persona_routes;
 use crate::server::AppState;
 
@@ -576,6 +576,10 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         .layer(axum::middleware::from_fn_with_state(
             state.clone(),
             require_auth,
+        ))
+        .layer(axum::middleware::from_fn_with_state(
+            state.clone(),
+            require_ready,
         ))
         .layer(axum::middleware::from_fn_with_state(
             state.clone().rate_limiter.clone(),

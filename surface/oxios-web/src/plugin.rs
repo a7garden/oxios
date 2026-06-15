@@ -22,6 +22,7 @@ use oxios_gateway::surface::{Surface, SurfaceContext, SurfaceHandle};
 
 use crate::api_docs;
 use crate::bridge::{WebBridge, WebBridgeHandle};
+use oxios_gateway::ReliabilityLayer;
 use crate::middleware::RateLimiter;
 use crate::routes;
 use crate::server::AppState;
@@ -34,7 +35,7 @@ use crate::server::AppState;
 struct EmbeddedAssets;
 
 // ---------------------------------------------------------------------------
-// Filesystem serving (no caching — reads fresh every request for auto-update)
+// Filesystem serving (RFC-024 SP3: atomic pointer + immutable cache)
 // ---------------------------------------------------------------------------
 
 /// Reads a file from the filesystem dist directory.
@@ -55,40 +56,70 @@ fn mime_type(path: &str) -> axum::http::HeaderValue {
         .unwrap_or_else(|_| axum::http::HeaderValue::from_static("application/octet-stream"))
 }
 
-/// Serve a static file — filesystem first, then embedded fallback.
+/// Whether `path` is a content-addressed asset (hashed filename under
+/// `assets/`). Such files are safe to cache as immutable because a new
+/// build emits new hashes, so the URL itself is the cache key.
+fn is_immutable_asset(path: &str) -> bool {
+    let clean = path.trim_start_matches('/');
+    clean.starts_with("assets/")
+}
+
+/// Read the active web version from `<dist>/version.json` (for the
+/// `X-Web-Version` header). Returns `"dev"` when not present.
+fn read_active_version(dist: &std::path::Path) -> String {
+    #[derive(serde::Deserialize)]
+    struct VersionFile {
+        version: Option<String>,
+    }
+    std::fs::read(dist.join("version.json"))
+        .ok()
+        .and_then(|b| serde_json::from_slice::<VersionFile>(&b).ok())
+        .and_then(|v| v.version)
+        .unwrap_or_else(|| "dev".to_string())
+}
+
+/// Serve a static file.
+///
+/// **RFC-024 C3 (3-source consistency):** when an active dist is published
+/// (`Some`), we serve *only* from it and never fall back to embedded assets.
+/// This guarantees a request never mixes two build hashes. Embedded assets
+/// are used only when no active dist exists (startup download failure, etc.).
 fn serve_file(dist: Option<&std::path::Path>, path: &str) -> Response {
     let clean = path.trim_start_matches('/');
 
-    // Try filesystem first
+    // ── Active dist path ──
     if let Some(d) = dist {
-        if let Some(data) = fs_read(d, clean) {
-            let lookup = if clean.starts_with("assets/") {
-                clean.to_string()
-            } else {
-                format!("assets/{clean}")
-            };
-            return Response::builder()
-                .status(200)
-                .header("Content-Type", mime_type(&lookup))
-                .header("Cache-Control", "no-cache") // disable caching for auto-update
-                .body(Body::from(data))
-                .unwrap();
-        }
-        // Try without assets/ prefix
-        if let Some(data) = fs_read(d, &format!("assets/{clean}")) {
-            return Response::builder()
-                .status(200)
-                .header("Content-Type", mime_type(clean))
-                .header("Cache-Control", "no-cache")
-                .body(Body::from(data))
-                .unwrap();
-        }
+        // Resolve the on-disk name (dist files live either at root or under assets/).
+        let data = fs_read(d, clean)
+            .or_else(|| fs_read(d, &format!("assets/{clean}")));
+        let Some(data) = data else {
+            // Deliberately NOT falling back to embedded: the active dist is
+            // self-consistent; a missing file here is a real miss, not a
+            // hash mismatch to paper over.
+            return Response::builder().status(404).body(Body::empty()).unwrap();
+        };
+        let lookup = if clean.starts_with("assets/") {
+            clean.to_string()
+        } else {
+            format!("assets/{clean}")
+        };
+        let cache = if is_immutable_asset(&lookup) {
+            // Content-addressed → safe to cache forever.
+            "public, max-age=31536000, immutable"
+        } else {
+            "no-cache"
+        };
+        return Response::builder()
+            .status(200)
+            .header("Content-Type", mime_type(&lookup))
+            .header("Cache-Control", cache)
+            .body(Body::from(data))
+            .unwrap();
     }
 
-    // Fall back to embedded assets
+    // ── No active dist → embedded fallback ──
     let asset =
         EmbeddedAssets::get(clean).or_else(|| EmbeddedAssets::get(&format!("assets/{clean}")));
-
     match asset {
         Some(content) => {
             let lookup = if clean.starts_with("assets/") {
@@ -96,12 +127,18 @@ fn serve_file(dist: Option<&std::path::Path>, path: &str) -> Response {
             } else {
                 format!("assets/{clean}")
             };
+            let cache = if is_immutable_asset(&lookup) {
+                "public, max-age=31536000, immutable"
+            } else {
+                "no-cache"
+            };
             let mime = mime_guess::from_path(lookup.as_str())
                 .first_or_octet_stream()
                 .to_string();
             Response::builder()
                 .status(200)
                 .header("Content-Type", mime)
+                .header("Cache-Control", cache)
                 .body(Body::from(content.data.to_vec()))
                 .unwrap()
         }
@@ -118,20 +155,28 @@ async fn static_handler(
     path: axum::extract::Path<String>,
     state: axum::extract::State<Arc<AppState>>,
 ) -> Response {
-    let dist = state.web_dist.clone();
+    // RFC-024 SP3: load the atomic pointer per request (O(1)).
+    let dist = state.web_dist.path();
     serve_file(dist.as_deref(), &path)
 }
 
 /// SPA fallback — serves index.html for client-side routing.
 async fn spa_handler(axum::extract::State(state): axum::extract::State<Arc<AppState>>) -> Response {
-    // Try filesystem first
-    if let Some(ref dist) = state.web_dist
-        && let Some(data) = fs_read(dist, "index.html")
+    // RFC-024 SP3: load the atomic pointer per request.
+    let dist = state.web_dist.path();
+
+    // Active dist: serve its index.html, annotated with the active version
+    // so clients can detect a version switch (3-source consistency). index.html
+    // is never cached immutably — it is the pointer to the hashed assets.
+    if let Some(ref d) = dist
+        && let Some(data) = fs_read(d, "index.html")
     {
+        let version = read_active_version(d);
         return Response::builder()
             .status(200)
             .header("Content-Type", "text/html; charset=utf-8")
             .header("Cache-Control", "no-cache")
+            .header("X-Web-Version", version)
             .body(Body::from(data))
             .unwrap();
     }
@@ -141,6 +186,8 @@ async fn spa_handler(axum::extract::State(state): axum::extract::State<Arc<AppSt
         Some(content) => Response::builder()
             .status(200)
             .header("Content-Type", "text/html; charset=utf-8")
+            .header("Cache-Control", "no-cache")
+            .header("X-Web-Version", "embedded")
             .body(Body::from(content.data.to_vec()))
             .unwrap(),
         None => Response::builder()
@@ -189,9 +236,20 @@ impl Surface for WebSurface {
         // `None` here means we'll fall back to embedded assets.
         let web_dist = ctx.web_dist;
 
-        // Create web channel for gateway message routing
-        let web_channel = WebBridge::new(256);
-        let bridge_handle = WebBridgeHandle::from_bridge(&web_channel);
+        // Create web channel for gateway message routing. Each web bridge
+        // owns its own reliability layer (RFC-024 SP2): the gateway's
+        // global layer is the source of truth, but the bridge layer is
+        // what WS resume handlers query for replay.
+        let web_channel = WebBridge::new(
+            256,
+            Arc::new(ReliabilityLayer::new(Default::default())),
+        );
+        // RFC-024 SP1 / C1: pull the response timeout from config so
+        // operators can tune the HTTP→gateway ceiling per environment.
+        let response_timeout =
+            std::time::Duration::from_secs(config.gateway.response_timeout_secs);
+        let bridge_handle = WebBridgeHandle::from_bridge(&web_channel)
+            .with_response_timeout(response_timeout);
 
         // Build app state — all knowledge access goes through kernel.knowledge
         let state = Arc::new(AppState {
@@ -204,6 +262,7 @@ impl Surface for WebSurface {
             rate_limiter: RateLimiter::new(rate_limit),
             memory_map_cache: routes::MemoryMapCache::default(),
             web_dist,
+            readiness: ctx.kernel.readiness.clone(),
         });
 
         // Build API routes

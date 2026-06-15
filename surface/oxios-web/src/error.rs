@@ -26,6 +26,8 @@ pub enum AppError {
         /// Maximum allowed size.
         limit: usize,
     },
+    /// Gateway did not respond within the configured deadline (RFC-024 C1).
+    GatewayTimeout(String),
 }
 
 impl std::fmt::Display for AppError {
@@ -41,6 +43,7 @@ impl std::fmt::Display for AppError {
                 f,
                 "Payload too large: {size} bytes exceeds limit of {limit} bytes"
             ),
+            AppError::GatewayTimeout(m) => write!(f, "Gateway Timeout: {m}"),
         }
     }
 }
@@ -60,6 +63,7 @@ impl IntoResponse for AppError {
                 StatusCode::PAYLOAD_TOO_LARGE,
                 format!("{size} bytes exceeds limit of {limit} bytes"),
             ),
+            AppError::GatewayTimeout(m) => (StatusCode::GATEWAY_TIMEOUT, m.clone()),
         };
         let body = json!({ "error": message });
         (status, axum::Json(body)).into_response()

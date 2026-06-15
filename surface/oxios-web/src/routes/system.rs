@@ -1,3 +1,4 @@
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use axum::Json;
@@ -132,7 +133,8 @@ pub(crate) struct StatusResponse {
     status: String,
     /// Binary (daemon) version.
     version: String,
-    /// Web UI frontend version (from package.json at build time).
+    /// Web UI frontend version (read from `<web_dist>/version.json` written
+    /// by the Vite build, or `"dev"` when not present — e.g. `bun dev`).
     web_version: String,
     /// Registered channels.
     channels: Vec<String>,
@@ -140,6 +142,27 @@ pub(crate) struct StatusResponse {
     uptime: String,
     /// Component-level health details.
     components: Option<ComponentHealth>,
+}
+
+/// Reads the Web UI version from `<web_dist>/version.json`.
+///
+/// That file is emitted by the Vite build and carries the version stamped
+/// from the root `Cargo.toml` (same source as the binary version), plus an
+/// optional `git_sha`. Returns `"dev"` when the file is missing — e.g. when
+/// running `bun dev` or serving a workspace `web/dist` that predates the
+/// version plugin — so the dashboard always renders a sane badge.
+fn read_web_version(web_dist: &Option<PathBuf>) -> String {
+    #[derive(Deserialize)]
+    struct VersionFile {
+        version: Option<String>,
+    }
+
+    web_dist
+        .as_ref()
+        .and_then(|p| std::fs::read(p.join("version.json")).ok())
+        .and_then(|b| serde_json::from_slice::<VersionFile>(&b).ok())
+        .and_then(|v| v.version)
+        .unwrap_or_else(|| "dev".to_string())
 }
 
 /// GET /api/status — System status with component health.
@@ -219,11 +242,14 @@ pub(crate) async fn handle_status(state: State<Arc<AppState>>) -> Json<StatusRes
             .unwrap_or(0),
     });
 
-    // Web UI version — embedded at build time via env variable.
-    // Falls back to "unknown" when not set (e.g. dev mode without the env).
-    let web_version = option_env!("OXIOS_WEB_VERSION")
-        .map(|s| s.to_string())
-        .unwrap_or_else(|| "dev".to_string());
+    // Web UI version — read at runtime from `<web_dist>/version.json`.
+    // That file is emitted by the Vite build (`vite.config.ts`) from the root
+    // `Cargo.toml` version, so it matches the binary version by construction.
+    // Falls back to `"dev"` when the file is absent (e.g. `bun dev`, or a
+    // workspace `web/dist` predating this change). Reading on each request is
+    // effectively free: the file is tiny and the OS page-caches it, and it lets
+    // a daily auto-update of `web/dist/` be reflected without a restart.
+    let web_version = read_web_version(&state.web_dist.path());
 
     Json(StatusResponse {
         service: "oxios".into(),
@@ -399,19 +425,26 @@ pub(crate) async fn handle_update_run(
     let mut web_updated = false;
     let mut messages: Vec<String> = Vec::new();
 
-    // Update web UI
+    // Update web UI (atomic — RFC-024 SP3)
     if body.web {
         if let Some((name, url, size)) = assets.iter().find(|(n, _, _)| n == "web-dist.zip") {
             tracing::info!(name, size, "Downloading web UI for update");
             let bytes = download_bytes(&client, url).await?;
 
-            let dest_dir = dirs::home_dir()
+            // Extract into a fresh versioned staging dir — NEVER the active
+            // dir. The active dir is published only after extraction succeeds
+            // and validates, so no request ever sees a half-populated dist.
+            let web_root = dirs::home_dir()
                 .ok_or_else(|| AppError::Internal("cannot determine home directory".into()))?
                 .join(".oxios")
-                .join("web")
-                .join("dist");
-            std::fs::create_dir_all(&dest_dir)
-                .map_err(|e| AppError::Internal(format!("failed to create web dir: {e}")))?;
+                .join("web");
+            let staging = web_root.join(format!("dist-{target_version}"));
+            if staging.exists() {
+                std::fs::remove_dir_all(&staging)
+                    .map_err(|e| AppError::Internal(format!("failed to clear staging: {e}")))?;
+            }
+            std::fs::create_dir_all(&staging)
+                .map_err(|e| AppError::Internal(format!("failed to create staging: {e}")))?;
 
             let cursor = std::io::Cursor::new(&bytes);
             let mut archive = zip::ZipArchive::new(cursor)
@@ -421,8 +454,11 @@ pub(crate) async fn handle_update_run(
                 let mut file = archive
                     .by_index(i)
                     .map_err(|e| AppError::Internal(format!("zip read error: {e}")))?;
-                let out_path = dest_dir.join(file.name());
-                if file.name().ends_with('/') {
+                let out_path = match file.enclosed_name() {
+                    Some(p) => staging.join(p),
+                    None => continue,
+                };
+                if file.is_dir() {
                     std::fs::create_dir_all(&out_path).ok();
                 } else {
                     if let Some(p) = out_path.parent() {
@@ -434,6 +470,19 @@ pub(crate) async fn handle_update_run(
                         .map_err(|e| AppError::Internal(format!("write error: {e}")))?;
                 }
             }
+
+            // Validate before publishing.
+            if !staging.join("index.html").is_file() {
+                return Err(AppError::Internal(
+                    "extracted dist missing index.html".into(),
+                ));
+            }
+
+            // Atomic publish: swap the in-memory pointer + persist marker.
+            // Previous generation is cleaned up after a grace period.
+            let marker = web_root.join(".active");
+            state.web_dist.publish(staging, &marker);
+
             web_updated = true;
             messages.push(format!("Web UI updated to {target_version}"));
         } else {

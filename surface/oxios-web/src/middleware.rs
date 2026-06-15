@@ -10,7 +10,7 @@ use axum::{
     extract::{Request, State},
     http::StatusCode,
     middleware::Next,
-    response::Response,
+    response::{IntoResponse, Response},
 };
 
 use crate::server::AppState;
@@ -145,4 +145,46 @@ pub async fn require_auth(
     }
 
     Ok(next.run(request).await)
+}
+
+/// Readiness gate middleware (RFC-024 SP4).
+///
+/// Returns 503 Service Unavailable for protected API routes while subsystems
+/// are still warming up. Health endpoints (`/health`, `/health/ready`,
+/// `/metrics`) and the SPA / static assets are always allowed so probes and
+/// the dashboard shell can render. The deadline (30 s default) is enforced
+/// here so a permanently missing engine cannot lock the gate forever.
+pub async fn require_ready(
+    State(state): State<Arc<AppState>>,
+    request: Request,
+    next: Next,
+) -> Result<Response, StatusCode> {
+    let path = request.uri().path();
+    // Always-on endpoints bypass the gate.
+    if path == "/health"
+        || path == "/health/ready"
+        || path == "/metrics"
+        || path.starts_with("/assets/")
+        || path == "/"
+        || path == "/index.html"
+    {
+        return Ok(next.run(request).await);
+    }
+
+    // Deadline → any still-Warming subsystem becomes Degraded (still
+    // counts as ready, but signals a partial setup to operators).
+    state.readiness.enforce_deadline();
+
+    if state.readiness.is_ready() {
+        Ok(next.run(request).await)
+    } else {
+        tracing::debug!(path = %path, "Request blocked — subsystem not yet ready");
+        let resp = (
+            StatusCode::SERVICE_UNAVAILABLE,
+            [(axum::http::header::RETRY_AFTER, "2")],
+            "warming up",
+        )
+            .into_response();
+        Err(resp)
+    }
 }
