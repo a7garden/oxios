@@ -105,9 +105,7 @@ pub fn detect_meta(path: &Path) -> MountMeta {
 ///
 /// Returns `(path, mtime)` pairs for existing markers — this is the snapshot
 /// the drift detector compares against on the next session.
-pub fn snapshot_markers(
-    path: &Path,
-) -> Vec<(std::path::PathBuf, std::time::SystemTime)> {
+pub fn snapshot_markers(path: &Path) -> Vec<(std::path::PathBuf, std::time::SystemTime)> {
     let all: Vec<&str> = MARKERS
         .iter()
         .map(|(m, _)| *m)
@@ -117,7 +115,10 @@ pub fn snapshot_markers(
     all.into_iter()
         .filter_map(|m| {
             let p = path.join(m);
-            p.metadata().and_then(|md| md.modified()).ok().map(|t| (p, t))
+            p.metadata()
+                .and_then(|md| md.modified())
+                .ok()
+                .map(|t| (p, t))
         })
         .collect()
 }
@@ -148,8 +149,14 @@ fn extract_stack(marker: &str, path: &Path, stack: &mut Vec<String>) {
                     // Only dependency-style lines (not section headers).
                     if !name.starts_with('[')
                         && !name.is_empty()
-                        && !["path", "version", "features", "default-features", "optional"]
-                            .contains(&name)
+                        && ![
+                            "path",
+                            "version",
+                            "features",
+                            "default-features",
+                            "optional",
+                        ]
+                        .contains(&name)
                     {
                         push(stack, name);
                     }
@@ -175,7 +182,8 @@ fn extract_stack(marker: &str, path: &Path, stack: &mut Vec<String>) {
                 if trimmed.starts_with("require ") || trimmed.contains(" v") {
                     let parts: Vec<&str> = trimmed.split_whitespace().collect();
                     for part in parts {
-                        if part.contains('/') && part.contains('.') && !part.starts_with("require") {
+                        if part.contains('/') && part.contains('.') && !part.starts_with("require")
+                        {
                             // Take the last path segment as the stack name.
                             if let Some(name) = part.rsplit('/').next() {
                                 push(stack, name);
@@ -216,13 +224,13 @@ fn first_meaningful_line(content: &str) -> String {
             continue;
         }
         // Strip markdown emphasis for a cleaner summary.
-        let clean = trimmed
-            .trim_start_matches('>')
-            .replace("**", "")
-            .replace('*', "")
-            .replace('`', "");
+        let clean = trimmed.trim_start_matches('>').replace(['*', '`'], "");
         let clean = clean.trim();
-        let capped = if clean.len() > 120 { &clean[..120] } else { clean };
+        let capped = if clean.len() > 120 {
+            &clean[..120]
+        } else {
+            clean
+        };
         // Find a safe UTF-8 boundary.
         let mut end = capped.len();
         while end > 0 && !capped.is_char_boundary(end) {
@@ -299,9 +307,16 @@ mod tests {
         let dir = TempDir::new().unwrap();
         fs::write(dir.path().join("Cargo.toml"), "[package]\nname = \"x\"").unwrap();
         let snap = snapshot_markers(dir.path());
-        assert!(snap.iter().any(|(p, _)| p.file_name().unwrap() == "Cargo.toml"));
+        assert!(
+            snap.iter()
+                .any(|(p, _)| p.file_name().unwrap() == "Cargo.toml")
+        );
         // Non-existent markers are excluded.
-        assert!(!snap.iter().any(|(p, _)| p.file_name().unwrap() == "package.json"));
+        assert!(
+            !snap
+                .iter()
+                .any(|(p, _)| p.file_name().unwrap() == "package.json")
+        );
     }
 
     #[test]

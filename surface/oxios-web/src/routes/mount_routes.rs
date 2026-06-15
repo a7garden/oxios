@@ -178,3 +178,14 @@ pub(crate) async fn handle_mount_delete(
         .map_err(|e| AppError::Internal(format!("Failed to delete mount: {e}")))?;
     Ok(StatusCode::NO_CONTENT)
 }
+
+/// POST /api/mounts/:id/rescan — Re-seed auto_meta from the filesystem (RFC-025).
+pub(crate) async fn handle_mount_rescan(
+    state: State<Arc<AppState>>,
+    Path(id): Path<String>,
+) -> Result<Json<MountInfo>, AppError> {
+    let api = mount_api!(state);
+    api.rescan(&id)
+        .map_err(|e| AppError::Internal(format!("Failed to rescan: {e}")))
+        .map(Json)
+}

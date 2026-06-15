@@ -1,6 +1,6 @@
 # RFC-025: Mount + Project System
 
-> **Status:** Phase 1 implemented
+> **Status:** Phase 1–4 implemented
 > **Date:** 2026-06-15
 > **Replaces:** RFC-011 (project-system) — evolves the single `Project` concept into two distinct concepts (`Mount` + `Project`)
 > **Related:** RFC-008 (memory consolidation — Dream integration), RFC-011 Phase 1–4
@@ -405,24 +405,25 @@ Agents still **cannot** create or remove Mounts/Projects — those remain user-l
 - [x] Orchestrator parses the full `mount_ids` list (`resolve_mount_workspace`)
 - [x] Path-access fix: every bound Mount grants path access (was `project_paths[0]`-only)
 - [x] Web `/api/mounts` CRUD routes + `mount_ids`/`mount_tag` in the chat flow
-- [ ] Rename the web store to `activeMountIds`; activate the detection badge (frontend)
+- [x] Frontend: Mount UI (types, hooks, dialog, management page, detection badge)
 
-**Phase 2 — Project bundle layer + sidebar grouping**
-- Project as instruction/memory bundle referencing Mounts, owning sessions (1:N)
-- Project instructions editor (inline sidebar drawer)
-- `project_memory` junction reuse
-- Chat sidebar reorganized as Project-tree → sessions
+**Phase 2 — Project bundle layer + sidebar grouping** ✅
+- [x] Project struct gains `mount_ids: Vec` + `instructions: String` (additive migration)
+- [x] Orchestrator injects Project instructions + auto-activates referenced Mounts
+- [x] `PUT /api/projects/:id` accepts `mount_ids` + `instructions`
+- [x] EditProjectDialog: Mount multi-select chips + instructions textarea
+- [ ] Sidebar reorganized as Project-tree (deferred — current flat list works)
 
-**Phase 3 — Agent-driven enrichment**
-- `mount.update` tool action
-- Dream integration (RFC-008) for Mount refresh
-- Auto-meta detection (languages / stack / markers)
+**Phase 3 — Agent-driven enrichment** ✅
+- [x] `mount` tool (list/get/update): agent explores and writes auto_description/auto_meta
+- [x] Auto-meta detection (meta_detection.rs): Cargo.toml→rust, package.json→ts, etc.
+- [x] Drift detection: marker mtime snapshot comparison
+- [x] `check_all_drift()` for Dream-time refresh hook
 
-**Phase 4 — UX polish**
-- Session creation with Mount multi-select + Project picker
-- Detection-badge full flow (dismiss / switch)
-- Mount re-scan trigger
-- Drag-to-reparent sessions between Projects
+**Phase 4 — UX polish** ◑
+- [x] Detection-badge full flow (dismiss / accept / bind)
+- [x] Mount re-scan trigger (`POST /api/mounts/:id/rescan`)
+- [ ] Drag-to-reparent sessions between Projects (deferred — low priority)
 
 ## Sidebar UX: Project-Centric Chat Navigation
 

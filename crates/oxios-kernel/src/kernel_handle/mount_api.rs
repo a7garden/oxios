@@ -142,6 +142,16 @@ impl MountApi {
         }
     }
 
+    /// Re-seed auto_meta from the filesystem (RFC-025 manual rescan).
+    pub fn rescan(&self, id: &str) -> Result<MountInfo> {
+        let mount_id: MountId = Uuid::parse_str(id).context("Invalid mount ID")?;
+        self.mount_manager
+            .seed_auto_meta(mount_id)
+            .context("Failed to rescan mount")?;
+        self.get_mount(id)
+            .ok_or_else(|| anyhow::anyhow!("Mount not found after rescan"))
+    }
+
     /// Detect a Mount from a message, returning the matched Mount's info.
     pub fn detect(&self, message: &str) -> Option<MountInfo> {
         use crate::mount::DetectionResult;

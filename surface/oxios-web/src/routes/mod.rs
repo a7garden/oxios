@@ -112,8 +112,8 @@ pub(crate) use marketplace::{
     handle_skills_sh_search, handle_skills_sh_skill_audit, handle_skills_sh_skill_detail,
 };
 pub(crate) use mount_routes::{
-    handle_mount_create, handle_mount_delete, handle_mount_get, handle_mount_update,
-    handle_mounts_list,
+    handle_mount_create, handle_mount_delete, handle_mount_get, handle_mount_rescan,
+    handle_mount_update, handle_mounts_list,
 };
 pub(crate) use project_routes::{
     handle_project_create, handle_project_delete, handle_project_get, handle_project_link_memory,
@@ -455,6 +455,7 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         .route("/api/mounts/{id}", get(handle_mount_get))
         .route("/api/mounts/{id}", put(handle_mount_update))
         .route("/api/mounts/{id}", delete(handle_mount_delete))
+        .route("/api/mounts/{id}/rescan", post(handle_mount_rescan))
         // Tool Registry (for settings UI)
         .route("/api/tools/registry", get(handle_tools_registry))
         // Budget

@@ -261,12 +261,8 @@ impl MountManager {
     /// `true` if any marker drifted (and the flag was set). Cheap: a handful
     /// of `stat()` calls.
     pub fn check_drift(&self, id: MountId) -> Result<bool> {
-        use std::path::PathBuf;
-
         let mut mounts = self.mounts.write();
-        let mount = mounts
-            .get_mut(&id)
-            .ok_or(MountManagerError::NotFound(id))?;
+        let mount = mounts.get_mut(&id).ok_or(MountManagerError::NotFound(id))?;
         let Some(primary) = mount.primary_path().cloned() else {
             return Ok(false);
         };
@@ -277,10 +273,7 @@ impl MountManager {
             mount.updated_at = Utc::now();
         }
         // Always refresh the snapshot so the next comparison is accurate.
-        mount.last_marker_snapshot = current
-            .into_iter()
-            .map(|(p, t)| (PathBuf::from(p), t))
-            .collect();
+        mount.last_marker_snapshot = current.into_iter().collect();
         let mount_clone = mount.clone();
         drop(mounts);
         let _ = mount_db::save_mount(&self.db.conn(), &mount_clone);
