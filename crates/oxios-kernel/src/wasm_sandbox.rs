@@ -93,13 +93,21 @@ impl Default for WasmConfig {
     }
 }
 
+/// Host state combining WASI preview1 context.
+/// In wasmtime 22, WASI types moved to `wasmtime-wasi` and the `Linker`'s
+/// `T` must implement a closure-based accessor, not hold `WasiCtx` directly.
+#[cfg(feature = "wasm-sandbox")]
+struct WasiHostState {
+    wasi: wasmtime_wasi::preview1::WasiP1Ctx,
+}
+
 /// WASM sandbox for executing untrusted tool code.
 ///
 /// Provides isolation and resource limits for WASM modules.
 #[cfg(feature = "wasm-sandbox")]
 pub struct WasmSandbox {
     engine: wasmtime::Engine,
-    linker: wasmtime::Linker<wasmtime::WasiCtx>,
+    linker: wasmtime::Linker<WasiHostState>,
     config: WasmConfig,
     modules: RwLock<HashMap<String, wasmtime::Module>>,
 }
@@ -116,12 +124,13 @@ impl WasmSandbox {
 
         let mut linker = wasmtime::Linker::new(&engine);
 
-        // Create WASI context
-        let wasi_ctx = wasmtime_wasi::WasiCtxBuilder::new().build();
-
-        linker
-            .define_wasi(wasi_ctx)
-            .map_err(|e| WasmError::InstantiationFailed(e.to_string()))?;
+        // wasmtime 22: WASI is registered via the preview1 compatibility layer,
+        // not the old `linker.define_wasi()` method. The closure extracts the
+        // `WasiP1Ctx` from our host state during calls.
+        wasmtime_wasi::preview1::add_to_linker_sync(&mut linker, |state: &mut WasiHostState| {
+            &mut state.wasi
+        })
+        .map_err(|e| WasmError::InstantiationFailed(e.to_string()))?;
 
         Ok(Self {
             engine,
@@ -175,20 +184,20 @@ impl WasmSandbox {
                 .ok_or_else(|| WasmError::ModuleNotFound(module_name.to_string()))?
         };
 
-        // Create a new store with fuel for instruction limiting
-        let mut store =
-            wasmtime::Store::new(&self.engine, wasmtime_wasi::WasiCtxBuilder::new().build());
+        // Create a new store with WASI state and fuel for instruction limiting.
+        // wasmtime 22: store T must be our WasiHostState (holds WasiP1Ctx).
+        let wasi = wasmtime_wasi::WasiCtxBuilder::new().build_p1();
+        let mut store = wasmtime::Store::new(&self.engine, WasiHostState { wasi });
 
         // Set fuel limit (convert instructions to fuel units, 1 fuel = 1 instruction)
         store
             .set_fuel(self.config.max_instructions)
             .map_err(|e| WasmError::InstantiationFailed(e.to_string()))?;
 
-        // Instantiate the module
+        // Instantiate the module (synchronous in wasmtime 22)
         let instance = self
             .linker
             .instantiate(&mut store, &module)
-            .await
             .map_err(|e| WasmError::InstantiationFailed(e.to_string()))?;
 
         // Get the function
@@ -214,13 +223,13 @@ impl WasmSandbox {
                 WasmError::ExecutionFailed(format!("Failed to write input to memory: {}", e))
             })?;
 
-        // Execute the function
+        // Execute the function (synchronous in wasmtime 22)
         let result = func
             .call(&mut store, (input_ptr, input_bytes.len() as i32))
             .map_err(|e| {
-                // Check for fuel exhaustion
+                // Check for fuel exhaustion (get_fuel returns Result in wasmtime 22)
                 let fuel_err = store
-                    .fuel_remaining()
+                    .get_fuel()
                     .map(|remaining| remaining == 0)
                     .unwrap_or(false);
 
@@ -234,10 +243,13 @@ impl WasmSandbox {
                 }
             })?;
 
-        // Read output from memory
+        // Read output from memory.
+        // wasmtime 22: `Memory::read` fills a caller-provided buffer instead
+        // of returning a new Vec.
         let output_len = result.1 as usize;
-        let output_bytes = memory
-            .read(&store, result.0 as usize, output_len)
+        let mut output_bytes = vec![0u8; output_len];
+        memory
+            .read(&store, result.0 as usize, &mut output_bytes)
             .map_err(|e| {
                 WasmError::ExecutionFailed(format!("Failed to read output from memory: {}", e))
             })?;

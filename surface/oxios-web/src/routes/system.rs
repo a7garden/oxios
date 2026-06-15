@@ -849,10 +849,10 @@ pub(crate) async fn handle_agent_get(
     Path(id): Path<String>,
 ) -> Result<Json<serde_json::Value>, AppError> {
     // Try in-memory first
-    if let Ok(agents) = state.kernel.agents.list().await {
-        if let Some(agent) = agents.into_iter().find(|a| a.id.to_string() == id) {
-            return Ok(Json(agent_detail_json(&agent, &state)));
-        }
+    if let Ok(agents) = state.kernel.agents.list().await
+        && let Some(agent) = agents.into_iter().find(|a| a.id.to_string() == id)
+    {
+        return Ok(Json(agent_detail_json(&agent, &state)));
     }
 
     // Fall back to SQLite (or filesystem)
@@ -898,10 +898,10 @@ pub(crate) async fn handle_agent_trace(
     Path(id): Path<String>,
 ) -> Result<Json<serde_json::Value>, AppError> {
     // Try in-memory first
-    if let Ok(agents) = state.kernel.agents.list().await {
-        if let Some(agent) = agents.into_iter().find(|a| a.id.to_string() == id) {
-            return Ok(Json(trace_json(&agent)));
-        }
+    if let Ok(agents) = state.kernel.agents.list().await
+        && let Some(agent) = agents.into_iter().find(|a| a.id.to_string() == id)
+    {
+        return Ok(Json(trace_json(&agent)));
     }
 
     // Fallback: load from SQLite

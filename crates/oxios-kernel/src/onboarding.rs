@@ -464,7 +464,7 @@ fn setup_embedding(config: &OxiosConfig) -> anyhow::Result<String> {
 
         let result = with_spinner(
             &format!("Downloading {}...", display_name),
-            &format!("{} Downloaded", theme::success(theme::ok()).to_string()),
+            &format!("{} Downloaded", theme::success(theme::ok())),
             || crate::embedding::gguf::GgufModelLoader::ensure_model(&model_dir),
         );
 

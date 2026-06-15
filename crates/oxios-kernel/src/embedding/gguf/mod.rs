@@ -21,7 +21,6 @@ use std::time::{Duration, Instant};
 
 use anyhow::{Context, Result};
 use llama_gguf::{
-    HfClient,
     backend::cpu::CpuBackend,
     gguf::GgufFile,
     model::{EmbeddingConfig, EmbeddingExtractor, LlamaModel, PoolingStrategy, load_llama_model},
@@ -35,12 +34,13 @@ pub use self::loader::GgufModelLoader;
 pub use self::loader::{MODEL_DISPLAY_NAME, MODEL_SIZE_MB};
 
 /// Matryoshka dimension truncation.
-#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Copy, Default, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum EmbeddingDimension {
     /// 128 dimensions — smallest, fastest, slightly lower quality.
     Dim128,
     /// 256 dimensions — recommended balance.
+    #[default]
     Dim256,
     /// 512 dimensions — higher quality.
     Dim512,
@@ -57,12 +57,6 @@ impl EmbeddingDimension {
             Self::Dim512 => 512,
             Self::Dim768 => 768,
         }
-    }
-}
-
-impl Default for EmbeddingDimension {
-    fn default() -> Self {
-        Self::Dim256
     }
 }
 
@@ -207,11 +201,11 @@ impl GgufEmbeddingProvider {
     /// Unload the model if TTL has expired.
     pub fn maybe_unload(&self) {
         let mut inner = self.inner.lock();
-        if let Some(ref loaded) = *inner {
-            if loaded.loaded_at.elapsed() > self.model_ttl {
-                *inner = None;
-                tracing::debug!("GGUF embedding model unloaded (TTL expired)");
-            }
+        if let Some(ref loaded) = *inner
+            && loaded.loaded_at.elapsed() > self.model_ttl
+        {
+            *inner = None;
+            tracing::debug!("GGUF embedding model unloaded (TTL expired)");
         }
     }
 
