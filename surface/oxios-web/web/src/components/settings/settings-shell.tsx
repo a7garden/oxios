@@ -181,7 +181,7 @@ export function SettingsShell({
   }, [navigateByOffset, onReview, onNavigate, orderedSectionIds])
 
   return (
-    <div className="flex gap-6">
+    <div className="flex flex-col md:flex-row gap-6">
       {/* Desktop rail (spec §5): visible from `md` (768px) up, widening
           across three tiers — 200px → 240px → 280px. Below `md` the
           rail is hidden behind the `MobileSheet` drawer. */}
