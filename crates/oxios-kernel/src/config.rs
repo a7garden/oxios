@@ -961,6 +961,45 @@ pub struct GatewayConfig {
     /// dev typically wants them; production typically does not.
     #[serde(default)]
     pub expose_api_docs: bool,
+    /// RFC-024 SP1: ceiling on `send_and_wait` for HTTP request-response
+    /// matching. The HTTP layer returns 504 Gateway Timeout when the
+    /// orchestrator does not respond within this duration.
+    #[serde(default = "default_response_timeout_secs")]
+    pub response_timeout_secs: u64,
+    /// RFC-024 SP1: in-memory replay buffer tuning (per channel).
+    #[serde(default)]
+    pub reliability: GatewayReliabilityConfig,
+}
+
+/// RFC-024 SP1: in-memory replay buffer tuning.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GatewayReliabilityConfig {
+    /// Per-channel replay buffer size. Older messages are evicted when
+    /// the buffer is full.
+    #[serde(default = "default_replay_buffer_size")]
+    pub replay_buffer_size: usize,
+    /// How long a message stays in the replay buffer.
+    #[serde(default = "default_replay_ttl_secs")]
+    pub replay_ttl_secs: u64,
+}
+
+impl Default for GatewayReliabilityConfig {
+    fn default() -> Self {
+        Self {
+            replay_buffer_size: default_replay_buffer_size(),
+            replay_ttl_secs: default_replay_ttl_secs(),
+        }
+    }
+}
+
+fn default_response_timeout_secs() -> u64 {
+    120
+}
+fn default_replay_buffer_size() -> usize {
+    512
+}
+fn default_replay_ttl_secs() -> u64 {
+    60
 }
 
 impl GatewayConfig {
@@ -1452,7 +1491,16 @@ fn default_rate_limit_per_minute() -> u32 {
 }
 
 fn default_cors_origins() -> Vec<String> {
-    vec!["http://localhost:4200".to_string()]
+    // Browsers treat `localhost` and `127.0.0.1` as distinct origins, so both
+    // must be allow-listed or cross-origin requests silently fail CORS checks.
+    // 4200 = backend that also serves the production SPA (same origin).
+    // 5173 = Vite dev server (`bun dev` in surface/oxios-web/web).
+    vec![
+        "http://localhost:4200".to_string(),
+        "http://127.0.0.1:4200".to_string(),
+        "http://localhost:5173".to_string(),
+        "http://127.0.0.1:5173".to_string(),
+    ]
 }
 
 impl Default for SecurityConfig {

@@ -63,6 +63,18 @@ port = 4200
 # Default: false (production-safe).
 # expose_api_docs = false
 
+# RFC-024 SP1: ceiling on HTTP→gateway request-response matching.
+# The HTTP layer returns 504 when the orchestrator does not respond
+# within this duration. Default: 120s.
+# response_timeout_secs = 120
+
+# RFC-024 SP1: in-memory replay buffer for WS resume / C2 (order+replay).
+[gateway.reliability]
+# Per-channel ring buffer size. Older messages are evicted on overflow.
+# replay_buffer_size = 512
+# How long a message stays in the buffer.
+# replay_ttl_secs = 60
+
 [exec]
 # Default execution mode: "structured" (recommended) or "shell".
 # Shell mode is DANGEROUS — requires explicit allow_shell_mode=true.
@@ -110,8 +122,9 @@ cache_limit_entries = 50
 [security]
 # NOTE: auth_enabled should be true in production.
 auth_enabled = false
-# Allowed CORS origins.
-cors_origins = ["http://localhost:4200"]
+# Allowed CORS origins. Browsers treat `localhost` and `127.0.0.1` as distinct
+# origins, so both are included. 5173 covers the Vite dev server (`bun dev`).
+cors_origins = ["http://localhost:4200", "http://127.0.0.1:4200", "http://localhost:5173", "http://127.0.0.1:5173"]
 # Default allowed tools for agents.
 allowed_tools = ["read", "write", "edit", "bash", "grep", "find", "exec"]
 network_access = false

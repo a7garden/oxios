@@ -136,6 +136,12 @@ pub enum ErrorKind {
 pub struct OutgoingMessage {
     /// Unique message identifier.
     pub id: uuid::Uuid,
+    /// RFC-024 SP1: monotonic sequence number assigned by the gateway's
+    /// `ReliabilityLayer`. `None` for messages built outside the delivery
+    /// pipeline (tests, direct responses). Consumers use this together
+    /// with the message `id` to dedupe (C2 order, C3 idempotency).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub seq: Option<u64>,
     /// Name of the target channel.
     pub channel: String,
     /// Identifier for the user who should receive the message.
@@ -178,6 +184,7 @@ impl OutgoingMessage {
     ) -> Self {
         Self {
             id,
+            seq: None,
             channel: channel.into(),
             user_id: user_id.into(),
             content: content.into(),
@@ -208,6 +215,7 @@ impl OutgoingMessage {
     ) -> Self {
         Self {
             id,
+            seq: None,
             channel: channel.into(),
             user_id: user_id.into(),
             content: content.into(),
@@ -238,6 +246,7 @@ impl OutgoingMessage {
     ) -> Self {
         Self {
             id: correlation_id,
+            seq: None,
             channel: channel.to_string(),
             user_id: user_id.to_string(),
             content: content.to_string(),
@@ -256,6 +265,7 @@ impl OutgoingMessage {
     pub fn error(correlation_id: Uuid, channel: &str, user_id: &str, err: UserFacingError) -> Self {
         Self {
             id: correlation_id,
+            seq: None,
             channel: channel.to_string(),
             user_id: user_id.to_string(),
             content: err.message.clone(),

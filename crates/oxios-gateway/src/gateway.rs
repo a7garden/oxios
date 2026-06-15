@@ -39,6 +39,7 @@ use crate::channel::Channel;
 use crate::error_classify::classify_error;
 use crate::message::{ErrorKind, IncomingMessage, OutgoingMessage, ResponseMeta, UserFacingError};
 use crate::meta::meta;
+use crate::reliability::ReliabilityLayer;
 use crate::GatewayInbox;
 
 /// Gateway receive buffer size.
@@ -93,6 +94,11 @@ pub struct Gateway {
 
     /// Keywords that trigger spec (Ouroboros) mode. Prefix-only match.
     spec_keywords: Vec<String>,
+
+    /// RFC-024 SP1: delivery reliability layer — assigns a monotonic `seq`
+    /// to each outgoing message and keeps a bounded ring buffer for replay.
+    /// Cheap to clone; the inner state is `Sync`.
+    reliability: ReliabilityLayer,
 }
 
 /// Default spec keywords (used when no config is available).
@@ -140,6 +146,7 @@ impl Gateway {
             shutdown,
             concurrency: Arc::new(Semaphore::new(MAX_CONCURRENT_ROUTES)),
             spec_keywords: default_spec_keywords(),
+            reliability: Arc::new(ReliabilityLayer::new(Default::default())),
         }
     }
 
@@ -161,6 +168,7 @@ impl Gateway {
             shutdown,
             concurrency: Arc::new(Semaphore::new(MAX_CONCURRENT_ROUTES)),
             spec_keywords: default_spec_keywords(),
+            reliability: Arc::new(ReliabilityLayer::new(Default::default())),
         }
     }
 
@@ -407,6 +415,7 @@ impl Gateway {
                         response_meta,
                     );
                     outgoing.target_conn_id = conn_id;
+                    let outgoing = self.reliability.assign_seq(outgoing);
                     if let Err(e) = entry.channel.send(outgoing).await {
                         tracing::error!(error = %e, "Failed to send response");
                     }
@@ -423,6 +432,7 @@ impl Gateway {
                     }
                     outgoing.target_conn_id = conn_id;
 
+                    let outgoing = self.reliability.assign_seq(outgoing);
                     if let Err(e) = entry.channel.send(outgoing).await {
                         tracing::error!(error = %e, "Failed to send error response");
                     }
@@ -440,6 +450,7 @@ impl Gateway {
     pub async fn send_to(&self, channel_name: &str, msg: OutgoingMessage) -> Result<()> {
         let channels = self.channels.read().await;
         if let Some(entry) = channels.get(channel_name) {
+            let msg = self.reliability.assign_seq(msg);
             entry.channel.send(msg).await?;
         } else {
             tracing::warn!(channel = %channel_name, "No such channel registered");
@@ -453,6 +464,7 @@ impl Gateway {
     fn dispatch_switch_model(&self, channel_name: String, msg: IncomingMessage) {
         let engine_api = self.engine_api.clone();
         let channels = self.channels.clone();
+        let reliability = self.reliability.clone();
         let conn_id = msg.metadata.get("conn_id").cloned();
 
         tokio::spawn(async move {
@@ -498,6 +510,7 @@ impl Gateway {
                             },
                         );
                         outgoing.target_conn_id = conn_id;
+                        let outgoing = reliability.assign_seq(outgoing);
                         if let Err(e) = entry.channel.send(outgoing).await {
                             tracing::error!(error = %e, "Failed to send switch_model response");
                         }
@@ -515,6 +528,7 @@ impl Gateway {
                         let mut outgoing =
                             OutgoingMessage::error(msg.id, &msg.channel, &msg.user_id, user_err);
                         outgoing.target_conn_id = conn_id;
+                        let outgoing = reliability.assign_seq(outgoing);
                         if let Err(e) = entry.channel.send(outgoing).await {
                             tracing::error!(error = %e, "Failed to send switch_model error");
                         }
@@ -534,6 +548,7 @@ impl Gateway {
     fn dispatch_switch_persona(&self, channel_name: String, msg: IncomingMessage) {
         let persona_api = self.persona_api.clone();
         let channels = self.channels.clone();
+        let reliability = self.reliability.clone();
         let conn_id = msg.metadata.get("conn_id").cloned();
 
         tokio::spawn(async move {
@@ -580,6 +595,7 @@ impl Gateway {
                             },
                         );
                         outgoing.target_conn_id = conn_id;
+                        let outgoing = reliability.assign_seq(outgoing);
                         if let Err(e) = entry.channel.send(outgoing).await {
                             tracing::error!(error = %e, "Failed to send switch_persona response");
                         }
@@ -594,6 +610,7 @@ impl Gateway {
                         let mut outgoing =
                             OutgoingMessage::error(msg.id, &msg.channel, &msg.user_id, user_err);
                         outgoing.target_conn_id = conn_id;
+                        let outgoing = reliability.assign_seq(outgoing);
                         if let Err(e) = entry.channel.send(outgoing).await {
                             tracing::error!(error = %e, "Failed to send switch_persona error");
                         }

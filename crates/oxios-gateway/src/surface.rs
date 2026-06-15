@@ -31,6 +31,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::task::JoinHandle;
 
+use crate::ActiveWebDist;
 use crate::Channel;
 
 /// Context provided to surfaces during initialization.
@@ -41,12 +42,12 @@ pub struct SurfaceContext {
     pub config: Arc<parking_lot::RwLock<oxios_kernel::OxiosConfig>>,
     /// Path to the config file.
     pub config_path: PathBuf,
-    /// Pre-resolved web UI dist directory.
+    /// Pre-resolved web UI dist directory, published through an atomic
+    /// pointer so updates can swap it without a 404 window (RFC-024 SP3).
     ///
-    /// If `Some(path)`, the web UI has already been verified/downloaded
-    /// before the surface starts. Surfaces should use this directly
-    /// instead of re-running the download logic.
-    pub web_dist: Option<PathBuf>,
+    /// Surfaces should serve from `web_dist.path()` on every request. When
+    /// the inner path is `None`, surfaces fall back to embedded assets.
+    pub web_dist: ActiveWebDist,
 }
 
 /// Handle returned by a surface after initialization.
