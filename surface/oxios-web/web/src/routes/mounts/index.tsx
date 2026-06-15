@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { FolderPlus, Trash2 } from 'lucide-react'
+import { FolderPlus, Sparkles, Trash2, Wrench } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -103,7 +103,11 @@ function MountsPage() {
 
               {/* Name */}
               <div className="mb-2 flex items-center gap-2">
-                <span className="text-lg">{mount.source === 'auto_promoted' ? '✨' : '🔧'}</span>
+                {mount.source === 'auto_promoted' ? (
+                  <Sparkles className="h-4 w-4 text-violet-500" />
+                ) : (
+                  <Wrench className="h-4 w-4" />
+                )}
                 <h3 className="font-semibold truncate">{mount.name}</h3>
                 {mount.source === 'auto_promoted' && (
                   <span className="rounded-full bg-violet-500/10 px-2 py-0.5 text-xs text-violet-600">

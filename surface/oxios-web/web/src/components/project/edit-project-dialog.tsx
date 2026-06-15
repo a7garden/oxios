@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { FolderOpen } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -191,7 +192,7 @@ export function EditProjectDialog({
                         : 'border-transparent hover:bg-muted'
                     }`}
                   >
-                    🔧 {m.name}
+                    <span className="inline-flex items-center gap-1"><FolderOpen className="h-3 w-3" /> {m.name}</span>
                   </button>
                 ))}
               </div>
