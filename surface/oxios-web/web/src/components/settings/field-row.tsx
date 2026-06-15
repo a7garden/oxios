@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
+import { Slider } from '@/components/ui/slider'
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
@@ -33,6 +34,16 @@ interface FieldRowProps {
    * on the parent field's value.
    */
   sectionValues?: Record<string, unknown>
+  /**
+   * Optional validate function for `tags` type fields.
+   * Called before adding a new tag; return an i18n key string on error.
+   */
+  validate?: (value: string) => string | null
+  /**
+   * Optional suggestion list for `tags` type fields.
+   * When provided, the input shows a suggestion popover.
+   */
+  suggestions?: { value: string; label: string; group?: string }[]
 }
 
 /**
@@ -52,6 +63,8 @@ export function FieldRow({
   modified,
   disabled: disabledProp,
   sectionValues,
+  validate,
+  suggestions,
 }: FieldRowProps) {
   const { t } = useTranslation()
   const id = `${sectionKey}-${field.key.replace(/\./g, '-')}`

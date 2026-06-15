@@ -513,6 +513,8 @@ function EnginePanel() {
 // the other legacy form code that uses the same primitives.
 import { Bot } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { AllowedToolsPicker } from '@/components/settings/allowed-tools-picker'
+import { validateCorsOrigin } from '@/lib/cors-validator'
 
 // ─── Settings Page ─────────────────────────────────────────────
 
@@ -896,6 +898,16 @@ function renderActiveSection(
     )
   }
 
+  // Security: dedicated SectionCard with AllowedToolsPicker + CORS validation.
+  if (sectionId === 'security') {
+    return <SecuritySectionCard
+      securityValues={formValues.security}
+      onFieldChange={(fk, v) => setField('security', fk, v)}
+      onDiscardAll={onDiscardAll}
+      unsavedCount={unsavedCount}
+    />
+  }
+
   // New sections: render a unified SectionCard.
   const newSection = NEW_SECTIONS.find((s) => s.key === sectionId)
   if (newSection) {
@@ -1005,6 +1017,83 @@ function LegacySectionCard({
             onChange={(val) => setField(sectionId, field.key, val)}
             sectionValues={formValues[sectionId]}
           />
+        )
+      })}
+    </SectionCard>
+  )
+}
+
+// ─── SecuritySectionCard ─────────────────────────────────────
+
+/** Security section card with AllowedToolsPicker + CORS validation. */
+function SecuritySectionCard({
+  securityValues,
+  onFieldChange,
+  onDiscardAll,
+  unsavedCount,
+}: {
+  securityValues?: Record<string, unknown>
+  onFieldChange: (fieldKey: string, value: unknown) => void
+  onDiscardAll: () => void
+  unsavedCount: number
+}) {
+  const { t } = useTranslation()
+  const section = NEW_SECTIONS.find((s) => s.key === 'security')!
+
+  return (
+    <SectionCard
+      title={t('settings.sectionSecurity')}
+      description={t('settings.securityDescription')}
+      icon={<SectionIcon iconKey="security" className="h-3.5 w-3.5" />}
+      sectionId="security"
+      fieldCount={section.fields.length}
+      modified={unsavedCount > 0}
+      onReset={onDiscardAll}
+    >
+      {section.fields.map((field) => {
+        const v = securityValues?.[field.key]
+        const isAllowedTools = field.key === 'allowed_tools'
+        const isCorsOrigins = field.key === 'cors_origins'
+
+        if (isAllowedTools) {
+          return (
+            <div key={field.key} className="space-y-2">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <label className="text-sm font-medium text-foreground">
+                    {t(field.labelKey)}
+                  </label>
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
+                  {t(field.descriptionKey)}
+                </p>
+              </div>
+              <AllowedToolsPicker
+                value={Array.isArray(v) ? (v as string[]) : []}
+                onChange={(next) => onFieldChange(field.key, next)}
+              />
+            </div>
+          )
+        }
+
+        return (
+          <div key={field.key}>
+            <FieldRow
+              sectionKey="security"
+              field={field}
+              value={
+                securityValues?.[field.key] as
+                  | string
+                  | boolean
+                  | string[]
+                  | number
+                  | undefined
+              }
+              onChange={(val) => onFieldChange(field.key, val)}
+              sectionValues={securityValues}
+              validate={isCorsOrigins ? validateCorsOrigin : undefined}
+            />
+          </div>
         )
       })}
     </SectionCard>
