@@ -10,8 +10,10 @@ import { useAuthStore } from './auth'
 interface PersistedState {
   /** Last active session ID (null = no conversation started yet). */
   activeSessionId: string | null
-  /** Project ID associated with the active session. */
+  /** Project ID associated with the active session (grouping). */
   activeProjectId: string | null
+  /** RFC-025: Active Mount IDs (comma-separated, primary first). */
+  activeMountIds: string | null
 }
 
 const PERSIST_KEY = 'oxios-chat-persist'
@@ -34,6 +36,10 @@ interface ChatRuntimeState {
   _lastDoneProjectId: string | null
   /** AI-detected project (Phase 2 stub, always null). */
   detectedProject: import('@/types').Project | null
+  /** RFC-025: detected mount tag from the last orchestrator response. */
+  detectedMountTag: string | null
+  /** RFC-025: detected mount IDs from the last orchestrator response. */
+  detectedMountIds: string[]
   /** IDs of dismissed detection badges. */
   dismissedProjectIds: string[]
   /** Active structured interview questions (null = no interview active). */
@@ -79,6 +85,10 @@ interface ChatActions {
   newSession: () => void
   /** Set the active project explicitly. */
   setActiveProject: (projectId: string | null) => void
+  /** RFC-025: Set active Mount IDs (comma-separated, primary first). */
+  setActiveMountIds: (mountIds: string[] | null) => void
+  /** RFC-025: Set the detected mount tag from the orchestrator response. */
+  setDetectedMountTag: (tag: string | null) => void
   /** Set the detected project (Phase 2: called from WS response). */
   setDetectedProject: (project: import('@/types').Project | null) => void
   /** Dismiss a detection badge (don't show again for this project). */
@@ -254,6 +264,7 @@ export const useChatStore = create<ChatStore>()(
       // ── Persisted ──
       activeSessionId: null,
       activeProjectId: null,
+      activeMountIds: null,
 
       // ── Runtime ──
       messages: [],
@@ -263,6 +274,8 @@ export const useChatStore = create<ChatStore>()(
       _lastDoneSessionId: null,
       _lastDoneProjectId: null,
       detectedProject: null,
+      detectedMountTag: null,
+      detectedMountIds: [],
       dismissedProjectIds: [],
       activeInterview: null,
       interviewRound: 0,
@@ -391,7 +404,7 @@ export const useChatStore = create<ChatStore>()(
       },
 
       sendMessage(content: string) {
-        const { activeSessionId, activeProjectId, connected, connect, _ws } = get()
+        const { activeSessionId, activeProjectId, activeMountIds, connected, connect, _ws } = get()
 
         // Ensure WS is connected first
         if (!connected || !_ws || _ws.readyState !== WebSocket.OPEN) {
@@ -418,6 +431,7 @@ export const useChatStore = create<ChatStore>()(
           content,
           session_id: activeSessionId ?? '',
           project_ids: activeProjectId ?? '',
+          mount_ids: activeMountIds ?? '',
         }
         const effectiveSpecMode = get().specMode
         if (effectiveSpecMode) {
@@ -542,6 +556,16 @@ export const useChatStore = create<ChatStore>()(
         })
       },
 
+      setActiveMountIds(mountIds: string[] | null) {
+        set({
+          activeMountIds: mountIds ? mountIds.join(',') : null,
+        })
+      },
+
+      setDetectedMountTag(tag: string | null) {
+        set({ detectedMountTag: tag })
+      },
+
       setDetectedProject(project: import('@/types').Project | null) {
         set({ detectedProject: project })
       },
@@ -557,6 +581,7 @@ export const useChatStore = create<ChatStore>()(
         set({
           activeSessionId: null,
           activeProjectId: null,
+          activeMountIds: null,
           messages: [],
           activeInterview: null,
           interviewRound: 0,
@@ -564,6 +589,8 @@ export const useChatStore = create<ChatStore>()(
           activeToolApproval: null,
           specModes: {},
           specMode: false,
+          detectedMountTag: null,
+          detectedMountIds: [],
         })
       },
 
@@ -793,6 +820,15 @@ export const useChatStore = create<ChatStore>()(
           case 'done': {
             const sid = chunk.session_id ?? null
             const vid = chunk.project_id ?? null
+            // RFC-025: extract mount_tag from metadata (gateway sets it)
+            const chunkExtra = chunk as unknown as Record<string, unknown>
+            const mountTag = chunkExtra.mount_tag as string | undefined
+            const mountIdsRaw = chunkExtra.mount_ids as string | string[] | undefined
+            const mountIds = Array.isArray(mountIdsRaw)
+              ? mountIdsRaw
+              : mountIdsRaw
+                ? mountIdsRaw.split(',').filter(Boolean)
+                : []
             const toolCalls = chunk.tool_calls ?? []
             const phase = chunk.phase
             const evaluationPassed: boolean | undefined =
@@ -916,6 +952,13 @@ export const useChatStore = create<ChatStore>()(
             if (vid) {
               set({ activeProjectId: vid, _lastDoneProjectId: vid })
             }
+            // RFC-025: store detected mount tag + ids for the detection badge.
+            if (mountTag) {
+              set({ detectedMountTag: mountTag })
+            }
+            if (mountIds.length > 0) {
+              set({ detectedMountIds: mountIds })
+            }
             break
           }
           case 'error': {
@@ -930,6 +973,7 @@ export const useChatStore = create<ChatStore>()(
       partialize: (state): PersistedState => ({
         activeSessionId: state.activeSessionId,
         activeProjectId: state.activeProjectId,
+        activeMountIds: state.activeMountIds,
       }),
       onRehydrateStorage: () => (state) => {
         if (!state) return

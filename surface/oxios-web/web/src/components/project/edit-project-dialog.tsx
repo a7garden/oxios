@@ -14,6 +14,7 @@ import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { useUpdateProject } from '@/hooks/use-projects'
+import { useMounts } from '@/hooks/use-mounts'
 import type { Project } from '@/types'
 
 interface EditProjectDialogProps {
@@ -40,6 +41,11 @@ export function EditProjectDialog({
   const [tags, setTags] = useState('')
   const [paths, setPaths] = useState('')
   const [memoryVisible, setMemoryVisible] = useState(true)
+  // RFC-025: mount_ids + instructions
+  const [mountIds, setMountIds] = useState<string[]>([])
+  const [instructions, setInstructions] = useState('')
+  const { data: mountsData } = useMounts()
+  const availableMounts = mountsData?.items ?? []
 
   // Sync state when project prop changes
   if (project && open) {
@@ -50,6 +56,9 @@ export function EditProjectDialog({
     if (paths !== (project.paths ?? []).join('\n')) setPaths((project.paths ?? []).join('\n'))
     if (memoryVisible !== (project.memory_visible ?? true))
       setMemoryVisible(project.memory_visible ?? true)
+    if (mountIds.join(',') !== (project.mount_ids ?? []).join(','))
+      setMountIds(project.mount_ids ?? [])
+    if (instructions !== (project.instructions ?? '')) setInstructions(project.instructions ?? '')
   }
 
   const handleSubmit = () => {
@@ -70,6 +79,8 @@ export function EditProjectDialog({
           .filter(Boolean),
         emoji: icon,
         memory_visible: memoryVisible,
+        mount_ids: mountIds,
+        instructions: instructions.trim() || undefined,
       },
       {
         onSuccess: () => {
@@ -154,6 +165,53 @@ export function EditProjectDialog({
               {t('projects.memoryVisible', 'Memory Visible')}
             </label>
             <Switch checked={memoryVisible} onCheckedChange={setMemoryVisible} />
+          </div>
+
+          {/* RFC-025: Mount references */}
+          {availableMounts.length > 0 && (
+            <div className="space-y-1">
+              <label className="text-sm font-medium">
+                {t('projects.mounts', 'Mounts')}
+              </label>
+              <div className="flex flex-wrap gap-1">
+                {availableMounts.map((m) => (
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={() => {
+                      setMountIds((prev) =>
+                        prev.includes(m.id)
+                          ? prev.filter((id) => id !== m.id)
+                          : [...prev, m.id],
+                      )
+                    }}
+                    className={`rounded px-2 py-1 text-xs border transition-colors ${
+                      mountIds.includes(m.id)
+                        ? 'border-primary bg-primary/10 text-primary'
+                        : 'border-transparent hover:bg-muted'
+                    }`}
+                  >
+                    🔧 {m.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* RFC-025: Custom instructions */}
+          <div className="space-y-1">
+            <label className="text-sm font-medium">
+              {t('projects.instructions', 'Instructions')}
+            </label>
+            <Textarea
+              value={instructions}
+              onChange={(e) => setInstructions(e.target.value)}
+              rows={3}
+              placeholder={t(
+                'projects.instructionsPlaceholder',
+                '이 Project에서 항상 지켜야 할 규칙. 시스템 프롬프트에 주입됩니다.',
+              )}
+            />
           </div>
         </div>
 

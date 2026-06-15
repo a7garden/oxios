@@ -8,6 +8,7 @@ import { MessageBubble } from '@/components/chat/message-bubble'
 import { ToolApprovalCard } from '@/components/chat/tool-approval-card'
 import { TypingIndicator } from '@/components/chat/typing-indicator'
 import { AiDetectionBadge } from '@/components/project/ai-detection-badge'
+import { MountDetectionBadge } from '@/components/mount/mount-detection-badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { useChatStore } from '@/stores/chat'
 
@@ -129,6 +130,9 @@ function ChatPage() {
             onDismiss={() => dismissDetection(detectedProject.id)}
           />
         )}
+
+        {/* RFC-025: Mount Detection Badge */}
+        <MountDetectionBadge />
 
         {/* ── Messages area ── */}
         <ScrollArea

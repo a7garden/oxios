@@ -120,6 +120,11 @@ const consoleNavGroups: { labelKey: string; items: NavItem[] }[] = [
         href: '/projects',
         icon: <FolderKanban className="h-4 w-4" />,
       },
+      {
+        labelKey: 'common.mounts',
+        href: '/mounts',
+        icon: <FolderPlus className="h-4 w-4" />,
+      },
     ],
   },
   {

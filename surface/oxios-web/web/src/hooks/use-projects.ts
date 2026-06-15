@@ -20,6 +20,10 @@ export interface UpdateProjectInput {
   emoji?: string
   description?: string
   memory_visible?: boolean
+  /** RFC-025: referenced Mount IDs. */
+  mount_ids?: string[]
+  /** RFC-025: custom instructions injected into the system prompt. */
+  instructions?: string
 }
 
 // ─── Hooks ────────────────────────────────────────────────────
