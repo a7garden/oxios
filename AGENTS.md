@@ -122,6 +122,7 @@ See `docs/ARCHITECTURE.md` for the full reference (subsystems, data flow, depend
 | `docs/rfc-008-memory-consolidation.md` | Modifying memory system |
 | `docs/rfc-009-skill-unification.md` | Modifying skill system |
 | `docs/rfc-010-clawhub-marketplace.md` | Marketplace feature |
+| `docs/rfc-024-web-daemon-reliability.md` | Modifying web↔daemon delivery, SSE/WS, static asset serving, readiness |
 | `docs/design-knowledge-ui.md` | Knowledge UI (frontend components, shortcuts, architecture) |
 | `docs/channel-plugin-guide.md` | Adding a new channel |
 | `docs/USER-GUIDE.md` | Changing user-facing features or CLI behavior |
