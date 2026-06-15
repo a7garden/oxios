@@ -73,7 +73,10 @@ pub(crate) async fn handle_session_get(
         Ok(Some(session)) => Ok(Json(serde_json::json!({
             "id": session.id.0,
             "user_id": session.user_id,
-            "project_id": session.metadata.get("project_ids").and_then(|v| v.as_str()).map(String::from),
+            // RFC-025: top-level field first, legacy metadata fallbacks.
+            "project_id": session.project_id.clone()
+                .or_else(|| session.metadata.get("project_id").and_then(|v| v.as_str()).map(String::from))
+                .or_else(|| session.metadata.get("project_ids").and_then(|v| v.as_str()).map(String::from)),
             "user_messages": session.user_messages,
             "agent_responses": session.agent_responses,
             "active_seed_id": session.active_seed_id,

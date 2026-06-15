@@ -3,8 +3,8 @@
 //! Mirrors `ProjectManager`'s structure for consistency. Mounts are persisted
 //! in the `mounts` SQLite table (same `memory.db`).
 
-use std::collections::HashMap;
-use std::path::PathBuf;
+use std::collections::{HashMap, HashSet};
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::SystemTime;
 
@@ -42,6 +42,13 @@ pub struct MountManager {
     mounts: RwLock<HashMap<MountId, Mount>>,
     /// Name → ID index for fast name lookup.
     name_index: RwLock<HashMap<String, MountId>>,
+    /// RFC-025 Phase 5: roots the user has explicitly dismissed (Promo-3).
+    ///
+    /// When an `AutoPromoted` Mount is removed, its canonicalized root paths
+    /// are recorded here (and in `mount_dismissals`) so the scanner never
+    /// re-creates a Mount the user has rejected. Canonicalized form is used
+    /// so that the comparison is path-stable across symlinks.
+    dismissed_roots: RwLock<HashSet<PathBuf>>,
     /// SQLite database for persistence.
     db: Arc<MemoryDatabase>,
     /// Event bus for publishing Mount events.
@@ -61,11 +68,21 @@ impl MountManager {
             mounts.insert(mount.id, mount);
         }
 
-        tracing::info!(count = mounts.len(), "MountManager initialized");
+        // Promo-3: load dismissal tombstones so re-promoted mounts stay dead.
+        let dismissed_roots = mount_db::list_dismissed_roots(&db.conn())?
+            .into_iter()
+            .collect::<HashSet<_>>();
+
+        tracing::info!(
+            count = mounts.len(),
+            dismissed = dismissed_roots.len(),
+            "MountManager initialized"
+        );
 
         Ok(Self {
             mounts: RwLock::new(mounts),
             name_index: RwLock::new(name_index),
+            dismissed_roots: RwLock::new(dismissed_roots),
             db,
             event_bus,
         })
@@ -104,6 +121,7 @@ impl MountManager {
         paths: Vec<PathBuf>,
         source: MountSource,
     ) -> Result<Mount> {
+        let name = validate_mount_name(&name)?;
         {
             let name_index = self.name_index.read();
             if name_index.contains_key(&name) {
@@ -176,6 +194,7 @@ impl MountManager {
 
     /// Rename a Mount.
     pub fn rename(&self, id: MountId, new_name: String) -> Result<Mount> {
+        let new_name = validate_mount_name(&new_name)?;
         let mut mounts = self.mounts.write();
         let mut name_index = self.name_index.write();
         let mount = mounts.get_mut(&id).ok_or(MountManagerError::NotFound(id))?;
@@ -198,16 +217,89 @@ impl MountManager {
     }
 
     /// Remove a Mount.
+    ///
+    /// DB-first ordering (matches `create_mount`): if the DB delete fails the
+    /// in-memory state is left untouched so the caller can retry and the Mount
+    /// doesn't silently reappear on restart.
+    ///
+    /// If the Mount was `AutoPromoted`, its canonicalized root paths are
+    /// recorded as dismissals (tombstones) so the background scanner does
+    /// not immediately re-promote them (Promo-3). Manual mounts are removed
+    /// without recording a tombstone (the user may still want auto-promotion
+    /// for that root).
     pub fn remove_mount(&self, id: MountId) -> Result<()> {
+        // Preserve NotFound semantics + capture the Mount for tombstoning.
+        let removed = {
+            let mounts = self.mounts.read();
+            mounts
+                .get(&id)
+                .cloned()
+                .ok_or(MountManagerError::NotFound(id))?
+        };
+        // Delete from the DB before touching memory.
+        mount_db::delete_mount(&self.db.conn(), &id.to_string())?;
         {
             let mut mounts = self.mounts.write();
             let mut name_index = self.name_index.write();
-            let mount = mounts.remove(&id).ok_or(MountManagerError::NotFound(id))?;
-            name_index.remove(&mount.name);
+            if let Some(mount) = mounts.remove(&id) {
+                name_index.remove(&mount.name);
+            }
         }
-        mount_db::delete_mount(&self.db.conn(), &id.to_string())?;
+
+        // Promo-3: tombstone auto-promoted roots so they aren't re-created.
+        if removed.source == MountSource::AutoPromoted {
+            self.record_dismissal(&removed.paths);
+        }
+
         tracing::info!(id = %id, "Mount removed");
         Ok(())
+    }
+
+    /// Canonicalize each path and record it as a dismissed root, both
+    /// in-memory and in SQLite (Promo-3). Best-effort: paths that fail to
+    /// canonicalize are stored in their raw form so the tombstone still
+    /// matches the exact string the scanner would normalize to.
+    fn record_dismissal(&self, paths: &[PathBuf]) {
+        let to_record: Vec<PathBuf> = paths
+            .iter()
+            .map(|p| Self::canonicalize_for_index(p))
+            .collect();
+
+        {
+            let mut dismissed = self.dismissed_roots.write();
+            for p in &to_record {
+                dismissed.insert(p.clone());
+            }
+        }
+        for p in &to_record {
+            if let Err(e) = mount_db::add_dismissed_root(&self.db.conn(), p) {
+                tracing::warn!(
+                    path = %p.display(),
+                    error = %e,
+                    "failed to persist mount dismissal"
+                );
+            }
+        }
+        tracing::debug!(count = to_record.len(), "recorded mount dismissals");
+    }
+
+    /// Canonicalize a path for index comparison, falling back to the raw
+    /// path when canonicalization fails (e.g. the path was removed).
+    fn canonicalize_for_index(path: &Path) -> PathBuf {
+        std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf())
+    }
+
+    /// RFC-025 Phase 5: is `root` in the dismissed set (Promo-3)?
+    ///
+    /// Compares against both the canonicalized and raw forms of stored
+    /// tombstones so that a root matches regardless of symlink resolution.
+    fn is_dismissed(&self, root: &Path) -> bool {
+        let dismissed = self.dismissed_roots.read();
+        if dismissed.contains(root) {
+            return true;
+        }
+        let canonical = Self::canonicalize_for_index(root);
+        dismissed.contains(&canonical)
     }
 
     /// Record that a Mount was used in a session.
@@ -221,8 +313,10 @@ impl MountManager {
                 None
             }
         };
-        if let Some(mount) = to_save {
-            let _ = mount_db::save_mount(&self.db.conn(), &mount);
+        if let Some(mount) = to_save
+            && let Err(e) = mount_db::save_mount(&self.db.conn(), &mount)
+        {
+            tracing::warn!(id = %id, error = %e, "touch: failed to save Mount");
         }
     }
 
@@ -244,15 +338,33 @@ impl MountManager {
                 .ok_or(MountManagerError::NotFound(id))?
                 .clone()
         };
-        let Some(primary) = mount.primary_path() else {
+        let Some(primary) = mount.primary_path().cloned() else {
             return Ok(()); // nothing to scan
         };
         if !primary.exists() {
             tracing::debug!(path = %primary.display(), "Mount path missing, skip meta seed");
             return Ok(());
         }
-        let meta = super::meta_detection::detect_meta(primary);
-        self.update_enrichment(id, None, Some(meta))?;
+        // detect_meta is cheap heuristics only — it must NOT clear the
+        // enrichment nudge. Route it directly (not through update_enrichment,
+        // which would stamp `last_enriched_at` and clear `enrichment_pending`),
+        // so the agent is still prompted to do real enrichment.
+        let meta = super::meta_detection::detect_meta(&primary);
+        let to_save = {
+            let mut mounts = self.mounts.write();
+            let Some(mount) = mounts.get_mut(&id) else {
+                return Ok(()); // removed while detecting
+            };
+            mount.auto_meta = meta;
+            mount.enrichment_pending = true;
+            mount.last_enriched_at = None;
+            mount.updated_at = Utc::now();
+            mount.clone()
+        };
+        if let Err(e) = mount_db::save_mount(&self.db.conn(), &to_save) {
+            tracing::warn!(id = %id, error = %e, "seed_auto_meta: failed to save Mount");
+        }
+        tracing::info!(name = %to_save.name, id = %id, "Mount auto_meta seeded");
         Ok(())
     }
 
@@ -262,22 +374,50 @@ impl MountManager {
     /// `true` if any marker drifted (and the flag was set). Cheap: a handful
     /// of `stat()` calls.
     pub fn check_drift(&self, id: MountId) -> Result<bool> {
-        let mut mounts = self.mounts.write();
-        let mount = mounts.get_mut(&id).ok_or(MountManagerError::NotFound(id))?;
-        let Some(primary) = mount.primary_path().cloned() else {
-            return Ok(false);
+        // Acquire a read lock only to clone the primary path and the current
+        // snapshot, then drop it so the filesystem I/O (snapshot_markers) runs
+        // lock-free (M8: don't do I/O under the write lock).
+        let (primary, old_snapshot) = {
+            let mounts = self.mounts.read();
+            let mount = mounts.get(&id).ok_or(MountManagerError::NotFound(id))?;
+            let Some(primary) = mount.primary_path().cloned() else {
+                return Ok(false);
+            };
+            (primary, mount.last_marker_snapshot.clone())
         };
+
+        // Filesystem I/O — no lock held.
         let current = super::meta_detection::snapshot_markers(&primary);
-        let drifted = markers_drifted(&mount.last_marker_snapshot, &current);
-        if drifted {
-            mount.enrichment_pending = true;
-            mount.updated_at = Utc::now();
+        let drifted = markers_drifted(&old_snapshot, &current);
+        let current_map: HashMap<PathBuf, SystemTime> = current.into_iter().collect();
+
+        // Re-acquire a write lock to apply results (re-checking the Mount
+        // still exists — it may have been removed while we read the fs).
+        let to_save = {
+            let mut mounts = self.mounts.write();
+            let Some(mount) = mounts.get_mut(&id) else {
+                return Ok(drifted);
+            };
+            // Skip the mutation + DB write when nothing drifted and the
+            // snapshot is unchanged (m4: don't write on every drift check).
+            if !drifted && mount.last_marker_snapshot == current_map {
+                None
+            } else {
+                if drifted {
+                    mount.enrichment_pending = true;
+                    mount.updated_at = Utc::now();
+                }
+                // Refresh the snapshot so the next comparison is accurate.
+                mount.last_marker_snapshot = current_map;
+                Some(mount.clone())
+            }
+        };
+
+        if let Some(mount) = to_save
+            && let Err(e) = mount_db::save_mount(&self.db.conn(), &mount)
+        {
+            tracing::warn!(id = %id, error = %e, "check_drift: failed to save Mount");
         }
-        // Always refresh the snapshot so the next comparison is accurate.
-        mount.last_marker_snapshot = current.into_iter().collect();
-        let mount_clone = mount.clone();
-        drop(mounts);
-        let _ = mount_db::save_mount(&self.db.conn(), &mount_clone);
         Ok(drifted)
     }
 
@@ -315,6 +455,15 @@ impl MountManager {
             }
             // Skip if any existing Mount already covers this root.
             if self.root_already_covered(&root) {
+                continue;
+            }
+            // Promo-3: skip roots the user has explicitly dismissed, so a
+            // deleted AutoPromoted Mount is not immediately re-created.
+            if self.is_dismissed(&root) {
+                tracing::debug!(
+                    path = %root.display(),
+                    "auto-promotion skipped: root was dismissed"
+                );
                 continue;
             }
             // Derive a name from the final path component.
@@ -388,6 +537,28 @@ fn markers_drifted(
         }
     }
     false
+}
+
+/// Validate a Mount name (RFC-025): non-empty after trim, ≤ 64 chars (by char
+/// count), no control characters. Returns the trimmed name on success.
+fn validate_mount_name(name: &str) -> Result<String> {
+    let trimmed = name.trim();
+    if trimmed.is_empty() {
+        return Err(MountManagerError::Invalid("Mount name must not be empty".to_string()).into());
+    }
+    if trimmed.chars().count() > 64 {
+        return Err(MountManagerError::Invalid(
+            "Mount name must be at most 64 characters".to_string(),
+        )
+        .into());
+    }
+    if trimmed.chars().any(|c| c.is_control()) {
+        return Err(MountManagerError::Invalid(
+            "Mount name must not contain control characters".to_string(),
+        )
+        .into());
+    }
+    Ok(trimmed.to_string())
 }
 
 #[cfg(test)]
@@ -510,17 +681,22 @@ mod tests {
         let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         let file = root.join("src/lib.rs");
 
-        let mut session = Session::new("test");
-        // Three touches of the same root → crosses the default threshold.
-        for _ in 0..3 {
-            session.user_messages.push(UserMessage {
-                content: format!("fix {} please", file.display()),
-                timestamp: Utc::now(),
-            });
-        }
+        // Frequency is counted per distinct root per session (Promo-7): one
+        // session's repeated mentions count once. So we need three separate
+        // sessions to cross the default threshold of 3.
+        let sessions: Vec<Session> = (0..3)
+            .map(|_| {
+                let mut session = Session::new("test");
+                session.user_messages.push(UserMessage {
+                    content: format!("fix {} please", file.display()),
+                    timestamp: Utc::now(),
+                });
+                session
+            })
+            .collect();
 
         let config = path_promotion::PromotionConfig::default();
-        let created = mgr.promote_frequent_paths(&[session], &config);
+        let created = mgr.promote_frequent_paths(&sessions, &config);
         assert_eq!(created.len(), 1, "expected exactly one promoted Mount");
 
         let mount = mgr.get_mount(created[0]).expect("promoted mount exists");
@@ -530,11 +706,26 @@ mod tests {
         assert!(mount.auto_meta.languages.contains(&"rust".to_string()));
     }
 
-    #[test]
-    fn test_promote_skips_already_covered_root() {
+    /// Build `n` sessions each mentioning `root` once (Promo-7: frequency is
+    /// per distinct root per session, so we vary the *session* count, not
+    /// the message count within one session).
+    fn sessions_mentioning(root: &PathBuf, n: u32) -> Vec<crate::state_store::Session> {
         use crate::state_store::{Session, UserMessage};
         use chrono::Utc;
+        (0..n)
+            .map(|_| {
+                let mut s = Session::new("test");
+                s.user_messages.push(UserMessage {
+                    content: format!("work on {}/src/lib.rs", root.display()),
+                    timestamp: Utc::now(),
+                });
+                s
+            })
+            .collect()
+    }
 
+    #[test]
+    fn test_promote_skips_already_covered_root() {
         let mgr = open_manager();
         let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         // Pre-create a Mount covering this root.
@@ -545,16 +736,12 @@ mod tests {
         )
         .unwrap();
 
-        let mut session = Session::new("test");
-        for _ in 0..5 {
-            session.user_messages.push(UserMessage {
-                content: format!("work on {}/src/lib.rs", root.display()),
-                timestamp: Utc::now(),
-            });
-        }
-
+        // Promo-7: 3 separate sessions (count=3) cross the default threshold,
+        // so this exercises the coverage-skip path rather than trivially
+        // passing because the count is below threshold.
+        let sessions = sessions_mentioning(&root, 3);
         let config = path_promotion::PromotionConfig::default();
-        let created = mgr.promote_frequent_paths(&[session], &config);
+        let created = mgr.promote_frequent_paths(&sessions, &config);
         assert!(
             created.is_empty(),
             "should not promote an already-covered root"
@@ -563,23 +750,78 @@ mod tests {
 
     #[test]
     fn test_promote_respects_threshold() {
-        use crate::state_store::{Session, UserMessage};
-        use chrono::Utc;
-
         let mgr = open_manager();
         let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
 
-        let mut session = Session::new("test");
-        // Only two touches — below the default threshold of 3.
-        for _ in 0..2 {
-            session.user_messages.push(UserMessage {
-                content: format!("work on {}/src/lib.rs", root.display()),
-                timestamp: Utc::now(),
-            });
-        }
-
+        // Promo-7: 2 sessions → count=2, below the default threshold of 3.
+        let sessions = sessions_mentioning(&root, 2);
         let config = path_promotion::PromotionConfig::default();
-        let created = mgr.promote_frequent_paths(&[session], &config);
+        let created = mgr.promote_frequent_paths(&sessions, &config);
         assert!(created.is_empty(), "should not promote below threshold");
+    }
+
+    #[test]
+    fn test_promote_skips_dismissed_root() {
+        // Promo-3: removing an AutoPromoted Mount must tombstone its root so
+        // the scanner never re-creates it.
+        let mgr = open_manager();
+        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let sessions = sessions_mentioning(&root, 3);
+        let config = path_promotion::PromotionConfig::default();
+
+        // First scan: promotes the root to an AutoPromoted Mount.
+        let created = mgr.promote_frequent_paths(&sessions, &config);
+        assert_eq!(created.len(), 1, "expected exactly one promoted Mount");
+        let promoted_id = created[0];
+        assert_eq!(
+            mgr.get_mount(promoted_id).unwrap().source,
+            MountSource::AutoPromoted
+        );
+
+        // User dismisses it.
+        mgr.remove_mount(promoted_id).expect("remove");
+        assert!(mgr.get_mount(promoted_id).is_none());
+
+        // Second scan with the same evidence must NOT re-create it.
+        let recreated = mgr.promote_frequent_paths(&sessions, &config);
+        assert!(
+            recreated.is_empty(),
+            "dismissed root must not be re-promoted (got {:?})",
+            recreated
+        );
+    }
+
+    #[test]
+    fn test_dismissal_only_for_auto_promoted() {
+        // Promo-3: dismissing a *Manual* Mount must not tombstone the root,
+        // since the user may still want auto-promotion for it later.
+        let mgr = open_manager();
+        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+
+        // Manual mount.
+        let m = mgr
+            .create_mount(
+                "manual-kernel".to_string(),
+                vec![root.clone()],
+                MountSource::Manual,
+            )
+            .unwrap();
+        mgr.remove_mount(m.id).expect("remove manual");
+
+        // Dismissed set should be empty — no tombstone for manual mounts.
+        assert!(
+            mgr.dismissed_roots.read().is_empty(),
+            "manual removal must not tombstone"
+        );
+
+        // Subsequent promotion is still possible. Promo-7: 3 sessions.
+        let sessions = sessions_mentioning(&root, 3);
+        let config = path_promotion::PromotionConfig::default();
+        let created = mgr.promote_frequent_paths(&sessions, &config);
+        assert_eq!(
+            created.len(),
+            1,
+            "promotion must still work after manual removal"
+        );
     }
 }

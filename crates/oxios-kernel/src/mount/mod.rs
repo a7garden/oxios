@@ -160,7 +160,6 @@ impl Mount {
     /// Record that this Mount was used in a session.
     pub fn touch(&mut self) {
         self.last_active_at = Utc::now();
-        self.updated_at = Utc::now();
     }
 
     /// Whether this Mount has any filesystem paths.

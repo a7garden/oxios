@@ -89,6 +89,8 @@ interface ChatActions {
   setActiveMountIds: (mountIds: string[] | null) => void
   /** RFC-025: Set the detected mount tag from the orchestrator response. */
   setDetectedMountTag: (tag: string | null) => void
+  /** RFC-025: Clear detected mount tag and IDs (e.g. on badge accept/dismiss). */
+  clearDetectedMount: () => void
   /** Set the detected project (Phase 2: called from WS response). */
   setDetectedProject: (project: import('@/types').Project | null) => void
   /** Dismiss a detection badge (don't show again for this project). */
@@ -430,7 +432,8 @@ export const useChatStore = create<ChatStore>()(
           type: 'message',
           content,
           session_id: activeSessionId ?? '',
-          project_ids: activeProjectId ?? '',
+          // Web-C2: backend WS handler reads singular `project_id`
+          project_id: activeProjectId ?? '',
           mount_ids: activeMountIds ?? '',
         }
         const effectiveSpecMode = get().specMode
@@ -512,7 +515,8 @@ export const useChatStore = create<ChatStore>()(
             }
           }
 
-          const projectId = data.project_id ?? data.metadata?.project_ids ?? null
+          const projectId =
+            data.project_id ?? data.metadata?.project_id ?? data.metadata?.project_ids ?? null
           // Restore spec mode from session metadata (persisted by backend)
           const storedMode = data.metadata?.mode
           const isSpec = storedMode === 'spec' || storedMode === 'ouroboros'
@@ -564,6 +568,10 @@ export const useChatStore = create<ChatStore>()(
 
       setDetectedMountTag(tag: string | null) {
         set({ detectedMountTag: tag })
+      },
+
+      clearDetectedMount() {
+        set({ detectedMountTag: null, detectedMountIds: [] })
       },
 
       setDetectedProject(project: import('@/types').Project | null) {
@@ -824,11 +832,21 @@ export const useChatStore = create<ChatStore>()(
             const chunkExtra = chunk as unknown as Record<string, unknown>
             const mountTag = chunkExtra.mount_tag as string | undefined
             const mountIdsRaw = chunkExtra.mount_ids as string | string[] | undefined
+            // Web-M4: gateway serializes mount_ids as a JSON-array string
+            // (e.g. `["id1","id2"]`); splitting on comma produces garbage.
             const mountIds = Array.isArray(mountIdsRaw)
               ? mountIdsRaw
-              : mountIdsRaw
-                ? mountIdsRaw.split(',').filter(Boolean)
-                : []
+              : typeof mountIdsRaw === 'string' && mountIdsRaw.trim().startsWith('[')
+                ? (() => {
+                    try {
+                      return JSON.parse(mountIdsRaw) as string[]
+                    } catch {
+                      return []
+                    }
+                  })()
+                : mountIdsRaw
+                  ? mountIdsRaw.split(',').filter(Boolean)
+                  : []
             const toolCalls = chunk.tool_calls ?? []
             const phase = chunk.phase
             const evaluationPassed: boolean | undefined =

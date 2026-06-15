@@ -5,6 +5,7 @@
 //! (cheap `stat` + tiny reads), not on every message.
 
 use std::path::Path;
+use std::time::{Duration, UNIX_EPOCH};
 
 use super::MountMeta;
 
@@ -119,7 +120,18 @@ pub fn snapshot_markers(path: &Path) -> Vec<(std::path::PathBuf, std::time::Syst
             p.metadata()
                 .and_then(|md| md.modified())
                 .ok()
-                .map(|t| (p, t))
+                // Truncate to whole seconds so the freshly-read mtime matches
+                // the precision stored in the DB (u64 seconds). Without this,
+                // drift would fire on every restart: the DB reconstructs a
+                // whole-second SystemTime, but a fresh `stat()` yields
+                // nanosecond precision.
+                .map(|t| {
+                    let truncated = t
+                        .duration_since(UNIX_EPOCH)
+                        .map(|d| UNIX_EPOCH + Duration::from_secs(d.as_secs()))
+                        .unwrap_or(t);
+                    (p, truncated)
+                })
         })
         .collect()
 }

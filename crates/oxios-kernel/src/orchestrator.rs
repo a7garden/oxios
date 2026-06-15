@@ -246,8 +246,10 @@ impl Orchestrator {
     /// - all resolved filesystem paths (primary first),
     /// - a display tag like `[🔧 oxios + oxi-sdk]`.
     ///
-    /// Honors the sticky-primary model: detection never replaces an explicit
-    /// primary, only appends a secondary.
+    /// Honors the sticky-primary model: when `mount_ids` is explicitly
+    /// provided they are used as-is (detection is skipped). Detection only
+    /// runs when `mount_ids` is `None`, seeding the primary slot — it never
+    /// replaces an explicit primary, only appends a secondary.
     fn resolve_mount_workspace(
         &self,
         mount_ids: Option<&str>,
@@ -277,14 +279,41 @@ impl Orchestrator {
                 crate::mount::DetectionResult::NoMatch { .. } => vec![],
             }
         };
-        // De-duplicate while preserving order.
-        ids.dedup();
+        // De-duplicate while preserving order (handles non-consecutive dups).
+        let mut seen = std::collections::HashSet::new();
+        ids.retain(|id| seen.insert(*id));
+
+        // ── Project-referenced Mount activation (RFC-025) ──
+        // When a project_id is provided, auto-activate its referenced Mounts
+        // BEFORE we derive mounts/tag/context/paths, so they are fully
+        // visible in the system prompt and the badge — not just granted
+        // path access. (Previously this ran after the prompt was built, so
+        // project-referenced Mounts were invisible in the context body.)
+        let project_for_instructions: Option<crate::project::Project> = if let Some(project_ids_str) =
+            project_ids
+            && let Some(first_id_str) = project_ids_str.split(',').next()
+            && let Some(pm) = self.project_manager()
+            && let Ok(pid) = Uuid::parse_str(first_id_str.trim())
+        {
+            let proj = pm.get_project(pid);
+            if let Some(ref project) = proj {
+                for mid in &project.mount_ids {
+                    if !ids.contains(mid) {
+                        ids.push(*mid);
+                    }
+                }
+            }
+            proj
+        } else {
+            None
+        };
 
         if ids.is_empty() {
             return (Vec::new(), None, Vec::new(), String::new());
         }
 
-        // Touch each active Mount (record activity).
+        // Touch each active Mount (record activity) — now includes any
+        // Project-referenced Mounts activated above.
         for id in &ids {
             mm.touch(*id);
         }
@@ -294,7 +323,7 @@ impl Orchestrator {
             return (Vec::new(), None, Vec::new(), String::new());
         }
 
-        // Collect all paths (primary first, deduped).
+        // Collect all paths (primary first, deduped) over the full Mount set.
         let mut paths: Vec<std::path::PathBuf> = Vec::new();
         for m in &mounts {
             for p in &m.paths {
@@ -314,44 +343,39 @@ impl Orchestrator {
 
         let mut context = build_workspace_context_body(&mounts).unwrap_or_default();
 
-        // ── Project instructions + referenced Mounts (RFC-025) ──
-        // When a project_id is provided, merge its referenced Mounts
-        // (auto-activate) and inject its instructions into the context body.
-        if let Some(project_ids_str) = project_ids
-            && let Some(first_id_str) = project_ids_str.split(',').next()
-            && let Some(pm) = self.project_manager()
-            && let Ok(pid) = Uuid::parse_str(first_id_str.trim())
-            && let Some(project) = pm.get_project(pid)
-        {
-            // Auto-activate Project-referenced Mounts not yet bound.
-            for mid in &project.mount_ids {
-                if !ids.contains(mid) {
-                    ids.push(*mid);
+        // ── Project instructions (RFC-025) ──
+        // Inject the project's instructions into the context body. The
+        // "### Active Mounts" header above is only present when there are
+        // actual mount entries in `context`; the Project Instructions section
+        // stands on its own when only instructions exist.
+        if let Some(project) = project_for_instructions {
+            // Cap instructions to stay within the prompt budget (~500 tokens).
+            let instructions = if project.instructions.len() > 2000 {
+                let mut end = 2000;
+                while end > 0 && !project.instructions.is_char_boundary(end) {
+                    end -= 1;
                 }
-            }
-
-            // Inject instructions.
-            if !project.instructions.is_empty() {
-                if context.is_empty() {
-                    context.push_str("### Active Mounts\n");
-                }
+                format!("{}...", &project.instructions[..end])
+            } else {
+                project.instructions.clone()
+            };
+            if !instructions.is_empty() {
                 context.push_str(&format!(
                     "\n### Project Instructions: {}\n{}\n",
-                    project.name, project.instructions
+                    project.name, instructions
                 ));
             }
+        }
 
-            // Re-collect paths if Project added Mounts.
-            if !project.mount_ids.is_empty() {
-                let extra_mounts = mm.get_mounts_ordered(&project.mount_ids);
-                for m in &extra_mounts {
-                    for p in &m.paths {
-                        if !paths.contains(p) {
-                            paths.push(p.clone());
-                        }
-                    }
-                }
+        // Enforce a hard prompt budget on the final context body (~1500 tokens).
+        const MAX_CONTEXT_CHARS: usize = 6000;
+        if context.len() > MAX_CONTEXT_CHARS {
+            let mut end = MAX_CONTEXT_CHARS;
+            while end > 0 && !context.is_char_boundary(end) {
+                end -= 1;
             }
+            context.truncate(end);
+            context.push_str("\n...(context truncated)...\n");
         }
 
         let context_opt = if context.is_empty() {
@@ -1433,10 +1457,9 @@ impl Orchestrator {
         subtasks: Vec<SubTask>,
         parent_seed: &Seed,
     ) -> Result<Vec<SubTask>> {
-        let mut task = subtasks
-            .into_iter()
-            .next()
-            .expect("execute_single_subtask is only called when subtasks is non-empty");
+        let mut task = subtasks.into_iter().next().ok_or_else(|| {
+            anyhow::anyhow!("execute_single_subtask called with an empty subtask list")
+        })?;
         let child_seed = Seed {
             id: Uuid::new_v4(),
             goal: task.description.clone(),
@@ -1945,7 +1968,7 @@ fn build_workspace_context_body(mounts: &[crate::mount::Mount]) -> Option<String
             }
             let summary = m.summary_line();
             if !summary.is_empty() {
-                out.push_str(&format!("  _{}_)\n", summary));
+                out.push_str(&format!("  _{}_\n", summary));
             }
             if m.enrichment_pending {
                 out.push_str("  _(content changed — consider re-scanning this Mount)_\n");
@@ -1985,7 +2008,7 @@ mod mount_workspace_tests {
         assert!(body.contains("### Active Mounts"));
         // Primary gets full description.
         assert!(body.contains("Agent OS."));
-        assert!(body.contains("_Rust agent OS_)"));
+        assert!(body.contains("_Rust agent OS_"));
         // Secondary is terse.
         assert!(body.contains("**oxi** → /oxi — SDK"));
     }

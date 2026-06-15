@@ -102,6 +102,12 @@ function ExpandedChatNav() {
     delete window.__draggedSessionId
     try {
       await moveSession.mutateAsync({ sessionId: draggedId, project_id: projectId })
+      // Web-M2: if the moved session is the active session, sync the
+      // chat-store's activeProjectId so subsequent messages route to the
+      // new project.
+      if (useChatStore.getState().activeSessionId === draggedId) {
+        useChatStore.setState({ activeProjectId: projectId })
+      }
       toast.success(t('chat.sessionMoved', '세션이 이동되었습니다'))
     } catch (err) {
       toast.error(err instanceof Error ? err.message : t('chat.sessionMoveFailed', '이동 실패'))

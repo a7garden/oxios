@@ -5,7 +5,7 @@
 //! the migration window.
 
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
 use anyhow::Result;
@@ -33,6 +33,14 @@ CREATE TABLE IF NOT EXISTS mounts (
 );
 
 CREATE INDEX IF NOT EXISTS idx_mounts_name ON mounts(name);
+
+-- ─────────────────────────────────────────────
+-- Mount dismissals (RFC-025 Phase 5) — tombstones for deleted
+-- AutoPromoted Mounts, so the scanner does not re-create them.
+-- ─────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS mount_dismissals (
+    root_path TEXT PRIMARY KEY
+);
 "#;
 
 /// Ensure the `mounts` table exists.
@@ -85,6 +93,29 @@ pub fn delete_mount(conn: &rusqlite::Connection, id: &str) -> Result<()> {
     Ok(())
 }
 
+/// RFC-025 Phase 5: load all dismissed root paths (tombstones).
+///
+/// These are roots the user explicitly removed after the scanner
+/// auto-promoted them. The scanner skips them so it never re-creates a
+/// Mount the user has rejected (Promo-3).
+pub fn list_dismissed_roots(conn: &rusqlite::Connection) -> Result<Vec<PathBuf>> {
+    let mut stmt = conn.prepare("SELECT root_path FROM mount_dismissals")?;
+    let rows = stmt.query_map([], |row| {
+        let s: String = row.get(0)?;
+        Ok(PathBuf::from(s))
+    })?;
+    rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
+}
+
+/// RFC-025 Phase 5: record a dismissed root path (tombstone).
+pub fn add_dismissed_root(conn: &rusqlite::Connection, root: &Path) -> Result<()> {
+    conn.execute(
+        "INSERT OR IGNORE INTO mount_dismissals (root_path) VALUES (?1)",
+        rusqlite::params![root.to_string_lossy()],
+    )?;
+    Ok(())
+}
+
 /// Convert a SQLite row into a [`Mount`].
 fn row_to_mount(row: &rusqlite::Row<'_>) -> rusqlite::Result<Mount> {
     use chrono::{DateTime, Utc};
@@ -118,6 +149,7 @@ fn row_to_mount(row: &rusqlite::Row<'_>) -> rusqlite::Result<Mount> {
     let last_marker_snapshot = deserialize_snapshot(&snapshot_str);
     let source = match source_str.as_str() {
         "auto_detected" => MountSource::AutoDetected,
+        "auto_promoted" => MountSource::AutoPromoted,
         _ => MountSource::Manual,
     };
     let last_enriched_at = last_enriched_str
@@ -245,5 +277,21 @@ mod tests {
             .unwrap()
             .as_secs();
         assert_eq!(secs, 1_700_000_000);
+    }
+
+    #[test]
+    fn test_dismissed_roots_roundtrip() {
+        let db = open_db();
+        // Starts empty.
+        assert!(list_dismissed_roots(&db.conn()).unwrap().is_empty());
+        // Insert two tombstones.
+        add_dismissed_root(&db.conn(), &PathBuf::from("/proj/a")).expect("add");
+        add_dismissed_root(&db.conn(), &PathBuf::from("/proj/b")).expect("add");
+        // Idempotent — re-adding the same root is a no-op.
+        add_dismissed_root(&db.conn(), &PathBuf::from("/proj/a")).expect("re-add");
+        let roots = list_dismissed_roots(&db.conn()).unwrap();
+        assert_eq!(roots.len(), 2);
+        assert!(roots.contains(&PathBuf::from("/proj/a")));
+        assert!(roots.contains(&PathBuf::from("/proj/b")));
     }
 }

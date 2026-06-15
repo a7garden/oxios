@@ -138,7 +138,7 @@ pub(crate) async fn handle_chat(
                 .or_else(|| response.metadata.get("session_id").cloned());
             let project_id = meta
                 .and_then(|m| m.project_id.clone())
-                .or_else(|| response.metadata.get("project_id").cloned());
+                .or_else(|| response.metadata.get("project_ids").cloned());
             let phase = meta
                 .map(|m| m.phase.clone())
                 .or_else(|| response.metadata.get("phase").cloned());
@@ -446,7 +446,7 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
                         .meta
                         .as_ref()
                         .and_then(|m| m.project_id.clone())
-                        .or_else(|| msg.metadata.get("project_id").cloned());
+                        .or_else(|| msg.metadata.get("project_ids").cloned());
                     let phase = msg
                         .meta
                         .as_ref()
@@ -569,6 +569,9 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
                         "project_tag": project_tag,
                         "seed_id": seed_id,
                         "duration_ms": duration_ms,
+                        // RFC-025: surface detected mount info to the frontend.
+                        "mount_tag": msg.metadata.get("mount_tag"),
+                        "mount_ids": msg.metadata.get("mount_ids"),
                         // TODO: populate tool_calls from trajectory_steps once kernel provides them
                         "tool_calls": msg.metadata.get("tool_calls")
                             .and_then(|v| serde_json::from_str::<serde_json::Value>(v).ok())
@@ -632,6 +635,12 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
 
                     let incoming_project_id = parsed
                         .get("project_id")
+                        .and_then(|v| v.as_str())
+                        .filter(|s| !s.is_empty())
+                        .map(String::from);
+                    // RFC-025: mount_ids (comma-separated, primary first).
+                    let incoming_mount_ids = parsed
+                        .get("mount_ids")
                         .and_then(|v| v.as_str())
                         .filter(|s| !s.is_empty())
                         .map(String::from);
@@ -707,6 +716,9 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
                             if let Some(ref vid) = incoming_project_id {
                                 incoming.metadata.insert("project_ids".into(), vid.clone());
                             }
+                            if let Some(ref mids) = incoming_mount_ids {
+                                incoming.metadata.insert("mount_ids".into(), mids.clone());
+                            }
                             incoming
                                 .metadata
                                 .insert("conn_id".into(), conn_id_for_send.clone());
@@ -749,6 +761,9 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
                             }
                             if let Some(ref vid) = incoming_project_id {
                                 incoming.metadata.insert("project_ids".into(), vid.clone());
+                            }
+                            if let Some(ref mids) = incoming_mount_ids {
+                                incoming.metadata.insert("mount_ids".into(), mids.clone());
                             }
                             incoming
                                 .metadata
@@ -863,9 +878,10 @@ async fn persist_session(
                     None
                 },
             });
-            // Attach project_id to session metadata if provided
+            // RFC-025: set top-level project_id field (was metadata key — caused
+            // singular/plural mismatch with list_sessions and GET endpoint).
             if let Some(vid) = project_id {
-                session.set_metadata("project_id", serde_json::json!(vid));
+                session.project_id = Some(vid.to_string());
             }
             // Persist execution mode in session metadata
             if let Some(mode) = metadata.get("mode") {
@@ -901,9 +917,9 @@ async fn persist_session(
                     None
                 },
             });
-            // Attach project_id to session metadata
+            // RFC-025: set top-level project_id field.
             if let Some(vid) = project_id {
-                session.set_metadata("project_id", serde_json::json!(vid));
+                session.project_id = Some(vid.to_string());
             }
             // Persist execution mode for new session
             if let Some(mode) = metadata.get("mode") {

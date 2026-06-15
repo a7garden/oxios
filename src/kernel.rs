@@ -59,6 +59,14 @@ pub struct Kernel {
     /// SQLite-backed agent history query index.
     #[cfg(feature = "sqlite-memory")]
     agent_log_db: Option<Arc<oxios_kernel::agent_log_db::AgentLogDb>>,
+    /// RFC-025 Phase 5: cancellation sender for the Mount auto-promotion
+    /// scanner (Promo-6). Sending `true` breaks the scan loop's `select!`.
+    /// `None` when the scanner is disabled. Kept on the `Kernel` so the
+    /// sender stays alive (otherwise `watch::Receiver::changed()` resolves
+    /// immediately on sender-drop and would abort the loop) and so a future
+    /// graceful shutdown can trigger it.
+    #[allow(dead_code)] // wired via `shutdown_promotion_scanner` on graceful shutdown
+    promo_shutdown_tx: Option<tokio::sync::watch::Sender<bool>>,
 }
 
 impl Kernel {
@@ -375,6 +383,17 @@ impl Kernel {
         self.audit_trail
             .flush_to(&*self.state_store)
             .map_err(|e| anyhow::anyhow!("audit flush failed: {e}"))
+    }
+
+    /// RFC-025 Phase 5: signal the Mount auto-promotion scanner to stop
+    /// (Promo-6). No-op when the scanner is disabled. Safe to call during
+    /// graceful shutdown; the spawned task breaks its `select!` loop on the
+    /// next iteration.
+    #[allow(dead_code)] // part of graceful-shutdown wiring (Promo-6); call site TODO
+    pub fn shutdown_promotion_scanner(&self) {
+        if let Some(tx) = &self.promo_shutdown_tx {
+            let _ = tx.send(true);
+        }
     }
 
     /// Execute a prompt with an optional session ID for multi-turn conversations.
@@ -894,19 +913,28 @@ impl KernelBuilder {
         // Scans session history on a cadence and promotes paths that cross
         // the frequency threshold into Mounts. Cheap (one filesystem walk
         // per scan) and debounced by the threshold.
-        {
+        //
+        // Promo-6: a `watch` channel provides a cancellation point so a
+        // future graceful shutdown can break the loop. The `Sender` is
+        // stored on the returned `Kernel` to keep it alive.
+        let promo_shutdown_tx = {
             let mounts_cfg = &config.mounts;
-            if mounts_cfg.auto_promote_enabled
-                && let Some(ref mm) = mount_manager
-            {
+            if !mounts_cfg.auto_promote_enabled {
+                None
+            } else if let Some(ref mm) = mount_manager {
                 let mm = mm.clone();
                 let ss = state_store.clone();
+                // Promo-11: respect the configured toggle instead of a
+                // hardcoded `true`.
                 let promo_config = oxios_kernel::PromotionConfig {
-                    enabled: true,
+                    enabled: mounts_cfg.auto_promote_enabled,
                     threshold: mounts_cfg.auto_promote_threshold,
                     window_days: mounts_cfg.auto_promote_window_days,
                 };
                 let interval_secs = mounts_cfg.auto_promote_interval_secs;
+                // Promo-6: cancellation channel.
+                let (shutdown_tx, mut shutdown_rx) = tokio::sync::watch::channel(false);
+                let window_days = mounts_cfg.auto_promote_window_days;
                 tokio::spawn(async move {
                     let mut ticker =
                         tokio::time::interval(std::time::Duration::from_secs(interval_secs));
@@ -914,26 +942,64 @@ impl KernelBuilder {
                     // after startup, then wait the full interval thereafter.
                     ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
                     loop {
-                        ticker.tick().await;
-                        match ss.load_all_sessions().await {
-                            Ok(sessions) => {
-                                let created = mm.promote_frequent_paths(&sessions, &promo_config);
-                                if !created.is_empty() {
+                        // Promo-6: break out on shutdown.
+                        tokio::select! {
+                            _ = ticker.tick() => {}
+                            res = shutdown_rx.changed() => {
+                                if res.is_err() || *shutdown_rx.borrow() {
                                     tracing::info!(
-                                        promoted = created.len(),
-                                        "RFC-025: auto-promoted frequent paths to Mounts"
+                                        "Mount auto-promotion scanner shutting down"
                                     );
+                                    break;
                                 }
                             }
+                        }
+
+                        // Promo-1: only load sessions updated within the
+                        // promotion window, bounding memory to the ones that
+                        // can actually contribute a touch.
+                        let cutoff = chrono::Utc::now() - chrono::Duration::days(window_days);
+                        let sessions = match ss.load_sessions_for_promotion(cutoff).await {
+                            Ok(s) => s,
                             Err(e) => {
                                 tracing::warn!(error = %e, "Mount promotion scan failed");
+                                continue;
+                            }
+                        };
+
+                        // Promo-5: `promote_frequent_paths` does blocking
+                        // filesystem I/O (canonicalize + marker walks). Run it
+                        // on a blocking thread so it never stalls the async
+                        // runtime.
+                        let mm = mm.clone();
+                        let promo_config = promo_config.clone();
+                        match tokio::task::spawn_blocking(move || {
+                            mm.promote_frequent_paths(&sessions, &promo_config)
+                        })
+                        .await
+                        {
+                            Ok(created) if !created.is_empty() => {
+                                tracing::info!(
+                                    promoted = created.len(),
+                                    "RFC-025: auto-promoted frequent paths to Mounts"
+                                );
+                            }
+                            Ok(_) => {}
+                            Err(e) => {
+                                tracing::warn!(
+                                    error = %e,
+                                    "Mount promotion scan task panicked"
+                                );
                             }
                         }
                     }
                 });
                 tracing::info!("Mount auto-promotion scanner spawned");
+                Some(shutdown_tx)
+            } else {
+                None
             }
-        }
+        };
 
         let budget_manager = Arc::new(BudgetManager::new());
 
@@ -1289,6 +1355,7 @@ impl KernelBuilder {
             engine_handle,
             #[cfg(feature = "sqlite-memory")]
             agent_log_db,
+            promo_shutdown_tx,
         })
     }
 }

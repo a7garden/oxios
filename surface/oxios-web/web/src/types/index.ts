@@ -36,9 +36,11 @@ export interface SessionDetail {
   agent_responses: {
     content: string
     session_id: string
-    seed_id: string
-    phase_reached: string
-    evaluation_passed: boolean
+    // Web-m6: these fields are nullable on the backend (chat-only sessions
+    // never run the Ouroboros pipeline), so type them optional.
+    seed_id?: string | null
+    phase_reached?: string | null
+    evaluation_passed?: boolean | null
     timestamp: string
   }[]
   active_seed_id?: string

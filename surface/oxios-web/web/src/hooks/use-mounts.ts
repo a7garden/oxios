@@ -69,3 +69,15 @@ export function useDeleteMount() {
     },
   })
 }
+
+/** Rescan a Mount — re-seed auto_meta from the filesystem (RFC-025). */
+export function useRescanMount() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => api.post<Mount>(`/api/mounts/${id}/rescan`, {}),
+    onSuccess: (_, id) => {
+      qc.invalidateQueries({ queryKey: ['mounts'] })
+      qc.invalidateQueries({ queryKey: ['mount', id] })
+    },
+  })
+}

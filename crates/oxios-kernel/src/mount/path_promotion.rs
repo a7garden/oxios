@@ -23,7 +23,7 @@
 //! run this on a cadence (alongside Dream consolidation) rather than on every
 //! message. The threshold naturally debounces one-off mentions.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
 use chrono::{DateTime, Duration, Utc};
@@ -115,6 +115,11 @@ pub fn extract_paths(session: &Session) -> Vec<(String, DateTime<Utc>)> {
 ///
 /// Returns a map of `root -> PathFrequency` restricted to events within the
 /// configured window.
+///
+/// Frequency is computed **per distinct root per session**: a single session
+/// that mentions the same project root ten times counts once, not ten times.
+/// This prevents one chatty session from inflating a root across the
+/// threshold (Promo-7).
 pub fn tally_frequencies(
     sessions: &[Session],
     config: &PromotionConfig,
@@ -123,6 +128,10 @@ pub fn tally_frequencies(
     let mut freqs: HashMap<PathBuf, PathFrequency> = HashMap::new();
 
     for session in sessions {
+        // Deduplicate roots within a single session before counting: each
+        // distinct root contributes at most one touch per session.
+        let mut distinct_roots: HashSet<PathBuf> = HashSet::new();
+        let mut root_last_seen: HashMap<PathBuf, DateTime<Utc>> = HashMap::new();
         for (raw, ts) in extract_paths(session) {
             if ts < cutoff {
                 continue;
@@ -130,8 +139,18 @@ pub fn tally_frequencies(
             let Some(root) = normalize_to_root(Path::new(&raw)) else {
                 continue;
             };
+            distinct_roots.insert(root.clone());
+            // Track the most recent touch for this root in this session.
+            root_last_seen
+                .entry(root)
+                .and_modify(|prev| *prev = (*prev).max(ts))
+                .or_insert(ts);
+        }
+
+        for root in distinct_roots {
+            let ts = root_last_seen[&root];
             let entry = freqs.entry(root).or_default();
-            entry.count += 1;
+            entry.count += 1; // +1 per distinct root per session
             entry.last_seen = Some(
                 entry
                     .last_seen
@@ -151,9 +170,15 @@ pub fn tally_frequencies(
 /// - Returns `None` if no marker is found within the filesystem (e.g. the
 ///   path doesn't exist, or it's a loose file with no project context).
 pub fn normalize_to_root(path: &Path) -> Option<PathBuf> {
+    // Expand a leading `~` to the home directory before canonicalizing so
+    // that home-relative paths (`~/projects/foo`) resolve correctly (Promo-4).
+    // `std::fs::canonicalize` does *not* expand `~`, so without this those
+    // paths would fall back to the raw form and fail to find markers.
+    let expanded = expand_tilde(path);
+
     // Canonicalize to resolve `..` and symlinks. Fall back to the raw path
     // if the file no longer exists (it may still be a meaningful prefix).
-    let canonical = std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
+    let canonical = std::fs::canonicalize(&expanded).unwrap_or(expanded);
 
     // Start from the path itself if it's a directory, else from its parent.
     let start = if canonical.is_dir() {
@@ -178,12 +203,57 @@ fn has_marker(dir: &Path) -> bool {
     ROOT_MARKERS.iter().any(|m| dir.join(m).exists())
 }
 
+/// Expand a leading `~` (or `~user`, though only `~` is common) to the home
+/// directory. Returns the original path unchanged if it doesn't start with `~`
+/// or if `HOME` is unavailable (Promo-4).
+fn expand_tilde(path: &Path) -> PathBuf {
+    expand_tilde_with_home(path, std::env::var_os("HOME"))
+}
+
+/// Pure helper: same as [`expand_tilde`] but with the home directory passed
+/// in explicitly. Split out so tests can exercise the prefix logic without
+/// mutating the process-wide `HOME` environment variable (Promo-4).
+fn expand_tilde_with_home(path: &Path, home: Option<std::ffi::OsString>) -> PathBuf {
+    let s = path.to_string_lossy();
+    let Some(home) = home else {
+        // No HOME → leave `~` paths untouched.
+        return path.to_path_buf();
+    };
+    if s == "~" {
+        return PathBuf::from(home);
+    }
+    if let Some(rest) = s.strip_prefix("~/") {
+        return PathBuf::from(home).join(rest);
+    }
+    path.to_path_buf()
+}
+
 /// Collect path-like string values from a JSON value (recursively).
+///
+/// `depth` bounds the recursion to prevent stack overflow on pathologically
+/// nested JSON (Promo-10). The bound of 32 comfortably exceeds any
+/// realistic tool_args payload.
 fn collect_path_like_strings(
     value: &serde_json::Value,
     out: &mut Vec<(String, DateTime<Utc>)>,
     ts: DateTime<Utc>,
 ) {
+    collect_path_like_strings_inner(value, out, ts, 0);
+}
+
+/// Inner recursive worker carrying the current `depth`.
+fn collect_path_like_strings_inner(
+    value: &serde_json::Value,
+    out: &mut Vec<(String, DateTime<Utc>)>,
+    ts: DateTime<Utc>,
+    depth: u32,
+) {
+    // Promo-10: bound recursion depth to avoid stack overflow on deeply
+    // (or cyclically) nested JSON.
+    const MAX_DEPTH: u32 = 32;
+    if depth > MAX_DEPTH {
+        return;
+    }
     match value {
         serde_json::Value::String(s) => {
             if looks_like_path(s) {
@@ -192,12 +262,12 @@ fn collect_path_like_strings(
         }
         serde_json::Value::Array(arr) => {
             for v in arr {
-                collect_path_like_strings(v, out, ts);
+                collect_path_like_strings_inner(v, out, ts, depth + 1);
             }
         }
         serde_json::Value::Object(map) => {
             for v in map.values() {
-                collect_path_like_strings(v, out, ts);
+                collect_path_like_strings_inner(v, out, ts, depth + 1);
             }
         }
         _ => {}
@@ -248,20 +318,31 @@ mod tests {
 
     #[test]
     fn test_looks_like_path() {
-        assert!(looks_like_path("/Volumes/MERCURY/PROJECTS/oxios"));
+        assert!(looks_like_path("/usr/local/bin"));
         assert!(looks_like_path("~/projects/foo"));
         assert!(!looks_like_path("hello world"));
         assert!(!looks_like_path("/x")); // too shallow
         assert!(!looks_like_path("no-slash"));
     }
 
+    /// Path to this crate's root — used instead of a hardcoded developer
+    /// path so the tests are portable (Promo-2). It has `Cargo.toml` at its
+    /// root, so `normalize_to_root` collapses any child to it.
+    fn crate_root() -> PathBuf {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+    }
+
     #[test]
     fn test_tally_counts_repeated_paths() {
         let now = Utc::now();
+        let root = crate_root();
         let sessions = vec![make_session(vec![
-            ("fix /Volumes/MERCURY/PROJECTS/oxios/src/main.rs", now),
-            ("also check /Volumes/MERCURY/PROJECTS/oxios/Cargo.toml", now),
-            ("again /Volumes/MERCURY/PROJECTS/oxios", now),
+            (format!("fix {}/src/lib.rs", root.display()).as_str(), now),
+            (
+                format!("also check {}/Cargo.toml", root.display()).as_str(),
+                now,
+            ),
+            (format!("again {}", root.display()).as_str(), now),
         ])];
 
         let config = PromotionConfig {
@@ -270,33 +351,47 @@ mod tests {
         };
         let freqs = tally_frequencies(&sessions, &config);
 
-        // All three should collapse to the oxios project root (it has Cargo.toml).
-        let oxios_root = PathBuf::from("/Volumes/MERCURY/PROJECTS/oxios");
-        let oxios_freq = freqs
+        // All three mentions collapse to the same project root (Cargo.toml).
+        let final_segment = root
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("oxios-kernel");
+        let freq = freqs
             .iter()
-            .find(|(k, _)| k.ends_with("oxios"))
-            .map(|(_, v)| v);
-        assert!(oxios_freq.is_some(), "expected oxios root in {:?}", freqs);
-        assert!(oxios_freq.unwrap().count >= 3);
+            .find(|(k, _)| k.ends_with(final_segment))
+            .map(|(_, v)| v)
+            .unwrap_or_else(|| panic!("expected root in {:?}", freqs));
+        // Promo-7: a single session counts each distinct root once, so the
+        // count is exactly 1 regardless of how many times it was mentioned.
+        assert_eq!(freq.count, 1);
     }
 
     #[test]
     fn test_tally_respects_window() {
         let now = Utc::now();
         let old = now - Duration::days(30);
+        let root = crate_root();
+        // Use a real project root (the crate itself) so that the *only* reason
+        // the tally is empty is the window filter, not `normalize_to_root`
+        // returning `None` (Promo-2). Three old touches of the same root.
         let sessions = vec![make_session(vec![
-            ("work on /tmp/very/old/path", old),
-            ("work on /tmp/very/old/path", old),
-            ("work on /tmp/very/old/path", old),
+            (
+                format!("work on {}/src/lib.rs", root.display()).as_str(),
+                old,
+            ),
+            (
+                format!("work on {}/Cargo.toml", root.display()).as_str(),
+                old,
+            ),
+            (format!("work on {}", root.display()).as_str(), old),
         ])];
         let config = PromotionConfig {
             window_days: 14,
             ..Default::default()
         };
         let freqs = tally_frequencies(&sessions, &config);
-        // Old events outside the window shouldn't appear (and /tmp isn't a
-        // project root anyway, so it'd be filtered by normalize_to_root).
-        assert!(freqs.is_empty());
+        // Old events outside the window must not appear.
+        assert!(freqs.is_empty(), "expected empty freqs, got {:?}", freqs);
     }
 
     #[test]
@@ -305,5 +400,61 @@ mod tests {
         let file = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/lib.rs");
         let root = normalize_to_root(&file).expect("should find root");
         assert!(root.ends_with("oxios-kernel"));
+    }
+
+    #[test]
+    fn test_normalize_expands_tilde() {
+        // Promo-4: test the pure prefix-expansion logic without touching the
+        // process environment (avoids unsafe set_var + parallel-test races).
+        let home = std::ffi::OsString::from("/Users/test");
+        // `~/foo` → `$HOME/foo`
+        assert_eq!(
+            expand_tilde_with_home(Path::new("~/foo"), Some(home.clone())),
+            PathBuf::from("/Users/test/foo")
+        );
+        // bare `~` → `$HOME`
+        assert_eq!(
+            expand_tilde_with_home(Path::new("~"), Some(home.clone())),
+            PathBuf::from("/Users/test")
+        );
+        // absolute path unchanged
+        assert_eq!(
+            expand_tilde_with_home(Path::new("/etc/passwd"), Some(home.clone())),
+            PathBuf::from("/etc/passwd")
+        );
+        // relative path unchanged
+        assert_eq!(
+            expand_tilde_with_home(Path::new("relative/path"), Some(home.clone())),
+            PathBuf::from("relative/path")
+        );
+        // No HOME available → `~` paths pass through untouched.
+        assert_eq!(
+            expand_tilde_with_home(Path::new("~/foo"), None),
+            PathBuf::from("~/foo")
+        );
+    }
+
+    #[test]
+    fn test_collect_path_like_bounds_recursion_depth() {
+        // Promo-10: deeply nested JSON must not overflow the stack.
+        // Build a value nested far beyond MAX_DEPTH and confirm collection
+        // returns without panicking.
+        let mut value = serde_json::json!({"path": "/usr/local/bin"});
+        for _ in 0..100 {
+            value = serde_json::json!({ "nested": value });
+        }
+        let mut out = Vec::new();
+        collect_path_like_strings(&value, &mut out, Utc::now());
+        // The deep path is unreachable (>32 levels) so nothing is collected.
+        assert!(out.is_empty(), "expected no paths past depth bound");
+
+        // A shallow path IS collected.
+        let shallow = serde_json::json!({
+            "a": { "b": { "file": "/usr/local/bin/oxios" } }
+        });
+        let mut out2 = Vec::new();
+        collect_path_like_strings(&shallow, &mut out2, Utc::now());
+        assert_eq!(out2.len(), 1);
+        assert_eq!(out2[0].0, "/usr/local/bin/oxios");
     }
 }

@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { FolderPlus, Sparkles, Trash2, Wrench } from 'lucide-react'
+import { FolderPlus, RefreshCw, Sparkles, Trash2, Wrench } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -10,7 +10,7 @@ import { LoadingCards } from '@/components/shared/loading'
 import { RefreshButton } from '@/components/shared/refresh-button'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { useMounts, useDeleteMount } from '@/hooks/use-mounts'
+import { useMounts, useDeleteMount, useRescanMount } from '@/hooks/use-mounts'
 import type { Mount } from '@/types'
 
 export const Route = createFileRoute('/mounts/')({ component: MountsPage })
@@ -22,6 +22,7 @@ function MountsPage() {
 
   const { data, isLoading, isError, refetch } = useMounts(search || undefined)
   const deleteMount = useDeleteMount()
+  const rescanMount = useRescanMount()
 
   const mounts = Array.isArray(data?.items) ? data.items : []
 
@@ -31,6 +32,15 @@ function MountsPage() {
       toast.success(t('mounts.deleted', 'Mount가 삭제되었습니다'))
     } catch (err) {
       toast.error(err instanceof Error ? err.message : t('mounts.deleteFailed', '삭제 실패'))
+    }
+  }
+
+  const handleRescan = async (mount: Mount) => {
+    try {
+      await rescanMount.mutateAsync(mount.id)
+      toast.success(t('mounts.rescanned', 'Mount가 갱신되었습니다'))
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t('mounts.rescanFailed', '갱신 실패'))
     }
   }
 
@@ -91,15 +101,27 @@ function MountsPage() {
               key={mount.id}
               className="group relative rounded-lg border bg-card p-4 transition-all hover:shadow-sm"
             >
-              {/* Delete button */}
-              <Button
-                variant="ghost"
-                size="icon"
-                className="absolute right-2 top-2 h-7 w-7 opacity-0 transition-opacity group-hover:opacity-100"
-                onClick={() => handleDelete(mount)}
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-              </Button>
+              {/* Action buttons: rescan + delete (top-right) */}
+              <div className="absolute right-2 top-2 flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7"
+                  onClick={() => handleRescan(mount)}
+                  aria-label={t('mounts.rescan', '갱신')}
+                >
+                  <RefreshCw className="h-3.5 w-3.5" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7"
+                  onClick={() => handleDelete(mount)}
+                  aria-label={t('common.delete', '삭제')}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              </div>
 
               {/* Name */}
               <div className="mb-2 flex items-center gap-2">

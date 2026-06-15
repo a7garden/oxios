@@ -14,12 +14,13 @@ export function MountDetectionBadge() {
   const detectedMountTag = useChatStore((s) => s.detectedMountTag)
   const activeMountIds = useChatStore((s) => s.activeMountIds)
   const setActiveMountIds = useChatStore((s) => s.setActiveMountIds)
-  const setDetectedMountTag = useChatStore((s) => s.setDetectedMountTag)
+  const clearDetectedMount = useChatStore((s) => s.clearDetectedMount)
 
   if (!detectedMountTag) return null
 
   const handleDismiss = () => {
-    setDetectedMountTag(null)
+    // Web-m2: clear both the tag and the detected IDs.
+    clearDetectedMount()
   }
 
   const handleAccept = () => {
@@ -30,7 +31,8 @@ export function MountDetectionBadge() {
     // Merge: keep existing primary, append new secondary mounts.
     const merged = [...new Set([...current, ...detectedIds])]
     setActiveMountIds(merged)
-    setDetectedMountTag(null)
+    // Web-m2: clear both the tag and the detected IDs on accept.
+    clearDetectedMount()
   }
 
   return (
