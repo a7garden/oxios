@@ -24,6 +24,7 @@ pub mod knowledge_tool;
 pub mod marketplace_tool;
 pub mod persona_tool;
 pub mod project_tool;
+pub mod mount_tool;
 pub mod resource_tool;
 pub mod security_tool;
 
@@ -36,6 +37,7 @@ pub use knowledge_tool::KnowledgeTool;
 pub use marketplace_tool::MarketplaceTool;
 pub use persona_tool::PersonaTool;
 pub use project_tool::ProjectTool;
+pub use mount_tool::MountTool;
 pub use resource_tool::ResourceTool;
 pub use security_tool::SecurityTool;
 
@@ -59,6 +61,7 @@ pub fn register_all_kernel_tools(registry: &ToolRegistry, kernel: &KernelHandle,
 
     // Kernel domain tools (take &KernelHandle)
     registry.register(ProjectTool::from_kernel(kernel));
+    registry.register(MountTool::from_kernel(kernel));
     registry.register(KernelAgentTool::from_kernel(kernel));
     registry.register(PersonaTool::from_kernel(kernel));
     registry.register(CronTool::from_kernel(kernel));

@@ -81,6 +81,16 @@ pub struct Project {
     pub updated_at: DateTime<Utc>,
     /// When this project was last active (used in a session).
     pub last_active_at: DateTime<Utc>,
+
+    // ── RFC-025: Project as instruction/memory bundle ──
+    /// Mounts this Project references. Empty for non-code Projects or
+    /// Projects created before RFC-025 migration.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub mount_ids: Vec<crate::mount::MountId>,
+    /// Custom system-prompt instructions. Injected into `## Workspace Context`
+    /// when this Project is active.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub instructions: String,
 }
 
 fn default_emoji() -> String {
@@ -107,6 +117,8 @@ impl Project {
             created_at: now,
             updated_at: now,
             last_active_at: now,
+            mount_ids: Vec::new(),
+            instructions: String::new(),
         }
     }
 

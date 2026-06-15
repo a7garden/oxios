@@ -27,6 +27,10 @@ pub struct ProjectInfo {
     pub tags: Vec<String>,
     pub emoji: String,
     pub memory_visible: bool,
+    /// RFC-025: Mounts this Project references.
+    pub mount_ids: Vec<String>,
+    /// RFC-025: Custom instructions injected into the system prompt.
+    pub instructions: String,
     pub created_at: String,
     pub updated_at: String,
     pub last_active_at: String,
@@ -47,6 +51,8 @@ impl From<&Project> for ProjectInfo {
             tags: project.tags.clone(),
             emoji: project.emoji.clone(),
             memory_visible: project.memory_visible,
+            mount_ids: project.mount_ids.iter().map(|m| m.to_string()).collect(),
+            instructions: project.instructions.clone(),
             created_at: project.created_at.to_rfc3339(),
             updated_at: project.updated_at.to_rfc3339(),
             last_active_at: project.last_active_at.to_rfc3339(),
@@ -165,5 +171,24 @@ impl ProjectApi {
     pub fn get_project_memory_ids(&self, project_id: &str) -> Result<Vec<String>> {
         let pid = Uuid::parse_str(project_id).context("Invalid project ID")?;
         self.project_manager.get_project_memory_ids(pid)
+    }
+
+    /// Update a Project's RFC-025 bundle fields (mount_ids, instructions).
+    pub fn update_project_bundle(
+        &self,
+        id: &str,
+        mount_ids: Option<Vec<String>>,
+        instructions: Option<String>,
+    ) -> Result<ProjectInfo> {
+        let pid = Uuid::parse_str(id).context("Invalid project ID")?;
+        let mount_ids = mount_ids.map(|ids| {
+            ids.into_iter()
+                .filter_map(|s| uuid::Uuid::parse_str(&s).ok())
+                .collect()
+        });
+        let project = self
+            .project_manager
+            .update_project_bundle(pid, mount_ids, instructions)?;
+        Ok(ProjectInfo::from(&project))
     }
 }

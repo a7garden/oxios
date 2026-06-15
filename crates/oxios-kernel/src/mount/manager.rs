@@ -6,6 +6,7 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::time::SystemTime;
 
 use anyhow::Result;
 use chrono::Utc;
@@ -229,6 +230,90 @@ impl MountManager {
         let mounts = self.list_mounts();
         detect_mounts(message, &mounts)
     }
+
+    /// Seed `auto_meta` from the filesystem (RFC-025 §Auto-Meta).
+    ///
+    /// Cheap heuristic detection on marker files. The agent refines this
+    /// during enrichment. Idempotent — safe to call multiple times.
+    pub fn seed_auto_meta(&self, id: MountId) -> Result<()> {
+        let mount = {
+            let mounts = self.mounts.read();
+            mounts
+                .get(&id)
+                .ok_or(MountManagerError::NotFound(id))?
+                .clone()
+        };
+        let Some(primary) = mount.primary_path() else {
+            return Ok(()); // nothing to scan
+        };
+        if !primary.exists() {
+            tracing::debug!(path = %primary.display(), "Mount path missing, skip meta seed");
+            return Ok(());
+        }
+        let meta = super::meta_detection::detect_meta(primary);
+        self.update_enrichment(id, None, Some(meta))?;
+        Ok(())
+    }
+
+    /// Check marker-file drift and set `enrichment_pending` (RFC-025 §Enrichment).
+    ///
+    /// Compares current marker mtimes against the stored snapshot. Returns
+    /// `true` if any marker drifted (and the flag was set). Cheap: a handful
+    /// of `stat()` calls.
+    pub fn check_drift(&self, id: MountId) -> Result<bool> {
+        use std::path::PathBuf;
+
+        let mut mounts = self.mounts.write();
+        let mount = mounts
+            .get_mut(&id)
+            .ok_or(MountManagerError::NotFound(id))?;
+        let Some(primary) = mount.primary_path().cloned() else {
+            return Ok(false);
+        };
+        let current = super::meta_detection::snapshot_markers(&primary);
+        let drifted = markers_drifted(&mount.last_marker_snapshot, &current);
+        if drifted {
+            mount.enrichment_pending = true;
+            mount.updated_at = Utc::now();
+        }
+        // Always refresh the snapshot so the next comparison is accurate.
+        mount.last_marker_snapshot = current
+            .into_iter()
+            .map(|(p, t)| (PathBuf::from(p), t))
+            .collect();
+        let mount_clone = mount.clone();
+        drop(mounts);
+        let _ = mount_db::save_mount(&self.db.conn(), &mount_clone);
+        Ok(drifted)
+    }
+
+    /// Check drift for all Mounts (Dream-time refresh, RFC-025).
+    ///
+    /// Returns the IDs of Mounts whose content drifted.
+    pub fn check_all_drift(&self) -> Vec<MountId> {
+        let ids: Vec<MountId> = self.mounts.read().keys().copied().collect();
+        ids.into_iter()
+            .filter(|id| self.check_drift(*id).unwrap_or(false))
+            .collect()
+    }
+}
+
+/// Compare a stored marker snapshot against the current state.
+/// Returns `true` if any marker was added, removed, or changed mtime.
+fn markers_drifted(
+    stored: &HashMap<PathBuf, SystemTime>,
+    current: &[(std::path::PathBuf, SystemTime)],
+) -> bool {
+    if stored.len() != current.len() {
+        return true; // marker added or removed
+    }
+    for (path, mtime) in current {
+        match stored.get(path) {
+            Some(stored_time) if stored_time == mtime => continue,
+            _ => return true, // new, removed, or changed
+        }
+    }
+    false
 }
 
 #[cfg(test)]

@@ -271,6 +271,32 @@ impl ProjectManager {
 
         Ok(())
     }
+
+    /// Update a Project's RFC-025 fields (mount_ids, instructions).
+    pub fn update_project_bundle(
+        &self,
+        id: ProjectId,
+        mount_ids: Option<Vec<crate::mount::MountId>>,
+        instructions: Option<String>,
+    ) -> Result<Project> {
+        let mut projects = self.projects.write();
+        let project = projects
+            .get_mut(&id)
+            .ok_or(ProjectManagerError::NotFound(id))?;
+
+        if let Some(mids) = mount_ids {
+            project.mount_ids = mids;
+        }
+        if let Some(instr) = instructions {
+            project.instructions = instr;
+        }
+        project.updated_at = Utc::now();
+
+        let project_clone = project.clone();
+        drop(projects);
+        project_db::save_project(&self.db.conn(), &project_clone)?;
+        Ok(project_clone)
+    }
 }
 
 #[cfg(test)]

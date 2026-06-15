@@ -64,6 +64,10 @@ pub(crate) struct UpdateProjectRequest {
     pub emoji: Option<String>,
     pub description: Option<String>,
     pub memory_visible: Option<bool>,
+    /// RFC-025: referenced Mount IDs.
+    pub mount_ids: Option<Vec<String>>,
+    /// RFC-025: custom instructions.
+    pub instructions: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -168,6 +172,35 @@ pub(crate) async fn handle_project_update(
     Json(body): Json<UpdateProjectRequest>,
 ) -> Result<Json<ProjectInfo>, AppError> {
     let api = project_api!(state);
+
+    // RFC-025: if mount_ids or instructions are provided, route to bundle update.
+    if body.mount_ids.is_some() || body.instructions.is_some() {
+        let project = api
+            .update_project_bundle(&id, body.mount_ids, body.instructions)
+            .map_err(|e| AppError::BadRequest(e.to_string()))?;
+        // Also apply traditional field updates if provided.
+        if body.name.is_some()
+            || body.paths.is_some()
+            || body.tags.is_some()
+            || body.emoji.is_some()
+            || body.description.is_some()
+            || body.memory_visible.is_some()
+        {
+            let updated = api
+                .update_project(
+                    &id,
+                    body.name,
+                    body.paths,
+                    body.tags,
+                    body.emoji,
+                    body.description,
+                    body.memory_visible,
+                )
+                .map_err(|e| AppError::BadRequest(e.to_string()))?;
+            return Ok(Json(updated));
+        }
+        return Ok(Json(project));
+    }
 
     let project = api
         .update_project(

@@ -18,6 +18,7 @@
 
 pub mod detection;
 pub mod manager;
+pub mod meta_detection;
 pub mod mount_db;
 
 use std::collections::HashMap;
@@ -31,6 +32,7 @@ use uuid::Uuid;
 // ── Re-exports ──────────────────────────────────────────────
 pub use detection::{DetectionResult, detect_mounts, extract_path, find_by_id, find_by_name};
 pub use manager::{MountManager, MountManagerError};
+pub use meta_detection::{detect_meta, snapshot_markers};
 
 /// Unique identifier for a Mount.
 pub type MountId = Uuid;

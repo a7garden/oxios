@@ -251,6 +251,7 @@ impl Orchestrator {
     fn resolve_mount_workspace(
         &self,
         mount_ids: Option<&str>,
+        project_ids: Option<&str>,
         user_message: &str,
     ) -> (
         Vec<MountId>,
@@ -311,8 +312,51 @@ impl Orchestrator {
             format!("[🔧 {}]", names.join(" + "))
         };
 
-        let context = build_workspace_context_body(&mounts);
-        (ids, context, paths, tag)
+        let mut context = build_workspace_context_body(&mounts).unwrap_or_default();
+
+        // ── Project instructions + referenced Mounts (RFC-025) ──
+        // When a project_id is provided, merge its referenced Mounts
+        // (auto-activate) and inject its instructions into the context body.
+        if let Some(project_ids_str) = project_ids {
+            if let Some(first_id_str) = project_ids_str.split(',').next()
+                && let Some(pm) = self.project_manager()
+                && let Ok(pid) = Uuid::parse_str(first_id_str.trim())
+                && let Some(project) = pm.get_project(pid)
+            {
+                // Auto-activate Project-referenced Mounts not yet bound.
+                for mid in &project.mount_ids {
+                    if !ids.contains(mid) {
+                        ids.push(*mid);
+                    }
+                }
+
+                // Inject instructions.
+                if !project.instructions.is_empty() {
+                    if context.is_empty() {
+                        context.push_str("### Active Mounts\n");
+                    }
+                    context.push_str(&format!(
+                        "\n### Project Instructions: {}\n{}\n",
+                        project.name, project.instructions
+                    ));
+                }
+
+                // Re-collect paths if Project added Mounts.
+                if !project.mount_ids.is_empty() {
+                    let extra_mounts = mm.get_mounts_ordered(&project.mount_ids);
+                    for m in &extra_mounts {
+                        for p in &m.paths {
+                            if !paths.contains(p) {
+                                paths.push(p.clone());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        let context_opt = if context.is_empty() { None } else { Some(context) };
+        (ids, context_opt, paths, tag)
     }
 
     /// Set the A2A protocol for inter-agent task delegation.
@@ -495,7 +539,7 @@ impl Orchestrator {
         // applied to the seed once it's created and returned to the caller so
         // the gateway/frontend can show a detection badge.
         let (active_mount_ids, workspace_context, mount_paths, mount_tag) =
-            self.resolve_mount_workspace(mount_ids, user_message);
+            self.resolve_mount_workspace(mount_ids, project_ids, user_message);
         let mount_tag_opt = if mount_tag.is_empty() {
             None
         } else {
@@ -1078,7 +1122,7 @@ impl Orchestrator {
 
         // ── Mount workspace resolution (RFC-025) ──
         let (active_mount_ids, workspace_context, mount_paths, mount_tag) =
-            self.resolve_mount_workspace(mount_ids, user_message);
+            self.resolve_mount_workspace(mount_ids, project_ids, user_message);
         let mount_tag_opt = if mount_tag.is_empty() {
             None
         } else {
