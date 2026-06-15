@@ -14,7 +14,7 @@ export function MemoryCard({ memory, onClick }: MemoryCardProps) {
   const { t } = useTranslation()
   return (
     <Card
-      className="cursor-pointer hover:border-primary/30 hover:shadow-sm transition-all"
+      className="cursor-pointer select-none hover:border-primary/30 hover:shadow-sm transition-all"
       onClick={onClick}
     >
       <CardContent className="p-4 space-y-2">

@@ -411,7 +411,7 @@ export function KnowledgeChat() {
                       <div
                         key={msg.index}
                         className={cn(
-                          'group relative flex items-start gap-2 rounded-lg px-3 py-2 text-sm transition-colors cursor-pointer',
+                          'group relative flex items-start gap-2 rounded-lg px-3 py-2 text-sm transition-colors cursor-pointer select-none',
                           isSelected
                             ? 'bg-primary/10 ring-1 ring-primary/30'
                             : 'hover:bg-accent/40',

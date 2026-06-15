@@ -1,4 +1,5 @@
 @import 'tailwindcss';
+@import 'tw-animate-css';
 @import 'highlight.js/styles/github-dark.css';
 @plugin '@tailwindcss/typography';
 
@@ -203,6 +204,35 @@
       sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+  }
+
+  /*
+   * Disable text selection on interactive UI chrome.
+   *
+   * Controls (buttons, nav, tabs, menu items, switches, etc.) are never
+   * meant to be text-selected — selecting a label while clicking it is
+   * never the user's intent and only produces accidental highlight.
+   * Real copyable content (prose, code, messages, table data) lives in
+   * plain elements and inherits normal selection.
+   *
+   * For clickable div/li/card rows the global rule does not apply, so add
+   * the Tailwind `select-none` utility directly on the element. Opt back
+   * in with `select-text` where a control genuinely needs selectable text.
+   */
+  button,
+  [role='button'],
+  [role='tab'],
+  [role='menuitem'],
+  [role='menuitemcheckbox'],
+  [role='menuitemradio'],
+  [role='option'],
+  [role='switch'],
+  [role='checkbox'],
+  [role='radio'],
+  [role='treeitem'],
+  summary {
+    -webkit-user-select: none;
+    user-select: none;
   }
 }
 

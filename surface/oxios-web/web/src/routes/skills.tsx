@@ -711,7 +711,7 @@ function SkillCard({
   return (
     <Card
       className={cn(
-        'transition-shadow hover:shadow-md cursor-pointer',
+        'transition-shadow hover:shadow-md cursor-pointer select-none',
         isSelected && 'ring-2 ring-primary',
       )}
     >
@@ -893,7 +893,7 @@ function MarketplaceCard({
   return (
     <Card
       className={cn(
-        'transition-shadow hover:shadow-md cursor-pointer',
+        'transition-shadow hover:shadow-md cursor-pointer select-none',
         isSelected && 'ring-2 ring-primary',
       )}
     >
@@ -961,7 +961,7 @@ function SkillsShCard({
   return (
     <Card
       className={cn(
-        'transition-shadow hover:shadow-md cursor-pointer',
+        'transition-shadow hover:shadow-md cursor-pointer select-none',
         isSelected && 'ring-2 ring-primary',
       )}
     >

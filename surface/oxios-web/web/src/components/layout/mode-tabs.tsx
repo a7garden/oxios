@@ -46,7 +46,7 @@ export function ModeTabs({ variant = 'header' }: ModeTabsProps) {
             to={href}
             aria-current={isActive ? 'page' : undefined}
             className={cn(
-              'flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium transition-all',
+              'flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium select-none transition-all',
               variant === 'header' && [
                 'rounded-md',
                 isActive

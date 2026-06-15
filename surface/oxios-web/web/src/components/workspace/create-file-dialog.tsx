@@ -60,7 +60,7 @@ export function CreateFileDialog({
             placeholder={isDir ? 'directory-name' : 'filename.ext'}
             autoFocus
           />
-          <label className="flex items-center gap-2 text-sm cursor-pointer">
+          <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
             <input
               type="checkbox"
               checked={isDir}

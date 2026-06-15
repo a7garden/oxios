@@ -97,7 +97,7 @@ export function StatCard({
       className={cn(
         'relative h-full overflow-hidden',
         (href || onClick) &&
-          'cursor-pointer transition-all hover:bg-accent/60 hover:shadow-sm hover:-translate-y-px focus-visible:ring-2 focus-visible:ring-ring',
+          'cursor-pointer select-none transition-all hover:bg-accent/60 hover:shadow-sm hover:-translate-y-px focus-visible:ring-2 focus-visible:ring-ring',
       )}
       onClick={onClick}
       title={title}

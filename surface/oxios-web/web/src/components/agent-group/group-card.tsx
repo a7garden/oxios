@@ -37,7 +37,7 @@ export function GroupCard({ group, onClick }: Props) {
   const meta = STATUS_META[status] ?? STATUS_META.Pending!
 
   return (
-    <Card className="cursor-pointer transition-shadow hover:shadow-md" onClick={onClick}>
+    <Card className="cursor-pointer select-none transition-shadow hover:shadow-md" onClick={onClick}>
       <CardContent className="p-5 space-y-3">
         <div className="flex items-start justify-between">
           <div>

@@ -136,7 +136,7 @@ function MonthView({
             key={i}
             onClick={() => onDateClick?.(date)}
             className={cn(
-              'min-h-[80px] border-b border-r px-1 py-0.5 cursor-pointer hover:bg-muted/40 transition-colors',
+              'min-h-[80px] border-b border-r px-1 py-0.5 cursor-pointer select-none hover:bg-muted/40 transition-colors',
               !isCurrentMonth && 'bg-muted/20',
             )}
           >

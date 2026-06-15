@@ -245,7 +245,7 @@ export function SearchModal({
               <li
                 key={item.path + (item.isDir ? '-dir' : '-file')}
                 className={cn(
-                  'flex items-center gap-2.5 px-3 py-2 text-sm cursor-pointer rounded-md transition-colors',
+                  'flex items-center gap-2.5 px-3 py-2 text-sm cursor-pointer select-none rounded-md transition-colors',
                   i === focusedIndex ? 'bg-accent text-accent-foreground' : 'hover:bg-accent/50',
                 )}
                 onClick={() => handleSelect(item)}

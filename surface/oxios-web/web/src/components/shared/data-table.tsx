@@ -309,7 +309,7 @@ export function DataTable<T>({
                   className={cn(
                     'border-b last:border-0 transition-all',
                     onRowClick &&
-                      'cursor-pointer hover:bg-muted/80 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-inset',
+                      'cursor-pointer select-none hover:bg-muted/80 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-inset',
                   )}
                   onClick={() => onRowClick?.(row)}
                   tabIndex={onRowClick ? 0 : undefined}

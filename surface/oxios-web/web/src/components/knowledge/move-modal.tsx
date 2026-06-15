@@ -152,7 +152,7 @@ export function MoveModal() {
                 key={dir}
                 aria-selected={i === focusedIndex}
                 className={cn(
-                  'px-4 py-2.5 text-sm cursor-pointer transition-colors',
+                  'px-4 py-2.5 text-sm cursor-pointer select-none transition-colors',
                   i === focusedIndex ? 'bg-accent' : 'hover:bg-accent/50',
                 )}
                 onClick={() => handleMove(dir)}

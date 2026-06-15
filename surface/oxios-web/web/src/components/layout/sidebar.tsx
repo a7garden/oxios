@@ -67,21 +67,21 @@ interface NavItem {
 
 /** Primary navigation item (icon + label). */
 export const itemBase =
-  'flex items-center gap-3 rounded-lg px-2.5 py-2 text-sm w-full text-left transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-sidebar'
+  'flex items-center gap-3 rounded-lg px-2.5 py-2 text-sm w-full text-left select-none transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-sidebar'
 
 /** Dense list item (session rows, file rows). */
 export const itemDense =
-  'flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs w-full text-left transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring'
+  'flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs w-full text-left select-none transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring'
 
 export const itemActive = 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
 export const itemInactive =
   'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
 export const itemCollapsedBase =
-  'flex items-center justify-center rounded-lg p-2 transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring'
+  'flex items-center justify-center rounded-lg p-2 select-none transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring'
 
 /** Section header label. */
 export const sectionHeader =
-  'px-2 mb-1 text-xs font-medium text-muted-foreground uppercase tracking-wider'
+  'px-2 mb-1 text-xs font-medium text-muted-foreground uppercase tracking-wider select-none'
 
 /** Vertical spacing between sections. */
 export const sectionGap = 'mb-3'
@@ -181,9 +181,9 @@ export function Sidebar() {
   return (
     <aside
       className={cn(
-        'flex flex-col border-r bg-sidebar text-sidebar-foreground transition-all duration-300',
-        // Desktop: always visible with dynamic width
-        mobileOpen ? 'w-60' : collapsed ? 'w-16' : 'w-60',
+        'flex h-full w-60 flex-col overflow-hidden border-r bg-sidebar text-sidebar-foreground transition-[width] duration-300 ease-[var(--animate-in-easing)]',
+        // Desktop collapses to icon rail; mobile drawer stays full width
+        collapsed ? 'lg:w-16' : 'lg:w-60',
       )}
     >
       {/* Header — brand + collapse toggle */}

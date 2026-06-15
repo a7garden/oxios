@@ -50,7 +50,7 @@ export function AgentStatusCard({ total, running, failed, runningSeries }: Agent
       className="block h-full focus:outline-none"
     >
       <Card
-        className="relative h-full overflow-hidden cursor-pointer transition-all hover:bg-accent/60 hover:shadow-sm hover:-translate-y-px focus-visible:ring-2 focus-visible:ring-ring"
+        className="relative h-full overflow-hidden cursor-pointer select-none transition-all hover:bg-accent/60 hover:shadow-sm hover:-translate-y-px focus-visible:ring-2 focus-visible:ring-ring"
         title={totalUnknown ? t('dashboard.totalForkedUnavailable') : undefined}
       >
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
