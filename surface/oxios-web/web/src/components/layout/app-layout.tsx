@@ -1,5 +1,5 @@
 import { Outlet, useRouterState } from '@tanstack/react-router'
-import React from 'react'
+import React, { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { InfoPanel } from '@/components/knowledge/info-panel'
 import { MoveModal } from '@/components/knowledge/move-modal'
@@ -41,25 +41,44 @@ export function AppLayout() {
     connectEvents()
   })
 
+  // Close the mobile drawer on Escape — keyboard accessibility
+  useEffect(() => {
+    if (!mobileOpen) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMobileOpen(false)
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [mobileOpen, setMobileOpen])
+
   return (
     <div className="flex h-screen overflow-hidden">
-      {/* ── Sidebar — single, mode-adaptive ── */}
-      {mobileOpen && (
-        <div
-          role="dialog"
-          aria-label={t('common.closeMenu')}
-          className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm lg:hidden animate-in fade-in-0 duration-200"
-          onClick={() => setMobileOpen(false)}
-          onKeyDown={(e) => {
-            if (e.key === 'Escape') setMobileOpen(false)
-          }}
-        />
-      )}
+      {/* ── Desktop sidebar — persistent, width-collapsible ── */}
+      <div className="hidden lg:flex">
+        <Sidebar />
+      </div>
+
+      {/* ── Mobile sidebar — slide-in drawer (animated enter + exit) ── */}
+      {/* Backdrop: always mounted, opacity + pointer-events toggled */}
       <div
+        role="presentation"
+        aria-hidden={!mobileOpen}
+        onClick={() => setMobileOpen(false)}
         className={cn(
-          'hidden lg:flex',
-          mobileOpen &&
-            'fixed inset-y-0 left-0 z-50 flex flex-col bg-sidebar animate-in slide-in-from-left duration-300',
+          'fixed inset-0 z-40 bg-black/50 backdrop-blur-sm lg:hidden',
+          'transition-opacity duration-300 ease-[var(--animate-in-easing)]',
+          mobileOpen ? 'opacity-100' : 'pointer-events-none opacity-0',
+        )}
+      />
+      {/* Drawer panel: always mounted, translateX toggled so closing slides out */}
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={t('common.closeMenu')}
+        className={cn(
+          'fixed inset-y-0 left-0 z-50 flex lg:hidden',
+          'transition-transform duration-300 ease-[var(--animate-in-easing)] will-change-transform',
+          mobileOpen ? 'translate-x-0' : 'pointer-events-none -translate-x-full',
         )}
       >
         <Sidebar />

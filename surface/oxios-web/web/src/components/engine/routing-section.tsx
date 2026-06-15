@@ -61,7 +61,9 @@ export function RoutingSection() {
         {/* Cost efficient toggle */}
         <div className="flex items-start justify-between gap-4">
           <div className="space-y-0.5">
-            <Label className="flex items-center gap-1">
+            <Label
+              className={`flex items-center gap-1 ${!routing.routingEnabled ? 'text-muted-foreground/50' : ''}`}
+            >
               <Zap className="h-3.5 w-3.5 text-warning" />
               {t(tKeys.costEfficient)}
             </Label>
@@ -70,6 +72,7 @@ export function RoutingSection() {
           <Switch
             checked={routing.preferCostEfficient}
             onCheckedChange={(v) => update({ preferCostEfficient: v })}
+            disabled={!routing.routingEnabled}
           />
         </div>
 
@@ -82,6 +85,7 @@ export function RoutingSection() {
           onRemove={(i) =>
             update({ fallbackModels: routing.fallbackModels.filter((_, idx) => idx !== i) })
           }
+          disabled={!routing.routingEnabled}
         />
 
         {/* Excluded models */}
@@ -91,6 +95,7 @@ export function RoutingSection() {
           onRemove={(m) =>
             update({ excludedModels: routing.excludedModels.filter((x) => x !== m) })
           }
+          disabled={!routing.routingEnabled}
         />
       </div>
     </div>
@@ -103,10 +108,12 @@ function FallbackModelsEditor({
   models,
   onAdd,
   onRemove,
+  disabled,
 }: {
   models: string[]
   onAdd: (m: string) => void
   onRemove: (i: number) => void
+  disabled?: boolean
 }) {
   const { t } = useTranslation()
   const [newModel, setNewModel] = useState('')
@@ -141,6 +148,7 @@ function FallbackModelsEditor({
               className="h-8 w-8 p-0 shrink-0"
               onClick={() => onRemove(i)}
               title="Remove"
+              disabled={disabled}
             >
               <CircleX className="h-4 w-4 text-muted-foreground" />
             </Button>
@@ -155,13 +163,14 @@ function FallbackModelsEditor({
             onKeyDown={handleKeyDown}
             placeholder="provider/model-id"
             className="h-8 text-sm flex-1"
+            disabled={disabled}
           />
           <Button
             variant="outline"
             size="sm"
             className="h-8 shrink-0"
             onClick={handleAdd}
-            disabled={!newModel.trim()}
+            disabled={!newModel.trim() || disabled}
           >
             <Plus className="h-3.5 w-3.5 mr-1" />
             {t(tKeys.addModel)}
@@ -178,10 +187,12 @@ function ExcludedModelsEditor({
   models,
   onAdd,
   onRemove,
+  disabled,
 }: {
   models: string[]
   onAdd: (m: string) => void
   onRemove: (m: string) => void
+  disabled?: boolean
 }) {
   const { t } = useTranslation()
   const [newModel, setNewModel] = useState('')
@@ -215,8 +226,9 @@ function ExcludedModelsEditor({
             {model}
             <button
               type="button"
-              className="ml-1 text-muted-foreground hover:text-foreground"
-              onClick={() => onRemove(model)}
+              className={`ml-1 ${disabled ? 'text-muted-foreground/30 cursor-not-allowed' : 'text-muted-foreground hover:text-foreground'}`}
+              onClick={() => !disabled && onRemove(model)}
+              disabled={disabled}
             >
               <CircleX className="h-3 w-3" />
             </button>
@@ -230,13 +242,14 @@ function ExcludedModelsEditor({
             onKeyDown={handleKeyDown}
             placeholder="provider/model-id"
             className="h-7 w-48 text-xs"
+            disabled={disabled}
           />
           <Button
             variant="ghost"
             size="sm"
             className="h-7 px-2"
             onClick={handleAdd}
-            disabled={!newModel.trim()}
+            disabled={!newModel.trim() || disabled}
           >
             <Plus className="h-3.5 w-3.5" />
           </Button>

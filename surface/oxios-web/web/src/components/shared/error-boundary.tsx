@@ -15,19 +15,32 @@ interface State {
 const MAX_RETRIES = 2
 
 /**
- * Detects module-import failures (stale deploy, network blip, Vite HMR
- * transient error). Safari reports "Importing a module script failed",
- * Chrome "Failed to fetch module", Firefox "error resolving module specifier".
+ * Detects chunk / dynamic-import load failures (stale deploy, network
+ * blip, Vite HMR transient error).
+ *
+ * Each browser reports these differently:
+ * - Safari:     "Importing a module script failed"
+ * - Chrome:     "Failed to fetch dynamically imported module"
+ * - Firefox:    "error resolving module specifier"
+ * - Vite lazy:  "Loading chunk <id> failed" / "Loading CSS chunk <id> failed"
+ *
+ * IMPORTANT: we deliberately do NOT match on `error.name === 'TypeError'`.
+ * App bugs like `undefined.map(...)` are also `TypeError`s, but they are
+ * NOT chunk-load failures. Matching on the name hid every real render
+ * error behind the misleading "웹 UI 파일을 업데이트 중" message and
+ * triggered an infinite auto-reload loop into the same crash.
  */
 function isModuleImportError(error: Error): boolean {
   const msg = error.message ?? ''
   const name = error.name ?? ''
   return (
+    name === 'ChunkLoadError' ||
     msg.includes('Importing a module script failed') ||
     msg.includes('Failed to fetch dynamically imported module') ||
     msg.includes('error resolving module specifier') ||
     msg.includes('Unable to resolve specifier') ||
-    name === 'TypeError'
+    // Vite's lazy-chunk loader: "Loading chunk <hash> failed." / "...CSS chunk..."
+    /Loading (?:CSS )?chunk [\w-]+ failed/i.test(msg)
   )
 }
 

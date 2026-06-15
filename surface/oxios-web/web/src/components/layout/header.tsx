@@ -1,5 +1,5 @@
 import { Link } from '@tanstack/react-router'
-import { Menu, Monitor, Moon, Settings, Sun } from 'lucide-react'
+import { Languages, Menu, Monitor, Moon, MoreVertical, Settings, Sun } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import {
   DropdownMenu,
@@ -37,17 +37,26 @@ export function Header() {
 
       <div className="flex-1" />
 
-      {/* Global actions — desktop: individual icons, mobile: consolidated dropdown */}
-      <div className="hidden lg:flex items-center gap-1">
-        <ThemeToggle />
-        <LanguageSelector />
+      {/* Global actions — desktop: individual icons, mobile: consolidated dropdown.
+          The NotificationBell is always visible (high-priority), only
+          theme/language/settings collapse into the dropdown on narrow
+          screens. */}
+      <div className="flex items-center gap-1">
+        {/* NotificationBell stays visible at every breakpoint — the
+            badge + quick access must not disappear on mobile. */}
         <NotificationBell />
-        <SettingsLink />
-      </div>
 
-      {/* Mobile: consolidated settings */}
-      <div className="lg:hidden">
-        <MobileSettingsDropdown />
+        {/* Desktop: theme + language + settings as individual icons. */}
+        <div className="hidden lg:flex items-center gap-1">
+          <ThemeToggle />
+          <LanguageSelector />
+          <SettingsLink />
+        </div>
+
+        {/* Mobile/tablet: theme + language + settings consolidated. */}
+        <div className="lg:hidden">
+          <MobileQuickMenu />
+        </div>
       </div>
     </header>
   )
@@ -111,10 +120,16 @@ function SettingsLink() {
 }
 
 // ---------------------------------------------------------------------------
-// Mobile settings dropdown (consolidated)
+// Mobile quick menu (consolidated theme / language / settings dropdown)
 // ---------------------------------------------------------------------------
+//
+// On narrow screens the individual theme/language/settings icons are
+// collapsed into a single "more" menu. The trigger is a kebab icon
+// (MoreVertical ⋮) rather than a settings gear, so it reads as a
+// generic overflow menu instead of a link to the settings page.
+// The NotificationBell stays separate and always visible.
 
-function MobileSettingsDropdown() {
+function MobileQuickMenu() {
   const { t } = useTranslation()
   const { i18n } = useTranslation()
   const { theme, resolved, setTheme } = useThemeStore()
@@ -131,9 +146,14 @@ function MobileSettingsDropdown() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <span className="inline-flex items-center justify-center rounded-md p-2 text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
-          <Settings className="h-4 w-4" />
-        </span>
+        <button
+          type="button"
+          className="inline-flex items-center justify-center rounded-md p-2 text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          aria-label={t('common.more')}
+          title={t('common.more')}
+        >
+          <MoreVertical className="h-4 w-4" />
+        </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         <DropdownMenuItem
@@ -153,7 +173,7 @@ function MobileSettingsDropdown() {
           }}
           className="flex items-center gap-2"
         >
-          <span>🌐</span>
+          <Languages className="h-4 w-4" />
           <span>{i18n.language === 'ko' ? 'English' : '한국어'}</span>
         </DropdownMenuItem>
         <DropdownMenuSeparator />

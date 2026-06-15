@@ -112,24 +112,37 @@ export function ProviderOptions({ provider, values, onChange, className }: Provi
   return (
     <div className={className}>
       <div className="space-y-4">
-        {schema.map((opt, i) => (
-          <div key={opt.key}>
-            {i > 0 && <Separator className="mb-4" />}
-            <div className="flex items-start justify-between gap-6">
-              <div className="flex-1 min-w-0 pt-0.5">
-                <Label className="text-sm font-medium">{t(opt.labelKey)}</Label>
-                <p className="text-xs text-muted-foreground mt-0.5">{t(opt.descriptionKey)}</p>
-              </div>
-              <div className="shrink-0 w-56">
-                <OptionControl
-                  option={opt}
-                  value={values[opt.key]}
-                  onChange={(val) => onChange(opt.key, val)}
-                />
+        {schema.map((opt, i) => {
+          // Compute disabled state for thinking-budget fields
+          // that depend on their parent thinking-type/thinking-level select.
+          const isDisabled =
+            (opt.key === 'thinking_budget_tokens' && values['thinking_type'] === 'disabled') ||
+            (opt.key === 'thinking_budget' && values['thinking_level'] === 'none')
+
+          return (
+            <div key={opt.key}>
+              {i > 0 && <Separator className="mb-4" />}
+              <div className="flex items-start justify-between gap-6">
+                <div className="flex-1 min-w-0 pt-0.5">
+                  <Label
+                    className={`text-sm font-medium ${isDisabled ? 'text-muted-foreground/50' : ''}`}
+                  >
+                    {t(opt.labelKey)}
+                  </Label>
+                  <p className="text-xs text-muted-foreground mt-0.5">{t(opt.descriptionKey)}</p>
+                </div>
+                <div className="shrink-0 w-56">
+                  <OptionControl
+                    option={opt}
+                    value={values[opt.key]}
+                    onChange={(val) => onChange(opt.key, val)}
+                    disabled={isDisabled}
+                  />
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          )
+        })}
       </div>
     </div>
   )
@@ -141,10 +154,12 @@ function OptionControl({
   option,
   value,
   onChange,
+  disabled,
 }: {
   option: OptionDef
   value: unknown
   onChange: (val: string | number) => void
+  disabled?: boolean
 }) {
   const { t } = useTranslation()
 
@@ -157,6 +172,7 @@ function OptionControl({
         placeholder={
           option.placeholderKey ? t(option.placeholderKey) : t('common.selectPlaceholder')
         }
+        disabled={disabled}
       />
     )
   }
@@ -173,6 +189,7 @@ function OptionControl({
         }
       }}
       placeholder={option.placeholderKey ? t(option.placeholderKey) : undefined}
+      disabled={disabled}
     />
   )
 }

@@ -1,4 +1,4 @@
-import { Globe } from 'lucide-react'
+import { Languages } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Select } from '@/components/ui/select'
 
@@ -17,7 +17,7 @@ export function LanguageSelector() {
 
   return (
     <div className="flex items-center gap-2">
-      <Globe className="h-4 w-4 text-muted-foreground" />
+      <Languages className="h-4 w-4 text-muted-foreground" />
       <Select
         value={i18n.language}
         onValueChange={handleChange}
