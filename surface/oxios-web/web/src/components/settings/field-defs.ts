@@ -367,7 +367,7 @@ const memorySection: SettingsSectionDef = {
       descriptionKey: 'settings.dreamIntervalHoursDescription',
       type: 'range',
       min: 1,
-      max: 168,
+      max: 72,
       placeholder: '24',
       hotReload: false,
       restartScope: 'memory',
