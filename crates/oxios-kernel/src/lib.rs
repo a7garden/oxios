@@ -74,6 +74,7 @@ pub mod workers;
 pub mod backup;
 pub mod config;
 pub mod git_layer;
+pub mod mount;
 pub mod project;
 pub mod resource_monitor;
 pub mod session_context;
@@ -218,8 +219,8 @@ pub use skill::{
     SkillInstallSpec, SkillInvocationPolicy, SkillManager, SkillMeta, SkillMetadata, SkillRef,
     SkillSnapshot, SkillSource, SkillState, SkillStatus,
 };
-pub use tools::tool_types::{ArgumentDef, ToolDef};
 pub use tools::ToolMeta;
+pub use tools::tool_types::{ArgumentDef, ToolDef};
 pub use tools::{ExecTool, KnowledgeTool};
 #[cfg(feature = "wasm-sandbox")]
 pub use wasm_sandbox::{ResourceKind, WasmConfig, WasmError, WasmSandbox};
@@ -235,6 +236,11 @@ pub use config::{
 pub use git_layer::{
     CommitContext, CommitDiff, CommitInfo, DiffKind, DiffStats, FileDiff, GitLayer, LogEntry,
 };
+pub use mount::{
+    DetectionResult as MountDetectionResult, Mount, MountId, MountMeta, MountSource, detect_mounts,
+};
+#[cfg(feature = "sqlite-memory")]
+pub use mount::{MountManager, MountManagerError};
 pub use project::{
     ConversationBuffer, ConversationTurn, DetectionResult, Project, ProjectId, ProjectSource,
     detect_project, extract_path, find_by_id, find_by_name,
@@ -262,10 +268,10 @@ pub use kernel_handle::MarketplaceApi;
 pub use kernel_handle::{
     A2aApi, AgentApi, CalendarApi, CopilotResponse, EmailApi, EngineApi, EngineConfigResponse,
     ExecApi, ExtensionApi, FallbackEvent, InfraApi, InputModality as EngineInputModality,
-    KnowledgeContext, KnowledgeLens, KnowledgeNote, McpApi, MemoryNote, ModelInfo, PersonaApi,
-    ProjectApi, ProjectInfo, ProviderCategory, ProviderInfo, RoutingConfigSnapshot, RoutingStats,
-    RoutingStatsSnapshot, RoutingUpdate, SecurityApi, SharedExecConfig, StateApi,
-    ValidateKeyResult,
+    KnowledgeContext, KnowledgeLens, KnowledgeNote, McpApi, MemoryNote, ModelInfo, MountApi,
+    MountInfo, PersonaApi, ProjectApi, ProjectInfo, ProviderCategory, ProviderInfo,
+    RoutingConfigSnapshot, RoutingStats, RoutingStatsSnapshot, RoutingUpdate, SecurityApi,
+    SharedExecConfig, StateApi, ValidateKeyResult,
 };
 pub use session_context::SessionContext;
 

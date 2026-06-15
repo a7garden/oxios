@@ -5,6 +5,7 @@
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 
 /// Unique identifier for a seed.
 pub type SeedId = uuid::Uuid;
@@ -69,6 +70,20 @@ pub struct Seed {
     /// Project ID detected by the orchestrator, passed through to AgentInfo.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub project_id: Option<uuid::Uuid>,
+
+    /// Rendered `## Workspace Context` content (RFC-025) — active Mounts,
+    /// project instructions, and relevant memories. The agent runtime
+    /// injects this after the Goal section. `None` when no Mounts/Projects
+    /// are active.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub workspace_context: Option<String>,
+
+    /// Resolved filesystem paths from all active Mounts (RFC-025).
+    /// `paths[0]` of the primary Mount is the CWD; every path is added to
+    /// the agent's `allowed_paths`. Empty when no Mounts are active
+    /// (falls back to the kernel workspace).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub mount_paths: Vec<PathBuf>,
 }
 
 impl Seed {
@@ -115,6 +130,8 @@ impl Seed {
             cspace_hint: None,
             output_schema: None,
             project_id: None,
+            workspace_context: None,
+            mount_paths: Vec::new(),
         }
     }
 
@@ -138,6 +155,8 @@ impl Seed {
             cspace_hint: None,
             output_schema: None,
             project_id: None,
+            workspace_context: None,
+            mount_paths: Vec::new(),
         }
     }
 
@@ -159,6 +178,8 @@ impl Seed {
             cspace_hint: parent.cspace_hint.clone(),
             output_schema: parent.output_schema.clone(),
             project_id: parent.project_id,
+            workspace_context: parent.workspace_context.clone(),
+            mount_paths: parent.mount_paths.clone(),
         }
     }
 }

@@ -1209,6 +1209,8 @@ impl Default for GatewayConfig {
             host: default_gateway_host(),
             port: default_gateway_port(),
             expose_api_docs: false,
+            response_timeout_secs: default_response_timeout_secs(),
+            reliability: GatewayReliabilityConfig::default(),
         }
     }
 }
@@ -2212,6 +2214,7 @@ mod tests {
             host: "0.0.0.0".into(),
             port: 4200,
             expose_api_docs: true,
+            ..Default::default()
         };
         assert!(
             !cfg.should_expose_api_docs(),
@@ -2223,6 +2226,7 @@ mod tests {
             host: "127.0.0.1".into(),
             port: 4200,
             expose_api_docs: true,
+            ..Default::default()
         };
         assert!(cfg.should_expose_api_docs());
 
@@ -2231,6 +2235,7 @@ mod tests {
             host: "::1".into(),
             port: 4200,
             expose_api_docs: true,
+            ..Default::default()
         };
         assert!(cfg.should_expose_api_docs());
 
@@ -2239,6 +2244,7 @@ mod tests {
             host: "localhost".into(),
             port: 4200,
             expose_api_docs: true,
+            ..Default::default()
         };
         assert!(cfg.should_expose_api_docs());
 
@@ -2247,6 +2253,7 @@ mod tests {
             host: "127.0.0.1".into(),
             port: 4200,
             expose_api_docs: false,
+            ..Default::default()
         };
         assert!(!cfg.should_expose_api_docs());
     }

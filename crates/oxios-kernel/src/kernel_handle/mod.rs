@@ -12,6 +12,7 @@ pub mod knowledge_lens;
 pub mod marketplace_api;
 pub mod mcp_api;
 pub mod memory_api;
+pub mod mount_api;
 pub mod persona_api;
 pub mod project_api;
 pub mod security_api;
@@ -36,6 +37,7 @@ pub use knowledge_lens::{
 pub use marketplace_api::MarketplaceApi;
 pub use mcp_api::McpApi;
 pub use memory_api::MemoryApi;
+pub use mount_api::{MountApi, MountInfo};
 pub use persona_api::PersonaApi;
 pub use project_api::{ProjectApi, ProjectInfo};
 pub use security_api::SecurityApi;
@@ -48,12 +50,12 @@ use crate::budget::BudgetManager;
 use crate::config::OxiosConfig;
 use crate::cron::CronScheduler;
 use crate::event_bus::EventBus;
-use crate::readiness::ReadinessGate;
 use crate::git_layer::CommitInfo;
 use crate::git_layer::GitLayer;
 use crate::mcp::McpBridge;
 use crate::memory::MemoryManager;
 use crate::persona::PersonaManager;
+use crate::readiness::ReadinessGate;
 use crate::resource_monitor::ResourceMonitor;
 use crate::scheduler::AgentScheduler;
 use crate::skill::SkillManager;
@@ -75,6 +77,7 @@ use std::time::Instant;
 /// - [`PersonaApi`]   — multi-persona management
 /// - [`ExtensionApi`] — programs, skills, host tools
 /// - [`McpApi`]       — MCP server bridge
+/// - [`MountApi`]      — Mount (path alias) management (RFC-025)
 /// - [`ProjectApi`]    — Project management, memory linking
 /// - [`ExecApi`]      — execution config, access management
 /// - [`A2aApi`]       — agent-to-agent communication
@@ -97,6 +100,8 @@ pub struct KernelHandle {
     pub infra: InfraApi,
     /// Project management: work context (RFC-011).
     pub projects: Option<ProjectApi>,
+    /// Mount management: path aliases (RFC-025).
+    pub mounts: Option<MountApi>,
     /// Execution: config + access management.
     pub exec: ExecApi,
     /// Agent-to-agent communication.
@@ -150,6 +155,7 @@ impl KernelHandle {
             mcp,
             infra,
             projects,
+            mounts: None,
             exec,
             a2a,
             engine,
@@ -163,6 +169,21 @@ impl KernelHandle {
             // startup via `readiness.set_*` / a background task.
             readiness: Arc::new(ReadinessGate::new(0)),
         }
+    }
+
+    /// Attach a MountManager-backed API (RFC-025).
+    ///
+    /// Called by the kernel assembler after SQLite initializes the
+    /// `MountManager`. Leaves the [`Self::projects`] facade untouched so
+    /// RFC-011 Projects continue to work during the migration.
+    pub fn with_mounts(mut self, mounts: MountApi) -> Self {
+        self.mounts = Some(mounts);
+        self
+    }
+
+    /// Set the Mounts facade in place (post-construction wiring).
+    pub fn set_mounts(&mut self, mounts: MountApi) {
+        self.mounts = Some(mounts);
     }
 
     /// Build a KernelHandle from raw subsystem parameters.
@@ -225,6 +246,7 @@ impl KernelHandle {
                 start_time,
             ),
             projects: None,
+            mounts: None, // from_subsystems is deprecated; mounts initialized separately
             exec: ExecApi::new(
                 Arc::new(parking_lot::RwLock::new(config.exec.clone())),
                 access_manager,
@@ -260,6 +282,10 @@ impl KernelHandle {
             ),
             calendar: None, // from_subsystems is deprecated; calendar initialized separately
             email: None,    // from_subsystems is deprecated; email initialized separately
+            // RFC-024 SP4: default Warming/no-deadline. The Kernel
+            // (src/kernel.rs) sets the actual state and deadline during
+            // startup via `readiness.set_*` / a background task.
+            readiness: Arc::new(ReadinessGate::new(0)),
         }
     }
 

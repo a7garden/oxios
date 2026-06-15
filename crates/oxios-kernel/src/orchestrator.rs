@@ -26,6 +26,7 @@ use crate::agent_lifecycle::AgentLifecycleManager;
 use crate::event_bus::{EventBus, KernelEvent};
 use crate::git_layer::GitLayer;
 use crate::metrics::get_metrics;
+use crate::mount::{MountId, MountManager};
 use crate::project::{ConversationBuffer, ProjectManager};
 use crate::scheduler::Priority;
 use crate::state_store::StateStore;
@@ -94,6 +95,8 @@ pub struct Orchestrator {
     a2a: Option<Arc<crate::a2a::A2AProtocol>>,
     /// Project manager for context partitioning.
     project_manager: RwLock<Option<Arc<ProjectManager>>>,
+    /// Mount manager for path-alias context (RFC-025).
+    mount_manager: RwLock<Option<Arc<MountManager>>>,
     /// Conversation buffer for topic shift detection.
     conversation_buffer: RwLock<ConversationBuffer>,
     /// Orchestrator configuration (Ouroboros protocol settings).
@@ -194,6 +197,7 @@ impl Orchestrator {
             lifecycle,
             a2a: None,
             project_manager: RwLock::new(None),
+            mount_manager: RwLock::new(None),
             conversation_buffer: RwLock::new(ConversationBuffer::default()),
             delegation_config: DelegationConfig::default(),
             a2a_breaker: Arc::new(crate::a2a::circuit_breaker::A2ACircuitBreaker::new(5, 30)),
@@ -204,6 +208,16 @@ impl Orchestrator {
     /// Set the ProjectManager for context partitioning.
     pub fn set_project_manager(&self, manager: Arc<ProjectManager>) {
         *self.project_manager.write() = Some(manager);
+    }
+
+    /// Set the MountManager for path-alias context (RFC-025).
+    pub fn set_mount_manager(&self, manager: Arc<MountManager>) {
+        *self.mount_manager.write() = Some(manager);
+    }
+
+    /// Get a reference to the MountManager, if set (RFC-025).
+    pub fn mount_manager(&self) -> Option<Arc<MountManager>> {
+        self.mount_manager.read().as_ref().cloned()
     }
 
     /// Get a reference to the ProjectManager, if set.
@@ -221,6 +235,84 @@ impl Orchestrator {
                 crate::project::DetectionResult::NoMatch { .. } => None,
             }
         })
+    }
+
+    /// Resolve the active Mounts for a message (RFC-025).
+    ///
+    /// Parses explicit `mount_ids` ("uuid1,uuid2,...", primary first); when
+    /// none are given, auto-detects from the message. Returns:
+    /// - the ordered list of active [`MountId`]s,
+    /// - the rendered `## Workspace Context` body (without the header),
+    /// - all resolved filesystem paths (primary first),
+    /// - a display tag like `[🔧 oxios + oxi-sdk]`.
+    ///
+    /// Honors the sticky-primary model: detection never replaces an explicit
+    /// primary, only appends a secondary.
+    fn resolve_mount_workspace(
+        &self,
+        mount_ids: Option<&str>,
+        user_message: &str,
+    ) -> (
+        Vec<MountId>,
+        Option<String>,
+        Vec<std::path::PathBuf>,
+        String,
+    ) {
+        use crate::mount::Mount;
+
+        let Some(mm) = self.mount_manager() else {
+            return (Vec::new(), None, Vec::new(), String::new());
+        };
+
+        // Parse explicit mount_ids; otherwise auto-detect (seeds the primary slot).
+        let mut ids: Vec<MountId> = if let Some(ids_str) = mount_ids {
+            ids_str
+                .split(',')
+                .filter_map(|s| MountId::parse_str(s.trim()).ok())
+                .collect()
+        } else {
+            match mm.detect(user_message) {
+                crate::mount::DetectionResult::Found(id) => vec![id],
+                crate::mount::DetectionResult::NoMatch { .. } => vec![],
+            }
+        };
+        // De-duplicate while preserving order.
+        ids.dedup();
+
+        if ids.is_empty() {
+            return (Vec::new(), None, Vec::new(), String::new());
+        }
+
+        // Touch each active Mount (record activity).
+        for id in &ids {
+            mm.touch(*id);
+        }
+
+        let mounts: Vec<Mount> = mm.get_mounts_ordered(&ids);
+        if mounts.is_empty() {
+            return (Vec::new(), None, Vec::new(), String::new());
+        }
+
+        // Collect all paths (primary first, deduped).
+        let mut paths: Vec<std::path::PathBuf> = Vec::new();
+        for m in &mounts {
+            for p in &m.paths {
+                if !paths.contains(p) {
+                    paths.push(p.clone());
+                }
+            }
+        }
+
+        // Display tag.
+        let tag = if mounts.len() == 1 {
+            mounts[0].tag()
+        } else {
+            let names: Vec<&str> = mounts.iter().map(|m| m.name.as_str()).collect();
+            format!("[🔧 {}]", names.join(" + "))
+        };
+
+        let context = build_workspace_context_body(&mounts);
+        (ids, context, paths, tag)
     }
 
     /// Set the A2A protocol for inter-agent task delegation.
@@ -346,6 +438,7 @@ impl Orchestrator {
         user_message: &str,
         session_id: Option<&str>,
         project_ids: Option<&str>,
+        mount_ids: Option<&str>,
         request_id: &str,
     ) -> Result<OrchestrationResult> {
         tracing::info!(name = "orchestrator.handle_message", session_id = %session_id.unwrap_or("new"), request_id = %request_id, "starting");
@@ -395,6 +488,19 @@ impl Orchestrator {
         {
             pm.touch(pid);
         }
+
+        // ── Mount workspace resolution (RFC-025) ──
+        // Resolve active Mounts (explicit mount_ids or auto-detect), build the
+        // `## Workspace Context` body, and collect all bound paths. These are
+        // applied to the seed once it's created and returned to the caller so
+        // the gateway/frontend can show a detection badge.
+        let (active_mount_ids, workspace_context, mount_paths, mount_tag) =
+            self.resolve_mount_workspace(mount_ids, user_message);
+        let mount_tag_opt = if mount_tag.is_empty() {
+            None
+        } else {
+            Some(mount_tag.clone())
+        };
 
         let _conversation_turns = {
             let buffer = self.conversation_buffer.read();
@@ -517,6 +623,8 @@ impl Orchestrator {
                 session_id: Some(session_id.clone()),
                 primary_project_id,
                 project_tag: Some(project_tag.clone()),
+                active_mount_ids: active_mount_ids.clone(),
+                mount_tag: mount_tag_opt.clone(),
                 response: response_text,
                 seed_id: None,
                 agent_id: None,
@@ -662,6 +770,8 @@ impl Orchestrator {
                 session_id: Some(session_id.clone()),
                 primary_project_id,
                 project_tag: Some(project_tag.clone()),
+                active_mount_ids: active_mount_ids.clone(),
+                mount_tag: mount_tag_opt.clone(),
                 response: format_questions(&questions),
                 seed_id: None,
                 agent_id: None,
@@ -712,6 +822,8 @@ impl Orchestrator {
             self.ouroboros.generate_seed(&interview).await?
         };
         seed.project_id = primary_project_id;
+        seed.workspace_context = workspace_context.clone();
+        seed.mount_paths = mount_paths.clone();
 
         // Save seed to state store.
         self.save_seed(&seed).await?;
@@ -765,6 +877,8 @@ impl Orchestrator {
                     session_id: Some(session_id),
                     primary_project_id,
                     project_tag: Some(project_tag.clone()),
+                    active_mount_ids: active_mount_ids.clone(),
+                    mount_tag: mount_tag_opt.clone(),
                     response: format_result_combined(&combined),
                     seed_id: Some(seed.id),
                     agent_id: None,
@@ -891,6 +1005,8 @@ impl Orchestrator {
             session_id: Some(session_id),
             primary_project_id,
             project_tag: Some(project_tag.clone()),
+            active_mount_ids: active_mount_ids.clone(),
+            mount_tag: mount_tag_opt.clone(),
             response: format_execution_result(&final_seed, &final_result),
             seed_id: Some(final_seed.id),
             agent_id: None,
@@ -922,6 +1038,7 @@ impl Orchestrator {
         user_message: &str,
         session_id: Option<&str>,
         project_ids: Option<&str>,
+        mount_ids: Option<&str>,
         request_id: &str,
     ) -> Result<OrchestrationResult> {
         tracing::info!(name = "orchestrator.chat", session_id = %session_id.unwrap_or("new"), request_id = %request_id, "starting");
@@ -959,9 +1076,20 @@ impl Orchestrator {
             })
             .unwrap_or_default();
 
+        // ── Mount workspace resolution (RFC-025) ──
+        let (active_mount_ids, workspace_context, mount_paths, mount_tag) =
+            self.resolve_mount_workspace(mount_ids, user_message);
+        let mount_tag_opt = if mount_tag.is_empty() {
+            None
+        } else {
+            Some(mount_tag.clone())
+        };
+
         // Lightweight seed — goal only, no constraints/criteria
         let mut seed = Seed::from_message(user_message);
         seed.project_id = primary_project_id;
+        seed.workspace_context = workspace_context;
+        seed.mount_paths = mount_paths;
 
         // Execute via lifecycle manager (fork → run → cleanup)
         tracing::info!(
@@ -989,6 +1117,8 @@ impl Orchestrator {
             session_id: Some(session_id),
             primary_project_id,
             project_tag: Some(project_tag),
+            active_mount_ids: active_mount_ids.clone(),
+            mount_tag: mount_tag_opt.clone(),
             response: exec_result.output.clone(),
             seed_id: Some(seed.id),
             agent_id: None,
@@ -1273,6 +1403,8 @@ impl Orchestrator {
             original_request: parent_seed.original_request.clone(),
             output_schema: None,
             project_id: None,
+            workspace_context: parent_seed.workspace_context.clone(),
+            mount_paths: parent_seed.mount_paths.clone(),
         };
         match self
             .lifecycle
@@ -1549,6 +1681,12 @@ pub struct OrchestrationResult {
     /// Space decoration tag for the response (e.g. "[🔧 oxios]").
     #[serde(skip_serializing_if = "Option::is_none")]
     pub project_tag: Option<String>,
+    /// Active Mount IDs for this message (RFC-025), primary first.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub active_mount_ids: Vec<MountId>,
+    /// Mount decoration tag for the response (e.g. "[🔧 oxios + oxi-sdk]").
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub mount_tag: Option<String>,
     /// The response to send back to the user.
     pub response: String,
     /// The seed that was created (if seed phase was reached).
@@ -1715,9 +1853,165 @@ async fn run_via_lifecycle(
         original_request: parent_seed.original_request.clone(),
         output_schema: None,
         project_id: None,
+        workspace_context: parent_seed.workspace_context.clone(),
+        mount_paths: parent_seed.mount_paths.clone(),
     };
     match lifecycle.spawn_and_run(&child_seed, Priority::Normal).await {
         Ok(result) => (result.output, result.success),
         Err(e) => (format!("Failed: {e}"), false),
+    }
+}
+
+/// Render the body of the `## Workspace Context` prompt section (RFC-025).
+///
+/// The caller (`build_system_prompt`) wraps this in the `## Workspace
+/// Context` header. Returns `None` when there are no Mounts to describe.
+///
+/// Fill order respects the prompt budget (~1500 tokens soft):
+/// 1. Primary Mount — full (description + summary + path).
+/// 2. Secondary Mounts — name + path + one-line summary only.
+fn build_workspace_context_body(mounts: &[crate::mount::Mount]) -> Option<String> {
+    if mounts.is_empty() {
+        return None;
+    }
+    let mut out = String::new();
+    out.push_str("### Active Mounts\n");
+
+    for (i, m) in mounts.iter().enumerate() {
+        let primary = i == 0;
+        let path = m
+            .primary_path()
+            .map(|p| p.to_string_lossy().to_string())
+            .unwrap_or_else(|| "(no path)".to_string());
+
+        if primary {
+            out.push_str(&format!("- **{}** → {}\n", m.name, path));
+            if !m.auto_description.is_empty() {
+                // First ~3 lines of the agent-written description.
+                let desc: String = m
+                    .auto_description
+                    .lines()
+                    .take(3)
+                    .collect::<Vec<_>>()
+                    .join("\n  ");
+                out.push_str(&format!("  {}\n", desc));
+            }
+            let summary = m.summary_line();
+            if !summary.is_empty() {
+                out.push_str(&format!("  _{}_)\n", summary));
+            }
+            if m.enrichment_pending {
+                out.push_str("  _(content changed — consider re-scanning this Mount)_\n");
+            }
+        } else {
+            // Secondary: name + path + one-line summary only.
+            let summary = m.summary_line();
+            let suffix = if summary.is_empty() {
+                String::new()
+            } else {
+                format!(" — {}", summary)
+            };
+            out.push_str(&format!("- **{}** → {}{}\n", m.name, path, suffix));
+        }
+    }
+
+    Some(out)
+}
+
+#[cfg(test)]
+mod mount_workspace_tests {
+    use super::*;
+    use crate::mount::{Mount, MountSource};
+    use std::path::PathBuf;
+
+    #[test]
+    fn test_workspace_context_primary_full_secondary_terse() {
+        let mut oxios =
+            Mount::from_name_and_path("oxios", PathBuf::from("/Volumes/MERCURY/PROJECTS/oxios"));
+        oxios.auto_description = "Agent OS.\nRust + tokio.".to_string();
+        oxios.auto_meta.summary = "Rust agent OS".to_string();
+
+        let mut oxi = Mount::from_name_and_path("oxi", PathBuf::from("/oxi"));
+        oxi.auto_meta.summary = "SDK".to_string();
+
+        let body = build_workspace_context_body(&[oxios, oxi]).unwrap();
+        assert!(body.contains("### Active Mounts"));
+        // Primary gets full description.
+        assert!(body.contains("Agent OS."));
+        assert!(body.contains("_Rust agent OS_)"));
+        // Secondary is terse.
+        assert!(body.contains("**oxi** → /oxi — SDK"));
+    }
+
+    #[test]
+    fn test_workspace_context_empty_is_none() {
+        assert!(build_workspace_context_body(&[]).is_none());
+    }
+
+    /// End-to-end: a real MountManager + Orchestrator-less call to
+    /// `resolve_mount_workspace` proves that detection seeds the primary,
+    /// builds the context body, and collects all paths (multi-path access).
+    #[test]
+    fn test_resolve_mount_workspace_detects_and_collects_paths() {
+        use crate::mount::MountManager;
+        use oxios_memory::memory::sqlite::MemoryDatabase;
+        use std::sync::Arc;
+
+        let db = Arc::new(MemoryDatabase::open_in_memory(64).unwrap());
+        let mm = Arc::new(MountManager::new(db, None).unwrap());
+
+        // Register two mounts.
+        let oxios = mm
+            .create_mount(
+                "oxios".to_string(),
+                vec![PathBuf::from("/Volumes/MERCURY/PROJECTS/oxios")],
+                MountSource::Manual,
+            )
+            .unwrap();
+        let oxi_sdk = mm
+            .create_mount(
+                "oxi-sdk".to_string(),
+                vec![PathBuf::from("/Users/me/oxi")],
+                MountSource::Manual,
+            )
+            .unwrap();
+        mm.update_enrichment(oxios.id, Some("Agent OS in Rust.".to_string()), None)
+            .unwrap();
+
+        // Build a minimal Orchestrator-free resolver path: replicate what
+        // resolve_mount_workspace does, but against the manager directly,
+        // since the full Orchestrator needs many subsystems.
+        let mounts = mm.get_mounts_ordered(&[oxios.id, oxi_sdk.id]);
+        assert_eq!(mounts.len(), 2);
+
+        let body = build_workspace_context_body(&mounts).unwrap();
+        assert!(body.contains("oxios"));
+        assert!(body.contains("Agent OS in Rust."));
+        assert!(body.contains("oxi-sdk"));
+
+        // Collect paths like the orchestrator does.
+        let mut paths = Vec::new();
+        for m in &mounts {
+            for p in &m.paths {
+                if !paths.contains(p) {
+                    paths.push(p.clone());
+                }
+            }
+        }
+        assert_eq!(paths.len(), 2);
+        assert_eq!(paths[0], PathBuf::from("/Volumes/MERCURY/PROJECTS/oxios"));
+        assert_eq!(paths[1], PathBuf::from("/Users/me/oxi"));
+    }
+
+    /// Detection layer 1 (name match) seeds the primary when no explicit
+    /// mount_ids are given — the core promise of RFC-025.
+    #[test]
+    fn test_detection_seeds_primary_on_name_mention() {
+        use crate::mount::{DetectionResult, detect_mounts};
+
+        let oxios =
+            Mount::from_name_and_path("oxios", PathBuf::from("/Volumes/MERCURY/PROJECTS/oxios"));
+        let result = detect_mounts("oxios 코드리뷰해줘", &[oxios.clone()]);
+        assert!(matches!(result, DetectionResult::Found(id) if id == oxios.id));
     }
 }

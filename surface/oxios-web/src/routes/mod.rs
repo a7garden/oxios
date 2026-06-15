@@ -22,6 +22,7 @@ mod git_routes;
 mod infra;
 mod knowledge_routes;
 mod marketplace;
+mod mount_routes;
 mod project_routes;
 mod resource_routes;
 mod system;
@@ -93,7 +94,6 @@ pub(crate) use infra::{
     handle_permissions_put, handle_scheduler_stats, handle_scheduler_tasks,
     handle_security_permissions,
 };
-pub(crate) use tools::handle_tools_registry;
 pub(crate) use knowledge_routes::{
     handle_knowledge_backlinks, handle_knowledge_chat_append, handle_knowledge_chat_delete,
     handle_knowledge_chat_messages, handle_knowledge_chat_move, handle_knowledge_checklist_add,
@@ -111,6 +111,10 @@ pub(crate) use marketplace::{
     handle_marketplace_updates, handle_skills_sh_install, handle_skills_sh_list,
     handle_skills_sh_search, handle_skills_sh_skill_audit, handle_skills_sh_skill_detail,
 };
+pub(crate) use mount_routes::{
+    handle_mount_create, handle_mount_delete, handle_mount_get, handle_mount_update,
+    handle_mounts_list,
+};
 pub(crate) use project_routes::{
     handle_project_create, handle_project_delete, handle_project_get, handle_project_link_memory,
     handle_project_memories, handle_project_unlink_memory, handle_project_update,
@@ -126,6 +130,7 @@ pub(crate) use system::{
     handle_readiness, handle_status, handle_update_changelog, handle_update_check,
     handle_update_run,
 };
+pub(crate) use tools::handle_tools_registry;
 pub(crate) use workspace::{
     MemoryMapCache, handle_memory_create, handle_memory_get, handle_memory_list, handle_memory_map,
     handle_memory_search, handle_memory_semantic_search, handle_seed_evolution, handle_seed_get,
@@ -444,6 +449,12 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
             "/api/projects/{id}/memories/{memoryId}",
             delete(handle_project_unlink_memory),
         )
+        // Mounts (RFC-025)
+        .route("/api/mounts", get(handle_mounts_list))
+        .route("/api/mounts", post(handle_mount_create))
+        .route("/api/mounts/{id}", get(handle_mount_get))
+        .route("/api/mounts/{id}", put(handle_mount_update))
+        .route("/api/mounts/{id}", delete(handle_mount_delete))
         // Tool Registry (for settings UI)
         .route("/api/tools/registry", get(handle_tools_registry))
         // Budget

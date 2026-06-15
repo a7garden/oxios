@@ -10,9 +10,9 @@ use oxios_kernel::{
     A2AProtocol, AgentRuntime, AgentScheduler, AuditPersistence, AuditTrail, BasicSupervisor,
     BudgetManager, ClawHubClient, ClawHubInstaller, CronScheduler, EngineHandle, EventBus,
     GitLayer, MarketplaceApi, McpBridge, McpServer, MemoryManager, Orchestrator, OxiosConfig,
-    OxiosEngine, PersonaManager, ProjectManager, ResourceMonitor, ReadinessGate, SkillManager,
-    SkillsShClient, SkillsShInstaller, SubsystemState, Supervisor,
-    access_manager::AccessManager, auth::AuthManager, config::load_config,
+    OxiosEngine, PersonaManager, ProjectManager, ResourceMonitor, SkillManager, SkillsShClient,
+    SkillsShInstaller, SubsystemState, Supervisor, access_manager::AccessManager,
+    auth::AuthManager, config::load_config,
 };
 use oxios_markdown::KnowledgeBase;
 use oxios_markdown::knowledge::FileChange;
@@ -387,7 +387,7 @@ impl Kernel {
         session_id: Option<&str>,
     ) -> Result<oxios_kernel::OrchestrationResult> {
         self.orchestrator
-            .handle_message("cli", prompt, session_id, None, "cli-direct")
+            .handle_message("cli", prompt, session_id, None, None, "cli-direct")
             .await
     }
 
@@ -401,7 +401,7 @@ impl Kernel {
         session_id: Option<&str>,
     ) -> Result<oxios_kernel::OrchestrationResult> {
         self.orchestrator
-            .chat("cli", prompt, session_id, None, "cli-direct")
+            .chat("cli", prompt, session_id, None, None, "cli-direct")
             .await
     }
 
@@ -780,6 +780,8 @@ impl KernelBuilder {
 
         // ProjectManager — initialized after SQLite (RFC-011)
         let mut project_manager: Option<Arc<oxios_kernel::ProjectManager>> = None;
+        // MountManager — initialized after SQLite (RFC-025)
+        let mut mount_manager: Option<Arc<oxios_kernel::MountManager>> = None;
 
         // ── RFC-012: SQLite memory backend ──
         // When enabled, initialize the SQLite database and attach it to the memory manager.
@@ -819,13 +821,28 @@ impl KernelBuilder {
                     );
 
                     // Initialize ProjectManager using the same SQLite database
-                    match oxios_kernel::ProjectManager::new(db_clone, Some(event_bus.clone())) {
+                    match oxios_kernel::ProjectManager::new(
+                        db_clone.clone(),
+                        Some(event_bus.clone()),
+                    ) {
                         Ok(pm) => {
                             project_manager = Some(Arc::new(pm));
                             tracing::info!("ProjectManager initialized");
                         }
                         Err(e) => {
                             tracing::warn!(error = %e, "ProjectManager init failed (non-fatal)");
+                        }
+                    }
+
+                    // Initialize MountManager (RFC-025) using the same SQLite database.
+                    // Coexists with ProjectManager during the migration window.
+                    match oxios_kernel::MountManager::new(db_clone, Some(event_bus.clone())) {
+                        Ok(mm) => {
+                            mount_manager = Some(Arc::new(mm));
+                            tracing::info!("MountManager initialized");
+                        }
+                        Err(e) => {
+                            tracing::warn!(error = %e, "MountManager init failed (non-fatal)");
                         }
                     }
 
@@ -918,8 +935,8 @@ impl KernelBuilder {
         // ── KernelHandle — the syscall table for agent OS control ──
         // Created inline here because AgentRuntime needs it.
         // Will be cached again in the Kernel instance.
-        let kernel_handle: Arc<oxios_kernel::KernelHandle> =
-            Arc::new(oxios_kernel::KernelHandle::new(
+        let kernel_handle: Arc<oxios_kernel::KernelHandle> = {
+            let kh = oxios_kernel::KernelHandle::new(
                 oxios_kernel::StateApi::new(state_store.clone()),
                 oxios_kernel::AgentApi::new(
                     // Placeholder supervisor — the real one needs AgentRuntime which needs this handle.
@@ -981,7 +998,16 @@ impl KernelBuilder {
                 build_marketplace_api_value(&config),
                 None, // calendar (initialized later)
                 None, // email (initialized later)
-            ));
+            );
+            // Attach the Mount facade (RFC-025). Set before Arc so the handle
+            // carries it from construction.
+            let kh = if let Some(mm) = mount_manager.clone() {
+                kh.with_mounts(oxios_kernel::MountApi::new(mm))
+            } else {
+                kh
+            };
+            Arc::new(kh)
+        };
 
         // Knowledge dream (RFC-022)
         if config.memory.knowledge_dream.enabled {
@@ -1118,6 +1144,8 @@ impl KernelBuilder {
                         original_request: String::new(),
                         output_schema: None,
                         project_id: None,
+                        workspace_context: None,
+                        mount_paths: Vec::new(),
                     };
                     match lc
                         .spawn_and_run(&seed, oxios_kernel::scheduler::Priority::Normal)
@@ -1149,6 +1177,9 @@ impl KernelBuilder {
         if let Some(pm) = project_manager.clone() {
             orchestrator.set_project_manager(pm);
         }
+        if let Some(mm) = mount_manager.clone() {
+            orchestrator.set_mount_manager(mm);
+        }
         let orchestrator = Arc::new(orchestrator);
 
         let gateway = Arc::new(Gateway::with_apis(
@@ -1167,7 +1198,9 @@ impl KernelBuilder {
         // key — at which point the gate is set to `Ready` or `Degraded`.
         // The deadline forcibly promotes any still-Warming subsystem to
         // `Degraded` so a missing API key cannot lock the gate forever.
-        kernel_handle.readiness.set_state_store(SubsystemState::Ready);
+        kernel_handle
+            .readiness
+            .set_state_store(SubsystemState::Ready);
         let deadline_secs = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .map(|d| d.as_secs() + 30)

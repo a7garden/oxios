@@ -149,7 +149,7 @@ mod tests {
     use super::*;
     use chrono::Utc;
 
-    fn make_seed(gen: u32, ac_count: usize) -> Seed {
+    fn make_seed(generation: u32, ac_count: usize) -> Seed {
         Seed {
             id: uuid::Uuid::new_v4(),
             goal: "Test goal".to_string(),
@@ -159,12 +159,14 @@ mod tests {
                 .collect(),
             ontology: vec![],
             created_at: Utc::now(),
-            generation: gen,
+            generation,
             parent_seed_id: None,
             cspace_hint: None,
             original_request: String::new(),
             output_schema: None,
             project_id: None,
+            workspace_context: None,
+            mount_paths: Vec::new(),
         }
     }
 

@@ -1,6 +1,6 @@
 # RFC-025: Mount + Project System
 
-> **Status:** Draft
+> **Status:** Phase 1 implemented
 > **Date:** 2026-06-15
 > **Replaces:** RFC-011 (project-system) — evolves the single `Project` concept into two distinct concepts (`Mount` + `Project`)
 > **Related:** RFC-008 (memory consolidation — Dream integration), RFC-011 Phase 1–4
@@ -399,11 +399,13 @@ Agents still **cannot** create or remove Mounts/Projects — those remain user-l
 
 ## Phased Plan
 
-**Phase 1 — Mount core + prompt injection** *(the biggest user-visible win)*
-- Mount data model + manager + DB schema + migration
-- `## Workspace Context` injection in `build_system_prompt`
-- Orchestrator parses the full `mount_ids` list
-- Rename the web store to `activeMountIds`; activate the detection badge
+**Phase 1 — Mount core + prompt injection** ✅ *(the biggest user-visible win)*
+- [x] Mount data model + manager + DB schema
+- [x] `## Workspace Context` injection in `build_system_prompt`
+- [x] Orchestrator parses the full `mount_ids` list (`resolve_mount_workspace`)
+- [x] Path-access fix: every bound Mount grants path access (was `project_paths[0]`-only)
+- [x] Web `/api/mounts` CRUD routes + `mount_ids`/`mount_tag` in the chat flow
+- [ ] Rename the web store to `activeMountIds`; activate the detection badge (frontend)
 
 **Phase 2 — Project bundle layer + sidebar grouping**
 - Project as instruction/memory bundle referencing Mounts, owning sessions (1:N)

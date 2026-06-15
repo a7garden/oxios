@@ -31,16 +31,16 @@ use anyhow::Result;
 use serde_json;
 use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::sync::{mpsc, watch, Mutex, RwLock, Semaphore};
+use tokio::sync::{Mutex, RwLock, Semaphore, mpsc, watch};
 use tokio::task::JoinHandle;
 use tokio::time::Duration;
 
+use crate::GatewayInbox;
 use crate::channel::Channel;
 use crate::error_classify::classify_error;
 use crate::message::{ErrorKind, IncomingMessage, OutgoingMessage, ResponseMeta, UserFacingError};
 use crate::meta::meta;
 use crate::reliability::ReliabilityLayer;
-use crate::GatewayInbox;
 
 /// Gateway receive buffer size.
 ///
@@ -98,7 +98,7 @@ pub struct Gateway {
     /// RFC-024 SP1: delivery reliability layer — assigns a monotonic `seq`
     /// to each outgoing message and keeps a bounded ring buffer for replay.
     /// Cheap to clone; the inner state is `Sync`.
-    reliability: ReliabilityLayer,
+    reliability: Arc<ReliabilityLayer>,
 }
 
 /// Default spec keywords (used when no config is available).
@@ -299,6 +299,7 @@ impl Gateway {
         let channels = self.channels.clone();
         let semaphore = self.concurrency.clone();
         let spec_keywords = self.spec_keywords.clone();
+        let reliability = self.reliability.clone();
 
         tokio::spawn(async move {
             // Concurrency limit — excess requests wait.
@@ -323,6 +324,7 @@ impl Gateway {
 
             let session_id = msg.metadata.get(meta::SESSION_ID).cloned();
             let project_ids = msg.metadata.get(meta::PROJECT_IDS).cloned();
+            let mount_ids = msg.metadata.get(meta::MOUNT_IDS).cloned();
             let conn_id = msg.metadata.get("conn_id").cloned();
             let request_id = msg.id.to_string();
 
@@ -341,6 +343,7 @@ impl Gateway {
                         &effective_content,
                         session_id.as_deref(),
                         project_ids.as_deref(),
+                        mount_ids.as_deref(),
                         &request_id,
                     )
                     .await
@@ -351,6 +354,7 @@ impl Gateway {
                         &msg.content,
                         session_id.as_deref(),
                         project_ids.as_deref(),
+                        mount_ids.as_deref(),
                         &request_id,
                     )
                     .await
@@ -378,11 +382,21 @@ impl Gateway {
                     if let Some(ref pid) = orchestration.primary_project_id {
                         channel_meta.insert(meta::PROJECT_IDS.to_owned(), pid.to_string());
                     }
+                    // RFC-025: surface active Mount IDs so the frontend can show
+                    // a detection badge and bind them on follow-up turns.
+                    if !orchestration.active_mount_ids.is_empty()
+                        && let Ok(json) = serde_json::to_string(&orchestration.active_mount_ids)
+                    {
+                        channel_meta.insert(meta::MOUNT_IDS.to_owned(), json);
+                    }
+                    if let Some(ref mtag) = orchestration.mount_tag {
+                        channel_meta.insert("mount_tag".to_owned(), mtag.clone());
+                    }
                     // Serialize tool_calls into metadata so web routes can read them.
-                    if !orchestration.tool_calls.is_empty() {
-                        if let Ok(json) = serde_json::to_string(&orchestration.tool_calls) {
-                            channel_meta.insert("tool_calls".to_owned(), json);
-                        }
+                    if !orchestration.tool_calls.is_empty()
+                        && let Ok(json) = serde_json::to_string(&orchestration.tool_calls)
+                    {
+                        channel_meta.insert("tool_calls".to_owned(), json);
                     }
                     // Persist execution mode in channel_meta so session persistence can read it.
                     channel_meta.insert("mode".to_owned(), orchestration.mode.clone());
@@ -415,7 +429,7 @@ impl Gateway {
                         response_meta,
                     );
                     outgoing.target_conn_id = conn_id;
-                    let outgoing = self.reliability.assign_seq(outgoing);
+                    let outgoing = reliability.assign_seq(outgoing);
                     if let Err(e) = entry.channel.send(outgoing).await {
                         tracing::error!(error = %e, "Failed to send response");
                     }
@@ -432,7 +446,7 @@ impl Gateway {
                     }
                     outgoing.target_conn_id = conn_id;
 
-                    let outgoing = self.reliability.assign_seq(outgoing);
+                    let outgoing = reliability.assign_seq(outgoing);
                     if let Err(e) = entry.channel.send(outgoing).await {
                         tracing::error!(error = %e, "Failed to send error response");
                     }

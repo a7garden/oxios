@@ -649,6 +649,8 @@ impl OuroborosProtocol for OuroborosEngine {
             original_request: interview.original_message.clone(),
             output_schema: None,
             project_id: None,
+            workspace_context: None,
+            mount_paths: Vec::new(),
         };
 
         tracing::info!(seed_id = %seed.id, goal = %seed.goal, "Seed generated");
@@ -893,6 +895,8 @@ impl OuroborosProtocol for OuroborosEngine {
             original_request: seed.original_request.clone(),
             output_schema: None,
             project_id: seed.project_id,
+            workspace_context: seed.workspace_context.clone(),
+            mount_paths: seed.mount_paths.clone(),
         };
 
         tracing::info!(

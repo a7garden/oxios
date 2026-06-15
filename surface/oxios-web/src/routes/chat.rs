@@ -34,6 +34,9 @@ pub(crate) struct ChatRequest {
     /// Optional space ID for context partitioning.
     #[serde(default)]
     project_id: String,
+    /// RFC-025: comma-separated Mount IDs to bind (primary first).
+    #[serde(default)]
+    mount_ids: String,
 }
 
 pub(crate) fn default_user() -> String {
@@ -61,6 +64,12 @@ pub(crate) struct ChatResponse {
     /// RFC-014: Space tag decoration.
     #[serde(skip_serializing_if = "Option::is_none")]
     project_tag: Option<String>,
+    /// RFC-025: active Mount IDs (comma-separated), primary first.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    mount_ids: Option<String>,
+    /// RFC-025: Mount decoration tag (e.g. "[🔧 oxios + oxi-sdk]").
+    #[serde(skip_serializing_if = "Option::is_none")]
+    mount_tag: Option<String>,
     /// RFC-014: Seed ID.
     #[serde(skip_serializing_if = "Option::is_none")]
     seed_id: Option<String>,
@@ -102,6 +111,11 @@ pub(crate) async fn handle_chat(
         msg.metadata
             .insert("project_ids".to_owned(), body.project_id.clone());
     }
+    // RFC-025: include mount_ids from request (multi-path injection).
+    if !body.mount_ids.is_empty() {
+        msg.metadata
+            .insert("mount_ids".to_owned(), body.mount_ids.clone());
+    }
 
     let msg_id = msg.id.to_string();
     let content_echo = body.content.clone();
@@ -124,6 +138,9 @@ pub(crate) async fn handle_chat(
                 .map(|m| m.phase.clone())
                 .or_else(|| response.metadata.get("phase").cloned());
             let project_tag = meta.and_then(|m| m.project_tag.clone());
+            // RFC-025: active Mount IDs + tag (from channel metadata set by the gateway).
+            let mount_ids = response.metadata.get("mount_ids").cloned();
+            let mount_tag = response.metadata.get("mount_tag").cloned();
             let seed_id = meta.and_then(|m| m.seed_id.clone());
             let evaluation_passed = meta.and_then(|m| m.evaluation_passed);
             let duration_ms = meta.and_then(|m| m.duration_ms);
@@ -271,6 +288,8 @@ pub(crate) async fn handle_chat(
                 project_id: project_id.clone(),
                 phase,
                 project_tag,
+                mount_ids,
+                mount_tag,
                 seed_id,
                 evaluation_passed,
                 duration_ms,
@@ -444,7 +463,7 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
                     // resync chunk and *skips* persistence / token / done
                     // emission — the client is expected to pull state via
                     // the regular HTTP API after seeing it.
-                    if msg.metadata.get("type").and_then(|v| v.as_str()) == Some("resync") {
+                    if msg.metadata.get("type").map(|v| v.as_str()) == Some("resync") {
                         let chunk = serde_json::json!({"type": "resync"});
                         if ws_tx
                             .send(Message::Text(chunk.to_string().into()))
@@ -625,10 +644,8 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
                         // user message, so we `continue` without touching
                         // the gateway.
                         "resume" => {
-                            let last_seq: u64 = parsed
-                                .get("last_seq")
-                                .and_then(|v| v.as_u64())
-                                .unwrap_or(0);
+                            let last_seq: u64 =
+                                parsed.get("last_seq").and_then(|v| v.as_u64()).unwrap_or(0);
                             tracing::debug!(
                                 conn_id = %conn_id_for_send,
                                 last_seq,

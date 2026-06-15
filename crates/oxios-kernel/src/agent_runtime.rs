@@ -277,7 +277,13 @@ impl AgentRuntime {
 
         // Build system prompt (without SKILL.md injection — capabilities are
         // surfaced through the CSpace tool set + semantic retrieval instead).
-        let mut system_prompt = build_system_prompt(seed, persona_prompt.as_deref(), None, None);
+        let mut system_prompt = build_system_prompt(
+            seed,
+            persona_prompt.as_deref(),
+            None,
+            None,
+            seed.workspace_context.as_deref(),
+        );
 
         // Semantic capability retrieval: find tools relevant to this seed's goal.
         let capabilities_xml = if let Some(ref retriever) = self.tool_retriever {
@@ -318,6 +324,7 @@ impl AgentRuntime {
                 persona_prompt.as_deref(),
                 capabilities_xml.as_deref(),
                 kernel_manifest.as_deref(),
+                seed.workspace_context.as_deref(),
             );
         }
 
@@ -422,6 +429,7 @@ impl AgentRuntime {
                 audit_trail,
                 self.routing_stats.clone(),
                 session_id.clone(),
+                &seed.mount_paths,
             )
             .await?
         };
@@ -585,6 +593,7 @@ async fn run_agent(
     audit_trail: Option<Arc<AuditTrail>>,
     routing_stats: Option<Arc<crate::kernel_handle::RoutingStats>>,
     session_id: Option<String>,
+    mount_paths: &[std::path::PathBuf],
 ) -> Result<(
     String,
     usize,
@@ -599,7 +608,11 @@ async fn run_agent(
     u64,
 )> {
     // Extract workspace.
-    let workspace = if !config.project_paths.is_empty() {
+    // RFC-025: prefer the primary Mount's first path, then fall back to the
+    // legacy config.project_paths, then workspace_dir, then temp.
+    let workspace = if !mount_paths.is_empty() {
+        mount_paths[0].clone()
+    } else if !config.project_paths.is_empty() {
         config.project_paths[0].clone()
     } else if let Some(ref ws) = config.workspace_dir {
         ws.clone()
@@ -650,6 +663,22 @@ async fn run_agent(
         let ws_pattern = format!("{}/**", workspace.to_string_lossy().trim_end_matches('/'));
         if !perms.allowed_paths.iter().any(|p| p == &ws_pattern) {
             perms.allow_path(&ws_pattern);
+        }
+
+        // 2b. RFC-025: every bound Mount grants path access.
+        //     This fixes the latent gap where only project_paths[0] was
+        //     accessible — now all Mount paths (multi-path work) are allowed.
+        //     Parent patterns already covering a path are skipped.
+        for mount_path in mount_paths {
+            let pattern = format!("{}/**", mount_path.to_string_lossy().trim_end_matches('/'));
+            if !perms.allowed_paths.iter().any(|p| p == &pattern) {
+                perms.allow_path(&pattern);
+                tracing::debug!(
+                    agent = %agent_name,
+                    path = %pattern,
+                    "Added Mount path to agent allowed paths (RFC-025)"
+                );
+            }
         }
 
         // 3. Kernel workspace (state store path)
@@ -748,7 +777,7 @@ async fn run_agent(
         compaction_instruction: None,
         context_window: 128_000,
         api_key: config.api_key.clone(),
-        workspace_dir: config.project_paths.first().cloned(),
+        workspace_dir: Some(workspace.clone()),
         output_mode: None,
         provider_options: config.provider_options.clone(),
     };
@@ -1332,6 +1361,7 @@ fn build_system_prompt(
     persona_prompt: Option<&str>,
     capabilities_xml: Option<&str>,
     kernel_manifest: Option<&str>,
+    workspace_context: Option<&str>,
 ) -> String {
     let mut prompt = String::from(
         "You are an autonomous agent in the Oxios operating system.\n\
@@ -1373,6 +1403,15 @@ fn build_system_prompt(
         for (i, c) in seed.acceptance_criteria.iter().enumerate() {
             prompt.push_str(&format!("{}. {}\n", i + 1, c));
         }
+    }
+
+    // ── Workspace Context (RFC-025) ──
+    // Inject active Mounts + project instructions AFTER the goal/constraints
+    // and BEFORE the persona, so the agent sees its workspace before it acts.
+    if let Some(ctx) = workspace_context.filter(|s| !s.trim().is_empty()) {
+        prompt.push_str("\n## Workspace Context\n");
+        prompt.push_str(ctx);
+        prompt.push('\n');
     }
 
     if !seed.ontology.is_empty() {
@@ -1556,9 +1595,11 @@ mod tests {
             original_request: String::new(),
             output_schema: None,
             project_id: None,
+            workspace_context: None,
+            mount_paths: Vec::new(),
         };
 
-        let prompt = build_system_prompt(&seed, None, None, None);
+        let prompt = build_system_prompt(&seed, None, None, None, None);
 
         assert!(prompt.contains("Build a web server"));
         assert!(prompt.contains("Must use Rust"));
@@ -1582,9 +1623,11 @@ mod tests {
             original_request: String::new(),
             output_schema: None,
             project_id: None,
+            workspace_context: None,
+            mount_paths: Vec::new(),
         };
 
-        let prompt = build_system_prompt(&seed, None, None, None);
+        let prompt = build_system_prompt(&seed, None, None, None, None);
 
         assert!(prompt.contains("Test goal"));
     }
