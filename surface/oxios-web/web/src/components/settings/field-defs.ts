@@ -329,7 +329,7 @@ const memorySection: SettingsSectionDef = {
       dependsOn: { field: 'enabled', value: true },
     },
     {
-      key: 'learning.sona_enabled',
+      key: 'learning.enabled',
       labelKey: 'settings.sonaEnabled',
       descriptionKey: 'settings.sonaEnabledDescription',
       type: 'toggle',
