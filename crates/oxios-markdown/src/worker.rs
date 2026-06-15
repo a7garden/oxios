@@ -14,7 +14,7 @@ use crate::fs::VirtualFs;
 use crate::journal::add_record as journal_add_record;
 use crate::parser::norm_new_lines;
 use crate::types::{
-    FsError, KnowledgeConfig, CHAT_FILENAME, DIR_ARCHIVE, DIR_USER_ROOT, DONE_FILENAME,
+    CHAT_FILENAME, DIR_ARCHIVE, DIR_USER_ROOT, DONE_FILENAME, FsError, KnowledgeConfig,
     LATER_FILENAME,
 };
 
@@ -286,10 +286,10 @@ fn checklist_items(md: &str) -> Vec<String> {
     let mut items = Vec::new();
     for line in md.lines() {
         let trimmed = line.trim();
-        if let Some(caps) = re.captures(trimmed) {
-            if let Some(m) = caps.get(1) {
-                items.push(m.as_str().to_string());
-            }
+        if let Some(caps) = re.captures(trimmed)
+            && let Some(m) = caps.get(1)
+        {
+            items.push(m.as_str().to_string());
         }
     }
     items

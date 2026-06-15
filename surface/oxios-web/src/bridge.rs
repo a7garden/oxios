@@ -12,7 +12,7 @@ use async_trait::async_trait;
 use oxios_gateway::GatewayInbox;
 use oxios_gateway::channel::Channel;
 use oxios_gateway::message::{IncomingMessage, OutgoingMessage};
-use oxios_gateway::{ReplayResult, ReliabilityLayer};
+use oxios_gateway::{ReliabilityLayer, ReplayResult};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::{Mutex, RwLock, broadcast, mpsc, oneshot, watch};
@@ -205,13 +205,8 @@ impl WebBridgeHandle {
             ReplayResult::Resync => {
                 let mut meta = HashMap::new();
                 meta.insert("type".into(), "resync".into());
-                let resync = OutgoingMessage::with_id(
-                    uuid::Uuid::new_v4(),
-                    "web",
-                    "system",
-                    "",
-                )
-                .with_metadata_only(meta);
+                let resync = OutgoingMessage::with_id(uuid::Uuid::new_v4(), "web", "system", "")
+                    .with_metadata_only(meta);
                 let _ = self.outgoing_tx.send(resync);
             }
         }
@@ -240,7 +235,8 @@ impl WebBridgeHandle {
     /// entry is removed (no leak) and the caller receives a `Timeout` error
     /// so the HTTP layer can map it to a 504 Gateway Timeout.
     pub async fn send_and_wait(&self, msg: IncomingMessage) -> Result<OutgoingMessage> {
-        self.send_and_wait_with_timeout(msg, self.response_timeout).await
+        self.send_and_wait_with_timeout(msg, self.response_timeout)
+            .await
     }
 
     /// Like [`send_and_wait`] but with an explicit timeout. Exposed for

@@ -12,9 +12,7 @@ use axum::extract::State;
 use crate::server::AppState;
 
 /// GET /api/tools/registry — List all known tool metadata.
-pub(crate) async fn handle_tools_registry(
-    state: State<Arc<AppState>>,
-) -> Json<serde_json::Value> {
+pub(crate) async fn handle_tools_registry(state: State<Arc<AppState>>) -> Json<serde_json::Value> {
     let tools = state.kernel.infra.list_available_tools();
     Json(serde_json::json!({ "tools": tools }))
 }

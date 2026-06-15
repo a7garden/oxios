@@ -111,9 +111,7 @@ pub fn extract_zip_into(dest: &std::path::Path, bytes: &[u8]) -> Result<usize> {
     let mut archive = zip::ZipArchive::new(reader).context("invalid zip file")?;
     let mut count = 0usize;
     for i in 0..archive.len() {
-        let mut file = archive
-            .by_index(i)
-            .context("zip read error")?;
+        let mut file = archive.by_index(i).context("zip read error")?;
         let outpath = match file.enclosed_name() {
             Some(path) => dest.join(path),
             None => continue,
@@ -214,7 +212,7 @@ async fn download_and_extract_web_dist(version_tag: &str) -> Result<PathBuf> {
     if dist_dir.exists() {
         std::fs::remove_dir_all(&dist_dir)?;
     }
-    std::fs::create_dir_all(&dist_dir)?;;
+    std::fs::create_dir_all(&dist_dir)?;
 
     for i in 0..archive.len() {
         let mut file = archive.by_index(i)?;
@@ -297,7 +295,10 @@ pub async fn ensure_web_dist(workspace: &Path) -> WebDistResult {
                 if let Some(m) = marker.as_ref() {
                     let _ = std::fs::write(m, p.to_string_lossy().as_bytes());
                 }
-                WebDistResult::Downloaded { path: p, version: tag }
+                WebDistResult::Downloaded {
+                    path: p,
+                    version: tag,
+                }
             }
             Err(e) => {
                 tracing::warn!(error = %e, "Failed to auto-download web UI");

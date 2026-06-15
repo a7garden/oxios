@@ -234,19 +234,17 @@ impl CalendarEngine {
         let mut events = Vec::new();
         for entry in &all_entries {
             let path = self.dir.join(&entry.file);
-            if let Ok(content) = std::fs::read_to_string(&path) {
-                if let Ok(event) = ical::parse_ics(&content, &entry.file) {
-                    // For recurring events, expand occurrences in range
-                    if let Some(ref rrule_str) = event.rrule {
-                        if let Ok(expanded) =
-                            self.expand_rrule_in_range(&event, rrule_str, from, to)
-                        {
-                            events.extend(expanded);
-                            continue;
-                        }
-                    }
-                    events.push(event);
+            if let Ok(content) = std::fs::read_to_string(&path)
+                && let Ok(event) = ical::parse_ics(&content, &entry.file)
+            {
+                // For recurring events, expand occurrences in range
+                if let Some(ref rrule_str) = event.rrule
+                    && let Ok(expanded) = self.expand_rrule_in_range(&event, rrule_str, from, to)
+                {
+                    events.extend(expanded);
+                    continue;
                 }
+                events.push(event);
             }
         }
 
@@ -262,10 +260,10 @@ impl CalendarEngine {
         let mut events = Vec::new();
         for entry in entries {
             let path = self.dir.join(&entry.file);
-            if let Ok(content) = std::fs::read_to_string(&path) {
-                if let Ok(event) = ical::parse_ics(&content, &entry.file) {
-                    events.push(event);
-                }
+            if let Ok(content) = std::fs::read_to_string(&path)
+                && let Ok(event) = ical::parse_ics(&content, &entry.file)
+            {
+                events.push(event);
             }
         }
         events.sort_by_key(|e| e.start);
@@ -297,11 +295,11 @@ impl CalendarEngine {
         // Merge overlapping intervals
         let mut merged: Vec<(DateTime<Utc>, DateTime<Utc>)> = Vec::new();
         for (start, end) in intervals {
-            if let Some(last) = merged.last_mut() {
-                if start <= last.1 {
-                    last.1 = last.1.max(end);
-                    continue;
-                }
+            if let Some(last) = merged.last_mut()
+                && start <= last.1
+            {
+                last.1 = last.1.max(end);
+                continue;
             }
             merged.push((start, end));
         }
@@ -421,10 +419,10 @@ impl CalendarEngine {
         let mut events = Vec::new();
         for entry in entries {
             let path = self.dir.join(&entry.file);
-            if let Ok(content) = std::fs::read_to_string(&path) {
-                if let Ok(event) = ical::parse_ics(&content, &entry.file) {
-                    events.push(event);
-                }
+            if let Ok(content) = std::fs::read_to_string(&path)
+                && let Ok(event) = ical::parse_ics(&content, &entry.file)
+            {
+                events.push(event);
             }
         }
         Ok(events)

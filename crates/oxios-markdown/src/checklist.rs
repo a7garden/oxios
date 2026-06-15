@@ -123,12 +123,12 @@ pub fn complete_checklist_item(md: &str, item_hash: &str) -> (String, String) {
         if trimmed.len() < 6 {
             continue;
         }
-        if let Some(rest) = trimmed.strip_prefix("- [ ] ") {
-            if hash_filename(rest) == item_hash {
-                found_item = rest.to_string();
-                found_index = Some(i);
-                break;
-            }
+        if let Some(rest) = trimmed.strip_prefix("- [ ] ")
+            && hash_filename(rest) == item_hash
+        {
+            found_item = rest.to_string();
+            found_index = Some(i);
+            break;
         }
     }
 
@@ -166,11 +166,11 @@ pub fn remove_checklist_item(md: &str, item_or_hash: &str) -> (String, String) {
             .strip_prefix("- [ ] ")
             .or_else(|| trimmed.strip_prefix("- [x] "));
 
-        if let Some(rest) = rest {
-            if hash_filename(rest) == item_or_hash || rest == item_or_hash {
-                removed_item = rest.to_string();
-                continue; // skip this line
-            }
+        if let Some(rest) = rest
+            && (hash_filename(rest) == item_or_hash || rest == item_or_hash)
+        {
+            removed_item = rest.to_string();
+            continue; // skip this line
         }
 
         new_lines.push(line.to_string());
@@ -232,10 +232,10 @@ pub fn checklist_item(md: &str, item_or_hash: &str) -> String {
             .strip_prefix("- [ ] ")
             .or_else(|| trimmed.strip_prefix("- [x] "));
 
-        if let Some(rest) = rest {
-            if hash_filename(rest) == item_or_hash || rest == item_or_hash {
-                return rest.to_string();
-            }
+        if let Some(rest) = rest
+            && (hash_filename(rest) == item_or_hash || rest == item_or_hash)
+        {
+            return rest.to_string();
         }
     }
 

@@ -12,8 +12,8 @@ use unicode_segmentation::UnicodeSegmentation;
 use crate::fs::VirtualFs;
 use crate::parser::norm_new_lines;
 use crate::types::{
-    FsError, Habits, YearHabits, DIR_HABITS, DIR_INSIGHTS, HABIT_COMPLETED,
-    HABIT_COMPLETED_AT_WEEKEND, HABIT_SKIPPED, MD_EXT, MOOD_EMOJIS, MOOD_HABIT,
+    DIR_HABITS, DIR_INSIGHTS, FsError, HABIT_COMPLETED, HABIT_COMPLETED_AT_WEEKEND, HABIT_SKIPPED,
+    Habits, MD_EXT, MOOD_EMOJIS, MOOD_HABIT, YearHabits,
 };
 
 /// Habits-specific errors.
@@ -58,10 +58,10 @@ pub fn habits(fs: &VirtualFs, year: i32) -> Result<Habits, HabitsError> {
 
         if line.starts_with("###") {
             let parts: Vec<&str> = line.split(' ').collect();
-            if parts.len() >= 2 {
-                if let Ok(m) = chrono::Month::from_str(parts[1]) {
-                    month = m;
-                }
+            if parts.len() >= 2
+                && let Ok(m) = chrono::Month::from_str(parts[1])
+            {
+                month = m;
             }
             continue;
         }

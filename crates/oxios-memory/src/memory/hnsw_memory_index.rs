@@ -8,9 +8,9 @@ use anyhow::Result;
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 
-use super::l2_normalize_f32;
 use super::HnswIndex;
 use super::MemoryEntry;
+use super::l2_normalize_f32;
 
 /// Result of a semantic search hit.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -80,23 +80,19 @@ impl HnswMemoryIndex {
             if index_path.exists() && mapping_path.exists() {
                 tracing::info!(path = %index_path.display(), "Restoring HNSW index from disk");
 
-                if let Ok(index) = HnswIndex::load(&index_path) {
-                    if let Ok(data) = std::fs::read_to_string(&mapping_path) {
-                        if let Ok((k2i, i2k)) = serde_json::from_str::<(
-                            HashMap<u64, String>,
-                            HashMap<String, u64>,
-                        )>(&data)
-                        {
-                            let max_key = k2i.keys().max().copied().unwrap_or(0);
-                            return Ok(Self {
-                                index: RwLock::new(index),
-                                key_to_id: RwLock::new(k2i),
-                                id_to_key: RwLock::new(i2k),
-                                next_key: AtomicU64::new(max_key + 1),
-                                persist_path,
-                            });
-                        }
-                    }
+                if let Ok(index) = HnswIndex::load(&index_path)
+                    && let Ok(data) = std::fs::read_to_string(&mapping_path)
+                    && let Ok((k2i, i2k)) =
+                        serde_json::from_str::<(HashMap<u64, String>, HashMap<String, u64>)>(&data)
+                {
+                    let max_key = k2i.keys().max().copied().unwrap_or(0);
+                    return Ok(Self {
+                        index: RwLock::new(index),
+                        key_to_id: RwLock::new(k2i),
+                        id_to_key: RwLock::new(i2k),
+                        next_key: AtomicU64::new(max_key + 1),
+                        persist_path,
+                    });
                 }
 
                 tracing::warn!("Failed to restore HNSW index, creating new one");

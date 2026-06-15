@@ -130,10 +130,10 @@ impl MemoryManager {
 
     /// Commit a file to git if git_layer is available.
     pub(crate) async fn git_commit(&self, rel_path: &str, message: &str) {
-        if let Some(ref gl) = self.git {
-            if gl.is_enabled() {
-                let _ = gl.commit_file(rel_path, message).await;
-            }
+        if let Some(ref gl) = self.git
+            && gl.is_enabled()
+        {
+            let _ = gl.commit_file(rel_path, message).await;
         }
     }
 

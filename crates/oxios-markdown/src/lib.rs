@@ -49,11 +49,11 @@ pub mod worker;
 
 // Re-export core types for convenience
 pub use types::{
-    FileEntry, FsError, Habits, KnowledgeConfig, SyncError, SyncFile, SyncRequest, SyncResponse,
-    CHAT_FILENAME, DIR_ARCHIVE, DIR_JOURNAL, DIR_MEDIA, DIR_USER_ROOT, DONE_FILENAME,
-    HABIT_COMPLETED, HABIT_COMPLETED_AT_WEEKEND, HABIT_SKIPPED, LATER_FILENAME, MD_EXT, MODE_CHAT,
-    MODE_FULL, MODE_JOURNAL, MODE_NOTES, MODE_TASKS, MOOD_EMOJIS, MOOD_HABIT, READ_FILENAME,
-    SHOP_FILENAME, STATUS_MERGED, STATUS_NOT_MODIFIED, STATUS_OK, STATUS_UPDATED_ON_SERVER,
+    CHAT_FILENAME, DIR_ARCHIVE, DIR_JOURNAL, DIR_MEDIA, DIR_USER_ROOT, DONE_FILENAME, FileEntry,
+    FsError, HABIT_COMPLETED, HABIT_COMPLETED_AT_WEEKEND, HABIT_SKIPPED, Habits, KnowledgeConfig,
+    LATER_FILENAME, MD_EXT, MODE_CHAT, MODE_FULL, MODE_JOURNAL, MODE_NOTES, MODE_TASKS,
+    MOOD_EMOJIS, MOOD_HABIT, READ_FILENAME, SHOP_FILENAME, STATUS_MERGED, STATUS_NOT_MODIFIED,
+    STATUS_OK, STATUS_UPDATED_ON_SERVER, SyncError, SyncFile, SyncRequest, SyncResponse,
     WATCH_FILENAME,
 };
 
@@ -67,8 +67,8 @@ pub use checklist::{
     complete_checklist_item, incomplete_checklist_items, remove_checklist_item,
     remove_completed_checklist_items,
 };
-pub use fs::split_posix_path;
 pub use fs::VirtualFs;
+pub use fs::split_posix_path;
 pub use fslog::FsLog;
 pub use habits::{
     emoji_for_status, habit_emoji, habits, last_week_habits, weekday_emoji, write_habits,
@@ -90,15 +90,16 @@ pub use parser::{
     ucfirst,
 };
 pub use plugins::{
-    can_handle as world_clock_can_handle, format_report as format_world_clock_report,
-    handle as world_clock_handle, world_clock_for_names, world_clock_now, TimezoneEntry,
+    TimezoneEntry, can_handle as world_clock_can_handle,
+    format_report as format_world_clock_report, handle as world_clock_handle,
+    world_clock_for_names, world_clock_now,
 };
 pub use schedule::ScheduleManager;
-pub use stats::{done_today, format_today_report, today_report, CompletedItem, TodayReport};
+pub use stats::{CompletedItem, TodayReport, done_today, format_today_report, today_report};
 pub use sync::{MediaEntry, MediaSyncResponse, SyncEngine};
-pub use tgtxt::{extract_text_imgs_links, ExtractResult};
+pub use tgtxt::{ExtractResult, extract_text_imgs_links};
 pub use tokens::TokenManager;
 pub use worker::{
-    move_due_tasks, next_exclude_today, remove_completed_checklist, remove_completed_inbox_entries,
-    remove_completed_items, schedule_report, NightlyReport,
+    NightlyReport, move_due_tasks, next_exclude_today, remove_completed_checklist,
+    remove_completed_inbox_entries, remove_completed_items, schedule_report,
 };

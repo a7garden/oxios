@@ -22,10 +22,10 @@ use oxios_gateway::surface::{Surface, SurfaceContext, SurfaceHandle};
 
 use crate::api_docs;
 use crate::bridge::{WebBridge, WebBridgeHandle};
-use oxios_gateway::ReliabilityLayer;
 use crate::middleware::RateLimiter;
 use crate::routes;
 use crate::server::AppState;
+use oxios_gateway::ReliabilityLayer;
 
 /// Static web assets — embedded at compile time via rust-embed.
 /// This is the fallback when no external web/dist/ is found.
@@ -90,8 +90,7 @@ fn serve_file(dist: Option<&std::path::Path>, path: &str) -> Response {
     // ── Active dist path ──
     if let Some(d) = dist {
         // Resolve the on-disk name (dist files live either at root or under assets/).
-        let data = fs_read(d, clean)
-            .or_else(|| fs_read(d, &format!("assets/{clean}")));
+        let data = fs_read(d, clean).or_else(|| fs_read(d, &format!("assets/{clean}")));
         let Some(data) = data else {
             // Deliberately NOT falling back to embedded: the active dist is
             // self-consistent; a missing file here is a real miss, not a
@@ -240,16 +239,12 @@ impl Surface for WebSurface {
         // owns its own reliability layer (RFC-024 SP2): the gateway's
         // global layer is the source of truth, but the bridge layer is
         // what WS resume handlers query for replay.
-        let web_channel = WebBridge::new(
-            256,
-            Arc::new(ReliabilityLayer::new(Default::default())),
-        );
+        let web_channel = WebBridge::new(256, Arc::new(ReliabilityLayer::new(Default::default())));
         // RFC-024 SP1 / C1: pull the response timeout from config so
         // operators can tune the HTTP→gateway ceiling per environment.
-        let response_timeout =
-            std::time::Duration::from_secs(config.gateway.response_timeout_secs);
-        let bridge_handle = WebBridgeHandle::from_bridge(&web_channel)
-            .with_response_timeout(response_timeout);
+        let response_timeout = std::time::Duration::from_secs(config.gateway.response_timeout_secs);
+        let bridge_handle =
+            WebBridgeHandle::from_bridge(&web_channel).with_response_timeout(response_timeout);
 
         // Build app state — all knowledge access goes through kernel.knowledge
         let state = Arc::new(AppState {

@@ -104,9 +104,9 @@ impl DaemonManager {
         // here — the user saw `started` but `curl` got connection refused.
         match self.wait_until_listening(port, std::time::Duration::from_secs(15)) {
             Ok(()) => println!("  Status:   ready (listening on :{port})"),
-            Err(_) => println!(
-                "  Status:   still warming up (did not respond on :{port} within 15s)"
-            ),
+            Err(_) => {
+                println!("  Status:   still warming up (did not respond on :{port} within 15s)")
+            }
         }
         Ok(())
     }
@@ -114,9 +114,10 @@ impl DaemonManager {
     /// Poll `127.0.0.1:port` until a TCP connect succeeds or `timeout` elapses.
     fn wait_until_listening(&self, port: u16, timeout: std::time::Duration) -> Result<()> {
         use std::net::ToSocketAddrs;
-        let addr = format!("127.0.0.1:{port}").to_socket_addrs()?.next().ok_or_else(|| {
-            anyhow::anyhow!("invalid bind address 127.0.0.1:{port}")
-        })?;
+        let addr = format!("127.0.0.1:{port}")
+            .to_socket_addrs()?
+            .next()
+            .ok_or_else(|| anyhow::anyhow!("invalid bind address 127.0.0.1:{port}"))?;
         let start = std::time::Instant::now();
         let interval = std::time::Duration::from_millis(200);
         while start.elapsed() < timeout {

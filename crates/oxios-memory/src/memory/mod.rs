@@ -19,8 +19,8 @@ pub use embedding::{EmbeddingProvider, EmbeddingVector, TfIdfEmbeddingProvider};
 // ─── Core types ─────────────────────────────────────────────────────
 pub mod types;
 pub use types::{
-    content_hash, dedup_by_id, extract_keywords, MemoryEntry, MemoryTier, MemoryType,
-    ProtectionLevel, TextVector,
+    MemoryEntry, MemoryTier, MemoryType, ProtectionLevel, TextVector, content_hash, dedup_by_id,
+    extract_keywords,
 };
 
 // ─── Text / math utilities ──────────────────────────────────────────
@@ -66,10 +66,10 @@ pub mod sqlite;
 
 // ─── Re-exports (b.1 — chunking/normalizer/hyperbolic) ──────────────
 pub use backend::MemoryBackend;
-pub use chunking::{chunk_fixed, chunk_paragraphs, ChunkConfig, TextChunk};
+pub use chunking::{ChunkConfig, TextChunk, chunk_fixed, chunk_paragraphs};
 pub use hyperbolic::{
-    batch_euclidean_to_poincare, euclidean_to_poincare, hyperbolic_distance, mobius_add,
-    mobius_scalar_mul, HyperbolicConfig, HyperbolicEmbedding,
+    HyperbolicConfig, HyperbolicEmbedding, batch_euclidean_to_poincare, euclidean_to_poincare,
+    hyperbolic_distance, mobius_add, mobius_scalar_mul,
 };
 pub use normalizer::{
     cosine_similarity_f32, dot_product_f32, l2_norm_f32, l2_norm_f64, l2_normalize_f32,
@@ -83,7 +83,7 @@ pub use auto_protect::AutoProtector;
 pub use compaction::CompactionTree;
 pub use decay::DecayEngine;
 pub use embedding_cache::{CacheStats, EmbeddingCache};
-pub use embedding_viz::{compute_pca_2d, compute_top_neighbors, MemoryMapEntry, MemoryNeighbor};
+pub use embedding_viz::{MemoryMapEntry, MemoryNeighbor, compute_pca_2d, compute_top_neighbors};
 pub use flash_attention::{BenchmarkResult, FlashAttention, FlashAttentionConfig, MemoryEstimate};
 pub use graph::MemoryGraph;
 pub use hnsw::HnswIndex;

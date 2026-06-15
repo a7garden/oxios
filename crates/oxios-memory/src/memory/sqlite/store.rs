@@ -15,7 +15,7 @@ use chrono::Utc;
 use super::cache;
 use super::database::MemoryDatabase;
 use super::search::{self, RankedMemory};
-use crate::memory::types::{content_hash, dedup_by_id, MemoryEntry, MemoryTier, MemoryType};
+use crate::memory::types::{MemoryEntry, MemoryTier, MemoryType, content_hash, dedup_by_id};
 
 /// A learning pattern row from the `patterns` table.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -383,14 +383,13 @@ impl SqliteMemoryStore {
         }
 
         // Then check semantic similarity
-        if let Ok(vec) = self.embedding.embed(content).await {
-            if let Some(f32_vec) = vec.to_f32_dense() {
-                if let Ok(hits) = super::search::vector::search_vector(&self.db, &f32_vec, 5) {
-                    for hit in hits {
-                        if hit.distance < 0.05 {
-                            return true;
-                        }
-                    }
+        if let Ok(vec) = self.embedding.embed(content).await
+            && let Some(f32_vec) = vec.to_f32_dense()
+            && let Ok(hits) = super::search::vector::search_vector(&self.db, &f32_vec, 5)
+        {
+            for hit in hits {
+                if hit.distance < 0.05 {
+                    return true;
                 }
             }
         }
@@ -870,17 +869,21 @@ mod tests {
 
         let entry = make_test_entry("forget-test-1", MemoryType::Fact, "to be deleted");
         store.remember(&entry).await.unwrap();
-        assert!(store
-            .get("forget-test-1", MemoryType::Fact)
-            .unwrap()
-            .is_some());
+        assert!(
+            store
+                .get("forget-test-1", MemoryType::Fact)
+                .unwrap()
+                .is_some()
+        );
 
         let deleted = store.forget("forget-test-1", MemoryType::Fact).unwrap();
         assert!(deleted);
-        assert!(store
-            .get("forget-test-1", MemoryType::Fact)
-            .unwrap()
-            .is_none());
+        assert!(
+            store
+                .get("forget-test-1", MemoryType::Fact)
+                .unwrap()
+                .is_none()
+        );
     }
 
     #[tokio::test]

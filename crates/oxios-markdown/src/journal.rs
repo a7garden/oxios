@@ -8,7 +8,7 @@ use regex::Regex;
 
 use crate::fs::VirtualFs;
 use crate::parser::{has_image, norm_new_lines};
-use crate::types::{FsError, DIR_JOURNAL};
+use crate::types::{DIR_JOURNAL, FsError};
 
 /// Image markdown pattern.
 const IMG_PATTERN: &str = r"!\[.*?\]\(.*?\)";

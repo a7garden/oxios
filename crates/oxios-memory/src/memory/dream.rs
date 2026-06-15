@@ -782,7 +782,7 @@ impl DreamProcess {
         // 5. PageRank-based importance boost (Phase 2)
         if self.config.pagerank_enabled {
             #[cfg(feature = "sqlite-memory")]
-            if let Some(ref sqlite) = self.memory_manager.sqlite_store() {
+            if let Some(sqlite) = self.memory_manager.sqlite_store() {
                 let scores = sqlite.compute_pagerank(
                     self.config.pagerank_damping,
                     self.config.pagerank_iterations,
@@ -926,7 +926,7 @@ impl DreamProcess {
 
         // 5. Apply PageRank importance updates (Phase 2)
         #[cfg(feature = "sqlite-memory")]
-        if let Some(ref sqlite) = self.memory_manager.sqlite_store() {
+        if let Some(sqlite) = self.memory_manager.sqlite_store() {
             for update in &plan.pagerank_updates {
                 let conn = sqlite.db().conn();
                 let _ = conn.execute(
@@ -956,7 +956,7 @@ impl DreamProcess {
         // RFC-018 b.1: hyperbolic core moved to oxios-memory; SQLite persistence
         // is a kernel-side adapter (`hyperbolic_persist`).
         #[cfg(feature = "sqlite-memory")]
-        if let Some(ref sqlite) = self.memory_manager.sqlite_store() {
+        if let Some(sqlite) = self.memory_manager.sqlite_store() {
             let config = crate::memory::hyperbolic::HyperbolicConfig::default();
             match crate::memory::sqlite::hyperbolic_persist::restore_from_sqlite(sqlite, config) {
                 Ok(he) => {
@@ -975,7 +975,7 @@ impl DreamProcess {
         // 9. Persist & auto-promote learning patterns (Phase 4: SONA)
         let patterns_persisted = {
             #[cfg(feature = "sqlite-memory")]
-            if let Some(ref sqlite) = self.memory_manager.sqlite_store() {
+            if let Some(sqlite) = self.memory_manager.sqlite_store() {
                 // Auto-promote high-quality patterns to long-term storage
                 let _ = sqlite.auto_promote_patterns(0.8, 3);
                 // Count total patterns in store as the persistence metric
@@ -996,7 +996,7 @@ impl DreamProcess {
         // 10. Flash Attention reranking (Phase 6)
         let flash_reranked = {
             #[cfg(feature = "sqlite-memory")]
-            if let Some(ref sqlite) = self.memory_manager.sqlite_store() {
+            if let Some(sqlite) = self.memory_manager.sqlite_store() {
                 let hot = self
                     .memory_manager
                     .list_by_tier(MemoryTier::Hot, 50)

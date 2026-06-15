@@ -15,5 +15,5 @@ pub mod migration;
 pub mod search;
 pub mod store;
 
-pub use database::{bytes_to_f32_slice, f32_slice_to_bytes, MemoryDatabase};
+pub use database::{MemoryDatabase, bytes_to_f32_slice, f32_slice_to_bytes};
 pub use store::SqliteMemoryStore;

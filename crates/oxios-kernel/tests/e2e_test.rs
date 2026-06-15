@@ -299,6 +299,7 @@ async fn test_orchestrator_happy_path() {
             "Fix the bug in main.rs",
             None,
             None,
+            None,
             "test-req",
         )
         .await
@@ -346,6 +347,7 @@ async fn test_orchestrator_evolution_loop() {
             "Something that needs evolution",
             None,
             None,
+            None,
             "test-req",
         )
         .await
@@ -389,6 +391,7 @@ async fn test_session_continuation() {
             "Work on the project",
             Some(session_id),
             None,
+            None,
             "test-req",
         )
         .await
@@ -402,6 +405,7 @@ async fn test_session_continuation() {
             "test-user",
             "Make it production ready",
             Some(session_id),
+            None,
             None,
             "test-req",
         )
@@ -426,12 +430,26 @@ async fn test_multiple_sessions_independent() {
     );
 
     let result_a = orchestrator
-        .handle_message("user-a", "Task A", Some("session-a"), None, "test-req")
+        .handle_message(
+            "user-a",
+            "Task A",
+            Some("session-a"),
+            None,
+            None,
+            "test-req",
+        )
         .await
         .unwrap();
 
     let result_b = orchestrator
-        .handle_message("user-b", "Task B", Some("session-b"), None, "test-req")
+        .handle_message(
+            "user-b",
+            "Task B",
+            Some("session-b"),
+            None,
+            None,
+            "test-req",
+        )
         .await
         .unwrap();
 
@@ -462,6 +480,7 @@ async fn test_session_cleaned_after_completion() {
             "Simple task",
             Some(session_id),
             None,
+            None,
             "test-req",
         )
         .await
@@ -469,7 +488,7 @@ async fn test_session_cleaned_after_completion() {
 
     // New message without session ID should get a fresh session.
     let result2 = orchestrator
-        .handle_message("test-user", "Another task", None, None, "test-req")
+        .handle_message("test-user", "Another task", None, None, None, "test-req")
         .await
         .unwrap();
 
@@ -498,7 +517,7 @@ async fn test_phase_events_published() {
 
     let handle = tokio::spawn(async move {
         orchestrator
-            .handle_message("test-user", "Test events", None, None, "test-req")
+            .handle_message("test-user", "Test events", None, None, None, "test-req")
             .await
             .unwrap()
     });

@@ -1,7 +1,7 @@
 [package]
 name = "oxios-calendar"
 version = "1.3.0"
-edition = "2021"
+edition = "2024"
 description = "Oxios calendar: .ics-based event management"
 license = "MIT"
 

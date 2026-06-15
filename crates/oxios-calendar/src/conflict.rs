@@ -20,10 +20,10 @@ pub fn detect_conflicts(
 
     for event in events {
         // Skip self
-        if let Some(uid) = exclude_uid {
-            if event.uid == uid {
-                continue;
-            }
+        if let Some(uid) = exclude_uid
+            && event.uid == uid
+        {
+            continue;
         }
 
         // Skip cancelled events

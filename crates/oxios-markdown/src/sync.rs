@@ -9,8 +9,8 @@ use crate::fs::VirtualFs;
 use crate::fslog::FsLog;
 use crate::merge::merge;
 use crate::types::{
-    FsError, SyncError, SyncFile, SyncRequest, SyncResponse, DIR_MEDIA, DIR_USER_ROOT, MD_EXT,
-    STATUS_MERGED, STATUS_NOT_MODIFIED, STATUS_OK, STATUS_UPDATED_ON_SERVER,
+    DIR_MEDIA, DIR_USER_ROOT, FsError, MD_EXT, STATUS_MERGED, STATUS_NOT_MODIFIED, STATUS_OK,
+    STATUS_UPDATED_ON_SERVER, SyncError, SyncFile, SyncRequest, SyncResponse,
 };
 
 /// Configuration for the sync engine.
@@ -91,12 +91,11 @@ impl SyncEngine {
             let mut content = client_file.content.clone();
 
             // If server file is newer, merge with client content
-            if let Some(server_modified) = server_mtime {
-                if server_modified > client_file.last_modified {
-                    if let Ok(server_content) = self.fs.read(DIR_USER_ROOT, rel) {
-                        content = merge(&server_content, &client_file.content);
-                    }
-                }
+            if let Some(server_modified) = server_mtime
+                && server_modified > client_file.last_modified
+                && let Ok(server_content) = self.fs.read(DIR_USER_ROOT, rel)
+            {
+                content = merge(&server_content, &client_file.content);
             }
 
             // Skip config file
@@ -122,17 +121,17 @@ impl SyncEngine {
             let dir = if parts.len() == 1 { "." } else { parts[0] };
             let client_dir_time = request.timestamps.get(dir).copied().unwrap_or(0);
 
-            if server_time > &client_dir_time {
-                if let Ok(content) = self.fs.read(DIR_USER_ROOT, path) {
-                    files_to_send.push(SyncFile {
-                        status: STATUS_OK.to_string(),
-                        path: path.clone(),
-                        last_modified: *server_time,
-                        client_last_modified: 0,
-                        client_last_synced: 0,
-                        content,
-                    });
-                }
+            if server_time > &client_dir_time
+                && let Ok(content) = self.fs.read(DIR_USER_ROOT, path)
+            {
+                files_to_send.push(SyncFile {
+                    status: STATUS_OK.to_string(),
+                    path: path.clone(),
+                    last_modified: *server_time,
+                    client_last_modified: 0,
+                    client_last_synced: 0,
+                    content,
+                });
             }
 
             let existing = dir_timestamps.get(dir).copied().unwrap_or(0);
@@ -160,13 +159,13 @@ impl SyncEngine {
         let server_mtime = self.fs.mtime(DIR_USER_ROOT, rel).ok().unwrap_or(0);
 
         // Already up to date?
-        if let Some(ref content) = server_content {
-            if *content == client_file.content {
-                return Ok(SyncResponse {
-                    status: STATUS_NOT_MODIFIED.to_string(),
-                    ..SyncResponse::default()
-                });
-            }
+        if let Some(ref content) = server_content
+            && *content == client_file.content
+        {
+            return Ok(SyncResponse {
+                status: STATUS_NOT_MODIFIED.to_string(),
+                ..SyncResponse::default()
+            });
         }
 
         let mut status = STATUS_OK.to_string();

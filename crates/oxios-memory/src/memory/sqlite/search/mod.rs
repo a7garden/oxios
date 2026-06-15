@@ -92,10 +92,10 @@ pub fn search(
     for (rowid, score) in fused.into_iter().take(limit) {
         if let Some(entry) = load_memory_by_rowid(db, rowid)? {
             // Apply type filter if specified
-            if let Some(ref mt) = memory_type {
-                if entry.memory_type != *mt {
-                    continue;
-                }
+            if let Some(ref mt) = memory_type
+                && entry.memory_type != *mt
+            {
+                continue;
             }
             results.push(RankedMemory { entry, score });
         }
@@ -269,9 +269,11 @@ mod tests {
         }
 
         let results = search(&db, None, "test", Some(MemoryType::Fact), 10).unwrap();
-        assert!(results
-            .iter()
-            .all(|r| r.entry.memory_type == MemoryType::Fact));
+        assert!(
+            results
+                .iter()
+                .all(|r| r.entry.memory_type == MemoryType::Fact)
+        );
     }
 
     #[test]

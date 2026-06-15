@@ -117,7 +117,7 @@ impl MemoryGraph {
 
             let sink_sum: f64 = scores
                 .iter()
-                .filter(|(&k, _)| out_degree.get(&k).copied().unwrap_or(0) == 0)
+                .filter(|&(&k, _)| out_degree.get(&k).copied().unwrap_or(0) == 0)
                 .map(|(_, &s)| s)
                 .sum();
 

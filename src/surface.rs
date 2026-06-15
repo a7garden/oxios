@@ -7,7 +7,7 @@ pub use oxios_gateway::{Surface, SurfaceContext};
 
 use anyhow::Result;
 use oxios_gateway::ActiveWebDist;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::Arc;
 
 use crate::kernel::Kernel;

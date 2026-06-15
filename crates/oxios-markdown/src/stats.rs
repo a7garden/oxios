@@ -2,8 +2,8 @@
 //!
 //! Ported from files.md (`server/stats/stats.go`) by Artem Zakirullin.
 
-use crate::fs::{display_name, is_checklist_item, VirtualFs};
-use crate::types::{FileEntry, FsError, DIR_ARCHIVE};
+use crate::fs::{VirtualFs, display_name, is_checklist_item};
+use crate::types::{DIR_ARCHIVE, FileEntry, FsError};
 
 /// A completed item shown in today's report.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]

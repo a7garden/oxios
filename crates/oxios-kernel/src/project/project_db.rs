@@ -189,9 +189,7 @@ fn row_to_project(row: &rusqlite::Row<'_>) -> rusqlite::Result<Project> {
     let mount_ids_str: String = row
         .get::<_, Option<String>>(8)?
         .unwrap_or_else(|| "[]".to_string());
-    let instructions: String = row
-        .get::<_, Option<String>>(9)?
-        .unwrap_or_default();
+    let instructions: String = row.get::<_, Option<String>>(9)?.unwrap_or_default();
     let created_at: String = row.get(10)?;
     let updated_at: String = row.get(11)?;
     let last_active_at: String = row.get(12)?;

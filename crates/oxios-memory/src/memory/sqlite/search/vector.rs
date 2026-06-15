@@ -7,7 +7,7 @@
 
 use anyhow::Result;
 
-use super::super::database::{bytes_to_f32_slice, f32_slice_to_bytes, MemoryDatabase};
+use super::super::database::{MemoryDatabase, bytes_to_f32_slice, f32_slice_to_bytes};
 
 /// A single vector search hit.
 #[derive(Debug, Clone)]

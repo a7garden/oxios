@@ -574,10 +574,12 @@ mod tests {
     #[test]
     fn test_promote_single_entry() {
         let tree = CompactionTree::default_tree();
-        let entries = vec![(0..20)
-            .map(|i| format!("line {}", i))
-            .collect::<Vec<_>>()
-            .join("\n")];
+        let entries = vec![
+            (0..20)
+                .map(|i| format!("line {}", i))
+                .collect::<Vec<_>>()
+                .join("\n"),
+        ];
 
         let result = tree.promote(&entries, CompactionLevel::Raw);
         // Single entry should just be compacted (no header)

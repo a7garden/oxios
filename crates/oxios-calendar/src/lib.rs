@@ -56,7 +56,7 @@ pub mod journal_bridge;
 pub mod rrule;
 pub mod types;
 
-pub use cron_bridge::{expand_cron_events, CronJobDef, CronSyntheticEvent};
+pub use cron_bridge::{CronJobDef, CronSyntheticEvent, expand_cron_events};
 pub use engine::CalendarEngine;
 pub use journal_bridge::JournalBridge;
 pub use types::*;

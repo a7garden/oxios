@@ -43,30 +43,10 @@ pub use project_api::{ProjectApi, ProjectInfo};
 pub use security_api::SecurityApi;
 pub use state_api::StateApi;
 
-use crate::a2a::A2AProtocol;
-use crate::access_manager::AccessManager;
-use crate::auth::AuthManager;
-use crate::budget::BudgetManager;
-use crate::config::OxiosConfig;
-use crate::cron::CronScheduler;
-use crate::event_bus::EventBus;
 use crate::git_layer::CommitInfo;
-use crate::git_layer::GitLayer;
-use crate::mcp::McpBridge;
-use crate::memory::MemoryManager;
-use crate::persona::PersonaManager;
 use crate::readiness::ReadinessGate;
-use crate::resource_monitor::ResourceMonitor;
-use crate::scheduler::AgentScheduler;
-use crate::skill::SkillManager;
-use crate::skill::clawhub::{ClawHubClient, ClawHubInstaller};
-use crate::skill::skills_sh::{SkillsShClient, SkillsShInstaller};
-use crate::state_store::StateStore;
-use crate::supervisor::Supervisor;
-use oxi_sdk::observability::AuditTrail;
 use serde::Serialize;
 use std::sync::Arc;
-use std::time::Instant;
 
 /// Oxios kernel System Call API — composed of 13 domain Facades.
 ///
@@ -184,109 +164,6 @@ impl KernelHandle {
     /// Set the Mounts facade in place (post-construction wiring).
     pub fn set_mounts(&mut self, mounts: MountApi) {
         self.mounts = Some(mounts);
-    }
-
-    /// Build a KernelHandle from raw subsystem parameters.
-    ///
-    /// Prefer [`KernelHandle::new()`] which takes pre-built Facades.
-    #[deprecated(note = "Use KernelHandle::new() with pre-built Facades instead")]
-    #[allow(clippy::too_many_arguments)]
-    pub fn from_subsystems(
-        state_store: Arc<StateStore>,
-        event_bus: EventBus,
-        supervisor: Arc<dyn Supervisor>,
-        scheduler: Arc<AgentScheduler>,
-        memory_manager: Arc<MemoryManager>,
-        git_layer: Arc<GitLayer>,
-        audit_trail: Arc<AuditTrail>,
-        budget_manager: Arc<BudgetManager>,
-        resource_monitor: Arc<ResourceMonitor>,
-        cron_scheduler: Arc<CronScheduler>,
-        skill_manager: Arc<SkillManager>,
-        persona_manager: Arc<PersonaManager>,
-        mcp_bridge: Arc<McpBridge>,
-        auth_manager: Arc<parking_lot::Mutex<AuthManager>>,
-        access_manager: Arc<parking_lot::Mutex<AccessManager>>,
-        config: OxiosConfig,
-        start_time: Instant,
-    ) -> Self {
-        let knowledge_dir = state_store.base_path.join("knowledge");
-        let knowledge = Arc::new(
-            oxios_markdown::KnowledgeBase::new(knowledge_dir)
-                .expect("Failed to create KnowledgeBase"),
-        );
-        let knowledge_lens = Arc::new(
-            KnowledgeLens::new(knowledge.clone(), memory_manager.clone())
-                .expect("Failed to create KnowledgeLens"),
-        );
-        Self {
-            security: SecurityApi::new(
-                auth_manager.clone(),
-                audit_trail,
-                access_manager.clone(),
-                state_store.clone(),
-            ),
-            state: StateApi::new(state_store.clone()),
-            agents: AgentApi::new(
-                supervisor,
-                budget_manager,
-                memory_manager,
-                Some(event_bus.clone()),
-            ),
-            persona: PersonaApi::new(persona_manager),
-            extensions: ExtensionApi::new(skill_manager),
-            mcp: McpApi::new(mcp_bridge),
-            infra: InfraApi::new(
-                git_layer,
-                scheduler,
-                cron_scheduler,
-                resource_monitor,
-                event_bus.clone(),
-                config.clone(),
-                start_time,
-            ),
-            projects: None,
-            mounts: None, // from_subsystems is deprecated; mounts initialized separately
-            exec: ExecApi::new(
-                Arc::new(parking_lot::RwLock::new(config.exec.clone())),
-                access_manager,
-            ),
-            #[allow(clippy::default_trait_access)]
-            a2a: A2aApi::new(Arc::new(A2AProtocol::new(crate::EventBus::new(0)))),
-            engine: EngineApi::new(
-                Arc::new(parking_lot::RwLock::new(config.clone())),
-                std::path::PathBuf::from("~/.oxios/config.toml"),
-                Arc::new(RoutingStats::new()),
-                Arc::new(crate::engine::EngineHandle::new(Arc::new(
-                    crate::engine::OxiosEngine::new("anthropic/claude-sonnet-4-20250514"),
-                ))),
-            ),
-            knowledge,
-            knowledge_lens,
-            marketplace_api: MarketplaceApi::new(
-                Arc::new(ClawHubInstaller::new(
-                    state_store.base_path.join("skills"),
-                    state_store.base_path.clone(),
-                    config.marketplace.base_url.clone(),
-                )),
-                Arc::new(
-                    ClawHubClient::new(config.marketplace.base_url.clone())
-                        .expect("valid ClawHub client"),
-                ),
-                Arc::new(SkillsShInstaller::new(
-                    state_store.base_path.join("skills"),
-                    None,
-                    None,
-                )),
-                Arc::new(SkillsShClient::new(None, None).expect("valid Skills.sh client")),
-            ),
-            calendar: None, // from_subsystems is deprecated; calendar initialized separately
-            email: None,    // from_subsystems is deprecated; email initialized separately
-            // RFC-024 SP4: default Warming/no-deadline. The Kernel
-            // (src/kernel.rs) sets the actual state and deadline during
-            // startup via `readiness.set_*` / a background task.
-            readiness: Arc::new(ReadinessGate::new(0)),
-        }
     }
 
     // ═══════════════════════════════════════════════════════════════════════

@@ -10,22 +10,20 @@
 //!
 //! **Three-state model** (per subsystem):
 //! - `Warming` — startup, not yet `Ready`. Counts as "not ready".
-//! - `Ready`   — fully operational. Counts as "ready".
-//! - `Degraded`— operational with limitations (e.g. engine initialized but
-//!              no API key; only a fallback model available). **Counts as
-//!              "ready"** so a missing API key does not lock the user out
-//!              of `/api/status` for diagnosis.
-//! - `Failed`  — startup aborted (engine init crashed). The state store is
-//!               still useful for inspection so it is allowed to become
-//!               `Ready` independently; the engine `Failed` state keeps the
-//!               readiness gate closed and `/api/status` is the only API
-//!               that bypasses it (RFC-024 §7.1.1).
+//! - `Ready` — fully operational. Counts as "ready".
+//! - `Degraded` — operational with limitations (e.g. engine initialized but no API key;
+//!   only a fallback model available). **Counts as "ready"** so a missing API key does
+//!   not lock the user out of `/api/status` for diagnosis.
+//! - `Failed` — startup aborted (engine init crashed). The state store is still useful
+//!   for inspection so it is allowed to become `Ready` independently; the engine `Failed`
+//!   state keeps the readiness gate closed and `/api/status` is the only API that
+//!   bypasses it (RFC-024 §7.1.1).
 //!
 //! **Deadline.** Callers set a deadline (default 30 s) after which any
 //! subsystem still in `Warming` is force-promoted to `Degraded` to prevent
 //! the gate from staying closed forever.
 
-use std::sync::atomic::{AtomicU64, AtomicU8, Ordering};
+use std::sync::atomic::{AtomicU8, AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 const STATE_WARMING: u8 = 0;
@@ -123,12 +121,17 @@ impl ReadinessGate {
         SubsystemState::from_u8(self.engine.load(Ordering::SeqCst))
     }
 
-    /// `true` when the gate is open: state store `Ready` AND engine
-    /// `Ready` or `Degraded`. Engine `Failed` keeps the gate closed.
+    /// `true` when the gate is open: both subsystems are `Ready` or
+    /// `Degraded`. A `Failed` (or still-`Warming`) subsystem keeps the gate
+    /// closed. `Degraded` counts as ready so a missing API key (engine)
+    /// or a slow-but-functional state store does not lock the user out
+    /// after the deadline elapses (RFC-024 SP4).
     pub fn is_ready(&self) -> bool {
         let s = self.state_store_state();
         let e = self.engine_state();
-        s == SubsystemState::Ready && (e == SubsystemState::Ready || e == SubsystemState::Degraded)
+        let s_ok = s == SubsystemState::Ready || s == SubsystemState::Degraded;
+        let e_ok = e == SubsystemState::Ready || e == SubsystemState::Degraded;
+        s_ok && e_ok
     }
 
     /// Force-promote any still-Warming subsystem to Degraded once the

@@ -6,7 +6,7 @@
 use chrono::{Datelike, FixedOffset, TimeZone, Utc};
 
 use crate::fs::VirtualFs;
-use crate::types::{KnowledgeConfig, Schedule, DIR_USER_ROOT};
+use crate::types::{DIR_USER_ROOT, KnowledgeConfig, Schedule};
 
 /// Schedule-specific errors.
 #[derive(Debug, thiserror::Error)]

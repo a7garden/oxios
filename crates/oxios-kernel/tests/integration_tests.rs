@@ -482,7 +482,14 @@ async fn test_orchestrator_happy_path() {
     );
 
     let result = orchestrator
-        .handle_message("test-user", "Do something useful", None, None, "test-req")
+        .handle_message(
+            "test-user",
+            "Do something useful",
+            None,
+            None,
+            None,
+            "test-req",
+        )
         .await
         .unwrap();
 
@@ -537,7 +544,14 @@ async fn test_orchestrator_evolution_loop() {
     );
 
     let result = orchestrator
-        .handle_message("test-user", "Do something tricky", None, None, "test-req")
+        .handle_message(
+            "test-user",
+            "Do something tricky",
+            None,
+            None,
+            None,
+            "test-req",
+        )
         .await
         .unwrap();
 
@@ -587,7 +601,7 @@ async fn test_orchestrator_events_published() {
     // Run orchestration in background.
     let handle = tokio::spawn(async move {
         orchestrator
-            .handle_message("test-user", "Check events", None, None, "test-req")
+            .handle_message("test-user", "Check events", None, None, None, "test-req")
             .await
             .unwrap()
     });
@@ -876,7 +890,14 @@ async fn test_scheduler_orchestrator_integration() {
 
     // Run a single orchestration.
     let result = orchestrator
-        .handle_message("test-user", "Build a simple thing", None, None, "test-req")
+        .handle_message(
+            "test-user",
+            "Build a simple thing",
+            None,
+            None,
+            None,
+            "test-req",
+        )
         .await
         .unwrap();
 

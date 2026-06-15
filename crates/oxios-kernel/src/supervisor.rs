@@ -706,6 +706,8 @@ mod tests {
             original_request: String::new(),
             output_schema: None,
             project_id: None,
+            workspace_context: None,
+            mount_paths: Vec::new(),
         }
     }
 

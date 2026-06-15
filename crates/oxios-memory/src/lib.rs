@@ -39,14 +39,14 @@ pub use crate::memory::{
 
 // Re-export core types (RFC-018)
 pub use crate::memory::types::{
-    content_hash, dedup_by_id, extract_keywords, MemoryEntry, MemoryTier, MemoryType,
-    ProtectionLevel, TextVector,
+    MemoryEntry, MemoryTier, MemoryType, ProtectionLevel, TextVector, content_hash, dedup_by_id,
+    extract_keywords,
 };
 
 // Re-export extracted modules (b.1 — chunking/normalizer/hyperbolic)
 pub use crate::memory::{
-    chunk_fixed, chunk_paragraphs, cosine_similarity_f32, l2_normalize_f32, l2_normalize_f64,
-    ChunkConfig, HyperbolicConfig, HyperbolicEmbedding, TextChunk,
+    ChunkConfig, HyperbolicConfig, HyperbolicEmbedding, TextChunk, chunk_fixed, chunk_paragraphs,
+    cosine_similarity_f32, l2_normalize_f32, l2_normalize_f64,
 };
 
 // Re-export lifecycle modules (b.3-b.5)

@@ -391,6 +391,7 @@ pub(crate) async fn handle_update_check(
 
 /// POST /api/update/run — Execute the update (download + install binary/web).
 pub(crate) async fn handle_update_run(
+    state: State<Arc<AppState>>,
     Json(body): Json<UpdateRunBody>,
 ) -> Result<Json<UpdateRunResponse>, AppError> {
     let current = env!("CARGO_PKG_VERSION");
@@ -1895,7 +1896,7 @@ pub(crate) async fn handle_doctor(state: State<Arc<AppState>>) -> Json<DoctorRes
     });
 
     // 9. Web dist directory
-    if let Some(ref web_dist) = state.web_dist {
+    if let Some(web_dist) = state.web_dist.path() {
         if web_dist.exists() {
             results.push(DoctorCheck {
                 name: "web_dist".into(),

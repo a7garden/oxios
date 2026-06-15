@@ -12,7 +12,7 @@ use std::time::SystemTime;
 
 use md5::{Digest as Md5Digest, Md5};
 
-use crate::types::{FileEntry, FsError, DIR_ARCHIVE, DIR_JOURNAL, DIR_MEDIA, DIR_USER_ROOT};
+use crate::types::{DIR_ARCHIVE, DIR_JOURNAL, DIR_MEDIA, DIR_USER_ROOT, FileEntry, FsError};
 
 /// Forbidden filename characters and their safe replacements.
 const FORBIDDEN_CHARS: &[(&str, &str)] = &[

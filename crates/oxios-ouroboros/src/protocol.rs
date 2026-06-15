@@ -8,7 +8,7 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
 use crate::seed::Seed;
-use crate::{ouroboros_engine::InterviewQuestionOutput, EvaluationResult, InterviewResult};
+use crate::{EvaluationResult, InterviewResult, ouroboros_engine::InterviewQuestionOutput};
 
 /// The phases of the Ouroboros lifecycle.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

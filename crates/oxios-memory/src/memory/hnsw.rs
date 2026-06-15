@@ -7,8 +7,8 @@
 use std::path::Path;
 
 use anyhow::{Context, Result};
-use usearch::ffi::{IndexOptions, MetricKind, ScalarKind};
 use usearch::Index;
+use usearch::ffi::{IndexOptions, MetricKind, ScalarKind};
 
 /// Default vector dimensions (OpenAI text-embedding-3-small).
 const DEFAULT_DIMENSIONS: usize = 1536;

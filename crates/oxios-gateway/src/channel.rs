@@ -12,8 +12,8 @@ use async_trait::async_trait;
 use tokio::sync::{mpsc, watch};
 use tokio::task::JoinHandle;
 
-use crate::message::OutgoingMessage;
 use crate::GatewayInbox;
+use crate::message::OutgoingMessage;
 
 /// A communication channel that plugs into the gateway.
 ///

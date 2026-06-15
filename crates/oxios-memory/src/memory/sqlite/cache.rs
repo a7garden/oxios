@@ -5,7 +5,7 @@
 
 use anyhow::Result;
 
-use super::database::{bytes_to_f32_slice, f32_slice_to_bytes, MemoryDatabase};
+use super::database::{MemoryDatabase, bytes_to_f32_slice, f32_slice_to_bytes};
 use crate::memory::types::content_hash;
 
 /// Cache statistics.

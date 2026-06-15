@@ -142,6 +142,15 @@ impl ReliabilityLayer {
     }
 }
 
+impl std::fmt::Debug for ReliabilityLayer {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ReliabilityLayer")
+            .field("current_seq", &self.current_seq())
+            .field("buffer_len", &self.buffer_len())
+            .finish()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

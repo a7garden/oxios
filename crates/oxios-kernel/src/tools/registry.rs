@@ -27,8 +27,16 @@ pub struct ToolMeta {
 }
 
 impl ToolMeta {
-    pub const fn new(name: &'static str, description_key: &'static str, category: &'static str) -> Self {
-        Self { name, description_key, category }
+    pub const fn new(
+        name: &'static str,
+        description_key: &'static str,
+        category: &'static str,
+    ) -> Self {
+        Self {
+            name,
+            description_key,
+            category,
+        }
     }
 }
 
@@ -38,38 +46,38 @@ impl ToolMeta {
 /// in the frontend settings. The list mirrors
 /// [`super::registration`] — always-on tools + CSpace-driven tools.
 pub fn known_tools() -> &'static [ToolMeta] {
-    &TOOL_CATALOG
+    TOOL_CATALOG
 }
 
 const TOOL_CATALOG: &[ToolMeta] = &[
     // ── Always-on tools (registered for every agent) ──────────────
-    ToolMeta::new("read",              "tools.read",            "fs"),
-    ToolMeta::new("write",             "tools.write",           "fs"),
-    ToolMeta::new("edit",              "tools.edit",            "fs"),
-    ToolMeta::new("grep",              "tools.grep",            "fs"),
-    ToolMeta::new("find",              "tools.find",            "fs"),
-    ToolMeta::new("ls",                "tools.ls",              "fs"),
-    ToolMeta::new("web_search",        "tools.webSearch",       "comms"),
-    ToolMeta::new("get_search_results","tools.getSearchResults","comms"),
+    ToolMeta::new("read", "tools.read", "fs"),
+    ToolMeta::new("write", "tools.write", "fs"),
+    ToolMeta::new("edit", "tools.edit", "fs"),
+    ToolMeta::new("grep", "tools.grep", "fs"),
+    ToolMeta::new("find", "tools.find", "fs"),
+    ToolMeta::new("ls", "tools.ls", "fs"),
+    ToolMeta::new("web_search", "tools.webSearch", "comms"),
+    ToolMeta::new("get_search_results", "tools.getSearchResults", "comms"),
     // ── Kernel domain tools (CSpace-driven) ───────────────────────
-    ToolMeta::new("exec",              "tools.exec",            "exec"),
-    ToolMeta::new("browse",            "tools.browse",          "comms"),
-    ToolMeta::new("memory_read",       "tools.memoryRead",      "memory"),
-    ToolMeta::new("memory_write",      "tools.memoryWrite",     "memory"),
-    ToolMeta::new("memory_search",     "tools.memorySearch",    "memory"),
-    ToolMeta::new("project",           "tools.project",         "system"),
-    ToolMeta::new("kernel_agent",      "tools.kernelAgent",     "system"),
-    ToolMeta::new("a2a_delegate",      "tools.a2aDelegate",     "a2a"),
-    ToolMeta::new("a2a_send",          "tools.a2aSend",         "a2a"),
-    ToolMeta::new("a2a_query",         "tools.a2aQuery",        "a2a"),
-    ToolMeta::new("persona",           "tools.persona",         "system"),
-    ToolMeta::new("cron",              "tools.cron",            "system"),
-    ToolMeta::new("security",          "tools.security",        "system"),
-    ToolMeta::new("budget",            "tools.budget",          "system"),
-    ToolMeta::new("resource",          "tools.resource",        "system"),
-    ToolMeta::new("knowledge",         "tools.knowledge",       "system"),
-    ToolMeta::new("calendar",          "tools.calendar",        "system"),
-    ToolMeta::new("send_email",        "tools.sendEmail",       "comms"),
+    ToolMeta::new("exec", "tools.exec", "exec"),
+    ToolMeta::new("browse", "tools.browse", "comms"),
+    ToolMeta::new("memory_read", "tools.memoryRead", "memory"),
+    ToolMeta::new("memory_write", "tools.memoryWrite", "memory"),
+    ToolMeta::new("memory_search", "tools.memorySearch", "memory"),
+    ToolMeta::new("project", "tools.project", "system"),
+    ToolMeta::new("kernel_agent", "tools.kernelAgent", "system"),
+    ToolMeta::new("a2a_delegate", "tools.a2aDelegate", "a2a"),
+    ToolMeta::new("a2a_send", "tools.a2aSend", "a2a"),
+    ToolMeta::new("a2a_query", "tools.a2aQuery", "a2a"),
+    ToolMeta::new("persona", "tools.persona", "system"),
+    ToolMeta::new("cron", "tools.cron", "system"),
+    ToolMeta::new("security", "tools.security", "system"),
+    ToolMeta::new("budget", "tools.budget", "system"),
+    ToolMeta::new("resource", "tools.resource", "system"),
+    ToolMeta::new("knowledge", "tools.knowledge", "system"),
+    ToolMeta::new("calendar", "tools.calendar", "system"),
+    ToolMeta::new("send_email", "tools.sendEmail", "comms"),
 ];
 
 #[cfg(test)]
@@ -80,16 +88,28 @@ mod tests {
     fn catalog_is_populated() {
         let tools = known_tools();
         assert!(!tools.is_empty(), "tool catalog should not be empty");
-        assert!(tools.iter().any(|t| t.name == "read"), "read tool should be in catalog");
-        assert!(tools.iter().any(|t| t.name == "exec"), "exec tool should be in catalog");
-        assert!(tools.iter().any(|t| t.name == "memory_read"), "memory_read should be in catalog");
+        assert!(
+            tools.iter().any(|t| t.name == "read"),
+            "read tool should be in catalog"
+        );
+        assert!(
+            tools.iter().any(|t| t.name == "exec"),
+            "exec tool should be in catalog"
+        );
+        assert!(
+            tools.iter().any(|t| t.name == "memory_read"),
+            "memory_read should be in catalog"
+        );
     }
 
     #[test]
     fn all_tools_have_required_fields() {
         for tool in known_tools() {
             assert!(!tool.name.is_empty(), "tool name should not be empty");
-            assert!(!tool.description_key.is_empty(), "description_key should not be empty");
+            assert!(
+                !tool.description_key.is_empty(),
+                "description_key should not be empty"
+            );
             assert!(!tool.category.is_empty(), "category should not be empty");
         }
     }

@@ -13,7 +13,7 @@ use crate::memory::embedding::EmbeddingVector;
 use crate::memory::storage::MemoryStorageExt;
 #[cfg(feature = "sqlite-memory")]
 use crate::memory::types::MemoryTier;
-use crate::memory::types::{content_hash, dedup_by_id, extract_keywords, MemoryEntry, MemoryType};
+use crate::memory::types::{MemoryEntry, MemoryType, content_hash, dedup_by_id, extract_keywords};
 
 use super::MemoryManager;
 
@@ -167,10 +167,10 @@ impl MemoryManager {
         // Update HNSW index if attached
         if let Some(f32_vec) = vector.to_f32_dense() {
             let hnsw = self.hnsw_index.read();
-            if let Some(ref hnsw) = *hnsw {
-                if let Err(e) = hnsw.add_entry(&id, &f32_vec) {
-                    tracing::warn!(id = %id, error = %e, "Failed to update HNSW index on remember");
-                }
+            if let Some(ref hnsw) = *hnsw
+                && let Err(e) = hnsw.add_entry(&id, &f32_vec)
+            {
+                tracing::warn!(id = %id, error = %e, "Failed to update HNSW index on remember");
             }
         }
 
@@ -211,10 +211,10 @@ impl MemoryManager {
         // Remove from HNSW index if attached
         {
             let hnsw = self.hnsw_index.read();
-            if let Some(ref hnsw) = *hnsw {
-                if let Err(e) = hnsw.remove_entry(id) {
-                    tracing::warn!(id = %id, error = %e, "Failed to remove from HNSW index on forget");
-                }
+            if let Some(ref hnsw) = *hnsw
+                && let Err(e) = hnsw.remove_entry(id)
+            {
+                tracing::warn!(id = %id, error = %e, "Failed to remove from HNSW index on forget");
             }
         }
 

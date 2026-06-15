@@ -173,6 +173,7 @@ No CI. Publish from local in **dependency order** — crates.io resolves version
 - **Two knowledge systems.** Agent memory = MemoryManager (JSON per Space). User notes = KnowledgeBase (`.md` files, `~/.oxios/knowledge/`). See `docs/rfc-003-knowledge-separation.md`.
 - **Unified skill model.** No separate `program/` module or `program.toml`. `SkillManager` handles everything. Each skill = `SKILL.md` + YAML frontmatter.
 - **Feature gates.** Web, CLI, Telegram, browser, telemetry are feature-gated. Check `cargo build -p oxios --features <feature>`.
+- **No `--all-features`.** Never run `cargo build/clippy --all-features`. It enables *every* feature on every workspace member. While `oxios-kernel/native-browser` (→ `oxi-agent/native-browser`) is **fixed** as of oxi-sdk 0.35.0, `--all-features` still trips an unrelated pre-existing bug in `oxios-kernel/wasm-sandbox` — wasmtime 22.0.1 API drift (`WasiCtx`, `fuel_remaining`, `define_wasi`). Fix the wasmtime upgrade first. CI uses the exact per-crate feature set in `.github/workflows/ci.yml`, never `--all-features`.
 - **Workspace deps.** `oxi-sdk` must be in both `[workspace.dependencies]` (root `Cargo.toml`) AND `[dependencies]` in the crate using it.
 - **Stdin blocking.** `oxios run --context-file -` reads stdin to EOF. Don't use with interactive input.
 - **CI oxi checkout.** CI checks out `a7garden/oxi` alongside oxios. Check ref if oxi-related tests fail.

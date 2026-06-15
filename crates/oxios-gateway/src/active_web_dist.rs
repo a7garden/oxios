@@ -107,7 +107,7 @@ impl ActiveWebDist {
         }
         legacy
             .filter(|p| p.join("index.html").is_file())
-            .cloned()
+            .map(PathBuf::from)
     }
 }
 

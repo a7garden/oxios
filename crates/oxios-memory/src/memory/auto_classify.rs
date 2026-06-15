@@ -288,8 +288,9 @@ mod tests {
         let tags =
             AutoClassifier::extract_tags("Rust tokio async runtime memory consolidation system", 5);
         assert!(!tags.is_empty());
-        assert!(tags
-            .iter()
-            .any(|t| t.contains("rust") || t.contains("memory")));
+        assert!(
+            tags.iter()
+                .any(|t| t.contains("rust") || t.contains("memory"))
+        );
     }
 }

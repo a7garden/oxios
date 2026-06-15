@@ -87,6 +87,7 @@ mod tests {
             metadata: HashMap::new(),
             meta,
             target_conn_id: None,
+            seq: None,
         }
     }
 

@@ -477,6 +477,8 @@ mod tests {
             original_request: String::new(),
             output_schema: None,
             project_id: None,
+            workspace_context: None,
+            mount_paths: Vec::new(),
         };
         let content = "## Rust Ownership Design\n\nContent here...";
         let path = auto_save_path(&seed, content);
@@ -500,6 +502,8 @@ mod tests {
             original_request: String::new(),
             output_schema: None,
             project_id: None,
+            workspace_context: None,
+            mount_paths: Vec::new(),
         };
         let content = "Plain text without headings but we still need a path.";
         let path = auto_save_path(&seed, content);

@@ -185,6 +185,6 @@ pub async fn require_ready(
             "warming up",
         )
             .into_response();
-        Err(resp)
+        Ok(resp)
     }
 }

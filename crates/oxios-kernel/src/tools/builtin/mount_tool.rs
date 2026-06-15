@@ -182,8 +182,10 @@ impl AgentTool for MountTool {
                     .and_then(|v| v.as_str())
                     .map(String::from);
 
-                let auto_meta = params.get("auto_meta").and_then(|v| v.as_object()).map(
-                    |obj| crate::mount::MountMeta {
+                let auto_meta = params
+                    .get("auto_meta")
+                    .and_then(|v| v.as_object())
+                    .map(|obj| crate::mount::MountMeta {
                         languages: obj
                             .get("languages")
                             .and_then(|v| v.as_array())
@@ -216,19 +218,17 @@ impl AgentTool for MountTool {
                             .and_then(|v| v.as_str())
                             .map(String::from)
                             .unwrap_or_default(),
-                    },
-                );
+                    });
 
                 if auto_description.is_none() && auto_meta.is_none() {
-                    return Err(
-                        "update requires 'auto_description' or 'auto_meta'".to_string()
-                    );
+                    return Err("update requires 'auto_description' or 'auto_meta'".to_string());
                 }
 
                 match mm.update_enrichment(id, auto_description, auto_meta) {
                     Ok(m) => Ok(AgentToolResult::success(format!(
                         "Updated Mount '{}' ({}). enrichment_pending cleared.",
-                        m.name, &id_str[..8.min(id_str.len())]
+                        m.name,
+                        &id_str[..8.min(id_str.len())]
                     ))),
                     Err(e) => Ok(AgentToolResult::error(format!(
                         "Failed to update mount: {e}"

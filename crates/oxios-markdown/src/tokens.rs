@@ -129,7 +129,7 @@ impl TokenManager {
 
 fn gen_token() -> String {
     let mut rng = rand::thread_rng();
-    let bytes: [u8; TOKEN_LENGTH] = rng.gen();
+    let bytes: [u8; TOKEN_LENGTH] = rng.r#gen();
     hex::encode(bytes)
 }
 

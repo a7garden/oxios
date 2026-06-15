@@ -32,6 +32,7 @@ import { Route as WorkspaceIndexRouteImport } from './routes/workspace/index'
 import { Route as SessionsIndexRouteImport } from './routes/sessions/index'
 import { Route as SeedsIndexRouteImport } from './routes/seeds/index'
 import { Route as ProjectsIndexRouteImport } from './routes/projects/index'
+import { Route as MountsIndexRouteImport } from './routes/mounts/index'
 import { Route as KnowledgeIndexRouteImport } from './routes/knowledge/index'
 import { Route as AgentsIndexRouteImport } from './routes/agents/index'
 import { Route as AgentGroupsIndexRouteImport } from './routes/agent-groups/index'
@@ -160,6 +161,11 @@ const ProjectsIndexRoute = ProjectsIndexRouteImport.update({
   path: '/projects/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const MountsIndexRoute = MountsIndexRouteImport.update({
+  id: '/mounts/',
+  path: '/mounts/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const KnowledgeIndexRoute = KnowledgeIndexRouteImport.update({
   id: '/knowledge/',
   path: '/knowledge/',
@@ -252,6 +258,7 @@ export interface FileRoutesByFullPath {
   '/agent-groups/': typeof AgentGroupsIndexRoute
   '/agents/': typeof AgentsIndexRoute
   '/knowledge/': typeof KnowledgeIndexRoute
+  '/mounts/': typeof MountsIndexRoute
   '/projects/': typeof ProjectsIndexRoute
   '/seeds/': typeof SeedsIndexRoute
   '/sessions/': typeof SessionsIndexRoute
@@ -289,6 +296,7 @@ export interface FileRoutesByTo {
   '/agent-groups': typeof AgentGroupsIndexRoute
   '/agents': typeof AgentsIndexRoute
   '/knowledge': typeof KnowledgeIndexRoute
+  '/mounts': typeof MountsIndexRoute
   '/projects': typeof ProjectsIndexRoute
   '/seeds': typeof SeedsIndexRoute
   '/sessions': typeof SessionsIndexRoute
@@ -327,6 +335,7 @@ export interface FileRoutesById {
   '/agent-groups/': typeof AgentGroupsIndexRoute
   '/agents/': typeof AgentsIndexRoute
   '/knowledge/': typeof KnowledgeIndexRoute
+  '/mounts/': typeof MountsIndexRoute
   '/projects/': typeof ProjectsIndexRoute
   '/seeds/': typeof SeedsIndexRoute
   '/sessions/': typeof SessionsIndexRoute
@@ -366,6 +375,7 @@ export interface FileRouteTypes {
     | '/agent-groups/'
     | '/agents/'
     | '/knowledge/'
+    | '/mounts/'
     | '/projects/'
     | '/seeds/'
     | '/sessions/'
@@ -403,6 +413,7 @@ export interface FileRouteTypes {
     | '/agent-groups'
     | '/agents'
     | '/knowledge'
+    | '/mounts'
     | '/projects'
     | '/seeds'
     | '/sessions'
@@ -440,6 +451,7 @@ export interface FileRouteTypes {
     | '/agent-groups/'
     | '/agents/'
     | '/knowledge/'
+    | '/mounts/'
     | '/projects/'
     | '/seeds/'
     | '/sessions/'
@@ -478,6 +490,7 @@ export interface RootRouteChildren {
   AgentGroupsIndexRoute: typeof AgentGroupsIndexRoute
   AgentsIndexRoute: typeof AgentsIndexRoute
   KnowledgeIndexRoute: typeof KnowledgeIndexRoute
+  MountsIndexRoute: typeof MountsIndexRoute
   ProjectsIndexRoute: typeof ProjectsIndexRoute
   SeedsIndexRoute: typeof SeedsIndexRoute
   SessionsIndexRoute: typeof SessionsIndexRoute
@@ -647,6 +660,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProjectsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/mounts/': {
+      id: '/mounts/'
+      path: '/mounts'
+      fullPath: '/mounts/'
+      preLoaderRoute: typeof MountsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/knowledge/': {
       id: '/knowledge/'
       path: '/knowledge'
@@ -777,6 +797,7 @@ const rootRouteChildren: RootRouteChildren = {
   AgentGroupsIndexRoute: AgentGroupsIndexRoute,
   AgentsIndexRoute: AgentsIndexRoute,
   KnowledgeIndexRoute: KnowledgeIndexRoute,
+  MountsIndexRoute: MountsIndexRoute,
   ProjectsIndexRoute: ProjectsIndexRoute,
   SeedsIndexRoute: SeedsIndexRoute,
   SessionsIndexRoute: SessionsIndexRoute,

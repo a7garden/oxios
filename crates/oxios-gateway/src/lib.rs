@@ -11,23 +11,23 @@
 
 pub mod active_web_dist;
 pub mod channel;
-pub mod reliability;
 pub mod error_classify;
 pub mod format;
 pub mod gateway;
 pub mod message;
 pub mod meta;
 pub mod plugin;
+pub mod reliability;
 pub mod surface;
 
 pub use active_web_dist::ActiveWebDist;
 pub use channel::Channel;
-pub use reliability::{ReplayConfig, ReplayResult, ReliabilityLayer};
 pub use error_classify::classify_error;
 pub use format::ChannelFormatter;
 pub use gateway::Gateway;
 pub use message::{ErrorKind, IncomingMessage, OutgoingMessage, ResponseMeta, UserFacingError};
 pub use plugin::{ChannelBundle, ChannelContext, ChannelPlugin};
+pub use reliability::{ReliabilityLayer, ReplayConfig, ReplayResult};
 pub use surface::{Surface, SurfaceContext, SurfaceHandle};
 
 /// Unified inbox type for the gateway.

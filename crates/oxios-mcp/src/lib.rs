@@ -33,7 +33,7 @@ pub use protocol::*;
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use tokio::sync::RwLock;
 
 // ---------------------------------------------------------------------------
@@ -235,10 +235,10 @@ impl McpBridge {
     /// Remove a server by name (disconnects client if active, removes config).
     pub async fn remove_server(&self, name: &str) -> Result<()> {
         // Shut down client if active.
-        if let Some(client) = self.clients.write().await.remove(name) {
-            if let Err(e) = client.shutdown().await {
-                tracing::warn!(server = %name, error = %e, "Error shutting down MCP server during removal");
-            }
+        if let Some(client) = self.clients.write().await.remove(name)
+            && let Err(e) = client.shutdown().await
+        {
+            tracing::warn!(server = %name, error = %e, "Error shutting down MCP server during removal");
         }
         // Remove from config list.
         let found = {
@@ -271,10 +271,10 @@ impl McpBridge {
 
         // If disabled, disconnect the client (now fully outside the lock).
         if !new_state {
-            if let Some(client) = self.clients.write().await.remove(name) {
-                if let Err(e) = client.shutdown().await {
-                    tracing::warn!(server = %name, error = %e, "Error shutting down MCP server on disable");
-                }
+            if let Some(client) = self.clients.write().await.remove(name)
+                && let Err(e) = client.shutdown().await
+            {
+                tracing::warn!(server = %name, error = %e, "Error shutting down MCP server on disable");
             }
             self.tool_cache.write().await.remove(name);
         }

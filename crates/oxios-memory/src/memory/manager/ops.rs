@@ -209,10 +209,10 @@ impl MemoryManager {
             return Ok(Some(entry));
         }
         // Try as category/name format
-        if let Some((cat, name)) = reference.split_once('/') {
-            if let Ok(Some(entry)) = self.storage.load_json::<MemoryEntry>(cat, name).await {
-                return Ok(Some(entry));
-            }
+        if let Some((cat, name)) = reference.split_once('/')
+            && let Ok(Some(entry)) = self.storage.load_json::<MemoryEntry>(cat, name).await
+        {
+            return Ok(Some(entry));
         }
         Ok(None)
     }
@@ -263,11 +263,11 @@ impl MemoryManager {
 
     /// Shift a memory entry between tiers.
     pub async fn shift_tier(&self, id: &str, from: MemoryTier, to: MemoryTier) -> Result<()> {
-        if let Ok(Some(mut entry)) = self.get_by_id(id).await {
-            if entry.tier == from {
-                entry.tier = to;
-                self.remember(entry).await?;
-            }
+        if let Ok(Some(mut entry)) = self.get_by_id(id).await
+            && entry.tier == from
+        {
+            entry.tier = to;
+            self.remember(entry).await?;
         }
         Ok(())
     }

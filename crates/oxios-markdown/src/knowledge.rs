@@ -32,7 +32,7 @@ use crate::parser::{extract_headings, similar};
 use crate::plugins::world_clock_for_names;
 use crate::stats::{done_today, today_report};
 use crate::types::NoteMeta;
-use crate::types::{FileEntry, Habits, KnowledgeConfig, CHAT_FILENAME, DIR_USER_ROOT};
+use crate::types::{CHAT_FILENAME, DIR_USER_ROOT, FileEntry, Habits, KnowledgeConfig};
 #[cfg(test)]
 use crate::types::{NoteQuality, NoteSource};
 use crate::worker::{move_due_tasks, remove_completed_items};
@@ -228,10 +228,10 @@ impl KnowledgeBase {
         for (path, _size) in &files {
             if let Ok(content) = fs.read_path(path) {
                 let (meta, _body) = parse_note_meta(&content);
-                if let Some(m) = meta {
-                    if m.needs_review {
-                        result.push((path.clone(), m));
-                    }
+                if let Some(m) = meta
+                    && m.needs_review
+                {
+                    result.push((path.clone(), m));
                 }
             }
         }
@@ -366,11 +366,11 @@ impl KnowledgeBase {
                         }
                     }
                 }
-            } else if entry.name.ends_with(".md") {
-                if let Ok(content) = fs.read_path(&entry.name) {
-                    self.backlinks.write().index_file(&entry.name, &content);
-                    count += 1;
-                }
+            } else if entry.name.ends_with(".md")
+                && let Ok(content) = fs.read_path(&entry.name)
+            {
+                self.backlinks.write().index_file(&entry.name, &content);
+                count += 1;
             }
         }
 
