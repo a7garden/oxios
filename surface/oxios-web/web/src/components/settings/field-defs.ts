@@ -22,6 +22,21 @@ export type FieldType =
   | 'csv' // comma-separated list (e.g. cors_origins)
   | 'tags' // multi-line tag list (e.g. allowed_commands)
   | 'numbers' // multi-line number list (e.g. telegram allowed_users)
+  | 'range' // bounded numeric slider (requires min/max)
+
+export interface SettingsFieldDependsOn {
+  /**
+   * Dotted key of the parent field within the same section.
+   * Example: for memory, `'consolidation.dream_enabled'`.
+   */
+  field: string
+  /**
+   * The value the parent must have for this field to be enabled.
+   * For toggle parents: `true` (or `false` for inverse logic).
+   * For select parents: the activating string value, e.g. `'enforced'`.
+   */
+  value: boolean | string
+}
 
 export interface SettingsFieldDef {
   /** Dotted config key, e.g. `exec.allowed_commands` or `memory.embedding.provider`. */
@@ -36,10 +51,23 @@ export interface SettingsFieldDef {
   placeholder?: string
   /** For `select` fields. */
   options?: { value: string; labelKey: string }[]
+  /** Minimum value (for `number` and `range` types). */
+  min?: number
+  /** Maximum value (for `range` types; required when type is `range`). */
+  max?: number
+  /** Step increment (for `range` types; defaults to 1). */
+  step?: number
   /** If false, the field requires a daemon restart to take effect. */
   hotReload: boolean
   /** Sub-system that consumes this value (used in tooltips). */
   restartScope?: 'kernel' | 'gateway' | 'logging' | 'memory' | 'engine' | 'audit'
+  /**
+   * If set, this field is disabled when the parent field
+   * does NOT match `value`. The parent is looked up from
+   * the same section's form values (passed as `sectionValues`
+   * to `<FieldRow />`).
+   */
+  dependsOn?: SettingsFieldDependsOn
 }
 
 export interface SettingsSectionDef {
@@ -60,8 +88,8 @@ export interface SettingsSectionDef {
     | 'memory'
     | 'channels'
     | 'audit'
-  /** Sub-section used by `SettingsLayout` group navigation. */
-  groupId: 'ai' | 'system' | 'security' | 'memory' | 'channels' | 'advanced'
+  /** Group id this section belongs to. */
+  groupId: 'ai' | 'system' | 'security' | 'memory' | 'channels'
   fields: SettingsFieldDef[]
 }
 
@@ -101,6 +129,7 @@ const execSection: SettingsSectionDef = {
       type: 'tags',
       hotReload: true,
       restartScope: 'kernel',
+      dependsOn: { field: 'allowlist_mode', value: 'enforced' },
     },
     {
       key: 'allowlist_mode',
@@ -268,6 +297,7 @@ const memorySection: SettingsSectionDef = {
       placeholder: '~/.oxios/workspace/memory.db',
       hotReload: false,
       restartScope: 'memory',
+      dependsOn: { field: 'enabled', value: true },
     },
     {
       key: 'embedding.provider',
@@ -281,6 +311,7 @@ const memorySection: SettingsSectionDef = {
       ],
       hotReload: false,
       restartScope: 'memory',
+      dependsOn: { field: 'enabled', value: true },
     },
     {
       key: 'learning.sona_enabled',
@@ -289,6 +320,7 @@ const memorySection: SettingsSectionDef = {
       type: 'toggle',
       hotReload: false,
       restartScope: 'memory',
+      dependsOn: { field: 'enabled', value: true },
     },
     {
       key: 'consolidation.preset',
@@ -303,6 +335,7 @@ const memorySection: SettingsSectionDef = {
       ],
       hotReload: false,
       restartScope: 'memory',
+      dependsOn: { field: 'enabled', value: true },
     },
     {
       key: 'consolidation.dream_enabled',
@@ -311,6 +344,7 @@ const memorySection: SettingsSectionDef = {
       type: 'toggle',
       hotReload: false,
       restartScope: 'memory',
+      dependsOn: { field: 'enabled', value: true },
     },
     {
       key: 'consolidation.dream_interval_hours',
@@ -320,6 +354,7 @@ const memorySection: SettingsSectionDef = {
       placeholder: '24',
       hotReload: false,
       restartScope: 'memory',
+      dependsOn: { field: 'consolidation.dream_enabled', value: true },
     },
   ],
 }
@@ -412,6 +447,7 @@ const auditSection: SettingsSectionDef = {
       placeholder: '100000',
       hotReload: false,
       restartScope: 'audit',
+      dependsOn: { field: 'enabled', value: true },
     },
   ],
 }
@@ -433,7 +469,7 @@ export const NEW_SECTIONS: SettingsSectionDef[] = [
 // ---------------------------------------------------------------------------
 
 export interface SettingsGroup {
-  id: 'ai' | 'system' | 'security' | 'memory' | 'channels' | 'advanced'
+  id: 'ai' | 'system' | 'security' | 'memory' | 'channels'
   labelKey: string
   sectionKeys: string[]
 }
@@ -474,20 +510,13 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
     labelKey: 'settings.groupChannels',
     sectionKeys: ['channels.telegram'],
   },
-  {
-    id: 'advanced',
-    labelKey: 'settings.groupAdvanced',
-    sectionKeys: [
-      'resource_monitor',
-      'otel',
-      'daemon',
-      'persona',
-      'cron',
-      'mcp',
-      'browser',
-      'marketplace',
-    ],
-  },
+  // NOTE: The `advanced` group (resource_monitor, otel, daemon, persona,
+  // cron, mcp, browser, marketplace) is intentionally omitted. Those
+  // sections have no field definitions and no render path yet — they
+  // would surface as blank cards. Re-add the group here once each
+  // section has a matching SECTION_META entry + a renderer in
+  // `routes/settings.tsx::renderActiveSection`. The consistency test
+  // `settings-consistency.test.ts` enforces this invariant.
 ]
 
 // ---------------------------------------------------------------------------
@@ -499,4 +528,191 @@ export const newSectionsByKey = new Map(NEW_SECTIONS.map((s) => [s.key, s]))
 /** Returns the field def for a given section + dotted field key. */
 export function findFieldDef(sectionKey: string, fieldKey: string): SettingsFieldDef | undefined {
   return newSectionsByKey.get(sectionKey)?.fields.find((f) => f.key === fieldKey)
+}
+
+/**
+ * Builds a lookup from full dotted config path (`sectionKey.field.key`)
+ * to the i18n label key, for every field in `NEW_SECTIONS`.
+ *
+ * Used by the diff-preview dialog to show a human-readable label
+ * instead of the raw config path (e.g. `memory.learning.sona_enabled`
+ * → `settings.sonaEnabled`).
+ */
+export const pathLabelMap: Map<string, string> = (() => {
+  const m = new Map<string, string>()
+  for (const section of NEW_SECTIONS) {
+    for (const field of section.fields) {
+      m.set(`${section.key}.${field.key}`, field.labelKey)
+    }
+  }
+  return m
+})()
+
+// ---------------------------------------------------------------------------
+// Unified section metadata
+// ---------------------------------------------------------------------------
+//
+// `NEW_SECTIONS` covers the sections with the new declarative
+// field-rendering model. Older sections (`engine`, `kernel`, `scheduler`,
+// `orchestrator`, `context`, `gateway`, `session`, `logging`, `update`)
+// are still rendered with their custom components. To build the left
+// rail and section tabs from a single source of truth, we list their
+// metadata here.
+
+export type SectionIconKey =
+  | 'engine'
+  | 'kernel'
+  | 'exec'
+  | 'security'
+  | 'scheduler'
+  | 'orchestrator'
+  | 'context'
+  | 'gateway'
+  | 'session'
+  | 'logging'
+  | 'memory'
+  | 'channels'
+  | 'audit'
+  | 'update'
+
+export interface SectionMeta {
+  /** Section key, e.g. `engine`, `exec`, `memory`. */
+  id: string
+  /** i18n key for the section title. */
+  labelKey: string
+  /** i18n key for the section description (used by the rail/section card). */
+  descriptionKey: string
+  /** Group id for rail grouping. Must match a group in SETTINGS_GROUPS. */
+  groupId: 'ai' | 'system' | 'security' | 'memory' | 'channels'
+  /** Icon key for the rail/section card icon. */
+  iconKey: SectionIconKey
+  /** Whether this section renders its own custom component (EnginePanel, SystemUpdateCard, etc.). */
+  custom: boolean
+}
+
+export const SECTION_META: SectionMeta[] = [
+  // AI
+  {
+    id: 'engine',
+    labelKey: 'settings.sectionEngine',
+    descriptionKey: 'settings.engineDescription',
+    groupId: 'ai',
+    iconKey: 'engine',
+    custom: true,
+  },
+  // System
+  {
+    id: 'kernel',
+    labelKey: 'settings.sectionKernel',
+    descriptionKey: 'settings.kernelDescription',
+    groupId: 'system',
+    iconKey: 'kernel',
+    custom: false,
+  },
+  {
+    id: 'exec',
+    labelKey: 'settings.sectionExec',
+    descriptionKey: 'settings.executionDescription',
+    groupId: 'system',
+    iconKey: 'exec',
+    custom: false,
+  },
+  {
+    id: 'scheduler',
+    labelKey: 'settings.sectionScheduler',
+    descriptionKey: 'settings.schedulerDescription',
+    groupId: 'system',
+    iconKey: 'scheduler',
+    custom: false,
+  },
+  {
+    id: 'orchestrator',
+    labelKey: 'settings.sectionOrchestrator',
+    descriptionKey: 'settings.orchestratorDescription',
+    groupId: 'system',
+    iconKey: 'orchestrator',
+    custom: false,
+  },
+  {
+    id: 'context',
+    labelKey: 'settings.sectionContext',
+    descriptionKey: 'settings.contextDescription',
+    groupId: 'system',
+    iconKey: 'context',
+    custom: false,
+  },
+  {
+    id: 'gateway',
+    labelKey: 'settings.sectionGateway',
+    descriptionKey: 'settings.gatewayDescription',
+    groupId: 'system',
+    iconKey: 'gateway',
+    custom: false,
+  },
+  {
+    id: 'session',
+    labelKey: 'settings.sectionSession',
+    descriptionKey: 'settings.sessionDescription',
+    groupId: 'system',
+    iconKey: 'session',
+    custom: false,
+  },
+  {
+    id: 'logging',
+    labelKey: 'settings.sectionLogging',
+    descriptionKey: 'settings.loggingDescription',
+    groupId: 'system',
+    iconKey: 'logging',
+    custom: false,
+  },
+  {
+    id: 'update',
+    labelKey: 'settings.update',
+    descriptionKey: 'settings.updateDescription',
+    groupId: 'system',
+    iconKey: 'update',
+    custom: true,
+  },
+  // Security
+  {
+    id: 'security',
+    labelKey: 'settings.sectionSecurity',
+    descriptionKey: 'settings.securityDescription',
+    groupId: 'security',
+    iconKey: 'security',
+    custom: false,
+  },
+  {
+    id: 'audit',
+    labelKey: 'settings.sectionAudit',
+    descriptionKey: 'settings.auditDescription',
+    groupId: 'security',
+    iconKey: 'audit',
+    custom: false,
+  },
+  // Memory
+  {
+    id: 'memory',
+    labelKey: 'settings.sectionMemory',
+    descriptionKey: 'settings.memoryDescription',
+    groupId: 'memory',
+    iconKey: 'memory',
+    custom: false,
+  },
+  // Channels
+  {
+    id: 'channels.telegram',
+    labelKey: 'settings.sectionTelegram',
+    descriptionKey: 'settings.telegramDescription',
+    groupId: 'channels',
+    iconKey: 'channels',
+    custom: false,
+  },
+]
+
+const sectionMetaById = new Map(SECTION_META.map((m) => [m.id, m]))
+
+/** Lookup helper. Returns `undefined` for unknown ids. */
+export function getSectionMeta(id: string): SectionMeta | undefined {
+  return sectionMetaById.get(id)
 }

@@ -30,14 +30,31 @@ interface DiffPreviewProps {
   diffs: ConfigDiff[]
   onConfirm: () => void
   isPending?: boolean
+  /** Optional lookup: dotted config path → human-readable label. */
+  labelForPath?: (path: string) => string | undefined
 }
 
 /**
  * Modal shown right before saving changes. Lists every changed field
  * with old → new, plus a callout for fields that need a daemon restart.
  */
-export function DiffPreview({ open, onOpenChange, diffs, onConfirm, isPending }: DiffPreviewProps) {
+export function DiffPreview({
+  open,
+  onOpenChange,
+  diffs,
+  onConfirm,
+  isPending,
+  labelForPath,
+}: DiffPreviewProps) {
   const { t } = useTranslation()
+
+  const resolveLabel = (path: string): string | undefined => {
+    const key = labelForPath?.(path)
+    if (!key) return undefined
+    const translated = t(key)
+    // i18next returns the key itself when the entry is missing.
+    return translated === key ? undefined : translated
+  }
 
   const restartRequired = diffs.filter((d) => !d.hotReload)
   const hotReload = diffs.filter((d) => d.hotReload)
@@ -58,7 +75,7 @@ export function DiffPreview({ open, onOpenChange, diffs, onConfirm, isPending }:
               {t('settings.noChanges')}
             </p>
           ) : (
-            diffs.map((diff) => <DiffRow key={diff.path} diff={diff} />)
+            diffs.map((diff) => <DiffRow key={diff.path} diff={diff} resolveLabel={resolveLabel} />)
           )}
         </div>
 
@@ -73,7 +90,7 @@ export function DiffPreview({ open, onOpenChange, diffs, onConfirm, isPending }:
               <ul className="mt-2 list-disc list-inside text-xs text-warning/90 space-y-0.5">
                 {restartRequired.map((d) => (
                   <li key={d.path}>
-                    <code className="font-mono">{d.path}</code>
+                    <code className="font-mono">{resolveLabel(d.path) ?? d.path}</code>
                   </li>
                 ))}
               </ul>
@@ -107,12 +124,28 @@ export function DiffPreview({ open, onOpenChange, diffs, onConfirm, isPending }:
   )
 }
 
-function DiffRow({ diff }: { diff: ConfigDiff }) {
+function DiffRow({
+  diff,
+  resolveLabel,
+}: {
+  diff: ConfigDiff
+  resolveLabel: (path: string) => string | undefined
+}) {
   const { t } = useTranslation()
+  const label = resolveLabel(diff.path)
   return (
     <div className="flex flex-col gap-0.5 rounded-md border bg-muted/30 px-3 py-2">
       <div className="flex items-center justify-between">
-        <code className="font-mono text-xs text-muted-foreground">{diff.path}</code>
+        <div className="flex flex-col">
+          {label ? (
+            <>
+              <span className="text-sm font-medium">{label}</span>
+              <code className="font-mono text-2xs text-muted-foreground">{diff.path}</code>
+            </>
+          ) : (
+            <code className="font-mono text-xs text-muted-foreground">{diff.path}</code>
+          )}
+        </div>
         {diff.hotReload ? (
           <span className="text-2xs uppercase tracking-wider text-success">
             {t('settings.hotReload')}

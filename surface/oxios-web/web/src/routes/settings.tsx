@@ -1,23 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, useSearch } from '@tanstack/react-router'
-import {
-  Bot,
-  Brain,
-  Cpu,
-  Database,
-  Eye,
-  Globe,
-  MessageSquare,
-  Monitor,
-  Save,
-  Send,
-  Server,
-  Shield,
-  Sparkles,
-  Terminal,
-  Timer,
-  Zap,
-} from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -26,23 +8,28 @@ import { ModelSelect } from '@/components/engine/model-select'
 import { ProviderOptionsPanel } from '@/components/engine/provider-options'
 import { ProviderSelect } from '@/components/engine/provider-select'
 import { RoutingSection } from '@/components/engine/routing-section'
-import type { SubNavGroup } from '@/components/layout/settings-layout'
-import { SettingsLayout } from '@/components/layout/settings-layout'
 import { ChannelsSection } from '@/components/settings/channels-section'
 import { DiffPreview } from '@/components/settings/diff-preview'
 import {
+  getSectionMeta,
   NEW_SECTIONS,
+  pathLabelMap,
+  SECTION_META,
+  SETTINGS_GROUPS,
+  type SectionMeta,
   type SettingsFieldDef,
-  type SettingsSectionDef,
 } from '@/components/settings/field-defs'
 import { FieldRow } from '@/components/settings/field-row'
 import { MemorySection } from '@/components/settings/memory-section'
+import { SaveDock } from '@/components/settings/save-dock'
+import { SectionCard } from '@/components/settings/section-card'
+import { SectionIcon } from '@/components/settings/section-icons'
+import { SettingsHeader } from '@/components/settings/settings-header'
+import { SettingsShell } from '@/components/settings/settings-shell'
 import { ErrorState } from '@/components/shared/error-state'
 import { LoadingCards } from '@/components/shared/loading'
 import { SystemToolsPanel } from '@/components/system/system-tools'
 import { SystemUpdateCard } from '@/components/system/system-update'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import {
   type ConfigDiffEntry,
@@ -67,72 +54,11 @@ export const Route = createFileRoute('/settings')({
   component: SettingsPage,
 })
 
-// ─── Navigation structure (groups) ────────────────────────────
-
-const navGroups: SubNavGroup[] = [
-  {
-    id: 'ai',
-    labelKey: 'settings.groupAi',
-    items: [
-      { id: 'engine', labelKey: 'settings.sectionEngine', icon: <Bot className="h-4 w-4" /> },
-    ],
-  },
-  {
-    id: 'system',
-    labelKey: 'settings.groupSystem',
-    items: [
-      { id: 'kernel', labelKey: 'settings.sectionKernel', icon: <Cpu className="h-4 w-4" /> },
-      { id: 'exec', labelKey: 'settings.sectionExec', icon: <Terminal className="h-4 w-4" /> },
-      {
-        id: 'scheduler',
-        labelKey: 'settings.sectionScheduler',
-        icon: <Timer className="h-4 w-4" />,
-      },
-      {
-        id: 'orchestrator',
-        labelKey: 'settings.sectionOrchestrator',
-        icon: <Zap className="h-4 w-4" />,
-      },
-      { id: 'context', labelKey: 'settings.sectionContext', icon: <Brain className="h-4 w-4" /> },
-      { id: 'gateway', labelKey: 'settings.sectionGateway', icon: <Globe className="h-4 w-4" /> },
-      { id: 'session', labelKey: 'settings.sectionSession', icon: <Monitor className="h-4 w-4" /> },
-      { id: 'logging', labelKey: 'settings.sectionLogging', icon: <Server className="h-4 w-4" /> },
-      { id: 'update', labelKey: 'settings.update', icon: <Sparkles className="h-4 w-4" /> },
-    ],
-  },
-  {
-    id: 'security',
-    labelKey: 'settings.groupSecurity',
-    items: [
-      {
-        id: 'security',
-        labelKey: 'settings.sectionSecurity',
-        icon: <Shield className="h-4 w-4" />,
-      },
-      { id: 'audit', labelKey: 'settings.sectionAudit', icon: <Eye className="h-4 w-4" /> },
-    ],
-  },
-  {
-    id: 'memory',
-    labelKey: 'settings.groupMemory',
-    items: [
-      { id: 'memory', labelKey: 'settings.sectionMemory', icon: <Database className="h-4 w-4" /> },
-    ],
-  },
-  {
-    id: 'channels',
-    labelKey: 'settings.groupChannels',
-    items: [
-      {
-        id: 'channels.telegram',
-        labelKey: 'settings.sectionTelegram',
-        icon: <Send className="h-4 w-4" />,
-      },
-    ],
-  },
-]
-
-// ─── Field definitions (legacy sections from original file) ───
+// ─── Field type re-declaration (matches old LegacyField exactly) ──
+//
+// The legacy sections are rendered using the new `FieldRow` /
+// `SectionCard` components, but their declarations still live in this
+// file because they share form-state plumbing with the new sections.
 
 type FieldType = 'text' | 'number' | 'password' | 'toggle' | 'select'
 
@@ -143,31 +69,12 @@ interface LegacyField {
   type: FieldType
   placeholder?: string
   options?: { value: string; labelKey: string }[]
-  /**
-   * Mirrors `SettingsFieldDef.hotReload`. False means the field requires
-   * a daemon restart to take effect (the subsystem is constructed at
-   * boot). Used by the diff preview badges and the `annotatedDiff`
-   * classifier. The two MUST stay in sync with
-   * `system.rs::HOT_RELOADABLE_SECTIONS`.
-   */
   hotReload: boolean
-  /** Sub-system that consumes this value (used in tooltips). */
   restartScope?: 'kernel' | 'gateway' | 'logging' | 'memory' | 'engine' | 'audit'
 }
 
 const tKeys = {
-  engine: 'settings.engine',
-  engineDescription: 'settings.engineDescription',
-  provider: 'settings.provider',
-  providerDescription: 'settings.providerDescription',
-  model: 'settings.model',
-  modelDescription: 'settings.modelDescription',
-  modelSelectProviderFirst: 'settings.modelSelectProviderFirst',
-  apiKey: 'settings.apiKey',
-  apiKeyDescription: 'settings.apiKeyDescription',
-  advancedOptions: 'settings.advancedOptions',
-  advancedOptionsDescription: 'settings.advancedOptionsDescription',
-  kernel: 'settings.sectionKernel',
+  kernel: 'settings.kernel',
   kernelDescription: 'settings.kernelDescription',
   workspacePath: 'settings.workspacePath',
   workspacePathDescription: 'settings.workspacePathDescription',
@@ -175,31 +82,7 @@ const tKeys = {
   maxConcurrentAgentsDescription: 'settings.maxConcurrentAgentsDescription',
   eventBusCapacity: 'settings.eventBusCapacity',
   eventBusCapacityDescription: 'settings.eventBusCapacityDescription',
-  execution: 'settings.sectionExec',
-  executionDescription: 'settings.executionDescription',
-  defaultMode: 'settings.defaultMode',
-  defaultModeDescription: 'settings.defaultModeDescription',
-  structuredRecommended: 'settings.structuredRecommended',
-  shellDangerous: 'settings.shellDangerous',
-  allowShellMode: 'settings.allowShellMode',
-  allowShellModeDescription: 'settings.allowShellModeDescription',
-  defaultTimeoutS: 'settings.defaultTimeoutS',
-  defaultTimeoutSDescription: 'settings.defaultTimeoutSDescription',
-  maxTimeoutS: 'settings.maxTimeoutS',
-  maxTimeoutSDescription: 'settings.maxTimeoutSDescription',
-  security: 'settings.sectionSecurity',
-  securityDescription: 'settings.securityDescription',
-  apiKeyAuthentication: 'settings.apiKeyAuthentication',
-  apiKeyAuthenticationDescription: 'settings.apiKeyAuthenticationDescription',
-  networkAccess: 'settings.networkAccess',
-  networkAccessDescription: 'settings.networkAccessDescription',
-  allowForking: 'settings.allowForking',
-  allowForkingDescription: 'settings.allowForkingDescription',
-  maxExecutionTimeS: 'settings.maxExecutionTimeS',
-  maxExecutionTimeSDescription: 'settings.maxExecutionTimeSDescription',
-  maxMemoryMB: 'settings.maxMemoryMB',
-  maxMemoryMBDescription: 'settings.maxMemoryMBDescription',
-  scheduler: 'settings.sectionScheduler',
+  scheduler: 'settings.scheduler',
   schedulerDescription: 'settings.schedulerDescription',
   maxConcurrentTasks: 'settings.maxConcurrentTasks',
   maxConcurrentTasksDescription: 'settings.maxConcurrentTasksDescription',
@@ -207,25 +90,25 @@ const tKeys = {
   rateLimitPerMinDescription: 'settings.rateLimitPerMinDescription',
   zombieTimeoutS: 'settings.zombieTimeoutS',
   zombieTimeoutSDescription: 'settings.zombieTimeoutSDescription',
-  orchestrator: 'settings.sectionOrchestrator',
+  orchestrator: 'settings.orchestrator',
   orchestratorDescription: 'settings.orchestratorDescription',
   maxEvolutionIterations: 'settings.maxEvolutionIterations',
   maxEvolutionIterationsDescription: 'settings.maxEvolutionIterationsDescription',
   minEvaluationScore: 'settings.minEvaluationScore',
   minEvaluationScoreDescription: 'settings.minEvaluationScoreDescription',
-  context: 'settings.sectionContext',
+  context: 'settings.context',
   contextDescription: 'settings.contextDescription',
   activeTokenLimit: 'settings.activeTokenLimit',
   activeTokenLimitDescription: 'settings.activeTokenLimitDescription',
   cacheEntryLimit: 'settings.cacheEntryLimit',
   cacheEntryLimitDescription: 'settings.cacheEntryLimitDescription',
-  gateway: 'settings.sectionGateway',
+  gateway: 'settings.gateway',
   gatewayDescription: 'settings.gatewayDescription',
   host: 'settings.host',
   hostDescription: 'settings.hostDescription',
   port: 'settings.port',
   portDescription: 'settings.portDescription',
-  session: 'settings.sectionSession',
+  session: 'settings.session',
   sessionDescription: 'settings.sessionDescription',
   maxSessions: 'settings.maxSessions',
   maxSessionsDescription: 'settings.maxSessionsDescription',
@@ -233,10 +116,8 @@ const tKeys = {
   sessionTTLHoursDescription: 'settings.sessionTTLHoursDescription',
   autoPrune: 'settings.autoPrune',
   autoPruneDescription: 'settings.autoPruneDescription',
-  logging: 'settings.sectionLogging',
+  logging: 'settings.logging',
   loggingDescription: 'settings.loggingDescription',
-  update: 'settings.update',
-  updateDescription: 'settings.updateDescription',
   format: 'settings.format',
   formatDescription: 'settings.formatDescription',
   prettyDefault: 'settings.prettyDefault',
@@ -246,13 +127,10 @@ const tKeys = {
   subtitle: 'settings.subtitle',
 } as const
 
-const legacyFieldDefs: [string, string, LegacyField[]][] = [
+const legacyFieldDefs: [string, LegacyField[]][] = [
   [
     'kernel',
-    tKeys.kernelDescription,
     [
-      // Kernel is constructed at boot; PATCH persists but the running
-      // daemon keeps the boot-time values. Restart required.
       {
         key: 'workspace',
         labelKey: tKeys.workspacePath,
@@ -284,9 +162,7 @@ const legacyFieldDefs: [string, string, LegacyField[]][] = [
   ],
   [
     'scheduler',
-    tKeys.schedulerDescription,
     [
-      // Scheduler is propagated at runtime via `scheduler().update_config()`.
       {
         key: 'max_concurrent',
         labelKey: tKeys.maxConcurrentTasks,
@@ -318,10 +194,7 @@ const legacyFieldDefs: [string, string, LegacyField[]][] = [
   ],
   [
     'orchestrator',
-    tKeys.orchestratorDescription,
     [
-      // Orchestrator is constructed at boot; PATCH persists but does not
-      // re-create it. Restart required.
       {
         key: 'max_evolution_iterations',
         labelKey: tKeys.maxEvolutionIterations,
@@ -344,9 +217,7 @@ const legacyFieldDefs: [string, string, LegacyField[]][] = [
   ],
   [
     'context',
-    tKeys.contextDescription,
     [
-      // Context manager is constructed at boot; restart required.
       {
         key: 'active_limit_tokens',
         labelKey: tKeys.activeTokenLimit,
@@ -369,9 +240,7 @@ const legacyFieldDefs: [string, string, LegacyField[]][] = [
   ],
   [
     'gateway',
-    tKeys.gatewayDescription,
     [
-      // gateway host/port are bound at boot; restart required.
       {
         key: 'host',
         labelKey: tKeys.host,
@@ -394,9 +263,7 @@ const legacyFieldDefs: [string, string, LegacyField[]][] = [
   ],
   [
     'session',
-    tKeys.sessionDescription,
     [
-      // Session manager is constructed at boot; restart required.
       {
         key: 'max_sessions',
         labelKey: tKeys.maxSessions,
@@ -427,9 +294,7 @@ const legacyFieldDefs: [string, string, LegacyField[]][] = [
   ],
   [
     'logging',
-    tKeys.loggingDescription,
     [
-      // Logging format is set on the global subscriber at boot; restart required.
       {
         key: 'format',
         labelKey: tKeys.format,
@@ -447,264 +312,22 @@ const legacyFieldDefs: [string, string, LegacyField[]][] = [
   ],
 ]
 
-const legacyFieldsBySection = new Map(legacyFieldDefs.map(([key, , fields]) => [key, fields]))
-const legacySectionLabelKeys: Record<string, string> = {
-  kernel: tKeys.kernel,
-  scheduler: tKeys.scheduler,
-  orchestrator: tKeys.orchestrator,
-  context: tKeys.context,
-  gateway: tKeys.gateway,
-  session: tKeys.session,
-  logging: tKeys.logging,
-}
+const legacyFieldsBySection = new Map(legacyFieldDefs.map(([key, fields]) => [key, fields]))
 
-// ─── Engine Panel ────────────────────────────────────────────
-
-function EnginePanel() {
-  const { t } = useTranslation()
-  const { data: providers = [] } = useProviders()
-  const [selectedProvider, setSelectedProvider] = useState<string | null>(null)
-  const { data: models = [] } = useModels(selectedProvider)
-  const { data: engineConfig } = useEngineConfig()
-  const setModel = useSetModel()
-  const setApiKey = useSetApiKey()
-  const setProviderOptions = useSetProviderOptions()
-
-  const currentModel = engineConfig?.default_model ?? ''
-  const resolvedProvider = useMemo((): string | null => {
-    if (selectedProvider) return selectedProvider
-    if (currentModel.includes('/')) return currentModel.split('/')[0] ?? null
-    return null
-  }, [selectedProvider, currentModel])
-
-  const currentModelId = useMemo(() => {
-    if (!currentModel.includes('/')) return null
-    return currentModel // ModelInfo.id is already "provider/model", used as-is
-  }, [currentModel])
-
-  const handleProviderChange = (providerId: string) => {
-    setSelectedProvider(providerId)
+// Merged lookup: dotted config path → i18n label key, for both legacy
+// and new sections. Passed to DiffPreview so the review dialog shows
+// human-readable labels instead of raw config paths.
+const diffLabelMap: Map<string, string> = (() => {
+  const m = new Map(pathLabelMap)
+  for (const [sectionKey, fields] of legacyFieldDefs) {
+    for (const field of fields) {
+      m.set(`${sectionKey}.${field.key}`, field.labelKey)
+    }
   }
+  return m
+})()
 
-  const handleModelChange = (modelId: string) => {
-    // modelId from ModelSelect is already in "provider/model" format (ModelInfo.id)
-    setModel.mutate(modelId)
-  }
-
-  const handleApiKeySubmit = (apiKey: string) => {
-    setApiKey.mutate({ provider: resolvedProvider ?? 'unknown', apiKey })
-  }
-
-  const handleOptionsSave = (options: Record<string, unknown>) => {
-    setProviderOptions.mutate({ provider: resolvedProvider ?? 'unknown', options })
-  }
-
-  const apiKeySource =
-    engineConfig?.api_key_source ?? (engineConfig?.api_key_set ? 'config' : 'none')
-
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Bot className="h-4 w-4" />
-          {t(tKeys.engine)}
-        </CardTitle>
-        <p className="text-sm text-muted-foreground">{t(tKeys.engineDescription)}</p>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        <div className="flex items-start justify-between gap-6">
-          <div className="flex-1 min-w-0 pt-0.5">
-            <label className="text-sm font-medium">{t(tKeys.provider)}</label>
-            <p className="text-xs text-muted-foreground mt-0.5">{t(tKeys.providerDescription)}</p>
-          </div>
-          <div className="shrink-0 w-56">
-            <ProviderSelect
-              providers={providers}
-              value={resolvedProvider}
-              onValueChange={handleProviderChange}
-            />
-          </div>
-        </div>
-
-        <Separator />
-
-        <div className="flex items-start justify-between gap-6">
-          <div className="flex-1 min-w-0 pt-0.5">
-            <label className="text-sm font-medium">{t(tKeys.model)}</label>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              {currentModel ? (
-                <span>{t(tKeys.modelDescription, { model: currentModel })}</span>
-              ) : (
-                t(tKeys.modelSelectProviderFirst)
-              )}
-            </p>
-          </div>
-          <div className="shrink-0 w-64">
-            <ModelSelect models={models} value={currentModelId} onValueChange={handleModelChange} />
-          </div>
-        </div>
-
-        <Separator />
-
-        <div className="flex items-start justify-between gap-6">
-          <div className="flex-1 min-w-0 pt-0.5">
-            <label className="text-sm font-medium">{t(tKeys.apiKey)}</label>
-            <p className="text-xs text-muted-foreground mt-0.5">{t(tKeys.apiKeyDescription)}</p>
-          </div>
-          <div className="shrink-0 w-72">
-            <ApiKeyInput
-              hasKey={engineConfig?.api_key_set ?? false}
-              source={apiKeySource}
-              providerName={resolvedProvider ?? 'provider'}
-              onSubmit={handleApiKeySubmit}
-              isPending={setApiKey.isPending}
-            />
-          </div>
-        </div>
-
-        {resolvedProvider && ['anthropic', 'openai', 'google'].includes(resolvedProvider) && (
-          <>
-            <Separator />
-            <div>
-              <div className="mb-3">
-                <label className="text-sm font-medium">{t(tKeys.advancedOptions)}</label>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  {t(tKeys.advancedOptionsDescription, { provider: resolvedProvider })}
-                </p>
-              </div>
-              <ProviderOptionsPanel
-                provider={resolvedProvider}
-                onSave={handleOptionsSave}
-                isPending={setProviderOptions.isPending}
-              />
-            </div>
-          </>
-        )}
-      </CardContent>
-
-      <RoutingSection />
-    </Card>
-  )
-}
-
-// ─── Generic Config Section Card (legacy) ─────────────────────
-
-function LegacyConfigSectionCard({
-  sectionKey,
-  descriptionKey,
-  labelKey,
-  icon,
-  fields,
-  formValues,
-  onFieldChange,
-  config,
-}: {
-  sectionKey: string
-  descriptionKey: string
-  labelKey: string
-  icon: React.ReactNode
-  fields: LegacyField[]
-  formValues: Record<string, Record<string, string | boolean>>
-  onFieldChange: (sectionKey: string, fieldKey: string, value: string | boolean) => void
-  config: Record<string, unknown> | undefined
-}) {
-  const { t } = useTranslation()
-  const sectionConfig = config?.[sectionKey] as Record<string, unknown> | undefined
-
-  if (!sectionConfig && !formValues[sectionKey]) return null
-
-  return (
-    <Card>
-      <CardHeader className="pb-4">
-        <CardTitle className="flex items-center gap-2 text-base">
-          {icon}
-          {t(labelKey)}
-        </CardTitle>
-        <p className="text-xs text-muted-foreground">{t(descriptionKey)}</p>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {fields.map((field, i) => (
-          <div key={field.key}>
-            {i > 0 && <Separator className="mb-4" />}
-            <LegacyFieldRow
-              sectionKey={sectionKey}
-              field={field}
-              value={formValues[sectionKey]?.[field.key]}
-              onChange={(val) => onFieldChange(sectionKey, field.key, val)}
-            />
-          </div>
-        ))}
-      </CardContent>
-    </Card>
-  )
-}
-
-function LegacyFieldRow({
-  sectionKey,
-  field,
-  value,
-  onChange,
-}: {
-  sectionKey: string
-  field: LegacyField
-  value: string | boolean | undefined
-  onChange: (val: string | boolean) => void
-}) {
-  const { t } = useTranslation()
-  const id = `${sectionKey}-${field.key}`
-
-  return (
-    <div className="flex items-start justify-between gap-4 sm:gap-6">
-      <div className="flex-1 min-w-0 pt-0.5">
-        <label htmlFor={id} className="text-sm font-medium">
-          {t(field.labelKey)}
-        </label>
-        <p className="text-xs text-muted-foreground mt-0.5">{t(field.descriptionKey)}</p>
-      </div>
-      <div className="shrink-0 w-40 sm:w-56">
-        {field.type === 'toggle' ? (
-          <div className="flex items-center justify-end gap-2">
-            <span className="text-xs text-muted-foreground">
-              {value ? t('common.on') : t('common.off')}
-            </span>
-            <Switch checked={Boolean(value)} onCheckedChange={(checked) => onChange(checked)} />
-          </div>
-        ) : field.type === 'select' ? (
-          <Select
-            value={String(value ?? '')}
-            onValueChange={(v) => onChange(v)}
-            placeholder={t(field.labelKey)}
-            options={
-              Array.isArray(field.options)
-                ? field.options.map((opt) => ({
-                    label: t(opt.labelKey),
-                    value: opt.value,
-                  }))
-                : []
-            }
-            className="w-full"
-          />
-        ) : (
-          <Input
-            id={id}
-            type={
-              field.type === 'password' ? 'password' : field.type === 'number' ? 'number' : 'text'
-            }
-            value={String(value ?? '')}
-            onChange={(e) => onChange(e.target.value)}
-            placeholder={field.placeholder}
-          />
-        )}
-      </div>
-    </div>
-  )
-}
-
-// ─── Settings page ───────────────────────────────────────────
-
-// Map a section's fields to the storage key used in formValues
-// (`sectionKey.fieldKey` for simple sections, or `sectionKey.subKey` for
-// nested sections like memory.* and channels.telegram.*).
+// ─── Form-state primitives ──────────────────────────────────────
 
 function getNestedValue(obj: Record<string, unknown>, dotted: string): unknown {
   const parts = dotted.split('.')
@@ -732,19 +355,164 @@ function setNestedValue(obj: Record<string, unknown>, dotted: string, value: unk
   cur[parts[parts.length - 1]!] = value
 }
 
+// ─── Engine Panel (custom-rendered section) ─────────────────────
+
+function EnginePanel() {
+  const { t } = useTranslation()
+  const { data: providers = [] } = useProviders()
+  const [selectedProvider, setSelectedProvider] = useState<string | null>(null)
+  const { data: models = [] } = useModels(selectedProvider)
+  const { data: engineConfig } = useEngineConfig()
+  const setModel = useSetModel()
+  const setApiKey = useSetApiKey()
+  const setProviderOptions = useSetProviderOptions()
+
+  const currentModel = engineConfig?.default_model ?? ''
+  const resolvedProvider = useMemo((): string | null => {
+    if (selectedProvider) return selectedProvider
+    if (currentModel.includes('/')) return currentModel.split('/')[0] ?? null
+    return null
+  }, [selectedProvider, currentModel])
+
+  const currentModelId = useMemo(() => {
+    if (!currentModel.includes('/')) return null
+    return currentModel
+  }, [currentModel])
+
+  const handleProviderChange = (providerId: string) => {
+    setSelectedProvider(providerId)
+  }
+
+  const handleModelChange = (modelId: string) => {
+    setModel.mutate(modelId)
+  }
+
+  const handleApiKeySubmit = (apiKey: string) => {
+    setApiKey.mutate({ provider: resolvedProvider ?? 'unknown', apiKey })
+  }
+
+  const handleOptionsSave = (options: Record<string, unknown>) => {
+    setProviderOptions.mutate({ provider: resolvedProvider ?? 'unknown', options })
+  }
+
+  const apiKeySource =
+    engineConfig?.api_key_source ?? (engineConfig?.api_key_set ? 'config' : 'none')
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Bot className="h-4 w-4" />
+          {t('settings.engine')}
+        </CardTitle>
+        <p className="text-sm text-muted-foreground">{t('settings.engineDescription')}</p>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <div className="flex items-start justify-between gap-6">
+          <div className="flex-1 min-w-0 pt-0.5">
+            <label className="text-sm font-medium">{t('settings.provider')}</label>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {t('settings.providerDescription')}
+            </p>
+          </div>
+          <div className="shrink-0 w-56">
+            <ProviderSelect
+              providers={providers}
+              value={resolvedProvider}
+              onValueChange={handleProviderChange}
+            />
+          </div>
+        </div>
+
+        <Separator />
+
+        <div className="flex items-start justify-between gap-6">
+          <div className="flex-1 min-w-0 pt-0.5">
+            <label className="text-sm font-medium">{t('settings.model')}</label>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {currentModel ? (
+                <span>{t('settings.modelDescription', { model: currentModel })}</span>
+              ) : (
+                t('settings.modelSelectProviderFirst')
+              )}
+            </p>
+          </div>
+          <div className="shrink-0 w-64">
+            <ModelSelect models={models} value={currentModelId} onValueChange={handleModelChange} />
+          </div>
+        </div>
+
+        <Separator />
+
+        <div className="flex items-start justify-between gap-6">
+          <div className="flex-1 min-w-0 pt-0.5">
+            <label className="text-sm font-medium">{t('settings.apiKey')}</label>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {t('settings.apiKeyDescription')}
+            </p>
+          </div>
+          <div className="shrink-0 w-72">
+            <ApiKeyInput
+              hasKey={engineConfig?.api_key_set ?? false}
+              source={apiKeySource}
+              providerName={resolvedProvider ?? 'provider'}
+              onSubmit={handleApiKeySubmit}
+              isPending={setApiKey.isPending}
+            />
+          </div>
+        </div>
+
+        {resolvedProvider && ['anthropic', 'openai', 'google'].includes(resolvedProvider) && (
+          <>
+            <Separator />
+            <div>
+              <div className="mb-3">
+                <label className="text-sm font-medium">{t('settings.advancedOptions')}</label>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {t('settings.advancedOptionsDescription', { provider: resolvedProvider })}
+                </p>
+              </div>
+              <ProviderOptionsPanel
+                provider={resolvedProvider}
+                onSave={handleOptionsSave}
+                isPending={setProviderOptions.isPending}
+              />
+            </div>
+          </>
+        )}
+        <RoutingSection />
+      </CardContent>
+    </Card>
+  )
+}
+
+// ─── Card / header / input imports scoped to the EnginePanel ───
+//
+// We import them lazily at the bottom to keep the engine panel close to
+// the other legacy form code that uses the same primitives.
+import { Bot } from 'lucide-react'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+
+// ─── Settings Page ─────────────────────────────────────────────
+
 function SettingsPage() {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
   const search = useSearch({ from: '/settings' })
   const [activeSection, setActiveSection] = useState(search?.section ?? 'engine')
   const [showDiff, setShowDiff] = useState(false)
-  // `formValues` is keyed by sectionKey (e.g. `memory`, `channels.telegram`)
-  // and contains arbitrary nested objects for those sections.
   const [formValues, setFormValues] = useState<Record<string, Record<string, unknown>>>({})
-  const [saveNotice, setSaveNotice] = useState<'success' | 'error' | null>(null)
+  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null)
 
   const { data: config, isLoading, isError, refetch } = useConfig()
   const saveMutation = useSaveConfig()
+
+  // Deep-link recovery: if the URL points at a section that isn't in
+  // SECTION_META (e.g. an unimplemented id like `persona`), fall back
+  // to the first section so we never render a blank screen.
+  const safeActiveSection = getSectionMeta(activeSection)
+    ? activeSection
+    : (SECTION_META[0]?.id ?? 'engine')
 
   // Populate form from server config (initial sync + when navigating sections).
   useEffect(() => {
@@ -752,7 +520,7 @@ function SettingsPage() {
     const next: Record<string, Record<string, unknown>> = {}
 
     // Legacy sections (simple flat keys).
-    for (const [sectionKey, , fields] of legacyFieldDefs) {
+    for (const [sectionKey, fields] of legacyFieldDefs) {
       const sectionConfig = config[sectionKey] as Record<string, unknown> | undefined
       if (!sectionConfig) continue
       const bucket: Record<string, unknown> = {}
@@ -768,19 +536,15 @@ function SettingsPage() {
     for (const section of NEW_SECTIONS) {
       const bucket: Record<string, unknown> = {}
       for (const field of section.fields) {
-        // `memory.*` keys (and other nested sections) are dotted.
-        // Resolve them against the right sub-object. `channels.telegram`
-        // uses a flat key under the `telegram` sub-object — the section
-        // key is prepended at payload-build time.
         const dottedKey = field.key
-        let container: Record<string, unknown> | undefined
         if (section.key === 'memory') {
           const [sub, ...rest] = dottedKey.split('.')
-          container = config.memory as Record<string, unknown> | undefined
+          let container: Record<string, unknown> | undefined = config.memory as
+            | Record<string, unknown>
+            | undefined
           if (container && sub && rest.length > 0) {
             container = container[sub] as Record<string, unknown> | undefined
           } else if (container && sub) {
-            // Top-level memory field (e.g. `enabled`).
             const topVal = container?.[sub]
             bucket[dottedKey] = field.type === 'toggle' ? topVal === true : String(topVal ?? '')
             continue
@@ -791,9 +555,6 @@ function SettingsPage() {
             bucket[dottedKey] = field.type === 'toggle' ? v === true : String(v ?? '')
           }
         } else if (section.key === 'channels.telegram') {
-          // The field key is the path *below* `channels.telegram`. The
-          // section key is prepended at payload-build time, so we read
-          // from `config.channels.telegram.<key>` directly.
           const tg = (config.channels as Record<string, unknown> | undefined)?.telegram as
             | Record<string, unknown>
             | undefined
@@ -802,7 +563,6 @@ function SettingsPage() {
             bucket[dottedKey] = field.type === 'toggle' ? v === true : String(v ?? '')
           }
         } else {
-          // Flat sections (exec, security, audit).
           const sectionConfig = config[section.key] as Record<string, unknown> | undefined
           const raw = sectionConfig?.[dottedKey]
           bucket[dottedKey] = field.type === 'toggle' ? raw === true : String(raw ?? '')
@@ -814,12 +574,10 @@ function SettingsPage() {
     setFormValues(next)
   }, [config])
 
-  // Build the PATCH payload from current form state.
   const buildPayload = (): Record<string, unknown> => {
     const payload: Record<string, unknown> = {}
 
-    // Legacy sections.
-    for (const [sectionKey, , fields] of legacyFieldDefs) {
+    for (const [sectionKey, fields] of legacyFieldDefs) {
       const sectionValues: Record<string, unknown> = {}
       for (const field of fields) {
         const val = formValues[sectionKey]?.[field.key]
@@ -833,10 +591,6 @@ function SettingsPage() {
       payload[sectionKey] = sectionValues
     }
 
-    // New sections. Each section's `field.key` is the path *below* the
-    // section key, so we collect values into `bucket` and assign once
-    // to `payload[section.key]`. This matches how `memory` and
-    // `channels.telegram` are encoded in `OxiosConfig`.
     for (const section of NEW_SECTIONS) {
       const bucket: Record<string, unknown> = {}
       for (const field of section.fields) {
@@ -845,7 +599,6 @@ function SettingsPage() {
         if (field.type === 'toggle') {
           setNestedValue(bucket, field.key, Boolean(raw))
         } else if (field.type === 'tags') {
-          // String array (commands).
           const arr = Array.isArray(raw)
             ? raw
             : String(raw)
@@ -871,32 +624,21 @@ function SettingsPage() {
           setNestedValue(bucket, field.key, String(raw))
         }
       }
-      // Assign bucket under the section key. We use `setNestedValue` so
-      // section keys that contain dots (e.g. `channels.telegram`)
-      // become a nested object literal, not a flat key with a dot in
-      // its name. `obj['channels.telegram'] = x` would otherwise set
-      // `obj["channels.telegram"]` and the server would receive a
-      // payload whose top-level key is `"channels.telegram"` instead
-      // of `obj.channels.telegram`.
       setNestedValue(payload, section.key, bucket)
     }
 
     return payload
   }
 
-  // Compute the current diff against the last-loaded config.
   const diff: ConfigDiffEntry[] = useMemo(() => {
     if (!config) return []
     const proposed = buildPayload()
     return diffConfigs(config, proposed)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [config, formValues, activeSection])
+  }, [config, formValues])
 
-  // Re-classify the diff with the authoritative hot-reload metadata from
-  // field-defs (this is local & instant; the backend re-checks authoritatively).
   const annotatedDiff: ConfigDiffEntry[] = useMemo(() => {
     return diff.map((entry) => {
-      // Try to find the matching field def in the new sections.
       for (const section of NEW_SECTIONS) {
         const f = section.fields.find(
           (field) => field.key === entry.path || `${section.key}.${field.key}` === entry.path,
@@ -905,24 +647,31 @@ function SettingsPage() {
           return { ...entry, hotReload: f.hotReload, scope: f.restartScope }
         }
       }
-      // Also try legacy fields. They declare their own hotReload and
-      // restartScope so the diff badges and tooltips match the backend.
-      for (const [sectionKey, , fields] of legacyFieldDefs) {
-        const f = (fields as LegacyField[]).find(
-          (field) => `${sectionKey}.${field.key}` === entry.path,
-        )
+      for (const [sectionKey, fields] of legacyFieldDefs) {
+        const f = fields.find((field) => `${sectionKey}.${field.key}` === entry.path)
         if (f) {
           return { ...entry, hotReload: f.hotReload, scope: f.restartScope }
         }
       }
-      // Unknown path — let the backend classification in the response
-      // handle it. Mark hotReload: false to err on the safe side.
       return { ...entry, hotReload: false }
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [diff])
 
   const hasUnsaved = annotatedDiff.length > 0
+  const restartCount = annotatedDiff.filter((d) => !d.hotReload).length
+  const hotReloadCount = annotatedDiff.length - restartCount
+
+  // Map unsaved diffs to per-section counts. Used by the rail to show
+  // badges and modified dots, and by the section card headers.
+  const unsavedBySection = useMemo(() => {
+    const out: Record<string, number> = {}
+    for (const entry of annotatedDiff) {
+      const top = entry.path.split('.')[0] ?? entry.path
+      out[top] = (out[top] ?? 0) + 1
+    }
+    return out
+  }, [annotatedDiff])
 
   const handleSaveClick = () => {
     if (annotatedDiff.length === 0) return
@@ -934,13 +683,9 @@ function SettingsPage() {
     saveMutation.mutate(payload, {
       onSuccess: (res) => {
         setShowDiff(false)
-        setSaveNotice('success')
-        setTimeout(() => setSaveNotice(null), 3000)
+        setLastSavedAt(new Date())
         if (res && 'hot_reload' in res) {
           const r = (res as ConfigPatchResponse).hot_reload
-          // Surface the hot-reload breakdown as a toast so the user
-          // gets a visible confirmation of what was applied and what
-          // needs a restart.
           if (r.requires_restart.length > 0) {
             toast(
               t('settings.savedWithRestart', {
@@ -960,11 +705,14 @@ function SettingsPage() {
       },
       onError: () => {
         setShowDiff(false)
-        setSaveNotice('error')
-        setTimeout(() => setSaveNotice(null), 5000)
         toast.error(t('settings.settingsSaveFailed'))
       },
     })
+  }
+
+  const handleDiscard = () => {
+    setFormValues({})
+    refetch()
   }
 
   const setField = (sectionKey: string, fieldKey: string, value: unknown) => {
@@ -977,107 +725,79 @@ function SettingsPage() {
   if (isLoading) return <LoadingCards count={4} />
   if (isError) return <ErrorState onRetry={() => refetch()} />
 
-  // Render active panel content.
-  const renderContent = () => {
-    if (activeSection === 'engine') return <EnginePanel />
-    if (activeSection === 'update') {
-      return (
-        <div className="space-y-6">
-          <SystemUpdateCard />
-          <SystemToolsPanel />
-        </div>
-      )
-    }
-
-    // New sections.
-    const newSection = NEW_SECTIONS.find((s) => s.key === activeSection)
-    if (newSection) {
-      return renderNewSection(newSection, formValues, setField, t)
-    }
-
-    // Legacy sections.
-    const fields = legacyFieldsBySection.get(activeSection)
-    if (!fields) return null
-    const def = legacyFieldDefs.find(([key]) => key === activeSection)
-    if (!def) return null
-    return (
-      <LegacyConfigSectionCard
-        sectionKey={activeSection}
-        labelKey={legacySectionLabelKeys[activeSection] ?? activeSection}
-        descriptionKey={def[1]}
-        icon={navGroups.flatMap((g) => g.items).find((i) => i.id === activeSection)?.icon}
-        fields={fields}
-        formValues={formValues as Record<string, Record<string, string | boolean>>}
-        onFieldChange={(sk, fk, v) => setField(sk, fk, v)}
-        config={config}
-      />
-    )
+  const handleNavigate = (id: string) => {
+    setActiveSection(id)
+    // Keep URL in sync so deep-links work.
+    const url = new URL(window.location.href)
+    url.searchParams.set('section', id)
+    window.history.replaceState({}, '', url.toString())
   }
+
+  // Build shell data from SECTION_META + SETTINGS_GROUPS.
+  const shellGroups = SETTINGS_GROUPS.filter((g) =>
+    SECTION_META.some((s) => s.groupId === g.id),
+  ).map((g) => ({ id: g.id, labelKey: g.labelKey }))
+
+  const shellSections = SECTION_META.map((m) => ({
+    id: m.id,
+    labelKey: m.labelKey,
+    groupId: m.groupId,
+  }))
+
+  const activeMeta = getSectionMeta(safeActiveSection)
 
   return (
     <div>
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold">{t(tKeys.title)}</h1>
-          <p className="text-muted-foreground text-sm">{t(tKeys.subtitle)}</p>
-        </div>
-      </div>
+      <SettingsHeader
+        title={t(tKeys.title)}
+        subtitle={t(tKeys.subtitle)}
+        status={
+          saveMutation.isPending
+            ? 'saving'
+            : saveMutation.isError
+              ? 'error'
+              : hasUnsaved
+                ? 'unsaved'
+                : 'saved'
+        }
+        lastSavedAt={lastSavedAt}
+        unsavedCount={annotatedDiff.length}
+      />
 
-      {/* Save notice */}
-      {saveNotice === 'success' && (
-        <div className="rounded-lg border border-success-subtle p-3 text-sm text-success mb-4">
-          {t('settings.settingsSaved')}
-        </div>
-      )}
-      {saveNotice === 'error' && (
-        <div className="rounded-lg border border-error-subtle p-3 text-sm text-error mb-4">
-          {t('settings.settingsSaveFailed')}
-        </div>
-      )}
-
-      <SettingsLayout groups={navGroups} activeId={activeSection} onNavigate={setActiveSection}>
-        {renderContent()}
-      </SettingsLayout>
-
-      {/* Sticky Save Bar */}
-      <div
-        className="sticky bottom-0 -mx-4 sm:-mx-6 mt-8 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 px-4 sm:px-6 py-3 z-10"
-        data-testid="sticky-save-bar"
+      <SettingsShell
+        groups={shellGroups}
+        sections={shellSections}
+        activeId={safeActiveSection}
+        onNavigate={handleNavigate}
+        unsavedBySection={unsavedBySection}
+        onReview={hasUnsaved ? handleSaveClick : undefined}
       >
-        <div className="flex items-center justify-between gap-3 max-w-3xl">
-          <div className="text-xs text-muted-foreground">
-            {hasUnsaved ? (
-              <span>
-                {t('settings.unsavedChanges')} · {annotatedDiff.length}{' '}
-                {annotatedDiff.length === 1 ? 'field' : 'fields'}
-              </span>
-            ) : (
-              <span>{t('settings.settingsSaved')}</span>
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={!hasUnsaved || saveMutation.isPending}
-              onClick={() => refetch()}
-              data-testid="reset-changes"
-            >
-              {t('common.reset')}
-            </Button>
-            <Button
-              size="sm"
-              disabled={!hasUnsaved || saveMutation.isPending}
-              onClick={handleSaveClick}
-              data-testid="save-changes"
-            >
-              <Save className="h-4 w-4 mr-2" />
-              {saveMutation.isPending ? t('settings.savingChanges') : t('common.save')}
-            </Button>
-          </div>
-        </div>
-      </div>
+        {renderActiveSection(
+          safeActiveSection,
+          activeMeta,
+          formValues,
+          setField,
+          t,
+          hasUnsaved,
+          unsavedBySection[safeActiveSection] ?? 0,
+          handleDiscard,
+        )}
+      </SettingsShell>
+
+      {/* Floating Save Dock — the single source of save/discard actions.
+          Rendered `position: fixed` so it stays reachable regardless of
+          scroll position. A previous inline fallback button block was
+          removed to avoid a duplicate CTA (review feedback). */}
+      <SaveDock
+        totalChanges={annotatedDiff.length}
+        restartRequired={restartCount}
+        applyLive={hotReloadCount}
+        isPending={saveMutation.isPending}
+        onReview={handleSaveClick}
+        onDiscard={handleDiscard}
+        visible={hasUnsaved}
+      />
 
       {/* Diff Preview Modal */}
       <DiffPreview
@@ -1086,84 +806,188 @@ function SettingsPage() {
         diffs={annotatedDiff}
         onConfirm={handleConfirmSave}
         isPending={saveMutation.isPending}
+        labelForPath={(path) => diffLabelMap.get(path)}
       />
     </div>
   )
 }
 
-// ─── New section renderer ────────────────────────────────────
+// ─── Section renderer (unified for legacy + new) ────────────────
 
-function renderNewSection(
-  section: SettingsSectionDef,
+function renderActiveSection(
+  sectionId: string,
+  meta: SectionMeta | undefined,
   formValues: Record<string, Record<string, unknown>>,
   setField: (sectionKey: string, fieldKey: string, value: unknown) => void,
   t: (key: string) => string,
+  _hasUnsaved: boolean,
+  unsavedCount: number,
+  onDiscardAll: () => void,
 ) {
-  // Memory gets sub-cards.
-  if (section.key === 'memory') {
+  // Engine: render the dedicated engine panel.
+  if (sectionId === 'engine') {
+    return <EnginePanel />
+  }
+
+  // Update: dedicated system update card.
+  if (sectionId === 'update') {
+    return (
+      <div className="space-y-4">
+        <SystemUpdateCard />
+        <SystemToolsPanel />
+      </div>
+    )
+  }
+
+  if (!meta) return null
+
+  // Memory: render sub-cards for storage / embedding / learning / dream.
+  if (sectionId === 'memory') {
+    const memorySection = NEW_SECTIONS.find((s) => s.key === 'memory')!
     const fieldsBySubsection: Record<string, SettingsFieldDef[]> = {
-      storage: section.fields.filter((f) => f.key === 'enabled' || f.key.startsWith('sqlite.')),
-      embedding: section.fields.filter((f) => f.key.startsWith('embedding.')),
-      learning: section.fields.filter((f) => f.key.startsWith('learning.')),
-      dream: section.fields.filter((f) => f.key.startsWith('consolidation.')),
+      storage: memorySection.fields.filter(
+        (f) => f.key === 'enabled' || f.key.startsWith('sqlite.'),
+      ),
+      embedding: memorySection.fields.filter((f) => f.key.startsWith('embedding.')),
+      learning: memorySection.fields.filter((f) => f.key.startsWith('learning.')),
+      dream: memorySection.fields.filter((f) => f.key.startsWith('consolidation.')),
     }
     return (
       <MemorySection
         fieldsBySubsection={fieldsBySubsection}
-        formValues={formValues as Record<string, Record<string, string | boolean>>}
-        onFieldChange={(sk, fk, v) => setField(sk, fk, v)}
-      />
-    )
-  }
-
-  // Channels get a single card.
-  if (section.key === 'channels.telegram') {
-    return (
-      <ChannelsSection
-        sectionKey={section.key}
-        labelKey={section.labelKey}
-        fields={section.fields}
         formValues={formValues as Record<string, Record<string, string | boolean | string[]>>}
         onFieldChange={(sk, fk, v) => setField(sk, fk, v)}
       />
     )
   }
 
-  // Default: a single card with all fields.
-  return (
-    <Card>
-      <CardHeader className="pb-4">
-        <CardTitle className="flex items-center gap-2 text-base">
-          <MessageSquare className="h-4 w-4" />
-          {t(section.labelKey)}
-        </CardTitle>
-        <p className="text-xs text-muted-foreground">{t(section.descriptionKey)}</p>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {section.fields.map((field, i) => (
-          <div key={field.key}>
-            {i > 0 && <Separator className="mb-4" />}
-            <FieldRow
-              sectionKey={section.key}
-              field={field}
-              value={
-                formValues[section.key]?.[field.key] as
-                  | string
-                  | boolean
-                  | string[]
-                  | number
-                  | undefined
-              }
-              onChange={(val) => setField(section.key, field.key, val)}
-            />
-          </div>
+  // Telegram (channel): dedicated channels section card.
+  if (sectionId === 'channels.telegram') {
+    const tg = NEW_SECTIONS.find((s) => s.key === 'channels.telegram')!
+    return (
+      <ChannelsSection
+        sectionKey={tg.key}
+        labelKey={tg.labelKey}
+        fields={tg.fields}
+        formValues={formValues as Record<string, Record<string, string | boolean | string[]>>}
+        onFieldChange={(sk, fk, v) => setField(sk, fk, v)}
+      />
+    )
+  }
+
+  // New sections: render a unified SectionCard.
+  const newSection = NEW_SECTIONS.find((s) => s.key === sectionId)
+  if (newSection) {
+    return (
+      <SectionCard
+        title={t(newSection.labelKey)}
+        description={t(newSection.descriptionKey)}
+        icon={<SectionIcon iconKey={newSection.iconKey} className="h-3.5 w-3.5" />}
+        sectionId={newSection.key}
+        fieldCount={newSection.fields.length}
+        modified={unsavedCount > 0}
+        onReset={onDiscardAll}
+      >
+        {newSection.fields.map((field) => (
+          <FieldRow
+            key={field.key}
+            sectionKey={newSection.key}
+            field={field}
+            value={
+              formValues[newSection.key]?.[field.key] as
+                | string
+                | boolean
+                | string[]
+                | number
+                | undefined
+            }
+            onChange={(val) => setField(newSection.key, field.key, val)}
+            modified={unsavedCount > 0 && formValues[newSection.key]?.[field.key] !== undefined}
+            sectionValues={formValues[newSection.key]}
+          />
         ))}
-      </CardContent>
-    </Card>
+      </SectionCard>
+    )
+  }
+
+  // Legacy sections: render a unified SectionCard with the legacy
+  // field defs mapped into the SettingsFieldDef shape.
+  const legacyFields = legacyFieldsBySection.get(sectionId)
+  if (legacyFields) {
+    return (
+      <LegacySectionCard
+        meta={meta}
+        sectionId={sectionId}
+        fields={legacyFields}
+        formValues={formValues}
+        setField={setField}
+        t={t}
+        modified={unsavedCount > 0}
+        onReset={onDiscardAll}
+      />
+    )
+  }
+
+  return null
+}
+
+function LegacySectionCard({
+  meta,
+  sectionId,
+  fields,
+  formValues,
+  setField,
+  t,
+  modified,
+  onReset,
+}: {
+  meta: SectionMeta
+  sectionId: string
+  fields: LegacyField[]
+  formValues: Record<string, Record<string, unknown>>
+  setField: (sectionKey: string, fieldKey: string, value: unknown) => void
+  t: (key: string) => string
+  modified: boolean
+  onReset: () => void
+}) {
+  return (
+    <SectionCard
+      title={t(meta.labelKey)}
+      description={t(meta.descriptionKey)}
+      icon={<SectionIcon iconKey={meta.iconKey} className="h-3.5 w-3.5" />}
+      sectionId={sectionId}
+      fieldCount={fields.length}
+      modified={modified}
+      onReset={onReset}
+    >
+      {fields.map((field) => {
+        // Adapt LegacyField → SettingsFieldDef so we can reuse the new
+        // FieldRow component (which is the source of truth for the
+        // responsive layout + RestartBadge).
+        const adapted: SettingsFieldDef = {
+          key: field.key,
+          labelKey: field.labelKey,
+          descriptionKey: field.descriptionKey,
+          type: field.type,
+          placeholder: field.placeholder,
+          options: field.options,
+          hotReload: field.hotReload,
+          restartScope: field.restartScope,
+        }
+        const v = formValues[sectionId]?.[field.key]
+        return (
+          <FieldRow
+            key={field.key}
+            sectionKey={sectionId}
+            field={adapted}
+            value={v as string | boolean | string[] | number | undefined}
+            onChange={(val) => setField(sectionId, field.key, val)}
+            sectionValues={formValues[sectionId]}
+          />
+        )
+      })}
+    </SectionCard>
   )
 }
 
-import { Input } from '@/components/ui/input'
-import { Select } from '@/components/ui/select'
-// Imports that need to be available in this file.
-import { Switch } from '@/components/ui/switch'
+// ─── End ──────────────────────────────────────────────────────

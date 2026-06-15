@@ -53,6 +53,7 @@ export function ChannelsSection({
                   | undefined
               }
               onChange={(val) => onFieldChange(sectionKey, field.key, val)}
+              sectionValues={formValues[sectionKey]}
             />
           </div>
         ))}

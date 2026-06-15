@@ -61,6 +61,7 @@ export function MemorySection({
                         | undefined
                     }
                     onChange={(val) => onFieldChange('memory', field.key, val)}
+                    sectionValues={formValues.memory}
                   />
                 </div>
               ))}
