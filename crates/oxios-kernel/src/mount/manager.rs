@@ -122,12 +122,6 @@ impl MountManager {
         source: MountSource,
     ) -> Result<Mount> {
         let name = validate_mount_name(&name)?;
-        {
-            let name_index = self.name_index.read();
-            if name_index.contains_key(&name) {
-                return Err(MountManagerError::DuplicateName(name).into());
-            }
-        }
         if paths.is_empty() {
             return Err(MountManagerError::Invalid(
                 "a Mount requires at least one path".to_string(),
@@ -138,14 +132,25 @@ impl MountManager {
         let mut mount = Mount::new(&name, source);
         mount.paths = paths;
 
+        // Hold the write locks across the uniqueness check, the DB write, and
+        // the in-memory insert. The previous version used a *read* lock for the
+        // name check and a *separate* write lock for the insert, leaving a
+        // TOCTOU window in which two concurrent `create_mount` calls with the
+        // same name both passed the check. Acquiring both locks in the
+        // consistent order used throughout the manager (mounts → name_index)
+        // closes the window entirely.
+        let mut mounts = self.mounts.write();
+        let mut name_index = self.name_index.write();
+        if name_index.contains_key(&name) {
+            return Err(MountManagerError::DuplicateName(name).into());
+        }
+
         mount_db::save_mount(&self.db.conn(), &mount)?;
 
-        {
-            let mut mounts = self.mounts.write();
-            let mut name_index = self.name_index.write();
-            name_index.insert(mount.name.clone(), mount.id);
-            mounts.insert(mount.id, mount.clone());
-        }
+        name_index.insert(mount.name.clone(), mount.id);
+        mounts.insert(mount.id, mount.clone());
+        drop(name_index);
+        drop(mounts);
 
         if let Some(ref event_bus) = self.event_bus {
             let _ = event_bus.publish(KernelEvent::ProjectCreated {
@@ -426,9 +431,15 @@ impl MountManager {
     /// Returns the IDs of Mounts whose content drifted.
     pub fn check_all_drift(&self) -> Vec<MountId> {
         let ids: Vec<MountId> = self.mounts.read().keys().copied().collect();
-        ids.into_iter()
-            .filter(|id| self.check_drift(*id).unwrap_or(false))
-            .collect()
+        let mut drifted = Vec::new();
+        for id in ids {
+            match self.check_drift(id) {
+                Ok(true) => drifted.push(id),
+                Ok(false) => {}
+                Err(e) => tracing::warn!(error = %e, %id, "check_drift failed for mount"),
+            }
+        }
+        drifted
     }
 
     /// RFC-025 Phase 5: scan session history and auto-create Mounts for paths
@@ -447,9 +458,15 @@ impl MountManager {
         }
 
         let freqs = path_promotion::tally_frequencies(sessions, config);
+        // Sort deterministically: most frequent first, then alphabetically by
+        // path. This guarantees that when two roots derive the same name the
+        // most-used one wins consistently across runs (HashMap iteration order
+        // is otherwise non-deterministic).
+        let mut sorted_freqs: Vec<_> = freqs.into_iter().collect();
+        sorted_freqs.sort_by(|a, b| b.1.count.cmp(&a.1.count).then_with(|| a.0.cmp(&b.0)));
         let mut created = Vec::new();
 
-        for (root, freq) in freqs {
+        for (root, freq) in sorted_freqs {
             if freq.count < config.threshold {
                 continue;
             }

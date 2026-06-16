@@ -275,8 +275,15 @@ fn collect_path_like_strings_inner(
 }
 
 /// Heuristic: does this string look like an absolute or home-relative path?
+///
+/// Note: `normalize_to_root` filters out most false positives anyway, so this
+/// only needs to be a coarse pre-filter.
 fn looks_like_path(s: &str) -> bool {
     let s = s.trim_matches(punct);
+    // Reject UNC paths (//host/share) — not local filesystem paths.
+    if s.starts_with("//") {
+        return false;
+    }
     // Absolute unix path with at least one separator and some depth.
     (s.starts_with('/') && s.matches('/').count() >= 2 && s.len() > 3)
         || (s.starts_with("~/") && s.len() > 3)

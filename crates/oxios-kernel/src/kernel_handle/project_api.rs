@@ -181,11 +181,25 @@ impl ProjectApi {
         instructions: Option<String>,
     ) -> Result<ProjectInfo> {
         let pid = Uuid::parse_str(id).context("Invalid project ID")?;
-        let mount_ids = mount_ids.map(|ids| {
-            ids.into_iter()
-                .filter_map(|s| uuid::Uuid::parse_str(&s).ok())
-                .collect()
-        });
+        // Reject invalid UUIDs rather than silently dropping them. Collecting
+        // all the bad IDs lets the caller see every offender in one error.
+        let mount_ids = match mount_ids {
+            Some(ids) => {
+                let mut parsed = Vec::with_capacity(ids.len());
+                let mut bad = Vec::new();
+                for s in ids {
+                    match uuid::Uuid::parse_str(&s) {
+                        Ok(u) => parsed.push(u),
+                        Err(_) => bad.push(s),
+                    }
+                }
+                if !bad.is_empty() {
+                    anyhow::bail!("Invalid mount ID(s): {}", bad.join(", "));
+                }
+                Some(parsed)
+            }
+            None => None,
+        };
         let project = self
             .project_manager
             .update_project_bundle(pid, mount_ids, instructions)?;

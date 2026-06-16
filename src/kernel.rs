@@ -1538,15 +1538,20 @@ fn migrate_projects_to_mounts(
             oxios_kernel::MountSource::AutoDetected,
         ) {
             Ok(mount) => {
-                // Link the new Mount back to the Project.
+                // Link the new Mount back to the Project. If the link fails,
+                // roll back the just-created Mount so it does not become a
+                // permanent orphan — otherwise the name-collision check above
+                // would skip it on every subsequent migration run while the
+                // Project still references no Mount.
                 if let Err(e) =
                     project_manager.update_project_bundle(project.id, Some(vec![mount.id]), None)
                 {
                     tracing::warn!(
                         project = %project.name,
                         error = %e,
-                        "failed to link migrated Mount to Project"
+                        "link failed; rolling back orphan Mount"
                     );
+                    let _ = mount_manager.remove_mount(mount.id);
                 } else {
                     migrated += 1;
                 }

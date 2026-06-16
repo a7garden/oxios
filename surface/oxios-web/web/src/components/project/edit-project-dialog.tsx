@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { FolderOpen } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -48,19 +48,19 @@ export function EditProjectDialog({
   const { data: mountsData } = useMounts()
   const availableMounts = mountsData?.items ?? []
 
-  // Sync state when project prop changes
-  if (project && open) {
-    if (name !== project.name) setName(project.name)
-    if (icon !== (project.emoji ?? 'package')) setIcon(project.emoji ?? 'package')
-    if (description !== (project.description ?? '')) setDescription(project.description ?? '')
-    if (tags !== (project.tags ?? []).join(', ')) setTags((project.tags ?? []).join(', '))
-    if (paths !== (project.paths ?? []).join('\n')) setPaths((project.paths ?? []).join('\n'))
-    if (memoryVisible !== (project.memory_visible ?? true))
+  // Sync state when the project prop or open state changes.
+  useEffect(() => {
+    if (project && open) {
+      setName(project.name)
+      setIcon(project.emoji ?? 'package')
+      setDescription(project.description ?? '')
+      setTags((project.tags ?? []).join(', '))
+      setPaths((project.paths ?? []).join('\n'))
       setMemoryVisible(project.memory_visible ?? true)
-    if (mountIds.join(',') !== (project.mount_ids ?? []).join(','))
       setMountIds(project.mount_ids ?? [])
-    if (instructions !== (project.instructions ?? '')) setInstructions(project.instructions ?? '')
-  }
+      setInstructions(project.instructions ?? '')
+    }
+  }, [project?.id, open])
 
   const handleSubmit = () => {
     if (!project || !name.trim()) return

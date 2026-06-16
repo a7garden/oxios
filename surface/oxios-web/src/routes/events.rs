@@ -40,7 +40,7 @@ pub(crate) struct MoveSessionBody {
 pub(crate) async fn handle_sessions_list(
     state: State<Arc<AppState>>,
     Query(params): Query<PageParams>,
-) -> Json<serde_json::Value> {
+) -> Result<Json<serde_json::Value>, StatusCode> {
     match state.kernel.state.list_sessions().await {
         Ok(sessions) => {
             let items: Vec<SessionListItem> = sessions
@@ -56,9 +56,12 @@ pub(crate) async fn handle_sessions_list(
                     updated_at: s.updated_at.to_rfc3339(),
                 })
                 .collect();
-            Json(paginate(&items, &params))
+            Ok(Json(paginate(&items, &params)))
         }
-        Err(_) => Json(paginate(&Vec::<SessionListItem>::new(), &params)),
+        Err(e) => {
+            tracing::warn!(error = %e, "list_sessions failed");
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
+        }
     }
 }
 
