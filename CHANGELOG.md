@@ -5,6 +5,30 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2026-06-16
+
+### Added
+- **RFC-024 web↔daemon reliability** — Atomic static-asset distribution with content-hash references, hard timeouts on all SSE/WS streams, and a readiness gate (SP4) so the web surface only serves after the kernel is fully initialized. Gateway gains a SP1/SP2 reliability layer.
+- **RFC-025 Mount + Project system** — Unified notion of host directories mounted into the workspace as first-class Project bundles:
+  - Mount core + Workspace Context injection (Phase 1) and Project bundle layer + agent enrichment (Phase 2/3).
+  - Frontend Mount UI with detection badge and Project bundle rendering.
+  - Phase 4 Mount rescan; Phase 5 frequent-path auto-promotion to Mounts.
+  - Project-tree sidebar with drag-to-reparent and data migration.
+- **Mobile responsive design (Web)** — Full responsive redesign (Phases 1–5) across chat, control, browse, and settings surfaces.
+- **Settings UX overhaul (Web)** — Range sliders, full tool checklist (replacing the allowed_tools tag-input), CORS editor, and field-control polish.
+
+### Changed
+- **Version bump to 1.4.0** — All crates updated to 1.4.0; web `package.json` aligned to 1.4.0.
+- **Rust 2024 edition + oxi-sdk 0.35.0** — Workspace migrated to edition 2024 and bumped to oxi-sdk 0.35.0 (native-browser fix).
+- **wasm-sandbox wasmtime 22 migration** — Resolved `WasiCtx`, `fuel_remaining`, `define_wasi`, and `Memory::read` API drift; `cargo build/clippy --workspace --all-features` now passes cleanly.
+- **Iconography (Web)** — Replaced emoji across the UI with lucide-react icons.
+
+### Fixed
+- **RFC-025 review pass** — Fixed all critical, major, and minor issues identified in the review across the stack (remaining substantive bugs, last design issues).
+- **Settings** — Phantom memory changes from a non-existent field key; `dream_interval_hours` slider max reduced from 168h to 72h; settings shell flex layout-break on narrow screens.
+- **Web** — Accidental text selection on interactive UI chrome.
+- **Frontend provider catalog** — Missing provider models added to the fallback catalog.
+
 ## [1.3.0] - 2026-06-13
 
 ### Added
