@@ -128,6 +128,10 @@ impl MountManager {
             )
             .into());
         }
+        // Reject overly broad system paths (lightweight safety, not a sandbox).
+        for p in &paths {
+            validate_mount_path(p)?;
+        }
 
         let mut mount = Mount::new(&name, source);
         mount.paths = paths;
@@ -578,6 +582,26 @@ fn validate_mount_name(name: &str) -> Result<String> {
     Ok(trimmed.to_string())
 }
 
+/// Reject paths that are too broad to be a meaningful project root.
+///
+/// This is a lightweight safety check, not a full sandbox — AccessManager
+/// RBAC enforcement is the real boundary. We only reject the filesystem root
+/// and a few system directories that would make detection hijack every path.
+fn validate_mount_path(path: &Path) -> Result<()> {
+    let forbidden = [
+        "", "/etc", "/dev", "/proc", "/sys", "/var", "/usr", "/bin", "/sbin", "/boot",
+    ];
+    let normalized = path.to_str().map(|s| s.trim_end_matches('/')).unwrap_or("");
+    if forbidden.contains(&normalized) {
+        return Err(MountManagerError::Invalid(format!(
+            "Mount path '{}' is a system directory; refusing to create an overly broad Mount",
+            path.display()
+        ))
+        .into());
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -627,6 +651,24 @@ mod tests {
             .create_mount("x".to_string(), vec![], MountSource::Manual)
             .unwrap_err();
         assert!(err.to_string().contains("at least one path"));
+    }
+
+    #[test]
+    fn test_system_directory_path_rejected() {
+        let mgr = open_manager();
+        for bad in ["/", "/etc", "/dev", "/proc", "/usr"] {
+            let err = mgr
+                .create_mount(
+                    "bad".to_string(),
+                    vec![PathBuf::from(bad)],
+                    MountSource::Manual,
+                )
+                .unwrap_err();
+            assert!(
+                err.to_string().contains("system directory"),
+                "expected system directory rejection for {bad}"
+            );
+        }
     }
 
     #[test]

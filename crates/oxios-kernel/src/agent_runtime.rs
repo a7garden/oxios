@@ -632,11 +632,14 @@ async fn run_agent(
     // AgentLifecycleManager::ensure_permissions() adds kernel.workspace (~/.oxios/workspace),
     // but the agent operates in different directories depending on context:
     //
-    //   1. CWD -- oxi-sdk tools (ReadTool, LsTool, etc.) resolve relative paths
-    //      against std::env::current_dir(), which is the daemon working directory.
-    //      Without CWD in allowed_paths, EVERY file tool call is denied.
-    //   2. The designated workspace -- computed from project_paths / workspace_dir / temp.
-    //   3. Kernel workspace -- state store path for seeds, sessions, etc.
+    //   1. Process CWD — oxi-sdk 0.35+ bakes `workspace_dir` into file tools
+    //      via `with_cwd`, so ReadTool/LsTool resolve relatives against the
+    //      workspace, NOT the process CWD. However, oxios's own CSpace tools
+    //      (kernel-bridge tools wrapped in GatedTool) and bash/exec
+    //      subprocesses may still resolve against the process CWD. We grant
+    //      it as a safety net so those tools aren't denied by GatedTool.
+    //   2. The designated workspace — computed from mount_paths / workspace_dir / temp.
+    //   3. Kernel workspace — state store path for seeds, sessions, etc.
     //   4. /tmp -- general temp file access.
     //
     // All four must be in allowed_paths before GatedTool wraps any tool.

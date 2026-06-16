@@ -588,6 +588,15 @@ impl Orchestrator {
             Some(mount_tag.clone())
         };
 
+        // RFC-025: suppress project_tag when mount_tag is present — the mount
+        // badge is more specific (shows actual mount names) and avoids showing
+        // two near-identical badges for the same context.
+        let project_tag = if mount_tag_opt.is_some() {
+            String::new()
+        } else {
+            project_tag
+        };
+
         let _conversation_turns = {
             let buffer = self.conversation_buffer.read();
             buffer.turns().iter().cloned().collect::<Vec<_>>()
@@ -1169,6 +1178,13 @@ impl Orchestrator {
             None
         } else {
             Some(mount_tag.clone())
+        };
+
+        // RFC-025: suppress project_tag when mount_tag is present.
+        let project_tag = if mount_tag_opt.is_some() {
+            String::new()
+        } else {
+            project_tag
         };
 
         // Lightweight seed — goal only, no constraints/criteria
