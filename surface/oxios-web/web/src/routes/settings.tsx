@@ -71,6 +71,9 @@ interface LegacyField {
   options?: { value: string; labelKey: string }[]
   hotReload: boolean
   restartScope?: 'kernel' | 'gateway' | 'logging' | 'memory' | 'engine' | 'audit'
+  min?: number
+  max?: number
+  step?: number
 }
 
 const tKeys = {
@@ -512,8 +515,8 @@ function EnginePanel() {
 // We import them lazily at the bottom to keep the engine panel close to
 // the other legacy form code that uses the same primitives.
 import { Bot } from 'lucide-react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { AllowedToolsPicker } from '@/components/settings/allowed-tools-picker'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { validateCorsOrigin } from '@/lib/cors-validator'
 
 // ─── Settings Page ─────────────────────────────────────────────
@@ -900,12 +903,14 @@ function renderActiveSection(
 
   // Security: dedicated SectionCard with AllowedToolsPicker + CORS validation.
   if (sectionId === 'security') {
-    return <SecuritySectionCard
-      securityValues={formValues.security}
-      onFieldChange={(fk, v) => setField('security', fk, v)}
-      onDiscardAll={onDiscardAll}
-      unsavedCount={unsavedCount}
-    />
+    return (
+      <SecuritySectionCard
+        securityValues={formValues.security}
+        onFieldChange={(fk, v) => setField('security', fk, v)}
+        onDiscardAll={onDiscardAll}
+        unsavedCount={unsavedCount}
+      />
+    )
   }
 
   // New sections: render a unified SectionCard.
@@ -1006,6 +1011,9 @@ function LegacySectionCard({
           options: field.options,
           hotReload: field.hotReload,
           restartScope: field.restartScope,
+          min: field.min,
+          max: field.max,
+          step: field.step,
         }
         const v = formValues[sectionId]?.[field.key]
         return (
@@ -1060,9 +1068,7 @@ function SecuritySectionCard({
             <div key={field.key} className="space-y-2">
               <div className="min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <label className="text-sm font-medium text-foreground">
-                    {t(field.labelKey)}
-                  </label>
+                  <label className="text-sm font-medium text-foreground">{t(field.labelKey)}</label>
                 </div>
                 <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
                   {t(field.descriptionKey)}
@@ -1082,12 +1088,7 @@ function SecuritySectionCard({
               sectionKey="security"
               field={field}
               value={
-                securityValues?.[field.key] as
-                  | string
-                  | boolean
-                  | string[]
-                  | number
-                  | undefined
+                securityValues?.[field.key] as string | boolean | string[] | number | undefined
               }
               onChange={(val) => onFieldChange(field.key, val)}
               sectionValues={securityValues}

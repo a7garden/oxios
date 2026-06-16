@@ -1,7 +1,6 @@
 import { Search, X } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
@@ -59,7 +58,9 @@ export function AllowedToolsPicker({ value, onChange, disabled }: AllowedToolsPi
       if (tools.length > 0) groups.set(cat, tools)
     }
     // Uncategorized
-    const rest = filtered.filter((t) => !CATEGORY_ORDER.includes(t.category as typeof CATEGORY_ORDER[number]))
+    const rest = filtered.filter(
+      (t) => !CATEGORY_ORDER.includes(t.category as (typeof CATEGORY_ORDER)[number]),
+    )
     if (rest.length > 0) groups.set('other', rest)
 
     return Array.from(groups.entries())
@@ -89,9 +90,7 @@ export function AllowedToolsPicker({ value, onChange, disabled }: AllowedToolsPi
 
   if (isLoading) {
     return (
-      <div className="text-sm text-muted-foreground py-4 text-center">
-        {t('common.loading')}
-      </div>
+      <div className="text-sm text-muted-foreground py-4 text-center">{t('common.loading')}</div>
     )
   }
 
@@ -148,7 +147,10 @@ export function AllowedToolsPicker({ value, onChange, disabled }: AllowedToolsPi
                     className="text-xs text-muted-foreground hover:text-foreground ml-2"
                     onClick={() => {
                       const allChecked = tools.every((t) => value.includes(t.name))
-                      toggleAll(tools.map((t) => t.name), !allChecked)
+                      toggleAll(
+                        tools.map((t) => t.name),
+                        !allChecked,
+                      )
                     }}
                   >
                     {tools.every((t) => value.includes(t.name))
@@ -186,9 +188,7 @@ export function AllowedToolsPicker({ value, onChange, disabled }: AllowedToolsPi
 
       {/* Manual entry for non-catalog tools (MCP etc.) */}
       {!disabled && (
-        <div className="text-xs text-muted-foreground">
-          {t('settings.allowedToolsManualEntry')}
-        </div>
+        <div className="text-xs text-muted-foreground">{t('settings.allowedToolsManualEntry')}</div>
       )}
     </div>
   )

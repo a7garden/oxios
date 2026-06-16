@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
 import { FolderOpen } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -14,8 +14,8 @@ import {
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
-import { useUpdateProject } from '@/hooks/use-projects'
 import { useMounts } from '@/hooks/use-mounts'
+import { useUpdateProject } from '@/hooks/use-projects'
 import type { Project } from '@/types'
 
 interface EditProjectDialogProps {
@@ -171,9 +171,7 @@ export function EditProjectDialog({
           {/* RFC-025: Mount references */}
           {availableMounts.length > 0 && (
             <div className="space-y-1">
-              <label className="text-sm font-medium">
-                {t('projects.mounts', 'Mounts')}
-              </label>
+              <label className="text-sm font-medium">{t('projects.mounts', 'Mounts')}</label>
               <div className="flex flex-wrap gap-1">
                 {availableMounts.map((m) => (
                   <button
@@ -181,9 +179,7 @@ export function EditProjectDialog({
                     type="button"
                     onClick={() => {
                       setMountIds((prev) =>
-                        prev.includes(m.id)
-                          ? prev.filter((id) => id !== m.id)
-                          : [...prev, m.id],
+                        prev.includes(m.id) ? prev.filter((id) => id !== m.id) : [...prev, m.id],
                       )
                     }}
                     className={`rounded px-2 py-1 text-xs border transition-colors ${
@@ -192,7 +188,9 @@ export function EditProjectDialog({
                         : 'border-transparent hover:bg-muted'
                     }`}
                   >
-                    <span className="inline-flex items-center gap-1"><FolderOpen className="h-3 w-3" /> {m.name}</span>
+                    <span className="inline-flex items-center gap-1">
+                      <FolderOpen className="h-3 w-3" /> {m.name}
+                    </span>
                   </button>
                 ))}
               </div>

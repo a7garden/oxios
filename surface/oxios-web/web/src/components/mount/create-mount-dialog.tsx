@@ -42,9 +42,7 @@ export function CreateMountDialog({ open, onOpenChange }: CreateMountDialogProps
       setPath('')
       onOpenChange(false)
     } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : t('mounts.createFailed', '생성 실패'),
-      )
+      toast.error(err instanceof Error ? err.message : t('mounts.createFailed', '생성 실패'))
     }
   }
 
@@ -84,17 +82,10 @@ export function CreateMountDialog({ open, onOpenChange }: CreateMountDialogProps
             />
           </div>
           <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-            >
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               {t('common.cancel', '취소')}
             </Button>
-            <Button
-              type="submit"
-              disabled={!name.trim() || !path.trim() || createMount.isPending}
-            >
+            <Button type="submit" disabled={!name.trim() || !path.trim() || createMount.isPending}>
               {createMount.isPending
                 ? t('common.creating', '생성 중...')
                 : t('mounts.create', 'Mount 만들기')}

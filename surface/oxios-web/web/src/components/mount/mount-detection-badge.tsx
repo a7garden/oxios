@@ -1,7 +1,7 @@
-import { X, FolderCheck } from 'lucide-react'
+import { FolderCheck, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { useChatStore } from '@/stores/chat'
 import { cn } from '@/lib/utils'
+import { useChatStore } from '@/stores/chat'
 
 /**
  * Mount 감지 배지 (RFC-025).

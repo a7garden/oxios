@@ -10,7 +10,7 @@ import { LoadingCards } from '@/components/shared/loading'
 import { RefreshButton } from '@/components/shared/refresh-button'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { useMounts, useDeleteMount, useRescanMount } from '@/hooks/use-mounts'
+import { useDeleteMount, useMounts, useRescanMount } from '@/hooks/use-mounts'
 import type { Mount } from '@/types'
 
 export const Route = createFileRoute('/mounts/')({ component: MountsPage })
@@ -51,10 +51,7 @@ function MountsPage() {
         <div>
           <h1 className="text-2xl font-bold">{t('mounts.title', 'Mounts')}</h1>
           <p className="text-muted-foreground text-sm">
-            {t(
-              'mounts.desc',
-              '경로 별칭. 이름을 언급하면 자동으로 컨텍스트에 주입됩니다.',
-            )}
+            {t('mounts.desc', '경로 별칭. 이름을 언급하면 자동으로 컨텍스트에 주입됩니다.')}
           </p>
         </div>
         <Button onClick={() => setShowCreate(true)}>

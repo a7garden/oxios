@@ -1,20 +1,14 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
-import {
-  ChevronRight,
-  FolderKanban,
-  Inbox,
-  Plus,
-  RefreshCw,
-} from 'lucide-react'
+import { ChevronRight, FolderKanban, Inbox, Plus, RefreshCw } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { useMoveSession } from '@/hooks/use-sessions'
 import { api } from '@/lib/api-client'
 import { cn } from '@/lib/utils'
-import { useMoveSession } from '@/hooks/use-sessions'
 import { useChatStore } from '@/stores/chat'
 import { useSidebarStore } from '@/stores/sidebar'
 import type { Project, Session } from '@/types'
@@ -211,9 +205,7 @@ function ExpandedChatNav() {
           <div className={sectionGap}>
             <div className="flex items-center gap-1 px-2 py-1 text-sm text-muted-foreground">
               <Inbox className="h-3.5 w-3.5" />
-              <span className="font-medium">
-                {t('chat.unfiled', '분류 안 됨')}
-              </span>
+              <span className="font-medium">{t('chat.unfiled', '분류 안 됨')}</span>
               <span className="ml-auto text-2xs text-muted-foreground/60">
                 {unfiledSessions.length}
               </span>
@@ -223,9 +215,7 @@ function ExpandedChatNav() {
                 e.preventDefault()
                 setDragOverProject('__unfiled__')
               }}
-              onDragLeave={() =>
-                setDragOverProject((cur) => (cur === '__unfiled__' ? null : cur))
-              }
+              onDragLeave={() => setDragOverProject((cur) => (cur === '__unfiled__' ? null : cur))}
               onDrop={(e) => {
                 e.preventDefault()
                 handleDropToProject(null)
@@ -249,9 +239,7 @@ function ExpandedChatNav() {
         )}
 
         {/* Quick project switcher (sets the active project for new sessions) */}
-        {projects.length > 0 && (
-          <div className={sectionSeparator} />
-        )}
+        {projects.length > 0 && <div className={sectionSeparator} />}
       </div>
 
       {/* Footer links */}

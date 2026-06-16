@@ -293,9 +293,7 @@ function FieldControl({
             disabled={disabled}
             className="flex-1"
           />
-          <span className="text-xs text-muted-foreground tabular-nums w-6 shrink-0">
-            {max}
-          </span>
+          <span className="text-xs text-muted-foreground tabular-nums w-6 shrink-0">{max}</span>
           <span className="text-sm font-mono tabular-nums w-14 text-right shrink-0">
             {numVal.toFixed(decimals)}
           </span>

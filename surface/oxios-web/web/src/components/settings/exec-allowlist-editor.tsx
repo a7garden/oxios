@@ -47,9 +47,7 @@ export function ExecAllowlistEditor({
 
   const filteredSuggestions = suggestions
     ? suggestions.filter(
-        (s) =>
-          !value.includes(s.value) &&
-          s.value.toLowerCase().includes(draft.toLowerCase()),
+        (s) => !value.includes(s.value) && s.value.toLowerCase().includes(draft.toLowerCase()),
       )
     : []
 
@@ -107,15 +105,12 @@ export function ExecAllowlistEditor({
 
   // Group suggestions by category when available.
   const groupedSuggestions = suggestions
-    ? filteredSuggestions.reduce<Record<string, typeof filteredSuggestions>>(
-        (acc, s) => {
-          const group = s.group ?? t('common.other')
-          if (!acc[group]) acc[group] = []
-          acc[group].push(s)
-          return acc
-        },
-        {},
-      )
+    ? filteredSuggestions.reduce<Record<string, typeof filteredSuggestions>>((acc, s) => {
+        const group = s.group ?? t('common.other')
+        if (!acc[group]) acc[group] = []
+        acc[group].push(s)
+        return acc
+      }, {})
     : {}
 
   return (
@@ -162,9 +157,7 @@ export function ExecAllowlistEditor({
             }}
             onKeyDown={handleKeyDown}
             placeholder={
-              value.length === 0 && !suggestions
-                ? t('settings.allowedCommandsPlaceholder')
-                : ''
+              value.length === 0 && !suggestions ? t('settings.allowedCommandsPlaceholder') : ''
             }
             disabled={disabled}
             className="h-7 border-0 bg-transparent shadow-none focus-visible:ring-0 px-1"
@@ -188,9 +181,7 @@ export function ExecAllowlistEditor({
                       }}
                     >
                       <span className="font-mono text-xs">{s.value}</span>
-                      <span className="text-xs text-muted-foreground ml-auto">
-                        {s.label}
-                      </span>
+                      <span className="text-xs text-muted-foreground ml-auto">{s.label}</span>
                     </button>
                   ))}
                 </div>
