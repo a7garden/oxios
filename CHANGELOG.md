@@ -5,6 +5,16 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0] - 2026-06-17
+
+### Added
+- **`oxios update` overhaul** — Progress bars for all three update stages (web UI download with byte/speed/ETA, zip extraction file count, `cargo install` spinner that reflects the live compile line) and automatic daemon restart after a successful update so the new binary/web UI takes effect immediately. A `--no-restart` flag opts out, and restart only fires when the daemon is already running.
+
+### Fixed
+- **Web i18n (Korean UI)** — Restored 189 translation keys that were missing from both `en.json` and `ko.json` (mounts, projects, email, knowledge UI, chat/questionnaire, agents/sessions, dataTable, shared common/settings), which had been rendering as raw `section.key` strings in the UI.
+- **`oxios update`** — A daemon restart failure no longer masks a successful update; it now warns and points at `oxios start` for manual recovery instead of exiting as a failure.
+- **Web i18n polish** — `questionnaire.count` singular/plural ("1 questions"), mounts rescan terminology consistency, and removal of a dead duplicate `chat.questionnaire.*` namespace.
+
 ## [1.4.0] - 2026-06-16
 
 ### Added
