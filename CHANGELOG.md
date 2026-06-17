@@ -5,6 +5,11 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.1] - 2026-06-17
+
+### Fixed
+- **Security: wasmtime-wasi RUSTSEC-2026-0182** — Upgraded the `wasmtime` / `wasmtime-wasi` dependency from 22 to 24.0.10 (the backport release that fixes the WASIp1 `fd_renumber` resource leak). `cargo audit` now reports zero vulnerabilities. `wasm-sandbox` is still an optional, non-default feature, so default builds were unaffected, but the published `oxios-kernel` now resolves to the patched transitive dependency.
+
 ## [1.5.0] - 2026-06-17
 
 ### Added

@@ -1,6 +1,6 @@
 [package]
 name = "oxios-mcp"
-version = "1.5.0"
+version = "1.5.1"
 edition = "2024"
 description = "Model Context Protocol client — JSON-RPC 2.0 over stdio"
 license = "MIT"
