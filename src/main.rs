@@ -1858,8 +1858,24 @@ async fn run() -> Result<()> {
                         "  {} Restarting daemon to activate the update...",
                         style("⟳").cyan()
                     );
-                    daemon.restart(&config_path, port)?;
-                    println!("  {} Daemon restarted.", style("✓").green());
+                    // The update itself already succeeded (new files are on
+                    // disk), so a restart failure must NOT mask that success.
+                    // We warn instead of propagating, and tell the user how to
+                    // recover — `restart()` does stop()+start(), so on failure
+                    // the daemon may be left stopped.
+                    match daemon.restart(&config_path, port) {
+                        Ok(()) => println!("  {} Daemon restarted.", style("✓").green()),
+                        Err(e) => {
+                            println!(
+                                "  {} Update succeeded, but daemon restart failed: {e}",
+                                style("⚠").yellow()
+                            );
+                            println!(
+                                "    Run `{}` manually to launch the new build.",
+                                style("oxios start").bold()
+                            );
+                        }
+                    }
                 } else {
                     println!(
                         "  {} Daemon is not running. Run `{}` to start it with the new build.",
