@@ -175,7 +175,7 @@ pub async fn run_update(
 
     // ── Confirmation ─────────────────────────────────────────────────────────
     if !yes {
-        println!("  {} Release notes:\n", style("📋").cyan());
+        println!("  {} Release notes:\n", style("Release notes").cyan());
         for line in body.lines().take(10) {
             println!("    {line}");
         }
@@ -184,7 +184,7 @@ pub async fn run_update(
         }
         println!();
 
-        print!("  Continue with update? [y/N] ");
+        print!("  Continue with update? ");
         std::io::stdout().flush().ok();
         let mut input = String::new();
         std::io::stdin().read_line(&mut input).ok();
