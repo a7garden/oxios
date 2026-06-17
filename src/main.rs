@@ -205,6 +205,10 @@ enum Command {
         /// Skip confirmation prompt.
         #[arg(short = 'y')]
         yes: bool,
+
+        /// Do not restart the daemon after updating.
+        #[arg(long)]
+        no_restart: bool,
     },
 
     /// Show changelog or release notes for a version.
@@ -1831,15 +1835,41 @@ async fn run() -> Result<()> {
             version,
             dry_run,
             yes,
+            no_restart,
         }) => {
-            return commands::update::run_update(
+            let outcome = commands::update::run_update(
                 *web_only,
                 *binary_only,
                 version.as_deref(),
                 *dry_run,
                 *yes,
             )
-            .await;
+            .await?;
+
+            // Auto-restart the daemon so the new binary/web UI takes effect.
+            // We only restart when the daemon is *already* running — starting a
+            // background daemon the user never launched would be surprising.
+            if !*no_restart && outcome.any() {
+                println!();
+                let daemon = DaemonManager::new(&config.daemon.pid_file, &config.daemon.log_dir);
+                let port = config.gateway.port;
+                if matches!(daemon.status(), oxios_kernel::DaemonStatus::Running { .. }) {
+                    println!(
+                        "  {} Restarting daemon to activate the update...",
+                        style("⟳").cyan()
+                    );
+                    daemon.restart(&config_path, port)?;
+                    println!("  {} Daemon restarted.", style("✓").green());
+                } else {
+                    println!(
+                        "  {} Daemon is not running. Run `{}` to start it with the new build.",
+                        style("ℹ").cyan(),
+                        style("oxios restart").bold()
+                    );
+                }
+            }
+
+            return Ok(());
         }
         Some(Command::Changelog { version }) => {
             return commands::update::run_changelog(version.as_deref()).await;

@@ -5,8 +5,38 @@
 
 use anyhow::{Context, Result};
 use console::style;
-use std::io::Write;
+use futures::StreamExt;
+use indicatif::{ProgressBar, ProgressStyle};
+use std::io::{BufRead, BufReader, Write};
 use std::path::PathBuf;
+use std::process::Stdio;
+use std::time::Duration;
+
+/// Outcome of `oxios update` — what was actually changed on disk.
+///
+/// The caller (main.rs) uses this to decide whether a daemon restart is needed.
+#[derive(Debug, Default, Clone, Copy)]
+pub struct UpdateOutcome {
+    /// The `oxios` binary was reinstalled (requires restart to take effect).
+    pub binary_updated: bool,
+    /// The web UI under `~/.oxios/web/dist/` was replaced.
+    pub web_updated: bool,
+}
+
+impl UpdateOutcome {
+    /// Nothing changed (already latest, dry run, or user cancelled).
+    pub const fn unchanged() -> Self {
+        Self {
+            binary_updated: false,
+            web_updated: false,
+        }
+    }
+
+    /// Whether anything at all was updated.
+    pub fn any(&self) -> bool {
+        self.binary_updated || self.web_updated
+    }
+}
 
 /// Update oxios binary (via cargo) and/or web UI (from GitHub Releases).
 pub async fn run_update(
@@ -15,8 +45,9 @@ pub async fn run_update(
     version: Option<&str>,
     dry_run: bool,
     yes: bool,
-) -> Result<()> {
+) -> Result<UpdateOutcome> {
     let current = env!("CARGO_PKG_VERSION");
+    let mut outcome = UpdateOutcome::unchanged();
 
     // ── Determine what to update ────────────────────────────────────────────
     let update_binary = !web_only;
@@ -102,7 +133,7 @@ pub async fn run_update(
             current
         );
         println!("  Use `--version X.Y.Z` to force a specific version.");
-        return Ok(());
+        return Ok(UpdateOutcome::unchanged());
     }
 
     // ── Parse assets (web UI only) ──────────────────────────────────────────
@@ -139,7 +170,7 @@ pub async fn run_update(
             }
             println!("  Would run: {cmd}");
         }
-        return Ok(());
+        return Ok(UpdateOutcome::unchanged());
     }
 
     // ── Confirmation ─────────────────────────────────────────────────────────
@@ -159,7 +190,7 @@ pub async fn run_update(
         std::io::stdin().read_line(&mut input).ok();
         if !input.trim().eq_ignore_ascii_case("y") {
             println!("  Update cancelled.");
-            return Ok(());
+            return Ok(UpdateOutcome::unchanged());
         }
     }
 
@@ -171,61 +202,85 @@ pub async fn run_update(
             args.push(v);
         }
 
-        print!(
-            "  Running cargo install oxios{}... ",
+        // Spinner: cargo streams `Compiling X…` / `Finished` lines to stderr
+        // (with carriage returns), so we parse them and update the spinner
+        // message rather than dumping the raw output.
+        let pb = ProgressBar::new_spinner();
+        pb.set_style(
+            ProgressStyle::with_template("  {spinner} {msg}")
+                .unwrap()
+                .tick_strings(&["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]),
+        );
+        pb.enable_steady_tick(Duration::from_millis(100));
+        pb.set_message(format!(
+            "cargo install oxios{}",
             version
                 .map(|v| format!(" --version {v}"))
                 .unwrap_or_default()
-        );
-        std::io::stdout().flush().ok();
+        ));
 
-        let output = std::process::Command::new("cargo")
+        let mut child = std::process::Command::new("cargo")
             .args(&args)
-            .output()
+            .stdout(Stdio::null())
+            .stderr(Stdio::piped())
+            .spawn()
             .context("failed to run cargo — is it installed and in PATH?")?;
 
-        if output.status.success() {
-            println!("done.");
+        let stderr = child.stderr.take().expect("piped stderr");
+        let pb_for_thread = pb.clone();
+        let stderr_thread = std::thread::spawn(move || -> Vec<String> {
+            let reader = BufReader::new(stderr);
+            let mut lines = Vec::new();
+            for line in reader.lines().map_while(Result::ok) {
+                let t = line.trim().to_string();
+                if !t.is_empty() {
+                    pb_for_thread.set_message(t.clone());
+                    lines.push(t);
+                }
+            }
+            lines
+        });
+
+        let status = child.wait().context("failed to wait for cargo")?;
+        let lines = stderr_thread.join().unwrap_or_default();
+        pb.finish_and_clear();
+
+        if status.success() {
+            outcome.binary_updated = true;
             println!(
                 "  {} Binary updated to {} via cargo.",
                 style("✓").green(),
                 tag_name
             );
         } else {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            // cargo install outputs compilation progress to stderr
             println!();
-            for line in stderr.lines().take(5) {
+            for line in lines.into_iter().take(10) {
                 println!("    {line}");
             }
             anyhow::bail!("cargo install failed (see above)");
         }
-
-        println!();
-        println!(
-            "  {} Run `{}` to restart with the new binary.",
-            style("ℹ").cyan(),
-            style("oxios restart").bold()
-        );
     }
 
     // ── Download and install web UI ────────────────────────────────────────
     if update_web {
         if let Some((name, url, size)) = web_asset {
-            print!("  Downloading {name}... ");
-            std::io::stdout().flush().ok();
-
-            let bytes = download_file(&client, url, *size).await?;
-            println!("done ({}).", format_size(bytes.len() as u64));
+            let bytes = download_file(&client, url, *size, name).await?;
 
             let dest_dir = dest_web_dir()?;
             std::fs::create_dir_all(&dest_dir).context(format!("failed to create {dest_dir:?}"))?;
 
-            print!("  Extracting to {dest_dir:?}... ");
-            std::io::stdout().flush().ok();
-
             let cursor = std::io::Cursor::new(bytes);
             let mut archive = zip::ZipArchive::new(cursor).context("invalid zip file")?;
+
+            // File-count progress bar for extraction.
+            let total = archive.len() as u64;
+            let pb = ProgressBar::new(total);
+            pb.set_style(
+                ProgressStyle::with_template("  {spinner} Extracting {wide_bar} {pos}/{len} files")
+                    .unwrap()
+                    .progress_chars("█▓░"),
+            );
+            pb.enable_steady_tick(Duration::from_millis(120));
 
             for i in 0..archive.len() {
                 let mut file = archive.by_index(i)?;
@@ -240,8 +295,11 @@ pub async fn run_update(
                     let mut out_file = std::fs::File::create(&out_path)?;
                     std::io::copy(&mut file, &mut out_file)?;
                 }
+                pb.inc(1);
             }
-            println!("done.");
+            pb.finish_with_message(format!("extracted {total} files → {dest_dir:?}"));
+
+            outcome.web_updated = true;
             println!(
                 "  {} Web UI updated to {} in {:?}.",
                 style("✓").green(),
@@ -257,7 +315,7 @@ pub async fn run_update(
     }
 
     println!();
-    Ok(())
+    Ok(outcome)
 }
 
 /// Show changelog / release notes for a given version (or latest).
@@ -315,7 +373,8 @@ fn dest_web_dir() -> Result<PathBuf> {
 async fn download_file(
     client: &reqwest::Client,
     url: &str,
-    _expected_size: u64,
+    expected_size: u64,
+    name: &str,
 ) -> Result<Vec<u8>> {
     let resp = client
         .get(url)
@@ -327,9 +386,30 @@ async fn download_file(
         anyhow::bail!("Download failed: {}", resp.status());
     }
 
-    let bytes = resp.bytes().await.context("failed to read response body")?;
+    // Prefer Content-Length; fall back to the asset size from the API.
+    let total = resp.content_length().unwrap_or(expected_size);
+    let pb = ProgressBar::new(total);
+    pb.set_style(
+        ProgressStyle::with_template(
+            "  {spinner} {prefix} {wide_bar} {bytes}/{total_bytes} ({bytes_per_sec}, ETA {eta})",
+        )
+        .unwrap()
+        .progress_chars("█▓░"),
+    );
+    pb.set_prefix(format!("Downloading {name}"));
+    pb.enable_steady_tick(Duration::from_millis(120));
 
-    Ok(bytes.to_vec())
+    // Stream chunks so the bar reflects real progress instead of buffering.
+    let mut bytes = Vec::with_capacity(total as usize);
+    let mut stream = resp.bytes_stream();
+    while let Some(chunk) = stream.next().await {
+        let chunk = chunk.context("failed to read chunk")?;
+        pb.inc(chunk.len() as u64);
+        bytes.extend_from_slice(&chunk);
+    }
+
+    pb.finish_with_message(format!("downloaded {}", format_size(bytes.len() as u64)));
+    Ok(bytes)
 }
 
 fn format_size(bytes: u64) -> String {

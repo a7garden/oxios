@@ -84,7 +84,7 @@ arc-swap = "1.7"
 oxi-sdk = "0.35.0"
 
 # HTTP client
-reqwest = { version = "0.12", features = ["json", "rustls-tls"] }
+reqwest = { version = "0.12", features = ["json", "rustls-tls", "stream"] }
 
 # Archive
 zip = "2"
@@ -145,6 +145,7 @@ inquire = { workspace = true }
 libc = { workspace = true }
 console = { workspace = true }
 indicatif = "0.17"
+futures = { workspace = true }
 clap_complete = "4"
 webbrowser = "1.0"
 reqwest = { workspace = true }

@@ -5235,6 +5235,7 @@ dependencies = [
  "clap_complete",
  "console",
  "dirs 6.0.0",
+ "futures",
  "hex",
  "indicatif",
  "inquire",
