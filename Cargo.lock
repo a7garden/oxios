@@ -1011,7 +1011,7 @@ checksum = "af491d569909a7e4dee0ad7db7f5341fef5c614d5b8ec8cf765732aba3cff681"
 dependencies = [
  "serde",
  "termcolor",
- "unicode-width 0.1.14",
+ "unicode-width 0.2.2",
 ]
 
 [[package]]
@@ -5049,9 +5049,9 @@ checksum = "1a80800c0488c3a21695ea981a54918fbb37abf04f4d0720c453632255e2ff0e"
 
 [[package]]
 name = "oxi-agent"
-version = "0.35.0"
+version = "0.37.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "91172e25d1a7078ee3fe32c6026b7b218c9ff455723a80d34ac388eeea53c501"
+checksum = "7d85074a318ecd740f3f9755617c5b6559fc12a7a9c23401da0333ebb79cf519"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5078,9 +5078,9 @@ dependencies = [
 
 [[package]]
 name = "oxi-ai"
-version = "0.35.0"
+version = "0.37.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "96ce1116fea2251c854a0156d94737a4a6290b8dda61b239d92754d00dbf238f"
+checksum = "41a1fca385ebf4472df1eba19970c3c9c494d1c9db7834ba8abf8240efdbe274"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -5088,6 +5088,8 @@ dependencies = [
  "chrono",
  "digest",
  "dirs 5.0.1",
+ "filetime",
+ "flate2",
  "fs2",
  "futures",
  "hmac",
@@ -5113,9 +5115,9 @@ dependencies = [
 
 [[package]]
 name = "oxi-sdk"
-version = "0.35.0"
+version = "0.37.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3e23ea0f44045387de0be18b229b9ad4a32691680d577ee2222316a7b3121d89"
+checksum = "c0e98cf1d886bb21a03f5acb7c3188f0aa9821206b55dc4345d2df0d5b0ac9b2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5123,11 +5125,14 @@ dependencies = [
  "chrono",
  "dirs 5.0.1",
  "fastrand",
+ "filetime",
+ "flate2",
  "glob",
  "oxi-agent",
  "oxi-ai",
  "oxibrowser-core",
  "parking_lot",
+ "reqwest",
  "serde",
  "serde_json",
  "serde_yaml",

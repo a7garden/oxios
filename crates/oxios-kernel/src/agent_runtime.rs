@@ -783,6 +783,12 @@ async fn run_agent(
         workspace_dir: Some(workspace.clone()),
         output_mode: None,
         provider_options: config.provider_options.clone(),
+        // oxi-sdk 0.37.0+: ownership identity for oxi's built-in ownership-gated
+        // tools (e.g. the `issue` tool's flock). `None` preserves the pre-0.37.1
+        // behavior (ToolContext.session_id == None). Oxios runs its own tool
+        // set, so no ownership identity is needed here; set `Some(...)` only if
+        // oxios agents start using oxi ownership-gated tools.
+        session_id: None,
     };
 
     // ── Build Agent (RFC-014 Phase D) ──
