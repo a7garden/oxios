@@ -7,7 +7,7 @@
 
 Oxios is an **Agent Operating System** in Rust. AI agents fork, exec, wait, kill — just like Unix processes.
 
-**Stack:** Rust 2021, tokio async, serde, oxi-sdk (crates.io).
+**Stack:** Rust 2024 (edition 2024, MSRV 1.96), tokio async, serde, oxi-sdk (crates.io).
 
 ```
 User → Channel (Web/CLI/Telegram) → Gateway → Kernel
@@ -102,6 +102,7 @@ See `docs/ARCHITECTURE.md` for the full reference (subsystems, data flow, depend
 - **Supervisor** — Agent lifecycle: fork/exec/wait/kill.
 - **Orchestrator** — Ouroboros protocol end-to-end. The "brain".
 - **AgentRuntime** — Wraps oxi-sdk tool-calling loop.
+- **OxiosEngine** — Wraps oxi-sdk's `Oxi`. Provider/model resolution goes through `OxiBuilder`. The **catalog port** (`oxi-sdk` `ModelCatalog`) is initialized once at boot (`OxiosEngine::init_file_catalog`, self-hosted under `~/.oxios/cache/`) and attached to every engine — including across hot-swaps — so `resolve_model` and Web UI introspection (`EngineApi`) consult dynamic models.dev metadata (live price/limit refresh, user overrides) before falling back to the static registry. Static free-fns (`get_provider_models`, etc.) remain as fallbacks (the static `model_db` is itself backed by the embedded models.dev snapshot, so it carries real prices).
 - **Memory** — Tiered (Hot/Warm/Cold), Dream consolidation, HNSW, hyperbolic embeddings.
 - **AccessManager** — OWASP RBAC + path sandboxing + Merkle audit trail.
 - **Skill** — Unified system (RFC-009). Each skill = `SKILL.md` with YAML frontmatter.
@@ -173,7 +174,7 @@ No CI. Publish from local in **dependency order** — crates.io resolves version
 - **Two knowledge systems.** Agent memory = MemoryManager (JSON per Space). User notes = KnowledgeBase (`.md` files, `~/.oxios/knowledge/`). See `docs/rfc-003-knowledge-separation.md`.
 - **Unified skill model.** No separate `program/` module or `program.toml`. `SkillManager` handles everything. Each skill = `SKILL.md` + YAML frontmatter.
 - **Feature gates.** Web, CLI, Telegram, browser, telemetry are feature-gated. Check `cargo build -p oxios --features <feature>`.
-- **`--all-features` works.** As of oxi-sdk 0.35.0 (native-browser fix) and the wasmtime 24 migration, `cargo build/clippy --workspace --all-features` passes cleanly. Previously broken by two separate upstream issues: (1) `oxi-agent` edition-2024 async-lifetime bugs in `native-browser`, (2) `wasm-sandbox` wasmtime 22 API drift (`WasiCtx`, `fuel_remaining`, `define_wasi`, `Memory::read`). The 22 migration resolved the API drift; the bump to 24.0.10 also fixes RUSTSEC-2026-0182 (wasmtime-wasi WASIp1 `fd_renumber` leak). CI still uses per-crate features (`.github/workflows/ci.yml`) for precision, but `--all-features` is a valid local smoke test.
+- **`--all-features` works.** As of oxi-sdk 0.37.1 (native-browser fix at 0.35.0 + the dynamic-catalog port at 0.37.0) and the wasmtime 24 migration, `cargo build/clippy --workspace --all-features` passes cleanly. Previously broken by two separate upstream issues: (1) `oxi-agent` edition-2024 async-lifetime bugs in `native-browser`, (2) `wasm-sandbox` wasmtime 22 API drift (`WasiCtx`, `fuel_remaining`, `define_wasi`, `Memory::read`). The 22 migration resolved the API drift; the bump to 24.0.10 also fixes RUSTSEC-2026-0182 (wasmtime-wasi WASIp1 `fd_renumber` leak). CI still uses per-crate features (`.github/workflows/ci.yml`) for precision, but `--all-features` is a valid local smoke test.
 - **Workspace deps.** `oxi-sdk` must be in both `[workspace.dependencies]` (root `Cargo.toml`) AND `[dependencies]` in the crate using it.
 - **Stdin blocking.** `oxios run --context-file -` reads stdin to EOF. Don't use with interactive input.
 - **CI oxi checkout.** CI checks out `a7garden/oxi` alongside oxios. Check ref if oxi-related tests fail.
