@@ -16,7 +16,9 @@
 //! ```
 
 use anyhow::Result;
-use oxi_sdk::{Oxi, OxiBuilder, ProviderPool, RateLimitPolicy};
+use oxi_sdk::{
+    CatalogConfig, FileModelCatalog, ModelCatalog, Oxi, OxiBuilder, ProviderPool, RateLimitPolicy,
+};
 use std::sync::Arc;
 
 use crate::credential::{CredentialStore, discover_auth_store_providers};
@@ -78,7 +80,35 @@ impl OxiosEngine {
     /// to create properly authenticated providers.
     ///
     /// Resolution order (per provider): env var → config.toml → ~/.oxi/auth.json
+    ///
+    /// No model catalog is wired (resolves via the static registry only).
+    /// For dynamic models.dev metadata use
+    /// [`from_config_with_catalog`](Self::from_config_with_catalog).
     pub fn from_config(default_model_id: impl Into<String>, config_api_key: Option<&str>) -> Self {
+        Self::from_config_with_catalog_opt(default_model_id, config_api_key, None)
+    }
+
+    /// Like [`from_config`](Self::from_config) but wires a model catalog port
+    /// into the engine.
+    ///
+    /// Pass the shared catalog from
+    /// [`init_file_catalog`](Self::init_file_catalog) so dynamic models.dev
+    /// metadata (live prices/limits, user overrides, local discovery) is
+    /// reused across engine hot-swaps instead of re-initialized. `resolve_model`
+    /// then consults the catalog before falling back to the static registry.
+    pub fn from_config_with_catalog(
+        default_model_id: impl Into<String>,
+        config_api_key: Option<&str>,
+        catalog: Arc<dyn ModelCatalog>,
+    ) -> Self {
+        Self::from_config_with_catalog_opt(default_model_id, config_api_key, Some(catalog))
+    }
+
+    fn from_config_with_catalog_opt(
+        default_model_id: impl Into<String>,
+        config_api_key: Option<&str>,
+        catalog: Option<Arc<dyn ModelCatalog>>,
+    ) -> Self {
         let model_id = default_model_id.into();
 
         // Resolve the primary provider's credential
@@ -149,6 +179,10 @@ impl OxiosEngine {
             }
         }
 
+        let builder = match catalog {
+            Some(cat) => builder.with_catalog(cat),
+            None => builder,
+        };
         let oxi = builder.build();
         Self {
             oxi,
@@ -167,22 +201,29 @@ impl OxiosEngine {
     /// Use this when you need credential injection, routing, or
     /// custom provider registration.
     ///
+    /// # Catalog
+    ///
+    /// For dynamic models.dev metadata, initialize the catalog via
+    /// [`OxiosEngine::init_file_catalog`] and attach it with
+    /// [`with_catalog`](OxiosEngineBuilder::with_catalog):
+    ///
+    /// ```no_run
+    /// # async fn doc() -> anyhow::Result<()> {
+    /// use oxios_kernel::engine::OxiosEngine;
+    ///
+    /// let catalog = OxiosEngine::init_file_catalog().await?;
+    /// let engine = OxiosEngine::builder()
+    ///     .default_model("anthropic/claude-sonnet-4-20250514")
+    ///     .with_catalog(catalog)
+    ///     .build();
+    /// # Ok(()) }
+    /// ```
+    ///
     /// # RFC-014 Phase D
     ///
     /// The builder also exposes `.with_authorizer()` / `.with_tracer()` /
     /// `.with_cost_tracker()` for attaching engine-level observability
     /// and security handles. All three are `None` by default.
-    ///
-    /// # Example
-    ///
-    /// ```no_run
-    /// use oxios_kernel::engine::OxiosEngine;
-    ///
-    /// let engine = OxiosEngine::builder()
-    ///     .default_model("anthropic/claude-sonnet-4-20250514")
-    ///     .api_key("anthropic", "sk-ant-...")
-    ///     .build();
-    /// ```
     pub fn builder() -> OxiosEngineBuilder {
         OxiosEngineBuilder {
             inner: OxiBuilder::new().with_builtins(),
@@ -192,6 +233,44 @@ impl OxiosEngine {
             tracer: None,
             cost_tracker: None,
         }
+    }
+
+    /// Build a [`CatalogConfig`] rooted at the oxios home (`~/.oxios/`).
+    ///
+    /// Keeps the models.dev cache/overrides self-hosted under oxios's own
+    /// directory (not oxi's `~/.oxi/`), consistent with the MCP cache/consent
+    /// path customization. Local-server discovery (`ollama`/`lmstudio`) is
+    /// left empty — wire it later if oxios wants to auto-discover local
+    /// models.
+    pub fn catalog_config() -> CatalogConfig {
+        let home = dirs::home_dir()
+            .unwrap_or_else(|| std::path::PathBuf::from("."))
+            .join(".oxios");
+        CatalogConfig {
+            cache_path: home.join("cache/models-dev.json"),
+            etag_path: home.join("cache/models-dev.json.etag"),
+            override_path: home.join("catalog/overrides.toml"),
+            snapshot_path: home.join("cache/models-dev.json"),
+            // oxios doesn't probe local servers yet.
+            local_discovery_urls: Vec::new(),
+            ..CatalogConfig::default()
+        }
+    }
+
+    /// Initialize the shared [`FileModelCatalog`] for the engine.
+    ///
+    /// Loads the embedded models.dev snapshot + runtime cache, applies user
+    /// overrides, and (if the cache is stale) attempts one live refresh
+    /// (failure is silent — the snapshot serves as fallback). The returned
+    /// `Arc<dyn ModelCatalog>` is cheap to clone and should be **shared**
+    /// across engine hot-swaps: the catalog is lazy/on-call (no background
+    /// tasks), so re-initializing it on every rebuild would just reload the
+    /// snapshot needlessly.
+    pub async fn init_file_catalog() -> Result<Arc<dyn ModelCatalog>> {
+        let catalog: Arc<dyn ModelCatalog> = FileModelCatalog::init(Self::catalog_config())
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to initialize model catalog: {e}"))?;
+        Ok(catalog)
     }
 
     /// Get a reference to the underlying Oxi instance.
@@ -401,6 +480,21 @@ impl OxiosEngineBuilder {
     /// will receive this cost tracker through the new `AgentBuilder::cost_tracker()` API.
     pub fn with_cost_tracker(mut self, cost_tracker: Arc<oxi_sdk::CostTracker>) -> Self {
         self.cost_tracker = Some(cost_tracker);
+        self
+    }
+
+    /// Wire a model catalog port (e.g. [`FileModelCatalog`]) into the engine.
+    ///
+    /// When set, `Oxi::resolve_model()` consults the catalog first (dynamic
+    /// models.dev metadata: live prices/limits, user overrides, local
+    /// discovery) before falling back to the static registry. Without this,
+    /// the engine uses a [`NoopModelCatalog`](oxi_sdk::NoopModelCatalog) and
+    /// resolves via the static `model_db` only.
+    ///
+    /// Initialize the catalog once via
+    /// [`OxiosEngine::init_file_catalog`] and reuse the `Arc` across rebuilds.
+    pub fn with_catalog(mut self, catalog: Arc<dyn oxi_sdk::ModelCatalog>) -> Self {
+        self.inner = self.inner.with_catalog(catalog);
         self
     }
 }
@@ -730,5 +824,38 @@ mod tests {
         assert!(engine.tracer().is_some());
         assert!(engine.cost_tracker().is_some());
         assert_eq!(engine.default_model_id(), "openai/gpt-4o");
+    }
+
+    // ── Catalog port integration (oxi-sdk 0.37.0+) ──
+    //
+    // `#[ignore]` because `init_file_catalog` may touch the network for a
+    // one-shot models.dev refresh and writes to `~/.oxios/cache/`. Run with
+    // `cargo test -p oxios-kernel --lib catalog_integration -- --ignored`.
+    #[tokio::test]
+    #[ignore]
+    async fn catalog_integration_init_and_resolve() {
+        // 1. Catalog initializes (SNAP + cache + optional live refresh).
+        let catalog = OxiosEngine::init_file_catalog()
+            .await
+            .expect("catalog init should succeed (SNAP is always embedded)");
+
+        // 2. The embedded snapshot always carries providers/models, so a wired
+        //    catalog is non-empty.
+        assert!(
+            catalog.model_count_sync() > 0,
+            "catalog should expose models from the embedded snapshot"
+        );
+        assert!(!catalog.list_providers_sync().is_empty());
+
+        // 3. An engine built with the catalog resolves through it first.
+        let engine = OxiosEngine::builder()
+            .default_model("anthropic/claude-sonnet-4-20250514")
+            .with_catalog(catalog)
+            .build();
+        let model = engine
+            .resolve_model("openai/gpt-4o")
+            .expect("catalog-backed resolve_model should succeed");
+        assert_eq!(model.provider, "openai");
+        assert_eq!(model.id, "gpt-4o");
     }
 }

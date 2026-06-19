@@ -738,15 +738,41 @@ impl KernelBuilder {
 
         // Model comes from config, not hardcoded default
         let model_id = &config.engine.default_model;
+        // Initialize the shared model catalog once. This pulls in dynamic
+        // models.dev metadata (live prices/limits, user overrides). Failure
+        // is non-fatal: engines fall back to the static registry.
+        let catalog = match OxiosEngine::init_file_catalog().await {
+            Ok(c) => {
+                tracing::info!("Model catalog initialized (dynamic models.dev data)");
+                Some(c)
+            }
+            Err(e) => {
+                tracing::warn!(
+                    error = %e,
+                    "Failed to initialize model catalog; resolving via static registry"
+                );
+                None
+            }
+        };
         let engine = if config.engine.routing_enabled {
-            let engine_builder = OxiosEngine::builder().default_model(model_id);
+            let mut engine_builder = OxiosEngine::builder().default_model(model_id);
+            if let Some(ref c) = catalog {
+                engine_builder = engine_builder.with_catalog(c.clone());
+            }
             let (engine, _routing_control) = engine_builder.build_with_routing();
             Arc::new(engine)
         } else {
-            Arc::new(OxiosEngine::from_config(
-                model_id,
-                config.engine.api_key.as_deref(),
-            ))
+            match &catalog {
+                Some(c) => Arc::new(OxiosEngine::from_config_with_catalog(
+                    model_id,
+                    config.engine.api_key.as_deref(),
+                    c.clone(),
+                )),
+                None => Arc::new(OxiosEngine::from_config(
+                    model_id,
+                    config.engine.api_key.as_deref(),
+                )),
+            }
         };
         let model = engine
             .resolve_model(model_id)

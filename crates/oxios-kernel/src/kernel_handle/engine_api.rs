@@ -643,6 +643,37 @@ impl From<&oxi_sdk::ModelEntry> for ModelInfo {
     }
 }
 
+impl From<&oxi_sdk::CatalogModelEntry> for ModelInfo {
+    /// Build a [`ModelInfo`] from a live catalog entry (catalog port).
+    ///
+    /// Same fields as the [`ModelEntry`](oxi_sdk::ModelEntry) path; the
+    /// catalog entry additionally reflects runtime models.dev refresh +
+    /// user overrides when wired into the engine.
+    fn from(entry: &oxi_sdk::CatalogModelEntry) -> Self {
+        Self {
+            id: format!("{}/{}", entry.provider, entry.model_id),
+            name: entry.name.clone(),
+            api: entry.protocol.as_str().to_string(),
+            provider: entry.provider.clone(),
+            reasoning: entry.reasoning,
+            input: entry
+                .input_modalities
+                .iter()
+                .map(|m| match m.as_str() {
+                    "image" => InputModality::Image,
+                    _ => InputModality::Text,
+                })
+                .collect(),
+            context_window: entry.context_window,
+            max_tokens: entry.max_tokens,
+            cost_input: entry.cost_input,
+            cost_output: entry.cost_output,
+            cost_cache_read: entry.cost_cache_read,
+            cost_cache_write: entry.cost_cache_write,
+        }
+    }
+}
+
 /// Current engine configuration + credential status + routing.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EngineConfigResponse {
@@ -723,6 +754,10 @@ impl EngineApi {
 
     /// List all available providers from the oxi-sdk catalog.
     ///
+    /// Reads provider/model counts from the live catalog (runtime models.dev
+    /// refresh + user overrides) when wired into the engine, falling back to
+    /// the static registry otherwise.
+    ///
     /// Filters out hidden/internal providers (those flagged with
     /// `hidden: true` in [`PROVIDER_META`]) and augments each entry
     /// with credential status, display name, and description.
@@ -731,14 +766,27 @@ impl EngineApi {
     /// default — a new provider landing in `oxi-sdk` should be
     /// available to users even before its metadata is added here.
     pub fn providers(&self) -> Vec<ProviderInfo> {
-        let all = oxi_sdk::get_providers();
+        let catalog = self.engine_handle.get().oxi().catalog().clone();
+        let use_catalog = catalog.model_count_sync() > 0;
+        let all: Vec<String> = if use_catalog {
+            catalog.list_providers_sync()
+        } else {
+            oxi_sdk::get_providers()
+                .into_iter()
+                .map(|s| s.to_string())
+                .collect()
+        };
 
         all.into_iter()
             .filter(|p| provider_meta(p).map(|m| !m.hidden).unwrap_or(true))
             .map(|p| {
-                let model_count = oxi_sdk::get_provider_models(p).len();
+                let model_count = if use_catalog {
+                    catalog.list_models_sync(&p).len()
+                } else {
+                    oxi_sdk::get_provider_models(&p).len()
+                };
                 let has_key = CredentialStore::has_credential(
-                    p,
+                    &p,
                     self.config
                         .read()
                         .engine
@@ -746,11 +794,11 @@ impl EngineApi {
                         .as_deref()
                         .filter(|k| !k.is_empty()),
                 );
-                let meta = provider_meta(p);
+                let meta = provider_meta(&p);
                 ProviderInfo {
-                    id: p.to_string(),
-                    name: provider_display_name(p),
-                    category: provider_category(p),
+                    id: p.clone(),
+                    name: provider_display_name(&p),
+                    category: provider_category(&p),
                     model_count,
                     has_key,
                     description: meta.map(|m| m.description.to_string()).unwrap_or_default(),
@@ -761,34 +809,52 @@ impl EngineApi {
     }
 
     /// List models for a given provider, optionally filtered by a query.
+    ///
+    /// Reads from the live catalog (runtime models.dev refresh + user
+    /// overrides) when wired into the engine, falling back to the static
+    /// registry (embedded snapshot) otherwise.
     pub fn models(&self, provider: &str, query: Option<&str>) -> Vec<ModelInfo> {
-        let entries = oxi_sdk::get_provider_models(provider);
-        entries
-            .iter()
-            .filter(|e| {
-                // Skip "latest" aliases
-                !e.name.contains("latest")
-            })
-            .filter(|e| {
+        let catalog = self.engine_handle.get().oxi().catalog().clone();
+        let live = catalog.list_models_sync(provider);
+        let models: Vec<ModelInfo> = if !live.is_empty() {
+            live.iter().map(ModelInfo::from).collect()
+        } else {
+            oxi_sdk::get_provider_models(provider)
+                .iter()
+                .map(ModelInfo::from)
+                .collect()
+        };
+        models
+            .into_iter()
+            .filter(|m| !m.name.contains("latest"))
+            .filter(|m| {
                 if let Some(q) = query {
                     let q = q.to_lowercase();
-                    e.name.to_lowercase().contains(&q)
-                        || e.id.to_lowercase().contains(&q)
-                        || e.provider.to_lowercase().contains(&q)
+                    m.name.to_lowercase().contains(&q)
+                        || m.id.to_lowercase().contains(&q)
+                        || m.provider.to_lowercase().contains(&q)
                 } else {
                     true
                 }
             })
-            .map(ModelInfo::from)
             .collect()
     }
 
     /// Search models across all providers.
+    ///
+    /// Uses the live catalog's `search_sync` when available, else the static
+    /// registry.
     pub fn search_models(&self, query: &str) -> Vec<ModelInfo> {
-        oxi_sdk::search_models(query)
-            .into_iter()
-            .map(ModelInfo::from)
-            .collect()
+        let catalog = self.engine_handle.get().oxi().catalog().clone();
+        let live = catalog.search_sync(query);
+        if !live.is_empty() {
+            live.iter().map(ModelInfo::from).collect()
+        } else {
+            oxi_sdk::search_models(query)
+                .into_iter()
+                .map(ModelInfo::from)
+                .collect()
+        }
     }
 
     /// Get the current engine configuration + credential status + routing.
@@ -994,14 +1060,20 @@ impl EngineApi {
 
     /// Rebuild `OxiosEngine` from current config and swap into the handle.
     ///
-    /// This is cheap (~3μs): `OxiBuilder` populates registries from static
-    /// `model_db` data. No network calls, no I/O beyond what `CredentialStore`
-    /// already caches in memory.
+    /// Reuses the model catalog from the current engine (it holds the
+    /// in-memory models.dev snapshot — re-initializing it on every config
+    /// change would just reload the same data). No network calls beyond
+    /// what `CredentialStore` already caches in memory.
     fn rebuild_and_swap(&self) {
         let cfg = self.config.read();
         let model_id = &cfg.engine.default_model;
-        let new_engine =
-            crate::engine::OxiosEngine::from_config(model_id, cfg.api_key().as_deref());
+        // The catalog Arc is cheap to clone and shared across hot-swaps.
+        let catalog = self.engine_handle.get().oxi().catalog().clone();
+        let new_engine = crate::engine::OxiosEngine::from_config_with_catalog(
+            model_id,
+            cfg.api_key().as_deref(),
+            catalog,
+        );
         drop(cfg);
         self.engine_handle.swap(new_engine);
     }
