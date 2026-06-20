@@ -7,6 +7,9 @@ on:
 
 permissions:
   contents: read
+  # `actions: write` lets the `trigger-publish` job dispatch publish.yml
+  # via `gh workflow run` (same-repo dispatch works with GITHUB_TOKEN).
+  actions: write
 
 jobs:
   release:
@@ -34,3 +37,25 @@ jobs:
         with:
           files: web-dist.zip
           generate_release_notes: true
+
+  # ── Trigger crates.io publish ──────────────────────────────────
+  # A Release created with GITHUB_TOKEN does NOT emit a `release: published`
+  # event to other workflows (GitHub suppresses this to prevent loops), so
+  # publish.yml's `on: release` trigger never fires. Dispatch it explicitly
+  # here once the Release is live. publish.yml verifies the Release exists
+  # before publishing.
+  trigger-publish:
+    name: Trigger crates.io publish
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      # `gh workflow run` resolves the target workflow file from the *local*
+      # git checkout, so it needs an actions/checkout step. Without it the
+      # job fails with `fatal: not a git repository`.
+      - uses: actions/checkout@v5
+      - name: Dispatch publish workflow
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh workflow run publish.yml -f dry_run=false
+          echo "publish.yml dispatched for $GITHUB_REF_NAME"

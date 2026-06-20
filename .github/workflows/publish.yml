@@ -1,0 +1,197 @@
+name: Publish to crates.io
+
+# Publishes all workspace crates to crates.io in topological order
+# after a GitHub Release is published.
+#
+# Why is this triggered by release.yml (and not `on: release: published`)?
+#   - A Release created with GITHUB_TOKEN does NOT emit `release: published`
+#     to other workflows (GitHub suppresses this to prevent event loops),
+#     so release.yml's `trigger-publish` job dispatches this workflow
+#     explicitly once the Release is live.
+#
+# Required secrets:
+#   CARGO_TOKEN       — https://crates.io/settings/tokens
+#                       (scope: publish; do NOT use the GitHub token —
+#                        crates.io requires its own token.)
+#
+# Optional:
+#   CARGO_REGISTRY_TOKEN — alternative name, used by some setups.
+
+on:
+  # Triggered by release.yml's `trigger-publish` job via `gh workflow run`
+  # once the GitHub Release is live.
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run — only verify the package builds, do not publish"
+        required: false
+        type: boolean
+        default: true
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_NET_OFFLINE: "false"
+  RUST_BACKTRACE: "1"
+
+jobs:
+  # ── Pre-flight: ensure release.yml succeeded for this tag ──────
+  pre-flight:
+    name: Verify release artifacts exist
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Check that the release workflow ran for this tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${GITHUB_REF_NAME:-${GITHUB_REF#refs/tags/}}"
+          # workflow_dispatch from a branch (not a v* tag) → use the
+          # latest GitHub Release. This lets us re-run publish from
+          # main after fixing the workflow without re-tagging.
+          if [[ "$TAG" != v* ]]; then
+            TAG=$(gh release list --limit 1 --json tagName --jq '.[0].tagName')
+          fi
+          echo "Release tag: $TAG"
+          if ! gh release view "$TAG" > /dev/null 2>&1; then
+            echo "::error::No GitHub release for $TAG — run release.yml first."
+            exit 1
+          fi
+          echo "Release verified: $TAG"
+
+  # ── Dry-run packaging check (always runs, no network) ─────────
+  package-check:
+    name: cargo package (dry run)
+    needs: pre-flight
+    runs-on: [self-hosted, macOS, ARM64]
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - name: Verify each crate packages cleanly
+        # `cargo package --list` only checks that the .crate tarball can be
+        # assembled and metadata is valid — it does NOT compile. The real
+        # compile gate (which catches packaging-only bugs like a cross-crate
+        # `include_bytes!`) is `cargo publish`'s verify step in the `publish`
+        # job below. That gate must run per-crate *after* its internal deps
+        # are published (topological order), so it cannot live here.
+        run: |
+          set -euo pipefail
+          for crate in oxios-markdown oxios-mcp oxios-ouroboros oxios-memory oxios-calendar oxios-kernel oxios-gateway; do
+            echo "─── Packaging $crate ───"
+            cargo package -p "$crate" --no-verify --list
+          done
+
+  # ── Publish in topological order ───────────────────────────────
+  # Topological order (oxios AGENTS.md §Release):
+  #   ① oxios-markdown   (no oxios deps)
+  #      oxios-mcp        (no oxios deps)
+  #      oxios-ouroboros  (no oxios deps, depends on oxi-sdk — external)
+  #      oxios-memory     (no oxios deps)
+  #   ② oxios-calendar   → oxios-markdown
+  #   ③ oxios-kernel     → {ouroboros, markdown, calendar, mcp, memory}
+  #   ④ oxios-gateway    → oxios-kernel (+ oxios-ouroboros)
+  #
+  # max-parallel: 1 enforces sequential publish. Each job polls for
+  # its heaviest dependency's new version to clear the crates.io index
+  # propagation lag (can take ~30-60s after publish).
+  publish:
+    name: cargo publish ${{ matrix.crate }}
+    needs: [pre-flight]
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run != 'true'
+    runs-on: [self-hosted, macOS, ARM64]
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        crate:
+          - oxios-markdown
+          - oxios-mcp
+          - oxios-ouroboros
+          - oxios-memory
+          - oxios-calendar
+          - oxios-kernel
+          - oxios-gateway
+    steps:
+      - uses: actions/checkout@v5
+      - name: Wait for crates.io index to see the dependency's new version
+        # Poll the crates.io API (not `cargo search`, which only does
+        # name matching) for the exact new version of the heaviest
+        # internal dependency. Skips crates with no internal deps.
+        run: |
+          CRATE="${{ matrix.crate }}"
+          # Map each crate to the internal dependency it must wait for
+          # (the one published immediately before it in topo order, or
+          # the last of a parallel tier).
+          case "$CRATE" in
+            oxios-markdown|oxios-mcp|oxios-ouroboros|oxios-memory)
+              WAIT=""; exit 0 ;;
+            oxios-calendar)
+              WAIT="oxios-markdown" ;;
+            oxios-kernel)
+              WAIT="oxios-calendar" ;;
+            oxios-gateway)
+              WAIT="oxios-kernel" ;;
+            *)
+              WAIT=""; exit 0 ;;
+          esac
+          # Read the required version from this crate's Cargo.toml.
+          CRATE_DIR="crates/$CRATE"
+          TARGET=$(grep -E "^${WAIT} = \{ version = " "$CRATE_DIR/Cargo.toml" \
+            | head -1 | sed -E 's/.*version = "([^"]+)".*/\1/')
+          if [ -z "$TARGET" ]; then
+            echo "::error::Could not determine required version of $WAIT from $CRATE_DIR/Cargo.toml"
+            exit 1
+          fi
+          echo "Waiting for $WAIT $TARGET on crates.io..."
+          for i in $(seq 1 60); do
+            # Query crates.io API for the max stable version.
+            # crates.io requires a User-Agent header — bare curl gets 403.
+            SEEN=$(curl -fsSL -H "User-Agent: oxios-publish-ci/1.0 (github.com/a7garden/oxios)" \
+              "https://crates.io/api/v1/crates/$WAIT" \
+              | grep -oE '"max_stable_version":[[:space:]]*"[^"]+"' \
+              | head -1 | sed -E 's/.*:[[:space:]]*"([^"]+)".*/\1/')
+            if [ "$SEEN" = "$TARGET" ]; then
+              echo "$WAIT $TARGET visible on crates.io"
+              exit 0
+            fi
+            echo "  waiting for $WAIT $TARGET (saw $SEEN)... ($i/60)"
+            sleep 10
+          done
+          echo "::error::Timeout waiting for $WAIT $TARGET on crates.io"
+          exit 1
+      - name: Publish ${{ matrix.crate }}
+        working-directory: crates/${{ matrix.crate }}
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_TOKEN || secrets.CARGO_REGISTRY_TOKEN }}
+        run: |
+          if [ -z "$CARGO_REGISTRY_TOKEN" ]; then
+            echo "::error::Neither CARGO_TOKEN nor CARGO_REGISTRY_TOKEN is set as a repository secret."
+            echo "::error::Create one at https://crates.io/settings/tokens with publish scope."
+            exit 1
+          fi
+          # NOTE: no `--no-verify`. `cargo publish` compiles the packaged
+          # tarball against its *registry* dependencies (path deps are
+          # stripped during packaging). This is the gate that catches bugs a
+          # workspace build cannot — e.g. a cross-crate `include_bytes!` that
+          # resolves in-tree but escapes the crate root in the published
+          # tarball. Topological order + the "Wait for dependency" step above
+          # ensure each crate's internal deps are already visible on
+          # crates.io when it verifies.
+          #
+          # Idempotent: if the exact version is already on crates.io, treat
+          # it as success so the whole matrix can be safely re-run to publish
+          # only the crates a prior run missed (e.g. a transient error
+          # mid-matrix). Without this, re-running would fail-fast on every
+          # already-published crate and never reach the missing one.
+          set +e
+          cargo publish --token "$CARGO_REGISTRY_TOKEN" 2>&1 | tee /tmp/publish.log
+          status=${PIPESTATUS[0]}
+          set -e
+          if [ "$status" -eq 0 ]; then
+            exit 0
+          fi
+          if grep -qiE "already exists on crates.io|already uploaded|already been published" /tmp/publish.log; then
+            echo "::notice::${{ matrix.crate }} is already published at this version; skipping."
+            exit 0
+          fi
+          exit "$status"
