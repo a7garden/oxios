@@ -2,8 +2,25 @@
 
 All notable changes to this project are documented in this file.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+## [1.6.0] - 2026-06-21
+
+### Added
+- **Interview wizard a11y / keyboard** — Roving focus for option groups (ArrowLeft/Right on `single_choice` auto-selects like a native radiogroup), Space to focus-and-select, Shift+Enter inserts a newline in `free_text`, and `role="group"` / `aria-pressed` / `aria-label` on option buttons so screen readers announce selection state and group semantics. The `keyboardHint` strings (en/ko) are updated to reflect the new bindings. A new test file covers the keyboard + selection behavior across `single_choice`, `multi_choice`, and `free_text` kinds.
+
+### Changed
+- **Refactor: live model resolution via `ModelResolver` port** — All LLM-bound phases now read the live, post-hot-swap engine default through a new `ModelResolver` trait (`oxios-ouroboros::ModelResolver`) instead of capturing a frozen model id at construction. This eliminates the divergence where interview / seed / evaluate / evolve used a boot-time model while execute re-resolved via the engine handle, and surfaces a bad model id at the first phase call instead of silently at execute.
+  - `OuroborosEngine::new` now takes `Arc<dyn ModelResolver>` and resolves the live default + provider at the start of every LLM-bound phase. Tests use a new `StaticModelResolver` helper.
+  - `EngineHandle` (kernel) implements `ModelResolver`; `OxiosEngine` gains a provider cache that survives across reads within one generation and is cleared on `swap`.
+  - `EngineApi::set_model` validates the new model BEFORE persisting (rejects unknown models / unconfigured providers), so a Web UI "switch succeeded" is truthful and a bad model id no longer surfaces only at execute time.
+  - `AgentRuntime`, `PersistenceHook`, `KnowledgeDream`, `KnowledgeLens` drop their frozen `model_id` fields and resolve live on each call.
+  - Boot-time validation: a broken configured model now fails the daemon fast instead of silently at every curation run (`KnowledgeDream`, `KernelBuilder`).
+
+### Fixed
+- **Clippy: clear pre-existing lints on v1.5.2** — A clippy upgrade since v1.5.2 surfaced 38 mechanical lints (in `option_map_unit_fn`, `field_reassign_with_default`, `items_after_test_module`, `needless_borrows_for_generic_args`, `nonminimal_bool`, `ptr_arg`, `useless_conversion`, `cloned_ref_to_slice_refs`, `unused_imports`, and `dead_code`). All are addressed without behavior change. `cargo clippy --workspace --all-targets -- -D warnings` (the documented quality gate) now passes locally and matches CI.
 
 ## [1.5.1] - 2026-06-17
 
