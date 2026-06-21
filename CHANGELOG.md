@@ -6,6 +6,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.1] - 2026-06-21
+
+### Fixed
+- **Web daemon startup reliability** — Hardened `oxios start` / `oxios serve` against silent failure modes (RFC-024 territory):
+  - Pre-spawn port guard detects an orphaned oxios process still holding the port past a stale/missing pidfile, so the spawned daemon's bind no longer fails silently while the readiness probe reports success against the old listener.
+  - A readiness-probe miss now surfaces the daemon log tail and fails the start instead of printing a misleading "started".
+  - `oxios serve` refuses to start a daemon whose web assets could not be obtained (it would have served 503 on every web request); CLI/Telegram-only configs with the web surface disabled are unaffected.
+  - `web_dist` auto-download from GitHub Releases now retries with a bounded backoff so a transient network blip or rate-limit does not strand the daemon.
+  - Unit tests added for `port_in_use` and the startup guards.
+
 ## [1.6.0] - 2026-06-21
 
 ### Added
