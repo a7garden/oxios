@@ -285,33 +285,50 @@ pub async fn ensure_web_dist(workspace: &Path) -> WebDistResult {
         return WebDistResult::WorkspaceDir(workspace_dist);
     }
 
-    // 4. Auto-download from GitHub Releases
+    // 4. Auto-download from GitHub Releases (with bounded retry so a transient
+    //    network blip or rate-limit doesn't strand the daemon serving 503
+    //    until a manual `oxios update --web-only`). Each attempt retries the
+    //    full tag-lookup + download pair.
     tracing::info!("No web UI found locally, downloading from GitHub Releases...");
-    match fetch_latest_release_tag().await {
-        Ok(tag) => match download_and_extract_web_dist(&tag).await {
-            Ok(p) => {
-                // Publish the freshly-extracted staging dir so restarts
-                // resolve it via the marker.
-                if let Some(m) = marker.as_ref() {
-                    let _ = std::fs::write(m, p.to_string_lossy().as_bytes());
+    const MAX_ATTEMPTS: u32 = 3;
+    let mut last_reason = String::from("unknown error");
+    for attempt in 1..=MAX_ATTEMPTS {
+        let outcome = match fetch_latest_release_tag().await {
+            Ok(tag) => match download_and_extract_web_dist(&tag).await {
+                Ok(path) => Some((tag, path)),
+                Err(e) => {
+                    last_reason = e.to_string();
+                    None
                 }
-                WebDistResult::Downloaded {
-                    path: p,
-                    version: tag,
-                }
-            }
+            },
             Err(e) => {
-                tracing::warn!(error = %e, "Failed to auto-download web UI");
-                WebDistResult::DownloadFailed {
-                    reason: e.to_string(),
-                }
+                last_reason = e.to_string();
+                None
             }
-        },
-        Err(e) => {
-            tracing::warn!(error = %e, "Could not fetch latest release info");
-            WebDistResult::DownloadFailed {
-                reason: e.to_string(),
+        };
+
+        if let Some((tag, path)) = outcome {
+            // Publish the freshly-extracted staging dir so restarts
+            // resolve it via the marker.
+            if let Some(m) = marker.as_ref() {
+                let _ = std::fs::write(m, path.to_string_lossy().as_bytes());
             }
+            return WebDistResult::Downloaded { path, version: tag };
         }
+
+        if attempt < MAX_ATTEMPTS {
+            tracing::warn!(
+                attempt,
+                max = MAX_ATTEMPTS,
+                reason = %last_reason,
+                "Web UI download failed, retrying"
+            );
+            tokio::time::sleep(std::time::Duration::from_secs(2 * attempt as u64)).await;
+        } else {
+            tracing::warn!(reason = %last_reason, "Web UI download failed (no retries left)");
+        }
+    }
+    WebDistResult::DownloadFailed {
+        reason: last_reason,
     }
 }

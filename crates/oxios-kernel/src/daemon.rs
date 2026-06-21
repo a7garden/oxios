@@ -77,6 +77,20 @@ impl DaemonManager {
             DaemonStatus::Stopped => {}
         }
 
+        // Pre-spawn port guard: catches an orphaned oxios process that still
+        // holds the port even though the pidfile is stale or missing (e.g. a
+        // prior `oxios stop` removed the pidfile but the process refused to
+        // die). Without this the spawned daemon's bind fails silently while
+        // the post-spawn readiness probe connects to the *old* listener and
+        // reports success — leaving the broken daemon running undetected.
+        if self.port_in_use(port) {
+            anyhow::bail!(
+                "port {port} is already in use — another oxios instance is \
+                 likely still running. Run `oxios stop`, or find and kill the \
+                 process with `lsof -i :{port}` then retry."
+            );
+        }
+
         // Ensure log directory exists
         std::fs::create_dir_all(&self.log_dir).context("failed to create log directory")?;
 
@@ -105,7 +119,29 @@ impl DaemonManager {
         match self.wait_until_listening(port, std::time::Duration::from_secs(15)) {
             Ok(()) => println!("  Status:   ready (listening on :{port})"),
             Err(_) => {
-                println!("  Status:   still warming up (did not respond on :{port} within 15s)")
+                // The spawned daemon never accepted a connection — almost
+                // always a fatal startup error (web UI unavailable, config
+                // problem) or a bind failure we failed to anticipate.
+                // Surface the log tail so the user sees *why* instead of a
+                // misleading "started", and fail the start.
+                println!("  Status:   FAILED to start (no listener on :{port} within 15s)");
+                let log_path = self.log_dir.join("oxios.log");
+                if let Ok(content) = std::fs::read_to_string(&log_path) {
+                    let lines: Vec<&str> = content.lines().collect();
+                    let start = lines.len().saturating_sub(30);
+                    if start < lines.len() {
+                        println!("  ── recent log (last {} lines) ──", lines.len() - start);
+                        for line in &lines[start..] {
+                            println!("  {line}");
+                        }
+                    }
+                }
+                println!("  Full log: {}", log_path.display());
+                anyhow::bail!(
+                    "daemon failed to start listening on :{port} \
+                     (see the log above and {})",
+                    log_path.display()
+                );
             }
         }
         Ok(())
@@ -127,6 +163,23 @@ impl DaemonManager {
             std::thread::sleep(interval);
         }
         anyhow::bail!("daemon did not start listening on :{port} within {timeout:?}")
+    }
+
+    /// Whether anything is currently accepting connections on `127.0.0.1:port`.
+    ///
+    /// Pre-spawn guard used by [`start`](Self::start) to detect an orphaned
+    /// daemon that escaped the pidfile — the pidfile was removed but the
+    /// process kept the port.
+    fn port_in_use(&self, port: u16) -> bool {
+        use std::net::{TcpStream, ToSocketAddrs};
+        let Some(addr) = format!("127.0.0.1:{port}")
+            .to_socket_addrs()
+            .ok()
+            .and_then(|mut a| a.next())
+        else {
+            return false;
+        };
+        TcpStream::connect_timeout(&addr, std::time::Duration::from_millis(200)).is_ok()
     }
 
     /// Stop the daemon by sending SIGTERM.
@@ -357,5 +410,37 @@ WantedBy=multi-user.target
             let _ = pid;
             false
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn port_in_use_detects_a_live_listener() {
+        // Bind an ephemeral port and confirm port_in_use reports it in use.
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let dm = DaemonManager::new("/tmp/oxios-test.pid", "/tmp");
+        assert!(
+            dm.port_in_use(port),
+            "port should be reported in use while a listener is bound"
+        );
+    }
+
+    #[test]
+    fn port_in_use_false_for_unused_port() {
+        let dm = DaemonManager::new("/tmp/oxios-test.pid", "/tmp");
+        // Obtain a port that was just free by binding and dropping, then
+        // confirm port_in_use no longer sees a listener.
+        let port = {
+            let l = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+            l.local_addr().unwrap().port()
+        };
+        assert!(
+            !dm.port_in_use(port),
+            "port should be reported free once the listener is dropped"
+        );
     }
 }

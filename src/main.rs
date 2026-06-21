@@ -2806,6 +2806,25 @@ async fn cmd_serve(kernel: &Kernel, config_path: &Path) -> Result<()> {
         _ => {}
     }
 
+    // Fail fast: if the web surface is enabled but its assets couldn't be
+    // obtained, refuse to start a daemon that would serve 503 on every web
+    // request and mask the real cause (download failure). CLI/Telegram-only
+    // setups — where the web surface is disabled in config — are unaffected.
+    {
+        let web_enabled = match &kernel.config().surfaces {
+            Some(s) => s.enabled.iter().any(|n| n == "web"),
+            None => cfg!(feature = "web"),
+        };
+        if web_enabled && matches!(web_result, web_dist::WebDistResult::DownloadFailed { .. }) {
+            anyhow::bail!(
+                "web UI is enabled but could not be downloaded; refusing to start a \
+                 broken web server. Check your network or run `oxios update --web-only` \
+                 to retry, or disable the web surface in config ([surfaces] enabled = []) \
+                 to start without it."
+            );
+        }
+    }
+
     // Activate channels
     let active_web_dist = oxios_gateway::ActiveWebDist::new(web_dist_path);
     let surface_tasks =
