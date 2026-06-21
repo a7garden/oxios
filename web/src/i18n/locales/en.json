@@ -693,7 +693,7 @@
       "roundComplete": "Round {{round}} complete",
       "clarityImproved": "Clarity improved to {{percent}}%",
       "generatingSeed": "Generating seed...",
-      "keyboardHint": "1-9: select · Enter: next · Esc: skip"
+      "keyboardHint": "Enter: next · Shift+Enter: newline · Space/1-9: select · ←→: move · Esc: skip"
     },
     "transparency": {
       "timelineHeader_one": "{{count}} activity",

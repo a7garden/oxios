@@ -693,7 +693,7 @@
       "roundComplete": "{{round}}차 완료",
       "clarityImproved": "명확도 {{percent}}%로 향상",
       "generatingSeed": "시드 생성 중...",
-      "keyboardHint": "1-9: 선택 · Enter: 다음 · Esc: 건너뛰기"
+      "keyboardHint": "Enter: 다음 · Shift+Enter: 줄바꿈 · 스페이스/1-9: 선택 · ←→: 이동 · Esc: 건너뛰기"
     },
     "transparency": {
       "timelineHeader_one": "활동 {{count}}개",

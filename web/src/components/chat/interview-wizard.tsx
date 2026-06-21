@@ -35,6 +35,7 @@ export function InterviewWizard({
   const [freeTexts, setFreeTexts] = useState<Record<string, string>>({})
   const [, setDirection] = useState<'forward' | 'back'>('forward')
   const freeTextRef = useRef<HTMLTextAreaElement>(null)
+  const contentRef = useRef<HTMLDivElement>(null)
 
   const totalSteps = questions.length
   const question = questions[currentStep]
@@ -132,24 +133,89 @@ export function InterviewWizard({
     }
   }, [isLastStep, questions, answers, freeTexts, onSubmit])
 
-  // Keyboard shortcuts
+  // Move focus between options with arrow keys (roving focus). Returns the
+  // value of the newly-focused option (via `data-value`) so single-choice
+  // questions can select on arrow — matching native radiogroup behavior.
+  // Returns undefined when there are no option buttons (e.g. free_text).
+  const focusOption = useCallback((dir: 1 | -1): string | undefined => {
+    const container = contentRef.current
+    if (!container) return undefined
+    const btns = Array.from(
+      container.querySelectorAll<HTMLButtonElement>('button[data-option="true"]'),
+    )
+    if (btns.length === 0) return undefined
+    const active = document.activeElement as HTMLButtonElement | null
+    const idx = active ? btns.indexOf(active) : -1
+    const next = idx === -1 ? 0 : Math.min(Math.max(idx + dir, 0), btns.length - 1)
+    const target = btns[next]
+    target?.focus()
+    return target?.dataset.value
+  }, [])
+
+  // Autofocus on step change so the whole wizard is keyboard-operable without
+  // a mouse: choice questions focus the first option (Space toggles, arrows
+  // roam, numbers pick), free-text questions focus the textarea.
+  useEffect(() => {
+    const q = questions[currentStep]
+    if (!q) return
+    const id = requestAnimationFrame(() => {
+      if (q.kind === 'free_text') {
+        freeTextRef.current?.focus()
+      } else {
+        contentRef.current?.querySelector<HTMLButtonElement>('button[data-option="true"]')?.focus()
+      }
+    })
+    return () => cancelAnimationFrame(id)
+  }, [currentStep, questions])
+
+  // Global keyboard shortcuts. Enter advances from ANYWHERE — including the
+  // free-text textarea (Shift+Enter inserts a newline). IME composition Enter
+  // is ignored so Korean/CJK users can confirm candidates without advancing.
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Don't capture when typing in textarea/input
-      const tag = (e.target as HTMLElement)?.tagName
-      if (tag === 'TEXTAREA' || tag === 'INPUT') return
+      // Respect the disabled state (e.g. mid-stream) just like the footer
+      // buttons do — don't let a stray Enter submit while the wizard is locked.
+      if (disabled) return
 
-      if (e.key === 'Enter') {
+      const target = e.target as HTMLElement | null
+      const tag = target?.tagName
+      const inText = tag === 'TEXTAREA' || tag === 'INPUT'
+
+      // Enter advances from the wizard's own textarea OR from any non-text
+      // target (option buttons, the card body). preventDefault also cancels
+      // native <button> activation, so Enter on a focused option advances
+      // instead of toggling it. Other inputs on the page are left alone.
+      // Shift+Enter inserts a newline; IME-composition Enter confirms a
+      // candidate without advancing (Korean/CJK).
+      const composing = e.isComposing || e.keyCode === 229
+      const isWizardTextarea = target === freeTextRef.current
+      if (e.key === 'Enter' && !e.shiftKey && !composing && (!inText || isWizardTextarea)) {
         e.preventDefault()
         handleNext()
-      } else if (e.key === 'Backspace') {
+        return
+      }
+
+      // Inside some other text field — don't hijack it.
+      if (inText) return
+
+      if (e.key === 'Backspace') {
         e.preventDefault()
         handlePrev()
       } else if (e.key === 'Escape') {
         e.preventDefault()
         handleSkip()
+      } else if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
+        e.preventDefault()
+        const v = focusOption(1)
+        // Native radiogroup semantics: arrow both moves AND selects for
+        // single-choice. Multi-choice only moves focus (Space toggles).
+        if (question?.kind === 'single_choice' && v) setAnswer(question.id, v)
+      } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
+        e.preventDefault()
+        const v = focusOption(-1)
+        if (question?.kind === 'single_choice' && v) setAnswer(question.id, v)
       } else if (question && question.kind !== 'free_text') {
-        // Number keys 1-9 for quick selection
+        // Number keys 1-9 for quick selection (no focus needed)
         const num = parseInt(e.key, 10)
         if (num >= 1 && num <= 9) {
           const opts = question.options ?? []
@@ -168,7 +234,7 @@ export function InterviewWizard({
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [question, handleNext, handlePrev, handleSkip])
+  }, [disabled, question, handleNext, handlePrev, handleSkip, focusOption])
 
   // Current free text for this step
   const currentFreeText = freeTexts[question?.id ?? ''] ?? ''
@@ -248,7 +314,7 @@ export function InterviewWizard({
           </div>
 
           {/* ── Question content (animated) ── */}
-          <div className="px-4 pt-2 pb-3">
+          <div ref={contentRef} className="px-4 pt-2 pb-3">
             <div
               key={currentStep}
               className="animate-in fade-in-0 slide-in-from-bottom-2 duration-200"
@@ -354,10 +420,14 @@ function QuestionWidget({
 
   if (question.kind === 'yes_no') {
     return (
-      <div className="flex gap-2">
+      // biome-ignore lint/a11y/useSemanticElements: custom-styled choice widget; ARIA group is intentional for keyboard/styling integration
+      <div className="flex gap-2" role="group" aria-label={question.text}>
         <button
           type="button"
           onClick={() => onChange('yes')}
+          data-option="true"
+          data-value="yes"
+          aria-pressed={value === 'yes'}
           disabled={disabled}
           className={cn(
             'flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg text-sm border transition-all',
@@ -371,6 +441,9 @@ function QuestionWidget({
         <button
           type="button"
           onClick={() => onChange('no')}
+          data-option="true"
+          data-value="no"
+          aria-pressed={value === 'no'}
           disabled={disabled}
           className={cn(
             'flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg text-sm border transition-all',
@@ -394,7 +467,8 @@ function QuestionWidget({
             {t('chat.interview.selected', { count: selected.length })}
           </p>
         )}
-        <div className="flex flex-wrap gap-2">
+        {/* biome-ignore lint/a11y/useSemanticElements: custom-styled choice widget; ARIA group is intentional for keyboard/styling integration */}
+        <div className="flex flex-wrap gap-2" role="group" aria-label={question.text}>
           {(question.options ?? []).map((opt, i) => {
             const isActive = selected.includes(opt.value)
             return (
@@ -402,6 +476,9 @@ function QuestionWidget({
                 key={opt.value}
                 type="button"
                 onClick={() => onToggle(opt.value)}
+                data-option="true"
+                data-value={opt.value}
+                aria-pressed={isActive}
                 disabled={disabled}
                 className={cn(
                   'px-3 py-2 rounded-lg text-sm border transition-all text-left',
@@ -427,12 +504,17 @@ function QuestionWidget({
 
   if (question.kind === 'single_choice') {
     return (
-      <div className="grid gap-2 sm:grid-cols-2">
+      <div className="grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label={question.text}>
         {(question.options ?? []).map((opt, i) => (
+          // biome-ignore lint/a11y/useSemanticElements: button-styled radio — custom keyboard (arrows select) and chip styling need a button, not a native input
           <button
             key={opt.value}
             type="button"
+            role="radio"
+            aria-checked={value === opt.value}
             onClick={() => onChange(opt.value)}
+            data-option="true"
+            data-value={opt.value}
             disabled={disabled}
             className={cn(
               'px-3 py-2.5 rounded-lg text-sm border transition-all text-left',
