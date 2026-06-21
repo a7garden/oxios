@@ -114,6 +114,7 @@ jobs:
           - oxios-kernel
           - oxios-gateway
           - oxios
+    steps:
       - uses: actions/checkout@v5
       - name: Wait for crates.io index to see the dependency's new version
         # Poll the crates.io API (not `cargo search`, which only does
@@ -124,6 +125,7 @@ jobs:
           # Map each crate to the internal dependency it must wait for
           case "$CRATE" in
             oxios-markdown|oxios-mcp|oxios-ouroboros|oxios-memory)
+              WAIT=""; exit 0 ;;
             oxios-calendar)
               WAIT="oxios-markdown" ;;
             oxios-kernel)
