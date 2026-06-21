@@ -21,15 +21,15 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
 
-      # ─── Build web assets ────────────────────────────────────────────
+      # ─── Build web assets ──────────────────────────────────────────
       - name: Build web assets
-        working-directory: surface/oxios-web/web
+        working-directory: web
         run: bun install && bun run build
 
-      # ─── Package and create GitHub Release ───────────────────────────
-      - name: Package web assets
+      # ─── Package and create GitHub Release ───────────
+
         run: |
-          cd surface/oxios-web/web/dist
+          cd web/dist
           zip -r $GITHUB_WORKSPACE/web-dist.zip .
 
       - name: Create GitHub Release

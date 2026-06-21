@@ -1,6 +1,6 @@
 [package]
 name = "oxios"
-version = "1.5.1"
+version = "1.5.2"
 edition = "2024"
 description = "Oxios Agent OS — Agent Operating System powered by oxi-sdk"
 license = "MIT"
@@ -29,18 +29,14 @@ panic = "abort"
 opt-level = 3
 
 [workspace]
+# RFC-026: Removed surface/oxios-web, channels/oxios-cli, channels/oxios-telegram.
+# Their code lives in src/api/, src/channels/cli/, src/channels/telegram/ as modules.
 members = [
     "crates/oxios-mcp",
     "crates/oxios-memory",
     "crates/oxios-calendar",
     "crates/oxios-kernel",
     "crates/oxios-markdown",
-    "crates/oxios-ouroboros",
-    "crates/oxios-gateway",
-    "surface/oxios-web",
-    "channels/oxios-cli",
-    "channels/oxios-telegram",
-    "benchmarks/oxios-bench",
 ]
 
 [workspace.dependencies]
@@ -90,7 +86,6 @@ reqwest = { version = "0.12", features = ["json", "rustls-tls", "stream"] }
 zip = "2"
 
 # File system paths
-# File system paths
 dirs = "6"
 
 # Email
@@ -108,26 +103,55 @@ tempfile = "3"
 # Once init
 once_cell = "1.19"
 
+# Web/API (RFC-026: moved from surface/oxios-web)
+axum = { version = "0.8", features = ["ws"] }
+tower = "0.5"
+tower-http = { version = "0.6", features = ["cors"] }
+
+mime_guess = "2"
+futures-util = "0.3"
+tokio-stream = { version = "0.1", features = ["sync"] }
+utoipa = { version = "5", features = ["axum_extras", "uuid", "chrono"] }
+utoipa-swagger-ui = { version = "9", features = ["axum"] }
+
+# CLI channel (RFC-026: moved from channels/oxios-cli)
+reedline = "0.38"
+
 [features]
 default = ["web", "cli", "browser", "sqlite-memory"]
-web = ["dep:oxios-web"]
-cli = ["dep:oxios-cli"]
-telegram = ["dep:oxios-telegram"]
+# web: HTTP API server (Axum). Source: src/api/ (merged from surface/oxios-web per RFC-026)
+web = ["dep:axum", "dep:tower", "dep:tower-http",
+       "dep:mime_guess", "dep:futures-util", "dep:tokio-stream",
+       "dep:utoipa", "dep:utoipa-swagger-ui"]
+# cli: interactive terminal channel. Source: src/channels/cli/ (merged from channels/oxios-cli per RFC-026)
+cli = ["dep:reedline"]
+# telegram: Telegram bot channel. Source: src/channels/telegram/ (merged from channels/oxios-telegram per RFC-026)
+telegram = []
 browser = []
 sqlite-memory = ["oxios-kernel/sqlite-memory"]
 embedding-gguf = ["oxios-kernel/embedding-gguf"]
 otel = ["oxios-kernel/otel", "dep:opentelemetry", "dep:opentelemetry_sdk"]
 
 [dependencies]
-oxios-kernel = { version = "1.5.1", path = "crates/oxios-kernel", default-features = false }
-oxios-calendar = { version = "1.5.1", path = "crates/oxios-calendar" }
-oxios-markdown = { version = "1.5.1", path = "crates/oxios-markdown" }
-oxios-ouroboros = { version = "1.5.1", path = "crates/oxios-ouroboros" }
-oxios-gateway = { version = "1.5.1", path = "crates/oxios-gateway" }
+oxios-kernel = { version = "1.5.2", path = "crates/oxios-kernel", default-features = false }
+oxios-calendar = { version = "1.5.2", path = "crates/oxios-calendar" }
+oxios-markdown = { version = "1.5.2", path = "crates/oxios-markdown" }
+oxios-ouroboros = { version = "1.5.2", path = "crates/oxios-ouroboros" }
+oxios-gateway = { version = "1.5.2", path = "crates/oxios-gateway" }
 oxi-sdk = { workspace = true }
-oxios-web = { version = "1.5.1", path = "surface/oxios-web", optional = true }
-oxios-cli = { version = "1.5.1", path = "channels/oxios-cli", optional = true }
-oxios-telegram = { version = "1.5.1", path = "channels/oxios-telegram", optional = true }
+
+# RFC-026: optional deps gated by features (were separate crates)
+axum = { workspace = true, optional = true }
+tower = { workspace = true, optional = true }
+tower-http = { workspace = true, optional = true }
+
+mime_guess = { workspace = true, optional = true }
+futures-util = { workspace = true, optional = true }
+tokio-stream = { workspace = true, optional = true }
+utoipa = { workspace = true, optional = true }
+utoipa-swagger-ui = { workspace = true, optional = true }
+reedline = { workspace = true, optional = true }
+
 hex = { workspace = true }
 uuid = { workspace = true }
 tokio = { workspace = true }
@@ -144,22 +168,21 @@ chrono = { workspace = true }
 inquire = { workspace = true }
 libc = { workspace = true }
 console = { workspace = true }
+async-trait = { workspace = true }
+ futures = { workspace = true }
 indicatif = "0.17"
-futures = { workspace = true }
 clap_complete = "4"
 webbrowser = "1.0"
-reqwest = { workspace = true }
-opentelemetry = { version = "0.27", optional = true }
-opentelemetry_sdk = { version = "0.27", optional = true }
-zip = { workspace = true }
-dirs = { workspace = true }
-sha2 = { workspace = true }
-toml_edit = "0.22"
+ reqwest = { workspace = true }
+ opentelemetry = { version = "0.27", optional = true }
+ opentelemetry_sdk = { version = "0.27", optional = true }
+ zip = { workspace = true }
+ dirs = { workspace = true }
+ sha2 = { workspace = true }
+ toml_edit = "0.22"
 
 [dev-dependencies]
-oxios-ouroboros = { version = "1.5.1", path = "crates/oxios-ouroboros" }
-oxi-sdk = { workspace = true }
-uuid = { workspace = true }
+oxios-ouroboros = { version = "1.5.2", path = "crates/oxios-ouroboros" }
 chrono = { workspace = true }
 tokio = { workspace = true }
 serde_json = { workspace = true }

@@ -15,7 +15,7 @@ use crate::kernel::Kernel;
 /// Build the list of available surfaces.
 pub fn build_surfaces() -> Vec<Box<dyn Surface>> {
     #[cfg(feature = "web")]
-    let surfaces: Vec<Box<dyn Surface>> = vec![Box::new(oxios_web::WebSurface::new())];
+    let surfaces: Vec<Box<dyn Surface>> = vec![Box::new(crate::api::WebSurface::new())];
     #[cfg(not(feature = "web"))]
     let surfaces: Vec<Box<dyn Surface>> = vec![];
     surfaces

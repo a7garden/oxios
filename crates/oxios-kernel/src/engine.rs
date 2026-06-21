@@ -267,9 +267,10 @@ impl OxiosEngine {
     /// tasks), so re-initializing it on every rebuild would just reload the
     /// snapshot needlessly.
     pub async fn init_file_catalog() -> Result<Arc<dyn ModelCatalog>> {
-        let catalog: Arc<dyn ModelCatalog> = FileModelCatalog::init(Self::catalog_config())
-            .await
-            .map_err(|e| anyhow::anyhow!("Failed to initialize model catalog: {e}"))?;
+        let catalog: Arc<dyn ModelCatalog> =
+            FileModelCatalog::init(Self::catalog_config())
+                .await
+                .map_err(|e| anyhow::anyhow!("Failed to initialize model catalog: {e}"))?;
         Ok(catalog)
     }
 

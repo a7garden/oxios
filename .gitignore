@@ -1,10 +1,10 @@
 /target
-channels/oxios-web/frontend/target/
-channels/oxios-web/static/wasm/*.wasm
-channels/oxios-web/static/assets/*.wasm
-channels/oxios-web/static/dioxus/wasm/*.wasm
-channels/oxios-web/static/dioxus/wasm/snippets/
-channels/oxios-web/static/dioxus/assets/
+# RFC-026: React frontend (was surface/oxios-web/web/)
+web/node_modules/
+web/dist/
+web/storybook-static/
+web/playwright-report/
+web/test-results/
 *.swp
 *.swo
 .DS_Store

@@ -1011,7 +1011,7 @@ checksum = "af491d569909a7e4dee0ad7db7f5341fef5c614d5b8ec8cf765732aba3cff681"
 dependencies = [
  "serde",
  "termcolor",
- "unicode-width 0.2.2",
+ "unicode-width 0.1.14",
 ]
 
 [[package]]
@@ -5244,75 +5244,58 @@ dependencies = [
 
 [[package]]
 name = "oxios"
-version = "1.5.1"
+version = "1.5.2"
 dependencies = [
  "anyhow",
+ "async-trait",
+ "axum 0.8.9",
  "chrono",
  "clap",
  "clap_complete",
  "console",
  "dirs 6.0.0",
  "futures",
+ "futures-util",
  "hex",
  "indicatif",
  "inquire",
  "libc",
+ "mime_guess",
  "mockall",
  "opentelemetry",
  "opentelemetry_sdk",
  "oxi-sdk",
  "oxios-calendar",
- "oxios-cli",
  "oxios-gateway",
  "oxios-kernel",
  "oxios-markdown",
  "oxios-ouroboros",
- "oxios-telegram",
- "oxios-web",
  "parking_lot",
+ "reedline",
  "reqwest",
  "serde",
  "serde_json",
  "sha2",
  "tempfile",
  "tokio",
+ "tokio-stream",
  "toml",
  "toml_edit 0.22.27",
+ "tower 0.5.3",
+ "tower-http 0.6.11",
  "tracing",
  "tracing-appender",
  "tracing-subscriber",
+ "utoipa",
+ "utoipa-swagger-ui",
  "uuid",
  "webbrowser",
  "zip 2.4.2",
 ]
 
 [[package]]
-name = "oxios-bench"
-version = "1.5.1"
-dependencies = [
- "anyhow",
- "async-trait",
- "chrono",
- "clap",
- "console",
- "futures",
- "regex",
- "reqwest",
- "serde",
- "serde_json",
- "tempfile",
- "thiserror 1.0.69",
- "tokio",
- "tokio-test",
- "toml",
- "tracing",
- "tracing-subscriber",
- "uuid",
-]
-
-[[package]]
 name = "oxios-calendar"
-version = "1.5.1"
+version = "1.5.2"
 dependencies = [
  "anyhow",
  "chrono",
@@ -5332,24 +5315,8 @@ dependencies = [
 ]
 
 [[package]]
-name = "oxios-cli"
-version = "1.5.1"
-dependencies = [
- "anyhow",
- "async-trait",
- "chrono",
- "oxios-gateway",
- "reedline",
- "serde",
- "serde_json",
- "tokio",
- "tracing",
- "uuid",
-]
-
-[[package]]
 name = "oxios-gateway"
-version = "1.5.1"
+version = "1.5.2"
 dependencies = [
  "anyhow",
  "arc-swap",
@@ -5368,7 +5335,7 @@ dependencies = [
 
 [[package]]
 name = "oxios-kernel"
-version = "1.5.1"
+version = "1.5.2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5428,7 +5395,7 @@ dependencies = [
 
 [[package]]
 name = "oxios-markdown"
-version = "1.5.1"
+version = "1.5.2"
 dependencies = [
  "anyhow",
  "chrono",
@@ -5457,7 +5424,7 @@ dependencies = [
 
 [[package]]
 name = "oxios-mcp"
-version = "1.5.1"
+version = "1.5.2"
 dependencies = [
  "anyhow",
  "parking_lot",
@@ -5469,7 +5436,7 @@ dependencies = [
 
 [[package]]
 name = "oxios-memory"
-version = "1.5.1"
+version = "1.5.2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5491,7 +5458,7 @@ dependencies = [
 
 [[package]]
 name = "oxios-ouroboros"
-version = "1.5.1"
+version = "1.5.2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5505,57 +5472,6 @@ dependencies = [
  "tokio",
  "tracing",
  "uuid",
-]
-
-[[package]]
-name = "oxios-telegram"
-version = "1.5.1"
-dependencies = [
- "anyhow",
- "async-trait",
- "chrono",
- "oxios-gateway",
- "reqwest",
- "serde",
- "serde_json",
- "tokio",
- "tracing",
- "uuid",
-]
-
-[[package]]
-name = "oxios-web"
-version = "1.5.1"
-dependencies = [
- "anyhow",
- "async-trait",
- "axum 0.8.9",
- "chrono",
- "dirs 6.0.0",
- "futures-util",
- "mime_guess",
- "oxi-sdk",
- "oxios-calendar",
- "oxios-gateway",
- "oxios-kernel",
- "oxios-markdown",
- "oxios-ouroboros",
- "parking_lot",
- "reqwest",
- "rust-embed",
- "serde",
- "serde_json",
- "tempfile",
- "tokio",
- "tokio-stream",
- "toml",
- "tower 0.5.3",
- "tower-http 0.6.11",
- "tracing",
- "utoipa",
- "utoipa-swagger-ui",
- "uuid",
- "zip 2.4.2",
 ]
 
 [[package]]
@@ -6549,7 +6465,6 @@ version = "8.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5bcdef0be6fe7f6fa333b1073c949729274b05f123a0ad7efcb8efd878e5c3b1"
 dependencies = [
- "mime_guess",
  "sha2",
  "walkdir",
 ]
@@ -7482,17 +7397,6 @@ dependencies = [
  "pin-project-lite",
  "tokio",
  "tokio-util",
-]
-
-[[package]]
-name = "tokio-test"
-version = "0.4.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3f6d24790a10a7af737693a3e8f1d03faef7e6ca0cc99aae5066f533766de545"
-dependencies = [
- "futures-core",
- "tokio",
- "tokio-stream",
 ]
 
 [[package]]

@@ -59,23 +59,23 @@ jobs:
       - uses: oven-sh/setup-bun@v2
 
       - name: Install deps
-        working-directory: surface/oxios-web/web
+        working-directory: web
         run: bun install --frozen-lockfile
 
       - name: Type check
-        working-directory: surface/oxios-web/web
+        working-directory: web
         run: bun run typecheck
 
       - name: Unit tests
-        working-directory: surface/oxios-web/web
+        working-directory: web
         run: bun run test
 
       - name: Lint
-        working-directory: surface/oxios-web/web
+        working-directory: web
         run: bun run lint
 
       - name: Build
-        working-directory: surface/oxios-web/web
+        working-directory: web
         run: bun run build
 
   # ─── Test Suite ────────────────────────────────────────────────────
@@ -138,7 +138,7 @@ jobs:
       - uses: oven-sh/setup-bun@v2
 
       - name: Build web assets
-        working-directory: surface/oxios-web/web
+        working-directory: web
         run: bun install --frozen-lockfile && bun run build
 
       - name: Run unit tests (partitioned)

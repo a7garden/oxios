@@ -23,8 +23,10 @@ oxios/
 │   ├── oxios-mcp/         # MCP client (JSON-RPC 2.0 over stdio)
 │   ├── oxios-memory/      # Tiered agent memory (Hot/Warm/Cold, Dream, HNSW)
 │   └── oxios-calendar/    # .ics-based calendar event management
-├── surface/oxios-web/     # Web dashboard (Axum + React)
-├── channels/              # CLI, Telegram channels (feature-gated)
+├── src/                   # Binary: HTTP API server, CLI/Telegram channels, main()
+│   ├── api/               # REST/WebSocket/SSE (was surface/oxios-web)
+│   └── channels/          # In-process channels (was channels/oxios-{cli,telegram})
+├── web/                   # React frontend (was surface/oxios-web/web)
 ├── share/                 # Default skills, config
 └── docs/                  # Architecture, RFCs, design documents
 ```
@@ -38,7 +40,7 @@ oxios/
 | **Language** | Rust 2021 + TypeScript 5 (frontend) |
 | **License** | MIT |
 | **CI** | `cargo fmt && clippy -D warnings && cargo test --workspace` |
-| **Build** | `cargo build && cd surface/oxios-web/web && bun run build` |
+| **Build** | `cargo build && cd web && bun run build` |
 | **Test** | `cargo test --workspace` |
 
 ## Principles
@@ -48,17 +50,6 @@ oxios/
 - **No reimplementation** — reuse oxi-sdk from crates.io.
 - **Channel agnostic** — gateway doesn't care where messages come from.
 - **No containers** — direct host execution. Security via AccessManager (RBAC + path sandboxing).
-
-## Commands
-
-```bash
-cargo build                                          # Build
-cargo test --workspace                               # Test
-cargo run                                            # Daemon (background)
-cargo run -- --foreground                            # Daemon (foreground)
-cargo run -- run --json "prompt"                     # Single-shot JSON execution
-cd surface/oxios-web/web && bun install && bun dev   # Frontend dev server
-```
 
 ## Conventions
 
@@ -135,37 +126,30 @@ Two separate pipelines, two different triggers.
 
 ### Web UI — GitHub Actions (automatic)
 
-Tag push (`v*`) triggers `.github/workflows/release.yml`. Builds `surface/oxios-web/web` with Bun, zips `dist/`, uploads as GitHub Release asset. No local action needed.
+Tag push (`v*`) triggers `.github/workflows/release.yml`. Builds `web/` with Bun, zips `dist/`, uploads as GitHub Release asset. No local action needed.
 
 ```bash
 git tag v1.2.0 && git push --tags   # → CI builds & publishes web-dist.zip
 ```
 
-### crates.io — Local (manual)
+### crates.io — CI (automatic)
 
-No CI. Publish from local in **dependency order** — crates.io resolves versions at publish time, so dependencies must exist before dependents.
+GitHub Actions `publish.yml` publishes all 8 crates in topological order.
+`publish.yml` is dispatched by `release.yml` after a GitHub Release is created
+(a Release made with GITHUB_TOKEN doesn't emit `release: published`, so
+`release.yml` triggers it via `gh workflow run`).
 
+Topological order:
+
+① oxios-markdown, oxios-mcp, oxios-ouroboros, oxios-memory   (no oxios deps)
+② oxios-calendar    → oxios-markdown
+③ oxios-kernel      → {ouroboros, markdown, calendar, mcp, memory}
+④ oxios-gateway     → oxios-kernel
+⑤ oxios (binary)    → {kernel, gateway, markdown, ouroboros, calendar}
 ```
-① oxios-markdown      (no oxios deps)
-   oxios-mcp           (no oxios deps)
-   oxios-ouroboros     (no oxios deps)
-   oxios-memory        (no oxios deps)
-② oxios-calendar      → oxios-markdown
-③ oxios-kernel        → {oxios-ouroboros, oxios-markdown, oxios-calendar, oxios-mcp, oxios-memory}
-④ oxios-gateway       → oxios-kernel
-⑤ oxios               → oxios-kernel (binary crate, not published)
-```
 
-**Steps per crate:**
-1. Bump `version` in `Cargo.toml`
-2. `cargo publish -p <crate> --dry-run` — verify
-3. `cargo publish -p <crate>` — publish
-4. Commit version bump, push
-
-**Before starting:** `cargo test --workspace` must pass. CI green is not enough — local tests catch feature-gated paths.
-
-## Pitfalls
-
+`oxios-web`/`oxios-cli`/`oxios-telegram` were merged into the binary as
+in-process modules per RFC-026 — no separate crates to publish.
 - **Kernel is intentionally monolithic.** See ARCHITECTURE.md §10. Do not propose splitting.
 - **oxi-sdk is crates.io only.** Never add as path dep. Never reimplement what it provides.
 - **Kernel binary vs library.** `src/kernel.rs` (assembler) is in the binary crate, not `oxios-kernel`.

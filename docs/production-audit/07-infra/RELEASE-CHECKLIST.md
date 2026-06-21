@@ -9,8 +9,8 @@ Use this checklist for every release. Complete all items before publishing.
 - [ ] `cargo test --workspace` passes (all platforms)
 - [ ] `cargo clippy --workspace --all-features -- -D warnings` clean
 - [ ] `cargo fmt --all -- --check` clean
-- [ ] Frontend: `cd surface/oxios-web/web && bun install && bun run build` succeeds
-- [ ] Frontend: `cd surface/oxios-web/web && npx tsc --noEmit` zero errors
+- [ ] Frontend: `cd web && bun install && bun run build` succeeds
+- [ ] Frontend: `cd web && npx tsc --noEmit` zero errors
 - [ ] `cargo audit` — no critical/high vulnerabilities
 - [ ] Version bumped in **all** `Cargo.toml` files:
   - [ ] Root `Cargo.toml` (`version = "0.x.0"`)
@@ -19,10 +19,8 @@ Use this checklist for every release. Complete all items before publishing.
   - [ ] `crates/oxios-markdown/Cargo.toml`
   - [ ] `crates/oxios-ouroboros/Cargo.toml`
   - [ ] `crates/oxios-gateway/Cargo.toml`
-  - [ ] `surface/oxios-web/Cargo.toml`
-  - [ ] `channels/oxios-cli/Cargo.toml`
-  - [ ] `channels/oxios-telegram/Cargo.toml`
-  - [ ] `benchmarks/oxios-bench/Cargo.toml` (if versioned)
+  - [ ] `crates/oxios-memory/Cargo.toml`
+
 - [ ] `CHANGELOG.md` updated with version, date, and changes
 - [ ] `Cargo.lock` updated (`cargo update -p oxios` or full rebuild)
 - [ ] Docker image builds: `docker build .`

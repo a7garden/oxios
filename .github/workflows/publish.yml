@@ -75,7 +75,9 @@ jobs:
         # are published (topological order), so it cannot live here.
         run: |
           set -euo pipefail
-          for crate in oxios-markdown oxios-mcp oxios-ouroboros oxios-memory oxios-calendar oxios-kernel oxios-gateway; do
+          for crate in oxios-markdown oxios-mcp oxios-ouroboros oxios-memory \
+                       oxios-calendar oxios-kernel oxios-gateway \
+                       oxios; do
             echo "─── Packaging $crate ───"
             cargo package -p "$crate" --no-verify --list
           done
@@ -111,7 +113,7 @@ jobs:
           - oxios-calendar
           - oxios-kernel
           - oxios-gateway
-    steps:
+          - oxios
       - uses: actions/checkout@v5
       - name: Wait for crates.io index to see the dependency's new version
         # Poll the crates.io API (not `cargo search`, which only does
@@ -120,22 +122,22 @@ jobs:
         run: |
           CRATE="${{ matrix.crate }}"
           # Map each crate to the internal dependency it must wait for
-          # (the one published immediately before it in topo order, or
-          # the last of a parallel tier).
           case "$CRATE" in
             oxios-markdown|oxios-mcp|oxios-ouroboros|oxios-memory)
-              WAIT=""; exit 0 ;;
             oxios-calendar)
               WAIT="oxios-markdown" ;;
             oxios-kernel)
               WAIT="oxios-calendar" ;;
             oxios-gateway)
               WAIT="oxios-kernel" ;;
+            oxios)
+              WAIT="oxios-gateway" ;;
             *)
               WAIT=""; exit 0 ;;
           esac
           # Read the required version from this crate's Cargo.toml.
-          CRATE_DIR="crates/$CRATE"
+          # oxios (binary) lives at the workspace root; all others under crates/.
+          CRATE_DIR="$([ "$CRATE" = "oxios" ] && echo "." || echo "crates/$CRATE")"
           TARGET=$(grep -E "^${WAIT} = \{ version = " "$CRATE_DIR/Cargo.toml" \
             | head -1 | sed -E 's/.*version = "([^"]+)".*/\1/')
           if [ -z "$TARGET" ]; then
@@ -160,9 +162,8 @@ jobs:
           echo "::error::Timeout waiting for $WAIT $TARGET on crates.io"
           exit 1
       - name: Publish ${{ matrix.crate }}
-        working-directory: crates/${{ matrix.crate }}
-        env:
-          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_TOKEN || secrets.CARGO_REGISTRY_TOKEN }}
+        working-directory: ${{ matrix.crate == 'oxios' && '.' || format('crates/{0}', matrix.crate) }}
+
         run: |
           if [ -z "$CARGO_REGISTRY_TOKEN" ]; then
             echo "::error::Neither CARGO_TOKEN nor CARGO_REGISTRY_TOKEN is set as a repository secret."

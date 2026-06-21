@@ -611,10 +611,10 @@ oxios/                          # Main binary (src/main.rs)
 │   ├── oxios-mcp/              # MCP client (JSON-RPC 2.0 over stdio)
 │   ├── oxios-memory/           # Tiered agent memory (Hot/Warm/Cold, Dream, HNSW, hyperbolic)
 │   └── oxios-calendar/         # .ics-based calendar event management
-├── surface/oxios-web/          # Web dashboard (Axum backend + React frontend)
-├── channels/
-│   ├── oxios-cli/              # CLI channel
-│   └── oxios-telegram/         # Telegram channel
+├── src/                        # Main binary
+│   ├── api/                    # HTTP API server (was surface/oxios-web)
+│   └── channels/               # In-process channels (was channels/oxios-{cli,telegram})
+├── web/                        # React frontend (was surface/oxios-web/web)
 ├── share/                      # Default skills, config, migration scripts
 └── docs/                       # Architecture docs, RFCs, design documents
 ```
@@ -628,11 +628,11 @@ oxios ──► oxios-kernel ──► oxios-memory
                        ──► oxios-calendar
                        ──► oxios-mcp
                        ──► oxi-sdk (crates.io)
-      ──► oxios-calendar
       ──► oxios-gateway ──► oxios-kernel
-      ──► oxios-web / oxios-cli / oxios-telegram (feature-gated channels)
-                                 └──► oxios-gateway
 ```
+
+API server (`src/api/`) and channels (`src/channels/`) are in-process modules,
+not separate crates.
 
 **File locations:**
 

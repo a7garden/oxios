@@ -1541,7 +1541,7 @@ fn default_cors_origins() -> Vec<String> {
     // Browsers treat `localhost` and `127.0.0.1` as distinct origins, so both
     // must be allow-listed or cross-origin requests silently fail CORS checks.
     // 4200 = backend that also serves the production SPA (same origin).
-    // 5173 = Vite dev server (`bun dev` in surface/oxios-web/web).
+    // 5173 = Vite dev server (`bun dev` in web/).
     vec![
         "http://localhost:4200".to_string(),
         "http://127.0.0.1:4200".to_string(),

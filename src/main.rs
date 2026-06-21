@@ -10,6 +10,14 @@ mod otel;
 mod surface;
 mod web_dist;
 
+// RFC-026: HTTP API server (merged from surface/oxios-web)
+#[cfg(feature = "web")]
+mod api;
+
+// RFC-026: in-process channels (merged from channels/oxios-cli, channels/oxios-telegram)
+// Individual sub-modules are feature-gated internally.
+mod channels;
+
 use anyhow::{Context, Result};
 use clap::{CommandFactory, Parser, Subcommand};
 use clap_complete::{Shell, generate};
@@ -23,9 +31,9 @@ use oxios_kernel::onboarding::WORKSPACE_SUBDIRS;
 use oxios_kernel::{DaemonManager, OxiosConfig, credential::CredentialStore};
 
 #[cfg(feature = "cli")]
-use oxios_cli::CliPlugin;
+use crate::channels::cli::CliPlugin;
 #[cfg(feature = "telegram")]
-use oxios_telegram::TelegramPlugin;
+use crate::channels::telegram::TelegramPlugin;
 
 use oxios_gateway::plugin::{ChannelContext, ChannelPlugin};
 
@@ -1986,12 +1994,12 @@ async fn run() -> Result<()> {
         Some(Command::Chat) => {
             #[cfg(feature = "cli")]
             {
-                let cli_channel = oxios_cli::CliChannel::new(256);
+                let cli_channel = crate::channels::cli::CliChannel::new(256);
                 let handle = cli_channel.handle();
                 if let Err(e) = kernel.register_channel(Box::new(cli_channel)).await {
                     tracing::error!(error = %e, "Failed to register CLI channel");
                 }
-                let mut loop_ = oxios_cli::InteractiveLoop::new(handle);
+                let mut loop_ = crate::channels::cli::InteractiveLoop::new(handle);
                 loop_.run().await?;
                 Ok(())
             }
