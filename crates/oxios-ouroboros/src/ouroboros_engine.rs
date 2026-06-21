@@ -12,12 +12,13 @@ use anyhow::Result;
 use async_trait::async_trait;
 use chrono::Utc;
 use futures::StreamExt;
-use oxi_sdk::{Context, Message, Model, Provider, UserMessage};
+use oxi_sdk::{Context, Message, UserMessage};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
 use crate::evaluation::EvaluationResult;
 use crate::interview::InterviewResult;
+use crate::model_resolver::ModelResolver;
 use crate::protocol::{ExecutionResult, OuroborosProtocol, Phase};
 use crate::seed::{AmbiguityScore, Entity, Seed};
 
@@ -139,11 +140,13 @@ struct EvaluationResponse {
 
 /// LLM-powered implementation of the Ouroboros protocol.
 ///
-/// The engine uses the injected `oxi_sdk::Provider` to make LLM calls
-/// for interview, seed generation, evaluation, and evolution.
+/// The engine resolves the live default model from the injected
+/// [`ModelResolver`] (the kernel's `EngineHandle`) at the start of every
+/// LLM-bound phase. This keeps interview / seed / evaluate / evolve in lockstep
+/// with the execute phase and with hot-swaps, and surfaces a bad model ID at
+/// the first phase call instead of silently at execute.
 pub struct OuroborosEngine {
-    provider: Arc<dyn Provider>,
-    model: Model,
+    resolver: Arc<dyn ModelResolver>,
     phase: parking_lot::Mutex<Phase>,
     /// Optional persona system prompt, prepended to every LLM call.
     persona_prompt: parking_lot::Mutex<Option<String>>,
@@ -155,11 +158,14 @@ pub struct OuroborosEngine {
 }
 
 impl OuroborosEngine {
-    /// Create a new engine with the given provider and LLM model.
-    pub fn new(provider: Arc<dyn Provider>, model: Model) -> Self {
+    /// Create a new engine backed by the given model resolver.
+    ///
+    /// Production code passes the kernel's `EngineHandle` (wrapped as
+    /// `Arc<dyn ModelResolver>`); tests can pass a [`StaticModelResolver`]
+    /// for a fixed model.
+    pub fn new(resolver: Arc<dyn ModelResolver>) -> Self {
         Self {
-            provider,
-            model,
+            resolver,
             phase: parking_lot::Mutex::new(Phase::Interview),
             persona_prompt: parking_lot::Mutex::new(None),
             eval_cache: crate::eval_cache::EvalCache::new(256),
@@ -272,11 +278,20 @@ impl OuroborosEngine {
             system_prompt.to_string()
         };
 
+        // Resolve the live default model + provider (post-hot-swap). Single
+        // source of truth shared with the kernel's AgentRuntime — every phase
+        // reads the same engine default, so interview and execute can't
+        // diverge. A bad model ID fails here at phase entry, not at execute.
+        let resolved = self.resolver.resolve_default()?;
+
         let mut ctx = Context::new();
         ctx.set_system_prompt(effective_system);
         ctx.add_message(Message::User(UserMessage::new(user_message)));
 
-        let stream = self.provider.stream(&self.model, &ctx, None).await?;
+        let stream = resolved
+            .provider
+            .stream(&resolved.model, &ctx, None)
+            .await?;
 
         // Collect the stream into a single text string.
         let mut text = String::new();
@@ -1051,7 +1066,7 @@ impl std::fmt::Debug for OuroborosEngine {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("OuroborosEngine")
             .field("phase", &self.phase())
-            .field("model", &self.model.id)
+            .field("model", &"<resolved live via ModelResolver>")
             .finish()
     }
 }

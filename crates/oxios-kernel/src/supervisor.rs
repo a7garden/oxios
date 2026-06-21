@@ -687,7 +687,7 @@ mod tests {
 
         let engine = crate::OxiosEngine::new("mock/model");
         let engine_handle = Arc::new(crate::engine::EngineHandle::new(Arc::new(engine)));
-        let runtime = AgentRuntime::new(engine_handle, "mock/model", kernel_handle, None);
+        let runtime = AgentRuntime::new(engine_handle, kernel_handle, None);
         BasicSupervisor::new(event_bus, runtime)
     }
 

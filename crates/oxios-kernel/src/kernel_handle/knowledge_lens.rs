@@ -82,8 +82,6 @@ pub struct KnowledgeLens {
     /// Callback handle for file-change events.
     #[allow(dead_code)]
     callback_handle: Option<mpsc::Sender<oxios_markdown::knowledge::FileChange>>,
-    /// Default model ID for copilot chat.
-    model_id: String,
 }
 
 impl std::fmt::Debug for KnowledgeLens {
@@ -114,7 +112,6 @@ impl KnowledgeLens {
             memory,
             agent_writes: Arc::new(RwLock::new(HashSet::new())),
             callback_handle: Some(tx_for_cb),
-            model_id: "anthropic/claude-sonnet-4".to_string(),
         };
 
         // Spawn background task to process file-change events
@@ -137,11 +134,6 @@ impl KnowledgeLens {
     /// Get the underlying knowledge base (read-only access).
     pub fn knowledge_base(&self) -> &Arc<oxios_markdown::KnowledgeBase> {
         &self.kb
-    }
-
-    /// Get the default model ID used for copilot chat.
-    pub fn model_id(&self) -> &str {
-        &self.model_id
     }
 
     /// Mark a file as having been written by an agent.
@@ -216,8 +208,7 @@ impl KnowledgeLens {
     #[allow(clippy::unused_async)]
     pub async fn copilot_chat(
         &self,
-        engine: Arc<dyn crate::engine::EngineProvider>,
-        model_id: &str,
+        engine_handle: Arc<crate::engine::EngineHandle>,
         question: &str,
         context_path: Option<&str>,
     ) -> Result<CopilotResponse> {
@@ -273,26 +264,23 @@ impl KnowledgeLens {
             context_parts.join("\n\n")
         );
 
-        let provider_name = model_id
-            .split_once('/')
-            .map(|(p, _)| p)
-            .unwrap_or("anthropic");
-        let provider = engine
-            .create_provider(provider_name)
-            .map_err(|e| anyhow::anyhow!("Provider: {e}"))?;
-        let model = engine
-            .resolve_model(model_id)
-            .map_err(|e| anyhow::anyhow!("Model: {e}"))?;
+        // Resolve the live default model + a cached provider through the same
+        // single source of truth the rest of the kernel uses (interview,
+        // execute, persistence). Honors hot-swaps and the user's configured
+        // provider/key — fixes the old hardcoded anthropic engine bug.
+        let resolved = engine_handle
+            .resolve_default()
+            .map_err(|e| anyhow::anyhow!("Model/provider: {e}"))?;
 
         let mut ctx = oxi_sdk::Context::new();
         ctx.set_system_prompt(&system_prompt);
         ctx.add_message(oxi_sdk::Message::User(oxi_sdk::UserMessage::new(question)));
 
-        let stream = provider
-            .stream(&model, &ctx, None)
+        let stream = resolved
+            .provider
+            .stream(&resolved.model, &ctx, None)
             .await
             .map_err(|e| anyhow::anyhow!("Stream: {e}"))?;
-
         let mut text = String::new();
         use futures::StreamExt;
         let mut pinned = std::pin::pin!(stream);

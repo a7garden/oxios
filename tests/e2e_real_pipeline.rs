@@ -33,9 +33,9 @@ mod tests {
             .create_provider(&model.provider)
             .unwrap_or_else(|_| panic!("Provider '{}' not available", model.provider));
 
-        Some(Arc::new(oxios_ouroboros::OuroborosEngine::new(
-            provider, model,
-        )))
+        Some(Arc::new(oxios_ouroboros::OuroborosEngine::new(Arc::new(
+            oxios_ouroboros::StaticModelResolver::new(model, provider, &model_id),
+        ))))
     }
 
     #[tokio::test]

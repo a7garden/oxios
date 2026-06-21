@@ -17,6 +17,7 @@ pub mod eval_cache;
 pub mod evaluation;
 pub mod interview;
 pub mod lateral;
+pub mod model_resolver;
 pub mod ouroboros_engine;
 pub mod protocol;
 pub mod regression;
@@ -24,6 +25,7 @@ pub mod seed;
 
 pub use evaluation::EvaluationResult;
 pub use interview::InterviewResult;
+pub use model_resolver::{ModelResolver, ResolvedModel, StaticModelResolver};
 pub use ouroboros_engine::OuroborosEngine;
 pub use protocol::{ExecutionResult, OuroborosProtocol, Phase, ToolCallRecord};
 pub use seed::{AmbiguityScore, Entity, Seed};

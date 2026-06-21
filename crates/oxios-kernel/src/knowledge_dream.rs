@@ -7,7 +7,7 @@
 
 use std::sync::Arc;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 
@@ -100,25 +100,46 @@ pub struct KnowledgeDream {
 
 impl KnowledgeDream {
     /// Create a new knowledge dream process.
+    ///
+    /// When `config.model` is an explicit model (not `"auto"`), it is validated
+    /// against the live engine now — a typo fails at boot with a clear error
+    /// rather than silently at every curation run. Callers should skip
+    /// spawning on `Err` (the dream is a non-critical background feature).
     pub fn new(
         knowledge_base: Arc<KnowledgeBase>,
         git_layer: Arc<GitLayer>,
         engine_handle: Arc<EngineHandle>,
         config: KnowledgeDreamConfig,
-    ) -> Self {
+    ) -> Result<Self> {
         let model_id = if config.model == "auto" {
-            // Will use the default model from engine
+            // Will use the default model from engine at curation time.
             String::new()
         } else {
+            // Fail-fast: resolve the explicit curation model AND its provider so
+            // a malformed id or unconfigured provider surfaces here, not in the
+            // background loop.
+            let engine = engine_handle.get();
+            let model = engine.resolve_model(&config.model).with_context(|| {
+                format!(
+                    "knowledge_dream.model '{}' is not a known model",
+                    config.model
+                )
+            })?;
+            engine.create_provider(&model.provider).with_context(|| {
+                format!(
+                    "knowledge_dream.model '{}' provider '{}' is not configured",
+                    config.model, model.provider
+                )
+            })?;
             config.model.clone()
         };
-        Self {
+        Ok(Self {
             knowledge_base,
             git_layer,
             engine_handle,
             model_id,
             config,
-        }
+        })
     }
 
     /// Run the knowledge dream.

@@ -8,7 +8,7 @@
 use std::sync::Arc;
 
 use oxi_sdk::{OxiBuilder, Provider};
-use oxios_ouroboros::{OuroborosEngine, OuroborosProtocol};
+use oxios_ouroboros::{OuroborosEngine, OuroborosProtocol, StaticModelResolver};
 
 /// auth.json에서 zai API 키 읽기.
 fn load_zai_key() -> Option<String> {
@@ -49,7 +49,11 @@ async fn make_engine() -> Arc<dyn OuroborosProtocol> {
     let provider = oxi
         .create_provider("zai")
         .expect("provider creation failed");
-    Arc::new(OuroborosEngine::new(provider, model))
+    Arc::new(OuroborosEngine::new(Arc::new(StaticModelResolver::new(
+        model,
+        provider,
+        "zai/glm-5-turbo",
+    ))))
 }
 
 /// 시나리오 정의.

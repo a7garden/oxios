@@ -796,8 +796,7 @@ pub(crate) async fn handle_knowledge_copilot(
         .kernel
         .knowledge_lens
         .copilot_chat(
-            Arc::new(oxios_kernel::OxiosEngine::new("anthropic/claude-sonnet-4")),
-            "anthropic/claude-sonnet-4",
+            Arc::clone(state.kernel.engine.engine_handle()),
             &body.question,
             body.context_path.as_deref(),
         )

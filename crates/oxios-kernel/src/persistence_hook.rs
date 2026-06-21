@@ -88,18 +88,20 @@ pub struct PersistenceHook {
     memory_manager: Arc<MemoryManager>,
     knowledge_base: Arc<KnowledgeBase>,
     engine_handle: Arc<EngineHandle>,
-    model_id: String,
     state_store: Arc<StateStore>,
     event_bus: EventBus,
 }
 
 impl PersistenceHook {
     /// Create a new persistence hook.
+    ///
+    /// The reflection model is resolved live from `engine_handle` on each
+    /// reflection, so it tracks hot-swaps — same source of truth as interview
+    /// and execute.
     pub fn new(
         memory_manager: Arc<MemoryManager>,
         knowledge_base: Arc<KnowledgeBase>,
         engine_handle: Arc<EngineHandle>,
-        model_id: impl Into<String>,
         state_store: Arc<StateStore>,
         event_bus: EventBus,
     ) -> Self {
@@ -107,7 +109,6 @@ impl PersistenceHook {
             memory_manager,
             knowledge_base,
             engine_handle,
-            model_id: model_id.into(),
             state_store,
             event_bus,
         }
@@ -353,7 +354,7 @@ impl PersistenceHook {
         let engine = self.engine_handle.get();
         let agent_config = oxi_sdk::AgentConfig {
             description: Some("Persistence reflection".into()),
-            model_id: self.model_id.clone(),
+            model_id: engine.default_model_id().to_string(),
             system_prompt: Some("You output JSON only. No explanation.".to_string()),
             max_tokens: Some(512),
             temperature: Some(0.3),

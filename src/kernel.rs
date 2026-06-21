@@ -774,15 +774,27 @@ impl KernelBuilder {
                 )),
             }
         };
+        // Boot-time validation: resolve the configured model so a broken
+        // config fails fast (daemon refuses to start). `model.provider` is
+        // reused below to seed the agent API key.
         let model = engine
             .resolve_model(model_id)
             .context(format!("Failed to resolve model: {model_id}"))?;
-        let provider = engine
-            .create_provider(&model.provider)
-            .context(format!("Failed to create provider: {}", model.provider))?;
 
-        let ouroboros: Arc<dyn OuroborosProtocol> =
-            Arc::new(OuroborosEngine::new(Arc::clone(&provider), model.clone()));
+        // EngineHandle — hot-swappable engine reference. Created here so both
+        // the OuroborosEngine (interview/seed/eval/evolve) and the AgentRuntime
+        // (execute) resolve the *live* default model through it — the single
+        // source of truth that makes the phases agree and honors hot-swaps.
+        let engine_handle = Arc::new(EngineHandle::new(engine));
+
+        // Boot-time fail-fast for the provider too: this also warms the
+        // EngineHandle provider cache.
+        engine_handle
+            .resolve_default()
+            .context("Boot model/provider resolution failed")?;
+
+        let resolver: Arc<dyn oxios_ouroboros::ModelResolver> = engine_handle.clone();
+        let ouroboros: Arc<dyn OuroborosProtocol> = Arc::new(OuroborosEngine::new(resolver));
 
         let mut access_manager = AccessManager::new();
         if let Some(ref audit_path) = config.security.audit_log_path {
@@ -1059,11 +1071,10 @@ impl KernelBuilder {
         // Routing stats — shared between EngineApi and AgentRuntime
         let routing_stats = Arc::new(oxios_kernel::RoutingStats::new());
 
-        // EngineHandle — hot-swappable engine reference.
-        // EngineApi writes (set_model / set_api_key) rebuild and swap.
-        // AgentRuntime reads the latest engine on each execute().
-        let engine_handle = Arc::new(EngineHandle::new(engine));
-
+        // EngineHandle was created earlier (before OuroborosEngine) so both the
+        // Ouroboros phases and AgentRuntime resolve the live default model
+        // through the same handle. EngineApi writes (set_model / set_api_key)
+        // rebuild and swap it; AgentRuntime reads the latest on each execute().
         // ── Gateway APIs — Arc-wrapped for sharing with Gateway and KernelHandle ──
         let engine_api = Arc::new(oxios_kernel::EngineApi::new(
             Arc::new(parking_lot::RwLock::new(config.clone())),
@@ -1156,14 +1167,26 @@ impl KernelBuilder {
         if config.memory.knowledge_dream.enabled {
             let kb = kernel_handle.knowledge.clone();
             let kd_config = config.memory.knowledge_dream.clone();
-            let kd = Arc::new(oxios_kernel::knowledge_dream::KnowledgeDream::new(
+            match oxios_kernel::knowledge_dream::KnowledgeDream::new(
                 kb,
                 git_layer.clone(),
                 engine_handle.clone(),
                 kd_config,
-            ));
-            kd.spawn();
-            tracing::info!("Knowledge dream spawned for background note curation");
+            ) {
+                Ok(kd) => {
+                    Arc::new(kd).spawn();
+                    tracing::info!("Knowledge dream spawned for background note curation");
+                }
+                Err(e) => {
+                    // Non-fatal: the dream is a background feature. A bad
+                    // curation model disables it with a clear log rather than
+                    // crashing the daemon or silently failing every cycle.
+                    tracing::error!(
+                        error = %e,
+                        "Knowledge dream disabled — invalid model config, skipping background curation"
+                    );
+                }
+            }
         }
 
         // Build ToolRetriever for semantic capability discovery.
@@ -1171,7 +1194,6 @@ impl KernelBuilder {
 
         let agent_runtime = AgentRuntime::new(
             Arc::clone(&engine_handle),
-            model_id,
             kernel_handle.clone(),
             Some(Arc::clone(&routing_stats)),
         )
@@ -1185,7 +1207,6 @@ impl KernelBuilder {
                 .map(|(key, _)| key);
 
             oxios_kernel::agent_runtime::AgentRuntimeConfig {
-                model_id: model_id.clone(),
                 api_key,
                 provider_options: config.engine.provider_options.clone(),
                 ..Default::default()
@@ -1200,7 +1221,6 @@ impl KernelBuilder {
                 .expect("KnowledgeBase init failed"),
             ),
             Arc::clone(&engine_handle),
-            model_id.clone(),
             state_store.clone(),
             event_bus.clone(),
         )));
@@ -1335,22 +1355,7 @@ impl KernelBuilder {
         oxios_kernel::register_builtin_metrics();
         oxios_kernel::observability::init();
 
-        // RFC-024 SP4: mark state store ready and start the 30 s readiness
-        // deadline. The engine state is finalized by the caller (main.rs
-        // cmd_serve) once it knows whether the configured model has an API
-        // key — at which point the gate is set to `Ready` or `Degraded`.
-        // The deadline forcibly promotes any still-Warming subsystem to
-        // `Degraded` so a missing API key cannot lock the gate forever.
-        kernel_handle
-            .readiness
-            .set_state_store(SubsystemState::Ready);
-        let deadline_secs = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_secs() + 30)
-            .unwrap_or(0);
-        kernel_handle.readiness.set_deadline_secs(deadline_secs);
-
-        Ok(Kernel {
+        let kernel = Kernel {
             orchestrator,
             gateway,
             event_bus: event_bus.clone(),
@@ -1372,17 +1377,42 @@ impl KernelBuilder {
             project_manager,
             start_time: std::time::Instant::now(),
             config_path,
-            handle_cache: {
-                let cell = std::sync::OnceLock::new();
-                let _ = cell.set(kernel_handle.clone());
-                cell
-            },
+            // Do NOT pre-seed with the cycle-breaking preliminary handle
+            // (`kernel_handle`, built above solely to construct AgentRuntime):
+            // its AgentApi is intentionally incomplete (NoOpSupervisor, no
+            // agent_log_db / state_store). Caching it made every control-plane
+            // agent query silently return empty even though the real
+            // supervisor kept persisting rows. The fully-wired handle is
+            // assembled lazily by `handle()` and cached just below.
+            handle_cache: std::sync::OnceLock::new(),
             a2a_protocol,
             engine_handle,
             #[cfg(feature = "sqlite-memory")]
             agent_log_db,
             promo_shutdown_tx,
-        })
+        };
+
+        // Eagerly assemble the fully-wired KernelHandle (real supervisor +
+        // SQLite agent log + state store) and cache it, so the control plane
+        // — HTTP API, CLI — never observes the incomplete preliminary handle.
+        // Runs `handle()`'s `get_or_init` exactly once.
+        let handle = kernel.handle();
+
+        // RFC-024 SP4: mark state store ready and start the 30 s readiness
+        // deadline on the *cached* handle's gate. The engine state is
+        // finalized by the caller (main.rs cmd_serve) once it knows whether
+        // the configured model has an API key — at which point the gate is
+        // set to `Ready` or `Degraded`. The deadline forcibly promotes any
+        // still-Warming subsystem to `Degraded` so a missing API key cannot
+        // lock the gate forever.
+        handle.readiness.set_state_store(SubsystemState::Ready);
+        let deadline_secs = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs() + 30)
+            .unwrap_or(0);
+        handle.readiness.set_deadline_secs(deadline_secs);
+
+        Ok(kernel)
     }
 }
 

@@ -8,6 +8,7 @@
 
 use crate::config::OxiosConfig;
 use crate::credential::CredentialStore;
+use anyhow::Context;
 use chrono::{DateTime, Utc};
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
@@ -908,6 +909,23 @@ impl EngineApi {
     /// Updates both the in-memory config and the on-disk file, then
     /// hot-swaps the runtime engine so the next agent execution uses the new model.
     pub fn set_model(&self, model_id: &str) -> anyhow::Result<()> {
+        // Validate BEFORE persisting/swapping: reject unknown models and
+        // unconfigured providers so the Web UI's "switch succeeded" is truthful.
+        // This prevents the divergence where a bad model ID was silently
+        // accepted at swap time and only surfaced as "Model not found" at the
+        // execute phase — after interview/seed had already run.
+        {
+            let engine = self.engine_handle.get();
+            let model = engine
+                .resolve_model(model_id)
+                .with_context(|| format!("Unknown model '{model_id}'"))?;
+            engine.create_provider(&model.provider).with_context(|| {
+                format!(
+                    "Provider '{}' is not configured for '{model_id}'",
+                    model.provider
+                )
+            })?;
+        }
         {
             let mut cfg = self.config.write();
             cfg.engine.default_model = model_id.to_string();
@@ -1320,5 +1338,56 @@ mod tests {
         // Most recent first (i=209 down to i=10)
         assert_eq!(history[0].from_model, "model-209");
         assert_eq!(history[199].from_model, "model-10");
+    }
+
+    #[test]
+    fn set_model_rejects_unknown_model_before_persist() {
+        use crate::engine::{EngineHandle, OxiosEngine};
+
+        let engine = Arc::new(OxiosEngine::new("anthropic/claude-sonnet-4-20250514"));
+        let handle = Arc::new(EngineHandle::new(engine));
+        let config = Arc::new(parking_lot::RwLock::new(OxiosConfig::default()));
+        // Validation runs before any IO, so a non-existent path is safe — it
+        // must never be written to.
+        let path = PathBuf::from("/tmp/oxios-set-model-test-NONEXISTENT.toml");
+        let api = EngineApi::new(config, path, Arc::new(RoutingStats::new()), handle);
+
+        // The malformed id from the user-reported bug. Must be rejected, not
+        // silently accepted and deferred to the execute phase.
+        let before = api.config.read().engine.default_model.clone();
+        let err = api.set_model("zai-coding-plan/glm-5-turbo").unwrap_err();
+        assert!(
+            err.to_string().contains("Unknown model"),
+            "expected unknown-model error, got: {err}"
+        );
+        // Rejection happened before persist: config is untouched.
+        assert_eq!(api.config.read().engine.default_model, before);
+    }
+
+    #[test]
+    fn set_model_accepts_known_builtin_model() {
+        use crate::engine::{EngineHandle, OxiosEngine};
+
+        let engine = Arc::new(OxiosEngine::new("anthropic/claude-sonnet-4-20250514"));
+        let handle = Arc::new(EngineHandle::new(engine));
+        let config = Arc::new(parking_lot::RwLock::new(OxiosConfig::default()));
+        let tmp =
+            std::env::temp_dir().join(format!("oxios-set-model-ok-{}.toml", std::process::id()));
+        let api = EngineApi::new(config, tmp.clone(), Arc::new(RoutingStats::new()), handle);
+
+        // A builtin model with a built-in provider resolves + creates a provider
+        // without any API key, so validation passes. The swap should succeed.
+        let result = api.set_model("openai/gpt-4o");
+        // create_provider may still fail without a key on some SDK builds; treat
+        // both Ok and a provider-config error as acceptable, but never an
+        // "Unknown model" rejection for a known builtin.
+        match result {
+            Ok(()) => assert_eq!(api.config.read().engine.default_model, "openai/gpt-4o"),
+            Err(e) => assert!(
+                !e.to_string().contains("Unknown model"),
+                "known model rejected as unknown: {e}"
+            ),
+        }
+        let _ = std::fs::remove_file(&tmp);
     }
 }

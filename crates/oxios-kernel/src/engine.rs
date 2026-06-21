@@ -21,6 +21,8 @@ use oxi_sdk::{
 };
 use std::sync::Arc;
 
+use oxios_ouroboros::{ModelResolver, ResolvedModel};
+
 use crate::credential::{CredentialStore, discover_auth_store_providers};
 
 /// The kernel's engine — wraps oxi-sdk's Oxi instance.
@@ -564,13 +566,18 @@ impl std::fmt::Debug for OxiosEngine {
 ///   uses the same `Arc<OxiosEngine>` for the entire run (consistent within one execution).
 pub struct EngineHandle {
     inner: parking_lot::RwLock<Arc<OxiosEngine>>,
+    /// Provider cache keyed by provider name. Survives across reads within one
+    /// engine generation; cleared on [`swap`](Self::swap) so credential /
+    /// provider changes take effect. Avoids rebuilding providers per phase call.
+    provider_cache:
+        parking_lot::RwLock<std::collections::HashMap<String, Arc<dyn oxi_sdk::Provider>>>,
 }
-
 impl EngineHandle {
     /// Create a new handle wrapping the given engine.
     pub fn new(engine: Arc<OxiosEngine>) -> Self {
         Self {
             inner: parking_lot::RwLock::new(engine),
+            provider_cache: parking_lot::RwLock::new(std::collections::HashMap::new()),
         }
     }
 
@@ -587,14 +594,60 @@ impl EngineHandle {
     /// Callers should rebuild `OxiosEngine` with updated credentials/model
     /// before calling this.
     pub fn swap(&self, new_engine: OxiosEngine) {
-        let mut guard = self.inner.write();
-        let old_id = guard.default_model_id().to_string();
-        *guard = Arc::new(new_engine);
-        tracing::info!(
-            old_model = %old_id,
-            new_model = %guard.default_model_id(),
-            "Engine hot-swapped"
-        );
+        {
+            let mut guard = self.inner.write();
+            let old_id = guard.default_model_id().to_string();
+            *guard = Arc::new(new_engine);
+            tracing::info!(
+                old_model = %old_id,
+                new_model = %guard.default_model_id(),
+                "Engine hot-swapped"
+            );
+        }
+        // Invalidate cached providers so credential / provider changes
+        // (set_model / set_api_key) take effect on the next resolve.
+        self.provider_cache.write().clear();
+        tracing::debug!("Provider cache cleared on engine swap");
+    }
+
+    /// Resolve the live default model + a cached provider.
+    ///
+    /// This is the single source of truth for "which model does this task
+    /// use", shared by the Ouroboros phases (via the [`ModelResolver`]
+    /// impl) and the kernel's `AgentRuntime` (execute). Reads the engine's
+    /// current `default_model_id` — which reflects hot-swaps — so a model
+    /// change via the Web UI takes effect on the next phase call.
+    ///
+    /// Providers are cached per provider name and invalidated on [`swap`],
+    /// so repeated resolution within one engine generation is cheap.
+    pub fn resolve_default(&self) -> Result<ResolvedModel> {
+        let engine = self.get();
+        let model_id = engine.default_model_id().to_string();
+        let model = engine.resolve_model(&model_id)?;
+        let provider = self.cached_provider(&model.provider)?;
+        Ok(ResolvedModel {
+            model,
+            provider,
+            model_id,
+        })
+    }
+
+    /// Get a (cached) provider for a provider name, creating it on first use.
+    fn cached_provider(&self, name: &str) -> Result<Arc<dyn oxi_sdk::Provider>> {
+        if let Some(p) = self.provider_cache.read().get(name) {
+            return Ok(Arc::clone(p));
+        }
+        let provider = self.get().create_provider(name)?;
+        self.provider_cache
+            .write()
+            .insert(name.to_string(), Arc::clone(&provider));
+        Ok(provider)
+    }
+}
+
+impl ModelResolver for EngineHandle {
+    fn resolve_default(&self) -> Result<ResolvedModel> {
+        EngineHandle::resolve_default(self)
     }
 }
 
@@ -614,6 +667,43 @@ impl std::fmt::Debug for EngineHandle {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn resolve_default_reflects_hot_swap() {
+        // The single source of truth: after a swap, resolve_default returns
+        // the NEW default model. This is what makes Ouroboros (interview) and
+        // AgentRuntime (execute) agree after a Web UI model change.
+        let engine = OxiosEngine::new("anthropic/claude-sonnet-4-20250514");
+        let handle = EngineHandle::new(Arc::new(engine));
+        let r1 = handle.resolve_default().expect("initial resolve");
+        assert_eq!(r1.model_id, "anthropic/claude-sonnet-4-20250514");
+        assert_eq!(r1.model.provider, "anthropic");
+
+        handle.swap(OxiosEngine::new("openai/gpt-4o"));
+        let r2 = handle.resolve_default().expect("post-swap resolve");
+        assert_eq!(r2.model_id, "openai/gpt-4o");
+        assert_eq!(r2.model.provider, "openai");
+    }
+
+    #[test]
+    fn resolve_default_fails_for_unknown_model() {
+        // A bad default model surfaces immediately at resolve_default, not at
+        // some later phase — the fix for the "interview works, execute fails"
+        // divergence.
+        let engine = OxiosEngine::new("zai-coding-plan/glm-5-turbo");
+        let handle = EngineHandle::new(Arc::new(engine));
+        assert!(handle.resolve_default().is_err());
+    }
+
+    #[test]
+    fn model_resolver_impl_delegates_to_resolve_default() {
+        // EngineHandle implements the Ouroboros ModelResolver port by delegating
+        // to resolve_default — verify the trait path returns the same id.
+        let engine = OxiosEngine::new("anthropic/claude-sonnet-4-20250514");
+        let handle = EngineHandle::new(Arc::new(engine));
+        let via_trait: &dyn ModelResolver = &handle;
+        let r = via_trait.resolve_default().expect("trait resolve");
+        assert_eq!(r.model_id, "anthropic/claude-sonnet-4-20250514");
+    }
 
     #[test]
     fn test_resolve_model_with_provider_prefix() {

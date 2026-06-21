@@ -169,20 +169,17 @@ pub struct AgentRuntime {
 impl AgentRuntime {
     /// Creates a new agent runtime with engine handle and kernel access.
     ///
-    /// Provider/model resolution goes through `engine_handle` (hot-swapped on config change).
-    /// Tool access goes through `kernel_handle`.
+    /// The active model is resolved live from `engine_handle` on each
+    /// `execute()` (reads the post-hot-swap default) — there is no frozen
+    /// model id at construction. Tool access goes through `kernel_handle`.
     pub fn new(
         engine_handle: Arc<crate::engine::EngineHandle>,
-        model_id: impl Into<String>,
         kernel_handle: Arc<KernelHandle>,
         routing_stats: Option<Arc<crate::kernel_handle::RoutingStats>>,
     ) -> Self {
         Self {
             engine_handle,
-            config: AgentRuntimeConfig {
-                model_id: model_id.into(),
-                ..Default::default()
-            },
+            config: AgentRuntimeConfig::default(),
             kernel_handle,
             persona_manager: None,
             tool_retriever: None,
@@ -389,14 +386,21 @@ impl AgentRuntime {
             Err(e) => tracing::warn!(error = %e, "Failed to recall knowledge context"),
         }
 
-        // Resolve model from engine (provider resolution happens inside AgentBuilder).
-        // Get the latest engine — may have been hot-swapped via Web UI config change.
+        // Resolve the LIVE default model (post-hot-swap). This is the single
+        // source of truth — the same engine default the OuroborosEngine reads
+        // via the ModelResolver port. Validates fail-fast: a bad model ID set
+        // via the Web UI is rejected here at execute entry, before any tool work.
         let engine = self.engine_handle.get();
-        let _model = engine.resolve_model(&self.config.model_id)?;
+        let model_id = engine.default_model_id().to_string();
+        engine.resolve_model(&model_id)?;
         let seed_id = seed.id;
 
-        // Build the agent.
-        let config = self.config.clone();
+        // Build the agent. Refresh config.model_id to the live value so every
+        // downstream consumer (AgentConfig, legacy provider path, usage callback)
+        // uses the same model as the interview/seed phases — no frozen boot
+        // string that silently diverges from what interview used.
+        let mut config = self.config.clone();
+        config.model_id = model_id;
         let kernel_handle = Arc::clone(&self.kernel_handle);
 
         // Extract audit trail from kernel for TrailAuditSink wiring.
@@ -1506,7 +1510,7 @@ fn build_user_prompt(seed: &Seed) -> String {
 impl std::fmt::Debug for AgentRuntime {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("AgentRuntime")
-            .field("model_id", &self.config.model_id)
+            .field("model_id", &self.engine_handle.get().default_model_id())
             .finish()
     }
 }
