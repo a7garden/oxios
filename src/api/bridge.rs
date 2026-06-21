@@ -58,11 +58,13 @@ impl WebBridge {
     }
 
     /// Returns a receiver for outgoing messages (used by WebSocket/SSE handlers).
+    #[allow(dead_code)]
     pub fn subscribe_outgoing(&self) -> broadcast::Receiver<OutgoingMessage> {
         self.outgoing_tx.subscribe()
     }
 
     /// Send a message directly (for use in tests or direct API responses).
+    #[allow(dead_code)]
     pub fn broadcast_outgoing(&self, msg: OutgoingMessage) -> Result<()> {
         let _ = self.outgoing_tx.send(msg);
         Ok(())
@@ -70,6 +72,7 @@ impl WebBridge {
 
     /// Deliver a response to the registered handler, if any.
     /// Also broadcasts for WebSocket/SSE clients.
+    #[allow(dead_code)]
     pub async fn deliver_response(&self, msg: OutgoingMessage) -> Result<()> {
         let msg_id = msg.id;
 
@@ -218,6 +221,7 @@ impl WebBridgeHandle {
     }
 
     /// Send an incoming message to the gateway pipeline.
+    #[allow(dead_code)]
     pub async fn send_incoming(&self, msg: IncomingMessage) -> Result<()> {
         self.incoming_tx
             .send(msg)

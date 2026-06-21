@@ -868,8 +868,8 @@ mod tests {
 
         // Create multiple sessions
         for i in 0..3 {
-            let mut session = Session::new(&format!("user-{}", i));
-            session.add_user_message(&format!("Message {}", i));
+            let mut session = Session::new(format!("user-{}", i));
+            session.add_user_message(format!("Message {}", i));
             store.save_session(&session).await.unwrap();
             tokio::time::sleep(std::time::Duration::from_millis(10)).await;
         }
@@ -932,8 +932,8 @@ mod tests {
 
         // Create 5 sessions
         for i in 0..5 {
-            let mut session = Session::new(&format!("user-{}", i));
-            session.add_user_message(&format!("Message {}", i));
+            let mut session = Session::new(format!("user-{}", i));
+            session.add_user_message(format!("Message {}", i));
             store.save_session(&session).await.unwrap();
             tokio::time::sleep(std::time::Duration::from_millis(10)).await;
         }

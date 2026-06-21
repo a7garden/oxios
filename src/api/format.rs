@@ -12,6 +12,7 @@ use oxios_gateway::message::OutgoingMessage;
 /// The web channel uses OutgoingMessage directly (JSON serialized by route handlers).
 /// This formatter exists to satisfy the [`ChannelFormatter`] trait but performs no
 /// transformation.
+#[allow(dead_code)]
 pub struct WebFormatter;
 
 impl ChannelFormatter for WebFormatter {

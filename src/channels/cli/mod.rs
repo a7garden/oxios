@@ -9,9 +9,6 @@ pub mod interactive;
 pub mod plugin;
 pub mod session;
 
-pub use channel::{CliChannel, CliChannelHandle};
-pub use commands::MetaCommand;
-pub use format::CliFormatter;
+pub use channel::CliChannel;
 pub use interactive::InteractiveLoop;
 pub use plugin::CliPlugin;
-pub use session::Session;

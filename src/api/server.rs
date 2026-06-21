@@ -59,6 +59,7 @@ impl std::fmt::Debug for AppState {
 
 impl AppState {
     /// Reload config from disk and update in-memory state.
+    #[allow(dead_code)]
     pub async fn reload_config(&self) -> Result<(), AppError> {
         let config = config::load_config(&self.config_path)
             .map_err(|e| AppError::Internal(e.to_string()))?;

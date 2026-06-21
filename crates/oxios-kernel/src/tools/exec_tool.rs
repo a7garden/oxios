@@ -1128,8 +1128,10 @@ mod tests {
     async fn test_no_agent_name_bypasses_access_control() {
         // ExecTool::new_unrestricted() (no context) should NOT check permissions,
         // but shell mode must still be enabled in config.
-        let mut config = ExecConfig::default();
-        config.allow_shell_mode = true; // Enable shell mode for this test
+        let config = ExecConfig {
+            allow_shell_mode: true,
+            ..Default::default()
+        };
         let access = AccessManager::new(); // empty — no permissions for anyone
         let tool = ExecTool::new_unrestricted(
             Arc::new(parking_lot::RwLock::new(config)),

@@ -14,6 +14,7 @@ pub enum AppError {
     /// Internal server error.
     Internal(String),
     /// Authentication required or failed.
+    #[allow(dead_code)]
     Unauthorized(String),
     /// Permission denied.
     Forbidden(String),

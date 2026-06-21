@@ -619,7 +619,7 @@ mod tests {
         let task = ScheduledTask::new("Test task".into(), Priority::Normal);
         assert_eq!(task.status, TaskStatus::Queued);
         assert!(task.agent_id.is_none());
-        assert!(!task.error.is_some());
+        assert!(task.error.is_none());
     }
 
     #[test]

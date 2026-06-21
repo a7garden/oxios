@@ -38,6 +38,7 @@ impl InteractiveLoop {
     }
 
     /// Create with a custom prompt label.
+    #[allow(dead_code)]
     pub fn with_prompt_label(handle: CliChannelHandle, left: &str) -> Self {
         let editor = Reedline::create();
         let prompt = DefaultPrompt::new(

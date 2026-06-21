@@ -768,7 +768,7 @@ mod tests {
     /// Build `n` sessions each mentioning `root` once (Promo-7: frequency is
     /// per distinct root per session, so we vary the *session* count, not
     /// the message count within one session).
-    fn sessions_mentioning(root: &PathBuf, n: u32) -> Vec<crate::state_store::Session> {
+    fn sessions_mentioning(root: &Path, n: u32) -> Vec<crate::state_store::Session> {
         use crate::state_store::{Session, UserMessage};
         use chrono::Utc;
         (0..n)

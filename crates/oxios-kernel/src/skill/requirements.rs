@@ -89,8 +89,10 @@ mod tests {
     }
     #[test]
     fn test_always() {
-        let mut m = SkillMetadata::default();
-        m.always = true;
+        let mut m = SkillMetadata {
+            always: true,
+            ..Default::default()
+        };
         m.requires.bins = vec!["nonexistent-xyz".into()];
         assert!(check_requirements(&m).eligible);
     }

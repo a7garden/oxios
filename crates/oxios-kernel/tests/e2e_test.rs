@@ -187,19 +187,17 @@ impl Supervisor for MockSupervisor {
     }
 
     async fn exec(&self, id: AgentId) -> Result<()> {
-        self.agents
-            .write()
-            .get_mut(&id)
-            .map(|a| a.status = AgentStatus::Running);
+        if let Some(a) = self.agents.write().get_mut(&id) {
+            a.status = AgentStatus::Running;
+        }
         Ok(())
     }
 
     async fn run_with_seed(&self, id: AgentId, _seed: &Seed) -> Result<ExecutionResult> {
         self.run_called.fetch_add(1, Ordering::SeqCst);
-        self.agents
-            .write()
-            .get_mut(&id)
-            .map(|a| a.status = AgentStatus::Idle);
+        if let Some(a) = self.agents.write().get_mut(&id) {
+            a.status = AgentStatus::Idle;
+        }
         let _ = self.event_bus.publish(KernelEvent::AgentStarted { id });
         let _ = self.event_bus.publish(KernelEvent::AgentStopped { id });
         Ok(ExecutionResult {
@@ -223,10 +221,9 @@ impl Supervisor for MockSupervisor {
     }
 
     async fn kill(&self, id: AgentId) -> Result<()> {
-        self.agents
-            .write()
-            .get_mut(&id)
-            .map(|a| a.status = AgentStatus::Stopped);
+        if let Some(a) = self.agents.write().get_mut(&id) {
+            a.status = AgentStatus::Stopped;
+        }
         Ok(())
     }
 

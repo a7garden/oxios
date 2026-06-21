@@ -207,10 +207,10 @@ impl EvalCache {
 
     fn put(&mut self, seed: &Seed, execution: &ExecutionResult, result: EvaluationResult) {
         let key = EvalKey::new(seed, execution);
-        if self.cache.len() >= self.max_entries {
-            if let Some(first_key) = self.cache.keys().next().cloned() {
-                self.cache.remove(&first_key);
-            }
+        if self.cache.len() >= self.max_entries
+            && let Some(first_key) = self.cache.keys().next().cloned()
+        {
+            self.cache.remove(&first_key);
         }
         self.cache.insert(key, result);
     }

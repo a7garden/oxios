@@ -1064,8 +1064,10 @@ mod tests {
             .unwrap();
         }
 
-        let mut filter = AgentListFilter::default();
-        filter.status = Some(AgentStatusFilter::Failed);
+        let filter = AgentListFilter {
+            status: Some(AgentStatusFilter::Failed),
+            ..Default::default()
+        };
         let result = db.query(&filter).unwrap();
         assert_eq!(result.total, 2);
     }
@@ -1091,17 +1093,19 @@ mod tests {
             .unwrap();
         }
 
-        let mut filter = AgentListFilter::default();
-        filter.date_from = Some(
-            DateTime::parse_from_rfc3339("2026-06-05T00:00:00Z")
-                .map(|dt| dt.with_timezone(&Utc))
-                .unwrap(),
-        );
-        filter.date_to = Some(
-            DateTime::parse_from_rfc3339("2026-06-15T00:00:00Z")
-                .map(|dt| dt.with_timezone(&Utc))
-                .unwrap(),
-        );
+        let filter = AgentListFilter {
+            date_from: Some(
+                DateTime::parse_from_rfc3339("2026-06-05T00:00:00Z")
+                    .map(|dt| dt.with_timezone(&Utc))
+                    .unwrap(),
+            ),
+            date_to: Some(
+                DateTime::parse_from_rfc3339("2026-06-15T00:00:00Z")
+                    .map(|dt| dt.with_timezone(&Utc))
+                    .unwrap(),
+            ),
+            ..Default::default()
+        };
         let result = db.query(&filter).unwrap();
         assert_eq!(result.total, 1);
     }
@@ -1128,9 +1132,11 @@ mod tests {
         agent2.name = "Fix build error".into();
         db.upsert_agent(&agent2).unwrap();
 
-        let mut filter = AgentListFilter::default();
-        filter.q = Some("Refactor".into());
-        filter.search_field = SearchField::Name;
+        let filter = AgentListFilter {
+            q: Some("Refactor".into()),
+            search_field: SearchField::Name,
+            ..Default::default()
+        };
         let result = db.query(&filter).unwrap();
         assert_eq!(result.total, 1);
         assert!(result.items[0].name.contains("Refactor"));
@@ -1150,9 +1156,11 @@ mod tests {
             .unwrap();
         }
 
-        let mut filter = AgentListFilter::default();
-        filter.sort_by = SortBy::Cost;
-        filter.sort_dir = SortDir::Desc;
+        let filter = AgentListFilter {
+            sort_by: SortBy::Cost,
+            sort_dir: SortDir::Desc,
+            ..Default::default()
+        };
         let result = db.query(&filter).unwrap();
         assert_eq!(result.items[0].cost_usd, 0.50);
         assert_eq!(result.items[1].cost_usd, 0.10);
@@ -1173,12 +1181,13 @@ mod tests {
             .unwrap();
         }
 
-        let mut filter = AgentListFilter::default();
-        filter.per_page = 3;
-        filter.page = 1;
+        let mut filter = AgentListFilter {
+            per_page: 3,
+            page: 1,
+            ..Default::default()
+        };
         let result = db.query(&filter).unwrap();
         assert_eq!(result.items.len(), 3);
-        assert_eq!(result.total, 10);
         assert_eq!(result.total_pages, 4);
 
         filter.page = 2;

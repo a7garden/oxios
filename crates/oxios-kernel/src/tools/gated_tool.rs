@@ -190,9 +190,7 @@ mod tests {
         let perms = AgentPermissions::for_new_agent("test-agent");
         access.set_permissions(perms);
 
-        let subject = Subject::Agent(
-            <crate::types::AgentId as std::convert::From<uuid::Uuid>>::from(uuid::Uuid::new_v4()),
-        );
+        let subject = Subject::Agent(uuid::Uuid::new_v4());
         access
             .rbac_manager_mut()
             .assign_role(subject, Role::Superuser);

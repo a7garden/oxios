@@ -2112,7 +2112,7 @@ mod mount_workspace_tests {
 
         let oxios =
             Mount::from_name_and_path("oxios", PathBuf::from("/Volumes/MERCURY/PROJECTS/oxios"));
-        let result = detect_mounts("oxios 코드리뷰해줘", &[oxios.clone()]);
+        let result = detect_mounts("oxios 코드리뷰해줘", std::slice::from_ref(&oxios));
         assert!(matches!(result, DetectionResult::Found(id) if id == oxios.id));
     }
 }

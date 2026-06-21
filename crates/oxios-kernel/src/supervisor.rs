@@ -562,6 +562,45 @@ impl BasicSupervisor {
     }
 }
 
+/// A no-op supervisor used during KernelBuilder::build() to break the
+/// KernelHandle → AgentRuntime → Supervisor → KernelHandle cycle.
+///
+/// AgentApi.supervisor is only used for list/kill operations, not during
+/// tool registration, so this placeholder is safe during build time.
+pub struct NoOpSupervisor;
+
+#[async_trait::async_trait]
+impl Supervisor for NoOpSupervisor {
+    async fn fork(&self, _spec: &Seed) -> Result<AgentId> {
+        Err(anyhow::anyhow!(
+            "NoOpSupervisor: fork not available during build"
+        ))
+    }
+    async fn exec(&self, _id: AgentId) -> Result<()> {
+        Err(anyhow::anyhow!(
+            "NoOpSupervisor: exec not available during build"
+        ))
+    }
+    async fn run_with_seed(&self, _id: AgentId, _seed: &Seed) -> Result<ExecutionResult> {
+        Err(anyhow::anyhow!(
+            "NoOpSupervisor: run_with_seed not available during build"
+        ))
+    }
+    async fn wait(&self, _id: AgentId) -> Result<AgentStatus> {
+        Err(anyhow::anyhow!(
+            "NoOpSupervisor: wait not available during build"
+        ))
+    }
+    async fn kill(&self, _id: AgentId) -> Result<()> {
+        Err(anyhow::anyhow!(
+            "NoOpSupervisor: kill not available during build"
+        ))
+    }
+    async fn list(&self) -> Result<Vec<AgentInfo>> {
+        Ok(Vec::new())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -796,44 +835,5 @@ mod tests {
         let result = supervisor.wait(unknown_id).await;
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("not found"));
-    }
-}
-
-/// A no-op supervisor used during KernelBuilder::build() to break the
-/// KernelHandle → AgentRuntime → Supervisor → KernelHandle cycle.
-///
-/// AgentApi.supervisor is only used for list/kill operations, not during
-/// tool registration, so this placeholder is safe during build time.
-pub struct NoOpSupervisor;
-
-#[async_trait::async_trait]
-impl Supervisor for NoOpSupervisor {
-    async fn fork(&self, _spec: &Seed) -> Result<AgentId> {
-        Err(anyhow::anyhow!(
-            "NoOpSupervisor: fork not available during build"
-        ))
-    }
-    async fn exec(&self, _id: AgentId) -> Result<()> {
-        Err(anyhow::anyhow!(
-            "NoOpSupervisor: exec not available during build"
-        ))
-    }
-    async fn run_with_seed(&self, _id: AgentId, _seed: &Seed) -> Result<ExecutionResult> {
-        Err(anyhow::anyhow!(
-            "NoOpSupervisor: run_with_seed not available during build"
-        ))
-    }
-    async fn wait(&self, _id: AgentId) -> Result<AgentStatus> {
-        Err(anyhow::anyhow!(
-            "NoOpSupervisor: wait not available during build"
-        ))
-    }
-    async fn kill(&self, _id: AgentId) -> Result<()> {
-        Err(anyhow::anyhow!(
-            "NoOpSupervisor: kill not available during build"
-        ))
-    }
-    async fn list(&self) -> Result<Vec<AgentInfo>> {
-        Ok(Vec::new())
     }
 }

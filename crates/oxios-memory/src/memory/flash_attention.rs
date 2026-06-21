@@ -502,13 +502,16 @@ mod tests {
     #[test]
     fn test_block_size_effect() {
         // Different block sizes should produce the same result
-        let mut config1 = FlashAttentionConfig::default();
-        config1.dimensions = 16;
-        config1.block_size = 2;
-
-        let mut config2 = FlashAttentionConfig::default();
-        config2.dimensions = 16;
-        config2.block_size = 32;
+        let config1 = FlashAttentionConfig {
+            dimensions: 16,
+            block_size: 2,
+            ..Default::default()
+        };
+        let config2 = FlashAttentionConfig {
+            dimensions: 16,
+            block_size: 32,
+            ..Default::default()
+        };
 
         let fa1 = FlashAttention::new(config1);
         let fa2 = FlashAttention::new(config2);
@@ -533,13 +536,16 @@ mod tests {
 
     #[test]
     fn test_temperature_scaling() {
-        let mut config_high = FlashAttentionConfig::default();
-        config_high.dimensions = 16;
-        config_high.temperature = 2.0;
-
-        let mut config_low = FlashAttentionConfig::default();
-        config_low.dimensions = 16;
-        config_low.temperature = 0.5;
+        let config_high = FlashAttentionConfig {
+            dimensions: 16,
+            temperature: 2.0,
+            ..Default::default()
+        };
+        let config_low = FlashAttentionConfig {
+            dimensions: 16,
+            temperature: 0.5,
+            ..Default::default()
+        };
 
         let fa_high = FlashAttention::new(config_high);
         let fa_low = FlashAttention::new(config_low);

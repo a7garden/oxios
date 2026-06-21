@@ -56,6 +56,7 @@ impl CliChannel {
     }
 
     /// Returns a sender that can be used to inject incoming messages.
+    #[allow(dead_code)]
     pub fn sender(&self) -> mpsc::Sender<IncomingMessage> {
         self.incoming_tx.clone()
     }
@@ -68,8 +69,8 @@ impl CliChannel {
             processing: self.processing.clone(),
         }
     }
-
     /// Returns a clone of the shared processing flag.
+    #[allow(dead_code)]
     pub fn processing_flag(&self) -> Arc<AtomicBool> {
         self.processing.clone()
     }
@@ -148,9 +149,9 @@ impl std::fmt::Debug for CliChannelHandle {
         f.debug_struct("CliChannelHandle").finish()
     }
 }
-
 impl CliChannelHandle {
     /// Creates a handle from a CliChannel.
+    #[allow(dead_code)]
     pub fn from_channel(channel: &CliChannel) -> Self {
         channel.handle()
     }
@@ -188,6 +189,7 @@ impl CliChannelHandle {
     }
 
     /// Get the current session ID.
+    #[allow(dead_code)]
     pub fn session_id(&self) -> uuid::Uuid {
         self.session.lock().map(|s| s.id).unwrap_or_default()
     }
