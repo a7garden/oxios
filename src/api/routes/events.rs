@@ -24,7 +24,6 @@ pub(crate) struct SessionListItem {
     project_id: Option<String>,
     message_count: usize,
     title: Option<String>,
-    active_seed_id: Option<String>,
     created_at: String,
     updated_at: String,
 }
@@ -51,7 +50,6 @@ pub(crate) async fn handle_sessions_list(
                     project_id: s.project_id,
                     message_count: s.message_count,
                     title: s.title,
-                    active_seed_id: s.active_seed_id,
                     created_at: s.created_at.to_rfc3339(),
                     updated_at: s.updated_at.to_rfc3339(),
                 })
@@ -82,7 +80,6 @@ pub(crate) async fn handle_session_get(
                 .or_else(|| session.metadata.get("project_ids").and_then(|v| v.as_str()).map(String::from)),
             "user_messages": session.user_messages,
             "agent_responses": session.agent_responses,
-            "active_seed_id": session.active_seed_id,
             "active_persona_id": session.active_persona_id,
             "created_at": session.created_at.to_rfc3339(),
             "updated_at": session.updated_at.to_rfc3339(),
@@ -179,6 +176,13 @@ pub(crate) async fn handle_events(
     state: State<Arc<AppState>>,
 ) -> Sse<impl tokio_stream::Stream<Item = Result<SseEvent, Infallible>>> {
     let receiver = state.kernel.infra.subscribe();
+    // RFC-024 §11: count SSE connection opens. The server cannot reliably
+    // observe the close (client disconnect arrives as TCP RST without an
+    // application-level signal), so we expose opens only and let the gauge
+    // of "in-flight subscribers" live in the broadcast layer.
+    oxios_kernel::metrics::get_metrics()
+        .sse_connections_open
+        .inc();
     let stream = BroadcastStream::new(receiver);
     let stream = TokioStreamExt::filter_map(stream, |result| {
         match result {
@@ -261,23 +265,6 @@ pub(crate) fn sanitize_event(event: &oxios_kernel::event_bus::KernelEvent) -> se
             "from": from.to_string(),
             // content excluded — may contain sensitive data
         }),
-        KernelEvent::SeedCreated { seed_id } => serde_json::json!({
-            "type": "seed_created",
-            "seed_id": seed_id.to_string(),
-        }),
-        KernelEvent::EvaluationComplete { seed_id, passed } => serde_json::json!({
-            "type": "evaluation_complete",
-            "seed_id": seed_id.to_string(),
-            "passed": passed,
-        }),
-        KernelEvent::PhaseStarted { phase, .. } => serde_json::json!({
-            "type": "phase_started",
-            "phase": format!("{phase:?}"),
-        }),
-        KernelEvent::PhaseCompleted { phase, .. } => serde_json::json!({
-            "type": "phase_completed",
-            "phase": format!("{phase:?}"),
-        }),
         KernelEvent::AgentOutput {
             session_id,
             agent_id,
@@ -353,26 +340,6 @@ pub(crate) fn sanitize_event(event: &oxios_kernel::event_bus::KernelEvent) -> se
             "type": "project_activated",
             "project_id": project_id.to_string(),
             "name": name,
-        }),
-        KernelEvent::EvolutionStarted {
-            seed_id,
-            new_seed_id,
-            iteration,
-        } => serde_json::json!({
-            "type": "evolution_started",
-            "seed_id": seed_id.to_string(),
-            "new_seed_id": new_seed_id.to_string(),
-            "iteration": iteration,
-        }),
-        KernelEvent::EvolutionMaxReached {
-            seed_id,
-            final_score,
-            iterations,
-        } => serde_json::json!({
-            "type": "evolution_max_reached",
-            "seed_id": seed_id.to_string(),
-            "final_score": final_score,
-            "iterations": iterations,
         }),
         // ── RFC-015: chat transparency events (forwarded to /api/events too) ──
         KernelEvent::ToolExecutionStarted {

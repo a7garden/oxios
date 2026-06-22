@@ -6,7 +6,7 @@ const BASE_DELAY_MS = 1000
 export class SseClient {
   private controller: AbortController | null = null
   private reconnectAttempts = 0
-  private reconnectTimer: ReturnType<typeof setTimeout> | null = null
+  private reconnectTimer: number | null = null
   private currentPath: string | null = null
   private currentOnEvent: ((event: string, data: unknown) => void) | null = null
   private currentOnError: ((error: Error) => void) | null = null
@@ -111,7 +111,7 @@ export class SseClient {
     const delay = BASE_DELAY_MS * 2 ** this.reconnectAttempts
     this.reconnectAttempts++
 
-    this.reconnectTimer = setTimeout(() => {
+    this.reconnectTimer = window.setTimeout(() => {
       this.reconnectTimer = null
       this.doConnect()
     }, delay)

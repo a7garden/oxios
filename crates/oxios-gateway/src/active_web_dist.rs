@@ -55,6 +55,13 @@ impl ActiveWebDist {
         // between load_full and store is inconsequential.
         let prev = self.inner.load_full();
         self.inner.store(Some(Arc::new(new_path)));
+        // RFC-024 §11: count atomic swaps. First publish (None → Some) is
+        // a no-op for the metric — the daemon started, nothing was swapped.
+        // Subsequent publishes each bump the counter so daily / manual
+        // updates show up in `oxios_web_dist_swaps_total`.
+        if prev.is_some() {
+            oxios_kernel::metrics::get_metrics().web_dist_swaps.inc();
+        }
         prev.map(|p| (*p).clone())
     }
 
@@ -185,5 +192,52 @@ mod tests {
         let b = a.clone();
         b.swap(PathBuf::from("/y"));
         assert_eq!(a.path().as_deref(), Some(std::path::Path::new("/y")));
+    }
+
+    /// RFC-024 §11: every `swap` after the initial publish must
+    /// increment `oxios_web_dist_swaps_total`. The first publish
+    /// (None → Some) is a daemon-startup event, not a swap, so it
+    /// does NOT count — this keeps the metric free of startup
+    /// noise that would mask real update activity.
+    ///
+    /// Note: the metric is a process-wide counter shared with other
+    /// tests in this binary. We therefore assert on the *delta*
+    /// (before/after), not the absolute value, so the test is
+    /// independent of execution order.
+    #[test]
+    fn swap_increments_metric_only_after_initial_publish() {
+        let _ = oxios_kernel::metrics::get_metrics();
+        let before = counter_value("oxios_web_dist_swaps_total");
+
+        // First publish (None → Some) — daemon boot, not a swap.
+        let h = ActiveWebDist::new(Some(PathBuf::from("/v1")));
+        let after_boot = counter_value("oxios_web_dist_swaps_total");
+        assert_eq!(
+            after_boot - before,
+            0,
+            "first publish must not count as a swap"
+        );
+
+        // Subsequent publish — counts.
+        let _ = h.swap(PathBuf::from("/v2"));
+        let after_one = counter_value("oxios_web_dist_swaps_total");
+        assert_eq!(after_one - after_boot, 1, "swap must count");
+        // And again.
+        let _ = h.swap(PathBuf::from("/v3"));
+        let after_two = counter_value("oxios_web_dist_swaps_total");
+        assert_eq!(after_two - after_one, 1, "swap must count");
+    }
+
+    fn counter_value(metric: &str) -> u64 {
+        let export = oxios_kernel::metrics::registry().export();
+        for line in export.lines() {
+            if let Some(rest) = line.strip_prefix(metric) {
+                let after = rest.trim_start();
+                if let Some(num) = after.split_whitespace().next() {
+                    return num.parse().unwrap_or(0);
+                }
+            }
+        }
+        0
     }
 }

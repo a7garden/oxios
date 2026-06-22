@@ -14,6 +14,21 @@ pub struct MetricsRegistry {
     counters: RwLock<Vec<Counter>>,
     gauges: RwLock<Vec<Gauge>>,
     histograms: RwLock<Vec<Histogram>>,
+    /// Counters with dynamic label values (RFC-024).
+    ///
+    /// Each (name, label_key, label_value) triple is a unique time series.
+    /// `LabeledCounterHandle` stores the index into this vec, and increment
+    /// is a single `fetch_add` on the stored atomic. O(1) per inc, O(n) only
+    /// at registration.
+    labeled_counters: RwLock<Vec<LabeledCounter>>,
+}
+
+struct LabeledCounter {
+    name: String,
+    help: String,
+    label_key: &'static str,
+    label_value: String,
+    value: AtomicU64,
 }
 
 impl MetricsRegistry {
@@ -71,6 +86,34 @@ impl MetricsRegistry {
             count: Mutex::new(0u64),
         });
         HistogramHandle { id, buckets }
+    }
+    /// Register a labeled counter (RFC-024) — one time series per
+    /// (name, label_key, label_value) triple. O(1) increment, registration
+    /// is O(n) over existing labeled counters with the same name (linear
+    /// scan; metric name sets are small at boot).
+    pub fn labeled_counter(
+        &self,
+        name: &'static str,
+        help: &'static str,
+        label_key: &'static str,
+        label_value: &str,
+    ) -> LabeledCounterHandle {
+        let mut labeled = self.labeled_counters.write();
+        // Reuse the existing series if registered with the same triple.
+        for (i, lc) in labeled.iter().enumerate() {
+            if lc.name == name && lc.label_key == label_key && lc.label_value == label_value {
+                return LabeledCounterHandle { id: i };
+            }
+        }
+        let id = labeled.len();
+        labeled.push(LabeledCounter {
+            name: name.into(),
+            help: help.into(),
+            label_key,
+            label_value: label_value.into(),
+            value: AtomicU64::new(0),
+        });
+        LabeledCounterHandle { id }
     }
 
     /// Export all metrics in Prometheus text format.
@@ -137,6 +180,28 @@ impl MetricsRegistry {
             }
         }
 
+        // Labeled counters (RFC-024). One series per registered
+        // (name, label_key, label_value) triple. HELP/TYPE lines are emitted
+        // per-series (Prometheus accepts repeated HELP/TYPE per series).
+        {
+            let labeled = self.labeled_counters.read();
+            let mut seen_help: std::collections::HashSet<String> =
+                std::collections::HashSet::new();
+            for lc in labeled.iter() {
+                if seen_help.insert(lc.name.clone()) {
+                    out.push_str(&format!("# HELP {} {}\n", lc.name, lc.help));
+                    out.push_str(&format!("# TYPE {} counter\n", lc.name));
+                }
+                out.push_str(&format!(
+                    "{}{{{}=\"{}\"}} {}\n",
+                    lc.name,
+                    lc.label_key,
+                    lc.label_value,
+                    lc.value.load(Ordering::Relaxed)
+                ));
+            }
+        }
+
         out
     }
 }
@@ -176,6 +241,37 @@ impl CounterHandle {
         }
     }
 }
+
+/// Handle to a labeled counter (RFC-024). Each handle refers to one
+/// (name, label_key, label_value) time series.
+#[derive(Clone)]
+pub struct LabeledCounterHandle {
+    id: usize,
+}
+
+impl LabeledCounterHandle {
+    /// Increment the counter by 1.
+    pub fn inc(&self) {
+        let r = registry();
+        let labeled = r.labeled_counters.read();
+        if let Some(c) = labeled.get(self.id) {
+            c.value.fetch_add(1, Ordering::Relaxed);
+        }
+    }
+
+    /// Increment the counter by `n`.
+    pub fn inc_by(&self, n: u64) {
+        if n == 0 {
+            return;
+        }
+        let r = registry();
+        let labeled = r.labeled_counters.read();
+        if let Some(c) = labeled.get(self.id) {
+            c.value.fetch_add(n, Ordering::Relaxed);
+        }
+    }
+}
+
 
 #[derive(Clone)]
 pub struct GaugeHandle {
@@ -291,10 +387,44 @@ pub struct MetricsHandles {
     /// LLM call metrics.
     pub llm_calls: CounterHandle,
     pub llm_errors: CounterHandle,
-    /// Audit trail events dropped because the bus subscriber lagged.
-    /// Non-zero indicates the audit pipeline can't keep up with the
-    /// event rate; investigate bus capacity or high-frequency publishers.
     pub audit_lagged_events: CounterHandle,
+
+    // ── RFC-024: web↔daemon reliability metrics ──
+    // Labeled counters use one handle per (name, label_key, label_value)
+    // triple. Wire them up at the increment sites in oxios-gateway and the
+    // web routes — see RFC-024 §11.
+
+    /// Outgoing messages by outcome (delivered | dropped | resynced | timed_out).
+    pub gateway_messages_delivered: LabeledCounterHandle,
+    pub gateway_messages_dropped: LabeledCounterHandle,
+    pub gateway_messages_resynced: LabeledCounterHandle,
+    pub gateway_messages_timed_out: LabeledCounterHandle,
+
+    /// Replay requests by outcome (replay | resync).
+    pub gateway_replay_replay: LabeledCounterHandle,
+    pub gateway_replay_resync: LabeledCounterHandle,
+
+    /// `send_and_wait` duration histogram.
+    pub gateway_response_duration: HistogramHandle,
+
+    /// SSE client connections by action (open | close). The original
+    /// RFC-024 §11 metric (`sse_reconnects_total{reason}`) required
+    /// client-side observability (proxy/NAT/UA-specific reasons) the
+    /// server cannot see. We expose server-side lifecycle instead.
+    pub sse_connections_open: LabeledCounterHandle,
+    pub sse_connections_close: LabeledCounterHandle,
+
+    /// WS client connections by action (open | close | keepalive_timeout).
+    pub ws_connections_open: LabeledCounterHandle,
+    pub ws_connections_close: LabeledCounterHandle,
+    pub ws_connections_keepalive_timeout: LabeledCounterHandle,
+
+    /// Atomic web-dist swaps (RFC-024 SP3).
+    pub web_dist_swaps: CounterHandle,
+
+    /// 0 = warming up, 1 = ready (RFC-024 SP4). Updated from
+    /// `ReadinessGate` when a subsystem changes state.
+    pub readiness_state: GaugeHandle,
 }
 
 impl MetricsHandles {
@@ -323,7 +453,6 @@ impl MetricsHandles {
         self.orch_duration.observe(value);
     }
 }
-
 /// Global lazy metric handles.
 static METRICS: std::sync::OnceLock<MetricsHandles> = std::sync::OnceLock::new();
 
@@ -384,6 +513,93 @@ pub fn get_metrics() -> &'static MetricsHandles {
                 "Audit events dropped due to broadcast subscriber lag",
                 &[],
             ),
+
+            // ── RFC-024: web↔daemon reliability metrics ──
+            // One handle per (name, label_value) variant. The registry's
+            // labeled_counter dedup ensures each variant registers exactly
+            // once even if both `get_metrics()` and `register_builtin_metrics`
+            // are called at startup.
+            gateway_messages_delivered: r.labeled_counter(
+                "oxios_gateway_messages_total",
+                "Outgoing messages (result=delivered|dropped|resynced|timed_out)",
+                "result",
+                "delivered",
+            ),
+            gateway_messages_dropped: r.labeled_counter(
+                "oxios_gateway_messages_total",
+                "Outgoing messages (result=delivered|dropped|resynced|timed_out)",
+                "result",
+                "dropped",
+            ),
+            gateway_messages_resynced: r.labeled_counter(
+                "oxios_gateway_messages_total",
+                "Outgoing messages (result=delivered|dropped|resynced|timed_out)",
+                "result",
+                "resynced",
+            ),
+            gateway_messages_timed_out: r.labeled_counter(
+                "oxios_gateway_messages_total",
+                "Outgoing messages (result=delivered|dropped|resynced|timed_out)",
+                "result",
+                "timed_out",
+            ),
+            gateway_replay_replay: r.labeled_counter(
+                "oxios_gateway_replay_requests_total",
+                "Replay requests (outcome=replay|resync)",
+                "outcome",
+                "replay",
+            ),
+            gateway_replay_resync: r.labeled_counter(
+                "oxios_gateway_replay_requests_total",
+                "Replay requests (outcome=replay|resync)",
+                "outcome",
+                "resync",
+            ),
+            gateway_response_duration: r.histogram(
+                "oxios_gateway_response_duration_seconds",
+                "send_and_wait duration in seconds",
+                vec![0.05, 0.25, 1.0, 5.0, 30.0, 60.0, 120.0],
+            ),
+            sse_connections_open: r.labeled_counter(
+                "oxios_sse_connections_total",
+                "SSE client connections (action=open|close)",
+                "action",
+                "open",
+            ),
+            sse_connections_close: r.labeled_counter(
+                "oxios_sse_connections_total",
+                "SSE client connections (action=open|close)",
+                "action",
+                "close",
+            ),
+            ws_connections_open: r.labeled_counter(
+                "oxios_ws_connections_total",
+                "WS client connections (action=open|close|keepalive_timeout)",
+                "action",
+                "open",
+            ),
+            ws_connections_close: r.labeled_counter(
+                "oxios_ws_connections_total",
+                "WS client connections (action=open|close|keepalive_timeout)",
+                "action",
+                "close",
+            ),
+            ws_connections_keepalive_timeout: r.labeled_counter(
+                "oxios_ws_connections_total",
+                "WS client connections (action=open|close|keepalive_timeout)",
+                "action",
+                "keepalive_timeout",
+            ),
+            web_dist_swaps: r.counter(
+                "oxios_web_dist_swaps_total",
+                "Atomic web-dist swaps (RFC-024 SP3)",
+                &[],
+            ),
+            readiness_state: r.gauge(
+                "oxios_readiness_state",
+                "0 = warming up, 1 = ready (RFC-024 SP4)",
+                0.0,
+            ),
         }
     })
 }
@@ -414,40 +630,6 @@ pub fn register_builtin_metrics() {
         vec![0.1, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0, 60.0],
     );
 
-    // RFC-024 §11: web↔daemon reliability metrics. Registered here so they
-    // appear on /metrics from startup; the corresponding increment sites
-    // live in oxios-gateway (deliver/timeout/replay) and the web routes
-    // (SSE/WS reconnect, asset swap, readiness state).
-    r.counter(
-        "oxios_gateway_messages_total",
-        "Outgoing messages (label: result=delivered|dropped|resynced|timed_out)",
-        &[],
-    );
-    r.counter(
-        "oxios_gateway_replay_requests_total",
-        "Replay requests (label: outcome=replay|resync)",
-        &[],
-    );
-    r.counter(
-        "oxios_sse_reconnects_total",
-        "SSE reconnects (label: reason=ok|lag|error|unauthorized)",
-        &[],
-    );
-    r.counter(
-        "oxios_ws_reconnects_total",
-        "WS reconnects (label: reason=ok|lag|error|unauthorized)",
-        &[],
-    );
-    r.counter(
-        "oxios_web_dist_swaps_total",
-        "Atomic web-dist swaps (RFC-024 SP3)",
-        &[],
-    );
-    r.gauge(
-        "oxios_readiness_state",
-        "0 = warming up, 1 = ready (RFC-024 SP4)",
-        0.0,
-    );
     r.histogram(
         "oxios_phase_duration_seconds",
         "Phase duration",

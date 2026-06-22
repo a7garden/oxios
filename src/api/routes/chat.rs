@@ -72,9 +72,6 @@ pub(crate) struct ChatResponse {
     /// RFC-025: Mount decoration tag (e.g. "[🔧 oxios + oxi-sdk]").
     #[serde(skip_serializing_if = "Option::is_none")]
     mount_tag: Option<String>,
-    /// RFC-014: Seed ID.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    seed_id: Option<String>,
     /// RFC-014: Evaluation passed.
     #[serde(skip_serializing_if = "Option::is_none")]
     evaluation_passed: Option<bool>,
@@ -152,14 +149,10 @@ pub(crate) async fn handle_chat(
             // RFC-025: active Mount IDs + tag (from channel metadata set by the gateway).
             let mount_ids = response.metadata.get("mount_ids").cloned();
             let mount_tag = response.metadata.get("mount_tag").cloned();
-            let seed_id = meta.and_then(|m| m.seed_id.clone());
             let evaluation_passed = meta.and_then(|m| m.evaluation_passed);
             let duration_ms = meta.and_then(|m| m.duration_ms);
-            let mode = meta.and_then(|m| m.mode.clone());
 
-            // Persist session
-            {
-                // RFC-015: parse tool_calls into trajectory step records.
+            // RFC-015: parse tool_calls into trajectory step records.
                 let trajectory_steps: Vec<oxios_kernel::state_store::TrajectoryStepRecord> =
                     response
                         .metadata
@@ -208,7 +201,6 @@ pub(crate) async fn handle_chat(
                         session.add_agent_response(oxios_kernel::state_store::AgentResponse {
                             content: response.content.clone(),
                             session_id: Some(sid.0.clone()),
-                            seed_id: seed_id.clone(),
                             phase_reached: phase.clone(),
                             evaluation_passed,
                             timestamp: chrono::Utc::now(),
@@ -227,10 +219,6 @@ pub(crate) async fn handle_chat(
                         if let Some(ref pid) = request_project_id {
                             session.project_id = Some(pid.clone());
                         }
-                        // Persist execution mode (chat/ouroboros) in session metadata
-                        if let Some(ref m) = mode {
-                            session.set_metadata("mode", serde_json::json!(m));
-                        }
                         if let Err(e) = state.kernel.state.save_session(&session).await {
                             tracing::warn!(error = %e, "Failed to persist session");
                         }
@@ -248,7 +236,6 @@ pub(crate) async fn handle_chat(
                         session.add_agent_response(oxios_kernel::state_store::AgentResponse {
                             content: response.content.clone(),
                             session_id: Some(sid.0.clone()),
-                            seed_id: seed_id.clone(),
                             phase_reached: phase.clone(),
                             evaluation_passed,
                             timestamp: chrono::Utc::now(),
@@ -264,10 +251,6 @@ pub(crate) async fn handle_chat(
                         // RFC-025: Set top-level project_id for grouping.
                         if let Some(ref pid) = request_project_id {
                             session.project_id = Some(pid.clone());
-                        }
-                        // Persist execution mode for new session
-                        if let Some(ref m) = mode {
-                            session.set_metadata("mode", serde_json::json!(m));
                         }
                         if let Err(e) = state.kernel.state.save_session(&session).await {
                             tracing::warn!(error = %e, "Failed to create session");
@@ -291,7 +274,6 @@ pub(crate) async fn handle_chat(
                         }
                     });
                 }
-            }
 
             Ok(Json(ChatResponse {
                 id: msg_id,
@@ -303,7 +285,6 @@ pub(crate) async fn handle_chat(
                 project_tag,
                 mount_ids,
                 mount_tag,
-                seed_id,
                 evaluation_passed,
                 duration_ms,
             }))
@@ -374,6 +355,11 @@ pub(crate) async fn handle_chat_stream(
 /// - **Outgoing done** (backend → frontend):
 ///   `{ type: "done", session_id?, project_id?, phase?, evaluation_passed? }`
 pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState>) {
+    // RFC-024 §11: count WS connection opens. The drop counter (`close` /
+    // `keepalive_timeout`) is wired at the join site below where the
+    // task's exit reason is observable.
+    oxios_kernel::metrics::get_metrics().ws_connections_open.inc();
+
     // Assign a unique connection ID for point-to-point message routing.
     // Prevents cross-tab message leakage in multi-session scenarios.
     let conn_id = uuid::Uuid::new_v4().to_string();
@@ -381,7 +367,22 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
     let conn_id_for_recv = conn_id.clone();
     let conn_id_for_send = conn_id.clone();
     let (mut ws_tx, mut ws_rx) = socket.split();
-
+    // RFC-024 SP2 (B3): the sink is shared between the recv_task (which
+    // forwards gateway chunks) and a dedicated keepalive task (which sends
+    // periodic pings). An `Arc<Mutex<>>` keeps the change tiny: the lock is
+    // held only across the actual `send` call (microseconds), and ping
+    // frequency is 20 s so contention with token streams is negligible.
+    let ws_tx = std::sync::Arc::new(tokio::sync::Mutex::new(ws_tx));
+    // RFC-024 SP2 (B3): keepalive wiring. The send_task notifies this on
+    // every `Message::Pong` it reads, extending the keepalive deadline.
+    // The keepalive task (spawned below) sends a `Ping` every 20 s and
+    // declares the connection dead if no `Pong` arrives within 60 s of
+    // the last activity.
+    let pong_signal = std::sync::Arc::new(tokio::sync::Notify::new());
+    /// Set to true when the keepalive task aborts the connection due to a
+    /// missing pong. The close site reads it to choose between the
+    /// `close` and `keepalive_timeout` metric labels.
+    let keepalive_timed_out = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
     // Subscribe to outgoing messages from the web channel (not kernel event bus).
     // WebChannel::send() broadcasts OutgoingMessage here; the kernel event bus
     // carries KernelEvents which are a different type entirely.
@@ -436,7 +437,9 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
     // RFC-015: also forward real-time kernel events (tool execution, token
     // usage, memory recall, reasoning fragments) as WS chunks so the
     // frontend can show live progress.
-    let mut recv_task = tokio::spawn(async move {
+    let mut recv_task = {
+    let ws_tx = ws_tx.clone();
+    tokio::spawn(async move {
         // Track the active session so we only forward events tagged with it.
         // Multi-turn conversations keep the same session_id across messages.
         let mut active_session_id: Option<String> = None;
@@ -472,7 +475,6 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
                         .or_else(|| msg.metadata.get("phase").cloned());
                     let evaluation_passed = msg.meta.as_ref().and_then(|m| m.evaluation_passed);
                     let project_tag = msg.meta.as_ref().and_then(|m| m.project_tag.clone());
-                    let seed_id = msg.meta.as_ref().and_then(|m| m.seed_id.clone());
                     let duration_ms = msg.meta.as_ref().and_then(|m| m.duration_ms);
 
                     // Remember the session we are forwarding for. Subsequent
@@ -491,6 +493,8 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
                     if msg.metadata.get("type").map(|v| v.as_str()) == Some("resync") {
                         let chunk = serde_json::json!({"type": "resync"});
                         if ws_tx
+                            .lock()
+                            .await
                             .send(Message::Text(chunk.to_string().into()))
                             .await
                             .is_err()
@@ -542,11 +546,11 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
                         // Send interview chunk with structured questions
                         let interview_chunk = serde_json::json!({
                             "type": "interview",
+                            "seq": msg.seq,
                             "session_id": session_id,
                             "project_id": project_id,
                             "questions": msg.meta.as_ref().and_then(|m| m.interview_questions.clone()),
                             "round": msg.meta.as_ref().and_then(|m| m.interview_round),
-                            "ambiguity": msg.meta.as_ref().and_then(|m| m.interview_ambiguity),
                         });
                         let json = match serde_json::to_string(&interview_chunk) {
                             Ok(j) => j,
@@ -555,13 +559,14 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
                                 continue;
                             }
                         };
-                        if ws_tx.send(Message::Text(json.into())).await.is_err() {
+                        if ws_tx.lock().await.send(Message::Text(json.into())).await.is_err() {
                             break;
                         }
                     } else {
                         // Standard token chunk
                         let token_chunk = serde_json::json!({
                             "type": "token",
+                            "seq": msg.seq,
                             "content": msg.content,
                             "session_id": session_id,
                             "project_id": project_id,
@@ -573,35 +578,33 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
                                 continue;
                             }
                         };
-                        if ws_tx.send(Message::Text(json.into())).await.is_err() {
+                        if ws_tx.lock().await.send(Message::Text(json.into())).await.is_err() {
                             break; // WS closed — session was already persisted above
                         }
                     }
 
-                    // Send done chunk with final metadata
                     let done_chunk = serde_json::json!({
                         "type": "done",
+                        "seq": msg.seq,
                         "session_id": session_id,
                         "project_id": project_id,
                         "phase": phase,
                         "evaluation_passed": evaluation_passed,
                         "project_tag": project_tag,
-                        "seed_id": seed_id,
                         "duration_ms": duration_ms,
                         // RFC-025: surface detected mount info to the frontend.
                         "mount_tag": msg.metadata.get("mount_tag"),
                         "mount_ids": msg.metadata.get("mount_ids"),
-                        // TODO: populate tool_calls from trajectory_steps once kernel provides them
+                        // TODO: populate tool_calls from trajectory_steps once kernel provides it
                         "tool_calls": msg.metadata.get("tool_calls")
                             .and_then(|v| serde_json::from_str::<serde_json::Value>(v).ok())
                             .unwrap_or(serde_json::json!([])),
-                        "mode": msg.meta.as_ref().and_then(|m| m.mode.clone()),
                     });
                     let done_json = match serde_json::to_string(&done_chunk) {
                         Ok(j) => j,
                         Err(_) => break,
                     };
-                    if ws_tx.send(Message::Text(done_json.into())).await.is_err() {
+                    if ws_tx.lock().await.send(Message::Text(done_json.into())).await.is_err() {
                         break; // WS closed — session was already persisted above
                     }
                 }
@@ -619,20 +622,23 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
                                 continue;
                             }
                         };
-                        if ws_tx.send(Message::Text(json.into())).await.is_err() {
+                        if ws_tx.lock().await.send(Message::Text(json.into())).await.is_err() {
                             break;
                         }
                     }
                 }
             }
         }
-    });
+    })
+    };
 
     // ── Receive from WebSocket client → gateway ──
     //
     // Frontend sends JSON:
     //   `{ type: "message", content: "...", session_id?, project_id? }`
-    let mut send_task = tokio::spawn(async move {
+    let mut send_task = {
+    let pong_signal = pong_signal.clone();
+    tokio::spawn(async move {
         while let Some(Ok(msg)) = FuturesStreamExt::next(&mut ws_rx).await {
             match msg {
                 Message::Text(text) => {
@@ -662,11 +668,6 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
                         .get("mount_ids")
                         .and_then(|v| v.as_str())
                         .filter(|s| !s.is_empty())
-                        .map(String::from);
-
-                    let incoming_mode = parsed
-                        .get("mode")
-                        .and_then(|v| v.as_str())
                         .map(String::from);
 
                     match msg_type {
@@ -741,9 +742,6 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
                             incoming
                                 .metadata
                                 .insert("conn_id".into(), conn_id_for_send.clone());
-                            if let Some(m) = incoming_mode.clone() {
-                                incoming.metadata.insert("mode".into(), m);
-                            }
 
                             {
                                 let mut pending = pending_for_send.lock().await;
@@ -787,9 +785,6 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
                             incoming
                                 .metadata
                                 .insert("conn_id".into(), conn_id_for_send.clone());
-                            if let Some(m) = incoming_mode.clone() {
-                                incoming.metadata.insert("mode".into(), m);
-                            }
 
                             {
                                 let mut pending = pending_for_send.lock().await;
@@ -801,36 +796,109 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
                                     },
                                 );
                             }
-
-                            if incoming_tx.send(incoming).await.is_err() {
-                                break;
-                            }
                         }
                     }
                 }
                 Message::Close(_) => break,
+                Message::Pong(_) => {
+                    // RFC-024 SP2 (B3): the client responded to one of
+                    // our pings. Reset the keepalive deadline so the
+                    // connection is not killed mid-conversation.
+                    pong_signal.notify_one();
+                }
                 _ => {}
             }
         }
-    });
-    // F7: when one side finishes, abort the other so its broadcast
-    // subscribers and WebSocket half are released promptly. Without this,
-    // a client that stops reading but leaves the socket half-open lets
-    // the recv_task block forever on `ws_tx.send().await`, leaking a
-    // broadcast subscriber and its buffer per abandoned connection — a
-    // trivial memory/subscriber-exhaustion DoS.
+    })
+    };
+
+    // RFC-024 SP2 (B3): dedicated keepalive task. Sends an empty Ping
+    // every 20 s; if no Pong arrives within 60 s of the most recent
+    // activity (ping OR pong), the connection is treated as dead — the
+    // most common cause is a NAT / proxy / load-balancer silently
+    // closing the idle TCP socket.
+    let mut keepalive_task = {
+        let ws_tx = ws_tx.clone();
+        let pong_signal = pong_signal.clone();
+        let keepalive_timed_out = keepalive_timed_out.clone();
+        tokio::spawn(async move {
+            let ping_interval = std::time::Duration::from_secs(20);
+            let pong_timeout = std::time::Duration::from_secs(60);
+            let mut ticker = tokio::time::interval(ping_interval);
+            ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+            // First tick fires immediately; skip it to give the connection
+            // a chance to settle.
+            ticker.tick().await;
+            loop {
+                // Either a scheduled ping OR a pong from the client
+                // resets the 60 s deadline.
+                tokio::select! {
+                    _ = ticker.tick() => {
+                        if let Err(e) = ws_tx
+                            .lock()
+                            .await
+                            .send(Message::Ping(Vec::new().into()))
+                            .await
+                        {
+                            tracing::debug!(
+                                conn_id = %conn_id,
+                                error = %e,
+                                "Keepalive ping send failed; closing"
+                            );
+                            return;
+                        }
+                    }
+                    _ = pong_signal.notified() => {
+                        // Pong received — deadline resets on next tick.
+                        continue;
+                    }
+                    _ = tokio::time::sleep(pong_timeout) => {
+                        tracing::warn!(
+                            conn_id = %conn_id,
+                            "WebSocket keepalive timeout (no pong within 60 s)"
+                        );
+                        keepalive_timed_out.store(true, std::sync::atomic::Ordering::SeqCst);
+                        return;
+                    }
+                }
+            }
+        })
+    };
+    // F7: when any side finishes, abort the others so the broadcast
+    // subscribers and WebSocket half are released promptly. Without
+    // this, a client that stops reading but leaves the socket
+    // half-open lets the recv_task block forever on
+    // `ws_tx.send().await`, leaking a broadcast subscriber and its
+    // buffer per abandoned connection — a trivial memory /
+    // subscriber-exhaustion DoS.
     tokio::select! {
         _ = &mut recv_task => {
             send_task.abort();
+            keepalive_task.abort();
         }
         _ = &mut send_task => {
             recv_task.abort();
+            keepalive_task.abort();
+        }
+        _ = &mut keepalive_task => {
+            recv_task.abort();
+            send_task.abort();
         }
     }
-    // Drain both handles (the aborted one resolves immediately with a
-    // JoinError; the finished one with Ok) so no task is leaked.
+    // Drain all three handles so no task is leaked.
     let _ = recv_task.await;
     let _ = send_task.await;
+    let _ = keepalive_task.await;
+    // RFC-024 §11: pick the close label. The keepalive task sets the
+    // flag only when it bailed because the pong deadline elapsed; the
+    // peer-driven path (client sent `Message::Close` or the socket
+    // was reset) is the default.
+    let m = oxios_kernel::metrics::get_metrics();
+    if keepalive_timed_out.load(std::sync::atomic::Ordering::SeqCst) {
+        m.ws_connections_keepalive_timeout.inc();
+    } else {
+        m.ws_connections_close.inc();
+    }
 }
 
 /// User message awaiting a gateway response for session persistence.
@@ -894,7 +962,6 @@ async fn persist_session(
             session.add_agent_response(oxios_kernel::state_store::AgentResponse {
                 content: agent_content.to_string(),
                 session_id: Some(sid.0.clone()),
-                seed_id: metadata.get("seed_id").cloned(),
                 phase_reached: metadata.get("phase").cloned(),
                 evaluation_passed: metadata
                     .get("evaluation_passed")
@@ -914,10 +981,6 @@ async fn persist_session(
             if let Some(vid) = project_id {
                 session.project_id = Some(vid.to_string());
             }
-            // Persist execution mode in session metadata
-            if let Some(mode) = metadata.get("mode") {
-                session.set_metadata("mode", serde_json::json!(mode));
-            }
             if let Err(e) = state_store.save_session(&session).await {
                 tracing::warn!(error = %e, "WS: failed to persist session");
             }
@@ -933,7 +996,6 @@ async fn persist_session(
             session.add_agent_response(oxios_kernel::state_store::AgentResponse {
                 content: agent_content.to_string(),
                 session_id: Some(sid.0.clone()),
-                seed_id: metadata.get("seed_id").cloned(),
                 phase_reached: metadata.get("phase").cloned(),
                 evaluation_passed: metadata
                     .get("evaluation_passed")
@@ -951,10 +1013,6 @@ async fn persist_session(
             // RFC-025: set top-level project_id field.
             if let Some(vid) = project_id {
                 session.project_id = Some(vid.to_string());
-            }
-            // Persist execution mode for new session
-            if let Some(mode) = metadata.get("mode") {
-                session.set_metadata("mode", serde_json::json!(mode));
             }
             if let Err(e) = state_store.save_session(&session).await {
                 tracing::warn!(error = %e, "WS: failed to create session");

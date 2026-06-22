@@ -120,9 +120,16 @@ pub struct Gateway {
 /// CLI): even without a client-initiated `replay(last_seq)`, transient send
 /// failures get a chance to recover rather than being dropped on the floor.
 async fn send_with_retry(channel: &Arc<dyn Channel>, msg: OutgoingMessage) -> Result<()> {
+    let m = oxios_kernel::metrics::get_metrics();
     for attempt in 1..=SEND_MAX_RETRIES {
         match channel.send(msg.clone()).await {
-            Ok(()) => return Ok(()),
+            Ok(()) => {
+                // RFC-024 §11: count delivered messages. Every call site
+                // (dispatch, send_to, action handlers) routes through this
+                // helper, so a single counter here is enough.
+                m.gateway_messages_delivered.inc();
+                return Ok(());
+            }
             Err(e) => {
                 if attempt >= SEND_MAX_RETRIES {
                     tracing::error!(
@@ -133,6 +140,8 @@ async fn send_with_retry(channel: &Arc<dyn Channel>, msg: OutgoingMessage) -> Re
                         attempts = SEND_MAX_RETRIES,
                         "Failed to send message after retries; dead-lettering"
                     );
+                    // RFC-024 §11: dead-lettered after exhausting retries.
+                    m.gateway_messages_dropped.inc();
                     return Err(e);
                 }
                 tracing::warn!(
@@ -427,7 +436,6 @@ impl Gateway {
                 (Ok(orchestration), Some(channel)) => {
                     tracing::info!(
                         phase = %orchestration.phase_reached,
-                        seed_id = ?orchestration.seed_id,
                         duration_ms = duration_ms,
                         "Orchestration complete"
                     );
@@ -456,15 +464,11 @@ impl Gateway {
                     {
                         channel_meta.insert("tool_calls".to_owned(), json);
                     }
-                    // Persist execution mode in channel_meta so session persistence can read it.
-                    channel_meta.insert("mode".to_owned(), orchestration.mode.clone());
-
                     // Typed orchestration metadata (RFC-014)
                     let response_meta = ResponseMeta {
                         session_id: orchestration.session_id,
                         project_id: orchestration.primary_project_id.map(|u| u.to_string()),
                         project_tag: orchestration.project_tag,
-                        seed_id: orchestration.seed_id.map(|u| u.to_string()),
                         phase: orchestration.phase_reached.to_string(),
                         evaluation_passed: orchestration.evaluation_passed,
                         duration_ms: Some(duration_ms),
@@ -474,8 +478,6 @@ impl Gateway {
                         // questions — the frontend falls back to markdown.
                         interview_questions: orchestration.interview_questions,
                         interview_round: orchestration.interview_round,
-                        interview_ambiguity: orchestration.interview_ambiguity,
-                        mode: Some(orchestration.mode.clone()),
                     };
 
                     let mut outgoing = OutgoingMessage::success(
@@ -507,7 +509,24 @@ impl Gateway {
                     let _ = send_with_retry(&channel, outgoing).await;
                 }
                 (_, None) => {
-                    tracing::warn!(channel = %channel_name, "Channel no longer registered");
+                    // Channel was unregistered between dispatch and the
+                    // completion callback. The HTTP request's oneshot in
+                    // `WebBridge::responses` will time out at
+                    // `send_and_wait`'s deadline, returning 504 to the
+                    // client — so the C1 contract is still satisfied,
+                    // just at the deadline rather than immediately.
+                    // RFC-024 §A4: surface the request_id and channel for
+                    // diagnosis (the previous `warn!` line was too quiet
+                    // to be noticed in production).
+                    oxios_kernel::metrics::get_metrics()
+                        .gateway_messages_dropped
+                        .inc();
+                    tracing::error!(
+                        channel = %channel_name,
+                        request_id = %msg.id,
+                        "Channel no longer registered; HTTP request will hit \
+                         send_and_wait timeout (C1 still satisfied via 504)"
+                    );
                 }
             }
         });
@@ -592,15 +611,12 @@ impl Gateway {
                                 session_id: None,
                                 project_id: None,
                                 project_tag: None,
-                                seed_id: None,
                                 phase: "action".to_string(),
                                 evaluation_passed: Some(true),
                                 duration_ms: None,
                                 error: None,
                                 interview_questions: None,
                                 interview_round: None,
-                                interview_ambiguity: None,
-                                mode: None,
                             },
                         );
                         outgoing.target_conn_id = conn_id;
@@ -676,15 +692,12 @@ impl Gateway {
                                 session_id: None,
                                 project_id: None,
                                 project_tag: None,
-                                seed_id: None,
                                 phase: "action".to_string(),
                                 evaluation_passed: Some(true),
                                 duration_ms: None,
                                 error: None,
                                 interview_questions: None,
                                 interview_round: None,
-                                interview_ambiguity: None,
-                                mode: None,
                             },
                         );
                         outgoing.target_conn_id = conn_id;

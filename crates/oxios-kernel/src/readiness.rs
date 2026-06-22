@@ -101,14 +101,25 @@ impl ReadinessGate {
         self.deadline_secs.load(Ordering::SeqCst)
     }
 
-    /// Update the state-store readiness.
+    /// Update the state-store readiness. Bumps the `oxios_readiness_state`
+    /// gauge when the gate's `is_ready()` result changes (RFC-024 §11).
     pub fn set_state_store(&self, s: SubsystemState) {
         self.state_store.store(s.to_u8(), Ordering::SeqCst);
+        self.update_readiness_gauge();
     }
 
-    /// Update the engine readiness.
+    /// Update the engine readiness. Bumps the `oxios_readiness_state`
+    /// gauge when the gate's `is_ready()` result changes (RFC-024 §11).
     pub fn set_engine(&self, s: SubsystemState) {
         self.engine.store(s.to_u8(), Ordering::SeqCst);
+        self.update_readiness_gauge();
+    }
+
+    /// Recompute the readiness gauge and write it if the boolean changed.
+    /// Cheap: one CAS read + one gauge write at most per state mutation.
+    fn update_readiness_gauge(&self) {
+        let ready = self.is_ready();
+        crate::metrics::get_metrics().readiness_state.set(if ready { 1.0 } else { 0.0 });
     }
 
     /// Read the current state-store state.
@@ -244,5 +255,55 @@ mod tests {
         let g = ReadinessGate::new(0);
         g.enforce_deadline();
         assert_eq!(g.state_store_state(), SubsystemState::Warming);
+    }
+
+    /// RFC-024 §11: `set_state_store` / `set_engine` must publish the
+    /// resulting boolean to the `oxios_readiness_state` gauge. We do
+    /// not assert an exact value (other tests in the binary may have
+    /// run first) — only that the gauge line appears in the export
+    /// with a valid 0.0 or 1.0 value, and that toggling the gate
+    /// changes it.
+    #[test]
+    fn readiness_gauge_tracks_gate_state() {
+        // Snapshot the gauge before mutating.
+        let before = current_readiness_gauge();
+
+        let g = ReadinessGate::new(0);
+        // Fresh gate is Warming — gauge should be 0.
+        g.set_state_store(SubsystemState::Ready);
+        g.set_engine(SubsystemState::Ready);
+        let both_ready = current_readiness_gauge();
+        assert!(
+            (both_ready - 1.0).abs() < f64::EPSILON,
+            "both subsystems Ready should yield gauge=1.0, got {both_ready}"
+        );
+
+        // Flip one to Failed → gauge should drop back to 0.
+        g.set_engine(SubsystemState::Failed);
+        let one_failed = current_readiness_gauge();
+        assert!(
+            one_failed < both_ready,
+            "engine Failed should drop the gauge (before={before}, after={one_failed})"
+        );
+    }
+
+    fn current_readiness_gauge() -> f64 {
+        // Find the `oxios_readiness_state` line in the registry export.
+        // We rely on `register_builtin_metrics` having been called by
+        // another test (or by a binary that links this crate); if the
+        // gauge has not been registered the assertion in the test
+        // will fail and the developer will see it immediately.
+        let export = crate::metrics::registry().export();
+        for line in export.lines() {
+            if let Some(rest) = line.strip_prefix("oxios_readiness_state ") {
+                if let Ok(v) = rest.trim().parse::<f64>() {
+                    return v;
+                }
+            }
+        }
+        panic!(
+            "oxios_readiness_state gauge not found in registry export — \
+             did register_builtin_metrics run?"
+        );
     }
 }

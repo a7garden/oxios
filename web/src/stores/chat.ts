@@ -1,6 +1,15 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { ChatActivity, ChatMessage, StreamChunk, ToolCallSummary } from '@/types'
+import type {
+  ChatActivity,
+  ChatMessage,
+  InterviewAnswer,
+  InterviewQuestion,
+  Project,
+  StreamChunk,
+  ToolCallContext,
+  ToolCallSummary,
+} from '@/types'
 import { useAuthStore } from './auth'
 
 // ---------------------------------------------------------------------------
@@ -35,7 +44,7 @@ interface ChatRuntimeState {
   /** The project ID from the last "done" chunk. */
   _lastDoneProjectId: string | null
   /** AI-detected project (Phase 2 stub, always null). */
-  detectedProject: import('@/types').Project | null
+  detectedProject: Project | null
   /** RFC-025: detected mount tag from the last orchestrator response. */
   detectedMountTag: string | null
   /** RFC-025: detected mount IDs from the last orchestrator response. */
@@ -43,7 +52,7 @@ interface ChatRuntimeState {
   /** IDs of dismissed detection badges. */
   dismissedProjectIds: string[]
   /** Active structured interview questions (null = no interview active). */
-  activeInterview: import('@/types').InterviewQuestion[] | null
+  activeInterview: InterviewQuestion[] | null
   /** Active tool approval request awaiting user response (RFC-017). */
   activeToolApproval: {
     id: string
@@ -63,9 +72,23 @@ interface ChatRuntimeState {
   /** WebSocket instance managed by the store. */
   _ws: WebSocket | null
   /** Reconnect timer (exponential backoff). */
-  _reconnectTimer: ReturnType<typeof setTimeout> | null
+  _reconnectTimer: number | null
   /** Reconnect attempt counter. */
   _reconnectAttempts: number
+  /** RFC-024 SP2 (B4): client-side keepalive ping timer. Fires every
+   *  `WS_CLIENT_PING_MS` so the server's pong-deadline is reset even
+   *  when no app-level message is flowing. */
+  _pingTimer: number | null
+  /** RFC-024 SP2 (C2): highest `seq` we have observed on this WS.
+   *  Persisted in `sessionStorage` so a hard refresh / tab reopen can
+   *  resume the stream from the next message. */
+  _lastSeq: number
+  /** RFC-024 SP2 (C3): ring of recently-seen `msg.id` values for
+   *  dedup. The replay buffer can return the same message twice
+   *  (e.g. a server restart that lost the in-memory state) — we
+   *  silently drop the second copy. Bounded so memory does not grow
+   *  unbounded for long-lived connections. */
+  _seenMsgIds: string[]
 }
 
 // ---------------------------------------------------------------------------
@@ -77,6 +100,8 @@ interface ChatActions {
   connect: () => Promise<void>
   /** Close the WebSocket and reset connection state. */
   disconnect: () => void
+  /** RFC-024 SP2 (B4): cancel the client-side keepalive interval. */
+  stopPingTimer: () => void
   /** Send a message using the active session. */
   sendMessage: (content: string) => void
   /** Load a previous session's message history from the API. */
@@ -92,13 +117,13 @@ interface ChatActions {
   /** RFC-025: Clear detected mount tag and IDs (e.g. on badge accept/dismiss). */
   clearDetectedMount: () => void
   /** Set the detected project (Phase 2: called from WS response). */
-  setDetectedProject: (project: import('@/types').Project | null) => void
+  setDetectedProject: (project: Project | null) => void
   /** Dismiss a detection badge (don't show again for this project). */
   dismissDetection: (projectId: string) => void
   /** Clear persisted state (e.g. on logout). */
   clearPersist: () => void
   /** Submit interview answers and send them as a message. */
-  submitInterviewResponse: (answers: import('@/types').InterviewAnswer[]) => void
+  submitInterviewResponse: (answers: InterviewAnswer[]) => void
   /** Resolve a pending tool approval (RFC-017). */
   resolveToolApproval: (id: string, approved: boolean) => Promise<void>
   /** Handle an incoming WS chunk. */
@@ -230,7 +255,7 @@ function trajectoryToActivity(step: {
   is_error: boolean
   tool_call_id: string
   timestamp: string
-  context?: import('@/types').ToolCallContext
+  context?: ToolCallContext
 }): ChatActivity {
   return {
     id: step.tool_call_id,
@@ -293,7 +318,74 @@ async function buildWsUrl(): Promise<string> {
 /** Max reconnect attempts before giving up. */
 const MAX_RECONNECT_ATTEMPTS = 5
 
-// ---------------------------------------------------------------------------
+// RFC-024 SP2 (B4): client-side keepalive interval. Independent of the
+// server's 20 s ping — sending our own ping every 25 s means the
+// server's 60 s pong-deadline is reset on either side's traffic, so
+// the connection survives NAT/proxy timeouts that fire anywhere from
+// 30 s (aggressive) to 5 min (lenient).
+const WS_CLIENT_PING_MS = 25_000
+
+// RFC-024 SP2 (C3): cap on the dedup ring. 256 is generous — the
+// server's replay buffer is 512 by default, so anything we've seen
+// in the last 256 messages we will not apply twice.
+const DEDUP_RING_MAX = 256
+
+// RFC-024 SP2 (C2): sessionStorage keys. We deliberately use
+// sessionStorage (not localStorage): the cursor is per-tab, and a
+// different tab's session/project should not contaminate this one.
+const SS_LAST_SEQ_KEY = 'oxios:ws:last_seq'
+const SS_SEEN_IDS_KEY = 'oxios:ws:seen_ids'
+
+function loadLastSeq(): number {
+  try {
+    const raw = sessionStorage.getItem(SS_LAST_SEQ_KEY)
+    if (!raw) return 0
+    const n = Number.parseInt(raw, 10)
+    return Number.isFinite(n) && n >= 0 ? n : 0
+  } catch {
+    return 0
+  }
+}
+
+function saveLastSeq(seq: number): void {
+  try {
+    sessionStorage.setItem(SS_LAST_SEQ_KEY, String(seq))
+  } catch {
+    // sessionStorage may be unavailable (private mode, quota); degrade silently.
+  }
+}
+
+function loadSeenIds(): string[] {
+  try {
+    const raw = sessionStorage.getItem(SS_SEEN_IDS_KEY)
+    if (!raw) return []
+    const parsed = JSON.parse(raw)
+    return Array.isArray(parsed) ? parsed.filter((v): v is string => typeof v === 'string') : []
+  } catch {
+    return []
+  }
+}
+
+function saveSeenIds(ids: string[]): void {
+  try {
+    sessionStorage.setItem(SS_SEEN_IDS_KEY, JSON.stringify(ids))
+  } catch {
+    // see saveLastSeq
+  }
+}
+
+// Returns true if this is a new id (caller should apply), false if
+// we have seen it before (caller should drop). Mutates `ring` in place.
+function markSeen(id: string, ring: string[]): boolean {
+  if (ring.includes(id)) return false
+  ring.push(id)
+  // Cap the ring so a burst of replayed messages does not leave the
+  // dedup set carrying entries the user will never see again. We
+  // drop down to DEDUP_RING_MAX (rather than splice one at a time)
+  // so a flood of replays after a long offline period is O(1) total.
+  if (ring.length > DEDUP_RING_MAX) ring.length = DEDUP_RING_MAX
+  return true
+}
 // F9: Token-streaming batching
 // ---------------------------------------------------------------------------
 // Each incoming token chunk previously rebuilt the entire messages array
@@ -385,7 +477,14 @@ export const useChatStore = create<ChatStore>()(
       _ws: null,
       _reconnectTimer: null,
       _reconnectAttempts: 0,
-
+      _pingTimer: null,
+      // RFC-024 SP2 (C2): restore the seq cursor from sessionStorage
+      // so a hard refresh / new tab can resume the stream without
+      // gaps. Both values are best-effort — if the server's buffer
+      // is older than the saved cursor, the server emits a `resync`
+      // chunk and the client falls back to a full state refresh.
+      _lastSeq: loadLastSeq(),
+      _seenMsgIds: loadSeenIds(),
       // ── Actions ──
 
       async connect() {
@@ -433,6 +532,35 @@ export const useChatStore = create<ChatStore>()(
           // If another connect() replaced this ws, ignore.
           if (get()._ws !== ws) return
           set({ connected: true, _reconnectAttempts: 0 })
+
+          // RFC-024 SP2 (C2): if we have a saved cursor, ask the server
+          // to replay any messages we missed while disconnected. The
+          // server either broadcasts the gapless slice or, if the
+          // cursor is older than its replay buffer, sends a synthetic
+          // `resync` chunk so we can pull fresh state via HTTP.
+          const lastSeq = get()._lastSeq
+          if (lastSeq > 0) {
+            ws.send(JSON.stringify({ type: 'resume', last_seq: lastSeq }))
+          }
+
+          // RFC-024 SP2 (B4): start the client-side keepalive. We send
+          // our own ping every WS_CLIENT_PING_MS so the server's
+          // 60 s pong-deadline is reset by either side's traffic.
+          // Browsers do not auto-pong application-level pings.
+          get().stopPingTimer()
+          const pingTimer = window.setInterval(() => {
+            if (get()._ws === ws && ws.readyState === WebSocket.OPEN) {
+              try {
+                ws.send(JSON.stringify({ type: 'ping' }))
+              } catch {
+                // Send can throw if the socket was just closed between
+                // the readyState check and the send; the close handler
+                // will deal with the reconnect.
+              }
+            }
+          }, WS_CLIENT_PING_MS)
+          set({ _pingTimer: pingTimer })
+
           // Flush queued messages.
           const queue = get()._sendQueue
           if (queue.length > 0) {
@@ -447,7 +575,27 @@ export const useChatStore = create<ChatStore>()(
           // Stale connection — ignore.
           if (get()._ws !== ws) return
           try {
-            const raw = JSON.parse(event.data as string)
+            const raw = JSON.parse(event.data as string) as Record<string, unknown>
+            // RFC-024 SP2 (C2): track the highest seq we have observed
+            // so the next reconnect can resume from here. Persisted
+            // eagerly so a crash mid-stream still leaves a usable
+            // cursor.
+            const seq = raw.seq
+            if (typeof seq === 'number' && seq > get()._lastSeq) {
+              set({ _lastSeq: seq })
+              saveLastSeq(seq)
+            }
+            // RFC-024 SP2 (C3): drop replays of messages we have
+            // already applied. The server's replay path can deliver
+            // duplicates when the cursor is just inside the buffer
+            // window; without dedup the user would see the same
+            // token stream rendered twice.
+            const msgId = raw.id
+            if (typeof msgId === 'string') {
+              const ring = get()._seenMsgIds
+              if (!markSeen(msgId, ring)) return
+              saveSeenIds(ring)
+            }
             const chunk = parseChunk(raw)
             get().handleChunk(chunk)
           } catch {
@@ -459,6 +607,13 @@ export const useChatStore = create<ChatStore>()(
           // Another connect() already replaced this ws — do nothing.
           if (get()._ws !== ws) return
 
+          // RFC-024 SP2 (B4): stop the client-side keepalive so the
+          // orphaned timer does not keep firing after the socket is
+          // gone (it would silently fail in `onopen` above, but the
+          // interval itself would survive until disconnect() or a new
+          // connect()).
+          get().stopPingTimer()
+
           set({ connected: false, isStreaming: false, _ws: null })
 
           // Auto-reconnect with exponential backoff.
@@ -466,7 +621,7 @@ export const useChatStore = create<ChatStore>()(
           if (attempt >= MAX_RECONNECT_ATTEMPTS) return
 
           const delay = 1000 * 2 ** attempt
-          const timer = setTimeout(() => {
+          window.setTimeout(() => {
             set({ _reconnectTimer: null })
             // Only reconnect if no new connection was established in the meantime.
             if (get()._ws === null) {
@@ -474,7 +629,6 @@ export const useChatStore = create<ChatStore>()(
               get().connect()
             }
           }, delay)
-          set({ _reconnectTimer: timer })
         }
 
         ws.onerror = () => {
@@ -483,11 +637,25 @@ export const useChatStore = create<ChatStore>()(
         }
       },
 
+      // RFC-024 SP2 (B4): cancel the keepalive interval. Safe to
+      // call from `disconnect`, the close handler, or the start of
+      // a new `connect()` to avoid overlapping timers.
+      stopPingTimer() {
+        const t = get()._pingTimer
+        if (t !== null) {
+          window.clearInterval(t)
+          if (get()._pingTimer === t) set({ _pingTimer: null })
+        }
+      },
+
       disconnect() {
         const { _ws, _reconnectTimer } = get()
 
         // Stop any pending reconnect.
         if (_reconnectTimer) clearTimeout(_reconnectTimer)
+
+        // RFC-024 SP2 (B4): kill the keepalive timer.
+        get().stopPingTimer()
 
         if (_ws) {
           // Detach handlers before closing to prevent onclose from
@@ -580,7 +748,7 @@ export const useChatStore = create<ChatStore>()(
             is_error: boolean
             tool_call_id: string
             timestamp: string
-            context?: import('@/types').ToolCallContext
+            context?: ToolCallContext
           }> = data.trajectory_steps ?? []
           const trajectoryActivities = trajectorySteps.map(trajectoryToActivity)
 
@@ -686,7 +854,7 @@ export const useChatStore = create<ChatStore>()(
         set({ detectedMountTag: null, detectedMountIds: [] })
       },
 
-      setDetectedProject(project: import('@/types').Project | null) {
+      setDetectedProject(project: Project | null) {
         set({ detectedProject: project })
       },
 
@@ -714,7 +882,7 @@ export const useChatStore = create<ChatStore>()(
         })
       },
 
-      submitInterviewResponse(answers: import('@/types').InterviewAnswer[]) {
+      submitInterviewResponse(answers: InterviewAnswer[]) {
         const { _ws, activeInterview, activeSessionId, activeProjectId, interviewRound } = get()
         if (!activeInterview) return
 

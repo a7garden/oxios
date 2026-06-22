@@ -229,13 +229,17 @@ impl WebBridgeHandle {
     /// a synthetic `type: "resync"` message is broadcast instead and the
     /// client is expected to pull state via the regular HTTP API.
     pub fn replay_after(&self, last_seq: u64) {
+        // RFC-024 §11: count replay outcomes (label=replay|resync).
+        let m = oxios_kernel::metrics::get_metrics();
         match self.reliability.replay(last_seq) {
             ReplayResult::Replay(msgs) => {
+                m.gateway_replay_replay.inc();
                 for m in msgs {
                     let _ = self.outgoing_tx.send(m);
                 }
             }
             ReplayResult::Resync => {
+                m.gateway_replay_resync.inc();
                 let mut meta = HashMap::new();
                 meta.insert("type".into(), "resync".into());
                 let resync = OutgoingMessage::with_id(uuid::Uuid::new_v4(), "web", "system", "")
@@ -291,6 +295,9 @@ impl WebBridgeHandle {
             responses.insert(msg_id, tx);
         }
 
+        // RFC-024 §11: observe `send_and_wait` duration for every attempt.
+        let start = std::time::Instant::now();
+
         // Send the message.
         if let Err(e) = self.incoming_tx.send(msg).await {
             // Could not even enqueue — drop our correlation entry.
@@ -298,7 +305,7 @@ impl WebBridgeHandle {
             return Err(BridgeSendError::SendFailed(e.to_string()));
         }
 
-        match tokio::time::timeout(timeout, rx).await {
+        let outcome = match tokio::time::timeout(timeout, rx).await {
             Ok(Ok(resp)) => Ok(resp),
             Ok(Err(_)) => {
                 // Gateway gave up; remove the entry.
@@ -310,6 +317,20 @@ impl WebBridgeHandle {
                 self.responses.write().await.remove(&msg_id);
                 Err(BridgeSendError::Timeout)
             }
+        };
+
+        // RFC-024 §11: histogram + outcome counter. We always observe the
+        // duration (even on success) so the histogram reflects the real
+        // latency distribution; the labelled counter separates outcomes.
+        let m = oxios_kernel::metrics::get_metrics();
+        m.gateway_response_duration
+            .observe(start.elapsed().as_secs_f64());
+        match &outcome {
+            Ok(_) => {} // delivered — counted at the channel layer (gateway.rs)
+            Err(BridgeSendError::Timeout) => m.gateway_messages_timed_out.inc(),
+            Err(BridgeSendError::ChannelDropped) => m.gateway_messages_dropped.inc(),
+            Err(BridgeSendError::SendFailed(_)) => m.gateway_messages_dropped.inc(),
         }
+        outcome
     }
 }

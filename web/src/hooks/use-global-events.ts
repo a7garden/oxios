@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useRef } from 'react'
 import { useEvents } from '@/hooks/use-events'
 import { api } from '@/lib/api-client'
@@ -8,6 +8,12 @@ import { playNotificationSound } from '@/lib/sound'
 import { useNotificationStore } from '@/stores/notifications'
 import type { NotificationSeverity } from '@/stores/notifications'
 import type { OxiosEvent } from '@/types'
+
+// RFC-024 SP2 (C2 resync): key under which the events store broadcasts a
+// `resync` notification. Listeners (this hook, AppLayout) invalidate any
+// queries that mirror the dropped stream so the UI re-pulls the same
+// state the server would have sent.
+const RESYNC_EVENT = 'oxios:resync'
 
 /**
  * Global event listener that converts backend events into notifications.
@@ -23,15 +29,27 @@ import type { OxiosEvent } from '@/types'
  * - When `agent_failed` fires, a subsequent `agent_stopped(success:false)`
  *   for the same agent within 30s is suppressed (the failure was already
  *   reported via the error notification).
- *
- * RFC-028 SP-1b/SP-1d: agent_stopped now carries a `success` flag on the
- * wire, so we distinguish completion from evaluation failure. Desktop
- * notifications and sounds fire alongside in-app notifications.
  */
-export function useGlobalEvents() {
+ export function useGlobalEvents() {
   const add = useNotificationStore((s) => s.add)
   const { events } = useEvents()
   const seen = useRef<Map<string, number>>(new Map())
+  const queryClient = useQueryClient()
+
+  // RFC-024 SP2 (C2): when the SSE bus reports a resync (it lagged and
+  // dropped events), the React Query cache is now stale. We invalidate
+  // the most user-visible queries so the next render pulls fresh state
+  // from the HTTP API instead of showing a half-updated UI.
+  useEffect(() => {
+    const onResync = () => {
+      queryClient.invalidateQueries({ queryKey: ['status'] })
+      queryClient.invalidateQueries({ queryKey: ['sessions'] })
+      queryClient.invalidateQueries({ queryKey: ['agents'] })
+      queryClient.invalidateQueries({ queryKey: ['approvals'] })
+    }
+    window.addEventListener(RESYNC_EVENT, onResync)
+    return () => window.removeEventListener(RESYNC_EVENT, onResync)
+  }, [queryClient])
 
   useEffect(() => {
     for (const event of events) {

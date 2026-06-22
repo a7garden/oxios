@@ -40,7 +40,20 @@ export const useEventStore = create<EventState>((set, get) => ({
 
     sse.connect(
       '/api/events',
-      (_event, data) => {
+      (event, data) => {
+        // RFC-024 SP2 (C2 resync path): the server emits a `resync`
+        // event when the broadcast bus lagged and dropped events. The
+        // client cannot reconstruct the missed stream, so it pulls
+        // fresh state via the regular HTTP API and clears the in-memory
+        // event log so the UI does not display a mix of stale and
+        // current entries. We re-trigger any consumer that has a
+        // refresh hook attached (e.g. useApprovalWatcher via a query
+        // invalidation in AppLayout).
+        if (event === 'resync') {
+          set({ events: [] })
+          window.dispatchEvent(new CustomEvent('oxios:resync'))
+          return
+        }
         const evt = data as OxiosEvent
         set((s) => ({ events: [evt, ...s.events].slice(0, MAX_EVENTS) }))
       },
