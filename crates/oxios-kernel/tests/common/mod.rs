@@ -122,11 +122,7 @@ pub fn build_test_orchestrator(
     );
 
     let mock = Arc::new(MockIntentEngine::new());
-    let orchestrator = oxios_kernel::Orchestrator::new(
-        event_bus,
-        state_store,
-        lifecycle,
-    );
+    let orchestrator = oxios_kernel::Orchestrator::new(event_bus, state_store, lifecycle);
     orchestrator.set_intent_engine(mock.clone() as Arc<dyn IntentEngineOps>);
 
     (Arc::new(orchestrator), mock)

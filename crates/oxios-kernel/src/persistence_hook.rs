@@ -412,7 +412,8 @@ fn auto_save_path(directive: &Directive, content: &str) -> String {
         .map(|l| l.trim_start_matches('#').trim().to_string())
         .filter(|h| !h.is_empty())
         .unwrap_or_else(|| {
-            directive.goal
+            directive
+                .goal
                 .split_whitespace()
                 .take(5)
                 .collect::<Vec<_>>()

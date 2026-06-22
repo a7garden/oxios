@@ -119,7 +119,9 @@ impl ReadinessGate {
     /// Cheap: one CAS read + one gauge write at most per state mutation.
     fn update_readiness_gauge(&self) {
         let ready = self.is_ready();
-        crate::metrics::get_metrics().readiness_state.set(if ready { 1.0 } else { 0.0 });
+        crate::metrics::get_metrics()
+            .readiness_state
+            .set(if ready { 1.0 } else { 0.0 });
     }
 
     /// Read the current state-store state.

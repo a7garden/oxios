@@ -185,8 +185,7 @@ impl MetricsRegistry {
         // per-series (Prometheus accepts repeated HELP/TYPE per series).
         {
             let labeled = self.labeled_counters.read();
-            let mut seen_help: std::collections::HashSet<String> =
-                std::collections::HashSet::new();
+            let mut seen_help: std::collections::HashSet<String> = std::collections::HashSet::new();
             for lc in labeled.iter() {
                 if seen_help.insert(lc.name.clone()) {
                     out.push_str(&format!("# HELP {} {}\n", lc.name, lc.help));
@@ -271,7 +270,6 @@ impl LabeledCounterHandle {
         }
     }
 }
-
 
 #[derive(Clone)]
 pub struct GaugeHandle {
@@ -393,7 +391,6 @@ pub struct MetricsHandles {
     // Labeled counters use one handle per (name, label_key, label_value)
     // triple. Wire them up at the increment sites in oxios-gateway and the
     // web routes — see RFC-024 §11.
-
     /// Outgoing messages by outcome (delivered | dropped | resynced | timed_out).
     pub gateway_messages_delivered: LabeledCounterHandle,
     pub gateway_messages_dropped: LabeledCounterHandle,

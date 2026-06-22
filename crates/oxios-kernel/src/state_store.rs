@@ -224,7 +224,6 @@ impl Session {
         &self.trajectory_steps
     }
 
-
     /// Sets the active persona ID.
     pub fn set_active_persona(&mut self, persona_id: Option<String>) {
         self.active_persona_id = persona_id;

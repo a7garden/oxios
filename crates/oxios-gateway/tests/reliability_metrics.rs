@@ -167,7 +167,9 @@ async fn sse_connection_open_counter_increments() {
     // The SSE server's `handle_events` increments this on every
     // subscription. We exercise the same handle directly here.
     let before = counter_value("oxios_sse_connections_total", "action", "open");
-    oxios_kernel::metrics::get_metrics().sse_connections_open.inc();
+    oxios_kernel::metrics::get_metrics()
+        .sse_connections_open
+        .inc();
     let after = counter_value("oxios_sse_connections_total", "action", "open");
     assert_eq!(after, before + 1);
 }
@@ -175,7 +177,9 @@ async fn sse_connection_open_counter_increments() {
 #[tokio::test]
 async fn ws_connection_open_counter_increments() {
     let before = counter_value("oxios_ws_connections_total", "action", "open");
-    oxios_kernel::metrics::get_metrics().ws_connections_open.inc();
+    oxios_kernel::metrics::get_metrics()
+        .ws_connections_open
+        .inc();
     let after = counter_value("oxios_ws_connections_total", "action", "open");
     assert_eq!(after, before + 1);
 }
@@ -230,7 +234,11 @@ fn labelled_series_are_unique_in_export() {
             }
         }
     }
-    assert_eq!(dupes.load(Ordering::SeqCst), 0, "duplicate metric series in export");
+    assert_eq!(
+        dupes.load(Ordering::SeqCst),
+        0,
+        "duplicate metric series in export"
+    );
 }
 
 // IncomingMessage::new is referenced indirectly to keep the import
