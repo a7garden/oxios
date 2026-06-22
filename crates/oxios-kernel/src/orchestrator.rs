@@ -995,9 +995,9 @@ impl Orchestrator {
 
                 Ok(HandleResponse::Task {
                     scope,
-                    directive,
+                    directive: Box::new(directive),
                     env,
-                    result,
+                    result: Box::new(result),
                     verdict,
                     evaluation_passed,
                 })
@@ -1377,11 +1377,11 @@ pub enum HandleResponse {
         /// The scope decided by `assess` — Trivial skips review.
         scope: oxios_ouroboros::Scope,
         /// The directive that was executed (post-retry if a retry ran).
-        directive: oxios_ouroboros::Directive,
+        directive: Box<oxios_ouroboros::Directive>,
         /// The execution environment resolved for this message.
         env: oxios_ouroboros::ExecEnv,
         /// The execution result.
-        result: ExecutionResult,
+        result: Box<ExecutionResult>,
         /// The review verdict — `None` for `Scope::Trivial`.
         verdict: Option<oxios_ouroboros::Verdict>,
         /// Whether the (final) verdict passed — `None` for `Scope::Trivial`.

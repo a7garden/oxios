@@ -65,6 +65,7 @@ impl MockOuroboros {
     }
 
     /// Create a mock that will fail evaluation on the first pass.
+    #[expect(dead_code)]
     fn with_failing_evaluation() -> Self {
         let s = Self::new();
         s.evaluation_passes.store(false, Ordering::SeqCst);

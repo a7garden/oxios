@@ -29,6 +29,7 @@ use oxios_ouroboros::{Directive, ExecEnv};
 // Helpers
 // ---------------------------------------------------------------------------
 
+#[expect(dead_code)]
 fn make_config(max_iterations: u32) -> OrchestratorConfig {
     OrchestratorConfig {
         max_evolution_iterations: max_iterations,
@@ -61,6 +62,7 @@ impl MockOuroboros {
         }
     }
 
+    #[expect(dead_code)]
     fn with_failing_evaluation() -> Self {
         let s = Self::new();
         s.evaluation_passes.store(false, Ordering::SeqCst);
@@ -282,6 +284,7 @@ fn build_rfc027_orchestrator(
     common::build_test_orchestrator(supervisor, state_store, event_bus)
 }
 
+#[expect(dead_code)]
 fn make_lifecycle(
     supervisor: Arc<MockSupervisor>,
     scheduler: Arc<oxios_kernel::scheduler::AgentScheduler>,
@@ -479,6 +482,6 @@ async fn test_phase_events_published() {
         .unwrap();
 
     // The unified path completes and returns a result.
-    assert!(result.response.len() > 0);
+    assert!(!result.response.is_empty());
     assert!(result.session_id.is_some());
 }

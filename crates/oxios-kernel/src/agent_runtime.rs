@@ -641,51 +641,51 @@ impl AgentRuntime {
         // Runs after successful execution, fire-and-forget.
         // Only available on the Seed path today (persistence_seed is Some);
         // the Directive path will gain its own hook adapter in Phase 6.
-        if let Some(seed) = persistence_seed {
-            if success && let Some(hook) = &self.persistence_hook {
-                let already_saved_knowledge = trajectory_steps
-                    .iter()
-                    .any(|s| s.input == "knowledge" && s.output.contains("written successfully"));
-                let hook = hook.clone();
-                let seed_clone = seed.clone();
-                let traj_clone = trajectory_steps.clone();
-                let output_clone = final_content.clone();
-                let sid = session_id.clone();
-                // Compute the assistant message index for this execution.
-                // Increment per-session counter, then use the pre-increment value.
-                let msg_index = {
-                    let mut counter = self.session_msg_counter.lock();
-                    let idx = counter.entry(sid.clone().unwrap_or_default()).or_insert(0);
-                    let current = *idx;
-                    *idx += 1;
-                    current
-                };
-                tokio::spawn(async move {
-                    match hook
-                        .evaluate(
-                            &seed_clone,
-                            &traj_clone,
-                            &output_clone,
-                            already_saved_knowledge,
-                        )
-                        .await
-                    {
-                        Ok(plan) => {
-                            if !plan.memory.is_empty() || !plan.knowledge.is_empty() {
-                                tracing::info!(
-                                    memory = plan.memory.len(),
-                                    knowledge = plan.knowledge.len(),
-                                    message_index = msg_index,
-                                    "PersistenceHook executing plan"
-                                );
-                                let session_id = sid.unwrap_or_default();
-                                hook.execute_plan(plan, &session_id, msg_index).await;
-                            }
+        if let Some(seed) = persistence_seed
+            && success && let Some(hook) = &self.persistence_hook
+        {
+            let already_saved_knowledge = trajectory_steps
+                .iter()
+                .any(|s| s.input == "knowledge" && s.output.contains("written successfully"));
+            let hook = hook.clone();
+            let seed_clone = seed.clone();
+            let traj_clone = trajectory_steps.clone();
+            let output_clone = final_content.clone();
+            let sid = session_id.clone();
+            // Compute the assistant message index for this execution.
+            // Increment per-session counter, then use the pre-increment value.
+            let msg_index = {
+                let mut counter = self.session_msg_counter.lock();
+                let idx = counter.entry(sid.clone().unwrap_or_default()).or_insert(0);
+                let current = *idx;
+                *idx += 1;
+                current
+            };
+            tokio::spawn(async move {
+                match hook
+                    .evaluate(
+                        &seed_clone,
+                        &traj_clone,
+                        &output_clone,
+                        already_saved_knowledge,
+                    )
+                    .await
+                {
+                    Ok(plan) => {
+                        if !plan.memory.is_empty() || !plan.knowledge.is_empty() {
+                            tracing::info!(
+                                memory = plan.memory.len(),
+                                knowledge = plan.knowledge.len(),
+                                message_index = msg_index,
+                                "PersistenceHook executing plan"
+                            );
+                            let session_id = sid.unwrap_or_default();
+                            hook.execute_plan(plan, &session_id, msg_index).await;
                         }
-                        Err(e) => tracing::warn!(error = %e, "PersistenceHook evaluate failed"),
                     }
-                });
-            }
+                    Err(e) => tracing::warn!(error = %e, "PersistenceHook evaluate failed"),
+                }
+            });
         }
 
         Ok(result)
