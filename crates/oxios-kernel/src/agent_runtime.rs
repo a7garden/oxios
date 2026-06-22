@@ -642,7 +642,8 @@ impl AgentRuntime {
         // Only available on the Seed path today (persistence_seed is Some);
         // the Directive path will gain its own hook adapter in Phase 6.
         if let Some(seed) = persistence_seed
-            && success && let Some(hook) = &self.persistence_hook
+            && success
+            && let Some(hook) = &self.persistence_hook
         {
             let already_saved_knowledge = trajectory_steps
                 .iter()
