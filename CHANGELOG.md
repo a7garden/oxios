@@ -4,8 +4,12 @@ All notable changes to this project are documented in this file.
 
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.7.1] - 2026-06-22
 
+### Changed
+- **Cargo.lock update** — Lockfile refresh to include the correct dependency resolution for the v1.7.0 release.
+
+## [Unreleased]
 ## [1.6.1] - 2026-06-21
 
 ### Fixed
