@@ -17,7 +17,6 @@ use oxios_kernel::{
 use oxios_markdown::KnowledgeBase;
 use oxios_markdown::knowledge::FileChange;
 
-use oxios_ouroboros; // Used for Directive, ExecEnv, IntentEngine types below.
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::OnceLock;

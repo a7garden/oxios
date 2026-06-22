@@ -297,10 +297,10 @@ mod tests {
         // will fail and the developer will see it immediately.
         let export = crate::metrics::registry().export();
         for line in export.lines() {
-            if let Some(rest) = line.strip_prefix("oxios_readiness_state ") {
-                if let Ok(v) = rest.trim().parse::<f64>() {
-                    return v;
-                }
+            if let Some(rest) = line.strip_prefix("oxios_readiness_state ")
+                && let Ok(v) = rest.trim().parse::<f64>()
+            {
+                return v;
             }
         }
         panic!(
