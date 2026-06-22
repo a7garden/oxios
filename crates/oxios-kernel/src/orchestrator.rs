@@ -8,16 +8,15 @@
 //! 5. retry — re-execute with feedback if review fails
 
 use std::sync::Arc;
-use std::time::Duration;
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use oxios_ouroboros::ExecutionResult;
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::agent_lifecycle::AgentLifecycleManager;
-use crate::event_bus::{EventBus, KernelEvent};
+use crate::event_bus::EventBus;
 use crate::git_layer::GitLayer;
 use crate::metrics::get_metrics;
 use crate::mount::{MountId, MountManager};
