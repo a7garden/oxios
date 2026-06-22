@@ -1,14 +1,10 @@
 //! Agent group types for oxios orchestration.
 //!
-//! oxios has its own `OxiosAgentGroup` struct for managing groups of agents
-//! spawned by the orchestrator (Seed splitting, state persistence, events).
-//!
-//! For multi-agent execution within a pipeline/parallel/orchestrated workflow,
-//! use the re-exports from oxi_sdk: `SdkAgentGroup`, `SdkGroupResult`.
-//! See `lib.rs` for oxi-sdk re-exports.
+//! Defines the data structures for multi-agent groups persisted to the state
+//! store. The group creation logic (`delegate_subtasks`) was removed during
+//! the RFC-027 migration; these types remain for reading historical data
+//! from the state store via the `/api/agent-groups` API.
 
-use chrono::Utc;
-use oxios_ouroboros::Seed;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -30,8 +26,8 @@ pub enum OxiosAgentGroupStatus {
 pub struct OxiosGroupAgent {
     /// Unique ID for this group agent.
     pub id: Uuid,
-    /// The child seed this agent executes.
-    pub seed: Seed,
+    /// The goal this agent was assigned.
+    pub goal: String,
     /// Current status.
     pub status: OxiosAgentGroupStatus,
     /// Result output (when completed).
@@ -43,50 +39,13 @@ pub struct OxiosGroupAgent {
 pub struct OxiosAgentGroup {
     /// Unique group ID.
     pub id: Uuid,
-    /// The parent seed that spawned this group.
+    /// The parent ID that spawned this group.
     pub parent_seed_id: Uuid,
     /// Agents in this group.
     pub agents: Vec<OxiosGroupAgent>,
 }
 
 impl OxiosAgentGroup {
-    /// Create a new agent group by splitting a parent seed into subtasks.
-    pub fn new(parent_seed: &Seed, subtask_descriptions: Vec<String>) -> Self {
-        let agents = subtask_descriptions
-            .into_iter()
-            .map(|desc| {
-                let child_seed = Seed {
-                    id: Uuid::new_v4(),
-                    goal: desc,
-                    constraints: parent_seed.constraints.clone(),
-                    acceptance_criteria: vec!["Task completes successfully".into()],
-                    ontology: parent_seed.ontology.clone(),
-                    created_at: Utc::now(),
-                    generation: parent_seed.generation + 1,
-                    parent_seed_id: Some(parent_seed.id),
-                    cspace_hint: parent_seed.cspace_hint.clone(),
-                    original_request: parent_seed.original_request.clone(),
-                    output_schema: None,
-                    project_id: None,
-                    workspace_context: parent_seed.workspace_context.clone(),
-                    mount_paths: parent_seed.mount_paths.clone(),
-                };
-                OxiosGroupAgent {
-                    id: child_seed.id,
-                    seed: child_seed,
-                    status: OxiosAgentGroupStatus::Pending,
-                    result: None,
-                }
-            })
-            .collect();
-
-        Self {
-            id: Uuid::new_v4(),
-            parent_seed_id: parent_seed.id,
-            agents,
-        }
-    }
-
     /// Get all pending agents.
     pub fn pending_agents(&self) -> Vec<&OxiosGroupAgent> {
         self.agents
@@ -154,53 +113,12 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_group_new_splits_seed() {
-        let parent = Seed {
-            id: Uuid::new_v4(),
-            goal: "Test goal".into(),
-            constraints: vec!["constraint1".into()],
-            acceptance_criteria: vec!["Criterion".into()],
-            ontology: vec![],
-            created_at: Utc::now(),
-            generation: 0,
-            parent_seed_id: None,
-            cspace_hint: None,
-            original_request: String::new(),
-            output_schema: None,
-            project_id: None,
-            workspace_context: None,
-            mount_paths: Vec::new(),
-        };
-
-        let descriptions = vec!["subtask 1".into(), "subtask 2".into()];
-        let group = OxiosAgentGroup::new(&parent, descriptions);
-
-        assert_eq!(group.agents.len(), 2);
-        assert!(group.pending_agents().len() == 2);
-        assert!(!group.all_completed());
-        assert_eq!(group.parent_seed_id, parent.id);
-    }
-
-    #[test]
     fn test_completion_pct_empty_group() {
-        let parent = Seed {
+        let group = OxiosAgentGroup {
             id: Uuid::new_v4(),
-            goal: "Test".into(),
-            constraints: vec![],
-            acceptance_criteria: vec![],
-            ontology: vec![],
-            created_at: Utc::now(),
-            generation: 0,
-            parent_seed_id: None,
-            cspace_hint: None,
-            original_request: String::new(),
-            output_schema: None,
-            project_id: None,
-            workspace_context: None,
-            mount_paths: Vec::new(),
+            parent_seed_id: Uuid::new_v4(),
+            agents: vec![],
         };
-
-        let group = OxiosAgentGroup::new(&parent, vec![]);
         assert!((group.completion_pct() - 0.0).abs() < f64::EPSILON);
     }
 }
