@@ -50,7 +50,7 @@ use crate::KernelHandle;
 use crate::event_bus::KernelEvent;
 use crate::session_context::SessionContext;
 use crate::types::AgentId;
-use oxios_ouroboros::{Directive, Entity, ExecEnv, ExecutionResult};
+use oxios_ouroboros::{Directive, ExecEnv, ExecutionResult};
 
 /// Global LLM circuit breaker instance — delegates to oxi-sdk's ProviderCircuitBreaker.
 static LLM_CIRCUIT_BREAKER: std::sync::OnceLock<oxi_sdk::ProviderCircuitBreaker> =
@@ -249,14 +249,12 @@ impl AgentRuntime {
         session_ctx: &mut SessionContext,
         session_id: Option<String>,
     ) -> Result<ExecutionResult> {
-        let ontology: &[Entity] = &[];
         self.execute_inner(
             agent_id,
             &directive.goal,
             &directive.original_request,
             &directive.constraints,
             &directive.acceptance_criteria,
-            ontology,
             env.cspace_hint.as_deref(),
             &env.mount_paths,
             env.workspace_context.as_deref(),
@@ -281,7 +279,6 @@ impl AgentRuntime {
         original_request: &str,
         constraints: &[String],
         acceptance_criteria: &[String],
-        ontology: &[Entity],
         cspace_hint: Option<&str>,
         mount_paths: &[std::path::PathBuf],
         workspace_context: Option<&str>,
@@ -319,7 +316,6 @@ impl AgentRuntime {
             original_request,
             constraints,
             acceptance_criteria,
-            ontology,
             workspace_context,
             persona_prompt.as_deref(),
             None,
@@ -365,7 +361,6 @@ impl AgentRuntime {
                 original_request,
                 constraints,
                 acceptance_criteria,
-                ontology,
                 workspace_context,
                 persona_prompt.as_deref(),
                 capabilities_xml.as_deref(),
@@ -1442,13 +1437,11 @@ fn build_directive_system_prompt(
     capabilities_xml: Option<&str>,
     kernel_manifest: Option<&str>,
 ) -> String {
-    let ontology: &[Entity] = &[];
     build_system_prompt_inner(
         &directive.goal,
         &directive.original_request,
         &directive.constraints,
         &directive.acceptance_criteria,
-        ontology,
         env.workspace_context.as_deref(),
         persona_prompt,
         capabilities_xml,
@@ -1459,7 +1452,7 @@ fn build_directive_system_prompt(
 /// Shared system-prompt builder for the directive path.
 ///
 /// Composes the static agent prelude, goal/constraints/criteria sections,
-/// optional workspace context and ontology, persona, capability index, and
+/// optional workspace context, persona, capability index, and
 /// kernel manifest into a single prompt string.
 #[allow(clippy::too_many_arguments)]
 fn build_system_prompt_inner(
@@ -1467,7 +1460,6 @@ fn build_system_prompt_inner(
     original_request: &str,
     constraints: &[String],
     acceptance_criteria: &[String],
-    ontology: &[Entity],
     workspace_context: Option<&str>,
     persona_prompt: Option<&str>,
     capabilities_xml: Option<&str>,
@@ -1522,16 +1514,6 @@ fn build_system_prompt_inner(
         prompt.push_str("\n## Workspace Context\n");
         prompt.push_str(ctx);
         prompt.push('\n');
-    }
-
-    if !ontology.is_empty() {
-        prompt.push_str("\n## Domain Entities\n");
-        for e in ontology {
-            prompt.push_str(&format!(
-                "- **{}** ({}): {}\n",
-                e.name, e.entity_type, e.description
-            ));
-        }
     }
 
     // Inject persona system prompt
