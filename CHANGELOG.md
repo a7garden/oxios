@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.8.0] - 2026-06-22
+
 ### Added — RFC-028: Web UI Delivery
 - **AgentStopped `success` flag (SP-1a)** — `KernelEvent::AgentStopped` now carries `success: bool`. `sanitize_event` serializes it as `agent_stopped.success` on the SSE wire. The supervisor emits `result.success` on the Ok path and `false` on kill/terminate. `#[serde(default)]` keeps older consumers working.
 - **Completion notifications (SP-1b)** — `use-global-events.ts` handles `agent_stopped` events: `success:true` → "Task Completed" (success severity), `success:false` → "Task Failed" (warning). Cross-event dedup suppresses `agent_stopped(success:false)` when `agent_failed` was already emitted within 30s.
