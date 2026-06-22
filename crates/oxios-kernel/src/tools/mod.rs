@@ -4,6 +4,7 @@
 //! - `exec_tool` — unified workspace/host command execution
 
 pub mod a2a_tools;
+pub mod ask_user_tool;
 pub mod builtin;
 pub mod exec_tool;
 pub mod gated_tool;
@@ -17,6 +18,7 @@ pub mod retrieval;
 pub mod tool_types;
 
 pub use a2a_tools::{A2aDelegateTool, A2aQueryTool, A2aSendTool};
+pub use ask_user_tool::{AskUserTool, PendingAskUser};
 pub use builtin::{
     BudgetTool, CronTool, KernelAgentTool, KnowledgeTool, PersonaTool, ProjectTool, ResourceTool,
     SecurityTool,

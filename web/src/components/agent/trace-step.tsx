@@ -1,4 +1,11 @@
-import { ChevronDown, ChevronRight, Clock } from 'lucide-react'
+import {
+  Brain,
+  ChevronDown,
+  ChevronRight,
+  Clock,
+  Lightbulb,
+  Wrench,
+} from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Badge } from '@/components/ui/badge'
@@ -6,6 +13,36 @@ import type { AgentTraceStep } from '@/types/agent'
 
 interface TraceStepProps {
   step: AgentTraceStep
+}
+
+/** Icon + color for a trace step kind. */
+function kindVisual(kind: AgentTraceStep['kind']) {
+  switch (kind) {
+    case 'memory':
+      return { icon: <Brain className="h-3.5 w-3.5 text-info" />, badgeClass: 'text-info' }
+    case 'reasoning':
+      return {
+        icon: <Lightbulb className="h-3.5 w-3.5 text-message-task" />,
+        badgeClass: 'text-message-task',
+      }
+    default:
+      return { icon: <Wrench className="h-3.5 w-3.5 text-muted-foreground" />, badgeClass: '' }
+  }
+}
+
+/** Human-readable label for a kind. */
+function kindLabel(
+  kind: AgentTraceStep['kind'],
+  t: ReturnType<typeof useTranslation>['t'],
+): string | null {
+  switch (kind) {
+    case 'memory':
+      return t('agents.memoryRecall', 'Memory Recall')
+    case 'reasoning':
+      return t('agents.reasoning', 'Reasoning')
+    default:
+      return null
+  }
 }
 
 export function TraceStepCard({ step }: TraceStepProps) {
@@ -18,7 +55,10 @@ export function TraceStepCard({ step }: TraceStepProps) {
       : step.status === 'failed'
         ? 'bg-error'
         : 'bg-warning'
-
+  const kind = step.kind
+  const visual = kindVisual(kind)
+  const kLabel = kindLabel(kind, t)
+  const badgeText = kLabel ?? step.tool_name ?? step.action
   return (
     <div className="border rounded-lg">
       <button
@@ -27,8 +67,12 @@ export function TraceStepCard({ step }: TraceStepProps) {
         onClick={() => setExpanded(!expanded)}
       >
         <div className={`w-2 h-2 rounded-full ${statusColor}`} />
-        <Badge variant="outline" className="text-xs font-mono truncate min-w-0 max-w-[180px]">
-          {step.tool_name || step.action}
+        {visual.icon}
+        <Badge
+          variant="outline"
+          className={`text-xs font-mono truncate min-w-0 max-w-[180px] ${visual.badgeClass}`}
+        >
+          {badgeText}
         </Badge>
         <span className="text-xs text-muted-foreground flex items-center gap-1">
           <Clock className="h-3 w-3" /> {durationSec}s

@@ -246,9 +246,10 @@ pub(crate) fn sanitize_event(event: &oxios_kernel::event_bus::KernelEvent) -> se
             "type": "agent_started",
             "agent_id": id.to_string(),
         }),
-        KernelEvent::AgentStopped { id } => serde_json::json!({
+        KernelEvent::AgentStopped { id, success } => serde_json::json!({
             "type": "agent_stopped",
             "agent_id": id.to_string(),
+            "success": success,
         }),
         KernelEvent::AgentFailed { id, error } => serde_json::json!({
             "type": "agent_failed",
@@ -503,6 +504,16 @@ pub(crate) fn sanitize_event(event: &oxios_kernel::event_bus::KernelEvent) -> se
             "type": "knowledge_removed",
             "session_id": session_id,
             "message_index": message_index,
+        }),
+        KernelEvent::AskUserRequest {
+            id,
+            question,
+            options,
+        } => serde_json::json!({
+            "type": "ask_user_request",
+            "id": id,
+            "question": question,
+            "options": options,
         }),
     };
     // Merge payload into base

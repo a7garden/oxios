@@ -78,6 +78,10 @@
   --animate-in-duration: 200ms;
   --animate-in-duration-slow: 350ms;
   --animate-in-easing: cubic-bezier(0.16, 1, 0.3, 1);
+  /* Shadow tokens */
+  --shadow-sm: var(--shadow-sm);
+  --shadow-md: var(--shadow-md);
+  --shadow-lg: var(--shadow-lg);
 }
 
 /* ============================================================================
@@ -85,7 +89,7 @@
    ============================================================================ */
 :root {
   --radius: 0.625rem;
-  --background: oklch(0.985 0 0);
+  --background: oklch(0.99 0 0);
   --foreground: oklch(0.141 0.005 285.823);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.141 0.005 285.823);
@@ -147,6 +151,10 @@
   --surface-section: color-mix(in oklch, var(--muted) 30%, var(--background));
   --modified-accent: var(--primary);
   --modified-row-bg: color-mix(in oklch, var(--primary) 3%, transparent);
+  /* ── Elevation shadows ─────────────────────────────────── */
+  --shadow-sm: 0 1px 2px oklch(0 0 0 / 0.04);
+  --shadow-md: 0 2px 8px oklch(0 0 0 / 0.06);
+  --shadow-lg: 0 4px 16px oklch(0 0 0 / 0.08);
 }
 
 .dark {
@@ -205,6 +213,10 @@
   --surface-section: color-mix(in oklch, var(--muted) 30%, var(--background));
   --modified-accent: var(--primary);
   --modified-row-bg: color-mix(in oklch, var(--primary) 3%, transparent);
+  /* ── Elevation shadows (dark — higher alpha for depth) ─── */
+  --shadow-sm: 0 1px 2px oklch(0 0 0 / 0.2);
+  --shadow-md: 0 2px 8px oklch(0 0 0 / 0.3);
+  --shadow-lg: 0 4px 16px oklch(0 0 0 / 0.4);
 }
 
 @layer base {
@@ -253,6 +265,16 @@
   
   button, [role='button'], a {
     -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Keyboard key indicator — shortcuts, command hints */
+  kbd {
+    font-family: 'Geist Mono', monospace;
+    font-size: 0.7rem;
+    padding: 0.1rem 0.35rem;
+    border-radius: 0.25rem;
+    border: 1px solid var(--border);
+    background: var(--muted);
   }
 }
 

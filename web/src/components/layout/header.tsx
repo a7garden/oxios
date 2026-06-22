@@ -23,7 +23,7 @@ export function Header() {
       {/* Mobile hamburger */}
       <button
         type="button"
-        className="lg:hidden"
+        className="lg:hidden rounded-md focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
         onClick={() => setMobileOpen(true)}
         aria-label={t('common.openNav', 'Open navigation menu')}
       >

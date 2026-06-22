@@ -74,20 +74,7 @@ export interface SettingsSectionDef {
   key: string
   labelKey: string
   descriptionKey: string
-  iconKey:
-    | 'engine'
-    | 'kernel'
-    | 'exec'
-    | 'security'
-    | 'scheduler'
-    | 'orchestrator'
-    | 'context'
-    | 'gateway'
-    | 'session'
-    | 'logging'
-    | 'memory'
-    | 'channels'
-    | 'audit'
+  iconKey: SectionIconKey
   /** Group id this section belongs to. */
   groupId: 'ai' | 'system' | 'security' | 'memory' | 'channels'
   fields: SettingsFieldDef[]
@@ -472,6 +459,298 @@ const auditSection: SettingsSectionDef = {
 }
 
 // ---------------------------------------------------------------------------
+// 6. calendar — Calendar configuration (RFC-028 SP-2a)
+// ---------------------------------------------------------------------------
+
+const calendarSection: SettingsSectionDef = {
+  key: 'calendar',
+  labelKey: 'settings.sectionCalendar',
+  descriptionKey: 'settings.calendarDescription',
+  iconKey: 'calendar',
+  groupId: 'channels',
+  fields: [
+    {
+      key: 'enabled',
+      labelKey: 'settings.calendarEnabled',
+      descriptionKey: 'settings.calendarEnabledDesc',
+      type: 'toggle',
+      hotReload: false,
+    },
+    {
+      key: 'timezone',
+      labelKey: 'settings.calendarTimezone',
+      descriptionKey: 'settings.calendarTimezoneDesc',
+      type: 'text',
+      placeholder: 'Asia/Seoul',
+      hotReload: false,
+    },
+    {
+      key: 'default_reminder_minutes',
+      labelKey: 'settings.calendarReminders',
+      descriptionKey: 'settings.calendarRemindersDesc',
+      type: 'numbers',
+      hotReload: false,
+    },
+    {
+      key: 'alarm_channels',
+      labelKey: 'settings.calendarAlarmChannels',
+      descriptionKey: 'settings.calendarAlarmChannelsDesc',
+      type: 'tags',
+      hotReload: false,
+    },
+    {
+      key: 'journal_sync',
+      labelKey: 'settings.calendarJournalSync',
+      descriptionKey: 'settings.calendarJournalSyncDesc',
+      type: 'select',
+      options: [
+        { value: 'on_open', labelKey: 'settings.calendarJournalOnOpen' },
+        { value: 'midnight', labelKey: 'settings.calendarJournalMidnight' },
+        { value: 'both', labelKey: 'settings.calendarJournalBoth' },
+      ],
+      hotReload: false,
+    },
+    {
+      key: 'system_calendar',
+      labelKey: 'settings.calendarSystemCalendar',
+      descriptionKey: 'settings.calendarSystemCalendarDesc',
+      type: 'toggle',
+      hotReload: false,
+    },
+    {
+      key: 'archive_after_days',
+      labelKey: 'settings.calendarArchiveDays',
+      descriptionKey: 'settings.calendarArchiveDaysDesc',
+      type: 'number',
+      hotReload: false,
+    },
+  ],
+}
+
+// ---------------------------------------------------------------------------
+// 7. otel — OpenTelemetry tracing
+// ---------------------------------------------------------------------------
+
+const otelSection: SettingsSectionDef = {
+  key: 'otel',
+  labelKey: 'settings.sectionOtel',
+  descriptionKey: 'settings.otelDescription',
+  iconKey: 'otel',
+  groupId: 'system',
+  fields: [
+    {
+      key: 'enabled',
+      labelKey: 'settings.otelEnabled',
+      descriptionKey: 'settings.otelEnabledDesc',
+      type: 'toggle',
+      hotReload: false,
+    },
+    {
+      key: 'endpoint',
+      labelKey: 'settings.otelEndpoint',
+      descriptionKey: 'settings.otelEndpointDesc',
+      type: 'text',
+      placeholder: 'http://localhost:4317',
+      hotReload: false,
+    },
+    {
+      key: 'service_name',
+      labelKey: 'settings.otelServiceName',
+      descriptionKey: 'settings.otelServiceNameDesc',
+      type: 'text',
+      placeholder: 'oxios',
+      hotReload: false,
+    },
+    {
+      key: 'sampling_ratio',
+      labelKey: 'settings.otelSamplingRatio',
+      descriptionKey: 'settings.otelSamplingRatioDesc',
+      type: 'range',
+      min: 0,
+      max: 1,
+      step: 0.1,
+      hotReload: false,
+    },
+  ],
+}
+
+// ---------------------------------------------------------------------------
+// 8. agent_log — Agent history log
+// ---------------------------------------------------------------------------
+
+const agentLogSection: SettingsSectionDef = {
+  key: 'agent_log',
+  labelKey: 'settings.sectionAgentLog',
+  descriptionKey: 'settings.agentLogDescription',
+  iconKey: 'agentLog',
+  groupId: 'system',
+  fields: [
+    {
+      key: 'max_entries',
+      labelKey: 'settings.agentLogMaxEntries',
+      descriptionKey: 'settings.agentLogMaxEntriesDesc',
+      type: 'number',
+      hotReload: false,
+    },
+    {
+      key: 'ttl_hours',
+      labelKey: 'settings.agentLogTtlHours',
+      descriptionKey: 'settings.agentLogTtlHoursDesc',
+      type: 'number',
+      hotReload: false,
+    },
+    {
+      key: 'max_tool_calls_per_agent',
+      labelKey: 'settings.agentLogMaxToolCalls',
+      descriptionKey: 'settings.agentLogMaxToolCallsDesc',
+      type: 'number',
+      hotReload: false,
+    },
+    {
+      key: 'prune_batch_size',
+      labelKey: 'settings.agentLogPruneBatch',
+      descriptionKey: 'settings.agentLogPruneBatchDesc',
+      type: 'number',
+      hotReload: false,
+    },
+    {
+      key: 'db_path',
+      labelKey: 'settings.agentLogDbPath',
+      descriptionKey: 'settings.agentLogDbPathDesc',
+      type: 'text',
+      placeholder: '(default location)',
+      hotReload: false,
+    },
+  ],
+}
+
+// ---------------------------------------------------------------------------
+// 9. resource_monitor — System resource monitoring
+// ---------------------------------------------------------------------------
+
+const resourceMonitorSection: SettingsSectionDef = {
+  key: 'resource_monitor',
+  labelKey: 'settings.sectionResourceMonitor',
+  descriptionKey: 'settings.resourceMonitorDescription',
+  iconKey: 'resourceMonitor',
+  groupId: 'system',
+  fields: [
+    {
+      key: 'interval_secs',
+      labelKey: 'settings.rmInterval',
+      descriptionKey: 'settings.rmIntervalDesc',
+      type: 'number',
+      hotReload: false,
+    },
+    {
+      key: 'history_max',
+      labelKey: 'settings.rmHistoryMax',
+      descriptionKey: 'settings.rmHistoryMaxDesc',
+      type: 'number',
+      hotReload: false,
+    },
+    {
+      key: 'cpu_threshold',
+      labelKey: 'settings.rmCpuThreshold',
+      descriptionKey: 'settings.rmCpuThresholdDesc',
+      type: 'range',
+      min: 0,
+      max: 100,
+      step: 1,
+      hotReload: false,
+    },
+    {
+      key: 'memory_threshold',
+      labelKey: 'settings.rmMemThreshold',
+      descriptionKey: 'settings.rmMemThresholdDesc',
+      type: 'range',
+      min: 0,
+      max: 100,
+      step: 1,
+      hotReload: false,
+    },
+    {
+      key: 'load_threshold',
+      labelKey: 'settings.rmLoadThreshold',
+      descriptionKey: 'settings.rmLoadThresholdDesc',
+      type: 'number',
+      hotReload: false,
+    },
+  ],
+}
+
+// ---------------------------------------------------------------------------
+// 10. browser — Headless browser integration
+// ---------------------------------------------------------------------------
+
+const browserSection: SettingsSectionDef = {
+  key: 'browser',
+  labelKey: 'settings.sectionBrowser',
+  descriptionKey: 'settings.browserDescription',
+  iconKey: 'browser',
+  groupId: 'system',
+  fields: [
+    {
+      key: 'enabled',
+      labelKey: 'settings.browserEnabled',
+      descriptionKey: 'settings.browserEnabledDesc',
+      type: 'toggle',
+      hotReload: false,
+    },
+    {
+      key: 'engine',
+      labelKey: 'settings.browserEngine',
+      descriptionKey: 'settings.browserEngineDesc',
+      type: 'multiline',
+      placeholder: '{\n  "user_agent": "MyBot/1.0"\n}',
+      hotReload: false,
+    },
+  ],
+}
+
+// ---------------------------------------------------------------------------
+// 11. budget — Budget enforcement
+// ---------------------------------------------------------------------------
+
+const budgetSection: SettingsSectionDef = {
+  key: 'budget',
+  labelKey: 'settings.sectionBudget',
+  descriptionKey: 'settings.budgetDescription',
+  iconKey: 'budget',
+  groupId: 'system',
+  fields: [
+    {
+      key: 'enabled',
+      labelKey: 'settings.budgetEnabled',
+      descriptionKey: 'settings.budgetEnabledDesc',
+      type: 'toggle',
+      hotReload: false,
+    },
+    {
+      key: 'default_token_budget',
+      labelKey: 'settings.budgetTokenBudget',
+      descriptionKey: 'settings.budgetTokenBudgetDesc',
+      type: 'number',
+      hotReload: false,
+    },
+    {
+      key: 'default_calls_budget',
+      labelKey: 'settings.budgetCallsBudget',
+      descriptionKey: 'settings.budgetCallsBudgetDesc',
+      type: 'number',
+      hotReload: false,
+    },
+    {
+      key: 'default_window_secs',
+      labelKey: 'settings.budgetWindowSecs',
+      descriptionKey: 'settings.budgetWindowSecsDesc',
+      type: 'number',
+      hotReload: false,
+    },
+  ],
+}
+
+// ---------------------------------------------------------------------------
 // All new sections (MVP)
 // ---------------------------------------------------------------------------
 
@@ -481,6 +760,12 @@ export const NEW_SECTIONS: SettingsSectionDef[] = [
   memorySection,
   telegramSection,
   auditSection,
+  calendarSection,
+  otelSection,
+  agentLogSection,
+  resourceMonitorSection,
+  browserSection,
+  budgetSection,
 ]
 
 // ---------------------------------------------------------------------------
@@ -504,7 +789,7 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
     labelKey: 'settings.groupSystem',
     sectionKeys: [
       'kernel',
-      'exec', // exec is moved into System per RFC (allowlist is system-wide)
+      'exec',
       'scheduler',
       'orchestrator',
       'context',
@@ -512,12 +797,18 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
       'session',
       'logging',
       'update',
+      'otel',
+      'agent_log',
+      'resource_monitor',
+      'browser',
+      'budget',
+      'notifications',
     ],
   },
   {
     id: 'security',
     labelKey: 'settings.groupSecurity',
-    sectionKeys: ['security', 'audit'],
+    sectionKeys: ['security', 'audit', 'secrets'],
   },
   {
     id: 'memory',
@@ -527,15 +818,8 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
   {
     id: 'channels',
     labelKey: 'settings.groupChannels',
-    sectionKeys: ['channels.telegram'],
+    sectionKeys: ['channels.telegram', 'calendar'],
   },
-  // NOTE: The `advanced` group (resource_monitor, otel, daemon, persona,
-  // cron, mcp, browser, marketplace) is intentionally omitted. Those
-  // sections have no field definitions and no render path yet — they
-  // would surface as blank cards. Re-add the group here once each
-  // section has a matching SECTION_META entry + a renderer in
-  // `routes/settings.tsx::renderActiveSection`. The consistency test
-  // `settings-consistency.test.ts` enforces this invariant.
 ]
 
 // ---------------------------------------------------------------------------
@@ -593,6 +877,14 @@ export type SectionIconKey =
   | 'channels'
   | 'audit'
   | 'update'
+  | 'calendar'
+  | 'otel'
+  | 'agentLog'
+  | 'resourceMonitor'
+  | 'browser'
+  | 'budget'
+  | 'secrets'
+  | 'notifications'
 
 export interface SectionMeta {
   /** Section key, e.g. `engine`, `exec`, `memory`. */
@@ -726,6 +1018,72 @@ export const SECTION_META: SectionMeta[] = [
     groupId: 'channels',
     iconKey: 'channels',
     custom: false,
+  },
+  // RFC-028 SP-2a: declarative config sections
+  {
+    id: 'calendar',
+    labelKey: 'settings.sectionCalendar',
+    descriptionKey: 'settings.calendarDescription',
+    groupId: 'channels',
+    iconKey: 'calendar',
+    custom: false,
+  },
+  {
+    id: 'otel',
+    labelKey: 'settings.sectionOtel',
+    descriptionKey: 'settings.otelDescription',
+    groupId: 'system',
+    iconKey: 'otel',
+    custom: false,
+  },
+  {
+    id: 'agent_log',
+    labelKey: 'settings.sectionAgentLog',
+    descriptionKey: 'settings.agentLogDescription',
+    groupId: 'system',
+    iconKey: 'agentLog',
+    custom: false,
+  },
+  {
+    id: 'resource_monitor',
+    labelKey: 'settings.sectionResourceMonitor',
+    descriptionKey: 'settings.resourceMonitorDescription',
+    groupId: 'system',
+    iconKey: 'resourceMonitor',
+    custom: false,
+  },
+  {
+    id: 'browser',
+    labelKey: 'settings.sectionBrowser',
+    descriptionKey: 'settings.browserDescription',
+    groupId: 'system',
+    iconKey: 'browser',
+    custom: false,
+  },
+  {
+    id: 'budget',
+    labelKey: 'settings.sectionBudget',
+    descriptionKey: 'settings.budgetDescription',
+    groupId: 'system',
+    iconKey: 'budget',
+    custom: false,
+  },
+  // RFC-028 SP-2c / SP-1e: custom-rendered sections
+  {
+    id: 'secrets',
+    labelKey: 'settings.sectionSecrets',
+    descriptionKey: 'settings.secretsDescription',
+    groupId: 'security',
+    iconKey: 'secrets',
+    custom: true,
+  },
+  {
+    id: 'notifications',
+    labelKey: 'settings.sectionNotifications',
+    descriptionKey: 'settings.notificationsDescription',
+    groupId: 'system',
+    iconKey: 'notifications',
+    custom: true,
   },
 ]
 

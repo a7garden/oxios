@@ -25,6 +25,8 @@ const RENDERABLE_SECTION_IDS = new Set<string>([
   // Custom renderers (dedicated components)
   'engine',
   'update',
+  'secrets',
+  'notifications',
   // Domain-specific sections (own sub-components)
   'memory',
   'channels.telegram',

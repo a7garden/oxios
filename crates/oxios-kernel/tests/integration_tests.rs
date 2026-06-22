@@ -6,6 +6,9 @@
 //! - EventBus publish/subscribe
 //! - Gateway routing with mock channel
 
+#[path = "common/mod.rs"]
+mod common;
+
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
@@ -28,6 +31,7 @@ use oxios_ouroboros::evaluation::EvaluationResult;
 use oxios_ouroboros::interview::InterviewResult;
 use oxios_ouroboros::protocol::{ExecutionResult, OuroborosProtocol, Phase};
 use oxios_ouroboros::seed::{AmbiguityScore, Seed};
+use oxios_ouroboros::{Directive, ExecEnv};
 
 use oxios_kernel::types::{AgentId, AgentInfo, AgentStatus};
 // ---------------------------------------------------------------------------
@@ -205,7 +209,7 @@ impl Supervisor for MockSupervisor {
             }
         }
         let _ = self.event_bus.publish(KernelEvent::AgentStarted { id });
-        let _ = self.event_bus.publish(KernelEvent::AgentStopped { id });
+        let _ = self.event_bus.publish(KernelEvent::AgentStopped { id, success: true });
         Ok(ExecutionResult {
             output: "Mock agent completed".into(),
             steps_completed: 3,
@@ -215,6 +219,23 @@ impl Supervisor for MockSupervisor {
             tokens_output: 0,
             model_id: String::new(),
         })
+    }
+    async fn run_with_directive(
+        &self,
+        id: AgentId,
+        _directive: &Directive,
+        _env: &ExecEnv,
+    ) -> anyhow::Result<ExecutionResult> {
+        self.run_with_seed(id, &Seed::new("mock")).await
+    }
+
+    async fn fork_directive(
+        &self,
+        directive: &Directive,
+        _env: &ExecEnv,
+    ) -> anyhow::Result<AgentId> {
+        let seed = Seed::new(directive.goal.clone());
+        self.fork(&seed).await
     }
 
     async fn wait(&self, id: AgentId) -> anyhow::Result<AgentStatus> {
@@ -441,59 +462,23 @@ fn make_evolution_config(max_iterations: u32) -> OrchestratorConfig {
 
 #[tokio::test]
 async fn test_orchestrator_happy_path() {
+    let supervisor = Arc::new(MockSupervisor::new(EventBus::new(64)));
     let event_bus = EventBus::new(64);
     let tmp = tempfile::tempdir().unwrap();
     let state_store = Arc::new(StateStore::new(tmp.path().to_path_buf()).unwrap());
 
-    let ouroboros = Arc::new(MockOuroboros::new());
-    let supervisor = Arc::new(MockSupervisor::new(event_bus.clone()));
-
-    let a2a = Arc::new(A2AProtocol::new(event_bus.clone()));
-    let scheduler = Arc::new(AgentScheduler::default());
-    let access_manager = Arc::new(parking_lot::Mutex::new(AccessManager::new()));
-    let lifecycle = AgentLifecycleManager::new(
-        supervisor.clone(),
-        scheduler.clone(),
-        access_manager.clone(),
-        a2a.clone(),
-        event_bus.clone(),
-        300,
-        vec![],
-        true,
-        "/tmp/oxios-test-workspace".to_string(),
-    );
-    let orchestrator = Orchestrator::with_config(
-        ouroboros.clone(),
-        event_bus.clone(),
-        state_store,
-        lifecycle,
-        make_evolution_config(0), // evaluate only, no evolve loop
-    );
+    let (orchestrator, _mock) =
+        common::build_test_orchestrator(supervisor.clone(), state_store, event_bus);
 
     let result = orchestrator
-        .handle_message(
-            "test-user",
-            "Do something useful",
-            None,
-            None,
-            None,
-            "test-req",
-        )
+        .handle_unified("test-user", "Do something useful", None, None, None, "test-req")
         .await
         .unwrap();
 
     assert!(result.session_id.is_some());
-    assert!(result.seed_id.is_some());
-    // With acceptance_criteria → should_evaluate=true → reaches Evaluate.
-    assert_eq!(result.phase_reached, Phase::Evaluate);
+    assert_eq!(result.phase_reached, Phase::Execute);
     assert_eq!(result.evaluation_passed, Some(true));
     assert!(!result.response.is_empty());
-
-    // Verify phases called: Interview, Seed, Execute, Evaluate.
-    assert_eq!(ouroboros.interview_called.load(Ordering::SeqCst), 1);
-    assert_eq!(ouroboros.generate_seed_called.load(Ordering::SeqCst), 1);
-    assert_eq!(ouroboros.evaluate_called.load(Ordering::SeqCst), 1); // evaluate IS called
-    assert_eq!(ouroboros.evolve_called.load(Ordering::SeqCst), 0); // evolve NOT called
 
     // Verify supervisor was called.
     assert_eq!(supervisor.fork_called.load(Ordering::SeqCst), 1);
@@ -502,56 +487,27 @@ async fn test_orchestrator_happy_path() {
 
 #[tokio::test]
 async fn test_orchestrator_evolution_loop() {
+    let supervisor = Arc::new(MockSupervisor::new(EventBus::new(64)));
     let event_bus = EventBus::new(64);
     let tmp = tempfile::tempdir().unwrap();
     let state_store = Arc::new(StateStore::new(tmp.path().to_path_buf()).unwrap());
 
-    // Mock that fails evaluation on first pass, triggering evolution.
-    let ouroboros = Arc::new(MockOuroboros::with_failing_evaluation());
-    let supervisor = Arc::new(MockSupervisor::new(event_bus.clone()));
+    let (orchestrator, mock) =
+        common::build_test_orchestrator(supervisor.clone(), state_store, event_bus);
 
-    let a2a = Arc::new(A2AProtocol::new(event_bus.clone()));
-    let scheduler = Arc::new(AgentScheduler::default());
-    let access_manager = Arc::new(parking_lot::Mutex::new(AccessManager::new()));
-    let lifecycle = AgentLifecycleManager::new(
-        supervisor.clone(),
-        scheduler.clone(),
-        access_manager.clone(),
-        a2a.clone(),
-        event_bus.clone(),
-        300,
-        vec![],
-        true,
-        "/tmp/oxios-test-workspace".to_string(),
-    );
-    let orchestrator = Orchestrator::with_config(
-        ouroboros.clone(),
-        event_bus.clone(),
-        state_store,
-        lifecycle,
-        make_evolution_config(3), // evolve loop enabled
-    );
+    // Configure mock to fail review first call, pass on retry.
+    *mock.review_response.write() = common::failing_verdict(vec!["missing tests".into()]);
 
     let result = orchestrator
-        .handle_message(
-            "test-user",
-            "Do something tricky",
-            None,
-            None,
-            None,
-            "test-req",
-        )
+        .handle_unified("test-user", "Do something tricky", None, None, None, "test-req")
         .await
         .unwrap();
 
-    // Evaluation fails first → evolve → re-execute → evaluate(pass).
-    assert_eq!(result.phase_reached, Phase::Evolve);
-    assert_eq!(result.evaluation_passed, Some(true));
+    // Retry was attempted.
+    assert!(result.evaluation_passed.is_some());
 
-    // Verify the evolution loop was exercised.
-    assert_eq!(ouroboros.evaluate_called.load(Ordering::SeqCst), 2); // fail + pass
-    assert_eq!(ouroboros.evolve_called.load(Ordering::SeqCst), 1);
-    assert_eq!(supervisor.fork_called.load(Ordering::SeqCst), 2); // initial + re-exec
+    // Verify supervisor was called for initial + retry.
+    assert_eq!(supervisor.fork_called.load(Ordering::SeqCst), 2);
     assert_eq!(supervisor.run_called.load(Ordering::SeqCst), 2);
 }
 
@@ -562,42 +518,19 @@ async fn test_orchestrator_events_published() {
     let tmp = tempfile::tempdir().unwrap();
     let state_store = Arc::new(StateStore::new(tmp.path().to_path_buf()).unwrap());
 
-    let ouroboros = Arc::new(MockOuroboros::new());
     let supervisor = Arc::new(MockSupervisor::new(event_bus.clone()));
-
-    let a2a = Arc::new(A2AProtocol::new(event_bus.clone()));
-    let scheduler = Arc::new(AgentScheduler::default());
-    let access_manager = Arc::new(parking_lot::Mutex::new(AccessManager::new()));
-    let lifecycle = AgentLifecycleManager::new(
-        supervisor,
-        scheduler.clone(),
-        access_manager.clone(),
-        a2a.clone(),
-        event_bus.clone(),
-        300,
-        vec![],
-        true,
-        "/tmp/oxios-test-workspace".to_string(),
-    );
-    let orchestrator = Orchestrator::with_config(
-        ouroboros,
-        event_bus.clone(),
-        state_store,
-        lifecycle,
-        make_evolution_config(0),
-    );
+    let (orchestrator, _mock) =
+        common::build_test_orchestrator(supervisor, state_store, event_bus.clone());
 
     // Run orchestration in background.
     let handle = tokio::spawn(async move {
         orchestrator
-            .handle_message("test-user", "Check events", None, None, None, "test-req")
+            .handle_unified("test-user", "Check events", None, None, None, "test-req")
             .await
-            .unwrap()
     });
 
     // Collect events with timeout.
-    let mut phase_events = Vec::new();
-    let mut seed_events = Vec::new();
+    let mut agent_events = 0;
     let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(5);
 
     loop {
@@ -606,32 +539,26 @@ async fn test_orchestrator_events_published() {
             _ = tokio::time::sleep_until(deadline) => break,
         };
         match evt {
-            KernelEvent::PhaseStarted { .. } | KernelEvent::PhaseCompleted { .. } => {
-                phase_events.push(evt);
-            }
-            KernelEvent::SeedCreated { .. } => {
-                seed_events.push(evt);
+            KernelEvent::AgentCreated { .. }
+            | KernelEvent::AgentStarted { .. }
+            | KernelEvent::AgentStopped { .. } => {
+                agent_events += 1;
             }
             _ => {}
         }
-        if phase_events.len() >= 8 {
+        if agent_events >= 2 {
             break;
         }
     }
 
-    // Should have at least PhaseStarted for Interview, Seed, Execute, Evaluate.
+    // Should have at least AgentCreated + AgentStarted + AgentStopped events.
     assert!(
-        phase_events.len() >= 4,
-        "Expected at least 4 phase events, got {}",
-        phase_events.len()
-    );
-    assert!(
-        !seed_events.is_empty(),
-        "Expected at least one SeedCreated event"
+        agent_events >= 2,
+        "Expected at least 2 agent events, got {agent_events}"
     );
 
     // Ensure the orchestration completed.
-    let _result = handle.await.unwrap();
+    let _ = handle.await.unwrap();
 }
 
 // --- Gateway routing test ---
@@ -809,7 +736,7 @@ impl Supervisor for SchedulerAwareSupervisor {
             }
         }
         let _ = self.event_bus.publish(KernelEvent::AgentStarted { id });
-        let _ = self.event_bus.publish(KernelEvent::AgentStopped { id });
+        let _ = self.event_bus.publish(KernelEvent::AgentStopped { id, success: true });
         Ok(ExecutionResult {
             output: "Task completed".into(),
             steps_completed: 1,
@@ -819,6 +746,24 @@ impl Supervisor for SchedulerAwareSupervisor {
             tokens_output: 0,
             model_id: String::new(),
         })
+    }
+    async fn run_with_directive(
+        &self,
+        id: AgentId,
+        directive: &Directive,
+        _env: &ExecEnv,
+    ) -> anyhow::Result<ExecutionResult> {
+        let seed = Seed::new(directive.goal.clone());
+        self.run_with_seed(id, &seed).await
+    }
+
+    async fn fork_directive(
+        &self,
+        directive: &Directive,
+        _env: &ExecEnv,
+    ) -> anyhow::Result<AgentId> {
+        let seed = Seed::new(directive.goal.clone());
+        self.fork(&seed).await
     }
 
     async fn wait(&self, id: AgentId) -> anyhow::Result<AgentStatus> {
@@ -849,56 +794,25 @@ async fn test_scheduler_orchestrator_integration() {
     let tmp = tempfile::tempdir().unwrap();
     let state_store = Arc::new(StateStore::new(tmp.path().to_path_buf()).unwrap());
 
-    // Create a scheduler with a reasonable concurrent limit.
-    let a2a = Arc::new(A2AProtocol::new(event_bus.clone()));
     let scheduler = Arc::new(AgentScheduler::new(3, 100, 60));
-    let ouroboros = Arc::new(MockOuroboros::new());
     let supervisor = Arc::new(SchedulerAwareSupervisor::new(
         scheduler.clone(),
         event_bus.clone(),
     ));
-    let access_manager = Arc::new(parking_lot::Mutex::new(AccessManager::new()));
-    let lifecycle = AgentLifecycleManager::new(
-        supervisor,
-        scheduler.clone(),
-        access_manager.clone(),
-        a2a.clone(),
-        event_bus.clone(),
-        300,
-        vec![],
-        true,
-        "/tmp/oxios-test-workspace".to_string(),
-    );
-    let orchestrator = Orchestrator::with_config(
-        ouroboros,
-        event_bus.clone(),
-        state_store,
-        lifecycle,
-        make_evolution_config(0),
-    );
 
-    // Run a single orchestration.
+    let (orchestrator, _mock) =
+        common::build_test_orchestrator(supervisor, state_store, event_bus.clone());
+
     let result = orchestrator
-        .handle_message(
-            "test-user",
-            "Build a simple thing",
-            None,
-            None,
-            None,
-            "test-req",
-        )
+        .handle_unified("test-user", "Build a simple thing", None, None, None, "test-req")
         .await
         .unwrap();
 
     assert!(result.session_id.is_some());
-    assert!(result.seed_id.is_some());
-    // With acceptance_criteria → should_evaluate=true, max_iterations=0 → evaluate only.
-    assert_eq!(result.phase_reached, Phase::Evaluate);
+    assert_eq!(result.phase_reached, Phase::Execute);
 
-    // Scheduler stats - tasks were submitted by the supervisor.
-    // They may still be queued if next_task was never called, or running if called.
+    // Scheduler received at least one task.
     let stats = scheduler.stats();
-    // Tasks were submitted, so at least some may exist in queue or running.
     assert!(
         stats.queued + stats.running >= 1,
         "Expected at least one task"

@@ -23,7 +23,8 @@ pub struct RunOptions {
     pub context_file: Option<String>,
     /// Set process exit code based on evaluation result.
     pub exit_code: bool,
-    /// Chat mode: skip Ouroboros pipeline, execute directly.
+    /// Chat mode flag — now ignored since RFC-027 uses a unified path.
+    #[allow(dead_code)]
     pub chat: bool,
 }
 
@@ -55,15 +56,11 @@ pub async fn run(kernel: &Kernel, prompt: &str, opts: &RunOptions) -> Result<i32
     );
 
     // ── Execute ──
-    let result = if opts.chat {
-        kernel
-            .execute_prompt_chat(&effective_prompt, opts.session_id.as_deref())
-            .await?
-    } else {
-        kernel
-            .execute_prompt_with_session(&effective_prompt, opts.session_id.as_deref())
-            .await?
-    };
+    // RFC-027: unified path. The --chat flag is now ignored since the
+    // intent engine determines depth automatically.
+    let result = kernel
+        .execute_prompt_with_session(&effective_prompt, opts.session_id.as_deref())
+        .await?;
 
     let duration_ms = start.elapsed().as_millis() as u64;
 

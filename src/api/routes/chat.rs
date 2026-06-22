@@ -1180,6 +1180,38 @@ pub(crate) struct ToolApprovalResponseBody {
     pub approved: bool,
 }
 
+// ---------------------------------------------------------------------------
+// ask_user (RFC-027 agent-driven clarification)
+// ---------------------------------------------------------------------------
+
+/// POST /api/chat/ask-user/{id}/respond — Provide the user's answer to a
+/// pending `ask_user` tool invocation. Resolves the oneshot the AskUserTool
+/// is awaiting so the agent can resume execution.
+#[allow(dead_code)]
+pub(crate) async fn handle_ask_user_respond(
+    state: State<Arc<AppState>>,
+    Path(id): Path<String>,
+    Json(body): Json<AskUserResponseBody>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    let resolved = state.kernel.infra.pending_ask_user().resolve(&id, body.answer);
+    if !resolved {
+        return Err(AppError::NotFound(format!(
+            "ask_user request {id} not found or already resolved"
+        )));
+    }
+
+    tracing::info!(request_id = %id, "ask_user: user response received");
+
+    Ok(Json(serde_json::json!({ "status": "ok" })))
+}
+
+#[allow(dead_code)]
+#[derive(Debug, serde::Deserialize)]
+pub(crate) struct AskUserResponseBody {
+    /// The user's answer to the pending question.
+    pub answer: String,
+}
+
 #[cfg(test)]
 mod rfc015_tests {
     use super::*;

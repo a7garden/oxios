@@ -83,6 +83,8 @@ export interface AgentTrace {
 
 export interface AgentTraceStep {
   index: number
+  /** Step kind — tool call, memory recall, or reasoning fragment (RFC-028 SP-3a). */
+  kind?: 'tool' | 'memory' | 'reasoning'
   tool_name: string | null
   action: string
   input: unknown

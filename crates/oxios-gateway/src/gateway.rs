@@ -106,43 +106,10 @@ pub struct Gateway {
     /// each dispatch and drained on shutdown so `run()` can await them.
     in_flight: Arc<Mutex<Vec<JoinHandle<()>>>>,
 
-    /// Keywords that trigger spec (Ouroboros) mode. Prefix-only match.
-    spec_keywords: Vec<String>,
-
     /// RFC-024 SP1: delivery reliability layer — assigns a monotonic `seq`
     /// to each outgoing message and keeps a bounded ring buffer for replay.
     /// Cheap to clone; the inner state is `Sync`.
     reliability: Arc<ReliabilityLayer>,
-}
-
-/// Default spec keywords (used when no config is available).
-fn default_spec_keywords() -> Vec<String> {
-    vec!["#spec".into(), "#plan".into()]
-}
-
-/// Detect whether a message should be routed to Ouroboros (spec) mode.
-/// Checks: metadata["mode"] == "spec", or content starts with a spec keyword.
-fn detect_spec_mode(msg: &IncomingMessage, spec_keywords: &[String]) -> bool {
-    // 1. Explicit metadata flag
-    if msg.metadata.get(meta::MODE).is_some_and(|v| v == "spec") {
-        return true;
-    }
-    // 2. Prefix keyword match
-    let content = msg.content.trim();
-    spec_keywords
-        .iter()
-        .any(|kw| content.starts_with(kw.as_str()))
-}
-
-/// Strip spec keyword prefix from content if present.
-fn strip_spec_keyword<'a>(content: &'a str, spec_keywords: &[String]) -> &'a str {
-    let trimmed = content.trim_start();
-    for kw in spec_keywords {
-        if let Some(rest) = trimmed.strip_prefix(kw.as_str()) {
-            return rest.trim_start();
-        }
-    }
-    content
 }
 
 /// F21: deliver a message through a channel with bounded retries and linear
@@ -197,7 +164,6 @@ impl Gateway {
             shutdown,
             concurrency: Arc::new(Semaphore::new(MAX_CONCURRENT_ROUTES)),
             in_flight: Arc::new(Mutex::new(Vec::new())),
-            spec_keywords: default_spec_keywords(),
             reliability: Arc::new(ReliabilityLayer::new(Default::default())),
         }
     }
@@ -220,7 +186,6 @@ impl Gateway {
             shutdown,
             concurrency: Arc::new(Semaphore::new(MAX_CONCURRENT_ROUTES)),
             in_flight: Arc::new(Mutex::new(Vec::new())),
-            spec_keywords: default_spec_keywords(),
             reliability: Arc::new(ReliabilityLayer::new(Default::default())),
         }
     }
@@ -409,7 +374,6 @@ impl Gateway {
         // ── Normal orchestrator routing ────────────────────────────
         let orchestrator = self.orchestrator.clone();
         let channels = self.channels.clone();
-        let spec_keywords = self.spec_keywords.clone();
         let reliability = self.reliability.clone();
         let in_flight = self.in_flight.clone();
 
@@ -436,37 +400,18 @@ impl Gateway {
             let conn_id = msg.metadata.get("conn_id").cloned();
             let request_id = msg.id.to_string();
 
-            // ── Mode detection: spec vs chat ──
-            let is_spec = detect_spec_mode(&msg, &spec_keywords);
-            let effective_content = if is_spec {
-                strip_spec_keyword(&msg.content, &spec_keywords).to_string()
-            } else {
-                msg.content.clone()
-            };
-
-            let result = if is_spec {
-                orchestrator
-                    .handle_message(
-                        &msg.user_id,
-                        &effective_content,
-                        session_id.as_deref(),
-                        project_ids.as_deref(),
-                        mount_ids.as_deref(),
-                        &request_id,
-                    )
-                    .await
-            } else {
-                orchestrator
-                    .chat(
-                        &msg.user_id,
-                        &msg.content,
-                        session_id.as_deref(),
-                        project_ids.as_deref(),
-                        mount_ids.as_deref(),
-                        &request_id,
-                    )
-                    .await
-            };
+            // RFC-027: unified path. Falls back to handle_message internally
+            // if IntentEngine is not wired.
+            let result = orchestrator
+                .handle_unified(
+                    &msg.user_id,
+                    &msg.content,
+                    session_id.as_deref(),
+                    project_ids.as_deref(),
+                    mount_ids.as_deref(),
+                    &request_id,
+                )
+                .await;
 
             let duration_ms = start.elapsed().as_millis() as u64;
 

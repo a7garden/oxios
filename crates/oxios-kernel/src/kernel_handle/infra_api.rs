@@ -7,7 +7,7 @@ use crate::event_bus::{EventBus, KernelEvent};
 use crate::git_layer::{GitLayer, LogEntry};
 use crate::resource_monitor::{ResourceMonitor, ResourceSnapshot};
 use crate::scheduler::{AgentScheduler, ScheduledTask, SchedulerStats};
-use crate::tools::{PendingToolApprovals, known_tools};
+use crate::tools::{PendingAskUser, PendingToolApprovals, known_tools};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -24,6 +24,8 @@ pub struct InfraApi {
     pub(crate) orchestrator_config: parking_lot::RwLock<crate::config::OrchestratorConfig>,
     /// Pending tool approval requests (HitL escalation).
     pub(crate) pending_tool_approvals: PendingToolApprovals,
+    /// Pending `ask_user` requests (RFC-027 agent-driven clarification).
+    pub(crate) pending_ask_user: Arc<PendingAskUser>,
 }
 
 impl InfraApi {
@@ -49,6 +51,7 @@ impl InfraApi {
                 crate::config::OrchestratorConfig::default(),
             ),
             pending_tool_approvals: PendingToolApprovals::new(),
+            pending_ask_user: Arc::new(PendingAskUser::new()),
         }
     }
     /// Get a reference to the GitLayer.
@@ -188,6 +191,17 @@ impl InfraApi {
     /// Access the pending tool approvals registry.
     pub fn pending_tool_approvals(&self) -> &PendingToolApprovals {
         &self.pending_tool_approvals
+    }
+
+    /// Access the pending `ask_user` registry (RFC-027 agent-driven clarification).
+    pub fn pending_ask_user(&self) -> Arc<PendingAskUser> {
+        Arc::clone(&self.pending_ask_user)
+    }
+
+    /// Clone the underlying event bus so tools can publish `KernelEvent`s
+    /// without routing through the wrapping `publish` helper.
+    pub fn event_bus_clone(&self) -> EventBus {
+        self.event_bus.clone()
     }
 
     /// List all known tool metadata (static catalog).

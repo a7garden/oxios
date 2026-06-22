@@ -1,10 +1,16 @@
 import {
+  Activity,
+  Bell,
   Bot,
   Brain,
+  Calendar,
+  Globe,
   Cpu,
   Database,
   Eye,
-  Globe,
+  Gauge,
+  KeyRound,
+  ListOrdered,
   MessageSquare,
   Monitor,
   Send,
@@ -13,6 +19,7 @@ import {
   Sparkles,
   Terminal,
   Timer,
+  Wallet,
   Zap,
 } from 'lucide-react'
 import type { SectionIconKey } from './field-defs'
@@ -32,6 +39,14 @@ const ICON_MAP: Record<SectionIconKey, React.ComponentType<{ className?: string 
   channels: Send,
   audit: Eye,
   update: Sparkles,
+  calendar: Calendar,
+  otel: Activity,
+  agentLog: ListOrdered,
+  resourceMonitor: Gauge,
+  browser: Globe,
+  budget: Wallet,
+  secrets: KeyRound,
+  notifications: Bell,
 }
 
 /** Generic fallback used when an id is unknown. */

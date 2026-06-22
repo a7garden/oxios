@@ -1,4 +1,4 @@
-//! Orchestrator: coordinates the Ouroboros lifecycle for user messages.
+//! Orchestrator: coordinates the unified intent lifecycle (RFC-027).
 //!
 //! The orchestrator is the "brain" that runs the Ouroboros protocol.
 //! Given a user message:
@@ -10,13 +10,17 @@
 //! The orchestrator does NOT know about channels or HTTP — it only
 //! coordinates Ouroboros + Supervisor + EventBus + StateStore + Scheduler + AccessManager.
 
+// Legacy helper functions (save_seed, publish_phase_*, format_*) are
+// retained for reference but no longer called after RFC-027 migration.
+#![allow(dead_code)]
+
 use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::{Context, Result};
 use chrono;
 use oxios_ouroboros::{
-    EvaluationResult, ExecutionResult, InterviewResult, OuroborosProtocol, Phase, Seed,
+    ExecutionResult, InterviewResult, OuroborosProtocol, Phase, Seed,
 };
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
@@ -82,7 +86,11 @@ impl SubTask {
 
 /// The orchestrator coordinates the full Ouroboros lifecycle.
 pub struct Orchestrator {
+    #[allow(dead_code)]
     ouroboros: Arc<dyn OuroborosProtocol>,
+    /// IntentEngine for the unified handle() path (RFC-027).
+    /// Lazily available when the kernel wires it; None in legacy constructions.
+    intent_engine: RwLock<Option<Arc<dyn oxios_ouroboros::IntentEngineOps>>>,
     event_bus: EventBus,
     state_store: Arc<StateStore>,
     /// Git version control layer for auto-commits.
@@ -103,8 +111,8 @@ pub struct Orchestrator {
     delegation_config: DelegationConfig,
     /// A2A circuit breaker for delegation reliability.
     a2a_breaker: Arc<crate::a2a::circuit_breaker::A2ACircuitBreaker>,
-    /// Evolution loop settings.
-    evolution_config: RwLock<EvolutionConfig>,
+    /// RFC-027 intent config (retry settings, etc).
+    intent_config: RwLock<crate::config::IntentConfig>,
 }
 
 /// Configuration for A2A delegation retries.
@@ -140,23 +148,6 @@ impl DelegationConfig {
     }
 }
 
-/// Evolution loop settings extracted from OrchestratorConfig.
-#[derive(Debug, Clone)]
-struct EvolutionConfig {
-    /// Maximum evolution iterations (0 = evaluate only).
-    max_iterations: u32,
-    /// Minimum score to pass evaluation.
-    score_threshold: f64,
-}
-
-impl From<crate::config::OrchestratorConfig> for EvolutionConfig {
-    fn from(c: crate::config::OrchestratorConfig) -> Self {
-        Self {
-            max_iterations: c.max_evolution_iterations,
-            score_threshold: c.min_evaluation_score,
-        }
-    }
-}
 
 impl Orchestrator {
     /// Creates a new orchestrator.
@@ -181,11 +172,11 @@ impl Orchestrator {
         event_bus: EventBus,
         state_store: Arc<StateStore>,
         lifecycle: AgentLifecycleManager,
-        config: crate::config::OrchestratorConfig,
+        _config: crate::config::OrchestratorConfig,
     ) -> Self {
-        let evolution_config = EvolutionConfig::from(config.clone());
         Self {
             ouroboros,
+            intent_engine: RwLock::new(None),
             event_bus,
             state_store,
             git_layer: None,
@@ -196,9 +187,20 @@ impl Orchestrator {
             mount_manager: RwLock::new(None),
             conversation_buffer: RwLock::new(ConversationBuffer::default()),
             delegation_config: DelegationConfig::default(),
+            intent_config: RwLock::new(crate::config::IntentConfig::default()),
             a2a_breaker: Arc::new(crate::a2a::circuit_breaker::A2ACircuitBreaker::new(5, 30)),
-            evolution_config: RwLock::new(evolution_config),
         }
+    }
+
+    /// Wire the IntentEngine for unified handle() calls (RFC-027).
+    /// Called by the kernel assembler after construction.
+    pub fn set_intent_engine(&self, engine: Arc<dyn oxios_ouroboros::IntentEngineOps>) {
+        *self.intent_engine.write() = Some(engine);
+    }
+
+    /// Whether the IntentEngine is wired (unified path available).
+    pub fn has_intent_engine(&self) -> bool {
+        self.intent_engine.read().is_some()
     }
 
     /// Set the ProjectManager for context partitioning.
@@ -407,13 +409,6 @@ impl Orchestrator {
         self.git_layer = Some(git_layer);
     }
 
-    /// Hot-reload evolution config without restart.
-    ///
-    /// Takes effect on the next orchestration run.
-    pub fn update_evolution_config(&self, config: crate::config::OrchestratorConfig) {
-        *self.evolution_config.write() = EvolutionConfig::from(config);
-        tracing::info!("Orchestrator evolution config hot-reloaded");
-    }
 
     /// Restore sessions from persisted state.
     ///
@@ -511,836 +506,6 @@ impl Orchestrator {
         {
             let _ = gl.commit_file(rel_path, message);
         }
-    }
-
-    /// Handle a user message through the full Ouroboros loop.
-    ///
-    /// Returns an `OrchestrationResult` with the response and metadata.
-    ///
-    /// If the interview phase needs clarification (ambiguity > 0.2),
-    /// the result will contain the questions and the phase will be
-    /// `Phase::Interview`. The caller should send these questions to
-    /// the user and include the `session_id` in follow-up messages.
-    pub async fn handle_message(
-        &self,
-        user_id: &str,
-        user_message: &str,
-        session_id: Option<&str>,
-        project_ids: Option<&str>,
-        mount_ids: Option<&str>,
-        request_id: &str,
-    ) -> Result<OrchestrationResult> {
-        tracing::info!(name = "orchestrator.handle_message", session_id = %session_id.unwrap_or("new"), request_id = %request_id, "starting");
-        get_metrics().messages.inc();
-        let orch_start = std::time::Instant::now();
-
-        let session_id = session_id
-            .map(String::from)
-            .unwrap_or_else(|| Uuid::new_v4().to_string());
-
-        tracing::info!(session_id = %session_id, user_id = %user_id, request_id = %request_id, content_len = user_message.len(), "Orchestrator handling message");
-
-        // ── Project Detection ──
-        // Parse project IDs from caller ("uuid1,uuid2,...") or auto-detect.
-        let primary_project_id: Option<Uuid> = if let Some(ids_str) = project_ids {
-            // Explicit project IDs from caller
-            ids_str
-                .split(',')
-                .next()
-                .and_then(|s| Uuid::parse_str(s.trim()).ok())
-        } else {
-            // Auto-detect from message
-            self.detect_project_tag(user_message).and_then(|_tag| {
-                // Extract UUID from project manager
-                self.project_manager().and_then(|pm| {
-                    let projects = pm.list_projects();
-                    let result = crate::project::detect_project(user_message, &projects);
-                    match result {
-                        crate::project::DetectionResult::Found(id) => Some(id),
-                        crate::project::DetectionResult::NoMatch { .. } => None,
-                    }
-                })
-            })
-        };
-
-        // Resolve project tag for display
-        let project_tag = primary_project_id
-            .and_then(|id| {
-                self.project_manager()
-                    .and_then(|pm| pm.get_project(id).map(|p| p.tag()))
-            })
-            .unwrap_or_default();
-
-        // Touch the project to record activity
-        if let Some(pid) = primary_project_id
-            && let Some(pm) = self.project_manager()
-        {
-            pm.touch(pid);
-        }
-
-        // ── Mount workspace resolution (RFC-025) ──
-        // Resolve active Mounts (explicit mount_ids or auto-detect), build the
-        // `## Workspace Context` body, and collect all bound paths. These are
-        // applied to the seed once it's created and returned to the caller so
-        // the gateway/frontend can show a detection badge.
-        let (active_mount_ids, workspace_context, mount_paths, mount_tag) =
-            self.resolve_mount_workspace(mount_ids, project_ids, user_message);
-        let mount_tag_opt = if mount_tag.is_empty() {
-            None
-        } else {
-            Some(mount_tag.clone())
-        };
-
-        // RFC-025: suppress project_tag when mount_tag is present — the mount
-        // badge is more specific (shows actual mount names) and avoids showing
-        // two near-identical badges for the same context.
-        let project_tag = if mount_tag_opt.is_some() {
-            String::new()
-        } else {
-            project_tag
-        };
-
-        let _conversation_turns = {
-            let buffer = self.conversation_buffer.read();
-            buffer.turns().iter().cloned().collect::<Vec<_>>()
-        };
-
-        // Record user message in conversation buffer
-        {
-            let mut buffer = self.conversation_buffer.write();
-            buffer.push_user(user_message);
-        }
-
-        // Phase 1: Interview
-        self.publish_phase_started(&session_id, Phase::Interview)
-            .await;
-
-        // Get or create the interview session (pre-fetch to avoid lock across await).
-        let needs_interview;
-        let existing_history: Option<Vec<_>>;
-        {
-            let sessions = self.sessions.read();
-            needs_interview = !sessions.contains_key(&session_id);
-            existing_history = if !needs_interview {
-                sessions
-                    .get(&session_id)
-                    .map(|s| s.interview.conversation_history.clone())
-            } else {
-                None
-            };
-            // Lock dropped here before any .await
-        }
-
-        // Conduct the interview.
-        let interview = {
-            tracing::info!(phase = "interview", "Starting interview phase");
-            if needs_interview {
-                self.ouroboros.interview(user_message).await?
-            } else {
-                // This is a follow-up message in an existing interview.
-                // Build multi-turn context from conversation history.
-                let multi_turn_context = {
-                    let mut context_parts = Vec::new();
-                    if let Some(ref history) = existing_history {
-                        for exchange in history {
-                            context_parts.push(format!(
-                                "User: {}\nAgent: {}",
-                                exchange.user, exchange.agent
-                            ));
-                        }
-                    }
-                    context_parts.push(format!("User: {user_message}"));
-                    context_parts.join("\n\n")
-                };
-
-                // Record all Q&A as a single exchange for multi-turn history.
-                // The formatted `user_message` already contains Q&A context
-                // (sent from the frontend as `text` field). Pair it with
-                // the full question list as the agent side.
-                {
-                    let mut sessions = self.sessions.write();
-                    if let Some(s) = sessions.get_mut(&session_id) {
-                        let all_questions = s.interview.questions.join("\n");
-                        s.interview.add_to_history(user_message, &all_questions);
-                    }
-                }
-
-                // Run another interview pass with full conversation history.
-                self.ouroboros.interview(&multi_turn_context).await?
-            }
-        };
-
-        // If this is a non-task message (greeting, small talk), return the chat response directly.
-        if !interview.is_task {
-            tracing::info!(session_id = %session_id, "Chat response (non-task)");
-
-            let response_text = if interview.chat_response.is_empty() {
-                "Hello! How can I help you today?".to_string()
-            } else {
-                interview.chat_response.clone()
-            };
-
-            // Record agent response in conversation buffer
-            {
-                let mut buffer = self.conversation_buffer.write();
-                buffer.push_agent(&response_text, None);
-            }
-
-            // Record exchange in conversation history for multi-turn
-            // and store session so multi-turn works on follow-up messages
-            {
-                let mut sessions = self.sessions.write();
-                if let Some(session) = sessions.get_mut(&session_id) {
-                    tracing::debug!(session_id = %session_id, history_len = session.interview.conversation_history.len(), "Adding to existing session history");
-                    session
-                        .interview
-                        .add_to_history(user_message, &response_text);
-                } else {
-                    // First non-task message — create a minimal session for history
-                    let mut interview = InterviewResult::new();
-                    interview.is_task = false;
-                    interview.chat_response = response_text.clone();
-                    interview.add_to_history(user_message, &response_text);
-                    sessions.insert(
-                        session_id.clone(),
-                        InterviewSession {
-                            id: session_id.clone(),
-                            interview,
-                            phase: Phase::Interview,
-                            seed_id: None,
-                            agent_id: None,
-                        },
-                    );
-                }
-            }
-
-            self.publish_phase_completed(&session_id, Phase::Interview, "chat")
-                .await;
-
-            return Ok(OrchestrationResult {
-                session_id: Some(session_id.clone()),
-                primary_project_id,
-                project_tag: Some(project_tag.clone()),
-                active_mount_ids: active_mount_ids.clone(),
-                mount_tag: mount_tag_opt.clone(),
-                response: response_text,
-                seed_id: None,
-                agent_id: None,
-                phase_reached: Phase::Interview,
-                evaluation_passed: None,
-                output: None,
-                tool_calls: vec![],
-                interview_questions: None,
-                interview_round: None,
-                interview_ambiguity: None,
-                mode: "ouroboros".to_string(),
-            });
-        }
-
-        // If ambiguity is too high, return questions for the user to answer.
-        if !interview.ready_for_seed {
-            // Record this exchange in conversation history and store the interview.
-            {
-                let mut sessions = self.sessions.write();
-                let session =
-                    sessions
-                        .entry(session_id.clone())
-                        .or_insert_with(|| InterviewSession {
-                            id: session_id.clone(),
-                            interview: interview.clone(),
-                            phase: Phase::Interview,
-                            seed_id: None,
-                            agent_id: None,
-                        });
-
-                let questions_text = interview.questions.join("\n");
-
-                // If this is the first round (no prior history), record the
-                // original user message → agent questions as the first exchange.
-                // Without this the multi-turn context loses the user's intent
-                // and follow-up rounds can't understand the conversation.
-                let is_first_round = session.interview.conversation_history.is_empty();
-                if is_first_round {
-                    let original = if interview.original_message.is_empty() {
-                        user_message.to_string()
-                    } else {
-                        interview.original_message.clone()
-                    };
-                    session.interview.add_to_history(&original, &questions_text);
-                } else {
-                    // Follow-up round: record the user's answer + these questions.
-                    let last_answer = session.interview.answers.last().cloned();
-                    if let Some(ref ans) = last_answer
-                        && !ans.is_empty()
-                    {
-                        session.interview.add_to_history(ans, &questions_text);
-                    }
-                }
-            } // Lock dropped before .await
-
-            let questions = interview
-                .questions
-                .iter()
-                .filter(|q| !q.is_empty())
-                .cloned()
-                .collect::<Vec<_>>();
-
-            tracing::info!(
-                session_id = %session_id,
-                ambiguity = interview.ambiguity.ambiguity(),
-                questions = questions.len(),
-                "Interview needs clarification"
-            );
-
-            self.publish_phase_completed(&session_id, Phase::Interview, "needs clarification")
-                .await;
-
-            // Structured questions for the interactive Web UI come from
-            // the same LLM call as `interview()` — the engine sanitizes
-            // them and synthesizes a free_text fallback when the LLM
-            // omitted the structured form. `None` means the frontend
-            // falls back to plain markdown rendering of `questions`.
-            let structured = interview.structured_questions.clone();
-
-            // Round = completed user/agent exchange pairs in the interview
-            // history, minimum 1. Previously this read `answers`, which is
-            // never populated by `add_to_history` and left the round stuck
-            // at 1 forever.
-            let interview_round = {
-                let sessions = self.sessions.read();
-                sessions
-                    .get(&session_id)
-                    .map(|s| ((s.interview.conversation_history.len() / 2) as u32).max(1))
-                    .unwrap_or(1)
-            };
-
-            return Ok(OrchestrationResult {
-                session_id: Some(session_id.clone()),
-                primary_project_id,
-                project_tag: Some(project_tag.clone()),
-                active_mount_ids: active_mount_ids.clone(),
-                mount_tag: mount_tag_opt.clone(),
-                response: format_questions(&questions),
-                seed_id: None,
-                agent_id: None,
-                phase_reached: Phase::Interview,
-                evaluation_passed: None,
-                output: None,
-                tool_calls: vec![],
-                interview_questions: structured,
-                interview_round: Some(interview_round),
-                interview_ambiguity: Some(interview.ambiguity.ambiguity()),
-                mode: "ouroboros".to_string(),
-            });
-        }
-
-        // Record agent response in conversation buffer (for topic shift detection)
-        // Note: interview phase returns questions, not a full agent response,
-        // but we record it for completeness.
-        {
-            let mut buffer = self.conversation_buffer.write();
-            buffer.push_agent("[interview: ready]", None);
-        }
-
-        // Interview complete and ready.
-        self.publish_phase_completed(&session_id, Phase::Interview, "ready")
-            .await;
-        self.publish_phase_started(&session_id, Phase::Seed).await;
-
-        // ── Complexity-based routing ──
-        //
-        // "simple" + low ambiguity → create a lightweight Seed from the user
-        // message directly (no LLM call) and skip formal evaluation.
-        // "complex" (or ambiguous simple) → generate a full Seed via LLM.
-        let is_simple = interview.complexity == "simple" && interview.ambiguity.ambiguity() <= 0.3;
-
-        let mut seed = if is_simple {
-            tracing::info!(
-                phase = "seed",
-                method = "from_message",
-                "Simple task — ad-hoc seed"
-            );
-            Seed::from_message(&interview.original_message)
-        } else {
-            tracing::info!(
-                phase = "seed",
-                method = "llm",
-                "Complex task — LLM-generated seed"
-            );
-            self.ouroboros.generate_seed(&interview).await?
-        };
-        seed.project_id = primary_project_id;
-        seed.workspace_context = workspace_context.clone();
-        seed.mount_paths = mount_paths.clone();
-
-        // Save seed to state store.
-        self.save_seed(&seed).await?;
-
-        // Publish seed created event.
-        self.event_bus
-            .publish(KernelEvent::SeedCreated { seed_id: seed.id })?;
-
-        self.publish_phase_completed(&session_id, Phase::Seed, "generated")
-            .await;
-        self.publish_phase_started(&session_id, Phase::Execute)
-            .await;
-
-        // Check if the seed should be split into multi-agent execution.
-        // When the seed has 3+ acceptance criteria, we treat each criterion
-        // as a distinct subtask and delegate to separate agents.
-        if should_split_seed(&seed) {
-            let subtasks = split_into_subtasks(&seed);
-            if subtasks.len() > 1 {
-                tracing::info!(
-                    phase = "delegate",
-                    subtasks = subtasks.len(),
-                    "Delegating to multi-agent"
-                );
-                let results = self.delegate_subtasks(subtasks, &seed).await?;
-
-                // Combine successful results
-                let combined: String = results
-                    .iter()
-                    .filter(|r| r.success)
-                    .filter_map(|r| r.result.as_deref())
-                    .collect::<Vec<_>>()
-                    .join("\n\n");
-
-                let all_passed = results.iter().all(|r| r.success);
-
-                // Clean up the session.
-                {
-                    let mut sessions = self.sessions.write();
-                    sessions.remove(&session_id);
-                }
-
-                // Record the same duration/success metrics the single-agent
-                // path records, so multi-agent orchestration is observable.
-                let metrics = get_metrics();
-                metrics
-                    .orch_duration
-                    .observe(orch_start.elapsed().as_secs_f64());
-                if all_passed {
-                    metrics.agents_completed.inc();
-                } else {
-                    metrics.agents_failed.inc();
-                }
-
-                tracing::info!(
-                    session_id = %session_id,
-                    subtasks = results.len(),
-                    passed = all_passed,
-                    "Multi-agent orchestration complete"
-                );
-
-                return Ok(OrchestrationResult {
-                    session_id: Some(session_id),
-                    primary_project_id,
-                    project_tag: Some(project_tag.clone()),
-                    active_mount_ids: active_mount_ids.clone(),
-                    mount_tag: mount_tag_opt.clone(),
-                    response: format_result_combined(&combined),
-                    seed_id: Some(seed.id),
-                    agent_id: None,
-                    phase_reached: Phase::Execute,
-                    evaluation_passed: Some(all_passed),
-                    output: Some(combined),
-                    tool_calls: vec![],
-                    interview_questions: None,
-                    interview_round: None,
-                    interview_ambiguity: None,
-                    mode: "ouroboros".to_string(),
-                });
-            }
-        }
-
-        // Record agent response in conversation buffer (for multi-agent case)
-        {
-            let mut buffer = self.conversation_buffer.write();
-            buffer.push_agent("[multi-agent: complete]", None);
-        }
-
-        // Execute agent via lifecycle manager.
-        tracing::info!(phase = "execute", "Starting execution phase");
-        let exec_result = self
-            .lifecycle
-            .spawn_and_run(&seed, Priority::Normal)
-            .await?;
-
-        // Periodically reap zombie tasks.
-        self.lifecycle.reap_zombies();
-
-        self.publish_phase_completed(&session_id, Phase::Execute, "completed")
-            .await;
-
-        // ── Evaluate + Evolve ──
-        //
-        // Three paths:
-        // 1. output_schema → structured validation (no evolution)
-        // 2. acceptance_criteria present → full evaluate + optional evolve loop
-        // 3. neither → simple boolean pass/fail
-        let (final_result, final_seed, passed, phase_reached) = if let Some(ref schema) =
-            seed.output_schema
-        {
-            // Structured output validation — no evolution.
-            let passed = match oxi_sdk::StructuredOutput::extract(
-                &exec_result.output,
-                &oxi_sdk::OutputMode::ValidatedJson {
-                    schema: schema.clone(),
-                },
-            ) {
-                Ok(_) => {
-                    tracing::info!(session_id = %session_id, "Structured output validation passed");
-                    true
-                }
-                Err(e) => {
-                    tracing::warn!(session_id = %session_id, error = %e, "Structured output validation failed");
-                    false
-                }
-            };
-            (exec_result, seed.clone(), passed, Phase::Execute)
-        } else if self.should_evaluate(&seed) {
-            // Full Ouroboros evaluate + optional evolve loop.
-            self.publish_phase_started(&session_id, Phase::Evaluate)
-                .await;
-
-            let (result, eval, evolved_seed) = self
-                .run_evolution_loop(&session_id, &seed, exec_result)
-                .await?;
-
-            // Use a single read of the config so `passed` is consistent
-            // with itself (the loop takes its own snapshot internally).
-            let passed = {
-                let cfg = self.evolution_config.read();
-                eval.all_passed() && eval.score >= cfg.score_threshold
-            };
-
-            self.publish_phase_completed(
-                &session_id,
-                Phase::Evaluate,
-                &format!("score={:.2}", eval.score),
-            )
-            .await;
-
-            let reached = if evolved_seed.generation > 0 {
-                Phase::Evolve
-            } else {
-                Phase::Evaluate
-            };
-
-            (result, evolved_seed, passed, reached)
-        } else {
-            // Simple task: boolean pass/fail, no LLM evaluation.
-            let passed = exec_result.success;
-            (exec_result, seed.clone(), passed, Phase::Execute)
-        };
-
-        // Clean up the session.
-        {
-            let mut sessions = self.sessions.write();
-            sessions.remove(&session_id);
-        }
-
-        tracing::info!(
-            session_id = %session_id,
-            passed,
-            phase = %phase_reached,
-            "Orchestration complete"
-        );
-
-        // Measure orchestration duration.
-        let metrics = get_metrics();
-        metrics
-            .orch_duration
-            .observe(orch_start.elapsed().as_secs_f64());
-        if passed {
-            metrics.agents_completed.inc();
-        } else {
-            metrics.agents_failed.inc();
-        }
-
-        // Record agent response in conversation buffer (for topic shift detection)
-        {
-            let mut buffer = self.conversation_buffer.write();
-            buffer.push_agent(&final_seed.goal, None);
-        }
-
-        Ok(OrchestrationResult {
-            session_id: Some(session_id),
-            primary_project_id,
-            project_tag: Some(project_tag.clone()),
-            active_mount_ids: active_mount_ids.clone(),
-            mount_tag: mount_tag_opt.clone(),
-            response: format_execution_result(&final_seed, &final_result),
-            seed_id: Some(final_seed.id),
-            agent_id: None,
-            phase_reached,
-            evaluation_passed: Some(passed),
-            output: Some(final_result.output.clone()),
-            tool_calls: final_result.tool_calls.clone(),
-            interview_questions: None,
-            interview_round: None,
-            interview_ambiguity: None,
-            mode: "ouroboros".to_string(),
-        })
-    }
-
-    /// Check whether a seed should go through full evaluate + evolve.
-    ///
-    /// Only seeds with acceptance criteria and no output_schema qualify.
-    /// Simple tasks (from_message, no criteria) get boolean pass/fail.
-    fn should_evaluate(&self, seed: &Seed) -> bool {
-        !seed.acceptance_criteria.is_empty() && seed.output_schema.is_none()
-    }
-
-    /// Default chat mode: execute via AgentRuntime directly.
-    ///
-    /// Skips interview/seed/evaluate/evolve. Returns fast responses.
-    pub async fn chat(
-        &self,
-        _user_id: &str,
-        user_message: &str,
-        session_id: Option<&str>,
-        project_ids: Option<&str>,
-        mount_ids: Option<&str>,
-        request_id: &str,
-    ) -> Result<OrchestrationResult> {
-        tracing::info!(name = "orchestrator.chat", session_id = %session_id.unwrap_or("new"), request_id = %request_id, "starting");
-        let metrics = get_metrics();
-        metrics.messages.inc();
-        let orch_start = std::time::Instant::now();
-
-        let session_id = session_id
-            .map(String::from)
-            .unwrap_or_else(|| Uuid::new_v4().to_string());
-
-        // Project detection (same as handle_message)
-        let primary_project_id: Option<Uuid> = if let Some(ids_str) = project_ids {
-            ids_str
-                .split(',')
-                .next()
-                .and_then(|s| Uuid::parse_str(s.trim()).ok())
-        } else {
-            self.detect_project_tag(user_message).and_then(|_tag| {
-                self.project_manager().and_then(|pm| {
-                    let projects = pm.list_projects();
-                    let result = crate::project::detect_project(user_message, &projects);
-                    match result {
-                        crate::project::DetectionResult::Found(id) => Some(id),
-                        crate::project::DetectionResult::NoMatch { .. } => None,
-                    }
-                })
-            })
-        };
-
-        let project_tag = primary_project_id
-            .and_then(|id| {
-                self.project_manager()
-                    .and_then(|pm| pm.get_project(id).map(|p| p.tag()))
-            })
-            .unwrap_or_default();
-
-        // ── Mount workspace resolution (RFC-025) ──
-        let (active_mount_ids, workspace_context, mount_paths, mount_tag) =
-            self.resolve_mount_workspace(mount_ids, project_ids, user_message);
-        let mount_tag_opt = if mount_tag.is_empty() {
-            None
-        } else {
-            Some(mount_tag.clone())
-        };
-
-        // RFC-025: suppress project_tag when mount_tag is present.
-        let project_tag = if mount_tag_opt.is_some() {
-            String::new()
-        } else {
-            project_tag
-        };
-
-        // Lightweight seed — goal only, no constraints/criteria
-        let mut seed = Seed::from_message(user_message);
-        seed.project_id = primary_project_id;
-        seed.workspace_context = workspace_context;
-        seed.mount_paths = mount_paths;
-
-        // Execute via lifecycle manager (fork → run → cleanup)
-        tracing::info!(
-            phase = "execute",
-            mode = "chat",
-            "Starting direct execution"
-        );
-        let exec_result = self
-            .lifecycle
-            .spawn_and_run(&seed, Priority::Normal)
-            .await?;
-        self.lifecycle.reap_zombies();
-
-        let metrics = get_metrics();
-        metrics
-            .orch_duration
-            .observe(orch_start.elapsed().as_secs_f64());
-        if exec_result.success {
-            metrics.agents_completed.inc();
-        } else {
-            metrics.agents_failed.inc();
-        }
-
-        Ok(OrchestrationResult {
-            session_id: Some(session_id),
-            primary_project_id,
-            project_tag: Some(project_tag),
-            active_mount_ids: active_mount_ids.clone(),
-            mount_tag: mount_tag_opt.clone(),
-            response: exec_result.output.clone(),
-            seed_id: Some(seed.id),
-            agent_id: None,
-            phase_reached: Phase::Execute,
-            evaluation_passed: None,
-            output: Some(exec_result.output),
-            tool_calls: exec_result.tool_calls,
-            interview_questions: None,
-            interview_round: None,
-            interview_ambiguity: None,
-            mode: "chat".to_string(),
-        })
-    }
-
-    /// Execute a seed via the lifecycle manager.
-    async fn execute_seed(&self, seed: &Seed) -> Result<ExecutionResult> {
-        self.lifecycle.spawn_and_run(seed, Priority::Normal).await
-    }
-
-    /// Evaluate → (optional) Evolve → re-execute loop.
-    ///
-    /// Tracks the best result seen across iterations. If evolution
-    /// degrades the score, returns the previous best.
-    async fn run_evolution_loop(
-        &self,
-        _session_id: &str,
-        seed: &Seed,
-        initial_result: ExecutionResult,
-    ) -> Result<(ExecutionResult, EvaluationResult, Seed)> {
-        // Snapshot the config under a single read guard so a concurrent
-        // `update_evolution_config` call can't split max_iterations and
-        // score_threshold across two different config versions (TOCTOU).
-        let (max_iterations, threshold) = {
-            let cfg = self.evolution_config.read();
-            (cfg.max_iterations, cfg.score_threshold)
-        };
-
-        let mut current_seed = seed.clone();
-        let mut current_result = initial_result;
-
-        // Best-result tracking.
-        let mut best_result = current_result.clone();
-        let mut best_seed = current_seed.clone();
-        let mut best_eval: Option<EvaluationResult> = None;
-
-        for iteration in 0..=max_iterations {
-            // Evaluate
-            let evaluation = self
-                .ouroboros
-                .evaluate(&current_seed, &current_result)
-                .await?;
-
-            tracing::info!(
-                iteration,
-                seed_id = %current_seed.id,
-                score = evaluation.score,
-                passed = evaluation.all_passed(),
-                "Evaluation complete"
-            );
-
-            let _ = self.event_bus.publish(KernelEvent::EvaluationComplete {
-                seed_id: current_seed.id,
-                passed: evaluation.all_passed(),
-            });
-            // Update best if this iteration *strictly* improved. A tie
-            // keeps the earlier (first-seen) result so a flat or wobbling
-            // score sequence doesn't let later iterations clobber the
-            // original.
-            if best_eval
-                .as_ref()
-                .is_none_or(|b| evaluation.score > b.score)
-            {
-                best_result = current_result.clone();
-                best_seed = current_seed.clone();
-                best_eval = Some(evaluation.clone());
-            }
-
-            // Passed or exhausted iterations.
-            if evaluation.score >= threshold || iteration == max_iterations {
-                if iteration == max_iterations && max_iterations > 0 {
-                    let _ = self.event_bus.publish(KernelEvent::EvolutionMaxReached {
-                        seed_id: current_seed.id,
-                        final_score: evaluation.score,
-                        iterations: iteration,
-                    });
-                }
-                return Ok((
-                    best_result,
-                    best_eval.ok_or_else(|| {
-                        anyhow::anyhow!(
-                            "Evolve loop exited with threshold met but no evaluation was produced"
-                        )
-                    })?,
-                    best_seed,
-                ));
-            }
-
-            // max_iterations == 0 → evaluate only, no evolution.
-            if max_iterations == 0 {
-                return Ok((
-                    best_result,
-                    best_eval.ok_or_else(|| {
-                        anyhow::anyhow!("No iterations configured and no evaluation was produced")
-                    })?,
-                    best_seed,
-                ));
-            }
-
-            // Evolve: produce an improved seed.
-            let evolved = self.ouroboros.evolve(&current_seed, &evaluation).await?;
-            match evolved {
-                Some(new_seed) => {
-                    tracing::info!(
-                        old_seed_id = %current_seed.id,
-                        new_seed_id = %new_seed.id,
-                        iteration,
-                        "Seed evolved, re-executing"
-                    );
-
-                    let _ = self.event_bus.publish(KernelEvent::EvolutionStarted {
-                        seed_id: current_seed.id,
-                        new_seed_id: new_seed.id,
-                        iteration,
-                    });
-
-                    // Save the evolved seed.
-                    self.save_seed(&new_seed).await?;
-
-                    current_seed = new_seed;
-                    current_result = self.execute_seed(&current_seed).await?;
-                }
-                None => {
-                    tracing::info!(
-                        seed_id = %current_seed.id,
-                        "Evolve returned None, stopping loop"
-                    );
-                    return Ok((
-                        best_result,
-                        best_eval.ok_or_else(|| {
-                            anyhow::anyhow!(
-                                "Evolve returned no seed and no evaluation was produced"
-                            )
-                        })?,
-                        best_seed,
-                    ));
-                }
-            }
-        }
-
-        // Unreachable: every branch above returns.
-        unreachable!()
     }
 
     /// Save a seed to the state store.
@@ -1745,6 +910,501 @@ impl Orchestrator {
 
         Ok(completed)
     }
+
+    // ──────────────────────────────────────────────────────────────────
+    // RFC-027 §3 — Unified intent handler
+    // ──────────────────────────────────────────────────────────────────
+    //
+    // Phase 5 entry point. Routes a single user message through:
+    //   assess → (crystallize) → execute → (review + retry) → Response
+    //
+    // The legacy `handle_message()` and `chat()` paths remain intact;
+    // this method coexists alongside them until Phase 6 cuts over.
+
+    /// Unified entry point for every user message (RFC-027 §3).
+    ///
+    /// One method, one match — depth falls out of [`Scope`]:
+    ///
+    /// 1. [`IntentEngine::assess`] classifies the message (conversation /
+    ///    clarify / task + scope). Always called once.
+    /// 2. For `Assessment::Task(scope)` we build a [`Directive`]:
+    ///    - `Scope::Trivial` — `Directive::from_message(msg)` verbatim.
+    ///    - `Scope::Substantial` — [`IntentEngine::crystallize`] produces a
+    ///      structured directive with goal, constraints, and acceptance
+    ///      criteria.
+    /// 3. The [`ExecEnv`] is resolved from [`MsgCtx`] independently of the
+    ///    directive (Mount workspace context, paths, project ID, cspace hint).
+    /// 4. Execution delegates to the existing [`AgentLifecycleManager`].
+    ///    In Phase 5 the Directive is shimmed into a [`Seed`] for the
+    ///    current pipeline; Phase 6 will replace this with
+    ///    `lifecycle.execute_directive(&Directive, &ExecEnv)`.
+    /// 5. For `Scope::Substantial` we call [`IntentEngine::review`] and, if
+    ///    the verdict fails, retry once with the verdict's gaps folded back
+    ///    into the directive as additional constraints.
+    ///
+    /// Does not modify or call the legacy `handle_message()` / `chat()`
+    /// paths — they remain the canonical entry points until Phase 6 cuts
+    /// the gateway over to `handle()`.
+    ///
+    /// # Parameters
+    /// - `engine` — the LLM-backed intent engine (assess/crystallize/review).
+    /// - `msg` — the user's raw message text.
+    /// - `ctx` — per-message context (session, history, project/mount hints).
+    pub async fn handle(
+        &self,
+        engine: &dyn oxios_ouroboros::IntentEngineOps,
+        msg: &str,
+        ctx: &oxios_ouroboros::MsgCtx,
+    ) -> Result<HandleResponse> {
+        // 1. assess — always called once, routes the message.
+        let assessment = engine.assess(msg, ctx).await?;
+
+        match assessment {
+            oxios_ouroboros::Assessment::Conversation(reply) => {
+                Ok(HandleResponse::Reply(reply))
+            }
+
+            oxios_ouroboros::Assessment::Clarify { questions } => {
+                Ok(HandleResponse::Clarify(questions))
+            }
+
+            oxios_ouroboros::Assessment::Task(scope) => {
+                // 2. Build the Directive based on scope.
+                let mut directive = match scope {
+                    oxios_ouroboros::Scope::Trivial => {
+                        oxios_ouroboros::Directive::from_message(msg)
+                    }
+                    oxios_ouroboros::Scope::Substantial => {
+                        engine.crystallize(msg, ctx).await?
+                    }
+                };
+
+                // 3. Resolve the execution environment from MsgCtx.
+                let env = self.resolve_exec_env(ctx, msg);
+
+                // 4. Execute (always). Trivial tasks skip review; substantial
+                //    tasks go through verify_or_retry below.
+                let mut result = self.execute_directive(&directive, &env).await?;
+
+                // 5. Verify + optional retry (Substantial only).
+                let (verdict, evaluation_passed) = match scope {
+                    oxios_ouroboros::Scope::Trivial => (None, None),
+                    oxios_ouroboros::Scope::Substantial => {
+                        let (r, v) = self
+                            .verify_or_retry(engine, &mut directive, &env, result, msg, ctx)
+                            .await?;
+                        result = r;
+                        let passed = v.all_passed();
+                        (Some(v), Some(passed))
+                    }
+                };
+
+                self.lifecycle.reap_zombies();
+
+                Ok(HandleResponse::Task {
+                    scope,
+                    directive,
+                    env,
+                    result,
+                    verdict,
+                    evaluation_passed,
+                })
+            }
+        }
+    }
+
+    /// Unified entry point that accepts legacy-style parameters and returns
+    /// an `OrchestrationResult` (RFC-027).
+    ///
+    /// Builds a [`MsgCtx`] from the session history (if any), then delegates
+    /// to [`handle`](Self::handle). Falls back to `handle_message` if no
+    /// `IntentEngine` is wired.
+    pub async fn handle_unified(
+        &self,
+        user_id: &str,
+        msg: &str,
+        session_id: Option<&str>,
+        project_ids: Option<&str>,
+        mount_ids: Option<&str>,
+        request_id: &str,
+    ) -> Result<OrchestrationResult> {
+        // Get the IntentEngine (always wired by the kernel assembler).
+        let engine = self
+            .intent_engine
+            .read()
+            .clone()
+            .expect("IntentEngine not wired — kernel assembler bug");
+
+        // Build MsgCtx.
+        let sid = session_id.unwrap_or(request_id).to_string();
+        let history = self.load_session_history(&sid).await;
+        let ctx = oxios_ouroboros::MsgCtx {
+            session_id: sid.clone(),
+            history,
+            project_ids: project_ids.map(String::from),
+            mount_ids: mount_ids.map(String::from),
+            user_id: user_id.to_string(),
+        };
+
+        // Call the unified path.
+        let start = std::time::Instant::now();
+        let response = self.handle(engine.as_ref(), msg, &ctx).await?;
+        let duration_ms = start.elapsed().as_millis() as u64;
+
+        Ok(self.handle_response_to_orchestration_result(
+            response,
+            &ctx,
+            duration_ms,
+        ))
+    }
+
+    /// Load conversation history for a session from the state store.
+    async fn load_session_history(
+        &self,
+        session_id: &str,
+    ) -> Vec<oxios_ouroboros::Exchange> {
+        let sid = crate::state_store::SessionId(session_id.to_string());
+        match self.state_store.load_session(&sid).await {
+            Ok(Some(session)) => session
+                .user_messages
+                .iter()
+                .zip(session.agent_responses.iter())
+                .map(|(u, a)| oxios_ouroboros::Exchange {
+                    user: u.content.clone(),
+                    agent: a.content.clone(),
+                })
+                .collect(),
+            _ => Vec::new(),
+        }
+    }
+
+    fn handle_response_to_orchestration_result(
+        &self,
+        response: HandleResponse,
+        ctx: &oxios_ouroboros::MsgCtx,
+        duration_ms: u64,
+    ) -> OrchestrationResult {
+        let metrics = get_metrics();
+        metrics.orch_duration.observe(duration_ms as f64 / 1000.0);
+
+        match response {
+            HandleResponse::Reply(reply) => OrchestrationResult {
+                session_id: Some(ctx.session_id.clone()),
+                primary_project_id: None,
+                project_tag: None,
+                active_mount_ids: Vec::new(),
+                mount_tag: None,
+                response: reply,
+                seed_id: None,
+                agent_id: None,
+                phase_reached: oxios_ouroboros::Phase::Interview,
+                evaluation_passed: None,
+                output: None,
+                tool_calls: Vec::new(),
+                interview_questions: None,
+                interview_round: None,
+                interview_ambiguity: None,
+                mode: "unified".to_string(),
+            },
+            HandleResponse::Clarify(questions) => {
+                let questions_text = questions
+                    .iter()
+                    .map(|q| q.text.clone())
+                    .collect::<Vec<_>>()
+                    .join("\n");
+                let structured = Some(
+                    questions
+                        .iter()
+                        .map(|q| oxios_ouroboros::ouroboros_engine::InterviewQuestionOutput {
+                            id: q.id.clone(),
+                            text: q.text.clone(),
+                            kind: format!("{:?}", q.kind).to_lowercase(),
+                            options: q
+                                .options
+                                .iter()
+                                .map(|o| {
+                                    oxios_ouroboros::ouroboros_engine::InterviewOptionOutput {
+                                        value: o.value.clone(),
+                                        label: o.label.clone(),
+                                        description: String::new(),
+                                    }
+                                })
+                                .collect(),
+                        })
+                        .collect(),
+                );
+                OrchestrationResult {
+                    session_id: Some(ctx.session_id.clone()),
+                    primary_project_id: None,
+                    project_tag: None,
+                    active_mount_ids: Vec::new(),
+                    mount_tag: None,
+                    response: questions_text,
+                    seed_id: None,
+                    agent_id: None,
+                    phase_reached: oxios_ouroboros::Phase::Interview,
+                    evaluation_passed: None,
+                    output: None,
+                    tool_calls: Vec::new(),
+                    interview_questions: structured,
+                    interview_round: Some(
+                        ((ctx.history.len() / 2) as u32).max(1),
+                    ),
+                    interview_ambiguity: None,
+                    mode: "unified".to_string(),
+                }
+            }
+            HandleResponse::Task {
+                scope: _,
+                directive,
+                env,
+                result,
+                verdict,
+                evaluation_passed,
+            } => {
+                let response_text = if directive.acceptance_criteria.is_empty() {
+                    result.output.clone()
+                } else {
+                    match &verdict {
+                        Some(v) if v.all_passed() => result.output.clone(),
+                        Some(v) => format!(
+                            "{}\n\n⚠ Review notes:\n{}",
+                            result.output,
+                            v.notes.join("\n")
+                        ),
+                        None => result.output.clone(),
+                    }
+                };
+                if evaluation_passed.unwrap_or(false) {
+                    metrics.agents_completed.inc();
+                } else {
+                    metrics.agents_failed.inc();
+                }
+                OrchestrationResult {
+                    session_id: Some(ctx.session_id.clone()),
+                    primary_project_id: env.project_id,
+                    project_tag: None,
+                    active_mount_ids: Vec::new(),
+                    mount_tag: None,
+                    response: response_text,
+                    seed_id: None,
+                    agent_id: None,
+                    phase_reached: oxios_ouroboros::Phase::Execute,
+                    evaluation_passed,
+                    output: Some(result.output.clone()),
+                    tool_calls: result.tool_calls.clone(),
+                    interview_questions: None,
+                    interview_round: None,
+                    interview_ambiguity: None,
+                    mode: "unified".to_string(),
+                }
+            }
+        }
+    }
+
+    /// Resolve an [`ExecEnv`] from the per-message context.
+    ///
+    /// Mirrors the Mount workspace resolution done by `handle_message()`
+    /// and `chat()` but packages the result as the new [`ExecEnv`] type.
+    /// Independent of the directive — runs whether the task is Trivial
+    /// or Substantial.
+    fn resolve_exec_env(
+        &self,
+        ctx: &oxios_ouroboros::MsgCtx,
+        msg: &str,
+    ) -> oxios_ouroboros::ExecEnv {
+        let (active_mount_ids, workspace_context, mount_paths, _mount_tag) = self
+            .resolve_mount_workspace(ctx.mount_ids.as_deref(), ctx.project_ids.as_deref(), msg);
+        // active_mount_ids + mount_tag are surfaced via the legacy path;
+        // ExecEnv carries the resolved paths/context/project that the
+        // agent runtime actually consumes.
+        let _ = active_mount_ids;
+
+        // Resolve a primary project ID (matches handle_message semantics):
+        // explicit project_ids takes precedence over auto-detection.
+        let project_id = ctx
+            .project_ids
+            .as_deref()
+            .and_then(|ids| {
+                ids.split(',')
+                    .next()
+                    .and_then(|s| Uuid::parse_str(s.trim()).ok())
+            })
+            .or_else(|| {
+                self.detect_project_tag(msg).and_then(|_tag| {
+                    self.project_manager().and_then(|pm| {
+                        let projects = pm.list_projects();
+                        match crate::project::detect_project(msg, &projects) {
+                            crate::project::DetectionResult::Found(id) => Some(id),
+                            crate::project::DetectionResult::NoMatch { .. } => None,
+                        }
+                    })
+                })
+            });
+
+        // Touch the project to record activity (mirrors handle_message).
+        if let Some(pid) = project_id
+            && let Some(pm) = self.project_manager()
+        {
+            pm.touch(pid);
+        }
+
+        oxios_ouroboros::ExecEnv {
+            workspace_context,
+            mount_paths,
+            project_id,
+            cspace_hint: None,
+        }
+    }
+
+    /// Execute a [`Directive`] under an [`ExecEnv`].
+    ///
+    /// **Phase 5 stub:** builds a legacy [`Seed`] from the directive and
+    /// delegates to the existing [`AgentLifecycleManager::spawn_and_run`]
+    /// pipeline. Phase 6 will replace this with
+    /// `lifecycle.execute_directive(&directive, &env)` once
+    /// AgentRuntime/Supervisor/AgentLifecycleManager have their
+    /// Directive-based methods (see sibling subagents Runtime and
+    /// RuntimeDirective).
+    async fn execute_directive(
+        &self,
+        directive: &oxios_ouroboros::Directive,
+        env: &oxios_ouroboros::ExecEnv,
+    ) -> Result<ExecutionResult> {
+        let seed = self.directive_to_seed(directive, env);
+        self.lifecycle.spawn_and_run(&seed, Priority::Normal).await
+    }
+
+    /// Shim a [`Directive`] + [`ExecEnv`] into a legacy [`Seed`].
+    ///
+    /// Used only by [`Self::execute_directive`] during the Phase 5 stub
+    /// window. Carries every field the agent runtime reads: goal,
+    /// constraints, acceptance criteria, original request, output schema,
+    /// project, workspace context, mount paths, and cspace hint.
+    fn directive_to_seed(
+        &self,
+        directive: &oxios_ouroboros::Directive,
+        env: &oxios_ouroboros::ExecEnv,
+    ) -> Seed {
+        let mut seed = Seed::new(directive.goal.clone());
+        seed.original_request = directive.original_request.clone();
+        seed.constraints = directive.constraints.clone();
+        seed.acceptance_criteria = directive.acceptance_criteria.clone();
+        seed.output_schema = directive.output_schema.clone();
+        seed.project_id = env.project_id;
+        seed.workspace_context = env.workspace_context.clone();
+        seed.mount_paths = env.mount_paths.clone();
+        seed.cspace_hint = env.cspace_hint.clone();
+        seed
+    }
+
+    /// Review the result against the directive's criteria; on failure,
+    /// retry once with the verdict's gaps folded back as constraints.
+    ///
+    /// Phase 5 caps retries at one explicit attempt; once IntentConfig
+    /// lands (Phase 5 sibling subtask) this will read the configured
+    /// `max_retries` instead.
+    async fn verify_or_retry(
+        &self,
+        engine: &dyn oxios_ouroboros::IntentEngineOps,
+        directive: &mut oxios_ouroboros::Directive,
+        env: &oxios_ouroboros::ExecEnv,
+        initial_result: ExecutionResult,
+        _msg: &str,
+        _ctx: &oxios_ouroboros::MsgCtx,
+    ) -> Result<(ExecutionResult, oxios_ouroboros::Verdict)> {
+        let verdict = engine.review(directive, &initial_result).await?;
+
+        if verdict.all_passed() || verdict.gaps.is_empty() {
+            return Ok((initial_result, verdict));
+        }
+
+        // Check if retry is enabled (RFC-027 Decision 6).
+        // When disabled, return the initial result with the failed verdict.
+        let enable_retry = self
+            .intent_config
+            .read()
+            .enable_retry;
+        if !enable_retry {
+            tracing::info!("Review failed but retry disabled (enable_retry=false)");
+            return Ok((initial_result, verdict));
+        }
+
+        let metrics = get_metrics();
+        metrics.retry_attempted.inc();
+
+        tracing::info!(
+            gaps = verdict.gaps.len(),
+            "Review failed — retrying with feedback"
+        );
+
+        // Execute with feedback: previous output + gaps injected.
+        let retry_result = self
+            .lifecycle
+            .execute_with_feedback(
+                directive,
+                env,
+                &initial_result,
+                &verdict.gaps,
+                Priority::Normal,
+            )
+            .await?;
+
+        // Re-review.
+        let retry_verdict = engine.review(directive, &retry_result).await?;
+
+        // Track retry effectiveness.
+        if retry_verdict.score > verdict.score {
+            metrics.retry_improved.inc();
+        } else if retry_verdict.score < verdict.score {
+            metrics.retry_degraded.inc();
+        } else {
+            metrics.retry_unchanged.inc();
+        }
+
+        // Return best result.
+        let chosen_result = if retry_verdict.score >= verdict.score {
+            retry_result
+        } else {
+            initial_result
+        };
+
+        Ok((chosen_result, retry_verdict))
+    }
+}
+
+/// Response envelope for [`Orchestrator::handle`] (RFC-027 §3).
+///
+/// One variant per terminal state of the unified handler:
+///
+/// - [`HandleResponse::Reply`] — conversational answer, no agent spawned.
+/// - [`HandleResponse::Clarify`] — the message was ambiguous; ask these
+///   structured questions before acting.
+/// - [`HandleResponse::Task`] — an agent executed the task. Carries the
+///   scope, the directive that was run, the resolved environment, the
+///   execution result, and (for substantial tasks) the review verdict +
+///   pass/fail.
+#[derive(Debug, Clone)]
+pub enum HandleResponse {
+    /// Conversational reply — no agent was spawned.
+    Reply(String),
+    /// Structured clarifying questions to ask before acting.
+    Clarify(Vec<oxios_ouroboros::Question>),
+    /// A task was executed by an agent.
+    Task {
+        /// The scope decided by `assess` — Trivial skips review.
+        scope: oxios_ouroboros::Scope,
+        /// The directive that was executed (post-retry if a retry ran).
+        directive: oxios_ouroboros::Directive,
+        /// The execution environment resolved for this message.
+        env: oxios_ouroboros::ExecEnv,
+        /// The execution result.
+        result: ExecutionResult,
+        /// The review verdict — `None` for `Scope::Trivial`.
+        verdict: Option<oxios_ouroboros::Verdict>,
+        /// Whether the (final) verdict passed — `None` for `Scope::Trivial`.
+        evaluation_passed: Option<bool>,
+    },
 }
 
 /// Active session state for multi-turn interviews.

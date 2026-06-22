@@ -208,7 +208,7 @@ export function Sidebar() {
         <button
           type="button"
           onClick={toggle}
-          className="hidden lg:block rounded-md p-1.5 hover:bg-sidebar-accent"
+          className="hidden lg:block rounded-md p-1.5 hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
           aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
         >
           {collapsed ? <PanelLeft className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}

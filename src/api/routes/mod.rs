@@ -28,6 +28,7 @@ mod resource_routes;
 mod system;
 mod tools;
 mod workspace;
+mod secrets_routes;
 
 use std::sync::Arc;
 
@@ -65,6 +66,7 @@ pub(crate) use chat::{
     handle_chat, handle_chat_stream, handle_chat_ticket, handle_knowledge_saves,
     handle_remove_knowledge_save, handle_save_to_knowledge, handle_session_tool_calls,
     handle_tool_approval_respond,
+    handle_ask_user_respond,
 };
 pub(crate) use cron_jobs::{
     handle_cron_job_create, handle_cron_job_delete, handle_cron_job_get, handle_cron_job_trigger,
@@ -226,6 +228,11 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
             "/api/chat/tool-approval/{id}/respond",
             post(handle_tool_approval_respond),
         )
+        // RFC-027: ask_user agent-driven clarification
+        .route(
+            "/api/chat/ask-user/{id}/respond",
+            post(handle_ask_user_respond),
+        )
         // RFC-016: Knowledge persistence API
         .route(
             "/api/chat/{session_id}/knowledge-saves",
@@ -270,6 +277,17 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
         .route(
             "/api/engine/routing/fallbacks",
             get(handle_engine_routing_fallbacks),
+        )
+        // Secrets management (RFC-028 SP-2b)
+        .route("/api/secrets", get(secrets_routes::handle_secrets_list))
+        .route(
+            "/api/secrets/{key}",
+            put(secrets_routes::handle_secret_set)
+                .delete(secrets_routes::handle_secret_delete),
+        )
+        .route(
+            "/api/secrets/{key}/source",
+            get(secrets_routes::handle_secret_source),
         )
         // Workspace
         .route("/api/workspace/tree", get(handle_workspace_tree))

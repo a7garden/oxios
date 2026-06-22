@@ -961,39 +961,95 @@ pub(crate) async fn handle_agent_trace(
     state: State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<Json<serde_json::Value>, AppError> {
-    // Try in-memory first
-    if let Ok(agents) = state.kernel.agents.list().await
+    use oxios_kernel::state_store::SessionId;
+
+    // Try in-memory first, then SQLite.
+    let agent = if let Ok(agents) = state.kernel.agents.list().await
         && let Some(agent) = agents.into_iter().find(|a| a.id.to_string() == id)
     {
-        return Ok(Json(trace_json(&agent)));
-    }
+        agent
+    } else if let Ok(Some(agent)) = state.kernel.agents.get(&id).await {
+        agent
+    } else {
+        return Err(AppError::NotFound("agent not found".into()));
+    };
 
-    // Fallback: load from SQLite
-    if let Ok(Some(agent)) = state.kernel.agents.get(&id).await {
-        return Ok(Json(trace_json(&agent)));
-    }
+    // RFC-028 SP-3a: join session trajectory for a fuller trace.
+    // The agent's `tool_calls` field is capped (`max_tool_calls_per_agent`),
+    // but the session trajectory accumulates the complete execution history.
+    let trajectory = if let Some(sid) = &agent.session_id {
+        match state.kernel.state.load_session(&SessionId(sid.clone())).await {
+            Ok(Some(session)) => Some(session.trajectory().to_vec()),
+            _ => None,
+        }
+    } else {
+        None
+    };
 
-    Err(AppError::NotFound("agent not found".into()))
+    Ok(Json(trace_json(&agent, trajectory.as_deref())))
 }
 
-fn trace_json(agent: &oxios_kernel::types::AgentInfo) -> serde_json::Value {
-    let steps: Vec<serde_json::Value> = agent
-        .tool_calls
-        .iter()
-        .enumerate()
-        .map(|(i, tc)| {
-            serde_json::json!({
-                "index": i,
-                "tool_name": tc.tool,
-                "action": tc.tool,
-                "input": tc.input,
-                "output": tc.output,
-                "started_at": tc.timestamp.map(|t| t.to_rfc3339()).unwrap_or_default(),
-                "duration_ms": tc.duration_ms,
-                "status": if tc.is_error { "failed" } else { "completed" },
-            })
-        })
-        .collect();
+fn trace_json(
+    agent: &oxios_kernel::types::AgentInfo,
+    trajectory: Option<&[oxios_kernel::state_store::TrajectoryStepRecord]>,
+) -> serde_json::Value {
+    use std::collections::HashSet;
+
+    // Collect tool_call_ids already present in agent.tool_calls to dedup
+    // against the session trajectory.
+    let mut seen_ids: HashSet<String> = HashSet::new();
+    let mut steps: Vec<serde_json::Value> = Vec::new();
+
+    for (i, tc) in agent.tool_calls.iter().enumerate() {
+        if !tc.tool_call_id.is_empty() {
+            seen_ids.insert(tc.tool_call_id.clone());
+        }
+        steps.push(serde_json::json!({
+            "index": i,
+            "kind": "tool",
+            "tool_name": tc.tool,
+            "action": tc.tool,
+            "input": tc.input,
+            "output": tc.output,
+            "started_at": tc.timestamp.map(|t| t.to_rfc3339()).unwrap_or_default(),
+            "duration_ms": tc.duration_ms,
+            "status": if tc.is_error { "failed" } else { "completed" },
+        }));
+    }
+
+    // Append trajectory steps not already covered by tool_calls.
+    if let Some(traj) = trajectory {
+        let mut idx = steps.len();
+        for step in traj {
+            if !step.tool_call_id.is_empty() && seen_ids.contains(&step.tool_call_id) {
+                continue;
+            }
+            seen_ids.insert(step.tool_call_id.clone());
+            steps.push(serde_json::json!({
+                "index": idx,
+                "kind": "tool",
+                "tool_name": step.tool_name,
+                "action": step.tool_name,
+                "input": step.tool_args,
+                "output": step.output_summary,
+                "started_at": step.timestamp.to_rfc3339(),
+                "duration_ms": step.duration_ms,
+                "status": if step.is_error { "failed" } else { "completed" },
+            }));
+            idx += 1;
+        }
+
+        // Sort by started_at so the merged timeline is chronological.
+        steps.sort_by(|a, b| {
+            let ta = a["started_at"].as_str().unwrap_or("");
+            let tb = b["started_at"].as_str().unwrap_or("");
+            ta.cmp(tb)
+        });
+        // Re-index after sort.
+        for (i, step) in steps.iter_mut().enumerate() {
+            step["index"] = serde_json::json!(i);
+        }
+    }
 
     serde_json::json!({
         "agent_id": agent.id.to_string(),

@@ -105,6 +105,48 @@ impl CredentialStore {
         Ok(())
     }
 
+    /// Delete a credential from `~/.oxi/auth.json`.
+    ///
+    /// Removes the top-level key entry. No-op if the key or file doesn't exist.
+    pub fn delete(key: &str) -> Result<()> {
+        let path = auth_json_path()?;
+        if !path.exists() {
+            return Ok(());
+        }
+        let raw = std::fs::read_to_string(&path)?;
+        let mut map: serde_json::Map<String, serde_json::Value> =
+            serde_json::from_str(&raw)?;
+        if map.remove(key).is_some() {
+            std::fs::write(&path, serde_json::to_string_pretty(&map)?)?;
+            tracing::info!(key = %key, "Credential deleted from oxi auth store");
+        }
+        Ok(())
+    }
+
+    /// Resolve a non-provider secret (telegram token, email password, etc.).
+    ///
+    /// Unlike [`resolve`](Self::resolve) — which checks `OXIOS_<PROVIDER>_API_KEY`
+    /// and config.toml — this checks an explicit env var name first, then the
+    /// auth store. Used by the `/api/secrets` endpoints for keys that are not
+    /// LLM provider credentials.
+    pub fn resolve_secret(key: &str, env_var: &str) -> Option<(String, CredentialSource)> {
+        // 1. Environment variable
+        if let Ok(val) = std::env::var(env_var)
+            && !val.is_empty()
+        {
+            return Some((val, CredentialSource::EnvVar));
+        }
+        // 2. Auth store (~/.oxi/auth.json)
+        if let Ok(Some(token)) = oxi_sdk::load_token(key) {
+            if !token.access_token.is_empty() {
+                return Some((token.access_token, CredentialSource::OxiAuthStore));
+            }
+        } else if let Some(val) = try_load_legacy_key(key) {
+            return Some((val, CredentialSource::OxiAuthStore));
+        }
+        None
+    }
+
     /// Extract the provider name from a model ID.
     /// "anthropic/claude-sonnet-4-20250514" → "anthropic"
     /// Returns `None` if the model ID is empty or has no provider prefix.

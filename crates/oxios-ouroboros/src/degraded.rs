@@ -6,6 +6,8 @@
 
 use crate::AmbiguityScore;
 use crate::{EvaluationResult, InterviewResult, Seed};
+use crate::assessment::{Assessment, Scope};
+use crate::directive::{Directive, Verdict};
 
 /// Produce a degraded interview result when LLM parsing fails.
 ///
@@ -106,6 +108,44 @@ pub fn degraded_evaluation(seed: &Seed, output: &str, mechanical_pass: bool) -> 
         consensus_pass: None,
         score,
         notes,
+    }
+}
+
+// ---------------------------------------------------------------------------
+// RFC-027 fallbacks
+// ---------------------------------------------------------------------------
+
+/// Produce a degraded [`Assessment`] when the assess LLM call fails.
+///
+/// Uses simple keyword heuristics to distinguish task from conversation.
+pub fn degraded_assessment(msg: &str) -> Assessment {
+    if contains_action_verb(msg) {
+        Assessment::Task(Scope::Substantial)
+    } else {
+        Assessment::Conversation("Hello! How can I help you today?".to_string())
+    }
+}
+
+/// Produce a degraded [`Directive`] when the crystallize LLM call fails.
+///
+/// Uses the user message verbatim as both goal and original_request.
+pub fn degraded_directive(msg: &str) -> Directive {
+    Directive::from_message(msg)
+}
+
+/// Produce a degraded [`Verdict`] when the review LLM call fails.
+///
+/// Reports the mechanical check result with no semantic analysis.
+pub fn degraded_verdict(passed: bool) -> Verdict {
+    Verdict {
+        passed,
+        score: if passed { 1.0 } else { 0.0 },
+        notes: Vec::new(),
+        gaps: if passed {
+            Vec::new()
+        } else {
+            vec!["Mechanical check failed".to_string()]
+        },
     }
 }
 

@@ -406,21 +406,21 @@ impl Kernel {
         session_id: Option<&str>,
     ) -> Result<oxios_kernel::OrchestrationResult> {
         self.orchestrator
-            .handle_message("cli", prompt, session_id, None, None, "cli-direct")
+            .handle_unified("cli", prompt, session_id, None, None, "cli-direct")
             .await
     }
 
     /// Execute a prompt in chat mode (skips Ouroboros pipeline).
-    ///
-    /// Uses direct agent execution without interview/seed/evaluate/evolve.
-    /// Called by `oxios run --chat`.
+    /// **DEPRECATED (RFC-027):** use `execute_prompt_with_session` which
+    /// routes through the unified `IntentEngine` path.
+    #[allow(dead_code)]
     pub async fn execute_prompt_chat(
         &self,
         prompt: &str,
         session_id: Option<&str>,
     ) -> Result<oxios_kernel::OrchestrationResult> {
         self.orchestrator
-            .chat("cli", prompt, session_id, None, None, "cli-direct")
+            .handle_unified("cli", prompt, session_id, None, None, "cli-direct")
             .await
     }
 
@@ -794,7 +794,9 @@ impl KernelBuilder {
             .context("Boot model/provider resolution failed")?;
 
         let resolver: Arc<dyn oxios_ouroboros::ModelResolver> = engine_handle.clone();
-        let ouroboros: Arc<dyn OuroborosProtocol> = Arc::new(OuroborosEngine::new(resolver));
+        let ouroboros: Arc<dyn OuroborosProtocol> = Arc::new(OuroborosEngine::new(resolver.clone()));
+        let intent_engine: Arc<oxios_ouroboros::IntentEngine> =
+            Arc::new(oxios_ouroboros::IntentEngine::new(resolver.clone()));
 
         let mut access_manager = AccessManager::new();
         if let Some(ref audit_path) = config.security.audit_log_path {
@@ -811,8 +813,9 @@ impl KernelBuilder {
 
         let persona_manager = PersonaManager::new();
         if let Some(p) = persona_manager.first_enabled() {
-            ouroboros.set_persona_prompt(Some(p.system_prompt));
-            tracing::info!(persona = %p.name, "Active persona set on OuroborosEngine");
+            ouroboros.set_persona_prompt(Some(p.system_prompt.clone()));
+            intent_engine.set_persona_prompt(Some(p.system_prompt));
+            tracing::info!(persona = %p.name, "Active persona set on engines");
         }
 
         let a2a_protocol = Arc::new(A2AProtocol::new(event_bus.clone()));
@@ -1342,6 +1345,7 @@ impl KernelBuilder {
             lifecycle,
             config.orchestrator.clone(),
         );
+        orchestrator.set_intent_engine(intent_engine.clone());
         orchestrator.set_git_layer(git_layer.clone());
         orchestrator.set_a2a(a2a_protocol.clone());
         if let Some(pm) = project_manager.clone() {

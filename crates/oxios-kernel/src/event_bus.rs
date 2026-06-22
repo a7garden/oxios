@@ -42,9 +42,19 @@ pub enum KernelEvent {
         id: AgentId,
     },
     /// An agent has been stopped.
+    ///
+    /// Carries `success` so consumers can distinguish a normal completion
+    /// (`success: true`) from an evaluation/assessment failure
+    /// (`success: false`). Infrastructure errors (panic, timeout) emit
+    /// `AgentFailed` instead.
     AgentStopped {
         /// The agent's ID.
         id: AgentId,
+        /// Whether the agent's result passed evaluation. Mirrors
+        /// `ExecutionResult.success` from the Ok path; `false` on the
+        /// kill/terminate path (user-initiated stop).
+        #[serde(default)]
+        success: bool,
     },
     /// An agent has encountered a failure.
     AgentFailed {
@@ -322,6 +332,18 @@ pub enum KernelEvent {
         session_id: String,
         message_index: usize,
     },
+    /// A question was posed to the user by the agent (RFC-027, `ask_user`).
+    /// The frontend renders an input/option picker and resolves the
+    /// pending oneshot via a separate response endpoint.
+    AskUserRequest {
+        /// Unique request ID — used by the response handler to resolve
+        /// the oneshot the tool is awaiting.
+        id: String,
+        /// The question text the user sees.
+        question: String,
+        /// Optional structured options. Empty when the question is open-ended.
+        options: Vec<String>,
+    },
 }
 
 /// Convert a KernelEvent to an AuditAction for the audit trail.
@@ -333,8 +355,12 @@ pub fn kernel_event_to_audit_action(event: &KernelEvent) -> AuditAction {
         KernelEvent::AgentStarted { .. } => AuditAction::AgentSpawn {
             task_type: "started".to_string(),
         },
-        KernelEvent::AgentStopped { .. } => AuditAction::AgentExit {
-            reason: "stopped".to_string(),
+        KernelEvent::AgentStopped { success, .. } => AuditAction::AgentExit {
+            reason: if *success {
+                "completed".to_string()
+            } else {
+                "stopped".to_string()
+            },
         },
         KernelEvent::AgentFailed { error, .. } => AuditAction::AgentExit {
             reason: error.clone(),
@@ -497,6 +523,9 @@ pub fn kernel_event_to_audit_action(event: &KernelEvent) -> AuditAction {
             message_index,
         } => AuditAction::Other {
             detail: format!("knowledge:removed:{session_id}:{message_index}"),
+        },
+        KernelEvent::AskUserRequest { id, question, .. } => AuditAction::Other {
+            detail: format!("ask_user:{id}:{question}"),
         },
     }
 }

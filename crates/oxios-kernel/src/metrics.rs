@@ -275,6 +275,11 @@ pub struct MetricsHandles {
     pub agents_forked: CounterHandle,
     pub agents_completed: CounterHandle,
     pub agents_failed: CounterHandle,
+    /// RFC-027 retry metrics.
+    pub retry_attempted: CounterHandle,
+    pub retry_improved: CounterHandle,
+    pub retry_unchanged: CounterHandle,
+    pub retry_degraded: CounterHandle,
     pub orch_duration: HistogramHandle,
     pub messages: CounterHandle,
     /// LLM circuit breaker state: 0=closed, 1=open, 2=half_open.
@@ -334,6 +339,10 @@ pub fn get_metrics() -> &'static MetricsHandles {
                 &[],
             ),
             agents_failed: r.counter("oxios_agents_failed_total", "Total agents failed", &[]),
+            retry_attempted: r.counter("oxios_retry_attempted_total", "Review retries attempted", &[]),
+            retry_improved: r.counter("oxios_retry_improved_total", "Retries that improved score", &[]),
+            retry_unchanged: r.counter("oxios_retry_unchanged_total", "Retries with same score", &[]),
+            retry_degraded: r.counter("oxios_retry_degraded_total", "Retries that degraded score", &[]),
             orch_duration: r.histogram(
                 "oxios_orchestration_duration_seconds",
                 "Orchestration duration",

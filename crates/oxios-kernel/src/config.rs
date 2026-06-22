@@ -1423,6 +1423,71 @@ impl Default for OrchestratorConfig {
     }
 }
 
+/// Intent engine configuration (RFC-027 unified intent handling).
+///
+/// Controls the unified intent engine that replaces the legacy Ouroboros
+/// five-phase protocol: `assess` → `crystallize` → `execute` → `review` → `retry`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IntentConfig {
+    /// Maximum retry attempts when a Substantial task fails review.
+    /// Set to 0 to disable retries entirely.
+    /// Default: 2.
+    #[serde(default = "default_intent_max_retries")]
+    pub max_retries: u32,
+
+    /// Minimum review score (0.0–1.0) required for a verdict to pass.
+    /// Reviews below this threshold trigger a retry.
+    /// Default: 0.7.
+    #[serde(default = "default_intent_score_threshold")]
+    pub score_threshold: f64,
+
+    /// Maximum clarification rounds before forcing the task to proceed
+    /// with the system's best-guess understanding.
+    /// Default: 3.
+    #[serde(default = "default_intent_max_clarify_rounds")]
+    pub max_clarify_rounds: u32,
+
+    /// Whether to retry Substantial tasks whose review verdict fails.
+    /// When false, a failing review is reported back to the user directly.
+    /// Default: true.
+    #[serde(default = "default_intent_enable_retry")]
+    pub enable_retry: bool,
+
+    /// Optional lightweight model ID for `assess`/`crystallize`/`review` calls.
+    /// When None, the engine uses the resolver's default model.
+    /// Default: None.
+    #[serde(default)]
+    pub lightweight_model: Option<String>,
+}
+
+fn default_intent_max_retries() -> u32 {
+    2
+}
+
+fn default_intent_score_threshold() -> f64 {
+    0.7
+}
+
+fn default_intent_max_clarify_rounds() -> u32 {
+    3
+}
+
+fn default_intent_enable_retry() -> bool {
+    true
+}
+
+impl Default for IntentConfig {
+    fn default() -> Self {
+        Self {
+            max_retries: default_intent_max_retries(),
+            score_threshold: default_intent_score_threshold(),
+            max_clarify_rounds: default_intent_max_clarify_rounds(),
+            enable_retry: default_intent_enable_retry(),
+            lightweight_model: None,
+        }
+    }
+}
+
 /// Context manager configuration (inspired by AIOS).
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ContextConfig {

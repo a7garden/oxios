@@ -2,7 +2,11 @@ import { useQuery } from '@tanstack/react-query'
 import { useEffect, useRef } from 'react'
 import { useEvents } from '@/hooks/use-events'
 import { api } from '@/lib/api-client'
+import { showDesktopNotification } from '@/lib/desktop-notify'
+import { loadNotificationPrefs } from '@/lib/notification-prefs'
+import { playNotificationSound } from '@/lib/sound'
 import { useNotificationStore } from '@/stores/notifications'
+import type { NotificationSeverity } from '@/stores/notifications'
 import type { OxiosEvent } from '@/types'
 
 /**
@@ -10,13 +14,19 @@ import type { OxiosEvent } from '@/types'
  *
  * Rules (matching the snake_case wire format emitted by `sanitize_event`):
  * - approval_requested → warning notification, link /approvals
- * - agent_failed → error notification
- * - agent_started → info notification
- * - Duplicate suppression: same (type, agent_id) within 30s is ignored.
+ * - agent_failed       → error notification (infrastructure error)
+ * - agent_started      → info notification
+ * - agent_stopped      → success (task completed) or warning (evaluation failed)
  *
- * NOTE: there is no `agent_completed` event on the wire — the backend only
- * emits `agent_stopped`. Successful completion is a `stopped` event with no
- * error payload. Notification rules here intentionally omit it.
+ * Duplicate suppression:
+ * - Same (type, agent_id) within 30s is ignored.
+ * - When `agent_failed` fires, a subsequent `agent_stopped(success:false)`
+ *   for the same agent within 30s is suppressed (the failure was already
+ *   reported via the error notification).
+ *
+ * RFC-028 SP-1b/SP-1d: agent_stopped now carries a `success` flag on the
+ * wire, so we distinguish completion from evaluation failure. Desktop
+ * notifications and sounds fire alongside in-app notifications.
  */
 export function useGlobalEvents() {
   const add = useNotificationStore((s) => s.add)
@@ -25,23 +35,62 @@ export function useGlobalEvents() {
 
   useEffect(() => {
     for (const event of events) {
+      // Dedup: same (type, agent_id) within 30s.
       const key = `${event.type}-${event.agent_id ?? ''}`
       const now = Date.now()
       const lastSeen = seen.current.get(key) ?? 0
-      if (now - lastSeen < 30_000) continue // dedup
+      if (now - lastSeen < 30_000) continue
       seen.current.set(key, now)
+
+      // Cross-event dedup: if agent_failed was already emitted for this
+      // agent, suppress a trailing agent_stopped(success:false).
+      if (event.type === 'agent_stopped') {
+        const failedKey = `agent_failed-${event.agent_id ?? ''}`
+        const lastFailed = seen.current.get(failedKey) ?? 0
+        if (now - lastFailed < 30_000) continue
+      }
 
       const title = eventTitle(event)
       if (!title) continue
 
-      add({
-        title,
-        message: eventMessage(event),
-        severity: eventSeverity(event),
-        link: eventLink(event),
-      })
+      const severity = eventSeverity(event)
+      const message = eventMessage(event)
+      const link = eventLink(event)
+
+      add({ title, message, severity, link })
+
+      // Desktop notification + sound (controlled by user prefs).
+      const prefs = loadNotificationPrefs()
+      if (prefs.desktop_notifications_enabled) {
+        showDesktopNotification(title, message, link)
+      }
+      if (prefs.sound_enabled) {
+        const soundSeverity = shouldPlaySound(severity, prefs)
+        if (soundSeverity) playNotificationSound(soundSeverity)
+      }
     }
   }, [events, add])
+}
+
+/**
+ * Determine if a sound should play for this severity, respecting per-severity prefs.
+ */
+function shouldPlaySound(
+  severity: NotificationSeverity,
+  prefs: { complete_sound_enabled: boolean; error_sound_enabled: boolean },
+): NotificationSeverity | null {
+  switch (severity) {
+    case 'success':
+      return prefs.complete_sound_enabled ? 'success' : null
+    case 'error':
+      return prefs.error_sound_enabled ? 'error' : null
+    case 'warning':
+      // warning (eval failure, approval) is a "negative" event — gated
+      // by error_sound_enabled alongside `error` severity.
+      return prefs.error_sound_enabled ? 'warning' : null
+    case 'info':
+      return 'info'
+  }
 }
 
 /**
@@ -64,10 +113,10 @@ export function useApprovalWatcher() {
   const count = data ?? 0
 
   useEffect(() => {
-    if (count > prevCount.current && prevCount.current > 0) {
+    if (count > prevCount.current) {
       add({
-        title: 'New Approval Required',
-        message: `${count - prevCount.current} new approval(s) pending`,
+        title: 'Approval Required',
+        message: `${count - prevCount.current} new request(s) pending`,
         severity: 'warning',
         link: '/approvals',
       })
@@ -80,6 +129,17 @@ export function useApprovalWatcher() {
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
+/**
+ * Extract the `success` flag from an agent_stopped event.
+ * Defaults to `true` when absent (backward compat with older backends).
+ */
+function agentStoppedSuccess(e: OxiosEvent): boolean {
+  if (e.data && typeof e.data['success'] === 'boolean') {
+    return e.data['success']
+  }
+  return true
+}
+
 function eventTitle(e: OxiosEvent): string | null {
   switch (e.type) {
     case 'approval_requested':
@@ -88,6 +148,8 @@ function eventTitle(e: OxiosEvent): string | null {
       return 'Agent Failed'
     case 'agent_started':
       return 'Agent Started'
+    case 'agent_stopped':
+      return agentStoppedSuccess(e) ? 'Task Completed' : 'Task Failed'
     default:
       return null
   }
@@ -99,12 +161,14 @@ function eventMessage(e: OxiosEvent): string {
   return detail ? `${agent}: ${String(detail).slice(0, 100)}` : agent
 }
 
-function eventSeverity(e: OxiosEvent): 'info' | 'warning' | 'error' | 'success' {
+function eventSeverity(e: OxiosEvent): NotificationSeverity {
   switch (e.type) {
     case 'approval_requested':
       return 'warning'
     case 'agent_failed':
       return 'error'
+    case 'agent_stopped':
+      return agentStoppedSuccess(e) ? 'success' : 'warning'
     default:
       return 'info'
   }
@@ -116,7 +180,8 @@ function eventLink(e: OxiosEvent): string | undefined {
       return '/approvals'
     case 'agent_failed':
     case 'agent_started':
-      return e.agent_id ? `/agents` : undefined
+    case 'agent_stopped':
+      return e.agent_id ? '/agents' : undefined
     default:
       return undefined
   }

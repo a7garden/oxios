@@ -352,7 +352,7 @@ impl AgentCardRegistry {
             drop(cards);
 
             self.event_bus
-                .publish(KernelEvent::AgentStopped { id: agent_id })?;
+                .publish(KernelEvent::AgentStopped { id: agent_id, success: false })?;
         }
         Ok(())
     }

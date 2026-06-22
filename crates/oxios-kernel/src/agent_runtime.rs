@@ -50,7 +50,7 @@ use crate::KernelHandle;
 use crate::event_bus::KernelEvent;
 use crate::session_context::SessionContext;
 use crate::types::AgentId;
-use oxios_ouroboros::{ExecutionResult, Seed};
+use oxios_ouroboros::{Directive, Entity, ExecEnv, ExecutionResult, Seed};
 
 /// Global LLM circuit breaker instance — delegates to oxi-sdk's ProviderCircuitBreaker.
 static LLM_CIRCUIT_BREAKER: std::sync::OnceLock<oxi_sdk::ProviderCircuitBreaker> =
@@ -249,7 +249,97 @@ impl AgentRuntime {
         session_ctx: &mut SessionContext,
         session_id: Option<String>,
     ) -> Result<ExecutionResult> {
-        let prompt = build_user_prompt(seed);
+        self.execute_inner(
+            agent_id,
+            &seed.goal,
+            &seed.original_request,
+            &seed.constraints,
+            &seed.acceptance_criteria,
+            &seed.ontology,
+            seed.cspace_hint.as_deref(),
+            &seed.mount_paths,
+            seed.workspace_context.as_deref(),
+            session_ctx,
+            session_id,
+            Some(seed),
+        )
+        .await
+    }
+
+    /// Execute a Directive with its ExecEnv (RFC-027 unified intent handling).
+    ///
+    /// Maps Directive/ExecEnv fields to the agent's runtime inputs and runs
+    /// the same tool-calling loop as [`execute`](Self::execute). The
+    /// persistence hook (RFC-016) is currently skipped on this path because
+    /// it still expects a `&Seed`; Phase 6 will update it to accept a
+    /// `&Directive`.
+    pub async fn execute_directive(
+        &self,
+        agent_id: AgentId,
+        directive: &Directive,
+        env: &ExecEnv,
+        session_ctx: &mut SessionContext,
+    ) -> Result<ExecutionResult> {
+        // Directive has no stable per-execution ID yet (Phase 6). Derive a
+        // session_id from the agent_id so chat transparency events still
+        // correlate.
+        let session_id: Option<String> = Some(agent_id.to_string());
+        self.execute_directive_with_session(agent_id, directive, env, session_ctx, session_id)
+            .await
+    }
+
+    /// Like [`execute_directive`](Self::execute_directive) but with an
+    /// explicit session_id for RFC-015 chat transparency event publishing.
+    pub async fn execute_directive_with_session(
+        &self,
+        agent_id: AgentId,
+        directive: &Directive,
+        env: &ExecEnv,
+        session_ctx: &mut SessionContext,
+        session_id: Option<String>,
+    ) -> Result<ExecutionResult> {
+        let ontology: &[Entity] = &[];
+        self.execute_inner(
+            agent_id,
+            &directive.goal,
+            &directive.original_request,
+            &directive.constraints,
+            &directive.acceptance_criteria,
+            ontology,
+            env.cspace_hint.as_deref(),
+            &env.mount_paths,
+            env.workspace_context.as_deref(),
+            session_ctx,
+            session_id,
+            None,
+        )
+        .await
+    }
+
+    /// Shared execution body for Seed and Directive paths.
+    ///
+    /// Performs the full agent-runtime pipeline: prompt assembly, capability
+    /// retrieval, memory + knowledge recall, CSpace tool registration,
+    /// model resolution, agent run, post-execution summary, and (Seed path
+    /// only) the autonomous persistence hook. Directive callers pass
+    /// `persistence_seed = None` to skip persistence until Phase 6.
+    #[allow(clippy::too_many_arguments)]
+    async fn execute_inner(
+        &self,
+        agent_id: AgentId,
+        goal: &str,
+        original_request: &str,
+        constraints: &[String],
+        acceptance_criteria: &[String],
+        ontology: &[Entity],
+        cspace_hint: Option<&str>,
+        mount_paths: &[std::path::PathBuf],
+        workspace_context: Option<&str>,
+        session_ctx: &mut SessionContext,
+        session_id: Option<String>,
+        persistence_seed: Option<&Seed>,
+    ) -> Result<ExecutionResult> {
+        let prompt = build_user_prompt_inner(goal, acceptance_criteria);
 
         // Get active persona system prompt.
         let persona_prompt = self
@@ -264,9 +354,9 @@ impl AgentRuntime {
             .as_ref()
             .and_then(|pm| pm.get_active_persona().map(|p| p.role.clone()));
 
-        // Resolve CSpace from persona role, seed hint, or default.
+        // Resolve CSpace from persona role, hint, or default.
         let cspace = resolve_cspace(
-            seed.cspace_hint.as_deref(),
+            cspace_hint,
             persona_role.as_deref(),
             Some("worker"),
             agent_id,
@@ -274,17 +364,21 @@ impl AgentRuntime {
 
         // Build system prompt (without SKILL.md injection — capabilities are
         // surfaced through the CSpace tool set + semantic retrieval instead).
-        let mut system_prompt = build_system_prompt(
-            seed,
+        let mut system_prompt = build_system_prompt_inner(
+            goal,
+            original_request,
+            constraints,
+            acceptance_criteria,
+            ontology,
+            workspace_context,
             persona_prompt.as_deref(),
             None,
             None,
-            seed.workspace_context.as_deref(),
         );
 
-        // Semantic capability retrieval: find tools relevant to this seed's goal.
+        // Semantic capability retrieval: find tools relevant to this task's goal.
         let capabilities_xml = if let Some(ref retriever) = self.tool_retriever {
-            match retriever.embedder().embed(&seed.goal).await {
+            match retriever.embedder().embed(goal).await {
                 Ok(query_vec) => {
                     let results = retriever.retrieve(&query_vec, 8);
                     if results.is_empty() {
@@ -296,7 +390,7 @@ impl AgentRuntime {
                     }
                 }
                 Err(e) => {
-                    tracing::warn!(error = %e, "Failed to embed seed goal for retrieval");
+                    tracing::warn!(error = %e, "Failed to embed goal for retrieval");
                     None
                 }
             }
@@ -316,23 +410,27 @@ impl AgentRuntime {
 
         // Rebuild system prompt with capabilities and manifest if available.
         if capabilities_xml.is_some() || kernel_manifest.is_some() {
-            system_prompt = build_system_prompt(
-                seed,
+            system_prompt = build_system_prompt_inner(
+                goal,
+                original_request,
+                constraints,
+                acceptance_criteria,
+                ontology,
+                workspace_context,
                 persona_prompt.as_deref(),
                 capabilities_xml.as_deref(),
                 kernel_manifest.as_deref(),
-                seed.workspace_context.as_deref(),
             );
         }
 
         // Blend relevant memories into system prompt.
         let memory_manager = self.kernel_handle.agents.memory_manager();
         match memory_manager
-            .recall_with_proactive(&seed.goal, &mut session_ctx.recall_timing)
+            .recall_with_proactive(goal, &mut session_ctx.recall_timing)
             .await
         {
             Ok(memories) if !memories.is_empty() => {
-                tracing::info!(count = memories.len(), "Recalled memories for seed");
+                tracing::info!(count = memories.len(), "Recalled memories for task");
                 system_prompt = memory_manager.blend_into_prompt(&memories, &system_prompt);
             }
             Ok(_) => tracing::debug!("No memories recalled"),
@@ -341,7 +439,7 @@ impl AgentRuntime {
 
         // Inject learned strategy from SONA (RFC-020 Phase 2).
         if let Some(sona) = memory_manager.sona_engine() {
-            match sona.adapt(&seed.goal).await {
+            match sona.adapt(goal).await {
                 Ok(Some(pattern)) if pattern.confidence > 0.5 => {
                     tracing::info!(
                         domain = %pattern.domain,
@@ -363,14 +461,14 @@ impl AgentRuntime {
         match self
             .kernel_handle
             .knowledge_lens
-            .recall_for_context(&seed.goal, 5)
+            .recall_for_context(goal, 5)
             .await
         {
             Ok(ctx) if !ctx.notes.is_empty() => {
                 tracing::info!(
                     notes = ctx.notes.len(),
                     memories = ctx.memories.len(),
-                    "Recalled knowledge context for seed"
+                    "Recalled knowledge context for task"
                 );
                 let knowledge_blend = ctx
                     .notes
@@ -393,7 +491,9 @@ impl AgentRuntime {
         let engine = self.engine_handle.get();
         let model_id = engine.default_model_id().to_string();
         engine.resolve_model(&model_id)?;
-        let seed_id = seed.id;
+        // Synthetic per-execution ID for tracing. Seed path uses seed.id;
+        // Directive path mints a fresh UUID since Directive doesn't carry one.
+        let exec_id = persistence_seed.map(|s| s.id).unwrap_or_else(uuid::Uuid::new_v4);
 
         // Build the agent. Refresh config.model_id to the live value so every
         // downstream consumer (AgentConfig, legacy provider path, usage callback)
@@ -426,14 +526,14 @@ impl AgentRuntime {
                 kernel_handle,
                 system_prompt,
                 prompt,
-                seed_id,
-                seed.goal.clone(),
+                exec_id,
+                goal.to_string(),
                 agent_id,
                 cspace,
                 audit_trail,
                 self.routing_stats.clone(),
                 session_id.clone(),
-                &seed.mount_paths,
+                mount_paths,
             )
             .await?
         };
@@ -473,7 +573,7 @@ impl AgentRuntime {
             match agent.run(summary_prompt).await {
                 Ok((response, _events)) => {
                     if !response.content.is_empty() {
-                        tracing::info!(seed_id = %seed_id, "Post-execution summary generated");
+                        tracing::info!(exec_id = %exec_id, "Post-execution summary generated");
                         final_content = response.content;
                     }
                 }
@@ -518,7 +618,7 @@ impl AgentRuntime {
             .collect();
 
         tracing::info!(
-            seed_id = %seed_id,
+            exec_id = %exec_id,
             steps = steps_completed,
             success,
             tool_calls = tool_calls.len(),
@@ -537,49 +637,53 @@ impl AgentRuntime {
 
         // RFC-016: Autonomous persistence hook.
         // Runs after successful execution, fire-and-forget.
-        if success && let Some(hook) = &self.persistence_hook {
-            let already_saved_knowledge = trajectory_steps
-                .iter()
-                .any(|s| s.input == "knowledge" && s.output.contains("written successfully"));
-            let hook = hook.clone();
-            let seed_clone = seed.clone();
-            let traj_clone = trajectory_steps.clone();
-            let output_clone = final_content.clone();
-            let sid = session_id.clone();
-            // Compute the assistant message index for this execution.
-            // Increment per-session counter, then use the pre-increment value.
-            let msg_index = {
-                let mut counter = self.session_msg_counter.lock();
-                let idx = counter.entry(sid.clone().unwrap_or_default()).or_insert(0);
-                let current = *idx;
-                *idx += 1;
-                current
-            };
-            tokio::spawn(async move {
-                match hook
-                    .evaluate(
-                        &seed_clone,
-                        &traj_clone,
-                        &output_clone,
-                        already_saved_knowledge,
-                    )
-                    .await
-                {
-                    Ok(plan) => {
-                        if !plan.memory.is_empty() || !plan.knowledge.is_empty() {
-                            tracing::info!(
-                                memory = plan.memory.len(),
-                                knowledge = plan.knowledge.len(),
-                                message_index = msg_index,
-                                "PersistenceHook executing plan"
-                            );
-                            let session_id = sid.unwrap_or_default();
-                            hook.execute_plan(plan, &session_id, msg_index).await;
+        // Only available on the Seed path today (persistence_seed is Some);
+        // the Directive path will gain its own hook adapter in Phase 6.
+        if let Some(seed) = persistence_seed {
+            if success && let Some(hook) = &self.persistence_hook {
+                let already_saved_knowledge = trajectory_steps
+                    .iter()
+                    .any(|s| s.input == "knowledge" && s.output.contains("written successfully"));
+                let hook = hook.clone();
+                let seed_clone = seed.clone();
+                let traj_clone = trajectory_steps.clone();
+                let output_clone = final_content.clone();
+                let sid = session_id.clone();
+                // Compute the assistant message index for this execution.
+                // Increment per-session counter, then use the pre-increment value.
+                let msg_index = {
+                    let mut counter = self.session_msg_counter.lock();
+                    let idx = counter.entry(sid.clone().unwrap_or_default()).or_insert(0);
+                    let current = *idx;
+                    *idx += 1;
+                    current
+                };
+                tokio::spawn(async move {
+                    match hook
+                        .evaluate(
+                            &seed_clone,
+                            &traj_clone,
+                            &output_clone,
+                            already_saved_knowledge,
+                        )
+                        .await
+                    {
+                        Ok(plan) => {
+                            if !plan.memory.is_empty() || !plan.knowledge.is_empty() {
+                                tracing::info!(
+                                    memory = plan.memory.len(),
+                                    knowledge = plan.knowledge.len(),
+                                    message_index = msg_index,
+                                    "PersistenceHook executing plan"
+                                );
+                                let session_id = sid.unwrap_or_default();
+                                hook.execute_plan(plan, &session_id, msg_index).await;
+                            }
                         }
+                        Err(e) => tracing::warn!(error = %e, "PersistenceHook evaluate failed"),
                     }
-                    Err(e) => tracing::warn!(error = %e, "PersistenceHook evaluate failed"),
-                }
-            });
+                });
+            }
         }
 
         Ok(result)
@@ -1380,15 +1484,70 @@ fn handle_compaction(summary: String, session_id: String, memory_manager: Arc<Me
 
 /// Build a system prompt from the Seed's goal, constraints, persona,
 /// and optionally a capability index and kernel manifest.
-///
-/// Note: SKILL.md content is no longer injected here. Capabilities are
-/// surfaced through the CSpace tool set + semantic retrieval instead.
+#[allow(dead_code)]
 fn build_system_prompt(
     seed: &Seed,
     persona_prompt: Option<&str>,
     capabilities_xml: Option<&str>,
     kernel_manifest: Option<&str>,
     workspace_context: Option<&str>,
+) -> String {
+    build_system_prompt_inner(
+        &seed.goal,
+        &seed.original_request,
+        &seed.constraints,
+        &seed.acceptance_criteria,
+        &seed.ontology,
+        workspace_context,
+        persona_prompt,
+        capabilities_xml,
+        kernel_manifest,
+    )
+}
+
+/// Build a system prompt from a Directive and ExecEnv (RFC-027).
+///
+/// Maps [`Directive`] fields (`goal`, `original_request`, `constraints`,
+/// `acceptance_criteria`) and [`ExecEnv`] fields (`workspace_context`) into
+#[allow(dead_code)]
+fn build_directive_system_prompt(
+    directive: &Directive,
+    env: &ExecEnv,
+    persona_prompt: Option<&str>,
+    capabilities_xml: Option<&str>,
+    kernel_manifest: Option<&str>,
+) -> String {
+    let ontology: &[Entity] = &[];
+    build_system_prompt_inner(
+        &directive.goal,
+        &directive.original_request,
+        &directive.constraints,
+        &directive.acceptance_criteria,
+        ontology,
+        env.workspace_context.as_deref(),
+        persona_prompt,
+        capabilities_xml,
+        kernel_manifest,
+    )
+}
+
+/// Shared system-prompt builder for Seed and Directive paths.
+///
+/// Composes the static agent prelude, goal/constraints/criteria sections,
+/// optional workspace context and ontology, persona, capability index, and
+/// kernel manifest into a single prompt string. The ontology section is
+/// Seed-only; Directive callers pass an empty slice.
+#[allow(clippy::too_many_arguments)]
+fn build_system_prompt_inner(
+    goal: &str,
+    original_request: &str,
+    constraints: &[String],
+    acceptance_criteria: &[String],
+    ontology: &[Entity],
+    workspace_context: Option<&str>,
+    persona_prompt: Option<&str>,
+    capabilities_xml: Option<&str>,
+    kernel_manifest: Option<&str>,
 ) -> String {
     let mut prompt = String::from(
         "You are an autonomous agent in the Oxios operating system.\n\
@@ -1407,27 +1566,27 @@ fn build_system_prompt(
          When the task asks to \"get\", \"fetch\", \"find online\", or \"look up\" something\n\
          from the web, use `web_search`.\n",
     );
-    prompt.push_str(&format!("\n## Goal\n{}\n", seed.goal));
+    prompt.push_str(&format!("\n## Goal\n{}\n", goal));
 
     // Preserve user's original wording so the agent sees exact language,
     // filenames, and nuances that may have been abstracted in the goal.
-    if !seed.original_request.is_empty() && seed.original_request != seed.goal {
+    if !original_request.is_empty() && original_request != goal {
         prompt.push_str(&format!(
             "\n## User's Original Request\n{}\n",
-            seed.original_request
+            original_request
         ));
     }
 
-    if !seed.constraints.is_empty() {
+    if !constraints.is_empty() {
         prompt.push_str("\n## Constraints\n");
-        for (i, c) in seed.constraints.iter().enumerate() {
+        for (i, c) in constraints.iter().enumerate() {
             prompt.push_str(&format!("{}. {}\n", i + 1, c));
         }
     }
 
-    if !seed.acceptance_criteria.is_empty() {
+    if !acceptance_criteria.is_empty() {
         prompt.push_str("\n## Acceptance Criteria\n");
-        for (i, c) in seed.acceptance_criteria.iter().enumerate() {
+        for (i, c) in acceptance_criteria.iter().enumerate() {
             prompt.push_str(&format!("{}. {}\n", i + 1, c));
         }
     }
@@ -1441,9 +1600,9 @@ fn build_system_prompt(
         prompt.push('\n');
     }
 
-    if !seed.ontology.is_empty() {
+    if !ontology.is_empty() {
         prompt.push_str("\n## Domain Entities\n");
-        for e in &seed.ontology {
+        for e in ontology {
             prompt.push_str(&format!(
                 "- **{}** ({}): {}\n",
                 e.name, e.entity_type, e.description
@@ -1506,13 +1665,21 @@ fn build_system_prompt(
 
     prompt
 }
-
-/// Build the user prompt from the seed.
+#[allow(dead_code)]
 fn build_user_prompt(seed: &Seed) -> String {
+    build_user_prompt_inner(&seed.goal, &seed.acceptance_criteria)
+}
+#[allow(dead_code)]
+fn build_directive_user_prompt(directive: &Directive) -> String {
+    build_user_prompt_inner(&directive.goal, &directive.acceptance_criteria)
+}
+
+/// Shared user-prompt builder for Seed and Directive paths.
+fn build_user_prompt_inner(goal: &str, acceptance_criteria: &[String]) -> String {
     format!(
         "Execute the following goal:\n\n{}\n\nAcceptance criteria:\n{}",
-        seed.goal,
-        seed.acceptance_criteria
+        goal,
+        acceptance_criteria
             .iter()
             .enumerate()
             .map(|(i, c)| format!("{}. {}", i + 1, c))

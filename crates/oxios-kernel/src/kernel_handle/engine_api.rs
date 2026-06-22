@@ -977,6 +977,32 @@ impl EngineApi {
         Ok(())
     }
 
+    /// Clear an API key for a provider.
+    ///
+    /// Removes the key from config.toml's `[engine].api_key` (when the
+    /// provider matches the current default model) and rebuilds the engine
+    /// so the credential is dropped from the running process. The key in
+    /// `~/.oxi/auth.json` must be removed separately via `CredentialStore::delete`.
+    pub fn clear_api_key(&self, provider: &str) -> anyhow::Result<()> {
+        let snapshot = {
+            let mut cfg = self.config.write();
+            let matches = CredentialStore::provider_from_model(&cfg.engine.default_model)
+                .is_some_and(|current_provider| current_provider == provider);
+            if matches {
+                cfg.engine.api_key = None;
+                Some(cfg.clone())
+            } else {
+                None
+            }
+        };
+        if let Some(snap) = snapshot {
+            self.persist(&snap)?;
+        }
+        tracing::info!(provider = %provider, "API key cleared from config");
+        self.rebuild_and_swap();
+        Ok(())
+    }
+
     /// Update provider options in config.toml.
     ///
     /// Persists the options and makes them available for the next agent run.

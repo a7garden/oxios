@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { createJSONStorage, persist } from 'zustand/middleware'
 
 /**
  * Global notification severity.
@@ -41,52 +42,70 @@ interface NotificationState {
 }
 
 let _nextId = 0
-
-export const useNotificationStore = create<NotificationState>((set) => ({
-  notifications: [],
-  unreadCount: 0,
-
-  add(n) {
-    const entry: Notification = {
-      ...n,
-      id: `notif-${++_nextId}-${Date.now()}`,
-      timestamp: new Date().toISOString(),
-      read: false,
-    }
-    set((s) => ({
-      notifications: [entry, ...s.notifications].slice(0, 50),
-      unreadCount: s.unreadCount + 1,
-    }))
-  },
-
-  markRead(id) {
-    set((s) => {
-      const wasUnread = s.notifications.find((n) => n.id === id && !n.read)
-      return {
-        notifications: s.notifications.map((n) => (n.id === id ? { ...n, read: true } : n)),
-        unreadCount: wasUnread ? Math.max(0, s.unreadCount - 1) : s.unreadCount,
-      }
-    })
-  },
-
-  markAllRead() {
-    set((s) => ({
-      notifications: s.notifications.map((n) => ({ ...n, read: true })),
+export const useNotificationStore = create<NotificationState>()(
+  persist(
+    (set) => ({
+      notifications: [],
       unreadCount: 0,
-    }))
-  },
 
-  dismiss(id) {
-    set((s) => {
-      const wasUnread = s.notifications.find((n) => n.id === id && !n.read)
-      return {
-        notifications: s.notifications.filter((n) => n.id !== id),
-        unreadCount: wasUnread ? Math.max(0, s.unreadCount - 1) : s.unreadCount,
-      }
-    })
-  },
+      add(n) {
+        const entry: Notification = {
+          ...n,
+          id: `notif-${++_nextId}-${Date.now()}`,
+          timestamp: new Date().toISOString(),
+          read: false,
+        }
+        set((s) => ({
+          notifications: [entry, ...s.notifications].slice(0, 50),
+          unreadCount: s.unreadCount + 1,
+        }))
+      },
 
-  clear() {
-    set({ notifications: [], unreadCount: 0 })
-  },
-}))
+      markRead(id) {
+        set((s) => {
+          const wasUnread = s.notifications.find((n) => n.id === id && !n.read)
+          return {
+            notifications: s.notifications.map((n) => (n.id === id ? { ...n, read: true } : n)),
+            unreadCount: wasUnread ? Math.max(0, s.unreadCount - 1) : s.unreadCount,
+          }
+        })
+      },
+
+      markAllRead() {
+        set((s) => ({
+          notifications: s.notifications.map((n) => ({ ...n, read: true })),
+          unreadCount: 0,
+        }))
+      },
+
+      dismiss(id) {
+        set((s) => {
+          const wasUnread = s.notifications.find((n) => n.id === id && !n.read)
+          return {
+            notifications: s.notifications.filter((n) => n.id !== id),
+            unreadCount: wasUnread ? Math.max(0, s.unreadCount - 1) : s.unreadCount,
+          }
+        })
+      },
+
+      clear() {
+        set({ notifications: [], unreadCount: 0 })
+      },
+    }),
+    {
+      name: 'oxios-notifications',
+      storage: createJSONStorage(() => localStorage),
+      // Persist only unread notifications (max 30) — read notifications
+      // are transient and cleared on reload to keep localStorage small.
+      partialize: (s) => {
+        const unread = s.notifications.filter((n) => !n.read).slice(0, 30)
+        return {
+          notifications: unread,
+          // Derive from the persisted list so the badge matches what the
+          // dropdown actually shows after reload.
+          unreadCount: unread.length,
+        }
+      },
+    },
+  ),
+)

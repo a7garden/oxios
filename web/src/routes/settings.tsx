@@ -24,6 +24,8 @@ import { MemorySection } from '@/components/settings/memory-section'
 import { SaveDock } from '@/components/settings/save-dock'
 import { SectionCard } from '@/components/settings/section-card'
 import { SectionIcon } from '@/components/settings/section-icons'
+import { NotificationSectionCard } from '@/components/settings/notification-section'
+import { SecretsSectionCard } from '@/components/settings/secrets-section'
 import { SettingsHeader } from '@/components/settings/settings-header'
 import { SettingsShell } from '@/components/settings/settings-shell'
 import { ErrorState } from '@/components/shared/error-state'
@@ -591,7 +593,12 @@ function SettingsPage() {
         } else {
           const sectionConfig = config[section.key] as Record<string, unknown> | undefined
           const raw = sectionConfig?.[dottedKey]
-          bucket[dottedKey] = field.type === 'toggle' ? raw === true : String(raw ?? '')
+          bucket[dottedKey] =
+            field.type === 'toggle'
+              ? raw === true
+              : field.type === 'multiline' && typeof raw === 'object'
+                ? JSON.stringify(raw, null, 2)
+                : String(raw ?? '')
         }
       }
       next[section.key] = bucket
@@ -646,8 +653,14 @@ function SettingsPage() {
         } else if (field.type === 'number' || field.type === 'range') {
           const num = Number(raw)
           if (!Number.isNaN(num)) setNestedValue(bucket, field.key, num)
-        } else {
-          setNestedValue(bucket, field.key, String(raw))
+        } else if (field.type === 'multiline') {
+          // Try to parse as JSON (for fields like browser.engine);
+          // fall back to the raw string if it's not valid JSON.
+          try {
+            setNestedValue(bucket, field.key, JSON.parse(String(raw)))
+          } catch {
+            setNestedValue(bucket, field.key, String(raw))
+          }
         }
       }
       setNestedValue(payload, section.key, bucket)
@@ -863,6 +876,16 @@ function renderActiveSection(
         <SystemToolsPanel />
       </div>
     )
+  }
+
+  // Secrets: dedicated secrets management card (RFC-028 SP-2c).
+  if (sectionId === 'secrets') {
+    return <SecretsSectionCard />
+  }
+
+  // Notifications: client-side prefs card (RFC-028 SP-1e).
+  if (sectionId === 'notifications') {
+    return <NotificationSectionCard />
   }
 
   if (!meta) return null

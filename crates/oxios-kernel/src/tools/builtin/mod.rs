@@ -42,6 +42,7 @@ pub use resource_tool::ResourceTool;
 pub use security_tool::SecurityTool;
 
 use crate::KernelHandle;
+use crate::tools::AskUserTool;
 use crate::types::AgentId;
 use oxi_sdk::ToolRegistry;
 
@@ -88,6 +89,11 @@ pub fn register_all_kernel_tools(registry: &ToolRegistry, kernel: &KernelHandle,
     // KnowledgeTool (markdown note management)
     registry.register(KnowledgeTool::from_kernel(kernel));
 
+    // ask_user (RFC-027): agent-driven clarification via event bus + oneshot
+    registry.register(AskUserTool::new(
+        kernel.infra.pending_ask_user(),
+        kernel.infra.event_bus_clone(),
+    ));
     // Browser (optional feature, stores Arc<KernelHandle>)
     #[cfg(feature = "native-browser")]
     {}
