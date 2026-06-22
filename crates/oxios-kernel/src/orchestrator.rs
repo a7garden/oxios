@@ -73,7 +73,8 @@ impl SubTask {
     }
 }
 
-/// The orchestrator coordinates the full Ouroboros lifecycle.
+/// The orchestrator coordinates the unified intent lifecycle (RFC-027).
+#[allow(dead_code)]
 pub struct Orchestrator {
     /// IntentEngine for the unified handle() path (RFC-027).
     /// Lazily available when the kernel wires it; None in legacy constructions.
@@ -101,7 +102,7 @@ pub struct Orchestrator {
 }
 
 /// Configuration for A2A delegation retries.
-#[derive(Debug, Clone)]
+#[allow(dead_code)]
 struct DelegationConfig {
     /// Maximum retry attempts for A2A delegation.
     max_retries: u32,
@@ -125,6 +126,7 @@ impl Default for DelegationConfig {
     }
 }
 
+#[allow(dead_code)]
 impl DelegationConfig {
     /// Calculate exponential backoff delay.
     fn backoff_delay(&self, attempt: u32) -> u64 {
@@ -397,8 +399,7 @@ impl Orchestrator {
         // No-op — see doc comment above.
     }
 
-
-    /// Commit a file to git if GitLayer is configured and enabled.
+    #[allow(dead_code)]
     fn git_commit(&self, rel_path: &str, message: &str) {
         if let Some(ref gl) = self.git_layer
             && gl.is_enabled()
@@ -406,7 +407,6 @@ impl Orchestrator {
             let _ = gl.commit_file(rel_path, message);
         }
     }
-
 
     // ──────────────────────────────────────────────────────────────────
     // RFC-027 §3 — Unified intent handler
@@ -598,24 +598,20 @@ impl Orchestrator {
                 let structured = Some(
                     questions
                         .iter()
-                        .map(
-                            |q| oxios_ouroboros::ouroboros_engine::InterviewQuestionOutput {
-                                id: q.id.clone(),
-                                text: q.text.clone(),
-                                kind: format!("{:?}", q.kind).to_lowercase(),
-                                options: q
-                                    .options
-                                    .iter()
-                                    .map(|o| {
-                                        oxios_ouroboros::ouroboros_engine::InterviewOptionOutput {
-                                            value: o.value.clone(),
-                                            label: o.label.clone(),
-                                            description: String::new(),
-                                        }
-                                    })
-                                    .collect(),
-                            },
-                        )
+                        .map(|q| oxios_ouroboros::InterviewQuestionOutput {
+                            id: q.id.clone(),
+                            text: q.text.clone(),
+                            kind: format!("{:?}", q.kind).to_lowercase(),
+                            options: q
+                                .options
+                                .iter()
+                                .map(|o| oxios_ouroboros::InterviewOptionOutput {
+                                    value: o.value.clone(),
+                                    label: o.label.clone(),
+                                    description: String::new(),
+                                })
+                                .collect(),
+                        })
                         .collect(),
                 );
                 OrchestrationResult {
@@ -859,7 +855,6 @@ pub enum HandleResponse {
     },
 }
 
-
 /// Result of a full orchestration cycle.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OrchestrationResult {
@@ -905,15 +900,12 @@ pub struct OrchestrationResult {
     /// buttons). When `None`, the frontend falls back to rendering
     /// `response` as plain markdown.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub interview_questions:
-        Option<Vec<oxios_ouroboros::ouroboros_engine::InterviewQuestionOutput>>,
+    pub interview_questions: Option<Vec<oxios_ouroboros::InterviewQuestionOutput>>,
     /// Current interview round (1-based). Populated alongside
     /// `interview_questions`. Drives the "Round N/M" indicator.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub interview_round: Option<u32>,
 }
-
-
 
 /// Render the body of the `## Workspace Context` prompt section (RFC-025).
 ///
