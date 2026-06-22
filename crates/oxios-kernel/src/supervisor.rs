@@ -20,7 +20,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use chrono::Utc;
 use oxi_sdk::Agent;
-use oxios_ouroboros::{Directive, ExecEnv, Seed};
+use oxios_ouroboros::{Directive, ExecEnv};
 use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -116,29 +116,20 @@ impl AgentPool {
 /// Supervisor trait for managing agent lifecycles.
 #[async_trait]
 pub trait Supervisor: Send + Sync {
-    /// Fork a new agent from a seed specification.
-    async fn fork(&self, spec: &Seed) -> Result<AgentId>;
-
     /// Start executing an agent.
     async fn exec(&self, id: AgentId) -> Result<()>;
 
-    /// Fork and execute an agent with its seed, running to completion.
-    /// Returns the execution result from the agent runtime.
-    async fn run_with_seed(&self, id: AgentId, seed: &Seed) -> Result<ExecutionResult>;
-
     /// Fork a new agent from a Directive and ExecEnv (RFC-027).
     ///
-    /// Mirrors [`Supervisor::fork`] but reads the goal / project_id from
-    /// the unified-intent types. The resulting agent has no `seed_id` (a
-    /// Directive has no stable per-execution UUID yet — Phase 6 will mint
-    /// one in `Orchestrator::handle()`).
+    /// Reads the goal / project_id from the unified-intent types. The
+    /// resulting agent has no `seed_id` (a Directive has no stable
+    /// per-execution UUID yet — Phase 6 will mint one in
+    /// `Orchestrator::handle()`).
     async fn fork_directive(&self, directive: &Directive, env: &ExecEnv) -> Result<AgentId>;
 
     /// Fork and execute an agent with a Directive + ExecEnv, running to completion.
     ///
-    /// Mirrors [`Supervisor::run_with_seed`] but dispatches to
-    /// `AgentRuntime::execute_directive_with_session`. The legacy Seed
-    /// variants stay until Phase 6 removes them.
+    /// Dispatches to `AgentRuntime::execute_directive_with_session`.
     async fn run_with_directive(
         &self,
         id: AgentId,
@@ -167,7 +158,7 @@ pub struct BasicSupervisor {
     runtime: Arc<AgentRuntime>,
     resource_monitor: Option<Arc<ResourceMonitor>>,
     /// Session context for proactive recall timing (RFC-020).
-    /// Shared across all Seed executions within this supervisor's lifetime
+    /// Shared across all agent executions within this supervisor's lifetime
     /// so that RecallTiming can track message count and topic changes.
     /// Uses tokio::sync::RwLock (not parking_lot) so the guard is Send,
     /// allowing it to be held across .await in tokio::spawn.
@@ -236,46 +227,6 @@ impl BasicSupervisor {
 
 #[async_trait]
 impl Supervisor for BasicSupervisor {
-    async fn fork(&self, spec: &Seed) -> Result<AgentId> {
-        let id = AgentId::new_v4();
-        let info = AgentInfo {
-            id,
-            name: spec.goal.clone(),
-            status: AgentStatus::Starting,
-            created_at: Utc::now(),
-            seed_id: Some(spec.id),
-            project_id: spec.project_id,
-            started_at: None,
-            completed_at: None,
-            error: None,
-            steps_completed: 0,
-            steps_total: None,
-            tool_calls: vec![],
-            tokens_input: 0,
-            tokens_output: 0,
-            cost_usd: 0.0,
-            model_id: String::new(),
-            session_id: None,
-        };
-
-        {
-            let mut agents = self.agents.write();
-            agents.insert(id, info);
-        }
-
-        self.update_agent_count();
-
-        let _ = self
-            .event_bus
-            .publish(crate::event_bus::KernelEvent::AgentCreated {
-                id,
-                name: spec.goal.clone(),
-            });
-
-        tracing::info!(agent_id = %id, "Forked new agent from seed");
-        Ok(id)
-    }
-
     async fn fork_directive(&self, directive: &Directive, env: &ExecEnv) -> Result<AgentId> {
         let id = AgentId::new_v4();
         let info = AgentInfo {
@@ -337,196 +288,6 @@ impl Supervisor for BasicSupervisor {
         tracing::info!(agent_id = %id, "Agent execution started");
 
         Ok(())
-    }
-
-    async fn run_with_seed(&self, id: AgentId, seed: &Seed) -> Result<ExecutionResult> {
-        // Mark as running.
-        {
-            let mut agents = self.agents.write();
-            match agents.get_mut(&id) {
-                Some(agent) => {
-                    agent.status = AgentStatus::Running;
-                    agent.started_at = Some(Utc::now());
-                }
-                None => anyhow::bail!("Agent {id} not found"),
-            }
-        }
-
-        let _ = self
-            .event_bus
-            .publish(crate::event_bus::KernelEvent::AgentStarted { id });
-
-        tracing::info!(agent_id = %id, seed_id = %seed.id, "Running agent task");
-
-        // Spawn the execution as a tokio task so we can track and abort it.
-        let cancelled = Arc::new(AtomicBool::new(false));
-        let runtime = Arc::clone(&self.runtime);
-        let seed = seed.clone();
-
-        // Share the session context so RecallTiming persists across Seeds.
-        // Uses tokio::sync::RwLock so the guard is Send-safe across .await.
-        let session_ctx = self.session_context.clone();
-
-        let (done_tx, done_rx) = tokio::sync::oneshot::channel::<Result<ExecutionResult>>();
-        let cancelled_done = cancelled.clone();
-        let handle: JoinHandle<()> = tokio::spawn(async move {
-            // Check for cancellation before starting.
-            let result = if cancelled_done.load(Ordering::Relaxed) {
-                Ok(ExecutionResult {
-                    output: "Agent cancelled before execution".into(),
-                    steps_completed: 0,
-                    success: false,
-                    tool_calls: vec![],
-                    tokens_input: 0,
-                    tokens_output: 0,
-                    model_id: String::new(),
-                })
-            } else {
-                let mut ctx = session_ctx.write().await;
-                runtime.execute(id, &seed, &mut ctx).await
-            };
-            // Receiver gone (run_with_seed returned early) → ignore error.
-            let _ = done_tx.send(result);
-        });
-
-        // Store the handle so kill() can abort the task. The handle STAYS in
-        // the map during await — the previous impl removed it before awaiting,
-        // so kill() could never find a live handle to abort (kill was a no-op
-        // for running agents).
-        {
-            let mut handles = self.handles.write();
-            handles.insert(
-                id,
-                AgentHandle {
-                    cancelled,
-                    task: handle,
-                },
-            );
-        }
-
-        // Await completion via the oneshot channel. If kill() aborts the task
-        // (or it panics), done_tx is dropped and this returns Err — treat as
-        // cancellation.
-        let result = match done_rx.await {
-            Ok(res) => res,
-            Err(_) => {
-                let mut handles = self.handles.write();
-                handles.remove(&id);
-                Ok(ExecutionResult {
-                    output: "Agent task aborted".into(),
-                    steps_completed: 0,
-                    success: false,
-                    tool_calls: vec![],
-                    tokens_input: 0,
-                    tokens_output: 0,
-                    model_id: String::new(),
-                })
-            }
-        };
-
-        // Natural completion — remove the handle.
-        {
-            let mut handles = self.handles.write();
-            handles.remove(&id);
-        }
-
-        match result {
-            Ok(result) => {
-                tracing::info!(
-                    agent_id = %id,
-                    success = result.success,
-                    steps = result.steps_completed,
-                    "Agent task completed"
-                );
-
-                {
-                    let mut agents = self.agents.write();
-                    if let Some(agent) = agents.get_mut(&id) {
-                        agent.status = if result.success {
-                            AgentStatus::Idle
-                        } else {
-                            AgentStatus::Failed
-                        };
-                        agent.completed_at = Some(Utc::now());
-                        agent.steps_completed = result.steps_completed;
-                        agent.tool_calls = result
-                            .tool_calls
-                            .iter()
-                            .map(|tc| crate::types::ToolCallRecord {
-                                tool: tc.tool.clone(),
-                                input: tc.input.clone(),
-                                output: tc.output.clone(),
-                                duration_ms: tc.duration_ms,
-                                is_error: tc.is_error,
-                                tool_call_id: tc.tool_call_id.clone(),
-                                timestamp: tc.timestamp,
-                            })
-                            .collect();
-                        agent.tokens_input = result.tokens_input;
-                        agent.tokens_output = result.tokens_output;
-                        agent.model_id = result.model_id.clone();
-                        agent.cost_usd = if !result.model_id.is_empty() {
-                            crate::kernel_handle::engine_api::estimate_cost(
-                                &result.model_id,
-                                result.tokens_input,
-                                result.tokens_output,
-                            )
-                        } else {
-                            0.0
-                        };
-                        if !result.success {
-                            agent.error = Some(result.output.clone());
-                        }
-                    }
-                }
-
-                let _ = self
-                    .event_bus
-                    .publish(crate::event_bus::KernelEvent::AgentStopped {
-                        id,
-                        success: result.success,
-                    });
-                self.update_agent_count();
-
-                // Persist to agent history log (async, non-blocking)
-                self.persist_agent(id).await;
-
-                Ok(result)
-            }
-            Err(e) => {
-                tracing::error!(agent_id = %id, error = %e, "Agent task failed");
-
-                {
-                    let mut agents = self.agents.write();
-                    if let Some(agent) = agents.get_mut(&id) {
-                        agent.status = AgentStatus::Failed;
-                        agent.completed_at = Some(Utc::now());
-                        agent.error = Some(e.to_string());
-                    }
-                }
-
-                let _ = self
-                    .event_bus
-                    .publish(crate::event_bus::KernelEvent::AgentFailed {
-                        id,
-                        error: e.to_string(),
-                    });
-                self.update_agent_count();
-
-                // Persist to agent history log (async, non-blocking)
-                self.persist_agent(id).await;
-
-                Ok(ExecutionResult {
-                    output: format!("Agent failed: {e}"),
-                    steps_completed: 0,
-                    success: false,
-                    tool_calls: vec![],
-                    tokens_input: 0,
-                    tokens_output: 0,
-                    model_id: String::new(),
-                })
-            }
-        }
     }
 
     async fn run_with_directive(
@@ -835,19 +596,9 @@ pub struct NoOpSupervisor;
 
 #[async_trait::async_trait]
 impl Supervisor for NoOpSupervisor {
-    async fn fork(&self, _spec: &Seed) -> Result<AgentId> {
-        Err(anyhow::anyhow!(
-            "NoOpSupervisor: fork not available during build"
-        ))
-    }
     async fn exec(&self, _id: AgentId) -> Result<()> {
         Err(anyhow::anyhow!(
             "NoOpSupervisor: exec not available during build"
-        ))
-    }
-    async fn run_with_seed(&self, _id: AgentId, _seed: &Seed) -> Result<ExecutionResult> {
-        Err(anyhow::anyhow!(
-            "NoOpSupervisor: run_with_seed not available during build"
         ))
     }
     async fn fork_directive(&self, _directive: &Directive, _env: &ExecEnv) -> Result<AgentId> {
@@ -885,8 +636,6 @@ mod tests {
     use super::*;
     use crate::event_bus::EventBus;
     use crate::types::AgentStatus;
-    // Note: imports kept for potential future test extensions.
-    use oxios_ouroboros::Seed;
 
     // Note: MockProvider no longer needed — OxiosEngine handles provider resolution.
     // The engine resolves models internally, so tests just use OxiosEngine::new().
@@ -1009,47 +758,32 @@ mod tests {
         BasicSupervisor::new(event_bus, runtime)
     }
 
-    /// Helper to create a minimal Seed for testing.
-    fn make_seed(goal: &str) -> Seed {
-        Seed {
-            id: uuid::Uuid::new_v4(),
-            goal: goal.to_string(),
-            constraints: vec![],
-            acceptance_criteria: vec![],
-            ontology: vec![],
-            created_at: chrono::Utc::now(),
-            generation: 0,
-            parent_seed_id: None,
-            cspace_hint: None,
-            original_request: String::new(),
-            output_schema: None,
-            project_id: None,
-            workspace_context: None,
-            mount_paths: Vec::new(),
-        }
+    /// Helper to create a minimal (Directive, ExecEnv) pair for testing.
+    fn make_directive(goal: &str) -> (Directive, ExecEnv) {
+        (Directive::from_message(goal), ExecEnv::default())
     }
 
     #[tokio::test]
     async fn test_fork_creates_agent() {
         let supervisor = make_supervisor().await;
-        let seed = make_seed("Test agent");
+        let (directive, env) = make_directive("Test agent");
 
-        let id = supervisor.fork(&seed).await.unwrap();
+        let id = supervisor.fork_directive(&directive, &env).await.unwrap();
 
         let agents = supervisor.list().await.unwrap();
         assert_eq!(agents.len(), 1);
         assert_eq!(agents[0].id, id);
         assert_eq!(agents[0].name, "Test agent");
         assert_eq!(agents[0].status, AgentStatus::Starting);
-        assert_eq!(agents[0].seed_id, Some(seed.id));
+        assert_eq!(agents[0].seed_id, None);
     }
 
     #[tokio::test]
     async fn test_exec_updates_status_to_running() {
         let supervisor = make_supervisor().await;
-        let seed = make_seed("Running agent");
+        let (directive, env) = make_directive("Running agent");
 
-        let id = supervisor.fork(&seed).await.unwrap();
+        let id = supervisor.fork_directive(&directive, &env).await.unwrap();
         assert_eq!(supervisor.wait(id).await.unwrap(), AgentStatus::Starting);
 
         supervisor.exec(id).await.unwrap();
@@ -1059,9 +793,9 @@ mod tests {
     #[tokio::test]
     async fn test_kill_sets_stopped() {
         let supervisor = make_supervisor().await;
-        let seed = make_seed("Doomed agent");
+        let (directive, env) = make_directive("Doomed agent");
 
-        let id = supervisor.fork(&seed).await.unwrap();
+        let id = supervisor.fork_directive(&directive, &env).await.unwrap();
         supervisor.exec(id).await.unwrap();
         assert_eq!(supervisor.wait(id).await.unwrap(), AgentStatus::Running);
 
@@ -1083,9 +817,12 @@ mod tests {
     async fn test_list_returns_all_agents() {
         let supervisor = make_supervisor().await;
 
-        let id1 = supervisor.fork(&make_seed("Agent 1")).await.unwrap();
-        let id2 = supervisor.fork(&make_seed("Agent 2")).await.unwrap();
-        let id3 = supervisor.fork(&make_seed("Agent 3")).await.unwrap();
+        let (d1, e1) = make_directive("Agent 1");
+        let id1 = supervisor.fork_directive(&d1, &e1).await.unwrap();
+        let (d2, e2) = make_directive("Agent 2");
+        let id2 = supervisor.fork_directive(&d2, &e2).await.unwrap();
+        let (d3, e3) = make_directive("Agent 3");
+        let id3 = supervisor.fork_directive(&d3, &e3).await.unwrap();
 
         let agents = supervisor.list().await.unwrap();
         assert_eq!(agents.len(), 3);

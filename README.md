@@ -180,30 +180,25 @@ That's it. The OS handles the rest.
 
 ## Core Concepts
 
-### 🔄 Ouroboros Protocol
+### 🔄 Unified Intent Handling
 
-Powered by the [Ouroboros specification framework](https://github.com/Q00/ouroboros). Agents never execute blindly — every task starts with a specification that evolves through cycles.
+Every message flows through a single path that adapts depth to the task. No keywords, no modes — the message itself determines how much processing it needs.
 
 ```
-┌─────────────────────────────────────────────┐
-│                                             │
-│  Interview ──► Seed ──► Execute ──► Evaluate│
-│       ▲                            │        │
-│       │                            ▼        │
-│       └──────── Evolve ◄────────────────────┘
-│                                             │
-└─────────────────────────────────────────────┘
+message → assess → ├─ Conversation → direct reply (no agent)
+                   ├─ Clarify → ask questions, then proceed
+                   └─ Task → crystallize → execute → review → (retry if needed)
 ```
 
-| Phase | What Happens |
+| Stage | What Happens |
 |-------|-------------|
-| **Interview** | Agent asks clarifying questions to understand the task |
-| **Seed** | Generates a formal specification (the "seed") |
-| **Execute** | Implements the spec using available tools |
-| **Evaluate** | Validates the output against the specification |
-| **Evolve** | Refines the spec based on results, then loops |
+| **Assess** | Classifies the message: conversation, needs clarification, or a task |
+| **Crystallize** | For substantial tasks, generates a structured directive (goal, constraints, acceptance criteria) |
+| **Execute** | Runs the agent with the directive |
+| **Review** | Checks the result against acceptance criteria (substantial tasks only) |
+| **Retry** | Re-executes with feedback if review fails (up to 2 retries) |
 
-The Ouroboros protocol is the heart of Oxios. It ensures agents produce **reliable, spec-driven output** rather than improvising solutions.
+This replaces the former five-phase Ouroboros protocol (interview → seed → execute → evaluate → evolve) with a simpler, unified flow. The core ideas — ask when unclear, verify substantial results — are preserved without the ceremony.
 
 ### 🧭 Supervisor
 
@@ -475,18 +470,6 @@ Full REST API on **port 4200** with 76 endpoints. Auth middleware on all `/api/*
 | `GET` | `/api/workspace/tree` | File tree |
 | `GET` | `/api/workspace/file/{path}` | Read file |
 | `PUT` | `/api/workspace/file/{path}` | Write file |
-
-### Seeds & Skills
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/api/seeds` | List seeds |
-| `GET` | `/api/seeds/{id}` | Get seed details |
-| `GET` | `/api/seeds/{id}/evolution` | Seed evolution history |
-| `GET` | `/api/skills` | List skills |
-| `GET` | `/api/skills/{name}` | Get skill details |
-| `POST` | `/api/skills` | Create skill |
-| `DELETE` | `/api/skills/{name}` | Delete skill |
 
 ### Memory
 

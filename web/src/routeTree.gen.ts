@@ -30,14 +30,12 @@ import { Route as A2aRouteImport } from './routes/a2a'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as WorkspaceIndexRouteImport } from './routes/workspace/index'
 import { Route as SessionsIndexRouteImport } from './routes/sessions/index'
-import { Route as SeedsIndexRouteImport } from './routes/seeds/index'
 import { Route as ProjectsIndexRouteImport } from './routes/projects/index'
 import { Route as MountsIndexRouteImport } from './routes/mounts/index'
 import { Route as KnowledgeIndexRouteImport } from './routes/knowledge/index'
 import { Route as AgentsIndexRouteImport } from './routes/agents/index'
 import { Route as AgentGroupsIndexRouteImport } from './routes/agent-groups/index'
 import { Route as SessionsSessionIdRouteImport } from './routes/sessions/$sessionId'
-import { Route as SeedsSeedIdRouteImport } from './routes/seeds/$seedId'
 import { Route as ProjectsProjectIdRouteImport } from './routes/projects/$projectId'
 import { Route as KnowledgeSettingsRouteImport } from './routes/knowledge/settings'
 import { Route as KnowledgeHabitsRouteImport } from './routes/knowledge/habits'
@@ -151,11 +149,6 @@ const SessionsIndexRoute = SessionsIndexRouteImport.update({
   path: '/sessions/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const SeedsIndexRoute = SeedsIndexRouteImport.update({
-  id: '/seeds/',
-  path: '/seeds/',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ProjectsIndexRoute = ProjectsIndexRouteImport.update({
   id: '/projects/',
   path: '/projects/',
@@ -184,11 +177,6 @@ const AgentGroupsIndexRoute = AgentGroupsIndexRouteImport.update({
 const SessionsSessionIdRoute = SessionsSessionIdRouteImport.update({
   id: '/sessions/$sessionId',
   path: '/sessions/$sessionId',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SeedsSeedIdRoute = SeedsSeedIdRouteImport.update({
-  id: '/seeds/$seedId',
-  path: '/seeds/$seedId',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ProjectsProjectIdRoute = ProjectsProjectIdRouteImport.update({
@@ -253,14 +241,12 @@ export interface FileRoutesByFullPath {
   '/knowledge/habits': typeof KnowledgeHabitsRoute
   '/knowledge/settings': typeof KnowledgeSettingsRoute
   '/projects/$projectId': typeof ProjectsProjectIdRoute
-  '/seeds/$seedId': typeof SeedsSeedIdRoute
   '/sessions/$sessionId': typeof SessionsSessionIdRoute
   '/agent-groups/': typeof AgentGroupsIndexRoute
   '/agents/': typeof AgentsIndexRoute
   '/knowledge/': typeof KnowledgeIndexRoute
   '/mounts/': typeof MountsIndexRoute
   '/projects/': typeof ProjectsIndexRoute
-  '/seeds/': typeof SeedsIndexRoute
   '/sessions/': typeof SessionsIndexRoute
   '/workspace/': typeof WorkspaceIndexRoute
   '/agents/$agentId/trace': typeof AgentsAgentIdTraceRoute
@@ -291,14 +277,12 @@ export interface FileRoutesByTo {
   '/knowledge/habits': typeof KnowledgeHabitsRoute
   '/knowledge/settings': typeof KnowledgeSettingsRoute
   '/projects/$projectId': typeof ProjectsProjectIdRoute
-  '/seeds/$seedId': typeof SeedsSeedIdRoute
   '/sessions/$sessionId': typeof SessionsSessionIdRoute
   '/agent-groups': typeof AgentGroupsIndexRoute
   '/agents': typeof AgentsIndexRoute
   '/knowledge': typeof KnowledgeIndexRoute
   '/mounts': typeof MountsIndexRoute
   '/projects': typeof ProjectsIndexRoute
-  '/seeds': typeof SeedsIndexRoute
   '/sessions': typeof SessionsIndexRoute
   '/workspace': typeof WorkspaceIndexRoute
   '/agents/$agentId/trace': typeof AgentsAgentIdTraceRoute
@@ -330,14 +314,12 @@ export interface FileRoutesById {
   '/knowledge/habits': typeof KnowledgeHabitsRoute
   '/knowledge/settings': typeof KnowledgeSettingsRoute
   '/projects/$projectId': typeof ProjectsProjectIdRoute
-  '/seeds/$seedId': typeof SeedsSeedIdRoute
   '/sessions/$sessionId': typeof SessionsSessionIdRoute
   '/agent-groups/': typeof AgentGroupsIndexRoute
   '/agents/': typeof AgentsIndexRoute
   '/knowledge/': typeof KnowledgeIndexRoute
   '/mounts/': typeof MountsIndexRoute
   '/projects/': typeof ProjectsIndexRoute
-  '/seeds/': typeof SeedsIndexRoute
   '/sessions/': typeof SessionsIndexRoute
   '/workspace/': typeof WorkspaceIndexRoute
   '/agents/$agentId/trace': typeof AgentsAgentIdTraceRoute
@@ -370,14 +352,12 @@ export interface FileRouteTypes {
     | '/knowledge/habits'
     | '/knowledge/settings'
     | '/projects/$projectId'
-    | '/seeds/$seedId'
     | '/sessions/$sessionId'
     | '/agent-groups/'
     | '/agents/'
     | '/knowledge/'
     | '/mounts/'
     | '/projects/'
-    | '/seeds/'
     | '/sessions/'
     | '/workspace/'
     | '/agents/$agentId/trace'
@@ -408,14 +388,12 @@ export interface FileRouteTypes {
     | '/knowledge/habits'
     | '/knowledge/settings'
     | '/projects/$projectId'
-    | '/seeds/$seedId'
     | '/sessions/$sessionId'
     | '/agent-groups'
     | '/agents'
     | '/knowledge'
     | '/mounts'
     | '/projects'
-    | '/seeds'
     | '/sessions'
     | '/workspace'
     | '/agents/$agentId/trace'
@@ -446,14 +424,12 @@ export interface FileRouteTypes {
     | '/knowledge/habits'
     | '/knowledge/settings'
     | '/projects/$projectId'
-    | '/seeds/$seedId'
     | '/sessions/$sessionId'
     | '/agent-groups/'
     | '/agents/'
     | '/knowledge/'
     | '/mounts/'
     | '/projects/'
-    | '/seeds/'
     | '/sessions/'
     | '/workspace/'
     | '/agents/$agentId/trace'
@@ -485,14 +461,12 @@ export interface RootRouteChildren {
   KnowledgeHabitsRoute: typeof KnowledgeHabitsRoute
   KnowledgeSettingsRoute: typeof KnowledgeSettingsRoute
   ProjectsProjectIdRoute: typeof ProjectsProjectIdRoute
-  SeedsSeedIdRoute: typeof SeedsSeedIdRoute
   SessionsSessionIdRoute: typeof SessionsSessionIdRoute
   AgentGroupsIndexRoute: typeof AgentGroupsIndexRoute
   AgentsIndexRoute: typeof AgentsIndexRoute
   KnowledgeIndexRoute: typeof KnowledgeIndexRoute
   MountsIndexRoute: typeof MountsIndexRoute
   ProjectsIndexRoute: typeof ProjectsIndexRoute
-  SeedsIndexRoute: typeof SeedsIndexRoute
   SessionsIndexRoute: typeof SessionsIndexRoute
   WorkspaceIndexRoute: typeof WorkspaceIndexRoute
 }
@@ -646,13 +620,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SessionsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/seeds/': {
-      id: '/seeds/'
-      path: '/seeds'
-      fullPath: '/seeds/'
-      preLoaderRoute: typeof SeedsIndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/projects/': {
       id: '/projects/'
       path: '/projects'
@@ -693,13 +660,6 @@ declare module '@tanstack/react-router' {
       path: '/sessions/$sessionId'
       fullPath: '/sessions/$sessionId'
       preLoaderRoute: typeof SessionsSessionIdRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/seeds/$seedId': {
-      id: '/seeds/$seedId'
-      path: '/seeds/$seedId'
-      fullPath: '/seeds/$seedId'
-      preLoaderRoute: typeof SeedsSeedIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/projects/$projectId': {
@@ -792,14 +752,12 @@ const rootRouteChildren: RootRouteChildren = {
   KnowledgeHabitsRoute: KnowledgeHabitsRoute,
   KnowledgeSettingsRoute: KnowledgeSettingsRoute,
   ProjectsProjectIdRoute: ProjectsProjectIdRoute,
-  SeedsSeedIdRoute: SeedsSeedIdRoute,
   SessionsSessionIdRoute: SessionsSessionIdRoute,
   AgentGroupsIndexRoute: AgentGroupsIndexRoute,
   AgentsIndexRoute: AgentsIndexRoute,
   KnowledgeIndexRoute: KnowledgeIndexRoute,
   MountsIndexRoute: MountsIndexRoute,
   ProjectsIndexRoute: ProjectsIndexRoute,
-  SeedsIndexRoute: SeedsIndexRoute,
   SessionsIndexRoute: SessionsIndexRoute,
   WorkspaceIndexRoute: WorkspaceIndexRoute,
 }

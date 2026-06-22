@@ -70,34 +70,6 @@ pub enum KernelEvent {
         /// Message content.
         content: String,
     },
-    /// A new seed has been created.
-    SeedCreated {
-        /// The seed's ID.
-        seed_id: uuid::Uuid,
-    },
-    /// An evaluation has completed.
-    EvaluationComplete {
-        /// The seed that was evaluated.
-        seed_id: uuid::Uuid,
-        /// Whether the evaluation passed.
-        passed: bool,
-    },
-    /// An Ouroboros phase has started.
-    PhaseStarted {
-        /// The session this phase belongs to.
-        session_id: String,
-        /// The phase that started.
-        phase: oxios_ouroboros::Phase,
-    },
-    /// An Ouroboros phase has completed.
-    PhaseCompleted {
-        /// The session this phase belongs to.
-        session_id: String,
-        /// The phase that completed.
-        phase: oxios_ouroboros::Phase,
-        /// A brief summary of the result.
-        result_summary: String,
-    },
     /// An agent has produced output.
     AgentOutput {
         /// The session this output belongs to.
@@ -176,24 +148,6 @@ pub enum KernelEvent {
         project_id: uuid::Uuid,
         /// The project's name.
         name: String,
-    },
-    /// Evolution has started (evaluate → evolve → re-execute loop).
-    EvolutionStarted {
-        /// Seed ID before evolution.
-        seed_id: uuid::Uuid,
-        /// Seed ID after evolution.
-        new_seed_id: uuid::Uuid,
-        /// Current iteration (0-based).
-        iteration: u32,
-    },
-    /// Evolution loop reached max iterations.
-    EvolutionMaxReached {
-        /// The final seed ID.
-        seed_id: uuid::Uuid,
-        /// Final evaluation score.
-        final_score: f64,
-        /// Number of iterations completed.
-        iterations: u32,
     },
 
     // ── RFC-015 Chat Transparency ─────────────────────────────
@@ -368,22 +322,6 @@ pub fn kernel_event_to_audit_action(event: &KernelEvent) -> AuditAction {
         KernelEvent::MessageReceived { content, .. } => AuditAction::Other {
             detail: format!("message: {content}"),
         },
-        KernelEvent::SeedCreated { seed_id, .. } => AuditAction::Other {
-            detail: format!("seed_created:{seed_id}"),
-        },
-        KernelEvent::EvaluationComplete { seed_id, passed } => AuditAction::Other {
-            detail: format!("evaluation:{seed_id}:{passed}"),
-        },
-        KernelEvent::PhaseStarted { session_id, phase } => AuditAction::Other {
-            detail: format!("phase_started:{session_id}:{phase}"),
-        },
-        KernelEvent::PhaseCompleted {
-            session_id,
-            phase,
-            result_summary,
-        } => AuditAction::Other {
-            detail: format!("phase_completed:{session_id}:{phase}:{result_summary}"),
-        },
         KernelEvent::AgentOutput { output, .. } => AuditAction::Other {
             detail: format!("agent_output:{output}"),
         },
@@ -418,20 +356,6 @@ pub fn kernel_event_to_audit_action(event: &KernelEvent) -> AuditAction {
             success,
         } => AuditAction::Other {
             detail: format!("group_member_completed:{group_id}:{agent_id}:{success}"),
-        },
-        KernelEvent::EvolutionStarted {
-            seed_id,
-            new_seed_id,
-            iteration,
-        } => AuditAction::Other {
-            detail: format!("evolution:{seed_id}->{new_seed_id}:iter{iteration}"),
-        },
-        KernelEvent::EvolutionMaxReached {
-            seed_id,
-            final_score,
-            iterations,
-        } => AuditAction::Other {
-            detail: format!("evolution_max:{seed_id}:score={final_score}:iters={iterations}"),
         },
         KernelEvent::ProjectCreated {
             project_id: _,

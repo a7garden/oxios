@@ -16,7 +16,7 @@ use crate::metrics::get_metrics;
 use crate::scheduler::{AgentScheduler, Priority, ScheduledTask};
 use crate::supervisor::Supervisor;
 use crate::types::{AgentId, AgentStatus};
-use oxios_ouroboros::{Directive, ExecEnv, ExecutionResult, Seed};
+use oxios_ouroboros::{Directive, ExecEnv, ExecutionResult};
 
 /// Manages the full lifecycle of a single agent from fork to cleanup.
 pub struct AgentLifecycleManager {
@@ -92,85 +92,7 @@ impl AgentLifecycleManager {
     }
 
     /// Fork an agent, register it in A2A and access control, submit to
-    /// scheduler, run the seed, then clean up.
-    pub async fn spawn_and_run(&self, seed: &Seed, priority: Priority) -> Result<ExecutionResult> {
-        // 1. Fork
-        let agent_id = self.supervisor.fork(seed).await?;
-        let agent_name = format!("agent-{agent_id}");
-        tracing::info!(agent_id = %agent_id, seed_id = %seed.id, "Agent forked");
-
-        // 2. Register A2A card
-        let card = self.build_agent_card(agent_id, &agent_name, seed);
-        if let Err(e) = self.a2a.registry().register_agent(card).await {
-            tracing::warn!(agent_id = %agent_id, error = %e, "Failed to register A2A card");
-        }
-
-        // 2b. Deliver any pending A2A messages to this agent
-        if let Err(e) = self.a2a.deliver_pending_messages(agent_id).await {
-            tracing::debug!(agent_id = %agent_id, error = %e, "No pending A2A messages");
-        }
-
-        // 3. Ensure access permissions
-        self.ensure_permissions(&agent_name);
-
-        // 4. Submit and start task
-        get_metrics().agents_forked.inc();
-        let task =
-            ScheduledTask::for_agent(agent_id, format!("Execute seed '{}'", seed.goal), priority);
-        let task_id = self.scheduler.submit(task)?;
-        self.scheduler.start_task(task_id)?;
-
-        // 5. Run — always cleanup even on failure
-        let max_secs = self
-            .max_execution_time_secs
-            .load(std::sync::atomic::Ordering::Relaxed);
-        let result = if max_secs > 0 {
-            let exec_timeout = Duration::from_secs(max_secs);
-            match timeout(exec_timeout, self.supervisor.run_with_seed(agent_id, seed)).await {
-                Ok(Ok(r)) => r,
-                Ok(Err(e)) => {
-                    tracing::warn!(agent_id = %agent_id, error = %e, "Agent execution failed, cleaning up");
-                    self.cleanup_on_failure(agent_id, task_id).await;
-                    return Err(e);
-                }
-                Err(_) => {
-                    let secs = exec_timeout.as_secs();
-                    tracing::warn!(
-                        agent_id = %agent_id,
-                        secs,
-                        "Agent execution timed out after {}s",
-                        secs
-                    );
-                    // Abort the detached execution body. Previously the
-                    // timeout only dropped the awaiting future while the
-                    // spawned task kept running — leaking tokens/resources.
-                    let _ = self.supervisor.kill(agent_id).await;
-                    self.cleanup_on_failure(agent_id, task_id).await;
-                    bail!("Agent execution timed out after {secs} seconds");
-                }
-            }
-        } else {
-            match self.supervisor.run_with_seed(agent_id, seed).await {
-                Ok(r) => r,
-                Err(e) => {
-                    tracing::warn!(agent_id = %agent_id, error = %e, "Agent execution failed, cleaning up");
-                    self.cleanup_on_failure(agent_id, task_id).await;
-                    return Err(e);
-                }
-            }
-        };
-
-        // 6. Cleanup on success
-        self.cleanup(agent_id, task_id, &result).await;
-
-        Ok(result)
-    }
-
-    /// Fork an agent, register it in A2A and access control, submit to
     /// scheduler, run the directive + exec env, then clean up (RFC-027).
-    ///
-    /// Mirrors [`spawn_and_run`](Self::spawn_and_run) but operates on the
-    /// unified-intent types. The legacy Seed variant stays for Phase 6.
     pub async fn execute_directive(
         &self,
         directive: &Directive,
@@ -305,46 +227,10 @@ impl AgentLifecycleManager {
         Ok(())
     }
 
-    /// Build an A2A agent card from the seed.
-    fn build_agent_card(&self, agent_id: AgentId, agent_name: &str, seed: &Seed) -> AgentCard {
-        let goal_lower = seed.goal.to_lowercase();
-
-        let mut card = AgentCard::new(
-            agent_id,
-            agent_name,
-            format!("Agent executing seed: {}", seed.goal),
-        )
-        .with_capability("execute-seed")
-        .with_status(AgentStatus::Starting);
-
-        // Infer capabilities from goal.
-        if goal_lower.contains("review") || goal_lower.contains("code") {
-            card = card.with_capability("code-review");
-        }
-        if goal_lower.contains("test") {
-            card = card.with_capability("testing");
-        }
-        if goal_lower.contains("refactor") || goal_lower.contains("improve") {
-            card = card.with_capability("refactoring");
-        }
-        if goal_lower.contains("write")
-            || goal_lower.contains("create")
-            || goal_lower.contains("implement")
-        {
-            card = card.with_capability("code-generation");
-        }
-        if goal_lower.contains("debug") || goal_lower.contains("fix") {
-            card = card.with_capability("debugging");
-        }
-
-        card
-    }
-
     /// Build an A2A agent card from a Directive (RFC-027).
     ///
-    /// Mirrors [`build_agent_card`](Self::build_agent_card) but reads the
-    /// goal from a Directive. The card advertises `execute-directive` instead
-    /// of `execute-seed` so A2A consumers can distinguish the two paths.
+    /// Reads the goal from a Directive and advertises `execute-directive`
+    /// so A2A consumers know the agent follows the directive path.
     fn build_agent_card_directive(
         &self,
         agent_id: AgentId,

@@ -17,7 +17,7 @@ use oxios_kernel::{
 use oxios_markdown::KnowledgeBase;
 use oxios_markdown::knowledge::FileChange;
 
-use oxios_ouroboros::{OuroborosEngine, OuroborosProtocol, Seed};
+use oxios_ouroboros;  // Used for Directive, ExecEnv, IntentEngine types below.
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::OnceLock;
@@ -794,8 +794,6 @@ impl KernelBuilder {
             .context("Boot model/provider resolution failed")?;
 
         let resolver: Arc<dyn oxios_ouroboros::ModelResolver> = engine_handle.clone();
-        let ouroboros: Arc<dyn OuroborosProtocol> =
-            Arc::new(OuroborosEngine::new(resolver.clone()));
         let intent_engine: Arc<oxios_ouroboros::IntentEngine> =
             Arc::new(oxios_ouroboros::IntentEngine::new(resolver.clone()));
 
@@ -814,7 +812,6 @@ impl KernelBuilder {
 
         let persona_manager = PersonaManager::new();
         if let Some(p) = persona_manager.first_enabled() {
-            ouroboros.set_persona_prompt(Some(p.system_prompt.clone()));
             intent_engine.set_persona_prompt(Some(p.system_prompt));
             tracing::info!(persona = %p.name, "Active persona set on engines");
         }
@@ -1305,24 +1302,13 @@ impl KernelBuilder {
             .set_delegation_handler(Arc::new(move |_from, _to, task| {
                 let lc = dispatch_lifecycle.clone();
                 Box::pin(async move {
-                    let seed = Seed {
-                        id: task.task_id,
+                    let directive = oxios_ouroboros::Directive {
                         goal: task.description.clone(),
-                        constraints: vec![],
-                        acceptance_criteria: vec!["Task completes successfully".into()],
-                        ontology: vec![],
-                        created_at: chrono::Utc::now(),
-                        generation: 0,
-                        parent_seed_id: None,
-                        cspace_hint: None,
-                        original_request: String::new(),
-                        output_schema: None,
-                        project_id: None,
-                        workspace_context: None,
-                        mount_paths: Vec::new(),
+                        ..Default::default()
                     };
+                    let env = oxios_ouroboros::ExecEnv::default();
                     match lc
-                        .spawn_and_run(&seed, oxios_kernel::scheduler::Priority::Normal)
+                        .execute_directive(&directive, &env, oxios_kernel::scheduler::Priority::Normal)
                         .await
                     {
                         Ok(result) => Ok(serde_json::json!({
@@ -1340,7 +1326,6 @@ impl KernelBuilder {
             .await;
 
         let mut orchestrator = Orchestrator::with_config(
-            ouroboros,
             event_bus.clone(),
             state_store.clone(),
             lifecycle,

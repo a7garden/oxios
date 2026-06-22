@@ -28,9 +28,6 @@ const FILTER_PREFIXES: Record<string, string[]> = {
   tool_: ['tool_'],
   memory_: ['memory_'],
   approval_: ['approval_'],
-  // The "Seeds" filter is intentionally broad — it covers the full
-  // seed/phase/evaluation pipeline as called out in the RFC.
-  seeds: ['phase_', 'evaluation_', 'seed_'],
 }
 
 function matchesFilter(type: string, filter: string): boolean {
@@ -201,7 +198,6 @@ export function LiveActivityFeed({ variant = 'card' }: { variant?: 'card' | 'bar
         <option value="tool_">{t('dashboard.filterTools')}</option>
         <option value="memory_">{t('dashboard.filterMemory')}</option>
         <option value="approval_">{t('dashboard.filterApprovals')}</option>
-        <option value="seeds">{t('dashboard.filterSeeds')}</option>
       </select>
       <Button
         variant="ghost"

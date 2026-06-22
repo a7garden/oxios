@@ -80,7 +80,6 @@ function SessionDetailPage() {
   const details = [
     { label: t('sessions.sessionId'), value: session.id },
     { label: 'User ID', value: session.user_id ?? '—' },
-    { label: t('seeds.seed'), value: session.active_seed_id ?? '—' },
     { label: t('sessions.messages'), value: messages.length },
     { label: t('sessions.createdAt'), value: new Date(session.created_at).toLocaleString() },
     {

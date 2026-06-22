@@ -135,11 +135,10 @@ pub(crate) use system::{
 pub(crate) use tools::handle_tools_registry;
 pub(crate) use workspace::{
     MemoryMapCache, handle_memory_create, handle_memory_get, handle_memory_list, handle_memory_map,
-    handle_memory_search, handle_memory_semantic_search, handle_seed_evolution, handle_seed_get,
-    handle_seeds_list, handle_skill_content, handle_skill_create, handle_skill_delete,
-    handle_skill_disable, handle_skill_enable, handle_skill_get, handle_skills_list,
-    handle_workspace_file_create, handle_workspace_file_delete, handle_workspace_file_get,
-    handle_workspace_file_put, handle_workspace_tree,
+    handle_memory_search, handle_memory_semantic_search, handle_skill_content, handle_skill_create,
+    handle_skill_delete, handle_skill_disable, handle_skill_enable, handle_skill_get,
+    handle_skills_list, handle_workspace_file_create, handle_workspace_file_delete,
+    handle_workspace_file_get, handle_workspace_file_put, handle_workspace_tree,
 };
 
 // ---------------------------------------------------------------------------
@@ -305,10 +304,6 @@ pub fn build_routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
             "/api/workspace/file/{*path}",
             delete(handle_workspace_file_delete),
         )
-        // Seeds
-        .route("/api/seeds", get(handle_seeds_list))
-        .route("/api/seeds/{id}", get(handle_seed_get))
-        .route("/api/seeds/{id}/evolution", get(handle_seed_evolution))
         // Skills
         .route("/api/skills", get(handle_skills_list))
         .route("/api/skills/{name}", get(handle_skill_get))

@@ -70,8 +70,6 @@ pub struct AgentResponse {
     pub content: String,
     /// Session ID associated with this response.
     pub session_id: Option<String>,
-    /// Seed ID used for this response (if any).
-    pub seed_id: Option<String>,
     /// Phase reached during orchestration.
     pub phase_reached: Option<String>,
     /// Whether evaluation passed.
@@ -143,9 +141,6 @@ pub struct Session {
     /// the execution timeline when the session is re-opened.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub trajectory_steps: Vec<TrajectoryStepRecord>,
-    /// Currently active seed ID (if any).
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub active_seed_id: Option<String>,
     /// Currently active persona ID (for future multi-persona support).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub active_persona_id: Option<String>,
@@ -172,7 +167,6 @@ impl Session {
             user_messages: Vec::new(),
             agent_responses: Vec::new(),
             trajectory_steps: Vec::new(),
-            active_seed_id: None,
             active_persona_id: None,
             project_id: None,
             created_at: now,
@@ -190,7 +184,6 @@ impl Session {
             user_messages: Vec::new(),
             agent_responses: Vec::new(),
             trajectory_steps: Vec::new(),
-            active_seed_id: None,
             active_persona_id: None,
             project_id: None,
             created_at: now,
@@ -231,11 +224,6 @@ impl Session {
         &self.trajectory_steps
     }
 
-    /// Sets the active seed ID.
-    pub fn set_active_seed(&mut self, seed_id: Option<String>) {
-        self.active_seed_id = seed_id;
-        self.updated_at = Utc::now();
-    }
 
     /// Sets the active persona ID.
     pub fn set_active_persona(&mut self, persona_id: Option<String>) {
@@ -615,7 +603,6 @@ impl StateStore {
                                     }
                                 })
                             }),
-                        active_seed_id: session.active_seed_id.clone(),
                         project_id: session
                             .project_id
                             .clone()
@@ -844,9 +831,6 @@ pub struct SessionSummary {
     /// message (truncated to ~60 chars) when not explicitly set.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
-    /// Active seed ID if any.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub active_seed_id: Option<String>,
     /// Active project ID(s) this session belongs to.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub project_id: Option<String>,

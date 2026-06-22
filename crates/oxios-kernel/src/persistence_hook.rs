@@ -16,7 +16,7 @@ use crate::state_store::StateStore;
 use oxios_markdown::KnowledgeBase;
 use oxios_markdown::types::{NoteMeta, NoteQuality, NoteSource};
 use oxios_memory::memory::sona::TrajectoryStep;
-use oxios_ouroboros::Seed;
+use oxios_ouroboros::Directive;
 
 /// A planned write to the knowledge vault.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -119,7 +119,7 @@ impl PersistenceHook {
     /// `already_saved_knowledge` = true if tool-calling already did a knowledge write.
     pub async fn evaluate(
         &self,
-        seed: &Seed,
+        directive: &Directive,
         trajectory: &[TrajectoryStep],
         output: &str,
         already_saved_knowledge: bool,
@@ -131,7 +131,7 @@ impl PersistenceHook {
 
         // Layer 1: Heuristic — detect markdown documents
         if !already_saved_knowledge && looks_like_document(output) {
-            let path = auto_save_path(seed, output);
+            let path = auto_save_path(directive, output);
             let now = chrono::Utc::now().to_rfc3339();
             plan.knowledge.push(KnowledgeWrite {
                 path,
@@ -151,7 +151,7 @@ impl PersistenceHook {
         // Layer 2: LLM Reflection
         let knowledge_already_handled = !plan.knowledge.is_empty();
         let reflection_plan = self
-            .reflect(seed, trajectory, output, knowledge_already_handled)
+            .reflect(directive, trajectory, output, knowledge_already_handled)
             .await;
         match reflection_plan {
             Ok(rp) => {
@@ -294,7 +294,7 @@ impl PersistenceHook {
     /// LLM reflection — ask the model what to persist.
     async fn reflect(
         &self,
-        seed: &Seed,
+        directive: &Directive,
         trajectory: &[TrajectoryStep],
         output: &str,
         knowledge_already_handled: bool,
@@ -353,8 +353,8 @@ impl PersistenceHook {
              When saving to knowledge, strip conversational wrapping: greetings, sign-offs, questions to the user, hedging. Extract only substantive content.\n\
              JSON only:\n\
              {{\"memory\":[{{\"content\":\"...\",\"type\":\"fact|episode\",\"importance\":0.0-1.0}}]{knowledge_field}}}",
-            seed.goal,
-            seed.original_request,
+            directive.goal,
+            directive.original_request,
             trajectory_summary.join("\n"),
             result_snippet,
         );
@@ -401,8 +401,8 @@ fn looks_like_document(content: &str) -> bool {
     has_headers && has_structure
 }
 
-/// Generate an auto-save path from the seed goal and content.
-fn auto_save_path(seed: &Seed, content: &str) -> String {
+/// Generate an auto-save path from the directive goal and content.
+fn auto_save_path(directive: &Directive, content: &str) -> String {
     let date = chrono::Local::now().format("%Y-%m-%d").to_string();
 
     // Try to extract a meaningful name from the first ## heading
@@ -412,7 +412,7 @@ fn auto_save_path(seed: &Seed, content: &str) -> String {
         .map(|l| l.trim_start_matches('#').trim().to_string())
         .filter(|h| !h.is_empty())
         .unwrap_or_else(|| {
-            seed.goal
+            directive.goal
                 .split_whitespace()
                 .take(5)
                 .collect::<Vec<_>>()
@@ -480,49 +480,24 @@ mod tests {
 
     #[test]
     fn test_auto_save_path() {
-        let seed = Seed {
-            id: uuid::Uuid::new_v4(),
+        let directive = Directive {
             goal: "Write a Rust design document".to_string(),
-            constraints: vec![],
-            acceptance_criteria: vec![],
-            ontology: vec![],
-            created_at: chrono::Utc::now(),
-            generation: 0,
-            parent_seed_id: None,
-            cspace_hint: None,
-            original_request: String::new(),
-            output_schema: None,
-            project_id: None,
-            workspace_context: None,
-            mount_paths: Vec::new(),
+            ..Default::default()
         };
         let content = "## Rust Ownership Design\n\nContent here...";
-        let path = auto_save_path(&seed, content);
+        let path = auto_save_path(&directive, content);
         assert!(path.starts_with("notes/"));
         assert!(path.ends_with(".md"));
         assert!(path.contains("rust"));
     }
-
     #[test]
     fn test_auto_save_path_from_goal() {
-        let seed = Seed {
-            id: uuid::Uuid::new_v4(),
+        let directive = Directive {
             goal: "Fetch hacker news".to_string(),
-            constraints: vec![],
-            acceptance_criteria: vec![],
-            ontology: vec![],
-            created_at: chrono::Utc::now(),
-            generation: 0,
-            parent_seed_id: None,
-            cspace_hint: None,
-            original_request: String::new(),
-            output_schema: None,
-            project_id: None,
-            workspace_context: None,
-            mount_paths: Vec::new(),
+            ..Default::default()
         };
         let content = "Plain text without headings but we still need a path.";
-        let path = auto_save_path(&seed, content);
+        let path = auto_save_path(&directive, content);
         assert!(path.starts_with("notes/"));
         assert!(path.contains("fetch"));
     }

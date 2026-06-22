@@ -113,12 +113,6 @@ function AgentsList({
       <div className="flex flex-col items-center justify-center h-full gap-2 py-8 text-center">
         <Bot className="h-8 w-8 text-muted-foreground/40" />
         <p className="text-sm text-muted-foreground">{t('dashboard.noActiveAgents')}</p>
-        <Link
-          to="/seeds"
-          className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
-        >
-          {t('dashboard.onboarding.seed')}
-        </Link>
       </div>
     )
   }

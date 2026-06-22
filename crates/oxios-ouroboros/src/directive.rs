@@ -10,7 +10,7 @@ use std::path::PathBuf;
 
 /// What the agent should do. Built from either the raw message (Trivial)
 /// or a crystallize LLM call (Substantial).
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Directive {
     /// The goal the agent aims to achieve.
     pub goal: String,

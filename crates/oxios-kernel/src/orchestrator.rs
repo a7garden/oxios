@@ -1,25 +1,17 @@
 //! Orchestrator: coordinates the unified intent lifecycle (RFC-027).
 //!
-//! The orchestrator is the "brain" that runs the Ouroboros protocol.
-//! Given a user message:
-//! 1. Conduct the interview (ask clarifying questions if needed)
-//! 2. Generate a seed (via LLM for complex tasks, or ad-hoc for simple tasks)
-//! 3. Execute the agent via the supervisor
-//! 4. Return the result to the user
-//!
-//! The orchestrator does NOT know about channels or HTTP — it only
-//! coordinates Ouroboros + Supervisor + EventBus + StateStore + Scheduler + AccessManager.
-
-// Legacy helper functions (save_seed, publish_phase_*, format_*) are
-// retained for reference but no longer called after RFC-027 migration.
-#![allow(dead_code)]
+//! The orchestrator is the "brain" that processes every user message:
+//! 1. assess — classify the message (conversation / clarify / task)
+//! 2. crystallize — build a Directive for substantial tasks
+//! 3. execute — run the agent via the lifecycle manager
+//! 4. review — check the result against acceptance criteria
+//! 5. retry — re-execute with feedback if review fails
 
 use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::{Context, Result};
-use chrono;
-use oxios_ouroboros::{ExecutionResult, InterviewResult, OuroborosProtocol, Phase, Seed};
+use oxios_ouroboros::ExecutionResult;
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -84,8 +76,6 @@ impl SubTask {
 
 /// The orchestrator coordinates the full Ouroboros lifecycle.
 pub struct Orchestrator {
-    #[allow(dead_code)]
-    ouroboros: Arc<dyn OuroborosProtocol>,
     /// IntentEngine for the unified handle() path (RFC-027).
     /// Lazily available when the kernel wires it; None in legacy constructions.
     intent_engine: RwLock<Option<Arc<dyn oxios_ouroboros::IntentEngineOps>>>,
@@ -93,8 +83,6 @@ pub struct Orchestrator {
     state_store: Arc<StateStore>,
     /// Git version control layer for auto-commits.
     git_layer: Option<Arc<GitLayer>>,
-    /// Active interview sessions, keyed by session ID.
-    sessions: RwLock<std::collections::HashMap<String, InterviewSession>>,
     /// Agent lifecycle manager (fork, register, run, cleanup).
     lifecycle: AgentLifecycleManager,
     /// A2A protocol for inter-agent task delegation.
@@ -149,13 +137,11 @@ impl DelegationConfig {
 impl Orchestrator {
     /// Creates a new orchestrator.
     pub fn new(
-        ouroboros: Arc<dyn OuroborosProtocol>,
         event_bus: EventBus,
         state_store: Arc<StateStore>,
         lifecycle: AgentLifecycleManager,
     ) -> Self {
         Self::with_config(
-            ouroboros,
             event_bus,
             state_store,
             lifecycle,
@@ -165,19 +151,16 @@ impl Orchestrator {
 
     /// Creates a new orchestrator with custom config.
     pub fn with_config(
-        ouroboros: Arc<dyn OuroborosProtocol>,
         event_bus: EventBus,
         state_store: Arc<StateStore>,
         lifecycle: AgentLifecycleManager,
         _config: crate::config::OrchestratorConfig,
     ) -> Self {
         Self {
-            ouroboros,
             intent_engine: RwLock::new(None),
             event_bus,
             state_store,
             git_layer: None,
-            sessions: RwLock::new(std::collections::HashMap::new()),
             lifecycle,
             a2a: None,
             project_manager: RwLock::new(None),
@@ -408,92 +391,13 @@ impl Orchestrator {
 
     /// Restore sessions from persisted state.
     ///
-    /// Loads sessions from the `StateStore` that have an `active_seed_id`
-    /// (meaning they are mid-orchestration) and repopulates the in-memory
-    /// interview session map so that follow-up messages can continue
-    /// the conversation.
+    /// RFC-027: the in-memory interview session map is no longer used.
+    /// Clarify state is restored from the session store's conversation
+    /// history on demand by `handle_unified`. This function is a no-op.
     pub async fn restore_sessions(&self) {
-        let summaries = match self.state_store.list_sessions().await {
-            Ok(s) => s,
-            Err(e) => {
-                tracing::warn!(error = %e, "Failed to list sessions for restore");
-                return;
-            }
-        };
-
-        let mut restored = 0usize;
-        for summary in &summaries {
-            // Only restore sessions that are mid-orchestration (have an active seed).
-            let Some(ref seed_id_str) = summary.active_seed_id else {
-                continue;
-            };
-
-            let session_id = crate::state_store::SessionId(summary.id.clone());
-            let session = match self.state_store.load_session(&session_id).await {
-                Ok(Some(s)) => s,
-                Ok(None) => continue,
-                Err(e) => {
-                    tracing::warn!(
-                        session_id = %summary.id,
-                        error = %e,
-                        "Failed to load session for restore"
-                    );
-                    continue;
-                }
-            };
-
-            // Reconstruct an InterviewSession from the persisted data.
-            // The interview result is rebuilt from conversation history so
-            // that multi-turn context is available on follow-up messages.
-            let mut interview = oxios_ouroboros::InterviewResult::new();
-            interview.is_task = true; // Has active seed → was a task.
-            interview.original_message = session
-                .user_messages
-                .last()
-                .map(|m| m.content.clone())
-                .unwrap_or_default();
-
-            // Rebuild conversation history from user/agent exchanges.
-            // Use an index loop (not zip) so a trailing user message
-            // without a stored agent response (e.g. crash before flush)
-            // is preserved with an empty agent turn instead of dropped.
-            let history: Vec<oxios_ouroboros::interview::Exchange> = session
-                .user_messages
-                .iter()
-                .enumerate()
-                .map(|(i, user)| oxios_ouroboros::interview::Exchange {
-                    user: user.content.clone(),
-                    agent: session
-                        .agent_responses
-                        .get(i)
-                        .map(|a| a.content.clone())
-                        .unwrap_or_default(),
-                })
-                .collect();
-            interview.conversation_history = history;
-
-            let seed_id = seed_id_str.parse::<Uuid>().ok();
-
-            let interview_session = InterviewSession {
-                id: session.id.0.clone(),
-                interview,
-                phase: Phase::Execute,
-                seed_id,
-                agent_id: None,
-            };
-
-            {
-                let mut sessions = self.sessions.write();
-                sessions.insert(session.id.0.clone(), interview_session);
-            }
-
-            restored += 1;
-        }
-
-        if restored > 0 {
-            tracing::info!(restored, total = summaries.len(), "Sessions restored");
-        }
+        // No-op — see doc comment above.
     }
+
 
     /// Commit a file to git if GitLayer is configured and enabled.
     fn git_commit(&self, rel_path: &str, message: &str) {
@@ -504,408 +408,6 @@ impl Orchestrator {
         }
     }
 
-    /// Save a seed to the state store.
-    async fn save_seed(&self, seed: &Seed) -> Result<()> {
-        let key = seed.id.to_string();
-
-        self.state_store
-            .save_json("seeds", &key, seed)
-            .await
-            .context("failed to save seed to state store")?;
-
-        self.git_commit(&format!("seeds/{key}.json"), "ourobors: save seed");
-
-        Ok(())
-    }
-
-    /// Save an evaluation result to the state store.
-    /// Publish a PhaseStarted event.
-    async fn publish_phase_started(&self, session_id: &str, phase: Phase) {
-        let _ = self.event_bus.publish(KernelEvent::PhaseStarted {
-            session_id: session_id.to_owned(),
-            phase,
-        });
-    }
-
-    /// Publish a PhaseCompleted event.
-    async fn publish_phase_completed(&self, session_id: &str, phase: Phase, result: &str) {
-        let _ = self.event_bus.publish(KernelEvent::PhaseCompleted {
-            session_id: session_id.to_owned(),
-            phase,
-            result_summary: result.to_owned(),
-        });
-    }
-
-    /// Execute multiple subtasks using separate agents in parallel.
-    ///
-    /// When A2A is available, the orchestrator delegates tasks through the
-    /// A2A protocol with circuit breaker and retry support.
-    /// Otherwise, falls back to direct lifecycle execution.
-    ///
-    /// Results are collected as they complete using `JoinSet`.
-    pub async fn delegate_subtasks(
-        &self,
-        subtasks: Vec<SubTask>,
-        parent_seed: &Seed,
-    ) -> Result<Vec<SubTask>> {
-        // Single task — execute directly without group overhead.
-        if subtasks.len() == 1 {
-            return self.execute_single_subtask(subtasks, parent_seed).await;
-        }
-
-        // Try A2A-based delegation when the protocol is available.
-        if let Some(ref a2a) = self.a2a {
-            // Check circuit breaker
-            if !self.a2a_breaker.is_allowed() {
-                tracing::warn!(
-                    state = ?self.a2a_breaker.state(),
-                    "A2A circuit breaker open, using lifecycle fallback"
-                );
-                return self.delegate_via_lifecycle(subtasks, parent_seed).await;
-            }
-
-            // Delegate with retry
-            return self.delegate_with_retry(subtasks, parent_seed, a2a).await;
-        }
-
-        // Fallback: direct lifecycle execution (no A2A).
-        self.delegate_via_lifecycle(subtasks, parent_seed).await
-    }
-
-    /// Delegate subtasks via A2A with circuit breaker and retry support.
-    async fn delegate_with_retry(
-        &self,
-        subtasks: Vec<SubTask>,
-        parent_seed: &Seed,
-        a2a: &Arc<crate::a2a::A2AProtocol>,
-    ) -> Result<Vec<SubTask>> {
-        let mut attempt = 0;
-        let max_retries = self.delegation_config.max_retries;
-
-        loop {
-            match self
-                .delegate_via_a2a(subtasks.clone(), parent_seed, a2a)
-                .await
-            {
-                Ok(results) => {
-                    self.a2a_breaker.record_success();
-                    return Ok(results);
-                }
-                Err(e) => {
-                    self.a2a_breaker.record_failure();
-                    attempt += 1;
-
-                    if attempt >= max_retries {
-                        tracing::error!(
-                            attempts = attempt,
-                            error = %e,
-                            "A2A delegation exhausted after {} attempts, using lifecycle fallback",
-                            attempt
-                        );
-                        return self.delegate_via_lifecycle(subtasks, parent_seed).await;
-                    }
-
-                    // Exponential backoff
-                    let delay = self.delegation_config.backoff_delay(attempt);
-                    tracing::warn!(
-                        attempt,
-                        delay_ms = delay,
-                        error = %e,
-                        "A2A delegation failed, retrying with backoff"
-                    );
-                    tokio::time::sleep(Duration::from_millis(delay)).await;
-                }
-            }
-        }
-    }
-
-    /// Execute a single subtask directly via lifecycle manager.
-    async fn execute_single_subtask(
-        &self,
-        subtasks: Vec<SubTask>,
-        parent_seed: &Seed,
-    ) -> Result<Vec<SubTask>> {
-        let mut task = subtasks.into_iter().next().ok_or_else(|| {
-            anyhow::anyhow!("execute_single_subtask called with an empty subtask list")
-        })?;
-        let child_seed = Seed {
-            id: Uuid::new_v4(),
-            goal: task.description.clone(),
-            constraints: parent_seed.constraints.clone(),
-            acceptance_criteria: vec!["Task completes successfully".into()],
-            ontology: parent_seed.ontology.clone(),
-            created_at: chrono::Utc::now(),
-            generation: parent_seed.generation + 1,
-            parent_seed_id: Some(parent_seed.id),
-            cspace_hint: None,
-            original_request: parent_seed.original_request.clone(),
-            output_schema: None,
-            project_id: parent_seed.project_id,
-            workspace_context: parent_seed.workspace_context.clone(),
-            mount_paths: parent_seed.mount_paths.clone(),
-        };
-        match self
-            .lifecycle
-            .spawn_and_run(&child_seed, Priority::Normal)
-            .await
-        {
-            Ok(result) => {
-                task.result = Some(result.output.clone());
-            }
-            Err(e) => {
-                task.result = Some(format!("Failed: {e}"));
-                task.success = false;
-            }
-        }
-        Ok(vec![task])
-    }
-
-    /// Delegate subtasks via A2A protocol.
-    ///
-    /// Queries the AgentCardRegistry for agents matching each subtask's
-    /// Execute subtasks via A2A dispatch handler.
-    ///
-    /// Queries the AgentCardRegistry for agents matching each subtask's
-    /// required capability, then calls `execute_delegation` which runs
-    /// the task through the registered handler (lifecycle).
-    /// Falls back to direct lifecycle execution when no handler is registered.
-    async fn delegate_via_a2a(
-        &self,
-        subtasks: Vec<SubTask>,
-        parent_seed: &Seed,
-        a2a: &Arc<crate::a2a::A2AProtocol>,
-    ) -> Result<Vec<SubTask>> {
-        use crate::a2a::TaskPriority;
-        use tokio::task::JoinSet;
-
-        tracing::info!(
-            subtasks = subtasks.len(),
-            "Delegating subtasks via A2A protocol"
-        );
-
-        let orchestrator_id: crate::types::AgentId = uuid::Uuid::nil();
-        let subtask_count = subtasks.len();
-        let mut join_set: JoinSet<(usize, SubTask)> = JoinSet::new();
-
-        for (idx, subtask) in subtasks.into_iter().enumerate() {
-            let capability = subtask.required_capability.clone();
-            let description = subtask.description.clone();
-            let subtask_id = subtask.id;
-            let role = subtask.role.clone();
-            let a2a = Arc::clone(a2a);
-            let parent_seed = parent_seed.clone();
-            let lifecycle = self.lifecycle.clone();
-
-            join_set.spawn(async move {
-                // Find agent with the required capability via A2A registry.
-                let target: Option<crate::a2a::AgentCard> = if let Some(ref cap) = capability {
-                    a2a.query_capabilities(cap).await.ok()
-                        .and_then(|agents| agents.into_iter().next())
-                } else {
-                    None
-                };
-
-                let (output, success) = if let Some(ref target_card) = target {
-                    let target_id = target_card.agent_id;
-                    tracing::info!(
-                        subtask_index = idx,
-                        target = %target_card.name,
-                        target_id = %target_id,
-                        "A2A dispatching subtask"
-                    );
-
-                    let task = crate::a2a::TaskSpec::new(&description, serde_json::json!({
-                        "parent_seed": parent_seed.id.to_string(),
-                        "goal": description,
-                    }))
-                    .with_priority(TaskPriority::Normal);
-
-                    // Enqueue audit trail (fire-and-forget into queue).
-                    let _ = a2a.delegate_task(orchestrator_id, target_id, task.clone()).await;
-
-                    // Execute through dispatch handler (blocking).
-                    match a2a.execute_delegation(orchestrator_id, target_id, task).await {
-                        Some(Ok(result)) => {
-                            let out = result.get("output")
-                                .and_then(|v| v.as_str())
-                                .unwrap_or("")
-                                .to_string();
-                            let ok = result.get("success")
-                                .and_then(|v| v.as_bool())
-                                .unwrap_or(false);
-                            (out, ok)
-                        }
-                        Some(Err(e)) => {
-                            tracing::warn!(subtask_index = idx, error = %e, "execute_delegation failed");
-                            (format!("Failed: {e}"), false)
-                        }
-                        None => {
-                            // No handler — fallback to lifecycle.
-                            tracing::warn!(subtask_index = idx, "No dispatch handler, lifecycle fallback");
-                            run_via_lifecycle(&lifecycle, &parent_seed, &description).await
-                        }
-                    }
-                } else {
-                    tracing::info!(subtask_index = idx, "No A2A agent found, lifecycle fallback");
-                    run_via_lifecycle(&lifecycle, &parent_seed, &description).await
-                };
-
-                (idx, SubTask {
-                    id: subtask_id,
-                    description,
-                    required_capability: capability,
-                    result: Some(output),
-                    success,
-                    role,
-                })
-            });
-        }
-
-        let mut results: Vec<Option<SubTask>> = vec![None; subtask_count];
-        while let Some(join_result) = join_set.join_next().await {
-            match join_result {
-                Ok((idx, subtask)) => {
-                    results[idx] = Some(subtask);
-                }
-                Err(e) => {
-                    tracing::error!(error = %e, "A2A task panicked");
-                }
-            }
-        }
-
-        // Preserve subtask_count: a `None` slot means the task panicked or
-        // was lost. Previously flatten() dropped them, so `all(success)` on
-        // an empty vec returned true — total failure reported as success.
-        let completed: Vec<SubTask> = results
-            .into_iter()
-            .enumerate()
-            .map(|(idx, opt)| {
-                opt.unwrap_or_else(|| SubTask {
-                    id: Uuid::new_v4(),
-                    description: format!("subtask {idx} (failed)"),
-                    required_capability: None,
-                    result: Some("Task panicked or did not complete".into()),
-                    success: false,
-                    role: AgentRole::default(),
-                })
-            })
-            .collect();
-        tracing::info!(
-            completed = completed.len(),
-            succeeded = completed.iter().filter(|r| r.success).count(),
-            "A2A delegation complete"
-        );
-        Ok(completed)
-    }
-
-    async fn delegate_via_lifecycle(
-        &self,
-        subtasks: Vec<SubTask>,
-        parent_seed: &Seed,
-    ) -> Result<Vec<SubTask>> {
-        use crate::agent_group::OxiosAgentGroup;
-        use tokio::task::JoinSet;
-
-        let descriptions: Vec<String> = subtasks.iter().map(|st| st.description.clone()).collect();
-        let group = OxiosAgentGroup::new(parent_seed, descriptions);
-        let group_id = group.id;
-
-        self.event_bus.publish(KernelEvent::AgentGroupCreated {
-            group_id,
-            agent_count: group.agents.len(),
-        })?;
-
-        tracing::info!(
-            group_id = %group_id,
-            agent_count = group.agents.len(),
-            "Starting parallel multi-agent execution"
-        );
-
-        let mut join_set: JoinSet<(
-            usize,
-            crate::types::AgentId,
-            Result<oxios_ouroboros::ExecutionResult>,
-        )> = JoinSet::new();
-
-        for (idx, agent_entry) in group.agents.iter().enumerate() {
-            let child_seed = agent_entry.seed.clone();
-            let agent_id = agent_entry.id;
-            let lifecycle = self.lifecycle.clone();
-
-            join_set.spawn(async move {
-                let result = lifecycle.spawn_and_run(&child_seed, Priority::Normal).await;
-                (idx, agent_id, result)
-            });
-        }
-
-        let subtask_count = subtasks.len();
-        let mut completed = vec![None; subtask_count];
-        while let Some(join_result) = join_set.join_next().await {
-            match join_result {
-                Ok((idx, agent_id, Ok(exec_result))) => {
-                    let _ = self
-                        .event_bus
-                        .publish(KernelEvent::AgentGroupMemberCompleted {
-                            group_id,
-                            agent_id,
-                            success: exec_result.success,
-                        });
-                    completed[idx] = Some(SubTask {
-                        id: subtasks[idx].id,
-                        description: subtasks[idx].description.clone(),
-                        required_capability: subtasks[idx].required_capability.clone(),
-                        result: Some(exec_result.output.clone()),
-                        success: exec_result.success,
-                        role: subtasks[idx].role.clone(),
-                    });
-                }
-                Ok((idx, agent_id, Err(e))) => {
-                    tracing::warn!(subtask_index = idx, error = %e, "Subtask failed");
-                    let _ = self
-                        .event_bus
-                        .publish(KernelEvent::AgentGroupMemberCompleted {
-                            group_id,
-                            agent_id,
-                            success: false,
-                        });
-                    completed[idx] = Some(SubTask {
-                        id: subtasks[idx].id,
-                        description: subtasks[idx].description.clone(),
-                        required_capability: subtasks[idx].required_capability.clone(),
-                        result: Some(format!("Failed: {e}")),
-                        success: false,
-                        role: subtasks[idx].role.clone(),
-                    });
-                }
-                Err(e) => {
-                    tracing::error!(error = %e, "JoinSet task panicked");
-                }
-            }
-        }
-
-        let completed: Vec<SubTask> = completed.into_iter().flatten().collect();
-        let succeeded = completed.iter().filter(|r| r.success).count();
-        let total = completed.len();
-
-        tracing::info!(
-            group_id = %group_id,
-            succeeded,
-            total,
-            "Parallel multi-agent execution complete"
-        );
-
-        // Persist group state
-        let _ = self
-            .state_store
-            .save_json("agent_groups", &group_id.to_string(), &group)
-            .await;
-        self.git_commit(
-            &format!("agent_groups/{group_id}.json"),
-            "orchestrator: save group",
-        );
-
-        Ok(completed)
-    }
 
     // ──────────────────────────────────────────────────────────────────
     // RFC-027 §3 — Unified intent handler
@@ -1080,16 +582,13 @@ impl Orchestrator {
                 active_mount_ids: Vec::new(),
                 mount_tag: None,
                 response: reply,
-                seed_id: None,
                 agent_id: None,
-                phase_reached: oxios_ouroboros::Phase::Interview,
+                phase_reached: "interview".to_string(),
                 evaluation_passed: None,
                 output: None,
                 tool_calls: Vec::new(),
                 interview_questions: None,
                 interview_round: None,
-                interview_ambiguity: None,
-                mode: "unified".to_string(),
             },
             HandleResponse::Clarify(questions) => {
                 let questions_text = questions
@@ -1127,16 +626,13 @@ impl Orchestrator {
                     active_mount_ids: Vec::new(),
                     mount_tag: None,
                     response: questions_text,
-                    seed_id: None,
                     agent_id: None,
-                    phase_reached: oxios_ouroboros::Phase::Interview,
+                    phase_reached: "interview".to_string(),
                     evaluation_passed: None,
                     output: None,
                     tool_calls: Vec::new(),
                     interview_questions: structured,
                     interview_round: Some(((ctx.history.len() / 2) as u32).max(1)),
-                    interview_ambiguity: None,
-                    mode: "unified".to_string(),
                 }
             }
             HandleResponse::Task {
@@ -1172,16 +668,13 @@ impl Orchestrator {
                     active_mount_ids: Vec::new(),
                     mount_tag: None,
                     response: response_text,
-                    seed_id: None,
                     agent_id: None,
-                    phase_reached: oxios_ouroboros::Phase::Execute,
+                    phase_reached: "execute".to_string(),
                     evaluation_passed,
                     output: Some(result.output.clone()),
                     tool_calls: result.tool_calls.clone(),
                     interview_questions: None,
                     interview_round: None,
-                    interview_ambiguity: None,
-                    mode: "unified".to_string(),
                 }
             }
         }
@@ -1256,31 +749,9 @@ impl Orchestrator {
         directive: &oxios_ouroboros::Directive,
         env: &oxios_ouroboros::ExecEnv,
     ) -> Result<ExecutionResult> {
-        let seed = self.directive_to_seed(directive, env);
-        self.lifecycle.spawn_and_run(&seed, Priority::Normal).await
-    }
-
-    /// Shim a [`Directive`] + [`ExecEnv`] into a legacy [`Seed`].
-    ///
-    /// Used only by [`Self::execute_directive`] during the Phase 5 stub
-    /// window. Carries every field the agent runtime reads: goal,
-    /// constraints, acceptance criteria, original request, output schema,
-    /// project, workspace context, mount paths, and cspace hint.
-    fn directive_to_seed(
-        &self,
-        directive: &oxios_ouroboros::Directive,
-        env: &oxios_ouroboros::ExecEnv,
-    ) -> Seed {
-        let mut seed = Seed::new(directive.goal.clone());
-        seed.original_request = directive.original_request.clone();
-        seed.constraints = directive.constraints.clone();
-        seed.acceptance_criteria = directive.acceptance_criteria.clone();
-        seed.output_schema = directive.output_schema.clone();
-        seed.project_id = env.project_id;
-        seed.workspace_context = env.workspace_context.clone();
-        seed.mount_paths = env.mount_paths.clone();
-        seed.cspace_hint = env.cspace_hint.clone();
-        seed
+        self.lifecycle
+            .execute_directive(directive, env, Priority::Normal)
+            .await
     }
 
     /// Review the result against the directive's criteria; on failure,
@@ -1389,20 +860,6 @@ pub enum HandleResponse {
     },
 }
 
-/// Active session state for multi-turn interviews.
-#[derive(Debug, Clone)]
-#[allow(unused)]
-struct InterviewSession {
-    id: String,
-    interview: InterviewResult,
-    phase: Phase,
-    seed_id: Option<Uuid>,
-    agent_id: Option<AgentId>,
-}
-
-fn default_chat_mode() -> String {
-    "chat".into()
-}
 
 /// Result of a full orchestration cycle.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1424,14 +881,11 @@ pub struct OrchestrationResult {
     pub mount_tag: Option<String>,
     /// The response to send back to the user.
     pub response: String,
-    /// The seed that was created (if seed phase was reached).
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub seed_id: Option<Uuid>,
     /// The agent that executed (if execute phase was reached).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub agent_id: Option<AgentId>,
-    /// The furthest phase reached.
-    pub phase_reached: Phase,
+    /// The furthest phase reached: "interview" (conversation/clarify) or "execute" (task executed).
+    pub phase_reached: String,
     /// Whether evaluation passed.
     ///
     /// - `None` — evaluation was not applicable (interview, chat, non-task).
@@ -1458,150 +912,9 @@ pub struct OrchestrationResult {
     /// `interview_questions`. Drives the "Round N/M" indicator.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub interview_round: Option<u32>,
-    /// Current ambiguity score (0.0 = clear, 1.0 = fully ambiguous).
-    /// Populated alongside `interview_questions`. Drives the progress bar.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub interview_ambiguity: Option<f64>,
-    /// Execution mode: "chat" (default agent) | "ouroboros" (spec-first pipeline).
-    #[serde(default = "default_chat_mode")]
-    pub mode: String,
 }
 
-/// Format clarifying questions for display.
-fn format_questions(questions: &[String]) -> String {
-    if questions.is_empty() {
-        "I need a bit more clarification before I can proceed.".to_string()
-    } else {
-        format!(
-            "I'd like to understand your request better. Could you help clarify:\n\n{}",
-            questions
-                .iter()
-                .enumerate()
-                .map(|(i, q)| format!("{}. {}", i + 1, q))
-                .collect::<Vec<_>>()
-                .join("\n")
-        )
-    }
-}
 
-/// Format the final result for display.
-/// Format execution result for display to the user.
-fn format_execution_result(seed: &Seed, exec: &ExecutionResult) -> String {
-    let mut lines = Vec::new();
-
-    if exec.success {
-        lines.push(format!("✅ '{}'", seed.goal));
-    } else {
-        lines.push(format!(
-            "⚠️ '{}'을(를) 시도했지만 완전히 성공하지 못했습니다.",
-            seed.goal
-        ));
-    }
-
-    // Show a truncated preview of the output if present.
-    if !exec.output.is_empty() {
-        let preview = if exec.output.len() > 500 {
-            // Char-boundary safe: roll back to avoid splitting a
-            // multibyte UTF-8 sequence (Korean, CJK, emoji).
-            let mut end = 500;
-            while end > 0 && !exec.output.is_char_boundary(end) {
-                end -= 1;
-            }
-            format!("{}...", &exec.output[..end])
-        } else {
-            exec.output.clone()
-        };
-        lines.push(String::new());
-        lines.push(preview);
-    }
-
-    lines.join("\n")
-}
-
-/// Check if a seed should be split into subtasks.
-///
-/// Simple heuristic: if the seed has 3 or more acceptance criteria,
-/// it likely contains distinct concerns that can be parallelized.
-fn should_split_seed(seed: &Seed) -> bool {
-    // Only split for genuinely complex tasks with many criteria.
-    // Simple tasks (even with 3-4 criteria) are better handled by a single agent
-    // to preserve context coherence.
-    seed.acceptance_criteria.len() >= 5
-}
-
-/// Split a seed into subtasks based on acceptance criteria.
-///
-/// Each acceptance criterion becomes a separate subtask with the
-/// parent seed's goal as context. Infers required capability from
-/// the goal text using the same heuristic as `build_agent_card`.
-fn split_into_subtasks(seed: &Seed) -> Vec<SubTask> {
-    seed.acceptance_criteria
-        .iter()
-        .map(|criterion| {
-            let desc = format!("{}: {}", seed.goal, criterion);
-            let desc_lower = desc.to_lowercase();
-
-            // Infer capability from subtask description.
-            let cap = if desc_lower.contains("review") || desc_lower.contains("code") {
-                Some("code-review".to_string())
-            } else if desc_lower.contains("test") {
-                Some("testing".to_string())
-            } else if desc_lower.contains("refactor") || desc_lower.contains("improve") {
-                Some("refactoring".to_string())
-            } else if desc_lower.contains("write")
-                || desc_lower.contains("create")
-                || desc_lower.contains("implement")
-            {
-                Some("code-generation".to_string())
-            } else if desc_lower.contains("debug") || desc_lower.contains("fix") {
-                Some("debugging".to_string())
-            } else {
-                None
-            };
-
-            let mut subtask = SubTask::new(desc);
-            subtask.required_capability = cap;
-            subtask
-        })
-        .collect()
-}
-
-/// Format combined results from multi-agent execution.
-fn format_result_combined(combined: &str) -> String {
-    if combined.is_empty() {
-        "No subtasks completed successfully.".to_string()
-    } else {
-        format!("Multi-agent execution completed:\n\n{combined}")
-    }
-}
-
-/// Execute a subtask via lifecycle manager, returning (output, success).
-async fn run_via_lifecycle(
-    lifecycle: &crate::agent_lifecycle::AgentLifecycleManager,
-    parent_seed: &Seed,
-    description: &str,
-) -> (String, bool) {
-    let child_seed = Seed {
-        id: Uuid::new_v4(),
-        goal: description.to_string(),
-        constraints: parent_seed.constraints.clone(),
-        acceptance_criteria: vec!["Task completes successfully".into()],
-        ontology: parent_seed.ontology.clone(),
-        created_at: chrono::Utc::now(),
-        generation: parent_seed.generation + 1,
-        parent_seed_id: Some(parent_seed.id),
-        cspace_hint: None,
-        original_request: parent_seed.original_request.clone(),
-        output_schema: None,
-        project_id: parent_seed.project_id,
-        workspace_context: parent_seed.workspace_context.clone(),
-        mount_paths: parent_seed.mount_paths.clone(),
-    };
-    match lifecycle.spawn_and_run(&child_seed, Priority::Normal).await {
-        Ok(result) => (result.output, result.success),
-        Err(e) => (format!("Failed: {e}"), false),
-    }
-}
 
 /// Render the body of the `## Workspace Context` prompt section (RFC-025).
 ///

@@ -11,8 +11,7 @@ use async_trait::async_trait;
 use parking_lot::RwLock;
 
 use oxios_ouroboros::{
-    Assessment, Directive, EvaluationResult, ExecutionResult, IntentEngineOps, InterviewResult,
-    MsgCtx, OuroborosProtocol, Scope, Seed, Verdict,
+    Assessment, Directive, ExecutionResult, IntentEngineOps, MsgCtx, Scope, Verdict,
 };
 
 /// Mock IntentEngine that returns configurable responses.
@@ -99,37 +98,6 @@ impl IntentEngineOps for MockIntentEngine {
     }
 }
 
-/// A no-op OuroborosProtocol for the `Orchestrator::new` legacy field.
-struct MockOuroborosProtocol;
-
-#[async_trait]
-impl OuroborosProtocol for MockOuroborosProtocol {
-    async fn interview(&self, _user_input: &str) -> anyhow::Result<InterviewResult> {
-        unimplemented!("handle_unified path does not use interview")
-    }
-    async fn generate_seed(&self, _interview: &InterviewResult) -> anyhow::Result<Seed> {
-        unimplemented!("handle_unified path does not use generate_seed")
-    }
-    async fn execute(&self, _seed: &Seed) -> anyhow::Result<ExecutionResult> {
-        unimplemented!("handle_unified path does not use execute")
-    }
-    async fn evaluate(
-        &self,
-        _seed: &Seed,
-        _result: &ExecutionResult,
-    ) -> anyhow::Result<EvaluationResult> {
-        unimplemented!("handle_unified path does not use evaluate")
-    }
-    async fn evolve(
-        &self,
-        _seed: &Seed,
-        _evaluation: &EvaluationResult,
-    ) -> anyhow::Result<Option<Seed>> {
-        unimplemented!("handle_unified path does not use evolve")
-    }
-    fn set_persona_prompt(&self, _prompt: Option<String>) {}
-}
-
 /// Build a test orchestrator wired with a MockIntentEngine.
 pub fn build_test_orchestrator(
     supervisor: Arc<dyn oxios_kernel::supervisor::Supervisor>,
@@ -155,7 +123,6 @@ pub fn build_test_orchestrator(
 
     let mock = Arc::new(MockIntentEngine::new());
     let orchestrator = oxios_kernel::Orchestrator::new(
-        Arc::new(MockOuroborosProtocol),
         event_bus,
         state_store,
         lifecycle,

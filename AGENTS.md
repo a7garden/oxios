@@ -18,7 +18,7 @@ oxios/
 ├── crates/
 │   ├── oxios-kernel/      # Supervisor, scheduler, memory, security, tools
 │   ├── oxios-markdown/    # Knowledge base (VirtualFs, BacklinkIndex)
-│   ├── oxios-ouroboros/   # Spec-first protocol (interview → seed → execute → evaluate → evolve)
+│   ├── oxios-ouroboros/   # Unified intent handling (assess → crystallize → execute → review)
 │   ├── oxios-gateway/     # Channel-agnostic message hub
 │   ├── oxios-mcp/         # MCP client (JSON-RPC 2.0 over stdio)
 │   ├── oxios-memory/      # Tiered agent memory (Hot/Warm/Cold, Dream, HNSW)
@@ -46,7 +46,7 @@ oxios/
 ## Principles
 
 - **Unix philosophy** — fork/exec/wait/kill for agents. Compose small pieces.
-- **Ouroboros first** — never execute without a spec. Interview → seed → execute → evaluate → evolve.
+- **Intent-first** — assess every message; depth adapts to the task. assess → crystallize → execute → review.
 - **No reimplementation** — reuse oxi-sdk from crates.io.
 - **Channel agnostic** — gateway doesn't care where messages come from.
 - **No containers** — direct host execution. Security via AccessManager (RBAC + path sandboxing).
@@ -80,7 +80,7 @@ oxios/
 |------|---------|
 | `~/.oxios/` | Oxios home |
 | `~/.oxios/config.toml` | Configuration |
-| `~/.oxios/workspace/` | Agent working directory (seeds, sessions, skills) |
+| `~/.oxios/workspace/` | Agent working directory (sessions, skills) |
 | `~/.oxios/knowledge/` | User markdown knowledge base |
 | `~/.oxi/auth.json` | oxi-cli credentials (separate from Oxios) |
 

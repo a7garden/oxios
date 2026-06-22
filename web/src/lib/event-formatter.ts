@@ -61,9 +61,6 @@ function routeFromEvent(event: OxiosEvent): string | undefined {
   if (type === 'tool_started' || type === 'tool_finished') {
     return '/chat'
   }
-  if (type === 'phase_started' || type === 'phase_completed') {
-    return '/seeds'
-  }
   return undefined
 }
 

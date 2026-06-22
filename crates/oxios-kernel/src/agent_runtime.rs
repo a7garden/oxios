@@ -1,4 +1,4 @@
-//! Agent runtime: wraps oxi-sdk's Agent for Seed execution.
+//! Agent runtime: wraps oxi-sdk's Agent for directive execution.
 //!
 //! The AgentRuntime uses `OxiosEngine.oxi().agent()` (AgentBuilder pattern)
 //! to construct agents with full middleware, observability, and security
@@ -50,7 +50,7 @@ use crate::KernelHandle;
 use crate::event_bus::KernelEvent;
 use crate::session_context::SessionContext;
 use crate::types::AgentId;
-use oxios_ouroboros::{Directive, Entity, ExecEnv, ExecutionResult, Seed};
+use oxios_ouroboros::{Directive, Entity, ExecEnv, ExecutionResult};
 
 /// Global LLM circuit breaker instance — delegates to oxi-sdk's ProviderCircuitBreaker.
 static LLM_CIRCUIT_BREAKER: std::sync::OnceLock<oxi_sdk::ProviderCircuitBreaker> =
@@ -141,9 +141,9 @@ struct ExecuteState {
     total_output_tokens: u64,
 }
 
-/// Runtime that wraps an oxi-sdk `Agent` for executing Seeds.
+/// Runtime that wraps an oxi-sdk `Agent` for executing directives.
 ///
-/// Each call to [`AgentRuntime::execute`] creates a fresh `Agent`,
+/// Each call to [`AgentRuntime::execute_directive`] creates a fresh `Agent`,
 /// builds a ToolRegistry based on the agent's CSpace, and runs it to completion.
 ///
 /// All OS-level access goes through `KernelHandle` — the single syscall table
@@ -219,60 +219,11 @@ impl AgentRuntime {
         self
     }
 
-    /// Execute a Seed by running the tool-calling agent to completion.
-    ///
-    /// 1. Resolves CSpace from persona/role/hint
-    /// 2. Registers tools via CSpace
-    /// 3. Recalls memories if available
-    /// 4. Creates Agent via `Agent::new_with_resolver()`
-    /// 5. Runs via `Agent::run_streaming()`
-    pub async fn execute(
-        &self,
-        agent_id: AgentId,
-        seed: &Seed,
-        session_ctx: &mut SessionContext,
-    ) -> Result<ExecutionResult> {
-        // RFC-015: session_id is derived from seed.id for chat transparency
-        // event publishing. Most callers run one Seed per session turn, so
-        // seed.id is a usable session identifier.
-        let session_id: Option<String> = Some(seed.id.to_string());
-        self.execute_with_session(agent_id, seed, session_ctx, session_id)
-            .await
-    }
-
-    /// Like [`execute`](Self::execute) but with an explicit session_id for
-    /// RFC-015 chat transparency event publishing.
-    pub async fn execute_with_session(
-        &self,
-        agent_id: AgentId,
-        seed: &Seed,
-        session_ctx: &mut SessionContext,
-        session_id: Option<String>,
-    ) -> Result<ExecutionResult> {
-        self.execute_inner(
-            agent_id,
-            &seed.goal,
-            &seed.original_request,
-            &seed.constraints,
-            &seed.acceptance_criteria,
-            &seed.ontology,
-            seed.cspace_hint.as_deref(),
-            &seed.mount_paths,
-            seed.workspace_context.as_deref(),
-            session_ctx,
-            session_id,
-            Some(seed),
-        )
-        .await
-    }
-
     /// Execute a Directive with its ExecEnv (RFC-027 unified intent handling).
     ///
     /// Maps Directive/ExecEnv fields to the agent's runtime inputs and runs
-    /// the same tool-calling loop as [`execute`](Self::execute). The
-    /// persistence hook (RFC-016) is currently skipped on this path because
-    /// it still expects a `&Seed`; Phase 6 will update it to accept a
-    /// `&Directive`.
+    /// the tool-calling loop to completion. The persistence hook (RFC-016)
+    /// runs on this path.
     pub async fn execute_directive(
         &self,
         agent_id: AgentId,
@@ -311,18 +262,17 @@ impl AgentRuntime {
             env.workspace_context.as_deref(),
             session_ctx,
             session_id,
-            None,
+            Some(directive),
         )
         .await
     }
 
-    /// Shared execution body for Seed and Directive paths.
+    /// Shared execution body for the directive path.
     ///
     /// Performs the full agent-runtime pipeline: prompt assembly, capability
     /// retrieval, memory + knowledge recall, CSpace tool registration,
-    /// model resolution, agent run, post-execution summary, and (Seed path
-    /// only) the autonomous persistence hook. Directive callers pass
-    /// `persistence_seed = None` to skip persistence until Phase 6.
+    /// model resolution, agent run, post-execution summary, and the
+    /// autonomous persistence hook (RFC-016).
     #[allow(clippy::too_many_arguments)]
     async fn execute_inner(
         &self,
@@ -337,7 +287,7 @@ impl AgentRuntime {
         workspace_context: Option<&str>,
         session_ctx: &mut SessionContext,
         session_id: Option<String>,
-        persistence_seed: Option<&Seed>,
+        persistence_directive: Option<&Directive>,
     ) -> Result<ExecutionResult> {
         let prompt = build_user_prompt_inner(goal, acceptance_criteria);
 
@@ -485,17 +435,13 @@ impl AgentRuntime {
         }
 
         // Resolve the LIVE default model (post-hot-swap). This is the single
-        // source of truth — the same engine default the OuroborosEngine reads
-        // via the ModelResolver port. Validates fail-fast: a bad model ID set
-        // via the Web UI is rejected here at execute entry, before any tool work.
+        // source of truth for model resolution across all phases.
         let engine = self.engine_handle.get();
         let model_id = engine.default_model_id().to_string();
+        // Validates fail-fast: a bad model ID is rejected here at execute entry.
         engine.resolve_model(&model_id)?;
-        // Synthetic per-execution ID for tracing. Seed path uses seed.id;
-        // Directive path mints a fresh UUID since Directive doesn't carry one.
-        let exec_id = persistence_seed
-            .map(|s| s.id)
-            .unwrap_or_else(uuid::Uuid::new_v4);
+        // Synthetic per-execution ID for tracing.
+        let exec_id = uuid::Uuid::new_v4();
 
         // Build the agent. Refresh config.model_id to the live value so every
         // downstream consumer (AgentConfig, legacy provider path, usage callback)
@@ -639,9 +585,7 @@ impl AgentRuntime {
 
         // RFC-016: Autonomous persistence hook.
         // Runs after successful execution, fire-and-forget.
-        // Only available on the Seed path today (persistence_seed is Some);
-        // the Directive path will gain its own hook adapter in Phase 6.
-        if let Some(seed) = persistence_seed
+        if let Some(directive) = persistence_directive
             && success
             && let Some(hook) = &self.persistence_hook
         {
@@ -649,7 +593,7 @@ impl AgentRuntime {
                 .iter()
                 .any(|s| s.input == "knowledge" && s.output.contains("written successfully"));
             let hook = hook.clone();
-            let seed_clone = seed.clone();
+            let directive_clone = directive.clone();
             let traj_clone = trajectory_steps.clone();
             let output_clone = final_content.clone();
             let sid = session_id.clone();
@@ -665,7 +609,7 @@ impl AgentRuntime {
             tokio::spawn(async move {
                 match hook
                     .evaluate(
-                        &seed_clone,
+                        &directive_clone,
                         &traj_clone,
                         &output_clone,
                         already_saved_knowledge,
@@ -1486,29 +1430,6 @@ fn handle_compaction(summary: String, session_id: String, memory_manager: Arc<Me
     });
 }
 
-/// Build a system prompt from the Seed's goal, constraints, persona,
-/// and optionally a capability index and kernel manifest.
-#[allow(dead_code)]
-fn build_system_prompt(
-    seed: &Seed,
-    persona_prompt: Option<&str>,
-    capabilities_xml: Option<&str>,
-    kernel_manifest: Option<&str>,
-    workspace_context: Option<&str>,
-) -> String {
-    build_system_prompt_inner(
-        &seed.goal,
-        &seed.original_request,
-        &seed.constraints,
-        &seed.acceptance_criteria,
-        &seed.ontology,
-        workspace_context,
-        persona_prompt,
-        capabilities_xml,
-        kernel_manifest,
-    )
-}
-
 /// Build a system prompt from a Directive and ExecEnv (RFC-027).
 ///
 /// Maps [`Directive`] fields (`goal`, `original_request`, `constraints`,
@@ -1535,12 +1456,11 @@ fn build_directive_system_prompt(
     )
 }
 
-/// Shared system-prompt builder for Seed and Directive paths.
+/// Shared system-prompt builder for the directive path.
 ///
 /// Composes the static agent prelude, goal/constraints/criteria sections,
 /// optional workspace context and ontology, persona, capability index, and
-/// kernel manifest into a single prompt string. The ontology section is
-/// Seed-only; Directive callers pass an empty slice.
+/// kernel manifest into a single prompt string.
 #[allow(clippy::too_many_arguments)]
 fn build_system_prompt_inner(
     goal: &str,
@@ -1670,15 +1590,11 @@ fn build_system_prompt_inner(
     prompt
 }
 #[allow(dead_code)]
-fn build_user_prompt(seed: &Seed) -> String {
-    build_user_prompt_inner(&seed.goal, &seed.acceptance_criteria)
-}
-#[allow(dead_code)]
 fn build_directive_user_prompt(directive: &Directive) -> String {
     build_user_prompt_inner(&directive.goal, &directive.acceptance_criteria)
 }
 
-/// Shared user-prompt builder for Seed and Directive paths.
+/// Shared user-prompt builder for the directive path.
 fn build_user_prompt_inner(goal: &str, acceptance_criteria: &[String]) -> String {
     format!(
         "Execute the following goal:\n\n{}\n\nAcceptance criteria:\n{}",
@@ -1705,7 +1621,6 @@ mod tests {
     use super::*;
     use async_trait::async_trait;
     use oxi_sdk::{AgentTool, ToolContext, ToolError};
-    use oxios_ouroboros::Entity;
     use serde_json::Value;
 
     /// A test tool that does nothing — used to populate the registry.
@@ -1772,62 +1687,6 @@ mod tests {
         let missing = registry.missing(&["read", "exec", "nonexistent"]);
 
         assert_eq!(missing, vec!["exec", "nonexistent"]);
-    }
-
-    #[test]
-    fn test_build_system_prompt_includes_goal() {
-        let seed = Seed {
-            id: uuid::Uuid::new_v4(),
-            goal: "Build a web server".into(),
-            constraints: vec!["Must use Rust".into()],
-            acceptance_criteria: vec!["Server responds to requests".into()],
-            ontology: vec![Entity {
-                name: "HttpServer".into(),
-                entity_type: "struct".into(),
-                description: "The main server struct".into(),
-            }],
-            created_at: chrono::Utc::now(),
-            generation: 0,
-            parent_seed_id: None,
-            cspace_hint: None,
-            original_request: String::new(),
-            output_schema: None,
-            project_id: None,
-            workspace_context: None,
-            mount_paths: Vec::new(),
-        };
-
-        let prompt = build_system_prompt(&seed, None, None, None, None);
-
-        assert!(prompt.contains("Build a web server"));
-        assert!(prompt.contains("Must use Rust"));
-        assert!(prompt.contains("Server responds to requests"));
-        assert!(prompt.contains("HttpServer"));
-        assert!(prompt.contains("struct"));
-    }
-
-    #[test]
-    fn test_build_system_prompt_empty() {
-        let seed = Seed {
-            id: uuid::Uuid::new_v4(),
-            goal: "Test goal".into(),
-            constraints: vec![],
-            acceptance_criteria: vec![],
-            ontology: vec![],
-            created_at: chrono::Utc::now(),
-            generation: 0,
-            parent_seed_id: None,
-            cspace_hint: None,
-            original_request: String::new(),
-            output_schema: None,
-            project_id: None,
-            workspace_context: None,
-            mount_paths: Vec::new(),
-        };
-
-        let prompt = build_system_prompt(&seed, None, None, None, None);
-
-        assert!(prompt.contains("Test goal"));
     }
 
     #[test]

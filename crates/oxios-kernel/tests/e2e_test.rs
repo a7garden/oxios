@@ -10,7 +10,7 @@ mod common;
 use async_trait::async_trait;
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use anyhow::Result;
 use oxios_kernel::supervisor::Supervisor;
@@ -19,11 +19,7 @@ use oxios_kernel::{
     A2AProtocol, AccessManager, AgentLifecycleManager, EventBus, KernelEvent, Orchestrator,
     StateStore, config::OrchestratorConfig,
 };
-use oxios_ouroboros::{
-    AmbiguityScore, EvaluationResult, ExecutionResult, InterviewResult, OuroborosProtocol, Phase,
-    Seed,
-};
-use oxios_ouroboros::{Directive, ExecEnv};
+use oxios_ouroboros::{Directive, ExecEnv, ExecutionResult};
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -34,97 +30,6 @@ fn make_config(max_iterations: u32) -> OrchestratorConfig {
     OrchestratorConfig {
         max_evolution_iterations: max_iterations,
         min_evaluation_score: 0.8,
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Mock OuroborosProtocol — deterministic, no LLM calls
-// ---------------------------------------------------------------------------
-
-/// A mock Ouroboros protocol that returns deterministic results.
-struct MockOuroboros {
-    interview_called: AtomicUsize,
-    generate_seed_called: AtomicUsize,
-    evaluate_called: AtomicUsize,
-    evolve_called: AtomicUsize,
-    /// If false, evaluation fails on first pass (triggers evolve).
-    evaluation_passes: AtomicBool,
-}
-
-impl MockOuroboros {
-    fn new() -> Self {
-        Self {
-            interview_called: AtomicUsize::new(0),
-            generate_seed_called: AtomicUsize::new(0),
-            evaluate_called: AtomicUsize::new(0),
-            evolve_called: AtomicUsize::new(0),
-            evaluation_passes: AtomicBool::new(true),
-        }
-    }
-
-    #[expect(dead_code)]
-    fn with_failing_evaluation() -> Self {
-        let s = Self::new();
-        s.evaluation_passes.store(false, Ordering::SeqCst);
-        s
-    }
-}
-
-#[async_trait]
-impl OuroborosProtocol for MockOuroboros {
-    async fn interview(&self, _user_input: &str) -> Result<InterviewResult> {
-        self.interview_called.fetch_add(1, Ordering::SeqCst);
-        let mut result = InterviewResult::new();
-        // Low ambiguity → ready for seed immediately.
-        let score = AmbiguityScore::new(0.9, 0.85, 0.8);
-        result.update_ambiguity(score);
-        result.add_exchange("Goal confirmed", "User wants to proceed");
-        Ok(result)
-    }
-
-    async fn generate_seed(&self, _interview: &InterviewResult) -> Result<Seed> {
-        self.generate_seed_called.fetch_add(1, Ordering::SeqCst);
-        // Seed with acceptance_criteria so should_evaluate() returns true.
-        let mut seed = Seed::new("Test task from e2e smoke test");
-        seed.acceptance_criteria
-            .push("Output contains 'done'".into());
-        Ok(seed)
-    }
-
-    async fn execute(&self, seed: &Seed) -> Result<ExecutionResult> {
-        Ok(ExecutionResult {
-            output: format!("Executed seed: {}", seed.goal),
-            steps_completed: 3,
-            success: true,
-            tool_calls: vec![],
-            tokens_input: 0,
-            tokens_output: 0,
-            model_id: String::new(),
-        })
-    }
-
-    async fn evaluate(
-        &self,
-        _seed: &Seed,
-        _execution: &ExecutionResult,
-    ) -> Result<EvaluationResult> {
-        self.evaluate_called.fetch_add(1, Ordering::SeqCst);
-        let passes = self.evaluation_passes.load(Ordering::SeqCst);
-        // Make it pass on next call (evolve loop terminates).
-        self.evaluation_passes.store(true, Ordering::SeqCst);
-        Ok(EvaluationResult {
-            mechanical_pass: passes,
-            semantic_pass: Some(passes),
-            consensus_pass: None,
-            score: if passes { 0.95 } else { 0.4 },
-            notes: vec!["Mock evaluation".into()],
-        })
-    }
-
-    async fn evolve(&self, seed: &Seed, _evaluation: &EvaluationResult) -> Result<Option<Seed>> {
-        self.evolve_called.fetch_add(1, Ordering::SeqCst);
-        let evolved = Seed::evolved_from(seed);
-        Ok(Some(evolved))
     }
 }
 
@@ -152,15 +57,22 @@ impl MockSupervisor {
 
 #[async_trait]
 impl Supervisor for MockSupervisor {
-    async fn fork(&self, spec: &Seed) -> Result<AgentId> {
+    async fn exec(&self, id: AgentId) -> Result<()> {
+        if let Some(a) = self.agents.write().get_mut(&id) {
+            a.status = AgentStatus::Running;
+        }
+        Ok(())
+    }
+
+    async fn fork_directive(&self, directive: &Directive, _env: &ExecEnv) -> Result<AgentId> {
         self.fork_called.fetch_add(1, Ordering::SeqCst);
         let id = AgentId::new_v4();
         let info = AgentInfo {
             id,
-            name: spec.goal.clone(),
+            name: directive.goal.clone(),
             status: AgentStatus::Starting,
             created_at: chrono::Utc::now(),
-            seed_id: Some(spec.id),
+            seed_id: None,
             project_id: None,
             started_at: None,
             completed_at: None,
@@ -177,19 +89,17 @@ impl Supervisor for MockSupervisor {
         self.agents.write().insert(id, info);
         let _ = self.event_bus.publish(KernelEvent::AgentCreated {
             id,
-            name: spec.goal.clone(),
+            name: directive.goal.clone(),
         });
         Ok(id)
     }
 
-    async fn exec(&self, id: AgentId) -> Result<()> {
-        if let Some(a) = self.agents.write().get_mut(&id) {
-            a.status = AgentStatus::Running;
-        }
-        Ok(())
-    }
-
-    async fn run_with_seed(&self, id: AgentId, _seed: &Seed) -> Result<ExecutionResult> {
+    async fn run_with_directive(
+        &self,
+        id: AgentId,
+        _directive: &Directive,
+        _env: &ExecEnv,
+    ) -> Result<ExecutionResult> {
         self.run_called.fetch_add(1, Ordering::SeqCst);
         if let Some(a) = self.agents.write().get_mut(&id) {
             a.status = AgentStatus::Idle;
@@ -207,19 +117,6 @@ impl Supervisor for MockSupervisor {
             tokens_output: 0,
             model_id: String::new(),
         })
-    }
-    async fn run_with_directive(
-        &self,
-        id: AgentId,
-        _directive: &Directive,
-        _env: &ExecEnv,
-    ) -> Result<ExecutionResult> {
-        self.run_with_seed(id, &Seed::new("mock")).await
-    }
-
-    async fn fork_directive(&self, directive: &Directive, _env: &ExecEnv) -> Result<AgentId> {
-        let seed = Seed::new(directive.goal.clone());
-        self.fork(&seed).await
     }
 
     async fn wait(&self, id: AgentId) -> Result<AgentStatus> {
@@ -256,23 +153,6 @@ fn build_test_parts() -> (Arc<MockSupervisor>, EventBus, Arc<StateStore>) {
         Arc::new(StateStore::new(tmp.path().to_path_buf()).expect("StateStore creation failed"));
     let supervisor = Arc::new(MockSupervisor::new(event_bus.clone()));
     (supervisor, event_bus, state_store)
-}
-
-/// Legacy helper retained for compatibility — returns the proto too.
-#[allow(dead_code)]
-fn build_orchestrator_parts() -> (
-    Arc<MockOuroboros>,
-    Arc<MockSupervisor>,
-    EventBus,
-    Arc<StateStore>,
-) {
-    let event_bus = EventBus::new(64);
-    let tmp = tempfile::tempdir().unwrap();
-    let state_store =
-        Arc::new(StateStore::new(tmp.path().to_path_buf()).expect("StateStore creation failed"));
-    let ouroboros = Arc::new(MockOuroboros::new());
-    let supervisor = Arc::new(MockSupervisor::new(event_bus.clone()));
-    (ouroboros, supervisor, event_bus, state_store)
 }
 
 /// Build orchestrator with RFC-027 mock engine wired.
@@ -328,7 +208,7 @@ async fn test_orchestrator_happy_path() {
 
     // Substantial task → reaches Execute. Review passes (default mock).
     assert!(result.session_id.is_some());
-    assert_eq!(result.phase_reached, Phase::Execute);
+    assert_eq!(result.phase_reached, "execute");
     assert_eq!(result.evaluation_passed, Some(true));
     assert!(!result.response.is_empty());
 

@@ -50,21 +50,6 @@ export interface SessionDetail {
   metadata?: Record<string, unknown>
 }
 
-// Seed
-export interface Seed {
-  id: string
-  goal: string
-  constraints_count: number
-  created_at: string
-}
-
-export interface EvolutionEntry {
-  phase: string
-  timestamp: string
-  summary: string
-  changes?: Record<string, unknown>
-}
-
 // Project (replaces Space)
 export interface Project {
   id: string
@@ -272,7 +257,6 @@ export interface ChatResponse {
   response: string
   session_id: string
   project_id?: string
-  seed_id?: string
   agent_id?: string
   phase_reached?: string
   evaluation_passed?: boolean

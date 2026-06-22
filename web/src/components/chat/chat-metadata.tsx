@@ -10,7 +10,7 @@ interface ChatMetadataProps {
 export function ChatMetadata({ message, className }: ChatMetadataProps) {
   if (!message.metadata) return null
 
-  const { phase, evaluation_passed, duration_ms, seed_id } = message.metadata
+  const { phase, evaluation_passed, duration_ms } = message.metadata
   const durationStr = duration_ms
     ? duration_ms >= 60000
       ? `${Math.floor(duration_ms / 60000)}m ${Math.round((duration_ms % 60000) / 1000)}s`
@@ -42,7 +42,6 @@ export function ChatMetadata({ message, className }: ChatMetadataProps) {
           <Clock className="h-3 w-3" /> {durationStr}
         </span>
       )}
-      {seed_id && <span className="font-mono text-2xs">Seed {seed_id.slice(0, 8)}...</span>}
     </div>
   )
 }

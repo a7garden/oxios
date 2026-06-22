@@ -80,7 +80,6 @@ pub async fn run(kernel: &Kernel, prompt: &str, opts: &RunOptions) -> Result<i32
             "session_id": result.session_id,
             "primary_project_id": result.primary_project_id.map(|id| id.to_string()),
             "project_tag": result.project_tag,
-            "seed_id": result.seed_id.map(|id| id.to_string()),
             "agent_id": result.agent_id.map(|id| id.to_string()),
             "phase_reached": result.phase_reached.to_string(),
             "evaluation_passed": result.evaluation_passed,
@@ -94,9 +93,6 @@ pub async fn run(kernel: &Kernel, prompt: &str, opts: &RunOptions) -> Result<i32
     } else {
         // Human-readable output
         println!("{}", result.response);
-        if let Some(ref seed_id) = result.seed_id {
-            println!("\nSeed: {seed_id}");
-        }
         if let Some(ref session_id) = result.session_id {
             println!("Session: {session_id}");
         }

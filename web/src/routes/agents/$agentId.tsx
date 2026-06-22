@@ -81,23 +81,6 @@ function AgentDetailPage() {
       <Card>
         <CardContent className="pt-4 space-y-3">
           <div className="grid gap-2 md:grid-cols-3 text-sm">
-            {agent.seed_id && (
-              <div className="flex items-center gap-1">
-                <span className="text-muted-foreground">{t('agents.seed')}:</span>
-                <Button
-                  variant="link"
-                  className="h-auto p-0 text-xs"
-                  onClick={() =>
-                    navigate({
-                      to: '/seeds/$seedId',
-                      params: { seedId: agent.seed_id! },
-                    })
-                  }
-                >
-                  {agent.seed_id.slice(0, 8)}...
-                </Button>
-              </div>
-            )}
             {agent.project_id && (
               <div className="flex items-center gap-1">
                 <span className="text-muted-foreground">{t('agents.project', 'Project')}:</span>

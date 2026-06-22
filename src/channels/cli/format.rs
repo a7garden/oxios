@@ -120,15 +120,12 @@ mod tests {
             session_id: None,
             project_id: None,
             project_tag: Some("[🔧 oxios]".into()),
-            seed_id: None,
             phase: "Execute".into(),
             evaluation_passed: Some(true),
             duration_ms: Some(1500),
             error: None,
             interview_questions: None,
             interview_round: None,
-            interview_ambiguity: None,
-            mode: None,
         };
         let msg = make_msg("Done!", Some(meta));
         let formatter = CliFormatter;
@@ -144,15 +141,12 @@ mod tests {
             session_id: None,
             project_id: None,
             project_tag: None,
-            seed_id: None,
             phase: "Evaluate".into(),
             evaluation_passed: Some(false),
             duration_ms: Some(500),
             error: None,
             interview_questions: None,
             interview_round: None,
-            interview_ambiguity: None,
-            mode: None,
         };
         let msg = make_msg("Partial", Some(meta));
         let formatter = CliFormatter;
@@ -167,7 +161,6 @@ mod tests {
             session_id: None,
             project_id: None,
             project_tag: None,
-            seed_id: None,
             phase: String::new(),
             evaluation_passed: None,
             duration_ms: None,
@@ -178,8 +171,6 @@ mod tests {
             }),
             interview_questions: None,
             interview_round: None,
-            interview_ambiguity: None,
-            mode: None,
         };
         let msg = make_msg("시간이 초과되었습니다.", Some(meta));
         let formatter = CliFormatter;
@@ -194,7 +185,6 @@ mod tests {
             session_id: None,
             project_id: None,
             project_tag: None,
-            seed_id: None,
             phase: String::new(),
             evaluation_passed: None,
             duration_ms: None,
@@ -205,8 +195,6 @@ mod tests {
             }),
             interview_questions: None,
             interview_round: None,
-            interview_ambiguity: None,
-            mode: None,
         };
         let msg = make_msg("AI 서비스 오류.", Some(meta));
         let formatter = CliFormatter;

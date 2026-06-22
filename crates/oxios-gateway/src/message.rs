@@ -60,9 +60,6 @@ pub struct ResponseMeta {
     /// Project decoration tag (e.g., "[🔧 oxios]").
     #[serde(skip_serializing_if = "Option::is_none")]
     pub project_tag: Option<String>,
-    /// Seed ID created during orchestration.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub seed_id: Option<String>,
     /// Furthest phase reached (Interview | Seed | Execute | Evaluate | Evolve).
     pub phase: String,
     /// Whether evaluation passed.
@@ -91,13 +88,6 @@ pub struct ResponseMeta {
     /// `interview_questions`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub interview_round: Option<u32>,
-    /// Current ambiguity score (0.0 = clear, 1.0 = fully ambiguous).
-    /// Populated alongside `interview_questions`.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub interview_ambiguity: Option<f64>,
-    /// Execution mode: "chat" | "ouroboros".
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub mode: Option<String>,
 }
 
 /// A user-facing structured error.
@@ -275,15 +265,12 @@ impl OutgoingMessage {
                 session_id: None,
                 project_id: None,
                 project_tag: None,
-                seed_id: None,
                 phase: String::new(),
                 evaluation_passed: None,
                 duration_ms: None,
                 error: Some(err),
                 interview_questions: None,
                 interview_round: None,
-                interview_ambiguity: None,
-                mode: None,
             }),
             target_conn_id: None,
         }
