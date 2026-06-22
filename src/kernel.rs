@@ -794,7 +794,8 @@ impl KernelBuilder {
             .context("Boot model/provider resolution failed")?;
 
         let resolver: Arc<dyn oxios_ouroboros::ModelResolver> = engine_handle.clone();
-        let ouroboros: Arc<dyn OuroborosProtocol> = Arc::new(OuroborosEngine::new(resolver.clone()));
+        let ouroboros: Arc<dyn OuroborosProtocol> =
+            Arc::new(OuroborosEngine::new(resolver.clone()));
         let intent_engine: Arc<oxios_ouroboros::IntentEngine> =
             Arc::new(oxios_ouroboros::IntentEngine::new(resolver.clone()));
 

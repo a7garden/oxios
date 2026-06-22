@@ -978,7 +978,12 @@ pub(crate) async fn handle_agent_trace(
     // The agent's `tool_calls` field is capped (`max_tool_calls_per_agent`),
     // but the session trajectory accumulates the complete execution history.
     let trajectory = if let Some(sid) = &agent.session_id {
-        match state.kernel.state.load_session(&SessionId(sid.clone())).await {
+        match state
+            .kernel
+            .state
+            .load_session(&SessionId(sid.clone()))
+            .await
+        {
             Ok(Some(session)) => Some(session.trajectory().to_vec()),
             _ => None,
         }

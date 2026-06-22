@@ -19,9 +19,7 @@ use crate::degraded;
 use crate::directive::{Directive, Verdict};
 use crate::evaluation::MechanicalEvalResult;
 use crate::model_resolver::{ModelResolver, ResolvedModel};
-use crate::prompts::{
-    ASSESS_SYSTEM_PROMPT, CRYSTALLIZE_SYSTEM_PROMPT, REVIEW_SYSTEM_PROMPT,
-};
+use crate::prompts::{ASSESS_SYSTEM_PROMPT, CRYSTALLIZE_SYSTEM_PROMPT, REVIEW_SYSTEM_PROMPT};
 use crate::protocol::ExecutionResult;
 
 // ---------------------------------------------------------------------------
@@ -111,25 +109,13 @@ struct ReviewResponse {
 #[async_trait::async_trait]
 pub trait IntentEngineOps: Send + Sync {
     /// Classify a user message and decide what should happen next.
-    async fn assess(
-        &self,
-        msg: &str,
-        ctx: &crate::directive::MsgCtx,
-    ) -> Result<Assessment>;
+    async fn assess(&self, msg: &str, ctx: &crate::directive::MsgCtx) -> Result<Assessment>;
 
     /// Turn a substantial task into a structured Directive.
-    async fn crystallize(
-        &self,
-        msg: &str,
-        ctx: &crate::directive::MsgCtx,
-    ) -> Result<Directive>;
+    async fn crystallize(&self, msg: &str, ctx: &crate::directive::MsgCtx) -> Result<Directive>;
 
     /// Check execution output against a Directive's acceptance criteria.
-    async fn review(
-        &self,
-        directive: &Directive,
-        result: &ExecutionResult,
-    ) -> Result<Verdict>;
+    async fn review(&self, directive: &Directive, result: &ExecutionResult) -> Result<Verdict>;
 }
 
 /// LLM-backed intent engine.
@@ -339,16 +325,10 @@ impl IntentEngine {
     // -----------------------------------------------------------------------
 
     /// Check execution output against a Directive's acceptance criteria.
-    pub async fn review(
-        &self,
-        directive: &Directive,
-        result: &ExecutionResult,
-    ) -> Result<Verdict> {
+    pub async fn review(&self, directive: &Directive, result: &ExecutionResult) -> Result<Verdict> {
         // Stage 1: mechanical (LLM-free) check
-        let mechanical = MechanicalEvalResult::evaluate(
-            &directive.acceptance_criteria,
-            &result.output,
-        );
+        let mechanical =
+            MechanicalEvalResult::evaluate(&directive.acceptance_criteria, &result.output);
         let all_mechanical = mechanical.all_passed;
 
         // Stage 2: semantic (LLM) check
@@ -414,27 +394,15 @@ impl std::fmt::Debug for IntentEngine {
 
 #[async_trait::async_trait]
 impl IntentEngineOps for IntentEngine {
-    async fn assess(
-        &self,
-        msg: &str,
-        ctx: &crate::directive::MsgCtx,
-    ) -> Result<Assessment> {
+    async fn assess(&self, msg: &str, ctx: &crate::directive::MsgCtx) -> Result<Assessment> {
         IntentEngine::assess(self, msg, ctx).await
     }
 
-    async fn crystallize(
-        &self,
-        msg: &str,
-        ctx: &crate::directive::MsgCtx,
-    ) -> Result<Directive> {
+    async fn crystallize(&self, msg: &str, ctx: &crate::directive::MsgCtx) -> Result<Directive> {
         IntentEngine::crystallize(self, msg, ctx).await
     }
 
-    async fn review(
-        &self,
-        directive: &Directive,
-        result: &ExecutionResult,
-    ) -> Result<Verdict> {
+    async fn review(&self, directive: &Directive, result: &ExecutionResult) -> Result<Verdict> {
         IntentEngine::review(self, directive, result).await
     }
 }
@@ -587,9 +555,7 @@ fn map_assess_response(parsed: AssessResponse, original_msg: &str) -> Assessment
         }
         _ => {
             // Unknown kind — treat as conversation
-            Assessment::Conversation(format!(
-                "I'm not sure how to handle: {original_msg}"
-            ))
+            Assessment::Conversation(format!("I'm not sure how to handle: {original_msg}"))
         }
     }
 }

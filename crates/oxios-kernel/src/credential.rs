@@ -114,8 +114,7 @@ impl CredentialStore {
             return Ok(());
         }
         let raw = std::fs::read_to_string(&path)?;
-        let mut map: serde_json::Map<String, serde_json::Value> =
-            serde_json::from_str(&raw)?;
+        let mut map: serde_json::Map<String, serde_json::Value> = serde_json::from_str(&raw)?;
         if map.remove(key).is_some() {
             std::fs::write(&path, serde_json::to_string_pretty(&map)?)?;
             tracing::info!(key = %key, "Credential deleted from oxi auth store");

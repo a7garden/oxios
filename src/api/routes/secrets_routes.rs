@@ -146,9 +146,7 @@ fn resolve_secret_status(key: &str) -> SecretInfo {
 // ── Handlers ────────────────────────────────────────────────────────────────
 
 /// GET /api/secrets — List all known secrets with masked status.
-pub(crate) async fn handle_secrets_list(
-    _state: State<Arc<AppState>>,
-) -> Json<Vec<SecretInfo>> {
+pub(crate) async fn handle_secrets_list(_state: State<Arc<AppState>>) -> Json<Vec<SecretInfo>> {
     let infos: Vec<SecretInfo> = KNOWN_SECRETS
         .iter()
         .map(|(key, _)| resolve_secret_status(key))
@@ -184,8 +182,7 @@ pub(crate) async fn handle_secret_set(
             .set_api_key(&key, &body.value)
             .map_err(|e| AppError::Internal(e.to_string()))?;
     } else {
-        CredentialStore::store(&key, &body.value)
-            .map_err(|e| AppError::Internal(e.to_string()))?;
+        CredentialStore::store(&key, &body.value).map_err(|e| AppError::Internal(e.to_string()))?;
     }
 
     tracing::info!(key = %key, "Secret stored via /api/secrets");

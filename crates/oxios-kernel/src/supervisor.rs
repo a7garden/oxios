@@ -482,7 +482,10 @@ impl Supervisor for BasicSupervisor {
 
                 let _ = self
                     .event_bus
-                    .publish(crate::event_bus::KernelEvent::AgentStopped { id, success: result.success });
+                    .publish(crate::event_bus::KernelEvent::AgentStopped {
+                        id,
+                        success: result.success,
+                    });
                 self.update_agent_count();
 
                 // Persist to agent history log (async, non-blocking)
@@ -674,7 +677,10 @@ impl Supervisor for BasicSupervisor {
 
                 let _ = self
                     .event_bus
-                    .publish(crate::event_bus::KernelEvent::AgentStopped { id, success: result.success });
+                    .publish(crate::event_bus::KernelEvent::AgentStopped {
+                        id,
+                        success: result.success,
+                    });
                 self.update_agent_count();
 
                 // Persist to agent history log (async, non-blocking)

@@ -11,7 +11,7 @@ use async_trait::async_trait;
 use parking_lot::RwLock;
 
 use oxios_ouroboros::{
-    Assessment, Directive, ExecutionResult, IntentEngineOps, InterviewResult, EvaluationResult,
+    Assessment, Directive, EvaluationResult, ExecutionResult, IntentEngineOps, InterviewResult,
     MsgCtx, OuroborosProtocol, Scope, Seed, Verdict,
 };
 
@@ -107,10 +107,7 @@ impl OuroborosProtocol for MockOuroborosProtocol {
     async fn interview(&self, _user_input: &str) -> anyhow::Result<InterviewResult> {
         unimplemented!("handle_unified path does not use interview")
     }
-    async fn generate_seed(
-        &self,
-        _interview: &InterviewResult,
-    ) -> anyhow::Result<Seed> {
+    async fn generate_seed(&self, _interview: &InterviewResult) -> anyhow::Result<Seed> {
         unimplemented!("handle_unified path does not use generate_seed")
     }
     async fn execute(&self, _seed: &Seed) -> anyhow::Result<ExecutionResult> {

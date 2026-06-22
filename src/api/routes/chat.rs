@@ -1193,7 +1193,11 @@ pub(crate) async fn handle_ask_user_respond(
     Path(id): Path<String>,
     Json(body): Json<AskUserResponseBody>,
 ) -> Result<Json<serde_json::Value>, AppError> {
-    let resolved = state.kernel.infra.pending_ask_user().resolve(&id, body.answer);
+    let resolved = state
+        .kernel
+        .infra
+        .pending_ask_user()
+        .resolve(&id, body.answer);
     if !resolved {
         return Err(AppError::NotFound(format!(
             "ask_user request {id} not found or already resolved"

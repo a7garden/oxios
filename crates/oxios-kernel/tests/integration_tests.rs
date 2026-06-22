@@ -209,7 +209,9 @@ impl Supervisor for MockSupervisor {
             }
         }
         let _ = self.event_bus.publish(KernelEvent::AgentStarted { id });
-        let _ = self.event_bus.publish(KernelEvent::AgentStopped { id, success: true });
+        let _ = self
+            .event_bus
+            .publish(KernelEvent::AgentStopped { id, success: true });
         Ok(ExecutionResult {
             output: "Mock agent completed".into(),
             steps_completed: 3,
@@ -471,7 +473,14 @@ async fn test_orchestrator_happy_path() {
         common::build_test_orchestrator(supervisor.clone(), state_store, event_bus);
 
     let result = orchestrator
-        .handle_unified("test-user", "Do something useful", None, None, None, "test-req")
+        .handle_unified(
+            "test-user",
+            "Do something useful",
+            None,
+            None,
+            None,
+            "test-req",
+        )
         .await
         .unwrap();
 
@@ -499,7 +508,14 @@ async fn test_orchestrator_evolution_loop() {
     *mock.review_response.write() = common::failing_verdict(vec!["missing tests".into()]);
 
     let result = orchestrator
-        .handle_unified("test-user", "Do something tricky", None, None, None, "test-req")
+        .handle_unified(
+            "test-user",
+            "Do something tricky",
+            None,
+            None,
+            None,
+            "test-req",
+        )
         .await
         .unwrap();
 
@@ -736,7 +752,9 @@ impl Supervisor for SchedulerAwareSupervisor {
             }
         }
         let _ = self.event_bus.publish(KernelEvent::AgentStarted { id });
-        let _ = self.event_bus.publish(KernelEvent::AgentStopped { id, success: true });
+        let _ = self
+            .event_bus
+            .publish(KernelEvent::AgentStopped { id, success: true });
         Ok(ExecutionResult {
             output: "Task completed".into(),
             steps_completed: 1,
@@ -804,7 +822,14 @@ async fn test_scheduler_orchestrator_integration() {
         common::build_test_orchestrator(supervisor, state_store, event_bus.clone());
 
     let result = orchestrator
-        .handle_unified("test-user", "Build a simple thing", None, None, None, "test-req")
+        .handle_unified(
+            "test-user",
+            "Build a simple thing",
+            None,
+            None,
+            None,
+            "test-req",
+        )
         .await
         .unwrap();
 

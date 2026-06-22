@@ -14,7 +14,6 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 use anyhow::Result;
 use oxios_kernel::supervisor::Supervisor;
-use oxios_ouroboros::{Directive, ExecEnv};
 use oxios_kernel::types::{AgentId, AgentInfo, AgentStatus};
 use oxios_kernel::{
     A2AProtocol, AccessManager, AgentLifecycleManager, EventBus, KernelEvent, Orchestrator,
@@ -24,6 +23,7 @@ use oxios_ouroboros::{
     AmbiguityScore, EvaluationResult, ExecutionResult, InterviewResult, OuroborosProtocol, Phase,
     Seed,
 };
+use oxios_ouroboros::{Directive, ExecEnv};
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -193,7 +193,9 @@ impl Supervisor for MockSupervisor {
             a.status = AgentStatus::Idle;
         }
         let _ = self.event_bus.publish(KernelEvent::AgentStarted { id });
-        let _ = self.event_bus.publish(KernelEvent::AgentStopped { id, success: true });
+        let _ = self
+            .event_bus
+            .publish(KernelEvent::AgentStopped { id, success: true });
         Ok(ExecutionResult {
             output: "Mock agent completed successfully".into(),
             steps_completed: 5,
@@ -213,11 +215,7 @@ impl Supervisor for MockSupervisor {
         self.run_with_seed(id, &Seed::new("mock")).await
     }
 
-    async fn fork_directive(
-        &self,
-        directive: &Directive,
-        _env: &ExecEnv,
-    ) -> Result<AgentId> {
+    async fn fork_directive(&self, directive: &Directive, _env: &ExecEnv) -> Result<AgentId> {
         let seed = Seed::new(directive.goal.clone());
         self.fork(&seed).await
     }
@@ -249,11 +247,7 @@ impl Supervisor for MockSupervisor {
 
 /// Build orchestrator parts without the legacy OuroborosProtocol mock.
 /// Used by the RFC-027 tests that wire a MockIntentEngine instead.
-fn build_test_parts() -> (
-    Arc<MockSupervisor>,
-    EventBus,
-    Arc<StateStore>,
-) {
+fn build_test_parts() -> (Arc<MockSupervisor>, EventBus, Arc<StateStore>) {
     let event_bus = EventBus::new(64);
     let tmp = tempfile::tempdir().unwrap();
     let state_store =
@@ -314,10 +308,18 @@ fn make_lifecycle(
 #[tokio::test]
 async fn test_orchestrator_happy_path() {
     let (supervisor, event_bus, state_store) = build_test_parts();
-    let (orchestrator, _mock) = build_rfc027_orchestrator(supervisor.clone(), state_store, event_bus);
+    let (orchestrator, _mock) =
+        build_rfc027_orchestrator(supervisor.clone(), state_store, event_bus);
 
     let result = orchestrator
-        .handle_unified("test-user", "Fix the bug in main.rs", None, None, None, "test-req")
+        .handle_unified(
+            "test-user",
+            "Fix the bug in main.rs",
+            None,
+            None,
+            None,
+            "test-req",
+        )
         .await
         .unwrap();
 
@@ -336,7 +338,8 @@ async fn test_orchestrator_happy_path() {
 #[tokio::test]
 async fn test_orchestrator_evolution_loop() {
     let (supervisor, event_bus, state_store) = build_test_parts();
-    let (orchestrator, mock) = build_rfc027_orchestrator(supervisor.clone(), state_store, event_bus);
+    let (orchestrator, mock) =
+        build_rfc027_orchestrator(supervisor.clone(), state_store, event_bus);
 
     // Configure mock to fail review on first call, pass on second.
     *mock.review_response.write() = common::failing_verdict(vec!["missing tests".into()]);
@@ -365,19 +368,34 @@ async fn test_orchestrator_evolution_loop() {
 #[tokio::test]
 async fn test_session_continuation() {
     let (supervisor, event_bus, state_store) = build_test_parts();
-    let (orchestrator, _mock) = build_rfc027_orchestrator(supervisor.clone(), state_store, event_bus);
+    let (orchestrator, _mock) =
+        build_rfc027_orchestrator(supervisor.clone(), state_store, event_bus);
 
     let session_id = "test-session-123";
 
     let result1 = orchestrator
-        .handle_unified("test-user", "Work on the project", Some(session_id), None, None, "test-req")
+        .handle_unified(
+            "test-user",
+            "Work on the project",
+            Some(session_id),
+            None,
+            None,
+            "test-req",
+        )
         .await
         .unwrap();
     assert_eq!(result1.session_id.as_deref(), Some(session_id));
 
     // Second message with same session.
     let result2 = orchestrator
-        .handle_unified("test-user", "Make it production ready", Some(session_id), None, None, "test-req")
+        .handle_unified(
+            "test-user",
+            "Make it production ready",
+            Some(session_id),
+            None,
+            None,
+            "test-req",
+        )
         .await
         .unwrap();
     assert_eq!(result2.session_id.as_deref(), Some(session_id));
@@ -386,14 +404,29 @@ async fn test_session_continuation() {
 #[tokio::test]
 async fn test_multiple_sessions_independent() {
     let (supervisor, event_bus, state_store) = build_test_parts();
-    let (orchestrator, _mock) = build_rfc027_orchestrator(supervisor.clone(), state_store, event_bus);
+    let (orchestrator, _mock) =
+        build_rfc027_orchestrator(supervisor.clone(), state_store, event_bus);
 
     let result_a = orchestrator
-        .handle_unified("user-a", "Task A", Some("session-a"), None, None, "test-req")
+        .handle_unified(
+            "user-a",
+            "Task A",
+            Some("session-a"),
+            None,
+            None,
+            "test-req",
+        )
         .await
         .unwrap();
     let result_b = orchestrator
-        .handle_unified("user-b", "Task B", Some("session-b"), None, None, "test-req")
+        .handle_unified(
+            "user-b",
+            "Task B",
+            Some("session-b"),
+            None,
+            None,
+            "test-req",
+        )
         .await
         .unwrap();
 
@@ -406,12 +439,20 @@ async fn test_multiple_sessions_independent() {
 #[tokio::test]
 async fn test_session_cleaned_after_completion() {
     let (supervisor, event_bus, state_store) = build_test_parts();
-    let (orchestrator, _mock) = build_rfc027_orchestrator(supervisor.clone(), state_store, event_bus);
+    let (orchestrator, _mock) =
+        build_rfc027_orchestrator(supervisor.clone(), state_store, event_bus);
 
     let session_id = "cleanup-test-session";
 
     orchestrator
-        .handle_unified("test-user", "Simple task", Some(session_id), None, None, "test-req")
+        .handle_unified(
+            "test-user",
+            "Simple task",
+            Some(session_id),
+            None,
+            None,
+            "test-req",
+        )
         .await
         .unwrap();
 
@@ -429,7 +470,8 @@ async fn test_session_cleaned_after_completion() {
 #[tokio::test]
 async fn test_phase_events_published() {
     let (supervisor, event_bus, state_store) = build_test_parts();
-    let (orchestrator, _mock) = build_rfc027_orchestrator(supervisor.clone(), state_store, event_bus);
+    let (orchestrator, _mock) =
+        build_rfc027_orchestrator(supervisor.clone(), state_store, event_bus);
 
     let result = orchestrator
         .handle_unified("test-user", "Test events", None, None, None, "test-req")

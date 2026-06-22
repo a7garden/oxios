@@ -339,10 +339,26 @@ pub fn get_metrics() -> &'static MetricsHandles {
                 &[],
             ),
             agents_failed: r.counter("oxios_agents_failed_total", "Total agents failed", &[]),
-            retry_attempted: r.counter("oxios_retry_attempted_total", "Review retries attempted", &[]),
-            retry_improved: r.counter("oxios_retry_improved_total", "Retries that improved score", &[]),
-            retry_unchanged: r.counter("oxios_retry_unchanged_total", "Retries with same score", &[]),
-            retry_degraded: r.counter("oxios_retry_degraded_total", "Retries that degraded score", &[]),
+            retry_attempted: r.counter(
+                "oxios_retry_attempted_total",
+                "Review retries attempted",
+                &[],
+            ),
+            retry_improved: r.counter(
+                "oxios_retry_improved_total",
+                "Retries that improved score",
+                &[],
+            ),
+            retry_unchanged: r.counter(
+                "oxios_retry_unchanged_total",
+                "Retries with same score",
+                &[],
+            ),
+            retry_degraded: r.counter(
+                "oxios_retry_degraded_total",
+                "Retries that degraded score",
+                &[],
+            ),
             orch_duration: r.histogram(
                 "oxios_orchestration_duration_seconds",
                 "Orchestration duration",

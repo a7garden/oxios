@@ -493,7 +493,9 @@ impl AgentRuntime {
         engine.resolve_model(&model_id)?;
         // Synthetic per-execution ID for tracing. Seed path uses seed.id;
         // Directive path mints a fresh UUID since Directive doesn't carry one.
-        let exec_id = persistence_seed.map(|s| s.id).unwrap_or_else(uuid::Uuid::new_v4);
+        let exec_id = persistence_seed
+            .map(|s| s.id)
+            .unwrap_or_else(uuid::Uuid::new_v4);
 
         // Build the agent. Refresh config.model_id to the live value so every
         // downstream consumer (AgentConfig, legacy provider path, usage callback)

@@ -19,9 +19,7 @@ use std::time::Duration;
 
 use anyhow::{Context, Result};
 use chrono;
-use oxios_ouroboros::{
-    ExecutionResult, InterviewResult, OuroborosProtocol, Phase, Seed,
-};
+use oxios_ouroboros::{ExecutionResult, InterviewResult, OuroborosProtocol, Phase, Seed};
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -147,7 +145,6 @@ impl DelegationConfig {
         delay.min(self.max_delay_ms)
     }
 }
-
 
 impl Orchestrator {
     /// Creates a new orchestrator.
@@ -408,7 +405,6 @@ impl Orchestrator {
     pub fn set_git_layer(&mut self, git_layer: Arc<GitLayer>) {
         self.git_layer = Some(git_layer);
     }
-
 
     /// Restore sessions from persisted state.
     ///
@@ -960,9 +956,7 @@ impl Orchestrator {
         let assessment = engine.assess(msg, ctx).await?;
 
         match assessment {
-            oxios_ouroboros::Assessment::Conversation(reply) => {
-                Ok(HandleResponse::Reply(reply))
-            }
+            oxios_ouroboros::Assessment::Conversation(reply) => Ok(HandleResponse::Reply(reply)),
 
             oxios_ouroboros::Assessment::Clarify { questions } => {
                 Ok(HandleResponse::Clarify(questions))
@@ -974,9 +968,7 @@ impl Orchestrator {
                     oxios_ouroboros::Scope::Trivial => {
                         oxios_ouroboros::Directive::from_message(msg)
                     }
-                    oxios_ouroboros::Scope::Substantial => {
-                        engine.crystallize(msg, ctx).await?
-                    }
+                    oxios_ouroboros::Scope::Substantial => engine.crystallize(msg, ctx).await?,
                 };
 
                 // 3. Resolve the execution environment from MsgCtx.
@@ -1051,18 +1043,11 @@ impl Orchestrator {
         let response = self.handle(engine.as_ref(), msg, &ctx).await?;
         let duration_ms = start.elapsed().as_millis() as u64;
 
-        Ok(self.handle_response_to_orchestration_result(
-            response,
-            &ctx,
-            duration_ms,
-        ))
+        Ok(self.handle_response_to_orchestration_result(response, &ctx, duration_ms))
     }
 
     /// Load conversation history for a session from the state store.
-    async fn load_session_history(
-        &self,
-        session_id: &str,
-    ) -> Vec<oxios_ouroboros::Exchange> {
+    async fn load_session_history(&self, session_id: &str) -> Vec<oxios_ouroboros::Exchange> {
         let sid = crate::state_store::SessionId(session_id.to_string());
         match self.state_store.load_session(&sid).await {
             Ok(Some(session)) => session
@@ -1115,22 +1100,24 @@ impl Orchestrator {
                 let structured = Some(
                     questions
                         .iter()
-                        .map(|q| oxios_ouroboros::ouroboros_engine::InterviewQuestionOutput {
-                            id: q.id.clone(),
-                            text: q.text.clone(),
-                            kind: format!("{:?}", q.kind).to_lowercase(),
-                            options: q
-                                .options
-                                .iter()
-                                .map(|o| {
-                                    oxios_ouroboros::ouroboros_engine::InterviewOptionOutput {
-                                        value: o.value.clone(),
-                                        label: o.label.clone(),
-                                        description: String::new(),
-                                    }
-                                })
-                                .collect(),
-                        })
+                        .map(
+                            |q| oxios_ouroboros::ouroboros_engine::InterviewQuestionOutput {
+                                id: q.id.clone(),
+                                text: q.text.clone(),
+                                kind: format!("{:?}", q.kind).to_lowercase(),
+                                options: q
+                                    .options
+                                    .iter()
+                                    .map(|o| {
+                                        oxios_ouroboros::ouroboros_engine::InterviewOptionOutput {
+                                            value: o.value.clone(),
+                                            label: o.label.clone(),
+                                            description: String::new(),
+                                        }
+                                    })
+                                    .collect(),
+                            },
+                        )
                         .collect(),
                 );
                 OrchestrationResult {
@@ -1147,9 +1134,7 @@ impl Orchestrator {
                     output: None,
                     tool_calls: Vec::new(),
                     interview_questions: structured,
-                    interview_round: Some(
-                        ((ctx.history.len() / 2) as u32).max(1),
-                    ),
+                    interview_round: Some(((ctx.history.len() / 2) as u32).max(1)),
                     interview_ambiguity: None,
                     mode: "unified".to_string(),
                 }
@@ -1213,8 +1198,8 @@ impl Orchestrator {
         ctx: &oxios_ouroboros::MsgCtx,
         msg: &str,
     ) -> oxios_ouroboros::ExecEnv {
-        let (active_mount_ids, workspace_context, mount_paths, _mount_tag) = self
-            .resolve_mount_workspace(ctx.mount_ids.as_deref(), ctx.project_ids.as_deref(), msg);
+        let (active_mount_ids, workspace_context, mount_paths, _mount_tag) =
+            self.resolve_mount_workspace(ctx.mount_ids.as_deref(), ctx.project_ids.as_deref(), msg);
         // active_mount_ids + mount_tag are surfaced via the legacy path;
         // ExecEnv carries the resolved paths/context/project that the
         // agent runtime actually consumes.
@@ -1321,10 +1306,7 @@ impl Orchestrator {
 
         // Check if retry is enabled (RFC-027 Decision 6).
         // When disabled, return the initial result with the failed verdict.
-        let enable_retry = self
-            .intent_config
-            .read()
-            .enable_retry;
+        let enable_retry = self.intent_config.read().enable_retry;
         if !enable_retry {
             tracing::info!("Review failed but retry disabled (enable_retry=false)");
             return Ok((initial_result, verdict));

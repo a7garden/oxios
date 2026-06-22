@@ -351,8 +351,10 @@ impl AgentCardRegistry {
             tracing::info!(agent_id = %agent_id, name = %card.name, "Agent unregistered from A2A registry");
             drop(cards);
 
-            self.event_bus
-                .publish(KernelEvent::AgentStopped { id: agent_id, success: false })?;
+            self.event_bus.publish(KernelEvent::AgentStopped {
+                id: agent_id,
+                success: false,
+            })?;
         }
         Ok(())
     }

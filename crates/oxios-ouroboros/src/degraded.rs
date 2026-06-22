@@ -5,9 +5,9 @@
 //! placeholders. They preserve user intent from the available context.
 
 use crate::AmbiguityScore;
-use crate::{EvaluationResult, InterviewResult, Seed};
 use crate::assessment::{Assessment, Scope};
 use crate::directive::{Directive, Verdict};
+use crate::{EvaluationResult, InterviewResult, Seed};
 
 /// Produce a degraded interview result when LLM parsing fails.
 ///

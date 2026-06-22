@@ -298,9 +298,10 @@ impl AgentLifecycleManager {
         if let Err(e) = self.a2a.registry().unregister_agent(agent_id).await {
             tracing::warn!(agent_id = %agent_id, error = %e, "Failed to unregister A2A card");
         }
-        let _ = self
-            .event_bus
-            .publish(KernelEvent::AgentStopped { id: agent_id, success: false });
+        let _ = self.event_bus.publish(KernelEvent::AgentStopped {
+            id: agent_id,
+            success: false,
+        });
         Ok(())
     }
 
