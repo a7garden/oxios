@@ -153,127 +153,119 @@ pub(crate) async fn handle_chat(
             let duration_ms = meta.and_then(|m| m.duration_ms);
 
             // RFC-015: parse tool_calls into trajectory step records.
-                let trajectory_steps: Vec<oxios_kernel::state_store::TrajectoryStepRecord> =
-                    response
-                        .metadata
-                        .get("tool_calls")
-                        .and_then(|v| serde_json::from_str::<Vec<serde_json::Value>>(v).ok())
-                        .map(|calls| {
-                            calls
-                                .into_iter()
-                                .enumerate()
-                                .map(|(i, c)| oxios_kernel::state_store::TrajectoryStepRecord {
-                                    tool_name: c
-                                        .get("tool")
-                                        .and_then(|v| v.as_str())
-                                        .unwrap_or("")
-                                        .to_string(),
-                                    tool_args: c
-                                        .get("input")
-                                        .cloned()
-                                        .unwrap_or(serde_json::Value::Null),
-                                    output_summary: c
-                                        .get("output")
-                                        .and_then(|v| v.as_str())
-                                        .unwrap_or("")
-                                        .to_string(),
-                                    duration_ms: c
-                                        .get("duration_ms")
-                                        .and_then(|v| v.as_u64())
-                                        .unwrap_or(0),
-                                    is_error: false,
-                                    tool_call_id: format!("legacy-{i}"),
-                                    timestamp: chrono::Utc::now(),
-                                })
-                                .collect()
+            let trajectory_steps: Vec<oxios_kernel::state_store::TrajectoryStepRecord> = response
+                .metadata
+                .get("tool_calls")
+                .and_then(|v| serde_json::from_str::<Vec<serde_json::Value>>(v).ok())
+                .map(|calls| {
+                    calls
+                        .into_iter()
+                        .enumerate()
+                        .map(|(i, c)| oxios_kernel::state_store::TrajectoryStepRecord {
+                            tool_name: c
+                                .get("tool")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("")
+                                .to_string(),
+                            tool_args: c.get("input").cloned().unwrap_or(serde_json::Value::Null),
+                            output_summary: c
+                                .get("output")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("")
+                                .to_string(),
+                            duration_ms: c.get("duration_ms").and_then(|v| v.as_u64()).unwrap_or(0),
+                            is_error: false,
+                            tool_call_id: format!("legacy-{i}"),
+                            timestamp: chrono::Utc::now(),
                         })
-                        .unwrap_or_default();
+                        .collect()
+                })
+                .unwrap_or_default();
 
-                let session_id_for_save = session_id.clone().unwrap_or_else(|| msg_id.clone());
-                let sid = oxios_kernel::state_store::SessionId(session_id_for_save.clone());
-                match state.kernel.state.load_session(&sid).await {
-                    Ok(Some(mut session)) => {
-                        session.add_user_message(&content_echo);
-                        // Capture existing trajectory length before extending
-                        let traj_start = session.trajectory_steps.len();
-                        session.extend_trajectory(trajectory_steps);
-                        let traj_end = session.trajectory_steps.len();
-                        session.add_agent_response(oxios_kernel::state_store::AgentResponse {
-                            content: response.content.clone(),
-                            session_id: Some(sid.0.clone()),
-                            phase_reached: phase.clone(),
-                            evaluation_passed,
-                            timestamp: chrono::Utc::now(),
-                            trajectory_range: if traj_end > traj_start {
-                                Some(oxios_kernel::state_store::TrajectoryRange {
-                                    start: traj_start,
-                                    end: traj_end,
-                                })
-                            } else {
-                                None
-                            },
-                        });
-                        // RFC-025: Set top-level project_id for grouping.
-                        // User-requested project_id takes priority; otherwise
-                        // keep the existing grouping.
-                        if let Some(ref pid) = request_project_id {
-                            session.project_id = Some(pid.clone());
-                        }
-                        if let Err(e) = state.kernel.state.save_session(&session).await {
-                            tracing::warn!(error = %e, "Failed to persist session");
-                        }
-                    }
-                    Ok(None) => {
-                        // Create new session
-                        let mut session =
-                            oxios_kernel::state_store::Session::new(body.user_id.clone());
-                        session.id = oxios_kernel::state_store::SessionId(session_id_for_save);
-                        session.add_user_message(&content_echo);
-                        // New session: trajectory starts at 0
-                        let traj_start = 0usize;
-                        session.extend_trajectory(trajectory_steps);
-                        let traj_end = session.trajectory_steps.len();
-                        session.add_agent_response(oxios_kernel::state_store::AgentResponse {
-                            content: response.content.clone(),
-                            session_id: Some(sid.0.clone()),
-                            phase_reached: phase.clone(),
-                            evaluation_passed,
-                            timestamp: chrono::Utc::now(),
-                            trajectory_range: if traj_end > traj_start {
-                                Some(oxios_kernel::state_store::TrajectoryRange {
-                                    start: traj_start,
-                                    end: traj_end,
-                                })
-                            } else {
-                                None
-                            },
-                        });
-                        // RFC-025: Set top-level project_id for grouping.
-                        if let Some(ref pid) = request_project_id {
-                            session.project_id = Some(pid.clone());
-                        }
-                        if let Err(e) = state.kernel.state.save_session(&session).await {
-                            tracing::warn!(error = %e, "Failed to create session");
-                        }
-                    }
-                    Err(e) => tracing::warn!(error = %e, "Failed to load/create session"),
-                }
-
-                // Auto-prune sessions if configured (throttled to once per hour)
-                let cfg = state.config.read();
-                if cfg.session.auto_prune && state.kernel.state.should_auto_prune() {
-                    let prune_config = oxios_kernel::state_store::PruneConfig {
-                        max_sessions: cfg.session.max_sessions,
-                        ttl_hours: cfg.session.ttl_hours,
-                    };
-                    drop(cfg); // release read lock before async
-                    let kernel = state.kernel.clone();
-                    tokio::spawn(async move {
-                        if let Err(e) = kernel.state.prune_sessions(&prune_config).await {
-                            tracing::warn!(error = %e, "Session auto-prune failed");
-                        }
+            let session_id_for_save = session_id.clone().unwrap_or_else(|| msg_id.clone());
+            let sid = oxios_kernel::state_store::SessionId(session_id_for_save.clone());
+            match state.kernel.state.load_session(&sid).await {
+                Ok(Some(mut session)) => {
+                    session.add_user_message(&content_echo);
+                    // Capture existing trajectory length before extending
+                    let traj_start = session.trajectory_steps.len();
+                    session.extend_trajectory(trajectory_steps);
+                    let traj_end = session.trajectory_steps.len();
+                    session.add_agent_response(oxios_kernel::state_store::AgentResponse {
+                        content: response.content.clone(),
+                        session_id: Some(sid.0.clone()),
+                        phase_reached: phase.clone(),
+                        evaluation_passed,
+                        timestamp: chrono::Utc::now(),
+                        trajectory_range: if traj_end > traj_start {
+                            Some(oxios_kernel::state_store::TrajectoryRange {
+                                start: traj_start,
+                                end: traj_end,
+                            })
+                        } else {
+                            None
+                        },
                     });
+                    // RFC-025: Set top-level project_id for grouping.
+                    // User-requested project_id takes priority; otherwise
+                    // keep the existing grouping.
+                    if let Some(ref pid) = request_project_id {
+                        session.project_id = Some(pid.clone());
+                    }
+                    if let Err(e) = state.kernel.state.save_session(&session).await {
+                        tracing::warn!(error = %e, "Failed to persist session");
+                    }
                 }
+                Ok(None) => {
+                    // Create new session
+                    let mut session = oxios_kernel::state_store::Session::new(body.user_id.clone());
+                    session.id = oxios_kernel::state_store::SessionId(session_id_for_save);
+                    session.add_user_message(&content_echo);
+                    // New session: trajectory starts at 0
+                    let traj_start = 0usize;
+                    session.extend_trajectory(trajectory_steps);
+                    let traj_end = session.trajectory_steps.len();
+                    session.add_agent_response(oxios_kernel::state_store::AgentResponse {
+                        content: response.content.clone(),
+                        session_id: Some(sid.0.clone()),
+                        phase_reached: phase.clone(),
+                        evaluation_passed,
+                        timestamp: chrono::Utc::now(),
+                        trajectory_range: if traj_end > traj_start {
+                            Some(oxios_kernel::state_store::TrajectoryRange {
+                                start: traj_start,
+                                end: traj_end,
+                            })
+                        } else {
+                            None
+                        },
+                    });
+                    // RFC-025: Set top-level project_id for grouping.
+                    if let Some(ref pid) = request_project_id {
+                        session.project_id = Some(pid.clone());
+                    }
+                    if let Err(e) = state.kernel.state.save_session(&session).await {
+                        tracing::warn!(error = %e, "Failed to create session");
+                    }
+                }
+                Err(e) => tracing::warn!(error = %e, "Failed to load/create session"),
+            }
+
+            // Auto-prune sessions if configured (throttled to once per hour)
+            let cfg = state.config.read();
+            if cfg.session.auto_prune && state.kernel.state.should_auto_prune() {
+                let prune_config = oxios_kernel::state_store::PruneConfig {
+                    max_sessions: cfg.session.max_sessions,
+                    ttl_hours: cfg.session.ttl_hours,
+                };
+                drop(cfg); // release read lock before async
+                let kernel = state.kernel.clone();
+                tokio::spawn(async move {
+                    if let Err(e) = kernel.state.prune_sessions(&prune_config).await {
+                        tracing::warn!(error = %e, "Session auto-prune failed");
+                    }
+                });
+            }
 
             Ok(Json(ChatResponse {
                 id: msg_id,
@@ -358,7 +350,9 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
     // RFC-024 §11: count WS connection opens. The drop counter (`close` /
     // `keepalive_timeout`) is wired at the join site below where the
     // task's exit reason is observable.
-    oxios_kernel::metrics::get_metrics().ws_connections_open.inc();
+    oxios_kernel::metrics::get_metrics()
+        .ws_connections_open
+        .inc();
 
     // Assign a unique connection ID for point-to-point message routing.
     // Prevents cross-tab message leakage in multi-session scenarios.
@@ -366,7 +360,7 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
     // Clone for recv_task (send_task gets its own clone below).
     let conn_id_for_recv = conn_id.clone();
     let conn_id_for_send = conn_id.clone();
-    let (mut ws_tx, mut ws_rx) = socket.split();
+    let (ws_tx, mut ws_rx) = socket.split();
     // RFC-024 SP2 (B3): the sink is shared between the recv_task (which
     // forwards gateway chunks) and a dedicated keepalive task (which sends
     // periodic pings). An `Arc<Mutex<>>` keeps the change tiny: the lock is
@@ -379,9 +373,9 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
     // declares the connection dead if no `Pong` arrives within 60 s of
     // the last activity.
     let pong_signal = std::sync::Arc::new(tokio::sync::Notify::new());
-    /// Set to true when the keepalive task aborts the connection due to a
-    /// missing pong. The close site reads it to choose between the
-    /// `close` and `keepalive_timeout` metric labels.
+    // Set to true when the keepalive task aborts the connection due to a
+    // missing pong. The close site reads it to choose between the
+    // `close` and `keepalive_timeout` metric labels.
     let keepalive_timed_out = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
     // Subscribe to outgoing messages from the web channel (not kernel event bus).
     // WebChannel::send() broadcasts OutgoingMessage here; the kernel event bus
@@ -438,198 +432,198 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
     // usage, memory recall, reasoning fragments) as WS chunks so the
     // frontend can show live progress.
     let mut recv_task = {
-    let ws_tx = ws_tx.clone();
-    tokio::spawn(async move {
-        // Track the active session so we only forward events tagged with it.
-        // Multi-turn conversations keep the same session_id across messages.
-        let mut active_session_id: Option<String> = None;
+        let ws_tx = ws_tx.clone();
+        tokio::spawn(async move {
+            // Track the active session so we only forward events tagged with it.
+            // Multi-turn conversations keep the same session_id across messages.
+            let mut active_session_id: Option<String> = None;
 
-        loop {
-            tokio::select! {
-                // Bias toward gateway messages (text streaming + done).
-                biased;
-                msg_result = outgoing_rx.recv() => {
-                    let Ok(msg) = msg_result else { break };
+            loop {
+                tokio::select! {
+                    // Bias toward gateway messages (text streaming + done).
+                    biased;
+                    msg_result = outgoing_rx.recv() => {
+                        let Ok(msg) = msg_result else { break };
 
-                    // Filter by target_conn_id: only process messages addressed
-                    // to this connection (or broadcast messages with None).
-                    if msg.target_conn_id.as_ref().is_some_and(|id| id != &conn_id_for_recv) {
-                        continue;
-                    }
-
-                    let msg_id = msg.id;
-                    let session_id = msg
-                        .meta
-                        .as_ref()
-                        .and_then(|m| m.session_id.clone())
-                        .or_else(|| msg.metadata.get("session_id").cloned());
-                    let project_id = msg
-                        .meta
-                        .as_ref()
-                        .and_then(|m| m.project_id.clone())
-                        .or_else(|| msg.metadata.get("project_ids").cloned());
-                    let phase = msg
-                        .meta
-                        .as_ref()
-                        .map(|m| m.phase.clone())
-                        .or_else(|| msg.metadata.get("phase").cloned());
-                    let evaluation_passed = msg.meta.as_ref().and_then(|m| m.evaluation_passed);
-                    let project_tag = msg.meta.as_ref().and_then(|m| m.project_tag.clone());
-                    let duration_ms = msg.meta.as_ref().and_then(|m| m.duration_ms);
-
-                    // Remember the session we are forwarding for. Subsequent
-                    // kernel events without a session_id are still forwarded
-                    // (some events are system-wide).
-                    if session_id.is_some() {
-                        active_session_id = session_id.clone();
-                    }
-
-                    // RFC-024 SP2 / C2: a synthetic `type: "resync"` message
-                    // (broadcast by the bridge when a resume cursor was
-                    // older than the replay buffer) is forwarded as a
-                    // resync chunk and *skips* persistence / token / done
-                    // emission — the client is expected to pull state via
-                    // the regular HTTP API after seeing it.
-                    if msg.metadata.get("type").map(|v| v.as_str()) == Some("resync") {
-                        let chunk = serde_json::json!({"type": "resync"});
-                        if ws_tx
-                            .lock()
-                            .await
-                            .send(Message::Text(chunk.to_string().into()))
-                            .await
-                            .is_err()
-                        {
-                            break;
+                        // Filter by target_conn_id: only process messages addressed
+                        // to this connection (or broadcast messages with None).
+                        if msg.target_conn_id.as_ref().is_some_and(|id| id != &conn_id_for_recv) {
+                            continue;
                         }
-                        continue;
-                    }
 
-                    // ── Persist session to disk FIRST ──
-                    // Always persist, even if WS send fails later. This ensures
-                    // the exchange is durable even if the connection drops mid-stream.
-                    //
-                    // RFC-025 Web-M3: check-and-remove happen under a single
-                    // lock so there is no TOCTOU window between peeking the
-                    // pending slot and taking it. The lock is released before
-                    // the async persist_session call.
-                    if let Some(ref sid) = session_id {
-                        let pm = {
-                            let mut guard = pending_user_msg.lock().await;
-                            guard.remove(&msg_id)
-                        };
-                        // lock released here, before async I/O
-                        if let Some(pm) = pm {
-                            persist_session(
-                                &state_store,
-                                sid,
-                                pm.content.as_str(),
-                                pm.user_id.as_str(),
-                                &msg.content,
-                                project_id.as_deref(),
-                                &msg.metadata,
-                                prune_config.clone(),
-                            )
-                            .await;
+                        let msg_id = msg.id;
+                        let session_id = msg
+                            .meta
+                            .as_ref()
+                            .and_then(|m| m.session_id.clone())
+                            .or_else(|| msg.metadata.get("session_id").cloned());
+                        let project_id = msg
+                            .meta
+                            .as_ref()
+                            .and_then(|m| m.project_id.clone())
+                            .or_else(|| msg.metadata.get("project_ids").cloned());
+                        let phase = msg
+                            .meta
+                            .as_ref()
+                            .map(|m| m.phase.clone())
+                            .or_else(|| msg.metadata.get("phase").cloned());
+                        let evaluation_passed = msg.meta.as_ref().and_then(|m| m.evaluation_passed);
+                        let project_tag = msg.meta.as_ref().and_then(|m| m.project_tag.clone());
+                        let duration_ms = msg.meta.as_ref().and_then(|m| m.duration_ms);
+
+                        // Remember the session we are forwarding for. Subsequent
+                        // kernel events without a session_id are still forwarded
+                        // (some events are system-wide).
+                        if session_id.is_some() {
+                            active_session_id = session_id.clone();
                         }
-                    }
 
-                    // ── Forward to WebSocket client ──
-                    //
-                    // Chat UI redesign: when `meta.interview_questions` is
-                    // present, send an `interview` chunk (structured widgets)
-                    // and skip the token chunk — the questions are already
-                    // carried by the interview payload. When absent, fall
-                    // back to the existing token + done sequence.
-                    let has_interview = msg.meta.as_ref().and_then(|m| m.interview_questions.as_ref()).is_some();
+                        // RFC-024 SP2 / C2: a synthetic `type: "resync"` message
+                        // (broadcast by the bridge when a resume cursor was
+                        // older than the replay buffer) is forwarded as a
+                        // resync chunk and *skips* persistence / token / done
+                        // emission — the client is expected to pull state via
+                        // the regular HTTP API after seeing it.
+                        if msg.metadata.get("type").map(|v| v.as_str()) == Some("resync") {
+                            let chunk = serde_json::json!({"type": "resync"});
+                            if ws_tx
+                                .lock()
+                                .await
+                                .send(Message::Text(chunk.to_string().into()))
+                                .await
+                                .is_err()
+                            {
+                                break;
+                            }
+                            continue;
+                        }
 
-                    if has_interview {
-                        // Send interview chunk with structured questions
-                        let interview_chunk = serde_json::json!({
-                            "type": "interview",
+                        // ── Persist session to disk FIRST ──
+                        // Always persist, even if WS send fails later. This ensures
+                        // the exchange is durable even if the connection drops mid-stream.
+                        //
+                        // RFC-025 Web-M3: check-and-remove happen under a single
+                        // lock so there is no TOCTOU window between peeking the
+                        // pending slot and taking it. The lock is released before
+                        // the async persist_session call.
+                        if let Some(ref sid) = session_id {
+                            let pm = {
+                                let mut guard = pending_user_msg.lock().await;
+                                guard.remove(&msg_id)
+                            };
+                            // lock released here, before async I/O
+                            if let Some(pm) = pm {
+                                persist_session(
+                                    &state_store,
+                                    sid,
+                                    pm.content.as_str(),
+                                    pm.user_id.as_str(),
+                                    &msg.content,
+                                    project_id.as_deref(),
+                                    &msg.metadata,
+                                    prune_config.clone(),
+                                )
+                                .await;
+                            }
+                        }
+
+                        // ── Forward to WebSocket client ──
+                        //
+                        // Chat UI redesign: when `meta.interview_questions` is
+                        // present, send an `interview` chunk (structured widgets)
+                        // and skip the token chunk — the questions are already
+                        // carried by the interview payload. When absent, fall
+                        // back to the existing token + done sequence.
+                        let has_interview = msg.meta.as_ref().and_then(|m| m.interview_questions.as_ref()).is_some();
+
+                        if has_interview {
+                            // Send interview chunk with structured questions
+                            let interview_chunk = serde_json::json!({
+                                "type": "interview",
+                                "seq": msg.seq,
+                                "session_id": session_id,
+                                "project_id": project_id,
+                                "questions": msg.meta.as_ref().and_then(|m| m.interview_questions.clone()),
+                                "round": msg.meta.as_ref().and_then(|m| m.interview_round),
+                            });
+                            let json = match serde_json::to_string(&interview_chunk) {
+                                Ok(j) => j,
+                                Err(e) => {
+                                    tracing::error!(error = %e, "Failed to serialize interview chunk");
+                                    continue;
+                                }
+                            };
+                            if ws_tx.lock().await.send(Message::Text(json.into())).await.is_err() {
+                                break;
+                            }
+                        } else {
+                            // Standard token chunk
+                            let token_chunk = serde_json::json!({
+                                "type": "token",
+                                "seq": msg.seq,
+                                "content": msg.content,
+                                "session_id": session_id,
+                                "project_id": project_id,
+                            });
+                            let json = match serde_json::to_string(&token_chunk) {
+                                Ok(j) => j,
+                                Err(e) => {
+                                    tracing::error!(error = %e, "Failed to serialize outgoing message");
+                                    continue;
+                                }
+                            };
+                            if ws_tx.lock().await.send(Message::Text(json.into())).await.is_err() {
+                                break; // WS closed — session was already persisted above
+                            }
+                        }
+
+                        let done_chunk = serde_json::json!({
+                            "type": "done",
                             "seq": msg.seq,
                             "session_id": session_id,
                             "project_id": project_id,
-                            "questions": msg.meta.as_ref().and_then(|m| m.interview_questions.clone()),
-                            "round": msg.meta.as_ref().and_then(|m| m.interview_round),
+                            "phase": phase,
+                            "evaluation_passed": evaluation_passed,
+                            "project_tag": project_tag,
+                            "duration_ms": duration_ms,
+                            // RFC-025: surface detected mount info to the frontend.
+                            "mount_tag": msg.metadata.get("mount_tag"),
+                            "mount_ids": msg.metadata.get("mount_ids"),
+                            // TODO: populate tool_calls from trajectory_steps once kernel provides it
+                            "tool_calls": msg.metadata.get("tool_calls")
+                                .and_then(|v| serde_json::from_str::<serde_json::Value>(v).ok())
+                                .unwrap_or(serde_json::json!([])),
                         });
-                        let json = match serde_json::to_string(&interview_chunk) {
+                        let done_json = match serde_json::to_string(&done_chunk) {
                             Ok(j) => j,
-                            Err(e) => {
-                                tracing::error!(error = %e, "Failed to serialize interview chunk");
-                                continue;
-                            }
+                            Err(_) => break,
                         };
-                        if ws_tx.lock().await.send(Message::Text(json.into())).await.is_err() {
-                            break;
-                        }
-                    } else {
-                        // Standard token chunk
-                        let token_chunk = serde_json::json!({
-                            "type": "token",
-                            "seq": msg.seq,
-                            "content": msg.content,
-                            "session_id": session_id,
-                            "project_id": project_id,
-                        });
-                        let json = match serde_json::to_string(&token_chunk) {
-                            Ok(j) => j,
-                            Err(e) => {
-                                tracing::error!(error = %e, "Failed to serialize outgoing message");
-                                continue;
-                            }
-                        };
-                        if ws_tx.lock().await.send(Message::Text(json.into())).await.is_err() {
+                        if ws_tx.lock().await.send(Message::Text(done_json.into())).await.is_err() {
                             break; // WS closed — session was already persisted above
                         }
                     }
-
-                    let done_chunk = serde_json::json!({
-                        "type": "done",
-                        "seq": msg.seq,
-                        "session_id": session_id,
-                        "project_id": project_id,
-                        "phase": phase,
-                        "evaluation_passed": evaluation_passed,
-                        "project_tag": project_tag,
-                        "duration_ms": duration_ms,
-                        // RFC-025: surface detected mount info to the frontend.
-                        "mount_tag": msg.metadata.get("mount_tag"),
-                        "mount_ids": msg.metadata.get("mount_ids"),
-                        // TODO: populate tool_calls from trajectory_steps once kernel provides it
-                        "tool_calls": msg.metadata.get("tool_calls")
-                            .and_then(|v| serde_json::from_str::<serde_json::Value>(v).ok())
-                            .unwrap_or(serde_json::json!([])),
-                    });
-                    let done_json = match serde_json::to_string(&done_chunk) {
-                        Ok(j) => j,
-                        Err(_) => break,
-                    };
-                    if ws_tx.lock().await.send(Message::Text(done_json.into())).await.is_err() {
-                        break; // WS closed — session was already persisted above
-                    }
-                }
-                event_result = kernel_event_rx.recv() => {
-                    // Convert KernelEvent → WS chunk when relevant.
-                    let Ok(event) = event_result else {
-                        // Lagged or closed — skip and keep waiting.
-                        continue;
-                    };
-                    if let Some(chunk) = kernel_event_to_ws_chunk(&event, &active_session_id) {
-                        let json = match serde_json::to_string(&chunk) {
-                            Ok(j) => j,
-                            Err(e) => {
-                                tracing::warn!(error = %e, "Failed to serialize transparency chunk");
-                                continue;
-                            }
+                    event_result = kernel_event_rx.recv() => {
+                        // Convert KernelEvent → WS chunk when relevant.
+                        let Ok(event) = event_result else {
+                            // Lagged or closed — skip and keep waiting.
+                            continue;
                         };
-                        if ws_tx.lock().await.send(Message::Text(json.into())).await.is_err() {
-                            break;
+                        if let Some(chunk) = kernel_event_to_ws_chunk(&event, &active_session_id) {
+                            let json = match serde_json::to_string(&chunk) {
+                                Ok(j) => j,
+                                Err(e) => {
+                                    tracing::warn!(error = %e, "Failed to serialize transparency chunk");
+                                    continue;
+                                }
+                            };
+                            if ws_tx.lock().await.send(Message::Text(json.into())).await.is_err() {
+                                break;
+                            }
                         }
                     }
                 }
             }
-        }
-    })
+        })
     };
 
     // ── Receive from WebSocket client → gateway ──
@@ -637,179 +631,179 @@ pub(crate) async fn handle_chat_websocket(socket: WebSocket, state: Arc<AppState
     // Frontend sends JSON:
     //   `{ type: "message", content: "...", session_id?, project_id? }`
     let mut send_task = {
-    let pong_signal = pong_signal.clone();
-    tokio::spawn(async move {
-        while let Some(Ok(msg)) = FuturesStreamExt::next(&mut ws_rx).await {
-            match msg {
-                Message::Text(text) => {
-                    let parsed: serde_json::Value = match serde_json::from_str(&text) {
-                        Ok(v) => v,
-                        Err(_) => continue,
-                    };
+        let pong_signal = pong_signal.clone();
+        tokio::spawn(async move {
+            while let Some(Ok(msg)) = FuturesStreamExt::next(&mut ws_rx).await {
+                match msg {
+                    Message::Text(text) => {
+                        let parsed: serde_json::Value = match serde_json::from_str(&text) {
+                            Ok(v) => v,
+                            Err(_) => continue,
+                        };
 
-                    let msg_type = parsed
-                        .get("type")
-                        .and_then(|v| v.as_str())
-                        .unwrap_or("message");
+                        let msg_type = parsed
+                            .get("type")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("message");
 
-                    let incoming_session_id = parsed
-                        .get("session_id")
-                        .and_then(|v| v.as_str())
-                        .filter(|s| !s.is_empty())
-                        .map(String::from);
+                        let incoming_session_id = parsed
+                            .get("session_id")
+                            .and_then(|v| v.as_str())
+                            .filter(|s| !s.is_empty())
+                            .map(String::from);
 
-                    let incoming_project_id = parsed
-                        .get("project_id")
-                        .and_then(|v| v.as_str())
-                        .filter(|s| !s.is_empty())
-                        .map(String::from);
-                    // RFC-025: mount_ids (comma-separated, primary first).
-                    let incoming_mount_ids = parsed
-                        .get("mount_ids")
-                        .and_then(|v| v.as_str())
-                        .filter(|s| !s.is_empty())
-                        .map(String::from);
+                        let incoming_project_id = parsed
+                            .get("project_id")
+                            .and_then(|v| v.as_str())
+                            .filter(|s| !s.is_empty())
+                            .map(String::from);
+                        // RFC-025: mount_ids (comma-separated, primary first).
+                        let incoming_mount_ids = parsed
+                            .get("mount_ids")
+                            .and_then(|v| v.as_str())
+                            .filter(|s| !s.is_empty())
+                            .map(String::from);
 
-                    match msg_type {
-                        // RFC-024 SP2 / C2 (replay): client announces its
-                        // last-seen seq and asks the server to replay any
-                        // messages it missed while disconnected. The bridge
-                        // broadcasts the replayed slice (or a synthetic
-                        // `type: "resync"` message) which the recv_task
-                        // forwards to the client. We do NOT treat this as a
-                        // user message, so we `continue` without touching
-                        // the gateway.
-                        "resume" => {
-                            let last_seq: u64 =
-                                parsed.get("last_seq").and_then(|v| v.as_u64()).unwrap_or(0);
-                            tracing::debug!(
-                                conn_id = %conn_id_for_send,
-                                last_seq,
-                                "WS resume: replaying since last_seq"
-                            );
-                            bridge_for_resume.replay_after(last_seq);
-                            continue;
-                        }
-                        // Chat UI redesign: user submits structured interview
-                        // answers. Convert to natural language and forward as
-                        // a regular message so the Orchestrator's existing
-                        // multi-turn interview path handles it without any
-                        // special treatment.
-                        "interview_response" => {
-                            let answers = parsed
-                                .get("answers")
-                                .and_then(|v| v.as_array())
-                                .cloned()
-                                .unwrap_or_default();
-
-                            // Prefer the pre-formatted Q&A text from the frontend
-                            // (includes question context so the LLM understands
-                            // the answers). Fall back to raw values if absent.
-                            let answer_text = parsed
-                                .get("text")
-                                .and_then(|v| v.as_str())
-                                .filter(|s| !s.is_empty())
-                                .map(String::from)
-                                .unwrap_or_else(|| {
-                                    answers
-                                        .iter()
-                                        .filter_map(|a| {
-                                            let value = a.get("value")?.as_str()?;
-                                            if value.is_empty() {
-                                                return None;
-                                            }
-                                            Some(value.to_string())
-                                        })
-                                        .collect::<Vec<_>>()
-                                        .join("\n")
-                                });
-
-                            if answer_text.is_empty() {
+                        match msg_type {
+                            // RFC-024 SP2 / C2 (replay): client announces its
+                            // last-seen seq and asks the server to replay any
+                            // messages it missed while disconnected. The bridge
+                            // broadcasts the replayed slice (or a synthetic
+                            // `type: "resync"` message) which the recv_task
+                            // forwards to the client. We do NOT treat this as a
+                            // user message, so we `continue` without touching
+                            // the gateway.
+                            "resume" => {
+                                let last_seq: u64 =
+                                    parsed.get("last_seq").and_then(|v| v.as_u64()).unwrap_or(0);
+                                tracing::debug!(
+                                    conn_id = %conn_id_for_send,
+                                    last_seq,
+                                    "WS resume: replaying since last_seq"
+                                );
+                                bridge_for_resume.replay_after(last_seq);
                                 continue;
                             }
+                            // Chat UI redesign: user submits structured interview
+                            // answers. Convert to natural language and forward as
+                            // a regular message so the Orchestrator's existing
+                            // multi-turn interview path handles it without any
+                            // special treatment.
+                            "interview_response" => {
+                                let answers = parsed
+                                    .get("answers")
+                                    .and_then(|v| v.as_array())
+                                    .cloned()
+                                    .unwrap_or_default();
 
-                            let mut incoming =
-                                IncomingMessage::new("web", "default", answer_text.clone());
-                            if let Some(ref sid) = incoming_session_id {
-                                incoming.metadata.insert("session_id".into(), sid.clone());
-                            }
-                            if let Some(ref vid) = incoming_project_id {
-                                incoming.metadata.insert("project_ids".into(), vid.clone());
-                            }
-                            if let Some(ref mids) = incoming_mount_ids {
-                                incoming.metadata.insert("mount_ids".into(), mids.clone());
-                            }
-                            incoming
-                                .metadata
-                                .insert("conn_id".into(), conn_id_for_send.clone());
+                                // Prefer the pre-formatted Q&A text from the frontend
+                                // (includes question context so the LLM understands
+                                // the answers). Fall back to raw values if absent.
+                                let answer_text = parsed
+                                    .get("text")
+                                    .and_then(|v| v.as_str())
+                                    .filter(|s| !s.is_empty())
+                                    .map(String::from)
+                                    .unwrap_or_else(|| {
+                                        answers
+                                            .iter()
+                                            .filter_map(|a| {
+                                                let value = a.get("value")?.as_str()?;
+                                                if value.is_empty() {
+                                                    return None;
+                                                }
+                                                Some(value.to_string())
+                                            })
+                                            .collect::<Vec<_>>()
+                                            .join("\n")
+                                    });
 
-                            {
-                                let mut pending = pending_for_send.lock().await;
-                                pending.insert(
-                                    incoming.id,
-                                    PendingMessage {
-                                        content: answer_text,
-                                        user_id: "default".to_string(),
-                                    },
-                                );
-                            }
+                                if answer_text.is_empty() {
+                                    continue;
+                                }
 
-                            if incoming_tx.send(incoming).await.is_err() {
-                                break;
-                            }
-                        }
-                        // Default: regular chat message
-                        _ => {
-                            let content = parsed
-                                .get("content")
-                                .and_then(|v| v.as_str())
-                                .unwrap_or("")
-                                .to_string();
+                                let mut incoming =
+                                    IncomingMessage::new("web", "default", answer_text.clone());
+                                if let Some(ref sid) = incoming_session_id {
+                                    incoming.metadata.insert("session_id".into(), sid.clone());
+                                }
+                                if let Some(ref vid) = incoming_project_id {
+                                    incoming.metadata.insert("project_ids".into(), vid.clone());
+                                }
+                                if let Some(ref mids) = incoming_mount_ids {
+                                    incoming.metadata.insert("mount_ids".into(), mids.clone());
+                                }
+                                incoming
+                                    .metadata
+                                    .insert("conn_id".into(), conn_id_for_send.clone());
 
-                            if content.is_empty() {
-                                continue;
-                            }
+                                {
+                                    let mut pending = pending_for_send.lock().await;
+                                    pending.insert(
+                                        incoming.id,
+                                        PendingMessage {
+                                            content: answer_text,
+                                            user_id: "default".to_string(),
+                                        },
+                                    );
+                                }
 
-                            let mut incoming =
-                                IncomingMessage::new("web", "default", content.clone());
+                                if incoming_tx.send(incoming).await.is_err() {
+                                    break;
+                                }
+                            }
+                            // Default: regular chat message
+                            _ => {
+                                let content = parsed
+                                    .get("content")
+                                    .and_then(|v| v.as_str())
+                                    .unwrap_or("")
+                                    .to_string();
 
-                            if let Some(ref sid) = incoming_session_id {
-                                incoming.metadata.insert("session_id".into(), sid.clone());
-                            }
-                            if let Some(ref vid) = incoming_project_id {
-                                incoming.metadata.insert("project_ids".into(), vid.clone());
-                            }
-                            if let Some(ref mids) = incoming_mount_ids {
-                                incoming.metadata.insert("mount_ids".into(), mids.clone());
-                            }
-                            incoming
-                                .metadata
-                                .insert("conn_id".into(), conn_id_for_send.clone());
+                                if content.is_empty() {
+                                    continue;
+                                }
 
-                            {
-                                let mut pending = pending_for_send.lock().await;
-                                pending.insert(
-                                    incoming.id,
-                                    PendingMessage {
-                                        content,
-                                        user_id: "default".to_string(),
-                                    },
-                                );
+                                let mut incoming =
+                                    IncomingMessage::new("web", "default", content.clone());
+
+                                if let Some(ref sid) = incoming_session_id {
+                                    incoming.metadata.insert("session_id".into(), sid.clone());
+                                }
+                                if let Some(ref vid) = incoming_project_id {
+                                    incoming.metadata.insert("project_ids".into(), vid.clone());
+                                }
+                                if let Some(ref mids) = incoming_mount_ids {
+                                    incoming.metadata.insert("mount_ids".into(), mids.clone());
+                                }
+                                incoming
+                                    .metadata
+                                    .insert("conn_id".into(), conn_id_for_send.clone());
+
+                                {
+                                    let mut pending = pending_for_send.lock().await;
+                                    pending.insert(
+                                        incoming.id,
+                                        PendingMessage {
+                                            content,
+                                            user_id: "default".to_string(),
+                                        },
+                                    );
+                                }
                             }
                         }
                     }
+                    Message::Close(_) => break,
+                    Message::Pong(_) => {
+                        // RFC-024 SP2 (B3): the client responded to one of
+                        // our pings. Reset the keepalive deadline so the
+                        // connection is not killed mid-conversation.
+                        pong_signal.notify_one();
+                    }
+                    _ => {}
                 }
-                Message::Close(_) => break,
-                Message::Pong(_) => {
-                    // RFC-024 SP2 (B3): the client responded to one of
-                    // our pings. Reset the keepalive deadline so the
-                    // connection is not killed mid-conversation.
-                    pong_signal.notify_one();
-                }
-                _ => {}
             }
-        }
-    })
+        })
     };
 
     // RFC-024 SP2 (B3): dedicated keepalive task. Sends an empty Ping
