@@ -82,8 +82,7 @@ pub struct ResponseMeta {
     /// UI can render interactive widgets. When `None`, the frontend
     /// renders the plain `content` as markdown (graceful degradation).
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub interview_questions:
-        Option<Vec<oxios_ouroboros::ouroboros_engine::InterviewQuestionOutput>>,
+    pub interview_questions: Option<Vec<oxios_ouroboros::InterviewQuestionOutput>>,
     /// Current interview round (1-based). Populated alongside
     /// `interview_questions`.
     #[serde(skip_serializing_if = "Option::is_none")]
