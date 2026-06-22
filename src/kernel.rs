@@ -9,9 +9,9 @@ use oxios_gateway::Gateway;
 use oxios_kernel::{
     A2AProtocol, AgentRuntime, AgentScheduler, AuditPersistence, AuditTrail, BasicSupervisor,
     BudgetManager, ClawHubClient, ClawHubInstaller, CronScheduler, EngineHandle, EventBus,
-    GitLayer, MarketplaceApi, McpBridge, McpServer, MemoryManager, Orchestrator, OxiosConfig,
-    OxiosEngine, PersonaManager, ProjectManager, ResourceMonitor, SkillManager, SkillsShClient,
-    SkillsShInstaller, SubsystemState, Supervisor, access_manager::AccessManager,
+    GitLayer, HnswMemoryIndex, MarketplaceApi, McpBridge, McpServer, MemoryManager, Orchestrator,
+    OxiosConfig, OxiosEngine, PersonaManager, ProjectManager, ResourceMonitor, SkillManager,
+    SkillsShClient, SkillsShInstaller, SubsystemState, Supervisor, access_manager::AccessManager,
     auth::AuthManager, config::load_config,
 };
 use oxios_markdown::KnowledgeBase;
@@ -1086,20 +1086,40 @@ impl KernelBuilder {
             persona_manager.clone(),
         )));
 
+        // Shared KnowledgeBase — single source of truth (RFC-003)
+        let knowledge_base = Arc::new(
+            KnowledgeBase::new(PathBuf::from(&config.kernel.workspace).join("knowledge"))
+                .expect("KnowledgeBase init failed"),
+        );
+
+        // HNSW index for fast semantic search
+        let hnsw_index = Arc::new(
+            HnswMemoryIndex::new(
+                config.memory.sqlite.embedding_dim,
+                10000,
+                Some(PathBuf::from(&config.kernel.workspace).join("memory")),
+            )
+            .expect("HNSW index init failed"),
+        );
+
+        // Build AgentApi with HNSW index attached
+        let mut agent_api = oxios_kernel::AgentApi::new(
+            // Placeholder supervisor — the real one needs AgentRuntime which needs this handle.
+            // AgentApi.supervisor is only used for list/kill, not during tool registration.
+            Arc::new(oxios_kernel::supervisor::NoOpSupervisor),
+            budget_manager.clone(),
+            memory_manager.clone(),
+            None,
+        );
+        agent_api.set_hnsw_index(hnsw_index.clone());
+
         // ── KernelHandle — the syscall table for agent OS control ──
         // Created inline here because AgentRuntime needs it.
         // Will be cached again in the Kernel instance.
         let kernel_handle: Arc<oxios_kernel::KernelHandle> = {
             let kh = oxios_kernel::KernelHandle::new(
                 oxios_kernel::StateApi::new(state_store.clone()),
-                oxios_kernel::AgentApi::new(
-                    // Placeholder supervisor — the real one needs AgentRuntime which needs this handle.
-                    // AgentApi.supervisor is only used for list/kill, not during tool registration.
-                    Arc::new(oxios_kernel::supervisor::NoOpSupervisor),
-                    budget_manager.clone(),
-                    memory_manager.clone(),
-                    None,
-                ),
+                agent_api,
                 oxios_kernel::SecurityApi::new(
                     auth_manager.clone(),
                     audit_trail.clone(),
@@ -1131,20 +1151,12 @@ impl KernelBuilder {
                     Arc::clone(&routing_stats),
                     Arc::clone(&engine_handle),
                 ),
-                // KnowledgeBase — single source of truth (RFC-003)
-                Arc::new(
-                    KnowledgeBase::new(PathBuf::from(&config.kernel.workspace).join("knowledge"))
-                        .expect("KnowledgeBase init failed"),
-                ),
+                // KnowledgeBase — single source of truth (RFC-003), shared
+                knowledge_base.clone(),
                 // KnowledgeLens — semantic overlay, shares same KnowledgeBase
                 Arc::new(
                     oxios_kernel::KnowledgeLens::new(
-                        Arc::new(
-                            KnowledgeBase::new(
-                                PathBuf::from(&config.kernel.workspace).join("knowledge"),
-                            )
-                            .expect("KnowledgeBase init failed"),
-                        ),
+                        knowledge_base.clone(),
                         memory_manager.clone(),
                     )
                     .expect("KnowledgeLens init failed"),
@@ -1214,12 +1226,7 @@ impl KernelBuilder {
         })
         .with_persistence_hook(Arc::new(oxios_kernel::PersistenceHook::new(
             memory_manager.clone(),
-            Arc::new(
-                oxios_markdown::KnowledgeBase::new(
-                    PathBuf::from(&config.kernel.workspace).join("knowledge"),
-                )
-                .expect("KnowledgeBase init failed"),
-            ),
+            knowledge_base.clone(),
             Arc::clone(&engine_handle),
             state_store.clone(),
             event_bus.clone(),

@@ -272,7 +272,7 @@ impl OuroborosEngine {
                      Please respond with ONLY valid JSON matching the requested schema. \
                      Do not include any text before or after the JSON object.",
                     e,
-                    &raw[..raw.len().min(500)]
+                    &raw[..raw.floor_char_boundary(raw.len().min(500))]
                 );
                 let retry_raw = self.llm_complete(system_prompt, &retry_msg).await?;
                 Self::parse_json::<T>(&retry_raw)
@@ -548,7 +548,9 @@ impl OuroborosProtocol for OuroborosEngine {
                 .collect::<Vec<_>>()
                 .join("\n"),
             mechanical_notes,
-            &execution.output[..execution.output.len().min(3000)],
+            &execution.output[..execution
+                .output
+                .floor_char_boundary(execution.output.len().min(3000))],
             mechanical.all_passed,
         );
 

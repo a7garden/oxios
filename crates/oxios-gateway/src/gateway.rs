@@ -581,9 +581,9 @@ impl Gateway {
 
     /// Sends a message through the named channel.
     ///
-    /// F21: returns an error when the channel isn't registered (callers can
-    /// decide to dead-letter/retry) instead of silently succeeding.
     /// F22: releases the channels read lock before the send.
+    /// Returns Ok(()) even when the channel isn't registered (warns and
+    /// drops the message) — existing contract for fire-and-forget callers.
     pub async fn send_to(&self, channel_name: &str, msg: OutgoingMessage) -> Result<()> {
         let channel = {
             let channels = self.channels.read().await;

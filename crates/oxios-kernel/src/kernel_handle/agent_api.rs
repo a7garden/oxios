@@ -61,6 +61,10 @@ impl AgentApi {
     pub fn set_hnsw_index(&mut self, index: Arc<HnswMemoryIndex>) {
         self.hnsw_index = Some(index);
     }
+    /// Check whether an HNSW index is attached for fast semantic search.
+    pub fn has_hnsw_index(&self) -> bool {
+        self.hnsw_index.is_some()
+    }
 
     /// Publish a kernel event if the event bus is available.
     fn publish(&self, event: KernelEvent) {

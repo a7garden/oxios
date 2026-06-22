@@ -1310,7 +1310,14 @@ pub(crate) async fn handle_memory_semantic_search(
     });
     let limit = body.limit.unwrap_or(10);
 
-    // Use semantic search from kernel (HNSW-powered)
+    // Determine which engine was actually used (honest reporting)
+    let engine_label = if state.kernel.agents.has_hnsw_index() {
+        "hnsw"
+    } else {
+        "keyword"
+    };
+
+    // Use semantic search from kernel (HNSW-powered or keyword fallback)
     let hits = state
         .kernel
         .agents
@@ -1337,7 +1344,7 @@ pub(crate) async fn handle_memory_semantic_search(
     Ok(Json(serde_json::json!({
         "count": results.len(),
         "entries": results,
-        "engine": "hnsw",
+        "engine": engine_label,
     })))
 }
 
