@@ -27,8 +27,7 @@ use oxios_kernel::orchestrator::Orchestrator;
 use oxios_kernel::scheduler::AgentScheduler;
 use oxios_kernel::state_store::StateStore;
 use oxios_kernel::supervisor::Supervisor;
-use oxios_ouroboros::protocol::ExecutionResult;
-use oxios_ouroboros::{Directive, ExecEnv};
+use oxios_ouroboros::{Directive, ExecEnv, ExecutionResult};
 
 use oxios_kernel::types::{AgentId, AgentInfo, AgentStatus};
 
@@ -793,12 +792,8 @@ async fn test_scheduler_priority_ordering_in_orchestration() {
         true,
         "/tmp/oxios-test-workspace".to_string(),
     );
-    let _orchestrator = Orchestrator::with_config(
-        event_bus,
-        state_store,
-        lifecycle,
-        make_evolution_config(0),
-    );
+    let _orchestrator =
+        Orchestrator::with_config(event_bus, state_store, lifecycle, make_evolution_config(0));
     // Orchestrator is created successfully — shared state is fine.
 }
 
