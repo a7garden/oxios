@@ -906,6 +906,7 @@ async fn run_agent(
         // set, so no ownership identity is needed here; set `Some(...)` only if
         // oxios agents start using oxi ownership-gated tools.
         session_id: None,
+        ..Default::default()
     };
 
     // ── Build Agent (RFC-014 Phase D) ──

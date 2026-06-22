@@ -52,6 +52,11 @@ pub struct ProjectManager {
 impl ProjectManager {
     /// Create a new ProjectManager, loading existing projects from SQLite.
     pub fn new(db: Arc<MemoryDatabase>, event_bus: Option<EventBus>) -> Result<Self> {
+        // Ensure the schema exists (idempotent).
+        // Mirrors MountManager::new — MemoryDatabase only bootstraps
+        // memory tables, so project tables must be created here.
+        project_db::ensure_project_schema(&db.conn())?;
+
         let mut projects = HashMap::new();
         let mut name_index = HashMap::new();
 
@@ -63,7 +68,6 @@ impl ProjectManager {
         }
 
         tracing::info!(count = projects.len(), "ProjectManager initialized");
-
         Ok(Self {
             projects: RwLock::new(projects),
             name_index: RwLock::new(name_index),

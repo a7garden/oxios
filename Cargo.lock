@@ -1017,7 +1017,7 @@ checksum = "af491d569909a7e4dee0ad7db7f5341fef5c614d5b8ec8cf765732aba3cff681"
 dependencies = [
  "serde",
  "termcolor",
- "unicode-width 0.1.14",
+ "unicode-width 0.2.2",
 ]
 
 [[package]]
@@ -3262,6 +3262,8 @@ version = "0.17.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ed5909b6e89a2db4456e54cd5f673791d7eca6732202bbf2a9cc504fe2f9b84a"
 dependencies = [
+ "allocator-api2",
+ "equivalent",
  "foldhash 0.2.0",
 ]
 
@@ -4360,6 +4362,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "lru"
+version = "0.18.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8a860605968fce16869fd239cf4237a82f3ac470723415db603b0e8b6c8d4fb9"
+dependencies = [
+ "hashbrown 0.17.1",
+]
+
+[[package]]
 name = "lru-slab"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5086,9 +5097,9 @@ checksum = "1a80800c0488c3a21695ea981a54918fbb37abf04f4d0720c453632255e2ff0e"
 
 [[package]]
 name = "oxi-agent"
-version = "0.37.1"
+version = "0.45.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7d85074a318ecd740f3f9755617c5b6559fc12a7a9c23401da0333ebb79cf519"
+checksum = "ab666fc2f45ab93212383a3b92db66867c1d85034a931001843e75ac7788b00e"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5098,6 +5109,7 @@ dependencies = [
  "glob",
  "libc",
  "oxi-ai",
+ "oxi-hashline",
  "oxibrowser",
  "oxibrowser-core",
  "parking_lot",
@@ -5115,9 +5127,9 @@ dependencies = [
 
 [[package]]
 name = "oxi-ai"
-version = "0.37.1"
+version = "0.45.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "41a1fca385ebf4472df1eba19970c3c9c494d1c9db7834ba8abf8240efdbe274"
+checksum = "30b36f6a2d7c78b398950005801612771cd953ecabfe60634e26d99638594d9e"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -5151,10 +5163,24 @@ dependencies = [
 ]
 
 [[package]]
-name = "oxi-sdk"
-version = "0.37.1"
+name = "oxi-hashline"
+version = "0.45.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c0e98cf1d886bb21a03f5acb7c3188f0aa9821206b55dc4345d2df0d5b0ac9b2"
+checksum = "157c0f19163562b313b362339fb772a2ff3c0a91140a3f70ba7487ef3f58645e"
+dependencies = [
+ "async-trait",
+ "lru 0.18.0",
+ "parking_lot",
+ "serde",
+ "thiserror 2.0.18",
+ "xxhash-rust",
+]
+
+[[package]]
+name = "oxi-sdk"
+version = "0.45.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2585237515da211282e95b181f963f6b32969483ca16be595998f388a68078e2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5169,6 +5195,7 @@ dependencies = [
  "oxi-ai",
  "oxibrowser-core",
  "parking_lot",
+ "regex",
  "reqwest",
  "serde",
  "serde_json",
@@ -5480,7 +5507,7 @@ dependencies = [
  "chrono",
  "hf-hub",
  "llama-gguf",
- "lru",
+ "lru 0.10.1",
  "parking_lot",
  "rusqlite",
  "serde",
@@ -9188,6 +9215,12 @@ name = "writeable"
 version = "0.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1ffae5123b2d3fc086436f8834ae3ab053a283cfac8fe0a0b8eaae044768a4c4"
+
+[[package]]
+name = "xxhash-rust"
+version = "0.8.15"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fdd20c5420375476fbd4394763288da7eb0cc0b8c11deed431a91562af7335d3"
 
 [[package]]
 name = "xz2"

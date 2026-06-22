@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **oxi-sdk 0.37.1 → 0.45.1.** Workspace dependency bumped. `oxi-agent`'s `AgentConfig` gained four `#[serde(skip, default)]` fields (`ttsr_engine`, `memory`, `todo`, `agent_pool`); the single construction site in `crates/oxios-kernel/src/agent_runtime.rs::run_agent` now ends with `..Default::default()`. Catalog-port (0.37.0), `ask` tool rename (0.40.0), edition-2024 lift (0.41.x), and `resolve_model_from_id` catalog fallback (0.45.0) are all additive; no source-level behavior change for oxios.
+
+
 ## [1.8.0] - 2026-06-22
 
 ### Added — RFC-028: Web UI Delivery
